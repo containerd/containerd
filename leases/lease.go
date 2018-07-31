@@ -24,10 +24,13 @@ import (
 // Opt is used to set options on a lease
 type Opt func(*Lease) error
 
+// DeleteOpt allows configuring a delete operation
+type DeleteOpt func(context.Context, *DeleteOptions) error
+
 // Manager is used to create, list, and remove leases
 type Manager interface {
 	Create(context.Context, ...Opt) (Lease, error)
-	Delete(context.Context, Lease) error
+	Delete(context.Context, Lease, ...DeleteOpt) error
 	List(context.Context, ...string) ([]Lease, error)
 }
 
@@ -37,6 +40,19 @@ type Lease struct {
 	ID        string
 	CreatedAt time.Time
 	Labels    map[string]string
+}
+
+// DeleteOptions provide options on image delete
+type DeleteOptions struct {
+	Synchronous bool
+}
+
+// SynchronousDelete is used to indicate that a lease deletion and removal of
+// any unreferenced resources should occur synchronously before returning the
+// result.
+func SynchronousDelete(ctx context.Context, o *DeleteOptions) error {
+	o.Synchronous = true
+	return nil
 }
 
 // WithLabels sets labels on a lease

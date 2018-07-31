@@ -94,7 +94,7 @@ func (lm *LeaseManager) Create(ctx context.Context, opts ...leases.Opt) (leases.
 }
 
 // Delete delets the lease with the provided lease ID
-func (lm *LeaseManager) Delete(ctx context.Context, lease leases.Lease) error {
+func (lm *LeaseManager) Delete(ctx context.Context, lease leases.Lease, _ ...leases.DeleteOpt) error {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return err
@@ -102,9 +102,12 @@ func (lm *LeaseManager) Delete(ctx context.Context, lease leases.Lease) error {
 
 	topbkt := getBucket(lm.tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectLeases)
 	if topbkt == nil {
-		return nil
+		return errors.Wrapf(errdefs.ErrNotFound, "lease %q", lease.ID)
 	}
-	if err := topbkt.DeleteBucket([]byte(lease.ID)); err != nil && err != bolt.ErrBucketNotFound {
+	if err := topbkt.DeleteBucket([]byte(lease.ID)); err != nil {
+		if err == bolt.ErrBucketNotFound {
+			err = errors.Wrapf(errdefs.ErrNotFound, "lease %q", lease.ID)
+		}
 		return err
 	}
 	return nil

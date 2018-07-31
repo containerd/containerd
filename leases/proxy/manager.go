@@ -20,6 +20,7 @@ import (
 	"context"
 
 	leasesapi "github.com/containerd/containerd/api/services/leases/v1"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/leases"
 )
 
@@ -47,7 +48,7 @@ func (pm *proxyManager) Create(ctx context.Context, opts ...leases.Opt) (leases.
 		Labels: l.Labels,
 	})
 	if err != nil {
-		return leases.Lease{}, err
+		return leases.Lease{}, errdefs.FromGRPC(err)
 	}
 
 	return leases.Lease{
@@ -57,11 +58,19 @@ func (pm *proxyManager) Create(ctx context.Context, opts ...leases.Opt) (leases.
 	}, nil
 }
 
-func (pm *proxyManager) Delete(ctx context.Context, l leases.Lease) error {
+func (pm *proxyManager) Delete(ctx context.Context, l leases.Lease, opts ...leases.DeleteOpt) error {
+	var do leases.DeleteOptions
+	for _, opt := range opts {
+		if err := opt(ctx, &do); err != nil {
+			return err
+		}
+	}
+
 	_, err := pm.client.Delete(ctx, &leasesapi.DeleteRequest{
-		ID: l.ID,
+		ID:   l.ID,
+		Sync: do.Synchronous,
 	})
-	return err
+	return errdefs.FromGRPC(err)
 }
 
 func (pm *proxyManager) List(ctx context.Context, filters ...string) ([]leases.Lease, error) {
@@ -69,7 +78,7 @@ func (pm *proxyManager) List(ctx context.Context, filters ...string) ([]leases.L
 		Filters: filters,
 	})
 	if err != nil {
-		return nil, err
+		return nil, errdefs.FromGRPC(err)
 	}
 	l := make([]leases.Lease, len(resp.Leases))
 	for i := range resp.Leases {
