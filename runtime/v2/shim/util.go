@@ -49,14 +49,20 @@ func Command(ctx context.Context, runtime, containerdAddress, path string, cmdAr
 	}
 	args = append(args, cmdArgs...)
 	name := BinaryName(runtime)
-	if _, err := exec.LookPath(name); err != nil {
-		if eerr, ok := err.(*exec.Error); ok {
+	var cmdPath string
+	var lerr error
+	if cmdPath, lerr = exec.LookPath(name); lerr != nil {
+		if eerr, ok := lerr.(*exec.Error); ok {
 			if eerr.Err == exec.ErrNotFound {
 				return nil, errors.Wrapf(os.ErrNotExist, "runtime %q binary not installed %q", runtime, name)
 			}
 		}
 	}
-	cmd := exec.Command(name, args...)
+	cmdPath, err = filepath.Abs(cmdPath)
+	if err != nil {
+		return nil, err
+	}
+	cmd := exec.Command(cmdPath, args...)
 	cmd.Dir = path
 	cmd.Env = append(os.Environ(), "GOMAXPROCS=2")
 	cmd.SysProcAttr = getSysProcAttr()
