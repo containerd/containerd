@@ -19,10 +19,13 @@ package images
 import (
 	"fmt"
 
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/cmd/ctr/commands/content"
+	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
@@ -43,7 +46,7 @@ command. As part of this process, we do the following:
 		cli.StringSliceFlag{
 			Name:  "platform",
 			Usage: "Pull content from a specific platform",
-			Value: &cli.StringSlice{platforms.Default()},
+			Value: &cli.StringSlice{},
 		},
 		cli.BoolFlag{
 			Name:  "all-platforms",
@@ -78,11 +81,34 @@ command. As part of this process, we do the following:
 		log.G(ctx).WithField("image", ref).Debug("unpacking")
 
 		// TODO: Show unpack status
-		fmt.Printf("unpacking %s...\n", img.Target().Digest)
-		err = img.Unpack(ctx, context.String("snapshotter"))
-		if err == nil {
-			fmt.Println("done")
+
+		var p []string
+		if context.Bool("all-platforms") {
+			all, err := images.Platforms(ctx, client.ContentStore(), img.Target)
+			if err != nil {
+				return errors.Wrap(err, "unable to resolve image platforms")
+			}
+			p = make([]string, len(all))
+			for i := range all {
+				p[i] = platforms.Format(all[i])
+			}
+		} else {
+			p = context.StringSlice("platform")
 		}
-		return err
+		if len(p) == 0 {
+			p = append(p, platforms.Default())
+		}
+
+		for _, platform := range p {
+			fmt.Printf("unpacking %s %s...\n", platform, img.Target.Digest)
+			i := containerd.NewImageWithPlatform(client, img, platform)
+			err = i.Unpack(ctx, context.String("snapshotter"))
+			if err != nil {
+				return err
+			}
+		}
+
+		fmt.Println("done")
+		return nil
 	},
 }

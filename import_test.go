@@ -39,12 +39,12 @@ func TestOCIExportAndImport(t *testing.T) {
 	}
 	defer client.Close()
 
-	pulled, err := client.Pull(ctx, testImage)
+	pulled, err := client.Fetch(ctx, testImage)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	exported, err := client.Export(ctx, &oci.V1Exporter{}, pulled.Target())
+	exported, err := client.Export(ctx, &oci.V1Exporter{}, pulled.Target)
 	if err != nil {
 		t.Fatal(err)
 	}

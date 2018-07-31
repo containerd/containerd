@@ -40,11 +40,11 @@ func TestOCIExport(t *testing.T) {
 	}
 	defer client.Close()
 
-	pulled, err := client.Pull(ctx, testImage)
+	pulled, err := client.Fetch(ctx, testImage)
 	if err != nil {
 		t.Fatal(err)
 	}
-	exportedStream, err := client.Export(ctx, &oci.V1Exporter{}, pulled.Target())
+	exportedStream, err := client.Export(ctx, &oci.V1Exporter{}, pulled.Target)
 	if err != nil {
 		t.Fatal(err)
 	}

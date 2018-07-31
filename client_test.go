@@ -111,7 +111,7 @@ func TestMain(m *testing.M) {
 	}).Info("running tests against containerd")
 
 	// pull a seed image
-	if _, err = client.Pull(ctx, testImage, WithPullUnpack, WithPlatform(platforms.Default())); err != nil {
+	if _, err = client.Pull(ctx, testImage, WithPullUnpack); err != nil {
 		ctrd.Stop()
 		ctrd.Wait()
 		fmt.Fprintf(os.Stderr, "%s: %s\n", err, buf.String())
@@ -201,11 +201,11 @@ func TestImagePullAllPlatforms(t *testing.T) {
 	defer cancel()
 
 	cs := client.ContentStore()
-	img, err := client.Pull(ctx, testImage)
+	img, err := client.Fetch(ctx, testImage)
 	if err != nil {
 		t.Fatal(err)
 	}
-	index := img.Target()
+	index := img.Target
 	manifests, err := images.Children(ctx, cs, index)
 	if err != nil {
 		t.Fatal(err)
@@ -249,12 +249,12 @@ func TestImagePullSomePlatforms(t *testing.T) {
 		opts = append(opts, WithPlatform(platform))
 	}
 
-	img, err := client.Pull(ctx, "docker.io/library/busybox:latest", opts...)
+	img, err := client.Fetch(ctx, "docker.io/library/busybox:latest", opts...)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	index := img.Target()
+	index := img.Target
 	manifests, err := images.Children(ctx, cs, index)
 	if err != nil {
 		t.Fatal(err)
