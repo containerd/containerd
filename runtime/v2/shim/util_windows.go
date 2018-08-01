@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"syscall"
 	"time"
 
@@ -48,7 +49,25 @@ func SocketAddress(ctx context.Context, id string) (string, error) {
 
 // AnonDialer returns a dialer for a npipe
 func AnonDialer(address string, timeout time.Duration) (net.Conn, error) {
-	return winio.DialPipe(address, &timeout)
+	var c net.Conn
+	var lastError error
+	start := time.Now()
+	for {
+		remaining := timeout - time.Now().Sub(start)
+		if remaining <= 0 {
+			lastError = errors.Errorf("timed out waiting for npipe %s", address)
+			break
+		}
+		c, lastError = winio.DialPipe(address, &remaining)
+		if lastError == nil {
+			break
+		}
+		if !os.IsNotExist(lastError) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return c, lastError
 }
 
 // NewSocket returns a new npipe listener
