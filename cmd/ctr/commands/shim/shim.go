@@ -23,10 +23,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"time"
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/runtime/v2/task"
+	taskgrpc "github.com/containerd/containerd/runtime/v2/task/grpc"
 	tasksvc "github.com/containerd/containerd/runtime/v2/task/ttrpc"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl"
@@ -35,6 +37,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+	"google.golang.org/grpc"
 )
 
 var fifoFlags = []cli.Flag{
@@ -64,6 +67,10 @@ var Command = cli.Command{
 		cli.StringFlag{
 			Name:  "socket",
 			Usage: "socket on which to connect to the shim",
+		},
+		cli.BoolFlag{
+			Name:  "grpc",
+			Usage: " use grpc protocol",
 		},
 	},
 	Subcommands: []cli.Command{
@@ -230,6 +237,21 @@ func getTaskService(context *cli.Context) (tasksvc.TaskService, error) {
 	bindSocket := context.GlobalString("socket")
 	if bindSocket == "" {
 		return nil, errors.New("socket path must be specified")
+	}
+
+	if context.GlobalBool("grpc") {
+		dialOpts := []grpc.DialOption{grpc.WithInsecure(), grpc.WithTimeout(100 * time.Second)}
+		dialOpts = append(dialOpts,
+			grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
+				return net.DialTimeout("unix", "\x00"+bindSocket, timeout)
+			},
+			))
+		conn, err := grpc.Dial(fmt.Sprintf("unix://%s", bindSocket), dialOpts...)
+		if err != nil {
+			return nil, err
+		}
+
+		return taskgrpc.NewTtrpcTaskClient(conn), nil
 	}
 
 	conn, err := net.Dial("unix", "\x00"+bindSocket)
