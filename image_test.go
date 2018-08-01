@@ -45,7 +45,7 @@ func TestImageIsUnpacked(t *testing.T) {
 	}
 
 	// By default pull does not unpack an image
-	image, err := client.Pull(ctx, imageName)
+	image, err := client.Pull(ctx, imageName, WithPlatform("linux/amd64"))
 	if err != nil {
 		t.Fatal(err)
 	}
