@@ -73,8 +73,10 @@ script:
       sudo PATH=$PATH containerd -log-level debug &> /tmp/containerd-cri.log &
       sudo ctr version ;
       sudo PATH=$PATH GOPATH=$GOPATH critest --runtime-endpoint=/var/run/containerd/containerd.sock --parallel=8 ;
-      test $? -ne 0 && cat /tmp/containerd-cri.log ;
+      TEST_RC=$? ;
+      test $TEST_RC -ne 0 && cat /tmp/containerd-cri.log ;
       sudo pkill containerd ;
+      test $TEST_RC -eq 0 || /bin/false ;
     fi
 
 after_success:
