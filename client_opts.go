@@ -18,6 +18,7 @@ package containerd
 
 import (
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
 	"google.golang.org/grpc"
 )
@@ -76,6 +77,9 @@ type RemoteOpt func(*Client, *RemoteContext) error
 // WithPlatform allows the caller to specify a platform to retrieve
 // content for
 func WithPlatform(platform string) RemoteOpt {
+	if platform == "" {
+		platform = platforms.Default()
+	}
 	return func(_ *Client, c *RemoteContext) error {
 		for _, p := range c.Platforms {
 			if p == platform {

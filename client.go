@@ -449,10 +449,7 @@ func (c *Client) GetImage(ctx context.Context, ref string) (Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &image{
-		client: c,
-		i:      i,
-	}, nil
+	return NewImage(c, i), nil
 }
 
 // ListImages returns all existing images
@@ -463,10 +460,7 @@ func (c *Client) ListImages(ctx context.Context, filters ...string) ([]Image, er
 	}
 	images := make([]Image, len(imgs))
 	for i, img := range imgs {
-		images[i] = &image{
-			client: c,
-			i:      img,
-		}
+		images[i] = NewImage(c, img)
 	}
 	return images, nil
 }
