@@ -19,7 +19,7 @@ package containerd
 import (
 	"archive/tar"
 	"context"
-	"errors"
+	"os"
 	"path/filepath"
 
 	introspectionapi "github.com/containerd/containerd/api/services/introspection/v1"
@@ -28,10 +28,11 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/platforms"
+	"github.com/pkg/errors"
 )
 
 // Install a binary image into the opt service
-func (c *Client) Install(ctx context.Context, image Image) error {
+func (c *Client) Install(ctx context.Context, image Image, opts ...InstallOpts) error {
 	resp, err := c.IntrospectionService().Plugins(ctx, &introspectionapi.PluginsRequest{
 		Filters: []string{
 			"id==opt",
@@ -46,6 +47,10 @@ func (c *Client) Install(ctx context.Context, image Image) error {
 	path := resp.Plugins[0].Exports["path"]
 	if path == "" {
 		return errors.New("opt path not exported")
+	}
+	var config InstallConfig
+	for _, o := range opts {
+		o(&config)
 	}
 	var (
 		cs       = image.ContentStore()
@@ -66,8 +71,18 @@ func (c *Client) Install(ctx context.Context, image Image) error {
 			return err
 		}
 		defer r.Close()
-		if _, err := archive.Apply(ctx, path, r, archive.WithFilter(func(hdr *tar.Header) bool {
-			return filepath.Dir(hdr.Name) == "bin"
+		if _, err := archive.Apply(ctx, path, r, archive.WithFilter(func(hdr *tar.Header) (bool, error) {
+			d := filepath.Dir(hdr.Name)
+			result := d == "bin"
+			if config.Libs {
+				result = result || d == "lib"
+			}
+			if result && !config.Replace {
+				if _, err := os.Lstat(filepath.Join(path, hdr.Name)); err == nil {
+					return false, errors.Errorf("cannot replace %s in %s", hdr.Name, path)
+				}
+			}
+			return result, nil
 		})); err != nil {
 			return err
 		}

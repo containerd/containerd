@@ -14,28 +14,25 @@
    limitations under the License.
 */
 
-package runc
+package containerd
 
-import (
-	"context"
-	"os"
-	"os/exec"
-	"syscall"
-)
+// InstallOpts configures binary installs
+type InstallOpts func(*InstallConfig)
 
-func (r *Runc) command(context context.Context, args ...string) *exec.Cmd {
-	command := r.Command
-	if command == "" {
-		command = DefaultCommand
-	}
-	cmd := exec.CommandContext(context, command, append(r.args(), args...)...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: r.Setpgid,
-	}
-	cmd.Env = os.Environ()
-	if r.PdeathSignal != 0 {
-		cmd.SysProcAttr.Pdeathsig = r.PdeathSignal
-	}
+// InstallConfig sets the binary install configuration
+type InstallConfig struct {
+	// Libs installs libs from the image
+	Libs bool
+	// Replace will overwrite existing binaries or libs in the opt directory
+	Replace bool
+}
 
-	return cmd
+// WithInstallLibs installs libs from the image
+func WithInstallLibs(c *InstallConfig) {
+	c.Libs = true
+}
+
+// WithInstallReplace will replace existing files
+func WithInstallReplace(c *InstallConfig) {
+	c.Replace = true
 }

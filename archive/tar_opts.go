@@ -22,11 +22,11 @@ import "archive/tar"
 type ApplyOpt func(options *ApplyOptions) error
 
 // Filter specific files from the archive
-type Filter func(*tar.Header) bool
+type Filter func(*tar.Header) (bool, error)
 
 // all allows all files
-func all(_ *tar.Header) bool {
-	return true
+func all(_ *tar.Header) (bool, error) {
+	return true, nil
 }
 
 // WithFilter uses the filter to select which files are to be extracted.

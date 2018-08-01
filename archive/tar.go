@@ -158,7 +158,11 @@ func applyNaive(ctx context.Context, root string, tr *tar.Reader, options ApplyO
 		// Normalize name, for safety and for a simple is-root check
 		hdr.Name = filepath.Clean(hdr.Name)
 
-		if !options.Filter(hdr) {
+		accept, err := options.Filter(hdr)
+		if err != nil {
+			return 0, err
+		}
+		if !accept {
 			continue
 		}
 

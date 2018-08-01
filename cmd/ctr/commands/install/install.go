@@ -17,6 +17,7 @@
 package install
 
 import (
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/urfave/cli"
 )
@@ -27,6 +28,16 @@ var Command = cli.Command{
 	Usage:       "install a new package",
 	ArgsUsage:   "<ref>",
 	Description: "install a new package",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "libs,l",
+			Usage: "install libs from the image",
+		},
+		cli.BoolFlag{
+			Name:  "replace,r",
+			Usage: "replace any binaries or libs in the opt directory",
+		},
+	},
 	Action: func(context *cli.Context) error {
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -38,6 +49,13 @@ var Command = cli.Command{
 		if err != nil {
 			return err
 		}
-		return client.Install(ctx, image)
+		var opts []containerd.InstallOpts
+		if context.Bool("libs") {
+			opts = append(opts, containerd.WithInstallLibs)
+		}
+		if context.Bool("replace") {
+			opts = append(opts, containerd.WithInstallReplace)
+		}
+		return client.Install(ctx, image, opts...)
 	},
 }
