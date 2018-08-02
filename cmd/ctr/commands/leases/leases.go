@@ -113,7 +113,7 @@ var createCommand = cli.Command{
 		cli.DurationFlag{
 			Name:  "expires, x",
 			Usage: "expiration of lease (0 value will not expire)",
-			Value: 24 * 3600 * time.Second,
+			Value: 24 * time.Hour,
 		},
 	},
 	Action: func(context *cli.Context) error {

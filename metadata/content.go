@@ -420,12 +420,12 @@ func (cs *contentStore) Writer(ctx context.Context, opts ...content.WriterOpt) (
 		}
 		if !leased {
 			// Add timestamp to allow aborting once stale
-			// When lease is set the ingest shoudl be aborted
+			// When lease is set the ingest should be aborted
 			// after lease it belonged to is deleted.
 			// Expiration can be configurable in the future to
 			// give more control to the daemon, however leases
 			// already give users more control of expiration.
-			expireAt := time.Now().UTC().Add(24 * 3600 * time.Second)
+			expireAt := time.Now().UTC().Add(24 * time.Hour)
 			if err := writeExpireAt(expireAt, bkt); err != nil {
 				return err
 			}
