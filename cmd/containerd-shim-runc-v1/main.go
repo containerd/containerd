@@ -28,7 +28,7 @@ import (
 
 func main() {
 	if err := shim.Run(runc.New); err != nil {
-		fmt.Fprintf(os.Stderr, "containerd-shim-run-v1: %s\n", err)
+		fmt.Fprintf(os.Stderr, "containerd-shim-runc-v1: %s\n", err)
 		os.Exit(1)
 	}
 }
