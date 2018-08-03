@@ -55,7 +55,7 @@ func TestGCRoots(t *testing.T) {
 		addContent("ns2", dgst(9), nil),
 		addIngest("ns1", "ingest-1", "", nil),       // will be seen as expired
 		addIngest("ns1", "ingest-2", "", timeIn(0)), // expired
-		addIngest("ns1", "ingest-3", "", timeIn(3600*time.Second)),
+		addIngest("ns1", "ingest-3", "", timeIn(time.Hour)),
 		addIngest("ns2", "ingest-4", "", nil),
 		addIngest("ns2", "ingest-5", dgst(8), nil),
 		addIngest("ns2", "ingest-6", "", nil),      // added to expired lease
@@ -73,7 +73,7 @@ func TestGCRoots(t *testing.T) {
 		addLeaseSnapshot("ns2", "l2", "overlay", "sn6"),
 		addLeaseContent("ns2", "l1", dgst(4)),
 		addLeaseContent("ns2", "l2", dgst(5)),
-		addLease("ns2", "l3", labelmap(string(labelGCExpire), time.Now().Add(3600*time.Second).Format(time.RFC3339))),
+		addLease("ns2", "l3", labelmap(string(labelGCExpire), time.Now().Add(time.Hour).Format(time.RFC3339))),
 		addLeaseContent("ns2", "l3", dgst(6)),
 		addLeaseSnapshot("ns2", "l3", "overlay", "sn7"),
 		addLeaseIngest("ns2", "l3", "ingest-4"),
@@ -156,7 +156,7 @@ func TestGCRemove(t *testing.T) {
 		addSnapshot("ns1", "overlay", "sn3", "", labelmap(string(labelGCRoot), "always")),
 		addSnapshot("ns1", "overlay", "sn4", "", nil),
 		addSnapshot("ns2", "overlay", "sn1", "", nil),
-		addLease("ns1", "l1", labelmap(string(labelGCExpire), time.Now().Add(3600*time.Second).Format(time.RFC3339))),
+		addLease("ns1", "l1", labelmap(string(labelGCExpire), time.Now().Add(time.Hour).Format(time.RFC3339))),
 		addLease("ns2", "l2", labelmap(string(labelGCExpire), time.Now().Format(time.RFC3339))),
 	}
 

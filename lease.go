@@ -34,7 +34,7 @@ func (c *Client) WithLease(ctx context.Context) (context.Context, func(context.C
 
 	ls := c.LeasesService()
 
-	l, err := ls.Create(ctx, leases.WithRandomID(), leases.WithExpiration(24*3600*time.Second))
+	l, err := ls.Create(ctx, leases.WithRandomID(), leases.WithExpiration(24*time.Hour))
 	if err != nil {
 		return nil, nil, err
 	}
