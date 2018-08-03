@@ -1,5 +1,3 @@
-// +build !windows
-
 /*
    Copyright The containerd Authors.
 
@@ -16,9 +14,25 @@
    limitations under the License.
 */
 
-package archive
+package containerd
 
-// ApplyOptions provides additional options for an Apply operation
-type ApplyOptions struct {
-	Filter Filter // Filter tar headers
+// InstallOpts configures binary installs
+type InstallOpts func(*InstallConfig)
+
+// InstallConfig sets the binary install configuration
+type InstallConfig struct {
+	// Libs installs libs from the image
+	Libs bool
+	// Replace will overwrite existing binaries or libs in the opt directory
+	Replace bool
+}
+
+// WithInstallLibs installs libs from the image
+func WithInstallLibs(c *InstallConfig) {
+	c.Libs = true
+}
+
+// WithInstallReplace will replace existing files
+func WithInstallReplace(c *InstallConfig) {
+	c.Replace = true
 }

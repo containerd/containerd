@@ -16,9 +16,6 @@
    limitations under the License.
 */
 
-package archive
+package opt
 
-// ApplyOptions provides additional options for an Apply operation
-type ApplyOptions struct {
-	Filter Filter // Filter tar headers
-}
+const defaultPath = "/opt/containerd"
