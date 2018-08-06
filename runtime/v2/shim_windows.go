@@ -1,5 +1,3 @@
-// +build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -16,13 +14,29 @@
    limitations under the License.
 */
 
-package main
+package v2
 
 import (
-	"github.com/containerd/containerd/runtime/v2/runc"
-	"github.com/containerd/containerd/runtime/v2/shim"
+	"context"
+	"fmt"
+	"io"
+
+	winio "github.com/Microsoft/go-winio"
+	"github.com/containerd/containerd/namespaces"
 )
 
-func main() {
-	shim.Run("io.containerd.runc.v1", runc.New)
+func openShimLog(ctx context.Context, bundle *Bundle) (io.ReadCloser, error) {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return nil, err
+	}
+	l, err := winio.ListenPipe(fmt.Sprintf("\\\\.\\pipe\\containerd-shim-%s-%s-log", ns, bundle.ID), nil)
+	if err != nil {
+		return nil, err
+	}
+	c, err := l.Accept()
+	if err != nil {
+		l.Close()
+	}
+	return c, nil
 }

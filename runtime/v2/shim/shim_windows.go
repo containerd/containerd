@@ -21,6 +21,8 @@ package shim
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -77,6 +79,14 @@ func handleSignals(logger *logrus.Entry, signals chan os.Signal) error {
 			}
 		}
 	}
+}
+
+func openLog(ctx context.Context, id string) (io.Writer, error) {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return winio.DialPipe(fmt.Sprintf("\\\\.\\pipe\\containerd-shim-%s-%s-log", ns, id), nil)
 }
 
 func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event events.Event) error {

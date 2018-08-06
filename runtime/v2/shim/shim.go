@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	shimapi "github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/ttrpc"
@@ -82,15 +83,6 @@ func setRuntime() {
 			debug.FreeOSMemory()
 		}
 	}()
-	if debugFlag {
-		f, err := os.OpenFile("shim.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "open shim log %s", err)
-			os.Exit(1)
-		}
-		logrus.SetLevel(logrus.DebugLevel)
-		logrus.SetOutput(f)
-	}
 	if os.Getenv("GOMAXPROCS") == "" {
 		// If GOMAXPROCS hasn't been set, we default to a value of 2 to reduce
 		// the number of Go stacks present in the shim.
@@ -98,8 +90,31 @@ func setRuntime() {
 	}
 }
 
+func setLogger(ctx context.Context, id string) error {
+	logrus.SetFormatter(&logrus.TextFormatter{
+		TimestampFormat: log.RFC3339NanoFixed,
+		FullTimestamp:   true,
+	})
+	if debugFlag {
+		logrus.SetLevel(logrus.DebugLevel)
+	}
+	f, err := openLog(ctx, id)
+	if err != nil {
+		return err
+	}
+	logrus.SetOutput(f)
+	return nil
+}
+
 // Run initializes and runs a shim server
-func Run(initFunc Init) error {
+func Run(id string, initFunc Init) {
+	if err := run(id, initFunc); err != nil {
+		fmt.Fprintf(os.Stderr, "%s: %s\n", id, err)
+		os.Exit(1)
+	}
+}
+
+func run(id string, initFunc Init) error {
 	parseFlags()
 	setRuntime()
 
@@ -118,6 +133,8 @@ func Run(initFunc Init) error {
 		return fmt.Errorf("shim namespace cannot be empty")
 	}
 	ctx := namespaces.WithNamespace(context.Background(), namespaceFlag)
+	ctx = log.WithLogger(ctx, log.G(ctx).WithField("runtime", id))
+
 	service, err := initFunc(ctx, idFlag, publisher)
 	if err != nil {
 		return err
@@ -151,6 +168,9 @@ func Run(initFunc Init) error {
 		}
 		return nil
 	default:
+		if err := setLogger(ctx, idFlag); err != nil {
+			return err
+		}
 		client := NewShimClient(ctx, service, signals)
 		return client.Serve()
 	}

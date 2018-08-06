@@ -21,6 +21,7 @@ package shim
 import (
 	"bytes"
 	"context"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -29,6 +30,7 @@ import (
 
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/fifo"
 	"github.com/containerd/typeurl"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -82,6 +84,10 @@ func handleSignals(logger *logrus.Entry, signals chan os.Signal) error {
 			}
 		}
 	}
+}
+
+func openLog(ctx context.Context, _ string) (io.Writer, error) {
+	return fifo.OpenFifo(context.Background(), "log", unix.O_WRONLY, 0700)
 }
 
 func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event events.Event) error {

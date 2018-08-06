@@ -18,7 +18,9 @@ package v2
 
 import (
 	"context"
+	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -54,6 +56,25 @@ func loadShim(ctx context.Context, bundle *Bundle, events *exchange.Exchange, rt
 	if err != nil {
 		return nil, err
 	}
+	f, err := openShimLog(ctx, bundle)
+	if err != nil {
+		return nil, errors.Wrap(err, "open shim log pipe")
+	}
+	defer func() {
+		if err != nil {
+			f.Close()
+		}
+	}()
+	// open the log pipe and block until the writer is ready
+	// this helps with syncronization of the shim
+	// copy the shim's logs to containerd's output
+	go func() {
+		defer f.Close()
+		if _, err := io.Copy(os.Stderr, f); err != nil {
+			log.G(ctx).WithError(err).Error("copy shim log")
+		}
+	}()
+
 	client := ttrpc.NewClient(conn)
 	client.OnClose(func() { conn.Close() })
 	s := &shim{
