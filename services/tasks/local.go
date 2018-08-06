@@ -60,20 +60,15 @@ var (
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type: plugin.ServicePlugin,
-		ID:   services.TasksService,
-		Requires: []plugin.Type{
-			plugin.RuntimePlugin,
-			plugin.RuntimePluginV2,
-			plugin.MetadataPlugin,
-			plugin.TaskMonitorPlugin,
-		},
-		InitFn: initFunc,
+		Type:     plugin.ServicePlugin,
+		ID:       services.TasksService,
+		Requires: tasksServiceRequires,
+		InitFn:   initFunc,
 	})
 }
 
 func initFunc(ic *plugin.InitContext) (interface{}, error) {
-	rt, err := ic.GetByType(plugin.RuntimePlugin)
+	runtimes, err := loadV1Runtimes(ic)
 	if err != nil {
 		return nil, err
 	}
@@ -87,20 +82,7 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	runtimes := make(map[string]runtime.PlatformRuntime)
-	for _, rr := range rt {
-		ri, err := rr.Instance()
-		if err != nil {
-			log.G(ic.Context).WithError(err).Warn("could not load runtime instance due to initialization error")
-			continue
-		}
-		r := ri.(runtime.PlatformRuntime)
-		runtimes[r.ID()] = r
-	}
 
-	if len(runtimes) == 0 {
-		return nil, errors.New("no runtimes available to create task service")
-	}
 	monitor, err := ic.Get(plugin.TaskMonitorPlugin)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
