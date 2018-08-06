@@ -1321,3 +1321,38 @@ func TestContainerNoImage(t *testing.T) {
 		t.Fatalf("expected error to be %s but received %s", errdefs.ErrNotFound, err)
 	}
 }
+
+func TestUIDNoGID(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := testContext()
+	defer cancel()
+	id := t.Name()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	image, err := client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithUserID(1000)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx)
+
+	spec, err := container.Spec(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if uid := spec.Process.User.UID; uid != 1000 {
+		t.Fatalf("expected uid 1000 but received %d", uid)
+	}
+	if gid := spec.Process.User.GID; gid != 0 {
+		t.Fatalf("expected gid 0 but received %d", gid)
+	}
+}
