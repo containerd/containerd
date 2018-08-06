@@ -362,7 +362,7 @@ func WithUserID(uid uint32) SpecOpts {
 			})
 			if err != nil {
 				if os.IsNotExist(err) || err == errNoUsersFound {
-					s.Process.User.UID, s.Process.User.GID = uid, uid
+					s.Process.User.UID, s.Process.User.GID = uid, 0
 					return nil
 				}
 				return err
@@ -388,7 +388,7 @@ func WithUserID(uid uint32) SpecOpts {
 			})
 			if err != nil {
 				if os.IsNotExist(err) || err == errNoUsersFound {
-					s.Process.User.UID, s.Process.User.GID = uid, uid
+					s.Process.User.UID, s.Process.User.GID = uid, 0
 					return nil
 				}
 				return err
