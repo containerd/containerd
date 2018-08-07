@@ -1,4 +1,4 @@
-// +build linux
+// +build !windows
 
 /*
    Copyright The containerd Authors.
@@ -16,13 +16,17 @@
    limitations under the License.
 */
 
-package main
+package v2
 
 import (
-	"github.com/containerd/containerd/runtime/v2/runc"
-	"github.com/containerd/containerd/runtime/v2/shim"
+	"context"
+	"io"
+	"path/filepath"
+
+	"github.com/containerd/fifo"
+	"golang.org/x/sys/unix"
 )
 
-func main() {
-	shim.Run("io.containerd.runc.v1", runc.New)
+func openShimLog(ctx context.Context, bundle *Bundle) (io.ReadCloser, error) {
+	return fifo.OpenFifo(ctx, filepath.Join(bundle.Path, "log"), unix.O_RDONLY|unix.O_CREAT|unix.O_NONBLOCK, 0700)
 }

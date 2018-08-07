@@ -19,6 +19,8 @@ package v2
 import (
 	"bytes"
 	"context"
+	"io"
+	"os"
 	"strings"
 
 	eventstypes "github.com/containerd/containerd/api/events"
@@ -49,11 +51,36 @@ type binary struct {
 	rtTasks           *runtime.TaskList
 }
 
-func (b *binary) Start(ctx context.Context) (*shim, error) {
-	cmd, err := client.Command(ctx, b.runtime, b.containerdAddress, b.bundle.Path, "-id", b.bundle.ID, "start")
+func (b *binary) Start(ctx context.Context) (_ *shim, err error) {
+	cmd, err := client.Command(
+		ctx,
+		b.runtime,
+		b.containerdAddress,
+		b.bundle.Path,
+		"-id", b.bundle.ID,
+		"start",
+	)
 	if err != nil {
 		return nil, err
 	}
+	f, err := openShimLog(ctx, b.bundle)
+	if err != nil {
+		return nil, errors.Wrap(err, "open shim log pipe")
+	}
+	defer func() {
+		if err != nil {
+			f.Close()
+		}
+	}()
+	// open the log pipe and block until the writer is ready
+	// this helps with syncronization of the shim
+	// copy the shim's logs to containerd's output
+	go func() {
+		defer f.Close()
+		if _, err := io.Copy(os.Stderr, f); err != nil {
+			log.G(ctx).WithError(err).Error("copy shim log")
+		}
+	}()
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, errors.Wrapf(err, "%s", out)
