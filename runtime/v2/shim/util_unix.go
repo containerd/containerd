@@ -31,6 +31,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const shimBinaryFormat = "containerd-shim-%s-%s"
+
 func getSysProcAttr() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{
 		Setpgid: true,
