@@ -28,7 +28,8 @@ const (
 Please try out the release binaries and report any issues at
 https://github.com/{{.GithubRepo}}/issues.
 
-{{range  $note := .Notes}}
+{{- range  $note := .Notes}}
+
 ### {{$note.Title}}
 
 {{$note.Description}}
@@ -37,11 +38,14 @@ https://github.com/{{.GithubRepo}}/issues.
 ### Contributors
 {{range $contributor := .Contributors}}
 * {{$contributor}}
-{{- end}}
+{{- end -}}
 
-### Changes
-{{range $change := .Changes}}
+{{range $project := .Changes}}
+
+### Changes{{if $project.Name}} from {{$project.Name}}{{end}}
+{{range $change := $project.Changes }}
 * {{$change.Commit}} {{$change.Description}}
+{{- end}}
 {{- end}}
 
 ### Dependency Changes
