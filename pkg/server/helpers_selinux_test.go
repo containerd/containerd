@@ -35,6 +35,7 @@ func TestInitSelinuxOpts(t *testing.T) {
 		selinuxOpt   *runtime.SELinuxOption
 		processLabel string
 		mountLabels  []string
+		expectErr    bool
 	}{
 		"Should return empty strings for processLabel and mountLabel when selinuxOpt is nil": {
 			selinuxOpt:   nil,
@@ -61,12 +62,91 @@ func TestInitSelinuxOpts(t *testing.T) {
 			processLabel: "user_u:user_r:user_t:s0:c1,c2",
 			mountLabels:  []string{"user_u:object_r:container_file_t:s0:c1,c2", "user_u:object_r:svirt_sandbox_file_t:s0:c1,c2"},
 		},
+		"Should return error when the format of 'level' is not correct": {
+			selinuxOpt: &runtime.SELinuxOption{
+				User:  "user_u",
+				Role:  "user_r",
+				Type:  "user_t",
+				Level: "s0,c1,c2",
+			},
+			expectErr: true,
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			processLabel, mountLabel, err := initSelinuxOpts(test.selinuxOpt)
-			assert.NoError(t, err)
-			assert.Equal(t, test.processLabel, processLabel)
-			assert.Contains(t, test.mountLabels, mountLabel)
+			if test.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, test.processLabel, processLabel)
+				assert.Contains(t, test.mountLabels, mountLabel)
+			}
+		})
+	}
+}
+
+func TestCheckSelinuxLevel(t *testing.T) {
+	for desc, test := range map[string]struct {
+		level     string
+		expectErr bool
+	}{
+		"s0": {
+			level: "s0",
+		},
+		"s0-s0": {
+			level: "s0-s0",
+		},
+		"s0:c0": {
+			level: "s0:c0",
+		},
+		"s0:c0.c3": {
+			level: "s0:c0.c3",
+		},
+		"s0:c0,c3": {
+			level: "s0:c0,c3",
+		},
+		"s0-s0:c0,c3": {
+			level: "s0-s0:c0,c3",
+		},
+		"s0-s0:c0,c3.c6": {
+			level: "s0-s0:c0,c3.c6",
+		},
+		"s0-s0:c0,c3.c6,c8.c10": {
+			level: "s0-s0:c0,c3.c6,c8.c10",
+		},
+		"s0-s0:c0,c3.c6,c8,c10": {
+			level: "s0-s0:c0,c3.c6",
+		},
+		"s0,c0,c3": {
+			level:     "s0,c0,c3",
+			expectErr: true,
+		},
+		"s0:c0.c3.c6": {
+			level:     "s0:c0.c3.c6",
+			expectErr: true,
+		},
+		"s0-s0,c0,c3": {
+			level:     "s0-s0,c0,c3",
+			expectErr: true,
+		},
+		"s0-s0:c0.c3.c6": {
+			level:     "s0-s0:c0.c3.c6",
+			expectErr: true,
+		},
+		"s0-s0:c0,c3.c6.c8": {
+			level:     "s0-s0:c0,c3.c6.c8",
+			expectErr: true,
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			ok, err := checkSelinuxLevel(test.level)
+			if test.expectErr {
+				assert.Error(t, err)
+				assert.False(t, ok)
+			} else {
+				assert.NoError(t, err)
+				assert.True(t, ok)
+			}
 		})
 	}
 }
