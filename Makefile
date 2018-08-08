@@ -72,7 +72,7 @@ TEST_REQUIRES_ROOT_PACKAGES=$(filter \
 
 # Project binaries.
 COMMANDS=ctr containerd containerd-stress containerd-release
-MANPAGES=ctr.1 containerd.1 config.toml.5 containerd-config.1
+MANPAGES=ctr.1 containerd.1 containerd-config.1 containerd-config.toml.5
 
 # Build tags seccomp and apparmor are needed by CRI plugin.
 BUILDTAGS ?= seccomp apparmor

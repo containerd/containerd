@@ -91,4 +91,4 @@ Phil Estes <estesp@gmail.com>
 
 ## SEE ALSO
 
-containerd(1), config.toml(5), containerd-config(1)
+containerd(1), containerd-config(1), containerd-config.toml(5)
