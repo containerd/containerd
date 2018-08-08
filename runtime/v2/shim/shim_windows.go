@@ -26,6 +26,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"sync"
 
 	winio "github.com/Microsoft/go-winio"
 	"github.com/containerd/containerd/events"
@@ -81,12 +82,51 @@ func handleSignals(logger *logrus.Entry, signals chan os.Signal) error {
 	}
 }
 
+type deferredShimWriteLogger struct {
+	ctx context.Context
+
+	wg sync.WaitGroup
+
+	c      net.Conn
+	conerr error
+}
+
+func (dswl *deferredShimWriteLogger) Write(p []byte) (int, error) {
+	dswl.wg.Wait()
+	if dswl.c == nil {
+		return 0, dswl.conerr
+	}
+	return dswl.c.Write(p)
+}
+
+// openLog on Windows acts as the server of the log pipe. This allows the
+// containerd daemon to independently restart and reconnect to the logs.
 func openLog(ctx context.Context, id string) (io.Writer, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return winio.DialPipe(fmt.Sprintf("\\\\.\\pipe\\containerd-shim-%s-%s-log", ns, id), nil)
+	l, err := winio.ListenPipe(fmt.Sprintf("\\\\.\\pipe\\containerd-shim-%s-%s-log", ns, id), nil)
+	if err != nil {
+		return nil, err
+	}
+	dswl := &deferredShimWriteLogger{
+		ctx: ctx,
+	}
+	// TODO: JTERRY75 - this will not work with restarts. Only the first
+	// connection will work and all +1 connections will return 'use of closed
+	// network connection'. Make this reconnect aware.
+	dswl.wg.Add(1)
+	go func() {
+		c, conerr := l.Accept()
+		if conerr != nil {
+			l.Close()
+			dswl.conerr = conerr
+		}
+		dswl.c = c
+		dswl.wg.Done()
+	}()
+	return dswl, nil
 }
 
 func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event events.Event) error {
