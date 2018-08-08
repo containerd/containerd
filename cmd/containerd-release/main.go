@@ -18,11 +18,16 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path"
+	"path/filepath"
+	"regexp"
 	"sort"
 	"text/tabwriter"
 	"text/template"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -43,11 +48,22 @@ type dependency struct {
 	Name     string
 	Commit   string
 	Previous string
+	CloneURL string
 }
 
 type download struct {
 	Filename string
 	Hash     string
+}
+
+type projectChange struct {
+	Name    string
+	Changes []change
+}
+
+type projectRename struct {
+	Old string `toml:"old"`
+	New string `toml:"new"`
 }
 
 type release struct {
@@ -59,8 +75,13 @@ type release struct {
 	Preface         string            `toml:"preface"`
 	Notes           map[string]note   `toml:"notes"`
 	BreakingChanges map[string]change `toml:"breaking"`
+
+	// dependency options
+	MatchDeps  string                   `toml:"match_deps"`
+	RenameDeps map[string]projectRename `toml:"rename_deps"`
+
 	// generated fields
-	Changes      []change
+	Changes      []projectChange
 	Contributors []string
 	Dependencies []dependency
 	Version      string
@@ -79,6 +100,10 @@ This tool should be ran from the root of the project repository for a new releas
 			Name:  "dry,n",
 			Usage: "run the release tooling as a dry run to print the release notes to stdout",
 		},
+		cli.BoolFlag{
+			Name:  "debug,d",
+			Usage: "show debug output",
+		},
 		cli.StringFlag{
 			Name:  "template,t",
 			Usage: "template filepath to use in place of the default",
@@ -87,24 +112,47 @@ This tool should be ran from the root of the project repository for a new releas
 	}
 	app.Action = func(context *cli.Context) error {
 		var (
-			path = context.Args().First()
-			tag  = parseTag(path)
+			releasePath = context.Args().First()
+			tag         = parseTag(releasePath)
 		)
-		r, err := loadRelease(path)
+		if context.Bool("debug") {
+			logrus.SetLevel(logrus.DebugLevel)
+		}
+		r, err := loadRelease(releasePath)
 		if err != nil {
 			return err
 		}
 		logrus.Infof("Welcome to the %s release tool...", r.ProjectName)
-		previous, err := getPreviousDeps(r.Previous)
+
+		mailmapPath, err := filepath.Abs(".mailmap")
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to resolve mailmap")
 		}
+		gitConfigs["mailmap.file"] = mailmapPath
+
+		var (
+			contributors   = map[contributor]int{}
+			projectChanges = []projectChange{}
+		)
+
 		changes, err := changelog(r.Previous, r.Commit)
 		if err != nil {
 			return err
 		}
+		if err := addContributors(r.Previous, r.Commit, contributors); err != nil {
+			return err
+		}
+		projectChanges = append(projectChanges, projectChange{
+			Name:    "",
+			Changes: changes,
+		})
+
 		logrus.Infof("creating new release %s with %d new changes...", tag, len(changes))
 		rd, err := fileFromRev(r.Commit, vendorConf)
+		if err != nil {
+			return err
+		}
+		previous, err := getPreviousDeps(r.Previous)
 		if err != nil {
 			return err
 		}
@@ -112,20 +160,72 @@ This tool should be ran from the root of the project repository for a new releas
 		if err != nil {
 			return err
 		}
+		renameDependencies(previous, r.RenameDeps)
 		updatedDeps := updatedDeps(previous, deps)
-		contributors, err := getContributors(r.Previous, r.Commit)
-		if err != nil {
-			return err
-		}
 
 		sort.Slice(updatedDeps, func(i, j int) bool {
 			return updatedDeps[i].Name < updatedDeps[j].Name
 		})
 
+		if r.MatchDeps != "" && len(updatedDeps) > 0 {
+			re, err := regexp.Compile(r.MatchDeps)
+			if err != nil {
+				return errors.Wrap(err, "unable to compile 'match_deps' regexp")
+			}
+			td, err := ioutil.TempDir("", "tmp-clone-")
+			if err != nil {
+				return errors.Wrap(err, "unable to create temp clone directory")
+			}
+			defer os.RemoveAll(td)
+
+			cwd, err := os.Getwd()
+			if err != nil {
+				return errors.Wrap(err, "unable to get cwd")
+			}
+			for _, dep := range updatedDeps {
+				matches := re.FindStringSubmatch(dep.Name)
+				if matches == nil {
+					continue
+				}
+				logrus.Debugf("Matched dependency %s with %s", dep.Name, r.MatchDeps)
+				var name string
+				if len(matches) < 2 {
+					name = path.Base(dep.Name)
+				} else {
+					name = matches[1]
+				}
+				if err := os.Chdir(td); err != nil {
+					return errors.Wrap(err, "unable to chdir to temp clone directory")
+				}
+				git("clone", dep.CloneURL, name)
+
+				if err := os.Chdir(name); err != nil {
+					return errors.Wrapf(err, "unable to chdir to cloned %s directory", name)
+				}
+
+				changes, err := changelog(dep.Previous, dep.Commit)
+				if err != nil {
+					return errors.Wrapf(err, "failed to get changelog for %s", name)
+				}
+				if err := addContributors(dep.Previous, dep.Commit, contributors); err != nil {
+					return errors.Wrapf(err, "failed to get authors for %s", name)
+				}
+
+				projectChanges = append(projectChanges, projectChange{
+					Name:    name,
+					Changes: changes,
+				})
+
+			}
+			if err := os.Chdir(cwd); err != nil {
+				return errors.Wrap(err, "unable to chdir to previous cwd")
+			}
+		}
+
 		// update the release fields with generated data
-		r.Contributors = contributors
+		r.Contributors = orderContributors(contributors)
 		r.Dependencies = updatedDeps
-		r.Changes = changes
+		r.Changes = projectChanges
 		r.Version = tag
 
 		tmpl, err := getTemplate(context)
