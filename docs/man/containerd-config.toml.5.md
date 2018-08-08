@@ -1,13 +1,13 @@
-# config.toml 5 02/02/2018
+# /etc/containerd/config.toml 5 08/08/2018
 
 ## SYNOPSIS
 
 The **config.toml** file is a configuration file for the containerd daemon. The
-file must be placed in **/etc/containerd/** or used with the **--config**
-option of **containerd** to be used by the daemon. If the file does not exist
-at the appropriate location or is not provided via the **--config** option
-containerd uses its default configuration settings, which can be displayed
-with the **containerd config(1)** command.
+file must be placed at **/etc/containerd/config.toml** or specified with the
+**--config** option of **containerd** to be used by the daemon. If the file
+does not exist at the appropriate location or is not provided via the
+**--config** option containerd uses its default configuration settings, which
+can be displayed with the **containerd config(1)** command.
 
 ## DESCRIPTION
 
