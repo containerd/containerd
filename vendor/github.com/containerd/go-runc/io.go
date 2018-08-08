@@ -20,9 +20,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-
-	"github.com/pkg/errors"
-	"golang.org/x/sys/unix"
 )
 
 type IO interface {
@@ -35,51 +32,6 @@ type IO interface {
 
 type StartCloser interface {
 	CloseAfterStart() error
-}
-
-// NewPipeIO creates pipe pairs to be used with runc
-func NewPipeIO(uid, gid int) (i IO, err error) {
-	var pipes []*pipe
-	// cleanup in case of an error
-	defer func() {
-		if err != nil {
-			for _, p := range pipes {
-				p.Close()
-			}
-		}
-	}()
-	stdin, err := newPipe()
-	if err != nil {
-		return nil, err
-	}
-	pipes = append(pipes, stdin)
-	if err = unix.Fchown(int(stdin.r.Fd()), uid, gid); err != nil {
-		return nil, errors.Wrap(err, "failed to chown stdin")
-	}
-
-	stdout, err := newPipe()
-	if err != nil {
-		return nil, err
-	}
-	pipes = append(pipes, stdout)
-	if err = unix.Fchown(int(stdout.w.Fd()), uid, gid); err != nil {
-		return nil, errors.Wrap(err, "failed to chown stdout")
-	}
-
-	stderr, err := newPipe()
-	if err != nil {
-		return nil, err
-	}
-	pipes = append(pipes, stderr)
-	if err = unix.Fchown(int(stderr.w.Fd()), uid, gid); err != nil {
-		return nil, errors.Wrap(err, "failed to chown stderr")
-	}
-
-	return &pipeIO{
-		in:  stdin,
-		out: stdout,
-		err: stderr,
-	}, nil
 }
 
 func newPipe() (*pipe, error) {
