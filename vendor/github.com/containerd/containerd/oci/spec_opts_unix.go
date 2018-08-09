@@ -106,6 +106,12 @@ func WithLinuxNamespace(ns specs.LinuxNamespace) SpecOpts {
 
 // WithImageConfig configures the spec to from the configuration of an Image
 func WithImageConfig(image Image) SpecOpts {
+	return WithImageConfigArgs(image, nil)
+}
+
+// WithImageConfigArgs configures the spec to from the configuration of an Image with additional args that
+// replaces the CMD of the image
+func WithImageConfigArgs(image Image, args []string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
 		ic, err := image.Config(ctx)
 		if err != nil {
@@ -133,6 +139,9 @@ func WithImageConfig(image Image) SpecOpts {
 		setProcess(s)
 		s.Process.Env = append(s.Process.Env, config.Env...)
 		cmd := config.Cmd
+		if len(args) > 0 {
+			cmd = args
+		}
 		s.Process.Args = append(config.Entrypoint, cmd...)
 		cwd := config.WorkingDir
 		if cwd == "" {
@@ -348,8 +357,8 @@ func WithUIDGID(uid, gid uint32) SpecOpts {
 
 // WithUserID sets the correct UID and GID for the container based
 // on the image's /etc/passwd contents. If /etc/passwd does not exist,
-// or uid is not found in /etc/passwd, it sets gid to be the same with
-// uid, and not returns error.
+// or uid is not found in /etc/passwd, it sets the requested uid,
+// additionally sets the gid to 0, and does not return an error.
 func WithUserID(uid uint32) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
 		setProcess(s)
@@ -362,7 +371,7 @@ func WithUserID(uid uint32) SpecOpts {
 			})
 			if err != nil {
 				if os.IsNotExist(err) || err == errNoUsersFound {
-					s.Process.User.UID, s.Process.User.GID = uid, uid
+					s.Process.User.UID, s.Process.User.GID = uid, 0
 					return nil
 				}
 				return err
@@ -388,7 +397,7 @@ func WithUserID(uid uint32) SpecOpts {
 			})
 			if err != nil {
 				if os.IsNotExist(err) || err == errNoUsersFound {
-					s.Process.User.UID, s.Process.User.GID = uid, uid
+					s.Process.User.UID, s.Process.User.GID = uid, 0
 					return nil
 				}
 				return err

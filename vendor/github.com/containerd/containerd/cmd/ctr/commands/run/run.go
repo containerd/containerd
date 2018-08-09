@@ -19,9 +19,7 @@ package run
 import (
 	gocontext "context"
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"strings"
 
 	"github.com/containerd/console"
@@ -36,17 +34,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
-
-func loadSpec(path string, s *specs.Spec) error {
-	raw, err := ioutil.ReadFile(path)
-	if err != nil {
-		return errors.New("cannot load spec config file")
-	}
-	if err := json.Unmarshal(raw, s); err != nil {
-		return errors.Errorf("decoding spec config file failed, current supported OCI runtime-spec : v%s", specs.Version)
-	}
-	return nil
-}
 
 func withMounts(context *cli.Context) oci.SpecOpts {
 	return func(ctx gocontext.Context, client oci.Client, container *containers.Container, s *specs.Spec) error {

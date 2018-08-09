@@ -44,7 +44,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		if err != nil {
 			return nil, err
 		}
-		return client.NewContainer(ctx, id, containerd.WithCheckpoint(im, id))
+		return client.NewContainer(ctx, id, containerd.WithCheckpoint(im, id), containerd.WithRuntime(context.String("runtime"), nil))
 	}
 
 	var (
@@ -52,6 +52,13 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		cOpts []containerd.NewContainerOpts
 		spec  containerd.NewContainerOpts
 	)
+
+	if context.IsSet("config") {
+		opts = append(opts, oci.WithSpecFromFile(context.String("config")))
+	} else {
+		opts = append(opts, oci.WithDefaultSpec())
+	}
+
 	opts = append(opts, oci.WithEnv(context.StringSlice("env")))
 	opts = append(opts, withMounts(context))
 	cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(context.StringSlice("label"))))
@@ -117,15 +124,10 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	if context.IsSet("gpus") {
 		opts = append(opts, nvidia.WithGPUs(nvidia.WithDevices(context.Int("gpus")), nvidia.WithAllCapabilities))
 	}
-	if context.IsSet("config") {
-		var s specs.Spec
-		if err := loadSpec(context.String("config"), &s); err != nil {
-			return nil, err
-		}
-		spec = containerd.WithSpec(&s, opts...)
-	} else {
-		spec = containerd.WithNewSpec(opts...)
-	}
+
+	var s specs.Spec
+	spec = containerd.WithSpec(&s, opts...)
+
 	cOpts = append(cOpts, spec)
 
 	// oci.WithImageConfig (WithUsername, WithUserID) depends on rootfs snapshot for resolving /etc/passwd.

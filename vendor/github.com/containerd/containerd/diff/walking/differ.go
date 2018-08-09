@@ -18,10 +18,10 @@ package walking
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"io"
+	"math/rand"
 	"time"
 
 	"github.com/containerd/containerd/archive"

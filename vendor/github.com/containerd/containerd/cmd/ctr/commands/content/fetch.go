@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/progress"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -56,7 +57,16 @@ not use this implementation as a guide. The end goal should be having metadata,
 content and snapshots ready for a direct use via the 'ctr run'.
 
 Most of this is experimental and there are few leaps to make this work.`,
-	Flags: append(commands.RegistryFlags, commands.LabelFlag),
+	Flags: append(commands.RegistryFlags, commands.LabelFlag,
+		cli.StringSliceFlag{
+			Name:  "platform",
+			Usage: "Pull content from a specific platform",
+		},
+		cli.BoolFlag{
+			Name:  "all-platforms",
+			Usage: "pull content from all platforms",
+		},
+	),
 	Action: func(clicontext *cli.Context) error {
 		var (
 			ref = clicontext.Args().First()
@@ -73,10 +83,10 @@ Most of this is experimental and there are few leaps to make this work.`,
 }
 
 // Fetch loads all resources into the content store and returns the image
-func Fetch(ctx context.Context, client *containerd.Client, ref string, cliContext *cli.Context) (containerd.Image, error) {
+func Fetch(ctx context.Context, client *containerd.Client, ref string, cliContext *cli.Context) (images.Image, error) {
 	resolver, err := commands.GetResolver(ctx, cliContext)
 	if err != nil {
-		return nil, err
+		return images.Image{}, err
 	}
 
 	ongoing := newJobs(ref)
@@ -109,15 +119,19 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, cliContex
 	}
 
 	if !cliContext.Bool("all-platforms") {
-		for _, platform := range cliContext.StringSlice("platform") {
+		p := cliContext.StringSlice("platform")
+		if len(p) == 0 {
+			p = append(p, platforms.Default())
+		}
+		for _, platform := range p {
 			opts = append(opts, containerd.WithPlatform(platform))
 		}
 	}
 
-	img, err := client.Pull(pctx, ref, opts...)
+	img, err := client.Fetch(pctx, ref, opts...)
 	stopProgress()
 	if err != nil {
-		return nil, err
+		return images.Image{}, err
 	}
 
 	<-progress
