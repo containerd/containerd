@@ -108,7 +108,11 @@ func (c *criService) startContainer(ctx context.Context,
 		return cntr.IO, nil
 	}
 
-	task, err := container.NewTask(ctx, ioCreation)
+	var taskOpts []containerd.NewTaskOpts
+	if c.config.NoPivot {
+		taskOpts = append(taskOpts, containerd.WithNoPivotRoot)
+	}
+	task, err := container.NewTask(ctx, ioCreation, taskOpts...)
 	if err != nil {
 		return errors.Wrap(err, "failed to create containerd task")
 	}
