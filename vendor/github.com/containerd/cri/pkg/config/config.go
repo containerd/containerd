@@ -37,6 +37,8 @@ type ContainerdConfig struct {
 	DefaultRuntime Runtime `toml:"default_runtime" json:"defaultRuntime"`
 	// UntrustedWorkloadRuntime is a runtime to run untrusted workloads on it.
 	UntrustedWorkloadRuntime Runtime `toml:"untrusted_workload_runtime" json:"untrustedWorkloadRuntime"`
+	// NoPivot disables pivot-root (linux only), required when running a container in a RamDisk with runc
+	NoPivot bool `toml:"no_pivot" json:"noPivot"`
 }
 
 // CniConfig contains toml config related to cni
@@ -61,16 +63,32 @@ type CniConfig struct {
 // Mirror contains the config related to the registry mirror
 type Mirror struct {
 	// Endpoints are endpoints for a namespace. CRI plugin will try the endpoints
-	// one by one until a working one is found.
+	// one by one until a working one is found. The endpoint must be a valid url
+	// with host specified.
 	Endpoints []string `toml:"endpoint" json:"endpoint"`
-	// TODO (Abhi) We might need to add auth per namespace. Looks like
-	// image auth information is passed by kube itself.
+}
+
+// AuthConfig contains the config related to authentication to a specific registry
+type AuthConfig struct {
+	// Username is the username to login the registry.
+	Username string `toml:"username" json:"username"`
+	// Password is the password to login the registry.
+	Password string `toml:"password" json:"password"`
+	// Auth is a base64 encoded string from the concatenation of the username,
+	// a colon, and the password.
+	Auth string `toml:"auth" json:"auth"`
+	// IdentityToken is used to authenticate the user and get
+	// an access token for the registry.
+	IdentityToken string `toml:"identitytoken" json:"identitytoken"`
 }
 
 // Registry is registry settings configured
 type Registry struct {
 	// Mirrors are namespace to mirror mapping for all namespaces.
 	Mirrors map[string]Mirror `toml:"mirrors" json:"mirrors"`
+	// Auths are registry endpoint to auth config mapping. The registry endpoint must
+	// be a valid url with host specified.
+	Auths map[string]AuthConfig `toml:"auths" json:"auths"`
 }
 
 // PluginConfig contains toml config related to CRI plugin,
@@ -81,7 +99,7 @@ type PluginConfig struct {
 	// CniConfig contains config related to cni
 	CniConfig `toml:"cni" json:"cni"`
 	// Registry contains config related to the registry
-	Registry `toml:"registry" json:"registry"`
+	Registry Registry `toml:"registry" json:"registry"`
 	// StreamServerAddress is the ip address streaming server is listening on.
 	StreamServerAddress string `toml:"stream_server_address" json:"streamServerAddress"`
 	// StreamServerPort is the port streaming server is listening on.
@@ -132,9 +150,10 @@ func DefaultConfig() PluginConfig {
 				Engine: "",
 				Root:   "",
 			},
+			NoPivot: false,
 		},
-		StreamServerAddress:     "",
-		StreamServerPort:        "10010",
+		StreamServerAddress:     "127.0.0.1",
+		StreamServerPort:        "0",
 		EnableSelinux:           false,
 		EnableTLSStreaming:      false,
 		SandboxImage:            "k8s.gcr.io/pause:3.1",
