@@ -17,6 +17,7 @@
 package command
 
 import (
+	gocontext "context"
 	"io"
 	"os"
 
@@ -48,7 +49,7 @@ var configCommand = cli.Command{
 				config := &Config{
 					Config: defaultConfig(),
 				}
-				plugins, err := server.LoadPlugins(config.Config)
+				plugins, err := server.LoadPlugins(gocontext.Background(), config.Config)
 				if err != nil {
 					return err
 				}

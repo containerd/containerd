@@ -59,15 +59,16 @@ func HandleConsoleResize(ctx gocontext.Context, task resizer, con console.Consol
 
 // NewTask creates a new task
 func NewTask(ctx gocontext.Context, client *containerd.Client, container containerd.Container, _ string, tty, nullIO bool, ioOpts []cio.Opt, opts ...containerd.NewTaskOpts) (containerd.Task, error) {
-	ioCreator := cio.NewCreator(append([]cio.Opt{cio.WithStdio}, ioOpts...)...)
+	var ioCreator cio.Creator
 	if tty {
-		ioCreator = cio.NewCreator(append([]cio.Opt{cio.WithStdio, cio.WithTerminal}, ioOpts...)...)
-	}
-	if nullIO {
-		if tty {
+		if nullIO {
 			return nil, errors.New("tty and null-io cannot be used together")
 		}
+		ioCreator = cio.NewCreator(append([]cio.Opt{cio.WithStdio, cio.WithTerminal}, ioOpts...)...)
+	} else if nullIO {
 		ioCreator = cio.NullIO
+	} else {
+		ioCreator = cio.NewCreator(append([]cio.Opt{cio.WithStdio}, ioOpts...)...)
 	}
 	return container.NewTask(ctx, ioCreator)
 }

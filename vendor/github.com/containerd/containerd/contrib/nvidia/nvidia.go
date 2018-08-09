@@ -34,22 +34,31 @@ const nvidiaCLI = "nvidia-container-cli"
 // Capability specifies capabilities for the gpu inside the container
 // Detailed explaination of options can be found:
 // https://github.com/nvidia/nvidia-container-runtime#supported-driver-capabilities
-type Capability int
+type Capability string
 
 const (
 	// Compute capability
-	Compute Capability = iota + 1
+	Compute Capability = "compute"
 	// Compat32 capability
-	Compat32
+	Compat32 Capability = "compat32"
 	// Graphics capability
-	Graphics
+	Graphics Capability = "graphics"
 	// Utility capability
-	Utility
+	Utility Capability = "utility"
 	// Video capability
-	Video
+	Video Capability = "video"
 	// Display capability
-	Display
+	Display Capability = "display"
 )
+
+var allCaps = []Capability{
+	Compute,
+	Compat32,
+	Graphics,
+	Utility,
+	Video,
+	Display,
+}
 
 // WithGPUs adds NVIDIA gpu support to a container
 func WithGPUs(opts ...Opts) oci.SpecOpts {
@@ -60,9 +69,12 @@ func WithGPUs(opts ...Opts) oci.SpecOpts {
 				return err
 			}
 		}
-		path, err := exec.LookPath("containerd")
-		if err != nil {
-			return err
+		if c.OCIHookPath == "" {
+			path, err := exec.LookPath("containerd")
+			if err != nil {
+				return err
+			}
+			c.OCIHookPath = path
 		}
 		nvidiaPath, err := exec.LookPath(nvidiaCLI)
 		if err != nil {
@@ -72,7 +84,7 @@ func WithGPUs(opts ...Opts) oci.SpecOpts {
 			s.Hooks = &specs.Hooks{}
 		}
 		s.Hooks.Prestart = append(s.Hooks.Prestart, specs.Hook{
-			Path: path,
+			Path: c.OCIHookPath,
 			Args: append([]string{
 				"containerd",
 				"oci-hook",
@@ -86,13 +98,13 @@ func WithGPUs(opts ...Opts) oci.SpecOpts {
 }
 
 type config struct {
-	Devices      []int
-	DeviceUUID   string
+	Devices      []string
 	Capabilities []Capability
 	LoadKmods    bool
 	LDCache      string
 	LDConfig     string
 	Requirements []string
+	OCIHookPath  string
 }
 
 func (c *config) args() []string {
@@ -108,13 +120,10 @@ func (c *config) args() []string {
 		"configure",
 	)
 	if len(c.Devices) > 0 {
-		args = append(args, fmt.Sprintf("--device=%s", strings.Join(toStrings(c.Devices), ",")))
-	}
-	if c.DeviceUUID != "" {
-		args = append(args, fmt.Sprintf("--device=%s", c.DeviceUUID))
+		args = append(args, fmt.Sprintf("--device=%s", strings.Join(c.Devices, ",")))
 	}
 	for _, c := range c.Capabilities {
-		args = append(args, fmt.Sprintf("--%s", capFlags[c]))
+		args = append(args, fmt.Sprintf("--%s", c))
 	}
 	if c.LDConfig != "" {
 		args = append(args, fmt.Sprintf("--ldconfig=%s", c.LDConfig))
@@ -126,60 +135,71 @@ func (c *config) args() []string {
 	return args
 }
 
-var capFlags = map[Capability]string{
-	Compute:  "compute",
-	Compat32: "compat32",
-	Graphics: "graphics",
-	Utility:  "utility",
-	Video:    "video",
-	Display:  "display",
-}
-
-func toStrings(ints []int) []string {
-	var s []string
-	for _, i := range ints {
-		s = append(s, strconv.Itoa(i))
-	}
-	return s
-}
-
 // Opts are options for configuring gpu support
 type Opts func(*config) error
 
 // WithDevices adds the provided device indexes to the container
 func WithDevices(ids ...int) Opts {
 	return func(c *config) error {
-		c.Devices = ids
+		for _, i := range ids {
+			c.Devices = append(c.Devices, strconv.Itoa(i))
+		}
 		return nil
 	}
 }
 
-// WithDeviceUUID adds the specific device UUID to the container
-func WithDeviceUUID(guid string) Opts {
+// WithDeviceUUIDs adds the specific device UUID to the container
+func WithDeviceUUIDs(uuids ...string) Opts {
 	return func(c *config) error {
-		c.DeviceUUID = guid
+		c.Devices = append(c.Devices, uuids...)
 		return nil
 	}
 }
 
 // WithAllDevices adds all gpus to the container
 func WithAllDevices(c *config) error {
-	c.DeviceUUID = "all"
+	c.Devices = []string{"all"}
 	return nil
 }
 
 // WithAllCapabilities adds all capabilities to the container for the gpus
 func WithAllCapabilities(c *config) error {
-	for k := range capFlags {
-		c.Capabilities = append(c.Capabilities, k)
-	}
+	c.Capabilities = allCaps
 	return nil
+}
+
+// WithCapabilities adds the specified capabilities to the container for the gpus
+func WithCapabilities(caps ...Capability) Opts {
+	return func(c *config) error {
+		c.Capabilities = append(c.Capabilities, caps...)
+		return nil
+	}
 }
 
 // WithRequiredCUDAVersion sets the required cuda version
 func WithRequiredCUDAVersion(major, minor int) Opts {
 	return func(c *config) error {
 		c.Requirements = append(c.Requirements, fmt.Sprintf("cuda>=%d.%d", major, minor))
+		return nil
+	}
+}
+
+// WithOCIHookPath sets the hook path for the binary
+func WithOCIHookPath(path string) Opts {
+	return func(c *config) error {
+		c.OCIHookPath = path
+		return nil
+	}
+}
+
+// WithLookupOCIHookPath sets the hook path for the binary via a binary name
+func WithLookupOCIHookPath(name string) Opts {
+	return func(c *config) error {
+		path, err := exec.LookPath(name)
+		if err != nil {
+			return err
+		}
+		c.OCIHookPath = path
 		return nil
 	}
 }

@@ -46,8 +46,8 @@ func AppContext(context *cli.Context) (gocontext.Context, gocontext.CancelFunc) 
 }
 
 // NewClient returns a new containerd client
-func NewClient(context *cli.Context) (*containerd.Client, gocontext.Context, gocontext.CancelFunc, error) {
-	client, err := containerd.New(context.GlobalString("address"))
+func NewClient(context *cli.Context, opts ...containerd.ClientOpt) (*containerd.Client, gocontext.Context, gocontext.CancelFunc, error) {
+	client, err := containerd.New(context.GlobalString("address"), opts...)
 	if err != nil {
 		return nil, nil, nil, err
 	}

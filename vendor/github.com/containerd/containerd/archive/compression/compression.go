@@ -43,9 +43,17 @@ var (
 	}
 )
 
+// DecompressReadCloser include the stream after decompress and the compress method detected.
+type DecompressReadCloser interface {
+	io.ReadCloser
+	// GetCompression returns the compress method which is used before decompressing
+	GetCompression() Compression
+}
+
 type readCloserWrapper struct {
 	io.Reader
-	closer func() error
+	compression Compression
+	closer      func() error
 }
 
 func (r *readCloserWrapper) Close() error {
@@ -53,6 +61,10 @@ func (r *readCloserWrapper) Close() error {
 		return r.closer()
 	}
 	return nil
+}
+
+func (r *readCloserWrapper) GetCompression() Compression {
+	return r.compression
 }
 
 type writeCloserWrapper struct {
@@ -84,7 +96,7 @@ func DetectCompression(source []byte) Compression {
 }
 
 // DecompressStream decompresses the archive and returns a ReaderCloser with the decompressed archive.
-func DecompressStream(archive io.Reader) (io.ReadCloser, error) {
+func DecompressStream(archive io.Reader) (DecompressReadCloser, error) {
 	buf := bufioReader32KPool.Get().(*bufio.Reader)
 	buf.Reset(archive)
 	bs, err := buf.Peek(10)
@@ -105,14 +117,14 @@ func DecompressStream(archive io.Reader) (io.ReadCloser, error) {
 	}
 	switch compression := DetectCompression(bs); compression {
 	case Uncompressed:
-		readBufWrapper := &readCloserWrapper{buf, closer}
+		readBufWrapper := &readCloserWrapper{buf, compression, closer}
 		return readBufWrapper, nil
 	case Gzip:
 		gzReader, err := gzip.NewReader(buf)
 		if err != nil {
 			return nil, err
 		}
-		readBufWrapper := &readCloserWrapper{gzReader, closer}
+		readBufWrapper := &readCloserWrapper{gzReader, compression, closer}
 		return readBufWrapper, nil
 	default:
 		return nil, fmt.Errorf("unsupported compression format %s", (&compression).Extension())
