@@ -73,7 +73,11 @@ command. As part of this process, we do the following:
 		}
 		defer done(ctx)
 
-		img, err := content.Fetch(ctx, client, ref, context)
+		config, err := content.NewFetchConfig(ctx, context)
+		if err != nil {
+			return err
+		}
+		img, err := content.Fetch(ctx, client, ref, config)
 		if err != nil {
 			return err
 		}
