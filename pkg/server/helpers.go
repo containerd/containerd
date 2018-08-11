@@ -371,8 +371,7 @@ func initSelinuxOpts(selinuxOpt *runtime.SELinuxOption) (string, string, error) 
 	// Should ignored selinuxOpts if they are incomplete.
 	if selinuxOpt.GetUser() == "" ||
 		selinuxOpt.GetRole() == "" ||
-		selinuxOpt.GetType() == "" ||
-		selinuxOpt.GetLevel() == "" {
+		selinuxOpt.GetType() == "" {
 		return "", "", nil
 	}
 
@@ -391,6 +390,10 @@ func initSelinuxOpts(selinuxOpt *runtime.SELinuxOption) (string, string, error) 
 }
 
 func checkSelinuxLevel(level string) (bool, error) {
+	if len(level) == 0 {
+		return true, nil
+	}
+
 	matched, err := regexp.MatchString(`^s\d(-s\d)??(:c\d{1,4}((.c\d{1,4})?,c\d{1,4})*(.c\d{1,4})?(,c\d{1,4}(.c\d{1,4})?)*)?$`, level)
 	if err != nil || !matched {
 		return false, fmt.Errorf("the format of 'level' %q is not correct: %v", level, err)
