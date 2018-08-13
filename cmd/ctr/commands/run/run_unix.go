@@ -57,73 +57,75 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		opts = append(opts, oci.WithSpecFromFile(context.String("config")))
 	} else {
 		opts = append(opts, oci.WithDefaultSpec(), oci.WithDefaultUnixDevices)
-	}
+		opts = append(opts, oci.WithEnv(context.StringSlice("env")))
+		opts = append(opts, withMounts(context))
 
-	opts = append(opts, oci.WithEnv(context.StringSlice("env")))
-	opts = append(opts, withMounts(context))
-	cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(context.StringSlice("label"))))
-	cOpts = append(cOpts, containerd.WithRuntime(context.String("runtime"), nil))
-	if context.Bool("rootfs") {
-		opts = append(opts, oci.WithRootFSPath(ref))
-	} else {
-		snapshotter := context.String("snapshotter")
-		image, err := client.GetImage(ctx, ref)
-		if err != nil {
-			return nil, err
-		}
-		unpacked, err := image.IsUnpacked(ctx, snapshotter)
-		if err != nil {
-			return nil, err
-		}
-		if !unpacked {
-			if err := image.Unpack(ctx, snapshotter); err != nil {
+		if context.Bool("rootfs") {
+			opts = append(opts, oci.WithRootFSPath(ref))
+		} else {
+			snapshotter := context.String("snapshotter")
+			image, err := client.GetImage(ctx, ref)
+			if err != nil {
 				return nil, err
 			}
+			unpacked, err := image.IsUnpacked(ctx, snapshotter)
+			if err != nil {
+				return nil, err
+			}
+			if !unpacked {
+				if err := image.Unpack(ctx, snapshotter); err != nil {
+					return nil, err
+				}
+			}
+			opts = append(opts, oci.WithImageConfig(image))
+			cOpts = append(cOpts,
+				containerd.WithImage(image),
+				containerd.WithSnapshotter(snapshotter),
+				// Even when "readonly" is set, we don't use KindView snapshot here. (#1495)
+				// We pass writable snapshot to the OCI runtime, and the runtime remounts it as read-only,
+				// after creating some mount points on demand.
+				containerd.WithNewSnapshot(id, image))
 		}
-		opts = append(opts, oci.WithImageConfig(image))
-		cOpts = append(cOpts,
-			containerd.WithImage(image),
-			containerd.WithSnapshotter(snapshotter),
-			// Even when "readonly" is set, we don't use KindView snapshot here. (#1495)
-			// We pass writable snapshot to the OCI runtime, and the runtime remounts it as read-only,
-			// after creating some mount points on demand.
-			containerd.WithNewSnapshot(id, image))
-	}
-	if context.Bool("readonly") {
-		opts = append(opts, oci.WithRootFSReadonly())
-	}
-	if len(args) > 0 {
-		opts = append(opts, oci.WithProcessArgs(args...))
-	}
-	if cwd := context.String("cwd"); cwd != "" {
-		opts = append(opts, oci.WithProcessCwd(cwd))
-	}
-	if context.Bool("tty") {
-		opts = append(opts, oci.WithTTY)
-	}
-	if context.Bool("privileged") {
-		opts = append(opts, oci.WithPrivileged)
-	}
-	if context.Bool("net-host") {
-		opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace), oci.WithHostHostsFile, oci.WithHostResolvconf)
-	}
-	joinNs := context.StringSlice("with-ns")
-	for _, ns := range joinNs {
-		parts := strings.Split(ns, ":")
-		if len(parts) != 2 {
-			return nil, errors.New("joining a Linux namespace using --with-ns requires the format 'nstype:path'")
+		if context.Bool("readonly") {
+			opts = append(opts, oci.WithRootFSReadonly())
 		}
-		if !validNamespace(parts[0]) {
-			return nil, errors.New("the Linux namespace type specified in --with-ns is not valid: " + parts[0])
+		if len(args) > 0 {
+			opts = append(opts, oci.WithProcessArgs(args...))
 		}
-		opts = append(opts, oci.WithLinuxNamespace(specs.LinuxNamespace{
-			Type: specs.LinuxNamespaceType(parts[0]),
-			Path: parts[1],
-		}))
+		if cwd := context.String("cwd"); cwd != "" {
+			opts = append(opts, oci.WithProcessCwd(cwd))
+		}
+		if context.Bool("tty") {
+			opts = append(opts, oci.WithTTY)
+		}
+		if context.Bool("privileged") {
+			opts = append(opts, oci.WithPrivileged)
+		}
+		if context.Bool("net-host") {
+			opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace), oci.WithHostHostsFile, oci.WithHostResolvconf)
+		}
+
+		joinNs := context.StringSlice("with-ns")
+		for _, ns := range joinNs {
+			parts := strings.Split(ns, ":")
+			if len(parts) != 2 {
+				return nil, errors.New("joining a Linux namespace using --with-ns requires the format 'nstype:path'")
+			}
+			if !validNamespace(parts[0]) {
+				return nil, errors.New("the Linux namespace type specified in --with-ns is not valid: " + parts[0])
+			}
+			opts = append(opts, oci.WithLinuxNamespace(specs.LinuxNamespace{
+				Type: specs.LinuxNamespaceType(parts[0]),
+				Path: parts[1],
+			}))
+		}
+		if context.IsSet("gpus") {
+			opts = append(opts, nvidia.WithGPUs(nvidia.WithDevices(context.Int("gpus")), nvidia.WithAllCapabilities))
+		}
 	}
-	if context.IsSet("gpus") {
-		opts = append(opts, nvidia.WithGPUs(nvidia.WithDevices(context.Int("gpus")), nvidia.WithAllCapabilities))
-	}
+
+	cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(context.StringSlice("label"))))
+	cOpts = append(cOpts, containerd.WithRuntime(context.String("runtime"), nil))
 
 	var s specs.Spec
 	spec = containerd.WithSpec(&s, opts...)
