@@ -16,8 +16,16 @@
    limitations under the License.
 */
 
-package diff
+package platforms
 
-var defaultDifferConfig = &config{
-	Order: []string{"windows", "windows-lcow"},
+import (
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
+)
+
+// Default returns the default matcher for the platform.
+func Default() MatchComparer {
+	return Ordered(DefaultSpec(), specs.Platform{
+		OS:           "linux",
+		Architecture: "amd64",
+	})
 }

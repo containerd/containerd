@@ -1,4 +1,4 @@
-// +build windows
+// +build !windows
 
 /*
    Copyright The containerd Authors.
@@ -16,8 +16,13 @@
    limitations under the License.
 */
 
-package diff
+package v2
 
-var defaultDifferConfig = &config{
-	Order: []string{"windows", "windows-lcow"},
+import (
+	"github.com/containerd/containerd/platforms"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+)
+
+func supportedPlatforms() []ocispec.Platform {
+	return []ocispec.Platform{platforms.DefaultSpec()}
 }
