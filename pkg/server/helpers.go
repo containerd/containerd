@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -370,9 +371,14 @@ func initSelinuxOpts(selinuxOpt *runtime.SELinuxOption) (string, string, error) 
 	// Should ignored selinuxOpts if they are incomplete.
 	if selinuxOpt.GetUser() == "" ||
 		selinuxOpt.GetRole() == "" ||
-		selinuxOpt.GetType() == "" ||
-		selinuxOpt.GetLevel() == "" {
+		selinuxOpt.GetType() == "" {
 		return "", "", nil
+	}
+
+	// make sure the format of "level" is correct.
+	ok, err := checkSelinuxLevel(selinuxOpt.GetLevel())
+	if err != nil || !ok {
+		return "", "", err
 	}
 
 	labelOpts := fmt.Sprintf("%s:%s:%s:%s",
@@ -381,6 +387,18 @@ func initSelinuxOpts(selinuxOpt *runtime.SELinuxOption) (string, string, error) 
 		selinuxOpt.GetType(),
 		selinuxOpt.GetLevel())
 	return label.InitLabels(selinux.DupSecOpt(labelOpts))
+}
+
+func checkSelinuxLevel(level string) (bool, error) {
+	if len(level) == 0 {
+		return true, nil
+	}
+
+	matched, err := regexp.MatchString(`^s\d(-s\d)??(:c\d{1,4}((.c\d{1,4})?,c\d{1,4})*(.c\d{1,4})?(,c\d{1,4}(.c\d{1,4})?)*)?$`, level)
+	if err != nil || !matched {
+		return false, fmt.Errorf("the format of 'level' %q is not correct: %v", level, err)
+	}
+	return true, nil
 }
 
 // isInCRIMounts checks whether a destination is in CRI mount list.

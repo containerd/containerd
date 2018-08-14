@@ -19,6 +19,7 @@ limitations under the License.
 package server
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/opencontainers/selinux/go-selinux"
@@ -35,6 +36,7 @@ func TestInitSelinuxOpts(t *testing.T) {
 		selinuxOpt   *runtime.SELinuxOption
 		processLabel string
 		mountLabels  []string
+		expectErr    bool
 	}{
 		"Should return empty strings for processLabel and mountLabel when selinuxOpt is nil": {
 			selinuxOpt:   nil,
@@ -61,12 +63,108 @@ func TestInitSelinuxOpts(t *testing.T) {
 			processLabel: "user_u:user_r:user_t:s0:c1,c2",
 			mountLabels:  []string{"user_u:object_r:container_file_t:s0:c1,c2", "user_u:object_r:svirt_sandbox_file_t:s0:c1,c2"},
 		},
+		"Should be resolved correctly when selinuxOpt has been initialized with level=''": {
+			selinuxOpt: &runtime.SELinuxOption{
+				User:  "user_u",
+				Role:  "user_r",
+				Type:  "user_t",
+				Level: "",
+			},
+			processLabel: "user_u:user_r:user_t:s0",
+			mountLabels:  []string{"user_u:object_r:container_file_t:s0", "user_u:object_r:svirt_sandbox_file_t:s0"},
+		},
+		"Should return error when the format of 'level' is not correct": {
+			selinuxOpt: &runtime.SELinuxOption{
+				User:  "user_u",
+				Role:  "user_r",
+				Type:  "user_t",
+				Level: "s0,c1,c2",
+			},
+			expectErr: true,
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			processLabel, mountLabel, err := initSelinuxOpts(test.selinuxOpt)
-			assert.NoError(t, err)
-			assert.Equal(t, test.processLabel, processLabel)
-			assert.Contains(t, test.mountLabels, mountLabel)
+			if test.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				if test.selinuxOpt == nil || test.selinuxOpt.Level != "" {
+					assert.Equal(t, test.processLabel, processLabel)
+					assert.Contains(t, test.mountLabels, mountLabel)
+				} else {
+					assert.Equal(t, 0, strings.LastIndex(processLabel, test.processLabel))
+					contain := strings.LastIndex(mountLabel, test.mountLabels[0]) == 0 ||
+						strings.LastIndex(mountLabel, test.mountLabels[1]) == 0
+					assert.True(t, contain)
+				}
+			}
+		})
+	}
+}
+
+func TestCheckSelinuxLevel(t *testing.T) {
+	for desc, test := range map[string]struct {
+		level     string
+		expectErr bool
+	}{
+		"s0": {
+			level: "s0",
+		},
+		"s0-s0": {
+			level: "s0-s0",
+		},
+		"s0:c0": {
+			level: "s0:c0",
+		},
+		"s0:c0.c3": {
+			level: "s0:c0.c3",
+		},
+		"s0:c0,c3": {
+			level: "s0:c0,c3",
+		},
+		"s0-s0:c0,c3": {
+			level: "s0-s0:c0,c3",
+		},
+		"s0-s0:c0,c3.c6": {
+			level: "s0-s0:c0,c3.c6",
+		},
+		"s0-s0:c0,c3.c6,c8.c10": {
+			level: "s0-s0:c0,c3.c6,c8.c10",
+		},
+		"s0-s0:c0,c3.c6,c8,c10": {
+			level: "s0-s0:c0,c3.c6",
+		},
+		"s0,c0,c3": {
+			level:     "s0,c0,c3",
+			expectErr: true,
+		},
+		"s0:c0.c3.c6": {
+			level:     "s0:c0.c3.c6",
+			expectErr: true,
+		},
+		"s0-s0,c0,c3": {
+			level:     "s0-s0,c0,c3",
+			expectErr: true,
+		},
+		"s0-s0:c0.c3.c6": {
+			level:     "s0-s0:c0.c3.c6",
+			expectErr: true,
+		},
+		"s0-s0:c0,c3.c6.c8": {
+			level:     "s0-s0:c0,c3.c6.c8",
+			expectErr: true,
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			ok, err := checkSelinuxLevel(test.level)
+			if test.expectErr {
+				assert.Error(t, err)
+				assert.False(t, ok)
+			} else {
+				assert.NoError(t, err)
+				assert.True(t, ok)
+			}
 		})
 	}
 }
