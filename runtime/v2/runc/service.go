@@ -98,8 +98,7 @@ type service struct {
 	ec        chan runcC.Exit
 	ep        *epoller
 
-	id string
-	// Filled by Create()
+	id     string
 	bundle string
 	cg     cgroups.Cgroup
 }
