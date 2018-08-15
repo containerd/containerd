@@ -56,7 +56,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	if context.IsSet("config") {
 		opts = append(opts, oci.WithSpecFromFile(context.String("config")))
 	} else {
-		opts = append(opts, oci.WithDefaultSpec())
+		opts = append(opts, oci.WithDefaultSpec(), oci.WithDefaultUnixDevices)
 	}
 
 	opts = append(opts, oci.WithEnv(context.StringSlice("env")))

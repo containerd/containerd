@@ -602,6 +602,110 @@ func WithSeccompUnconfined(_ context.Context, _ Client, _ *containers.Container,
 	return nil
 }
 
+// WithParentCgroupDevices uses the default cgroup setup to inherit the container's parent cgroup's
+// allowed and denied devices
+func WithParentCgroupDevices(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+	setLinux(s)
+	if s.Linux.Resources == nil {
+		s.Linux.Resources = &specs.LinuxResources{}
+	}
+	s.Linux.Resources.Devices = nil
+	return nil
+}
+
+// WithDefaultUnixDevices adds the default devices for unix such as /dev/null, /dev/random to
+// the container's resource cgroup spec
+func WithDefaultUnixDevices(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+	setLinux(s)
+	if s.Linux.Resources == nil {
+		s.Linux.Resources = &specs.LinuxResources{}
+	}
+	intptr := func(i int64) *int64 {
+		return &i
+	}
+	s.Linux.Resources.Devices = append(s.Linux.Resources.Devices, []specs.LinuxDeviceCgroup{
+		{
+			// "/dev/null",
+			Type:   "c",
+			Major:  intptr(1),
+			Minor:  intptr(3),
+			Access: rwm,
+			Allow:  true,
+		},
+		{
+			// "/dev/random",
+			Type:   "c",
+			Major:  intptr(1),
+			Minor:  intptr(8),
+			Access: rwm,
+			Allow:  true,
+		},
+		{
+			// "/dev/full",
+			Type:   "c",
+			Major:  intptr(1),
+			Minor:  intptr(7),
+			Access: rwm,
+			Allow:  true,
+		},
+		{
+			// "/dev/tty",
+			Type:   "c",
+			Major:  intptr(5),
+			Minor:  intptr(0),
+			Access: rwm,
+			Allow:  true,
+		},
+		{
+			// "/dev/zero",
+			Type:   "c",
+			Major:  intptr(1),
+			Minor:  intptr(5),
+			Access: rwm,
+			Allow:  true,
+		},
+		{
+			// "/dev/urandom",
+			Type:   "c",
+			Major:  intptr(1),
+			Minor:  intptr(9),
+			Access: rwm,
+			Allow:  true,
+		},
+		{
+			// "/dev/console",
+			Type:   "c",
+			Major:  intptr(5),
+			Minor:  intptr(1),
+			Access: rwm,
+			Allow:  true,
+		},
+		// /dev/pts/ - pts namespaces are "coming soon"
+		{
+			Type:   "c",
+			Major:  intptr(136),
+			Access: rwm,
+			Allow:  true,
+		},
+		{
+			Type:   "c",
+			Major:  intptr(5),
+			Minor:  intptr(2),
+			Access: rwm,
+			Allow:  true,
+		},
+		{
+			// tuntap
+			Type:   "c",
+			Major:  intptr(10),
+			Minor:  intptr(200),
+			Access: rwm,
+			Allow:  true,
+		},
+	}...)
+	return nil
+}
+
 // WithPrivileged sets up options for a privileged container
 // TODO(justincormack) device handling
 var WithPrivileged = Compose(
