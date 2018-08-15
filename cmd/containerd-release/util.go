@@ -19,7 +19,6 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -30,6 +29,8 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -65,9 +66,18 @@ func parseDependencies(r io.Reader) ([]dependency, error) {
 		if len(parts) != 2 && len(parts) != 3 {
 			return nil, fmt.Errorf("invalid config format: %s", ln)
 		}
+
+		var cloneURL string
+		if len(parts) == 3 {
+			cloneURL = parts[2]
+		} else {
+			cloneURL = "git://" + parts[0]
+		}
+
 		deps = append(deps, dependency{
-			Name:   parts[0],
-			Commit: parts[1],
+			Name:     parts[0],
+			Commit:   parts[1],
+			CloneURL: cloneURL,
 		})
 	}
 	if err := s.Err(); err != nil {
@@ -92,8 +102,15 @@ func changelog(previous, commit string) ([]change, error) {
 	return parseChangelog(raw)
 }
 
+func gitChangeDiff(previous, commit string) string {
+	if previous != "" {
+		return fmt.Sprintf("%s..%s", previous, commit)
+	}
+	return commit
+}
+
 func getChangelog(previous, commit string) ([]byte, error) {
-	return git("log", "--oneline", fmt.Sprintf("%s..%s", previous, commit))
+	return git("log", "--oneline", gitChangeDiff(previous, commit))
 }
 
 func parseChangelog(changelog []byte) ([]change, error) {
@@ -123,12 +140,42 @@ func fileFromRev(rev, file string) (io.Reader, error) {
 	return bytes.NewReader(p), nil
 }
 
+var gitConfigs = map[string]string{}
+
 func git(args ...string) ([]byte, error) {
-	o, err := exec.Command("git", args...).CombinedOutput()
+	var gitArgs []string
+	for k, v := range gitConfigs {
+		gitArgs = append(gitArgs, "-c", fmt.Sprintf("%s=%s", k, v))
+	}
+	gitArgs = append(gitArgs, args...)
+	o, err := exec.Command("git", gitArgs...).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", err, o)
 	}
 	return o, nil
+}
+
+func renameDependencies(deps []dependency, renames map[string]projectRename) {
+	if len(renames) == 0 {
+		return
+	}
+	type dep struct {
+		shortname string
+		name      string
+	}
+	renameMap := map[string]dep{}
+	for shortname, rename := range renames {
+		renameMap[rename.Old] = dep{
+			shortname: shortname,
+			name:      rename.New,
+		}
+	}
+	for i := range deps {
+		if updated, ok := renameMap[deps[i].Name]; ok {
+			logrus.Debugf("Renamed %s from %s to %s", updated.shortname, deps[i].Name, updated.name)
+			deps[i].Name = updated.name
+		}
+	}
 }
 
 func updatedDeps(previous, deps []dependency) []dependency {
@@ -159,27 +206,61 @@ func toDepMap(deps []dependency) map[string]dependency {
 	return out
 }
 
-func getContributors(previous, commit string) ([]string, error) {
-	raw, err := git("log", "--format=%aN", fmt.Sprintf("%s..%s", previous, commit))
+type contributor struct {
+	name  string
+	email string
+}
+
+func addContributors(previous, commit string, contributors map[contributor]int) error {
+	raw, err := git("log", `--format=%aE %aN`, gitChangeDiff(previous, commit))
 	if err != nil {
-		return nil, err
+		return err
 	}
-	var (
-		set = make(map[string]struct{})
-		s   = bufio.NewScanner(bytes.NewReader(raw))
-		out []string
-	)
+	s := bufio.NewScanner(bytes.NewReader(raw))
 	for s.Scan() {
-		set[s.Text()] = struct{}{}
+		p := strings.SplitN(s.Text(), " ", 2)
+		if len(p) != 2 {
+			return errors.Errorf("invalid author line: %q", s.Text())
+		}
+		c := contributor{
+			name:  p[1],
+			email: p[0],
+		}
+		contributors[c] = contributors[c] + 1
 	}
 	if err := s.Err(); err != nil {
-		return nil, err
+		return err
 	}
-	for name := range set {
-		out = append(out, name)
+	return nil
+}
+
+func orderContributors(contributors map[contributor]int) []string {
+	type contribstat struct {
+		name  string
+		email string
+		count int
 	}
-	sort.Strings(out)
-	return out, nil
+	all := make([]contribstat, 0, len(contributors))
+	for c, count := range contributors {
+		all = append(all, contribstat{
+			name:  c.name,
+			email: c.email,
+			count: count,
+		})
+	}
+	sort.Slice(all, func(i, j int) bool {
+		if all[i].count == all[j].count {
+			return all[i].name < all[j].name
+		}
+		return all[i].count > all[j].count
+	})
+	names := make([]string, len(all))
+	for i := range names {
+		logrus.Debugf("Contributor: %s <%s> with %d commits", all[i].name, all[i].email, all[i].count)
+		names[i] = all[i].name
+	}
+
+	return names
 }
 
 // getTemplate will use a builtin template if the template is not specified on the cli
