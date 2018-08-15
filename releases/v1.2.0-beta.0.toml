@@ -1,0 +1,43 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.1.0"
+
+pre_release = true
+
+preface = """\
+After two major releases of containerd, we have brought back the beta releases to
+introduce a new runtime interface and new APIs. The 1.2 release will be fully
+backwards compatibility and have no API breakage. The API additions included in
+this release is focused on making containerd more extensible and cover more user
+cases.
+
+### New V2 Runtime
+
+A new v2 runtime has been added with a stable gRPC interface for managing
+containers through external plugins.
+
+### New Proxy Plugins
+
+A new proxy plugin configuration has been added to allow external snapshotters
+be connected to containerd using gRPC.
+
+### API Changes
+
+Minor API additions
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
+
+[rename_deps]
+	[rename_deps.ttrpc]
+	old = "github.com/stevvooe/ttrpc"
+	new = "github.com/containerd/ttrpc"
