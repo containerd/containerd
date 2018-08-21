@@ -70,13 +70,13 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			return newService(cs.(content.Store)), nil
+			return NewService(cs.(content.Store)), nil
 		},
 	})
 }
 
-// newService returns the content GRPC server
-func newService(cs content.Store) api.ContentServer {
+// NewService returns the content GRPC server
+func NewService(cs content.Store) api.ContentServer {
 	return &service{store: cs}
 }
 
