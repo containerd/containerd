@@ -30,11 +30,15 @@ const pipeRoot = `\\.\pipe`
 
 // NewFIFOSetInDir returns a new set of fifos for the task
 func NewFIFOSetInDir(_, id string, terminal bool) (*FIFOSet, error) {
+	stderr := fmt.Sprintf(`%s\ctr-%s-stderr`, pipeRoot, id)
+	if terminal {
+		stderr = ""
+	}
 	return NewFIFOSet(Config{
 		Terminal: terminal,
 		Stdin:    fmt.Sprintf(`%s\ctr-%s-stdin`, pipeRoot, id),
 		Stdout:   fmt.Sprintf(`%s\ctr-%s-stdout`, pipeRoot, id),
-		Stderr:   fmt.Sprintf(`%s\ctr-%s-stderr`, pipeRoot, id),
+		Stderr:   stderr,
 	}, nil), nil
 }
 
