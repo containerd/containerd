@@ -1,5 +1,3 @@
-// +build ignore
-
 /*
    Copyright The containerd Authors.
 
@@ -23,15 +21,13 @@ import (
 	"github.com/containerd/containerd/runtime"
 )
 
-// TODO: JTERRY75 - When Windows V1 runtime is removed change this to only build
-// on Windows.
 var tasksServiceRequires = []plugin.Type{
 	plugin.RuntimePluginV2,
 	plugin.MetadataPlugin,
 	plugin.TaskMonitorPlugin,
 }
 
-// loadV1Runtimes on Windows V2 returns an empty map. There are no v1 runtimes
+// loadV1Runtimes on Windows there are no v1 runtimes
 func loadV1Runtimes(ic *plugin.InitContext) (map[string]runtime.PlatformRuntime, error) {
 	return make(map[string]runtime.PlatformRuntime), nil
 }
