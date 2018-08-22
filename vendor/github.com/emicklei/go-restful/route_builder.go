@@ -89,7 +89,7 @@ func (b *RouteBuilder) Doc(documentation string) *RouteBuilder {
 	return b
 }
 
-// A verbose explanation of the operation behavior. Optional.
+// Notes is a verbose explanation of the operation behavior. Optional.
 func (b *RouteBuilder) Notes(notes string) *RouteBuilder {
 	b.notes = notes
 	return b
