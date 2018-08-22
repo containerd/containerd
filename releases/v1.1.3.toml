@@ -1,0 +1,38 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.1.2"
+
+pre_release = false
+
+preface = """\
+This is the third patch release for the `containerd` 1.1 release. This
+release includes a new config option in CRI plugin and several bug fixes
+in containerd client, ctr and native snapshotter.
+
+Containerd now sets gid to 0 if it is not specified. This matches the docker
+behavior. The change was applied to containerd client, `ctr` and CRI plugin.
+
+## CRI Plugin
+Add `no_pivot` config option. It is useful when running containerd on
+ramdisk.
+
+## ctr
+Fix a bug in `ctr run` that the `--no-pivot` and `--rootfs` flags are missing.
+
+## Native Snapshotter
+Fix a bug in the native snapshotter that the permission bits of `/`
+is set to `0700` unexpectedly. It is now set to `0755`.
+
+Please see the changelog for full details.
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
