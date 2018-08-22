@@ -143,6 +143,7 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 			cmd = args
 		}
 		s.Process.Args = append(config.Entrypoint, cmd...)
+
 		cwd := config.WorkingDir
 		if cwd == "" {
 			cwd = "/"
