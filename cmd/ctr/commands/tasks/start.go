@@ -65,13 +65,21 @@ var startCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-
 		var (
 			tty    = spec.Process.Terminal
 			opts   = getNewTaskOpts(context)
 			ioOpts = []cio.Opt{cio.WithFIFODir(context.String("fifo-dir"))}
 		)
-		task, err := NewTask(ctx, client, container, "", tty, context.Bool("null-io"), ioOpts, opts...)
+		var con console.Console
+		if tty {
+			con = console.Current()
+			defer con.Reset()
+			if err := con.SetRaw(); err != nil {
+				return err
+			}
+		}
+
+		task, err := NewTask(ctx, client, container, "", con, context.Bool("null-io"), ioOpts, opts...)
 		if err != nil {
 			return err
 		}
@@ -86,14 +94,6 @@ var startCommand = cli.Command{
 			return err
 		}
 
-		var con console.Console
-		if tty {
-			con = console.Current()
-			defer con.Reset()
-			if err := con.SetRaw(); err != nil {
-				return err
-			}
-		}
 		if err := task.Start(ctx); err != nil {
 			return err
 		}
