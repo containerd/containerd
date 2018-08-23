@@ -252,14 +252,14 @@ var infoCommand = cli.Command{
 			return err
 		}
 
-		if (cc.Spec != nil && cc.Spec.Value != nil) {
+		if (info.Spec != nil && info.Spec.Value != nil) {
 			type c containers.Container
 			type SpecDecode struct {
 				TypeUrl string `json:"type_url,omitempty"`
 				Value *interface{} `json:"value,omitempty"`
 			}
 
-			cc := c(container)
+			cc := c(info)
 
 			var s interface{}
 			if err := json.Unmarshal(cc.Spec.Value, &s); err != nil {
