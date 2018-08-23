@@ -51,9 +51,9 @@ type pipe struct {
 }
 
 func (p *pipe) Close() error {
-	err := p.r.Close()
-	if werr := p.w.Close(); err == nil {
-		err = werr
+	err := p.w.Close()
+	if rerr := p.r.Close(); err == nil {
+		err = rerr
 	}
 	return err
 }
