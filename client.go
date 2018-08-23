@@ -203,9 +203,15 @@ func (c *Client) IsServing(ctx context.Context) (bool, error) {
 	return r.Status == grpc_health_v1.HealthCheckResponse_SERVING, nil
 }
 
+// ContainersInfo returns all containers created in containerd
+func (c *Client) ContainersInfo(ctx context.Context, filters ...string) ([]containers.Container, error) {
+	r, err := c.ContainerService().List(ctx, filters...)
+	return r, err
+}
+
 // Containers returns all containers created in containerd
 func (c *Client) Containers(ctx context.Context, filters ...string) ([]Container, error) {
-	r, err := c.ContainerService().List(ctx, filters...)
+	r, err := c.ContainersInfo(ctx, filters...)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +249,7 @@ func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContain
 	return containerFromRecord(c, r), nil
 }
 
-// LoadContainer loads an existing container from metadata
+// LoadContainerInfo loads an existing container from metadata
 func (c *Client) LoadContainerInfo(ctx context.Context, id string) (containers.Container, error) {
 	r, err := c.ContainerService().Get(ctx, id)
 

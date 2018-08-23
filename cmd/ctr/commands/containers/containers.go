@@ -96,29 +96,26 @@ var listCommand = cli.Command{
 			return err
 		}
 		defer cancel()
-		containers, err := client.Containers(ctx, filters...)
+		containers, err := client.ContainersInfo(ctx, filters...)
 		if err != nil {
 			return err
 		}
 		if quiet {
 			for _, c := range containers {
-				fmt.Printf("%s\n", c.ID())
+				fmt.Printf("%s\n", c.ID)
 			}
 			return nil
 		}
 		w := tabwriter.NewWriter(os.Stdout, 4, 8, 4, ' ', 0)
 		fmt.Fprintln(w, "CONTAINER\tIMAGE\tRUNTIME\t")
 		for _, c := range containers {
-			info, err := c.Info(ctx)
-			if err != nil {
-				return err
-			}
+			info := c
 			imageName := info.Image
 			if imageName == "" {
 				imageName = "-"
 			}
 			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t\n",
-				c.ID(),
+				c.ID,
 				imageName,
 				info.Runtime.Name,
 			); err != nil {
