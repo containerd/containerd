@@ -1,7 +1,0 @@
-- OCI Image Spec support
-- OCI Runtime Spec support (aka runC)
-- Image push and pull support
-- Container runtime and lifecycle support
-- Network primitives for creation, modification, and deletion of interfaces
-- Management of network namespaces containers to join existing namespaces
-- Multi-tenant supported with CAS storage for global images
