@@ -30,6 +30,7 @@ build_script:
         script/setup/install-dev-tools;
         mingw32-make.exe check"
   - bash.exe -elc "export PATH=/c/tools/mingw64/bin:$PATH ; mingw32-make.exe build binaries"
+  - bash.exe -elc "export PATH=/c/tools/mingw64/bin:/c/gopath/bin:$PATH ; script/setup/install-runhcs"
 
 test_script:
   # TODO: need an equivalent of TRAVIS_COMMIT_RANGE
