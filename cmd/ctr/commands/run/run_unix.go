@@ -60,15 +60,15 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	if context.Bool("rootfs") {
 		ctrwd, err := os.Getwd()
 		if err != nil {
-						return nil, err
+			return nil, err
 		}
 		cwd, err := filepath.Abs(ctrwd)
 		if err != nil {
-						return nil, err
+			return nil, err
 		}
 		rootfs := ref;
 		if !filepath.IsAbs(rootfs) {
-				rootfs = filepath.Join(cwd, rootfs)
+			rootfs = filepath.Join(cwd, rootfs)
 		}
 		opts = append(opts, oci.WithRootFSPath(rootfs))
 	} else {
