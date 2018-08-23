@@ -20,6 +20,8 @@ package run
 
 import (
 	gocontext "context"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/containerd/containerd"
@@ -61,7 +63,20 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		opts = append(opts, withMounts(context))
 
 		if context.Bool("rootfs") {
-			opts = append(opts, oci.WithRootFSPath(ref))
+			rootfs := ref;
+			if !filepath.IsAbs(rootfs) {
+				ctrwd, err := os.Getwd()
+				if err != nil {
+					return nil, err
+				}
+				cwd, err := filepath.Abs(ctrwd)
+				if err != nil {
+					return nil, err
+				}
+				
+				rootfs = filepath.Join(cwd, rootfs)
+			}
+			opts = append(opts, oci.WithRootFSPath(rootfs))
 		} else {
 			snapshotter := context.String("snapshotter")
 			image, err := client.GetImage(ctx, ref)
