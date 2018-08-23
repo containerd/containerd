@@ -242,15 +242,12 @@ var infoCommand = cli.Command{
 			return err
 		}
 		defer cancel()
-		container, err := client.LoadContainer(ctx, id)
+		container, err := client.LoadContainerInfo(ctx, id)
 		if err != nil {
 			return err
 		}
-		info, err := container.Info(ctx)
-		if err != nil {
-			return err
-		}
-		commands.PrintAsJSON(info)
+
+		commands.PrintAsJSON(container)
 
 		return nil
 	},

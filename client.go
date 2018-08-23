@@ -244,8 +244,15 @@ func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContain
 }
 
 // LoadContainer loads an existing container from metadata
-func (c *Client) LoadContainer(ctx context.Context, id string) (Container, error) {
+func (c *Client) LoadContainerInfo(ctx context.Context, id string) (containers.Container, error) {
 	r, err := c.ContainerService().Get(ctx, id)
+
+	return r, err
+}
+
+// LoadContainer loads an existing container from metadata
+func (c *Client) LoadContainer(ctx context.Context, id string) (Container, error) {
+	r, err := c.LoadContainerInfo(ctx, id)
 	if err != nil {
 		return nil, err
 	}
