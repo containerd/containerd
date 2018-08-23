@@ -24,6 +24,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"fmt"
+
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v1/shim"
@@ -115,16 +117,39 @@ func (b *bundle) NewShimClient(ctx context.Context, namespace string, getClientO
 
 // Delete deletes the bundle from disk
 func (b *bundle) Delete() error {
-	err := os.RemoveAll(b.path)
+
+	tmpBundle := fmt.Sprintf("%s_deleted", b.path)
+	tmpWork := fmt.Sprintf("%s_deleted", b.workDir)
+
+	if b.path[len(b.path)-1] == '/' {
+		tmpBundle = fmt.Sprintf("%s_deleted", b.path[:len(b.path)-1])
+	}
+	if b.workDir[len(b.workDir)-1] == '/' {
+		tmpWork = fmt.Sprintf("%s_deleted", b.workDir[:len(b.workDir)-1])
+	}
+
+	err := os.Rename(b.path, tmpBundle)
+	err1 := os.Rename(b.workDir, tmpWork)
+
 	if err == nil {
-		return os.RemoveAll(b.workDir)
+		err = os.RemoveAll(tmpBundle)
 	}
-	// error removing the bundle path; still attempt removing work dir
-	err2 := os.RemoveAll(b.workDir)
-	if err2 == nil {
-		return err
+	if err1 == nil {
+		err1 = os.RemoveAll(tmpWork)
 	}
-	return errors.Wrapf(err, "Failed to remove both bundle and workdir locations: %v", err2)
+
+	if err != nil {
+		return errors.Wrapf(err, "Failed to remove  bundle  locations: %v", err)
+	}
+
+	switch {
+	case err != nil:
+		return errors.Wrapf(err, "Failed to remove  bundle  locations: %v", err)
+	case err1 != nil:
+		return errors.Wrapf(err, "Failed to remove  work dir  locations: %v", err1)
+	}
+
+	return nil
 }
 
 func (b *bundle) shimAddress(namespace string) string {
