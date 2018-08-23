@@ -1,4 +1,0 @@
-{{- $cssFiles := .Site.Params.css -}}
-{{- range $cssFiles }}
-<link rel="stylesheet" href="{{ printf "/css/%s.css" . | absURL}}">
-{{- end }}
