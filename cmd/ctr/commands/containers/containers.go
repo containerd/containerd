@@ -18,6 +18,7 @@ package containers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -250,7 +251,34 @@ var infoCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		commands.PrintAsJSON(info)
+
+		if (cc.Spec != nil && cc.Spec.Value != nil) {
+			type c containers.Container
+			type SpecDecode struct {
+				TypeUrl string `json:"type_url,omitempty"`
+				Value *interface{} `json:"value,omitempty"`
+			}
+
+			cc := c(container)
+
+			var s interface{}
+			if err := json.Unmarshal(cc.Spec.Value, &s); err != nil {
+				return nil
+			}
+
+			commands.PrintAsJSON(struct {
+				*c
+				Spec SpecDecode `json:"Spec,omitempty"`
+			}{
+				c: &cc,
+				Spec: SpecDecode {
+					TypeUrl: cc.Spec.TypeUrl,
+					Value: &s,
+				},
+			})
+		} else {
+			commands.PrintAsJSON(info)
+		}
 
 		return nil
 	},
