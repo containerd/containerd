@@ -20,7 +20,6 @@ package run
 
 import (
 	gocontext "context"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -63,18 +62,9 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		opts = append(opts, withMounts(context))
 
 		if context.Bool("rootfs") {
-			rootfs := ref;
-			if !filepath.IsAbs(rootfs) {
-				ctrwd, err := os.Getwd()
-				if err != nil {
-					return nil, err
-				}
-				cwd, err := filepath.Abs(ctrwd)
-				if err != nil {
-					return nil, err
-				}
-				
-				rootfs = filepath.Join(cwd, rootfs)
+			rootfs, err := filepath.Abs(ref)
+			if err != nil {
+				return nil, err
 			}
 			opts = append(opts, oci.WithRootFSPath(rootfs))
 		} else {
