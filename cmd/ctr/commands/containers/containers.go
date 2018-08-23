@@ -18,7 +18,6 @@ package containers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -29,7 +28,9 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/cmd/ctr/commands/run"
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/typeurl"
 	"github.com/urfave/cli"
 )
 
@@ -252,17 +253,17 @@ var infoCommand = cli.Command{
 			return err
 		}
 
-		if (info.Spec != nil && info.Spec.Value != nil) {
+		if info.Spec != nil && info.Spec.Value != nil {
 			type c containers.Container
 			type SpecDecode struct {
-				TypeUrl string `json:"type_url,omitempty"`
-				Value *interface{} `json:"value,omitempty"`
+				TypeURL string       `json:"type_url,omitempty"`
+				Value   *interface{} `json:"value,omitempty"`
 			}
 
 			cc := c(info)
 
-			var s interface{}
-			if err := json.Unmarshal(cc.Spec.Value, &s); err != nil {
+			v, err := typeurl.UnmarshalAny(cc.Spec)
+			if err != nil {
 				return nil
 			}
 
@@ -271,9 +272,9 @@ var infoCommand = cli.Command{
 				Spec SpecDecode `json:"Spec,omitempty"`
 			}{
 				c: &cc,
-				Spec: SpecDecode {
-					TypeUrl: cc.Spec.TypeUrl,
-					Value: &s,
+				Spec: SpecDecode{
+					TypeURL: cc.Spec.TypeUrl,
+					Value:   &v,
 				},
 			})
 		} else {
