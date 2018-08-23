@@ -182,9 +182,47 @@ func SetChildrenLabels(manager content.Manager, f HandlerFunc) HandlerFunc {
 	}
 }
 
-// FilterPlatforms is a handler wrapper which limits the descriptors returned
+// FilterPlatformList is a handler wrapper which limits the descriptors returned
 // by a handler to the specified platforms.
-func FilterPlatforms(f HandlerFunc, platformList ...string) HandlerFunc {
+func FilterPlatformList(f HandlerFunc, platformList ...string) HandlerFunc {
+	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		children, err := f(ctx, desc)
+		if err != nil {
+			return children, err
+		}
+
+		if len(platformList) == 0 {
+			return children, nil
+		}
+
+		var m platforms.Matcher
+
+		if len(platformList) > 0 {
+			ps := make([]ocispec.Platform, len(platformList))
+			for i, platform := range platformList {
+				p, err := platforms.Parse(platform)
+				if err != nil {
+					return nil, err
+				}
+				ps[i] = p
+			}
+			m = platforms.Any(ps...)
+		}
+
+		var descs []ocispec.Descriptor
+		for _, d := range children {
+			if d.Platform == nil || m.Match(*d.Platform) {
+				descs = append(descs, d)
+			}
+		}
+
+		return descs, nil
+	}
+}
+
+// FilterPlatforms is a handler wrapper which limits the descriptors returned
+// based on matching the specified platform matcher.
+func FilterPlatforms(f HandlerFunc, m platforms.Matcher) HandlerFunc {
 	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		children, err := f(ctx, desc)
 		if err != nil {
@@ -193,20 +231,12 @@ func FilterPlatforms(f HandlerFunc, platformList ...string) HandlerFunc {
 
 		var descs []ocispec.Descriptor
 
-		if len(platformList) == 0 {
+		if m == nil {
 			descs = children
 		} else {
-			for _, platform := range platformList {
-				p, err := platforms.Parse(platform)
-				if err != nil {
-					return nil, err
-				}
-				matcher := platforms.NewMatcher(p)
-
-				for _, d := range children {
-					if d.Platform == nil || matcher.Match(*d.Platform) {
-						descs = append(descs, d)
-					}
+			for _, d := range children {
+				if d.Platform == nil || m.Match(*d.Platform) {
+					descs = append(descs, d)
 				}
 			}
 		}
