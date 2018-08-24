@@ -27,7 +27,7 @@ func NewFakeStore(images []Image) (*Store, error) {
 			s.refCache[ref] = i.ID
 		}
 		if err := s.store.add(i); err != nil {
-			return nil, errors.Wrapf(err, "add image %q", i)
+			return nil, errors.Wrapf(err, "add image %+v", i)
 		}
 	}
 	return s, nil
