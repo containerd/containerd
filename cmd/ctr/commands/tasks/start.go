@@ -18,6 +18,7 @@ package tasks
 
 import (
 	"github.com/containerd/console"
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/pkg/errors"
@@ -42,11 +43,16 @@ var startCommand = cli.Command{
 			Name:  "pid-file",
 			Usage: "file path to write the task's pid",
 		},
+		cli.BoolFlag{
+			Name:  "detach,d",
+			Usage: "detach from the task after it has started execution",
+		},
 	},
 	Action: func(context *cli.Context) error {
 		var (
-			err error
-			id  = context.Args().Get(0)
+			err    error
+			id     = context.Args().Get(0)
+			detach = context.Bool("detach")
 		)
 		if id == "" {
 			return errors.New("container id must be provided")
@@ -83,19 +89,24 @@ var startCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		defer task.Delete(ctx)
+		var statusC <-chan containerd.ExitStatus
+		if !detach {
+			defer task.Delete(ctx)
+			if statusC, err = task.Wait(ctx); err != nil {
+				return err
+			}
+		}
 		if context.IsSet("pid-file") {
 			if err := commands.WritePidFile(context.String("pid-file"), int(task.Pid())); err != nil {
 				return err
 			}
 		}
-		statusC, err := task.Wait(ctx)
-		if err != nil {
-			return err
-		}
 
 		if err := task.Start(ctx); err != nil {
 			return err
+		}
+		if detach {
+			return nil
 		}
 		if tty {
 			if err := HandleConsoleResize(ctx, task, con); err != nil {
