@@ -114,6 +114,10 @@ type PluginConfig struct {
 	SystemdCgroup bool `toml:"systemd_cgroup" json:"systemdCgroup"`
 	// EnableTLSStreaming indicates to enable the TLS streaming support.
 	EnableTLSStreaming bool `toml:"enable_tls_streaming" json:"enableTLSStreaming"`
+	// TLSCertFileStreaming is the path to a certificate file
+	TLSCertFileStreaming string `toml:"tls_cert_file_streaming" json:"tlsCertFileStreaming"`
+	// TLSKeyFileStreaming is the path to a private key file
+	TLSKeyFileStreaming string `toml:"tls_key_file_streaming" json:"tlsKeyFileStreaming"`
 	// MaxContainerLogLineSize is the maximum log line size in bytes for a container.
 	// Log line longer than the limit will be split into multiple lines. Non-positive
 	// value means no limit.

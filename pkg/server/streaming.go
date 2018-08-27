@@ -44,18 +44,30 @@ func newStreamServer(c *criService, addr, port string) (streaming.Server, error)
 	}
 	config := streaming.DefaultConfig
 	config.Addr = net.JoinHostPort(addr, port)
-	runtime := newStreamRuntime(c)
-	if c.config.EnableTLSStreaming {
-		tlsCert, err := newTLSCert()
+	run := newStreamRuntime(c)
+	if !c.config.EnableTLSStreaming {
+		return streaming.NewServer(config, run)
+	}
+	if c.config.TLSCertFileStreaming != "" && c.config.TLSKeyFileStreaming != "" {
+		tlsCert, err := tls.LoadX509KeyPair(c.config.TLSCertFileStreaming, c.config.TLSKeyFileStreaming)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to generate tls certificate for stream server")
+			return nil, errors.Wrap(err, "failed to load x509 key pair for stream server")
 		}
 		config.TLSConfig = &tls.Config{
-			Certificates:       []tls.Certificate{tlsCert},
-			InsecureSkipVerify: true,
+			Certificates: []tls.Certificate{tlsCert},
 		}
+		return streaming.NewServer(config, run)
 	}
-	return streaming.NewServer(config, runtime)
+	// generating self-sign certs
+	tlsCert, err := newTLSCert()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate tls certificate for stream server")
+	}
+	config.TLSConfig = &tls.Config{
+		Certificates:       []tls.Certificate{tlsCert},
+		InsecureSkipVerify: true,
+	}
+	return streaming.NewServer(config, run)
 }
 
 type streamRuntime struct {
