@@ -53,9 +53,19 @@ containerd system. It can also be used to install `runc` and other related tools
 
 [Documentation](https://github.com/containerd/containerd/blob/master/docs/managed-opt.md)
 
+### Garbage Collection
+
+Add support for cleaning up leases and content ingests to garbage collections.
+
+Add expiration label to clean up temporary resources.
+
 ### API Changes
 
-Minor API additions"""
+Minor API additions
+
+### Other Improvements
+
+Improved multi-arch image support using more precise matching and ranking"""
 
 # notable prs to include in the release notes, 1234 is the pr number
 [notes]
