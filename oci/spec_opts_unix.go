@@ -486,6 +486,18 @@ func getAllCapabilities() []string {
 	return caps
 }
 
+// WithAmbientCapabilities set the Linux ambient capabilities for the process
+// Ambient capabilities should only be set for non-root users or the caller should
+// understand how these capabilities are used and set
+func WithAmbientCapabilities(caps []string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setCapabilities(s)
+
+		s.Process.Capabilities.Ambient = caps
+		return nil
+	}
+}
+
 var errNoUsersFound = errors.New("no users found")
 
 func getUIDGIDFromPath(root string, filter func(user.User) bool) (uid, gid uint32, err error) {
