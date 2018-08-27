@@ -113,7 +113,7 @@ func NewFetchConfig(ctx context.Context, clicontext *cli.Context) (*FetchConfig,
 	if !clicontext.Bool("all-platforms") {
 		p := clicontext.StringSlice("platform")
 		if len(p) == 0 {
-			p = append(p, platforms.Default())
+			p = append(p, platforms.DefaultString())
 		}
 		config.Platforms = p
 	}

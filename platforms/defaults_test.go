@@ -35,7 +35,7 @@ func TestDefault(t *testing.T) {
 		t.Fatalf("default platform not as expected: %#v != %#v", p, expected)
 	}
 
-	s := Default()
+	s := DefaultString()
 	if s != Format(p) {
 		t.Fatalf("default specifier should match formatted default spec: %v != %v", s, p)
 	}

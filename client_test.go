@@ -185,7 +185,7 @@ func TestImagePull(t *testing.T) {
 
 	ctx, cancel := testContext()
 	defer cancel()
-	_, err = client.Pull(ctx, testImage, WithPlatform(platforms.Default()))
+	_, err = client.Pull(ctx, testImage, WithPlatformMatcher(platforms.Default()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -304,7 +304,7 @@ func TestImagePullSchema1(t *testing.T) {
 	ctx, cancel := testContext()
 	defer cancel()
 	schema1TestImage := "gcr.io/google_containers/pause:3.0@sha256:0d093c962a6c2dd8bb8727b661e2b5f13e9df884af9945b4cc7088d9350cd3ee"
-	_, err = client.Pull(ctx, schema1TestImage, WithPlatform(platforms.Default()), WithSchema1Conversion)
+	_, err = client.Pull(ctx, schema1TestImage, WithPlatform(platforms.DefaultString()), WithSchema1Conversion)
 	if err != nil {
 		t.Fatal(err)
 	}

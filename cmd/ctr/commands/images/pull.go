@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -86,26 +87,28 @@ command. As part of this process, we do the following:
 
 		// TODO: Show unpack status
 
-		var p []string
+		var p []ocispec.Platform
 		if context.Bool("all-platforms") {
-			all, err := images.Platforms(ctx, client.ContentStore(), img.Target)
+			p, err = images.Platforms(ctx, client.ContentStore(), img.Target)
 			if err != nil {
 				return errors.Wrap(err, "unable to resolve image platforms")
 			}
-			p = make([]string, len(all))
-			for i := range all {
-				p[i] = platforms.Format(all[i])
-			}
 		} else {
-			p = context.StringSlice("platform")
+			for _, s := range context.StringSlice("platform") {
+				ps, err := platforms.Parse(s)
+				if err != nil {
+					return errors.Wrapf(err, "unable to parse platform %s", s)
+				}
+				p = append(p, ps)
+			}
 		}
 		if len(p) == 0 {
-			p = append(p, platforms.Default())
+			p = append(p, platforms.DefaultSpec())
 		}
 
 		for _, platform := range p {
-			fmt.Printf("unpacking %s %s...\n", platform, img.Target.Digest)
-			i := containerd.NewImageWithPlatform(client, img, platform)
+			fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
+			i := containerd.NewImageWithPlatform(client, img, platforms.Only(platform))
 			err = i.Unpack(ctx, context.String("snapshotter"))
 			if err != nil {
 				return err
