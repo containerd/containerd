@@ -55,19 +55,12 @@ const (
 )
 
 var (
-	empty       = &ptypes.Empty{}
-	runhcsDebug = false
+	empty = &ptypes.Empty{}
 )
-
-func init() {
-	if logrus.GetLevel() == logrus.DebugLevel {
-		runhcsDebug = true
-	}
-}
 
 func newRunhcs(bundle string) *runhcs.Runhcs {
 	rhs := &runhcs.Runhcs{
-		Debug:     runhcsDebug,
+		Debug:     logrus.GetLevel() == logrus.DebugLevel,
 		LogFormat: runhcs.JSON,
 		Owner:     "containerd-runhcs-shim-v1",
 	}
@@ -104,16 +97,20 @@ type service struct {
 
 // getProcess attempts to get a process by id.
 // The caller MUST NOT have locked s.mu previous to calling this function.
-func (s *service) getProcess(id string) (*process, error) {
+func (s *service) getProcess(id, execID string) (*process, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return s.getProcessLocked(id)
+	return s.getProcessLocked(id, execID)
 }
 
 // getProcessLocked attempts to get a process by id.
 // The caller MUST protect s.mu previous to calling this function.
-func (s *service) getProcessLocked(id string) (*process, error) {
+func (s *service) getProcessLocked(id, execID string) (*process, error) {
+	if execID != "" {
+		id = execID
+	}
+
 	var p *process
 	var ok bool
 	if p, ok = s.processes[id]; !ok {
@@ -200,11 +197,11 @@ func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.
 
 	var p *process
 	var err error
-	if p, err = s.getProcessLocked(r.ID); err != nil {
+	if p, err = s.getProcessLocked(r.ID, r.ExecID); err != nil {
 		return nil, err
 	}
 
-	cmd := exec.Command(runhcsBinary, runhcsDebugLegacy, "state", r.ID)
+	cmd := exec.Command(runhcsBinary, runhcsDebugLegacy, "state", p.id)
 	sout := getBuffer()
 	defer putBuffer(sout)
 
@@ -255,7 +252,7 @@ func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.
 	}
 	pe := p.stat()
 	return &taskAPI.StateResponse{
-		ID:         r.ID,
+		ID:         p.id,
 		Bundle:     cs.Bundle,
 		Pid:        uint32(cs.InitProcessPid),
 		Status:     status,
@@ -330,6 +327,8 @@ func writeMountsToConfig(bundle string, mounts []*containerd_types.Mount) error 
 
 // Create a new initial process and container with runhcs
 func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (*taskAPI.CreateTaskResponse, error) {
+	log.G(ctx).Infof("Create: %s", r.ID)
+
 	// Hold the lock for the entire duration to avoid duplicate process creation.
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -421,15 +420,7 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 	log.G(ctx).Infof("Start: %s: %s", r.ID, r.ExecID)
 	var p *process
 	var err error
-
-	var id string
-	if r.ExecID != "" {
-		id = r.ExecID
-	} else {
-		id = r.ID
-	}
-
-	if p, err = s.getProcess(id); err != nil {
+	if p, err = s.getProcess(r.ID, r.ExecID); err != nil {
 		return nil, err
 	}
 	p.Lock()
@@ -453,6 +444,7 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 			Detach:  true,
 		}
 
+		// ID here is the containerID to exec the process in.
 		err = rhcs.Exec(ctx, r.ID, procConfig, eopts)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to exec process: %s", r.ExecID)
@@ -507,9 +499,11 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 
 // Delete the initial process and container
 func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAPI.DeleteResponse, error) {
+	log.G(ctx).Infof("Delete: %s: %s", r.ID, r.ExecID)
+
 	var p *process
 	var err error
-	if p, err = s.getProcess(r.ExecID); err != nil {
+	if p, err = s.getProcess(r.ID, r.ExecID); err != nil {
 		return nil, err
 	}
 
@@ -532,7 +526,7 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAP
 	exit := p.stat()
 
 	s.mu.Lock()
-	delete(s.processes, r.ID)
+	delete(s.processes, p.id)
 	s.mu.Unlock()
 	return &taskAPI.DeleteResponse{
 		ExitedAt:   exit.exitedAt,
@@ -549,7 +543,7 @@ func (s *service) Pids(ctx context.Context, r *taskAPI.PidsRequest) (*taskAPI.Pi
 // Pause the container
 func (s *service) Pause(ctx context.Context, r *taskAPI.PauseRequest) (*ptypes.Empty, error) {
 	// TODO: Validate that 'id' is actually a valid parent container ID
-	if _, err := s.getProcess(r.ID); err != nil {
+	if _, err := s.getProcess(r.ID, ""); err != nil {
 		return nil, err
 	}
 
@@ -565,7 +559,7 @@ func (s *service) Pause(ctx context.Context, r *taskAPI.PauseRequest) (*ptypes.E
 // Resume the container
 func (s *service) Resume(ctx context.Context, r *taskAPI.ResumeRequest) (*ptypes.Empty, error) {
 	// TODO: Validate that 'id' is actually a valid parent container ID
-	if _, err := s.getProcess(r.ID); err != nil {
+	if _, err := s.getProcess(r.ID, ""); err != nil {
 		return nil, err
 	}
 
@@ -585,9 +579,11 @@ func (s *service) Checkpoint(ctx context.Context, r *taskAPI.CheckpointTaskReque
 
 // Kill a process with the provided signal
 func (s *service) Kill(ctx context.Context, r *taskAPI.KillRequest) (*ptypes.Empty, error) {
+	log.G(ctx).Infof("Kill: %s: %s", r.ID, r.ExecID)
+
 	var p *process
 	var err error
-	if p, err = s.getProcess(r.ExecID); err != nil {
+	if p, err = s.getProcess(r.ID, r.ExecID); err != nil {
 		return nil, err
 	}
 
@@ -605,13 +601,15 @@ func (s *service) Kill(ctx context.Context, r *taskAPI.KillRequest) (*ptypes.Emp
 
 // Exec an additional process inside the container
 func (s *service) Exec(ctx context.Context, r *taskAPI.ExecProcessRequest) (*ptypes.Empty, error) {
+	log.G(ctx).Infof("Exec: %s: %s", r.ID, r.ExecID)
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	var parent *process
 	var err error
 	// Get the parent container
-	if parent, err = s.getProcessLocked(r.ID); err != nil {
+	if parent, err = s.getProcessLocked(r.ID, ""); err != nil {
 		return nil, err
 	}
 
@@ -688,7 +686,7 @@ func (s *service) Exec(ctx context.Context, r *taskAPI.ExecProcessRequest) (*pty
 func (s *service) ResizePty(ctx context.Context, r *taskAPI.ResizePtyRequest) (*ptypes.Empty, error) {
 	var p *process
 	var err error
-	if p, err = s.getProcess(r.ExecID); err != nil {
+	if p, err = s.getProcess(r.ID, r.ExecID); err != nil {
 		return nil, err
 	}
 
@@ -696,7 +694,7 @@ func (s *service) ResizePty(ctx context.Context, r *taskAPI.ResizePtyRequest) (*
 		runhcsBinary,
 		runhcsDebugLegacy,
 		"resize-tty",
-		r.ID,
+		p.cid,
 		"-p",
 		strconv.FormatUint(uint64(p.pid), 10),
 		strconv.FormatUint(uint64(r.Width), 10),
@@ -714,7 +712,7 @@ func (s *service) ResizePty(ctx context.Context, r *taskAPI.ResizePtyRequest) (*
 func (s *service) CloseIO(ctx context.Context, r *taskAPI.CloseIORequest) (*ptypes.Empty, error) {
 	var p *process
 	var err error
-	if p, err = s.getProcess(r.ExecID); err != nil {
+	if p, err = s.getProcess(r.ID, r.ExecID); err != nil {
 		return nil, err
 	}
 	p.closeIO()
@@ -730,7 +728,7 @@ func (s *service) Update(ctx context.Context, r *taskAPI.UpdateTaskRequest) (*pt
 func (s *service) Wait(ctx context.Context, r *taskAPI.WaitRequest) (*taskAPI.WaitResponse, error) {
 	var p *process
 	var err error
-	if p, err = s.getProcess(r.ExecID); err != nil {
+	if p, err = s.getProcess(r.ID, r.ExecID); err != nil {
 		return nil, err
 	}
 	pe := p.wait()
@@ -756,6 +754,8 @@ func (s *service) Connect(ctx context.Context, r *taskAPI.ConnectRequest) (*task
 
 // Shutdown stops this instance of the runhcs shim
 func (s *service) Shutdown(ctx context.Context, r *taskAPI.ShutdownRequest) (*ptypes.Empty, error) {
+	log.G(ctx).Infof("Shutdown: %s", r.ID)
+
 	os.Exit(0)
 	return empty, nil
 }
