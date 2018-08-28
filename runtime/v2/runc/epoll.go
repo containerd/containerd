@@ -62,15 +62,21 @@ func (e *epoller) Close() error {
 func (e *epoller) run(ctx context.Context) {
 	var events [128]unix.EpollEvent
 	for {
-		n, err := unix.EpollWait(e.fd, events[:], -1)
-		if err != nil {
-			if err == unix.EINTR {
-				continue
+		select {
+		case <-ctx.Done():
+			e.Close()
+			return
+		default:
+			n, err := unix.EpollWait(e.fd, events[:], -1)
+			if err != nil {
+				if err == unix.EINTR {
+					continue
+				}
+				logrus.WithError(err).Error("cgroups: epoll wait")
 			}
-			logrus.WithError(err).Error("cgroups: epoll wait")
-		}
-		for i := 0; i < n; i++ {
-			e.process(ctx, uintptr(events[i].Fd))
+			for i := 0; i < n; i++ {
+				e.process(ctx, uintptr(events[i].Fd))
+			}
 		}
 	}
 }
