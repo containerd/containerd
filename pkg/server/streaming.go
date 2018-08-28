@@ -46,10 +46,13 @@ func newStreamServer(c *criService, addr, port string) (streaming.Server, error)
 	config.Addr = net.JoinHostPort(addr, port)
 	run := newStreamRuntime(c)
 	if !c.config.EnableTLSStreaming {
+		if c.config.X509KeyPairStreaming.TLSCertFile != "" || c.config.X509KeyPairStreaming.TLSKeyFile != "" {
+			return nil, errors.Errorf("X509KeyPairStreaming.TLSCertFile and/or X509KeyPairStreaming.TLSKeyFile are set but EnableTLSStreaming is not set")
+		}
 		return streaming.NewServer(config, run)
 	}
-	if c.config.TLSCertFileStreaming != "" && c.config.TLSKeyFileStreaming != "" {
-		tlsCert, err := tls.LoadX509KeyPair(c.config.TLSCertFileStreaming, c.config.TLSKeyFileStreaming)
+	if c.config.X509KeyPairStreaming.TLSCertFile != "" && c.config.X509KeyPairStreaming.TLSKeyFile != "" {
+		tlsCert, err := tls.LoadX509KeyPair(c.config.X509KeyPairStreaming.TLSCertFile, c.config.X509KeyPairStreaming.TLSKeyFile)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to load x509 key pair for stream server")
 		}
@@ -57,6 +60,8 @@ func newStreamServer(c *criService, addr, port string) (streaming.Server, error)
 			Certificates: []tls.Certificate{tlsCert},
 		}
 		return streaming.NewServer(config, run)
+	} else if c.config.X509KeyPairStreaming.TLSCertFile != "" || c.config.X509KeyPairStreaming.TLSKeyFile != "" {
+		return nil, errors.Errorf("must set both X509KeyPairStreaming.TLSCertFile and X509KeyPairStreaming.TLSKeyFile")
 	}
 	// generating self-sign certs
 	tlsCert, err := newTLSCert()

@@ -114,14 +114,20 @@ type PluginConfig struct {
 	SystemdCgroup bool `toml:"systemd_cgroup" json:"systemdCgroup"`
 	// EnableTLSStreaming indicates to enable the TLS streaming support.
 	EnableTLSStreaming bool `toml:"enable_tls_streaming" json:"enableTLSStreaming"`
-	// TLSCertFileStreaming is the path to a certificate file
-	TLSCertFileStreaming string `toml:"tls_cert_file_streaming" json:"tlsCertFileStreaming"`
-	// TLSKeyFileStreaming is the path to a private key file
-	TLSKeyFileStreaming string `toml:"tls_key_file_streaming" json:"tlsKeyFileStreaming"`
+	// X509KeyPairStreaming is a x509 key pair used for TLS streaming
+	X509KeyPairStreaming `toml:"x509_key_pair_streaming" json:"x509KeyPairStreaming"`
 	// MaxContainerLogLineSize is the maximum log line size in bytes for a container.
 	// Log line longer than the limit will be split into multiple lines. Non-positive
 	// value means no limit.
 	MaxContainerLogLineSize int `toml:"max_container_log_line_size" json:"maxContainerLogSize"`
+}
+
+// X509KeyPairStreaming contains the x509 configuration for streaming
+type X509KeyPairStreaming struct {
+	// TLSCertFile is the path to a certificate file
+	TLSCertFile string `toml:"tls_cert_file" json:"tlsCertFile"`
+	// TLSKeyFile is the path to a private key file
+	TLSKeyFile string `toml:"tls_key_file" json:"tlsKeyFile"`
 }
 
 // Config contains all configurations for cri server.
@@ -156,10 +162,14 @@ func DefaultConfig() PluginConfig {
 			},
 			NoPivot: false,
 		},
-		StreamServerAddress:     "127.0.0.1",
-		StreamServerPort:        "0",
-		EnableSelinux:           false,
-		EnableTLSStreaming:      false,
+		StreamServerAddress: "127.0.0.1",
+		StreamServerPort:    "0",
+		EnableSelinux:       false,
+		EnableTLSStreaming:  false,
+		X509KeyPairStreaming: X509KeyPairStreaming{
+			TLSKeyFile:  "",
+			TLSCertFile: "",
+		},
 		SandboxImage:            "k8s.gcr.io/pause:3.1",
 		StatsCollectPeriod:      10,
 		SystemdCgroup:           false,
