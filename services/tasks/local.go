@@ -259,36 +259,50 @@ func (l *local) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest, 
 }
 
 func processFromContainerd(ctx context.Context, p runtime.Process) (*task.Process, error) {
-	state, err := p.State(ctx)
-	if err != nil {
+	ch := make(chan *task.Process, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		state, err := p.State(ctx)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		var status task.Status
+		switch state.Status {
+		case runtime.CreatedStatus:
+			status = task.StatusCreated
+		case runtime.RunningStatus:
+			status = task.StatusRunning
+		case runtime.StoppedStatus:
+			status = task.StatusStopped
+		case runtime.PausedStatus:
+			status = task.StatusPaused
+		case runtime.PausingStatus:
+			status = task.StatusPausing
+		default:
+			log.G(ctx).WithField("status", state.Status).Warn("unknown status")
+		}
+		ch <- &task.Process{
+			ID:         p.ID(),
+			Pid:        state.Pid,
+			Status:     status,
+			Stdin:      state.Stdin,
+			Stdout:     state.Stdout,
+			Stderr:     state.Stderr,
+			Terminal:   state.Terminal,
+			ExitStatus: state.ExitStatus,
+			ExitedAt:   state.ExitedAt,
+		}
+	}()
+
+	select {
+	case err := <-errCh:
 		return nil, err
+	case p := <-ch:
+		return p, nil
+	case <-time.After(time.Second * 1):
+		return nil, fmt.Errorf("timeout loading process from containerd")
 	}
-	var status task.Status
-	switch state.Status {
-	case runtime.CreatedStatus:
-		status = task.StatusCreated
-	case runtime.RunningStatus:
-		status = task.StatusRunning
-	case runtime.StoppedStatus:
-		status = task.StatusStopped
-	case runtime.PausedStatus:
-		status = task.StatusPaused
-	case runtime.PausingStatus:
-		status = task.StatusPausing
-	default:
-		log.G(ctx).WithField("status", state.Status).Warn("unknown status")
-	}
-	return &task.Process{
-		ID:         p.ID(),
-		Pid:        state.Pid,
-		Status:     status,
-		Stdin:      state.Stdin,
-		Stdout:     state.Stdout,
-		Stderr:     state.Stderr,
-		Terminal:   state.Terminal,
-		ExitStatus: state.ExitStatus,
-		ExitedAt:   state.ExitedAt,
-	}, nil
 }
 
 func (l *local) Get(ctx context.Context, r *api.GetRequest, _ ...grpc.CallOption) (*api.GetResponse, error) {
