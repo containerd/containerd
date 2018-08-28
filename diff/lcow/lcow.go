@@ -16,16 +16,15 @@
    limitations under the License.
 */
 
-package windows
+package lcow
 
 import (
 	"context"
 	"io"
-	"io/ioutil"
+	"os/exec"
+	"path"
 	"time"
 
-	winio "github.com/Microsoft/go-winio"
-	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
@@ -34,7 +33,6 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -45,7 +43,7 @@ import (
 func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.DiffPlugin,
-		ID:   "windows",
+		ID:   "windows-lcow",
 		Requires: []plugin.Type{
 			plugin.MetadataPlugin,
 		},
@@ -55,8 +53,11 @@ func init() {
 				return nil, err
 			}
 
-			ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
-			return NewWindowsDiff(md.(*metadata.DB).ContentStore())
+			ic.Meta.Platforms = append(ic.Meta.Platforms, ocispec.Platform{
+				OS:           "linux",
+				Architecture: "amd64",
+			})
+			return NewWindowsLcowDiff(md.(*metadata.DB).ContentStore())
 		},
 	})
 }
@@ -68,18 +69,18 @@ type CompareApplier interface {
 	diff.Comparer
 }
 
-// windowsDiff does filesystem comparison and application
-// for Windows specific layer diffs.
-type windowsDiff struct {
+// windowsLcowDiff does filesystem comparison and application
+// for Windows specific Linux layer diffs.
+type windowsLcowDiff struct {
 	store content.Store
 }
 
 var emptyDesc = ocispec.Descriptor{}
 
-// NewWindowsDiff is the Windows container layer implementation
-// for comparing and applying filesystem layers
-func NewWindowsDiff(store content.Store) (CompareApplier, error) {
-	return windowsDiff{
+// NewWindowsLcowDiff is the Windows LCOW container layer implementation
+// for comparing and applying Linux filesystem layers on Windows
+func NewWindowsLcowDiff(store content.Store) (CompareApplier, error) {
+	return windowsLcowDiff{
 		store: store,
 	}, nil
 }
@@ -87,7 +88,7 @@ func NewWindowsDiff(store content.Store) (CompareApplier, error) {
 // Apply applies the content associated with the provided digests onto the
 // provided mounts. Archive content will be extracted and decompressed if
 // necessary.
-func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount) (d ocispec.Descriptor, err error) {
+func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount) (d ocispec.Descriptor, err error) {
 	t1 := time.Now()
 	defer func() {
 		if err == nil {
@@ -100,6 +101,11 @@ func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 		}
 	}()
 
+	layer, _, err := mountsToLayerAndParents(mounts)
+	if err != nil {
+		return emptyDesc, err
+	}
+
 	isCompressed, err := images.IsCompressedDiff(ctx, desc.MediaType)
 	if err != nil {
 		return emptyDesc, errors.Wrapf(errdefs.ErrNotImplemented, "unsupported diff media type: %v", desc.MediaType)
@@ -110,41 +116,30 @@ func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 		return emptyDesc, errors.Wrap(err, "failed to get reader from content store")
 	}
 	defer ra.Close()
-
-	r := content.NewReader(ra)
+	rdr := content.NewReader(ra)
 	if isCompressed {
-		ds, err := compression.DecompressStream(r)
+		ds, err := compression.DecompressStream(rdr)
 		if err != nil {
 			return emptyDesc, err
 		}
 		defer ds.Close()
-		r = ds
+		rdr = ds
 	}
-
+	// Calculate the Digest as we go
 	digester := digest.Canonical.Digester()
 	rc := &readCounter{
-		r: io.TeeReader(r, digester.Hash()),
+		r: io.TeeReader(rdr, digester.Hash()),
 	}
 
-	layer, parentLayerPaths, err := mountsToLayerAndParents(mounts)
-	if err != nil {
-		return emptyDesc, err
-	}
+	cmd := exec.Command(
+		"runhcs.exe",
+		"tar2vhd",
+		"--scratchpath", path.Join(layer, "sandbox.vhdx"), // TODO: JTERRY75 when the snapshotter changes this to be scratch.vhdx update it here too.
+		"--destpath", path.Join(layer, "layer.vhd"))
 
-	// TODO darrenstahlmsft: When this is done isolated, we should disable these.
-	// it currently cannot be disabled, unless we add ref counting. Since this is
-	// temporary, leaving it enabled is OK for now.
-	if err := winio.EnableProcessPrivileges([]string{winio.SeBackupPrivilege, winio.SeRestorePrivilege}); err != nil {
-		return emptyDesc, err
-	}
-
-	if _, err := archive.Apply(ctx, layer, rc, archive.WithParentLayers(parentLayerPaths), archive.AsWindowsContainerLayer()); err != nil {
-		return emptyDesc, err
-	}
-
-	// Read any trailing data
-	if _, err := io.Copy(ioutil.Discard, rc); err != nil {
-		return emptyDesc, err
+	cmd.Stdin = rc
+	if bytes, err := cmd.CombinedOutput(); err != nil {
+		return emptyDesc, errors.Wrapf(err, "failed to exec runhcs.exe tar2vhd: %s", string(bytes))
 	}
 
 	return ocispec.Descriptor{
@@ -156,7 +151,7 @@ func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 
 // Compare creates a diff between the given mounts and uploads the result
 // to the content store.
-func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
+func (s windowsLcowDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
 	return emptyDesc, errdefs.ErrNotImplemented
 }
 
@@ -173,14 +168,11 @@ func (rc *readCounter) Read(p []byte) (n int, err error) {
 
 func mountsToLayerAndParents(mounts []mount.Mount) (string, []string, error) {
 	if len(mounts) != 1 {
-		return "", nil, errors.Wrap(errdefs.ErrInvalidArgument, "number of mounts should always be 1 for Windows layers")
+		return "", nil, errors.Wrap(errdefs.ErrInvalidArgument, "number of mounts should always be 1 for Windows lcow-layers")
 	}
 	mnt := mounts[0]
-	if mnt.Type != "windows-layer" {
-		// This is a special case error. When this is received the diff service
-		// will attempt the next differ in the chain which for Windows is the
-		// lcow differ that we want.
-		return "", nil, errdefs.ErrNotImplemented
+	if mnt.Type != "lcow-layer" {
+		return "", nil, errors.Wrap(errdefs.ErrInvalidArgument, "mount layer type must be lcow-layer")
 	}
 
 	parentLayerPaths, err := mnt.GetParentPaths()

@@ -16,18 +16,20 @@
    limitations under the License.
 */
 
-package windows
+package lcow
 
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 
-	"github.com/Microsoft/hcsshim"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
@@ -35,6 +37,7 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/continuity/fs"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/windows"
 )
@@ -42,8 +45,12 @@ import (
 func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.SnapshotPlugin,
-		ID:   "windows",
+		ID:   "windows-lcow",
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			ic.Meta.Platforms = append(ic.Meta.Platforms, ocispec.Platform{
+				OS:           "linux",
+				Architecture: "amd64",
+			})
 			return NewSnapshotter(ic.Root)
 		},
 	})
@@ -51,7 +58,6 @@ func init() {
 
 type snapshotter struct {
 	root string
-	info hcsshim.DriverInfo
 	ms   *storage.MetaStore
 }
 
@@ -78,9 +84,6 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 	}
 
 	return &snapshotter{
-		info: hcsshim.DriverInfo{
-			HomeDir: filepath.Join(root, "snapshots"),
-		},
 		root: root,
 		ms:   ms,
 	}, nil
@@ -92,6 +95,7 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 // Should be used for parent resolution, existence checks and to discern
 // the kind of snapshot.
 func (s *snapshotter) Stat(ctx context.Context, key string) (snapshots.Info, error) {
+	log.G(ctx).Debug("Starting Stat")
 	ctx, t, err := s.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return snapshots.Info{}, err
@@ -103,6 +107,7 @@ func (s *snapshotter) Stat(ctx context.Context, key string) (snapshots.Info, err
 }
 
 func (s *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
+	log.G(ctx).Debug("Starting Update")
 	ctx, t, err := s.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return snapshots.Info{}, err
@@ -122,6 +127,7 @@ func (s *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 }
 
 func (s *snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
+	log.G(ctx).Debug("Starting Usage")
 	ctx, t, err := s.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return snapshots.Usage{}, err
@@ -144,10 +150,12 @@ func (s *snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, e
 }
 
 func (s *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	log.G(ctx).Debug("Starting Prepare")
 	return s.createSnapshot(ctx, snapshots.KindActive, key, parent, opts)
 }
 
 func (s *snapshotter) View(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	log.G(ctx).Debug("Starting View")
 	return s.createSnapshot(ctx, snapshots.KindView, key, parent, opts)
 }
 
@@ -156,6 +164,7 @@ func (s *snapshotter) View(ctx context.Context, key, parent string, opts ...snap
 //
 // This can be used to recover mounts after calling View or Prepare.
 func (s *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
+	log.G(ctx).Debug("Starting Mounts")
 	ctx, t, err := s.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return nil, err
@@ -170,6 +179,7 @@ func (s *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 }
 
 func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
+	log.G(ctx).Debug("Starting Commit")
 	ctx, t, err := s.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return err
@@ -193,6 +203,7 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 // Remove abandons the transaction identified by key. All resources
 // associated with the key will be removed.
 func (s *snapshotter) Remove(ctx context.Context, key string) error {
+	log.G(ctx).Debug("Starting Remove")
 	ctx, t, err := s.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return err
@@ -205,8 +216,7 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 	}
 
 	path := s.getSnapshotDir(id)
-	renamedID := "rm-" + id
-	renamed := filepath.Join(s.root, "snapshots", renamedID)
+	renamed := s.getSnapshotDir("rm-" + id)
 	if err := os.Rename(path, renamed); err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -219,7 +229,7 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 		return errors.Wrap(err, "failed to commit")
 	}
 
-	if err := hcsshim.DestroyLayer(s.info, renamedID); err != nil {
+	if err := os.RemoveAll(renamed); err != nil {
 		// Must be cleaned up, any "rm-*" could be removed if no active transactions
 		log.G(ctx).WithError(err).WithField("path", renamed).Warnf("Failed to remove root filesystem")
 	}
@@ -229,6 +239,7 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 
 // Walk the committed snapshots.
 func (s *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshots.Info) error) error {
+	log.G(ctx).Debug("Starting Walk")
 	ctx, t, err := s.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return err
@@ -271,7 +282,7 @@ func (s *snapshotter) mounts(sn storage.Snapshot) []mount.Mount {
 	var mounts []mount.Mount
 	mounts = append(mounts, mount.Mount{
 		Source: source,
-		Type:   "windows-layer",
+		Type:   "lcow-layer",
 		Options: []string{
 			roFlag,
 			parentLayersOption,
@@ -298,18 +309,77 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	}
 
 	if kind == snapshots.KindActive {
-		parentLayerPaths := s.parentIDsToParentPaths(newSnapshot.ParentIDs)
-
-		var parentPath string
-		if len(parentLayerPaths) != 0 {
-			parentPath = parentLayerPaths[0]
+		log.G(ctx).Debug("createSnapshot active")
+		// Create the new snapshot dir
+		snDir := s.getSnapshotDir(newSnapshot.ID)
+		if err := os.MkdirAll(snDir, 0700); err != nil {
+			return nil, err
 		}
+		// Create the scratch.vhdx cache file if it doesnt already exit.
+		scratchPath := filepath.Join(s.root, "scratch.vhdx")
+		scratchLockPath := filepath.Join(s.root, "scratch.vhdx.lock")
+		startTime := time.Now()
+		timeout := 2 * time.Minute
+		var scratchSource *os.File
+		for {
+			var err error
+			scratchSource, err = os.OpenFile(scratchPath, os.O_RDONLY, 0700)
+			if err != nil {
+				if os.IsNotExist(err) {
+					// No scratch path. Take the lock and create it.
+					slock, err := os.OpenFile(scratchLockPath, os.O_EXCL|os.O_CREATE, 0700)
+					if err != nil {
+						if time.Now().Sub(startTime) >= timeout {
+							return nil, errors.Wrap(err, "timed out waiting for scratch.vhdx.lock")
+						}
+						// Couldnt obtain the lock. Sleep and try again.
+						time.Sleep(1 * time.Second)
+						continue
+					}
+					defer slock.Close()
+					// Create the scratch
+					cmd := exec.Command(
+						"runhcs.exe",
+						"create-scratch",
+						"--destpath", scratchPath)
 
-		if err := hcsshim.CreateSandboxLayer(s.info, newSnapshot.ID, parentPath, parentLayerPaths); err != nil {
-			return nil, errors.Wrap(err, "failed to create sandbox layer")
+					if bytes, err := cmd.CombinedOutput(); err != nil {
+						_ = os.Remove(scratchPath)
+						return nil, errors.Wrapf(err, "failed to create scratch.vhdx. additional info: '%s'", string(bytes))
+					}
+					// Successfully created scratch in the cache. Open and copy
+					continue
+				} else {
+					if time.Now().Sub(startTime) >= timeout {
+						return nil, errors.Wrap(err, "timed out waiting for scratch.vhdx")
+					}
+					// Couldnt obtain read access. Sleep and try again. Likely
+					// this case is that scratch.vhdx is in the process of being
+					// written actively.
+					time.Sleep(1 * time.Second)
+					continue
+				}
+			}
+			break
 		}
+		defer scratchSource.Close()
 
-		// TODO(darrenstahlmsft): Allow changing sandbox size
+		// TODO: JTERRY75 - This has to be called sandbox.vhdx for the time
+		// being but it really is the scratch.vhdx Using this naming convention
+		// for now but this is not the kubernetes sandbox.
+		//
+		// Create the sandbox.vhdx for this snapshot from the cache.
+		destPath := filepath.Join(snDir, "sandbox.vhdx")
+		dest, err := os.OpenFile(destPath, os.O_RDWR|os.O_CREATE, 0700)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create sandbox.vhdx in snapshot")
+		}
+		defer dest.Close()
+		if _, err := io.Copy(dest, scratchSource); err != nil {
+			dest.Close()
+			os.Remove(destPath)
+			return nil, errors.Wrap(err, "failed to copy cached scratch.vhdx to sandbox.vhdx in snapshot")
+		}
 	}
 
 	if err := t.Commit(); err != nil {

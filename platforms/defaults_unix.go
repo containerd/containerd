@@ -1,4 +1,4 @@
-// +build windows
+// +build !windows
 
 /*
    Copyright The containerd Authors.
@@ -16,8 +16,9 @@
    limitations under the License.
 */
 
-package diff
+package platforms
 
-var defaultDifferConfig = &config{
-	Order: []string{"windows", "windows-lcow"},
+// Default returns the default matcher for the platform.
+func Default() MatchComparer {
+	return Only(DefaultSpec())
 }
