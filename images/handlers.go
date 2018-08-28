@@ -19,6 +19,7 @@ package images
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/platforms"
@@ -182,44 +183,6 @@ func SetChildrenLabels(manager content.Manager, f HandlerFunc) HandlerFunc {
 	}
 }
 
-// FilterPlatformList is a handler wrapper which limits the descriptors returned
-// by a handler to the specified platforms.
-func FilterPlatformList(f HandlerFunc, platformList ...string) HandlerFunc {
-	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		children, err := f(ctx, desc)
-		if err != nil {
-			return children, err
-		}
-
-		if len(platformList) == 0 {
-			return children, nil
-		}
-
-		var m platforms.Matcher
-
-		if len(platformList) > 0 {
-			ps := make([]ocispec.Platform, len(platformList))
-			for i, platform := range platformList {
-				p, err := platforms.Parse(platform)
-				if err != nil {
-					return nil, err
-				}
-				ps[i] = p
-			}
-			m = platforms.Any(ps...)
-		}
-
-		var descs []ocispec.Descriptor
-		for _, d := range children {
-			if d.Platform == nil || m.Match(*d.Platform) {
-				descs = append(descs, d)
-			}
-		}
-
-		return descs, nil
-	}
-}
-
 // FilterPlatforms is a handler wrapper which limits the descriptors returned
 // based on matching the specified platform matcher.
 func FilterPlatforms(f HandlerFunc, m platforms.Matcher) HandlerFunc {
@@ -242,5 +205,39 @@ func FilterPlatforms(f HandlerFunc, m platforms.Matcher) HandlerFunc {
 		}
 
 		return descs, nil
+	}
+}
+
+// LimitManifests is a handler wrapper which filters the manifest descriptors
+// returned using the provided platform.
+// The results will be ordered according to the comparison operator and
+// use the ordering in the manifests for equal matches.
+// A limit of 0 or less is considered no limit.
+func LimitManifests(f HandlerFunc, m platforms.MatchComparer, n int) HandlerFunc {
+	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		children, err := f(ctx, desc)
+		if err != nil {
+			return children, err
+		}
+
+		switch desc.MediaType {
+		case ocispec.MediaTypeImageIndex, MediaTypeDockerSchema2ManifestList:
+			sort.SliceStable(children, func(i, j int) bool {
+				if children[i].Platform == nil {
+					return false
+				}
+				if children[j].Platform == nil {
+					return true
+				}
+				return m.Less(*children[i].Platform, *children[j].Platform)
+			})
+
+			if n > 0 && len(children) > n {
+				children = children[:n]
+			}
+		default:
+			// only limit manifests from an index
+		}
+		return children, nil
 	}
 }

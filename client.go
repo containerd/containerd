@@ -338,7 +338,7 @@ func (c *Client) Fetch(ctx context.Context, ref string, opts ...RemoteOpt) (imag
 	}
 	defer done(ctx)
 
-	return c.fetch(ctx, fetchCtx, ref)
+	return c.fetch(ctx, fetchCtx, ref, 0)
 }
 
 // Pull downloads the provided content into containerd's content store
@@ -372,7 +372,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 	}
 	defer done(ctx)
 
-	img, err := c.fetch(ctx, pullCtx, ref)
+	img, err := c.fetch(ctx, pullCtx, ref, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -388,7 +388,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 	return i, nil
 }
 
-func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string) (images.Image, error) {
+func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, limit int) (images.Image, error) {
 	store := c.ContentStore()
 	name, desc, err := rCtx.Resolver.Resolve(ctx, ref)
 	if err != nil {
@@ -414,6 +414,10 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string) (im
 		childrenHandler = images.SetChildrenLabels(store, childrenHandler)
 		// Filter children by platforms
 		childrenHandler = images.FilterPlatforms(childrenHandler, rCtx.PlatformMatcher)
+		// Sort and limit manifests if a finite number is needed
+		if limit > 0 {
+			childrenHandler = images.LimitManifests(childrenHandler, rCtx.PlatformMatcher, limit)
+		}
 
 		handler = images.Handlers(append(rCtx.BaseHandlers,
 			remotes.FetchHandler(store, fetcher),
