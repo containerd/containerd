@@ -18,8 +18,10 @@ package main
 
 const (
 	defaultTemplateFile = "TEMPLATE"
-	releaseNotes        = `Welcome to the {{.Version}} release of {{.ProjectName}}!
-{{if .PreRelease -}}
+	releaseNotes        = `{{.ProjectName}} {{.Version}}
+
+Welcome to the {{.Tag}} release of {{.ProjectName}}!
+{{- if .PreRelease }}
 *This is a pre-release of {{.ProjectName}}*
 {{- end}}
 

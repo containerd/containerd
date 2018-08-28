@@ -24,8 +24,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 	"text/tabwriter"
 	"text/template"
+	"unicode"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -84,6 +86,7 @@ type release struct {
 	Changes      []projectChange
 	Contributors []string
 	Dependencies []dependency
+	Tag          string
 	Version      string
 	Downloads    []download
 }
@@ -105,7 +108,11 @@ This tool should be ran from the root of the project repository for a new releas
 			Usage: "show debug output",
 		},
 		cli.StringFlag{
-			Name:  "template,t",
+			Name:  "tag,t",
+			Usage: "tag name for the release, defaults to release file name",
+		},
+		cli.StringFlag{
+			Name:  "template",
 			Usage: "template filepath to use in place of the default",
 			Value: defaultTemplateFile,
 		},
@@ -113,8 +120,12 @@ This tool should be ran from the root of the project repository for a new releas
 	app.Action = func(context *cli.Context) error {
 		var (
 			releasePath = context.Args().First()
-			tag         = parseTag(releasePath)
+			tag         = context.String("tag")
 		)
+		if tag == "" {
+			tag = parseTag(releasePath)
+		}
+		version := strings.TrimLeft(tag, "v")
 		if context.Bool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
 		}
@@ -226,7 +237,11 @@ This tool should be ran from the root of the project repository for a new releas
 		r.Contributors = orderContributors(contributors)
 		r.Dependencies = updatedDeps
 		r.Changes = projectChanges
-		r.Version = tag
+		r.Tag = tag
+		r.Version = version
+
+		// Remove trailing new lines
+		r.Preface = strings.TrimRightFunc(r.Preface, unicode.IsSpace)
 
 		tmpl, err := getTemplate(context)
 		if err != nil {
