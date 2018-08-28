@@ -42,7 +42,7 @@ func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console
 	}
 
 	if stdin != "" {
-		in, err := fifo.OpenFifo(ctx, stdin, syscall.O_RDONLY, 0)
+		in, err := fifo.OpenFifo(ctx, stdin, syscall.O_RDONLY|syscall.O_NONBLOCK, 0)
 		if err != nil {
 			return nil, err
 		}
