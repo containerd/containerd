@@ -116,11 +116,16 @@ This tool should be ran from the root of the project repository for a new releas
 			Usage: "template filepath to use in place of the default",
 			Value: defaultTemplateFile,
 		},
+		cli.BoolFlag{
+			Name:  "linkify,l",
+			Usage: "add links to changelog",
+		},
 	}
 	app.Action = func(context *cli.Context) error {
 		var (
 			releasePath = context.Args().First()
 			tag         = context.String("tag")
+			linkify     = context.Bool("linkify")
 		)
 		if tag == "" {
 			tag = parseTag(releasePath)
@@ -149,6 +154,11 @@ This tool should be ran from the root of the project repository for a new releas
 		changes, err := changelog(r.Previous, r.Commit)
 		if err != nil {
 			return err
+		}
+		if linkify {
+			if err := linkifyChanges(changes, githubCommitLink(r.GithubRepo), githubPRLink(r.GithubRepo)); err != nil {
+				return err
+			}
 		}
 		if err := addContributors(r.Previous, r.Commit, contributors); err != nil {
 			return err
@@ -220,6 +230,16 @@ This tool should be ran from the root of the project repository for a new releas
 				}
 				if err := addContributors(dep.Previous, dep.Commit, contributors); err != nil {
 					return errors.Wrapf(err, "failed to get authors for %s", name)
+				}
+				if linkify {
+					if !strings.HasPrefix(dep.Name, "github.com/") {
+						logrus.Debugf("linkify only supported for Github, skipping %s", dep.Name)
+					} else {
+						ghname := dep.Name[11:]
+						if err := linkifyChanges(changes, githubCommitLink(ghname), githubPRLink(ghname)); err != nil {
+							return err
+						}
+					}
 				}
 
 				projectChanges = append(projectChanges, projectChange{

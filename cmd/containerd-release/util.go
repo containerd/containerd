@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -111,6 +112,26 @@ func gitChangeDiff(previous, commit string) string {
 
 func getChangelog(previous, commit string) ([]byte, error) {
 	return git("log", "--oneline", gitChangeDiff(previous, commit))
+}
+
+func linkifyChanges(c []change, commit, msg func(change) (string, error)) error {
+	for i := range c {
+		commitLink, err := commit(c[i])
+		if err != nil {
+			return err
+		}
+
+		description, err := msg(c[i])
+		if err != nil {
+			return err
+		}
+
+		c[i].Commit = fmt.Sprintf("[`%s`](%s)", c[i].Commit, commitLink)
+		c[i].Description = description
+
+	}
+
+	return nil
 }
 
 func parseChangelog(changelog []byte) ([]change, error) {
@@ -281,4 +302,37 @@ func getTemplate(context *cli.Context) (string, error) {
 		return "", err
 	}
 	return string(data), nil
+}
+
+func githubCommitLink(repo string) func(change) (string, error) {
+	return func(c change) (string, error) {
+		full, err := git("rev-parse", c.Commit)
+		if err != nil {
+			return "", err
+		}
+		commit := strings.TrimSpace(string(full))
+
+		return fmt.Sprintf("https://github.com/%s/commit/%s", repo, commit), nil
+	}
+}
+
+func githubPRLink(repo string) func(change) (string, error) {
+	r := regexp.MustCompile("^Merge pull request #[0-9]+")
+	return func(c change) (string, error) {
+		var err error
+		message := r.ReplaceAllStringFunc(c.Description, func(m string) string {
+			idx := strings.Index(m, "#")
+			pr := m[idx+1:]
+
+			// TODO: Validate links using github API
+			// TODO: Validate PR merged as commit hash
+			link := fmt.Sprintf("https://github.com/%s/pull/%s", repo, pr)
+
+			return fmt.Sprintf("%s [#%s](%s)", m[:idx], pr, link)
+		})
+		if err != nil {
+			return "", err
+		}
+		return message, nil
+	}
 }
