@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/continuity/fs"
+
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -171,7 +172,7 @@ func (b *snapshotter) usage(ctx context.Context, key string) (snapshots.Usage, e
 		if parentID != "" {
 			du, err = fs.DiffUsage(ctx, filepath.Join(b.root, "snapshots", parentID), p)
 		} else {
-			du, err = fs.DiskUsage(p)
+			du, err = fs.DiskUsage(ctx, p)
 		}
 		if err != nil {
 			// TODO(stevvooe): Consider not reporting an error in this case.
