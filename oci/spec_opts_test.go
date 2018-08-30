@@ -23,6 +23,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"runtime"
 	"testing"
 
 	"github.com/containerd/containerd/containers"
@@ -108,7 +109,13 @@ func TestWithDefaultSpec(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected, err := createDefaultSpec(ctx, c.ID)
+	var expected Spec
+	var err error
+	if runtime.GOOS == "windows" {
+		err = populateDefaultWindowsSpec(ctx, &expected, c.ID)
+	} else {
+		err = populateDefaultUnixSpec(ctx, &expected, c.ID)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +124,7 @@ func TestWithDefaultSpec(t *testing.T) {
 		t.Fatalf("spec should not be empty")
 	}
 
-	if !reflect.DeepEqual(&s, expected) {
+	if !reflect.DeepEqual(&s, &expected) {
 		t.Fatalf("spec from option differs from default: \n%#v != \n%#v", &s, expected)
 	}
 }
@@ -134,12 +141,12 @@ func TestWithSpecFromFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer fp.Close()
 	defer func() {
 		if err := os.Remove(fp.Name()); err != nil {
 			log.Printf("failed to remove tempfile %v: %v", fp.Name(), err)
 		}
 	}()
+	defer fp.Close()
 
 	expected, err := GenerateSpec(ctx, nil, &c)
 	if err != nil {
