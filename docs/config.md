@@ -28,7 +28,7 @@ The explanation and default value of each configuration item are as follows:
   # It generates a self-sign certificate unless the following x509_key_pair_streaming are both set.
   enable_tls_streaming = false
   
-  # "plugins.cri.x509_key_pair_streaming" constains a x509 valid key pair to stream with tls.
+  # "plugins.cri.x509_key_pair_streaming" contains a x509 valid key pair to stream with tls.
   [plugins.cri.x509_key_pair_streaming]
     # tls_cert_file is the filepath to the certificate paired with the "tls_key_file"
     tls_cert_file = ""
