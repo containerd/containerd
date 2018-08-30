@@ -1040,7 +1040,7 @@ func TestContainerRuntimeOptionsv2(t *testing.T) {
 	}
 }
 
-func TestContainerKillInitPidHost(t *testing.T) {
+func initContainerAndCheckChildrenDieOnKill(t *testing.T, opts ...oci.SpecOpts) {
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -1059,12 +1059,12 @@ func TestContainerKillInitPidHost(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	opts = append(opts, oci.WithImageConfig(image))
+	opts = append(opts, withProcessArgs("sh", "-c", "sleep 42; echo hi"))
+
 	container, err := client.NewContainer(ctx, id,
 		WithNewSnapshot(id, image),
-		WithNewSpec(oci.WithImageConfig(image),
-			withProcessArgs("sh", "-c", "sleep 42; echo hi"),
-			oci.WithHostNamespace(specs.PIDNamespace),
-		),
+		WithNewSpec(opts...),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1109,6 +1109,14 @@ func TestContainerKillInitPidHost(t *testing.T) {
 	if _, err := task.Delete(ctx, WithProcessKill); err != nil {
 		t.Error(err)
 	}
+}
+
+func TestContainerKillInitPidHost(t *testing.T) {
+	initContainerAndCheckChildrenDieOnKill(t, oci.WithHostNamespace(specs.PIDNamespace))
+}
+
+func TestContainerKillInitKillsChildWhenNotHostPid(t *testing.T) {
+	initContainerAndCheckChildrenDieOnKill(t)
 }
 
 func TestUserNamespaces(t *testing.T) {

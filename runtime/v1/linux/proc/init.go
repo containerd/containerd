@@ -249,7 +249,6 @@ func (p *Init) setExited(status int) {
 }
 
 func (p *Init) delete(context context.Context) error {
-	p.KillAll(context)
 	p.wg.Wait()
 	err := p.runtime.Delete(context, p.id, nil)
 	// ignore errors if a runtime has already deleted the process
