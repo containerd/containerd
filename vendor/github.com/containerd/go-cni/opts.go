@@ -136,19 +136,37 @@ func WithConfListFile(fileName string) CNIOpt {
 		if err != nil {
 			return err
 		}
+		i := len(c.networks)
 		c.networks = append(c.networks, &Network{
 			cni:    c.cniConfig,
 			config: confList,
-			ifName: getIfName(c.prefix, 0),
+			ifName: getIfName(c.prefix, i),
 		})
 		return nil
 	}
 }
 
-// WithDefaultConf can be used to detect network config
+// WithDefaultConf can be used to detect the default network
+// config file from the configured cni config directory and load
+// it.
+// Since the CNI spec does not specify a way to detect default networks,
+// the convention chosen is - the first network configuration in the sorted
+// list of network conf files as the default network.
+func WithDefaultConf(c *libcni) error {
+	return loadFromConfDir(c, 1)
+}
+
+// WithAllConf can be used to detect all network config
 // files from the configured cni config directory and load
 // them.
-func WithDefaultConf(c *libcni) error {
+func WithAllConf(c *libcni) error {
+	return loadFromConfDir(c, 0)
+}
+
+// loadFromConfDir detects network config files from the
+// configured cni config directory and load them. max is
+// the maximum network config to load (max i<= 0 means no limit).
+func loadFromConfDir(c *libcni, max int) error {
 	files, err := cnilibrary.ConfFiles(c.pluginConfDir, []string{".conf", ".conflist", ".json"})
 	switch {
 	case err != nil:
@@ -166,6 +184,7 @@ func WithDefaultConf(c *libcni) error {
 	// interface provided during init as the network interface for this default
 	// network. For every other network use a generated interface id.
 	i := 0
+	var networks []*Network
 	for _, confFile := range files {
 		var confList *cnilibrary.NetworkConfigList
 		if strings.HasSuffix(confFile, ".conflist") {
@@ -193,15 +212,19 @@ func WithDefaultConf(c *libcni) error {
 			return errors.Wrapf(ErrInvalidConfig, "CNI config list %s has no networks, skipping", confFile)
 
 		}
-		c.networks = append(c.networks, &Network{
+		networks = append(networks, &Network{
 			cni:    c.cniConfig,
 			config: confList,
 			ifName: getIfName(c.prefix, i),
 		})
 		i++
+		if i == max {
+			break
+		}
 	}
-	if len(c.networks) == 0 {
+	if len(networks) == 0 {
 		return errors.Wrapf(ErrCNINotInitialized, "no valid networks found in %s", c.pluginDirs)
 	}
+	c.networks = append(c.networks, networks...)
 	return nil
 }
