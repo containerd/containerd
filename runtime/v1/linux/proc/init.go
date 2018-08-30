@@ -228,7 +228,7 @@ func (p *Init) Status(ctx context.Context) (string, error) {
 	defer p.mu.Unlock()
 	c, err := p.runtime.State(ctx, p.id)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if strings.Contains(err.Error(), "does not exist") {
 			return "stopped", nil
 		}
 		return "", p.runtimeError(err, "OCI runtime state failed")
