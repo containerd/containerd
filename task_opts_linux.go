@@ -21,16 +21,7 @@ import (
 	"errors"
 
 	"github.com/containerd/containerd/runtime/linux/runctypes"
-	"github.com/opencontainers/runtime-spec/specs-go"
 )
-
-// WithResources sets the provided resources for task updates
-func WithResources(resources *specs.LinuxResources) UpdateTaskOpts {
-	return func(ctx context.Context, client *Client, r *UpdateTaskInfo) error {
-		r.Resources = resources
-		return nil
-	}
-}
 
 // WithNoNewKeyring causes tasks not to be created with a new keyring for secret storage.
 // There is an upper limit on the number of keyrings in a linux system

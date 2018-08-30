@@ -18,10 +18,12 @@ package containerd
 
 import (
 	"context"
+	"errors"
 	"syscall"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // NewTaskOpts allows the caller to set options on a new task
@@ -89,6 +91,22 @@ func WithKillAll(ctx context.Context, i *KillInfo) error {
 func WithKillExecID(execID string) KillOpts {
 	return func(ctx context.Context, i *KillInfo) error {
 		i.ExecID = execID
+		return nil
+	}
+}
+
+// WithResources sets the provided resources for task updates. Resources must be
+// either a *specs.LinuxResources or a *specs.WindowsResources
+func WithResources(resources interface{}) UpdateTaskOpts {
+	return func(ctx context.Context, client *Client, r *UpdateTaskInfo) error {
+		switch resources.(type) {
+		case *specs.LinuxResources:
+		case *specs.WindowsResources:
+		default:
+			return errors.New("WithResources requires a *specs.LinuxResources or *specs.WindowsResources")
+		}
+
+		r.Resources = resources
 		return nil
 	}
 }
