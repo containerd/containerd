@@ -12,11 +12,14 @@ import (
 	"github.com/containerd/continuity/devices"
 	driverpkg "github.com/containerd/continuity/driver"
 	"github.com/containerd/continuity/pathdriver"
+
 	"github.com/opencontainers/go-digest"
 )
 
 var (
-	ErrNotFound     = fmt.Errorf("not found")
+	// ErrNotFound represents the resource not found
+	ErrNotFound = fmt.Errorf("not found")
+	// ErrNotSupported represents the resource not supported
 	ErrNotSupported = fmt.Errorf("not supported")
 )
 
@@ -36,6 +39,7 @@ type Context interface {
 // not under the given root.
 type SymlinkPath func(root, linkname, target string) (string, error)
 
+// ContextOptions represents options to create a new context.
 type ContextOptions struct {
 	Digester   Digester
 	Driver     driverpkg.Driver
@@ -379,7 +383,7 @@ func (c *context) checkoutFile(fp string, rf RegularFile) error {
 	}
 	defer r.Close()
 
-	return atomicWriteFile(fp, r, rf)
+	return atomicWriteFile(fp, r, rf.Size(), rf.Mode())
 }
 
 // Apply the resource to the contexts. An error will be returned if the
@@ -472,10 +476,6 @@ func (c *context) Apply(resource Resource) error {
 				return err
 			}
 		}
-
-		// NOTE(stevvooe): Chmod on symlink is not supported on linux. We
-		// may want to maintain support for other platforms that have it.
-		chmod = false
 
 	case Device:
 		if fi == nil {
