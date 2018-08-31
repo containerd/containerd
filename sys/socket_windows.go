@@ -20,13 +20,27 @@ package sys
 
 import (
 	"net"
+	"net/url"
+	"strings"
 
 	"github.com/Microsoft/go-winio"
+	"github.com/pkg/errors"
 )
 
-// GetLocalListener returns a Listernet out of a named pipe.
-// `path` must be of the form of `\\.\pipe\<pipename>`
+// GetLocalListener returns a Listener out of a named pipe or tcp socket.
+// `path` must be of the form of `\\.\pipe\<pipename>` or tcp://<address>:port.
 // (see https://msdn.microsoft.com/en-us/library/windows/desktop/aa365150)
 func GetLocalListener(path string, uid, gid int) (net.Listener, error) {
-	return winio.ListenPipe(path, nil)
+	if strings.HasPrefix(path, "\\\\") {
+		return winio.ListenPipe(path, nil)
+	}
+	u, err := url.Parse(path)
+	if err != nil {
+		return nil, err
+	}
+	switch u.Scheme {
+	case "tcp":
+		return net.Listen("tcp", u.Host)
+	}
+	return nil, errors.Errorf("unsupported protocol '%s'", u.Scheme)
 }

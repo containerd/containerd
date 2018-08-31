@@ -18,11 +18,14 @@ package dialer
 
 import (
 	"net"
+	"net/url"
 	"os"
+	"strings"
 	"syscall"
 	"time"
 
 	winio "github.com/Microsoft/go-winio"
+	"github.com/pkg/errors"
 )
 
 func isNoent(err error) bool {
@@ -37,7 +40,18 @@ func isNoent(err error) bool {
 }
 
 func dialer(address string, timeout time.Duration) (net.Conn, error) {
-	return winio.DialPipe(address, &timeout)
+	if strings.HasPrefix(address, "\\\\") {
+		return winio.DialPipe(address, &timeout)
+	}
+	u, err := url.Parse(address)
+	if err != nil {
+		return nil, err
+	}
+	switch u.Scheme {
+	case "tcp":
+		return net.DialTimeout("tcp", u.Host, timeout)
+	}
+	return nil, errors.Errorf("unsupported protocol '%s'", u.Scheme)
 }
 
 // DialAddress returns the dial address
