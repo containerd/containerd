@@ -109,10 +109,10 @@ func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, fun
 		// cleaning config-specific resources is up to the caller
 	}
 	return client, &ctrd, cleanup
-
 }
 
-func testDaemonRuntimeRoot(t *testing.T, noShim bool) {
+// TestDaemonRuntimeRoot ensures plugin.linux.runtime_root is not ignored
+func TestDaemonRuntimeRoot(t *testing.T) {
 	runtimeRoot, err := ioutil.TempDir("", "containerd-test-runtime-root")
 	if err != nil {
 		t.Fatal(err)
@@ -154,6 +154,11 @@ func testDaemonRuntimeRoot(t *testing.T, noShim bool) {
 	}
 	defer task.Delete(ctx)
 
+	status, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	if err = task.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -163,23 +168,8 @@ func testDaemonRuntimeRoot(t *testing.T, noShim bool) {
 		t.Errorf("error while getting stat for %s: %v", stateJSONPath, err)
 	}
 
-	finishedC, err := task.Wait(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
 	if err = task.Kill(ctx, syscall.SIGKILL); err != nil {
 		t.Error(err)
 	}
-	<-finishedC
-}
-
-// TestDaemonRuntimeRoot ensures plugin.linux.runtime_root is not ignored
-func TestDaemonRuntimeRoot(t *testing.T) {
-	testDaemonRuntimeRoot(t, false)
-}
-
-// TestDaemonRuntimeRootNoShim ensures plugin.linux.runtime_root is not ignored when no_shim is true
-func TestDaemonRuntimeRootNoShim(t *testing.T) {
-	t.Skip("no_shim is not functional now: https://github.com/containerd/containerd/issues/2181")
-	testDaemonRuntimeRoot(t, true)
+	<-status
 }
