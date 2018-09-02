@@ -138,6 +138,22 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 	if copts.services == nil && c.conn == nil {
 		return nil, errors.New("no grpc connection or services is available")
 	}
+
+	// check namespace labels for default runtime
+	defaultns := "default"
+	if copts.defaultns != "" {
+		defaultns = copts.defaultns
+	}
+	namespaces := c.NamespaceService()
+	ctx := context.Background()
+	if labels, err := namespaces.Labels(ctx, defaultns); err == nil {
+		if defaultRuntime, ok := labels["runtime"]; ok {
+			c.runtime = defaultRuntime
+		}
+	} else {
+		return nil, err
+	}
+
 	return c, nil
 }
 
