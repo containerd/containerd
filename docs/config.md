@@ -24,8 +24,16 @@ The explanation and default value of each configuration item are as follows:
   # systemd_cgroup enables systemd cgroup support.
   systemd_cgroup = false
 
-  # enable_tls_streaming enables the TLS streaming support.
+  # enable_tls_streaming enables the TLS streaming support. 
+  # It generates a self-sign certificate unless the following x509_key_pair_streaming are both set.
   enable_tls_streaming = false
+  
+  # "plugins.cri.x509_key_pair_streaming" contains a x509 valid key pair to stream with tls.
+  [plugins.cri.x509_key_pair_streaming]
+    # tls_cert_file is the filepath to the certificate paired with the "tls_key_file"
+    tls_cert_file = ""
+    # tls_key_file is the filepath to the private key paired with the "tls_cert_file"
+    tls_key_file = ""
 
   # max_container_log_line_size is the maximum log line size in bytes for a container.
   # Log line longer than the limit will be split into multiple lines. -1 means no
