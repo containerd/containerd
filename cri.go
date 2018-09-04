@@ -71,6 +71,10 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	}
 	log.G(ctx).Infof("Start cri plugin with config %+v", c)
 
+	if err := validateConfig(&c); err != nil {
+		return nil, errors.Wrap(err, "invalid config")
+	}
+
 	if err := setGLogLevel(); err != nil {
 		return nil, errors.Wrap(err, "failed to set glog level")
 	}
@@ -102,6 +106,18 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		// TODO(random-liu): Whether and how we can stop containerd.
 	}()
 	return s, nil
+}
+
+// validateConfig validates the given configuration.
+func validateConfig(c *criconfig.Config) error {
+	// It is an error to provide both an UntrustedWorkloadRuntime & define an 'untrusted' runtime.
+	if _, ok := c.ContainerdConfig.Runtimes[criconfig.RuntimeUntrusted]; ok {
+		if c.ContainerdConfig.UntrustedWorkloadRuntime.Type != "" {
+			return errors.New("conflicting definitions: configuration includes untrusted_workload_runtime and runtimes['untrusted']")
+		}
+	}
+
+	return nil
 }
 
 // getServicesOpts get service options from plugin context.
