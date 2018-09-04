@@ -35,6 +35,7 @@ import (
 type initState interface {
 	proc.State
 
+	CheckRuncState(context.Context) error
 	Pause(context.Context) error
 	Resume(context.Context) error
 	Update(context.Context, *google_protobuf.Any) error
@@ -135,6 +136,10 @@ func (s *createdState) Exec(ctx context.Context, path string, r *ExecConfig) (pr
 	s.p.mu.Lock()
 	defer s.p.mu.Unlock()
 	return s.p.exec(ctx, path, r)
+}
+
+func (s *createdState) CheckRuncState(ctx context.Context) error {
+	return nil
 }
 
 type createdCheckpointState struct {
@@ -280,6 +285,10 @@ func (s *createdCheckpointState) Exec(ctx context.Context, path string, r *ExecC
 	return nil, errors.Errorf("cannot exec in a created state")
 }
 
+func (s *createdCheckpointState) CheckRuncState(ctx context.Context) error {
+	return nil
+}
+
 type runningState struct {
 	p *Init
 }
@@ -369,6 +378,20 @@ func (s *runningState) Exec(ctx context.Context, path string, r *ExecConfig) (pr
 	s.p.mu.Lock()
 	defer s.p.mu.Unlock()
 	return s.p.exec(ctx, path, r)
+}
+
+func (s *runningState) CheckRuncState(ctx context.Context) error {
+	s.p.mu.Lock()
+	defer s.p.mu.Unlock()
+	st, err := s.p.Status(ctx)
+	if err != nil {
+		return err
+	}
+	switch st {
+	case "paused":
+		s.transition("paused")
+	}
+	return nil
 }
 
 type pausedState struct {
@@ -464,6 +487,20 @@ func (s *pausedState) Exec(ctx context.Context, path string, r *ExecConfig) (pro
 	return nil, errors.Errorf("cannot exec in a paused state")
 }
 
+func (s *pausedState) CheckRuncState(ctx context.Context) error {
+	s.p.mu.Lock()
+	defer s.p.mu.Unlock()
+	st, err := s.p.Status(ctx)
+	if err != nil {
+		return err
+	}
+	switch st {
+	case "running":
+		s.transition("running")
+	}
+	return nil
+}
+
 type stoppedState struct {
 	p *Init
 }
@@ -542,4 +579,8 @@ func (s *stoppedState) Exec(ctx context.Context, path string, r *ExecConfig) (pr
 	defer s.p.mu.Unlock()
 
 	return nil, errors.Errorf("cannot exec in a stopped state")
+}
+
+func (s *stoppedState) CheckRuncState(ctx context.Context) error {
+	return nil
 }

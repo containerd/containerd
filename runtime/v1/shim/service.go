@@ -207,6 +207,9 @@ func (s *Service) Delete(ctx context.Context, r *ptypes.Empty) (*shimapi.DeleteR
 	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
+	if err := p.(*proc.Init).CheckRuncState(ctx); err != nil {
+		return nil, err
+	}
 	if err := p.Delete(ctx); err != nil {
 		return nil, err
 	}
@@ -229,6 +232,9 @@ func (s *Service) DeleteProcess(ctx context.Context, r *shimapi.DeleteProcessReq
 	p := s.processes[r.ID]
 	if p == nil {
 		return nil, errors.Wrapf(errdefs.ErrNotFound, "process %s", r.ID)
+	}
+	if err := p.(*proc.Init).CheckRuncState(ctx); err != nil {
+		return nil, err
 	}
 	if err := p.Delete(ctx); err != nil {
 		return nil, err
@@ -253,6 +259,9 @@ func (s *Service) Exec(ctx context.Context, r *shimapi.ExecProcessRequest) (*pty
 	p := s.processes[s.id]
 	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
+	}
+	if err := p.(*proc.Init).CheckRuncState(ctx); err != nil {
+		return nil, err
 	}
 
 	process, err := p.(*proc.Init).Exec(ctx, s.config.Path, &proc.ExecConfig{
@@ -339,6 +348,9 @@ func (s *Service) Pause(ctx context.Context, r *ptypes.Empty) (*ptypes.Empty, er
 	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
+	if err := p.(*proc.Init).CheckRuncState(ctx); err != nil {
+		return nil, err
+	}
 	if err := p.(*proc.Init).Pause(ctx); err != nil {
 		return nil, err
 	}
@@ -352,6 +364,9 @@ func (s *Service) Resume(ctx context.Context, r *ptypes.Empty) (*ptypes.Empty, e
 	p := s.processes[s.id]
 	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
+	}
+	if err := p.(*proc.Init).CheckRuncState(ctx); err != nil {
+		return nil, err
 	}
 	if err := p.(*proc.Init).Resume(ctx); err != nil {
 		return nil, err
@@ -367,6 +382,9 @@ func (s *Service) Kill(ctx context.Context, r *shimapi.KillRequest) (*ptypes.Emp
 		p := s.processes[s.id]
 		if p == nil {
 			return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
+		}
+		if err := p.(*proc.Init).CheckRuncState(ctx); err != nil {
+			return nil, err
 		}
 		if err := p.Kill(ctx, r.Signal, r.All); err != nil {
 			return nil, errdefs.ToGRPC(err)
