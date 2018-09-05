@@ -35,9 +35,9 @@ import (
 func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli.Context) (containerd.Container, error) {
 	var (
 		id     string
-		Config = context.IsSet("config")
+		config = context.IsSet("config")
 	)
-	if Config {
+	if config {
 		id = context.Args().First()
 	} else {
 		id = context.Args().Get(1)
@@ -57,7 +57,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		spec  containerd.NewContainerOpts
 	)
 
-	if Config {
+	if config {
 		opts = append(opts, oci.WithSpecFromFile(context.String("config")))
 	} else {
 		var (
