@@ -341,6 +341,8 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 	for _, e := range config.GetEnvs() {
 		g.AddProcessEnv(e.GetKey(), e.GetValue())
 	}
+	// add the HOSTNAME variable to the environment to match Docker runtime default
+	g.AddProcessEnv("HOSTNAME", sandboxConfig.GetHostname())
 
 	securityContext := config.GetLinux().GetSecurityContext()
 	selinuxOpt := securityContext.GetSelinuxOptions()
