@@ -19,6 +19,7 @@ package server
 import (
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/containerd/containerd/contrib/apparmor"
@@ -312,26 +313,50 @@ func TestContainerSpecWithExtraMounts(t *testing.T) {
 		Readonly:      false,
 	}
 	config.Mounts = append(config.Mounts, mountInConfig)
-	extraMount := &runtime.Mount{
-		ContainerPath: "test-container-path",
-		HostPath:      "test-host-path-extra",
-		Readonly:      true,
+	extraMounts := []*runtime.Mount{
+		{
+			ContainerPath: "test-container-path",
+			HostPath:      "test-host-path-extra",
+			Readonly:      true,
+		},
+		{
+			ContainerPath: "/sys",
+			HostPath:      "test-sys-extra",
+			Readonly:      false,
+		},
+		{
+			ContainerPath: "/dev",
+			HostPath:      "test-dev-extra",
+			Readonly:      false,
+		},
 	}
-	spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, []*runtime.Mount{extraMount})
+	spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, extraMounts)
 	require.NoError(t, err)
 	specCheck(t, testID, testSandboxID, testPid, spec)
-	var mounts []runtimespec.Mount
+	var mounts, sysMounts, devMounts []runtimespec.Mount
 	for _, m := range spec.Mounts {
 		if m.Destination == "test-container-path" {
 			mounts = append(mounts, m)
+		} else if m.Destination == "/sys" {
+			sysMounts = append(sysMounts, m)
+		} else if strings.HasPrefix(m.Destination, "/dev") {
+			devMounts = append(devMounts, m)
 		}
 	}
-	t.Logf("Extra mounts should come first")
-	require.Len(t, mounts, 2)
-	assert.Equal(t, "test-host-path-extra", mounts[0].Source)
-	assert.Contains(t, mounts[0].Options, "ro")
-	assert.Equal(t, "test-host-path", mounts[1].Source)
-	assert.Contains(t, mounts[1].Options, "rw")
+	t.Logf("CRI mount should override extra mount")
+	require.Len(t, mounts, 1)
+	assert.Equal(t, "test-host-path", mounts[0].Source)
+	assert.Contains(t, mounts[0].Options, "rw")
+
+	t.Logf("Extra mount should override default mount")
+	require.Len(t, sysMounts, 1)
+	assert.Equal(t, "test-sys-extra", sysMounts[0].Source)
+	assert.Contains(t, sysMounts[0].Options, "rw")
+
+	t.Logf("Dev mount should override all default dev mounts")
+	require.Len(t, devMounts, 1)
+	assert.Equal(t, "test-dev-extra", devMounts[0].Source)
+	assert.Contains(t, devMounts[0].Options, "rw")
 }
 
 func TestContainerAndSandboxPrivileged(t *testing.T) {

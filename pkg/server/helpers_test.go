@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/containerd/containerd"
@@ -25,6 +26,7 @@ import (
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
+	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	criconfig "github.com/containerd/cri/pkg/config"
 	"github.com/containerd/cri/pkg/util"
@@ -189,4 +191,25 @@ func TestGetRuntimeConfigFromContainerInfo(t *testing.T) {
 			assert.Equal(t, test.expectedRuntime, r)
 		})
 	}
+}
+
+func TestOrderedMounts(t *testing.T) {
+	mounts := []*runtime.Mount{
+		{ContainerPath: "/a/b/c"},
+		{ContainerPath: "/a/b"},
+		{ContainerPath: "/a/b/c/d"},
+		{ContainerPath: "/a"},
+		{ContainerPath: "/b"},
+		{ContainerPath: "/b/c"},
+	}
+	expected := []*runtime.Mount{
+		{ContainerPath: "/a"},
+		{ContainerPath: "/b"},
+		{ContainerPath: "/a/b"},
+		{ContainerPath: "/b/c"},
+		{ContainerPath: "/a/b/c"},
+		{ContainerPath: "/a/b/c/d"},
+	}
+	sort.Stable(orderedMounts(mounts))
+	assert.Equal(t, expected, mounts)
 }
