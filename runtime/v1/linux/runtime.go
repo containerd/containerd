@@ -204,7 +204,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 				log.G(ctx).WithError(err).WithFields(logrus.Fields{
 					"id":        id,
 					"namespace": namespace,
-				}).Warn("failed to clen up after killed shim")
+				}).Warn("failed to clean up after killed shim")
 			}
 		}
 		shimopt = ShimRemote(r.config, r.address, cgroup, exitHandler)
