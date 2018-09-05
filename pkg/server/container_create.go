@@ -357,6 +357,24 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 		return nil, errors.Wrapf(err, "failed to set OCI bind mounts %+v", mounts)
 	}
 
+	// Apply masked paths if specified.
+	// When `MaskedPaths` is not specified, keep runtime default for backward compatibility;
+	// When `MaskedPaths` is specified, but length is zero, clear masked path list.
+	if securityContext.GetMaskedPaths() != nil {
+		g.Config.Linux.MaskedPaths = nil
+		for _, path := range securityContext.GetMaskedPaths() {
+			g.AddLinuxMaskedPaths(path)
+		}
+	}
+
+	// Apply readonly paths if specified.
+	if securityContext.GetReadonlyPaths() != nil {
+		g.Config.Linux.ReadonlyPaths = nil
+		for _, path := range securityContext.GetReadonlyPaths() {
+			g.AddLinuxReadonlyPaths(path)
+		}
+	}
+
 	if securityContext.GetPrivileged() {
 		if !sandboxConfig.GetLinux().GetSecurityContext().GetPrivileged() {
 			return nil, errors.New("no privileged container allowed in sandbox")

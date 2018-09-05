@@ -248,7 +248,6 @@ func TestContainerCapabilities(t *testing.T) {
 		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil)
 		require.NoError(t, err)
 		specCheck(t, testID, testSandboxID, testPid, spec)
-		t.Log(spec.Process.Capabilities.Bounding)
 		for _, include := range test.includes {
 			assert.Contains(t, spec.Process.Capabilities.Bounding, include)
 			assert.Contains(t, spec.Process.Capabilities.Effective, include)
@@ -911,5 +910,47 @@ func TestGenerateApparmorSpecOpts(t *testing.T) {
 		} else {
 			assert.NoError(t, err)
 		}
+	}
+}
+
+func TestMaskedAndReadonlyPaths(t *testing.T) {
+	testID := "test-id"
+	testSandboxID := "sandbox-id"
+	testPid := uint32(1234)
+	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	c := newTestCRIService()
+	defaultSpec, err := defaultRuntimeSpec(testID)
+	require.NoError(t, err)
+	for desc, test := range map[string]struct {
+		masked           []string
+		readonly         []string
+		expectedMasked   []string
+		expectedReadonly []string
+	}{
+		"should apply default if not specified": {
+			expectedMasked:   defaultSpec.Linux.MaskedPaths,
+			expectedReadonly: defaultSpec.Linux.ReadonlyPaths,
+		},
+		"should be able to specify empty paths": {
+			masked:           []string{},
+			readonly:         []string{},
+			expectedMasked:   nil,
+			expectedReadonly: nil,
+		},
+		"should apply CRI specified paths": {
+			masked:           []string{"/proc"},
+			readonly:         []string{"/sys"},
+			expectedMasked:   []string{"/proc"},
+			expectedReadonly: []string{"/sys"},
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		config.Linux.SecurityContext.MaskedPaths = test.masked
+		config.Linux.SecurityContext.ReadonlyPaths = test.readonly
+		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil)
+		require.NoError(t, err)
+		specCheck(t, testID, testSandboxID, testPid, spec)
+		assert.Equal(t, test.expectedMasked, spec.Linux.MaskedPaths)
+		assert.Equal(t, test.expectedReadonly, spec.Linux.ReadonlyPaths)
 	}
 }

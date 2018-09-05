@@ -198,7 +198,7 @@ func (r *Request) Throttle(limiter flowcontrol.RateLimiter) *Request {
 	return r
 }
 
-// SubResource sets a sub-resource path which can be multiple segments segment after the resource
+// SubResource sets a sub-resource path which can be multiple segments after the resource
 // name but before the suffix.
 func (r *Request) SubResource(subresources ...string) *Request {
 	if r.err != nil {
@@ -731,7 +731,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 					}
 				}
 
-				glog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", seconds, retries, url)
+				glog.V(4).Infof("Got a Retry-After %ds response for attempt %d to %v", seconds, retries, url)
 				r.backoffMgr.Sleep(time.Duration(seconds) * time.Second)
 				return false
 			}

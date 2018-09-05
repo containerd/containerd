@@ -35,6 +35,8 @@ const (
 	NamespaceSystem string = "kube-system"
 	// NamespacePublic is the namespace where we place public info (ConfigMaps)
 	NamespacePublic string = "kube-public"
+	// NamespaceNodeLease is the namespace where we place node lease objects (used for node heartbeats)
+	NamespaceNodeLease string = "kube-node-lease"
 	// TerminationMessagePathDefault means the default path to capture the application termination message running in a container
 	TerminationMessagePathDefault string = "/dev/termination-log"
 )
@@ -411,6 +413,16 @@ type PersistentVolumeClaimSpec struct {
 	// This is an alpha feature and may change in the future.
 	// +optional
 	VolumeMode *PersistentVolumeMode
+	// This field requires the VolumeSnapshotDataSource alpha feature gate to be
+	// enabled and currently VolumeSnapshot is the only supported data source.
+	// If the provisioner can support VolumeSnapshot data source, it will create
+	// a new volume and data will be restored to the volume at the same time.
+	// If the provisioner does not support VolumeSnapshot data source, volume will
+	// not be created and the failure will be reported as an event.
+	// In the future, we plan to support more data source types and the behavior
+	// of the provisioner may change.
+	// +optional
+	DataSource *TypedLocalObjectReference
 }
 
 type PersistentVolumeClaimConditionType string
@@ -562,6 +574,8 @@ const (
 	ProtocolTCP Protocol = "TCP"
 	// ProtocolUDP is the UDP protocol.
 	ProtocolUDP Protocol = "UDP"
+	// ProtocolSCTP is the SCTP protocol.
+	ProtocolSCTP Protocol = "SCTP"
 )
 
 // Represents a Persistent Disk resource in Google Compute Engine.
@@ -1264,6 +1278,7 @@ type ScaleIOVolumeSource struct {
 	// +optional
 	StoragePool string
 	// Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
+	// Default is ThinProvisioned.
 	// +optional
 	StorageMode string
 	// The name of a volume already created in the ScaleIO system
@@ -1271,7 +1286,8 @@ type ScaleIOVolumeSource struct {
 	VolumeName string
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// Ex. "ext4", "xfs", "ntfs".
+	// Default is "xfs".
 	// +optional
 	FSType string
 	// Defaults to false (read/write). ReadOnly here will force
@@ -1300,6 +1316,7 @@ type ScaleIOPersistentVolumeSource struct {
 	// +optional
 	StoragePool string
 	// Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
+	// Default is ThinProvisioned.
 	// +optional
 	StorageMode string
 	// The name of a volume created in the ScaleIO system
@@ -1307,7 +1324,8 @@ type ScaleIOPersistentVolumeSource struct {
 	VolumeName string
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// Ex. "ext4", "xfs", "ntfs".
+	// Default is "xfs".
 	// +optional
 	FSType string
 	// Defaults to false (read/write). ReadOnly here will force
@@ -1519,7 +1537,7 @@ type CSIPersistentVolumeSource struct {
 
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// Ex. "ext4", "xfs", "ntfs".
 	// +optional
 	FSType string
 
@@ -1564,7 +1582,7 @@ type ContainerPort struct {
 	HostPort int32
 	// Required: This must be a valid port number, 0 < x < 65536.
 	ContainerPort int32
-	// Required: Supports "TCP" and "UDP".
+	// Required: Supports "TCP", "UDP" and "SCTP"
 	// +optional
 	Protocol Protocol
 	// Optional: What host IP to bind the external port to.
@@ -1589,7 +1607,7 @@ type VolumeMount struct {
 	SubPath string
 	// mountPropagation determines how mounts are propagated from the host
 	// to container and the other way around.
-	// When not set, MountPropagationHostToContainer is used.
+	// When not set, MountPropagationNone is used.
 	// This field is beta in 1.10.
 	// +optional
 	MountPropagation *MountPropagationMode
@@ -2567,6 +2585,14 @@ type PodSpec struct {
 	// More info: https://github.com/kubernetes/community/blob/master/keps/sig-network/0007-pod-ready%2B%2B.md
 	// +optional
 	ReadinessGates []PodReadinessGate
+	// RuntimeClassName refers to a RuntimeClass object in the node.k8s.io group, which should be used
+	// to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run.
+	// If unset or empty, the "legacy" RuntimeClass will be used, which is an implicit class with an
+	// empty definition that uses the default runtime handler.
+	// More info: https://github.com/kubernetes/community/blob/master/keps/sig-node/0014-runtime-class.md
+	// This is an alpha feature and may change in the future.
+	// +optional
+	RuntimeClassName *string
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
@@ -2609,7 +2635,7 @@ type PodSecurityContext struct {
 	// in the same pod, and the first process in each container will not be assigned PID 1.
 	// HostPID and ShareProcessNamespace cannot both be set.
 	// Optional: Default to false.
-	// This field is alpha-level and is honored only by servers that enable the PodShareProcessNamespace feature.
+	// This field is beta-level and may be disabled with the PodShareProcessNamespace feature.
 	// +k8s:conversion-gen=false
 	// +optional
 	ShareProcessNamespace *bool
@@ -3161,7 +3187,7 @@ type ServicePort struct {
 	// the 'Name' field in EndpointPort objects.
 	Name string
 
-	// The IP protocol for this port.  Supports "TCP" and "UDP".
+	// The IP protocol for this port.  Supports "TCP", "UDP", and "SCTP".
 	Protocol Protocol
 
 	// The port that will be exposed on the service.
@@ -3941,6 +3967,16 @@ type ObjectReference struct {
 // LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.
 type LocalObjectReference struct {
 	//TODO: Add other useful fields.  apiVersion, kind, uid?
+	Name string
+}
+
+// TypedLocalObjectReference contains enough information to let you locate the typed referenced object inside the same namespace.
+type TypedLocalObjectReference struct {
+	// APIGroup is the group for the resource being referenced
+	APIGroup string
+	// Kind is the type of resource being referenced
+	Kind string
+	// Name is the name of resource being referenced
 	Name string
 }
 
