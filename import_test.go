@@ -49,13 +49,17 @@ func TestOCIExportAndImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	imgrecs, err := client.Import(ctx, &oci.V1Importer{ImageName: "foo/bar:"}, exported)
+	opts := []ImportOpt{
+		WithImporter(&oci.V1Importer{}),
+		WithImageRefTranslator(oci.RefTranslator("foo/bar")),
+	}
+	imgrecs, err := client.Import(ctx, exported, opts...)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for _, imgrec := range imgrecs {
-		err = client.ImageService().Delete(ctx, imgrec.Name())
+		err = client.ImageService().Delete(ctx, imgrec.Name)
 		if err != nil {
 			t.Fatal(err)
 		}
