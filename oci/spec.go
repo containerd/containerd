@@ -19,6 +19,7 @@ package oci
 import (
 	"context"
 	"path/filepath"
+	"runtime"
 
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
@@ -51,22 +52,30 @@ func GenerateSpec(ctx context.Context, client Client, c *containers.Container, o
 // GenerateSpecWithPlatform will generate a default spec from the provided image
 // for use as a containerd container in the platform requested.
 func GenerateSpecWithPlatform(ctx context.Context, client Client, platform string, c *containers.Container, opts ...SpecOpts) (*Spec, error) {
-	plat, err := platforms.Parse(platform)
-	if err != nil {
-		return nil, err
-	}
-
 	var s Spec
-	if plat.OS == "windows" {
-		err = populateDefaultWindowsSpec(ctx, &s, c.ID)
-	} else {
-		err = populateDefaultUnixSpec(ctx, &s, c.ID)
-	}
-	if err != nil {
+	if err := generateDefaultSpecWithPlatform(ctx, platform, c.ID, &s); err != nil {
 		return nil, err
 	}
 
 	return &s, ApplyOpts(ctx, client, c, &s, opts...)
+}
+
+func generateDefaultSpecWithPlatform(ctx context.Context, platform, id string, s *Spec) error {
+	plat, err := platforms.Parse(platform)
+	if err != nil {
+		return err
+	}
+
+	if plat.OS == "windows" {
+		err = populateDefaultWindowsSpec(ctx, s, id)
+	} else {
+		err = populateDefaultUnixSpec(ctx, s, id)
+		if err == nil && runtime.GOOS == "windows" {
+			// To run LCOW we have a Linux and Windows section. Add an empty one now.
+			s.Windows = &specs.Windows{}
+		}
+	}
+	return err
 }
 
 // ApplyOpts applys the options to the given spec, injecting data from the

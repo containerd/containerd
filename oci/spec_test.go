@@ -73,6 +73,44 @@ func TestGenerateSpec(t *testing.T) {
 	}
 }
 
+func TestGenerateSpecWithPlatform(t *testing.T) {
+	t.Parallel()
+
+	ctx := namespaces.WithNamespace(context.Background(), "testing")
+	platforms := []string{"windows/amd64", "linux/amd64"}
+	for _, p := range platforms {
+		t.Logf("Testing platform: %s", p)
+		s, err := GenerateSpecWithPlatform(ctx, nil, p, &containers.Container{ID: t.Name()})
+		if err != nil {
+			t.Fatalf("failed to generate spec: %v", err)
+		}
+
+		if s.Root == nil {
+			t.Fatal("expected non nil Root section.")
+		}
+		if s.Process == nil {
+			t.Fatal("expected non nil Process section.")
+		}
+		if p == "windows/amd64" {
+			if s.Linux != nil {
+				t.Fatal("expected nil Linux section")
+			}
+			if s.Windows == nil {
+				t.Fatal("expected non nil Windows section")
+			}
+		} else {
+			if s.Linux == nil {
+				t.Fatal("expected non nil Linux section")
+			}
+			if runtime.GOOS == "windows" && s.Windows == nil {
+				t.Fatal("expected non nil Windows section for LCOW")
+			} else if runtime.GOOS != "windows" && s.Windows != nil {
+				t.Fatal("expected nil Windows section")
+			}
+		}
+	}
+}
+
 func TestSpecWithTTY(t *testing.T) {
 	t.Parallel()
 
