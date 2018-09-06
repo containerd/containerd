@@ -19,6 +19,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -471,4 +472,31 @@ func toRuntimeAuthConfig(a criconfig.AuthConfig) *runtime.AuthConfig {
 		Auth:          a.Auth,
 		IdentityToken: a.IdentityToken,
 	}
+}
+
+// mounts defines how to sort runtime.Mount.
+// This is the same with the Docker implementation:
+//   https://github.com/moby/moby/blob/17.05.x/daemon/volumes.go#L26
+type orderedMounts []*runtime.Mount
+
+// Len returns the number of mounts. Used in sorting.
+func (m orderedMounts) Len() int {
+	return len(m)
+}
+
+// Less returns true if the number of parts (a/b/c would be 3 parts) in the
+// mount indexed by parameter 1 is less than that of the mount indexed by
+// parameter 2. Used in sorting.
+func (m orderedMounts) Less(i, j int) bool {
+	return m.parts(i) < m.parts(j)
+}
+
+// Swap swaps two items in an array of mounts. Used in sorting
+func (m orderedMounts) Swap(i, j int) {
+	m[i], m[j] = m[j], m[i]
+}
+
+// parts returns the number of parts in the destination of a mount. Used in sorting.
+func (m orderedMounts) parts(i int) int {
+	return strings.Count(filepath.Clean(m[i].ContainerPath), string(os.PathSeparator))
 }
