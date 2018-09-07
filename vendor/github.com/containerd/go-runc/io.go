@@ -34,6 +34,24 @@ type StartCloser interface {
 	CloseAfterStart() error
 }
 
+// IOOpt sets I/O creation options
+type IOOpt func(*IOOption)
+
+// IOOption holds I/O creation options
+type IOOption struct {
+	OpenStdin  bool
+	OpenStdout bool
+	OpenStderr bool
+}
+
+func defaultIOOption() *IOOption {
+	return &IOOption{
+		OpenStdin:  true,
+		OpenStdout: true,
+		OpenStderr: true,
+	}
+}
+
 func newPipe() (*pipe, error) {
 	r, w, err := os.Pipe()
 	if err != nil {
@@ -65,14 +83,23 @@ type pipeIO struct {
 }
 
 func (i *pipeIO) Stdin() io.WriteCloser {
+	if i.in == nil {
+		return nil
+	}
 	return i.in.w
 }
 
 func (i *pipeIO) Stdout() io.ReadCloser {
+	if i.out == nil {
+		return nil
+	}
 	return i.out.r
 }
 
 func (i *pipeIO) Stderr() io.ReadCloser {
+	if i.err == nil {
+		return nil
+	}
 	return i.err.r
 }
 
@@ -83,28 +110,38 @@ func (i *pipeIO) Close() error {
 		i.out,
 		i.err,
 	} {
-		if cerr := v.Close(); err == nil {
-			err = cerr
+		if v != nil {
+			if cerr := v.Close(); err == nil {
+				err = cerr
+			}
 		}
 	}
 	return err
 }
 
 func (i *pipeIO) CloseAfterStart() error {
-	for _, f := range []*os.File{
-		i.out.w,
-		i.err.w,
+	for _, f := range []*pipe{
+		i.out,
+		i.err,
 	} {
-		f.Close()
+		if f != nil {
+			f.w.Close()
+		}
 	}
 	return nil
 }
 
 // Set sets the io to the exec.Cmd
 func (i *pipeIO) Set(cmd *exec.Cmd) {
-	cmd.Stdin = i.in.r
-	cmd.Stdout = i.out.w
-	cmd.Stderr = i.err.w
+	if i.in != nil {
+		cmd.Stdin = i.in.r
+	}
+	if i.out != nil {
+		cmd.Stdout = i.out.w
+	}
+	if i.err != nil {
+		cmd.Stderr = i.err.w
+	}
 }
 
 func NewSTDIO() (IO, error) {
