@@ -23,7 +23,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -91,10 +90,7 @@ func setCapabilities(s *Spec) {
 // Use as the first option to clear the spec, then apply options afterwards.
 func WithDefaultSpec() SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
-		if runtime.GOOS == "windows" {
-			return populateDefaultWindowsSpec(ctx, s, c.ID)
-		}
-		return populateDefaultUnixSpec(ctx, s, c.ID)
+		return generateDefaultSpecWithPlatform(ctx, platforms.DefaultString(), c.ID, s)
 	}
 }
 
@@ -104,15 +100,7 @@ func WithDefaultSpec() SpecOpts {
 // Use as the first option to clear the spec, then apply options afterwards.
 func WithDefaultSpecForPlatform(platform string) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
-		plat, err := platforms.Parse(platform)
-		if err != nil {
-			return err
-		}
-
-		if plat.OS == "windows" {
-			return populateDefaultWindowsSpec(ctx, s, c.ID)
-		}
-		return populateDefaultUnixSpec(ctx, s, c.ID)
+		return generateDefaultSpecWithPlatform(ctx, platform, c.ID, s)
 	}
 }
 

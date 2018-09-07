@@ -314,6 +314,14 @@ func writeMountsToConfig(bundle string, mounts []*containerd_types.Mount) error 
 		return errors.Wrap(err, "failed to seek to 0 in config.json")
 	}
 
+	// If we are creating LCOW make sure that spec.Windows is filled out before
+	// appending layer folders.
+	if m.Type == "lcow-layer" && spec.Windows == nil {
+		spec.Windows = &oci.Windows{
+			HyperV: &oci.WindowsHyperV{},
+		}
+	}
+
 	// Append the parents
 	spec.Windows.LayerFolders = append(spec.Windows.LayerFolders, parentLayerPaths...)
 	// Append the scratch
