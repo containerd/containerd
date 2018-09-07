@@ -49,7 +49,7 @@ var (
 func init() {
 	ns := metrics.NewNamespace("stress", "", nil)
 	// if you want more fine grained metrics then you can drill down with the metrics in prom that
-	// containerd is outputing
+	// containerd is outputting
 	ct = ns.NewLabeledTimer("run", "Run time of a full container during the test", "commit")
 	execTimer = ns.NewLabeledTimer("exec", "Run time of an exec process during the test", "commit")
 	binarySizeGauge = ns.NewLabeledGauge("binary_size", "Binary size of compiled binaries", metrics.Bytes, "name")
