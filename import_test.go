@@ -29,7 +29,6 @@ import (
 	"github.com/containerd/containerd/archive/tartest"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/images/archive"
-	"github.com/containerd/containerd/images/oci"
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -56,7 +55,7 @@ func TestOCIExportAndImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	exported, err := client.Export(ctx, &oci.V1Exporter{}, pulled.Target)
+	exported, err := client.Export(ctx, pulled.Target)
 	if err != nil {
 		t.Fatal(err)
 	}

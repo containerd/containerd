@@ -21,7 +21,7 @@ import (
 	"os"
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	oci "github.com/containerd/containerd/images/oci"
+	"github.com/containerd/containerd/images/oci"
 	"github.com/containerd/containerd/reference"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -51,6 +51,10 @@ Currently, only OCI format is supported.
 			Name:  "manifest-type",
 			Usage: "media type of manifest digest",
 			Value: ocispec.MediaTypeImageManifest,
+		},
+		cli.BoolFlag{
+			Name:  "all-platforms",
+			Usage: "exports content from all platforms",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -101,7 +105,14 @@ Currently, only OCI format is supported.
 				return nil
 			}
 		}
-		r, err := client.Export(ctx, &oci.V1Exporter{}, desc)
+
+		var (
+			exportOpts []oci.V1ExporterOpt
+		)
+
+		exportOpts = append(exportOpts, oci.WithAllPlatforms(context.Bool("all-platforms")))
+
+		r, err := client.Export(ctx, desc, exportOpts...)
 		if err != nil {
 			return err
 		}
