@@ -73,7 +73,7 @@ func (b *binary) Start(ctx context.Context) (_ *shim, err error) {
 		}
 	}()
 	// open the log pipe and block until the writer is ready
-	// this helps with syncronization of the shim
+	// this helps with synchronization of the shim
 	// copy the shim's logs to containerd's output
 	go func() {
 		defer f.Close()

@@ -315,7 +315,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		if err := os.MkdirAll(snDir, 0700); err != nil {
 			return nil, err
 		}
-		// Create the scratch.vhdx cache file if it doesnt already exit.
+		// Create the scratch.vhdx cache file if it doesn't already exit.
 		scratchPath := filepath.Join(s.root, "scratch.vhdx")
 		scratchLockPath := filepath.Join(s.root, "scratch.vhdx.lock")
 		startTime := time.Now()

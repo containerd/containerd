@@ -518,7 +518,7 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAP
 
 	select {
 	case <-time.After(5 * time.Second):
-		// Force close the container process since it didnt shutdown in time.
+		// Force close the container process since it didn't shutdown in time.
 		p.close()
 	case <-p.waitBlock:
 	}
