@@ -29,6 +29,8 @@ import (
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	criconfig "github.com/containerd/cri/pkg/config"
+	"github.com/containerd/cri/pkg/store"
+	imagestore "github.com/containerd/cri/pkg/store/image"
 	"github.com/containerd/cri/pkg/util"
 )
 
@@ -212,4 +214,59 @@ func TestOrderedMounts(t *testing.T) {
 	}
 	sort.Stable(orderedMounts(mounts))
 	assert.Equal(t, expected, mounts)
+}
+
+func TestParseImageReferences(t *testing.T) {
+	refs := []string{
+		"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+		"gcr.io/library/busybox:1.2",
+		"sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+		"arbitrary-ref",
+	}
+	expectedTags := []string{
+		"gcr.io/library/busybox:1.2",
+	}
+	expectedDigests := []string{"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582"}
+	tags, digests := parseImageReferences(refs)
+	assert.Equal(t, expectedTags, tags)
+	assert.Equal(t, expectedDigests, digests)
+}
+
+func TestLocalResolve(t *testing.T) {
+	image := imagestore.Image{
+		ID:      "sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113799",
+		ChainID: "test-chain-id-1",
+		References: []string{
+			"docker.io/library/busybox:latest",
+			"docker.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+		},
+		Size: 10,
+	}
+	c := newTestCRIService()
+	var err error
+	c.imageStore, err = imagestore.NewFakeStore([]imagestore.Image{image})
+	assert.NoError(t, err)
+
+	for _, ref := range []string{
+		"sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113799",
+		"busybox",
+		"busybox:latest",
+		"busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+		"library/busybox",
+		"library/busybox:latest",
+		"library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+		"docker.io/busybox",
+		"docker.io/busybox:latest",
+		"docker.io/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+		"docker.io/library/busybox",
+		"docker.io/library/busybox:latest",
+		"docker.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+	} {
+		img, err := c.localResolve(ref)
+		assert.NoError(t, err)
+		assert.Equal(t, image, img)
+	}
+	img, err := c.localResolve("randomid")
+	assert.Equal(t, store.ErrNotExist, err)
+	assert.Equal(t, imagestore.Image{}, img)
 }

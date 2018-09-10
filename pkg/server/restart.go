@@ -28,7 +28,6 @@ import (
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/typeurl"
-	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/pkg/system"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -97,16 +96,7 @@ func (c *criService) recover(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to list images")
 	}
-	images, err := loadImages(ctx, cImages, c.config.ContainerdConfig.Snapshotter)
-	if err != nil {
-		return errors.Wrap(err, "failed to load images")
-	}
-	for _, image := range images {
-		logrus.Debugf("Loaded image %+v", image)
-		if err := c.imageStore.Add(image); err != nil {
-			return errors.Wrapf(err, "failed to add image %q to store", image.ID)
-		}
-	}
+	loadImages(ctx, c.imageStore, cImages, c.config.ContainerdConfig.Snapshotter)
 
 	// It's possible that containerd containers are deleted unexpectedly. In that case,
 	// we can't even get metadata, we should cleanup orphaned sandbox/container directories
@@ -404,26 +394,9 @@ func loadSandbox(ctx context.Context, cntr containerd.Container) (sandboxstore.S
 }
 
 // loadImages loads images from containerd.
-// TODO(random-liu): Check whether image is unpacked, because containerd put image reference
-// into store before image is unpacked.
-func loadImages(ctx context.Context, cImages []containerd.Image,
-	snapshotter string) ([]imagestore.Image, error) {
-	// Group images by image id.
-	imageMap := make(map[string][]containerd.Image)
+func loadImages(ctx context.Context, store *imagestore.Store, cImages []containerd.Image,
+	snapshotter string) {
 	for _, i := range cImages {
-		desc, err := i.Config(ctx)
-		if err != nil {
-			logrus.WithError(err).Warnf("Failed to get image config for %q", i.Name())
-			continue
-		}
-		id := desc.Digest.String()
-		imageMap[id] = append(imageMap[id], i)
-	}
-	var images []imagestore.Image
-	for id, imgs := range imageMap {
-		// imgs len must be > 0, or else the entry will not be created in
-		// previous loop.
-		i := imgs[0]
 		ok, _, _, _, err := containerdimages.Check(ctx, i.ContentStore(), i.Target(), platforms.Default())
 		if err != nil {
 			logrus.WithError(err).Errorf("Failed to check image content readiness for %q", i.Name())
@@ -436,48 +409,19 @@ func loadImages(ctx context.Context, cImages []containerd.Image,
 		// Checking existence of top-level snapshot for each image being recovered.
 		unpacked, err := i.IsUnpacked(ctx, snapshotter)
 		if err != nil {
-			logrus.WithError(err).Warnf("Failed to Check whether image is unpacked for image %s", i.Name())
+			logrus.WithError(err).Warnf("Failed to check whether image is unpacked for image %s", i.Name())
 			continue
 		}
 		if !unpacked {
 			logrus.Warnf("The image %s is not unpacked.", i.Name())
 			// TODO(random-liu): Consider whether we should try unpack here.
 		}
-
-		info, err := getImageInfo(ctx, i)
-		if err != nil {
-			logrus.WithError(err).Warnf("Failed to get image info for %q", i.Name())
+		if err := store.Update(ctx, i.Name()); err != nil {
+			logrus.WithError(err).Warnf("Failed to update reference for image %q", i.Name())
 			continue
 		}
-		image := imagestore.Image{
-			ID:        id,
-			ChainID:   info.chainID.String(),
-			Size:      info.size,
-			ImageSpec: info.imagespec,
-			Image:     i,
-		}
-		// Recover repo digests and repo tags.
-		for _, i := range imgs {
-			name := i.Name()
-			r, err := reference.ParseAnyReference(name)
-			if err != nil {
-				logrus.WithError(err).Warnf("Failed to parse image reference %q", name)
-				continue
-			}
-			if _, ok := r.(reference.Canonical); ok {
-				image.RepoDigests = append(image.RepoDigests, name)
-			} else if _, ok := r.(reference.Tagged); ok {
-				image.RepoTags = append(image.RepoTags, name)
-			} else if _, ok := r.(reference.Digested); ok {
-				// This is an image id.
-				continue
-			} else {
-				logrus.Warnf("Invalid image reference %q", name)
-			}
-		}
-		images = append(images, image)
+		logrus.Debugf("Loaded image %q", i.Name())
 	}
-	return images, nil
 }
 
 func cleanupOrphanedIDDirs(cntrs []containerd.Container, base string) error {

@@ -19,8 +19,6 @@ package server
 import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
-
-	imagestore "github.com/containerd/cri/pkg/store/image"
 )
 
 // ListImages lists existing images.
@@ -37,20 +35,4 @@ func (c *criService) ListImages(ctx context.Context, r *runtime.ListImagesReques
 	}
 
 	return &runtime.ListImagesResponse{Images: images}, nil
-}
-
-// toCRIImage converts image to CRI image type.
-func toCRIImage(image imagestore.Image) *runtime.Image {
-	runtimeImage := &runtime.Image{
-		Id:          image.ID,
-		RepoTags:    image.RepoTags,
-		RepoDigests: image.RepoDigests,
-		Size_:       uint64(image.Size),
-	}
-	uid, username := getUserFromImage(image.ImageSpec.Config.User)
-	if uid != nil {
-		runtimeImage.Uid = &runtime.Int64Value{Value: *uid}
-	}
-	runtimeImage.Username = username
-	return runtimeImage
 }

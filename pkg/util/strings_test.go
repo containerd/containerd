@@ -46,3 +46,14 @@ func TestSubtractStringSlice(t *testing.T) {
 	assert.Empty(t, SubtractStringSlice(nil, "hij"))
 	assert.Empty(t, SubtractStringSlice([]string{}, "hij"))
 }
+
+func TestMergeStringSlices(t *testing.T) {
+	s1 := []string{"abc", "def", "ghi"}
+	s2 := []string{"def", "jkl", "mno"}
+	expect := []string{"abc", "def", "ghi", "jkl", "mno"}
+	result := MergeStringSlices(s1, s2)
+	assert.Len(t, result, len(expect))
+	for _, s := range expect {
+		assert.Contains(t, result, s)
+	}
+}

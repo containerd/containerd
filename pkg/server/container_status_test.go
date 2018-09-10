@@ -63,9 +63,11 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 		StartedAt: startedAt,
 	}
 	image := &imagestore.Image{
-		ID:          imageID,
-		RepoTags:    []string{"test-image-repo-tag"},
-		RepoDigests: []string{"test-image-repo-digest"},
+		ID: imageID,
+		References: []string{
+			"gcr.io/library/busybox:latest",
+			"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+		},
 	}
 	expected := &runtime.ContainerStatus{
 		Id:          testID,
@@ -73,8 +75,8 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 		State:       runtime.ContainerState_CONTAINER_RUNNING,
 		CreatedAt:   createdAt,
 		StartedAt:   startedAt,
-		Image:       &runtime.ImageSpec{Image: "test-image-repo-tag"},
-		ImageRef:    "test-image-repo-digest",
+		Image:       &runtime.ImageSpec{Image: "gcr.io/library/busybox:latest"},
+		ImageRef:    "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
 		Reason:      completeExitReason,
 		Labels:      config.GetLabels(),
 		Annotations: config.GetAnnotations(),
@@ -120,7 +122,7 @@ func TestToCRIContainerStatus(t *testing.T) {
 			expectedReason: errorExitReason,
 		},
 	} {
-		metadata, status, image, expected := getContainerStatusTestData()
+		metadata, status, _, expected := getContainerStatusTestData()
 		// Update status with test case.
 		status.FinishedAt = test.finishedAt
 		status.ExitCode = test.exitCode
@@ -138,8 +140,8 @@ func TestToCRIContainerStatus(t *testing.T) {
 		expected.ExitCode = test.exitCode
 		expected.Message = test.message
 		containerStatus := toCRIContainerStatus(container,
-			&runtime.ImageSpec{Image: image.RepoTags[0]},
-			image.RepoDigests[0])
+			expected.Image,
+			expected.ImageRef)
 		assert.Equal(t, expected, containerStatus, desc)
 	}
 }
@@ -207,7 +209,8 @@ func TestContainerStatus(t *testing.T) {
 			assert.NoError(t, c.containerStore.Add(container))
 		}
 		if test.imageExist {
-			c.imageStore.Add(*image)
+			c.imageStore, err = imagestore.NewFakeStore([]imagestore.Image{*image})
+			assert.NoError(t, err)
 		}
 		resp, err := c.ContainerStatus(context.Background(), &runtime.ContainerStatusRequest{ContainerId: container.ID})
 		if test.expectErr {

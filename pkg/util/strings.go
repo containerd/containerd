@@ -41,3 +41,19 @@ func SubtractStringSlice(ss []string, str string) []string {
 	}
 	return res
 }
+
+// MergeStringSlices merges 2 string slices into one and remove duplicated elements.
+func MergeStringSlices(a []string, b []string) []string {
+	set := map[string]struct{}{}
+	for _, s := range a {
+		set[s] = struct{}{}
+	}
+	for _, s := range b {
+		set[s] = struct{}{}
+	}
+	var ss []string
+	for s := range set {
+		ss = append(ss, s)
+	}
+	return ss
+}

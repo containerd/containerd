@@ -50,7 +50,7 @@ func newTestCRIService() *criService {
 		imageFSPath:        testImageFSPath,
 		os:                 ostesting.NewFakeOS(),
 		sandboxStore:       sandboxstore.NewStore(),
-		imageStore:         imagestore.NewStore(),
+		imageStore:         imagestore.NewStore(nil),
 		snapshotStore:      snapshotstore.NewStore(),
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerStore:     containerstore.NewStore(),

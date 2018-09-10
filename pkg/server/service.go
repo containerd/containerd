@@ -113,7 +113,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 		os:                 osinterface.RealOS{},
 		sandboxStore:       sandboxstore.NewStore(),
 		containerStore:     containerstore.NewStore(),
-		imageStore:         imagestore.NewStore(),
+		imageStore:         imagestore.NewStore(client),
 		snapshotStore:      snapshotstore.NewStore(),
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerNameIndex: registrar.NewRegistrar(),
@@ -157,7 +157,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 		return nil, errors.Wrap(err, "failed to create stream server")
 	}
 
-	c.eventMonitor = newEventMonitor(c.containerStore, c.sandboxStore)
+	c.eventMonitor = newEventMonitor(c.containerStore, c.sandboxStore, c.imageStore)
 
 	return c, nil
 }
