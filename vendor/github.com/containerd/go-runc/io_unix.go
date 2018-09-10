@@ -24,8 +24,15 @@ import (
 )
 
 // NewPipeIO creates pipe pairs to be used with runc
-func NewPipeIO(uid, gid int) (i IO, err error) {
-	var pipes []*pipe
+func NewPipeIO(uid, gid int, opts ...IOOpt) (i IO, err error) {
+	option := defaultIOOption()
+	for _, o := range opts {
+		o(option)
+	}
+	var (
+		pipes                 []*pipe
+		stdin, stdout, stderr *pipe
+	)
 	// cleanup in case of an error
 	defer func() {
 		if err != nil {
@@ -34,33 +41,33 @@ func NewPipeIO(uid, gid int) (i IO, err error) {
 			}
 		}
 	}()
-	stdin, err := newPipe()
-	if err != nil {
-		return nil, err
+	if option.OpenStdin {
+		if stdin, err = newPipe(); err != nil {
+			return nil, err
+		}
+		pipes = append(pipes, stdin)
+		if err = unix.Fchown(int(stdin.r.Fd()), uid, gid); err != nil {
+			return nil, errors.Wrap(err, "failed to chown stdin")
+		}
 	}
-	pipes = append(pipes, stdin)
-	if err = unix.Fchown(int(stdin.r.Fd()), uid, gid); err != nil {
-		return nil, errors.Wrap(err, "failed to chown stdin")
+	if option.OpenStdout {
+		if stdout, err = newPipe(); err != nil {
+			return nil, err
+		}
+		pipes = append(pipes, stdout)
+		if err = unix.Fchown(int(stdout.w.Fd()), uid, gid); err != nil {
+			return nil, errors.Wrap(err, "failed to chown stdout")
+		}
 	}
-
-	stdout, err := newPipe()
-	if err != nil {
-		return nil, err
+	if option.OpenStderr {
+		if stderr, err = newPipe(); err != nil {
+			return nil, err
+		}
+		pipes = append(pipes, stderr)
+		if err = unix.Fchown(int(stderr.w.Fd()), uid, gid); err != nil {
+			return nil, errors.Wrap(err, "failed to chown stderr")
+		}
 	}
-	pipes = append(pipes, stdout)
-	if err = unix.Fchown(int(stdout.w.Fd()), uid, gid); err != nil {
-		return nil, errors.Wrap(err, "failed to chown stdout")
-	}
-
-	stderr, err := newPipe()
-	if err != nil {
-		return nil, err
-	}
-	pipes = append(pipes, stderr)
-	if err = unix.Fchown(int(stderr.w.Fd()), uid, gid); err != nil {
-		return nil, errors.Wrap(err, "failed to chown stderr")
-	}
-
 	return &pipeIO{
 		in:  stdin,
 		out: stdout,

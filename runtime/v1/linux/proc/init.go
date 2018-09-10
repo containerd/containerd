@@ -123,7 +123,7 @@ func (p *Init) Create(ctx context.Context, r *CreateConfig) error {
 			return errors.Wrap(err, "creating new NULL IO")
 		}
 	} else {
-		if p.io, err = runc.NewPipeIO(p.IoUID, p.IoGID); err != nil {
+		if p.io, err = runc.NewPipeIO(p.IoUID, p.IoGID, withConditionalIO(p.stdio)); err != nil {
 			return errors.Wrap(err, "failed to create OCI runtime io pipes")
 		}
 	}
@@ -397,5 +397,13 @@ func (p *Init) runtimeError(rErr error, msg string) error {
 		return errors.Wrap(rErr, msg)
 	default:
 		return errors.Errorf("%s: %s", msg, rMsg)
+	}
+}
+
+func withConditionalIO(c proc.Stdio) runc.IOOpt {
+	return func(o *runc.IOOption) {
+		o.OpenStdin = c.Stdin != ""
+		o.OpenStdout = c.Stdout != ""
+		o.OpenStderr = c.Stderr != ""
 	}
 }

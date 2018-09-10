@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -1479,5 +1480,54 @@ func TestBindLowPortNonOpt(t *testing.T) {
 	}
 	if _, err := task.Delete(ctx); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestContainerNoSTDIN(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withExitStatus(0)), WithNewSnapshot(id, image))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStreams(nil, ioutil.Discard, ioutil.Discard)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	status := <-statusC
+	code, _, err := status.Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code != 0 {
+		t.Errorf("expected status 0 from wait but received %d", code)
 	}
 }
