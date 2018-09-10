@@ -110,15 +110,26 @@ var Command = cli.Command{
 	Action: func(context *cli.Context) error {
 		var (
 			err error
+			id  string
+			ref string
 
-			id     = context.Args().Get(1)
-			ref    = context.Args().First()
 			tty    = context.Bool("tty")
 			detach = context.Bool("detach")
+			config = context.IsSet("config")
 		)
 
-		if ref == "" {
-			return errors.New("image ref must be provided")
+		if config {
+			id = context.Args().First()
+			if context.NArg() > 1 {
+				return errors.New("with spec config file, only container id should be provided")
+			}
+		} else {
+			id = context.Args().Get(1)
+			ref = context.Args().First()
+
+			if ref == "" {
+				return errors.New("image ref must be provided")
+			}
 		}
 		if id == "" {
 			return errors.New("container id must be provided")

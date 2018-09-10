@@ -53,11 +53,22 @@ var createCommand = cli.Command{
 	Flags:     append(commands.SnapshotterFlags, commands.ContainerFlags...),
 	Action: func(context *cli.Context) error {
 		var (
-			id  = context.Args().Get(1)
-			ref = context.Args().First()
+			id     string
+			ref    string
+			config = context.IsSet("config")
 		)
-		if ref == "" {
-			return errors.New("image ref must be provided")
+
+		if config {
+			id = context.Args().First()
+			if context.NArg() > 1 {
+				return errors.New("with spec config file, only container id should be provided")
+			}
+		} else {
+			id = context.Args().Get(1)
+			ref = context.Args().First()
+			if ref == "" {
+				return errors.New("image ref must be provided")
+			}
 		}
 		if id == "" {
 			return errors.New("container id must be provided")

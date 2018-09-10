@@ -35,10 +35,14 @@ import (
 // NewContainer creates a new container
 func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli.Context) (containerd.Container, error) {
 	var (
-		ref  = context.Args().First()
-		id   = context.Args().Get(1)
-		args = context.Args()[2:]
+		id     string
+		config = context.IsSet("config")
 	)
+	if config {
+		id = context.Args().First()
+	} else {
+		id = context.Args().Get(1)
+	}
 
 	if raw := context.String("checkpoint"); raw != "" {
 		im, err := client.GetImage(ctx, raw)
@@ -54,9 +58,14 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		spec  containerd.NewContainerOpts
 	)
 
-	if context.IsSet("config") {
+	if config {
 		opts = append(opts, oci.WithSpecFromFile(context.String("config")))
 	} else {
+		var (
+			ref = context.Args().First()
+			//for container's id is Args[1]
+			args = context.Args()[2:]
+		)
 		opts = append(opts, oci.WithDefaultSpec(), oci.WithDefaultUnixDevices)
 		opts = append(opts, oci.WithEnv(context.StringSlice("env")))
 		opts = append(opts, withMounts(context))
