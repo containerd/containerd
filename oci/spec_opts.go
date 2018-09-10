@@ -634,6 +634,66 @@ func WithUsername(username string) SpecOpts {
 	}
 }
 
+// WithAdditionalGIDs sets the OCI spec's additionalGids array to any additional groups listed
+// for a particular user in the /etc/groups file of the image's root filesystem
+func WithAdditionalGIDs(username string) SpecOpts {
+	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
+		setProcess(s)
+		if c.Snapshotter == "" && c.SnapshotKey == "" {
+			if !isRootfsAbs(s.Root.Path) {
+				return errors.Errorf("rootfs absolute path is required")
+			}
+			gids, err := getSupplementalGroupsFromPath(s.Root.Path, func(g user.Group) bool {
+				// we only want supplemental groups
+				if g.Name == username {
+					return false
+				}
+				for _, entry := range g.List {
+					if entry == username {
+						return true
+					}
+				}
+				return false
+			})
+			if err != nil {
+				return err
+			}
+			s.Process.User.AdditionalGids = gids
+			return nil
+		}
+		if c.Snapshotter == "" {
+			return errors.Errorf("no snapshotter set for container")
+		}
+		if c.SnapshotKey == "" {
+			return errors.Errorf("rootfs snapshot not created for container")
+		}
+		snapshotter := client.SnapshotService(c.Snapshotter)
+		mounts, err := snapshotter.Mounts(ctx, c.SnapshotKey)
+		if err != nil {
+			return err
+		}
+		return mount.WithTempMount(ctx, mounts, func(root string) error {
+			gids, err := getSupplementalGroupsFromPath(root, func(g user.Group) bool {
+				// we only want supplemental groups
+				if g.Name == username {
+					return false
+				}
+				for _, entry := range g.List {
+					if entry == username {
+						return true
+					}
+				}
+				return false
+			})
+			if err != nil {
+				return err
+			}
+			s.Process.User.AdditionalGids = gids
+			return nil
+		})
+	}
+}
+
 // WithCapabilities sets Linux capabilities on the process
 func WithCapabilities(caps []string) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
@@ -713,6 +773,26 @@ func getGIDFromPath(root string, filter func(user.Group) bool) (gid uint32, err 
 	}
 	g := groups[0]
 	return uint32(g.Gid), nil
+}
+
+func getSupplementalGroupsFromPath(root string, filter func(user.Group) bool) ([]uint32, error) {
+	gpath, err := fs.RootPath(root, "/etc/group")
+	if err != nil {
+		return []uint32{}, err
+	}
+	groups, err := user.ParseGroupFileFilter(gpath, filter)
+	if err != nil {
+		return []uint32{}, err
+	}
+	if len(groups) == 0 {
+		// if there are no additional groups; just return an empty set
+		return []uint32{}, nil
+	}
+	addlGids := []uint32{}
+	for _, grp := range groups {
+		addlGids = append(addlGids, uint32(grp.Gid))
+	}
+	return addlGids, nil
 }
 
 func isRootfsAbs(root string) bool {
