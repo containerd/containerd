@@ -51,6 +51,7 @@ type FakeOS struct {
 	MountFn                func(source string, target string, fstype string, flags uintptr, data string) error
 	UnmountFn              func(target string) error
 	LookupMountFn          func(path string) (containerdmount.Info, error)
+	HostnameFn             func() (string, error)
 	calls                  []CalledDetail
 	errors                 map[string]error
 }
@@ -253,4 +254,17 @@ func (f *FakeOS) LookupMount(path string) (containerdmount.Info, error) {
 		return f.LookupMountFn(path)
 	}
 	return containerdmount.Info{}, nil
+}
+
+// Hostname is a fake call that invokes HostnameFn or just return nil.
+func (f *FakeOS) Hostname() (string, error) {
+	f.appendCalls("Hostname")
+	if err := f.getError("Hostname"); err != nil {
+		return "", err
+	}
+
+	if f.HostnameFn != nil {
+		return f.HostnameFn()
+	}
+	return "", nil
 }
