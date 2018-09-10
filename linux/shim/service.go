@@ -196,19 +196,21 @@ func (s *Service) Delete(ctx context.Context, r *ptypes.Empty) (*shimapi.DeleteR
 
 // DeleteProcess deletes an exec'd process
 func (s *Service) DeleteProcess(ctx context.Context, r *shimapi.DeleteProcessRequest) (*shimapi.DeleteResponse, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if r.ID == s.id {
 		return nil, status.Errorf(codes.InvalidArgument, "cannot delete init process with DeleteProcess")
 	}
+	s.mu.Lock()
 	p := s.processes[r.ID]
+	s.mu.Unlock()
 	if p == nil {
 		return nil, errors.Wrapf(errdefs.ErrNotFound, "process %s", r.ID)
 	}
 	if err := p.Delete(ctx); err != nil {
 		return nil, err
 	}
+	s.mu.Lock()
 	delete(s.processes, r.ID)
+	s.mu.Unlock()
 	return &shimapi.DeleteResponse{
 		ExitStatus: uint32(p.ExitStatus()),
 		ExitedAt:   p.ExitedAt(),
