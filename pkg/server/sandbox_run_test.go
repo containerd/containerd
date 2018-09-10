@@ -533,10 +533,18 @@ func TestGetSandboxRuntime(t *testing.T) {
 		Root:   "",
 	}
 
+	fooRuntime := criconfig.Runtime{
+		Type:   "io.containerd.runtime.v1.linux",
+		Engine: "foo-bar",
+		Root:   "",
+	}
+
 	for desc, test := range map[string]struct {
 		sandboxConfig            *runtime.PodSandboxConfig
+		runtimeHandler           string
 		defaultRuntime           criconfig.Runtime
 		untrustedWorkloadRuntime criconfig.Runtime
+		runtimes                 map[string]criconfig.Runtime
 		expectErr                bool
 		expectedRuntime          criconfig.Runtime
 	}{
@@ -595,6 +603,54 @@ func TestGetSandboxRuntime(t *testing.T) {
 			defaultRuntime: defaultRuntime,
 			expectErr:      true,
 		},
+		"should use 'untrusted' runtime for untrusted workload": {
+			sandboxConfig: &runtime.PodSandboxConfig{
+				Annotations: map[string]string{
+					annotations.UntrustedWorkload: "true",
+				},
+			},
+			defaultRuntime:  defaultRuntime,
+			runtimes:        map[string]criconfig.Runtime{criconfig.RuntimeUntrusted: untrustedWorkloadRuntime},
+			expectedRuntime: untrustedWorkloadRuntime,
+		},
+		"should use 'untrusted' runtime for untrusted workload & handler": {
+			sandboxConfig: &runtime.PodSandboxConfig{
+				Annotations: map[string]string{
+					annotations.UntrustedWorkload: "true",
+				},
+			},
+			runtimeHandler:  "untrusted",
+			defaultRuntime:  defaultRuntime,
+			runtimes:        map[string]criconfig.Runtime{criconfig.RuntimeUntrusted: untrustedWorkloadRuntime},
+			expectedRuntime: untrustedWorkloadRuntime,
+		},
+		"should return an error if untrusted annotation with conflicting handler": {
+			sandboxConfig: &runtime.PodSandboxConfig{
+				Annotations: map[string]string{
+					annotations.UntrustedWorkload: "true",
+				},
+			},
+			runtimeHandler:           "foo",
+			defaultRuntime:           defaultRuntime,
+			untrustedWorkloadRuntime: untrustedWorkloadRuntime,
+			runtimes:                 map[string]criconfig.Runtime{"foo": fooRuntime},
+			expectErr:                true,
+		},
+		"should use correct runtime for a runtime handler": {
+			sandboxConfig:            &runtime.PodSandboxConfig{},
+			runtimeHandler:           "foo",
+			defaultRuntime:           defaultRuntime,
+			untrustedWorkloadRuntime: untrustedWorkloadRuntime,
+			runtimes:                 map[string]criconfig.Runtime{"foo": fooRuntime},
+			expectedRuntime:          fooRuntime,
+		},
+		"should return error if runtime handler is required but not configured": {
+			sandboxConfig:  &runtime.PodSandboxConfig{},
+			runtimeHandler: "bar",
+			defaultRuntime: defaultRuntime,
+			runtimes:       map[string]criconfig.Runtime{"foo": fooRuntime},
+			expectErr:      true,
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			cri := newTestCRIService()
@@ -603,7 +659,8 @@ func TestGetSandboxRuntime(t *testing.T) {
 			}
 			cri.config.ContainerdConfig.DefaultRuntime = test.defaultRuntime
 			cri.config.ContainerdConfig.UntrustedWorkloadRuntime = test.untrustedWorkloadRuntime
-			r, err := cri.getSandboxRuntime(test.sandboxConfig)
+			cri.config.ContainerdConfig.Runtimes = test.runtimes
+			r, err := cri.getSandboxRuntime(test.sandboxConfig, test.runtimeHandler)
 			assert.Equal(t, test.expectErr, err != nil)
 			assert.Equal(t, test.expectedRuntime, r)
 		})

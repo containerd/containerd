@@ -33,10 +33,18 @@ type Runtime struct {
 type ContainerdConfig struct {
 	// Snapshotter is the snapshotter used by containerd.
 	Snapshotter string `toml:"snapshotter" json:"snapshotter"`
-	// DefaultRuntime is the runtime to use in containerd.
+	// DefaultRuntime is the default runtime to use in containerd.
+	// This runtime is used when no runtime handler (or the empty string) is provided.
 	DefaultRuntime Runtime `toml:"default_runtime" json:"defaultRuntime"`
 	// UntrustedWorkloadRuntime is a runtime to run untrusted workloads on it.
+	// DEPRECATED: use Runtimes instead. If provided, this runtime is mapped to the runtime handler
+	//     named 'untrusted'. It is a configuration error to provide both the (now deprecated)
+	//     UntrustedWorkloadRuntime and a handler in the Runtimes handler map (below) for 'untrusted'
+	//     workloads at the same time. Please provide one or the other.
 	UntrustedWorkloadRuntime Runtime `toml:"untrusted_workload_runtime" json:"untrustedWorkloadRuntime"`
+	// Runtimes is a map from CRI RuntimeHandler strings, which specify types of runtime
+	// configurations, to the matching configurations.
+	Runtimes map[string]Runtime `toml:"runtimes" json:"runtimes"`
 	// NoPivot disables pivot-root (linux only), required when running a container in a RamDisk with runc
 	NoPivot bool `toml:"no_pivot" json:"noPivot"`
 }
@@ -183,3 +191,8 @@ func DefaultConfig() PluginConfig {
 		},
 	}
 }
+
+const (
+	// RuntimeUntrusted is the implicit runtime defined for ContainerdConfig.UntrustedWorkloadRuntime
+	RuntimeUntrusted = "untrusted"
+)

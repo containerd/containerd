@@ -131,7 +131,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}()
 	}
 
-	ociRuntime, err := c.getSandboxRuntime(config)
+	ociRuntime, err := c.getSandboxRuntime(config, r.GetRuntimeHandler())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get sandbox runtime")
 	}
@@ -601,9 +601,13 @@ func hostAccessingSandbox(config *runtime.PodSandboxConfig) bool {
 // getSandboxRuntime returns the runtime configuration for sandbox.
 // If the sandbox contains untrusted workload, runtime for untrusted workload will be returned,
 // or else default runtime will be returned.
-func (c *criService) getSandboxRuntime(config *runtime.PodSandboxConfig) (criconfig.Runtime, error) {
-	untrusted := false
+func (c *criService) getSandboxRuntime(config *runtime.PodSandboxConfig, runtimeHandler string) (criconfig.Runtime, error) {
 	if untrustedWorkload(config) {
+		// If the untrusted annotation is provided, runtimeHandler MUST be empty.
+		if runtimeHandler != "" && runtimeHandler != criconfig.RuntimeUntrusted {
+			return criconfig.Runtime{}, errors.New("untrusted workload with explicit runtime handler is not allowed")
+		}
+
 		//  If the untrusted workload is requesting access to the host/node, this request will fail.
 		//
 		//  Note: If the workload is marked untrusted but requests privileged, this can be granted, as the
@@ -612,14 +616,22 @@ func (c *criService) getSandboxRuntime(config *runtime.PodSandboxConfig) (cricon
 		if hostAccessingSandbox(config) {
 			return criconfig.Runtime{}, errors.New("untrusted workload with host access is not allowed")
 		}
-		untrusted = true
+
+		// Handle the deprecated UntrustedWorkloadRuntime.
+		if c.config.ContainerdConfig.UntrustedWorkloadRuntime.Type != "" {
+			return c.config.ContainerdConfig.UntrustedWorkloadRuntime, nil
+		}
+
+		runtimeHandler = criconfig.RuntimeUntrusted
 	}
 
-	if untrusted {
-		if c.config.ContainerdConfig.UntrustedWorkloadRuntime.Type == "" {
-			return criconfig.Runtime{}, errors.New("no runtime for untrusted workload is configured")
-		}
-		return c.config.ContainerdConfig.UntrustedWorkloadRuntime, nil
+	if runtimeHandler == "" {
+		return c.config.ContainerdConfig.DefaultRuntime, nil
 	}
-	return c.config.ContainerdConfig.DefaultRuntime, nil
+
+	handler, ok := c.config.ContainerdConfig.Runtimes[runtimeHandler]
+	if !ok {
+		return criconfig.Runtime{}, errors.Errorf("no runtime for %q is configured", runtimeHandler)
+	}
+	return handler, nil
 }
