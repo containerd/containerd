@@ -45,6 +45,8 @@ var Command = cli.Command{
 		infoCommand,
 		listCommand,
 		setLabelsCommand,
+		checkpointCommand,
+		restoreCommand,
 	},
 }
 
@@ -279,6 +281,99 @@ var infoCommand = cli.Command{
 			return nil
 		}
 		commands.PrintAsJSON(info)
+		return nil
+	},
+}
+
+var checkpointCommand = cli.Command{
+	Name:      "checkpoint",
+	Usage:     "checkpoint a container",
+	ArgsUsage: "CONTAINER REF [flags]",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "rw",
+			Usage: "include the rw layer in the checkpoint",
+		},
+		cli.BoolFlag{
+			Name:  "image",
+			Usage: "include the image in the checkpoint",
+		},
+		cli.BoolFlag{
+			Name:  "task",
+			Usage: "checkpoint container task",
+		},
+	},
+	Action: func(context *cli.Context) error {
+		id := context.Args().First()
+		if id == "" {
+			return errors.New("container id must be provided")
+		}
+		ref := context.Args()[1]
+		if ref == "" {
+			return errors.New("ref must be provided")
+		}
+		client, ctx, cancel, err := commands.NewClient(context)
+		if err != nil {
+			return err
+		}
+		defer cancel()
+		opts := []containerd.CheckpointOpts{}
+		if context.Bool("image") {
+			opts = append(opts, containerd.WithCheckpointImage)
+		}
+		if context.Bool("rw") {
+			opts = append(opts, containerd.WithCheckpointRW)
+		}
+		if context.Bool("task") {
+			opts = append(opts, containerd.WithCheckpointTask)
+		}
+		container, err := client.LoadContainer(ctx, id)
+		if err != nil {
+			return err
+		}
+		if _, err := container.Checkpoint(ctx, ref, opts...); err != nil {
+			return err
+		}
+
+		return nil
+	},
+}
+
+var restoreCommand = cli.Command{
+	Name:      "restore",
+	Usage:     "restore a container from checkpoint",
+	ArgsUsage: "CONTAINER REF [flags]",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "live",
+			Usage: "restore the runtime and memory data from the checkpoint",
+		},
+	},
+	Action: func(context *cli.Context) error {
+		id := context.Args().First()
+		if id == "" {
+			return errors.New("container id must be provided")
+		}
+		ref := context.Args()[1]
+		if ref == "" {
+			return errors.New("ref must be provided")
+		}
+		opts := []containerd.RestoreOpts{
+			containerd.WithRestoreSpec,
+			containerd.WithRestoreRuntime,
+		}
+		if context.Bool("live") {
+			opts = append(opts, containerd.WithRestoreLive)
+		}
+		client, ctx, cancel, err := commands.NewClient(context)
+		if err != nil {
+			return err
+		}
+		defer cancel()
+		if err := client.Restore(ctx, id, ref, opts...); err != nil {
+			return err
+		}
+
 		return nil
 	},
 }

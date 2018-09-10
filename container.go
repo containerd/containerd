@@ -17,10 +17,12 @@
 package containerd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/containerd/containerd/api/services/tasks/v1"
@@ -28,9 +30,13 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl"
 	prototypes "github.com/gogo/protobuf/types"
+	ver "github.com/opencontainers/image-spec/specs-go"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
 
@@ -64,6 +70,8 @@ type Container interface {
 	Extensions(context.Context) (map[string]prototypes.Any, error)
 	// Update a container
 	Update(context.Context, ...UpdateContainerOpts) error
+	// Checkpoint creates a checkpoint image of the current container
+	Checkpoint(context.Context, string, ...CheckpointOpts) (Image, error)
 }
 
 func containerFromRecord(client *Client, c containers.Container) *container {
@@ -270,6 +278,98 @@ func (c *container) Update(ctx context.Context, opts ...UpdateContainerOpts) err
 		return errdefs.FromGRPC(err)
 	}
 	return nil
+}
+
+func (c *container) Checkpoint(ctx context.Context, ref string, opts ...CheckpointOpts) (Image, error) {
+	index := &ocispec.Index{
+		Versioned: ver.Versioned{
+			SchemaVersion: 2,
+		},
+		Annotations: make(map[string]string),
+	}
+	copts := &options.CheckpointOptions{
+		Exit:                false,
+		OpenTcp:             false,
+		ExternalUnixSockets: false,
+		Terminal:            false,
+		FileLocks:           true,
+		EmptyNamespaces:     nil,
+	}
+	img, err := c.Image(ctx)
+	if err != nil {
+		return nil, err
+	}
+	index.Annotations["image.name"] = img.Name()
+
+	ctx, done, err := c.client.WithLease(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer done(ctx)
+
+	// pause task to checkpoint
+	if err := func(ctx context.Context) error {
+		task, err := c.Task(ctx, nil)
+		if err != nil {
+			if errdefs.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		if err := task.Pause(ctx); err != nil {
+			return err
+		}
+		defer task.Resume(ctx)
+
+		info, err := c.Info(ctx)
+		if err != nil {
+			return err
+		}
+
+		// add runtime info to index
+		index.Annotations["runtime.name"] = info.Runtime.Name
+		if info.Runtime.Options != nil {
+			data, err := info.Runtime.Options.Marshal()
+			if err != nil {
+				return err
+			}
+			r := bytes.NewReader(data)
+			desc, err := writeContent(ctx, c.client.ContentStore(), images.MediaTypeContainerd1CheckpointRuntimeOptions, info.ID+"-runtime-options", r)
+			if err != nil {
+				return err
+			}
+			desc.Platform = &ocispec.Platform{
+				OS:           runtime.GOOS,
+				Architecture: runtime.GOARCH,
+			}
+			index.Manifests = append(index.Manifests, desc)
+		}
+
+		// process remaining opts
+		for _, o := range opts {
+			if err := o(ctx, c.client, &info, index, copts); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(ctx); err != nil {
+		return nil, err
+	}
+
+	desc, err := writeIndex(ctx, index, c.client, c.ID()+"index")
+	if err != nil {
+		return nil, err
+	}
+	i := images.Image{
+		Name:   ref,
+		Target: desc,
+	}
+	checkpoint, err := c.client.ImageService().Create(ctx, i)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewImage(c.client, checkpoint), nil
 }
 
 func (c *container) loadTask(ctx context.Context, ioAttach cio.Attach) (Task, error) {

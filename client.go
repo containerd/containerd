@@ -17,7 +17,9 @@
 package containerd
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"runtime"
@@ -36,6 +38,7 @@ import (
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	versionservice "github.com/containerd/containerd/api/services/version/v1"
+	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	contentproxy "github.com/containerd/containerd/content/proxy"
@@ -46,6 +49,7 @@ import (
 	"github.com/containerd/containerd/leases"
 	leasesproxy "github.com/containerd/containerd/leases/proxy"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
@@ -544,6 +548,107 @@ func (c *Client) ListImages(ctx context.Context, filters ...string) ([]Image, er
 		images[i] = NewImage(c, img)
 	}
 	return images, nil
+}
+
+// Restore restores a container from a checkpoint
+func (c *Client) Restore(ctx context.Context, id, ref string, opts ...RestoreOpts) error {
+	checkpoint, err := c.GetImage(ctx, ref)
+	if err != nil {
+		if !errdefs.IsNotFound(err) {
+			return err
+		}
+		ck, err := c.Fetch(ctx, ref)
+		if err != nil {
+			return err
+		}
+		checkpoint = NewImage(c, ck)
+	}
+
+	store := c.ContentStore()
+	index, err := decodeIndex(ctx, store, checkpoint.Target())
+	if err != nil {
+		return err
+	}
+
+	// get image from annotation
+	imageName, ok := index.Annotations["image.name"]
+	if !ok {
+		return ErrCheckpointIndexImageNameNotFound
+	}
+
+	image, err := c.Pull(ctx, imageName, WithPullUnpack)
+	if err != nil {
+		return err
+	}
+
+	ctx, done, err := c.WithLease(ctx)
+	if err != nil {
+		return err
+	}
+	defer done(ctx)
+
+	// container options
+	copts := []NewContainerOpts{
+		WithNewSpec(oci.WithImageConfig(image)),
+		WithNewSnapshot(id, image),
+	}
+	topts := []NewTaskOpts{}
+	for _, o := range opts {
+		co, to, err := o(ctx, c, checkpoint, index)
+		if err != nil {
+			return err
+		}
+		copts = append(copts, co...)
+		topts = append(topts, to...)
+	}
+
+	ctr, err := c.NewContainer(ctx, id, copts...)
+	if err != nil {
+		return err
+	}
+
+	// apply rw layer
+	info, err := ctr.Info(ctx)
+	if err != nil {
+		return err
+	}
+
+	rw, err := GetIndexByMediaType(index, ocispec.MediaTypeImageLayerGzip)
+	if err != nil {
+		return err
+	}
+
+	mounts, err := c.SnapshotService(info.Snapshotter).Mounts(ctx, info.SnapshotKey)
+	if err != nil {
+		return err
+	}
+
+	if _, err := c.DiffService().Apply(ctx, *rw, mounts); err != nil {
+		return err
+	}
+
+	task, err := ctr.NewTask(ctx, cio.NewCreator(cio.WithStdio), topts...)
+	if err != nil {
+		return err
+	}
+
+	if err := task.Start(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func writeIndex(ctx context.Context, index *ocispec.Index, client *Client, ref string) (d ocispec.Descriptor, err error) {
+	labels := map[string]string{}
+	for i, m := range index.Manifests {
+		labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i)] = m.Digest.String()
+	}
+	data, err := json.Marshal(index)
+	if err != nil {
+		return ocispec.Descriptor{}, err
+	}
+	return writeContent(ctx, client.ContentStore(), ocispec.MediaTypeImageIndex, ref, bytes.NewReader(data), content.WithLabels(labels))
 }
 
 // Subscribe to events that match one or more of the provided filters.
