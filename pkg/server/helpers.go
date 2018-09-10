@@ -97,6 +97,8 @@ const (
 	etcHosts = "/etc/hosts"
 	// resolvConfPath is the abs path of resolv.conf on host or container.
 	resolvConfPath = "/etc/resolv.conf"
+	// hostnameEnv is the key for HOSTNAME env.
+	hostnameEnv = "HOSTNAME"
 )
 
 const (

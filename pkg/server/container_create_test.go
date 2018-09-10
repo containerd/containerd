@@ -979,3 +979,45 @@ func TestMaskedAndReadonlyPaths(t *testing.T) {
 		assert.Equal(t, test.expectedReadonly, spec.Linux.ReadonlyPaths)
 	}
 }
+
+func TestHostname(t *testing.T) {
+	testID := "test-id"
+	testSandboxID := "sandbox-id"
+	testPid := uint32(1234)
+	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	c := newTestCRIService()
+	c.os.(*ostesting.FakeOS).HostnameFn = func() (string, error) {
+		return "real-hostname", nil
+	}
+	for desc, test := range map[string]struct {
+		hostname    string
+		networkNs   runtime.NamespaceMode
+		expectedEnv string
+	}{
+		"should add HOSTNAME=sandbox.Hostname for pod network namespace": {
+			hostname:    "test-hostname",
+			networkNs:   runtime.NamespaceMode_POD,
+			expectedEnv: "HOSTNAME=test-hostname",
+		},
+		"should add HOSTNAME=sandbox.Hostname for host network namespace": {
+			hostname:    "test-hostname",
+			networkNs:   runtime.NamespaceMode_NODE,
+			expectedEnv: "HOSTNAME=test-hostname",
+		},
+		"should add HOSTNAME=os.Hostname for host network namespace if sandbox.Hostname is not set": {
+			hostname:    "",
+			networkNs:   runtime.NamespaceMode_NODE,
+			expectedEnv: "HOSTNAME=real-hostname",
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		sandboxConfig.Hostname = test.hostname
+		sandboxConfig.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
+			NamespaceOptions: &runtime.NamespaceOption{Network: test.networkNs},
+		}
+		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil)
+		require.NoError(t, err)
+		specCheck(t, testID, testSandboxID, testPid, spec)
+		assert.Contains(t, spec.Process.Env, test.expectedEnv)
+	}
+}

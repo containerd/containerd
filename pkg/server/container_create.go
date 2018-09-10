@@ -334,6 +334,17 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 		g.AddProcessEnv("TERM", "xterm")
 	}
 
+	// Add HOSTNAME env.
+	hostname := sandboxConfig.GetHostname()
+	if sandboxConfig.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE &&
+		hostname == "" {
+		hostname, err = c.os.Hostname()
+		if err != nil {
+			return nil, err
+		}
+	}
+	g.AddProcessEnv(hostnameEnv, hostname)
+
 	// Apply envs from image config first, so that envs from container config
 	// can override them.
 	if err := addImageEnvs(&g, imageConfig.Env); err != nil {
