@@ -18,12 +18,18 @@ package containerd
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
+	"fmt"
 	"syscall"
 
+	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/mount"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
 )
 
 // NewTaskOpts allows the caller to set options on a new task
@@ -35,6 +41,44 @@ func WithRootFS(mounts []mount.Mount) NewTaskOpts {
 		ti.RootFS = mounts
 		return nil
 	}
+}
+
+// WithTaskCheckpoint allows a task to be created with live runtime and memory data from a
+// previous checkpoint. Additional software such as CRIU may be required to
+// restore a task from a checkpoint
+func WithTaskCheckpoint(im Image) NewTaskOpts {
+	return func(ctx context.Context, c *Client, info *TaskInfo) error {
+		desc := im.Target()
+		id := desc.Digest
+		index, err := decodeIndex(ctx, c.ContentStore(), desc)
+		if err != nil {
+			return err
+		}
+		for _, m := range index.Manifests {
+			if m.MediaType == images.MediaTypeContainerd1Checkpoint {
+				info.Checkpoint = &types.Descriptor{
+					MediaType: m.MediaType,
+					Size_:     m.Size,
+					Digest:    m.Digest,
+				}
+				return nil
+			}
+		}
+		return fmt.Errorf("checkpoint not found in index %s", id)
+	}
+}
+
+func decodeIndex(ctx context.Context, store content.Provider, desc imagespec.Descriptor) (*imagespec.Index, error) {
+	var index imagespec.Index
+	p, err := content.ReadBlob(ctx, store, desc)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(p, &index); err != nil {
+		return nil, err
+	}
+
+	return &index, nil
 }
 
 // WithCheckpointName sets the image name for the checkpoint
