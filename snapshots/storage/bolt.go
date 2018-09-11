@@ -23,11 +23,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/pkg/errors"
+	bolt "go.etcd.io/bbolt"
 )
 
 var (

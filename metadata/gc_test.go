@@ -27,10 +27,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/metadata/boltutil"
 	digest "github.com/opencontainers/go-digest"
+	bolt "go.etcd.io/bbolt"
 )
 
 func TestGCRoots(t *testing.T) {

@@ -20,7 +20,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/boltdb/bolt"
 	eventstypes "github.com/containerd/containerd/api/events"
 	api "github.com/containerd/containerd/api/services/namespaces/v1"
 	"github.com/containerd/containerd/errdefs"
@@ -30,6 +29,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
 	ptypes "github.com/gogo/protobuf/types"
+	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

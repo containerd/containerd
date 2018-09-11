@@ -16,7 +16,7 @@
 
 package metadata
 
-import "github.com/boltdb/bolt"
+import bolt "go.etcd.io/bbolt"
 
 type migration struct {
 	schema  string

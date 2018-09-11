@@ -17,8 +17,8 @@
 package metadata
 
 import (
-	"github.com/boltdb/bolt"
 	digest "github.com/opencontainers/go-digest"
+	bolt "go.etcd.io/bbolt"
 )
 
 // The layout where a "/" delineates a bucket is desribed in the following

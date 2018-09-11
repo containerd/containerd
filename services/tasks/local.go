@@ -26,7 +26,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/boltdb/bolt"
 	api "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/task"
@@ -48,6 +47,7 @@ import (
 	ptypes "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
+	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
