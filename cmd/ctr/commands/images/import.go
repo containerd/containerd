@@ -24,6 +24,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/images/docker"
 	oci "github.com/containerd/containerd/images/oci"
 	"github.com/containerd/containerd/log"
 	"github.com/urfave/cli"
@@ -35,11 +36,14 @@ var importCommand = cli.Command{
 	ArgsUsage: "[flags] <in>",
 	Description: `Import images from a tar stream.
 Implemented formats:
-- oci.v1     (default)
+- oci.v1
+- docker.v1.1
+- docker.v1.2
 
 
-For oci.v1 format, you need to specify --oci-name because an OCI archive contains image refs (tags)
-but does not contain the base image name.
+For OCI v1, you may need to specify --base-name because an OCI archive
+contains only partial image references (tags without the base image name).
+If no base image name is provided, a name will be generated as "import-%{date}".
 
 e.g.
   $ ctr images import --format oci.v1 --oci-name foo/bar foobar.tar
@@ -50,17 +54,21 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 	Flags: append([]cli.Flag{
 		cli.StringFlag{
 			Name:  "format",
-			Value: "oci.v1",
-			Usage: "image format. See DESCRIPTION.",
+			Value: "",
+			Usage: "image format, by default supports OCI v1, Docker v1.1, Docker v1.2",
 		},
 		cli.StringFlag{
-			Name:  "prefix,oci-name",
+			Name:  "base-name,oci-name",
 			Value: "",
-			Usage: "prefix image name for added images",
+			Usage: "base image name for added images, when provided images without this name prefix are filtered out",
 		},
 		cli.BoolFlag{
 			Name:  "digests",
 			Usage: "whether to create digest images",
+		},
+		cli.StringFlag{
+			Name:  "index-name",
+			Usage: "image name to keep index as, by default index is discarded",
 		},
 	}, commands.SnapshotterFlags...),
 
@@ -70,21 +78,28 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			opts []containerd.ImportOpt
 		)
 
+		prefix := context.String("base-name")
+		if prefix == "" {
+			prefix = fmt.Sprintf("import-%s", time.Now().Format("2006-01-02"))
+		}
+
 		switch format := context.String("format"); format {
-		case "oci.v1":
+		case "", "docker", "docker.v1.1", "docker.v1.2":
+			opts = append(opts, containerd.WithImporter(&docker.V1Importer{}))
+			opts = append(opts, containerd.WithImageRefTranslator(docker.RefTranslator(prefix, context.String("base-name") != "")))
+		case "oci", "oci.v1":
 			opts = append(opts, containerd.WithImporter(&oci.V1Importer{}))
-
-			prefix := context.String("prefix")
-			if prefix == "" {
-				prefix = fmt.Sprintf("import-%s", time.Now().Format("2006-01-02"))
-			}
-
 			opts = append(opts, containerd.WithImageRefTranslator(oci.RefTranslator(prefix)))
-			if context.Bool("digests") {
-				opts = append(opts, containerd.WithDigestRef(oci.DigestTranslator(prefix)))
-			}
 		default:
 			return fmt.Errorf("unknown format %s", format)
+		}
+
+		if context.Bool("digests") {
+			opts = append(opts, containerd.WithDigestRef(oci.DigestTranslator(prefix)))
+		}
+
+		if idxName := context.String("index-name"); idxName != "" {
+			opts = append(opts, containerd.WithIndexName(idxName))
 		}
 
 		client, ctx, cancel, err := commands.NewClient(context)
