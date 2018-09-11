@@ -37,6 +37,10 @@ var Command = cli.Command{
 			Name:  "replace,r",
 			Usage: "replace any binaries or libs in the opt directory",
 		},
+		cli.StringFlag{
+			Name:  "path",
+			Usage: "set an optional install path other than the managed opt directory",
+		},
 	},
 	Action: func(context *cli.Context) error {
 		client, ctx, cancel, err := commands.NewClient(context)
@@ -55,6 +59,9 @@ var Command = cli.Command{
 		}
 		if context.Bool("replace") {
 			opts = append(opts, containerd.WithInstallReplace)
+		}
+		if path := context.String("path"); path != "" {
+			opts = append(opts, containerd.WithInstallPath(path))
 		}
 		return client.Install(ctx, image, opts...)
 	},
