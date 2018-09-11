@@ -403,6 +403,30 @@ func TestToCNIPortMappings(t *testing.T) {
 				},
 			},
 		},
+		"CRI port mapping with unsupported protocol should be skipped": {
+			criPortMappings: []*runtime.PortMapping{
+				{
+					Protocol:      runtime.Protocol_SCTP,
+					ContainerPort: 1234,
+					HostPort:      5678,
+					HostIp:        "123.124.125.126",
+				},
+				{
+					Protocol:      runtime.Protocol_TCP,
+					ContainerPort: 4321,
+					HostPort:      8765,
+					HostIp:        "126.125.124.123",
+				},
+			},
+			cniPortMappings: []cni.PortMapping{
+				{
+					HostPort:      8765,
+					ContainerPort: 4321,
+					Protocol:      "tcp",
+					HostIP:        "126.125.124.123",
+				},
+			},
+		},
 	} {
 		t.Logf("TestCase %q", desc)
 		assert.Equal(t, test.cniPortMappings, toCNIPortMappings(test.criPortMappings))
