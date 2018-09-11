@@ -1513,10 +1513,14 @@ type KeyToPath struct {
 type LocalVolumeSource struct {
 	// The full path to the volume on the node.
 	// It can be either a directory or block device (disk, partition, ...).
-	// Directories can be represented only by PersistentVolume with VolumeMode=Filesystem.
-	// Block devices can be represented only by VolumeMode=Block, which also requires the
-	// BlockVolume alpha feature gate to be enabled.
 	Path string
+
+	// Filesystem type to mount.
+	// It applies only when the Path is a block device.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". The default value is to auto-select a fileystem if unspecified.
+	// +optional
+	FSType *string
 }
 
 // Represents storage that is managed by an external CSI volume driver (Beta feature)
@@ -4616,7 +4620,26 @@ type SecurityContext struct {
 	// the no_new_privs flag will be set on the container process.
 	// +optional
 	AllowPrivilegeEscalation *bool
+	// ProcMount denotes the type of proc mount to use for the containers.
+	// The default is DefaultProcMount which uses the container runtime defaults for
+	// readonly paths and masked paths.
+	// +optional
+	ProcMount *ProcMountType
 }
+
+type ProcMountType string
+
+const (
+	// DefaultProcMount uses the container runtime defaults for readonly and masked
+	// paths for /proc.  Most container runtimes mask certain paths in /proc to avoid
+	// accidental security exposure of special devices or information.
+	DefaultProcMount ProcMountType = "Default"
+
+	// UnmaskedProcMount bypasses the default masking behavior of the container
+	// runtime and ensures the newly created /proc the container stays intact with
+	// no modifications.
+	UnmaskedProcMount ProcMountType = "Unmasked"
+)
 
 // SELinuxOptions are the labels to be applied to the container.
 type SELinuxOptions struct {
