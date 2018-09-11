@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 #   Copyright The containerd Authors.
 
 #   Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,14 +15,18 @@
 #   limitations under the License.
 
 
-#Windows specific settings.
-WHALE = "+"
-ONI = "-"
-COMMANDS += containerd-shim-runhcs-v1
+#
+# Builds and installs runhcs.exe to /c/gopath/src/github.com/containerd/containerd/bin
+# based off the commit defined in vendor.conf
+#
+set -eu -o pipefail
 
-BINARY_SUFFIX=".exe"
+CONTAINERD_PATH=${GOPATH}/src/github.com/containerd/containerd
+HCSSHIM_VERSION=$(grep Microsoft/hcsshim ${CONTAINERD_PATH}/vendor.conf | cut -d " " -f 2)
+if [[ $HCSSHIM_VERSION != v* ]] ;
+then
+    echo "Invalid release version of hcsshim in vendor.conf"
+    exit 1
+fi
 
-# amd64 supports go test -race
-ifeq ($(GOARCH),amd64)
-	TESTFLAGS_RACE= -race
-endif
+wget -O ${CONTAINERD_PATH}/bin/runhcs.exe "https://github.com/Microsoft/hcsshim/releases/download/$HCSSHIM_VERSION/runhcs.exe"

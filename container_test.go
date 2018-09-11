@@ -38,7 +38,6 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/windows/hcsshimtypes"
 	gogotypes "github.com/gogo/protobuf/types"
 )
 
@@ -393,6 +392,11 @@ func TestContainerLargeExecArgs(t *testing.T) {
 }
 
 func TestContainerPids(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("pids test is not currently supported on windows")
+		return
+	}
+
 	t.Parallel()
 
 	client, err := newClient(t, address)
@@ -444,14 +448,7 @@ func TestContainerPids(t *testing.T) {
 	}
 	switch runtime.GOOS {
 	case "windows":
-		if processes[0].Info == nil {
-			t.Error("expected additional process information but received nil")
-		} else {
-			var details hcsshimtypes.ProcessDetails
-			if err := details.Unmarshal(processes[0].Info.Value); err != nil {
-				t.Errorf("expected Windows info type hcsshimtypes.ProcessDetails %v", err)
-			}
-		}
+		// TODO: JTERRY75 - Enable this test.
 	default:
 		if l := len(processes); l != 1 {
 			t.Errorf("expected 1 process but received %d", l)

@@ -85,9 +85,15 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 	if copts.timeout == 0 {
 		copts.timeout = 10 * time.Second
 	}
-	rt := fmt.Sprintf("%s.%s", plugin.RuntimePlugin, runtime.GOOS)
+	var rt string
 	if copts.defaultRuntime != "" {
 		rt = copts.defaultRuntime
+	} else {
+		if runtime.GOOS == "windows" {
+			rt = "io.containerd.runhcs.v1"
+		} else {
+			rt = fmt.Sprintf("%s.%s", plugin.RuntimePlugin, runtime.GOOS)
+		}
 	}
 	c := &Client{
 		runtime: rt,

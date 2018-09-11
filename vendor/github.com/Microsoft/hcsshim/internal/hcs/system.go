@@ -74,7 +74,7 @@ func CreateComputeSystem(id string, hcsDocumentInterface interface{}) (*System, 
 		}
 	}
 
-	events, err := processAsyncHcsResult(createError, resultp, computeSystem.callbackNumber, hcsNotificationSystemCreateCompleted, &timeout.Duration)
+	events, err := processAsyncHcsResult(createError, resultp, computeSystem.callbackNumber, hcsNotificationSystemCreateCompleted, &timeout.SystemCreate)
 	if err != nil {
 		if err == ErrTimeout {
 			// Terminate the compute system if it still exists. We're okay to
@@ -193,7 +193,7 @@ func (computeSystem *System) Start() error {
 
 	var resultp *uint16
 	err := hcsStartComputeSystem(computeSystem.handle, "", &resultp)
-	events, err := processAsyncHcsResult(err, resultp, computeSystem.callbackNumber, hcsNotificationSystemStartCompleted, &timeout.Duration)
+	events, err := processAsyncHcsResult(err, resultp, computeSystem.callbackNumber, hcsNotificationSystemStartCompleted, &timeout.SystemStart)
 	if err != nil {
 		return makeSystemError(computeSystem, "Start", "", err, events)
 	}
@@ -321,7 +321,7 @@ func (computeSystem *System) Pause() error {
 
 	var resultp *uint16
 	err := hcsPauseComputeSystem(computeSystem.handle, "", &resultp)
-	events, err := processAsyncHcsResult(err, resultp, computeSystem.callbackNumber, hcsNotificationSystemPauseCompleted, &timeout.Duration)
+	events, err := processAsyncHcsResult(err, resultp, computeSystem.callbackNumber, hcsNotificationSystemPauseCompleted, &timeout.SystemPause)
 	if err != nil {
 		return makeSystemError(computeSystem, "Pause", "", err, events)
 	}
@@ -343,7 +343,7 @@ func (computeSystem *System) Resume() error {
 
 	var resultp *uint16
 	err := hcsResumeComputeSystem(computeSystem.handle, "", &resultp)
-	events, err := processAsyncHcsResult(err, resultp, computeSystem.callbackNumber, hcsNotificationSystemResumeCompleted, &timeout.Duration)
+	events, err := processAsyncHcsResult(err, resultp, computeSystem.callbackNumber, hcsNotificationSystemResumeCompleted, &timeout.SystemResume)
 	if err != nil {
 		return makeSystemError(computeSystem, "Resume", "", err, events)
 	}

@@ -1,4 +1,4 @@
-// +build !no_btrfs
+// +build !windows,!no_btrfs
 
 /*
    Copyright The containerd Authors.
