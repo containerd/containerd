@@ -229,6 +229,15 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		specOpts = append(specOpts, oci.WithUser(userstr))
 	}
 
+	if securityContext.GetRunAsUsername() != "" {
+		userstr = securityContext.GetRunAsUsername()
+	} else {
+		// Even if RunAsUser is not set, we still call `GetValue` to get uid 0.
+		// Because it is still useful to get additional gids for uid 0.
+		userstr = strconv.FormatInt(securityContext.GetRunAsUser().GetValue(), 10)
+	}
+	specOpts = append(specOpts, customopts.WithAdditionalGIDs(userstr))
+
 	apparmorSpecOpts, err := generateApparmorSpecOpts(
 		securityContext.GetApparmorProfile(),
 		securityContext.GetPrivileged(),
