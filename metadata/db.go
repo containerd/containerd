@@ -43,7 +43,7 @@ const (
 	// dbVersion represents updates to the schema
 	// version which are additions and compatible with
 	// prior version of the same schema.
-	dbVersion = 2
+	dbVersion = 3
 )
 
 // DB represents a metadata database backed by a bolt

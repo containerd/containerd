@@ -45,6 +45,11 @@ var migrations = []migration{
 		version: 2,
 		migrate: migrateIngests,
 	},
+	{
+		schema:  "v1",
+		version: 3,
+		migrate: noOpMigration,
+	},
 }
 
 // addChildLinks Adds children key to the snapshotters to enforce snapshot
@@ -152,5 +157,12 @@ func migrateIngests(tx *bolt.Tx) error {
 		}
 	}
 
+	return nil
+}
+
+// noOpMigration was for a database change from boltdb/bolt which is no
+// longer being supported, to go.etcd.io/bbolt which is the currently
+// maintained repo for boltdb.
+func noOpMigration(tx *bolt.Tx) error {
 	return nil
 }

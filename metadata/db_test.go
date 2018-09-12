@@ -265,6 +265,16 @@ func TestMigrations(t *testing.T) {
 				return nil
 			},
 		},
+
+		{
+			name: "NoOp",
+			init: func(tx *bolt.Tx) error {
+				return nil
+			},
+			check: func(tx *bolt.Tx) error {
+				return nil
+			},
+		},
 	}
 
 	if len(migrationTests) != len(migrations) {
