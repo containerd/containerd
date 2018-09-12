@@ -14,18 +14,31 @@
    limitations under the License.
 */
 
-package docker
+package archive
 
 import (
 	"strings"
 
 	"github.com/containerd/cri/pkg/util"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
 
-// RefTranslator creates a reference which only has a tag or verifies
+// FilterRefPrefix restricts references to having the given image
+// prefix. Tag-only references will have the prefix prepended.
+func FilterRefPrefix(image string) func(string) string {
+	return refTranslator(image, true)
+}
+
+// AddRefPrefix prepends the given image prefix to tag-only references,
+// while leaving returning full references unmodified.
+func AddRefPrefix(image string) func(string) string {
+	return refTranslator(image, false)
+}
+
+// refTranslator creates a reference which only has a tag or verifies
 // a full reference.
-func RefTranslator(image string, checkPrefix bool) func(string) string {
+func refTranslator(image string, checkPrefix bool) func(string) string {
 	return func(ref string) string {
 		// Check if ref is full reference
 		if strings.ContainsAny(ref, "/:@") {
@@ -62,4 +75,12 @@ func normalizeReference(ref string) (string, error) {
 	}
 
 	return normalized.String(), nil
+}
+
+// DigestTranslator creates a digest reference by adding the
+// digest to an image name
+func DigestTranslator(prefix string) func(digest.Digest) string {
+	return func(dgst digest.Digest) string {
+		return prefix + "@" + dgst.String()
+	}
 }

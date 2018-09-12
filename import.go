@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/images/oci"
+	"github.com/containerd/containerd/images/archive"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -33,7 +33,6 @@ type importOpts struct {
 	indexName string
 	imageRefT func(string) string
 	dgstRefT  func(digest.Digest) string
-	importer  images.Importer
 }
 
 // ImportOpt allows the caller to specify import specific options
@@ -65,15 +64,6 @@ func WithIndexName(name string) ImportOpt {
 	}
 }
 
-// WithImporter sets the importer to use for converting
-// the read stream into an OCI Index.
-func WithImporter(importer images.Importer) ImportOpt {
-	return func(c *importOpts) error {
-		c.importer = importer
-		return nil
-	}
-}
-
 // Import imports an image from a Tar stream using reader.
 // Caller needs to specify importer. Future version may use oci.v1 as the default.
 // Note that unreferrenced blobs may be imported to the content store as well.
@@ -85,17 +75,13 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 		}
 	}
 
-	if iopts.importer == nil {
-		iopts.importer = &oci.V1Importer{}
-	}
-
 	ctx, done, err := c.WithLease(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer done(ctx)
 
-	index, err := iopts.importer.Import(ctx, c.ContentStore(), reader)
+	index, err := archive.ImportIndex(ctx, c.ContentStore(), reader)
 	if err != nil {
 		return nil, err
 	}

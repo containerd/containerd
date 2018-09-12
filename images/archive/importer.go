@@ -14,9 +14,8 @@
    limitations under the License.
 */
 
-// Package docker provides a Docker compatible importer capable of
-// importing both Docker and OCI formats.
-package docker
+// Package archive provides a Docker and OCI compatible importer
+package archive
 
 import (
 	"archive/tar"
@@ -37,19 +36,15 @@ import (
 	"github.com/pkg/errors"
 )
 
-// V1Importer implements Docker v1.1, v1.2 and OCI v1.
-type V1Importer struct {
-	// SkipOCI prevent interpretting OCI files
-	SkipOCI bool
-
-	// TODO: Add option to compress layers on ingest
-
-}
-
-var _ images.Importer = &V1Importer{}
-
-// Import implements Importer.
-func (oi *V1Importer) Import(ctx context.Context, store content.Store, reader io.Reader) (ocispec.Descriptor, error) {
+// ImportIndex imports an index from a tar achive image bundle
+// - implements Docker v1.1, v1.2 and OCI v1.
+// - prefers OCI v1 when provided
+// - creates OCI index for Docker formats
+// - normalizes Docker references and adds as OCI ref name
+//      e.g. alpine:latest -> docker.io/library/alpine:latest
+// - existing OCI reference names are untouched
+// - TODO: support option to compress layers on ingest
+func ImportIndex(ctx context.Context, store content.Store, reader io.Reader) (ocispec.Descriptor, error) {
 	var (
 		tr = tar.NewReader(reader)
 
@@ -82,7 +77,7 @@ func (oi *V1Importer) Import(ctx context.Context, store content.Store, reader io
 		}
 
 		hdrName := path.Clean(hdr.Name)
-		if hdrName == ocispec.ImageLayoutFile && !oi.SkipOCI {
+		if hdrName == ocispec.ImageLayoutFile {
 			if err = onUntarJSON(tr, &ociLayout); err != nil {
 				return ocispec.Descriptor{}, errors.Wrapf(err, "untar oci layout %q", hdr.Name)
 			}
@@ -103,6 +98,9 @@ func (oi *V1Importer) Import(ctx context.Context, store content.Store, reader io
 		}
 	}
 
+	// If OCI layout was given, interpret the tar as an OCI layout.
+	// When not provided, the layout of the tar will be interpretted
+	// as Docker v1.1 or v1.2.
 	if ociLayout.Version != "" {
 		if ociLayout.Version != ocispec.ImageLayoutVersion {
 			return ocispec.Descriptor{}, errors.Errorf("unsupported OCI version %s", ociLayout.Version)
@@ -156,7 +154,9 @@ func (oi *V1Importer) Import(ctx context.Context, store content.Store, reader io
 			return ocispec.Descriptor{}, errors.Wrap(err, "unable to resolve platform")
 		}
 		if len(platforms) > 0 {
-			// Only one platform can be resolved from non-index manifest
+			// Only one platform can be resolved from non-index manifest,
+			// The platform can only come from the config included above,
+			// if the config has no platform it can be safely ommitted.
 			desc.Platform = &platforms[0]
 		}
 
@@ -165,18 +165,18 @@ func (oi *V1Importer) Import(ctx context.Context, store content.Store, reader io
 		} else {
 			// Add descriptor per tag
 			for _, ref := range mfst.RepoTags {
-				msftdesc := desc
+				mfstdesc := desc
 
 				normalized, err := normalizeReference(ref)
 				if err != nil {
 					return ocispec.Descriptor{}, err
 				}
 
-				msftdesc.Annotations = map[string]string{
+				mfstdesc.Annotations = map[string]string{
 					ocispec.AnnotationRefName: normalized,
 				}
 
-				idx.Manifests = append(idx.Manifests, msftdesc)
+				idx.Manifests = append(idx.Manifests, mfstdesc)
 			}
 		}
 	}
