@@ -159,10 +159,6 @@ func TestDaemonRuntimeRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err = task.Start(ctx); err != nil {
-		t.Fatal(err)
-	}
-
 	stateJSONPath := filepath.Join(runtimeRoot, testNamespace, id, "state.json")
 	if _, err = os.Stat(stateJSONPath); err != nil {
 		t.Errorf("error while getting stat for %s: %v", stateJSONPath, err)
