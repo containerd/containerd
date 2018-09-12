@@ -157,7 +157,7 @@ func newSocket(address string) (*net.UnixListener, error) {
 }
 
 func connect(address string, d func(string, time.Duration) (net.Conn, error)) (net.Conn, error) {
-	return d(address, 100*time.Second)
+	return d(address, 10*time.Second)
 }
 
 func annonDialer(address string, timeout time.Duration) (net.Conn, error) {
