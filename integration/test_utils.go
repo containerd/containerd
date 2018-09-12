@@ -126,6 +126,13 @@ func WithPodLogDirectory(dir string) PodSandboxOpts {
 	}
 }
 
+// Add pod hostname.
+func WithPodHostname(hostname string) PodSandboxOpts {
+	return func(p *runtime.PodSandboxConfig) {
+		p.Hostname = hostname
+	}
+}
+
 // PodSandboxConfig generates a pod sandbox config for test.
 func PodSandboxConfig(name, ns string, opts ...PodSandboxOpts) *runtime.PodSandboxConfig {
 	config := &runtime.PodSandboxConfig{
