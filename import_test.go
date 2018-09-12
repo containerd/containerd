@@ -20,6 +20,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/containerd/containerd/images/docker"
 	"github.com/containerd/containerd/images/oci"
 )
 
@@ -51,7 +52,7 @@ func TestOCIExportAndImport(t *testing.T) {
 
 	opts := []ImportOpt{
 		WithImporter(&oci.V1Importer{}),
-		WithImageRefTranslator(oci.RefTranslator("foo/bar")),
+		WithImageRefTranslator(docker.RefTranslator("foo/bar", false)),
 	}
 	imgrecs, err := client.Import(ctx, exported, opts...)
 	if err != nil {

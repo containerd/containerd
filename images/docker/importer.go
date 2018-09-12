@@ -26,21 +26,24 @@ import (
 	"io"
 	"io/ioutil"
 	"path"
-	"strings"
 
+	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/cri/pkg/util"
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
 
-// V1Importer implements OCI Image Spec v1.
+// V1Importer implements Docker v1.1, v1.2 and OCI v1.
 type V1Importer struct {
+	// SkipOCI prevent interpretting OCI files
+	SkipOCI bool
+
 	// TODO: Add option to compress layers on ingest
+
 }
 
 var _ images.Importer = &V1Importer{}
@@ -48,14 +51,16 @@ var _ images.Importer = &V1Importer{}
 // Import implements Importer.
 func (oi *V1Importer) Import(ctx context.Context, store content.Store, reader io.Reader) (ocispec.Descriptor, error) {
 	var (
-		desc ocispec.Descriptor
-		tr   = tar.NewReader(reader)
+		tr = tar.NewReader(reader)
 
-		mfsts         []manifestDotJSON
-		symlinkLayers = make(map[string]string)             // key: filename (foobar/layer.tar), value: linkname (targetlayerid/layer.tar)
-		layers        = make(map[string]ocispec.Descriptor) // key: filename (foobar/layer.tar)
-		configs       = make(map[string]imageConfig)        // key: filename (foobar.json)
-
+		ociLayout ocispec.ImageLayout
+		mfsts     []struct {
+			Config   string
+			RepoTags []string
+			Layers   []string
+		}
+		symlinks = make(map[string]string)
+		blobs    = make(map[string]ocispec.Descriptor)
 	)
 	for {
 		hdr, err := tr.Next()
@@ -65,77 +70,70 @@ func (oi *V1Importer) Import(ctx context.Context, store content.Store, reader io
 		if err != nil {
 			return ocispec.Descriptor{}, err
 		}
-		if hdr.Typeflag == tar.TypeSymlink && isLayerTar(hdr.Name) {
-			linkname, err := followSymlinkLayer(hdr.Linkname)
-			if err != nil {
-				log.G(ctx).WithError(err).WithField("file", hdr.Name).Debugf("symlink to %s ignored", hdr.Linkname)
-			} else {
-				symlinkLayers[hdr.Name] = linkname
-			}
-			continue
+		if hdr.Typeflag == tar.TypeSymlink {
+			symlinks[hdr.Name] = path.Join(path.Dir(hdr.Name), hdr.Linkname)
 		}
 
 		if hdr.Typeflag != tar.TypeReg && hdr.Typeflag != tar.TypeRegA {
-			log.G(ctx).WithField("file", hdr.Name).Debug("file type ignored")
+			if hdr.Typeflag != tar.TypeDir {
+				log.G(ctx).WithField("file", hdr.Name).Debug("file type ignored")
+			}
 			continue
 		}
+
 		hdrName := path.Clean(hdr.Name)
-		if hdrName == "index.json" {
-			if desc.Digest != "" {
-				return ocispec.Descriptor{}, errors.New("duplicated index.json")
+		if hdrName == ocispec.ImageLayoutFile && !oi.SkipOCI {
+			if err = onUntarJSON(tr, &ociLayout); err != nil {
+				return ocispec.Descriptor{}, errors.Wrapf(err, "untar oci layout %q", hdr.Name)
 			}
-			desc, err = onUntarIndexJSON(ctx, tr, store, hdr.Size)
-			if err != nil {
-				return ocispec.Descriptor{}, err
-			}
-		} else if strings.HasPrefix(hdrName, "blobs/") {
-			if err := onUntarBlob(ctx, tr, store, hdrName, hdr.Size); err != nil {
-				return ocispec.Descriptor{}, err
-			}
-		} else if hdrName == ocispec.ImageLayoutFile {
-			// TODO Validate
-		} else if hdr.Name == "manifest.json" {
-			mfsts, err = onUntarManifestJSON(tr)
-			if err != nil {
+		} else if hdrName == "manifest.json" {
+			if err = onUntarJSON(tr, &mfsts); err != nil {
 				return ocispec.Descriptor{}, errors.Wrapf(err, "untar manifest %q", hdr.Name)
 			}
-		} else if isLayerTar(hdr.Name) {
-			desc, err := onUntarLayerTar(ctx, tr, store, hdr.Name, hdr.Size)
-			if err != nil {
-				return ocispec.Descriptor{}, errors.Wrapf(err, "untar layer %q", hdr.Name)
-			}
-			layers[hdr.Name] = desc
-		} else if isDotJSON(hdr.Name) {
-			c, err := onUntarDotJSON(ctx, tr, store, hdr.Name, hdr.Size)
-			if err != nil {
-				return ocispec.Descriptor{}, errors.Wrapf(err, "untar config %q", hdr.Name)
-			}
-			configs[hdr.Name] = c
 		} else {
-			log.G(ctx).WithField("file", hdr.Name).Debug("unknown file ignored")
+			dgst, err := onUntarBlob(ctx, tr, store, hdr.Size, "tar-"+hdrName)
+			if err != nil {
+				return ocispec.Descriptor{}, errors.Wrapf(err, "failed to ingest %q", hdr.Name)
+			}
+
+			blobs[hdrName] = ocispec.Descriptor{
+				Digest: dgst,
+				Size:   hdr.Size,
+			}
+		}
+	}
+
+	if ociLayout.Version != "" {
+		if ociLayout.Version != ocispec.ImageLayoutVersion {
+			return ocispec.Descriptor{}, errors.Errorf("unsupported OCI version %s", ociLayout.Version)
 		}
 
-	}
-	if desc.Digest != "" {
-		return desc, nil
+		idx, ok := blobs["index.json"]
+		if !ok {
+			return ocispec.Descriptor{}, errors.Errorf("missing index.json in OCI layout %s", ocispec.ImageLayoutVersion)
+		}
+
+		idx.MediaType = ocispec.MediaTypeImageIndex
+		return idx, nil
 	}
 
-	for name, linkname := range symlinkLayers {
-		desc, ok := layers[linkname]
+	for name, linkname := range symlinks {
+		desc, ok := blobs[linkname]
 		if !ok {
 			return ocispec.Descriptor{}, errors.Errorf("no target for symlink layer from %q to %q", name, linkname)
 		}
-		layers[name] = desc
+		blobs[name] = desc
 	}
 
 	var idx ocispec.Index
 	for _, mfst := range mfsts {
-		config, ok := configs[mfst.Config]
+		config, ok := blobs[mfst.Config]
 		if !ok {
 			return ocispec.Descriptor{}, errors.Errorf("image config %q not found", mfst.Config)
 		}
+		config.MediaType = ocispec.MediaTypeImageConfig
 
-		layers, err := resolveLayers(mfst.Layers, layers)
+		layers, err := resolveLayers(ctx, store, mfst.Layers, blobs)
 		if err != nil {
 			return ocispec.Descriptor{}, errors.Wrap(err, "failed to resolve layers")
 		}
@@ -144,13 +142,22 @@ func (oi *V1Importer) Import(ctx context.Context, store content.Store, reader io
 			Versioned: specs.Versioned{
 				SchemaVersion: 2,
 			},
-			Config: config.desc,
+			Config: config,
 			Layers: layers,
 		}
 
-		desc, err := writeManifest(ctx, store, manifest, config.img.Architecture, config.img.OS)
+		desc, err := writeManifest(ctx, store, manifest, ocispec.MediaTypeImageManifest)
 		if err != nil {
 			return ocispec.Descriptor{}, errors.Wrap(err, "write docker manifest")
+		}
+
+		platforms, err := images.Platforms(ctx, store, desc)
+		if err != nil {
+			return ocispec.Descriptor{}, errors.Wrap(err, "unable to resolve platform")
+		}
+		if len(platforms) > 0 {
+			// Only one platform can be resolved from non-index manifest
+			desc.Platform = &platforms[0]
 		}
 
 		if len(mfst.RepoTags) == 0 {
@@ -160,14 +167,13 @@ func (oi *V1Importer) Import(ctx context.Context, store content.Store, reader io
 			for _, ref := range mfst.RepoTags {
 				msftdesc := desc
 
-				// TODO: Replace this function to not depend on reference package
-				normalized, err := util.NormalizeImageRef(ref)
+				normalized, err := normalizeReference(ref)
 				if err != nil {
-					return ocispec.Descriptor{}, errors.Wrapf(err, "normalize image ref %q", ref)
+					return ocispec.Descriptor{}, err
 				}
 
 				msftdesc.Annotations = map[string]string{
-					ocispec.AnnotationRefName: normalized.String(),
+					ocispec.AnnotationRefName: normalized,
 				}
 
 				idx.Manifests = append(idx.Manifests, msftdesc)
@@ -175,117 +181,68 @@ func (oi *V1Importer) Import(ctx context.Context, store content.Store, reader io
 		}
 	}
 
-	return writeIndex(ctx, store, idx)
+	return writeManifest(ctx, store, idx, ocispec.MediaTypeImageIndex)
 }
 
-// RefTranslator creates a reference which only has a tag or verifies
-// a full reference.
-func RefTranslator(image string, checkPrefix bool) func(string) string {
-	return func(ref string) string {
-		// Check if ref is full reference
-		if strings.ContainsAny(ref, "/:@") {
-			// If not prefixed, don't include image
-			if checkPrefix && !isImagePrefix(ref, image) {
-				return ""
-			}
-			return ref
-		}
-		return image + ":" + ref
-	}
-}
-
-func onUntarIndexJSON(ctx context.Context, r io.Reader, store content.Ingester, size int64) (ocispec.Descriptor, error) {
+func onUntarJSON(r io.Reader, j interface{}) error {
 	b, err := ioutil.ReadAll(r)
 	if err != nil {
-		return ocispec.Descriptor{}, err
+		return err
 	}
-	desc := ocispec.Descriptor{
-		MediaType: ocispec.MediaTypeImageIndex,
-		Digest:    digest.FromBytes(b),
-		Size:      size,
+	if err := json.Unmarshal(b, j); err != nil {
+		return err
 	}
-	if int64(len(b)) != size {
-		return ocispec.Descriptor{}, errors.Errorf("size mismatch %d v %d", len(b), size)
-	}
-
-	if err := content.WriteBlob(ctx, store, "index-"+desc.Digest.String(), bytes.NewReader(b), desc); err != nil {
-		return ocispec.Descriptor{}, err
-	}
-
-	return desc, err
+	return nil
 }
 
-func onUntarBlob(ctx context.Context, r io.Reader, store content.Ingester, name string, size int64) error {
-	// name is like "blobs/sha256/deadbeef"
-	split := strings.Split(name, "/")
-	if len(split) != 3 {
-		return errors.Errorf("unexpected name: %q", name)
+func onUntarBlob(ctx context.Context, r io.Reader, store content.Ingester, size int64, ref string) (digest.Digest, error) {
+	dgstr := digest.Canonical.Digester()
+
+	if err := content.WriteBlob(ctx, store, ref, io.TeeReader(r, dgstr.Hash()), ocispec.Descriptor{Size: size}); err != nil {
+		return "", err
 	}
-	algo := digest.Algorithm(split[1])
-	if !algo.Available() {
-		return errors.Errorf("unsupported algorithm: %s", algo)
-	}
-	dgst := digest.NewDigestFromHex(algo.String(), split[2])
-	return content.WriteBlob(ctx, store, "blob-"+dgst.String(), r, ocispec.Descriptor{Size: size, Digest: dgst})
+
+	return dgstr.Digest(), nil
 }
 
-// manifestDotJSON is an entry in manifest.json.
-type manifestDotJSON struct {
-	Config   string
-	RepoTags []string
-	Layers   []string
-	// Parent is unsupported
-	Parent string
-}
-
-// isLayerTar returns true if name is like "foobar/layer.tar"
-func isLayerTar(name string) bool {
-	slashes := len(strings.Split(name, "/"))
-	return slashes == 2 && strings.HasSuffix(name, "/layer.tar")
-}
-
-// followSymlinkLayer returns actual layer name of the symlink layer.
-// It returns "foobar/layer.tar" if the name is like
-// "../foobar/layer.tar", and returns error if the name
-// is not in "../foobar/layer.tar" format.
-func followSymlinkLayer(name string) (string, error) {
-	parts := strings.Split(name, "/")
-	if len(parts) != 3 || parts[0] != ".." {
-		return "", errors.New("invalid symlink layer")
-	}
-	name = strings.TrimPrefix(name, "../")
-	if !isLayerTar(name) {
-		return "", errors.New("invalid layer tar")
-	}
-	return name, nil
-}
-
-// isDotJSON returns true if name is like "foobar.json"
-func isDotJSON(name string) bool {
-	slashes := len(strings.Split(name, "/"))
-	return slashes == 1 && strings.HasSuffix(name, ".json")
-}
-
-func resolveLayers(layerIDs []string, layerIDMap map[string]ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+func resolveLayers(ctx context.Context, store content.Store, layerFiles []string, blobs map[string]ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 	var layers []ocispec.Descriptor
-	for _, f := range layerIDs {
-		desc, ok := layerIDMap[f]
+	for _, f := range layerFiles {
+		desc, ok := blobs[f]
 		if !ok {
 			return nil, errors.Errorf("layer %q not found", f)
 		}
+
+		// Open blob, resolve media type
+		ra, err := store.ReaderAt(ctx, desc)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to open %q (%s)", f, desc.Digest)
+		}
+		s, err := compression.DecompressStream(content.NewReader(ra))
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to detect compression for %q", f)
+		}
+		if s.GetCompression() == compression.Uncompressed {
+			// TODO: Support compressing and writing back to content store
+			desc.MediaType = ocispec.MediaTypeImageLayer
+		} else {
+			desc.MediaType = ocispec.MediaTypeImageLayerGzip
+		}
+		s.Close()
+
 		layers = append(layers, desc)
 	}
 	return layers, nil
 }
 
-func writeManifest(ctx context.Context, cs content.Ingester, manifest ocispec.Manifest, arch, os string) (ocispec.Descriptor, error) {
+func writeManifest(ctx context.Context, cs content.Ingester, manifest interface{}, mediaType string) (ocispec.Descriptor, error) {
 	manifestBytes, err := json.Marshal(manifest)
 	if err != nil {
 		return ocispec.Descriptor{}, err
 	}
 
 	desc := ocispec.Descriptor{
-		MediaType: ocispec.MediaTypeImageManifest,
+		MediaType: mediaType,
 		Digest:    digest.FromBytes(manifestBytes),
 		Size:      int64(len(manifestBytes)),
 	}
@@ -293,105 +250,5 @@ func writeManifest(ctx context.Context, cs content.Ingester, manifest ocispec.Ma
 		return ocispec.Descriptor{}, err
 	}
 
-	if arch != "" || os != "" {
-		desc.Platform = &ocispec.Platform{
-			Architecture: arch,
-			OS:           os,
-		}
-	}
 	return desc, nil
-}
-
-func writeIndex(ctx context.Context, cs content.Ingester, manifest ocispec.Index) (ocispec.Descriptor, error) {
-	manifestBytes, err := json.Marshal(manifest)
-	if err != nil {
-		return ocispec.Descriptor{}, err
-	}
-
-	desc := ocispec.Descriptor{
-		MediaType: ocispec.MediaTypeImageIndex,
-		Digest:    digest.FromBytes(manifestBytes),
-		Size:      int64(len(manifestBytes)),
-	}
-	if err := content.WriteBlob(ctx, cs, "index-"+desc.Digest.String(), bytes.NewReader(manifestBytes), desc); err != nil {
-		return ocispec.Descriptor{}, err
-	}
-
-	return desc, nil
-}
-
-func onUntarManifestJSON(r io.Reader) ([]manifestDotJSON, error) {
-	// name: "manifest.json"
-	b, err := ioutil.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-	var mfsts []manifestDotJSON
-	if err := json.Unmarshal(b, &mfsts); err != nil {
-		return nil, err
-	}
-	return mfsts, nil
-}
-
-func onUntarLayerTar(ctx context.Context, r io.Reader, cs content.Ingester, name string, size int64) (ocispec.Descriptor, error) {
-	// name is like "foobar/layer.tar" ( guaranteed by isLayerTar() )
-	split := strings.Split(name, "/")
-	// note: split[0] is not expected digest here
-	cw, err := cs.Writer(ctx, content.WithRef("layer-"+split[0]), content.WithDescriptor(ocispec.Descriptor{Size: size}))
-	if err != nil {
-		return ocispec.Descriptor{}, err
-	}
-	// TODO: support compression and committing with labels
-	defer cw.Close()
-	if err := content.Copy(ctx, cw, r, size, ""); err != nil {
-		return ocispec.Descriptor{}, err
-	}
-	return ocispec.Descriptor{
-		MediaType: ocispec.MediaTypeImageLayer,
-		Size:      size,
-		Digest:    cw.Digest(),
-	}, nil
-}
-
-type imageConfig struct {
-	desc ocispec.Descriptor
-	img  ocispec.Image
-}
-
-func onUntarDotJSON(ctx context.Context, r io.Reader, cs content.Ingester, name string, size int64) (imageConfig, error) {
-	config := imageConfig{}
-	config.desc.MediaType = ocispec.MediaTypeImageConfig
-	config.desc.Size = size
-	// name is like "foobar.json" ( guaranteed by is DotJSON() )
-	split := strings.Split(name, ".")
-	cw, err := cs.Writer(ctx, content.WithRef("config-"+split[0]), content.WithDescriptor(ocispec.Descriptor{Size: size}))
-	if err != nil {
-		return imageConfig{}, err
-	}
-	defer cw.Close()
-	var buf bytes.Buffer
-	tr := io.TeeReader(r, &buf)
-	if err := content.Copy(ctx, cw, tr, size, ""); err != nil {
-		return imageConfig{}, err
-	}
-	config.desc.Digest = cw.Digest()
-	if err := json.Unmarshal(buf.Bytes(), &config.img); err != nil {
-		return imageConfig{}, err
-	}
-	return config, nil
-}
-
-func isImagePrefix(s, prefix string) bool {
-	if !strings.HasPrefix(s, prefix) {
-		return false
-	}
-	if len(s) > len(prefix) {
-		switch s[len(prefix)] {
-		case '/', ':', '@':
-			// Prevent matching partial namespaces
-		default:
-			return false
-		}
-	}
-	return true
 }

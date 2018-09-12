@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -81,15 +82,19 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 		prefix := context.String("base-name")
 		if prefix == "" {
 			prefix = fmt.Sprintf("import-%s", time.Now().Format("2006-01-02"))
+			opts = append(opts, containerd.WithImageRefTranslator(docker.RefTranslator(prefix, false)))
+		} else {
+			// When provided, filter out references which do not match
+			opts = append(opts, containerd.WithImageRefTranslator(docker.RefTranslator(prefix, true)))
 		}
 
 		switch format := context.String("format"); format {
 		case "", "docker", "docker.v1.1", "docker.v1.2":
-			opts = append(opts, containerd.WithImporter(&docker.V1Importer{}))
-			opts = append(opts, containerd.WithImageRefTranslator(docker.RefTranslator(prefix, context.String("base-name") != "")))
+			opts = append(opts, containerd.WithImporter(&docker.V1Importer{
+				SkipOCI: strings.HasPrefix(format, "docker"),
+			}))
 		case "oci", "oci.v1":
 			opts = append(opts, containerd.WithImporter(&oci.V1Importer{}))
-			opts = append(opts, containerd.WithImageRefTranslator(oci.RefTranslator(prefix)))
 		default:
 			return fmt.Errorf("unknown format %s", format)
 		}

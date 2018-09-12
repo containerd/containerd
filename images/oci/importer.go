@@ -118,15 +118,6 @@ func onUntarBlob(ctx context.Context, r io.Reader, store content.Ingester, name 
 	return content.WriteBlob(ctx, store, "blob-"+dgst.String(), r, ocispec.Descriptor{Size: size, Digest: dgst})
 }
 
-// RefTranslator creates a reference using an OCI ref annotation,
-// which is mentioned in the spec as only a tag compontent,
-// concatenated with an image name
-func RefTranslator(prefix string) func(string) string {
-	return func(ref string) string {
-		return prefix + ":" + ref
-	}
-}
-
 // DigestTranslator creates a digest reference by adding the
 // digest to an image name
 func DigestTranslator(prefix string) func(digest.Digest) string {
