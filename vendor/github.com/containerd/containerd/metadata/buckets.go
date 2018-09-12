@@ -21,7 +21,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 )
 
-// The layout where a "/" delineates a bucket is desribed in the following
+// The layout where a "/" delineates a bucket is described in the following
 // section. Please try to follow this as closely as possible when adding
 // functionality. We can bolster this with helpers and more structure if that
 // becomes an issue.

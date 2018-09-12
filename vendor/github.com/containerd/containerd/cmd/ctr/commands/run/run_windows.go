@@ -22,28 +22,11 @@ import (
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
-
-func withTTY(terminal bool) oci.SpecOpts {
-	if !terminal {
-		return func(ctx gocontext.Context, client oci.Client, c *containers.Container, s *specs.Spec) error {
-			s.Process.Terminal = false
-			return nil
-		}
-	}
-
-	con := console.Current()
-	size, err := con.Size()
-	if err != nil {
-		logrus.WithError(err).Error("console size")
-	}
-	return oci.WithTTY(int(size.Width), int(size.Height))
-}
 
 // NewContainer creates a new container
 func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli.Context) (containerd.Container, error) {
@@ -73,7 +56,17 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	opts = append(opts, oci.WithImageConfig(image))
 	opts = append(opts, oci.WithEnv(context.StringSlice("env")))
 	opts = append(opts, withMounts(context))
-	opts = append(opts, withTTY(context.Bool("tty")))
+	if context.Bool("tty") {
+		opts = append(opts, oci.WithTTY)
+
+		con := console.Current()
+		size, err := con.Size()
+		if err != nil {
+			logrus.WithError(err).Error("console size")
+		}
+		opts = append(opts, oci.WithTTYSize(int(size.Width), int(size.Height)))
+	}
+
 	if len(args) > 0 {
 		opts = append(opts, oci.WithProcessArgs(args...))
 	}

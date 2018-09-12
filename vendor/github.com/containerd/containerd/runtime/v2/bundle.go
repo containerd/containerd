@@ -58,16 +58,7 @@ func NewBundle(ctx context.Context, root, state, id string, spec []byte) (b *Bun
 		Path:      filepath.Join(state, ns, id),
 		Namespace: ns,
 	}
-	paths := []string{b.Path, work}
-	// create base directories
-	for _, d := range paths {
-		if err := os.MkdirAll(filepath.Dir(d), 0711); err != nil {
-			return nil, err
-		}
-		if err := os.Mkdir(d, 0711); err != nil {
-			return nil, err
-		}
-	}
+	var paths []string
 	defer func() {
 		if err != nil {
 			for _, d := range paths {
@@ -75,6 +66,28 @@ func NewBundle(ctx context.Context, root, state, id string, spec []byte) (b *Bun
 			}
 		}
 	}()
+	// create state directory for the bundle
+	if err := os.MkdirAll(filepath.Dir(b.Path), 0711); err != nil {
+		return nil, err
+	}
+	if err := os.Mkdir(b.Path, 0711); err != nil {
+		return nil, err
+	}
+	paths = append(paths, b.Path)
+	// create working directory for the bundle
+	if err := os.MkdirAll(filepath.Dir(work), 0711); err != nil {
+		return nil, err
+	}
+	if err := os.Mkdir(work, 0711); err != nil {
+		if !os.IsExist(err) {
+			return nil, err
+		}
+		os.RemoveAll(work)
+		if err := os.Mkdir(work, 0711); err != nil {
+			return nil, err
+		}
+	}
+	paths = append(paths, work)
 	// create rootfs dir
 	if err := os.Mkdir(filepath.Join(b.Path, "rootfs"), 0711); err != nil {
 		return nil, err
