@@ -202,6 +202,19 @@ func WithLogPath(path string) ContainerOpts {
 	}
 }
 
+// WithSupplementalGroups adds supplemental groups.
+func WithSupplementalGroups(gids []int64) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		if c.Linux == nil {
+			c.Linux = &runtime.LinuxContainerConfig{}
+		}
+		if c.Linux.SecurityContext == nil {
+			c.Linux.SecurityContext = &runtime.LinuxContainerSecurityContext{}
+		}
+		c.Linux.SecurityContext.SupplementalGroups = gids
+	}
+}
+
 // ContainerConfig creates a container config given a name and image name
 // and additional container config options
 func ContainerConfig(name, image string, opts ...ContainerOpts) *runtime.ContainerConfig {
