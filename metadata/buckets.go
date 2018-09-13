@@ -167,11 +167,11 @@ func getSnapshotterBucket(tx *bolt.Tx, namespace, snapshotter string) *bolt.Buck
 }
 
 func createBlobBucket(tx *bolt.Tx, namespace string, dgst digest.Digest) (*bolt.Bucket, error) {
-	bkt, err := createBucketIfNotExists(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectContent, bucketKeyObjectBlob, []byte(dgst.String()))
+	bkt, err := createBucketIfNotExists(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectContent, bucketKeyObjectBlob)
 	if err != nil {
 		return nil, err
 	}
-	return bkt, nil
+	return bkt.CreateBucket([]byte(dgst.String()))
 }
 
 func getBlobsBucket(tx *bolt.Tx, namespace string) *bolt.Bucket {
