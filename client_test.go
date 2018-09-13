@@ -171,7 +171,7 @@ func TestNewClient(t *testing.T) {
 		t.Fatal("New() returned nil client")
 	}
 	if err := client.Close(); err != nil {
-		t.Errorf("client closed returned errror %v", err)
+		t.Errorf("client closed returned error %v", err)
 	}
 }
 
@@ -340,6 +340,6 @@ func TestClientReconnect(t *testing.T) {
 		t.Fatal("containerd is not serving")
 	}
 	if err := client.Close(); err != nil {
-		t.Errorf("client closed returned errror %v", err)
+		t.Errorf("client closed returned error %v", err)
 	}
 }
