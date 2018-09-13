@@ -36,6 +36,7 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/content/testsuite"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/testutil"
 	"github.com/gotestyourself/gotestyourself/assert"
 	"github.com/opencontainers/go-digest"
@@ -173,7 +174,9 @@ func TestContentWriter(t *testing.T) {
 
 	// now, attempt to write the same data again
 	checkCopy(t, int64(len(p)), cw, bufio.NewReader(ioutil.NopCloser(bytes.NewReader(p))))
-	if err := cw.Commit(ctx, int64(len(p)), expected); err != nil {
+	if err := cw.Commit(ctx, int64(len(p)), expected); err == nil {
+		t.Fatal("expected already exists error")
+	} else if !errdefs.IsAlreadyExists(err) {
 		t.Fatal(err)
 	}
 
