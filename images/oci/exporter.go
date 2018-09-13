@@ -94,7 +94,7 @@ func blobRecord(cs content.Provider, desc ocispec.Descriptor) tarRecord {
 		CopyTo: func(ctx context.Context, w io.Writer) (int64, error) {
 			r, err := cs.ReaderAt(ctx, desc)
 			if err != nil {
-				return 0, err
+				return 0, errors.Wrap(err, "failed to get reader")
 			}
 			defer r.Close()
 
@@ -103,7 +103,7 @@ func blobRecord(cs content.Provider, desc ocispec.Descriptor) tarRecord {
 
 			n, err := io.Copy(io.MultiWriter(w, dgstr.Hash()), content.NewReader(r))
 			if err != nil {
-				return 0, err
+				return 0, errors.Wrap(err, "failed to copy to tar")
 			}
 			if dgstr.Digest() != desc.Digest {
 				return 0, errors.Errorf("unexpected digest %s copied", dgstr.Digest())
