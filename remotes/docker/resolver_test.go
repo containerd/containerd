@@ -69,9 +69,9 @@ func TestBasicResolver(t *testing.T) {
 		})
 
 		base, options, close := tlsServer(wrapped)
-		options.Credentials = func(string) (string, string, error) {
+		options.Authorizer = NewAuthorizer(options.Client, func(string) (string, string, error) {
 			return "user1", "password1", nil
-		}
+		})
 		return base, options, close
 	}
 	runBasicTest(t, "testname", basicAuth)
@@ -215,7 +215,7 @@ func withTokenServer(th http.Handler, creds func(string) (string, string, error)
 		})
 
 		base, options, close := tlsServer(wrapped)
-		options.Credentials = creds
+		options.Authorizer = NewAuthorizer(options.Client, creds)
 		options.Client.Transport.(*http.Transport).TLSClientConfig.RootCAs.AddCert(cert)
 		return base, options, func() {
 			s.Close()
