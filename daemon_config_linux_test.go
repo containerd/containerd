@@ -140,7 +140,7 @@ func TestDaemonRuntimeRoot(t *testing.T) {
 	}
 
 	id := t.Name()
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("top")), WithNewSnapshot(id, image), WithRuntime("io.containerd.runc.v1", &options.Options{
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("top")), WithRuntime("io.containerd.runc.v1", &options.Options{
 		Root: runtimeRoot,
 	}))
 	if err != nil {
