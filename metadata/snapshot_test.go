@@ -23,11 +23,11 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/native"
 	"github.com/containerd/containerd/snapshots/testsuite"
+	bolt "go.etcd.io/bbolt"
 )
 
 func newTestSnapshotter(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {

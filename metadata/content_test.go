@@ -24,7 +24,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/content/local"
 	"github.com/containerd/containerd/content/testsuite"
@@ -34,6 +33,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
+	bolt "go.etcd.io/bbolt"
 )
 
 func createContentStore(ctx context.Context, root string) (context.Context, content.Store, func() error, error) {

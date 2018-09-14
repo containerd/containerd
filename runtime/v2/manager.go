@@ -23,7 +23,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/log"
@@ -32,6 +31,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
+	bolt "go.etcd.io/bbolt"
 )
 
 func init() {

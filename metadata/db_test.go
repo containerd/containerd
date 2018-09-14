@@ -30,7 +30,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/content/local"
@@ -44,6 +43,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
+	bolt "go.etcd.io/bbolt"
 )
 
 func testDB(t *testing.T) (context.Context, *DB, func()) {
@@ -262,6 +262,16 @@ func TestMigrations(t *testing.T) {
 					return errors.New("deprecated ingest bucket still exists")
 				}
 
+				return nil
+			},
+		},
+
+		{
+			name: "NoOp",
+			init: func(tx *bolt.Tx) error {
+				return nil
+			},
+			check: func(tx *bolt.Tx) error {
 				return nil
 			},
 		},
