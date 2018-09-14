@@ -139,7 +139,9 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 
 			dgst := cw.Digest()
 			if err := cw.Commit(ctx, 0, dgst, commitopts...); err != nil {
-				return errors.Wrap(err, "failed to commit")
+				if !errdefs.IsAlreadyExists(err) {
+					return errors.Wrap(err, "failed to commit")
+				}
 			}
 
 			info, err := s.store.Info(ctx, dgst)

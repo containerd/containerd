@@ -213,7 +213,7 @@ func (s *service) Read(req *api.ReadContentRequest, session api.Content_ReadServ
 	_, err = io.CopyBuffer(
 		&readResponseWriter{session: session},
 		io.NewSectionReader(ra, offset, size), *p)
-	return err
+	return errdefs.ToGRPC(err)
 }
 
 // readResponseWriter is a writer that places the output into ReadContentRequest messages.
@@ -420,7 +420,7 @@ func (s *service) Write(session api.Content_WriteServer) (err error) {
 				// maintain the offset as append only, we just issue the write.
 				n, err := wr.Write(req.Data)
 				if err != nil {
-					return err
+					return errdefs.ToGRPC(err)
 				}
 
 				if n != len(req.Data) {
@@ -438,7 +438,7 @@ func (s *service) Write(session api.Content_WriteServer) (err error) {
 					opts = append(opts, content.WithLabels(req.Labels))
 				}
 				if err := wr.Commit(ctx, total, expected, opts...); err != nil {
-					return err
+					return errdefs.ToGRPC(err)
 				}
 			}
 
