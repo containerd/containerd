@@ -71,7 +71,7 @@ func supportsMultipleLowerDir(d string) error {
 }
 
 // Supported returns nil when the overlayfs is functional on the system with the root directory.
-// Suppported is not called during plugin initialization, but exposed for downstream projects which uses
+// Supported is not called during plugin initialization, but exposed for downstream projects which uses
 // this snapshotter as a library.
 func Supported(root string) error {
 	if err := os.MkdirAll(root, 0700); err != nil {

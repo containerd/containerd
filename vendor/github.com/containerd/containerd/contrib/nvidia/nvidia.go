@@ -32,7 +32,7 @@ import (
 const nvidiaCLI = "nvidia-container-cli"
 
 // Capability specifies capabilities for the gpu inside the container
-// Detailed explaination of options can be found:
+// Detailed explanation of options can be found:
 // https://github.com/nvidia/nvidia-container-runtime#supported-driver-capabilities
 type Capability string
 
