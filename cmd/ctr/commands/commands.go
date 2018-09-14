@@ -124,6 +124,10 @@ var (
 			Name:  "gpus",
 			Usage: "add gpus to the container",
 		},
+		cli.BoolFlag{
+			Name:  "allow-new-privs",
+			Usage: "turn off OCI spec's NoNewPrivileges feature flag",
+		},
 	}
 )
 
