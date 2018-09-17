@@ -318,7 +318,10 @@ var checkpointCommand = cli.Command{
 			return err
 		}
 		defer cancel()
-		opts := []containerd.CheckpointOpts{}
+		opts := []containerd.CheckpointOpts{
+			containerd.WithCheckpointRuntime,
+		}
+
 		if context.Bool("image") {
 			opts = append(opts, containerd.WithCheckpointImage)
 		}
@@ -338,10 +341,13 @@ var checkpointCommand = cli.Command{
 				return err
 			}
 		}
-		if err := task.Pause(ctx); err != nil {
-			return err
+		// pause if running
+		if task != nil {
+			if err := task.Pause(ctx); err != nil {
+				return err
+			}
+			defer task.Resume(ctx)
 		}
-		defer task.Resume(ctx)
 
 		if _, err := container.Checkpoint(ctx, ref, opts...); err != nil {
 			return err
@@ -359,6 +365,10 @@ var restoreCommand = cli.Command{
 		cli.BoolFlag{
 			Name:  "live",
 			Usage: "restore the runtime and memory data from the checkpoint",
+		},
+		cli.BoolFlag{
+			Name:  "rw",
+			Usage: "restore the rw layer from the checkpoint",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -394,6 +404,9 @@ var restoreCommand = cli.Command{
 			containerd.WithRestoreSnapshot,
 			containerd.WithRestoreRuntime,
 		}
+		if context.Bool("rw") {
+			opts = append(opts, containerd.WithRestoreRW)
+		}
 
 		ctr, err := client.Restore(ctx, id, checkpoint, opts...)
 		if err != nil {
@@ -404,6 +417,7 @@ var restoreCommand = cli.Command{
 		if context.Bool("live") {
 			topts = append(topts, containerd.WithTaskCheckpoint(checkpoint))
 		}
+
 		task, err := ctr.NewTask(ctx, cio.NewCreator(cio.WithStdio), topts...)
 		if err != nil {
 			return err
