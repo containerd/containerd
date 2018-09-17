@@ -23,12 +23,34 @@ import (
 	"io"
 	"io/ioutil"
 	"math/rand"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
 )
+
+const benchmarkTestDataURL = "https://git.io/fADcl"
+
+var benchmarkTestData []byte
+
+func TestMain(m *testing.M) {
+	// Download test data for benchmark from gist
+	resp, err := http.Get(benchmarkTestDataURL)
+	if err != nil {
+		panic(err)
+	}
+
+	defer resp.Body.Close()
+
+	benchmarkTestData, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	os.Exit(m.Run())
+}
 
 // generateData generates data that composed of 2 random parts
 // and single zero-filled part within them.
@@ -184,7 +206,7 @@ func TestCmdStreamBad(t *testing.T) {
 
 func generateCompressedData(b *testing.B, sizeInMb int) []byte {
 	sizeInBytes := sizeInMb * 1024 * 1024
-	data, _ := ioutil.ReadFile("testdata/test.json")
+	data := benchmarkTestData
 
 	for len(data) < sizeInBytes {
 		data = append(data, data...)
