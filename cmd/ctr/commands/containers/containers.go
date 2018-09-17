@@ -332,6 +332,17 @@ var checkpointCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		task, err := container.Task(ctx, nil)
+		if err != nil {
+			if !errdefs.IsNotFound(err) {
+				return err
+			}
+		}
+		if err := task.Pause(ctx); err != nil {
+			return err
+		}
+		defer task.Resume(ctx)
+
 		if _, err := container.Checkpoint(ctx, ref, opts...); err != nil {
 			return err
 		}
@@ -378,6 +389,7 @@ var restoreCommand = cli.Command{
 		}
 
 		opts := []containerd.RestoreOpts{
+			containerd.WithRestoreImage,
 			containerd.WithRestoreSpec,
 			containerd.WithRestoreSnapshot,
 			containerd.WithRestoreRuntime,

@@ -31,22 +31,54 @@ import (
 	"github.com/pkg/errors"
 )
 
-var (
-	// ErrCheckpointIndexImageNameNotFound is returned when the checkpoint image name is not present in the index
-	ErrCheckpointIndexImageNameNotFound = errors.New("image name not present in index")
-	// ErrCheckpointIndexRuntimeNameNotFound is returned when the checkpoint runtime name is not present in the index
-	ErrCheckpointIndexRuntimeNameNotFound = errors.New("runtime name not present in index")
-)
-
 // RestoreOpts are options to manage the restore operation
 type RestoreOpts func(context.Context, string, *Client, Image, *imagespec.Index) ([]NewContainerOpts, error)
 
+// WithRestoreImage restores the image for the container
+func WithRestoreImage(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) ([]NewContainerOpts, error) {
+	store := client.ContentStore()
+	m, err := GetIndexByMediaType(index, images.MediaTypeContainerd1CheckpointImageName)
+	if err != nil {
+		if err != ErrMediaTypeNotFound {
+			return nil, err
+		}
+	}
+	imageName := ""
+	if m != nil {
+		data, err := content.ReadBlob(ctx, store, *m)
+		if err != nil {
+			return nil, err
+		}
+		imageName = string(data)
+	}
+	i, err := client.GetImage(ctx, imageName)
+	if err != nil {
+		return nil, err
+	}
+
+	return []NewContainerOpts{
+		WithImage(i),
+	}, nil
+}
+
 // WithRestoreRuntime restores the runtime for the container
 func WithRestoreRuntime(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) ([]NewContainerOpts, error) {
-	runtimeName, ok := index.Annotations["runtime.name"]
-	if !ok {
-		return nil, ErrCheckpointIndexRuntimeNameNotFound
+	store := client.ContentStore()
+	n, err := GetIndexByMediaType(index, images.MediaTypeContainerd1CheckpointRuntimeName)
+	if err != nil {
+		if err != ErrMediaTypeNotFound {
+			return nil, err
+		}
 	}
+	runtimeName := ""
+	if n != nil {
+		data, err := content.ReadBlob(ctx, store, *n)
+		if err != nil {
+			return nil, err
+		}
+		runtimeName = string(data)
+	}
+
 	// restore options if present
 	m, err := GetIndexByMediaType(index, images.MediaTypeContainerd1CheckpointRuntimeOptions)
 	if err != nil {
@@ -54,9 +86,9 @@ func WithRestoreRuntime(ctx context.Context, id string, client *Client, checkpoi
 			return nil, err
 		}
 	}
+
 	var options *ptypes.Any
 	if m != nil {
-		store := client.ContentStore()
 		data, err := content.ReadBlob(ctx, store, *m)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to read checkpoint runtime")
@@ -98,15 +130,26 @@ func WithRestoreSpec(ctx context.Context, id string, client *Client, checkpoint 
 
 // WithRestoreSnapshot restores the snapshot from the checkpoint for the container
 func WithRestoreSnapshot(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) ([]NewContainerOpts, error) {
-	// get image from annotation
-	imageName, ok := index.Annotations["image.name"]
-	if !ok {
-		return nil, ErrCheckpointIndexImageNameNotFound
+	imageName := ""
+	store := client.ContentStore()
+	m, err := GetIndexByMediaType(index, images.MediaTypeContainerd1CheckpointImageName)
+	if err != nil {
+		if err != ErrMediaTypeNotFound {
+			return nil, err
+		}
 	}
-	i, err := client.Pull(ctx, imageName, WithPullUnpack)
+	if m != nil {
+		data, err := content.ReadBlob(ctx, store, *m)
+		if err != nil {
+			return nil, err
+		}
+		imageName = string(data)
+	}
+	i, err := client.GetImage(ctx, imageName)
 	if err != nil {
 		return nil, err
 	}
+
 	diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore(), platforms.Default())
 	if err != nil {
 		return nil, err
