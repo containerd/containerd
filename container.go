@@ -17,12 +17,10 @@
 package containerd
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/containerd/containerd/api/services/tasks/v1"
@@ -38,6 +36,11 @@ import (
 	ver "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
+)
+
+const (
+	checkpointImageNameLabel   = "image.name"
+	checkpointRuntimeNameLabel = "runtime.name"
 )
 
 // Container is a metadata object for container resources and task creation
@@ -312,45 +315,9 @@ func (c *container) Checkpoint(ctx context.Context, ref string, opts ...Checkpoi
 	defer done(ctx)
 
 	// add image name to manifest
-	ir := bytes.NewReader([]byte(img.Name()))
-	idesc, err := writeContent(ctx, c.client.ContentStore(), images.MediaTypeContainerd1CheckpointImageName, info.ID+"-image-name", ir)
-	if err != nil {
-		return nil, err
-	}
-	idesc.Platform = &ocispec.Platform{
-		OS:           runtime.GOOS,
-		Architecture: runtime.GOARCH,
-	}
-	index.Manifests = append(index.Manifests, idesc)
-
+	index.Annotations[checkpointImageNameLabel] = img.Name()
 	// add runtime info to index
-	rr := bytes.NewReader([]byte(info.Runtime.Name))
-	rdesc, err := writeContent(ctx, c.client.ContentStore(), images.MediaTypeContainerd1CheckpointRuntimeName, info.ID+"-runtime-name", rr)
-	if err != nil {
-		return nil, err
-	}
-	rdesc.Platform = &ocispec.Platform{
-		OS:           runtime.GOOS,
-		Architecture: runtime.GOARCH,
-	}
-	index.Manifests = append(index.Manifests, rdesc)
-
-	if info.Runtime.Options != nil {
-		data, err := info.Runtime.Options.Marshal()
-		if err != nil {
-			return nil, err
-		}
-		r := bytes.NewReader(data)
-		desc, err := writeContent(ctx, c.client.ContentStore(), images.MediaTypeContainerd1CheckpointRuntimeOptions, info.ID+"-runtime-options", r)
-		if err != nil {
-			return nil, err
-		}
-		desc.Platform = &ocispec.Platform{
-			OS:           runtime.GOOS,
-			Architecture: runtime.GOARCH,
-		}
-		index.Manifests = append(index.Manifests, desc)
-	}
+	index.Annotations[checkpointRuntimeNameLabel] = info.Runtime.Name
 
 	// process remaining opts
 	for _, o := range opts {

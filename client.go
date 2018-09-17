@@ -538,35 +538,11 @@ func (c *Client) Restore(ctx context.Context, id string, checkpoint Image, opts 
 
 	copts := []NewContainerOpts{}
 	for _, o := range opts {
-		co, err := o(ctx, id, c, checkpoint, index)
-		if err != nil {
-			return nil, err
-		}
-		copts = append(copts, co...)
+		copts = append(copts, o(ctx, id, c, checkpoint, index))
 	}
 
 	ctr, err := c.NewContainer(ctx, id, copts...)
 	if err != nil {
-		return nil, err
-	}
-
-	// apply rw layer
-	info, err := ctr.Info(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	rw, err := GetIndexByMediaType(index, ocispec.MediaTypeImageLayerGzip)
-	if err != nil {
-		return nil, err
-	}
-
-	mounts, err := c.SnapshotService(info.Snapshotter).Mounts(ctx, info.SnapshotKey)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := c.DiffService().Apply(ctx, *rw, mounts); err != nil {
 		return nil, err
 	}
 
