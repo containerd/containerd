@@ -140,7 +140,7 @@ func (c *Container) addHandler(service *WebService, serveMux *http.ServeMux) boo
 func (c *Container) Remove(ws *WebService) error {
 	if c.ServeMux == http.DefaultServeMux {
 		errMsg := fmt.Sprintf("[restful] cannot remove a WebService from a Container using the DefaultServeMux: ['%v']", ws)
-		log.Printf(errMsg)
+		log.Print(errMsg)
 		return errors.New(errMsg)
 	}
 	c.webServicesLock.Lock()

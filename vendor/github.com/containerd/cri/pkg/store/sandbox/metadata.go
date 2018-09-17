@@ -54,6 +54,8 @@ type Metadata struct {
 	NetNSPath string
 	// IP of Pod if it is attached to non host network
 	IP string
+	// RuntimeHandler is the runtime handler name of the pod.
+	RuntimeHandler string
 }
 
 // MarshalJSON encodes Metadata into bytes in json format.

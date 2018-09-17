@@ -24,6 +24,7 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
+	"github.com/containerd/cri/pkg/store"
 	imagestore "github.com/containerd/cri/pkg/store/image"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -32,19 +33,19 @@ import (
 // TODO(random-liu): We should change CRI to distinguish image id and image spec. (See
 // kubernetes/kubernetes#46255)
 func (c *criService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequest) (*runtime.ImageStatusResponse, error) {
-	image, err := c.localResolve(ctx, r.GetImage().GetImage())
+	image, err := c.localResolve(r.GetImage().GetImage())
 	if err != nil {
+		if err == store.ErrNotExist {
+			// return empty without error when image not found.
+			return &runtime.ImageStatusResponse{}, nil
+		}
 		return nil, errors.Wrapf(err, "can not resolve %q locally", r.GetImage().GetImage())
-	}
-	if image == nil {
-		// return empty without error when image not found.
-		return &runtime.ImageStatusResponse{}, nil
 	}
 	// TODO(random-liu): [P0] Make sure corresponding snapshot exists. What if snapshot
 	// doesn't exist?
 
-	runtimeImage := toCRIRuntimeImage(image)
-	info, err := c.toCRIImageInfo(ctx, image, r.GetVerbose())
+	runtimeImage := toCRIImage(image)
+	info, err := c.toCRIImageInfo(ctx, &image, r.GetVerbose())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate image info")
 	}
@@ -55,12 +56,13 @@ func (c *criService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequ
 	}, nil
 }
 
-// toCRIRuntimeImage converts internal image object to CRI runtime.Image.
-func toCRIRuntimeImage(image *imagestore.Image) *runtime.Image {
+// toCRIImage converts internal image object to CRI runtime.Image.
+func toCRIImage(image imagestore.Image) *runtime.Image {
+	repoTags, repoDigests := parseImageReferences(image.References)
 	runtimeImage := &runtime.Image{
 		Id:          image.ID,
-		RepoTags:    image.RepoTags,
-		RepoDigests: image.RepoDigests,
+		RepoTags:    repoTags,
+		RepoDigests: repoDigests,
 		Size_:       uint64(image.Size),
 	}
 	uid, username := getUserFromImage(image.ImageSpec.Config.User)

@@ -16,9 +16,14 @@ limitations under the License.
 
 package util
 
-import "github.com/docker/docker/pkg/stringid"
+import (
+	"encoding/hex"
+	"math/rand"
+)
 
 // GenerateID generates a random unique id.
 func GenerateID() string {
-	return stringid.GenerateNonCryptoID()
+	b := make([]byte, 32)
+	rand.Read(b)
+	return hex.EncodeToString(b)
 }
