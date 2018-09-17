@@ -102,15 +102,16 @@ func toCRISandboxStatus(meta sandboxstore.Metadata, status sandboxstore.Status, 
 
 // TODO (mikebrow): discuss predefining constants structures for some or all of these field names in CRI
 type sandboxInfo struct {
-	Pid         uint32                    `json:"pid"`
-	Status      string                    `json:"processStatus"`
-	NetNSClosed bool                      `json:"netNamespaceClosed"`
-	Image       string                    `json:"image"`
-	SnapshotKey string                    `json:"snapshotKey"`
-	Snapshotter string                    `json:"snapshotter"`
-	Runtime     *criconfig.Runtime        `json:"runtime"`
-	Config      *runtime.PodSandboxConfig `json:"config"`
-	RuntimeSpec *runtimespec.Spec         `json:"runtimeSpec"`
+	Pid            uint32                    `json:"pid"`
+	Status         string                    `json:"processStatus"`
+	NetNSClosed    bool                      `json:"netNamespaceClosed"`
+	Image          string                    `json:"image"`
+	SnapshotKey    string                    `json:"snapshotKey"`
+	Snapshotter    string                    `json:"snapshotter"`
+	RuntimeHandler string                    `json:"runtimeHandler"`
+	Runtime        *criconfig.Runtime        `json:"runtime"`
+	Config         *runtime.PodSandboxConfig `json:"config"`
+	RuntimeSpec    *runtimespec.Spec         `json:"runtimeSpec"`
 }
 
 // toCRISandboxInfo converts internal container object information to CRI sandbox status response info map.
@@ -132,9 +133,10 @@ func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox) (map[st
 	}
 
 	si := &sandboxInfo{
-		Pid:    sandbox.Status.Get().Pid,
-		Status: string(processStatus),
-		Config: sandbox.Config,
+		Pid:            sandbox.Status.Get().Pid,
+		RuntimeHandler: sandbox.RuntimeHandler,
+		Status:         string(processStatus),
+		Config:         sandbox.Config,
 	}
 
 	if si.Status == "" {

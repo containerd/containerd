@@ -74,9 +74,10 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// Create initial internal sandbox object.
 	sandbox := sandboxstore.NewSandbox(
 		sandboxstore.Metadata{
-			ID:     id,
-			Name:   name,
-			Config: config,
+			ID:             id,
+			Name:           name,
+			Config:         config,
+			RuntimeHandler: r.GetRuntimeHandler(),
 		},
 		sandboxstore.Status{
 			State: sandboxstore.StateUnknown,
