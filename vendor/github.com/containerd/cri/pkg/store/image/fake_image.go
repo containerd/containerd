@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2018 The Containerd Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package wait provides tools for polling or listening for changes
-// to a condition.
-package wait // import "k8s.io/apimachinery/pkg/util/wait"
+package image
+
+import "github.com/pkg/errors"
+
+// NewFakeStore returns an image store with predefined images.
+// Update is not allowed for this fake store.
+func NewFakeStore(images []Image) (*Store, error) {
+	s := NewStore(nil)
+	for _, i := range images {
+		for _, ref := range i.References {
+			s.refCache[ref] = i.ID
+		}
+		if err := s.store.add(i); err != nil {
+			return nil, errors.Wrapf(err, "add image %q", i)
+		}
+	}
+	return s, nil
+}

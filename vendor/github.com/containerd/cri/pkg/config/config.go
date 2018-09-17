@@ -33,10 +33,18 @@ type Runtime struct {
 type ContainerdConfig struct {
 	// Snapshotter is the snapshotter used by containerd.
 	Snapshotter string `toml:"snapshotter" json:"snapshotter"`
-	// DefaultRuntime is the runtime to use in containerd.
+	// DefaultRuntime is the default runtime to use in containerd.
+	// This runtime is used when no runtime handler (or the empty string) is provided.
 	DefaultRuntime Runtime `toml:"default_runtime" json:"defaultRuntime"`
 	// UntrustedWorkloadRuntime is a runtime to run untrusted workloads on it.
+	// DEPRECATED: use Runtimes instead. If provided, this runtime is mapped to the runtime handler
+	//     named 'untrusted'. It is a configuration error to provide both the (now deprecated)
+	//     UntrustedWorkloadRuntime and a handler in the Runtimes handler map (below) for 'untrusted'
+	//     workloads at the same time. Please provide one or the other.
 	UntrustedWorkloadRuntime Runtime `toml:"untrusted_workload_runtime" json:"untrustedWorkloadRuntime"`
+	// Runtimes is a map from CRI RuntimeHandler strings, which specify types of runtime
+	// configurations, to the matching configurations.
+	Runtimes map[string]Runtime `toml:"runtimes" json:"runtimes"`
 	// NoPivot disables pivot-root (linux only), required when running a container in a RamDisk with runc
 	NoPivot bool `toml:"no_pivot" json:"noPivot"`
 }
@@ -114,10 +122,20 @@ type PluginConfig struct {
 	SystemdCgroup bool `toml:"systemd_cgroup" json:"systemdCgroup"`
 	// EnableTLSStreaming indicates to enable the TLS streaming support.
 	EnableTLSStreaming bool `toml:"enable_tls_streaming" json:"enableTLSStreaming"`
+	// X509KeyPairStreaming is a x509 key pair used for TLS streaming
+	X509KeyPairStreaming `toml:"x509_key_pair_streaming" json:"x509KeyPairStreaming"`
 	// MaxContainerLogLineSize is the maximum log line size in bytes for a container.
 	// Log line longer than the limit will be split into multiple lines. Non-positive
 	// value means no limit.
 	MaxContainerLogLineSize int `toml:"max_container_log_line_size" json:"maxContainerLogSize"`
+}
+
+// X509KeyPairStreaming contains the x509 configuration for streaming
+type X509KeyPairStreaming struct {
+	// TLSCertFile is the path to a certificate file
+	TLSCertFile string `toml:"tls_cert_file" json:"tlsCertFile"`
+	// TLSKeyFile is the path to a private key file
+	TLSKeyFile string `toml:"tls_key_file" json:"tlsKeyFile"`
 }
 
 // Config contains all configurations for cri server.
@@ -152,10 +170,14 @@ func DefaultConfig() PluginConfig {
 			},
 			NoPivot: false,
 		},
-		StreamServerAddress:     "127.0.0.1",
-		StreamServerPort:        "0",
-		EnableSelinux:           false,
-		EnableTLSStreaming:      false,
+		StreamServerAddress: "127.0.0.1",
+		StreamServerPort:    "0",
+		EnableSelinux:       false,
+		EnableTLSStreaming:  false,
+		X509KeyPairStreaming: X509KeyPairStreaming{
+			TLSKeyFile:  "",
+			TLSCertFile: "",
+		},
 		SandboxImage:            "k8s.gcr.io/pause:3.1",
 		StatsCollectPeriod:      10,
 		SystemdCgroup:           false,
@@ -169,3 +191,8 @@ func DefaultConfig() PluginConfig {
 		},
 	}
 }
+
+const (
+	// RuntimeUntrusted is the implicit runtime defined for ContainerdConfig.UntrustedWorkloadRuntime
+	RuntimeUntrusted = "untrusted"
+)

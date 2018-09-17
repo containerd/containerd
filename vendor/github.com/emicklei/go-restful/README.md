@@ -67,6 +67,7 @@ func (u UserResource) findUser(request *restful.Request, response *restful.Respo
 - [Example posted on blog](http://ernestmicklei.com/2012/11/go-restful-first-working-example/)
 - [Design explained on blog](http://ernestmicklei.com/2012/11/go-restful-api-design/)
 - [sourcegraph](https://sourcegraph.com/github.com/emicklei/go-restful)
+- [showcase: Zazkia - tcp proxy for testing resiliency](https://github.com/emicklei/zazkia)
 - [showcase: Mora - MongoDB REST Api server](https://github.com/emicklei/mora)
 
 Type ```git shortlog -s``` for a full list of contributors.

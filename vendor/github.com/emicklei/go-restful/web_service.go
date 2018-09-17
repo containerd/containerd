@@ -233,7 +233,7 @@ func (w *WebService) RootPath() string {
 	return w.rootPath
 }
 
-// PathParameters return the path parameter names for (shared amoung its Routes)
+// PathParameters return the path parameter names for (shared among its Routes)
 func (w *WebService) PathParameters() []*Parameter {
 	return w.pathParameters
 }
