@@ -295,11 +295,15 @@ func (c *container) Checkpoint(ctx context.Context, ref string, opts ...Checkpoi
 		FileLocks:           true,
 		EmptyNamespaces:     nil,
 	}
+	info, err := c.Info(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	img, err := c.Image(ctx)
 	if err != nil {
 		return nil, err
 	}
-	index.Annotations["image.name"] = img.Name()
 
 	ctx, done, err := c.client.WithLease(ctx)
 	if err != nil {
@@ -307,53 +311,52 @@ func (c *container) Checkpoint(ctx context.Context, ref string, opts ...Checkpoi
 	}
 	defer done(ctx)
 
-	// pause task to checkpoint
-	if err := func(ctx context.Context) error {
-		task, err := c.Task(ctx, nil)
-		if err != nil {
-			if errdefs.IsNotFound(err) {
-				return nil
-			}
-			return err
-		}
-		if err := task.Pause(ctx); err != nil {
-			return err
-		}
-		defer task.Resume(ctx)
-
-		info, err := c.Info(ctx)
-		if err != nil {
-			return err
-		}
-
-		// add runtime info to index
-		index.Annotations["runtime.name"] = info.Runtime.Name
-		if info.Runtime.Options != nil {
-			data, err := info.Runtime.Options.Marshal()
-			if err != nil {
-				return err
-			}
-			r := bytes.NewReader(data)
-			desc, err := writeContent(ctx, c.client.ContentStore(), images.MediaTypeContainerd1CheckpointRuntimeOptions, info.ID+"-runtime-options", r)
-			if err != nil {
-				return err
-			}
-			desc.Platform = &ocispec.Platform{
-				OS:           runtime.GOOS,
-				Architecture: runtime.GOARCH,
-			}
-			index.Manifests = append(index.Manifests, desc)
-		}
-
-		// process remaining opts
-		for _, o := range opts {
-			if err := o(ctx, c.client, &info, index, copts); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(ctx); err != nil {
+	// add image name to manifest
+	ir := bytes.NewReader([]byte(img.Name()))
+	idesc, err := writeContent(ctx, c.client.ContentStore(), images.MediaTypeContainerd1CheckpointImageName, info.ID+"-image-name", ir)
+	if err != nil {
 		return nil, err
+	}
+	idesc.Platform = &ocispec.Platform{
+		OS:           runtime.GOOS,
+		Architecture: runtime.GOARCH,
+	}
+	index.Manifests = append(index.Manifests, idesc)
+
+	// add runtime info to index
+	rr := bytes.NewReader([]byte(info.Runtime.Name))
+	rdesc, err := writeContent(ctx, c.client.ContentStore(), images.MediaTypeContainerd1CheckpointRuntimeName, info.ID+"-runtime-name", rr)
+	if err != nil {
+		return nil, err
+	}
+	rdesc.Platform = &ocispec.Platform{
+		OS:           runtime.GOOS,
+		Architecture: runtime.GOARCH,
+	}
+	index.Manifests = append(index.Manifests, rdesc)
+
+	if info.Runtime.Options != nil {
+		data, err := info.Runtime.Options.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		r := bytes.NewReader(data)
+		desc, err := writeContent(ctx, c.client.ContentStore(), images.MediaTypeContainerd1CheckpointRuntimeOptions, info.ID+"-runtime-options", r)
+		if err != nil {
+			return nil, err
+		}
+		desc.Platform = &ocispec.Platform{
+			OS:           runtime.GOOS,
+			Architecture: runtime.GOARCH,
+		}
+		index.Manifests = append(index.Manifests, desc)
+	}
+
+	// process remaining opts
+	for _, o := range opts {
+		if err := o(ctx, c.client, &info, index, copts); err != nil {
+			return nil, err
+		}
 	}
 
 	desc, err := writeIndex(ctx, index, c.client, c.ID()+"index")
