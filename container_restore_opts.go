@@ -22,25 +22,34 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/proto"
 	ptypes "github.com/gogo/protobuf/types"
+	"github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
 
+var (
+	// ErrCheckpointIndexImageNameNotFound is returned when the checkpoint image name is not present in the index
+	ErrCheckpointIndexImageNameNotFound = errors.New("image name not present in index")
+	// ErrCheckpointIndexRuntimeNameNotFound is returned when the checkpoint runtime name is not present in the index
+	ErrCheckpointIndexRuntimeNameNotFound = errors.New("runtime name not present in index")
+)
+
 // RestoreOpts are options to manage the restore operation
-type RestoreOpts func(context.Context, *Client, Image, *imagespec.Index) ([]NewContainerOpts, []NewTaskOpts, error)
+type RestoreOpts func(context.Context, string, *Client, Image, *imagespec.Index) ([]NewContainerOpts, []NewTaskOpts, error)
 
 // WithRestoreLive restores the runtime and memory data for the container
-func WithRestoreLive(ctx context.Context, client *Client, checkpoint Image, index *imagespec.Index) ([]NewContainerOpts, []NewTaskOpts, error) {
+func WithRestoreLive(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) ([]NewContainerOpts, []NewTaskOpts, error) {
 	return nil, []NewTaskOpts{
 		WithTaskCheckpoint(checkpoint),
 	}, nil
 }
 
 // WithRestoreRuntime restores the runtime for the container
-func WithRestoreRuntime(ctx context.Context, client *Client, checkpoint Image, index *imagespec.Index) ([]NewContainerOpts, []NewTaskOpts, error) {
+func WithRestoreRuntime(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) ([]NewContainerOpts, []NewTaskOpts, error) {
 	runtimeName, ok := index.Annotations["runtime.name"]
 	if !ok {
 		return nil, nil, ErrCheckpointIndexRuntimeNameNotFound
@@ -69,7 +78,7 @@ func WithRestoreRuntime(ctx context.Context, client *Client, checkpoint Image, i
 }
 
 // WithRestoreSpec restores the spec from the checkpoint for the container
-func WithRestoreSpec(ctx context.Context, client *Client, checkpoint Image, index *imagespec.Index) ([]NewContainerOpts, []NewTaskOpts, error) {
+func WithRestoreSpec(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) ([]NewContainerOpts, []NewTaskOpts, error) {
 	m, err := GetIndexByMediaType(index, images.MediaTypeContainerd1CheckpointConfig)
 	if err != nil {
 		return nil, nil, err
@@ -91,5 +100,30 @@ func WithRestoreSpec(ctx context.Context, client *Client, checkpoint Image, inde
 	spec := v.(*oci.Spec)
 	return []NewContainerOpts{
 		WithSpec(spec),
+	}, nil, nil
+}
+
+func WithRestoreSnapshot(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) ([]NewContainerOpts, []NewTaskOpts, error) {
+	// get image from annotation
+	imageName, ok := index.Annotations["image.name"]
+	if !ok {
+		return nil, nil, ErrCheckpointIndexImageNameNotFound
+	}
+	i, err := client.Pull(ctx, imageName, WithPullUnpack)
+	if err != nil {
+		return nil, nil, err
+	}
+	diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore(), platforms.Default())
+	if err != nil {
+		return nil, nil, err
+	}
+	//setSnapshotterIfEmpty(client)
+	parent := identity.ChainID(diffIDs).String()
+	if _, err := client.SnapshotService(DefaultSnapshotter).Prepare(ctx, id, parent); err != nil {
+		return nil, nil, err
+	}
+	return []NewContainerOpts{
+		WithImage(i),
+		WithSnapshot(id),
 	}, nil, nil
 }

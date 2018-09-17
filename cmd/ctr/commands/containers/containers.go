@@ -288,7 +288,7 @@ var infoCommand = cli.Command{
 var checkpointCommand = cli.Command{
 	Name:      "checkpoint",
 	Usage:     "checkpoint a container",
-	ArgsUsage: "CONTAINER REF [flags]",
+	ArgsUsage: "CONTAINER REF",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "rw",
@@ -342,7 +342,7 @@ var checkpointCommand = cli.Command{
 var restoreCommand = cli.Command{
 	Name:      "restore",
 	Usage:     "restore a container from checkpoint",
-	ArgsUsage: "CONTAINER REF [flags]",
+	ArgsUsage: "CONTAINER REF",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "live",
@@ -358,18 +358,20 @@ var restoreCommand = cli.Command{
 		if ref == "" {
 			return errors.New("ref must be provided")
 		}
-		opts := []containerd.RestoreOpts{
-			containerd.WithRestoreSpec,
-			containerd.WithRestoreRuntime,
-		}
-		if context.Bool("live") {
-			opts = append(opts, containerd.WithRestoreLive)
-		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
 		defer cancel()
+
+		opts := []containerd.RestoreOpts{
+			containerd.WithRestoreSpec,
+			containerd.WithRestoreSnapshot,
+			containerd.WithRestoreRuntime,
+		}
+		if context.Bool("live") {
+			opts = append(opts, containerd.WithRestoreLive)
+		}
 		if err := client.Restore(ctx, id, ref, opts...); err != nil {
 			return err
 		}

@@ -36,10 +36,6 @@ var (
 	ErrCheckpointRWUnsupported = errors.New("rw checkpoint is only supported on v2 runtimes")
 	// ErrMediaTypeNotFound returns an error when a media type in the manifest is unknown
 	ErrMediaTypeNotFound = errors.New("media type not found")
-	// ErrCheckpointIndexImageNameNotFound is returned when the checkpoint image name is not present in the index
-	ErrCheckpointIndexImageNameNotFound = errors.New("image name not present in index")
-	// ErrCheckpointIndexRuntimeNameNotFound is returned when the checkpoint runtime name is not present in the index
-	ErrCheckpointIndexRuntimeNameNotFound = errors.New("runtime name not present in index")
 )
 
 // CheckpointOpts are options to manage the checkpoint operation

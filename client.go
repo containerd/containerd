@@ -49,7 +49,6 @@ import (
 	"github.com/containerd/containerd/leases"
 	leasesproxy "github.com/containerd/containerd/leases/proxy"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
@@ -570,31 +569,16 @@ func (c *Client) Restore(ctx context.Context, id, ref string, opts ...RestoreOpt
 		return err
 	}
 
-	// get image from annotation
-	imageName, ok := index.Annotations["image.name"]
-	if !ok {
-		return ErrCheckpointIndexImageNameNotFound
-	}
-
-	image, err := c.Pull(ctx, imageName, WithPullUnpack)
-	if err != nil {
-		return err
-	}
-
 	ctx, done, err := c.WithLease(ctx)
 	if err != nil {
 		return err
 	}
 	defer done(ctx)
 
-	// container options
-	copts := []NewContainerOpts{
-		WithNewSpec(oci.WithImageConfig(image)),
-		WithNewSnapshot(id, image),
-	}
+	copts := []NewContainerOpts{}
 	topts := []NewTaskOpts{}
 	for _, o := range opts {
-		co, to, err := o(ctx, c, checkpoint, index)
+		co, to, err := o(ctx, id, c, checkpoint, index)
 		if err != nil {
 			return err
 		}
