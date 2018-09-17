@@ -383,7 +383,7 @@ var restoreCommand = cli.Command{
 			containerd.WithRestoreRuntime,
 		}
 
-		ctr, err := client.Restore(ctx, id, ref, opts...)
+		ctr, err := client.Restore(ctx, id, checkpoint, opts...)
 		if err != nil {
 			return err
 		}

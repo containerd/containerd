@@ -523,19 +523,7 @@ func (c *Client) ListImages(ctx context.Context, filters ...string) ([]Image, er
 }
 
 // Restore restores a container from a checkpoint
-func (c *Client) Restore(ctx context.Context, id, ref string, opts ...RestoreOpts) (Container, error) {
-	checkpoint, err := c.GetImage(ctx, ref)
-	if err != nil {
-		if !errdefs.IsNotFound(err) {
-			return nil, err
-		}
-		ck, err := c.Fetch(ctx, ref)
-		if err != nil {
-			return nil, err
-		}
-		checkpoint = NewImage(c, ck)
-	}
-
+func (c *Client) Restore(ctx context.Context, id string, checkpoint Image, opts ...RestoreOpts) (Container, error) {
 	store := c.ContentStore()
 	index, err := decodeIndex(ctx, store, checkpoint.Target())
 	if err != nil {
