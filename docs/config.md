@@ -76,9 +76,9 @@ The explanation and default value of each configuration item are as follows:
       # runtime_root is the directory used by containerd for runtime state.
       runtime_root = ""
 
-  	# plugins.cri.containerd.runtimes is a map from CRI RuntimeHandler strings, which specify types
-  	# of runtime configurations, to the matching configurations. In this example,
-  	# 'runtime_handler_name' is the RuntimeHandler string to match.
+    # plugins.cri.containerd.runtimes is a map from CRI RuntimeHandler strings, which specify types
+    # of runtime configurations, to the matching configurations. In this example,
+    # 'runtime_handler_name' is the RuntimeHandler string to match.
     [plugins.cri.containerd.runtimes.runtime_handler_name]
       # runtime_type is the runtime type to use in containerd e.g. io.containerd.runtime.v1.linux
       runtime_type = ""
