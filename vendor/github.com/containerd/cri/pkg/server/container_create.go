@@ -19,6 +19,7 @@ package server
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -232,6 +233,15 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		specOpts = append(specOpts, oci.WithUser(userstr))
 	}
 
+	if securityContext.GetRunAsUsername() != "" {
+		userstr = securityContext.GetRunAsUsername()
+	} else {
+		// Even if RunAsUser is not set, we still call `GetValue` to get uid 0.
+		// Because it is still useful to get additional gids for uid 0.
+		userstr = strconv.FormatInt(securityContext.GetRunAsUser().GetValue(), 10)
+	}
+	specOpts = append(specOpts, customopts.WithAdditionalGIDs(userstr))
+
 	apparmorSpecOpts, err := generateApparmorSpecOpts(
 		securityContext.GetApparmorProfile(),
 		securityContext.GetPrivileged(),
@@ -333,6 +343,17 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 		g.AddProcessEnv("TERM", "xterm")
 	}
 
+	// Add HOSTNAME env.
+	hostname := sandboxConfig.GetHostname()
+	if sandboxConfig.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE &&
+		hostname == "" {
+		hostname, err = c.os.Hostname()
+		if err != nil {
+			return nil, err
+		}
+	}
+	g.AddProcessEnv(hostnameEnv, hostname)
+
 	// Apply envs from image config first, so that envs from container config
 	// can override them.
 	if err := addImageEnvs(&g, imageConfig.Env); err != nil {
@@ -349,8 +370,8 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 		return nil, errors.Wrapf(err, "failed to init selinux options %+v", securityContext.GetSelinuxOptions())
 	}
 
-	// Add extra mounts first so that CRI specified mounts can override.
-	mounts := append(extraMounts, config.GetMounts()...)
+	// Merge extra mounts and CRI mounts.
+	mounts := mergeMounts(config.GetMounts(), extraMounts)
 	if err := c.addOCIBindMounts(&g, mounts, mountLabel); err != nil {
 		return nil, errors.Wrapf(err, "failed to set OCI bind mounts %+v", mounts)
 	}
@@ -596,8 +617,35 @@ func setOCIDevicesPrivileged(g *generate.Generator) error {
 
 // addOCIBindMounts adds bind mounts.
 func (c *criService) addOCIBindMounts(g *generate.Generator, mounts []*runtime.Mount, mountLabel string) error {
+	// Sort mounts in number of parts. This ensures that high level mounts don't
+	// shadow other mounts.
+	sort.Sort(orderedMounts(mounts))
+
 	// Mount cgroup into the container as readonly, which inherits docker's behavior.
 	g.AddCgroupsMount("ro") // nolint: errcheck
+
+	// Copy all mounts from default mounts, except for
+	// - mounts overriden by supplied mount;
+	// - all mounts under /dev if a supplied /dev is present.
+	mountSet := make(map[string]struct{})
+	for _, m := range mounts {
+		mountSet[filepath.Clean(m.ContainerPath)] = struct{}{}
+	}
+	defaultMounts := g.Spec().Mounts
+	g.Spec().Mounts = nil
+	for _, m := range defaultMounts {
+		dst := filepath.Clean(m.Destination)
+		if _, ok := mountSet[dst]; ok {
+			// filter out mount overridden by a supplied mount
+			continue
+		}
+		if _, mountDev := mountSet["/dev"]; mountDev && strings.HasPrefix(dst, "/dev/") {
+			// filter out everything under /dev if /dev is a supplied mount
+			continue
+		}
+		g.Spec().Mounts = append(g.Spec().Mounts, m)
+	}
+
 	for _, mount := range mounts {
 		dst := mount.GetContainerPath()
 		src := mount.GetHostPath()
@@ -777,10 +825,6 @@ func defaultRuntimeSpec(id string) (*runtimespec.Spec, error) {
 		if mount.Destination == "/run" {
 			continue
 		}
-		// CRI plugin handles `/dev/shm` itself.
-		if mount.Destination == "/dev/shm" {
-			continue
-		}
 		mounts = append(mounts, mount)
 	}
 	spec.Mounts = mounts
@@ -923,4 +967,26 @@ func generateUserString(username string, uid, gid *runtime.Int64Value) (string, 
 		userstr = userstr + ":" + groupstr
 	}
 	return userstr, nil
+}
+
+// mergeMounts merge CRI mounts with extra mounts. If a mount destination
+// is mounted by both a CRI mount and an extra mount, the CRI mount will
+// be kept.
+func mergeMounts(criMounts, extraMounts []*runtime.Mount) []*runtime.Mount {
+	var mounts []*runtime.Mount
+	mounts = append(mounts, criMounts...)
+	// Copy all mounts from extra mounts, except for mounts overriden by CRI.
+	for _, e := range extraMounts {
+		found := false
+		for _, c := range criMounts {
+			if filepath.Clean(e.ContainerPath) == filepath.Clean(c.ContainerPath) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			mounts = append(mounts, e)
+		}
+	}
+	return mounts
 }

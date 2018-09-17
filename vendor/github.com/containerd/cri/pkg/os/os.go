@@ -44,6 +44,7 @@ type OS interface {
 	Mount(source string, target string, fstype string, flags uintptr, data string) error
 	Unmount(target string, flags int) error
 	LookupMount(path string) (containerdmount.Info, error)
+	Hostname() (string, error)
 }
 
 // RealOS is used to dispatch the real system level operations.
@@ -131,4 +132,9 @@ func Unmount(target string, flags int) error {
 		return err
 	}
 	return unix.Unmount(target, flags)
+}
+
+// Hostname will call os.Hostname to get the hostname of the host.
+func (RealOS) Hostname() (string, error) {
+	return os.Hostname()
 }

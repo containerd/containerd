@@ -19,8 +19,10 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -95,6 +97,8 @@ const (
 	etcHosts = "/etc/hosts"
 	// resolvConfPath is the abs path of resolv.conf on host or container.
 	resolvConfPath = "/etc/resolv.conf"
+	// hostnameEnv is the key for HOSTNAME env.
+	hostnameEnv = "HOSTNAME"
 )
 
 const (
@@ -370,9 +374,14 @@ func initSelinuxOpts(selinuxOpt *runtime.SELinuxOption) (string, string, error) 
 	// Should ignored selinuxOpts if they are incomplete.
 	if selinuxOpt.GetUser() == "" ||
 		selinuxOpt.GetRole() == "" ||
-		selinuxOpt.GetType() == "" ||
-		selinuxOpt.GetLevel() == "" {
+		selinuxOpt.GetType() == "" {
 		return "", "", nil
+	}
+
+	// make sure the format of "level" is correct.
+	ok, err := checkSelinuxLevel(selinuxOpt.GetLevel())
+	if err != nil || !ok {
+		return "", "", err
 	}
 
 	labelOpts := fmt.Sprintf("%s:%s:%s:%s",
@@ -381,6 +390,18 @@ func initSelinuxOpts(selinuxOpt *runtime.SELinuxOption) (string, string, error) 
 		selinuxOpt.GetType(),
 		selinuxOpt.GetLevel())
 	return label.InitLabels(selinux.DupSecOpt(labelOpts))
+}
+
+func checkSelinuxLevel(level string) (bool, error) {
+	if len(level) == 0 {
+		return true, nil
+	}
+
+	matched, err := regexp.MatchString(`^s\d(-s\d)??(:c\d{1,4}((.c\d{1,4})?,c\d{1,4})*(.c\d{1,4})?(,c\d{1,4}(.c\d{1,4})?)*)?$`, level)
+	if err != nil || !matched {
+		return false, fmt.Errorf("the format of 'level' %q is not correct: %v", level, err)
+	}
+	return true, nil
 }
 
 // isInCRIMounts checks whether a destination is in CRI mount list.
@@ -443,4 +464,31 @@ func getRuntimeConfigFromContainerInfo(c containers.Container) (criconfig.Runtim
 	r.Engine = runtimeOpts.Runtime
 	r.Root = runtimeOpts.RuntimeRoot
 	return r, nil
+}
+
+// mounts defines how to sort runtime.Mount.
+// This is the same with the Docker implementation:
+//   https://github.com/moby/moby/blob/17.05.x/daemon/volumes.go#L26
+type orderedMounts []*runtime.Mount
+
+// Len returns the number of mounts. Used in sorting.
+func (m orderedMounts) Len() int {
+	return len(m)
+}
+
+// Less returns true if the number of parts (a/b/c would be 3 parts) in the
+// mount indexed by parameter 1 is less than that of the mount indexed by
+// parameter 2. Used in sorting.
+func (m orderedMounts) Less(i, j int) bool {
+	return m.parts(i) < m.parts(j)
+}
+
+// Swap swaps two items in an array of mounts. Used in sorting
+func (m orderedMounts) Swap(i, j int) {
+	m[i], m[j] = m[j], m[i]
+}
+
+// parts returns the number of parts in the destination of a mount. Used in sorting.
+func (m orderedMounts) parts(i int) int {
+	return strings.Count(filepath.Clean(m[i].ContainerPath), string(os.PathSeparator))
 }
