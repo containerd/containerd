@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/cmd/ctr/commands/run"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/typeurl"
 	"github.com/urfave/cli"
@@ -364,15 +365,39 @@ var restoreCommand = cli.Command{
 		}
 		defer cancel()
 
+		checkpoint, err := client.GetImage(ctx, ref)
+		if err != nil {
+			if !errdefs.IsNotFound(err) {
+				return err
+			}
+			ck, err := client.Fetch(ctx, ref)
+			if err != nil {
+				return err
+			}
+			checkpoint = containerd.NewImage(client, ck)
+		}
+
 		opts := []containerd.RestoreOpts{
 			containerd.WithRestoreSpec,
 			containerd.WithRestoreSnapshot,
 			containerd.WithRestoreRuntime,
 		}
-		if context.Bool("live") {
-			opts = append(opts, containerd.WithRestoreLive)
+
+		ctr, err := client.Restore(ctx, id, ref, opts...)
+		if err != nil {
+			return err
 		}
-		if err := client.Restore(ctx, id, ref, opts...); err != nil {
+
+		topts := []containerd.NewTaskOpts{}
+		if context.Bool("live") {
+			topts = append(topts, containerd.WithTaskCheckpoint(checkpoint))
+		}
+		task, err := ctr.NewTask(ctx, cio.NewCreator(cio.WithStdio), topts...)
+		if err != nil {
+			return err
+		}
+
+		if err := task.Start(ctx); err != nil {
 			return err
 		}
 

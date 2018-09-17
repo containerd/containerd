@@ -39,26 +39,19 @@ var (
 )
 
 // RestoreOpts are options to manage the restore operation
-type RestoreOpts func(context.Context, string, *Client, Image, *imagespec.Index) ([]NewContainerOpts, []NewTaskOpts, error)
-
-// WithRestoreLive restores the runtime and memory data for the container
-func WithRestoreLive(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) ([]NewContainerOpts, []NewTaskOpts, error) {
-	return nil, []NewTaskOpts{
-		WithTaskCheckpoint(checkpoint),
-	}, nil
-}
+type RestoreOpts func(context.Context, string, *Client, Image, *imagespec.Index) ([]NewContainerOpts, error)
 
 // WithRestoreRuntime restores the runtime for the container
-func WithRestoreRuntime(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) ([]NewContainerOpts, []NewTaskOpts, error) {
+func WithRestoreRuntime(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) ([]NewContainerOpts, error) {
 	runtimeName, ok := index.Annotations["runtime.name"]
 	if !ok {
-		return nil, nil, ErrCheckpointIndexRuntimeNameNotFound
+		return nil, ErrCheckpointIndexRuntimeNameNotFound
 	}
 	// restore options if present
 	m, err := GetIndexByMediaType(index, images.MediaTypeContainerd1CheckpointRuntimeOptions)
 	if err != nil {
 		if err != ErrMediaTypeNotFound {
-			return nil, nil, err
+			return nil, err
 		}
 	}
 	var options *ptypes.Any
@@ -66,64 +59,64 @@ func WithRestoreRuntime(ctx context.Context, id string, client *Client, checkpoi
 		store := client.ContentStore()
 		data, err := content.ReadBlob(ctx, store, *m)
 		if err != nil {
-			return nil, nil, errors.Wrap(err, "unable to read checkpoint runtime")
+			return nil, errors.Wrap(err, "unable to read checkpoint runtime")
 		}
 		if err := proto.Unmarshal(data, options); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
 	return []NewContainerOpts{
 		WithRuntime(runtimeName, options),
-	}, nil, nil
+	}, nil
 }
 
 // WithRestoreSpec restores the spec from the checkpoint for the container
-func WithRestoreSpec(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) ([]NewContainerOpts, []NewTaskOpts, error) {
+func WithRestoreSpec(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) ([]NewContainerOpts, error) {
 	m, err := GetIndexByMediaType(index, images.MediaTypeContainerd1CheckpointConfig)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	store := client.ContentStore()
 	data, err := content.ReadBlob(ctx, store, *m)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "unable to read checkpoint config")
+		return nil, errors.Wrap(err, "unable to read checkpoint config")
 	}
 	var any ptypes.Any
 	if err := proto.Unmarshal(data, &any); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	v, err := typeurl.UnmarshalAny(&any)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	spec := v.(*oci.Spec)
 	return []NewContainerOpts{
 		WithSpec(spec),
-	}, nil, nil
+	}, nil
 }
 
-func WithRestoreSnapshot(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) ([]NewContainerOpts, []NewTaskOpts, error) {
+// WithRestoreSnapshot restores the snapshot from the checkpoint for the container
+func WithRestoreSnapshot(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) ([]NewContainerOpts, error) {
 	// get image from annotation
 	imageName, ok := index.Annotations["image.name"]
 	if !ok {
-		return nil, nil, ErrCheckpointIndexImageNameNotFound
+		return nil, ErrCheckpointIndexImageNameNotFound
 	}
 	i, err := client.Pull(ctx, imageName, WithPullUnpack)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore(), platforms.Default())
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	//setSnapshotterIfEmpty(client)
 	parent := identity.ChainID(diffIDs).String()
 	if _, err := client.SnapshotService(DefaultSnapshotter).Prepare(ctx, id, parent); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	return []NewContainerOpts{
 		WithImage(i),
 		WithSnapshot(id),
-	}, nil, nil
+	}, nil
 }
