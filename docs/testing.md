@@ -42,7 +42,7 @@ make test-cri
 ```bash
 make test-cri FOCUS=REGEXP_TO_FOCUS SKIP=REGEXP_TO_SKIP
 ```
-[More information](https://github.com/kubernetes-incubator/cri-tools) about CRI validation test.
+[More information](https://github.com/kubernetes-sigs/cri-tools) about CRI validation test.
 ## Node E2E Test
 [Node e2e test](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-node-tests.md) is a test framework testing Kubernetes node level functionalities such as managing pods, mounting volumes etc. It starts a local cluster with Kubelet and a few other minimum dependencies, and runs node functionality tests against the local cluster.
 * [Install dependencies](../README.md#install-dependencies).

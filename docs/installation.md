@@ -11,7 +11,7 @@ As shown below, the release tarball contains:
 1) `containerd`, `containerd-shim`, `containerd-stress`, `containerd-release`, `ctr`: binaries for containerd.
 2) `runc`: runc binary.
 3) `crictl`, `crictl.yaml`: command line tools for CRI container runtime and its config file.
-4) `critest`: binary to run [CRI validation test](https://github.com/kubernetes-incubator/cri-tools/blob/master/docs/validation.md).
+4) `critest`: binary to run [CRI validation test](https://github.com/kubernetes-sigs/cri-tools/blob/master/docs/validation.md).
 5) `containerd.service`: Systemd unit for containerd.
 6) `/opt/containerd/cluster/`: scripts for `kube-up.sh`.
 ```console
