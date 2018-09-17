@@ -101,7 +101,7 @@ make BUILD_TAGS='seccomp apparmor'
 | selinux   | selinux process and mount labeling | <none>                          |
 | apparmor  | apparmor profile support           | <none>                          |
 ### Validate Your `cri` Setup
-A Kubernetes incubator project called [cri-tools](https://github.com/kubernetes-incubator/cri-tools)
+A Kubernetes incubator project called [cri-tools](https://github.com/kubernetes-sigs/cri-tools)
 includes programs for exercising CRI implementations such as the `cri` plugin.
 More importantly, cri-tools includes the program `critest` which is used for running
 [CRI Validation Testing](https://github.com/kubernetes/community/blob/master/contributors/devel/cri-validation.md).
