@@ -172,7 +172,7 @@ func setSnapshotterIfEmpty(ctx context.Context, client *Client, c *containers.Co
 		namespaceService := client.NamespaceService()
 		if ns, err := namespaces.NamespaceRequired(ctx); err == nil {
 			if labels, err := namespaceService.Labels(ctx, ns); err == nil {
-				if snapshotLabel, ok := labels["snapshotter"]; ok {
+				if snapshotLabel, ok := labels["containerd.io/defaults/snapshotter"]; ok {
 					defaultSnapshotter = snapshotLabel
 				}
 			}

@@ -140,18 +140,16 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 	}
 
 	// check namespace labels for default runtime
-	defaultns := "default"
-	if copts.defaultns != "" {
-		defaultns = copts.defaultns
-	}
-	namespaces := c.NamespaceService()
-	ctx := context.Background()
-	if labels, err := namespaces.Labels(ctx, defaultns); err == nil {
-		if defaultRuntime, ok := labels["runtime"]; ok {
-			c.runtime = defaultRuntime
+	if copts.defaultRuntime == "" && copts.defaultns != "" {
+		namespaces := c.NamespaceService()
+		ctx := context.Background()
+		if labels, err := namespaces.Labels(ctx, copts.defaultns); err == nil {
+			if defaultRuntime, ok := labels["containerd.io/defaults/runtime"]; ok {
+				c.runtime = defaultRuntime
+			}
+		} else {
+			return nil, err
 		}
-	} else {
-		return nil, err
 	}
 
 	return c, nil
@@ -170,6 +168,20 @@ func NewWithConn(conn *grpc.ClientConn, opts ...ClientOpt) (*Client, error) {
 		conn:    conn,
 		runtime: fmt.Sprintf("%s.%s", plugin.RuntimePlugin, runtime.GOOS),
 	}
+
+	// check namespace labels for default runtime
+	if copts.defaultRuntime == "" && copts.defaultns != "" {
+		namespaces := c.NamespaceService()
+		ctx := context.Background()
+		if labels, err := namespaces.Labels(ctx, copts.defaultns); err == nil {
+			if defaultRuntime, ok := labels["containerd.io/defaults/runtime"]; ok {
+				c.runtime = defaultRuntime
+			}
+		} else {
+			return nil, err
+		}
+	}
+
 	if copts.services != nil {
 		c.services = *copts.services
 	}

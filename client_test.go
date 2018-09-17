@@ -405,11 +405,12 @@ func TestDefaultRuntimeWithNamespaceLabels(t *testing.T) {
 	defer cancel()
 	namespaces := client.NamespaceService()
 	testRuntime := "testRuntime"
-	if err := namespaces.SetLabel(ctx, testNamespace, "runtime", testRuntime); err != nil {
+	runtimeLabel := "containerd.io/defaults/runtime"
+	if err := namespaces.SetLabel(ctx, testNamespace, runtimeLabel, testRuntime); err != nil {
 		t.Fatal(err)
 	}
 
-	testClient, err := newClient(t, address, WithDefaultNamespace(testNamespace))
+	testClient, err := New(address, WithDefaultNamespace(testNamespace))
 	if err != nil {
 		t.Fatal(err)
 	}
