@@ -60,7 +60,7 @@ func TestWithEnv(t *testing.T) {
 	WithEnv([]string{"env2"})(nil, nil, nil, &s)
 
 	if len(s.Process.Env) != 2 {
-		t.Fatal("coudn't unset")
+		t.Fatal("could't unset")
 	}
 }
 
@@ -89,11 +89,11 @@ func TestWithMounts(t *testing.T) {
 	}
 
 	if s.Mounts[1].Source != "new-source" {
-		t.Fatal("invaid mount")
+		t.Fatal("invalid mount")
 	}
 
 	if s.Mounts[1].Destination != "new-dest" {
-		t.Fatal("invaid mount")
+		t.Fatal("invalid mount")
 	}
 }
 
