@@ -119,7 +119,7 @@ func TestContainerStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +183,7 @@ func TestContainerOutput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("echo", expected)), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("echo", expected)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +252,7 @@ func TestContainerExec(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,7 +337,7 @@ func TestContainerLargeExecArgs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -413,7 +413,7 @@ func TestContainerPids(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -490,7 +490,7 @@ func TestContainerCloseIO(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withCat()), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withCat()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -546,7 +546,7 @@ func TestDeleteRunningContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -601,7 +601,7 @@ func TestContainerKill(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "10")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "10")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -657,8 +657,8 @@ func TestContainerNoBinaryExists(t *testing.T) {
 	}
 
 	container, err := client.NewContainer(ctx, id,
-		WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("nothing")),
-		WithNewSnapshot(id, image))
+		WithNewSnapshot(id, image),
+		WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("nothing")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -703,7 +703,7 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -768,7 +768,7 @@ func TestWaitStoppedTask(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -831,7 +831,7 @@ func TestWaitStoppedProcess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -918,7 +918,7 @@ func TestTaskForceDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -959,7 +959,7 @@ func TestProcessForceDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1029,11 +1029,10 @@ func TestContainerHostname(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image),
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image),
 		withProcessArgs("hostname"),
 		oci.WithHostname(expected),
-	),
-		WithNewSnapshot(id, image))
+	))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1098,7 +1097,7 @@ func TestContainerExitedAtSet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withTrue()), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withTrue()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1158,7 +1157,7 @@ func TestDeleteContainerExecCreated(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1228,8 +1227,8 @@ func TestContainerMetrics(t *testing.T) {
 		t.Fatal(err)
 	}
 	container, err := client.NewContainer(ctx, id,
-		WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "30")),
-		WithNewSnapshot(id, image))
+		WithNewSnapshot(id, image),
+		WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "30")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1285,9 +1284,8 @@ func TestDeletedContainerMetrics(t *testing.T) {
 		t.Fatal(err)
 	}
 	container, err := client.NewContainer(ctx, id,
-		WithNewSpec(oci.WithImageConfig(image), withExitStatus(0)),
 		WithNewSnapshot(id, image),
-	)
+		WithNewSpec(oci.WithImageConfig(image), withExitStatus(0)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1518,7 +1516,7 @@ func TestContainerHook(t *testing.T) {
 		}
 		return nil
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), hook), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), hook))
 	if err != nil {
 		t.Fatal(err)
 	}

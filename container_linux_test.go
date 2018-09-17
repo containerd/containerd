@@ -70,9 +70,8 @@ func TestTaskUpdate(t *testing.T) {
 		}
 		return nil
 	}
-	container, err := client.NewContainer(ctx, id,
-		WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30"), memory),
-		WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image),
+		WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30"), memory))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +144,7 @@ func TestShimInCgroup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "30")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "30")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +207,7 @@ func TestDaemonRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,7 +279,7 @@ func TestContainerPTY(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), oci.WithTTY, withProcessArgs("echo", "hello")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithTTY, withProcessArgs("echo", "hello")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +356,7 @@ func TestContainerAttach(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withCat()), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withCat()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -652,7 +651,7 @@ func TestContainerAttachProcess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -894,7 +893,7 @@ func TestDaemonRestartWithRunningShim(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "100")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "100")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -978,8 +977,8 @@ func TestContainerRuntimeOptionsv1(t *testing.T) {
 
 	container, err := client.NewContainer(
 		ctx, id,
-		WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)),
 		WithNewSnapshot(id, image),
+		WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)),
 		WithRuntime("io.containerd.runtime.v1.linux", &runctypes.RuncOptions{Runtime: "no-runc"}),
 	)
 	if err != nil {
@@ -1021,8 +1020,8 @@ func TestContainerRuntimeOptionsv2(t *testing.T) {
 
 	container, err := client.NewContainer(
 		ctx, id,
-		WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)),
 		WithNewSnapshot(id, image),
+		WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)),
 		WithRuntime("io.containerd.runc.v1", &options.Options{BinaryName: "no-runc"}),
 	)
 	if err != nil {
@@ -1164,9 +1163,9 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 		oci.WithUserNamespace(0, 1000, 10000),
 	)}
 	if readonlyRootFS {
-		opts = append(opts, WithRemappedSnapshotView(id, image, 1000, 1000))
+		opts = append([]NewContainerOpts{WithRemappedSnapshotView(id, image, 1000, 1000)}, opts...)
 	} else {
-		opts = append(opts, WithRemappedSnapshot(id, image, 1000, 1000))
+		opts = append([]NewContainerOpts{WithRemappedSnapshot(id, image, 1000, 1000)}, opts...)
 	}
 
 	container, err := client.NewContainer(ctx, id, opts...)
@@ -1247,7 +1246,7 @@ func TestTaskResize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1503,7 +1502,7 @@ func TestContainerNoSTDIN(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withExitStatus(0)), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withExitStatus(0)))
 	if err != nil {
 		t.Fatal(err)
 	}
