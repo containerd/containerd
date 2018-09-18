@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/testutil"
 	"github.com/gotestyourself/gotestyourself/assert"
 	digest "github.com/opencontainers/go-digest"
@@ -40,6 +41,7 @@ import (
 func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, root string) (context.Context, content.Store, func() error, error)) {
 	t.Run("Writer", makeTest(t, name, storeFn, checkContentStoreWriter))
 	t.Run("UpdateStatus", makeTest(t, name, storeFn, checkUpdateStatus))
+	t.Run("CommitExists", makeTest(t, name, storeFn, checkCommitExists))
 	t.Run("Resume", makeTest(t, name, storeFn, checkResumeWriter))
 	t.Run("ResumeTruncate", makeTest(t, name, storeFn, checkResume(resumeTruncate)))
 	t.Run("ResumeDiscard", makeTest(t, name, storeFn, checkResume(resumeDiscard)))
@@ -280,6 +282,39 @@ func checkResumeWriter(ctx context.Context, t *testing.T, cs content.Store) {
 	}
 }
 
+func checkCommitExists(ctx context.Context, t *testing.T, cs content.Store) {
+	c1, d1 := createContent(256)
+	if err := content.WriteBlob(ctx, cs, "c1", bytes.NewReader(c1), 256, d1); err != nil {
+		t.Fatal(err)
+	}
+
+	for i, tc := range []struct {
+		expected digest.Digest
+	}{
+		{
+			expected: d1,
+		},
+		{},
+	} {
+		w, err := cs.Writer(ctx, fmt.Sprintf("c1-commitexists-%d", i), 0, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write(c1); err != nil {
+			w.Close()
+			t.Fatal(err)
+		}
+		err = w.Commit(ctx, int64(len(c1)), tc.expected)
+		w.Close()
+		if err == nil {
+			t.Errorf("(%d) Expected already exists error", i)
+		} else if !errdefs.IsAlreadyExists(err) {
+			t.Fatalf("(%d) Unexpected error: %+v", i, err)
+		}
+
+	}
+}
+
 func checkUpdateStatus(ctx context.Context, t *testing.T, cs content.Store) {
 	c1, d1 := createContent(256)
 
@@ -352,7 +387,7 @@ func checkUpdateStatus(ctx context.Context, t *testing.T, cs content.Store) {
 func checkLabels(ctx context.Context, t *testing.T, cs content.Store) {
 	c1, d1 := createContent(256)
 
-	w1, err := cs.Writer(ctx, "c1", 256, d1)
+	w1, err := cs.Writer(ctx, "c1-checklabels", 256, d1)
 	if err != nil {
 		t.Fatal(err)
 	}

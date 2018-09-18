@@ -552,9 +552,6 @@ func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64,
 		}
 		size = nw.size
 		actual = nw.expected
-		if getBlobBucket(tx, nw.namespace, actual) != nil {
-			return "", errors.Wrapf(errdefs.ErrAlreadyExists, "content %v", actual)
-		}
 	} else {
 		status, err := nw.w.Status()
 		if err != nil {
@@ -566,18 +563,16 @@ func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64,
 		size = status.Offset
 		actual = nw.w.Digest()
 
-		if err := nw.w.Commit(ctx, size, expected); err != nil {
-			if !errdefs.IsAlreadyExists(err) {
-				return "", err
-			}
-			if getBlobBucket(tx, nw.namespace, actual) != nil {
-				return "", errors.Wrapf(errdefs.ErrAlreadyExists, "content %v", actual)
-			}
+		if err := nw.w.Commit(ctx, size, expected); err != nil && !errdefs.IsAlreadyExists(err) {
+			return "", err
 		}
 	}
 
 	bkt, err := createBlobBucket(tx, nw.namespace, actual)
 	if err != nil {
+		if err == bolt.ErrBucketExists {
+			return "", errors.Wrapf(errdefs.ErrAlreadyExists, "content %v", actual)
+		}
 		return "", err
 	}
 
