@@ -40,7 +40,7 @@ Containerd 1.2 is validated against Kubernetes v1.11 and v1.12, but it is also c
 
 Users can:
 * Configure alternative runtime handlers with the config option `plugins.cri.containerd.runtimes.runtime_handler_name`, e.g. `plugins.cri.containerd.runtimes.kata`. ([config.md](https://github.com/containerd/cri/blob/release/1.2/docs/config.md))
-* Use the alternative runtime handler in Kubernetes by creating `RuntimeClass` for the runtime handler, and specifying `RuntimeClassName` in the pod spec. ([examples](https://github.com/kubernetes/community/blob/master/keps/sig-node/0014-runtime-class.md#examples))
+* Use the alternative runtime handler in Kubernetes by creating `RuntimeClass` for the runtime handler, and specifying `RuntimeClassName` in the pod spec. ([doc](https://github.com/kubernetes/website/blob/release-1.12/content/en/docs/concepts/containers/runtime-class.md))
 
 ***The `plugins.cri.containerd.untrusted_workload_runtime` config option and `io.kubernetes.cri.untrusted-workload` pod annotation are still functional, but start being deprecated. It is recommended to migrate to the `RuntimeClass` api.***
 
