@@ -33,7 +33,10 @@ import (
 
 // killContainerTimeout is the timeout that we wait for the container to
 // be SIGKILLed.
-const killContainerTimeout = 2 * time.Minute
+// The timeout is set to 1 min, because the default CRI operation timeout
+// for StopContainer is (2 min + stop timeout). Set to 1 min, so that we
+// have enough time for kill(all=true) and kill(all=false).
+const killContainerTimeout = 1 * time.Minute
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
 func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainerRequest) (*runtime.StopContainerResponse, error) {
@@ -63,6 +66,16 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 		return nil
 	}
 
+	task, err := container.Container.Task(ctx, nil)
+	if err != nil {
+		if !errdefs.IsNotFound(err) {
+			return errors.Wrapf(err, "failed to stop container, task not found for container %q", id)
+		}
+		return nil
+	}
+
+	// We only need to kill the task. The event handler will Delete the
+	// task from containerd after it handles the Exited event.
 	if timeout > 0 {
 		stopSignal := unix.SIGTERM
 		image, err := c.imageStore.Get(container.ImageRef)
@@ -81,52 +94,47 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 			}
 		}
 		logrus.Infof("Stop container %q with signal %v", id, stopSignal)
-		task, err := container.Container.Task(ctx, nil)
-		if err != nil {
-			if !errdefs.IsNotFound(err) {
-				return errors.Wrapf(err, "failed to stop container, task not found for container %q", id)
-			}
-			return nil
-		}
-		if task != nil {
-			if err = task.Kill(ctx, stopSignal); err != nil {
-				if !errdefs.IsNotFound(err) {
-					return errors.Wrapf(err, "failed to stop container %q", id)
-				}
-				// Move on to make sure container status is updated.
-			}
+		if err = task.Kill(ctx, stopSignal); err != nil && !errdefs.IsNotFound(err) {
+			return errors.Wrapf(err, "failed to stop container %q", id)
 		}
 
-		err = c.waitContainerStop(ctx, container, timeout)
-		if err == nil {
+		if err = c.waitContainerStop(ctx, container, timeout); err == nil {
 			return nil
 		}
-		logrus.WithError(err).Errorf("Stop container %q timed out", id)
+		logrus.WithError(err).Errorf("An error occurs during waiting for container %q to be stopped", id)
 	}
 
-	task, err := container.Container.Task(ctx, nil)
-	if err != nil {
-		if !errdefs.IsNotFound(err) {
-			return errors.Wrapf(err, "failed to stop container, task not found for container %q", id)
-		}
-		return nil
-	}
-	// Event handler will Delete the container from containerd after it handles the Exited event.
 	logrus.Infof("Kill container %q", id)
-	if task != nil {
-		if err = task.Kill(ctx, unix.SIGKILL, containerd.WithKillAll); err != nil {
-			if !errdefs.IsNotFound(err) {
-				return errors.Wrapf(err, "failed to kill container %q", id)
-			}
-			// Move on to make sure container status is updated.
-		}
+	if err = task.Kill(ctx, unix.SIGKILL, containerd.WithKillAll); err != nil && !errdefs.IsNotFound(err) {
+		return errors.Wrapf(err, "failed to kill container %q", id)
 	}
 
 	// Wait for a fixed timeout until container stop is observed by event monitor.
-	if err := c.waitContainerStop(ctx, container, killContainerTimeout); err != nil {
-		return errors.Wrapf(err, "an error occurs during waiting for container %q to stop", id)
+	if err = c.waitContainerStop(ctx, container, killContainerTimeout); err == nil {
+		return nil
 	}
-	return nil
+	logrus.WithError(err).Errorf("An error occurs during waiting for container %q to be killed", id)
+
+	// This is a fix for `runc`, and should not break other runtimes. With
+	// containerd.WithKillAll, `runc` will get all processes from the container
+	// cgroups, and kill them. However, sometimes the processes may be moved
+	// out from the container cgroup, e.g. users manually move them by mistake,
+	// or systemd.Delegate=true is not set.
+	// In these cases, we should try our best to do cleanup, kill the container
+	// without containerd.WithKillAll, so that runc can kill the container init
+	// process directly.
+	// NOTE(random-liu): If pid namespace is shared inside the pod, non-init processes
+	// of this container will be left running until the pause container is stopped.
+	logrus.Infof("Kill container %q init process", id)
+	if err = task.Kill(ctx, unix.SIGKILL); err != nil && !errdefs.IsNotFound(err) {
+		return errors.Wrapf(err, "failed to kill container %q init process", id)
+	}
+
+	// Wait for a fixed timeout until container stop is observed by event monitor.
+	if err = c.waitContainerStop(ctx, container, killContainerTimeout); err == nil {
+		return nil
+	}
+	return errors.Wrapf(err, "an error occurs during waiting for container %q init process to be killed", id)
 }
 
 // waitContainerStop waits for container to be stopped until timeout exceeds or context is cancelled.
