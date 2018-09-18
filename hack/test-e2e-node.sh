@@ -32,6 +32,9 @@ REPORT_DIR=${REPORT_DIR:-"/tmp/test-e2e-node"}
 UPLOAD_LOG=${UPLOAD_LOG:-false}
 # TIMEOUT is the timeout of the test.
 TIMEOUT=${TIMEOUT:-"40m"}
+# FAIL_SWAP_ON makes kubelet fail when swap is on.
+# Many dev environments run with swap on, so we don't fail by default.
+FAIL_SWAP_ON=${FAIL_SWAP_ON:-"false"}
 
 # Check GOPATH
 if [[ -z "${GOPATH}" ]]; then
@@ -79,12 +82,13 @@ mkdir -p ${REPORT_DIR}
 test_setup ${REPORT_DIR}
 
 timeout "${TIMEOUT}" make test-e2e-node \
-	RUNTIME=remote \
-	CONTAINER_RUNTIME_ENDPOINT=unix://${CONTAINERD_SOCK} \
-	ARTIFACTS=${REPORT_DIR} \
-	TEST_ARGS='--kubelet-flags=--cgroups-per-qos=true \
-	--kubelet-flags=--cgroup-root=/ \
-	--prepull-images=false'
+  RUNTIME=remote \
+  CONTAINER_RUNTIME_ENDPOINT=unix://${CONTAINERD_SOCK} \
+  ARTIFACTS=${REPORT_DIR} \
+  TEST_ARGS='--kubelet-flags=--cgroups-per-qos=true \
+  --kubelet-flags=--cgroup-root=/ \
+  --kubelet-flags=--fail-swap-on='${FAIL_SWAP_ON}' \
+  --prepull-images=false'
 test_exit_code=$?
 
 test_teardown
