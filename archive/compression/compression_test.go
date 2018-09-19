@@ -19,36 +19,21 @@ package compression
 import (
 	"bytes"
 	"compress/gzip"
-	"crypto/md5"
+	"context"
 	"io"
 	"io/ioutil"
 	"math/rand"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
-const benchmarkTestDataURL = "https://git.io/fADcl"
-
-var benchmarkTestData []byte
-
 func TestMain(m *testing.M) {
-	// Download test data for benchmark from gist
-	resp, err := http.Get(benchmarkTestDataURL)
-	if err != nil {
-		panic(err)
-	}
-
-	defer resp.Body.Close()
-
-	benchmarkTestData, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
-
+	// Force initPigz to be called, so tests start with the same initial state
+	gzipDecompress(context.Background(), strings.NewReader(""))
 	os.Exit(m.Run())
 }
 
@@ -202,72 +187,4 @@ func TestCmdStreamBad(t *testing.T) {
 	} else if string(buf) != "hello\n" {
 		t.Fatalf("wrong output: %s", string(buf))
 	}
-}
-
-func generateCompressedData(b *testing.B, sizeInMb int) []byte {
-	sizeInBytes := sizeInMb * 1024 * 1024
-	data := benchmarkTestData
-
-	for len(data) < sizeInBytes {
-		data = append(data, data...)
-	}
-
-	b.SetBytes(int64(len(data)))
-
-	var buf bytes.Buffer
-	compressor, err := CompressStream(&buf, Gzip)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	if n, err := compressor.Write(data); err != nil || n != len(data) {
-		b.Fatal(err)
-	}
-
-	compressor.Close()
-	return buf.Bytes()
-}
-
-func benchmarkDecompression(sizeInMb int) func(*testing.B) {
-	buf := make([]byte, 32*1024)
-	return func(b *testing.B) {
-		compressed := generateCompressedData(b, sizeInMb)
-		hash := md5.New()
-
-		b.ResetTimer()
-		for n := 0; n < b.N; n++ {
-			decompressor, err := DecompressStream(bytes.NewReader(compressed))
-			if err != nil {
-				b.Fatal(err)
-			}
-
-			if _, err = io.CopyBuffer(hash, decompressor, buf); err != nil {
-				b.Fatal(err)
-			}
-
-			decompressor.Close()
-		}
-	}
-}
-
-func BenchmarkGzipDecompression(b *testing.B) {
-	oldUnpigzPath := unpigzPath
-	unpigzPath = ""
-	defer func() { unpigzPath = oldUnpigzPath }()
-
-	b.Run("gzip-32mb", benchmarkDecompression(32))
-	b.Run("gzip-64mb", benchmarkDecompression(64))
-	b.Run("gzip-128mb", benchmarkDecompression(128))
-	b.Run("gzip-256mb", benchmarkDecompression(256))
-}
-
-func BenchmarkPigzDecompression(b *testing.B) {
-	if _, err := exec.LookPath("unpigz"); err != nil {
-		b.Skip("pigz not installed")
-	}
-
-	b.Run("pigz-32mb", benchmarkDecompression(32))
-	b.Run("pigz-64mb", benchmarkDecompression(64))
-	b.Run("pigz-128mb", benchmarkDecompression(128))
-	b.Run("pigz-256mb", benchmarkDecompression(256))
 }

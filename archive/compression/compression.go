@@ -45,13 +45,10 @@ const (
 
 const disablePigzEnv = "CONTAINERD_DISABLE_PIGZ"
 
-var unpigzPath string
-
-func init() {
-	if unpigzPath = detectPigz(); unpigzPath != "" {
-		log.L.Debug("using pigz for decompression")
-	}
-}
+var (
+	initPigz   sync.Once
+	unpigzPath string
+)
 
 var (
 	bufioReader32KPool = &sync.Pool{
@@ -176,6 +173,12 @@ func (compression *Compression) Extension() string {
 }
 
 func gzipDecompress(ctx context.Context, buf io.Reader) (io.ReadCloser, error) {
+	initPigz.Do(func() {
+		if unpigzPath = detectPigz(); unpigzPath != "" {
+			log.L.Debug("using pigz for decompression")
+		}
+	})
+
 	if unpigzPath == "" {
 		return gzip.NewReader(buf)
 	}
