@@ -99,7 +99,7 @@ func connect(address string, d func(string, time.Duration) (net.Conn, error)) (*
 		grpc.FailOnNonTempDialError(true),
 		grpc.WithBackoffMaxDelay(3 * time.Second),
 	}
-	ctx, cancel := gocontext.WithTimeout(gocontext.Background(), 60*time.Second)
+	ctx, cancel := gocontext.WithTimeout(gocontext.Background(), 2*time.Second)
 	defer cancel()
 	conn, err := grpc.DialContext(ctx, dialer.DialAddress(address), gopts...)
 	if err != nil {
