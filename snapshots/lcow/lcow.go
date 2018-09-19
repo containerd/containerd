@@ -23,13 +23,13 @@ import (
 	"encoding/json"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 	"unsafe"
 
+	"github.com/Microsoft/hcsshim/cmd/go-runhcs"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
@@ -337,16 +337,19 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 						continue
 					}
 					defer slock.Close()
-					// Create the scratch
-					cmd := exec.Command(
-						"runhcs.exe",
-						"create-scratch",
-						"--destpath", scratchPath)
 
-					if bytes, err := cmd.CombinedOutput(); err != nil {
-						_ = os.Remove(scratchPath)
-						return nil, errors.Wrapf(err, "failed to create scratch.vhdx. additional info: '%s'", string(bytes))
+					// Create the scratch
+					rhcs := runhcs.Runhcs{
+						Debug:     true,
+						Log:       filepath.Join(s.root, "runhcs-scratch.log"),
+						LogFormat: runhcs.JSON,
+						Owner:     "containerd",
 					}
+					if err := rhcs.CreateScratch(ctx, scratchPath); err != nil {
+						_ = os.Remove(scratchPath)
+						return nil, errors.Wrap(err, "failed to create scratch.vhdx")
+					}
+
 					// Successfully created scratch in the cache. Open and copy
 					continue
 				} else {
