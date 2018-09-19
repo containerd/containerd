@@ -20,6 +20,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/images/oci"
 )
 
@@ -49,13 +50,16 @@ func TestOCIExportAndImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	imgrecs, err := client.Import(ctx, &oci.V1Importer{ImageName: "foo/bar:"}, exported)
+	opts := []ImportOpt{
+		WithImageRefTranslator(archive.AddRefPrefix("foo/bar")),
+	}
+	imgrecs, err := client.Import(ctx, exported, opts...)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Import failed: %+v", err)
 	}
 
 	for _, imgrec := range imgrecs {
-		err = client.ImageService().Delete(ctx, imgrec.Name())
+		err = client.ImageService().Delete(ctx, imgrec.Name)
 		if err != nil {
 			t.Fatal(err)
 		}
