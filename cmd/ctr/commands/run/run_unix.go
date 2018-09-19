@@ -136,6 +136,9 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		if context.IsSet("gpus") {
 			opts = append(opts, nvidia.WithGPUs(nvidia.WithDevices(context.Int("gpus")), nvidia.WithAllCapabilities))
 		}
+		if context.IsSet("allow-new-privs") {
+			opts = append(opts, oci.WithNewPrivileges)
+		}
 	}
 
 	cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(context.StringSlice("label"))))

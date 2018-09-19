@@ -268,6 +268,14 @@ func WithLinuxNamespace(ns specs.LinuxNamespace) SpecOpts {
 	}
 }
 
+// WithNewPrivileges turns off the NoNewPrivileges feature flag in the spec
+func WithNewPrivileges(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+	setProcess(s)
+	s.Process.NoNewPrivileges = false
+
+	return nil
+}
+
 // WithImageConfig configures the spec to from the configuration of an Image
 func WithImageConfig(image Image) SpecOpts {
 	return WithImageConfigArgs(image, nil)
