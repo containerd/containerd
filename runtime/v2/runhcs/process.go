@@ -31,6 +31,13 @@ import (
 	"github.com/containerd/containerd/runtime"
 )
 
+type processExit struct {
+	pid        uint32
+	exitStatus uint32
+	exitedAt   time.Time
+	exitErr    error
+}
+
 func newProcess(ctx context.Context, s *service, id string, pid uint32, pr *pipeRelay, bundle, stdin, stdout, stderr string, terminal bool) (*process, error) {
 	p, err := os.FindProcess(int(pid))
 	if err != nil {

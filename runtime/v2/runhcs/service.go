@@ -49,9 +49,7 @@ import (
 )
 
 const (
-	runhcsBinary      = "runhcs"
-	runhcsVersion     = "0.0.1"
-	runhcsDebugLegacy = "--debug" // TODO: JTERRY75 remove when all cmd's are complete in go-runhcs
+	runhcsShimVersion = "0.0.1"
 )
 
 var (
@@ -201,41 +199,9 @@ func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.
 		return nil, err
 	}
 
-	cmd := exec.Command(runhcsBinary, runhcsDebugLegacy, "state", p.id)
-	sout := getBuffer()
-	defer putBuffer(sout)
-
-	cmd.Stdout = sout
-	_, stateErr := runCmd(ctx, cmd)
-	if stateErr != nil {
-		return nil, stateErr
-	}
-
-	// TODO: JTERRY75 merge this with runhcs declaration
-	type containerState struct {
-		// Version is the OCI version for the container
-		Version string `json:"ociVersion"`
-		// ID is the container ID
-		ID string `json:"id"`
-		// InitProcessPid is the init process id in the parent namespace
-		InitProcessPid int `json:"pid"`
-		// Status is the current status of the container, running, paused, ...
-		Status string `json:"status"`
-		// Bundle is the path on the filesystem to the bundle
-		Bundle string `json:"bundle"`
-		// Rootfs is a path to a directory containing the container's root filesystem.
-		Rootfs string `json:"rootfs"`
-		// Created is the unix timestamp for the creation time of the container in UTC
-		Created time.Time `json:"created"`
-		// Annotations is the user defined annotations added to the config.
-		Annotations map[string]string `json:"annotations,omitempty"`
-		// The owner of the state directory (the owner of the container).
-		Owner string `json:"owner"`
-	}
-
-	var cs containerState
-	if err := json.NewDecoder(sout).Decode(&cs); err != nil {
-		log.G(ctx).WithError(err).Debugf("failed to decode runhcs state output: %s", sout.Bytes())
+	rhcs := newRunhcs(p.bundle)
+	cs, err := rhcs.State(ctx, p.id)
+	if err != nil {
 		return nil, err
 	}
 
@@ -551,13 +517,14 @@ func (s *service) Pids(ctx context.Context, r *taskAPI.PidsRequest) (*taskAPI.Pi
 // Pause the container
 func (s *service) Pause(ctx context.Context, r *taskAPI.PauseRequest) (*ptypes.Empty, error) {
 	// TODO: Validate that 'id' is actually a valid parent container ID
-	if _, err := s.getProcess(r.ID, ""); err != nil {
+	var p *process
+	var err error
+	if p, err = s.getProcess(r.ID, ""); err != nil {
 		return nil, err
 	}
 
-	cmd := exec.Command(runhcsBinary, runhcsDebugLegacy, "pause", r.ID)
-	_, err := runCmd(ctx, cmd)
-	if err != nil {
+	rhcs := newRunhcs(p.bundle)
+	if err = rhcs.Pause(ctx, p.id); err != nil {
 		return nil, err
 	}
 
@@ -567,13 +534,14 @@ func (s *service) Pause(ctx context.Context, r *taskAPI.PauseRequest) (*ptypes.E
 // Resume the container
 func (s *service) Resume(ctx context.Context, r *taskAPI.ResumeRequest) (*ptypes.Empty, error) {
 	// TODO: Validate that 'id' is actually a valid parent container ID
-	if _, err := s.getProcess(r.ID, ""); err != nil {
+	var p *process
+	var err error
+	if p, err = s.getProcess(r.ID, ""); err != nil {
 		return nil, err
 	}
 
-	cmd := exec.Command(runhcsBinary, runhcsDebugLegacy, "resume", r.ID)
-	_, err := runCmd(ctx, cmd)
-	if err != nil {
+	rhcs := newRunhcs(p.bundle)
+	if err = rhcs.Resume(ctx, p.id); err != nil {
 		return nil, err
 	}
 
@@ -599,7 +567,7 @@ func (s *service) Kill(ctx context.Context, r *taskAPI.KillRequest) (*ptypes.Emp
 	// TODO: JTERRY75 runhcs support for r.All?
 	rhcs := newRunhcs(p.bundle)
 	if err = rhcs.Kill(ctx, p.id, strconv.FormatUint(uint64(r.Signal), 10)); err != nil {
-		if !strings.Contains(err.Error(), "container is not running") {
+		if !strings.Contains(err.Error(), "container is stopped") {
 			return nil, err
 		}
 	}
@@ -698,18 +666,12 @@ func (s *service) ResizePty(ctx context.Context, r *taskAPI.ResizePtyRequest) (*
 		return nil, err
 	}
 
-	cmd := exec.Command(
-		runhcsBinary,
-		runhcsDebugLegacy,
-		"resize-tty",
-		p.cid,
-		"-p",
-		strconv.FormatUint(uint64(p.pid), 10),
-		strconv.FormatUint(uint64(r.Width), 10),
-		strconv.FormatUint(uint64(r.Height), 10))
-
-	_, err = runCmd(ctx, cmd)
-	if err != nil {
+	pid := int(p.pid)
+	opts := runhcs.ResizeTTYOpts{
+		Pid: &pid,
+	}
+	rhcs := newRunhcs(p.bundle)
+	if err = rhcs.ResizeTTY(ctx, p.cid, uint16(r.Width), uint16(r.Height), &opts); err != nil {
 		return nil, err
 	}
 
@@ -756,7 +718,7 @@ func (s *service) Connect(ctx context.Context, r *taskAPI.ConnectRequest) (*task
 	return &taskAPI.ConnectResponse{
 		ShimPid: uint32(os.Getpid()),
 		TaskPid: s.processes[s.id].pid,
-		Version: runhcsVersion,
+		Version: runhcsShimVersion,
 	}, nil
 }
 
