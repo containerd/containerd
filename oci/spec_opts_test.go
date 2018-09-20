@@ -54,13 +54,13 @@ func TestWithEnv(t *testing.T) {
 	WithEnv([]string{"env2=2"})(nil, nil, nil, &s)
 
 	if s.Process.Env[2] != "env2=2" {
-		t.Fatal("could't update")
+		t.Fatal("couldn't update")
 	}
 
 	WithEnv([]string{"env2"})(nil, nil, nil, &s)
 
 	if len(s.Process.Env) != 2 {
-		t.Fatal("could't unset")
+		t.Fatal("couldn't unset")
 	}
 }
 
