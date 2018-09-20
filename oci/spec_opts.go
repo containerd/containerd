@@ -1011,3 +1011,14 @@ var WithPrivileged = Compose(
 	WithApparmorProfile(""),
 	WithSeccompUnconfined,
 )
+
+// WithWindowsHyperV sets the Windows.HyperV section for HyperV isolation of containers.
+func WithWindowsHyperV(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+	if s.Windows == nil {
+		s.Windows = &specs.Windows{}
+	}
+	if s.Windows.HyperV == nil {
+		s.Windows.HyperV = &specs.WindowsHyperV{}
+	}
+	return nil
+}

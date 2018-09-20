@@ -49,7 +49,6 @@ import (
 )
 
 const (
-	runhcsBinary      = "runhcs"
 	runhcsShimVersion = "0.0.1"
 )
 
