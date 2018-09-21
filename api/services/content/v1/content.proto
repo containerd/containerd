@@ -108,8 +108,8 @@ message UpdateRequest {
 	// the operation applies to all fields.
 	//
 	// In info, Digest, Size, and CreatedAt are immutable,
-	// other field may be updated using this mask.
-	// If no mask is provided, all mutable field are updated.
+	// other fields may be updated using this mask.
+	// If no mask is provided, all mutable fields are updated.
 	google.protobuf.FieldMask update_mask = 2;
 }
 
@@ -261,7 +261,7 @@ message WriteContentRequest {
 	//
 	// If the action is write, the remote may remove all previously written
 	// data after the offset. Implementations may support arbitrary offsets but
-	// MUST support reseting this value to zero with a write. If an
+	// MUST support resetting this value to zero with a write. If an
 	// implementation does not support a write at a particular offset, an
 	// OutOfRange error must be returned.
 	int64 offset = 5;
