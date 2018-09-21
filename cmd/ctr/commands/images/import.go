@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/log"
@@ -104,7 +105,13 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 				return err
 			}
 		}
-		imgs, err := client.Import(ctx, r, opts...)
+		ds, err := compression.DecompressStream(r)
+		if err != nil {
+			r.Close()
+			return err
+		}
+		imgs, err := client.Import(ctx, ds, opts...)
+		ds.Close()
 		closeErr := r.Close()
 		if err != nil {
 			return err
