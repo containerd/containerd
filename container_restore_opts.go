@@ -138,7 +138,7 @@ func WithRestoreSnapshot(ctx context.Context, id string, client *Client, checkpo
 	}
 }
 
-// WithRestoreSnapshot restores the snapshot from the checkpoint for the container
+// WithRestoreRW restores the rw layer from the checkpoint for the container
 func WithRestoreRW(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		// apply rw layer
