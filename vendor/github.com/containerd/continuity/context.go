@@ -1,3 +1,19 @@
+/*
+   Copyright The containerd Authors.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 package continuity
 
 import (
@@ -12,11 +28,14 @@ import (
 	"github.com/containerd/continuity/devices"
 	driverpkg "github.com/containerd/continuity/driver"
 	"github.com/containerd/continuity/pathdriver"
+
 	"github.com/opencontainers/go-digest"
 )
 
 var (
-	ErrNotFound     = fmt.Errorf("not found")
+	// ErrNotFound represents the resource not found
+	ErrNotFound = fmt.Errorf("not found")
+	// ErrNotSupported represents the resource not supported
 	ErrNotSupported = fmt.Errorf("not supported")
 )
 
@@ -36,6 +55,7 @@ type Context interface {
 // not under the given root.
 type SymlinkPath func(root, linkname, target string) (string, error)
 
+// ContextOptions represents options to create a new context.
 type ContextOptions struct {
 	Digester   Digester
 	Driver     driverpkg.Driver
@@ -379,7 +399,7 @@ func (c *context) checkoutFile(fp string, rf RegularFile) error {
 	}
 	defer r.Close()
 
-	return atomicWriteFile(fp, r, rf)
+	return atomicWriteFile(fp, r, rf.Size(), rf.Mode())
 }
 
 // Apply the resource to the contexts. An error will be returned if the
@@ -472,10 +492,6 @@ func (c *context) Apply(resource Resource) error {
 				return err
 			}
 		}
-
-		// NOTE(stevvooe): Chmod on symlink is not supported on linux. We
-		// may want to maintain support for other platforms that have it.
-		chmod = false
 
 	case Device:
 		if fi == nil {
@@ -572,8 +588,16 @@ func (c *context) Apply(resource Resource) error {
 // the context. Otherwise identical to filepath.Walk, the path argument is
 // corrected to be contained within the context.
 func (c *context) Walk(fn filepath.WalkFunc) error {
-	return c.pathDriver.Walk(c.root, func(p string, fi os.FileInfo, err error) error {
-		contained, err := c.contain(p)
+	root := c.root
+	fi, err := c.driver.Lstat(c.root)
+	if err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		root, err = c.driver.Readlink(c.root)
+		if err != nil {
+			return err
+		}
+	}
+	return c.pathDriver.Walk(root, func(p string, fi os.FileInfo, err error) error {
+		contained, err := c.containWithRoot(p, root)
 		return fn(contained, fi, err)
 	})
 }
@@ -592,7 +616,15 @@ func (c *context) fullpath(p string) (string, error) {
 // contain cleans and santizes the filesystem path p to be an absolute path,
 // effectively relative to the context root.
 func (c *context) contain(p string) (string, error) {
-	sanitized, err := c.pathDriver.Rel(c.root, p)
+	return c.containWithRoot(p, c.root)
+}
+
+// containWithRoot cleans and santizes the filesystem path p to be an absolute path,
+// effectively relative to the passed root. Extra care should be used when calling this
+// instead of contain. This is needed for Walk, as if context root is a symlink,
+// it must be evaluated prior to the Walk
+func (c *context) containWithRoot(p string, root string) (string, error) {
+	sanitized, err := c.pathDriver.Rel(root, p)
 	if err != nil {
 		return "", err
 	}

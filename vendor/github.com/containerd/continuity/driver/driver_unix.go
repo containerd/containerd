@@ -1,12 +1,27 @@
 // +build linux darwin freebsd solaris
 
+/*
+   Copyright The containerd Authors.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 package driver
 
 import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 
 	"github.com/containerd/continuity/devices"
@@ -14,7 +29,11 @@ import (
 )
 
 func (d *driver) Mknod(path string, mode os.FileMode, major, minor int) error {
-	return devices.Mknod(path, mode, major, minor)
+	err := devices.Mknod(path, mode, major, minor)
+	if err != nil {
+		err = &os.PathError{Op: "mknod", Path: path, Err: err}
+	}
+	return err
 }
 
 func (d *driver) Mkfifo(path string, mode os.FileMode) error {
@@ -23,19 +42,11 @@ func (d *driver) Mkfifo(path string, mode os.FileMode) error {
 	}
 	// mknod with a mode that has ModeNamedPipe set creates a fifo, not a
 	// device.
-	return devices.Mknod(path, mode, 0, 0)
-}
-
-// Lchmod changes the mode of an file not following symlinks.
-func (d *driver) Lchmod(path string, mode os.FileMode) (err error) {
-	if !filepath.IsAbs(path) {
-		path, err = filepath.Abs(path)
-		if err != nil {
-			return
-		}
+	err := devices.Mknod(path, mode, 0, 0)
+	if err != nil {
+		err = &os.PathError{Op: "mkfifo", Path: path, Err: err}
 	}
-
-	return sysx.Fchmodat(0, path, uint32(mode), sysx.AtSymlinkNofollow)
+	return err
 }
 
 // Getxattr returns all of the extended attributes for the file at path p.
@@ -119,4 +130,9 @@ func (d *driver) LSetxattr(path string, attrMap map[string][]byte) error {
 
 func (d *driver) DeviceInfo(fi os.FileInfo) (maj uint64, min uint64, err error) {
 	return devices.DeviceInfo(fi)
+}
+
+// Readlink was forked on Windows to fix a Golang bug, use the "os" package here
+func (d *driver) Readlink(p string) (string, error) {
+	return os.Readlink(p)
 }

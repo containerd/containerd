@@ -1,3 +1,19 @@
+/*
+   Copyright The containerd Authors.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 package fstest
 
 import (
@@ -33,7 +49,15 @@ func CheckDirectoryEqual(d1, d2 string) error {
 
 	diff := diffResourceList(m1.Resources, m2.Resources)
 	if diff.HasDiff() {
-		return errors.Errorf("directory diff between %s and %s\n%s", d1, d2, diff.String())
+		if len(diff.Deletions) != 0 {
+			return errors.Errorf("directory diff between %s and %s\n%s", d1, d2, diff.String())
+		}
+		// TODO: Also skip Recycle Bin contents in Windows layers which is used to store deleted files in some cases
+		for _, add := range diff.Additions {
+			if ok, _ := metadataFiles[add.Path()]; !ok {
+				return errors.Errorf("directory diff between %s and %s\n%s", d1, d2, diff.String())
+			}
+		}
 	}
 
 	return nil
