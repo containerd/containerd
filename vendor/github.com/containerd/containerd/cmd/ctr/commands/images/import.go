@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/images"
-	oci "github.com/containerd/containerd/images/oci"
+	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/log"
 	"github.com/urfave/cli"
 )
@@ -34,45 +35,58 @@ var importCommand = cli.Command{
 	ArgsUsage: "[flags] <in>",
 	Description: `Import images from a tar stream.
 Implemented formats:
-- oci.v1     (default)
+- oci.v1
+- docker.v1.1
+- docker.v1.2
 
 
-For oci.v1 format, you need to specify --oci-name because an OCI archive contains image refs (tags)
-but does not contain the base image name.
+For OCI v1, you may need to specify --base-name because an OCI archive may
+contain only partial image references (tags without the base image name).
+If no base image name is provided, a name will be generated as "import-%{yyyy-MM-dd}".
 
 e.g.
-  $ ctr images import --format oci.v1 --oci-name foo/bar foobar.tar
+  $ ctr images import --base-name foo/bar foobar.tar
 
 If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadbeef", the command will create
 "foo/bar:latest" and "foo/bar@sha256:deadbeef" images in the containerd store.
 `,
 	Flags: append([]cli.Flag{
 		cli.StringFlag{
-			Name:  "format",
-			Value: "oci.v1",
-			Usage: "image format. See DESCRIPTION.",
+			Name:  "base-name",
+			Value: "",
+			Usage: "base image name for added images, when provided only images with this name prefix are imported",
+		},
+		cli.BoolFlag{
+			Name:  "digests",
+			Usage: "whether to create digest images (default: false)",
 		},
 		cli.StringFlag{
-			Name:  "oci-name",
-			Value: "unknown/unknown",
-			Usage: "prefix added to either oci.v1 ref annotation or digest",
+			Name:  "index-name",
+			Usage: "image name to keep index as, by default index is discarded",
 		},
-		// TODO(AkihiroSuda): support commands.LabelFlag (for all children objects)
 	}, commands.SnapshotterFlags...),
 
 	Action: func(context *cli.Context) error {
 		var (
-			in            = context.Args().First()
-			imageImporter images.Importer
+			in   = context.Args().First()
+			opts []containerd.ImportOpt
 		)
 
-		switch format := context.String("format"); format {
-		case "oci.v1":
-			imageImporter = &oci.V1Importer{
-				ImageName: context.String("oci-name"),
-			}
-		default:
-			return fmt.Errorf("unknown format %s", format)
+		prefix := context.String("base-name")
+		if prefix == "" {
+			prefix = fmt.Sprintf("import-%s", time.Now().Format("2006-01-02"))
+			opts = append(opts, containerd.WithImageRefTranslator(archive.AddRefPrefix(prefix)))
+		} else {
+			// When provided, filter out references which do not match
+			opts = append(opts, containerd.WithImageRefTranslator(archive.FilterRefPrefix(prefix)))
+		}
+
+		if context.Bool("digests") {
+			opts = append(opts, containerd.WithDigestRef(archive.DigestTranslator(prefix)))
+		}
+
+		if idxName := context.String("index-name"); idxName != "" {
+			opts = append(opts, containerd.WithIndexName(idxName))
 		}
 
 		client, ctx, cancel, err := commands.NewClient(context)
@@ -90,20 +104,24 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 				return err
 			}
 		}
-		imgs, err := client.Import(ctx, imageImporter, r)
+		imgs, err := client.Import(ctx, r, opts...)
+		closeErr := r.Close()
 		if err != nil {
 			return err
 		}
-		if err = r.Close(); err != nil {
-			return err
+		if closeErr != nil {
+			return closeErr
 		}
 
 		log.G(ctx).Debugf("unpacking %d images", len(imgs))
 
 		for _, img := range imgs {
+			// TODO: Allow configuration of the platform
+			image := containerd.NewImage(client, img)
+
 			// TODO: Show unpack status
-			fmt.Printf("unpacking %s (%s)...", img.Name(), img.Target().Digest)
-			err = img.Unpack(ctx, context.String("snapshotter"))
+			fmt.Printf("unpacking %s (%s)...", img.Name, img.Target.Digest)
+			err = image.Unpack(ctx, context.String("snapshotter"))
 			if err != nil {
 				return err
 			}

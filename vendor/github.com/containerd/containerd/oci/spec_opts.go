@@ -268,6 +268,14 @@ func WithLinuxNamespace(ns specs.LinuxNamespace) SpecOpts {
 	}
 }
 
+// WithNewPrivileges turns off the NoNewPrivileges feature flag in the spec
+func WithNewPrivileges(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+	setProcess(s)
+	s.Process.NoNewPrivileges = false
+
+	return nil
+}
+
 // WithImageConfig configures the spec to from the configuration of an Image
 func WithImageConfig(image Image) SpecOpts {
 	return WithImageConfigArgs(image, nil)
@@ -315,8 +323,14 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 			}
 			s.Process.Cwd = cwd
 			if config.User != "" {
-				return WithUser(config.User)(ctx, client, c, s)
+				if err := WithUser(config.User)(ctx, client, c, s); err != nil {
+					return err
+				}
+				return WithAdditionalGIDs(fmt.Sprintf("%d", s.Process.User.UID))(ctx, client, c, s)
 			}
+			// we should query the image's /etc/group for additional GIDs
+			// even if there is no specified user in the image config
+			return WithAdditionalGIDs("root")(ctx, client, c, s)
 		} else if s.Windows != nil {
 			s.Process.Env = config.Env
 			s.Process.Args = append(config.Entrypoint, config.Cmd...)
@@ -997,3 +1011,14 @@ var WithPrivileged = Compose(
 	WithApparmorProfile(""),
 	WithSeccompUnconfined,
 )
+
+// WithWindowsHyperV sets the Windows.HyperV section for HyperV isolation of containers.
+func WithWindowsHyperV(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+	if s.Windows == nil {
+		s.Windows = &specs.Windows{}
+	}
+	if s.Windows.HyperV == nil {
+		s.Windows.HyperV = &specs.WindowsHyperV{}
+	}
+	return nil
+}

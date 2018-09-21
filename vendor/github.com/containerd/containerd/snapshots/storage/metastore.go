@@ -25,9 +25,9 @@ import (
 	"context"
 	"sync"
 
-	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/pkg/errors"
+	bolt "go.etcd.io/bbolt"
 )
 
 // Transactor is used to finalize an active transaction.
