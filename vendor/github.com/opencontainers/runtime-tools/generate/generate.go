@@ -703,43 +703,43 @@ func (g *Generator) DropLinuxResourcesBlockIOThrottleWriteIOPSDevice(major int64
 
 // SetLinuxResourcesCPUShares sets g.Config.Linux.Resources.CPU.Shares.
 func (g *Generator) SetLinuxResourcesCPUShares(shares uint64) {
-	g.initConfigLinuxResourcesCPU()
+	g.InitConfigLinuxResourcesCPU()
 	g.Config.Linux.Resources.CPU.Shares = &shares
 }
 
 // SetLinuxResourcesCPUQuota sets g.Config.Linux.Resources.CPU.Quota.
 func (g *Generator) SetLinuxResourcesCPUQuota(quota int64) {
-	g.initConfigLinuxResourcesCPU()
+	g.InitConfigLinuxResourcesCPU()
 	g.Config.Linux.Resources.CPU.Quota = &quota
 }
 
 // SetLinuxResourcesCPUPeriod sets g.Config.Linux.Resources.CPU.Period.
 func (g *Generator) SetLinuxResourcesCPUPeriod(period uint64) {
-	g.initConfigLinuxResourcesCPU()
+	g.InitConfigLinuxResourcesCPU()
 	g.Config.Linux.Resources.CPU.Period = &period
 }
 
 // SetLinuxResourcesCPURealtimeRuntime sets g.Config.Linux.Resources.CPU.RealtimeRuntime.
 func (g *Generator) SetLinuxResourcesCPURealtimeRuntime(time int64) {
-	g.initConfigLinuxResourcesCPU()
+	g.InitConfigLinuxResourcesCPU()
 	g.Config.Linux.Resources.CPU.RealtimeRuntime = &time
 }
 
 // SetLinuxResourcesCPURealtimePeriod sets g.Config.Linux.Resources.CPU.RealtimePeriod.
 func (g *Generator) SetLinuxResourcesCPURealtimePeriod(period uint64) {
-	g.initConfigLinuxResourcesCPU()
+	g.InitConfigLinuxResourcesCPU()
 	g.Config.Linux.Resources.CPU.RealtimePeriod = &period
 }
 
 // SetLinuxResourcesCPUCpus sets g.Config.Linux.Resources.CPU.Cpus.
 func (g *Generator) SetLinuxResourcesCPUCpus(cpus string) {
-	g.initConfigLinuxResourcesCPU()
+	g.InitConfigLinuxResourcesCPU()
 	g.Config.Linux.Resources.CPU.Cpus = cpus
 }
 
 // SetLinuxResourcesCPUMems sets g.Config.Linux.Resources.CPU.Mems.
 func (g *Generator) SetLinuxResourcesCPUMems(mems string) {
-	g.initConfigLinuxResourcesCPU()
+	g.InitConfigLinuxResourcesCPU()
 	g.Config.Linux.Resources.CPU.Mems = mems
 }
 
@@ -1535,6 +1535,12 @@ func (g *Generator) AddWindowsLayerFolders(folder string) {
 func (g *Generator) SetWindowsNetwork(network rspec.WindowsNetwork) {
 	g.initConfigWindows()
 	g.Config.Windows.Network = &network
+}
+
+// SetWindowsNetworkNamespace sets g.Config.Windows.Network.NetworkNamespace
+func (g *Generator) SetWindowsNetworkNamespace(path string) {
+	g.initConfigWindows()
+	g.Config.Windows.Network.NetworkNamespace = path
 }
 
 // SetWindowsResourcesCPU sets g.Config.Windows.Resources.CPU.

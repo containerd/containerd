@@ -43,9 +43,9 @@ Build the validation executables:
 $ make runtimetest validation-executables
 ```
 
-Runtime validation currently [only supports](docs/runtime-compliance-testing.md) the [OCI Runtime Command Line Interface](doc/command-line-interface.md).
+Runtime validation currently [only supports](docs/runtime-compliance-testing.md) the [OCI Runtime Command Line Interface](docs/command-line-interface.md).
 If we add support for alternative APIs in the future, runtime validation will gain an option to select the desired runtime API.
-For the command line interface, the `RUNTIME` option selects the runtime command (`funC` in the [OCI Runtime Command Line Interface](doc/command-line-interface.md)).
+For the command line interface, the `RUNTIME` option selects the runtime command (`funC` in the [OCI Runtime Command Line Interface](docs/command-line-interface.md)).
 
 ```
 $ sudo make RUNTIME=runc localvalidation
@@ -69,7 +69,7 @@ validation/linux_cgroups_hugetlb.t .................... 0/1
 
 validation/linux_cgroups_memory.t ..................... 9/9
 validation/linux_rootfs_propagation_shared.t ...... 252/282
-  not ok shared root propogation exposes "/target348456609/mount892511628/example376408222"
+  not ok shared root propagation exposes "/target348456609/mount892511628/example376408222"
 
   Skipped: 29
      /dev/null (default device) has unconfigured permissions
