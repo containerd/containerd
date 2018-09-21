@@ -172,6 +172,14 @@ func WithNoNewPrivileges(_ context.Context, _ Client, _ *containers.Container, s
 	return nil
 }
 
+// WithNewPrivileges turns off the NoNewPrivileges feature flag in the spec
+func WithNewPrivileges(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
+	setProcess(s)
+	s.Process.NoNewPrivileges = false
+
+	return nil
+}
+
 // WithHostHostsFile bind-mounts the host's /etc/hosts into the container as readonly
 func WithHostHostsFile(_ context.Context, _ Client, _ *containers.Container, s *specs.Spec) error {
 	s.Mounts = append(s.Mounts, specs.Mount{

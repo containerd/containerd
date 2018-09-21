@@ -113,6 +113,9 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			Path: parts[1],
 		}))
 	}
+	if context.IsSet("allow-new-privs") {
+		opts = append(opts, oci.WithNewPrivileges)
+	}
 	if context.IsSet("config") {
 		var s specs.Spec
 		if err := loadSpec(context.String("config"), &s); err != nil {
