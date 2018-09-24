@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/containerd/go-runc"
@@ -21,7 +23,8 @@ const (
 	// JSON is the JSON formatted log output.
 	JSON Format = "json"
 
-	command = "runhcs"
+	command        = "runhcs"
+	safePipePrefix = `\\.\pipe\ProtectedPrefix\Administrators\`
 )
 
 var bytesBufferPool = sync.Pool{
@@ -43,7 +46,7 @@ func putBuf(b *bytes.Buffer) {
 type Runhcs struct {
 	// Debug enables debug output for logging.
 	Debug bool
-	// Log sets the log file path where internal debug information is written.
+	// Log sets the log file path or named pipe (e.g. \\.\pipe\ProtectedPrefix\Administrators\runhcs-log) where internal debug information is written.
 	Log string
 	// LogFormat sets the format used by logs.
 	LogFormat Format
@@ -59,8 +62,14 @@ func (r *Runhcs) args() []string {
 		out = append(out, "--debug")
 	}
 	if r.Log != "" {
-		// TODO: JTERRY75 - Should we do abs here?
-		out = append(out, "--log", r.Log)
+		if strings.HasPrefix(r.Log, safePipePrefix) {
+			out = append(out, "--log", r.Log)
+		} else {
+			abs, err := filepath.Abs(r.Log)
+			if err == nil {
+				out = append(out, "--log", abs)
+			}
+		}
 	}
 	if r.LogFormat != none {
 		out = append(out, "--log-format", string(r.LogFormat))

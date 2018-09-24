@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	runc "github.com/containerd/go-runc"
 )
@@ -13,9 +14,9 @@ type CreateOpts struct {
 	runc.IO
 	// PidFile is the path to the file to write the process id to.
 	PidFile string
-	// ShimLog is the path to the log file for the launched shim process.
+	// ShimLog is the path to the log file or named pipe (e.g. \\.\pipe\ProtectedPrefix\Administrators\runhcs-<container-id>-shim-log) for the launched shim process.
 	ShimLog string
-	// VMLog is the path to the log file for the launched VM shim process.
+	// VMLog is the path to the log file or named pipe (e.g. \\.\pipe\ProtectedPrefix\Administrators\runhcs-<container-id>-vm-log) for the launched VM shim process.
 	VMLog string
 	// VMConsole is the path to the pipe for the VM's console (e.g. \\.\pipe\debugpipe)
 	VMConsole string
@@ -31,18 +32,26 @@ func (opt *CreateOpts) args() ([]string, error) {
 		out = append(out, "--pid-file", abs)
 	}
 	if opt.ShimLog != "" {
-		abs, err := filepath.Abs(opt.ShimLog)
-		if err != nil {
-			return nil, err
+		if strings.HasPrefix(opt.ShimLog, safePipePrefix) {
+			out = append(out, "--shim-log", opt.ShimLog)
+		} else {
+			abs, err := filepath.Abs(opt.ShimLog)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, "--shim-log", abs)
 		}
-		out = append(out, "--shim-log", abs)
 	}
 	if opt.VMLog != "" {
-		abs, err := filepath.Abs(opt.VMLog)
-		if err != nil {
-			return nil, err
+		if strings.HasPrefix(opt.VMLog, safePipePrefix) {
+			out = append(out, "--vm-log", opt.VMLog)
+		} else {
+			abs, err := filepath.Abs(opt.VMLog)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, "--vm-log", abs)
 		}
-		out = append(out, "--vm-log", abs)
 	}
 	if opt.VMConsole != "" {
 		out = append(out, "--vm-console", opt.VMConsole)

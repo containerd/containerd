@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/containerd/go-runc"
 )
@@ -15,7 +16,7 @@ type ExecOpts struct {
 	Detach bool
 	// PidFile is the path to the file to write the process id to.
 	PidFile string
-	// ShimLog is the path to the log file for the launched shim process.
+	// ShimLog is the path to the log file or named pipe (e.g. \\.\pipe\ProtectedPrefix\Administrators\runhcs-<container-id>-<exec-id>-log) for the launched shim process.
 	ShimLog string
 }
 
@@ -32,11 +33,15 @@ func (opt *ExecOpts) args() ([]string, error) {
 		out = append(out, "--pid-file", abs)
 	}
 	if opt.ShimLog != "" {
-		abs, err := filepath.Abs(opt.ShimLog)
-		if err != nil {
-			return nil, err
+		if strings.HasPrefix(opt.ShimLog, safePipePrefix) {
+			out = append(out, "--shim-log", opt.ShimLog)
+		} else {
+			abs, err := filepath.Abs(opt.ShimLog)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, "--shim-log", abs)
 		}
-		out = append(out, "--shim-log", abs)
 	}
 	return out, nil
 }
