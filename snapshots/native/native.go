@@ -120,7 +120,7 @@ func (o *snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, e
 	}
 
 	if info.Kind == snapshots.KindActive {
-		du, err := fs.DiskUsage(o.getSnapshotDir(id))
+		du, err := fs.DiskUsage(ctx, o.getSnapshotDir(id))
 		if err != nil {
 			return snapshots.Usage{}, err
 		}
@@ -166,7 +166,7 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		return err
 	}
 
-	usage, err := fs.DiskUsage(o.getSnapshotDir(id))
+	usage, err := fs.DiskUsage(ctx, o.getSnapshotDir(id))
 	if err != nil {
 		return err
 	}

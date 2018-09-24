@@ -171,7 +171,7 @@ func (b *snapshotter) usage(ctx context.Context, key string) (snapshots.Usage, e
 		if parentID != "" {
 			du, err = fs.DiffUsage(ctx, filepath.Join(b.root, "snapshots", parentID), p)
 		} else {
-			du, err = fs.DiskUsage(p)
+			du, err = fs.DiskUsage(ctx, p)
 		}
 		if err != nil {
 			// TODO(stevvooe): Consider not reporting an error in this case.
