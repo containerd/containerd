@@ -21,10 +21,13 @@ package lcow
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unsafe"
@@ -59,6 +62,8 @@ func init() {
 type snapshotter struct {
 	root string
 	ms   *storage.MetaStore
+
+	scratchLock sync.Mutex
 }
 
 // NewSnapshotter returns a new windows snapshotter
@@ -315,55 +320,10 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		if err := os.MkdirAll(snDir, 0700); err != nil {
 			return nil, err
 		}
-		// Create the scratch.vhdx cache file if it doesn't already exit.
-		scratchPath := filepath.Join(s.root, "scratch.vhdx")
-		scratchLockPath := filepath.Join(s.root, "scratch.vhdx.lock")
-		startTime := time.Now()
-		timeout := 2 * time.Minute
-		var scratchSource *os.File
-		for {
-			var err error
-			scratchSource, err = os.OpenFile(scratchPath, os.O_RDONLY, 0700)
-			if err != nil {
-				if os.IsNotExist(err) {
-					// No scratch path. Take the lock and create it.
-					slock, err := os.OpenFile(scratchLockPath, os.O_EXCL|os.O_CREATE, 0700)
-					if err != nil {
-						if time.Now().Sub(startTime) >= timeout {
-							return nil, errors.Wrap(err, "timed out waiting for scratch.vhdx.lock")
-						}
-						// Couldnt obtain the lock. Sleep and try again.
-						time.Sleep(1 * time.Second)
-						continue
-					}
-					defer slock.Close()
 
-					// Create the scratch
-					rhcs := runhcs.Runhcs{
-						Debug:     true,
-						Log:       filepath.Join(s.root, "runhcs-scratch.log"),
-						LogFormat: runhcs.JSON,
-						Owner:     "containerd",
-					}
-					if err := rhcs.CreateScratch(ctx, scratchPath); err != nil {
-						_ = os.Remove(scratchPath)
-						return nil, errors.Wrap(err, "failed to create scratch.vhdx")
-					}
-
-					// Successfully created scratch in the cache. Open and copy
-					continue
-				} else {
-					if time.Now().Sub(startTime) >= timeout {
-						return nil, errors.Wrap(err, "timed out waiting for scratch.vhdx")
-					}
-					// Couldnt obtain read access. Sleep and try again. Likely
-					// this case is that scratch.vhdx is in the process of being
-					// written actively.
-					time.Sleep(1 * time.Second)
-					continue
-				}
-			}
-			break
+		scratchSource, err := s.openOrCreateScratch(ctx)
+		if err != nil {
+			return nil, err
 		}
 		defer scratchSource.Close()
 
@@ -390,6 +350,51 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	}
 
 	return s.mounts(newSnapshot), nil
+}
+
+func (s *snapshotter) openOrCreateScratch(ctx context.Context) (_ *os.File, err error) {
+	// Create the scratch.vhdx cache file if it doesn't already exit.
+	s.scratchLock.Lock()
+	defer s.scratchLock.Unlock()
+
+	scratchFinalPath := filepath.Join(s.root, "scratch.vhdx")
+	scratchSource, err := os.OpenFile(scratchFinalPath, os.O_RDONLY, 0700)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, errors.Wrap(err, "failed to open scratch.vhdx for read")
+		}
+
+		log.G(ctx).Debug("scratch.vhdx not found, creating a new one")
+
+		// Golang logic for ioutil.TempFile without the file creation
+		r := uint32(time.Now().UnixNano() + int64(os.Getpid()))
+		r = r*1664525 + 1013904223 // constants from Numerical Recipes
+
+		scratchTempName := fmt.Sprintf("scratch-%s-tmp.vhdx", strconv.Itoa(int(1e9 + r%1e9))[1:])
+		scratchTempPath := filepath.Join(s.root, scratchTempName)
+
+		// Create the scratch
+		rhcs := runhcs.Runhcs{
+			Debug:     true,
+			Log:       filepath.Join(s.root, "runhcs-scratch.log"),
+			LogFormat: runhcs.JSON,
+			Owner:     "containerd",
+		}
+		if err := rhcs.CreateScratch(ctx, scratchTempPath); err != nil {
+			_ = os.Remove(scratchTempPath)
+			return nil, errors.Wrapf(err, "failed to create '%s' temp file", scratchTempName)
+		}
+		if err := os.Rename(scratchTempPath, scratchFinalPath); err != nil {
+			_ = os.Remove(scratchTempPath)
+			return nil, errors.Wrapf(err, "failed to rename '%s' temp file to 'scratch.vhdx'", scratchTempName)
+		}
+		scratchSource, err = os.OpenFile(scratchFinalPath, os.O_RDONLY, 0700)
+		if err != nil {
+			_ = os.Remove(scratchFinalPath)
+			return nil, errors.Wrap(err, "failed to open scratch.vhdx for read after creation")
+		}
+	}
+	return scratchSource, nil
 }
 
 func (s *snapshotter) parentIDsToParentPaths(parentIDs []string) []string {
