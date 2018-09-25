@@ -1,0 +1,51 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.1.3"
+
+pre_release = false
+
+preface = """\
+This is the fourth patch release for the `containerd` 1.1 release. This
+release includes several fixes in both the CRI plugin and containerd
+behavior as more real-world testing is occurring on containerd-based
+Kubernetes clusters.
+
+Containerd now handles a large number of layers using the overlayfs
+snapshotter properly. Also, supplemental GIDs found in `/etc/groups` for
+the running user are added to the OCI spec "additionalGids" array.
+
+The additional GIDs change and also setting `HOSTNAME` in the environment
+of containers running in a pod are both fixed in this release, matching
+expected Docker engine behavior.
+
+## Containerd
+Fix a potential content store bug, backported from 1.2
+
+## CRI Plugin
+Add `HOSTNAME` to container default environment. Add additional GIDs for
+running container user to the OCI spec. Fixed an issue that a directory
+mount can override sub-directory mount. Fixed an issue that a container
+can't be stopped when container processes are accidentally moved out of
+container cgroups. Fix an issue that invalid SELinux format is not
+rejected.
+
+## ctr
+Add a `--allow-new-privs` flag on `ctr run` to allow testing an OCI spec
+that does not set `NoNewPrivileges` on by default.
+
+## Overlayfs Snapshotter
+Supports > 128 layers properly.
+
+Please see the changelog for full details.
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
