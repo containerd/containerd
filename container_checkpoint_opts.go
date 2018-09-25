@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl"
@@ -67,16 +68,29 @@ func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Conta
 		return err
 	}
 	for _, d := range task.Descriptors {
+		platformSpec := platforms.DefaultSpec()
 		index.Manifests = append(index.Manifests, imagespec.Descriptor{
 			MediaType: d.MediaType,
 			Size:      d.Size_,
 			Digest:    d.Digest,
-			Platform: &imagespec.Platform{
-				OS:           runtime.GOOS,
-				Architecture: runtime.GOARCH,
-			},
+			Platform:  &platformSpec,
 		})
 	}
+	// save copts
+	data, err := any.Marshal()
+	if err != nil {
+		return err
+	}
+	r := bytes.NewReader(data)
+	desc, err := writeContent(ctx, client.ContentStore(), images.MediaTypeContainerd1CheckpointOptions, c.ID+"-checkpoint-options", r)
+	if err != nil {
+		return err
+	}
+	desc.Platform = &imagespec.Platform{
+		OS:           runtime.GOOS,
+		Architecture: runtime.GOARCH,
+	}
+	index.Manifests = append(index.Manifests, desc)
 	return nil
 }
 

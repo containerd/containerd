@@ -128,7 +128,6 @@ func TestCheckpointRestorePTY(t *testing.T) {
 	if container, err = client.Restore(ctx, id, checkpoint, []RestoreOpts{
 		WithRestoreImage,
 		WithRestoreSpec,
-		WithRestoreSnapshot,
 		WithRestoreRuntime,
 		WithRestoreRW,
 	}...); err != nil {
@@ -227,7 +226,6 @@ func TestCheckpointRestore(t *testing.T) {
 	if container, err = client.Restore(ctx, id, checkpoint, []RestoreOpts{
 		WithRestoreImage,
 		WithRestoreSpec,
-		WithRestoreSnapshot,
 		WithRestoreRuntime,
 		WithRestoreRW,
 	}...); err != nil {
@@ -315,7 +313,6 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 	if container, err = client.Restore(ctx, id, checkpoint, []RestoreOpts{
 		WithRestoreImage,
 		WithRestoreSpec,
-		WithRestoreSnapshot,
 		WithRestoreRuntime,
 		WithRestoreRW,
 	}...); err != nil {

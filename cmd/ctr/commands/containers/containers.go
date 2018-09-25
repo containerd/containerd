@@ -18,7 +18,6 @@ package containers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -32,6 +31,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/typeurl"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
@@ -309,7 +309,7 @@ var checkpointCommand = cli.Command{
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		ref := context.Args()[1]
+		ref := context.Args().Get(1)
 		if ref == "" {
 			return errors.New("ref must be provided")
 		}
@@ -346,7 +346,11 @@ var checkpointCommand = cli.Command{
 			if err := task.Pause(ctx); err != nil {
 				return err
 			}
-			defer task.Resume(ctx)
+			defer func() {
+				if err := task.Resume(ctx); err != nil {
+					fmt.Println(errors.Wrap(err, "error resuming task"))
+				}
+			}()
 		}
 
 		if _, err := container.Checkpoint(ctx, ref, opts...); err != nil {
@@ -363,12 +367,12 @@ var restoreCommand = cli.Command{
 	ArgsUsage: "CONTAINER REF",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
-			Name:  "live",
-			Usage: "restore the runtime and memory data from the checkpoint",
-		},
-		cli.BoolFlag{
 			Name:  "rw",
 			Usage: "restore the rw layer from the checkpoint",
+		},
+		cli.BoolFlag{
+			Name:  "live",
+			Usage: "restore the runtime and memory data from the checkpoint",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -376,7 +380,7 @@ var restoreCommand = cli.Command{
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		ref := context.Args()[1]
+		ref := context.Args().Get(1)
 		if ref == "" {
 			return errors.New("ref must be provided")
 		}
@@ -391,6 +395,7 @@ var restoreCommand = cli.Command{
 			if !errdefs.IsNotFound(err) {
 				return err
 			}
+			// TODO (ehazlett): consider other options (always/never fetch)
 			ck, err := client.Fetch(ctx, ref)
 			if err != nil {
 				return err
@@ -401,7 +406,6 @@ var restoreCommand = cli.Command{
 		opts := []containerd.RestoreOpts{
 			containerd.WithRestoreImage,
 			containerd.WithRestoreSpec,
-			containerd.WithRestoreSnapshot,
 			containerd.WithRestoreRuntime,
 		}
 		if context.Bool("rw") {

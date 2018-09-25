@@ -39,8 +39,9 @@ import (
 )
 
 const (
-	checkpointImageNameLabel   = "image.name"
-	checkpointRuntimeNameLabel = "runtime.name"
+	checkpointImageNameLabel       = "org.opencontainers.image.ref.name"
+	checkpointRuntimeNameLabel     = "io.containerd.checkpoint.runtime"
+	checkpointSnapshotterNameLabel = "io.containerd.checkpoint.snapshotter"
 )
 
 // Container is a metadata object for container resources and task creation
@@ -318,6 +319,8 @@ func (c *container) Checkpoint(ctx context.Context, ref string, opts ...Checkpoi
 	index.Annotations[checkpointImageNameLabel] = img.Name()
 	// add runtime info to index
 	index.Annotations[checkpointRuntimeNameLabel] = info.Runtime.Name
+	// add snapshotter info to index
+	index.Annotations[checkpointSnapshotterNameLabel] = info.Snapshotter
 
 	// process remaining opts
 	for _, o := range opts {
