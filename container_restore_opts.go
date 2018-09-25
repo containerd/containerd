@@ -33,8 +33,10 @@ import (
 var (
 	// ErrImageNameNotFoundInIndex is returned when the image name is not found in the index
 	ErrImageNameNotFoundInIndex = errors.New("image name not found in index")
-	// ErrRuntimeNameNotFoundInIndex is returned when the runtime name is not found in the index
-	ErrRuntimeNameNotFoundInIndex = errors.New("runtime name not found in index")
+	// ErrRuntimeNameNotFoundInIndex is returned when the runtime is not found in the index
+	ErrRuntimeNameNotFoundInIndex = errors.New("runtime not found in index")
+	// ErrSnapshotterNameNotFoundInIndex is returned when the snapshotter is not found in the index
+	ErrSnapshotterNameNotFoundInIndex = errors.New("snapshotter not found in index")
 )
 
 // RestoreOpts are options to manage the restore operation
@@ -47,12 +49,26 @@ func WithRestoreImage(ctx context.Context, id string, client *Client, checkpoint
 		if !ok || name == "" {
 			return ErrRuntimeNameNotFoundInIndex
 		}
+		snapshotter, ok := index.Annotations[checkpointSnapshotterNameLabel]
+		if !ok || name == "" {
+			return ErrSnapshotterNameNotFoundInIndex
+		}
 		i, err := client.GetImage(ctx, name)
 		if err != nil {
 			return err
 		}
 
+		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore(), platforms.Default())
+		if err != nil {
+			return err
+		}
+		parent := identity.ChainID(diffIDs).String()
+		if _, err := client.SnapshotService(snapshotter).Prepare(ctx, id, parent); err != nil {
+			return err
+		}
 		c.Image = i.Name()
+		c.SnapshotKey = id
+		c.Snapshotter = snapshotter
 		return nil
 	}
 }
@@ -109,31 +125,6 @@ func WithRestoreSpec(ctx context.Context, id string, client *Client, checkpoint 
 			return err
 		}
 		c.Spec = &any
-		return nil
-	}
-}
-
-// WithRestoreSnapshot restores the snapshot from the checkpoint for the container
-func WithRestoreSnapshot(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		imageName, ok := index.Annotations[checkpointImageNameLabel]
-		if !ok || imageName == "" {
-			return ErrRuntimeNameNotFoundInIndex
-		}
-		i, err := client.GetImage(ctx, imageName)
-		if err != nil {
-			return err
-		}
-		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore(), platforms.Default())
-		if err != nil {
-			return err
-		}
-		parent := identity.ChainID(diffIDs).String()
-		if _, err := client.SnapshotService(DefaultSnapshotter).Prepare(ctx, id, parent); err != nil {
-			return err
-		}
-		c.SnapshotKey = id
-		c.Snapshotter = DefaultSnapshotter
 		return nil
 	}
 }
