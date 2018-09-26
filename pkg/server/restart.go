@@ -36,7 +36,6 @@ import (
 
 	cio "github.com/containerd/cri/pkg/server/io"
 	containerstore "github.com/containerd/cri/pkg/store/container"
-	imagestore "github.com/containerd/cri/pkg/store/image"
 	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
 )
 
@@ -96,7 +95,7 @@ func (c *criService) recover(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to list images")
 	}
-	loadImages(ctx, c.imageStore, cImages, c.config.ContainerdConfig.Snapshotter)
+	c.loadImages(ctx, cImages)
 
 	// It's possible that containerd containers are deleted unexpectedly. In that case,
 	// we can't even get metadata, we should cleanup orphaned sandbox/container directories
@@ -411,8 +410,8 @@ func loadSandbox(ctx context.Context, cntr containerd.Container) (sandboxstore.S
 }
 
 // loadImages loads images from containerd.
-func loadImages(ctx context.Context, store *imagestore.Store, cImages []containerd.Image,
-	snapshotter string) {
+func (c *criService) loadImages(ctx context.Context, cImages []containerd.Image) {
+	snapshotter := c.config.ContainerdConfig.Snapshotter
 	for _, i := range cImages {
 		ok, _, _, _, err := containerdimages.Check(ctx, i.ContentStore(), i.Target(), platforms.Default())
 		if err != nil {
@@ -433,7 +432,7 @@ func loadImages(ctx context.Context, store *imagestore.Store, cImages []containe
 			logrus.Warnf("The image %s is not unpacked.", i.Name())
 			// TODO(random-liu): Consider whether we should try unpack here.
 		}
-		if err := store.Update(ctx, i.Name()); err != nil {
+		if err := c.updateImage(ctx, i.Name()); err != nil {
 			logrus.WithError(err).Warnf("Failed to update reference for image %q", i.Name())
 			continue
 		}
