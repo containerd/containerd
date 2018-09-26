@@ -35,7 +35,7 @@ containerd_pid=
 test_setup() {
   local report_dir=$1
   # Start containerd
-  if [ ! -x ${ROOT}/_output/containerd ]; then
+  if [ ! -x "${ROOT}/_output/containerd" ]; then
     echo "containerd is not built"
     exit 1
   fi
@@ -45,8 +45,18 @@ test_setup() {
   containerd_pid=$!
   # Wait for containerd to be running by using the containerd client ctr to check the version
   # of the containerd server. Wait an increasing amount of time after each of five attempts
-  readiness_check "sudo ctr version"
-  readiness_check "sudo crictl --runtime-endpoint=${CONTAINERD_SOCK} info"
+  local -r ctr_path=$(which ctr)
+  if [ -z "${ctr_path}" ]; then
+    echo "ctr is not in PATH"
+    exit 1
+  fi
+  local -r crictl_path=$(which crictl)
+  if [ -z "${crictl_path}" ]; then
+    echo "crictl is not in PATH"
+    exit 1
+  fi
+  readiness_check "sudo ${ctr_path} version"
+  readiness_check "sudo ${crictl_path} --runtime-endpoint=${CONTAINERD_SOCK} info"
 }
 
 # test_teardown kills containerd.
