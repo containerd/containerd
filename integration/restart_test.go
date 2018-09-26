@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"sort"
 	"testing"
 	"time"
 
@@ -128,6 +129,17 @@ func TestContainerdRestart(t *testing.T) {
 		}
 	}
 
+	t.Logf("Pull test images")
+	for _, image := range []string{"busybox", "alpine"} {
+		img, err := imageService.PullImage(&runtime.ImageSpec{image}, nil)
+		require.NoError(t, err)
+		defer func() {
+			assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: img}))
+		}()
+	}
+	imagesBeforeRestart, err := imageService.ListImages(nil)
+	assert.NoError(t, err)
+
 	t.Logf("Kill containerd")
 	require.NoError(t, KillProcess("containerd"))
 	defer func() {
@@ -178,5 +190,25 @@ func TestContainerdRestart(t *testing.T) {
 	for _, s := range sandboxes {
 		assert.NoError(t, runtimeService.StopPodSandbox(s.id))
 		assert.NoError(t, runtimeService.RemovePodSandbox(s.id))
+	}
+
+	t.Logf("Should recover all images")
+	imagesAfterRestart, err := imageService.ListImages(nil)
+	assert.NoError(t, err)
+	assert.Equal(t, len(imagesBeforeRestart), len(imagesAfterRestart))
+	for _, i1 := range imagesBeforeRestart {
+		found := false
+		for _, i2 := range imagesAfterRestart {
+			if i1.Id == i2.Id {
+				sort.Strings(i1.RepoTags)
+				sort.Strings(i1.RepoDigests)
+				sort.Strings(i2.RepoTags)
+				sort.Strings(i2.RepoDigests)
+				assert.Equal(t, i1, i2)
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "should find image %+v", i1)
 	}
 }

@@ -260,6 +260,26 @@ func Eventually(f CheckFunc, period, timeout time.Duration) error {
 	}
 }
 
+// Consistently makes sure that f consistently returns true without
+// error before timeout exceeds. If f returns error, Consistently
+// will return the same error immediately.
+func Consistently(f CheckFunc, period, timeout time.Duration) error {
+	start := time.Now()
+	for {
+		ok, err := f()
+		if !ok {
+			return errors.New("get false")
+		}
+		if err != nil {
+			return err
+		}
+		if time.Since(start) >= timeout {
+			return nil
+		}
+		time.Sleep(period)
+	}
+}
+
 // Randomize adds uuid after a string.
 func Randomize(str string) string {
 	return str + "-" + util.GenerateID()
