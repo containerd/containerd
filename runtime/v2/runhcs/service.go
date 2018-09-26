@@ -204,14 +204,26 @@ func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.
 		return nil, err
 	}
 
-	rhcs := newRunhcs(p.bundle)
-	cs, err := rhcs.State(ctx, p.id)
-	if err != nil {
-		return nil, err
+	var tstatus string
+
+	// This is a container
+	if p.cid == p.id {
+		rhcs := newRunhcs(p.bundle)
+		cs, err := rhcs.State(ctx, p.id)
+		if err != nil {
+			return nil, err
+		}
+		tstatus = cs.Status
+	} else {
+		if p.started {
+			tstatus = "running"
+		} else {
+			tstatus = "created"
+		}
 	}
 
 	status := task.StatusUnknown
-	switch cs.Status {
+	switch tstatus {
 	case "created":
 		status = task.StatusCreated
 	case "running":
@@ -224,8 +236,8 @@ func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.
 	pe := p.stat()
 	return &taskAPI.StateResponse{
 		ID:         p.id,
-		Bundle:     cs.Bundle,
-		Pid:        uint32(cs.InitProcessPid),
+		Bundle:     p.bundle,
+		Pid:        p.pid,
 		Status:     status,
 		Stdin:      p.stdin,
 		Stdout:     p.stdout,
