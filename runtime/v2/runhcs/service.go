@@ -160,8 +160,13 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 		"-address", containerdAddress,
 		"-publish-binary", containerdBinary,
 		"-socket", socketAddress,
-		"-debug",
 	}
+
+	opts, ok := ctx.Value(shim.OptsKey{}).(shim.Opts)
+	if ok && opts.Debug {
+		args = append(args, "-debug")
+	}
+
 	cmd := exec.Command(self, args...)
 	cmd.Dir = cwd
 	cmd.Env = append(os.Environ(), "GOMAXPROCS=2")

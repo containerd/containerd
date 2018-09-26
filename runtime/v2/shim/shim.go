@@ -53,6 +53,14 @@ type Shim interface {
 	StartShim(ctx context.Context, id, containerdBinary, containerdAddress string) (string, error)
 }
 
+// OptsKey is the context key for the Opts value.
+type OptsKey struct{}
+
+// Opts are context options associated with the shim invocation.
+type Opts struct {
+	Debug bool
+}
+
 var (
 	debugFlag            bool
 	idFlag               string
@@ -133,6 +141,7 @@ func run(id string, initFunc Init) error {
 		return fmt.Errorf("shim namespace cannot be empty")
 	}
 	ctx := namespaces.WithNamespace(context.Background(), namespaceFlag)
+	ctx = context.WithValue(ctx, OptsKey{}, Opts{Debug: debugFlag})
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("runtime", id))
 
 	service, err := initFunc(ctx, idFlag, publisher)
