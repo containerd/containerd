@@ -486,13 +486,15 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAP
 		return nil, err
 	}
 
-	rhs := newRunhcs(p.bundle)
-
-	dopts := &runhcs.DeleteOpts{
-		Force: true,
-	}
-	if err := rhs.Delete(ctx, p.id, dopts); err != nil {
-		return nil, errors.Wrapf(err, "failed to delete container: %s", p.id)
+	// This is a container
+	if p.cid == p.id {
+		rhs := newRunhcs(p.bundle)
+		dopts := &runhcs.DeleteOpts{
+			Force: true,
+		}
+		if err := rhs.Delete(ctx, p.id, dopts); err != nil {
+			return nil, errors.Wrapf(err, "failed to delete container: %s", p.id)
+		}
 	}
 
 	select {
