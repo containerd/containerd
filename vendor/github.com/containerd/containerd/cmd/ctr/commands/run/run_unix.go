@@ -136,6 +136,9 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		if context.IsSet("gpus") {
 			opts = append(opts, nvidia.WithGPUs(nvidia.WithDevices(context.Int("gpus")), nvidia.WithAllCapabilities))
 		}
+		if context.IsSet("allow-new-privs") {
+			opts = append(opts, oci.WithNewPrivileges)
+		}
 	}
 
 	cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(context.StringSlice("label"))))
@@ -146,9 +149,8 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 
 	cOpts = append(cOpts, spec)
 
-	// oci.WithImageConfig (WithUsername, WithUserID) depends on rootfs snapshot for resolving /etc/passwd.
-	// So cOpts needs to have precedence over opts.
-	// TODO: WithUsername, WithUserID should additionally support non-snapshot rootfs
+	// oci.WithImageConfig (WithUsername, WithUserID) depends on access to rootfs for resolving via
+	// the /etc/{passwd,group} files. So cOpts needs to have precedence over opts.
 	return client.NewContainer(ctx, id, cOpts...)
 }
 

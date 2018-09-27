@@ -19,12 +19,12 @@ package leases
 import (
 	"context"
 
-	"github.com/boltdb/bolt"
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
+	bolt "go.etcd.io/bbolt"
 )
 
 func init() {

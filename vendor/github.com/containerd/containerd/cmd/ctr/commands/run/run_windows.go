@@ -31,57 +31,80 @@ import (
 // NewContainer creates a new container
 func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli.Context) (containerd.Container, error) {
 	var (
-		ref  = context.Args().First()
-		id   = context.Args().Get(1)
-		args = context.Args()[2:]
-	)
-
-	image, err := client.GetImage(ctx, ref)
-	if err != nil {
-		return nil, err
-	}
-
-	var (
+		id    string
 		opts  []oci.SpecOpts
 		cOpts []containerd.NewContainerOpts
 		spec  containerd.NewContainerOpts
+
+		config = context.IsSet("config")
 	)
 
-	if context.IsSet("config") {
+	if config {
+		id = context.Args().First()
 		opts = append(opts, oci.WithSpecFromFile(context.String("config")))
 	} else {
-		opts = append(opts, oci.WithDefaultSpec())
-	}
+		var (
+			ref  = context.Args().First()
+			args = context.Args()[2:]
+		)
 
-	opts = append(opts, oci.WithImageConfig(image))
-	opts = append(opts, oci.WithEnv(context.StringSlice("env")))
-	opts = append(opts, withMounts(context))
-	if context.Bool("tty") {
-		opts = append(opts, oci.WithTTY)
-
-		con := console.Current()
-		size, err := con.Size()
-		if err != nil {
-			logrus.WithError(err).Error("console size")
+		id = context.Args().Get(1)
+		snapshotter := context.String("snapshotter")
+		if snapshotter == "windows-lcow" {
+			opts = append(opts, oci.WithDefaultSpecForPlatform("linux/amd64"))
+			// Clear the rootfs section.
+			opts = append(opts, oci.WithRootFSPath(""))
+		} else {
+			opts = append(opts, oci.WithDefaultSpec())
 		}
-		opts = append(opts, oci.WithTTYSize(int(size.Width), int(size.Height)))
+		opts = append(opts, oci.WithEnv(context.StringSlice("env")))
+		opts = append(opts, withMounts(context))
+
+		image, err := client.GetImage(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		unpacked, err := image.IsUnpacked(ctx, snapshotter)
+		if err != nil {
+			return nil, err
+		}
+		if !unpacked {
+			if err := image.Unpack(ctx, snapshotter); err != nil {
+				return nil, err
+			}
+		}
+		opts = append(opts, oci.WithImageConfig(image))
+		cOpts = append(cOpts, containerd.WithImage(image))
+		cOpts = append(cOpts, containerd.WithSnapshotter(snapshotter))
+		cOpts = append(cOpts, containerd.WithNewSnapshot(id, image))
+
+		if len(args) > 0 {
+			opts = append(opts, oci.WithProcessArgs(args...))
+		}
+		if cwd := context.String("cwd"); cwd != "" {
+			opts = append(opts, oci.WithProcessCwd(cwd))
+		}
+		if context.Bool("tty") {
+			opts = append(opts, oci.WithTTY)
+
+			con := console.Current()
+			size, err := con.Size()
+			if err != nil {
+				logrus.WithError(err).Error("console size")
+			}
+			opts = append(opts, oci.WithTTYSize(int(size.Width), int(size.Height)))
+		}
+		if context.Bool("isolated") {
+			opts = append(opts, oci.WithWindowsHyperV)
+		}
 	}
 
-	if len(args) > 0 {
-		opts = append(opts, oci.WithProcessArgs(args...))
-	}
-	if cwd := context.String("cwd"); cwd != "" {
-		opts = append(opts, oci.WithProcessCwd(cwd))
-	}
+	cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(context.StringSlice("label"))))
+	cOpts = append(cOpts, containerd.WithRuntime(context.String("runtime"), nil))
 
 	var s specs.Spec
 	spec = containerd.WithSpec(&s, opts...)
 
-	cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(context.StringSlice("label"))))
-	cOpts = append(cOpts, containerd.WithImage(image))
-	cOpts = append(cOpts, containerd.WithSnapshotter(context.String("snapshotter")))
-	cOpts = append(cOpts, containerd.WithNewSnapshot(id, image))
-	cOpts = append(cOpts, containerd.WithRuntime(context.String("runtime"), nil))
 	cOpts = append(cOpts, spec)
 
 	return client.NewContainer(ctx, id, cOpts...)

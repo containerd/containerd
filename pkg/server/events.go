@@ -42,11 +42,17 @@ const (
 	backOffInitDuration        = 1 * time.Second
 	backOffMaxDuration         = 5 * time.Minute
 	backOffExpireCheckDuration = 1 * time.Second
+
+	// handleEventTimeout is the timeout for handling 1 event. Event monitor
+	// handles events in serial, if one event blocks the event monitor, no
+	// other events can be handled.
+	// Add a timeout for each event handling, events that timeout will be requeued and
+	// handled again in the future.
+	handleEventTimeout = 10 * time.Second
 )
 
 // eventMonitor monitors containerd event and updates internal state correspondingly.
-// TODO(random-liu): [P1] Figure out is it possible to drop event during containerd
-// is running. If it is, we should do periodically list to sync state with containerd.
+// TODO(random-liu): Handle event for each container in a separate goroutine.
 type eventMonitor struct {
 	containerStore *containerstore.Store
 	sandboxStore   *sandboxstore.Store
@@ -189,6 +195,9 @@ func (em *eventMonitor) stop() {
 // handleEvent handles a containerd event.
 func (em *eventMonitor) handleEvent(any interface{}) error {
 	ctx := ctrdutil.NamespacedContext()
+	ctx, cancel := context.WithTimeout(ctx, handleEventTimeout)
+	defer cancel()
+
 	switch any.(type) {
 	// If containerd-shim exits unexpectedly, there will be no corresponding event.
 	// However, containerd could not retrieve container state in that case, so it's
