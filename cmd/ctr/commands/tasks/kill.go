@@ -47,7 +47,7 @@ var killCommand = cli.Command{
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		signal, err := commands.ParseSignal(context.String("signal"))
+		signal, err := containerd.ParseSignal(context.String("signal"))
 		if err != nil {
 			return err
 		}
