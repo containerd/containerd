@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/contrib/nvidia"
 	"github.com/containerd/containerd/oci"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -58,6 +58,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		spec  containerd.NewContainerOpts
 	)
 
+	cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(context.StringSlice("label"))))
 	if config {
 		opts = append(opts, oci.WithSpecFromFile(context.String("config")))
 	} else {
@@ -98,7 +99,8 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 				// Even when "readonly" is set, we don't use KindView snapshot here. (#1495)
 				// We pass writable snapshot to the OCI runtime, and the runtime remounts it as read-only,
 				// after creating some mount points on demand.
-				containerd.WithNewSnapshot(id, image))
+				containerd.WithNewSnapshot(id, image),
+				containerd.WithImageStopSignal(image, "SIGTERM"))
 		}
 		if context.Bool("readonly") {
 			opts = append(opts, oci.WithRootFSReadonly())
@@ -141,7 +143,6 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		}
 	}
 
-	cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(context.StringSlice("label"))))
 	cOpts = append(cOpts, containerd.WithRuntime(context.String("runtime"), nil))
 
 	var s specs.Spec
