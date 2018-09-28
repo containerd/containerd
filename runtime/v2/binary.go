@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/ttrpc"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 func shimBinary(ctx context.Context, bundle *Bundle, runtime, containerdAddress string, events *exchange.Exchange, rt *runtime.TaskList) *binary {
@@ -52,13 +53,18 @@ type binary struct {
 }
 
 func (b *binary) Start(ctx context.Context) (_ *shim, err error) {
+	args := []string{"-id", b.bundle.ID}
+	if logrus.GetLevel() == logrus.DebugLevel {
+		args = append(args, "-debug")
+	}
+	args = append(args, "start")
+
 	cmd, err := client.Command(
 		ctx,
 		b.runtime,
 		b.containerdAddress,
 		b.bundle.Path,
-		"-id", b.bundle.ID,
-		"start",
+		args...,
 	)
 	if err != nil {
 		return nil, err
