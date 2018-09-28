@@ -27,6 +27,7 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+	"syscall"
 	"unsafe"
 
 	winio "github.com/Microsoft/go-winio"
@@ -37,6 +38,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
+)
+
+const (
+	errorConnectionAborted syscall.Errno = 1236
 )
 
 // setupSignals creates a new signal handler for all signals
@@ -119,21 +124,100 @@ func handleSignals(logger *logrus.Entry, signals chan os.Signal) error {
 	}
 }
 
+// deferredShimWriteLogger exists to solve the upstream loggin issue presented
+// by using Windows Named Pipes for logging. When containerd restarts it tries
+// to reconnect to any shims. This means that the connection to the logger will
+// be severed but when containerd starts up it should reconnect and start
+// logging again. We abstract all of this logic behind what looks like a simple
+// `io.Writer` that can reconnect in the liftime and buffers logs while
+// disconnected.
 type deferredShimWriteLogger struct {
+	mu sync.Mutex
+
 	ctx context.Context
 
-	wg sync.WaitGroup
+	connected bool
+	aborted   bool
 
+	buffer bytes.Buffer
+
+	l      net.Listener
 	c      net.Conn
 	conerr error
 }
 
+// beginAccept issues an accept to wait for a connection. Once a conneciton
+// occurs drains any outstanding buffer. While draining the buffer any writes
+// are blocked. If the buffer fails to fully drain due to a connection drop a
+// call to `beginAccept` is re-issued waiting for another connection from
+// containerd.
+func (dswl *deferredShimWriteLogger) beginAccept() {
+	dswl.mu.Lock()
+	if dswl.connected {
+		return
+	}
+	dswl.mu.Unlock()
+
+	c, err := dswl.l.Accept()
+	if err == errorConnectionAborted {
+		dswl.mu.Lock()
+		dswl.aborted = true
+		dswl.l.Close()
+		dswl.conerr = errors.New("connection closed")
+		dswl.mu.Unlock()
+		return
+	}
+	dswl.mu.Lock()
+	dswl.connected = true
+	dswl.c = c
+
+	// Drain the buffer
+	if dswl.buffer.Len() > 0 {
+		_, err := dswl.buffer.WriteTo(dswl.c)
+		if err != nil {
+			// We lost our connection draining the buffer.
+			dswl.connected = false
+			dswl.c.Close()
+			go dswl.beginAccept()
+		}
+	}
+	dswl.mu.Unlock()
+}
+
 func (dswl *deferredShimWriteLogger) Write(p []byte) (int, error) {
-	dswl.wg.Wait()
-	if dswl.c == nil {
+	dswl.mu.Lock()
+	defer dswl.mu.Unlock()
+
+	if dswl.aborted {
 		return 0, dswl.conerr
 	}
-	return dswl.c.Write(p)
+
+	if dswl.connected {
+		// We have a connection. beginAccept would of drained the buffer so we just write our data to
+		// the connection directly.
+		written, err := dswl.c.Write(p)
+		if err != nil {
+			// We lost the connection.
+			dswl.connected = false
+			dswl.c.Close()
+			go dswl.beginAccept()
+
+			// We weren't able to write the full `p` bytes. Buffer the rest
+			if written != len(p) {
+				w, err := dswl.buffer.Write(p[written:])
+				if err != nil {
+					// We failed to buffer. Return this error
+					return written + w, err
+				}
+				written += w
+			}
+		}
+
+		return written, nil
+	}
+
+	// We are disconnected. Buffer the contents.
+	return dswl.buffer.Write(p)
 }
 
 // openLog on Windows acts as the server of the log pipe. This allows the
@@ -143,26 +227,16 @@ func openLog(ctx context.Context, id string) (io.Writer, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	dswl := &deferredShimWriteLogger{
+		ctx: ctx,
+	}
 	l, err := winio.ListenPipe(fmt.Sprintf("\\\\.\\pipe\\containerd-shim-%s-%s-log", ns, id), nil)
 	if err != nil {
 		return nil, err
 	}
-	dswl := &deferredShimWriteLogger{
-		ctx: ctx,
-	}
-	// TODO: JTERRY75 - this will not work with restarts. Only the first
-	// connection will work and all +1 connections will return 'use of closed
-	// network connection'. Make this reconnect aware.
-	dswl.wg.Add(1)
-	go func() {
-		c, conerr := l.Accept()
-		if conerr != nil {
-			l.Close()
-			dswl.conerr = conerr
-		}
-		dswl.c = c
-		dswl.wg.Done()
-	}()
+	dswl.l = l
+	go dswl.beginAccept()
 	return dswl, nil
 }
 
