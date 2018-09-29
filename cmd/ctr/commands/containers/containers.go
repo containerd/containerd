@@ -28,7 +28,9 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/cmd/ctr/commands/run"
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/typeurl"
 	"github.com/urfave/cli"
 )
 
@@ -261,7 +263,34 @@ var infoCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		commands.PrintAsJSON(info)
+
+		if info.Spec != nil && info.Spec.Value != nil {
+			type c containers.Container
+			type SpecDecode struct {
+				TypeURL string       `json:"type_url,omitempty"`
+				Value   *interface{} `json:"value,omitempty"`
+			}
+
+			cc := c(info)
+
+			v, err := typeurl.UnmarshalAny(cc.Spec)
+			if err != nil {
+				return nil
+			}
+
+			commands.PrintAsJSON(struct {
+				*c
+				Spec SpecDecode `json:"Spec,omitempty"`
+			}{
+				c: &cc,
+				Spec: SpecDecode{
+					TypeURL: cc.Spec.TypeUrl,
+					Value:   &v,
+				},
+			})
+		} else {
+			commands.PrintAsJSON(info)
+		}
 
 		return nil
 	},
