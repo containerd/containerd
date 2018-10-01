@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -26,7 +27,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
-	cni "github.com/containerd/go-cni"
+	"github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -530,7 +531,7 @@ func (c *criService) unmountSandboxFiles(id string, config *runtime.PodSandboxCo
 // setupPod setups up the network for a pod
 func (c *criService) setupPod(id string, path string, config *runtime.PodSandboxConfig) (string, error) {
 	if c.netPlugin == nil {
-		return "", errors.New("cni config not intialized")
+		return "", errors.New("cni config not initialized")
 	}
 
 	labels := getPodCNILabels(id, config)
@@ -541,6 +542,7 @@ func (c *criService) setupPod(id string, path string, config *runtime.PodSandbox
 	if err != nil {
 		return "", err
 	}
+	logDebugCNIResult(id, result)
 	// Check if the default interface has IP config
 	if configs, ok := result.Interfaces[defaultIfName]; ok && len(configs.IPConfigs) > 0 {
 		return selectPodIP(configs.IPConfigs), nil
@@ -638,4 +640,16 @@ func (c *criService) getSandboxRuntime(config *runtime.PodSandboxConfig, runtime
 		return criconfig.Runtime{}, errors.Errorf("no runtime for %q is configured", runtimeHandler)
 	}
 	return handler, nil
+}
+
+func logDebugCNIResult(sandboxID string, result *cni.CNIResult) {
+	if logrus.GetLevel() < logrus.DebugLevel {
+		return
+	}
+	cniResult, err := json.Marshal(result)
+	if err != nil {
+		logrus.WithError(err).Errorf("Failed to marshal CNI result for sandbox %q: %v", sandboxID, err)
+		return
+	}
+	logrus.Debugf("cni result for sandbox %q: %s", sandboxID, string(cniResult))
 }
