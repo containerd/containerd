@@ -129,7 +129,7 @@ func handleSignals(logger *logrus.Entry, signals chan os.Signal) error {
 // to reconnect to any shims. This means that the connection to the logger will
 // be severed but when containerd starts up it should reconnect and start
 // logging again. We abstract all of this logic behind what looks like a simple
-// `io.Writer` that can reconnect in the liftime and buffers logs while
+// `io.Writer` that can reconnect in the lifetime and buffers logs while
 // disconnected.
 type deferredShimWriteLogger struct {
 	mu sync.Mutex
@@ -193,7 +193,7 @@ func (dswl *deferredShimWriteLogger) Write(p []byte) (int, error) {
 	}
 
 	if dswl.connected {
-		// We have a connection. beginAccept would of drained the buffer so we just write our data to
+		// We have a connection. beginAccept would have drained the buffer so we just write our data to
 		// the connection directly.
 		written, err := dswl.c.Write(p)
 		if err != nil {
