@@ -124,6 +124,56 @@ func handleSignals(logger *logrus.Entry, signals chan os.Signal) error {
 	}
 }
 
+var _ = (io.WriterTo)(&blockingBuffer{})
+var _ = (io.Writer)(&blockingBuffer{})
+
+// blockingBuffer implements the `io.Writer` and `io.WriterTo` interfaces. Once
+// `capacity` is reached the calls to `Write` will block until a successful call
+// to `WriterTo` frees up the buffer space.
+//
+// Note: This has the same threadding semantics as bytes.Buffer with no
+// additional locking so multithreading is not supported.
+type blockingBuffer struct {
+	c *sync.Cond
+
+	capacity int
+
+	buffer bytes.Buffer
+}
+
+func newBlockingBuffer(capacity int) *blockingBuffer {
+	return &blockingBuffer{
+		c:        sync.NewCond(&sync.Mutex{}),
+		capacity: capacity,
+	}
+}
+
+func (bb *blockingBuffer) Len() int {
+	bb.c.L.Lock()
+	defer bb.c.L.Unlock()
+	return bb.buffer.Len()
+}
+
+func (bb *blockingBuffer) Write(p []byte) (int, error) {
+	if len(p) > bb.capacity {
+		return 0, errors.Errorf("len(p) (%d) too large for capacity (%d)", len(p), bb.capacity)
+	}
+
+	bb.c.L.Lock()
+	for bb.buffer.Len()+len(p) > bb.capacity {
+		bb.c.Wait()
+	}
+	defer bb.c.L.Unlock()
+	return bb.buffer.Write(p)
+}
+
+func (bb *blockingBuffer) WriteTo(w io.Writer) (int64, error) {
+	bb.c.L.Lock()
+	defer bb.c.L.Unlock()
+	defer bb.c.Signal()
+	return bb.buffer.WriteTo(w)
+}
+
 // deferredShimWriteLogger exists to solve the upstream loggin issue presented
 // by using Windows Named Pipes for logging. When containerd restarts it tries
 // to reconnect to any shims. This means that the connection to the logger will
@@ -139,7 +189,7 @@ type deferredShimWriteLogger struct {
 	connected bool
 	aborted   bool
 
-	buffer bytes.Buffer
+	buffer *blockingBuffer
 
 	l      net.Listener
 	c      net.Conn
@@ -229,7 +279,8 @@ func openLog(ctx context.Context, id string) (io.Writer, error) {
 	}
 
 	dswl := &deferredShimWriteLogger{
-		ctx: ctx,
+		ctx:    ctx,
+		buffer: newBlockingBuffer(64 * 1024), // 64KB,
 	}
 	l, err := winio.ListenPipe(fmt.Sprintf("\\\\.\\pipe\\containerd-shim-%s-%s-log", ns, id), nil)
 	if err != nil {
