@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/pkg/testutil"
+	"github.com/containerd/continuity/testutil/loopback"
 )
 
 func testOverlaySupported(t testing.TB, expected bool, mkfs ...string) {
@@ -35,7 +36,7 @@ func testOverlaySupported(t testing.TB, expected bool, mkfs ...string) {
 	}
 	defer os.RemoveAll(mnt)
 
-	deviceName, cleanupDevice, err := testutil.NewLoopback(100 << 20) // 100 MB
+	deviceName, cleanupDevice, err := loopback.New(100 << 20) // 100 MB
 	if err != nil {
 		t.Fatal(err)
 	}

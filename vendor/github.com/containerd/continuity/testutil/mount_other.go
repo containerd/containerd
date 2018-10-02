@@ -1,3 +1,5 @@
+// +build !linux,!windows
+
 /*
    Copyright The containerd Authors.
 
@@ -14,6 +16,6 @@
    limitations under the License.
 */
 
-package lookuptest
+package testutil
 
-// FIXME: without this dummy file, `make build` fails with "no buildable Go source files" error
+const unmountFlags int = 0
