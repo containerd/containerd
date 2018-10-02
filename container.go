@@ -325,7 +325,10 @@ func (c *container) Checkpoint(ctx context.Context, ref string, opts ...Checkpoi
 	// process remaining opts
 	for _, o := range opts {
 		if err := o(ctx, c.client, &info, index, copts); err != nil {
-			return nil, err
+			err = errdefs.FromGRPC(err)
+			if !errdefs.IsAlreadyExists(err) {
+				return nil, err
+			}
 		}
 	}
 
