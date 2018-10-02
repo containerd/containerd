@@ -16,7 +16,7 @@
    limitations under the License.
 */
 
-package testutil
+package loopback
 
 import (
 	"io/ioutil"
@@ -28,8 +28,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// NewLoopback creates a loopback device, and returns its device name (/dev/loopX), and its clean-up function.
-func NewLoopback(size int64) (string, func() error, error) {
+// New creates a loopback device, and returns its device name (/dev/loopX), and its clean-up function.
+func New(size int64) (string, func() error, error) {
 	// create temporary file for the disk image
 	file, err := ioutil.TempFile("", "containerd-test-loopback")
 	if err != nil {

@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/testsuite"
+	"github.com/containerd/continuity/testutil/loopback"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
@@ -51,7 +52,7 @@ func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshots.Snap
 		if os.Getpagesize() > 4096 {
 			loopbackSize = int64(650 << 20) // 650 MB
 		}
-		deviceName, cleanupDevice, err := testutil.NewLoopback(loopbackSize)
+		deviceName, cleanupDevice, err := loopback.New(loopbackSize)
 
 		if err != nil {
 			return nil, nil, err

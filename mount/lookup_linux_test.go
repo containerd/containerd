@@ -16,14 +16,7 @@
    limitations under the License.
 */
 
-// FIXME: we can't put this test to the mount package:
-// import cycle not allowed in test
-// package github.com/containerd/containerd/mount (test)
-//         imports github.com/containerd/containerd/pkg/testutil
-//         imports github.com/containerd/containerd/mount
-//
-// NOTE: we can't have this as lookup_test (compilation fails)
-package lookuptest
+package mount
 
 import (
 	"fmt"
@@ -34,14 +27,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/pkg/testutil"
+	// containerd/pkg/testutil has circular dependency on this mount pkg.
+	// so we use continuity/testutil instead.
+	"github.com/containerd/continuity/testutil"
+	"github.com/containerd/continuity/testutil/loopback"
 	"gotest.tools/assert"
 )
 
 func checkLookup(t *testing.T, fsType, mntPoint, dir string) {
 	t.Helper()
-	info, err := mount.Lookup(dir)
+	info, err := Lookup(dir)
 	assert.NilError(t, err)
 	assert.Equal(t, fsType, info.FSType)
 	assert.Equal(t, mntPoint, info.Mountpoint)
@@ -55,7 +50,7 @@ func testLookup(t *testing.T, fsType string) {
 	}
 	defer os.RemoveAll(mnt)
 
-	deviceName, cleanupDevice, err := testutil.NewLoopback(100 << 20) // 100 MB
+	deviceName, cleanupDevice, err := loopback.New(100 << 20) // 100 MB
 	if err != nil {
 		t.Fatal(err)
 	}
