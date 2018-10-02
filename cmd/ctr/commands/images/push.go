@@ -129,15 +129,19 @@ var pushCommand = cli.Command{
 		for {
 			select {
 			case <-ticker.C:
-				fw.Flush()
-
-				tw := tabwriter.NewWriter(fw, 1, 8, 1, ' ', 0)
-
-				content.Display(tw, ongoing.status(), start)
-				tw.Flush()
-
-				if done {
+				if !context.GlobalBool("debug") {
 					fw.Flush()
+
+					tw := tabwriter.NewWriter(fw, 1, 8, 1, ' ', 0)
+
+					content.Display(tw, ongoing.status(), start)
+					tw.Flush()
+
+					if done {
+						fw.Flush()
+						return nil
+					}
+				} else if done {
 					return nil
 				}
 			case err := <-errs:

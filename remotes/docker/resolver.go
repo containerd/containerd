@@ -18,13 +18,15 @@ package docker
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 	"path"
 	"strconv"
 	"strings"
+	"sync/atomic"
+	"time"
 
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/reference"
@@ -44,6 +46,14 @@ var (
 	// ErrInvalidAuthorization is used when credentials are passed to a server but
 	// those credentials are rejected.
 	ErrInvalidAuthorization = errors.New("authorization failed")
+
+	// ErrRetryWithAuthorization occurs when a request failed due to lack of
+	// authorization but may be retried with authorization.
+	ErrRetryWithAuthorization = errors.New("retry with authorization")
+
+	// ErrTooManyResponses is used to signify that a request has reached
+	// the maximum number of responses and should not be retried again.
+	ErrTooManyResponses = errors.New("too many responses")
 )
 
 // Authorizer is used to authorize HTTP requests based on 401 HTTP responses.
@@ -336,7 +346,6 @@ func (r *dockerBase) url(ps ...string) string {
 }
 
 func (r *dockerBase) authorize(ctx context.Context, req *http.Request) error {
-	// Check if has header for host
 	if r.auth != nil {
 		if err := r.auth.Authorize(ctx, req); err != nil {
 			return err
@@ -364,6 +373,9 @@ func (r *dockerBase) doRequest(ctx context.Context, req *http.Request) (*http.Re
 }
 
 func (r *dockerBase) doRequestWithRetries(ctx context.Context, req *http.Request, responses []*http.Response) (*http.Response, error) {
+	// Create unique identifier for request sequence
+	ctx = contextWithRequestID(ctx)
+
 	resp, err := r.doRequest(ctx, req)
 	if err != nil {
 		return nil, err
@@ -383,26 +395,26 @@ func (r *dockerBase) doRequestWithRetries(ctx context.Context, req *http.Request
 }
 
 func (r *dockerBase) retryRequest(ctx context.Context, req *http.Request, responses []*http.Response) (*http.Request, error) {
-	if len(responses) > 5 {
-		return nil, nil
-	}
-	last := responses[len(responses)-1]
-	if last.StatusCode == http.StatusUnauthorized {
-		log.G(ctx).WithField("header", last.Header.Get("WWW-Authenticate")).Debug("Unauthorized")
-		if r.auth != nil {
-			if err := r.auth.AddResponses(ctx, responses); err == nil {
+	if r.auth != nil {
+		if err := r.auth.AddResponses(ctx, responses); err != nil {
+			if cause := errors.Cause(err); cause == ErrRetryWithAuthorization {
 				return copyRequest(req)
-			} else if !errdefs.IsNotImplemented(err) {
+			} else if cause == ErrTooManyResponses {
+				return nil, nil
+			} else {
 				return nil, err
 			}
 		}
-
+	} else if len(responses) > 5 {
 		return nil, nil
-	} else if last.StatusCode == http.StatusMethodNotAllowed && req.Method == http.MethodHead {
+	}
+
+	// Support special cases for irregular registry behavior
+	last := responses[len(responses)-1]
+	if last.StatusCode == http.StatusMethodNotAllowed && req.Method == http.MethodHead {
 		// Support registries which have not properly implemented the HEAD method for
 		// manifests endpoint
 		if strings.Contains(req.URL.Path, "/manifests/") {
-			// TODO: copy request?
 			req.Method = http.MethodGet
 			return copyRequest(req)
 		}
@@ -422,4 +434,24 @@ func copyRequest(req *http.Request) (*http.Request, error) {
 		}
 	}
 	return &ireq, nil
+}
+
+type requestIDKey struct{}
+
+var reqCount uint64
+
+func contextWithRequestID(ctx context.Context) context.Context {
+	t := time.Now()
+	i := atomic.AddUint64(&reqCount, 1)
+	// TODO: Add rand to make cross system identifier
+
+	return context.WithValue(ctx, requestIDKey{}, fmt.Sprintf("%d-%d", i, t.Nanosecond()))
+}
+
+func getRequestID(ctx context.Context) string {
+	if x := ctx.Value(requestIDKey{}); x != nil {
+		return x.(string)
+	}
+
+	return ""
 }

@@ -116,8 +116,6 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 		}
 	}
 
-	// TODO: Lookup related objects for cross repository push
-
 	if isManifest {
 		var putPath string
 		if p.tag != "" {
@@ -140,6 +138,15 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 			return nil, err
 		}
 
+		source := chooseSource(ctx, p.refspec, desc.Annotations)
+		if source != "" {
+			ctx = addPullScope(ctx, source)
+			q := req.URL.Query()
+			q.Set("mount", desc.Digest.String())
+			q.Set("from", source)
+			req.URL.RawQuery = q.Encode()
+		}
+
 		resp, err := p.doRequestWithRetries(ctx, req, nil)
 		if err != nil {
 			return nil, err
@@ -147,6 +154,9 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 
 		switch resp.StatusCode {
 		case http.StatusOK, http.StatusAccepted, http.StatusNoContent:
+		case http.StatusCreated:
+			log.G(ctx).WithField("digest", desc.Digest.String()).WithField("source", source).Debug("mounted from source repository")
+			return nil, errors.Wrap(errdefs.ErrAlreadyExists, "mounted")
 		default:
 			// TODO: log error
 			return nil, errors.Errorf("unexpected response: %s", resp.Status)

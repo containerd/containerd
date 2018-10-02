@@ -29,12 +29,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context/ctxhttp"
 )
+
+type hostAuth struct {
+	c *sync.Cond
+
+	requests  map[string]struct{}
+	responses int
+
+	f func(context.Context) (string, error)
+}
 
 type dockerAuthorizer struct {
 	credentials func(string) (string, string, error)
@@ -42,7 +50,7 @@ type dockerAuthorizer struct {
 	client *http.Client
 	mu     sync.Mutex
 
-	auth map[string]string
+	auth map[string]*hostAuth
 }
 
 // NewAuthorizer creates a Docker authorizer using the provided function to
@@ -54,14 +62,62 @@ func NewAuthorizer(client *http.Client, f func(string) (string, string, error)) 
 	return &dockerAuthorizer{
 		credentials: f,
 		client:      client,
-		auth:        map[string]string{},
+		auth:        map[string]*hostAuth{},
 	}
 }
+func (auth *hostAuth) registerID(ctx context.Context, id string) {
+	auth.requests[id] = struct{}{}
 
+	// Clean up request after cancelled
+	go func() {
+		<-ctx.Done()
+
+		auth.c.L.Lock()
+		defer auth.c.L.Unlock()
+
+		if _, ok := auth.requests[id]; ok {
+			delete(auth.requests, id)
+			auth.c.Signal()
+		}
+	}()
+}
 func (a *dockerAuthorizer) Authorize(ctx context.Context, req *http.Request) error {
-	// TODO: Lookup matching challenge and scope rather than just host
-	if auth := a.getAuth(req.URL.Host); auth != "" {
-		req.Header.Set("Authorization", auth)
+	auth := a.getAuth(req.URL.Host)
+	id := getRequestID(ctx)
+
+	auth.c.L.Lock()
+	defer auth.c.L.Unlock()
+
+	if auth.requests == nil {
+		// first request, need a response before authorizing
+		auth.requests = map[string]struct{}{}
+		if id != "" {
+			auth.registerID(ctx, id)
+		}
+		return nil
+	}
+
+	if auth.responses == 0 {
+		// wait for a response
+		auth.c.Wait()
+	}
+
+	if id != "" {
+		// wait for number of requests to decrease
+		for len(auth.requests) >= 5 {
+			auth.c.Wait()
+		}
+
+		auth.registerID(ctx, id)
+	}
+
+	if auth.f != nil {
+		h, err := auth.f(ctx)
+		if err != nil {
+			return err
+		}
+
+		req.Header.Set("Authorization", h)
 	}
 
 	return nil
@@ -70,96 +126,138 @@ func (a *dockerAuthorizer) Authorize(ctx context.Context, req *http.Request) err
 func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.Response) error {
 	last := responses[len(responses)-1]
 	host := last.Request.URL.Host
-	for _, c := range parseAuthHeader(last.Header) {
-		if c.scheme == bearerAuth {
-			if err := invalidAuthorization(c, responses); err != nil {
-				// TODO: Clear token
-				a.setAuth(host, "")
-				return err
-			}
 
-			// TODO(dmcg): Store challenge, not token
-			// Move token fetching to authorize
-			return a.setTokenAuth(ctx, host, c.parameters)
-		} else if c.scheme == basicAuth {
-			// TODO: Resolve credentials on authorize
-			username, secret, err := a.credentials(host)
-			if err != nil {
-				return err
-			}
-			if username != "" && secret != "" {
-				auth := username + ":" + secret
-				a.setAuth(host, fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(auth))))
-				return nil
+	auth := a.getAuth(host)
+
+	auth.c.L.Lock()
+	defer func() {
+
+		id := getRequestID(ctx)
+		if id != "" {
+			delete(auth.requests, id)
+		}
+		auth.responses++
+		if auth.responses == 1 {
+			// First response, broadcast to wake all requests
+			// waiting for initial auth response
+			auth.c.Broadcast()
+		} else {
+			auth.c.Signal()
+		}
+		auth.c.L.Unlock()
+	}()
+
+	if len(responses) > 5 {
+		return errors.Wrap(ErrTooManyResponses, "exceeded 5 responses")
+	}
+
+	if last.StatusCode == http.StatusUnauthorized {
+		log.G(ctx).WithField("header", last.Header.Get("WWW-Authenticate")).Debug("Unauthorized")
+
+		for _, c := range parseAuthHeader(last.Header) {
+			if c.scheme == bearerAuth {
+				if err := invalidAuthorization(c, responses); err != nil {
+					auth.f = nil
+					return err
+				}
+
+				f, err := a.tokenAuth(ctx, host, c.parameters)
+				if err != nil {
+					return err
+				}
+				auth.f = f
+
+				return ErrRetryWithAuthorization
+			} else if c.scheme == basicAuth {
+				// TODO: Resolve credentials on authorize
+				username, secret, err := a.credentials(host)
+				if err != nil {
+					return err
+				}
+				if username != "" && secret != "" {
+					auth.f = func(context.Context) (string, error) {
+						auth := username + ":" + secret
+						return fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(auth))), nil
+					}
+
+					return ErrRetryWithAuthorization
+				}
 			}
 		}
 	}
 
-	return errors.Wrap(errdefs.ErrNotImplemented, "failed to find supported auth scheme")
+	return nil
 }
 
-func (a *dockerAuthorizer) getAuth(host string) string {
+func (a *dockerAuthorizer) getAuth(host string) *hostAuth {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	return a.auth[host]
+	auth := a.auth[host]
+	if auth == nil {
+		auth = &hostAuth{
+			c: sync.NewCond(&sync.Mutex{}),
+		}
+		a.auth[host] = auth
+	}
+
+	return auth
 }
 
-func (a *dockerAuthorizer) setAuth(host string, auth string) bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	changed := a.auth[host] != auth
-	a.auth[host] = auth
-
-	return changed
-}
-
-func (a *dockerAuthorizer) setTokenAuth(ctx context.Context, host string, params map[string]string) error {
+func (a *dockerAuthorizer) tokenAuth(ctx context.Context, host string, params map[string]string) (func(context.Context) (string, error), error) {
 	realm, ok := params["realm"]
 	if !ok {
-		return errors.New("no realm specified for token auth challenge")
+		return nil, errors.New("no realm specified for token auth challenge")
 	}
 
 	realmURL, err := url.Parse(realm)
 	if err != nil {
-		return errors.Wrap(err, "invalid token auth challenge realm")
+		return nil, errors.Wrap(err, "invalid token auth challenge realm")
 	}
 
-	to := tokenOptions{
+	common := tokenOptions{
 		realm:   realmURL.String(),
 		service: params["service"],
 	}
 
-	to.scopes = getTokenScopes(ctx, params)
-	if len(to.scopes) == 0 {
-		return errors.Errorf("no scope specified for token auth challenge")
-	}
-
 	if a.credentials != nil {
-		to.username, to.secret, err = a.credentials(host)
+		common.username, common.secret, err = a.credentials(host)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	var token string
-	if to.secret != "" {
-		// Credential information is provided, use oauth POST endpoint
-		token, err = a.fetchTokenWithOAuth(ctx, to)
-		if err != nil {
-			return errors.Wrap(err, "failed to fetch oauth token")
-		}
-	} else {
-		// Do request anonymously
-		token, err = a.fetchToken(ctx, to)
-		if err != nil {
-			return errors.Wrap(err, "failed to fetch anonymous token")
-		}
-	}
-	a.setAuth(host, fmt.Sprintf("Bearer %s", token))
+	scopedTokens := map[string]string{}
 
-	return nil
+	return func(ctx context.Context) (string, error) {
+		// copy common token options
+		to := common
+
+		to.scopes = getTokenScopes(ctx, params["scope"])
+		if len(to.scopes) == 0 {
+			return "", errors.Errorf("no scope specified for token auth challenge")
+		}
+
+		tokenKey := strings.Join(to.scopes, " ")
+		token := scopedTokens[tokenKey]
+		if token == "" {
+			if to.secret != "" {
+				// Credential information is provided, use oauth POST endpoint
+				token, err = a.fetchTokenWithOAuth(ctx, to)
+				if err != nil {
+					return "", errors.Wrap(err, "failed to fetch oauth token")
+				}
+			} else {
+				// Do request anonymously
+				token, err = a.fetchToken(ctx, to)
+				if err != nil {
+					return "", errors.Wrap(err, "failed to fetch anonymous token")
+				}
+			}
+			scopedTokens[tokenKey] = token
+		}
+		return fmt.Sprintf("Bearer %s", token), nil
+	}, nil
 }
 
 type tokenOptions struct {

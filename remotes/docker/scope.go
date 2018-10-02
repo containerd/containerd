@@ -18,6 +18,7 @@ package docker
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"sort"
 	"strings"
@@ -54,12 +55,12 @@ func contextWithRepositoryScope(ctx context.Context, refspec reference.Spec, pus
 }
 
 // getTokenScopes returns deduplicated and sorted scopes from ctx.Value(tokenScopesKey{}) and params["scope"].
-func getTokenScopes(ctx context.Context, params map[string]string) []string {
+func getTokenScopes(ctx context.Context, scope string) []string {
 	var scopes []string
 	if x := ctx.Value(tokenScopesKey{}); x != nil {
 		scopes = append(scopes, x.([]string)...)
 	}
-	if scope, ok := params["scope"]; ok {
+	if scope != "" {
 		for _, s := range scopes {
 			// Note: this comparison is unaware of the scope grammar (https://docs.docker.com/registry/spec/auth/scope/)
 			// So, "repository:foo/bar:pull,push" != "repository:foo/bar:push,pull", although semantically they are equal.
@@ -73,4 +74,14 @@ func getTokenScopes(ctx context.Context, params map[string]string) []string {
 Sort:
 	sort.Strings(scopes)
 	return scopes
+}
+
+func addPullScope(ctx context.Context, source string) context.Context {
+	var scopes []string
+	if x := ctx.Value(tokenScopesKey{}); x != nil {
+		scopes = append(scopes, x.([]string)...)
+	}
+	scopes = append(scopes, fmt.Sprintf("repository:%s:pull", source))
+
+	return context.WithValue(ctx, tokenScopesKey{}, scopes)
 }

@@ -156,7 +156,7 @@ func push(ctx context.Context, provider content.Provider, pusher Pusher, desc oc
 //
 // Base handlers can be provided which will be called before any push specific
 // handlers.
-func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, provider content.Provider, platform platforms.MatchComparer, baseHandlers ...images.Handler) error {
+func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, provider content.Store, platform platforms.MatchComparer, baseHandlers ...images.Handler) error {
 	var m sync.Mutex
 	manifestStack := []ocispec.Descriptor{}
 
@@ -176,7 +176,7 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, pr
 	pushHandler := PushHandler(pusher, provider)
 
 	handlers := append(baseHandlers,
-		images.FilterPlatforms(images.ChildrenHandler(provider), platform),
+		annotateDistribution(provider, images.FilterPlatforms(images.ChildrenHandler(provider), platform)),
 		filterHandler,
 		pushHandler,
 	)
@@ -202,4 +202,58 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, pr
 	}
 
 	return nil
+}
+
+func annotateDistribution(manager content.Manager, h images.HandlerFunc) images.HandlerFunc {
+	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		children, err := h(ctx, desc)
+		if err != nil {
+			return children, err
+		}
+		// If manifest or manifest list, annotate children
+		switch desc.MediaType {
+		case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest,
+
+			images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+		default:
+			return children, err
+
+		}
+
+		info, err := manager.Info(ctx, desc.Digest)
+		if err != nil {
+			return nil, err
+		}
+
+		annotations := info.Labels
+
+		// Filter annotations (not yet supported in API)
+		for k := range annotations {
+			if !strings.HasPrefix(k, "containerd.io/distribution.") {
+				delete(annotations, k)
+			}
+		}
+		for k, v := range desc.Annotations {
+			if strings.HasPrefix(k, "containerd.io/distribution.") {
+				annotations[k] = v
+			}
+		}
+
+		if len(annotations) > 0 {
+			for i := range children {
+				a := children[i].Annotations
+				if a == nil {
+					a = map[string]string{}
+				}
+				for k, v := range annotations {
+					if _, ok := a[k]; !ok {
+						a[k] = v
+					}
+				}
+				children[i].Annotations = a
+			}
+		}
+
+		return children, nil
+	}
 }

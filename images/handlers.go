@@ -208,6 +208,18 @@ func FilterPlatforms(f HandlerFunc, m platforms.Matcher) HandlerFunc {
 	}
 }
 
+// FilterManifests stops handling any non-manifest descriptor
+func FilterManifests(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error) {
+	switch desc.MediaType {
+	case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest,
+		MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+	default:
+		return nil, ErrStopHandler
+
+	}
+	return nil, nil
+}
+
 // LimitManifests is a handler wrapper which filters the manifest descriptors
 // returned using the provided platform.
 // The results will be ordered according to the comparison operator and

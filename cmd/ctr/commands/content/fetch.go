@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/pkg/progress"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/containerd/remotes/docker"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
@@ -66,6 +67,10 @@ Most of this is experimental and there are few leaps to make this work.`,
 			Name:  "all-platforms",
 			Usage: "pull content from all platforms",
 		},
+		cli.BoolFlag{
+			Name:  "shallow",
+			Usage: "only pull manifests",
+		},
 	),
 	Action: func(clicontext *cli.Context) error {
 		var (
@@ -95,6 +100,8 @@ type FetchConfig struct {
 	Labels []string
 	// Platforms to fetch
 	Platforms []string
+	// BaseHandler
+	Handlers []images.Handler
 }
 
 // NewFetchConfig returns the default FetchConfig from cli flags
@@ -117,6 +124,9 @@ func NewFetchConfig(ctx context.Context, clicontext *cli.Context) (*FetchConfig,
 		}
 		config.Platforms = p
 	}
+	if clicontext.Bool("shallow") {
+		config.Handlers = append(config.Handlers, images.HandlerFunc(images.FilterManifests))
+	}
 	return config, nil
 }
 
@@ -135,21 +145,24 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 		close(progress)
 	}()
 
-	h := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	config.Handlers = append(config.Handlers, images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		if desc.MediaType != images.MediaTypeDockerSchema1Manifest {
 			ongoing.add(desc)
 		}
 		return nil, nil
-	})
+	}))
 
 	log.G(pctx).WithField("image", ref).Debug("fetching")
 	labels := commands.LabelArgs(config.Labels)
 	opts := []containerd.RemoteOpt{
 		containerd.WithPullLabels(labels),
 		containerd.WithResolver(config.Resolver),
-		containerd.WithImageHandler(h),
 		containerd.WithSchema1Conversion,
 	}
+	for _, h := range config.Handlers {
+		opts = append(opts, containerd.WithImageHandler(h))
+	}
+
 	for _, platform := range config.Platforms {
 		opts = append(opts, containerd.WithPlatform(platform))
 	}
@@ -159,8 +172,36 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 		return images.Image{}, err
 	}
 
+	if err := addDistributionSource(ctx, client.ContentStore(), img.Target, ref); err != nil {
+		// Not a fetch error, pushing to a new repository may fail
+		// to perform a cross repository push
+		log.G(pctx).WithField("image", ref).Info("failed to store distribution source on manifest")
+	}
+
 	<-progress
 	return img, nil
+}
+
+func addDistributionSource(ctx context.Context, manager content.Manager, source ocispec.Descriptor, ref string) error {
+	info, err := manager.Info(ctx, source.Digest)
+	if err != nil {
+		return err
+	}
+	key, value, err := docker.SourceLabel(ctx, ref, info.Labels)
+	if err != nil {
+		return err
+	}
+
+	info = content.Info{
+		Digest: info.Digest,
+		Labels: map[string]string{
+			key: value,
+		},
+	}
+
+	_, err = manager.Update(ctx, info, fmt.Sprintf("labels.%s", key))
+
+	return err
 }
 
 func showProgress(ctx context.Context, ongoing *jobs, cs content.Store, out io.Writer) {
