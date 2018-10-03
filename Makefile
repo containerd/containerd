@@ -57,7 +57,7 @@ help:
 	@echo " * 'verify'           	- Execute the source code verification tools"
 	@echo " * 'proto'            	- Update protobuf of the cri plugin api"
 	@echo " * 'install.tools'    	- Install tools used by verify"
-	@echo " * 'install.deps'     	- Install dependencies of cri (Note: BUILDTAGS defaults to 'seccomp apparmor' for runc build")
+	@echo " * 'install.deps'     	- Install dependencies of cri (Note: BUILDTAGS defaults to 'seccomp apparmor' for runc build)"
 	@echo " * 'uninstall'        	- Remove installed binaries from system locations"
 	@echo " * 'version'          	- Print current cri plugin release version"
 	@echo " * 'update-vendor'    	- Syncs containerd/vendor.conf -> vendor.conf and sorts vendor.conf"
