@@ -176,10 +176,15 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, pr
 	pushHandler := PushHandler(pusher, provider)
 
 	handlers := append(baseHandlers,
-		annotateDistribution(provider, images.FilterPlatforms(images.ChildrenHandler(provider), platform)),
+		annotateHandler(provider, images.FilterPlatforms(images.ChildrenHandler(provider), platform)),
 		filterHandler,
 		pushHandler,
 	)
+
+	desc, err := annotateDescriptor(ctx, provider, desc)
+	if err != nil {
+		return err
+	}
 
 	if err := images.Dispatch(ctx, images.Handlers(handlers...), desc); err != nil {
 		return err
@@ -204,7 +209,40 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, pr
 	return nil
 }
 
-func annotateDistribution(manager content.Manager, h images.HandlerFunc) images.HandlerFunc {
+// annotateDescriptor adds distribution related annotations to
+// the given descriptor from content store labels
+func annotateDescriptor(ctx context.Context, manager content.Manager, desc ocispec.Descriptor) (ocispec.Descriptor, error) {
+	var annotations map[string]string
+	info, err := manager.Info(ctx, desc.Digest)
+	if err == nil {
+		annotations = info.Labels
+	} else if !errdefs.IsNotFound(err) {
+		return ocispec.Descriptor{}, err
+	}
+
+	if len(annotations) == 0 {
+		return desc, nil
+	}
+
+	// Filter annotations (not yet supported in API)
+	for k := range annotations {
+		if !strings.HasPrefix(k, "containerd.io/distribution.") {
+			delete(annotations, k)
+		}
+	}
+
+	for k, v := range desc.Annotations {
+		annotations[k] = v
+	}
+
+	desc.Annotations = annotations
+
+	return desc, nil
+}
+
+// annotateHandler returns an image handler which adds distribution
+// related annotations to child descriptors
+func annotateHandler(manager content.Manager, h images.HandlerFunc) images.HandlerFunc {
 	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		children, err := h(ctx, desc)
 		if err != nil {
@@ -220,38 +258,23 @@ func annotateDistribution(manager content.Manager, h images.HandlerFunc) images.
 
 		}
 
-		info, err := manager.Info(ctx, desc.Digest)
-		if err != nil {
-			return nil, err
-		}
-
-		annotations := info.Labels
-
-		// Filter annotations (not yet supported in API)
-		for k := range annotations {
-			if !strings.HasPrefix(k, "containerd.io/distribution.") {
-				delete(annotations, k)
+		for i := range children {
+			child, err := annotateDescriptor(ctx, manager, children[i])
+			if err != nil {
+				return nil, err
 			}
-		}
-		for k, v := range desc.Annotations {
-			if strings.HasPrefix(k, "containerd.io/distribution.") {
-				annotations[k] = v
-			}
-		}
 
-		if len(annotations) > 0 {
-			for i := range children {
-				a := children[i].Annotations
-				if a == nil {
-					a = map[string]string{}
+			if len(desc.Annotations) > 0 {
+				if child.Annotations == nil {
+					child.Annotations = map[string]string{}
 				}
-				for k, v := range annotations {
-					if _, ok := a[k]; !ok {
-						a[k] = v
+				for k, v := range desc.Annotations {
+					if _, ok := child.Annotations[k]; !ok {
+						child.Annotations[k] = v
 					}
 				}
-				children[i].Annotations = a
 			}
+			children[i] = child
 		}
 
 		return children, nil

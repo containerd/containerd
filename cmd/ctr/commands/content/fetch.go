@@ -172,10 +172,13 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 		return images.Image{}, err
 	}
 
-	if err := addDistributionSource(ctx, client.ContentStore(), img.Target, ref); err != nil {
-		// Not a fetch error, pushing to a new repository may fail
-		// to perform a cross repository push
-		log.G(pctx).WithField("image", ref).Info("failed to store distribution source on manifest")
+	descs := ongoing.jobs()
+	for _, desc := range descs {
+		if err := addDistributionSource(ctx, client.ContentStore(), desc, ref); err != nil {
+			// Not a fetch error, pushing to a new repository may fail
+			// to perform a cross repository push
+			log.G(pctx).WithField("digest", desc.Digest).WithField("image", ref).Info("failed to store distribution source on blob")
+		}
 	}
 
 	<-progress
