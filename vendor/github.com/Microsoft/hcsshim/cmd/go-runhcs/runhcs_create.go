@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	irunhcs "github.com/Microsoft/hcsshim/internal/runhcs"
 	runc "github.com/containerd/go-runc"
 )
 
@@ -32,7 +33,7 @@ func (opt *CreateOpts) args() ([]string, error) {
 		out = append(out, "--pid-file", abs)
 	}
 	if opt.ShimLog != "" {
-		if strings.HasPrefix(opt.ShimLog, safePipePrefix) {
+		if strings.HasPrefix(opt.ShimLog, irunhcs.SafePipePrefix) {
 			out = append(out, "--shim-log", opt.ShimLog)
 		} else {
 			abs, err := filepath.Abs(opt.ShimLog)
@@ -43,7 +44,7 @@ func (opt *CreateOpts) args() ([]string, error) {
 		}
 	}
 	if opt.VMLog != "" {
-		if strings.HasPrefix(opt.VMLog, safePipePrefix) {
+		if strings.HasPrefix(opt.VMLog, irunhcs.SafePipePrefix) {
 			out = append(out, "--vm-log", opt.VMLog)
 		} else {
 			abs, err := filepath.Abs(opt.VMLog)
