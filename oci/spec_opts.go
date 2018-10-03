@@ -654,6 +654,10 @@ func WithUsername(username string) SpecOpts {
 // The passed in user can be either a uid or a username.
 func WithAdditionalGIDs(userstr string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
+		// For LCOW additional GID's not supported
+		if s.Windows != nil {
+			return nil
+		}
 		setProcess(s)
 		setAdditionalGids := func(root string) error {
 			var username string
