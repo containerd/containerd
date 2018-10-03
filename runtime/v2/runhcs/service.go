@@ -195,13 +195,22 @@ func (s *service) Cleanup(ctx context.Context) (*taskAPI.DeleteResponse, error) 
 	if err != nil {
 		return nil, err
 	}
-	path, err := os.Getwd()
-	if err != nil {
-		return nil, err
+	// Forcibly shut down any container in this bundle
+	rhcs := newRunhcs("")
+	dopts := &runhcs.DeleteOpts{
+		Force: true,
 	}
-	if err := os.RemoveAll(path); err != nil {
-		return nil, err
+	if err := rhcs.Delete(ctx, s.id, dopts); err != nil {
+		log.G(ctx).WithError(err).Debugf("failed to delete container")
 	}
+
+	opts, ok := ctx.Value(shim.OptsKey{}).(shim.Opts)
+	if ok && opts.BundlePath != "" {
+		if err := os.RemoveAll(opts.BundlePath); err != nil {
+			return nil, err
+		}
+	}
+
 	return &taskAPI.DeleteResponse{
 		ExitedAt:   time.Now(),
 		ExitStatus: 255,

@@ -21,6 +21,7 @@ import (
 	"context"
 	"io"
 	"os"
+	gruntime "runtime"
 	"strings"
 
 	eventstypes "github.com/containerd/containerd/api/events"
@@ -109,7 +110,22 @@ func (b *binary) Start(ctx context.Context) (_ *shim, err error) {
 
 func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 	log.G(ctx).Info("cleaning up dead shim")
-	cmd, err := client.Command(ctx, b.runtime, b.containerdAddress, b.bundle.Path, "-id", b.bundle.ID, "delete")
+
+	// Windows cannot delete the current working directory while an
+	// executable is in use with it. For the cleanup case we invoke with the
+	// default work dir and forward the bundle path on the cmdline.
+	var bundlePath string
+	if gruntime.GOOS != "windows" {
+		bundlePath = b.bundle.Path
+	}
+
+	cmd, err := client.Command(ctx,
+		b.runtime,
+		b.containerdAddress,
+		bundlePath,
+		"-id", b.bundle.ID,
+		"-bundle", b.bundle.Path,
+		"delete")
 	if err != nil {
 		return nil, err
 	}

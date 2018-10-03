@@ -58,7 +58,8 @@ type OptsKey struct{}
 
 // Opts are context options associated with the shim invocation.
 type Opts struct {
-	Debug bool
+	BundlePath string
+	Debug      bool
 }
 
 var (
@@ -66,6 +67,7 @@ var (
 	idFlag               string
 	namespaceFlag        string
 	socketFlag           string
+	bundlePath           string
 	addressFlag          string
 	containerdBinaryFlag string
 	action               string
@@ -76,6 +78,7 @@ func parseFlags() {
 	flag.StringVar(&namespaceFlag, "namespace", "", "namespace that owns the shim")
 	flag.StringVar(&idFlag, "id", "", "id of the task")
 	flag.StringVar(&socketFlag, "socket", "", "abstract socket path to serve")
+	flag.StringVar(&bundlePath, "bundle", "", "path to the bundle if not workdir")
 
 	flag.StringVar(&addressFlag, "address", "", "grpc address back to main containerd")
 	flag.StringVar(&containerdBinaryFlag, "publish-binary", "containerd", "path to publish binary (used for publishing events)")
@@ -141,7 +144,7 @@ func run(id string, initFunc Init) error {
 		return fmt.Errorf("shim namespace cannot be empty")
 	}
 	ctx := namespaces.WithNamespace(context.Background(), namespaceFlag)
-	ctx = context.WithValue(ctx, OptsKey{}, Opts{Debug: debugFlag})
+	ctx = context.WithValue(ctx, OptsKey{}, Opts{BundlePath: bundlePath, Debug: debugFlag})
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("runtime", id))
 
 	service, err := initFunc(ctx, idFlag, publisher)
