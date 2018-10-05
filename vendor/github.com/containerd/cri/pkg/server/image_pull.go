@@ -114,14 +114,16 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	imageID := configDesc.Digest.String()
 
 	repoDigest, repoTag := getRepoDigestAndTag(namedRef, image.Target().Digest, isSchema1)
-	for _, r := range []string{repoTag, repoDigest} {
+	for _, r := range []string{imageID, repoTag, repoDigest} {
 		if r == "" {
 			continue
 		}
 		if err := c.createImageReference(ctx, r, image.Target()); err != nil {
-			return nil, errors.Wrapf(err, "failed to update image reference %q", r)
+			return nil, errors.Wrapf(err, "failed to create image reference %q", r)
 		}
 		// Update image store to reflect the newest state in containerd.
+		// No need to use `updateImage`, because the image reference must
+		// have been managed by the cri plugin.
 		if err := c.imageStore.Update(ctx, r); err != nil {
 			return nil, errors.Wrapf(err, "failed to update image store %q", r)
 		}
@@ -174,18 +176,55 @@ func (c *criService) createImageReference(ctx context.Context, name string, desc
 	img := containerdimages.Image{
 		Name:   name,
 		Target: desc,
+		// Add a label to indicate that the image is managed by the cri plugin.
+		Labels: map[string]string{imageLabelKey: imageLabelValue},
 	}
 	// TODO(random-liu): Figure out which is the more performant sequence create then update or
 	// update then create.
-	_, err := c.client.ImageService().Create(ctx, img)
-	if err == nil {
-		return nil
-	}
-	if !errdefs.IsAlreadyExists(err) {
+	oldImg, err := c.client.ImageService().Create(ctx, img)
+	if err == nil || !errdefs.IsAlreadyExists(err) {
 		return err
 	}
-	_, err = c.client.ImageService().Update(ctx, img, "target")
+	if oldImg.Target.Digest == img.Target.Digest && oldImg.Labels[imageLabelKey] == imageLabelValue {
+		return nil
+	}
+	_, err = c.client.ImageService().Update(ctx, img, "target", "labels")
 	return err
+}
+
+// updateImage updates image store to reflect the newest state of an image reference
+// in containerd. If the reference is not managed by the cri plugin, the function also
+// generates necessary metadata for the image and make it managed.
+func (c *criService) updateImage(ctx context.Context, r string) error {
+	img, err := c.client.GetImage(ctx, r)
+	if err != nil && !errdefs.IsNotFound(err) {
+		return errors.Wrap(err, "get image by reference")
+	}
+	if err == nil && img.Labels()[imageLabelKey] != imageLabelValue {
+		// Make sure the image has the image id as its unique
+		// identifier that references the image in its lifetime.
+		configDesc, err := img.Config(ctx)
+		if err != nil {
+			return errors.Wrap(err, "get image id")
+		}
+		id := configDesc.Digest.String()
+		if err := c.createImageReference(ctx, id, img.Target()); err != nil {
+			return errors.Wrapf(err, "create image id reference %q", id)
+		}
+		if err := c.imageStore.Update(ctx, id); err != nil {
+			return errors.Wrapf(err, "update image store for %q", id)
+		}
+		// The image id is ready, add the label to mark the image as managed.
+		if err := c.createImageReference(ctx, r, img.Target()); err != nil {
+			return errors.Wrap(err, "create managed label")
+		}
+	}
+	// If the image is not found, we should continue updating the cache,
+	// so that the image can be removed from the cache.
+	if err := c.imageStore.Update(ctx, r); err != nil {
+		return errors.Wrapf(err, "update image store for %q", r)
+	}
+	return nil
 }
 
 // credentials returns a credential function for docker resolver to use.
