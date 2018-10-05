@@ -63,7 +63,7 @@ func TestPodHostnameEnv(t *testing.T) {
 			opts := append(test.opts, WithPodLogDirectory(testPodLogDir))
 			t.Log("Create a sandbox with hostname")
 			sbConfig := PodSandboxConfig("sandbox", "hostname-env", opts...)
-			sb, err := runtimeService.RunPodSandbox(sbConfig)
+			sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 			require.NoError(t, err)
 			defer func() {
 				assert.NoError(t, runtimeService.StopPodSandbox(sb))

@@ -39,7 +39,7 @@ func checkMemoryLimit(t *testing.T, spec *runtimespec.Spec, memLimit int64) {
 func TestUpdateContainerResources(t *testing.T) {
 	t.Log("Create a sandbox")
 	sbConfig := PodSandboxConfig("sandbox", "update-container-resources")
-	sb, err := runtimeService.RunPodSandbox(sbConfig)
+	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.NoError(t, err)
 	defer func() {
 		assert.NoError(t, runtimeService.StopPodSandbox(sb))

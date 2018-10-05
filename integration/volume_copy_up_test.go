@@ -35,7 +35,7 @@ func TestVolumeCopyUp(t *testing.T) {
 
 	t.Logf("Create a sandbox")
 	sbConfig := PodSandboxConfig("sandbox", "volume-copy-up")
-	sb, err := runtimeService.RunPodSandbox(sbConfig)
+	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.NoError(t, err)
 	defer func() {
 		assert.NoError(t, runtimeService.StopPodSandbox(sb))
@@ -97,7 +97,7 @@ func TestVolumeOwnership(t *testing.T) {
 
 	t.Logf("Create a sandbox")
 	sbConfig := PodSandboxConfig("sandbox", "volume-ownership")
-	sb, err := runtimeService.RunPodSandbox(sbConfig)
+	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.NoError(t, err)
 	defer func() {
 		assert.NoError(t, runtimeService.StopPodSandbox(sb))

@@ -31,7 +31,7 @@ import (
 func TestContainerStats(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sbConfig := PodSandboxConfig("sandbox1", "stats")
-	sb, err := runtimeService.RunPodSandbox(sbConfig)
+	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.NoError(t, err)
 	defer func() {
 		assert.NoError(t, runtimeService.StopPodSandbox(sb))
@@ -76,7 +76,7 @@ func TestContainerStats(t *testing.T) {
 func TestContainerListStats(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sbConfig := PodSandboxConfig("running-pod", "statsls")
-	sb, err := runtimeService.RunPodSandbox(sbConfig)
+	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.NoError(t, err)
 	defer func() {
 		assert.NoError(t, runtimeService.StopPodSandbox(sb))
@@ -131,7 +131,7 @@ func TestContainerListStats(t *testing.T) {
 func TestContainerListStatsWithIdFilter(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sbConfig := PodSandboxConfig("running-pod", "statsls")
-	sb, err := runtimeService.RunPodSandbox(sbConfig)
+	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.NoError(t, err)
 	defer func() {
 		assert.NoError(t, runtimeService.StopPodSandbox(sb))
@@ -191,7 +191,7 @@ func TestContainerListStatsWithIdFilter(t *testing.T) {
 func TestContainerListStatsWithSandboxIdFilter(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sbConfig := PodSandboxConfig("running-pod", "statsls")
-	sb, err := runtimeService.RunPodSandbox(sbConfig)
+	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.NoError(t, err)
 	defer func() {
 		assert.NoError(t, runtimeService.StopPodSandbox(sb))
@@ -247,7 +247,7 @@ func TestContainerListStatsWithSandboxIdFilter(t *testing.T) {
 func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sbConfig := PodSandboxConfig("running-pod", "statsls")
-	sb, err := runtimeService.RunPodSandbox(sbConfig)
+	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.NoError(t, err)
 	defer func() {
 		assert.NoError(t, runtimeService.StopPodSandbox(sb))

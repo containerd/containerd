@@ -91,7 +91,7 @@ func TestContainerdRestart(t *testing.T) {
 	for i := range sandboxes {
 		s := &sandboxes[i]
 		sbCfg := PodSandboxConfig(s.name, sandboxNS)
-		sid, err := runtimeService.RunPodSandbox(sbCfg)
+		sid, err := runtimeService.RunPodSandbox(sbCfg, *runtimeHandler)
 		require.NoError(t, err)
 		defer func() {
 			// Make sure the sandbox is cleaned up in any case.

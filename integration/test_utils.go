@@ -58,6 +58,7 @@ var (
 
 var criEndpoint = flag.String("cri-endpoint", "unix:///run/containerd/containerd.sock", "The endpoint of cri plugin.")
 var criRoot = flag.String("cri-root", "/var/lib/containerd/io.containerd.grpc.v1.cri", "The root directory of cri plugin.")
+var runtimeHandler = flag.String("runtime-handler", "", "The runtime handler to use in the test.")
 
 func init() {
 	flag.Parse()
