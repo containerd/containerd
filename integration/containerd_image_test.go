@@ -121,7 +121,7 @@ func TestContainerdImage(t *testing.T) {
 
 	t.Logf("should be able to start container with the image")
 	sbConfig := PodSandboxConfig("sandbox", "containerd-image")
-	sb, err := runtimeService.RunPodSandbox(sbConfig)
+	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.NoError(t, err)
 	defer func() {
 		assert.NoError(t, runtimeService.StopPodSandbox(sb))

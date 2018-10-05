@@ -55,7 +55,7 @@ func TestTruncIndex(t *testing.T) {
 
 	t.Logf("Create a sandbox")
 	sbConfig := PodSandboxConfig("sandbox", "truncindex")
-	sb, err := runtimeService.RunPodSandbox(sbConfig)
+	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.NoError(t, err)
 	sbTruncIndex := genTruncIndex(sb)
 	var hasStoppedSandbox bool

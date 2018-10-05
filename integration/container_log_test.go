@@ -39,7 +39,7 @@ func TestLongContainerLog(t *testing.T) {
 	sbConfig := PodSandboxConfig("sandbox", "long-container-log",
 		WithPodLogDirectory(testPodLogDir),
 	)
-	sb, err := runtimeService.RunPodSandbox(sbConfig)
+	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.NoError(t, err)
 	defer func() {
 		assert.NoError(t, runtimeService.StopPodSandbox(sb))

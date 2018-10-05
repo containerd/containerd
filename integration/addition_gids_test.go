@@ -36,7 +36,7 @@ func TestAdditionalGids(t *testing.T) {
 	t.Log("Create a sandbox with log directory")
 	sbConfig := PodSandboxConfig("sandbox", "additional-gids",
 		WithPodLogDirectory(testPodLogDir))
-	sb, err := runtimeService.RunPodSandbox(sbConfig)
+	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.NoError(t, err)
 	defer func() {
 		assert.NoError(t, runtimeService.StopPodSandbox(sb))

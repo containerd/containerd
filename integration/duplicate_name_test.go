@@ -26,7 +26,7 @@ import (
 func TestDuplicateName(t *testing.T) {
 	t.Logf("Create a sandbox")
 	sbConfig := PodSandboxConfig("sandbox", "duplicate-name")
-	sb, err := runtimeService.RunPodSandbox(sbConfig)
+	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.NoError(t, err)
 	defer func() {
 		assert.NoError(t, runtimeService.StopPodSandbox(sb))
@@ -34,7 +34,7 @@ func TestDuplicateName(t *testing.T) {
 	}()
 
 	t.Logf("Create the sandbox again should fail")
-	_, err = runtimeService.RunPodSandbox(sbConfig)
+	_, err = runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.Error(t, err)
 
 	t.Logf("Create a container")
