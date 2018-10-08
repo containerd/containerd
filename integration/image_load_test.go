@@ -36,7 +36,7 @@ func TestImageLoad(t *testing.T) {
 	loadedImage := "docker.io/library/" + testImage
 	_, err := exec.LookPath("docker")
 	if err != nil {
-		t.Skip("Docker is not available: %v", err)
+		t.Skipf("Docker is not available: %v", err)
 	}
 	t.Logf("docker save image into tarball")
 	output, err := exec.Command("docker", "pull", testImage).CombinedOutput()
