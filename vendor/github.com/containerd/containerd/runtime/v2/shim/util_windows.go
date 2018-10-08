@@ -51,11 +51,12 @@ func SocketAddress(ctx context.Context, id string) (string, error) {
 func AnonDialer(address string, timeout time.Duration) (net.Conn, error) {
 	var c net.Conn
 	var lastError error
+	timedOutError := errors.Errorf("timed out waiting for npipe %s", address)
 	start := time.Now()
 	for {
 		remaining := timeout - time.Now().Sub(start)
 		if remaining <= 0 {
-			lastError = errors.Errorf("timed out waiting for npipe %s", address)
+			lastError = timedOutError
 			break
 		}
 		c, lastError = winio.DialPipe(address, &remaining)
@@ -63,6 +64,15 @@ func AnonDialer(address string, timeout time.Duration) (net.Conn, error) {
 			break
 		}
 		if !os.IsNotExist(lastError) {
+			break
+		}
+		// There is nobody serving the pipe. We limit the timeout for this case
+		// to 5 seconds because any shim that would serve this endpoint should
+		// serve it within 5 seconds. We use the passed in timeout for the
+		// `DialPipe` timeout if the pipe exists however to give the pipe time
+		// to `Accept` the connection.
+		if time.Now().Sub(start) >= 5*time.Second {
+			lastError = timedOutError
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
