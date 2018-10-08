@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package commands
+package containerd
 
 import (
 	"syscall"
