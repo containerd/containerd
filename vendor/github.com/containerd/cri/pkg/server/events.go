@@ -34,7 +34,6 @@ import (
 	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
 	"github.com/containerd/cri/pkg/store"
 	containerstore "github.com/containerd/cri/pkg/store/container"
-	imagestore "github.com/containerd/cri/pkg/store/image"
 	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
 )
 
@@ -42,20 +41,24 @@ const (
 	backOffInitDuration        = 1 * time.Second
 	backOffMaxDuration         = 5 * time.Minute
 	backOffExpireCheckDuration = 1 * time.Second
+
+	// handleEventTimeout is the timeout for handling 1 event. Event monitor
+	// handles events in serial, if one event blocks the event monitor, no
+	// other events can be handled.
+	// Add a timeout for each event handling, events that timeout will be requeued and
+	// handled again in the future.
+	handleEventTimeout = 10 * time.Second
 )
 
 // eventMonitor monitors containerd event and updates internal state correspondingly.
-// TODO(random-liu): [P1] Figure out is it possible to drop event during containerd
-// is running. If it is, we should do periodically list to sync state with containerd.
+// TODO(random-liu): Handle event for each container in a separate goroutine.
 type eventMonitor struct {
-	containerStore *containerstore.Store
-	sandboxStore   *sandboxstore.Store
-	imageStore     *imagestore.Store
-	ch             <-chan *events.Envelope
-	errCh          <-chan error
-	ctx            context.Context
-	cancel         context.CancelFunc
-	backOff        *backOff
+	c       *criService
+	ch      <-chan *events.Envelope
+	errCh   <-chan error
+	ctx     context.Context
+	cancel  context.CancelFunc
+	backOff *backOff
 }
 
 type backOff struct {
@@ -78,16 +81,14 @@ type backOffQueue struct {
 
 // Create new event monitor. New event monitor will start subscribing containerd event. All events
 // happen after it should be monitored.
-func newEventMonitor(c *containerstore.Store, s *sandboxstore.Store, i *imagestore.Store) *eventMonitor {
+func newEventMonitor(c *criService) *eventMonitor {
 	// event subscribe doesn't need namespace.
 	ctx, cancel := context.WithCancel(context.Background())
 	return &eventMonitor{
-		containerStore: c,
-		sandboxStore:   s,
-		imageStore:     i,
-		ctx:            ctx,
-		cancel:         cancel,
-		backOff:        newBackOff(),
+		c:       c,
+		ctx:     ctx,
+		cancel:  cancel,
+		backOff: newBackOff(),
 	}
 }
 
@@ -189,6 +190,9 @@ func (em *eventMonitor) stop() {
 // handleEvent handles a containerd event.
 func (em *eventMonitor) handleEvent(any interface{}) error {
 	ctx := ctrdutil.NamespacedContext()
+	ctx, cancel := context.WithTimeout(ctx, handleEventTimeout)
+	defer cancel()
+
 	switch any.(type) {
 	// If containerd-shim exits unexpectedly, there will be no corresponding event.
 	// However, containerd could not retrieve container state in that case, so it's
@@ -197,7 +201,7 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 	case *eventtypes.TaskExit:
 		e := any.(*eventtypes.TaskExit)
 		logrus.Infof("TaskExit event %+v", e)
-		cntr, err := em.containerStore.Get(e.ContainerID)
+		cntr, err := em.c.containerStore.Get(e.ContainerID)
 		if err == nil {
 			if err := handleContainerExit(ctx, e, cntr); err != nil {
 				return errors.Wrap(err, "failed to handle container TaskExit event")
@@ -207,7 +211,7 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 			return errors.Wrap(err, "can't find container for TaskExit event")
 		}
 		// Use GetAll to include sandbox in unknown state.
-		sb, err := em.sandboxStore.GetAll(e.ContainerID)
+		sb, err := em.c.sandboxStore.GetAll(e.ContainerID)
 		if err == nil {
 			if err := handleSandboxExit(ctx, e, sb); err != nil {
 				return errors.Wrap(err, "failed to handle sandbox TaskExit event")
@@ -220,12 +224,12 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 	case *eventtypes.TaskOOM:
 		e := any.(*eventtypes.TaskOOM)
 		logrus.Infof("TaskOOM event %+v", e)
-		cntr, err := em.containerStore.Get(e.ContainerID)
+		cntr, err := em.c.containerStore.Get(e.ContainerID)
 		if err != nil {
 			if err != store.ErrNotExist {
 				return errors.Wrap(err, "can't find container for TaskOOM event")
 			}
-			if _, err = em.sandboxStore.Get(e.ContainerID); err != nil {
+			if _, err = em.c.sandboxStore.Get(e.ContainerID); err != nil {
 				if err != store.ErrNotExist {
 					return errors.Wrap(err, "can't find sandbox for TaskOOM event")
 				}
@@ -243,15 +247,15 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 	case *eventtypes.ImageCreate:
 		e := any.(*eventtypes.ImageCreate)
 		logrus.Infof("ImageCreate event %+v", e)
-		return em.imageStore.Update(ctx, e.Name)
+		return em.c.updateImage(ctx, e.Name)
 	case *eventtypes.ImageUpdate:
 		e := any.(*eventtypes.ImageUpdate)
 		logrus.Infof("ImageUpdate event %+v", e)
-		return em.imageStore.Update(ctx, e.Name)
+		return em.c.updateImage(ctx, e.Name)
 	case *eventtypes.ImageDelete:
 		e := any.(*eventtypes.ImageDelete)
 		logrus.Infof("ImageDelete event %+v", e)
-		return em.imageStore.Update(ctx, e.Name)
+		return em.c.updateImage(ctx, e.Name)
 	}
 
 	return nil

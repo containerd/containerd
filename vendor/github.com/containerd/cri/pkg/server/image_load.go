@@ -44,8 +44,11 @@ func (c *criService) LoadImage(ctx context.Context, r *api.LoadImageRequest) (*a
 	}
 	for _, repoTag := range repoTags {
 		// Update image store to reflect the newest state in containerd.
-		if err := c.imageStore.Update(ctx, repoTag); err != nil {
-			return nil, errors.Wrapf(err, "failed to update image store %q", repoTag)
+		// Image imported by importer.Import is not treated as managed
+		// by the cri plugin, call `updateImage` to make it managed.
+		// TODO(random-liu): Replace this with the containerd library (issue #909).
+		if err := c.updateImage(ctx, repoTag); err != nil {
+			return nil, errors.Wrapf(err, "update image store %q", repoTag)
 		}
 		logrus.Debugf("Imported image %q", repoTag)
 	}
