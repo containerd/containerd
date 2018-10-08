@@ -37,7 +37,7 @@ func SourceLabel(ctx context.Context, ref string, labels map[string]string) (str
 	if err != nil {
 		return "", "", err
 	}
-	key := "containerd.io/distribution.source." + u.Host
+	key := sourceLabel(u.Host)
 	value := strings.TrimPrefix(u.Path, "/")
 
 	if label := labels[key]; label != "" {
@@ -53,7 +53,7 @@ func chooseSource(ctx context.Context, refspec reference.Spec, annotations map[s
 	if err != nil {
 		return ""
 	}
-	key := "containerd.io/distribution.source." + u.Host
+	key := sourceLabel(u.Host)
 
 	value := annotations[key]
 	if value == "" {
@@ -76,6 +76,10 @@ func chooseSource(ctx context.Context, refspec reference.Spec, annotations map[s
 	}
 
 	return match
+}
+
+func sourceLabel(host string) string {
+	return "containerd.io/distribution.source/" + host
 }
 
 func prefixLen(s, prefix string) int {
