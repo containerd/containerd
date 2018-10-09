@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/containerd/containerd/log"
@@ -89,6 +90,10 @@ func App() *cli.App {
 			Name:  "state",
 			Usage: "containerd state directory",
 		},
+		cli.StringFlag{
+			Name:  "temp",
+			Usage: "containerd temp directory",
+		},
 	}
 	app.Commands = []cli.Command{
 		configCommand,
@@ -115,6 +120,17 @@ func App() *cli.App {
 		// apply flags to the config
 		if err := applyFlags(context, config); err != nil {
 			return err
+		}
+		if config.Temp != "" {
+			if err := os.MkdirAll(config.Temp, 0700); err != nil {
+				return errors.Wrapf(err, "failed to create containerd temp location")
+			}
+			if runtime.GOOS == "windows" {
+				os.Setenv("TEMP", config.Temp)
+				os.Setenv("TMP", config.Temp)
+			} else {
+				os.Setenv("TMPDIR", config.Temp)
+			}
 		}
 		// cleanup temp mounts
 		if err := mount.SetTempMountLocation(filepath.Join(config.Root, "tmpmounts")); err != nil {
@@ -204,6 +220,10 @@ func applyFlags(context *cli.Context, config *server.Config) error {
 		{
 			name: "state",
 			d:    &config.State,
+		},
+		{
+			name: "temp",
+			d:    &config.Temp,
 		},
 		{
 			name: "address",

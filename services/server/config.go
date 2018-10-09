@@ -28,6 +28,8 @@ type Config struct {
 	Root string `toml:"root"`
 	// State is the path to a directory where containerd will store transient data
 	State string `toml:"state"`
+	// Temp is the path to a directory where containerd will store its temp data
+	Temp string `toml:"temp"`
 	// GRPC configuration settings
 	GRPC GRPCConfig `toml:"grpc"`
 	// Debug and profiling settings
