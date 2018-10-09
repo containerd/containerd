@@ -20,12 +20,12 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/containers"
+	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
+	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/context"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	criconfig "github.com/containerd/cri/pkg/config"
@@ -152,49 +152,6 @@ func TestBuildLabels(t *testing.T) {
 	assert.Equal(t, "b", configLabels["a"], "change in new labels should not affect original label")
 }
 
-func TestGetRuntimeConfigFromContainerInfo(t *testing.T) {
-	for desc, test := range map[string]struct {
-		typ             string
-		engine          string
-		root            string
-		expectErr       bool
-		expectedRuntime criconfig.Runtime
-	}{
-		"should return error if there is no runc options": {
-			typ:       "test.type",
-			expectErr: true,
-		},
-		"should retrieve runtime from container info": {
-			typ:    "test.type",
-			engine: "test-engine",
-			root:   "/test/root",
-			expectedRuntime: criconfig.Runtime{
-				Type:   "test.type",
-				Engine: "test-engine",
-				Root:   "/test/root",
-			},
-		},
-	} {
-		t.Run(desc, func(t *testing.T) {
-			var opts interface{}
-			if test.engine != "" || test.root != "" {
-				opts = &runctypes.RuncOptions{
-					Runtime:     test.engine,
-					RuntimeRoot: test.root,
-				}
-			}
-			c := containers.Container{}
-			assert.NoError(t, containerd.WithRuntime(
-				test.typ,
-				opts,
-			)(context.Background(), nil, &c))
-			r, err := getRuntimeConfigFromContainerInfo(c)
-			assert.Equal(t, test.expectErr, err != nil)
-			assert.Equal(t, test.expectedRuntime, r)
-		})
-	}
-}
-
 func TestOrderedMounts(t *testing.T) {
 	mounts := []*runtime.Mount{
 		{ContainerPath: "/a/b/c"},
@@ -269,4 +226,81 @@ func TestLocalResolve(t *testing.T) {
 	img, err := c.localResolve("randomid")
 	assert.Equal(t, store.ErrNotExist, err)
 	assert.Equal(t, imagestore.Image{}, img)
+}
+
+func TestGenerateRuntimeOptions(t *testing.T) {
+	nilOpts := `
+systemd_cgroup = true
+[containerd]
+  no_pivot = true
+[containerd.default_runtime]
+  runtime_type = "` + linuxRuntime + `"
+[containerd.runtimes.runc]
+  runtime_type = "` + runcRuntime + `"
+`
+	nonNilOpts := `
+systemd_cgroup = true
+[containerd]
+  no_pivot = true
+[containerd.default_runtime]
+  runtime_type = "` + linuxRuntime + `"
+[containerd.default_runtime.options]
+  Runtime = "default"
+  RuntimeRoot = "/default"
+[containerd.runtimes.runc]
+  runtime_type = "` + runcRuntime + `"
+[containerd.runtimes.runc.options]
+  BinaryName = "runc"
+  Root = "/runc"
+  NoNewKeyring = true
+`
+	var nilOptsConfig, nonNilOptsConfig criconfig.Config
+	_, err := toml.Decode(nilOpts, &nilOptsConfig)
+	require.NoError(t, err)
+	_, err = toml.Decode(nonNilOpts, &nonNilOptsConfig)
+	require.NoError(t, err)
+	require.Len(t, nilOptsConfig.Runtimes, 1)
+	require.Len(t, nonNilOptsConfig.Runtimes, 1)
+
+	for desc, test := range map[string]struct {
+		r               criconfig.Runtime
+		c               criconfig.Config
+		expectedOptions interface{}
+	}{
+		"when options is nil, should return nil option for non legacy runtime": {
+			r:               nilOptsConfig.Runtimes["runc"],
+			c:               nilOptsConfig,
+			expectedOptions: nil,
+		},
+		"when options is nil, should use legacy fields for legacy runtime": {
+			r: nilOptsConfig.DefaultRuntime,
+			c: nilOptsConfig,
+			expectedOptions: &runctypes.RuncOptions{
+				SystemdCgroup: true,
+			},
+		},
+		"when options is not nil, should be able to decode for io.containerd.runc.v1": {
+			r: nonNilOptsConfig.Runtimes["runc"],
+			c: nonNilOptsConfig,
+			expectedOptions: &runcoptions.Options{
+				BinaryName:   "runc",
+				Root:         "/runc",
+				NoNewKeyring: true,
+			},
+		},
+		"when options is not nil, should be able to decode for legacy runtime": {
+			r: nonNilOptsConfig.DefaultRuntime,
+			c: nonNilOptsConfig,
+			expectedOptions: &runctypes.RuncOptions{
+				Runtime:     "default",
+				RuntimeRoot: "/default",
+			},
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			opts, err := generateRuntimeOptions(test.r, test.c)
+			assert.NoError(t, err)
+			assert.Equal(t, test.expectedOptions, opts)
+		})
+	}
 }
