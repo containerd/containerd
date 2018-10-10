@@ -1,4 +1,4 @@
-// +build windows
+// +build !windows
 
 /*
    Copyright The containerd Authors.
@@ -16,15 +16,11 @@
    limitations under the License.
 */
 
-package commands
+package tasks
 
-import "github.com/urfave/cli"
+import (
+	"fmt"
+	"runtime"
+)
 
-var defaultRuntime = "io.containerd.runhcs.v1"
-
-func init() {
-	ContainerFlags = append(ContainerFlags, cli.Uint64Flag{
-		Name:  "cpu-count",
-		Usage: "number of CPUs available to the container",
-	})
-}
+var defaultRuntime = fmt.Sprintf("io.containerd.runtime.v1.%s", runtime.GOOS)

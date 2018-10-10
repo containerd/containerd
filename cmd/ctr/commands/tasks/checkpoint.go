@@ -45,6 +45,11 @@ var checkpointCommand = cli.Command{
 			Name:  "work-path",
 			Usage: "path to criu work files and logs",
 		},
+		cli.StringFlag{
+			Name:  "runtime",
+			Usage: "runtime name",
+			Value: defaultRuntime,
+		},
 	},
 	Action: func(context *cli.Context) error {
 		id := context.Args().First()

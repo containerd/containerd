@@ -16,15 +16,6 @@
    limitations under the License.
 */
 
-package commands
-
-import "github.com/urfave/cli"
+package tasks
 
 var defaultRuntime = "io.containerd.runhcs.v1"
-
-func init() {
-	ContainerFlags = append(ContainerFlags, cli.Uint64Flag{
-		Name:  "cpu-count",
-		Usage: "number of CPUs available to the container",
-	})
-}

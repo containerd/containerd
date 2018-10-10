@@ -19,8 +19,13 @@
 package commands
 
 import (
+	"fmt"
+	"runtime"
+
 	"github.com/urfave/cli"
 )
+
+var defaultRuntime = fmt.Sprintf("io.containerd.runtime.v1.%s", runtime.GOOS)
 
 func init() {
 	ContainerFlags = append(ContainerFlags, cli.BoolFlag{
