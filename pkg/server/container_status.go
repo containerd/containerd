@@ -99,7 +99,8 @@ func toCRIContainerStatus(container containerstore.Container, spec *runtime.Imag
 	}
 }
 
-type containerInfo struct {
+// ContainerInfo is extra information for a container.
+type ContainerInfo struct {
 	// TODO(random-liu): Add sandboxID in CRI container status.
 	SandboxID      string                   `json:"sandboxID"`
 	Pid            uint32                   `json:"pid"`
@@ -122,7 +123,7 @@ func toCRIContainerInfo(ctx context.Context, container containerstore.Container,
 	status := container.Status.Get()
 
 	// TODO(random-liu): Change CRI status info to use array instead of map.
-	ci := &containerInfo{
+	ci := &ContainerInfo{
 		SandboxID: container.SandboxID,
 		Pid:       status.Pid,
 		Removing:  status.Removing,

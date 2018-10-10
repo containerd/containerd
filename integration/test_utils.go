@@ -24,11 +24,14 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -295,6 +298,15 @@ func KillProcess(name string) error {
 	return nil
 }
 
+// KillPid kills the process by pid. kill is used.
+func KillPid(pid int) error {
+	output, err := exec.Command("kill", strconv.Itoa(pid)).CombinedOutput()
+	if err != nil {
+		return errors.Errorf("failed to kill %d - error: %v, output: %q", pid, err, output)
+	}
+	return nil
+}
+
 // PidOf returns pid of a process by name.
 func PidOf(name string) (int, error) {
 	b, err := exec.Command("pidof", name).CombinedOutput()
@@ -308,8 +320,8 @@ func PidOf(name string) (int, error) {
 	return strconv.Atoi(output)
 }
 
-// CRIConfig gets current cri config from containerd.
-func CRIConfig() (*criconfig.Config, error) {
+// RawRuntimeClient returns a raw grpc runtime service client.
+func RawRuntimeClient() (runtime.RuntimeServiceClient, error) {
 	addr, dialer, err := kubeletutil.GetAddressAndDialer(*criEndpoint)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get dialer")
@@ -320,8 +332,16 @@ func CRIConfig() (*criconfig.Config, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect cri endpoint")
 	}
-	client := runtime.NewRuntimeServiceClient(conn)
-	resp, err := client.Status(ctx, &runtime.StatusRequest{Verbose: true})
+	return runtime.NewRuntimeServiceClient(conn), nil
+}
+
+// CRIConfig gets current cri config from containerd.
+func CRIConfig() (*criconfig.Config, error) {
+	client, err := RawRuntimeClient()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get raw runtime client")
+	}
+	resp, err := client.Status(context.Background(), &runtime.StatusRequest{Verbose: true})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get status")
 	}
@@ -330,4 +350,22 @@ func CRIConfig() (*criconfig.Config, error) {
 		return nil, errors.Wrap(err, "failed to unmarshal config")
 	}
 	return config, nil
+}
+
+func RestartContainerd(t *testing.T) {
+	require.NoError(t, KillProcess("containerd"))
+
+	// Use assert so that the 3rd wait always runs, this makes sure
+	// containerd is running before this function returns.
+	assert.NoError(t, Eventually(func() (bool, error) {
+		pid, err := PidOf("containerd")
+		if err != nil {
+			return false, err
+		}
+		return pid == 0, nil
+	}, time.Second, 30*time.Second), "wait for containerd to be killed")
+
+	require.NoError(t, Eventually(func() (bool, error) {
+		return ConnectDaemons() == nil, nil
+	}, time.Second, 30*time.Second), "wait for containerd to be restarted")
 }

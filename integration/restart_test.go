@@ -19,7 +19,6 @@ package integration
 import (
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/stretchr/testify/assert"
@@ -140,27 +139,8 @@ func TestContainerdRestart(t *testing.T) {
 	imagesBeforeRestart, err := imageService.ListImages(nil)
 	assert.NoError(t, err)
 
-	t.Logf("Kill containerd")
-	require.NoError(t, KillProcess("containerd"))
-	defer func() {
-		assert.NoError(t, Eventually(func() (bool, error) {
-			return ConnectDaemons() == nil, nil
-		}, time.Second, 30*time.Second), "make sure containerd is running before test finish")
-	}()
-
-	t.Logf("Wait until containerd is killed")
-	require.NoError(t, Eventually(func() (bool, error) {
-		pid, err := PidOf("containerd")
-		if err != nil {
-			return false, err
-		}
-		return pid == 0, nil
-	}, time.Second, 30*time.Second), "wait for containerd to be killed")
-
-	t.Logf("Wait until containerd is restarted")
-	require.NoError(t, Eventually(func() (bool, error) {
-		return ConnectDaemons() == nil, nil
-	}, time.Second, 30*time.Second), "wait for containerd to be restarted")
+	t.Logf("Restart containerd")
+	RestartContainerd(t)
 
 	t.Logf("Check sandbox and container state after restart")
 	loadedSandboxes, err := runtimeService.ListPodSandbox(&runtime.PodSandboxFilter{})
