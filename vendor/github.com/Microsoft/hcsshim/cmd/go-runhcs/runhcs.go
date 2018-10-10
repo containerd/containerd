@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	irunhcs "github.com/Microsoft/hcsshim/internal/runhcs"
 	"github.com/containerd/go-runc"
 )
 
@@ -23,8 +24,7 @@ const (
 	// JSON is the JSON formatted log output.
 	JSON Format = "json"
 
-	command        = "runhcs"
-	safePipePrefix = `\\.\pipe\ProtectedPrefix\Administrators\`
+	command = "runhcs"
 )
 
 var bytesBufferPool = sync.Pool{
@@ -62,7 +62,7 @@ func (r *Runhcs) args() []string {
 		out = append(out, "--debug")
 	}
 	if r.Log != "" {
-		if strings.HasPrefix(r.Log, safePipePrefix) {
+		if strings.HasPrefix(r.Log, irunhcs.SafePipePrefix) {
 			out = append(out, "--log", r.Log)
 		} else {
 			abs, err := filepath.Abs(r.Log)

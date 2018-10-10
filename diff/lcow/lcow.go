@@ -21,10 +21,11 @@ package lcow
 import (
 	"context"
 	"io"
-	"os/exec"
+	"os"
 	"path"
 	"time"
 
+	"github.com/Microsoft/hcsshim/ext4/tar2ext4"
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
@@ -38,6 +39,11 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	// maxLcowVhdSizeGB is the max size in GB of any layer
+	maxLcowVhdSizeGB = 128 * 1024 * 1024 * 1024
 )
 
 func init() {
@@ -131,15 +137,22 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 		r: io.TeeReader(rdr, digester.Hash()),
 	}
 
-	cmd := exec.Command(
-		"runhcs.exe",
-		"tar2vhd",
-		"--scratchpath", path.Join(layer, "sandbox.vhdx"), // TODO: JTERRY75 when the snapshotter changes this to be scratch.vhdx update it here too.
-		"--destpath", path.Join(layer, "layer.vhd"))
+	layerPath := path.Join(layer, "layer.vhd")
+	outFile, err := os.Create(layerPath)
+	if err != nil {
+		return emptyDesc, err
+	}
+	defer outFile.Close()
+	defer func() {
+		if err != nil {
+			outFile.Close()
+			os.Remove(layerPath)
+		}
+	}()
 
-	cmd.Stdin = rc
-	if bytes, err := cmd.CombinedOutput(); err != nil {
-		return emptyDesc, errors.Wrapf(err, "failed to exec runhcs.exe tar2vhd: %s", string(bytes))
+	err = tar2ext4.Convert(rc, outFile, tar2ext4.ConvertWhiteout, tar2ext4.AppendVhdFooter, tar2ext4.MaximumDiskSize(maxLcowVhdSizeGB))
+	if err != nil {
+		return emptyDesc, errors.Wrapf(err, "failed to convert tar to ext4 vhd")
 	}
 
 	return ocispec.Descriptor{
