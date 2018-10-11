@@ -54,6 +54,8 @@ func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, r
 
 	t.Run("CrossNamespaceAppend", makeTest(t, name, storeFn, checkCrossNSAppend))
 	t.Run("CrossNamespaceShare", makeTest(t, name, storeFn, checkCrossNSShare))
+
+	t.Run("CommitErrorState", makeTest(t, name, storeFn, checkCommitErrorState))
 }
 
 // ContextWrapper is used to decorate new context used inside the test
@@ -312,7 +314,175 @@ func checkCommitExists(ctx context.Context, t *testing.T, cs content.Store) {
 		} else if !errdefs.IsAlreadyExists(err) {
 			t.Fatalf("(%d) Unexpected error: %+v", i, err)
 		}
+	}
+}
 
+func checkRefNotAvailable(ctx context.Context, t *testing.T, cs content.Store, ref string) {
+	t.Helper()
+
+	w, err := cs.Writer(ctx, content.WithRef(ref))
+	if err == nil {
+		w.Close()
+		t.Fatal("writer created with ref, expected to be in use")
+	}
+	if !errdefs.IsUnavailable(err) {
+		t.Fatalf("Expected unavailable error, got %+v", err)
+	}
+}
+
+func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) {
+	c1, d1 := createContent(256)
+	_, d2 := createContent(256)
+	if err := content.WriteBlob(ctx, cs, "c1", bytes.NewReader(c1), ocispec.Descriptor{Digest: d1}); err != nil {
+		t.Fatal(err)
+	}
+
+	ref := "c1-commiterror-state"
+	w, err := cs.Writer(ctx, content.WithRef(ref))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write(c1); err != nil {
+		if err := w.Close(); err != nil {
+			t.Errorf("Close error: %+v", err)
+		}
+		t.Fatal(err)
+	}
+
+	checkRefNotAvailable(ctx, t, cs, ref)
+
+	// Check exists
+	err = w.Commit(ctx, int64(len(c1)), d1)
+	if err == nil {
+		t.Fatalf("Expected already exists error")
+	} else if !errdefs.IsAlreadyExists(err) {
+		if err := w.Close(); err != nil {
+			t.Errorf("Close error: %+v", err)
+		}
+		t.Fatalf("Unexpected error: %+v", err)
+	}
+
+	w, err = cs.Writer(ctx, content.WithRef(ref))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checkRefNotAvailable(ctx, t, cs, ref)
+
+	if _, err := w.Write(c1); err != nil {
+		if err := w.Close(); err != nil {
+			t.Errorf("close error: %+v", err)
+		}
+		t.Fatal(err)
+	}
+
+	// Check exists without providing digest
+	err = w.Commit(ctx, int64(len(c1)), "")
+	if err == nil {
+		t.Fatalf("Expected already exists error")
+	} else if !errdefs.IsAlreadyExists(err) {
+		if err := w.Close(); err != nil {
+			t.Errorf("Close error: %+v", err)
+		}
+		t.Fatalf("Unexpected error: %+v", err)
+	}
+
+	w, err = cs.Writer(ctx, content.WithRef(ref))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checkRefNotAvailable(ctx, t, cs, ref)
+
+	if _, err := w.Write(append(c1, []byte("more")...)); err != nil {
+		if err := w.Close(); err != nil {
+			t.Errorf("close error: %+v", err)
+		}
+		t.Fatal(err)
+	}
+
+	// Commit with the wrong digest should produce an error
+	err = w.Commit(ctx, int64(len(c1))+4, d2)
+	if err == nil {
+		t.Fatalf("Expected error from wrong digest")
+	} else if !errdefs.IsFailedPrecondition(err) {
+		t.Errorf("Unexpected error: %+v", err)
+	}
+
+	w, err = cs.Writer(ctx, content.WithRef(ref))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checkRefNotAvailable(ctx, t, cs, ref)
+
+	// Commit with wrong size should also produce an error
+	err = w.Commit(ctx, int64(len(c1)), "")
+	if err == nil {
+		t.Fatalf("Expected error from wrong size")
+	} else if !errdefs.IsFailedPrecondition(err) {
+		t.Errorf("Unexpected error: %+v", err)
+	}
+
+	w, err = cs.Writer(ctx, content.WithRef(ref))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checkRefNotAvailable(ctx, t, cs, ref)
+
+	// Now expect commit to succeed
+	if err := w.Commit(ctx, int64(len(c1))+4, ""); err != nil {
+		if err := w.Close(); err != nil {
+			t.Errorf("close error: %+v", err)
+		}
+		t.Fatalf("Failed to commit: %+v", err)
+	}
+
+	// Create another writer with same reference
+	w, err = cs.Writer(ctx, content.WithRef(ref))
+	if err != nil {
+		t.Fatalf("Failed to open writer: %+v", err)
+	}
+
+	if _, err := w.Write(c1); err != nil {
+		if err := w.Close(); err != nil {
+			t.Errorf("close error: %+v", err)
+		}
+		t.Fatal(err)
+	}
+
+	checkRefNotAvailable(ctx, t, cs, ref)
+
+	// Commit should fail due to already exists
+	err = w.Commit(ctx, int64(len(c1)), d1)
+	if err == nil {
+		t.Fatalf("Expected already exists error")
+	} else if !errdefs.IsAlreadyExists(err) {
+		if err := w.Close(); err != nil {
+			t.Errorf("close error: %+v", err)
+		}
+		t.Fatalf("Unexpected error: %+v", err)
+	}
+
+	w, err = cs.Writer(ctx, content.WithRef(ref))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checkRefNotAvailable(ctx, t, cs, ref)
+
+	if err := w.Close(); err != nil {
+		t.Fatalf("Close failed: %+v", err)
+	}
+
+	// Create another writer with same reference to check available
+	w, err = cs.Writer(ctx, content.WithRef(ref))
+	if err != nil {
+		t.Fatalf("Failed to open writer: %+v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("Close failed: %+v", err)
 	}
 }
 
