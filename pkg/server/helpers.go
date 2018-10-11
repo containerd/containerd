@@ -353,7 +353,7 @@ func checkSelinuxLevel(level string) (bool, error) {
 
 	matched, err := regexp.MatchString(`^s\d(-s\d)??(:c\d{1,4}((.c\d{1,4})?,c\d{1,4})*(.c\d{1,4})?(,c\d{1,4}(.c\d{1,4})?)*)?$`, level)
 	if err != nil || !matched {
-		return false, fmt.Errorf("the format of 'level' %q is not correct: %v", level, err)
+		return false, errors.Wrapf(err, "the format of 'level' %q is not correct", level)
 	}
 	return true, nil
 }
