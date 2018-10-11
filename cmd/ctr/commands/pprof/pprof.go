@@ -89,10 +89,18 @@ var pprofHeapCommand = cli.Command{
 var pprofProfileCommand = cli.Command{
 	Name:  "profile",
 	Usage: "CPU profile",
+	Flags: []cli.Flag{
+		cli.DurationFlag{
+			Name:  "seconds,s",
+			Usage: "duration for collection (seconds)",
+			Value: 30 * time.Second,
+		},
+	},
 	Action: func(context *cli.Context) error {
 		client := getPProfClient(context)
 
-		output, err := httpGetRequest(client, "/debug/pprof/profile")
+		seconds := context.Duration("seconds").Seconds()
+		output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/profile?seconds=%v", seconds))
 		if err != nil {
 			return err
 		}
