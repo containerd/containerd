@@ -27,6 +27,7 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/Microsoft/go-winio/vhd"
 	"github.com/Microsoft/hcsshim"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
@@ -206,9 +207,20 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 
 	path := s.getSnapshotDir(id)
 	renamedID := "rm-" + id
-	renamed := filepath.Join(s.root, "snapshots", renamedID)
+	renamed := s.getSnapshotDir(renamedID)
 	if err := os.Rename(path, renamed); err != nil && !os.IsNotExist(err) {
-		return err
+		if !os.IsPermission(err) {
+			return err
+		}
+		// If permission denied, it's possible that the scratch is still mounted, an
+		// artifact after a hard daemon crash for example. Worth a shot to try detaching it
+		// before retrying the rename.
+		if detachErr := vhd.DetachVhd(filepath.Join(path, "sandbox.vhdx")); detachErr != nil {
+			return errors.Wrapf(err, "failed to detach VHD: %s", detachErr)
+		}
+		if renameErr := os.Rename(path, renamed); renameErr != nil && !os.IsNotExist(renameErr) {
+			return errors.Wrapf(err, "second rename attempt following detach failed: %s", renameErr)
+		}
 	}
 
 	if err := t.Commit(); err != nil {
