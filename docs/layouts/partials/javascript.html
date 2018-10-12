@@ -1,4 +1,0 @@
-{{- $jsFiles  := .Site.Params.js -}}
-{{- range $jsFiles }}
-<script src="{{ printf "/js/%s.js" . | absURL }}"></script>
-{{- end }}
