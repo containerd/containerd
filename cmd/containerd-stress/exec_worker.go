@@ -18,7 +18,6 @@ package main
 
 import (
 	"context"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -39,14 +38,9 @@ func (w *execWorker) exec(ctx, tctx context.Context) {
 		w.wg.Done()
 		logrus.Infof("worker %d finished", w.id)
 	}()
-	// create and start the exec container
-	w.spec.Linux.CgroupsPath = filepath.Join("/", "stress", "exec-container")
-	w.spec.Process.Args = []string{
-		"sleep", "30d",
-	}
 	c, err := w.client.NewContainer(ctx, "exec-container",
 		containerd.WithNewSnapshot("exec-container", w.image),
-		containerd.WithSpec(w.spec, oci.WithUsername("games")),
+		containerd.WithNewSpec(oci.WithImageConfig(w.image), oci.WithUsername("games"), oci.WithProcessArgs("sleep", "30d")),
 	)
 	if err != nil {
 		logrus.WithError(err).Error("create exec container")
@@ -66,8 +60,13 @@ func (w *execWorker) exec(ctx, tctx context.Context) {
 		logrus.WithError(err).Error("wait exec container's task")
 		return
 	}
+	spec, err := c.Spec(ctx)
+	if err != nil {
+		logrus.WithError(err).Error("failed to get spec")
+		return
+	}
 
-	pspec := w.spec.Process
+	pspec := spec.Process
 	pspec.Args = []string{"true"}
 
 	for {
