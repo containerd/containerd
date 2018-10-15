@@ -23,5 +23,4 @@ set -eu -o pipefail
 go get -u github.com/stevvooe/protobuild
 go get -u github.com/alecthomas/gometalinter
 gometalinter --install >/dev/null
-go get -u github.com/LK4D4/vndr
 go get -u github.com/cpuguy83/go-md2man
