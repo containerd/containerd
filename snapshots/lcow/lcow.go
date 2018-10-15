@@ -32,7 +32,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/Microsoft/hcsshim/cmd/go-runhcs"
+	"github.com/Microsoft/hcsshim/pkg/go-runhcs"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"

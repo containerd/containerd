@@ -35,7 +35,7 @@ import (
 	"time"
 
 	winio "github.com/Microsoft/go-winio"
-	"github.com/Microsoft/hcsshim/cmd/go-runhcs"
+	"github.com/Microsoft/hcsshim/pkg/go-runhcs"
 	containerd_types "github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
