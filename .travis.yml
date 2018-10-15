@@ -44,6 +44,7 @@ install:
   - protoc --version
   - go get -u github.com/vbatts/git-validation
   - go get -u github.com/kunalkushwaha/ltag
+  - go get -u github.com/LK4D4/vndr
   - if [ "$TRAVIS_GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-runc ; fi
   - if [ "$TRAVIS_GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-cni ; fi
   - if [ "$TRAVIS_GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-critools ; fi
@@ -52,13 +53,16 @@ install:
   - if [ "$TRAVIS_GOOS" = "linux" ]; then cd /tmp/criu-3.7 && sudo make install-criu ; fi
   - cd $TRAVIS_BUILD_DIR
 
+before_script:
+  - pushd ..; git clone https://github.com/containerd/project; popd
+
 script:
   - export GOOS=$TRAVIS_GOOS
   - export CGO_ENABLED=$TRAVIS_CGO_ENABLED
-  - DCO_VERBOSITY=-q script/validate/dco
-  - script/validate/fileheader
+  - DCO_VERBOSITY=-q ../project/script/validate/dco
+  - ../project/script/validate/fileheader ../project/
+  - ../project/script/validate/vendor
   - GOOS=linux script/setup/install-dev-tools
-  - script/validate/vendor
   - go build -i .
   - make check
   - if [ "$GOOS" = "linux" ]; then make check-protos check-api-descriptors; fi
