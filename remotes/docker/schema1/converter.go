@@ -45,7 +45,7 @@ import (
 
 const (
 	manifestSizeLimit            = 8e6 // 8MB
-	labelDockerSchema1EmptyLayer = "containerd.io/docker.schema1.empty.layer"
+	labelDockerSchema1EmptyLayer = "containerd.io/docker.schema1.empty-layer"
 )
 
 type blobState struct {
