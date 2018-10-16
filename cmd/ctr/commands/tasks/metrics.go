@@ -90,9 +90,12 @@ var metricsCommand = cli.Command{
 
 			fmt.Fprintf(w, "METRIC\tVALUE\t\n")
 			fmt.Fprintf(w, "memory.usage_in_bytes\t%d\t\n", data.Memory.Usage.Usage)
+			fmt.Fprintf(w, "memory.limit_in_bytes\t%d\t\n", data.Memory.Usage.Limit)
 			fmt.Fprintf(w, "memory.stat.cache\t%d\t\n", data.Memory.TotalCache)
 			fmt.Fprintf(w, "cpuacct.usage\t%d\t\n", data.CPU.Usage.Total)
 			fmt.Fprintf(w, "cpuacct.usage_percpu\t%v\t\n", data.CPU.Usage.PerCPU)
+			fmt.Fprintf(w, "pids.current\t%v\t\n", data.Pids.Current)
+			fmt.Fprintf(w, "pids.limit\t%v\t\n", data.Pids.Limit)
 			return w.Flush()
 		case formatJSON:
 			marshaledJSON, err := json.MarshalIndent(data, "", "  ")
