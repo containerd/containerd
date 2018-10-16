@@ -1,0 +1,13 @@
+[build]
+base    = "website"
+publish = "public"
+command = "make production-build"
+
+[build.environment]
+HUGO_VERSION = "0.49.2"
+
+[context.deploy-preview]
+command = "make preview-build"
+
+[context.branch-deploy]
+command = "make preview-build"
