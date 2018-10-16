@@ -19,7 +19,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -27,7 +26,6 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/oci"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 )
 
@@ -39,7 +37,6 @@ type worker struct {
 
 	client *containerd.Client
 	image  containerd.Image
-	spec   *specs.Spec
 	commit string
 }
 
@@ -76,10 +73,9 @@ func (w *worker) run(ctx, tctx context.Context) {
 
 func (w *worker) runContainer(ctx context.Context, id string) (err error) {
 	// fix up cgroups path for a default config
-	w.spec.Linux.CgroupsPath = filepath.Join("/", "stress", id)
 	c, err := w.client.NewContainer(ctx, id,
 		containerd.WithNewSnapshot(id, w.image),
-		containerd.WithSpec(w.spec, oci.WithUsername("games")),
+		containerd.WithNewSpec(oci.WithImageConfig(w.image), oci.WithUsername("games"), oci.WithProcessArgs("true")),
 	)
 	if err != nil {
 		return err

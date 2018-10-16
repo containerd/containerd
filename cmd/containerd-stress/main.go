@@ -29,9 +29,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/oci"
 	metrics "github.com/docker/go-metrics"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -227,7 +225,6 @@ func test(c config) error {
 	if err != nil {
 		return err
 	}
-	logrus.Info("generating spec from image")
 	tctx, cancel := context.WithTimeout(ctx, c.Duration)
 	go func() {
 		s := make(chan os.Signal, 1)
@@ -241,7 +238,6 @@ func test(c config) error {
 		r       = &run{}
 	)
 	logrus.Info("starting stress test run...")
-	args := oci.WithProcessArgs("true")
 	v, err := client.Version(ctx)
 	if err != nil {
 		return err
@@ -249,18 +245,9 @@ func test(c config) error {
 	// create the workers along with their spec
 	for i := 0; i < c.Concurrency; i++ {
 		wg.Add(1)
-		spec, err := oci.GenerateSpec(ctx, client,
-			&containers.Container{},
-			oci.WithImageConfig(image),
-			args,
-		)
-		if err != nil {
-			return err
-		}
 		w := &worker{
 			id:     i,
 			wg:     &wg,
-			spec:   spec,
 			image:  image,
 			client: client,
 			commit: v.Revision,
@@ -270,19 +257,10 @@ func test(c config) error {
 	var exec *execWorker
 	if c.Exec {
 		wg.Add(1)
-		spec, err := oci.GenerateSpec(ctx, client,
-			&containers.Container{},
-			oci.WithImageConfig(image),
-			args,
-		)
-		if err != nil {
-			return err
-		}
 		exec = &execWorker{
 			worker: worker{
 				id:     c.Concurrency,
 				wg:     &wg,
-				spec:   spec,
 				image:  image,
 				client: client,
 				commit: v.Revision,
