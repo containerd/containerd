@@ -30,7 +30,7 @@ import (
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
-	"github.com/containerd/containerd/services/server"
+	srvconfig "github.com/containerd/containerd/services/server/config"
 )
 
 // the following nolint is for shutting up gometalinter on non-linux.
@@ -42,7 +42,7 @@ func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, fun
 	testutil.RequiresRoot(t)
 	var (
 		ctrd              = daemon{}
-		configTOMLDecoded server.Config
+		configTOMLDecoded srvconfig.Config
 		buf               = bytes.NewBuffer(nil)
 	)
 
@@ -61,7 +61,7 @@ func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, fun
 		t.Fatal(err)
 	}
 
-	if err = server.LoadConfig(configTOMLFile, &configTOMLDecoded); err != nil {
+	if err = srvconfig.LoadConfig(configTOMLFile, &configTOMLDecoded); err != nil {
 		t.Fatal(err)
 	}
 

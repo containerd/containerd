@@ -40,6 +40,7 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/plugin"
+	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/containerd/containerd/snapshots"
 	ssproxy "github.com/containerd/containerd/snapshots/proxy"
 	metrics "github.com/docker/go-metrics"
@@ -50,7 +51,7 @@ import (
 )
 
 // New creates and initializes a new containerd server
-func New(ctx context.Context, config *Config) (*Server, error) {
+func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 	switch {
 	case config.Root == "":
 		return nil, errors.New("root must be specified")
@@ -149,7 +150,7 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 type Server struct {
 	rpc     *grpc.Server
 	events  *exchange.Exchange
-	config  *Config
+	config  *srvconfig.Config
 	plugins []*plugin.Plugin
 }
 
@@ -211,7 +212,7 @@ func (s *Server) Stop() {
 
 // LoadPlugins loads all plugins into containerd and generates an ordered graph
 // of all plugins.
-func LoadPlugins(ctx context.Context, config *Config) ([]*plugin.Registration, error) {
+func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Registration, error) {
 	// load all plugins into containerd
 	if err := plugin.Load(filepath.Join(config.Root, "plugins")); err != nil {
 		return nil, err

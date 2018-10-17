@@ -22,12 +22,13 @@ import (
 
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd/log"
+	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/containerd/containerd/sys"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // apply sets config settings on the server process
-func apply(ctx context.Context, config *Config) error {
+func apply(ctx context.Context, config *srvconfig.Config) error {
 	if config.OOMScore != 0 {
 		log.G(ctx).Debugf("changing OOM score to %d", config.OOMScore)
 		if err := sys.SetOOMScore(os.Getpid(), config.OOMScore); err != nil {

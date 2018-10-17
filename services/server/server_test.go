@@ -20,13 +20,14 @@ import (
 	"context"
 	"testing"
 
+	srvconfig "github.com/containerd/containerd/services/server/config"
 	"gotest.tools/assert"
 	is "gotest.tools/assert/cmp"
 )
 
 func TestNewErrorsWithSamePathForRootAndState(t *testing.T) {
 	path := "/tmp/path/for/testing"
-	_, err := New(context.Background(), &Config{
+	_, err := New(context.Background(), &srvconfig.Config{
 		Root:  path,
 		State: path,
 	})
