@@ -20,7 +20,6 @@ package cgroups
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 
@@ -31,13 +30,6 @@ import (
 	"github.com/containerd/typeurl"
 	metrics "github.com/docker/go-metrics"
 	"github.com/prometheus/client_golang/prometheus"
-)
-
-var (
-	// ErrAlreadyCollected is returned when a cgroups is already being monitored
-	ErrAlreadyCollected = errors.New("cgroup is already being collected")
-	// ErrCgroupNotExists is returns when a cgroup no longer exists
-	ErrCgroupNotExists = errors.New("cgroup does not exist in the collector")
 )
 
 // Trigger will be called when an event happens and provides the cgroup
@@ -141,7 +133,7 @@ func (c *collector) Add(t runtime.Task) error {
 	defer c.mu.Unlock()
 	id := taskID(t.ID(), t.Namespace())
 	if _, ok := c.tasks[id]; ok {
-		return ErrAlreadyCollected
+		return nil // requests to collect metrics should be idempotent
 	}
 	c.tasks[id] = t
 	return nil
