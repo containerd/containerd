@@ -20,17 +20,17 @@ package command
 
 import (
 	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/services/server"
+	srvconfig "github.com/containerd/containerd/services/server/config"
 )
 
-func defaultConfig() *server.Config {
-	return &server.Config{
+func defaultConfig() *srvconfig.Config {
+	return &srvconfig.Config{
 		Root:  defaults.DefaultRootDir,
 		State: defaults.DefaultStateDir,
-		GRPC: server.GRPCConfig{
+		GRPC: srvconfig.GRPCConfig{
 			Address: defaults.DefaultAddress,
 		},
-		Debug: server.Debug{
+		Debug: srvconfig.Debug{
 			Level:   "info",
 			Address: defaults.DefaultDebugAddress,
 		},

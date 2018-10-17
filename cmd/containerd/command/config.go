@@ -23,12 +23,13 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd/services/server"
+	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/urfave/cli"
 )
 
 // Config is a wrapper of server config for printing out.
 type Config struct {
-	*server.Config
+	*srvconfig.Config
 	// Plugins overrides `Plugins map[string]toml.Primitive` in server config.
 	Plugins map[string]interface{} `toml:"plugins"`
 }
