@@ -95,7 +95,8 @@ The current state is available in the following table:
 | [0.2](https://github.com/containerd/containerd/tree/v0.2.x)         | End of Life | Apr 21, 2016      | December 5, 2017 |
 | [1.0](https://github.com/containerd/containerd/releases/tag/v1.0.0) | Active   | December 5, 2017  | December 5, 2018 |
 | [1.1](https://github.com/containerd/containerd/releases/tag/v1.1.0) | Active   | April 23, 2018  | max(April 23, 2019, release of 1.2.0, Kubernetes 1.10 EOL) |
-| [1.2](https://github.com/containerd/containerd/milestone/17)     | Next   | TBD  | max(TBD+1 year, release of 1.3.0) |
+| [1.2](https://github.com/containerd/containerd/releases/tag/v1.2.0) | Active   | October 24, 2018 | max(October 24, 2019, release of 1.3.0) |
+| [1.3](https://github.com/containerd/containerd/milestone/20)        | Next   | TBD  | max(TBD+1 year, release of 1.4.0) |
 
 Note that branches and release from before 1.0 may not follow these rules.
 
@@ -164,13 +165,14 @@ The following table provides an overview of the components covered by
 containerd versions:
 
 
-| Component     | Status   | Stabilized Version | Links         |
-|---------------|----------|--------------------|---------------|
-| GRPC API      | Stable   | 1.0                | [api/](api) |
-| Metrics API   | Stable   | 1.0                | - |
-| Go client API | Unstable | 1.2 _tentative_    | [godoc](https://godoc.org/github.com/containerd/containerd) |
-| CRI GRPC API  | Unstable | v1alpha2 _current_ | [api/](https://github.com/kubernetes/kubernetes/tree/master/pkg/kubelet/apis/cri/runtime/v1alpha2) |
-| `ctr` tool    | Unstable | Out of scope       | - |
+| Component        | Status   | Stabilized Version | Links         |
+|------------------|----------|--------------------|---------------|
+| GRPC API         | Stable   | 1.0                | [api/](api) |
+| Metrics API      | Stable   | 1.0                | - |
+| Runtime Shim API | Stable   | 1.2                | - |
+| Go client API    | Unstable | _future_           | [godoc](https://godoc.org/github.com/containerd/containerd) |
+| CRI GRPC API     | Unstable | v1alpha2 _current_ | [api/](https://github.com/kubernetes/kubernetes/tree/master/pkg/kubelet/apis/cri/runtime/v1alpha2) |
+| `ctr` tool       | Unstable | Out of scope       | - |
 
 From the version stated in the above table, that component must adhere to the
 stability constraints expected in release versions.

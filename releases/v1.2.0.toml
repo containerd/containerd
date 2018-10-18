@@ -8,7 +8,7 @@ match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
 # previous release
 previous = "v1.1.0"
 
-pre_release = true
+pre_release = false
 
 preface = """\
 The third major release of containerd brings both a mix of boring and
@@ -48,6 +48,7 @@ Users can:
 * Supported [`ProcMount`](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/auth/proc-mount-type.md) option introduced in Kubernetes 1.12.
 * Added a new config option `plugins.cri.registry.auths` for user to config default credentials for specific registries. ([doc](https://github.com/containerd/cri/blob/release/1.2/docs/registry.md#configure-registry-credentials))
 * Added a new config option `plugins.cri.x509_key_pair_streaming` for user to config a valid certificate for the stream server. ([config.md](https://github.com/containerd/cri/blob/release/1.2/docs/config.md))
+* Added a runtime `options` field for shim v2 runtime. Use the `options` field to config runtime specific options, e.g. `NoPivotRoot` and `SystemdCgroup` for runtime type `io.containerd.runc.v1`. (See [config.md](https://github.com/containerd/cri/blob/release/1.2/docs/config.md))
 
 ### Notable Changes
 * `cri` plugin can see images pulled/imported into containerd by `ctr images pull` and `ctr images import`.
@@ -87,9 +88,23 @@ Add support for cleaning up leases and content ingests to garbage collections.
 
 Add expiration label to clean up temporary resources.
 
+## Image Importer
+
+The image importer has been updated to support output from `docker save`. Users
+of the `ctr` tool should take note of the usage change to `ctr images import`.
+We continue to recommend not building tooling on top of the `ctr` tool.
+
 ## API Changes
 
-Minor API additions
+This release features a couple additions to the API. Clients may make use of
+these new API features but should be able to handle cases when those features
+are not implemented on the server. The Go client handles this automatically.
+
+- Add `ListStream` method to containers API. This allows listing a larger
+number of containers without hitting message size limts.
+- Add `Sync` flag to `Delete` in leases API. Setting this option will ensure
+a garbage collection completes before the removal call is returned. This can
+be used to guarantee unreferenced objects are removed from disk after a lease.
 
 ## Other Improvements
 
