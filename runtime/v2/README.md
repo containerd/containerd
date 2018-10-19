@@ -13,7 +13,7 @@ The runtime can also be changed via a container update.
 ```
 
 When a user specifies a runtime name, `io.containerd.runc.v1`, they will specify the name and version of the runtime.
-This will be trasnlated by containerd into a binary name for the shim.
+This will be translated by containerd into a binary name for the shim.
 
 `io.containerd.runc.v1` -> `containerd-shim-runc-v1`
 
@@ -113,7 +113,7 @@ Containers that are to be launched with an interactive terminal will have the `t
 
 ### Root Filesystems
 
-The root filesytems for the containers is provided by on the `Create` rpc.
+The root filesystem for the containers is provided by on the `Create` rpc.
 Shims are responsible for managing the lifecycle of the filesystem mount during the lifecycle of a container.
 
 ```proto
