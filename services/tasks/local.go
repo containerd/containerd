@@ -173,11 +173,14 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 			Options: m.Options,
 		})
 	}
-	runtime, err := l.getRuntime(container.Runtime.Name)
+	rtime, err := l.getRuntime(container.Runtime.Name)
 	if err != nil {
 		return nil, err
 	}
-	c, err := runtime.Create(ctx, r.ContainerID, opts)
+	if _, err := rtime.Get(ctx, r.ContainerID); err != runtime.ErrTaskNotExists {
+		return nil, errdefs.ToGRPC(fmt.Errorf("task %s already exists", r.ContainerID))
+	}
+	c, err := rtime.Create(ctx, r.ContainerID, opts)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
