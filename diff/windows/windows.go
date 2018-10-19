@@ -119,7 +119,7 @@ func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 		buf := new(bytes.Buffer)
 		buf.ReadFrom(r)
 
-		newDesc, b, err := images.DecryptBlob(cc, buf.Bytes(), desc)
+		newDesc, b, err := images.DecryptBlob(cc, buf.Bytes(), desc, false)
 		if err != nil {
 			return emptyDesc, err
 		}

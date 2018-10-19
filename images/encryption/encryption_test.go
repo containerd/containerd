@@ -113,7 +113,7 @@ func TestEncryptLayer(t *testing.T) {
 		Size:        int64(len(encLayer)),
 	}
 
-	decLayer, err := DecryptLayer(dc, encLayer, newDesc)
+	decLayer, err := DecryptLayer(dc, encLayer, newDesc, false)
 	if err != nil {
 		t.Fatal(err)
 	}

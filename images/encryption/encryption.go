@@ -159,12 +159,13 @@ func preWrapKeys(keywrapper keywrap.KeyWrapper, ec *config.EncryptConfig, b64Ann
 
 // DecryptLayer decrypts a layer trying one keywrap.KeyWrapper after the other to see whether it
 // can apply the provided private key
-func DecryptLayer(dc *config.DecryptConfig, encLayer []byte, desc ocispec.Descriptor) ([]byte, error) {
+// If unwrapOnly is set we will only try to decrypt the layer encryption key and return
+func DecryptLayer(dc *config.DecryptConfig, encLayer []byte, desc ocispec.Descriptor, unwrapOnly bool) ([]byte, error) {
 	if dc == nil {
 		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "DecryptConfig must not be nil")
 	}
 	optsData, err := decryptLayerKeyOptsData(dc, desc)
-	if err != nil {
+	if err != nil || unwrapOnly {
 		return nil, err
 	}
 

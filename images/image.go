@@ -100,6 +100,14 @@ func (cr containedReader) Read(p []byte) (n int, err error) {
 	return cr.rd.Read(p)
 }
 
+type cryptoOp int
+
+const (
+	cryptoOpEncrypt    cryptoOp = iota
+	cryptoOpDecrypt             = iota
+	cryptoOpUnwrapOnly          = iota
+)
+
 // TODO(stevvooe): Many of these functions make strong platform assumptions,
 // which are untrue in a lot of cases. More refactoring must be done here to
 // make this work in all cases.
@@ -488,12 +496,12 @@ func encryptLayer(cc *encconfig.CryptoConfig, data []byte, desc ocispec.Descript
 
 // DecryptBlob decrypts the layer blob using the CryptoConfig and creates a new OCI Descriptor.
 // The caller is expected to store the returned plain data and OCI Descriptor
-func DecryptBlob(cc *encconfig.CryptoConfig, data []byte, desc ocispec.Descriptor) (ocispec.Descriptor, []byte, error) {
+func DecryptBlob(cc *encconfig.CryptoConfig, data []byte, desc ocispec.Descriptor, unwrapOnly bool) (ocispec.Descriptor, []byte, error) {
 	if cc == nil {
 		return ocispec.Descriptor{}, []byte{}, errors.Wrapf(errdefs.ErrInvalidArgument, "CryptoConfig must not be nil")
 	}
-	p, err := encryption.DecryptLayer(cc.Dc, data, desc)
-	if err != nil {
+	p, err := encryption.DecryptLayer(cc.Dc, data, desc, unwrapOnly)
+	if err != nil || unwrapOnly {
 		return ocispec.Descriptor{}, []byte{}, err
 	}
 
@@ -516,9 +524,9 @@ func DecryptBlob(cc *encconfig.CryptoConfig, data []byte, desc ocispec.Descripto
 
 // decryptLayer decrypts the layer using the CryptoConfig and creates a new OCI Descriptor.
 // The caller is expected to store the returned plain data and OCI Descriptor
-func decryptLayer(cc *encconfig.CryptoConfig, data []byte, desc ocispec.Descriptor) (ocispec.Descriptor, []byte, error) {
-	p, err := encryption.DecryptLayer(cc.Dc, data, desc)
-	if err != nil {
+func decryptLayer(cc *encconfig.CryptoConfig, data []byte, desc ocispec.Descriptor, unwrapOnly bool) (ocispec.Descriptor, []byte, error) {
+	p, err := encryption.DecryptLayer(cc.Dc, data, desc, unwrapOnly)
+	if err != nil || unwrapOnly {
 		return ocispec.Descriptor{}, []byte{}, err
 	}
 
@@ -540,7 +548,7 @@ func decryptLayer(cc *encconfig.CryptoConfig, data []byte, desc ocispec.Descript
 }
 
 // cryptLayer handles the changes due to encryption or decryption of a layer
-func cryptLayer(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, encrypt bool) (ocispec.Descriptor, error) {
+func cryptLayer(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, cryptoOp cryptoOp) (ocispec.Descriptor, error) {
 	var (
 		p       []byte
 		newDesc ocispec.Descriptor
@@ -551,12 +559,12 @@ func cryptLayer(ctx context.Context, cs content.Store, desc ocispec.Descriptor, 
 		return ocispec.Descriptor{}, err
 	}
 
-	if encrypt {
+	if cryptoOp == cryptoOpEncrypt {
 		newDesc, p, err = encryptLayer(cc, data, desc)
 	} else {
-		newDesc, p, err = decryptLayer(cc, data, desc)
+		newDesc, p, err = decryptLayer(cc, data, desc, cryptoOp == cryptoOpUnwrapOnly)
 	}
-	if err != nil {
+	if err != nil || cryptoOp == cryptoOpUnwrapOnly {
 		return ocispec.Descriptor{}, err
 	}
 	// some operations, such as changing recipients, may not touch the layer at all
@@ -625,7 +633,7 @@ func isUserSelectedPlatform(platform *ocispec.Platform, platformList []ocispec.P
 }
 
 // Encrypt or decrypt all the Children of a given descriptor
-func cryptChildren(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf *encryption.LayerFilter, encrypt bool, thisPlatform *ocispec.Platform) (ocispec.Descriptor, bool, error) {
+func cryptChildren(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf *encryption.LayerFilter, cryptoOp cryptoOp, thisPlatform *ocispec.Platform) (ocispec.Descriptor, bool, error) {
 	layerIndex := int32(0)
 
 	children, err := Children(ctx, cs, desc)
@@ -649,8 +657,8 @@ func cryptChildren(ctx context.Context, cs content.Store, desc ocispec.Descripto
 			config = child
 		case MediaTypeDockerSchema2LayerGzip, MediaTypeDockerSchema2Layer,
 			ocispec.MediaTypeImageLayerGzip, ocispec.MediaTypeImageLayer:
-			if encrypt && isUserSelectedLayer(layerIndex, layersTotal, lf.Layers) && isUserSelectedPlatform(thisPlatform, lf.Platforms) {
-				nl, err := cryptLayer(ctx, cs, child, cc, true)
+			if cryptoOp == cryptoOpEncrypt && isUserSelectedLayer(layerIndex, layersTotal, lf.Layers) && isUserSelectedPlatform(thisPlatform, lf.Platforms) {
+				nl, err := cryptLayer(ctx, cs, child, cc, cryptoOp)
 				if err != nil {
 					return ocispec.Descriptor{}, false, err
 				}
@@ -663,8 +671,8 @@ func cryptChildren(ctx context.Context, cs content.Store, desc ocispec.Descripto
 		case MediaTypeDockerSchema2LayerGzipEnc, MediaTypeDockerSchema2LayerEnc:
 			// this one can be decrypted but also its recpients list changed
 			if isUserSelectedLayer(layerIndex, layersTotal, lf.Layers) && isUserSelectedPlatform(thisPlatform, lf.Platforms) {
-				nl, err := cryptLayer(ctx, cs, child, cc, encrypt)
-				if err != nil {
+				nl, err := cryptLayer(ctx, cs, child, cc, cryptoOp)
+				if err != nil || cryptoOp == cryptoOpUnwrapOnly {
 					return ocispec.Descriptor{}, false, err
 				}
 				modified = true
@@ -716,7 +724,7 @@ func cryptChildren(ctx context.Context, cs content.Store, desc ocispec.Descripto
 }
 
 // cryptManifest encrypts or decrypts the children of a top level manifest
-func cryptManifest(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf *encryption.LayerFilter, encrypt bool) (ocispec.Descriptor, bool, error) {
+func cryptManifest(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf *encryption.LayerFilter, cryptoOp cryptoOp) (ocispec.Descriptor, bool, error) {
 	p, err := content.ReadBlob(ctx, cs, desc)
 	if err != nil {
 		return ocispec.Descriptor{}, false, err
@@ -726,15 +734,15 @@ func cryptManifest(ctx context.Context, cs content.Store, desc ocispec.Descripto
 		return ocispec.Descriptor{}, false, err
 	}
 	platform := platforms.DefaultSpec()
-	newDesc, modified, err := cryptChildren(ctx, cs, desc, cc, lf, encrypt, &platform)
-	if err != nil {
+	newDesc, modified, err := cryptChildren(ctx, cs, desc, cc, lf, cryptoOp, &platform)
+	if err != nil || cryptoOp == cryptoOpUnwrapOnly {
 		return ocispec.Descriptor{}, false, err
 	}
 	return newDesc, modified, nil
 }
 
 // cryptManifestList encrypts or decrypts the children of a top level manifest list
-func cryptManifestList(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf *encryption.LayerFilter, encrypt bool) (ocispec.Descriptor, bool, error) {
+func cryptManifestList(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf *encryption.LayerFilter, cryptoOp cryptoOp) (ocispec.Descriptor, bool, error) {
 	// read the index; if any layer is encrypted and any manifests change we will need to rewrite it
 	b, err := content.ReadBlob(ctx, cs, desc)
 	if err != nil {
@@ -749,8 +757,8 @@ func cryptManifestList(ctx context.Context, cs content.Store, desc ocispec.Descr
 	var newManifests []ocispec.Descriptor
 	modified := false
 	for _, manifest := range index.Manifests {
-		newManifest, m, err := cryptChildren(ctx, cs, manifest, cc, lf, encrypt, manifest.Platform)
-		if err != nil {
+		newManifest, m, err := cryptChildren(ctx, cs, manifest, cc, lf, cryptoOp, manifest.Platform)
+		if err != nil || cryptoOp == cryptoOpUnwrapOnly {
 			return ocispec.Descriptor{}, false, err
 		}
 		if m {
@@ -795,15 +803,15 @@ func cryptManifestList(ctx context.Context, cs content.Store, desc ocispec.Descr
 
 // cryptImage is the dispatcher to encrypt/decrypt an image; it accepts either an OCI descriptor
 // representing a manifest list or a single manifest
-func cryptImage(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf *encryption.LayerFilter, encrypt bool) (ocispec.Descriptor, bool, error) {
+func cryptImage(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf *encryption.LayerFilter, cryptoOp cryptoOp) (ocispec.Descriptor, bool, error) {
 	if cc == nil {
 		return ocispec.Descriptor{}, false, errors.Wrapf(errdefs.ErrInvalidArgument, "CryptoConfig must not be nil")
 	}
 	switch desc.MediaType {
 	case ocispec.MediaTypeImageIndex, MediaTypeDockerSchema2ManifestList:
-		return cryptManifestList(ctx, cs, desc, cc, lf, encrypt)
+		return cryptManifestList(ctx, cs, desc, cc, lf, cryptoOp)
 	case ocispec.MediaTypeImageManifest, MediaTypeDockerSchema2Manifest:
-		return cryptManifest(ctx, cs, desc, cc, lf, encrypt)
+		return cryptManifest(ctx, cs, desc, cc, lf, cryptoOp)
 	default:
 		return ocispec.Descriptor{}, false, errors.Errorf("CryptImage: Unhandled media type: %s", desc.MediaType)
 	}
@@ -811,12 +819,29 @@ func cryptImage(ctx context.Context, cs content.Store, desc ocispec.Descriptor, 
 
 // EncryptImage encrypts an image; it accepts either an OCI descriptor representing a manifest list or a single manifest
 func EncryptImage(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf *encryption.LayerFilter) (ocispec.Descriptor, bool, error) {
-	return cryptImage(ctx, cs, desc, cc, lf, true)
+	return cryptImage(ctx, cs, desc, cc, lf, cryptoOpEncrypt)
 }
 
 // DecryptImage decrypts an image; it accepts either an OCI descriptor representing a manifest list or a single manifest
 func DecryptImage(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf *encryption.LayerFilter) (ocispec.Descriptor, bool, error) {
-	return cryptImage(ctx, cs, desc, cc, lf, false)
+	return cryptImage(ctx, cs, desc, cc, lf, cryptoOpDecrypt)
+}
+
+// CheckAuthorization checks whether a user has the right keys to be allowed to access an image (every layer)
+// It takes decrypting of the layers only as far as decrypting the asymmetrically encrypted data
+// The decryption is only done for the current platform
+func CheckAuthorization(ctx context.Context, cs content.Store, desc ocispec.Descriptor, dc *encconfig.DecryptConfig) error {
+	cc := encconfig.CryptoConfig{
+		Dc: dc,
+	}
+	lf := encryption.LayerFilter{
+		Platforms: []ocispec.Platform{platforms.DefaultSpec()},
+	}
+	_, _, err := cryptImage(ctx, cs, desc, &cc, &lf, cryptoOpUnwrapOnly)
+	if err != nil {
+		return errors.Wrapf(err, "You are not authorized to used this image")
+	}
+	return nil
 }
 
 // GetImageLayerInfo gets the image key Ids necessary for decrypting an image
