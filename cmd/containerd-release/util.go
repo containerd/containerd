@@ -249,10 +249,7 @@ func addContributors(previous, commit string, contributors map[contributor]int) 
 		}
 		contributors[c] = contributors[c] + 1
 	}
-	if err := s.Err(); err != nil {
-		return err
-	}
-	return nil
+	return s.Err()
 }
 
 func orderContributors(contributors map[contributor]int) []string {
