@@ -246,7 +246,9 @@ func getImageLayerInfo(client *containerd.Client, ctx gocontext.Context, name st
 	return images.GetImageLayerInfo(ctx, client.ContentStore(), image.Target, lf, -1)
 }
 
-func createDcParameters(context *cli.Context, layerInfos []encryption.LayerInfo) (map[string][][]byte, error) {
+// CreateDcParameters creates the decryption parameter map from command line options and possibly
+// LayerInfos describing the image and helping us to query for the PGP decryption keys
+func CreateDcParameters(context *cli.Context, layerInfos []encryption.LayerInfo) (map[string][][]byte, error) {
 	dcparameters := make(map[string][][]byte)
 
 	// x509 cert is needed for PKCS7 decryption

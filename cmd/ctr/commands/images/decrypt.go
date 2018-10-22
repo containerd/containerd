@@ -88,7 +88,7 @@ var decryptCommand = cli.Command{
 			return nil
 		}
 
-		dcparameters, err := createDcParameters(context, layerInfos)
+		dcparameters, err := CreateDcParameters(context, layerInfos)
 		if err != nil {
 			return err
 		}

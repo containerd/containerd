@@ -107,7 +107,7 @@ command. As part of this process, we do the following:
 			p = append(p, platforms.DefaultSpec())
 		}
 
-		dcparameters, err := createDcParameters(context, nil)
+		dcparameters, err := CreateDcParameters(context, nil)
 		if err != nil {
 			return err
 		}

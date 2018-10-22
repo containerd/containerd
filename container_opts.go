@@ -223,3 +223,11 @@ func WithSpec(s *oci.Spec, opts ...oci.SpecOpts) NewContainerOpts {
 		return err
 	}
 }
+
+// WithDcParameters sets the image decryption parameters
+func WithDcParameters(dcparameters map[string][][]byte) NewContainerOpts {
+	return func(ctx context.Context, client *Client, c *containers.Container) error {
+		c.DcParameters = dcparameters
+		return nil
+	}
+}
