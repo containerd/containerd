@@ -16,7 +16,10 @@ limitations under the License.
 
 package config
 
-import "github.com/containerd/containerd"
+import (
+	"github.com/BurntSushi/toml"
+	"github.com/containerd/containerd"
+)
 
 // Runtime struct to contain the type(ID), engine, and root variables for a default runtime
 // and a runtime for untrusted worload.
@@ -24,9 +27,16 @@ type Runtime struct {
 	// Type is the runtime type to use in containerd e.g. io.containerd.runtime.v1.linux
 	Type string `toml:"runtime_type" json:"runtimeType"`
 	// Engine is the name of the runtime engine used by containerd.
+	// This only works for runtime type "io.containerd.runtime.v1.linux".
+	// DEPRECATED: use Options instead. Remove when shim v1 is deprecated.
 	Engine string `toml:"runtime_engine" json:"runtimeEngine"`
 	// Root is the directory used by containerd for runtime state.
+	// DEPRECATED: use Options instead. Remove when shim v1 is deprecated.
+	// This only works for runtime type "io.containerd.runtime.v1.linux".
 	Root string `toml:"runtime_root" json:"runtimeRoot"`
+	// Options are config options for the runtime. If options is loaded
+	// from toml config, it will be toml.Primitive.
+	Options *toml.Primitive `toml:"options" json:"options"`
 }
 
 // ContainerdConfig contains toml config related to containerd
@@ -46,6 +56,8 @@ type ContainerdConfig struct {
 	// configurations, to the matching configurations.
 	Runtimes map[string]Runtime `toml:"runtimes" json:"runtimes"`
 	// NoPivot disables pivot-root (linux only), required when running a container in a RamDisk with runc
+	// This only works for runtime type "io.containerd.runtime.v1.linux".
+	// DEPRECATED: use Runtime.Options instead. Remove when shim v1 is deprecated.
 	NoPivot bool `toml:"no_pivot" json:"noPivot"`
 }
 
@@ -119,6 +131,8 @@ type PluginConfig struct {
 	// StatsCollectPeriod is the period (in seconds) of snapshots stats collection.
 	StatsCollectPeriod int `toml:"stats_collect_period" json:"statsCollectPeriod"`
 	// SystemdCgroup enables systemd cgroup support.
+	// This only works for runtime type "io.containerd.runtime.v1.linux".
+	// DEPRECATED: config runc runtime handler instead. Remove when shim v1 is deprecated.
 	SystemdCgroup bool `toml:"systemd_cgroup" json:"systemdCgroup"`
 	// EnableTLSStreaming indicates to enable the TLS streaming support.
 	EnableTLSStreaming bool `toml:"enable_tls_streaming" json:"enableTLSStreaming"`

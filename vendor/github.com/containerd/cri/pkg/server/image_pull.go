@@ -261,9 +261,9 @@ func (c *criService) getResolver(ctx context.Context, ref string, cred func(stri
 			return nil, imagespec.Descriptor{}, errors.Wrapf(err, "parse registry endpoint %q", e)
 		}
 		resolver := docker.NewResolver(docker.ResolverOptions{
-			Credentials: cred,
-			Client:      http.DefaultClient,
-			Host:        func(string) (string, error) { return u.Host, nil },
+			Authorizer: docker.NewAuthorizer(http.DefaultClient, cred),
+			Client:     http.DefaultClient,
+			Host:       func(string) (string, error) { return u.Host, nil },
 			// By default use "https".
 			PlainHTTP: u.Scheme == "http",
 		})

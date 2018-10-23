@@ -30,7 +30,6 @@ import (
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -125,11 +124,6 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get sandbox %q info", sandboxID)
 	}
-	ociRuntime, err := getRuntimeConfigFromContainerInfo(sandboxInfo)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get OCI runtime")
-	}
-	logrus.Debugf("Use OCI %+v for container %q", ociRuntime, id)
 
 	// Create container root directory.
 	containerRootDir := c.getContainerRootDir(id)
@@ -261,14 +255,13 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 	containerLabels := buildLabels(config.Labels, containerKindContainer)
 
+	runtimeOptions, err := getRuntimeOptions(sandboxInfo)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get runtime options")
+	}
 	opts = append(opts,
 		containerd.WithSpec(spec, specOpts...),
-		containerd.WithRuntime(
-			ociRuntime.Type,
-			&runctypes.RuncOptions{
-				Runtime:       ociRuntime.Engine,
-				RuntimeRoot:   ociRuntime.Root,
-				SystemdCgroup: c.config.SystemdCgroup}), // TODO (mikebrow): add CriuPath when we add support for pause
+		containerd.WithRuntime(sandboxInfo.Runtime.Name, runtimeOptions),
 		containerd.WithContainerLabels(containerLabels),
 		containerd.WithContainerExtension(containerMetadataExtension, &meta))
 	var cntr containerd.Container
