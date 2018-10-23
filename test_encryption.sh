@@ -15,6 +15,11 @@
 #   limitations under the License.
 
 
+sudo -v
+if [ $? -ne 0 ]; then
+	echo "Need to be able to use sudo."
+	exit 1
+fi
 sudo chmod 777 /run/containerd/containerd.sock
 
 CTR=${CTR:-./bin/ctr}
@@ -221,6 +226,45 @@ testPGP() {
 	failExit $? "Image layerinfo on plain ${ALPINE} image shows differences in architectures"
 
 	echo "PASS: Export and import of PGP encrypted image"
+	echo
+	echo "Testing creation of container from encrypted image"
+	MSG=$($CTR container rm testcontainer1 2>&1)
+	MSG=$($CTR snapshot  rm testcontainer1 2>&1)
+	MSG=$(sudo $CTR container create ${ALPINE_ENC} testcontainer1 2>&1)
+	if [ $? -eq 0 ]; then
+		MSG=$($CTR container rm testcontainer1 2>&1)
+		MSG=$($CTR snapshot  rm testcontainer1 2>&1)
+		failExit 1 "Should not have been able to create a container from encrypted image without passing keys"
+	fi
+	MSG=$($CTR snapshot rm testcontainer1 2>&1)
+	MSG=$(sudo bash -c "$CTR container create \
+		--gpg-homedir ${GPGHOMEDIR} \
+		--gpg-version 2 \
+		--key <(echo "${GPGTESTKEY1}" | base64 -d) \
+		${ALPINE_ENC} testcontainer1 2>&1")
+	failExit $? "Should have been able to create a container from encrypted image when passing keys\n${MSG}"
+	MSG=$($CTR container rm testcontainer1 2>&1)
+	MSG=$($CTR snapshot  rm testcontainer1 2>&1)
+	sleep ${SLEEP_TIME}
+
+	MSG=$(sudo bash -c "$CTR run \
+		--rm \
+		${ALPINE_ENC} testcontainer1 echo 'Hello world'" 2>&1)
+	if [ $? -eq 0 ]; then
+		MSG=$($CTR snapshot  rm testcontainer1 2>&1)
+		failExit 1 "Should not have been able to run a container from encrypted image without passing keys"
+	fi
+	MSG=$($CTR snapshot  rm testcontainer1 2>&1)
+	MSG=$(sudo bash -c "$CTR run \
+		--gpg-homedir ${GPGHOMEDIR} \
+		--gpg-version 2 \
+		--key <(echo "${GPGTESTKEY1}" | base64 -d) \
+		--rm \
+		${ALPINE_ENC} testcontainer1 echo 'Hello world'" 2>&1)
+	failExit $? "Should have been able to run a container from encrypted image when passing keys\n${MSG}"
+	sleep ${SLEEP_TIME}
+
+	echo "PASS: Creation of container from encrypted image"
 	echo
 	echo "Testing adding a PGP recipient"
 	$CTR images encrypt \
