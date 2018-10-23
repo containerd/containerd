@@ -27,6 +27,13 @@ import (
 	osinterface "github.com/containerd/cri/pkg/os"
 )
 
+// The NetNS library assumes only containerd manages the lifecycle of the
+// network namespace mount. The only case that netns will be unmounted by
+// someone else is node reboot.
+// If this assumption is broken, NetNS won't be aware of the external
+// unmount, and there will be a state mismatch.
+// TODO(random-liu): Don't cache state, always load from the system.
+
 // ErrClosedNetNS is the error returned when network namespace is closed.
 var ErrClosedNetNS = errors.New("network namespace is closed")
 

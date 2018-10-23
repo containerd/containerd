@@ -24,7 +24,6 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
-	criconfig "github.com/containerd/cri/pkg/config"
 	containerstore "github.com/containerd/cri/pkg/store/container"
 )
 
@@ -100,16 +99,18 @@ func toCRIContainerStatus(container containerstore.Container, spec *runtime.Imag
 	}
 }
 
-type containerInfo struct {
+// ContainerInfo is extra information for a container.
+type ContainerInfo struct {
 	// TODO(random-liu): Add sandboxID in CRI container status.
-	SandboxID   string                   `json:"sandboxID"`
-	Pid         uint32                   `json:"pid"`
-	Removing    bool                     `json:"removing"`
-	SnapshotKey string                   `json:"snapshotKey"`
-	Snapshotter string                   `json:"snapshotter"`
-	Runtime     *criconfig.Runtime       `json:"runtime"`
-	Config      *runtime.ContainerConfig `json:"config"`
-	RuntimeSpec *runtimespec.Spec        `json:"runtimeSpec"`
+	SandboxID      string                   `json:"sandboxID"`
+	Pid            uint32                   `json:"pid"`
+	Removing       bool                     `json:"removing"`
+	SnapshotKey    string                   `json:"snapshotKey"`
+	Snapshotter    string                   `json:"snapshotter"`
+	RuntimeType    string                   `json:"runtimeType"`
+	RuntimeOptions interface{}              `json:"runtimeOptions"`
+	Config         *runtime.ContainerConfig `json:"config"`
+	RuntimeSpec    *runtimespec.Spec        `json:"runtimeSpec"`
 }
 
 // toCRIContainerInfo converts internal container object information to CRI container status response info map.
@@ -122,7 +123,7 @@ func toCRIContainerInfo(ctx context.Context, container containerstore.Container,
 	status := container.Status.Get()
 
 	// TODO(random-liu): Change CRI status info to use array instead of map.
-	ci := &containerInfo{
+	ci := &ContainerInfo{
 		SandboxID: container.SandboxID,
 		Pid:       status.Pid,
 		Removing:  status.Removing,
@@ -142,11 +143,12 @@ func toCRIContainerInfo(ctx context.Context, container containerstore.Container,
 	ci.SnapshotKey = ctrInfo.SnapshotKey
 	ci.Snapshotter = ctrInfo.Snapshotter
 
-	ociRuntime, err := getRuntimeConfigFromContainerInfo(ctrInfo)
+	runtimeOptions, err := getRuntimeOptions(ctrInfo)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get container runtime config")
+		return nil, errors.Wrap(err, "failed to get runtime options")
 	}
-	ci.Runtime = &ociRuntime
+	ci.RuntimeType = ctrInfo.Runtime.Name
+	ci.RuntimeOptions = runtimeOptions
 
 	infoBytes, err := json.Marshal(ci)
 	if err != nil {

@@ -25,7 +25,6 @@ import (
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/runtime/linux/runctypes"
 	cni "github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -171,18 +170,17 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	sandboxLabels := buildLabels(config.Labels, containerKindSandbox)
 
+	runtimeOpts, err := generateRuntimeOptions(ociRuntime, c.config)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate runtime options")
+	}
 	opts := []containerd.NewContainerOpts{
 		containerd.WithSnapshotter(c.config.ContainerdConfig.Snapshotter),
 		customopts.WithNewSnapshot(id, image.Image),
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(sandboxLabels),
 		containerd.WithContainerExtension(sandboxMetadataExtension, &sandbox.Metadata),
-		containerd.WithRuntime(
-			ociRuntime.Type,
-			&runctypes.RuncOptions{
-				Runtime:       ociRuntime.Engine,
-				RuntimeRoot:   ociRuntime.Root,
-				SystemdCgroup: c.config.SystemdCgroup})} // TODO (mikebrow): add CriuPath when we add support for pause
+		containerd.WithRuntime(ociRuntime.Type, runtimeOpts)}
 
 	container, err := c.client.NewContainer(ctx, id, opts...)
 	if err != nil {
@@ -296,7 +294,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			id, name)
 
 		var taskOpts []containerd.NewTaskOpts
-		if c.config.NoPivot {
+		// TODO(random-liu): Remove this after shim v1 is deprecated.
+		if c.config.NoPivot && ociRuntime.Type == linuxRuntime {
 			taskOpts = append(taskOpts, containerd.WithNoPivotRoot)
 		}
 		// We don't need stdio for sandbox container.

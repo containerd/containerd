@@ -25,8 +25,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
+	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl"
 	"github.com/docker/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
@@ -121,6 +123,14 @@ const (
 	// networkAttachCount is the minimum number of networks the PodSandbox
 	// attaches to
 	networkAttachCount = 2
+)
+
+// Runtime type strings for various runtimes.
+const (
+	// linuxRuntime is the legacy linux runtime for shim v1.
+	linuxRuntime = "io.containerd.runtime.v1.linux"
+	// runcRuntime is the runc runtime for shim v2.
+	runcRuntime = "io.containerd.runc.v1"
 )
 
 // makeSandboxName generates sandbox name from sandbox metadata. The name
@@ -390,26 +400,6 @@ func getPodCNILabels(id string, config *runtime.PodSandboxConfig) map[string]str
 	}
 }
 
-// getRuntimeConfigFromContainerInfo gets runtime configuration from containerd
-// container info.
-func getRuntimeConfigFromContainerInfo(c containers.Container) (criconfig.Runtime, error) {
-	r := criconfig.Runtime{
-		Type: c.Runtime.Name,
-	}
-	if c.Runtime.Options == nil {
-		// CRI plugin makes sure that runtime option is always set.
-		return criconfig.Runtime{}, errors.New("runtime options is nil")
-	}
-	data, err := typeurl.UnmarshalAny(c.Runtime.Options)
-	if err != nil {
-		return criconfig.Runtime{}, errors.Wrap(err, "failed to unmarshal runtime options")
-	}
-	runtimeOpts := data.(*runctypes.RuncOptions)
-	r.Engine = runtimeOpts.Runtime
-	r.Root = runtimeOpts.RuntimeRoot
-	return r, nil
-}
-
 // toRuntimeAuthConfig converts cri plugin auth config to runtime auth config.
 func toRuntimeAuthConfig(a criconfig.AuthConfig) *runtime.AuthConfig {
 	return &runtime.AuthConfig{
@@ -463,4 +453,46 @@ func parseImageReferences(refs []string) ([]string, []string) {
 		}
 	}
 	return tags, digests
+}
+
+// generateRuntimeOptions generates runtime options from cri plugin config.
+func generateRuntimeOptions(r criconfig.Runtime, c criconfig.Config) (interface{}, error) {
+	if r.Options == nil {
+		if r.Type != linuxRuntime {
+			return nil, nil
+		}
+		// This is a legacy config, generate runctypes.RuncOptions.
+		return &runctypes.RuncOptions{
+			Runtime:       r.Engine,
+			RuntimeRoot:   r.Root,
+			SystemdCgroup: c.SystemdCgroup,
+		}, nil
+	}
+	options := getRuntimeOptionsType(r.Type)
+	if err := toml.PrimitiveDecode(*r.Options, options); err != nil {
+		return nil, err
+	}
+	return options, nil
+}
+
+// getRuntimeOptionsType gets empty runtime options by the runtime type name.
+func getRuntimeOptionsType(t string) interface{} {
+	switch t {
+	case runcRuntime:
+		return &runcoptions.Options{}
+	default:
+		return &runctypes.RuncOptions{}
+	}
+}
+
+// getRuntimeOptions get runtime options from container metadata.
+func getRuntimeOptions(c containers.Container) (interface{}, error) {
+	if c.Runtime.Options == nil {
+		return nil, nil
+	}
+	opts, err := typeurl.UnmarshalAny(c.Runtime.Options)
+	if err != nil {
+		return nil, err
+	}
+	return opts, nil
 }
