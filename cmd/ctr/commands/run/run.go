@@ -111,7 +111,7 @@ var Command = cli.Command{
 			Name:  "cgroup",
 			Usage: "cgroup path (To disable use of cgroup, set to \"\" explicitly)",
 		},
-	}, append(platformRunFlags, append(commands.SnapshotterFlags, commands.ContainerFlags...)...)...),
+	}, append(commands.ImageDecryptionFlags, append(platformRunFlags, append(commands.SnapshotterFlags, commands.ContainerFlags...)...)...)...),
 	Action: func(context *cli.Context) error {
 		var (
 			err error

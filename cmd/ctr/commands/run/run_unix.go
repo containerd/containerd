@@ -25,6 +25,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/cmd/ctr/commands/images"
 	"github.com/containerd/containerd/contrib/nvidia"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
@@ -162,6 +163,12 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	spec = containerd.WithSpec(&s, opts...)
 
 	cOpts = append(cOpts, spec)
+
+	dcparameters, err := images.CreateDcParameters(context, nil)
+	if err != nil {
+		return nil, err
+	}
+	cOpts = append(cOpts, containerd.WithDcParameters(dcparameters))
 
 	// oci.WithImageConfig (WithUsername, WithUserID) depends on access to rootfs for resolving via
 	// the /etc/{passwd,group} files. So cOpts needs to have precedence over opts.
