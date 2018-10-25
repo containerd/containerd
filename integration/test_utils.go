@@ -42,6 +42,7 @@ import (
 	"github.com/containerd/cri/pkg/client"
 	criconfig "github.com/containerd/cri/pkg/config"
 	"github.com/containerd/cri/pkg/constants"
+	"github.com/containerd/cri/pkg/server"
 	"github.com/containerd/cri/pkg/util"
 )
 
@@ -350,6 +351,27 @@ func CRIConfig() (*criconfig.Config, error) {
 		return nil, errors.Wrap(err, "failed to unmarshal config")
 	}
 	return config, nil
+}
+
+// SandboxInfo gets sandbox info.
+func SandboxInfo(id string) (*runtime.PodSandboxStatus, *server.SandboxInfo, error) {
+	client, err := RawRuntimeClient()
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to get raw runtime client")
+	}
+	resp, err := client.PodSandboxStatus(context.Background(), &runtime.PodSandboxStatusRequest{
+		PodSandboxId: id,
+		Verbose:      true,
+	})
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to get sandbox status")
+	}
+	status := resp.GetStatus()
+	var info server.SandboxInfo
+	if err := json.Unmarshal([]byte(resp.GetInfo()["info"]), &info); err != nil {
+		return nil, nil, errors.Wrap(err, "failed to unmarshal sandbox info")
+	}
+	return status, &info, nil
 }
 
 func RestartContainerd(t *testing.T) {

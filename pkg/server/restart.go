@@ -34,6 +34,7 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
+	"github.com/containerd/cri/pkg/netns"
 	cio "github.com/containerd/cri/pkg/server/io"
 	containerstore "github.com/containerd/cri/pkg/store/container"
 	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
@@ -394,14 +395,7 @@ func loadSandbox(ctx context.Context, cntr containerd.Container) (sandboxstore.S
 		// Don't need to load netns for host network sandbox.
 		return sandbox, nil
 	}
-	netNS, err := sandboxstore.LoadNetNS(meta.NetNSPath)
-	if err != nil {
-		if err != sandboxstore.ErrClosedNetNS {
-			return sandbox, errors.Wrapf(err, "failed to load netns %q", meta.NetNSPath)
-		}
-		netNS = nil
-	}
-	sandbox.NetNS = netNS
+	sandbox.NetNS = netns.LoadNetNS(meta.NetNSPath)
 
 	// It doesn't matter whether task is running or not. If it is running, sandbox
 	// status will be `READY`; if it is not running, sandbox status will be `NOT_READY`,
