@@ -125,7 +125,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		instance, err := result.Instance()
 		if err != nil {
 			if plugin.IsSkipPlugin(err) {
-				log.G(ctx).WithField("type", p.Type).Infof("skip loading plugin %q...", id)
+				log.G(ctx).WithError(err).WithField("type", p.Type).Infof("skip loading plugin %q...", id)
 			} else {
 				log.G(ctx).WithError(err).Warnf("failed to load plugin %s", id)
 			}
@@ -251,8 +251,10 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 			for name, sn := range snapshottersRaw {
 				sn, err := sn.Instance()
 				if err != nil {
-					log.G(ic.Context).WithError(err).
-						Warnf("could not use snapshotter %v in metadata plugin", name)
+					if !plugin.IsSkipPlugin(err) {
+						log.G(ic.Context).WithError(err).
+							Warnf("could not use snapshotter %v in metadata plugin", name)
+					}
 					continue
 				}
 				snapshotters[name] = sn.(snapshots.Snapshotter)
