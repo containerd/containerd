@@ -681,6 +681,10 @@ func cryptChildren(ctx context.Context, cs content.Store, desc ocispec.Descripto
 				newLayers = append(newLayers, child)
 			}
 			layerIndex = layerIndex + 1
+		case MediaTypeDockerSchema2LayerForeign, MediaTypeDockerSchema2LayerForeignGzip:
+			/* never encrypt/decrypt */
+			newLayers = append(newLayers, child)
+			layerIndex = layerIndex + 1
 		default:
 			return ocispec.Descriptor{}, false, errors.Errorf("Bad/unhandled MediaType %s in encryptChildren\n", child.MediaType)
 		}
