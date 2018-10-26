@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/contrib/nvidia"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -72,7 +73,17 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			}
 			opts = append(opts, oci.WithRootFSPath(rootfs))
 		} else {
+			_, err := client.ContainerService().Get(ctx, id)
+			if err == nil {
+				return nil, errors.Wrapf(errdefs.ErrAlreadyExists, "Container: %s", id)
+			}
+
 			snapshotter := context.String("snapshotter")
+			_, err = client.SnapshotService(snapshotter).Stat(ctx, id)
+			if err == nil {
+				return nil, errors.Wrapf(errdefs.ErrAlreadyExists, "Snapshot: %s", id)
+			}
+
 			image, err := client.GetImage(ctx, ref)
 			if err != nil {
 				return nil, err
@@ -154,7 +165,11 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 
 	// oci.WithImageConfig (WithUsername, WithUserID) depends on access to rootfs for resolving via
 	// the /etc/{passwd,group} files. So cOpts needs to have precedence over opts.
-	return client.NewContainer(ctx, id, cOpts...)
+	c, err := client.NewContainer(ctx, id, cOpts...)
+	if err != nil {
+		client.SnapshotService(context.String("snapshotter")).Remove(ctx, id)
+	}
+	return c, err
 }
 
 func getNewTaskOpts(context *cli.Context) []containerd.NewTaskOpts {

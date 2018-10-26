@@ -22,6 +22,7 @@ import (
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/runtime/v2/runhcs/options"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -57,7 +58,17 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		)
 
 		id = context.Args().Get(1)
+
+		_, err := client.ContainerService().Get(ctx, id)
+		if err == nil {
+			return nil, errors.Wrapf(errdefs.ErrAlreadyExists, "Container: %s", id)
+		}
+
 		snapshotter := context.String("snapshotter")
+		_, err = client.SnapshotService(snapshotter).Stat(ctx, id)
+		if err == nil {
+			return nil, errors.Wrapf(errdefs.ErrAlreadyExists, "Snapshot: %s", id)
+		}
 		if snapshotter == "windows-lcow" {
 			opts = append(opts, oci.WithDefaultSpecForPlatform("linux/amd64"))
 			// Clear the rootfs section.
@@ -132,7 +143,11 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 
 	cOpts = append(cOpts, spec)
 
-	return client.NewContainer(ctx, id, cOpts...)
+	c, err := client.NewContainer(ctx, id, cOpts...)
+	if err != nil {
+		client.SnapshotService(context.String("snapshotter")).Remove(ctx, id)
+	}
+	return c, err
 }
 
 func getNewTaskOpts(_ *cli.Context) []containerd.NewTaskOpts {
