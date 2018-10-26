@@ -50,7 +50,7 @@ type snapshotter struct {
 // New creates a new snapshotter using aufs
 func New(root string) (snapshots.Snapshotter, error) {
 	if err := supported(); err != nil {
-		return nil, err
+		return nil, errors.Wrap(plugin.ErrSkipPlugin, err.Error())
 	}
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
