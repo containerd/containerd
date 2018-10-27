@@ -100,6 +100,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		cOpts = append(cOpts, containerd.WithImage(image))
 		cOpts = append(cOpts, containerd.WithSnapshotter(snapshotter))
 		cOpts = append(cOpts, containerd.WithNewSnapshot(id, image))
+		cOpts = append(cOpts, containerd.WithAuthorizationCheck())
 
 		if len(args) > 0 {
 			opts = append(opts, oci.WithProcessArgs(args...))

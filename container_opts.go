@@ -60,6 +60,14 @@ func WithRuntime(name string, options interface{}) NewContainerOpts {
 	}
 }
 
+// WithAuthorizationCheck checks the authorization of keys used for encrypted containers
+// be checked upon creation of a container
+func WithAuthorizationCheck() NewContainerOpts {
+	return func(ctx context.Context, client *Client, c *containers.Container) error {
+		return client.checkAuthorization(ctx, c.Image, c.DcParameters)
+	}
+}
+
 // WithImage sets the provided image as the base for the container
 func WithImage(i Image) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
