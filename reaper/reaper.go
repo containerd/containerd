@@ -26,12 +26,13 @@ import (
 	"github.com/containerd/containerd/sys"
 	runc "github.com/containerd/go-runc"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // ErrNoSuchProcess is returned when the process no longer exists
 var ErrNoSuchProcess = errors.New("no such process")
 
-const bufferSize = 32
+const bufferSize = 2048
 
 // Reap should be called when the process receives an SIGCHLD.  Reap will reap
 // all exited processes and close their wait channels
@@ -41,13 +42,20 @@ func Reap() error {
 	Default.Lock()
 	for c := range Default.subscribers {
 		for _, e := range exits {
-			c <- runc.Exit{
+			select {
+			case c <- runc.Exit{
 				Timestamp: now,
 				Pid:       e.Pid,
 				Status:    e.Status,
+			}:
+			default:
+				logrus.WithFields(logrus.Fields{
+					"subscriber": c,
+					"pid":        e.Pid,
+					"status":     e.Status,
+				}).Warn("failed to send exit to subscriber")
 			}
 		}
-
 	}
 	Default.Unlock()
 	return err
