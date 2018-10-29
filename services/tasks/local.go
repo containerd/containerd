@@ -460,7 +460,7 @@ func (l *local) CloseIO(ctx context.Context, r *api.CloseIORequest, _ ...grpc.Ca
 	}
 	if r.Stdin {
 		if err := p.CloseIO(ctx); err != nil {
-			return nil, err
+			return nil, errdefs.ToGRPC(err)
 		}
 	}
 	return empty, nil
