@@ -100,7 +100,6 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		cOpts = append(cOpts, containerd.WithImage(image))
 		cOpts = append(cOpts, containerd.WithSnapshotter(snapshotter))
 		cOpts = append(cOpts, containerd.WithNewSnapshot(id, image))
-		cOpts = append(cOpts, containerd.WithAuthorizationCheck())
 
 		if len(args) > 0 {
 			opts = append(opts, oci.WithProcessArgs(args...))
@@ -150,7 +149,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	if err != nil {
 		return nil, err
 	}
-	cOpts = append(cOpts, containerd.WithDcParameters(dcparameters))
+	cOpts = append(cOpts, containerd.WithAuthorizationCheck(dcparameters))
 
 	c, err := client.NewContainer(ctx, id, cOpts...)
 	if err != nil {

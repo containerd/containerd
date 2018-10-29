@@ -76,9 +76,6 @@ type Container struct {
 
 	// Extensions stores client-specified metadata
 	Extensions map[string]types.Any
-
-	// DcParameters are the image decryption parameters
-	DcParameters map[string][][]byte
 }
 
 // RuntimeInfo holds runtime specific information

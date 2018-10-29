@@ -168,7 +168,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	if err != nil {
 		return nil, err
 	}
-	cOpts = append(cOpts, containerd.WithDcParameters(dcparameters))
+	cOpts = append(cOpts, containerd.WithAuthorizationCheck(dcparameters))
 
 	// oci.WithImageConfig (WithUsername, WithUserID) depends on access to rootfs for resolving via
 	// the /etc/{passwd,group} files. So cOpts needs to have precedence over opts.
