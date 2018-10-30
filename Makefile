@@ -19,11 +19,9 @@ EPOCH_TEST_COMMIT := f9e02affccd51702191e5312665a16045ffef8ab
 PROJECT := github.com/containerd/cri
 BINDIR := ${DESTDIR}/usr/local/bin
 BUILD_DIR := _output
-# VERSION is derived from the current tag for HEAD plus amends. Version is used
+# VERSION is derived from the current commit for HEAD. Version is used
 # to set/overide the containerd version in vendor/github.com/containerd/containerd/version.
-VERSION := $(shell git describe --tags --dirty --always)
-# strip the first char of the tag if it's a `v`
-VERSION := $(VERSION:v%=%)
+VERSION := $(shell git rev-parse --short HEAD)
 TARBALL_PREFIX := cri-containerd
 TARBALL := $(TARBALL_PREFIX)-$(VERSION).$(GOOS)-$(GOARCH).tar.gz
 BUILD_TAGS := seccomp apparmor
