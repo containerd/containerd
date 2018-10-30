@@ -44,7 +44,7 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 	// Check the status of the cni initialization
 	if err := c.netPlugin.Status(); err != nil {
 		// If it is not initialized, then load the config and retry
-		if err = c.netPlugin.Load(cni.WithLoNetwork(), cni.WithDefaultConf()); err != nil {
+		if err = c.netPlugin.Load(cni.WithLoNetwork, cni.WithDefaultConf); err != nil {
 			networkCondition.Status = false
 			networkCondition.Reason = networkNotReadyReason
 			networkCondition.Message = fmt.Sprintf("Network plugin returns error: %v", err)
