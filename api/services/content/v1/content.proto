@@ -261,7 +261,7 @@ message WriteContentRequest {
 	//
 	// If the action is write, the remote may remove all previously written
 	// data after the offset. Implementations may support arbitrary offsets but
-	// MUST support reseting this value to zero with a write. If an
+	// MUST support resetting this value to zero with a write. If an
 	// implementation does not support a write at a particular offset, an
 	// OutOfRange error must be returned.
 	int64 offset = 5;
