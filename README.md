@@ -149,7 +149,8 @@ implementation.
 For sync communication we have a community slack with a #containerd channel that
 everyone is welcome to join and chat about development.
 
-**Slack:** https://dockr.ly/community
+**Slack:** Catch us in the #containerd and #containerd-dev channels on dockercommunity.slack.com.
+[Click here for an invite to docker community slack.](https://join.slack.com/t/dockercommunity/shared_invite/enQtNDY4MDc1Mzc0MzIwLTgxZDBlMmM4ZGEyNDc1N2FkMzlhODJkYmE1YTVkYjM1MDE3ZjAwZjBkOGFlOTJkZjRmZGYzNjYyY2M3ZTUxYzQ)
 
 ## Other Communications
 As this project is tightly coupled to CRI and CRI-Tools and they are Kubernetes
