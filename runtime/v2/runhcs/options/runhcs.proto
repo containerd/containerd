@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package containerd.runhcs.v1;
+
+import weak "gogoproto/gogo.proto";
+
+option go_package = "github.com/containerd/containerd/runtime/v2/runhcs/options;options";
+
+message Options {
+	// enable debug tracing
+	bool debug = 1;
+	enum DebugType {
+		NPIPE = 0;
+		FILE = 1;
+	}
+	// debug tracing output type
+	DebugType debug_type = 2;
+	// registry key root for storage of the runhcs container state
+	string registry_root = 3;
+}
