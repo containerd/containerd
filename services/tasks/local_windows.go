@@ -1,4 +1,4 @@
-// +build windows_v2
+// +build ignore
 
 /*
    Copyright The containerd Authors.
@@ -16,12 +16,22 @@
    limitations under the License.
 */
 
-package main
+package tasks
 
 import (
-	_ "github.com/containerd/containerd/diff/lcow"
-	_ "github.com/containerd/containerd/diff/windows"
-	_ "github.com/containerd/containerd/runtime/v2"
-	_ "github.com/containerd/containerd/snapshots/lcow"
-	_ "github.com/containerd/containerd/snapshots/windows"
+	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/runtime"
 )
+
+// TODO: JTERRY75 - When Windows V1 runtime is removed change this to only build
+// on Windows.
+var tasksServiceRequires = []plugin.Type{
+	plugin.RuntimePluginV2,
+	plugin.MetadataPlugin,
+	plugin.TaskMonitorPlugin,
+}
+
+// loadV1Runtimes on Windows V2 returns an empty map. There are no v1 runtimes
+func loadV1Runtimes(ic *plugin.InitContext) (map[string]runtime.PlatformRuntime, error) {
+	return make(map[string]runtime.PlatformRuntime), nil
+}

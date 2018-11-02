@@ -24,10 +24,3 @@ BINARY_SUFFIX=".exe"
 ifeq ($(GOARCH),amd64)
 	TESTFLAGS_RACE= -race
 endif
-
-# add support for building the Windows v2 runtime
-# based on the containerd-shim-runhcs-v1 shim rather
-# than the existing runtime on hcsshim
-ifeq (${BUILD_WINDOWS_V2},1)
-	BUILDTAGS += windows_v2
-endif
