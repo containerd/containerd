@@ -36,6 +36,7 @@ See [test dashboard](https://k8s-testgrid.appspot.com/sig-node-containerd)
 |     v1.0.0-alpha.x     |                    |      1.7, 1.8      |   v1alpha1  |
 |      v1.0.0-beta.x     |                    |        1.9         |   v1alpha1  |
 |       End-Of-Life      |        v1.1        |        1.10+       |   v1alpha2  |
+|                        |        v1.2        |        1.10+       |   v1alpha2  |
 |                        |        HEAD        |        1.10+       |   v1alpha2  |
 
 ## Production Quality Cluster on GCE
