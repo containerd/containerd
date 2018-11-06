@@ -451,10 +451,19 @@ func (s *Service) processExits() {
 	}
 }
 
-func (s *Service) checkProcesses(e runc.Exit) {
+func (s *Service) allProcesses() []proc.Process {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	res := make([]proc.Process, 0, len(s.processes))
 	for _, p := range s.processes {
+		res = append(res, p)
+	}
+	return res
+}
+
+func (s *Service) checkProcesses(e runc.Exit) {
+	for _, p := range s.allProcesses() {
 		if p.Pid() == e.Pid {
 			if ip, ok := p.(*proc.Init); ok {
 				// Ensure all children are killed
