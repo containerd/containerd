@@ -692,6 +692,8 @@ func shouldKillAllOnExit(bundlePath string) (bool, error) {
 func (s *service) allProcesses() (o []rproc.Process) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	o = make([]rproc.Process, 0, len(s.processes)+1)
 	for _, p := range s.processes {
 		o = append(o, p)
 	}
