@@ -284,13 +284,20 @@ func (p *process) handleSigkilledShim(rst uint32, rerr error) (uint32, error) {
 				}
 			}
 
+			timeout := time.After(10 * time.Second)
+			tick := time.Tick(5 * time.Millisecond)
 			// wait for the process to die
+		loop:
 			for {
-				e := unix.Kill(p.pid, 0)
-				if e == syscall.ESRCH {
-					break
+				select {
+				case <-timeout:
+					return UnknownStatus, fmt.Errorf("containerd: giving up on %s:%s (pid %v)", p.containerd.id, p.id, p.pid)
+				case <-tick:
+					e := unix.Kill(p.pid, 0)
+					if e == syscall.ESRCH {
+						break loop
+					}
 				}
-				time.Sleep(5 * time.Millisecond)
 			}
 			// Create the file so we get the exit event generated once monitor kicks in
 			// without having to go through all this process again
