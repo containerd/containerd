@@ -87,7 +87,7 @@ func handleSignals(logger *logrus.Entry, signals chan os.Signal) error {
 }
 
 func openLog(ctx context.Context, _ string) (io.Writer, error) {
-	return fifo.OpenFifo(context.Background(), "log", unix.O_WRONLY, 0700)
+	return fifo.OpenFifo(ctx, "log", unix.O_WRONLY, 0700)
 }
 
 func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event events.Event) error {
