@@ -166,6 +166,28 @@ var validJweCcs = []*config.CryptoConfig{
 			},
 		},
 	},
+	// EC Key (DER format)
+	{
+		Ec: &config.EncryptConfig{
+			Parameters: map[string][][]byte{
+				"pubkeys": {jweEcPubKeyPem},
+			},
+			Operation: config.OperationAddRecipients,
+			Dc: config.DecryptConfig{
+				Parameters: map[string][][]byte{
+					"privkeys":           {jweEcPrivKeyDer},
+					"privkeys-passwords": {oneEmpty},
+				},
+			},
+		},
+
+		Dc: &config.DecryptConfig{
+			Parameters: map[string][][]byte{
+				"privkeys":           {jweEcPrivKeyDer},
+				"privkeys-passwords": {oneEmpty},
+			},
+		},
+	},
 }
 
 var invalidJweCcs = []*config.CryptoConfig{
