@@ -141,6 +141,10 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		if context.IsSet("allow-new-privs") {
 			opts = append(opts, oci.WithNewPrivileges)
 		}
+		if context.IsSet("cgroup") {
+			// NOTE: can be set to "" explicitly for disabling cgroup.
+			opts = append(opts, oci.WithCgroup(context.String("cgroup")))
+		}
 	}
 
 	cOpts = append(cOpts, containerd.WithRuntime(context.String("runtime"), nil))

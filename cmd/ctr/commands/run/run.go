@@ -110,6 +110,10 @@ var Command = cli.Command{
 			Name:  "isolated",
 			Usage: "run the container with vm isolation",
 		},
+		cli.StringFlag{
+			Name:  "cgroup",
+			Usage: "cgroup path (To disable use of cgroup, set to \"\" explicitly)",
+		},
 	}, append(commands.SnapshotterFlags, commands.ContainerFlags...)...),
 	Action: func(context *cli.Context) error {
 		var (
