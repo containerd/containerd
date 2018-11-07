@@ -341,6 +341,9 @@ createJWEKeys() {
 	PRIVKEYJWK=${WORKDIR}/mykey.jwk
 	PUBKEYJWK=${WORKDIR}/mypubkey.jwk
 
+	ECPRIVKEYDER=${WORKDIR}/myeckey.der
+	ECPUBKEYDER=${WORKDIR}/myecpubkey.der
+
 	MSG="$(openssl genrsa -out ${PRIVKEYPEM} 2>&1)"
 	failExit $? "Could not generate private key\n$MSG"
 
@@ -370,6 +373,12 @@ createJWEKeys() {
 
 	MSG="$(openssl rsa -inform pem -outform pem -passin pass:${PRIVKEY3PASSWORD} -pubout -in ${PRIVKEY3PASSPEM} -out ${PUBKEY3PEM} 2>&1)"
 	failExit $? "Could not write 3rd public key in PEM format\n$MSG"
+
+	MSG="$(openssl ecparam -genkey -out ${ECPRIVKEYDER} -outform der -name secp521r1 2>&1)"
+	failExit $? "Could not generate EC private key\n$MSG"
+
+	MSG="$(openssl ec -in ${ECPRIVKEYDER} -inform der -pubout -outform der -out ${ECPUBKEYDER} 2>&1)"
+	failExit $? "Could not write EC public key in DER format\n$MSG"
 
 	echo "${JWKTESTKEY1}" > ${PRIVKEYJWK}
 	echo "${JWKTESTPUBKEY1}" > ${PUBKEYJWK}
@@ -434,11 +443,12 @@ testJWE() {
 		--key ${PRIVKEYPEM} \
 		--recipient ${PUBKEY2PEM} \
 		--recipient ${PUBKEY3PEM} \
+		--recipient ${ECPUBKEYDER} \
 		${ALPINE_ENC}
 	failExit $? "Adding recipient to JWE encrypted image failed"
 	sleep ${SLEEP_TIME}
 
-	for privkey in ${PRIVKEYPEM} ${PRIVKEY2PEM} ${PRIVKEY3PASSPEM}; do
+	for privkey in ${PRIVKEYPEM} ${PRIVKEY2PEM} ${PRIVKEY3PASSPEM} ${ECPRIVKEYDER}; do
 		local key=${privkey}
 		if [ "${privkey}" == "${PRIVKEY3PASSPEM}" ]; then
 			key=${privkey}:pass=${PRIVKEY3PASSWORD}
