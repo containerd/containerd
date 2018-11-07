@@ -52,6 +52,7 @@ func (kw *pkcs7KeyWrapper) WrapKeys(ec *config.EncryptConfig, optsData []byte) (
 		return nil, nil
 	}
 
+	pkcs7.ContentEncryptionAlgorithm = pkcs7.EncryptionAlgorithmAES128GCM
 	return pkcs7.Encrypt(optsData, x509Certs)
 }
 
