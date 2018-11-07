@@ -63,6 +63,9 @@ func ParsePrivateKey(privKey, privKeyPassword []byte, prefix string) (interface{
 	key, err := x509.ParsePKCS8PrivateKey(privKey)
 	if err != nil {
 		key, err = x509.ParsePKCS1PrivateKey(privKey)
+		if err != nil {
+			key, err = x509.ParseECPrivateKey(privKey)
+		}
 	}
 	if err != nil {
 		block, _ := pem.Decode(privKey)

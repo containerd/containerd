@@ -17,6 +17,8 @@
 package jwe
 
 import (
+	"crypto/ecdsa"
+
 	"github.com/containerd/containerd/images/encryption/config"
 	"github.com/containerd/containerd/images/encryption/keywrap"
 	"github.com/containerd/containerd/images/encryption/utils"
@@ -116,8 +118,14 @@ func addPubKeys(joseRecipients *[]jose.Recipient, pubKeys [][]byte) error {
 			return err
 		}
 
+		alg := jose.RSA_OAEP
+		switch key.(type) {
+		case *ecdsa.PublicKey:
+			alg = jose.ECDH_ES_A256KW
+		}
+
 		*joseRecipients = append(*joseRecipients, jose.Recipient{
-			Algorithm: jose.RSA_OAEP,
+			Algorithm: alg,
 			Key:       key,
 		})
 	}
