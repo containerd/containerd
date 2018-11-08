@@ -26,7 +26,6 @@ import (
 	"github.com/containerd/containerd/sys"
 	runc "github.com/containerd/go-runc"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // ErrNoSuchProcess is returned when the process no longer exists
@@ -42,18 +41,10 @@ func Reap() error {
 	Default.Lock()
 	for c := range Default.subscribers {
 		for _, e := range exits {
-			select {
-			case c <- runc.Exit{
+			c <- runc.Exit{
 				Timestamp: now,
 				Pid:       e.Pid,
 				Status:    e.Status,
-			}:
-			default:
-				logrus.WithFields(logrus.Fields{
-					"subscriber": c,
-					"pid":        e.Pid,
-					"status":     e.Status,
-				}).Warn("failed to send exit to subscriber")
 			}
 		}
 	}
