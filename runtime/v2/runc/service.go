@@ -110,7 +110,7 @@ type service struct {
 	cancel func()
 }
 
-func newCommand(ctx context.Context, containerdBinary, containerdAddress string) (*exec.Cmd, error) {
+func newCommand(ctx context.Context, id, containerdBinary, containerdAddress string) (*exec.Cmd, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -125,6 +125,7 @@ func newCommand(ctx context.Context, containerdBinary, containerdAddress string)
 	}
 	args := []string{
 		"-namespace", ns,
+		"-id", id,
 		"-address", containerdAddress,
 		"-publish-binary", containerdBinary,
 	}
@@ -138,7 +139,7 @@ func newCommand(ctx context.Context, containerdBinary, containerdAddress string)
 }
 
 func (s *service) StartShim(ctx context.Context, id, containerdBinary, containerdAddress string) (string, error) {
-	cmd, err := newCommand(ctx, containerdBinary, containerdAddress)
+	cmd, err := newCommand(ctx, id, containerdBinary, containerdAddress)
 	if err != nil {
 		return "", err
 	}
