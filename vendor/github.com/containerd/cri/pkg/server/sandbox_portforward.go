@@ -59,10 +59,12 @@ func (c *criService) portForward(id string, port int32, stream io.ReadWriteClose
 	securityContext := s.Config.GetLinux().GetSecurityContext()
 	hostNet := securityContext.GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE
 	if !hostNet {
-		if s.NetNS == nil || s.NetNS.Closed() {
+		if closed, err := s.NetNS.Closed(); err != nil {
+			return errors.Wrapf(err, "failed to check netwok namespace closed for sandbox %q", id)
+		} else if closed {
 			return errors.Errorf("network namespace for sandbox %q is closed", id)
 		}
-		netNSDo = s.NetNS.GetNs().Do
+		netNSDo = s.NetNS.Do
 		netNSPath = s.NetNS.GetPath()
 	} else {
 		// Run the function directly for host network.

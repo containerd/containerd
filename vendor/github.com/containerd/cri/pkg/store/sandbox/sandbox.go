@@ -22,6 +22,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/docker/docker/pkg/truncindex"
 
+	"github.com/containerd/cri/pkg/netns"
 	"github.com/containerd/cri/pkg/store"
 )
 
@@ -32,10 +33,12 @@ type Sandbox struct {
 	Metadata
 	// Status stores the status of the sandbox.
 	Status StatusStorage
-	// Container is the containerd sandbox container client
+	// Container is the containerd sandbox container client.
 	Container containerd.Container
-	// CNI network namespace client
-	NetNS *NetNS
+	// CNI network namespace client.
+	// For hostnetwork pod, this is always nil;
+	// For non hostnetwork pod, this should never be nil.
+	NetNS *netns.NetNS
 	// StopCh is used to propagate the stop information of the sandbox.
 	*store.StopCh
 }
