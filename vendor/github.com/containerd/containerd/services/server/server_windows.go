@@ -20,8 +20,10 @@ package server
 
 import (
 	"context"
+
+	srvconfig "github.com/containerd/containerd/services/server/config"
 )
 
-func apply(_ context.Context, _ *Config) error {
+func apply(_ context.Context, _ *srvconfig.Config) error {
 	return nil
 }

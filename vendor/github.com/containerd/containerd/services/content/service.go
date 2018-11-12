@@ -376,6 +376,9 @@ func (s *service) Write(session api.Content_WriteServer) (err error) {
 			expected = req.Expected
 
 			if _, err := s.store.Info(session.Context(), req.Expected); err == nil {
+				if err := wr.Close(); err != nil {
+					log.G(ctx).WithError(err).Error("failed to close writer")
+				}
 				if err := s.store.Abort(session.Context(), ref); err != nil {
 					log.G(ctx).WithError(err).Error("failed to abort write")
 				}

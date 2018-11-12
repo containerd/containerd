@@ -41,6 +41,7 @@ type walkingDiff struct {
 }
 
 var emptyDesc = ocispec.Descriptor{}
+var uncompressed = "containerd.io/uncompressed"
 
 // NewWalkingDiff is a generic implementation of diff.Comparer.  The diff is
 // calculated by mounting both the upper and lower mount sets and walking the
@@ -125,7 +126,7 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 				if config.Labels == nil {
 					config.Labels = map[string]string{}
 				}
-				config.Labels["containerd.io/uncompressed"] = dgstr.Digest().String()
+				config.Labels[uncompressed] = dgstr.Digest().String()
 			} else {
 				if err = archive.WriteDiff(ctx, cw, lowerRoot, upperRoot); err != nil {
 					return errors.Wrap(err, "failed to write diff")
@@ -147,6 +148,14 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 			info, err := s.store.Info(ctx, dgst)
 			if err != nil {
 				return errors.Wrap(err, "failed to get info from content store")
+			}
+
+			// Set uncompressed label if digest already existed without label
+			if _, ok := info.Labels[uncompressed]; !ok {
+				info.Labels[uncompressed] = config.Labels[uncompressed]
+				if _, err := s.store.Update(ctx, info, "labels."+uncompressed); err != nil {
+					return errors.Wrap(err, "error setting uncompressed label")
+				}
 			}
 
 			ocidesc = ocispec.Descriptor{
