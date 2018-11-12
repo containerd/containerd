@@ -49,7 +49,7 @@ Documentation=https://containerd.io
 After=network.target
 
 [Service]
-ExecStartPre=/sbin/modprobe overlay
+ExecStartPre=-/sbin/modprobe overlay
 ExecStart=/usr/local/bin/containerd
 Delegate=yes
 KillMode=process
