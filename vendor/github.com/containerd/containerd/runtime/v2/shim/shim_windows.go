@@ -196,7 +196,7 @@ type deferredShimWriteLogger struct {
 	conerr error
 }
 
-// beginAccept issues an accept to wait for a connection. Once a conneciton
+// beginAccept issues an accept to wait for a connection. Once a connection
 // occurs drains any outstanding buffer. While draining the buffer any writes
 // are blocked. If the buffer fails to fully drain due to a connection drop a
 // call to `beginAccept` is re-issued waiting for another connection from

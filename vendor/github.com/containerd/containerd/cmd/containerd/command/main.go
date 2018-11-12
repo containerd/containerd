@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/services/server"
+	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/containerd/version"
 	"github.com/pkg/errors"
@@ -109,7 +110,7 @@ func App() *cli.App {
 		// we don't miss any signals during boot
 		signal.Notify(signals, handledSignals...)
 
-		if err := server.LoadConfig(context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
+		if err := srvconfig.LoadConfig(context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
 			return err
 		}
 		// apply flags to the config
@@ -187,7 +188,7 @@ func serve(ctx gocontext.Context, l net.Listener, serveFunc func(net.Listener) e
 	}()
 }
 
-func applyFlags(context *cli.Context, config *server.Config) error {
+func applyFlags(context *cli.Context, config *srvconfig.Config) error {
 	// the order for config vs flag values is that flags will always override
 	// the config values if they are set
 	if err := setLevel(context, config); err != nil {
@@ -217,7 +218,7 @@ func applyFlags(context *cli.Context, config *server.Config) error {
 	return nil
 }
 
-func setLevel(context *cli.Context, config *server.Config) error {
+func setLevel(context *cli.Context, config *srvconfig.Config) error {
 	l := context.GlobalString("log-level")
 	if l == "" {
 		l = config.Debug.Level
