@@ -201,7 +201,8 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 	case *eventtypes.TaskExit:
 		e := any.(*eventtypes.TaskExit)
 		logrus.Infof("TaskExit event %+v", e)
-		cntr, err := em.c.containerStore.Get(e.ContainerID)
+		// Use ID instead of ContainerID to rule out TaskExit event for exec.
+		cntr, err := em.c.containerStore.Get(e.ID)
 		if err == nil {
 			if err := handleContainerExit(ctx, e, cntr); err != nil {
 				return errors.Wrap(err, "failed to handle container TaskExit event")
@@ -211,7 +212,7 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 			return errors.Wrap(err, "can't find container for TaskExit event")
 		}
 		// Use GetAll to include sandbox in unknown state.
-		sb, err := em.c.sandboxStore.GetAll(e.ContainerID)
+		sb, err := em.c.sandboxStore.GetAll(e.ID)
 		if err == nil {
 			if err := handleSandboxExit(ctx, e, sb); err != nil {
 				return errors.Wrap(err, "failed to handle sandbox TaskExit event")
@@ -224,16 +225,11 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 	case *eventtypes.TaskOOM:
 		e := any.(*eventtypes.TaskOOM)
 		logrus.Infof("TaskOOM event %+v", e)
+		// For TaskOOM, we only care which container it belongs to.
 		cntr, err := em.c.containerStore.Get(e.ContainerID)
 		if err != nil {
 			if err != store.ErrNotExist {
 				return errors.Wrap(err, "can't find container for TaskOOM event")
-			}
-			if _, err = em.c.sandboxStore.Get(e.ContainerID); err != nil {
-				if err != store.ErrNotExist {
-					return errors.Wrap(err, "can't find sandbox for TaskOOM event")
-				}
-				return nil
 			}
 			return nil
 		}
@@ -263,10 +259,6 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 
 // handleContainerExit handles TaskExit event for container.
 func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr containerstore.Container) error {
-	if e.Pid != cntr.Status.Get().Pid {
-		// Non-init process died, ignore the event.
-		return nil
-	}
 	// Attach container IO so that `Delete` could cleanup the stream properly.
 	task, err := cntr.Container.Task(ctx,
 		func(*containerdio.FIFOSet) (containerdio.IO, error) {
@@ -307,10 +299,6 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 
 // handleSandboxExit handles TaskExit event for sandbox.
 func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxstore.Sandbox) error {
-	if e.Pid != sb.Status.Get().Pid {
-		// Non-init process died, ignore the event.
-		return nil
-	}
 	// No stream attached to sandbox container.
 	task, err := sb.Container.Task(ctx, nil)
 	if err != nil {
