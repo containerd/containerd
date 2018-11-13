@@ -34,7 +34,7 @@ before_script:
   - export PATH=$HOME/gopath/bin:$PATH
 
 script:
-  - make install.tools
+  - make .install.gitvalidation
   - make .gitvalidation
   - make binaries
   - make install.deps
