@@ -299,7 +299,7 @@ func (in *instrumentedService) PullImage(ctx context.Context, r *runtime.PullIma
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	logrus.Infof("PullImage %q with auth config %+v", r.GetImage().GetImage(), r.GetAuth())
+	logrus.Infof("PullImage %q", r.GetImage().GetImage())
 	defer func() {
 		if err != nil {
 			logrus.WithError(err).Errorf("PullImage %q failed", r.GetImage().GetImage())

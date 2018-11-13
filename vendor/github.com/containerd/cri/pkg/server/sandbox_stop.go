@@ -59,21 +59,20 @@ func (c *criService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandb
 	}
 
 	// Teardown network for sandbox.
-	if sandbox.NetNSPath != "" {
+	if sandbox.NetNS != nil {
 		netNSPath := sandbox.NetNSPath
-		if sandbox.NetNS == nil || sandbox.NetNS.Closed() {
-			// Use empty netns path if netns is not available. This is defined in:
-			// https://github.com/containernetworking/cni/blob/v0.7.0-alpha1/SPEC.md
+		// Use empty netns path if netns is not available. This is defined in:
+		// https://github.com/containernetworking/cni/blob/v0.7.0-alpha1/SPEC.md
+		if closed, err := sandbox.NetNS.Closed(); err != nil {
+			return nil, errors.Wrap(err, "failed to check network namespace closed")
+		} else if closed {
 			netNSPath = ""
 		}
 		if err := c.teardownPod(id, netNSPath, sandbox.Config); err != nil {
 			return nil, errors.Wrapf(err, "failed to destroy network for sandbox %q", id)
 		}
-		// Close the sandbox network namespace if it was created
-		if sandbox.NetNS != nil {
-			if err = sandbox.NetNS.Remove(); err != nil {
-				return nil, errors.Wrapf(err, "failed to remove network namespace for sandbox %q", id)
-			}
+		if err = sandbox.NetNS.Remove(); err != nil {
+			return nil, errors.Wrapf(err, "failed to remove network namespace for sandbox %q", id)
 		}
 	}
 
