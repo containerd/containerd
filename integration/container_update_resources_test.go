@@ -51,7 +51,7 @@ func TestUpdateContainerResources(t *testing.T) {
 		"container",
 		pauseImage,
 		WithResources(&runtime.LinuxContainerResources{
-			MemoryLimitInBytes: 2 * 1024 * 1024,
+			MemoryLimitInBytes: 200 * 1024 * 1024,
 		}),
 	)
 	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
@@ -62,18 +62,18 @@ func TestUpdateContainerResources(t *testing.T) {
 	require.NoError(t, err)
 	spec, err := container.Spec(context.Background())
 	require.NoError(t, err)
-	checkMemoryLimit(t, spec, 2*1024*1024)
+	checkMemoryLimit(t, spec, 200*1024*1024)
 
 	t.Log("Update container memory limit after created")
 	err = runtimeService.UpdateContainerResources(cn, &runtime.LinuxContainerResources{
-		MemoryLimitInBytes: 4 * 1024 * 1024,
+		MemoryLimitInBytes: 400 * 1024 * 1024,
 	})
 	require.NoError(t, err)
 
 	t.Log("Check memory limit in container OCI spec")
 	spec, err = container.Spec(context.Background())
 	require.NoError(t, err)
-	checkMemoryLimit(t, spec, 4*1024*1024)
+	checkMemoryLimit(t, spec, 400*1024*1024)
 
 	t.Log("Start the container")
 	require.NoError(t, runtimeService.StartContainer(cn))
@@ -85,21 +85,21 @@ func TestUpdateContainerResources(t *testing.T) {
 	require.NoError(t, err)
 	stat, err := cgroup.Stat(cgroups.IgnoreNotExist)
 	require.NoError(t, err)
-	assert.Equal(t, uint64(4*1024*1024), stat.Memory.Usage.Limit)
+	assert.Equal(t, uint64(400*1024*1024), stat.Memory.Usage.Limit)
 
 	t.Log("Update container memory limit after started")
 	err = runtimeService.UpdateContainerResources(cn, &runtime.LinuxContainerResources{
-		MemoryLimitInBytes: 8 * 1024 * 1024,
+		MemoryLimitInBytes: 800 * 1024 * 1024,
 	})
 	require.NoError(t, err)
 
 	t.Log("Check memory limit in container OCI spec")
 	spec, err = container.Spec(context.Background())
 	require.NoError(t, err)
-	checkMemoryLimit(t, spec, 8*1024*1024)
+	checkMemoryLimit(t, spec, 800*1024*1024)
 
 	t.Log("Check memory limit in cgroup")
 	stat, err = cgroup.Stat(cgroups.IgnoreNotExist)
 	require.NoError(t, err)
-	assert.Equal(t, uint64(8*1024*1024), stat.Memory.Usage.Limit)
+	assert.Equal(t, uint64(800*1024*1024), stat.Memory.Usage.Limit)
 }
