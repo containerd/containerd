@@ -100,7 +100,7 @@ func forwardRunhcsLogs(ctx context.Context, c net.Conn, fields logrus.Fields) {
 
 		// TODO: JTERRY75 maybe we need to make this configurable so we know
 		// that runhcs is using the same one we are deserializing.
-		ti, err := time.Parse(logrus.DefaultTimestampFormat, e.Data[logrus.FieldKeyTime].(string))
+		ti, err := time.Parse(time.RFC3339, e.Data[logrus.FieldKeyTime].(string))
 		if err != nil {
 			log.G(ctx).WithFields(fields).WithError(err).Debug("invalid time stamp format")
 			ti = time.Time{}
