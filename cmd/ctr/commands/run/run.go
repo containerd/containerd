@@ -86,9 +86,10 @@ func parseMountFlag(m string) (specs.Mount, error) {
 
 // Command runs a container
 var Command = cli.Command{
-	Name:      "run",
-	Usage:     "run a container",
-	ArgsUsage: "[flags] Image|RootFS ID [COMMAND] [ARG...]",
+	Name:           "run",
+	Usage:          "run a container",
+	ArgsUsage:      "[flags] Image|RootFS ID [COMMAND] [ARG...]",
+	SkipArgReorder: true,
 	Flags: append([]cli.Flag{
 		cli.BoolFlag{
 			Name:  "rm",
