@@ -195,6 +195,19 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
 			if _, err := cs.Update(ctx, cinfo, "labels.containerd.io/uncompressed"); err != nil {
 				return err
 			}
+		} else {
+			// The cached image is served, so we need to do an image authorization check.
+			// Image authorization check prevents access to the cached encrypted images
+			// without valid private keys that can decrypt those encrypted images.
+			if images.IsEncryptedDiff(ctx, layer.Blob.MediaType) {
+				if cc == nil {
+					return fmt.Errorf("Unable to check authorization since decryption params are nil")
+				}
+				err = images.CheckAuthorization(ctx, cs, i.Target(), cc.Dc)
+				if err != nil {
+					return err
+				}
+			}
 		}
 
 		chain = append(chain, layer.Diff.Digest)

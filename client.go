@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -165,7 +166,7 @@ func NewWithConn(conn *grpc.ClientConn, opts ...ClientOpt) (*Client, error) {
 // Client is the client to interact with containerd and its various services
 // using a uniform interface
 type Client struct {
-	decryptionKeys string
+	decryptionKeys []string
 	services
 	connMu    sync.Mutex
 	conn      *grpc.ClientConn
@@ -408,8 +409,8 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 	i := NewImageWithPlatform(c, img, pullCtx.PlatformMatcher)
 
 	if pullCtx.Unpack {
-		if c.decryptionKeys != "" {
-			dcparameters, err := utils.SortDecryptionKeys(c.decryptionKeys)
+		if len(c.decryptionKeys) != 0 {
+			dcparameters, err := utils.SortDecryptionKeys(strings.Join(c.decryptionKeys, ","))
 			if err != nil {
 				return nil, err
 			}
