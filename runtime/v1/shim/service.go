@@ -509,16 +509,24 @@ func (s *Service) processExits() {
 	}
 }
 
-func (s *Service) checkProcesses(e runc.Exit) {
+func (s *Service) allProcesses() []rproc.Process {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	res := make([]rproc.Process, 0, len(s.processes))
+	for _, p := range s.processes {
+		res = append(res, p)
+	}
+	return res
+}
+
+func (s *Service) checkProcesses(e runc.Exit) {
 	shouldKillAll, err := shouldKillAllOnExit(s.bundle)
 	if err != nil {
 		log.G(s.context).WithError(err).Error("failed to check shouldKillAll")
 	}
 
-	for _, p := range s.processes {
+	for _, p := range s.allProcesses() {
 		if p.Pid() == e.Pid {
 
 			if shouldKillAll {
