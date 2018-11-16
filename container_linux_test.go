@@ -24,7 +24,9 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -256,6 +258,213 @@ func TestDaemonRestart(t *testing.T) {
 	}
 
 	<-statusC
+}
+
+func TestShimDoesNotLeakPipes(t *testing.T) {
+	containerdPid := ctrd.cmd.Process.Pid
+	initialPipes, err := numPipes(containerdPid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30")))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	exitChannel, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+
+	<-exitChannel
+
+	if _, err := task.Delete(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := container.Delete(ctx, WithSnapshotCleanup); err != nil {
+		t.Fatal(err)
+	}
+
+	currentPipes, err := numPipes(containerdPid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if initialPipes != currentPipes {
+		t.Errorf("Pipes have leaked after container has been deleted. Initially there were %d pipes, after container deletion there were %d pipes", initialPipes, currentPipes)
+	}
+}
+
+func numPipes(pid int) (int, error) {
+	cmd := exec.Command("sh", "-c", fmt.Sprintf("lsof -p %d | grep pipe", pid))
+
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	if err := cmd.Run(); err != nil {
+		return 0, err
+	}
+	return strings.Count(stdout.String(), "\n"), nil
+}
+
+func TestDaemonReconnectsToShimIOPipesOnRestart(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	_, err = task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ctrd.Restart(nil); err != nil {
+		t.Fatal(err)
+	}
+
+	waitCtx, waitCancel := context.WithTimeout(ctx, 2*time.Second)
+	serving, err := client.IsServing(waitCtx)
+	waitCancel()
+	if !serving {
+		t.Fatalf("containerd did not start within 2s: %v", err)
+	}
+
+	// After we restared containerd we write some messages to the log pipes, simulating shim writing stuff there.
+	// Then we make sure that these messages are available on the containerd log thus proving that the server reconnected to the log pipes
+	runtimeVersion := getRuntimeVersion()
+	logDirPath := getLogDirPath(runtimeVersion, id)
+
+	switch runtimeVersion {
+	case "v1":
+		writeToFile(t, filepath.Join(logDirPath, "shim.stdout.log"), fmt.Sprintf("%s writing to stdout\n", id))
+		writeToFile(t, filepath.Join(logDirPath, "shim.stderr.log"), fmt.Sprintf("%s writing to stderr\n", id))
+	case "v2":
+		writeToFile(t, filepath.Join(logDirPath, "log"), fmt.Sprintf("%s writing to log\n", id))
+	}
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+
+	<-statusC
+
+	stdioContents, err := ioutil.ReadFile(ctrdStdioFilePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	switch runtimeVersion {
+	case "v1":
+		if !strings.Contains(string(stdioContents), fmt.Sprintf("%s writing to stdout", id)) {
+			t.Fatal("containerd did not connect to the shim stdout pipe")
+		}
+		if !strings.Contains(string(stdioContents), fmt.Sprintf("%s writing to stderr", id)) {
+			t.Fatal("containerd did not connect to the shim stderr pipe")
+		}
+	case "v2":
+		if !strings.Contains(string(stdioContents), fmt.Sprintf("%s writing to log", id)) {
+			t.Fatal("containerd did not connect to the shim log pipe")
+		}
+	}
+}
+
+func writeToFile(t *testing.T, filePath, message string) {
+	writer, err := os.OpenFile(filePath, os.O_WRONLY, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writer.WriteString(message); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func getLogDirPath(runtimeVersion, id string) string {
+	switch runtimeVersion {
+	case "v1":
+		return filepath.Join(defaultRoot, "io.containerd.runtime.v1.linux", testNamespace, id)
+	case "v2":
+		return filepath.Join(defaultState, "io.containerd.runtime.v2.task", testNamespace, id)
+	default:
+		panic(fmt.Errorf("Unsupported runtime version %s", runtimeVersion))
+	}
+}
+
+func getRuntimeVersion() string {
+	switch rt := os.Getenv("TEST_RUNTIME"); rt {
+	case "io.containerd.runc.v1":
+		return "v2"
+	default:
+		return "v1"
+	}
 }
 
 func TestContainerPTY(t *testing.T) {
