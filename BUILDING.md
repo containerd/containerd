@@ -46,6 +46,7 @@ need to satisfy this dependencies in your system:
 
 If you're building with seccomp, you'll need to install it with the following:
 
+* CentOS/Fedora: `yum install libseccomp-devel`
 * Debian/Ubuntu: `apt install libseccomp-dev`
 
 At this point you are ready to build `containerd` yourself!
