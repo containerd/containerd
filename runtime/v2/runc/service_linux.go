@@ -49,9 +49,10 @@ func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console
 		cwg.Add(1)
 		go func() {
 			cwg.Done()
-			p := bufPool.Get().(*[]byte)
-			defer bufPool.Put(p)
-			io.CopyBuffer(epollConsole, in, *p)
+			bp := bufPool.Get().(*[]byte)
+			defer bufPool.Put(bp)
+			io.CopyBuffer(epollConsole, in, *bp)
+			epollConsole.Shutdown(p.epoller.CloseConsole)
 		}()
 	}
 
