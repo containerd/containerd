@@ -290,7 +290,7 @@ func (p *Init) setExited(status int) {
 }
 
 func (p *Init) delete(context context.Context) error {
-	p.KillAll(context)
+	p.killAll(context)
 	p.wg.Wait()
 	err := p.runtime.Delete(context, p.id, nil)
 	// ignore errors if a runtime has already deleted the process
@@ -346,6 +346,12 @@ func (p *Init) kill(context context.Context, signal uint32, all bool) error {
 
 // KillAll processes belonging to the init process
 func (p *Init) KillAll(context context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.killAll(context)
+}
+
+func (p *Init) killAll(context context.Context) error {
 	err := p.runtime.Kill(context, p.id, int(syscall.SIGKILL), &runc.KillOpts{
 		All: true,
 	})
