@@ -192,6 +192,8 @@ func (s *Service) Start(ctx context.Context, r *shimapi.StartRequest) (*shimapi.
 	if err != nil {
 		return nil, err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if err := p.Start(ctx); err != nil {
 		return nil, err
 	}
@@ -207,12 +209,12 @@ func (s *Service) Delete(ctx context.Context, r *ptypes.Empty) (*shimapi.DeleteR
 	if err != nil {
 		return nil, err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if err := p.Delete(ctx); err != nil {
 		return nil, err
 	}
-	s.mu.Lock()
 	delete(s.processes, s.id)
-	s.mu.Unlock()
 	s.platform.Close()
 	return &shimapi.DeleteResponse{
 		ExitStatus: uint32(p.ExitStatus()),
