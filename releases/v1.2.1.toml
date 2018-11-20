@@ -1,0 +1,37 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.2.0"
+
+pre_release = false
+
+preface = """\
+The first patch release for `containerd` 1.2 includes several
+runtime and CRI fixes.
+
+## Runtime
+* Fix race in process state when pausing containers
+* Optimize runtime v1 shim locking
+* Fix hang processing events
+* Increase event buffer size
+* Fix broken pipe causing shim hang
+* Update runc
+
+## CRI
+* Remove auth config logs
+* Fix NetNS cache state
+
+## Service
+* Ignore modprobe failures in systemd ExecStartPre"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
+
+[rename_deps]
