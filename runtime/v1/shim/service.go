@@ -246,14 +246,13 @@ func (s *Service) DeleteProcess(ctx context.Context, r *shimapi.DeleteProcessReq
 // Exec an additional process inside the container
 func (s *Service) Exec(ctx context.Context, r *shimapi.ExecProcessRequest) (*ptypes.Empty, error) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	if p := s.processes[r.ID]; p != nil {
-		s.mu.Unlock()
 		return nil, errdefs.ToGRPCf(errdefs.ErrAlreadyExists, "id %s", r.ID)
 	}
 
 	p := s.processes[s.id]
-	s.mu.Unlock()
 	if p == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
 	}
@@ -269,9 +268,7 @@ func (s *Service) Exec(ctx context.Context, r *shimapi.ExecProcessRequest) (*pty
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-	s.mu.Lock()
 	s.processes[r.ID] = process
-	s.mu.Unlock()
 	return empty, nil
 }
 
