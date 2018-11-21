@@ -1,0 +1,41 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.1.4"
+
+pre_release = false
+
+preface = """\
+This is the fifth patch release for the `containerd` 1.1 release. This
+release includes several fixes in both the CRI plugin and containerd-shim.
+
+## Runtime
+* Fix a bug that containerd-shim may hang when many exec processes simultaneously
+run in a container.
+* Update runc
+
+## CRI Plugin
+* Fix a bug that IPAM IP leaks after node reboot.
+* Stop logging image `AuthConfig` in the CRI plugin log.
+
+To use containerd 1.1 with Kubernetes 1.11+, please set `stream_server_address` to
+`127.0.0.1` or `localhost`, and set `enable_tls_streaming` to `false`.
+
+# Service
+* Ignore modprobe failures in systemd ExecStartPre. This fixes containerd start
+failures in the environment where `modprobe overlay` always returns error, e.g.
+an LXC container, a kernel with overlay built-in etc.
+
+
+Please see the changelog for full details.
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
