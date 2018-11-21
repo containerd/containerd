@@ -44,14 +44,6 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		id = context.Args().Get(1)
 	}
 
-	if raw := context.String("checkpoint"); raw != "" {
-		im, err := client.GetImage(ctx, raw)
-		if err != nil {
-			return nil, err
-		}
-		return client.NewContainer(ctx, id, containerd.WithCheckpoint(im, id), containerd.WithRuntime(context.String("runtime"), nil))
-	}
-
 	var (
 		opts  []oci.SpecOpts
 		cOpts []containerd.NewContainerOpts

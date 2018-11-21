@@ -28,8 +28,11 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/runtime/linux/runctypes"
-	"github.com/containerd/containerd/runtime/v2/runc/options"
+)
+
+const (
+	v1runtime          = "io.containerd.runtime.v1.linux"
+	testCheckpointName = "checkpoint-test:latest"
 )
 
 func TestCheckpointRestorePTY(t *testing.T) {
@@ -41,6 +44,9 @@ func TestCheckpointRestorePTY(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
+	if client.runtime == v1runtime {
+		t.Skip()
+	}
 
 	var (
 		ctx, cancel = testContext()
@@ -56,7 +62,8 @@ func TestCheckpointRestorePTY(t *testing.T) {
 		WithNewSnapshot(id, image),
 		WithNewSpec(oci.WithImageConfig(image),
 			oci.WithProcessArgs("sh", "-c", "read A; echo z${A}z"),
-			oci.WithTTY))
+			oci.WithTTY),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +90,12 @@ func TestCheckpointRestorePTY(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	checkpoint, err := task.Checkpoint(ctx, withExit(client))
+	checkpoint, err := container.Checkpoint(ctx, testCheckpointName+"withpty", []CheckpointOpts{
+		WithCheckpointRuntime,
+		WithCheckpointRW,
+		WithCheckpointTaskExit,
+		WithCheckpointTask,
+	}...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,6 +106,10 @@ func TestCheckpointRestorePTY(t *testing.T) {
 		t.Fatal(err)
 	}
 	direct.Delete()
+	if err := container.Delete(ctx, WithSnapshotCleanup); err != nil {
+		t.Fatal(err)
+	}
+
 	direct, err = newDirectIO(ctx, true)
 	if err != nil {
 		t.Fatal(err)
@@ -109,6 +125,14 @@ func TestCheckpointRestorePTY(t *testing.T) {
 		io.Copy(buf, direct.Stdout)
 	}()
 
+	if container, err = client.Restore(ctx, id, checkpoint, []RestoreOpts{
+		WithRestoreImage,
+		WithRestoreSpec,
+		WithRestoreRuntime,
+		WithRestoreRW,
+	}...); err != nil {
+		t.Fatal(err)
+	}
 	if task, err = container.NewTask(ctx, direct.IOCreate,
 		WithTaskCheckpoint(checkpoint)); err != nil {
 		t.Fatal(err)
@@ -146,6 +170,9 @@ func TestCheckpointRestore(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
+	if client.runtime == v1runtime {
+		t.Skip()
+	}
 
 	var (
 		ctx, cancel = testContext()
@@ -157,7 +184,7 @@ func TestCheckpointRestore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "100")))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "10")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +205,11 @@ func TestCheckpointRestore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	checkpoint, err := task.Checkpoint(ctx, withExit(client))
+	checkpoint, err := container.Checkpoint(ctx, testCheckpointName+"restore", []CheckpointOpts{
+		WithCheckpointRuntime,
+		WithCheckpointRW,
+		WithCheckpointTask,
+	}...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,6 +217,18 @@ func TestCheckpointRestore(t *testing.T) {
 	<-statusC
 
 	if _, err := task.Delete(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := container.Delete(ctx, WithSnapshotCleanup); err != nil {
+		t.Fatal(err)
+	}
+
+	if container, err = client.Restore(ctx, id, checkpoint, []RestoreOpts{
+		WithRestoreImage,
+		WithRestoreSpec,
+		WithRestoreRuntime,
+		WithRestoreRW,
+	}...); err != nil {
 		t.Fatal(err)
 	}
 	if task, err = container.NewTask(ctx, empty(), WithTaskCheckpoint(checkpoint)); err != nil {
@@ -217,6 +260,9 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
+	if client.runtime == v1runtime {
+		t.Skip()
+	}
 
 	id := t.Name()
 	ctx, cancel := testContext()
@@ -226,7 +272,7 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "100")))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "5")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +293,11 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	checkpoint, err := task.Checkpoint(ctx, withExit(client))
+	checkpoint, err := container.Checkpoint(ctx, testCheckpointName+"newcontainer", []CheckpointOpts{
+		WithCheckpointRuntime,
+		WithCheckpointRW,
+		WithCheckpointTask,
+	}...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,7 +310,12 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 	if err := container.Delete(ctx, WithSnapshotCleanup); err != nil {
 		t.Fatal(err)
 	}
-	if container, err = client.NewContainer(ctx, id, WithCheckpoint(checkpoint, id)); err != nil {
+	if container, err = client.Restore(ctx, id, checkpoint, []RestoreOpts{
+		WithRestoreImage,
+		WithRestoreSpec,
+		WithRestoreRuntime,
+		WithRestoreRW,
+	}...); err != nil {
 		t.Fatal(err)
 	}
 	if task, err = container.NewTask(ctx, empty(), WithTaskCheckpoint(checkpoint)); err != nil {
@@ -290,11 +345,14 @@ func TestCheckpointLeaveRunning(t *testing.T) {
 	if !supportsCriu {
 		t.Skip("system does not have criu installed")
 	}
-	client, err := New(address)
+	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
+	if client.runtime == v1runtime {
+		t.Skip()
+	}
 
 	var (
 		ctx, cancel = testContext()
@@ -327,7 +385,12 @@ func TestCheckpointLeaveRunning(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := task.Checkpoint(ctx); err != nil {
+	// checkpoint
+	if _, err := container.Checkpoint(ctx, testCheckpointName+"leaverunning", []CheckpointOpts{
+		WithCheckpointRuntime,
+		WithCheckpointRW,
+		WithCheckpointTask,
+	}...); err != nil {
 		t.Fatal(err)
 	}
 
@@ -344,20 +407,4 @@ func TestCheckpointLeaveRunning(t *testing.T) {
 	}
 
 	<-statusC
-}
-
-func withExit(client *Client) CheckpointTaskOpts {
-	return func(r *CheckpointTaskInfo) error {
-		switch client.runtime {
-		case "io.containerd.runc.v1":
-			r.Options = &options.CheckpointOptions{
-				Exit: true,
-			}
-		default:
-			r.Options = &runctypes.CheckpointOptions{
-				Exit: true,
-			}
-		}
-		return nil
-	}
 }
