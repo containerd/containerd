@@ -108,13 +108,16 @@ func (e *execProcess) Delete(ctx context.Context) error {
 }
 
 func (e *execProcess) delete(ctx context.Context) error {
-	e.wg.Wait()
-	if e.io != nil {
-		for _, c := range e.closers {
-			c.Close()
+	// we should not let e.mu in lock when waiting for io complete
+	go func() {
+		e.wg.Wait()
+		if e.io != nil {
+			for _, c := range e.closers {
+				c.Close()
+			}
+			e.io.Close()
 		}
-		e.io.Close()
-	}
+	}()
 	pidfile := filepath.Join(e.path, fmt.Sprintf("%s.pid", e.id))
 	// silently ignore error
 	os.Remove(pidfile)
