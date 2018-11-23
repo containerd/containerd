@@ -18,7 +18,6 @@ package tasks
 
 import (
 	"fmt"
-	"runtime"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
@@ -36,11 +35,6 @@ var checkpointCommand = cli.Command{
 		cli.BoolFlag{
 			Name:  "exit",
 			Usage: "stop the container after the checkpoint",
-		},
-		cli.StringFlag{
-			Name:  "runtime",
-			Usage: "runtime name",
-			Value: fmt.Sprintf("io.containerd.runtime.v1.%s", runtime.GOOS),
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -61,9 +55,13 @@ var checkpointCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		info, err := container.Info(ctx)
+		if err != nil {
+			return err
+		}
 		var opts []containerd.CheckpointTaskOpts
 		if context.Bool("exit") {
-			opts = append(opts, withExit(context.String("runtime")))
+			opts = append(opts, withExit(info.Runtime.Name))
 		}
 		checkpoint, err := task.Checkpoint(ctx, opts...)
 		if err != nil {
