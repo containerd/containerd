@@ -106,15 +106,11 @@ var Command = cli.Command{
 			Name:  "fifo-dir",
 			Usage: "directory used for storing IO FIFOs",
 		},
-		cli.BoolFlag{
-			Name:  "isolated",
-			Usage: "run the container with vm isolation",
-		},
 		cli.StringFlag{
 			Name:  "cgroup",
 			Usage: "cgroup path (To disable use of cgroup, set to \"\" explicitly)",
 		},
-	}, append(commands.SnapshotterFlags, commands.ContainerFlags...)...),
+	}, append(platformRunFlags, append(commands.SnapshotterFlags, commands.ContainerFlags...)...)...),
 	Action: func(context *cli.Context) error {
 		var (
 			err error
