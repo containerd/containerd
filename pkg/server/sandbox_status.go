@@ -21,6 +21,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
+	cni "github.com/containerd/go-cni"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -117,6 +118,7 @@ type SandboxInfo struct {
 	RuntimeOptions interface{}               `json:"runtimeOptions"`
 	Config         *runtime.PodSandboxConfig `json:"config"`
 	RuntimeSpec    *runtimespec.Spec         `json:"runtimeSpec"`
+	CNIResult      *cni.CNIResult            `json:"cniResult"`
 }
 
 // toCRISandboxInfo converts internal container object information to CRI sandbox status response info map.
@@ -142,6 +144,7 @@ func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox) (map[st
 		RuntimeHandler: sandbox.RuntimeHandler,
 		Status:         string(processStatus),
 		Config:         sandbox.Config,
+		CNIResult:      sandbox.CNIResult,
 	}
 
 	if si.Status == "" {
