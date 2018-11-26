@@ -264,6 +264,7 @@ func (p *Init) setExited(status int) {
 	p.exited = time.Now()
 	p.status = status
 	p.Platform.ShutdownConsole(context.Background(), p.console)
+	p.pid = -1
 	close(p.waitBlock)
 }
 
