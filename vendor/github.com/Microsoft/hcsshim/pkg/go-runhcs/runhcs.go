@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	irunhcs "github.com/Microsoft/hcsshim/internal/runhcs"
 	"github.com/containerd/go-runc"
@@ -23,9 +24,34 @@ const (
 	Text Format = "text"
 	// JSON is the JSON formatted log output.
 	JSON Format = "json"
-
-	command = "runhcs"
 )
+
+var runhcsPath atomic.Value
+
+func getCommandPath() string {
+	const command = "runhcs.exe"
+
+	pathi := runhcsPath.Load()
+	if pathi == nil {
+		path, err := exec.LookPath(command)
+		if err != nil {
+			// Failed to look up command just use it directly and let the
+			// Windows loader find it.
+			path = command
+			runhcsPath.Store(path)
+			return path
+		}
+		apath, err := filepath.Abs(path)
+		if err != nil {
+			// We couldnt make `path` an `AbsPath`. Just use `path` directly and
+			// let the Windows loader find it.
+			apath = path
+		}
+		runhcsPath.Store(apath)
+		return apath
+	}
+	return pathi.(string)
+}
 
 var bytesBufferPool = sync.Pool{
 	New: func() interface{} {
@@ -84,7 +110,7 @@ func (r *Runhcs) args() []string {
 }
 
 func (r *Runhcs) command(context context.Context, args ...string) *exec.Cmd {
-	cmd := exec.CommandContext(context, command, append(r.args(), args...)...)
+	cmd := exec.CommandContext(context, getCommandPath(), append(r.args(), args...)...)
 	cmd.Env = os.Environ()
 	return cmd
 }
