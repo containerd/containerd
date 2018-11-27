@@ -21,6 +21,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"testing"
@@ -36,11 +38,12 @@ import (
 )
 
 var (
-	address       string
-	noDaemon      bool
-	noCriu        bool
-	supportsCriu  bool
-	testNamespace = "testing"
+	address           string
+	noDaemon          bool
+	noCriu            bool
+	supportsCriu      bool
+	testNamespace     = "testing"
+	ctrdStdioFilePath string
 
 	ctrd = &daemon{}
 )
@@ -76,13 +79,26 @@ func TestMain(m *testing.M) {
 	if !noDaemon {
 		sys.ForceRemoveAll(defaultRoot)
 
-		err := ctrd.start("containerd", address, []string{
+		stdioFile, err := ioutil.TempFile("", "")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "could not create a new stdio temp file: %s\n", err)
+			os.Exit(1)
+		}
+		defer func() {
+			stdioFile.Close()
+			os.Remove(stdioFile.Name())
+		}()
+		ctrdStdioFilePath = stdioFile.Name()
+		stdioWriter := io.MultiWriter(stdioFile, buf)
+
+		err = ctrd.start("containerd", address, []string{
 			"--root", defaultRoot,
 			"--state", defaultState,
 			"--log-level", "debug",
-		}, buf, buf)
+			"--config", createShimDebugConfig(),
+		}, stdioWriter, stdioWriter)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %s", err, buf.String())
+			fmt.Fprintf(os.Stderr, "%s: %s\n", err, buf.String())
 			os.Exit(1)
 		}
 	}
@@ -137,6 +153,7 @@ func TestMain(m *testing.M) {
 				fmt.Fprintln(os.Stderr, "failed to wait for containerd", err)
 			}
 		}
+
 		if err := sys.ForceRemoveAll(defaultRoot); err != nil {
 			fmt.Fprintln(os.Stderr, "failed to remove test root dir", err)
 			os.Exit(1)
@@ -342,4 +359,20 @@ func TestClientReconnect(t *testing.T) {
 	if err := client.Close(); err != nil {
 		t.Errorf("client closed returned error %v", err)
 	}
+}
+
+func createShimDebugConfig() string {
+	f, err := ioutil.TempFile("", "containerd-config-")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create config file: %s\n", err)
+		os.Exit(1)
+	}
+	defer f.Close()
+
+	if _, err := f.WriteString("[plugins.linux]\n\tshim_debug = true\n"); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to write to config file %s: %s\n", f.Name(), err)
+		os.Exit(1)
+	}
+
+	return f.Name()
 }
