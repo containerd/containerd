@@ -107,7 +107,7 @@ func newPipeSet(ctx context.Context, io runtime.IO) (*pipeSet, error) {
 				if err == nil {
 					err = e
 				} else {
-					err = errors.Wrapf(err, e.Error())
+					err = errors.Wrap(err, e.Error())
 				}
 			}
 		}
