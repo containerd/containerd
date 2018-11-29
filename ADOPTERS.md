@@ -30,6 +30,10 @@ including the Balena project listed below.
 
 **_Azure acs-engine_** - Microsoft Azure's [acs-engine](https://github.com/Azure/acs-engine) open source project has customizable deployment of Kubernetes clusters, where containerd is a selectable container runtime. At some point in the future Azure's AKS service will default to use containerd as the CRI runtime for deployed Kubernetes clusters.
 
+**_Amazon Firecracker_** - The AWS [Firecracker VMM project](http://firecracker-microvm.io/) has extended containerd with a new snapshotter and v2 shim to allow containerd to drive virtualized container processes via their VMM implementation. More details on their containerd integration are available in [their GitHub project](https://github.com/firecracker-microvm/firecracker-containerd).
+
+**_Kata Containers_** - The [Kata containers](https://katacontainers.io/) lightweight-virtualized container runtime project integrates with containerd via a custom v2 shim implementation that drives the Kata container runtime.
+
 **_Other Projects_** - While the above list provides a cross-section of well known uses of containerd, the simplicity and clear API layer for containerd has inspired many smaller projects around providing simple container management platforms. Several examples of building higher layer functionality on top of the containerd base have come from various containerd community participants:
  - Michael Crosby's [boss](https://github.com/crosbymichael/boss) project,
  - Evan Hazlett's [stellar](https://github.com/ehazlett/stellar) project,
