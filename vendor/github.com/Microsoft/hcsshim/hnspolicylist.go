@@ -37,8 +37,8 @@ func GetPolicyListByID(policyListID string) (*PolicyList, error) {
 }
 
 // AddLoadBalancer policy list for the specified endpoints
-func AddLoadBalancer(endpoints []HNSEndpoint, isILB bool, isDSR bool, sourceVIP, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*PolicyList, error) {
-	return hns.AddLoadBalancer(endpoints, isILB, isDSR, sourceVIP, vip, protocol, internalPort, externalPort)
+func AddLoadBalancer(endpoints []HNSEndpoint, isILB bool, sourceVIP, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*PolicyList, error) {
+	return hns.AddLoadBalancer(endpoints, isILB, sourceVIP, vip, protocol, internalPort, externalPort)
 }
 
 // AddRoute adds route policy list for the specified endpoints
