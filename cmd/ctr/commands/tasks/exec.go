@@ -94,7 +94,10 @@ var execCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		defer process.Delete(ctx)
+		// if detach, we should not call this defer
+		if !detach {
+			defer process.Delete(ctx)
+		}
 
 		statusC, err := process.Wait(ctx)
 		if err != nil {
