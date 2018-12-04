@@ -25,6 +25,8 @@ runtime and CRI fixes.
 ## CRI
 * Remove auth config logs
 * Fix NetNS cache state
+* Fix a bug that containers sharing pod pid namespace can't be stopped
+* Remove host pid usage to work better with katacontainer
 
 ## Service
 * Ignore modprobe failures in systemd ExecStartPre"""
