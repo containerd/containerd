@@ -90,7 +90,7 @@ func GetResolver(ctx gocontext.Context, clicontext *cli.Context) (remotes.Resolv
 		IdleConnTimeout:     30 * time.Second,
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: clicontext.Bool("insecure"),
+			InsecureSkipVerify: clicontext.Bool("skip-verify"),
 		},
 		ExpectContinueTimeout: 5 * time.Second,
 	}

@@ -72,10 +72,6 @@ var (
 			Usage: "path to the runtime-specific spec config file",
 		},
 		cli.StringFlag{
-			Name:  "checkpoint",
-			Usage: "provide the checkpoint digest to restore the container",
-		},
-		cli.StringFlag{
 			Name:  "cwd",
 			Usage: "specify the working directory of the process",
 		},

@@ -18,7 +18,6 @@ package containers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -29,8 +28,10 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/cmd/ctr/commands/run"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/typeurl"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
@@ -45,13 +46,15 @@ var Command = cli.Command{
 		infoCommand,
 		listCommand,
 		setLabelsCommand,
+		checkpointCommand,
+		restoreCommand,
 	},
 }
 
 var createCommand = cli.Command{
 	Name:      "create",
 	Usage:     "create container",
-	ArgsUsage: "[flags] Image|RootFS CONTAINER",
+	ArgsUsage: "[flags] Image|RootFS CONTAINER [COMMAND] [ARG...]",
 	Flags:     append(commands.SnapshotterFlags, commands.ContainerFlags...),
 	Action: func(context *cli.Context) error {
 		var (
@@ -279,6 +282,155 @@ var infoCommand = cli.Command{
 			return nil
 		}
 		commands.PrintAsJSON(info)
+		return nil
+	},
+}
+
+var checkpointCommand = cli.Command{
+	Name:      "checkpoint",
+	Usage:     "checkpoint a container",
+	ArgsUsage: "CONTAINER REF",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "rw",
+			Usage: "include the rw layer in the checkpoint",
+		},
+		cli.BoolFlag{
+			Name:  "image",
+			Usage: "include the image in the checkpoint",
+		},
+		cli.BoolFlag{
+			Name:  "task",
+			Usage: "checkpoint container task",
+		},
+	},
+	Action: func(context *cli.Context) error {
+		id := context.Args().First()
+		if id == "" {
+			return errors.New("container id must be provided")
+		}
+		ref := context.Args().Get(1)
+		if ref == "" {
+			return errors.New("ref must be provided")
+		}
+		client, ctx, cancel, err := commands.NewClient(context)
+		if err != nil {
+			return err
+		}
+		defer cancel()
+		opts := []containerd.CheckpointOpts{
+			containerd.WithCheckpointRuntime,
+		}
+
+		if context.Bool("image") {
+			opts = append(opts, containerd.WithCheckpointImage)
+		}
+		if context.Bool("rw") {
+			opts = append(opts, containerd.WithCheckpointRW)
+		}
+		if context.Bool("task") {
+			opts = append(opts, containerd.WithCheckpointTask)
+		}
+		container, err := client.LoadContainer(ctx, id)
+		if err != nil {
+			return err
+		}
+		task, err := container.Task(ctx, nil)
+		if err != nil {
+			if !errdefs.IsNotFound(err) {
+				return err
+			}
+		}
+		// pause if running
+		if task != nil {
+			if err := task.Pause(ctx); err != nil {
+				return err
+			}
+			defer func() {
+				if err := task.Resume(ctx); err != nil {
+					fmt.Println(errors.Wrap(err, "error resuming task"))
+				}
+			}()
+		}
+
+		if _, err := container.Checkpoint(ctx, ref, opts...); err != nil {
+			return err
+		}
+
+		return nil
+	},
+}
+
+var restoreCommand = cli.Command{
+	Name:      "restore",
+	Usage:     "restore a container from checkpoint",
+	ArgsUsage: "CONTAINER REF",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "rw",
+			Usage: "restore the rw layer from the checkpoint",
+		},
+		cli.BoolFlag{
+			Name:  "live",
+			Usage: "restore the runtime and memory data from the checkpoint",
+		},
+	},
+	Action: func(context *cli.Context) error {
+		id := context.Args().First()
+		if id == "" {
+			return errors.New("container id must be provided")
+		}
+		ref := context.Args().Get(1)
+		if ref == "" {
+			return errors.New("ref must be provided")
+		}
+		client, ctx, cancel, err := commands.NewClient(context)
+		if err != nil {
+			return err
+		}
+		defer cancel()
+
+		checkpoint, err := client.GetImage(ctx, ref)
+		if err != nil {
+			if !errdefs.IsNotFound(err) {
+				return err
+			}
+			// TODO (ehazlett): consider other options (always/never fetch)
+			ck, err := client.Fetch(ctx, ref)
+			if err != nil {
+				return err
+			}
+			checkpoint = containerd.NewImage(client, ck)
+		}
+
+		opts := []containerd.RestoreOpts{
+			containerd.WithRestoreImage,
+			containerd.WithRestoreSpec,
+			containerd.WithRestoreRuntime,
+		}
+		if context.Bool("rw") {
+			opts = append(opts, containerd.WithRestoreRW)
+		}
+
+		ctr, err := client.Restore(ctx, id, checkpoint, opts...)
+		if err != nil {
+			return err
+		}
+
+		topts := []containerd.NewTaskOpts{}
+		if context.Bool("live") {
+			topts = append(topts, containerd.WithTaskCheckpoint(checkpoint))
+		}
+
+		task, err := ctr.NewTask(ctx, cio.NewCreator(cio.WithStdio), topts...)
+		if err != nil {
+			return err
+		}
+
+		if err := task.Start(ctx); err != nil {
+			return err
+		}
+
 		return nil
 	},
 }

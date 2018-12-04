@@ -90,6 +90,8 @@ func WithGPUs(opts ...Opts) oci.SpecOpts {
 				"oci-hook",
 				"--",
 				nvidiaPath,
+				// ensures the required kernel modules are properly loaded
+				"--load-kmods",
 			}, c.args()...),
 			Env: os.Environ(),
 		})
