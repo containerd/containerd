@@ -32,6 +32,8 @@ import (
 	"github.com/urfave/cli"
 )
 
+var platformRunFlags []cli.Flag
+
 // NewContainer creates a new container
 func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli.Context) (containerd.Container, error) {
 	var (
@@ -42,14 +44,6 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		id = context.Args().First()
 	} else {
 		id = context.Args().Get(1)
-	}
-
-	if raw := context.String("checkpoint"); raw != "" {
-		im, err := client.GetImage(ctx, raw)
-		if err != nil {
-			return nil, err
-		}
-		return client.NewContainer(ctx, id, containerd.WithCheckpoint(im, id), containerd.WithRuntime(context.String("runtime"), nil))
 	}
 
 	var (
@@ -140,6 +134,10 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		}
 		if context.IsSet("allow-new-privs") {
 			opts = append(opts, oci.WithNewPrivileges)
+		}
+		if context.IsSet("cgroup") {
+			// NOTE: can be set to "" explicitly for disabling cgroup.
+			opts = append(opts, oci.WithCgroup(context.String("cgroup")))
 		}
 	}
 

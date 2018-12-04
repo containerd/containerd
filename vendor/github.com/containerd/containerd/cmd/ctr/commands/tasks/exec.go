@@ -40,6 +40,10 @@ var execCommand = cli.Command{
 			Name:  "tty,t",
 			Usage: "allocate a TTY for the container",
 		},
+		cli.BoolFlag{
+			Name:  "detach,d",
+			Usage: "detach from the task after it has started execution",
+		},
 		cli.StringFlag{
 			Name:  "exec-id",
 			Usage: "exec specific id for the process",
@@ -51,9 +55,10 @@ var execCommand = cli.Command{
 	},
 	Action: func(context *cli.Context) error {
 		var (
-			id   = context.Args().First()
-			args = context.Args().Tail()
-			tty  = context.Bool("tty")
+			id     = context.Args().First()
+			args   = context.Args().Tail()
+			tty    = context.Bool("tty")
+			detach = context.Bool("detach")
 		)
 		if id == "" {
 			return errors.New("container id must be provided")
@@ -89,7 +94,10 @@ var execCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		defer process.Delete(ctx)
+		// if detach, we should not call this defer
+		if !detach {
+			defer process.Delete(ctx)
+		}
 
 		statusC, err := process.Wait(ctx)
 		if err != nil {
@@ -104,17 +112,22 @@ var execCommand = cli.Command{
 				return err
 			}
 		}
-		if tty {
-			if err := HandleConsoleResize(ctx, process, con); err != nil {
-				logrus.WithError(err).Error("console resize")
+		if !detach {
+			if tty {
+				if err := HandleConsoleResize(ctx, process, con); err != nil {
+					logrus.WithError(err).Error("console resize")
+				}
+			} else {
+				sigc := commands.ForwardAllSignals(ctx, process)
+				defer commands.StopCatch(sigc)
 			}
-		} else {
-			sigc := commands.ForwardAllSignals(ctx, process)
-			defer commands.StopCatch(sigc)
 		}
 
 		if err := process.Start(ctx); err != nil {
 			return err
+		}
+		if detach {
+			return nil
 		}
 		status := <-statusC
 		code, _, err := status.Result()

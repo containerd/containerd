@@ -17,7 +17,9 @@
 package containerd
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"runtime"
@@ -518,6 +520,45 @@ func (c *Client) ListImages(ctx context.Context, filters ...string) ([]Image, er
 		images[i] = NewImage(c, img)
 	}
 	return images, nil
+}
+
+// Restore restores a container from a checkpoint
+func (c *Client) Restore(ctx context.Context, id string, checkpoint Image, opts ...RestoreOpts) (Container, error) {
+	store := c.ContentStore()
+	index, err := decodeIndex(ctx, store, checkpoint.Target())
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, done, err := c.WithLease(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer done(ctx)
+
+	copts := []NewContainerOpts{}
+	for _, o := range opts {
+		copts = append(copts, o(ctx, id, c, checkpoint, index))
+	}
+
+	ctr, err := c.NewContainer(ctx, id, copts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return ctr, nil
+}
+
+func writeIndex(ctx context.Context, index *ocispec.Index, client *Client, ref string) (d ocispec.Descriptor, err error) {
+	labels := map[string]string{}
+	for i, m := range index.Manifests {
+		labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i)] = m.Digest.String()
+	}
+	data, err := json.Marshal(index)
+	if err != nil {
+		return ocispec.Descriptor{}, err
+	}
+	return writeContent(ctx, client.ContentStore(), ocispec.MediaTypeImageIndex, ref, bytes.NewReader(data), content.WithLabels(labels))
 }
 
 // Subscribe to events that match one or more of the provided filters.
