@@ -19,7 +19,6 @@ package server
 import (
 	"time"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/docker/docker/pkg/signal"
 	"github.com/pkg/errors"
@@ -105,7 +104,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 	}
 
 	logrus.Infof("Kill container %q", id)
-	if err = task.Kill(ctx, unix.SIGKILL, containerd.WithKillAll); err != nil && !errdefs.IsNotFound(err) {
+	if err = task.Kill(ctx, unix.SIGKILL); err != nil && !errdefs.IsNotFound(err) {
 		return errors.Wrapf(err, "failed to kill container %q", id)
 	}
 
@@ -113,28 +112,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 	if err = c.waitContainerStop(ctx, container, killContainerTimeout); err == nil {
 		return nil
 	}
-	logrus.WithError(err).Errorf("An error occurs during waiting for container %q to be killed", id)
-
-	// This is a fix for `runc`, and should not break other runtimes. With
-	// containerd.WithKillAll, `runc` will get all processes from the container
-	// cgroups, and kill them. However, sometimes the processes may be moved
-	// out from the container cgroup, e.g. users manually move them by mistake,
-	// or systemd.Delegate=true is not set.
-	// In these cases, we should try our best to do cleanup, kill the container
-	// without containerd.WithKillAll, so that runc can kill the container init
-	// process directly.
-	// NOTE(random-liu): If pid namespace is shared inside the pod, non-init processes
-	// of this container will be left running until the pause container is stopped.
-	logrus.Infof("Kill container %q init process", id)
-	if err = task.Kill(ctx, unix.SIGKILL); err != nil && !errdefs.IsNotFound(err) {
-		return errors.Wrapf(err, "failed to kill container %q init process", id)
-	}
-
-	// Wait for a fixed timeout until container stop is observed by event monitor.
-	if err = c.waitContainerStop(ctx, container, killContainerTimeout); err == nil {
-		return nil
-	}
-	return errors.Wrapf(err, "an error occurs during waiting for container %q init process to be killed", id)
+	return errors.Wrapf(err, "an error occurs during waiting for container %q to be killed", id)
 }
 
 // waitContainerStop waits for container to be stopped until timeout exceeds or context is cancelled.
