@@ -23,6 +23,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,7 +32,7 @@ import (
 
 // Test to test the CRI plugin should see image pulled into containerd directly.
 func TestContainerdImage(t *testing.T) {
-	testImage := "docker.io/library/busybox:latest"
+	const testImage = "docker.io/library/busybox:latest"
 	ctx := context.Background()
 
 	t.Logf("make sure the test image doesn't exist in the cri plugin")
@@ -145,4 +146,64 @@ func TestContainerdImage(t *testing.T) {
 	}
 	require.NoError(t, Eventually(checkContainer, 100*time.Millisecond, 10*time.Second))
 	require.NoError(t, Consistently(checkContainer, 100*time.Millisecond, time.Second))
+}
+
+// Test image managed by CRI plugin shouldn't be affected by images in other namespaces.
+func TestContainerdImageInOtherNamespaces(t *testing.T) {
+	const testImage = "docker.io/library/busybox:latest"
+	ctx := context.Background()
+
+	t.Logf("make sure the test image doesn't exist in the cri plugin")
+	i, err := imageService.ImageStatus(&runtime.ImageSpec{Image: testImage})
+	require.NoError(t, err)
+	if i != nil {
+		require.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: testImage}))
+	}
+
+	t.Logf("pull the image into test namespace")
+	namespacedCtx := namespaces.WithNamespace(ctx, "test")
+	_, err = containerdClient.Pull(namespacedCtx, testImage, containerd.WithPullUnpack)
+	assert.NoError(t, err)
+	defer func() {
+		// Make sure the image is cleaned up in any case.
+		if err := containerdClient.ImageService().Delete(namespacedCtx, testImage); err != nil {
+			assert.True(t, errdefs.IsNotFound(err), err)
+		}
+		assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: testImage}))
+	}()
+
+	t.Logf("cri plugin should not see the image")
+	checkImage := func() (bool, error) {
+		img, err := imageService.ImageStatus(&runtime.ImageSpec{Image: testImage})
+		if err != nil {
+			return false, err
+		}
+		return img == nil, nil
+	}
+	require.NoError(t, Consistently(checkImage, 100*time.Millisecond, time.Second))
+
+	t.Logf("pull the image into cri plugin")
+	id, err := imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil)
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: id}))
+	}()
+
+	t.Logf("cri plugin should see the image now")
+	img, err := imageService.ImageStatus(&runtime.ImageSpec{Image: testImage})
+	require.NoError(t, err)
+	assert.NotNil(t, img)
+
+	t.Logf("remove the image from test namespace")
+	require.NoError(t, containerdClient.ImageService().Delete(namespacedCtx, testImage))
+
+	t.Logf("cri plugin should still see the image")
+	checkImage = func() (bool, error) {
+		img, err := imageService.ImageStatus(&runtime.ImageSpec{Image: testImage})
+		if err != nil {
+			return false, err
+		}
+		return img != nil, nil
+	}
+	assert.NoError(t, Consistently(checkImage, 100*time.Millisecond, time.Second))
 }
