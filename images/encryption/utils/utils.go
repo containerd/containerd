@@ -57,6 +57,18 @@ func parseJWKPublicKey(privKey []byte, prefix string) (interface{}, error) {
 	return &jwk, nil
 }
 
+// IsPasswordError checks whether an error is related to a missing or wrong
+// password
+func IsPasswordError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+
+	return strings.Contains(msg, "password") &&
+		(strings.Contains(msg, "missing") || strings.Contains(msg, "wrong"))
+}
+
 // ParsePrivateKey tries to parse a private key in DER format first and
 // PEM format after, returning an error if the parsing failed
 func ParsePrivateKey(privKey, privKeyPassword []byte, prefix string) (interface{}, error) {
@@ -73,11 +85,11 @@ func ParsePrivateKey(privKey, privKeyPassword []byte, prefix string) (interface{
 			var der []byte
 			if x509.IsEncryptedPEMBlock(block) {
 				if privKeyPassword == nil {
-					return nil, errors.Wrapf(errdefs.ErrWrongPassword, "%s: Missing password for encrypted private key", prefix)
+					return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "%s: Missing password for encrypted private key", prefix)
 				}
 				der, err = x509.DecryptPEMBlock(block, privKeyPassword)
 				if err != nil {
-					return nil, errors.Wrapf(errdefs.ErrWrongPassword, "%s: Could not decrypt private key", prefix)
+					return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "%s: Wrong password: could not decrypt private key", prefix)
 				}
 			} else {
 				der = block.Bytes
@@ -179,7 +191,7 @@ func SortDecryptionKeys(b64ItemList string) (map[string][][]byte, error) {
 		}
 		var key string
 		isPrivKey, err := IsPrivateKey(keyData, password)
-		if errdefs.IsWrongPassword(err) {
+		if IsPasswordError(err) {
 			return nil, err
 		}
 		if isPrivKey {

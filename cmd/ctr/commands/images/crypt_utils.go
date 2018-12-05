@@ -26,7 +26,6 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/images/encryption"
 	encconfig "github.com/containerd/containerd/images/encryption/config"
@@ -128,7 +127,7 @@ func processPrivateKeyFiles(keyFilesAndPwds []string) ([][]byte, [][]byte, [][]b
 			return nil, nil, nil, nil, err
 		}
 		isPrivKey, err := encutils.IsPrivateKey(tmp, password)
-		if errdefs.IsWrongPassword(err) {
+		if encutils.IsPasswordError(err) {
 			return nil, nil, nil, nil, err
 		}
 		if isPrivKey {
