@@ -39,8 +39,9 @@ func TestContainerStore(t *testing.T) {
 					Attempt: 1,
 				},
 			},
-			ImageRef: "TestImage-1",
-			LogPath:  "/test/log/path/1",
+			ImageRef:   "TestImage-1",
+			StopSignal: "SIGTERM",
+			LogPath:    "/test/log/path/1",
 		},
 		"2abcd": {
 			ID:        "2abcd",
@@ -52,8 +53,9 @@ func TestContainerStore(t *testing.T) {
 					Attempt: 2,
 				},
 			},
-			ImageRef: "TestImage-2",
-			LogPath:  "/test/log/path/2",
+			StopSignal: "SIGTERM",
+			ImageRef:   "TestImage-2",
+			LogPath:    "/test/log/path/2",
 		},
 		"4a333": {
 			ID:        "4a333",
@@ -65,8 +67,9 @@ func TestContainerStore(t *testing.T) {
 					Attempt: 3,
 				},
 			},
-			ImageRef: "TestImage-3",
-			LogPath:  "/test/log/path/3",
+			StopSignal: "SIGTERM",
+			ImageRef:   "TestImage-3",
+			LogPath:    "/test/log/path/3",
 		},
 		"4abcd": {
 			ID:        "4abcd",
@@ -78,7 +81,8 @@ func TestContainerStore(t *testing.T) {
 					Attempt: 1,
 				},
 			},
-			ImageRef: "TestImage-4abcd",
+			StopSignal: "SIGTERM",
+			ImageRef:   "TestImage-4abcd",
 		},
 	}
 	statuses := map[string]Status{
@@ -182,8 +186,9 @@ func TestWithContainerIO(t *testing.T) {
 				Attempt: 1,
 			},
 		},
-		ImageRef: "TestImage-1",
-		LogPath:  "/test/log/path",
+		ImageRef:   "TestImage-1",
+		StopSignal: "SIGTERM",
+		LogPath:    "/test/log/path",
 	}
 	status := Status{
 		Pid:        1,
