@@ -593,7 +593,7 @@ func TestGenerateContainerMounts(t *testing.T) {
 				},
 			},
 		},
-		"should skip contaner mounts if already mounted by CRI": {
+		"should skip container mounts if already mounted by CRI": {
 			criMounts: []*runtime.Mount{
 				{
 					ContainerPath: "/etc/hosts",
