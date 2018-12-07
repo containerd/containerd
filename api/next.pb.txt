@@ -1833,35 +1833,6 @@ file {
       type_name: ".containerd.types.Mount"
       json_name: "mounts"
     }
-    field {
-      name: "dcparameters"
-      number: 3
-      label: LABEL_REPEATED
-      type: TYPE_MESSAGE
-      type_name: ".containerd.services.diff.v1.ApplyRequest.DcparametersEntry"
-      json_name: "dcparameters"
-    }
-    nested_type {
-      name: "DcparametersEntry"
-      field {
-        name: "key"
-        number: 1
-        label: LABEL_OPTIONAL
-        type: TYPE_STRING
-        json_name: "key"
-      }
-      field {
-        name: "value"
-        number: 2
-        label: LABEL_OPTIONAL
-        type: TYPE_MESSAGE
-        type_name: ".containerd.services.diff.v1.ByteArrays"
-        json_name: "value"
-      }
-      options {
-        map_entry: true
-      }
-    }
   }
   message_type {
     name: "ApplyResponse"

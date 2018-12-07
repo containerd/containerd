@@ -19,7 +19,6 @@ package diff
 import (
 	"context"
 
-	encconfig "github.com/containerd/containerd/images/encryption/config"
 	"github.com/containerd/containerd/mount"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -59,7 +58,7 @@ type Applier interface {
 	// implementation and content descriptor. For example, in the common
 	// case the descriptor is a file system difference in tar format,
 	// that tar would be applied on top of the mounts.
-	Apply(ctx context.Context, desc ocispec.Descriptor, mount []mount.Mount, cc *encconfig.CryptoConfig) (ocispec.Descriptor, error)
+	Apply(ctx context.Context, desc ocispec.Descriptor, mount []mount.Mount) (ocispec.Descriptor, error)
 }
 
 // WithMediaType sets the media type to use for creating the diff, without

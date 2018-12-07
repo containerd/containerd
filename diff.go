@@ -23,7 +23,6 @@ import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
-	encconfig "github.com/containerd/containerd/images/encryption/config"
 	"github.com/containerd/containerd/mount"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -46,11 +45,10 @@ type diffRemote struct {
 	client diffapi.DiffClient
 }
 
-func (r *diffRemote) Apply(ctx context.Context, diff ocispec.Descriptor, mounts []mount.Mount, cc *encconfig.CryptoConfig) (ocispec.Descriptor, error) {
+func (r *diffRemote) Apply(ctx context.Context, diff ocispec.Descriptor, mounts []mount.Mount) (ocispec.Descriptor, error) {
 	req := &diffapi.ApplyRequest{
-		Diff:         fromDescriptor(diff),
-		Mounts:       fromMounts(mounts),
-		Dcparameters: fromCryptoConfig(cc),
+		Diff:   fromDescriptor(diff),
+		Mounts: fromMounts(mounts),
 	}
 	resp, err := r.client.Apply(ctx, req)
 	if err != nil {
@@ -108,16 +106,4 @@ func fromMounts(mounts []mount.Mount) []*types.Mount {
 		}
 	}
 	return apiMounts
-}
-
-func fromCryptoConfig(cc *encconfig.CryptoConfig) map[string]*diffapi.ByteArrays {
-	dcparameters := make(map[string]*diffapi.ByteArrays)
-	if cc != nil && cc.Dc != nil && cc.Dc.Parameters != nil {
-		for k, v := range cc.Dc.Parameters {
-			dcparameters[k] = &diffapi.ByteArrays{
-				ByteArrays: v,
-			}
-		}
-	}
-	return dcparameters
 }

@@ -29,8 +29,6 @@ message ApplyRequest {
 	containerd.types.Descriptor diff = 1;
 
 	repeated containerd.types.Mount mounts = 2;
-
-	map<string, ByteArrays> dcparameters = 3;
 }
 
 message ApplyResponse {

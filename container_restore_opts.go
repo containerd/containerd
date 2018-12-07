@@ -142,7 +142,7 @@ func WithRestoreRW(ctx context.Context, id string, client *Client, checkpoint Im
 			return err
 		}
 
-		if _, err := client.DiffService().Apply(ctx, *rw, mounts, nil); err != nil {
+		if _, err := client.DiffService().Apply(ctx, *rw, mounts); err != nil {
 			return err
 		}
 		return nil

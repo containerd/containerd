@@ -149,13 +149,20 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
 		a  = i.client.DiffService()
 		cs = i.client.ContentStore()
 
-		chain    []digest.Digest
-		unpacked bool
+		chain            []digest.Digest
+		unpacked         bool
+		dcparametersJSON string
 	)
 
+	if i.dcparameters != nil && len(i.dcparameters) > 0 {
+		dcparametersJSON, err = encryption.DCParametersToJSON(i.dcparameters)
+		if err != nil {
+			return err
+		}
+	}
+
 	for id, layer := range layers {
-		var cc *encconfig.CryptoConfig
-		if i.dcparameters != nil || len(i.dcparameters) > 0 {
+		if len(dcparametersJSON) > 0 {
 			ds := platforms.DefaultSpec()
 			layerInfo := encryption.LayerInfo{
 				Index: uint32(id),
@@ -171,14 +178,14 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
 				return err
 			}
 
-			cc = &encconfig.CryptoConfig{
-				Dc: &encconfig.DecryptConfig{
-					Parameters: i.dcparameters,
-				},
+			if layer.Blob.Annotations == nil {
+				layer.Blob.Annotations = make(map[string]string)
 			}
+
+			layer.Blob.Annotations["_dcparameters"] = dcparametersJSON
 		}
 
-		unpacked, err = rootfs.ApplyLayer(ctx, layer, chain, sn, a, cc)
+		unpacked, err = rootfs.ApplyLayer(ctx, layer, chain, sn, a)
 		if err != nil {
 			return err
 		}
@@ -200,10 +207,10 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
 			// Image authorization check prevents access to the cached encrypted images
 			// without valid private keys that can decrypt those encrypted images.
 			if images.IsEncryptedDiff(ctx, layer.Blob.MediaType) {
-				if cc == nil {
-					return fmt.Errorf("Unable to check authorization since decryption params are nil")
+				dc := &encconfig.DecryptConfig{
+					Parameters: i.dcparameters,
 				}
-				err = images.CheckAuthorization(ctx, cs, i.Target(), cc.Dc)
+				err = images.CheckAuthorization(ctx, cs, i.Target(), dc)
 				if err != nil {
 					return err
 				}

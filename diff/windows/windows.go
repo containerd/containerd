@@ -32,7 +32,7 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
-	encconfig "github.com/containerd/containerd/images/encryption/config"
+	"github.com/containerd/containerd/images/encryption"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
@@ -89,7 +89,7 @@ func NewWindowsDiff(store content.Store) (CompareApplier, error) {
 // Apply applies the content associated with the provided digests onto the
 // provided mounts. Archive content will be extracted and decompressed if
 // necessary.
-func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount, cc *encconfig.CryptoConfig) (d ocispec.Descriptor, err error) {
+func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount) (d ocispec.Descriptor, err error) {
 	t1 := time.Now()
 	defer func() {
 		if err == nil {
@@ -116,6 +116,11 @@ func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 	r := content.NewReader(ra)
 
 	if images.IsEncryptedDiff(ctx, desc.MediaType) {
+		cc, err := encryption.GetCryptoConfigFromAnnotations(&desc)
+		if err != nil {
+			return emptyDesc, err
+		}
+
 		buf := new(bytes.Buffer)
 		buf.ReadFrom(r)
 
