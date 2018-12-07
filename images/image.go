@@ -420,6 +420,16 @@ func IsEncryptedDiff(ctx context.Context, mediaType string) bool {
 	return false
 }
 
+// HasEncryptedLayer returns true if any LayerInfo indicates that the layer is encrypted
+func HasEncryptedLayer(ctx context.Context, layerInfos []encryption.LayerInfo) bool {
+	for i := 0; i < len(layerInfos); i++ {
+		if IsEncryptedDiff(ctx, layerInfos[i].Descriptor.MediaType) {
+			return true
+		}
+	}
+	return false
+}
+
 // IsCompressedDiff returns true if mediaType is a known compressed diff media type.
 // It returns false if the media type is a diff, but not compressed. If the media type
 // is not a known diff type, it returns errdefs.ErrNotImplemented
@@ -906,10 +916,10 @@ func getImageLayerInfo(ctx context.Context, cs content.Store, desc ocispec.Descr
 			Index: uint32(layerIndex),
 			Descriptor: ocispec.Descriptor{
 				Annotations: make(map[string]string),
-
-				Digest:   desc.Digest,
-				Size:     desc.Size,
-				Platform: platform,
+				MediaType:   desc.MediaType,
+				Digest:      desc.Digest,
+				Size:        desc.Size,
+				Platform:    platform,
 			},
 		}
 		lis = append(lis, li)
@@ -919,6 +929,7 @@ func getImageLayerInfo(ctx context.Context, cs content.Store, desc ocispec.Descr
 			Index: uint32(layerIndex),
 			Descriptor: ocispec.Descriptor{
 				Annotations: desc.Annotations,
+				MediaType:   desc.MediaType,
 				Digest:      desc.Digest,
 				Size:        desc.Size,
 				Platform:    platform,

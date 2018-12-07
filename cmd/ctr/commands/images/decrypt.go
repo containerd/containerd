@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/images"
 	encconfig "github.com/containerd/containerd/images/encryption/config"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -76,13 +77,7 @@ var decryptCommand = cli.Command{
 			return err
 		}
 
-		isEncrypted := false
-		for i := 0; i < len(layerInfos); i++ {
-			if len(layerInfos[i].Descriptor.Annotations) > 0 {
-				isEncrypted = true
-				break
-			}
-		}
+		isEncrypted := images.HasEncryptedLayer(ctx, layerInfos)
 		if !isEncrypted {
 			fmt.Printf("Nothing to decrypted.\n")
 			return nil
