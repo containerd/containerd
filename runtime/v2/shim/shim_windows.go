@@ -40,7 +40,7 @@ import (
 )
 
 // setupSignals creates a new signal handler for all signals
-func setupSignals() (chan os.Signal, error) {
+func setupSignals(config Config) (chan os.Signal, error) {
 	signals := make(chan os.Signal, 32)
 	return signals, nil
 }
