@@ -1026,3 +1026,32 @@ func WithWindowsHyperV(_ context.Context, _ Client, _ *containers.Container, s *
 	}
 	return nil
 }
+
+// WithMemoryLimit sets the `Linux.LinuxResources.Memory.Limit` section to the
+// `limit` specified if the `Linux` section is not `nil`. Additionally sets the
+// `Windows.WindowsResources.Memory.Limit` section if the `Windows` section is
+// not `nil`.
+func WithMemoryLimit(limit uint64) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		if s.Linux != nil {
+			if s.Linux.Resources == nil {
+				s.Linux.Resources = &specs.LinuxResources{}
+			}
+			if s.Linux.Resources.Memory == nil {
+				s.Linux.Resources.Memory = &specs.LinuxMemory{}
+			}
+			l := int64(limit)
+			s.Linux.Resources.Memory.Limit = &l
+		}
+		if s.Windows != nil {
+			if s.Windows.Resources == nil {
+				s.Windows.Resources = &specs.WindowsResources{}
+			}
+			if s.Windows.Resources.Memory == nil {
+				s.Windows.Resources.Memory = &specs.WindowsMemoryResources{}
+			}
+			s.Windows.Resources.Memory.Limit = &limit
+		}
+		return nil
+	}
+}
