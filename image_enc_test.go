@@ -170,6 +170,7 @@ func TestImageEncryption(t *testing.T) {
 	}
 
 	// Perform decryption of image
+	defer client.ImageService().Delete(ctx, imageName, images.SynchronousDelete())
 	decSpec, modified, err := images.DecryptImage(ctx, client.ContentStore(), encSpec, cc, lf)
 	if err != nil {
 		t.Fatal(err)
