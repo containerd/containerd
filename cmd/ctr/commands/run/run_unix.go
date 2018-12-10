@@ -139,6 +139,10 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			// NOTE: can be set to "" explicitly for disabling cgroup.
 			opts = append(opts, oci.WithCgroup(context.String("cgroup")))
 		}
+		limit := context.Uint64("memory-limit")
+		if limit != 0 {
+			opts = append(opts, oci.WithMemoryLimit(limit))
+		}
 	}
 
 	cOpts = append(cOpts, containerd.WithRuntime(context.String("runtime"), nil))

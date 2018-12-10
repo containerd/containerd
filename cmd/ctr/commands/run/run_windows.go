@@ -105,6 +105,14 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		if context.Bool("isolated") {
 			opts = append(opts, oci.WithWindowsHyperV)
 		}
+		limit := context.Uint64("memory-limit")
+		if limit != 0 {
+			opts = append(opts, oci.WithMemoryLimit(limit))
+		}
+		ccount := context.Uint64("cpu-count")
+		if ccount != 0 {
+			opts = append(opts, oci.WithWindowsCPUCount(ccount))
+		}
 	}
 
 	cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(context.StringSlice("label"))))

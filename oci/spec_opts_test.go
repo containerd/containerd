@@ -174,3 +174,61 @@ func TestWithSpecFromFile(t *testing.T) {
 		t.Fatalf("spec from option differs from default: \n%#v != \n%#v", &s, expected)
 	}
 }
+
+func TestWithMemoryLimit(t *testing.T) {
+	var (
+		ctx = namespaces.WithNamespace(context.Background(), "testing")
+		c   = containers.Container{ID: t.Name()}
+		m   = uint64(768 * 1024 * 1024)
+		o   = WithMemoryLimit(m)
+	)
+	// Test with all three supported scenarios
+	platforms := []string{"", "linux/amd64", "windows/amd64"}
+	for _, p := range platforms {
+		var spec *Spec
+		var err error
+		if p == "" {
+			t.Log("Testing GenerateSpec default platform")
+			spec, err = GenerateSpec(ctx, nil, &c, o)
+
+			// Convert the platform to the default based on GOOS like
+			// GenerateSpec does.
+			switch runtime.GOOS {
+			case "linux":
+				p = "linux/amd64"
+			case "windows":
+				p = "windows/amd64"
+			}
+		} else {
+			t.Logf("Testing GenerateSpecWithPlatform with platform: '%s'", p)
+			spec, err = GenerateSpecWithPlatform(ctx, nil, p, &c, o)
+		}
+		if err != nil {
+			t.Fatalf("failed to generate spec with: %v", err)
+		}
+		switch p {
+		case "linux/amd64":
+			if *spec.Linux.Resources.Memory.Limit != int64(m) {
+				t.Fatalf("spec.Linux.Resources.Memory.Limit expected: %v, got: %v", m, *spec.Linux.Resources.Memory.Limit)
+			}
+			// If we are linux/amd64 on Windows GOOS it is LCOW
+			if runtime.GOOS == "windows" {
+				// Verify that we also set the Windows section.
+				if *spec.Windows.Resources.Memory.Limit != m {
+					t.Fatalf("for LCOW spec.Windows.Resources.Memory.Limit is also expected: %v, got: %v", m, *spec.Windows.Resources.Memory.Limit)
+				}
+			} else {
+				if spec.Windows != nil {
+					t.Fatalf("spec.Windows section should not be set for linux/amd64 spec on non-windows platform")
+				}
+			}
+		case "windows/amd64":
+			if *spec.Windows.Resources.Memory.Limit != m {
+				t.Fatalf("spec.Windows.Resources.Memory.Limit expected: %v, got: %v", m, *spec.Windows.Resources.Memory.Limit)
+			}
+			if spec.Linux != nil {
+				t.Fatalf("spec.Linux section should not be set for windows/amd64 spec ever")
+			}
+		}
+	}
+}
