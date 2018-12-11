@@ -419,6 +419,21 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 		}
 	}
 
+	// in https://github.com/moby/moby/blob/master/pkg/archive/archive.go, moby still use 'Xattrs'
+	// to deal with file extended attributes, maybe other image build tools also do this way.
+	// Add resolve file attributes from 'hdr.Xattrs' make these images work good
+	for key, value := range hdr.Xattrs {
+		if _, exist := hdr.PAXRecords[paxSchilyXattr+key]; !exist {
+			if err := setxattr(path, key, value); err != nil {
+				if errors.Cause(err) == syscall.ENOTSUP {
+					log.G(ctx).WithError(err).Warnf("ignored xattr %s in archive", key)
+					continue
+				}
+				return err
+			}
+		}
+	}
+
 	// There is no LChmod, so ignore mode for symlink. Also, this
 	// must happen after chown, as that can modify the file mode
 	if err := handleLChmod(hdr, path, hdrInfo); err != nil {
