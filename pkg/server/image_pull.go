@@ -61,11 +61,11 @@ import (
 // if we saw an image without snapshots or with in-complete contents during startup,
 // should we re-pull the image? Or should we remove the entry?
 //
-// yanxuean: We cann't delete image directly, because we don't know if the image
+// yanxuean: We can't delete image directly, because we don't know if the image
 // is pulled by us. There are resource leakage.
 //
 // 2) Containerd suggests user to add entry before pulling the image. However if
-// an error occurrs during the pulling, should we remove the entry from metadata
+// an error occurs during the pulling, should we remove the entry from metadata
 // store? Or should we leave it there until next startup (resource leakage)?
 //
 // 3) The cri plugin only exposes "READY" (successfully pulled and unpacked) images
