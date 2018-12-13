@@ -37,6 +37,19 @@ import (
 	"golang.org/x/net/context/ctxhttp"
 )
 
+// ResolverBlobMounter extends remotes.Resolver with support for cross repository blob mounts
+type ResolverBlobMounter interface {
+	remotes.Resolver
+	BlobMounter(ctx context.Context, ref string) (BlobMounter, error)
+}
+
+// BlobMounter mounts content from another repository
+type BlobMounter interface {
+	// MountBlob mounts a blob from another repository
+	// from must be a manifest path (namespace/repo, without the registry prefix)
+	MountBlob(ctx context.Context, d ocispec.Descriptor, from string) error
+}
+
 var (
 	// ErrNoToken is returned if a request is successful but the body does not
 	// contain an authorization token.
@@ -116,7 +129,7 @@ type dockerResolver struct {
 }
 
 // NewResolver returns a new resolver to a Docker registry
-func NewResolver(options ResolverOptions) remotes.Resolver {
+func NewResolver(options ResolverOptions) ResolverBlobMounter {
 	if options.Tracker == nil {
 		options.Tracker = NewInMemoryTracker()
 	}
@@ -289,6 +302,30 @@ func (r *dockerResolver) Pusher(ctx context.Context, ref string) (remotes.Pusher
 	// Manifests can be pushed by digest like any other object, but the passed in
 	// reference cannot take a digest without the associated content. A tag is allowed
 	// and will be used to tag pushed manifests.
+	if refspec.Object != "" && strings.Contains(refspec.Object, "@") {
+		return nil, errors.New("cannot use digest reference for push locator")
+	}
+
+	base, err := r.base(refspec)
+	if err != nil {
+		return nil, err
+	}
+
+	return dockerPusher{
+		dockerBase: base,
+		tag:        refspec.Object,
+		tracker:    r.tracker,
+	}, nil
+}
+
+func (r *dockerResolver) BlobMounter(ctx context.Context, ref string) (BlobMounter, error) {
+	refspec, err := reference.Parse(ref)
+	if err != nil {
+		return nil, err
+	}
+
+	// The passed in for a blob mounter cannot take a digest without the associated content.
+
 	if refspec.Object != "" && strings.Contains(refspec.Object, "@") {
 		return nil, errors.New("cannot use digest reference for push locator")
 	}
