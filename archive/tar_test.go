@@ -22,6 +22,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -33,6 +34,7 @@ import (
 	_ "crypto/sha256"
 
 	"github.com/containerd/containerd/archive/tartest"
+	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/continuity/fs/fstest"
 	"github.com/pkg/errors"
@@ -180,6 +182,50 @@ func TestSymlinks(t *testing.T) {
 		if err := testDiffApply(l[0], l[1]); err != nil {
 			t.Fatalf("Test[%d] apply failed: %+v", i+1, err)
 		}
+	}
+}
+
+func TestTarWithXattr(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	fileXattrExist := func(f1, xattrKey, xattrValue string) func(string) error {
+		return func(root string) error {
+			values, err := getxattr(filepath.Join(root, f1), xattrKey)
+			if err != nil {
+				return err
+			}
+			if xattrValue != string(values) {
+				return fmt.Errorf("file xattrs expect to be %s, actually get %s", xattrValue, values)
+			}
+			return nil
+		}
+	}
+
+	tests := []struct {
+		name  string
+		key   string
+		value string
+		err   error
+	}{
+		{
+			name:  "WithXattrsUser",
+			key:   "user.key",
+			value: "value",
+		},
+		{
+			// security related xattrs need root permission to test
+			name:  "WithXattrSelinux",
+			key:   "security.selinux",
+			value: "unconfined_u:object_r:default_t:s0\x00",
+		},
+	}
+	for _, at := range tests {
+		tc := tartest.TarContext{}.WithUIDGID(os.Getuid(), os.Getgid()).WithModTime(time.Now().UTC()).WithXattrs(map[string]string{
+			at.key: at.value,
+		})
+		w := tartest.TarAll(tc.File("/file", []byte{}, 0755))
+		validator := fileXattrExist("file", at.key, at.value)
+		t.Run(at.name, makeWriterToTarTest(w, nil, validator, at.err))
 	}
 }
 

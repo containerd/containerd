@@ -100,7 +100,7 @@ const (
 	// readdir calls to this directory do not follow to lower layers.
 	whiteoutOpaqueDir = whiteoutMetaPrefix + ".opq"
 
-	paxSchilyXattr = "SCHILY.xattrs."
+	paxSchilyXattr = "SCHILY.xattr."
 )
 
 // Apply applies a tar stream of an OCI style diff tar.
