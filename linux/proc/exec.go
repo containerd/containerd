@@ -89,6 +89,7 @@ func (e *execProcess) setExited(status int) {
 	e.status = status
 	e.exited = time.Now()
 	e.parent.platform.ShutdownConsole(context.Background(), e.console)
+	e.pid = -1
 	close(e.waitBlock)
 }
 
@@ -115,7 +116,7 @@ func (e *execProcess) resize(ws console.WinSize) error {
 
 func (e *execProcess) kill(ctx context.Context, sig uint32, _ bool) error {
 	pid := e.pid
-	if pid != 0 {
+	if pid > 0 {
 		if err := unix.Kill(pid, syscall.Signal(sig)); err != nil {
 			return errors.Wrapf(checkKillError(err), "exec kill error")
 		}
@@ -212,9 +213,13 @@ func (e *execProcess) Status(ctx context.Context) (string, error) {
 	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	// if we don't have a pid then the exec process has just been created
+	// if we don't have a pid(pid=0) then the exec process has just been created
 	if e.pid == 0 {
 		return "created", nil
+	}
+	// if we have a pid=-1 then the exec process has just been stopped
+	if e.pid == -1 {
+		return "stopped", nil
 	}
 	// if we have a pid and it can be signaled, the process is running
 	if err := unix.Kill(e.pid, 0); err == nil {
