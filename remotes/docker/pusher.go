@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/reference"
 	"github.com/containerd/containerd/remotes"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -45,7 +46,11 @@ type dockerPusher struct {
 }
 
 func (p dockerPusher) MountBlob(ctx context.Context, desc ocispec.Descriptor, from string) error {
-	ctx, err := contextWithRepositoryScope(ctx, p.refspec, true)
+	originRef, err := reference.Parse(from)
+	if err != nil {
+		return err
+	}
+	ctx, err = contextWithMountScope(ctx, originRef, p.refspec)
 	if err != nil {
 		return err
 	}
@@ -88,7 +93,9 @@ func (p dockerPusher) MountBlob(ctx context.Context, desc ocispec.Descriptor, fr
 		}
 	}
 
-	req, err = http.NewRequest(http.MethodPost, fmt.Sprintf("%s/?mount=%s&from=%s", p.url("blobs", "uploads"), desc.Digest, from), nil)
+	i := strings.Index(originRef.Locator, "/")
+	originRepoPath := originRef.Locator[i+1:]
+	req, err = http.NewRequest(http.MethodPost, fmt.Sprintf("%s/?mount=%s&from=%s", p.url("blobs", "uploads"), desc.Digest, originRepoPath), nil)
 	if err != nil {
 		return err
 	}
@@ -99,7 +106,7 @@ func (p dockerPusher) MountBlob(ctx context.Context, desc ocispec.Descriptor, fr
 	}
 
 	switch resp.StatusCode {
-	case http.StatusOK, http.StatusAccepted, http.StatusNoContent, http.StatusCreated:
+	case http.StatusCreated:
 	default:
 		// TODO: log error
 		return errors.Errorf("unexpected response: %s", resp.Status)

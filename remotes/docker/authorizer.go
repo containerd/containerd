@@ -25,7 +25,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"strings"
 	"sync"
 	"time"
 
@@ -131,7 +130,11 @@ func (a *dockerAuthorizer) setTokenAuth(ctx context.Context, host string, params
 		service: params["service"],
 	}
 
-	to.scopes = getTokenScopes(ctx, params)
+	to.scopes, err = getTokenScopes(ctx, params)
+	if err != nil {
+		return errors.Wrap(err, "invalid token scopes")
+	}
+
 	if len(to.scopes) == 0 {
 		return errors.Errorf("no scope specified for token auth challenge")
 	}
@@ -180,7 +183,9 @@ type postTokenResponse struct {
 
 func (a *dockerAuthorizer) fetchTokenWithOAuth(ctx context.Context, to tokenOptions) (string, error) {
 	form := url.Values{}
-	form.Set("scope", strings.Join(to.scopes, " "))
+	for _, scope := range to.scopes {
+		form.Add("scope", scope)
+	}
 	form.Set("service", to.service)
 	// TODO: Allow setting client_id
 	form.Set("client_id", "containerd-client")
