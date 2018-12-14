@@ -49,7 +49,7 @@ func TarAll(wt ...WriterToTar) WriterToTar {
 }
 
 // TarFromWriterTo is used to create a tar stream from a tar record
-// creator. This can be used to manifacture more specific tar records
+// creator. This can be used to manufacture more specific tar records
 // which allow testing specific tar cases which may be encountered
 // by the untar process.
 func TarFromWriterTo(wt WriterToTar) io.ReadCloser {
