@@ -46,7 +46,8 @@ fi
 
 # Install critest
 if [ ! -x "$(command -v ${CRITEST})" ]; then
-  go get -d ${CRITOOL_PKG}/...
+  # FIXME temporarily disabled due to a regression in Go 1.10.6 / 1.11.3 (https://github.com/golang/go/issues/29241)
+  go get -d ${CRITOOL_PKG} || true
   cd ${GOPATH}/src/${CRITOOL_PKG}
   git fetch --all
   git checkout ${CRITOOL_VERSION}
