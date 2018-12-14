@@ -107,7 +107,9 @@ all: binaries
 
 check: proto-fmt ## run all linters
 	@echo "$(WHALE) $@"
-	gometalinter --config .gometalinter.json ./...
+	# FIXME temporarily disabled due to a regression in Go 1.10.6 / 1.11.3 (https://github.com/golang/go/issues/29241)
+	# gometalinter --config .gometalinter.json ./...
+	gometalinter --config .gometalinter.json $(go list ./... | grep -v /vendor/)
 
 ci: check binaries checkprotos coverage coverage-integration ## to be used by the CI
 

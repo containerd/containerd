@@ -22,7 +22,12 @@ set -eu -o pipefail
 
 go get -u github.com/onsi/ginkgo/ginkgo
 CRITEST_COMMIT=v1.0.0-beta.1
-go get -d github.com/kubernetes-incubator/cri-tools/...
+
+# FIXME temporarily disabled due to a regression in Go 1.10.6 / 1.11.3 (https://github.com/golang/go/issues/29241)
+# go get -d github.com/kubernetes-incubator/cri-tools/...
+go get -d github.com/kubernetes-incubator/cri-tools || true
+PACKAGES=$(go list github.com/kubernetes-incubator/cri-tools/... | grep -v /vendor/)
+go get -d ${PACKAGES}
 cd $GOPATH/src/github.com/kubernetes-incubator/cri-tools
 git checkout $CRITEST_COMMIT
 make
