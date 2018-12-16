@@ -1,4 +1,4 @@
-// +build !windows,!freebsd
+// +build freebsd
 
 /*
    Copyright The containerd Authors.
@@ -16,25 +16,14 @@
    limitations under the License.
 */
 
-package main
+package shim
 
-import (
-	"syscall"
-)
+import "github.com/containerd/ttrpc"
 
-func setRlimit() error {
-	rlimit := uint64(100000)
-	if rlimit > 0 {
-		var limit syscall.Rlimit
-		if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
-			return err
-		}
-		if limit.Cur < rlimit {
-			limit.Cur = rlimit
-			if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
-				return err
-			}
-		}
-	}
+func newServer() (*ttrpc.Server, error) {
+	return ttrpc.NewServer()
+}
+
+func subreaper() error {
 	return nil
 }
