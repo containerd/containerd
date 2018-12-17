@@ -36,9 +36,9 @@ This command will launch new shims.
 The start command MUST accept the following flags:
 
 * `-namespace` the namespace for the container
-* `-id` the id of the container
 * `-address` the address of the containerd's main socket
 * `-publish-binary` the binary path to publish events back to containerd
+* `-id` the id of the container
 
 The start command, as well as all binary calls to the shim, has the bundle for the container set as the `cwd`.
 
@@ -58,11 +58,12 @@ If a bundle is still on disk but containerd cannot connect to a shim, the delete
 The delete command MUST accept the following flags:
 
 * `-namespace` the namespace for the container
-* `-id` the id of the container
 * `-address` the address of the containerd's main socket
 * `-publish-binary` the binary path to publish events back to containerd
+* `-id` the id of the container
+* `-bundle` the path to the bundle to delete. On non-Windows platforms this will match `cwd`
 
-The delete command will be executed in the container's bundle as its `cwd`.
+The delete command will be executed in the container's bundle as its `cwd` except for on the Windows platform.
 
 ### Host Level Shim Configuration
 
