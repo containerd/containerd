@@ -1,4 +1,4 @@
-// +build !linux,!windows,!darwin
+// +build freebsd
 
 /*
    Copyright The containerd Authors.
@@ -39,5 +39,8 @@ func setupSignals() (chan os.Signal, error) {
 }
 
 func newServer() (*ttrpc.Server, error) {
-	return ttrpc.NewServer(ttrpc.WithServerHandshaker(ttrpc.UnixSocketRequireSameUser()))
+	// for freebsd, we omit the socket credentials because these syscalls are
+	// slightly different. since we don't have freebsd support yet, this can be
+	// implemented later and the build can continue without issue.
+	return ttrpc.NewServer()
 }
