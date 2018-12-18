@@ -238,6 +238,9 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 			plugin.ContentPlugin,
 			plugin.SnapshotPlugin,
 		},
+		Config: &srvconfig.BoltConfig{
+			ContentSharingPolicy: srvconfig.SharingPolicyShared,
+		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			if err := os.MkdirAll(ic.Root, 0711); err != nil {
 				return nil, err
@@ -265,6 +268,22 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 				snapshotters[name] = sn.(snapshots.Snapshotter)
 			}
 
+			shared := true
+			ic.Meta.Exports["policy"] = srvconfig.SharingPolicyShared
+			if cfg, ok := ic.Config.(*srvconfig.BoltConfig); ok {
+				if cfg.ContentSharingPolicy != "" {
+					if err := cfg.Validate(); err != nil {
+						return nil, err
+					}
+					if cfg.ContentSharingPolicy == srvconfig.SharingPolicyIsolated {
+						ic.Meta.Exports["policy"] = srvconfig.SharingPolicyIsolated
+						shared = false
+					}
+
+					log.L.WithField("policy", cfg.ContentSharingPolicy).Info("metadata content store policy set")
+				}
+			}
+
 			path := filepath.Join(ic.Root, "meta.db")
 			ic.Meta.Exports["path"] = path
 
@@ -272,7 +291,12 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 			if err != nil {
 				return nil, err
 			}
-			mdb := metadata.NewDB(db, cs.(content.Store), snapshotters)
+
+			var dbopts []metadata.DBOpt
+			if !shared {
+				dbopts = append(dbopts, metadata.WithPolicyIsolated)
+			}
+			mdb := metadata.NewDB(db, cs.(content.Store), snapshotters, dbopts...)
 			if err := mdb.Init(ic.Context); err != nil {
 				return nil, err
 			}
