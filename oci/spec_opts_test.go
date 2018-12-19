@@ -31,6 +31,49 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
+func TestReplaceOrAppendEnvValues(t *testing.T) {
+	t.Parallel()
+
+	defaults := []string{
+		"o=ups", "p=$e", "x=foo", "y=boo", "z", "t=",
+	}
+	overrides := []string{
+		"x=bar", "y", "a=42", "o=", "e", "s=",
+	}
+	expected := []string{
+		"o=", "p=$e", "x=bar", "z", "t=", "a=42", "s=",
+	}
+
+	defaultsOrig := make([]string, len(defaults))
+	copy(defaultsOrig, defaults)
+	overridesOrig := make([]string, len(overrides))
+	copy(overridesOrig, overrides)
+
+	results := replaceOrAppendEnvValues(defaults, overrides)
+
+	for i, x := range defaultsOrig {
+		if defaults[i] != x {
+			t.Fatal("defaults slice was mutated")
+		}
+	}
+
+	for i, x := range overridesOrig {
+		if overrides[i] != x {
+			t.Fatal("overrides slice was mutated")
+		}
+	}
+
+	if len(expected) != len(results) {
+		t.Fatalf("expected %s, but found %s", expected, results)
+	}
+
+	for i, x := range expected {
+		if results[i] != x {
+			t.Fatalf("expected %s, but found %s", expected, results)
+		}
+	}
+}
+
 func TestWithEnv(t *testing.T) {
 	t.Parallel()
 
