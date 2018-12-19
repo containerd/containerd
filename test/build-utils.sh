@@ -29,11 +29,19 @@ fi
 gcloud auth activate-service-account --key-file "${GOOGLE_APPLICATION_CREDENTIALS}" --project="${PROJECT}"
 
 # Install dependent libraries.
-sh -c "echo 'deb http://ftp.debian.org/debian jessie-backports main' > /etc/apt/sources.list.d/backports.list"
 apt-get update
 apt-get install -y btrfs-tools
-apt-get install -y libseccomp2/jessie-backports
-apt-get install -y libseccomp-dev/jessie-backports
+
+# Kubernetes test infra uses jessie and stretch.
+if cat /etc/os-release | grep jessie; then
+  sh -c "echo 'deb http://ftp.debian.org/debian jessie-backports main' > /etc/apt/sources.list.d/backports.list"
+  apt-get update
+  apt-get install -y libseccomp2/jessie-backports
+  apt-get install -y libseccomp-dev/jessie-backports
+else
+  apt-get install -y libseccomp2
+  apt-get install -y libseccomp-dev
+fi
 
 # PULL_REFS is from prow.
 if [ ! -z "${PULL_REFS:-""}" ]; then
