@@ -145,6 +145,10 @@ func (m *TaskManager) loadExistingTasks(ctx context.Context) error {
 			continue
 		}
 		ns := nsd.Name()
+		// skip hidden directories
+		if len(ns) > 0 && ns[0] == '.' {
+			continue
+		}
 		log.G(ctx).WithField("namespace", ns).Debug("loading tasks in namespace")
 		if err := m.loadTasks(namespaces.WithNamespace(ctx, ns)); err != nil {
 			log.G(ctx).WithField("namespace", ns).WithError(err).Error("loading tasks in namespace")
