@@ -290,6 +290,10 @@ func (r *Runtime) restoreTasks(ctx context.Context) ([]*Task, error) {
 			continue
 		}
 		name := namespace.Name()
+		// skip hidden directories
+		if len(name) > 0 && name[0] == '.' {
+			continue
+		}
 		log.G(ctx).WithField("namespace", name).Debug("loading tasks in namespace")
 		tasks, err := r.loadTasks(ctx, name)
 		if err != nil {
