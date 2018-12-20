@@ -149,6 +149,8 @@ type Task interface {
 	// OCI Index that can be push and pulled from a remote resource.
 	//
 	// Additional software like CRIU maybe required to checkpoint and restore tasks
+	// NOTE: Checkpoint supports to dump task information to a directory, in this way,
+	// an empty OCI Index will be returned.
 	Checkpoint(context.Context, ...CheckpointTaskOpts) (Image, error)
 	// Update modifies executing tasks with updated settings
 	Update(context.Context, ...UpdateTaskOpts) error
@@ -391,6 +393,8 @@ func (t *task) Resize(ctx context.Context, w, h uint32) error {
 	return errdefs.FromGRPC(err)
 }
 
+// NOTE: Checkpoint supports to dump task information to a directory, in this way, an empty
+// OCI Index will be returned.
 func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Image, error) {
 	ctx, done, err := t.client.WithLease(ctx)
 	if err != nil {
@@ -437,9 +441,10 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 	if err := t.checkpointTask(ctx, &index, request); err != nil {
 		return nil, err
 	}
-	// if checkpoint image path passed, jump checkpoint image
+	// if checkpoint image path passed, jump checkpoint image,
+	// return an empty image
 	if isCheckpointPathExist(cr.Runtime.Name, i.Options) {
-		return nil, nil
+		return NewImage(t.client, images.Image{}), nil
 	}
 
 	if cr.Image != "" {
