@@ -27,9 +27,16 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/runtime/linux/runctypes"
+	"github.com/containerd/containerd/runtime/v2/runc/options"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
+)
+
+const (
+	v1runtime = "io.containerd.runtime.v1.linux"
+	v2runtime = "io.containerd.runc.v1"
 )
 
 // NewTaskOpts allows the caller to set options on a new task
@@ -85,6 +92,60 @@ func decodeIndex(ctx context.Context, store content.Provider, desc imagespec.Des
 func WithCheckpointName(name string) CheckpointTaskOpts {
 	return func(r *CheckpointTaskInfo) error {
 		r.Name = name
+		return nil
+	}
+}
+
+// WithCheckpointImagePath sets image path for checkpoint option
+func WithCheckpointImagePath(rt, path string) CheckpointTaskOpts {
+	return func(r *CheckpointTaskInfo) error {
+		switch rt {
+		case v1runtime:
+			if r.Options == nil {
+				r.Options = &runctypes.CheckpointOptions{}
+			}
+			opts, ok := r.Options.(*runctypes.CheckpointOptions)
+			if !ok {
+				return errors.New("invalid v1 checkpoint options format")
+			}
+			opts.ImagePath = path
+		case v2runtime:
+			if r.Options == nil {
+				r.Options = &options.CheckpointOptions{}
+			}
+			opts, ok := r.Options.(*options.CheckpointOptions)
+			if !ok {
+				return errors.New("invalid v2 checkpoint options format")
+			}
+			opts.ImagePath = path
+		}
+		return nil
+	}
+}
+
+// WithRestoreImagePath sets image path for create option
+func WithRestoreImagePath(rt, path string) NewTaskOpts {
+	return func(ctx context.Context, c *Client, ti *TaskInfo) error {
+		switch rt {
+		case v1runtime:
+			if ti.Options == nil {
+				ti.Options = &runctypes.CreateOptions{}
+			}
+			opts, ok := ti.Options.(*runctypes.CreateOptions)
+			if !ok {
+				return errors.New("invalid v1 create options format")
+			}
+			opts.CriuImagePath = path
+		case v2runtime:
+			if ti.Options == nil {
+				ti.Options = &options.Options{}
+			}
+			opts, ok := ti.Options.(*options.Options)
+			if !ok {
+				return errors.New("invalid v2 create options format")
+			}
+			opts.CriuImagePath = path
+		}
 		return nil
 	}
 }

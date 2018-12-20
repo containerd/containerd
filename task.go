@@ -37,6 +37,8 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/rootfs"
+	"github.com/containerd/containerd/runtime/linux/runctypes"
+	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl"
 	google_protobuf "github.com/gogo/protobuf/types"
 	digest "github.com/opencontainers/go-digest"
@@ -147,6 +149,8 @@ type Task interface {
 	// OCI Index that can be push and pulled from a remote resource.
 	//
 	// Additional software like CRIU maybe required to checkpoint and restore tasks
+	// NOTE: Checkpoint supports to dump task information to a directory, in this way,
+	// an empty OCI Index will be returned.
 	Checkpoint(context.Context, ...CheckpointTaskOpts) (Image, error)
 	// Update modifies executing tasks with updated settings
 	Update(context.Context, ...UpdateTaskOpts) error
@@ -387,6 +391,8 @@ func (t *task) Resize(ctx context.Context, w, h uint32) error {
 	return errdefs.FromGRPC(err)
 }
 
+// NOTE: Checkpoint supports to dump task information to a directory, in this way, an empty
+// OCI Index will be returned.
 func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Image, error) {
 	ctx, done, err := t.client.WithLease(ctx)
 	if err != nil {
@@ -433,6 +439,12 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 	if err := t.checkpointTask(ctx, &index, request); err != nil {
 		return nil, err
 	}
+	// if checkpoint image path passed, jump checkpoint image,
+	// return an empty image
+	if isCheckpointPathExist(cr.Runtime.Name, i.Options) {
+		return NewImage(t.client, images.Image{}), nil
+	}
+
 	if cr.Image != "" {
 		if err := t.checkpointImage(ctx, &index, cr.Image); err != nil {
 			return nil, err
@@ -542,6 +554,7 @@ func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tas
 	if err != nil {
 		return errdefs.FromGRPC(err)
 	}
+	// NOTE: response.Descriptors can be an empty slice if checkpoint image is jumped
 	// add the checkpoint descriptors to the index
 	for _, d := range response.Descriptors {
 		index.Manifests = append(index.Manifests, v1.Descriptor{
@@ -618,4 +631,25 @@ func writeContent(ctx context.Context, store content.Ingester, mediaType, ref st
 		Digest:    writer.Digest(),
 		Size:      size,
 	}, nil
+}
+
+// isCheckpointPathExist only suitable for runc runtime now
+func isCheckpointPathExist(runtime string, v interface{}) bool {
+	if v == nil {
+		return false
+	}
+
+	switch runtime {
+	case "io.containerd.runc.v1":
+		if opts, ok := v.(*options.CheckpointOptions); ok && opts.ImagePath != "" {
+			return true
+		}
+
+	case "io.containerd.runtime.v1.linux":
+		if opts, ok := v.(*runctypes.CheckpointOptions); ok && opts.ImagePath != "" {
+			return true
+		}
+	}
+
+	return false
 }

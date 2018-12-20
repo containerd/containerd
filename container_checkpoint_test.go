@@ -22,16 +22,19 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
 	"testing"
 
+	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/oci"
 )
 
 const (
-	v1runtime          = "io.containerd.runtime.v1.linux"
 	testCheckpointName = "checkpoint-test:latest"
 )
 
@@ -407,4 +410,124 @@ func TestCheckpointLeaveRunning(t *testing.T) {
 	}
 
 	<-statusC
+}
+
+func TestCRWithImagePath(t *testing.T) {
+	if !supportsCriu {
+		t.Skip("system does not have criu installed")
+	}
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		ctx, cancel = testContext()
+		id          = t.Name() + "-checkpoint"
+	)
+	defer cancel()
+
+	image, err := client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("top")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	// create image path store criu image files
+	crDir, err := ioutil.TempDir("", "test-cr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(crDir)
+	imagePath := filepath.Join(crDir, "cr")
+	// checkpoint task
+	if _, err := task.Checkpoint(ctx, WithCheckpointImagePath(client.runtime, imagePath)); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	<-statusC
+	task.Delete(ctx)
+
+	// check image files have been dumped into image path
+	if files, err := ioutil.ReadDir(imagePath); err != nil || len(files) == 0 {
+		t.Fatal("failed to checkpoint with image path set")
+	}
+
+	// restore task with same container image and checkpoint directory,
+	// the restore process should finish in millisecond level
+	id = t.Name() + "-restore"
+	ncontainer, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ncontainer.Delete(ctx, WithSnapshotCleanup)
+
+	ntask, err := ncontainer.NewTask(ctx, empty(), WithRestoreImagePath(client.runtime, imagePath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	statusC, err = ntask.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ntask.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	// check top process is existed in restored container
+	spec, err := container.Spec(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stdout := bytes.NewBuffer(nil)
+	spec.Process.Args = []string{"ps", "-ef"}
+	process, err := ntask.Exec(ctx, t.Name()+"_exec", spec.Process, cio.NewCreator(withByteBuffers(stdout)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	processStatusC, err := process.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := process.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	<-processStatusC
+	if _, err := process.Delete(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(stdout.String(), "top") {
+		t.Errorf("except top process exists in restored container but not, got output %s", stdout.String())
+	}
+
+	// we wrote the same thing after attach
+	if err := ntask.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	<-statusC
+	ntask.Delete(ctx)
 }
