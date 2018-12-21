@@ -153,6 +153,14 @@ func (r *windowsRuntime) Tasks(ctx context.Context, all bool) ([]runtime.Task, e
 	return r.tasks.GetAll(ctx, all)
 }
 
+func (r *windowsRuntime) Add(ctx context.Context, task runtime.Task) error {
+	return r.tasks.Add(ctx, task)
+}
+
+func (r *windowsRuntime) Delete(ctx context.Context, id string) {
+	r.tasks.Delete(ctx, id)
+}
+
 func (r *windowsRuntime) newTask(ctx context.Context, namespace, id string, rootfs []mount.Mount, spec *runtimespec.Spec, io runtime.IO, createOpts *hcsshimtypes.CreateOptions) (*task, error) {
 	var (
 		err  error
