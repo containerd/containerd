@@ -146,7 +146,7 @@ func (c *criService) recover(ctx context.Context) error {
 // * ListContainerStats: Not in critical code path, a default timeout will
 // be applied at CRI level.
 // * Recovery logic: We should set a time for each container/sandbox recovery.
-// * Event montior: We should set a timeout for each container/sandbox event handling.
+// * Event monitor: We should set a timeout for each container/sandbox event handling.
 const loadContainerTimeout = 10 * time.Second
 
 // loadContainer loads container from containerd and status checkpoint.

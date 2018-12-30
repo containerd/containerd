@@ -128,7 +128,7 @@ func (c *criService) waitSandboxStop(ctx context.Context, sandbox sandboxstore.S
 // teardownPod removes the network from the pod
 func (c *criService) teardownPod(id string, path string, config *runtime.PodSandboxConfig) error {
 	if c.netPlugin == nil {
-		return errors.New("cni config not intialized")
+		return errors.New("cni config not initialized")
 	}
 
 	labels := getPodCNILabels(id, config)
