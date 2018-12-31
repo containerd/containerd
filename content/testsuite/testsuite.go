@@ -997,7 +997,7 @@ var contentSeed int64
 
 func createContent(size int64) ([]byte, digest.Digest) {
 	// each time we call this, we want to get a different seed, but it should
-	// be related to the intitialization order and fairly consistent between
+	// be related to the initialization order and fairly consistent between
 	// test runs. An atomic integer works just good enough for this.
 	seed := atomic.AddInt64(&contentSeed, 1)
 
