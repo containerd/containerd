@@ -92,14 +92,6 @@ type Store interface {
 	Delete(ctx context.Context, name string, opts ...DeleteOpt) error
 }
 
-type containedReader struct {
-	rd io.Reader
-}
-
-func (cr containedReader) Read(p []byte) (n int, err error) {
-	return cr.rd.Read(p)
-}
-
 type cryptoOp int
 
 const (
@@ -452,22 +444,22 @@ func IsCompressedDiff(ctx context.Context, mediaType string) (bool, error) {
 // encryptLayer encrypts the layer using the CryptoConfig and creates a new OCI Descriptor.
 // A call to this function may also only manipulate the wrapped keys list.
 // The caller is expected to store the returned encrypted data and OCI Descriptor
-func encryptLayer(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc ocispec.Descriptor) (ocispec.Descriptor, []byte, error) {
+func encryptLayer(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc ocispec.Descriptor) (ocispec.Descriptor, content.ReaderDigester, error) {
 	var (
 		size int64
 		d    digest.Digest
 		err  error
 	)
 
-	p, annotations, err := encryption.EncryptLayer(cc.Ec, dataReader, desc)
+	encLayerReader, annotations, err := encryption.EncryptLayer(cc.Ec, dataReader, desc)
 	if err != nil {
-		return ocispec.Descriptor{}, []byte{}, err
+		return ocispec.Descriptor{}, nil, err
 	}
 
 	// were data touched ?
-	if len(p) > 0 {
-		size = int64(len(p))
-		d = digest.FromBytes(p)
+	if encLayerReader != nil {
+		size = encLayerReader.Size()
+		d = encLayerReader.Digest()
 	} else {
 		size = desc.Size
 		d = desc.Digest
@@ -497,26 +489,26 @@ func encryptLayer(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc 
 		newDesc.MediaType = MediaTypeDockerSchema2LayerEnc
 
 	default:
-		return ocispec.Descriptor{}, []byte{}, errors.Errorf("Encryption: unsupporter layer MediaType: %s\n", desc.MediaType)
+		return ocispec.Descriptor{}, nil, errors.Errorf("Encryption: unsupporter layer MediaType: %s\n", desc.MediaType)
 	}
 
-	return newDesc, p, nil
+	return newDesc, encLayerReader, nil
 }
 
 // DecryptBlob decrypts the layer blob using the CryptoConfig and creates a new OCI Descriptor.
 // The caller is expected to store the returned plain data and OCI Descriptor
-func DecryptBlob(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc ocispec.Descriptor, unwrapOnly bool) (ocispec.Descriptor, []byte, error) {
+func DecryptBlob(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc ocispec.Descriptor, unwrapOnly bool) (ocispec.Descriptor, io.Reader, error) {
 	if cc == nil {
-		return ocispec.Descriptor{}, []byte{}, errors.Wrapf(errdefs.ErrInvalidArgument, "CryptoConfig must not be nil")
+		return ocispec.Descriptor{}, nil, errors.Wrapf(errdefs.ErrInvalidArgument, "CryptoConfig must not be nil")
 	}
-	p, err := encryption.DecryptLayer(cc.Dc, dataReader, desc, unwrapOnly)
+	resultReader, err := encryption.DecryptLayer(cc.Dc, dataReader, desc, unwrapOnly)
 	if err != nil || unwrapOnly {
-		return ocispec.Descriptor{}, []byte{}, err
+		return ocispec.Descriptor{}, nil, err
 	}
 
 	newDesc := ocispec.Descriptor{
-		Digest:   digest.FromBytes(p),
-		Size:     int64(len(p)),
+		Digest:   resultReader.Digest(),
+		Size:     resultReader.Size(),
 		Platform: desc.Platform,
 	}
 
@@ -526,22 +518,22 @@ func DecryptBlob(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc o
 	case MediaTypeDockerSchema2LayerEnc:
 		newDesc.MediaType = MediaTypeDockerSchema2Layer
 	default:
-		return ocispec.Descriptor{}, []byte{}, errors.Errorf("Decryption: unsupporter layer MediaType: %s\n", desc.MediaType)
+		return ocispec.Descriptor{}, nil, errors.Errorf("Decryption: unsupporter layer MediaType: %s\n", desc.MediaType)
 	}
-	return newDesc, p, nil
+	return newDesc, resultReader, nil
 }
 
 // decryptLayer decrypts the layer using the CryptoConfig and creates a new OCI Descriptor.
 // The caller is expected to store the returned plain data and OCI Descriptor
-func decryptLayer(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc ocispec.Descriptor, unwrapOnly bool) (ocispec.Descriptor, []byte, error) {
-	p, err := encryption.DecryptLayer(cc.Dc, dataReader, desc, unwrapOnly)
+func decryptLayer(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc ocispec.Descriptor, unwrapOnly bool) (ocispec.Descriptor, content.ReaderDigester, error) {
+	resultReader, err := encryption.DecryptLayer(cc.Dc, dataReader, desc, unwrapOnly)
 	if err != nil || unwrapOnly {
-		return ocispec.Descriptor{}, []byte{}, err
+		return ocispec.Descriptor{}, nil, err
 	}
 
 	newDesc := ocispec.Descriptor{
-		Digest:   digest.FromBytes(p),
-		Size:     int64(len(p)),
+		Digest:   resultReader.Digest(),
+		Size:     resultReader.Size(),
 		Platform: desc.Platform,
 	}
 
@@ -551,16 +543,16 @@ func decryptLayer(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc 
 	case MediaTypeDockerSchema2LayerEnc:
 		newDesc.MediaType = MediaTypeDockerSchema2Layer
 	default:
-		return ocispec.Descriptor{}, []byte{}, errors.Errorf("Decryption: unsupporter layer MediaType: %s\n", desc.MediaType)
+		return ocispec.Descriptor{}, nil, errors.Errorf("Decryption: unsupporter layer MediaType: %s\n", desc.MediaType)
 	}
-	return newDesc, p, nil
+	return newDesc, resultReader, nil
 }
 
 // cryptLayer handles the changes due to encryption or decryption of a layer
 func cryptLayer(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, cryptoOp cryptoOp) (ocispec.Descriptor, error) {
 	var (
-		p       []byte
-		newDesc ocispec.Descriptor
+		resultReader content.ReaderDigester
+		newDesc      ocispec.Descriptor
 	)
 
 	dataReader, err := cs.ReaderAt(ctx, desc)
@@ -570,17 +562,17 @@ func cryptLayer(ctx context.Context, cs content.Store, desc ocispec.Descriptor, 
 	defer dataReader.Close()
 
 	if cryptoOp == cryptoOpEncrypt {
-		newDesc, p, err = encryptLayer(cc, dataReader, desc)
+		newDesc, resultReader, err = encryptLayer(cc, dataReader, desc)
 	} else {
-		newDesc, p, err = decryptLayer(cc, dataReader, desc, cryptoOp == cryptoOpUnwrapOnly)
+		newDesc, resultReader, err = decryptLayer(cc, dataReader, desc, cryptoOp == cryptoOpUnwrapOnly)
 	}
 	if err != nil || cryptoOp == cryptoOpUnwrapOnly {
 		return ocispec.Descriptor{}, err
 	}
 	// some operations, such as changing recipients, may not touch the layer at all
-	if len(p) > 0 {
+	if resultReader != nil {
 		ref := fmt.Sprintf("layer-%s", newDesc.Digest.String())
-		err = content.WriteBlob(ctx, cs, ref, containedReader{bytes.NewReader(p)}, newDesc)
+		err = content.WriteBlob(ctx, cs, ref, resultReader, newDesc)
 	}
 	return newDesc, err
 }

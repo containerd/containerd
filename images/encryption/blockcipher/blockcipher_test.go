@@ -17,6 +17,7 @@
 package blockcipher
 
 import (
+	"io"
 	"testing"
 
 	"github.com/containerd/containerd/content"
@@ -45,16 +46,28 @@ func TestBlockCipherEncryption(t *testing.T) {
 
 	layerDataReader := content.BufReaderAt{int64(len(layerData)), layerData}
 
-	ciphertext, lbco, err := h.Encrypt(layerDataReader, AEADAES256GCM, opt)
+	ciphertextReader, lbco, err := h.Encrypt(layerDataReader, AEADAES256GCM, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ciphertextReader := content.BufReaderAt{int64(len(ciphertext)), ciphertext}
+	ciphertext := make([]byte, ciphertextReader.Size())
+	_, err = ciphertextReader.Read(ciphertext)
+	if err != nil && err != io.EOF {
+		t.Fatal("Reading the ciphertext should not have failed")
+	}
+	ciphertextReaderAt := content.BufReaderAt{int64(len(ciphertext)), ciphertext}
+
 	// Use a different instantiated object to indicate an invokation at a diff time
-	plaintext, _, err := h.Decrypt(ciphertextReader, lbco)
+	plaintextReader, _, err := h.Decrypt(ciphertextReaderAt, lbco)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	plaintext := make([]byte, plaintextReader.Size())
+	_, err = plaintextReader.Read(plaintext)
+	if err != nil && err != io.EOF {
+		t.Fatal("Read the plaintext should not have failed")
 	}
 
 	if string(plaintext) != string(layerData) {
@@ -78,7 +91,7 @@ func TestBlockCipherEncryptionInvalidKey(t *testing.T) {
 
 	layerDataReader := content.BufReaderAt{int64(len(layerData)), layerData}
 
-	ciphertext, lbco, err := h.Encrypt(layerDataReader, AEADAES256GCM, opt)
+	ciphertextReader, lbco, err := h.Encrypt(layerDataReader, AEADAES256GCM, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,8 +103,12 @@ func TestBlockCipherEncryptionInvalidKey(t *testing.T) {
 	}
 
 	lbco.SymmetricKey = []byte("aaa34567890123456789012345678912")
-	ciphertextReader := content.BufReaderAt{int64(len(ciphertext)), ciphertext}
-	_, _, err = bc2.Decrypt(ciphertextReader, lbco)
+
+	ciphertext := make([]byte, ciphertextReader.Size())
+	ciphertextReader.Read(ciphertext)
+	ciphertextReaderAt := content.BufReaderAt{int64(len(ciphertext)), ciphertext}
+
+	_, _, err = bc2.Decrypt(ciphertextReaderAt, lbco)
 	if err == nil {
 		t.Fatal(err)
 	}

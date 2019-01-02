@@ -17,7 +17,6 @@
 package apply
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"io/ioutil"
@@ -89,13 +88,13 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 				return err
 			}
 
-			newDesc, b, err := images.DecryptBlob(cc, ra, desc, false)
+			newDesc, plainLayerReader, err := images.DecryptBlob(cc, ra, desc, false)
 			if err != nil {
 				return err
 			}
 
 			desc = newDesc
-			r = bytes.NewReader(b)
+			r = plainLayerReader
 		}
 
 		if isCompressed {

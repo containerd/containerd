@@ -19,7 +19,6 @@
 package windows
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"io/ioutil"
@@ -121,13 +120,13 @@ func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 			return emptyDesc, err
 		}
 
-		newDesc, b, err := images.DecryptBlob(cc, ra, desc, false)
+		newDesc, plainLayerReader, err := images.DecryptBlob(cc, ra, desc, false)
 		if err != nil {
 			return emptyDesc, err
 		}
 
 		desc = newDesc
-		r = bytes.NewReader(b)
+		r = plainLayerReader
 	}
 
 	if isCompressed {

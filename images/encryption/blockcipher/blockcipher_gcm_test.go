@@ -17,6 +17,7 @@
 package blockcipher
 
 import (
+	_ "crypto/sha256"
 	"testing"
 
 	"github.com/containerd/containerd/content"
@@ -59,7 +60,7 @@ func TestBlockCipherAesGcmEncryption(t *testing.T) {
 	}
 
 	layerDataReader := content.BufReaderAt{int64(len(layerData)), layerData}
-	ciphertext, lbco, err := bc.Encrypt(layerDataReader, opt)
+	ciphertextReader, lbco, err := bc.Encrypt(layerDataReader, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,11 +71,17 @@ func TestBlockCipherAesGcmEncryption(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ciphertextReader := content.BufReaderAt{int64(len(ciphertext)), ciphertext}
-	plaintext, _, err := bc2.Decrypt(ciphertextReader, lbco)
+	ciphertext := make([]byte, ciphertextReader.Size())
+	ciphertextReader.Read(ciphertext)
+	ciphertextReaderAt := content.BufReaderAt{int64(len(ciphertext)), ciphertext}
+
+	plaintextReader, _, err := bc2.Decrypt(ciphertextReaderAt, lbco)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	plaintext := make([]byte, plaintextReader.Size())
+	plaintextReader.Read(plaintext)
 
 	if string(plaintext) != string(layerData) {
 		t.Fatal("Decrypted data is incorrect")
@@ -96,7 +103,7 @@ func TestBlockCipherAesGcmEncryptionInvalidKey(t *testing.T) {
 	}
 
 	layerDataReader := content.BufReaderAt{int64(len(layerData)), layerData}
-	ciphertext, lbco, err := bc.Encrypt(layerDataReader, opt)
+	ciphertextReader, lbco, err := bc.Encrypt(layerDataReader, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,8 +115,12 @@ func TestBlockCipherAesGcmEncryptionInvalidKey(t *testing.T) {
 	}
 
 	lbco.SymmetricKey = []byte("aaa34567890123456789012345678912")
-	ciphertextReader := content.BufReaderAt{int64(len(ciphertext)), ciphertext}
-	_, _, err = bc2.Decrypt(ciphertextReader, lbco)
+
+	ciphertext := make([]byte, ciphertextReader.Size())
+	ciphertextReader.Read(ciphertext)
+	ciphertextReaderAt := content.BufReaderAt{int64(len(ciphertext)), ciphertext}
+
+	_, _, err = bc2.Decrypt(ciphertextReaderAt, lbco)
 	if err == nil {
 		t.Fatal(err)
 	}

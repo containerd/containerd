@@ -19,7 +19,6 @@
 package lcow
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"os"
@@ -132,13 +131,13 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 			return emptyDesc, err
 		}
 
-		newDesc, b, err := images.DecryptBlob(cc, ra, desc, false)
+		newDesc, plainLayerReader, err := images.DecryptBlob(cc, ra, desc, false)
 		if err != nil {
 			return emptyDesc, err
 		}
 
 		desc = newDesc
-		rdr = bytes.NewReader(b)
+		rdr = plainLayerReader
 	}
 
 	if isCompressed {

@@ -17,10 +17,43 @@
 package blockcipher
 
 import (
+	"hash"
+	"io"
+
 	"github.com/containerd/containerd/content"
 
+	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
+
+// CryptedDataReader wraps the io.Reader and adds the Size of the encrypted or decrypted
+// data to it as well as its hash
+type CryptedDataReader interface {
+	content.ReaderDigester
+}
+
+type cryptedDataReader struct {
+	rd     io.Reader
+	size   int64
+	digest digest.Digest
+	hash   hash.Hash
+}
+
+func (cr cryptedDataReader) Read(p []byte) (n int, err error) {
+	return cr.rd.Read(p)
+}
+
+func (cr cryptedDataReader) Size() int64 {
+	return cr.size
+}
+
+func (cr cryptedDataReader) Digest() digest.Digest {
+	return cr.digest
+}
+
+func (cr cryptedDataReader) Hash() hash.Hash {
+	return cr.hash
+}
 
 // LayerCipherType is the ciphertype as specified in the layer metadata
 type LayerCipherType string
@@ -43,9 +76,9 @@ type LayerBlockCipherOptions struct {
 // for handling the layer data for a specific algorithm
 type LayerBlockCipher interface {
 	// Encrypt takes in layer data and returns the ciphertext and relevant LayerBlockCipherOptions
-	Encrypt(layerDataReader content.ReaderAt, opt LayerBlockCipherOptions) ([]byte, LayerBlockCipherOptions, error)
+	Encrypt(layerDataReader content.ReaderAt, opt LayerBlockCipherOptions) (CryptedDataReader, LayerBlockCipherOptions, error)
 	// Decrypt takes in layer ciphertext data and returns the plaintext and relevant LayerBlockCipherOptions
-	Decrypt(layerDataReader content.ReaderAt, opt LayerBlockCipherOptions) ([]byte, LayerBlockCipherOptions, error)
+	Decrypt(layerDataReader content.ReaderAt, opt LayerBlockCipherOptions) (CryptedDataReader, LayerBlockCipherOptions, error)
 }
 
 // LayerBlockCipherHandler is the handler for encrypt/decrypt for layers
@@ -54,20 +87,20 @@ type LayerBlockCipherHandler struct {
 }
 
 // Encrypt is the handler for the layer decryption routine
-func (h *LayerBlockCipherHandler) Encrypt(plainDataReader content.ReaderAt, typ LayerCipherType, opt LayerBlockCipherOptions) ([]byte, LayerBlockCipherOptions, error) {
+func (h *LayerBlockCipherHandler) Encrypt(plainDataReader content.ReaderAt, typ LayerCipherType, opt LayerBlockCipherOptions) (CryptedDataReader, LayerBlockCipherOptions, error) {
 
 	if c, ok := h.cipherMap[typ]; ok {
-		data, newopt, err := c.Encrypt(plainDataReader, opt)
+		encDataReader, newopt, err := c.Encrypt(plainDataReader, opt)
 		if err == nil {
 			newopt.CipherOptions[CipherTypeOpt] = string(typ)
 		}
-		return data, newopt, err
+		return encDataReader, newopt, err
 	}
 	return nil, LayerBlockCipherOptions{}, errors.New("Not supported Cipher Type")
 }
 
 // Decrypt is the handler for the layer decryption routine
-func (h *LayerBlockCipherHandler) Decrypt(encDataReader content.ReaderAt, opt LayerBlockCipherOptions) ([]byte, LayerBlockCipherOptions, error) {
+func (h *LayerBlockCipherHandler) Decrypt(encDataReader content.ReaderAt, opt LayerBlockCipherOptions) (CryptedDataReader, LayerBlockCipherOptions, error) {
 	typ, ok := opt.CipherOptions[CipherTypeOpt]
 	if !ok {
 		return nil, LayerBlockCipherOptions{}, errors.New("No cipher type provided")

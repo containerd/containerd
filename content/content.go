@@ -32,6 +32,13 @@ type ReaderAt interface {
 	Size() int64
 }
 
+// ReaderDigester implements an interface for a Reader that is digesting the data it returns
+type ReaderDigester interface {
+	io.Reader
+	digest.Digester
+	Size() int64
+}
+
 // Provider provides a reader interface for specific content
 type Provider interface {
 	// ReaderAt only requires desc.Digest to be set.

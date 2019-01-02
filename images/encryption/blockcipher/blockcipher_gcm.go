@@ -17,14 +17,17 @@
 package blockcipher
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"io"
 
 	"github.com/containerd/containerd/content"
 
+	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
 
@@ -42,7 +45,7 @@ func NewGCMLayerBlockCipher(bits int) (LayerBlockCipher, error) {
 }
 
 // Encrypt takes in layer data and returns the ciphertext and relevant LayerBlockCipherOptions
-func (bc *GCMLayerBlockCipher) Encrypt(plainDataReader content.ReaderAt, opt LayerBlockCipherOptions) ([]byte, LayerBlockCipherOptions, error) {
+func (bc *GCMLayerBlockCipher) Encrypt(plainDataReader content.ReaderAt, opt LayerBlockCipherOptions) (CryptedDataReader, LayerBlockCipherOptions, error) {
 	key := opt.SymmetricKey
 
 	plaintext := make([]byte, plainDataReader.Size())
@@ -79,11 +82,13 @@ func (bc *GCMLayerBlockCipher) Encrypt(plainDataReader content.ReaderAt, opt Lay
 			"nonce": base64.StdEncoding.EncodeToString(nonce),
 		},
 	}
-	return ciphertext, lbco, nil
+	ciphertextReader := cryptedDataReader{bytes.NewReader(ciphertext), int64(len(ciphertext)), digest.Canonical.FromBytes(ciphertext), sha256.New()}
+
+	return ciphertextReader, lbco, nil
 }
 
 // Decrypt takes in layer ciphertext data and returns the plaintext and relevant LayerBlockCipherOptions
-func (bc *GCMLayerBlockCipher) Decrypt(encDataReader content.ReaderAt, opt LayerBlockCipherOptions) ([]byte, LayerBlockCipherOptions, error) {
+func (bc *GCMLayerBlockCipher) Decrypt(encDataReader content.ReaderAt, opt LayerBlockCipherOptions) (CryptedDataReader, LayerBlockCipherOptions, error) {
 	key := opt.SymmetricKey
 
 	ciphertext := make([]byte, encDataReader.Size())
@@ -122,5 +127,7 @@ func (bc *GCMLayerBlockCipher) Decrypt(encDataReader content.ReaderAt, opt Layer
 		return nil, LayerBlockCipherOptions{}, errors.Wrap(err, "Unable to decrypt ciphertext")
 	}
 
-	return plaintext, LayerBlockCipherOptions{}, nil
+	plaintextReader := cryptedDataReader{bytes.NewReader(plaintext), int64(len(plaintext)), digest.Canonical.FromBytes(plaintext), sha256.New()}
+
+	return plaintextReader, LayerBlockCipherOptions{}, nil
 }

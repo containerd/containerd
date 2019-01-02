@@ -89,11 +89,12 @@ func GetWrappedKeysMap(desc ocispec.Descriptor) map[string]string {
 }
 
 // EncryptLayer encrypts the layer by running one encryptor after the other
-func EncryptLayer(ec *config.EncryptConfig, encOrPlainLayerReader content.ReaderAt, desc ocispec.Descriptor) ([]byte, map[string]string, error) {
+func EncryptLayer(ec *config.EncryptConfig, encOrPlainLayerReader content.ReaderAt, desc ocispec.Descriptor) (content.ReaderDigester, map[string]string, error) {
 	var (
-		encLayer []byte
-		err      error
-		optsData []byte
+		encLayerReader content.ReaderDigester
+		encLayer       []byte
+		err            error
+		optsData       []byte
 	)
 
 	if ec == nil {
@@ -127,7 +128,7 @@ func EncryptLayer(ec *config.EncryptConfig, encOrPlainLayerReader content.Reader
 	for annotationsID, scheme := range keyWrapperAnnotations {
 		b64Annotations := desc.Annotations[annotationsID]
 		if b64Annotations == "" && optsData == nil {
-			encLayer, optsData, err = commonEncryptLayer(encOrPlainLayerReader, symKey, blockcipher.AEADAES256GCM)
+			encLayerReader, optsData, err = commonEncryptLayer(encOrPlainLayerReader, symKey, blockcipher.AEADAES256GCM)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -145,7 +146,7 @@ func EncryptLayer(ec *config.EncryptConfig, encOrPlainLayerReader content.Reader
 		err = errors.Errorf("No encryptor found to handle encryption")
 	}
 	// if nothing was encrypted, we just return encLayer = nil
-	return encLayer, newAnnotations, err
+	return encLayerReader, newAnnotations, err
 }
 
 // preWrapKeys calls WrapKeys and handles the base64 encoding and concatenation of the
@@ -165,7 +166,7 @@ func preWrapKeys(keywrapper keywrap.KeyWrapper, ec *config.EncryptConfig, b64Ann
 // DecryptLayer decrypts a layer trying one keywrap.KeyWrapper after the other to see whether it
 // can apply the provided private key
 // If unwrapOnly is set we will only try to decrypt the layer encryption key and return
-func DecryptLayer(dc *config.DecryptConfig, encLayerReader content.ReaderAt, desc ocispec.Descriptor, unwrapOnly bool) ([]byte, error) {
+func DecryptLayer(dc *config.DecryptConfig, encLayerReader content.ReaderAt, desc ocispec.Descriptor, unwrapOnly bool) (content.ReaderDigester, error) {
 	if dc == nil {
 		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "DecryptConfig must not be nil")
 	}
@@ -231,7 +232,7 @@ func preUnwrapKey(keywrapper keywrap.KeyWrapper, dc *config.DecryptConfig, b64An
 // commonEncryptLayer is a function to encrypt the plain layer using a new random
 // symmetric key and return the LayerBlockCipherHandler's JSON in string form for
 // later use during decryption
-func commonEncryptLayer(plainLayerReader content.ReaderAt, symKey []byte, typ blockcipher.LayerCipherType) ([]byte, []byte, error) {
+func commonEncryptLayer(plainLayerReader content.ReaderAt, symKey []byte, typ blockcipher.LayerCipherType) (content.ReaderDigester, []byte, error) {
 	opts := blockcipher.LayerBlockCipherOptions{
 		SymmetricKey: symKey,
 	}
@@ -240,7 +241,7 @@ func commonEncryptLayer(plainLayerReader content.ReaderAt, symKey []byte, typ bl
 		return nil, nil, err
 	}
 
-	encLayer, opts, err := lbch.Encrypt(plainLayerReader, typ, opts)
+	encLayerReader, opts, err := lbch.Encrypt(plainLayerReader, typ, opts)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -249,12 +250,13 @@ func commonEncryptLayer(plainLayerReader content.ReaderAt, symKey []byte, typ bl
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "Could not JSON marshal opts")
 	}
-	return encLayer, optsData, err
+
+	return encLayerReader, optsData, err
 }
 
 // commonDecryptLayer decrypts an encrypted layer previously encrypted with commonEncryptLayer
 // by passing along the optsData
-func commonDecryptLayer(encLayerReader content.ReaderAt, optsData []byte) ([]byte, error) {
+func commonDecryptLayer(encLayerReader content.ReaderAt, optsData []byte) (content.ReaderDigester, error) {
 	opts := blockcipher.LayerBlockCipherOptions{}
 	err := json.Unmarshal(optsData, &opts)
 	if err != nil {
@@ -266,12 +268,12 @@ func commonDecryptLayer(encLayerReader content.ReaderAt, optsData []byte) ([]byt
 		return nil, err
 	}
 
-	plainLayer, opts, err := lbch.Decrypt(encLayerReader, opts)
+	plainLayerReader, opts, err := lbch.Decrypt(encLayerReader, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	return plainLayer, nil
+	return plainLayerReader, nil
 }
 
 // GetCryptoConfigFromAnnotations expects the dcparameters in json format in
