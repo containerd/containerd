@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -40,6 +41,7 @@ import (
 	customopts "github.com/containerd/cri/pkg/containerd/opts"
 	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
 	"github.com/containerd/cri/pkg/log"
+	"github.com/containerd/cri/pkg/netns"
 	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
 	"github.com/containerd/cri/pkg/util"
 )
@@ -88,6 +90,13 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get sandbox image %q", c.config.SandboxImage)
 	}
+
+	ociRuntime, err := c.getSandboxRuntime(config, r.GetRuntimeHandler())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get sandbox runtime")
+	}
+	logrus.Debugf("Use OCI %+v for sandbox %q", ociRuntime, id)
+
 	securityContext := config.GetLinux().GetSecurityContext()
 	//Create Network Namespace if it is not in host network
 	hostNet := securityContext.GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE
@@ -96,7 +105,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// handle. NetNSPath in sandbox metadata and NetNS is non empty only for non host network
 		// namespaces. If the pod is in host network namespace then both are empty and should not
 		// be used.
-		sandbox.NetNS, err = sandboxstore.NewNetNS()
+		sandbox.NetNS, err = netns.NewNetNS()
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create network namespace for sandbox %q", id)
 		}
@@ -117,7 +126,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// In this case however caching the IP will add a subtle performance enhancement by avoiding
 		// calls to network namespace of the pod to query the IP of the veth interface on every
 		// SandboxStatus request.
-		sandbox.IP, err = c.setupPod(id, sandbox.NetNSPath, config)
+		sandbox.IP, sandbox.CNIResult, err = c.setupPod(id, sandbox.NetNSPath, config)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to setup network for sandbox %q", id)
 		}
@@ -130,12 +139,6 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			}
 		}()
 	}
-
-	ociRuntime, err := c.getSandboxRuntime(config, r.GetRuntimeHandler())
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get sandbox runtime")
-	}
-	logrus.Debugf("Use OCI %+v for sandbox %q", ociRuntime, id)
 
 	// Create sandbox container.
 	spec, err := c.generateSandboxContainerSpec(id, config, &image.ImageSpec.Config, sandbox.NetNSPath)
@@ -527,9 +530,9 @@ func (c *criService) unmountSandboxFiles(id string, config *runtime.PodSandboxCo
 }
 
 // setupPod setups up the network for a pod
-func (c *criService) setupPod(id string, path string, config *runtime.PodSandboxConfig) (string, error) {
+func (c *criService) setupPod(id string, path string, config *runtime.PodSandboxConfig) (string, *cni.CNIResult, error) {
 	if c.netPlugin == nil {
-		return "", errors.New("cni config not intialized")
+		return "", nil, errors.New("cni config not initialized")
 	}
 
 	labels := getPodCNILabels(id, config)
@@ -538,17 +541,18 @@ func (c *criService) setupPod(id string, path string, config *runtime.PodSandbox
 		cni.WithLabels(labels),
 		cni.WithCapabilityPortMap(toCNIPortMappings(config.GetPortMappings())))
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
+	logDebugCNIResult(id, result)
 	// Check if the default interface has IP config
 	if configs, ok := result.Interfaces[defaultIfName]; ok && len(configs.IPConfigs) > 0 {
-		return selectPodIP(configs.IPConfigs), nil
+		return selectPodIP(configs.IPConfigs), result, nil
 	}
 	// If it comes here then the result was invalid so destroy the pod network and return error
 	if err := c.teardownPod(id, path, config); err != nil {
 		logrus.WithError(err).Errorf("Failed to destroy network for sandbox %q", id)
 	}
-	return "", errors.Errorf("failed to find network info for sandbox %q", id)
+	return "", result, errors.Errorf("failed to find network info for sandbox %q", id)
 }
 
 // toCNIPortMappings converts CRI port mappings to CNI.
@@ -637,4 +641,16 @@ func (c *criService) getSandboxRuntime(config *runtime.PodSandboxConfig, runtime
 		return criconfig.Runtime{}, errors.Errorf("no runtime for %q is configured", runtimeHandler)
 	}
 	return handler, nil
+}
+
+func logDebugCNIResult(sandboxID string, result *cni.CNIResult) {
+	if logrus.GetLevel() < logrus.DebugLevel {
+		return
+	}
+	cniResult, err := json.Marshal(result)
+	if err != nil {
+		logrus.WithError(err).Errorf("Failed to marshal CNI result for sandbox %q: %v", sandboxID, err)
+		return
+	}
+	logrus.Debugf("cni result for sandbox %q: %s", sandboxID, string(cniResult))
 }

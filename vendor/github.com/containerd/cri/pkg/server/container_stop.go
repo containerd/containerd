@@ -19,7 +19,6 @@ package server
 import (
 	"time"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/docker/docker/pkg/signal"
 	"github.com/pkg/errors"
@@ -28,6 +27,7 @@ import (
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
+	"github.com/containerd/cri/pkg/store"
 	containerstore "github.com/containerd/cri/pkg/store/container"
 )
 
@@ -77,24 +77,36 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 	// We only need to kill the task. The event handler will Delete the
 	// task from containerd after it handles the Exited event.
 	if timeout > 0 {
-		stopSignal := unix.SIGTERM
-		image, err := c.imageStore.Get(container.ImageRef)
-		if err != nil {
-			// NOTE(random-liu): It's possible that the container is stopped,
-			// deleted and image is garbage collected before this point. However,
-			// the chance is really slim, even it happens, it's still fine to return
-			// an error here.
-			return errors.Wrapf(err, "failed to get image metadata %q", container.ImageRef)
-		}
-		if image.ImageSpec.Config.StopSignal != "" {
-			stopSignal, err = signal.ParseSignal(image.ImageSpec.Config.StopSignal)
+		stopSignal := "SIGTERM"
+		if container.StopSignal != "" {
+			stopSignal = container.StopSignal
+		} else {
+			// The image may have been deleted, and the `StopSignal` field is
+			// just introduced to handle that.
+			// However, for containers created before the `StopSignal` field is
+			// introduced, still try to get the stop signal from the image config.
+			// If the image has been deleted, logging an error and using the
+			// default SIGTERM is still better than returning error and leaving
+			// the container unstoppable. (See issue #990)
+			// TODO(random-liu): Remove this logic when containerd 1.2 is deprecated.
+			image, err := c.imageStore.Get(container.ImageRef)
 			if err != nil {
-				return errors.Wrapf(err, "failed to parse stop signal %q",
-					image.ImageSpec.Config.StopSignal)
+				if err != store.ErrNotExist {
+					return errors.Wrapf(err, "failed to get image %q", container.ImageRef)
+				}
+				logrus.Warningf("Image %q not found, stop container with signal %q", container.ImageRef, stopSignal)
+			} else {
+				if image.ImageSpec.Config.StopSignal != "" {
+					stopSignal = image.ImageSpec.Config.StopSignal
+				}
 			}
 		}
-		logrus.Infof("Stop container %q with signal %v", id, stopSignal)
-		if err = task.Kill(ctx, stopSignal); err != nil && !errdefs.IsNotFound(err) {
+		sig, err := signal.ParseSignal(stopSignal)
+		if err != nil {
+			return errors.Wrapf(err, "failed to parse stop signal %q", stopSignal)
+		}
+		logrus.Infof("Stop container %q with signal %v", id, sig)
+		if err = task.Kill(ctx, sig); err != nil && !errdefs.IsNotFound(err) {
 			return errors.Wrapf(err, "failed to stop container %q", id)
 		}
 
@@ -105,7 +117,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 	}
 
 	logrus.Infof("Kill container %q", id)
-	if err = task.Kill(ctx, unix.SIGKILL, containerd.WithKillAll); err != nil && !errdefs.IsNotFound(err) {
+	if err = task.Kill(ctx, unix.SIGKILL); err != nil && !errdefs.IsNotFound(err) {
 		return errors.Wrapf(err, "failed to kill container %q", id)
 	}
 
@@ -113,28 +125,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 	if err = c.waitContainerStop(ctx, container, killContainerTimeout); err == nil {
 		return nil
 	}
-	logrus.WithError(err).Errorf("An error occurs during waiting for container %q to be killed", id)
-
-	// This is a fix for `runc`, and should not break other runtimes. With
-	// containerd.WithKillAll, `runc` will get all processes from the container
-	// cgroups, and kill them. However, sometimes the processes may be moved
-	// out from the container cgroup, e.g. users manually move them by mistake,
-	// or systemd.Delegate=true is not set.
-	// In these cases, we should try our best to do cleanup, kill the container
-	// without containerd.WithKillAll, so that runc can kill the container init
-	// process directly.
-	// NOTE(random-liu): If pid namespace is shared inside the pod, non-init processes
-	// of this container will be left running until the pause container is stopped.
-	logrus.Infof("Kill container %q init process", id)
-	if err = task.Kill(ctx, unix.SIGKILL); err != nil && !errdefs.IsNotFound(err) {
-		return errors.Wrapf(err, "failed to kill container %q init process", id)
-	}
-
-	// Wait for a fixed timeout until container stop is observed by event monitor.
-	if err = c.waitContainerStop(ctx, container, killContainerTimeout); err == nil {
-		return nil
-	}
-	return errors.Wrapf(err, "an error occurs during waiting for container %q init process to be killed", id)
+	return errors.Wrapf(err, "an error occurs during waiting for container %q to be killed", id)
 }
 
 // waitContainerStop waits for container to be stopped until timeout exceeds or context is cancelled.
