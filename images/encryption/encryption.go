@@ -23,6 +23,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images/encryption/blockcipher"
 	"github.com/containerd/containerd/images/encryption/config"
@@ -88,7 +89,7 @@ func GetWrappedKeysMap(desc ocispec.Descriptor) map[string]string {
 }
 
 // EncryptLayer encrypts the layer by running one encryptor after the other
-func EncryptLayer(ec *config.EncryptConfig, encOrPlainLayer []byte, desc ocispec.Descriptor) ([]byte, map[string]string, error) {
+func EncryptLayer(ec *config.EncryptConfig, encOrPlainLayerReader content.ReaderAt, desc ocispec.Descriptor) ([]byte, map[string]string, error) {
 	var (
 		encLayer []byte
 		err      error
@@ -113,7 +114,11 @@ func EncryptLayer(ec *config.EncryptConfig, encOrPlainLayer []byte, desc ocispec
 				return nil, nil, err
 			}
 			// already encrypted!
-			encLayer = encOrPlainLayer
+			encLayer = make([]byte, encOrPlainLayerReader.Size())
+			_, err = encOrPlainLayerReader.ReadAt(encLayer, 0)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 	}
 
@@ -122,7 +127,7 @@ func EncryptLayer(ec *config.EncryptConfig, encOrPlainLayer []byte, desc ocispec
 	for annotationsID, scheme := range keyWrapperAnnotations {
 		b64Annotations := desc.Annotations[annotationsID]
 		if b64Annotations == "" && optsData == nil {
-			encLayer, optsData, err = commonEncryptLayer(encOrPlainLayer, symKey, blockcipher.AEADAES256GCM)
+			encLayer, optsData, err = commonEncryptLayer(encOrPlainLayerReader, symKey, blockcipher.AEADAES256GCM)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -160,7 +165,7 @@ func preWrapKeys(keywrapper keywrap.KeyWrapper, ec *config.EncryptConfig, b64Ann
 // DecryptLayer decrypts a layer trying one keywrap.KeyWrapper after the other to see whether it
 // can apply the provided private key
 // If unwrapOnly is set we will only try to decrypt the layer encryption key and return
-func DecryptLayer(dc *config.DecryptConfig, encLayer []byte, desc ocispec.Descriptor, unwrapOnly bool) ([]byte, error) {
+func DecryptLayer(dc *config.DecryptConfig, encLayerReader content.ReaderAt, desc ocispec.Descriptor, unwrapOnly bool) ([]byte, error) {
 	if dc == nil {
 		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "DecryptConfig must not be nil")
 	}
@@ -169,7 +174,7 @@ func DecryptLayer(dc *config.DecryptConfig, encLayer []byte, desc ocispec.Descri
 		return nil, err
 	}
 
-	return commonDecryptLayer(encLayer, optsData)
+	return commonDecryptLayer(encLayerReader, optsData)
 }
 
 func decryptLayerKeyOptsData(dc *config.DecryptConfig, desc ocispec.Descriptor) ([]byte, error) {
@@ -226,7 +231,7 @@ func preUnwrapKey(keywrapper keywrap.KeyWrapper, dc *config.DecryptConfig, b64An
 // commonEncryptLayer is a function to encrypt the plain layer using a new random
 // symmetric key and return the LayerBlockCipherHandler's JSON in string form for
 // later use during decryption
-func commonEncryptLayer(plainLayer []byte, symKey []byte, typ blockcipher.LayerCipherType) ([]byte, []byte, error) {
+func commonEncryptLayer(plainLayerReader content.ReaderAt, symKey []byte, typ blockcipher.LayerCipherType) ([]byte, []byte, error) {
 	opts := blockcipher.LayerBlockCipherOptions{
 		SymmetricKey: symKey,
 	}
@@ -235,7 +240,7 @@ func commonEncryptLayer(plainLayer []byte, symKey []byte, typ blockcipher.LayerC
 		return nil, nil, err
 	}
 
-	encLayer, opts, err := lbch.Encrypt(plainLayer, typ, opts)
+	encLayer, opts, err := lbch.Encrypt(plainLayerReader, typ, opts)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -249,7 +254,7 @@ func commonEncryptLayer(plainLayer []byte, symKey []byte, typ blockcipher.LayerC
 
 // commonDecryptLayer decrypts an encrypted layer previously encrypted with commonEncryptLayer
 // by passing along the optsData
-func commonDecryptLayer(encLayer []byte, optsData []byte) ([]byte, error) {
+func commonDecryptLayer(encLayerReader content.ReaderAt, optsData []byte) ([]byte, error) {
 	opts := blockcipher.LayerBlockCipherOptions{}
 	err := json.Unmarshal(optsData, &opts)
 	if err != nil {
@@ -261,7 +266,7 @@ func commonDecryptLayer(encLayer []byte, optsData []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	plainLayer, opts, err := lbch.Decrypt(encLayer, opts)
+	plainLayer, opts, err := lbch.Decrypt(encLayerReader, opts)
 	if err != nil {
 		return nil, err
 	}

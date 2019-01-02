@@ -18,6 +18,8 @@ package blockcipher
 
 import (
 	"testing"
+
+	"github.com/containerd/containerd/content"
 )
 
 func TestBlockCipherHandlerCreate(t *testing.T) {
@@ -41,13 +43,16 @@ func TestBlockCipherEncryption(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ciphertext, lbco, err := h.Encrypt(layerData, AEADAES256GCM, opt)
+	layerDataReader := content.BufReaderAt{int64(len(layerData)), layerData}
+
+	ciphertext, lbco, err := h.Encrypt(layerDataReader, AEADAES256GCM, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	ciphertextReader := content.BufReaderAt{int64(len(ciphertext)), ciphertext}
 	// Use a different instantiated object to indicate an invokation at a diff time
-	plaintext, _, err := h.Decrypt(ciphertext, lbco)
+	plaintext, _, err := h.Decrypt(ciphertextReader, lbco)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +76,9 @@ func TestBlockCipherEncryptionInvalidKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ciphertext, lbco, err := h.Encrypt(layerData, AEADAES256GCM, opt)
+	layerDataReader := content.BufReaderAt{int64(len(layerData)), layerData}
+
+	ciphertext, lbco, err := h.Encrypt(layerDataReader, AEADAES256GCM, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +90,8 @@ func TestBlockCipherEncryptionInvalidKey(t *testing.T) {
 	}
 
 	lbco.SymmetricKey = []byte("aaa34567890123456789012345678912")
-	_, _, err = bc2.Decrypt(ciphertext, lbco)
+	ciphertextReader := content.BufReaderAt{int64(len(ciphertext)), ciphertext}
+	_, _, err = bc2.Decrypt(ciphertextReader, lbco)
 	if err == nil {
 		t.Fatal(err)
 	}
@@ -103,7 +111,9 @@ func TestBlockCipherEncryptionInvalidKeyLength(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, _, err = h.Encrypt(layerData, AEADAES128GCM, opt)
+	layerDataReader := content.BufReaderAt{int64(len(layerData)), layerData}
+
+	_, _, err = h.Encrypt(layerDataReader, AEADAES128GCM, opt)
 	if err == nil {
 		t.Fatal(err)
 	}

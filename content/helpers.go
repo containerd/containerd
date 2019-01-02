@@ -206,3 +206,29 @@ func copyWithBuffer(dst io.Writer, src io.Reader) (written int64, err error) {
 	bufPool.Put(buf)
 	return
 }
+
+// BufReaderAt wraps a byte array with the ReaderAt interface
+type BufReaderAt struct {
+	Sz     int64
+	Buffer []byte
+}
+
+// ReadAt reads data from a given offset an copies them into the give byte array
+// returning the number of bytes copied or an error
+func (ra BufReaderAt) ReadAt(p []byte, offset int64) (int, error) {
+	c := ra.Sz - offset
+	if c < 0 {
+		return 0, errors.New("Not enough bytes to read")
+	}
+	return copy(p, ra.Buffer[offset:offset+c]), nil
+}
+
+// Size returns the number of bytes available
+func (ra BufReaderAt) Size() int64 {
+	return ra.Sz
+}
+
+// Close closes the read - in this implementation it does nothing
+func (ra BufReaderAt) Close() error {
+	return nil
+}

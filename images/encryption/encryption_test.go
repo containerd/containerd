@@ -20,6 +20,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/containerd/containerd/content"
+
 	"github.com/containerd/containerd/images/encryption/config"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -98,7 +100,9 @@ func TestEncryptLayer(t *testing.T) {
 		Size:   int64(len(data)),
 	}
 
-	encLayer, annotations, err := EncryptLayer(ec, data, desc)
+	dataReader := content.BufReaderAt{int64(len(data)), data}
+
+	encLayer, annotations, err := EncryptLayer(ec, dataReader, desc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +117,9 @@ func TestEncryptLayer(t *testing.T) {
 		Size:        int64(len(encLayer)),
 	}
 
-	decLayer, err := DecryptLayer(dc, encLayer, newDesc, false)
+	encLayerReader := content.BufReaderAt{int64(len(encLayer)), encLayer}
+
+	decLayer, err := DecryptLayer(dc, encLayerReader, newDesc, false)
 	if err != nil {
 		t.Fatal(err)
 	}

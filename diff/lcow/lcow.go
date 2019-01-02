@@ -132,10 +132,7 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 			return emptyDesc, err
 		}
 
-		buf := new(bytes.Buffer)
-		buf.ReadFrom(rdr)
-
-		newDesc, b, err := images.DecryptBlob(cc, buf.Bytes(), desc, false)
+		newDesc, b, err := images.DecryptBlob(cc, ra, desc, false)
 		if err != nil {
 			return emptyDesc, err
 		}

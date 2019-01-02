@@ -23,6 +23,8 @@ import (
 	"encoding/base64"
 	"io"
 
+	"github.com/containerd/containerd/content"
+
 	"github.com/pkg/errors"
 )
 
@@ -40,9 +42,14 @@ func NewGCMLayerBlockCipher(bits int) (LayerBlockCipher, error) {
 }
 
 // Encrypt takes in layer data and returns the ciphertext and relevant LayerBlockCipherOptions
-func (bc *GCMLayerBlockCipher) Encrypt(layerData []byte, opt LayerBlockCipherOptions) ([]byte, LayerBlockCipherOptions, error) {
+func (bc *GCMLayerBlockCipher) Encrypt(plainDataReader content.ReaderAt, opt LayerBlockCipherOptions) ([]byte, LayerBlockCipherOptions, error) {
 	key := opt.SymmetricKey
-	plaintext := layerData
+
+	plaintext := make([]byte, plainDataReader.Size())
+	_, err := plainDataReader.ReadAt(plaintext, 0)
+	if err != nil {
+		return nil, LayerBlockCipherOptions{}, errors.Wrap(err, "Could not read plain layer data")
+	}
 
 	if len(key) != bc.bits/8 {
 		return nil, LayerBlockCipherOptions{}, errors.New("Invalid key length")
@@ -76,13 +83,18 @@ func (bc *GCMLayerBlockCipher) Encrypt(layerData []byte, opt LayerBlockCipherOpt
 }
 
 // Decrypt takes in layer ciphertext data and returns the plaintext and relevant LayerBlockCipherOptions
-func (bc *GCMLayerBlockCipher) Decrypt(layerData []byte, opt LayerBlockCipherOptions) ([]byte, LayerBlockCipherOptions, error) {
+func (bc *GCMLayerBlockCipher) Decrypt(encDataReader content.ReaderAt, opt LayerBlockCipherOptions) ([]byte, LayerBlockCipherOptions, error) {
 	key := opt.SymmetricKey
-	ciphertext := layerData
+
+	ciphertext := make([]byte, encDataReader.Size())
+	_, err := encDataReader.ReadAt(ciphertext, 0)
+	if err != nil {
+		return nil, LayerBlockCipherOptions{}, errors.Wrap(err, "Could not read plain layer data")
+	}
+
 	nonceStr := opt.CipherOptions["nonce"]
 
 	var nonce []byte
-	var err error
 	if nonceStr != "" {
 		// Decode nonce str
 		nonce, err = base64.StdEncoding.DecodeString(nonceStr)

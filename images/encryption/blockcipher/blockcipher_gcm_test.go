@@ -18,6 +18,8 @@ package blockcipher
 
 import (
 	"testing"
+
+	"github.com/containerd/containerd/content"
 )
 
 func TestBlockCipherAesGcmCreateValid(t *testing.T) {
@@ -56,7 +58,8 @@ func TestBlockCipherAesGcmEncryption(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ciphertext, lbco, err := bc.Encrypt(layerData, opt)
+	layerDataReader := content.BufReaderAt{int64(len(layerData)), layerData}
+	ciphertext, lbco, err := bc.Encrypt(layerDataReader, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +70,8 @@ func TestBlockCipherAesGcmEncryption(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	plaintext, _, err := bc2.Decrypt(ciphertext, lbco)
+	ciphertextReader := content.BufReaderAt{int64(len(ciphertext)), ciphertext}
+	plaintext, _, err := bc2.Decrypt(ciphertextReader, lbco)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +95,8 @@ func TestBlockCipherAesGcmEncryptionInvalidKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ciphertext, lbco, err := bc.Encrypt(layerData, opt)
+	layerDataReader := content.BufReaderAt{int64(len(layerData)), layerData}
+	ciphertext, lbco, err := bc.Encrypt(layerDataReader, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +108,8 @@ func TestBlockCipherAesGcmEncryptionInvalidKey(t *testing.T) {
 	}
 
 	lbco.SymmetricKey = []byte("aaa34567890123456789012345678912")
-	_, _, err = bc2.Decrypt(ciphertext, lbco)
+	ciphertextReader := content.BufReaderAt{int64(len(ciphertext)), ciphertext}
+	_, _, err = bc2.Decrypt(ciphertextReader, lbco)
 	if err == nil {
 		t.Fatal(err)
 	}
@@ -123,7 +129,8 @@ func TestBlockCipherAesGcmEncryptionInvalidKeyLength(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, _, err = bc.Encrypt(layerData, opt)
+	layerDataReader := content.BufReaderAt{int64(len(layerData)), layerData}
+	_, _, err = bc.Encrypt(layerDataReader, opt)
 	if err == nil {
 		t.Fatal(err)
 	}

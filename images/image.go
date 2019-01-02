@@ -452,14 +452,14 @@ func IsCompressedDiff(ctx context.Context, mediaType string) (bool, error) {
 // encryptLayer encrypts the layer using the CryptoConfig and creates a new OCI Descriptor.
 // A call to this function may also only manipulate the wrapped keys list.
 // The caller is expected to store the returned encrypted data and OCI Descriptor
-func encryptLayer(cc *encconfig.CryptoConfig, data []byte, desc ocispec.Descriptor) (ocispec.Descriptor, []byte, error) {
+func encryptLayer(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc ocispec.Descriptor) (ocispec.Descriptor, []byte, error) {
 	var (
 		size int64
 		d    digest.Digest
 		err  error
 	)
 
-	p, annotations, err := encryption.EncryptLayer(cc.Ec, data, desc)
+	p, annotations, err := encryption.EncryptLayer(cc.Ec, dataReader, desc)
 	if err != nil {
 		return ocispec.Descriptor{}, []byte{}, err
 	}
@@ -505,11 +505,11 @@ func encryptLayer(cc *encconfig.CryptoConfig, data []byte, desc ocispec.Descript
 
 // DecryptBlob decrypts the layer blob using the CryptoConfig and creates a new OCI Descriptor.
 // The caller is expected to store the returned plain data and OCI Descriptor
-func DecryptBlob(cc *encconfig.CryptoConfig, data []byte, desc ocispec.Descriptor, unwrapOnly bool) (ocispec.Descriptor, []byte, error) {
+func DecryptBlob(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc ocispec.Descriptor, unwrapOnly bool) (ocispec.Descriptor, []byte, error) {
 	if cc == nil {
 		return ocispec.Descriptor{}, []byte{}, errors.Wrapf(errdefs.ErrInvalidArgument, "CryptoConfig must not be nil")
 	}
-	p, err := encryption.DecryptLayer(cc.Dc, data, desc, unwrapOnly)
+	p, err := encryption.DecryptLayer(cc.Dc, dataReader, desc, unwrapOnly)
 	if err != nil || unwrapOnly {
 		return ocispec.Descriptor{}, []byte{}, err
 	}
@@ -533,8 +533,8 @@ func DecryptBlob(cc *encconfig.CryptoConfig, data []byte, desc ocispec.Descripto
 
 // decryptLayer decrypts the layer using the CryptoConfig and creates a new OCI Descriptor.
 // The caller is expected to store the returned plain data and OCI Descriptor
-func decryptLayer(cc *encconfig.CryptoConfig, data []byte, desc ocispec.Descriptor, unwrapOnly bool) (ocispec.Descriptor, []byte, error) {
-	p, err := encryption.DecryptLayer(cc.Dc, data, desc, unwrapOnly)
+func decryptLayer(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc ocispec.Descriptor, unwrapOnly bool) (ocispec.Descriptor, []byte, error) {
+	p, err := encryption.DecryptLayer(cc.Dc, dataReader, desc, unwrapOnly)
 	if err != nil || unwrapOnly {
 		return ocispec.Descriptor{}, []byte{}, err
 	}
@@ -563,15 +563,16 @@ func cryptLayer(ctx context.Context, cs content.Store, desc ocispec.Descriptor, 
 		newDesc ocispec.Descriptor
 	)
 
-	data, err := content.ReadBlob(ctx, cs, desc)
+	dataReader, err := cs.ReaderAt(ctx, desc)
 	if err != nil {
 		return ocispec.Descriptor{}, err
 	}
+	defer dataReader.Close()
 
 	if cryptoOp == cryptoOpEncrypt {
-		newDesc, p, err = encryptLayer(cc, data, desc)
+		newDesc, p, err = encryptLayer(cc, dataReader, desc)
 	} else {
-		newDesc, p, err = decryptLayer(cc, data, desc, cryptoOp == cryptoOpUnwrapOnly)
+		newDesc, p, err = decryptLayer(cc, dataReader, desc, cryptoOp == cryptoOpUnwrapOnly)
 	}
 	if err != nil || cryptoOp == cryptoOpUnwrapOnly {
 		return ocispec.Descriptor{}, err
