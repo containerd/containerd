@@ -1,7 +1,7 @@
 # cri
 <p align="center">
 <img src="https://kubernetes.io/images/favicon.png" width="50" height="50">
-<img src="https://containerd.io/img/containerd-dark.png" width="200" >
+<img src="https://containerd.io/img/logos/icon/black/containerd-icon-black.png" width="50" >
 </p>
 
 *Note: The standalone `cri-containerd` binary is end-of-life. `cri-containerd` is
@@ -36,6 +36,7 @@ See [test dashboard](https://k8s-testgrid.appspot.com/sig-node-containerd)
 |     v1.0.0-alpha.x     |                    |      1.7, 1.8      |   v1alpha1  |
 |      v1.0.0-beta.x     |                    |        1.9         |   v1alpha1  |
 |       End-Of-Life      |        v1.1        |        1.10+       |   v1alpha2  |
+|                        |        v1.2        |        1.10+       |   v1alpha2  |
 |                        |        HEAD        |        1.10+       |   v1alpha2  |
 
 ## Production Quality Cluster on GCE
@@ -149,7 +150,8 @@ implementation.
 For sync communication we have a community slack with a #containerd channel that
 everyone is welcome to join and chat about development.
 
-**Slack:** https://dockr.ly/community
+**Slack:** Catch us in the #containerd and #containerd-dev channels on dockercommunity.slack.com.
+[Click here for an invite to docker community slack.](https://join.slack.com/t/dockercommunity/shared_invite/enQtNDY4MDc1Mzc0MzIwLTgxZDBlMmM4ZGEyNDc1N2FkMzlhODJkYmE1YTVkYjM1MDE3ZjAwZjBkOGFlOTJkZjRmZGYzNjYyY2M3ZTUxYzQ)
 
 ## Other Communications
 As this project is tightly coupled to CRI and CRI-Tools and they are Kubernetes

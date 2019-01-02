@@ -36,6 +36,7 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"k8s.io/klog"
 
 	criconfig "github.com/containerd/cri/pkg/config"
 	"github.com/containerd/cri/pkg/constants"
@@ -175,16 +176,18 @@ func getServicesOpts(ic *plugin.InitContext) ([]containerd.ServicesOpt, error) {
 // Set glog level.
 func setGLogLevel() error {
 	l := logrus.GetLevel()
-	if err := flag.Set("logtostderr", "true"); err != nil {
+	fs := flag.NewFlagSet("klog", flag.PanicOnError)
+	klog.InitFlags(fs)
+	if err := fs.Set("logtostderr", "true"); err != nil {
 		return err
 	}
 	switch l {
 	case log.TraceLevel:
-		return flag.Set("v", "5")
+		return fs.Set("v", "5")
 	case logrus.DebugLevel:
-		return flag.Set("v", "4")
+		return fs.Set("v", "4")
 	case logrus.InfoLevel:
-		return flag.Set("v", "2")
+		return fs.Set("v", "2")
 	// glog doesn't support following filters. Defaults to v=0.
 	case logrus.WarnLevel:
 	case logrus.ErrorLevel:
