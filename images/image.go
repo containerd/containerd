@@ -474,12 +474,11 @@ func encryptLayer(cc *encconfig.CryptoConfig, data []byte, desc ocispec.Descript
 	}
 
 	newDesc := ocispec.Descriptor{
-		Digest:   d,
-		Size:     size,
-		Platform: desc.Platform,
+		Digest:      d,
+		Size:        size,
+		Platform:    desc.Platform,
+		Annotations: annotations,
 	}
-	newDesc.Annotations = make(map[string]string)
-	newDesc.Annotations = annotations
 
 	switch desc.MediaType {
 	case MediaTypeDockerSchema2LayerGzip:
