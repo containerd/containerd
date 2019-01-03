@@ -1021,3 +1021,18 @@ func TestHostname(t *testing.T) {
 		assert.Contains(t, spec.Process.Env, test.expectedEnv)
 	}
 }
+
+func TestDisableCgroup(t *testing.T) {
+	config, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+	c := newTestCRIService()
+	c.config.DisableCgroup = true
+	spec, err := c.generateContainerSpec("test-id", "sandbox-id", 1234, config, sandboxConfig, imageConfig, nil)
+	require.NoError(t, err)
+
+	t.Log("resource limit should not be set")
+	assert.Nil(t, spec.Linux.Resources.Memory)
+	assert.Nil(t, spec.Linux.Resources.CPU)
+
+	t.Log("cgroup path should be empty")
+	assert.Empty(t, spec.Linux.CgroupsPath)
+}
