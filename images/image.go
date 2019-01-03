@@ -458,7 +458,7 @@ func encryptLayer(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc 
 
 	// were data touched ?
 	if encLayerReader != nil {
-		size = encLayerReader.Size()
+		size = 0
 		d = encLayerReader.Digest()
 	} else {
 		size = desc.Size
@@ -508,7 +508,7 @@ func DecryptBlob(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc o
 
 	newDesc := ocispec.Descriptor{
 		Digest:   resultReader.Digest(),
-		Size:     resultReader.Size(),
+		Size:     0,
 		Platform: desc.Platform,
 	}
 
@@ -533,7 +533,7 @@ func decryptLayer(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc 
 
 	newDesc := ocispec.Descriptor{
 		Digest:   resultReader.Digest(),
-		Size:     resultReader.Size(),
+		Size:     0,
 		Platform: desc.Platform,
 	}
 
@@ -572,7 +572,7 @@ func cryptLayer(ctx context.Context, cs content.Store, desc ocispec.Descriptor, 
 	// some operations, such as changing recipients, may not touch the layer at all
 	if resultReader != nil {
 		ref := fmt.Sprintf("layer-%s", newDesc.Digest.String())
-		err = content.WriteBlob(ctx, cs, ref, resultReader, newDesc)
+		newDesc.Size, err = content.WriteLayer(ctx, cs, ref, resultReader, newDesc)
 	}
 	return newDesc, err
 }

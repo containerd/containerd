@@ -80,6 +80,28 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, desc o
 	return Copy(ctx, cw, r, desc.Size, desc.Digest, opts...)
 }
 
+// WriteLayer writes a layer's data into the content store.
+//
+// This is useful when the size is NOT known beforehand.
+func WriteLayer(ctx context.Context, cs Store, ref string, r io.Reader, desc ocispec.Descriptor, opts ...Opt) (int64, error) {
+	cw, err := OpenWriter(ctx, cs, WithRef(ref), WithDescriptor(desc))
+	if err != nil {
+		if !errdefs.IsAlreadyExists(err) {
+			return 0, errors.Wrap(err, "failed to open writer")
+		}
+
+		dr, err := cs.ReaderAt(ctx, desc)
+		if err != nil {
+			return 0, errors.Wrap(err, "failed ReaderAt")
+		}
+		defer dr.Close()
+		return dr.Size(), nil // all ready present
+	}
+	defer cw.Close()
+
+	return copyN(ctx, cw, r, desc.Digest, opts...)
+}
+
 // OpenWriter opens a new writer for the given reference, retrying if the writer
 // is locked until the reference is available or returns an error.
 func OpenWriter(ctx context.Context, cs Ingester, opts ...WriterOpt) (Writer, error) {
@@ -148,6 +170,34 @@ func Copy(ctx context.Context, cw Writer, r io.Reader, size int64, expected dige
 	}
 
 	return nil
+}
+
+// copyN works like Copy except that the size need not be given
+func copyN(ctx context.Context, cw Writer, r io.Reader, expected digest.Digest, opts ...Opt) (int64, error) {
+	ws, err := cw.Status()
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get status")
+	}
+
+	if ws.Offset > 0 {
+		r, err = seekReader(r, ws.Offset, 0)
+		if err != nil {
+			return 0, errors.Wrapf(err, "unable to resume write to %v", ws.Ref)
+		}
+	}
+
+	size, err := copyWithBuffer(cw, r)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to copy")
+	}
+
+	if err := cw.Commit(ctx, size, expected, opts...); err != nil {
+		if !errdefs.IsAlreadyExists(err) {
+			return 0, errors.Wrapf(err, "failed commit on ref %q", ws.Ref)
+		}
+	}
+
+	return size, nil
 }
 
 // CopyReaderAt copies to a writer from a given reader at for the given
