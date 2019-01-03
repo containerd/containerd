@@ -44,6 +44,19 @@ The explanation and default value of each configuration item are as follows:
   # limit.
   max_container_log_line_size = 16384
 
+  # disable_cgroup indicates to disable the cgroup support.
+  # This is useful when the daemon does not have permission to access cgroup.
+  disable_cgroup = false
+
+  # disable_apparmor indicates to disable the apparmor support.
+  # This is useful when the daemon does not have permission to access apparmor.
+  disable_apparmor = false
+
+  # restrict_oom_score_adj indicates to limit the lower bound of OOMScoreAdj to
+  # the containerd's current OOMScoreAdj.
+  # This is useful when the containerd does not have permission to decrease OOMScoreAdj.
+  restrict_oom_score_adj = false
+
   # "plugins.cri.containerd" contains config related to containerd
   [plugins.cri.containerd]
 
