@@ -92,7 +92,11 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	// Reserve the container name to avoid concurrent `CreateContainer` request creating
 	// the same container.
 	id := util.GenerateID()
-	name := makeContainerName(config.GetMetadata(), sandboxConfig.GetMetadata())
+	metadata := config.GetMetadata()
+	if metadata == nil {
+		return nil, errors.New("container config must include metadata")
+	}
+	name := makeContainerName(metadata, sandboxConfig.GetMetadata())
 	logrus.Debugf("Generated id %q for container %q", id, name)
 	if err = c.containerNameIndex.Reserve(name, id); err != nil {
 		return nil, errors.Wrapf(err, "failed to reserve container name %q", name)
