@@ -304,3 +304,20 @@ systemd_cgroup = true
 		})
 	}
 }
+
+func TestRestrictOOMScoreAdj(t *testing.T) {
+	current, err := getCurrentOOMScoreAdj()
+	require.NoError(t, err)
+
+	got, err := restrictOOMScoreAdj(current - 1)
+	require.NoError(t, err)
+	assert.Equal(t, got, current)
+
+	got, err = restrictOOMScoreAdj(current)
+	require.NoError(t, err)
+	assert.Equal(t, got, current)
+
+	got, err = restrictOOMScoreAdj(current + 1)
+	require.NoError(t, err)
+	assert.Equal(t, got, current+1)
+}
