@@ -118,10 +118,37 @@ func WithHostNetwork(p *runtime.PodSandboxConfig) {
 		p.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{}
 	}
 	if p.Linux.SecurityContext.NamespaceOptions == nil {
-		p.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{
-			Network: runtime.NamespaceMode_NODE,
-		}
+		p.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{}
 	}
+	p.Linux.SecurityContext.NamespaceOptions.Network = runtime.NamespaceMode_NODE
+}
+
+// Set host pid.
+func WithHostPid(p *runtime.PodSandboxConfig) {
+	if p.Linux == nil {
+		p.Linux = &runtime.LinuxPodSandboxConfig{}
+	}
+	if p.Linux.SecurityContext == nil {
+		p.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{}
+	}
+	if p.Linux.SecurityContext.NamespaceOptions == nil {
+		p.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{}
+	}
+	p.Linux.SecurityContext.NamespaceOptions.Pid = runtime.NamespaceMode_NODE
+}
+
+// Set pod pid.
+func WithPodPid(p *runtime.PodSandboxConfig) {
+	if p.Linux == nil {
+		p.Linux = &runtime.LinuxPodSandboxConfig{}
+	}
+	if p.Linux.SecurityContext == nil {
+		p.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{}
+	}
+	if p.Linux.SecurityContext.NamespaceOptions == nil {
+		p.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{}
+	}
+	p.Linux.SecurityContext.NamespaceOptions.Pid = runtime.NamespaceMode_POD
 }
 
 // Add pod log directory.
