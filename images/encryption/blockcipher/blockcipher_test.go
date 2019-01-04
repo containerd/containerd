@@ -51,12 +51,12 @@ func TestBlockCipherEncryption(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ciphertext := make([]byte, ciphertextReader.Size())
+	ciphertext := make([]byte, 1024)
 	_, err = ciphertextReader.Read(ciphertext)
 	if err != nil && err != io.EOF {
 		t.Fatal("Reading the ciphertext should not have failed")
 	}
-	ciphertextReaderAt := content.BufReaderAt{int64(len(ciphertext)), ciphertext}
+	ciphertextReaderAt := content.BufReaderAt{ciphertextReader.Size(), ciphertext}
 
 	// Use a different instantiated object to indicate an invokation at a diff time
 	plaintextReader, _, err := h.Decrypt(ciphertextReaderAt, lbco)
@@ -64,13 +64,13 @@ func TestBlockCipherEncryption(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	plaintext := make([]byte, plaintextReader.Size())
+	plaintext := make([]byte, 1024)
 	_, err = plaintextReader.Read(plaintext)
 	if err != nil && err != io.EOF {
 		t.Fatal("Read the plaintext should not have failed")
 	}
 
-	if string(plaintext) != string(layerData) {
+	if string(plaintext[:plaintextReader.Size()]) != string(layerData) {
 		t.Fatal("Decrypted data is incorrect")
 	}
 }
@@ -104,13 +104,19 @@ func TestBlockCipherEncryptionInvalidKey(t *testing.T) {
 
 	lbco.SymmetricKey = []byte("aaa34567890123456789012345678912")
 
-	ciphertext := make([]byte, ciphertextReader.Size())
+	ciphertext := make([]byte, 1024)
 	ciphertextReader.Read(ciphertext)
-	ciphertextReaderAt := content.BufReaderAt{int64(len(ciphertext)), ciphertext}
+	ciphertextReaderAt := content.BufReaderAt{ciphertextReader.Size(), ciphertext}
 
-	_, _, err = bc2.Decrypt(ciphertextReaderAt, lbco)
-	if err == nil {
+	plaintextReader, _, err := bc2.Decrypt(ciphertextReaderAt, lbco)
+	if err != nil {
 		t.Fatal(err)
+	}
+
+	plaintext := make([]byte, 1024)
+	_, err = plaintextReader.Read(plaintext)
+	if err == nil {
+		t.Fatal("Read() should have failed due to wrong key")
 	}
 }
 
@@ -132,6 +138,6 @@ func TestBlockCipherEncryptionInvalidKeyLength(t *testing.T) {
 
 	_, _, err = h.Encrypt(layerDataReader, AEADAES128GCM, opt)
 	if err == nil {
-		t.Fatal(err)
+		t.Fatal("Test should have failed due to invalid key length")
 	}
 }

@@ -117,7 +117,7 @@ func TestEncryptLayer(t *testing.T) {
 		Size:        encLayerReader.Size(),
 	}
 
-	encLayer := make([]byte, encLayerReader.Size())
+	encLayer := make([]byte, 1024)
 	encLayerReader.Read(encLayer)
 	encLayerReaderAt := content.BufReaderAt{encLayerReader.Size(), encLayer}
 
@@ -126,10 +126,10 @@ func TestEncryptLayer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	decLayer := make([]byte, decLayerReader.Size())
+	decLayer := make([]byte, 1024)
 	decLayerReader.Read(decLayer)
 
-	if !reflect.DeepEqual(decLayer, data) {
+	if !reflect.DeepEqual(decLayer[:decLayerReader.Size()], data) {
 		t.Fatalf("Expected %v, got %v", data, decLayer)
 	}
 }

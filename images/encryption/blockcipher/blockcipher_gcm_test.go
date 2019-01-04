@@ -71,19 +71,19 @@ func TestBlockCipherAesGcmEncryption(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ciphertext := make([]byte, ciphertextReader.Size())
+	ciphertext := make([]byte, 1024)
 	ciphertextReader.Read(ciphertext)
-	ciphertextReaderAt := content.BufReaderAt{int64(len(ciphertext)), ciphertext}
+	ciphertextReaderAt := content.BufReaderAt{ciphertextReader.Size(), ciphertext}
 
 	plaintextReader, _, err := bc2.Decrypt(ciphertextReaderAt, lbco)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	plaintext := make([]byte, plaintextReader.Size())
+	plaintext := make([]byte, 1024)
 	plaintextReader.Read(plaintext)
 
-	if string(plaintext) != string(layerData) {
+	if string(plaintext[:plaintextReader.Size()]) != string(layerData) {
 		t.Fatal("Decrypted data is incorrect")
 	}
 }
@@ -116,13 +116,19 @@ func TestBlockCipherAesGcmEncryptionInvalidKey(t *testing.T) {
 
 	lbco.SymmetricKey = []byte("aaa34567890123456789012345678912")
 
-	ciphertext := make([]byte, ciphertextReader.Size())
+	ciphertext := make([]byte, 1024)
 	ciphertextReader.Read(ciphertext)
-	ciphertextReaderAt := content.BufReaderAt{int64(len(ciphertext)), ciphertext}
+	ciphertextReaderAt := content.BufReaderAt{ciphertextReader.Size(), ciphertext}
 
-	_, _, err = bc2.Decrypt(ciphertextReaderAt, lbco)
-	if err == nil {
+	plaintextReader, _, err := bc2.Decrypt(ciphertextReaderAt, lbco)
+	if err != nil {
 		t.Fatal(err)
+	}
+
+	plaintext := make([]byte, 1024)
+	_, err = plaintextReader.Read(plaintext)
+	if err == nil {
+		t.Fatal("Read() should have failed due to wrong key")
 	}
 }
 
@@ -143,6 +149,6 @@ func TestBlockCipherAesGcmEncryptionInvalidKeyLength(t *testing.T) {
 	layerDataReader := content.BufReaderAt{int64(len(layerData)), layerData}
 	_, _, err = bc.Encrypt(layerDataReader, opt)
 	if err == nil {
-		t.Fatal(err)
+		t.Fatal("Test should have failed due to invalid key length")
 	}
 }

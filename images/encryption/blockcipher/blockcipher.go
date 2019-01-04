@@ -17,12 +17,8 @@
 package blockcipher
 
 import (
-	"hash"
-	"io"
-
 	"github.com/containerd/containerd/content"
 
-	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
 
@@ -30,29 +26,6 @@ import (
 // data to it as well as its hash
 type CryptedDataReader interface {
 	content.ReaderDigester
-}
-
-type cryptedDataReader struct {
-	rd     io.Reader
-	size   int64
-	digest digest.Digest
-	hash   hash.Hash
-}
-
-func (cr cryptedDataReader) Read(p []byte) (n int, err error) {
-	return cr.rd.Read(p)
-}
-
-func (cr cryptedDataReader) Size() int64 {
-	return cr.size
-}
-
-func (cr cryptedDataReader) Digest() digest.Digest {
-	return cr.digest
-}
-
-func (cr cryptedDataReader) Hash() hash.Hash {
-	return cr.hash
 }
 
 // LayerCipherType is the ciphertype as specified in the layer metadata
