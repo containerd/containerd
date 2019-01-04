@@ -83,25 +83,17 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, desc o
 
 // WriteLayer writes a layer's data into the content store.
 //
-// This is useful when the size is NOT known beforehand.
-func WriteLayer(ctx context.Context, cs Store, r io.Reader, desc ocispec.Descriptor, opts ...Opt) (int64, error) {
+// This is useful when the size and digest are NOT known beforehand.
+func WriteLayer(ctx context.Context, cs Store, r ReaderDigester, opts ...Opt) (int64, digest.Digest, error) {
 	ref := fmt.Sprintf("blob-%d-%d", rand.Int(), rand.Int())
-	cw, err := OpenWriter(ctx, cs, WithRef(ref), WithDescriptor(desc))
+	cw, err := OpenWriter(ctx, cs, WithRef(ref))
 	if err != nil {
-		if !errdefs.IsAlreadyExists(err) {
-			return 0, errors.Wrap(err, "failed to open writer")
-		}
-
-		dr, err := cs.ReaderAt(ctx, desc)
-		if err != nil {
-			return 0, errors.Wrap(err, "failed ReaderAt")
-		}
-		defer dr.Close()
-		return dr.Size(), nil // all ready present
+		return 0, "", errors.Wrap(err, "failed to open writer")
 	}
 	defer cw.Close()
 
-	return copyN(ctx, cw, r, desc.Digest, opts...)
+	n, err := copyN(ctx, cw, r, "", opts...)
+	return n, r.Digest(), err
 }
 
 // OpenWriter opens a new writer for the given reference, retrying if the writer
