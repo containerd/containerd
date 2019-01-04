@@ -46,7 +46,7 @@ func TestBlockCipherEncryption(t *testing.T) {
 
 	layerDataReader := content.BufReaderAt{int64(len(layerData)), layerData}
 
-	ciphertextReader, lbco, err := h.Encrypt(layerDataReader, AEADAES256GCM, opt)
+	ciphertextReader, lbco, err := h.Encrypt(layerDataReader, AESSIVCMAC256, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestBlockCipherEncryption(t *testing.T) {
 
 func TestBlockCipherEncryptionInvalidKey(t *testing.T) {
 	var (
-		symKey = []byte("01234567890123456789012345678912")
+		symKey = []byte("0123456789012345678901234567890123456789012345678901234567890123")
 		opt    = LayerBlockCipherOptions{
 			SymmetricKey: symKey,
 		}
@@ -91,18 +91,18 @@ func TestBlockCipherEncryptionInvalidKey(t *testing.T) {
 
 	layerDataReader := content.BufReaderAt{int64(len(layerData)), layerData}
 
-	ciphertextReader, lbco, err := h.Encrypt(layerDataReader, AEADAES256GCM, opt)
+	ciphertextReader, lbco, err := h.Encrypt(layerDataReader, AESSIVCMAC512, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Use a different instantiated object to indicate an invokation at a diff time
-	bc2, err := NewGCMLayerBlockCipher(256)
+	bc2, err := NewAESSIVLayerBlockCipher(512)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	lbco.SymmetricKey = []byte("aaa34567890123456789012345678912")
+	lbco.SymmetricKey = []byte("aaa3456789012345678901234567890123456789012345678901234567890123")
 
 	ciphertext := make([]byte, 1024)
 	ciphertextReader.Read(ciphertext)
@@ -122,7 +122,7 @@ func TestBlockCipherEncryptionInvalidKey(t *testing.T) {
 
 func TestBlockCipherEncryptionInvalidKeyLength(t *testing.T) {
 	var (
-		symKey = []byte("01234567890123456789012345678912")
+		symKey = []byte("01234567890123456789012345678901")
 		opt    = LayerBlockCipherOptions{
 			SymmetricKey: symKey,
 		}
@@ -136,7 +136,7 @@ func TestBlockCipherEncryptionInvalidKeyLength(t *testing.T) {
 
 	layerDataReader := content.BufReaderAt{int64(len(layerData)), layerData}
 
-	_, _, err = h.Encrypt(layerDataReader, AEADAES128GCM, opt)
+	_, _, err = h.Encrypt(layerDataReader, AESSIVCMAC512, opt)
 	if err == nil {
 		t.Fatal("Test should have failed due to invalid key length")
 	}

@@ -101,7 +101,7 @@ func EncryptLayer(ec *config.EncryptConfig, encOrPlainLayerReader content.Reader
 		return nil, nil, errors.Wrapf(errdefs.ErrInvalidArgument, "EncryptConfig must not be nil")
 	}
 
-	symKey := make([]byte, 256/8)
+	symKey := make([]byte, 512/8)
 	_, err = io.ReadFull(rand.Reader, symKey)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "Could not create symmetric key")
@@ -128,7 +128,7 @@ func EncryptLayer(ec *config.EncryptConfig, encOrPlainLayerReader content.Reader
 	for annotationsID, scheme := range keyWrapperAnnotations {
 		b64Annotations := desc.Annotations[annotationsID]
 		if b64Annotations == "" && optsData == nil {
-			encLayerReader, optsData, err = commonEncryptLayer(encOrPlainLayerReader, symKey, blockcipher.AEADAES256GCM)
+			encLayerReader, optsData, err = commonEncryptLayer(encOrPlainLayerReader, symKey, blockcipher.AESSIVCMAC512)
 			if err != nil {
 				return nil, nil, err
 			}

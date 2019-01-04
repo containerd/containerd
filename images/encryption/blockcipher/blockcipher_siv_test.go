@@ -18,34 +18,35 @@ package blockcipher
 
 import (
 	_ "crypto/sha256"
+	"io"
 	"testing"
 
 	"github.com/containerd/containerd/content"
 )
 
-func TestBlockCipherAesGcmCreateValid(t *testing.T) {
-	_, err := NewGCMLayerBlockCipher(128)
+func TestBlockCipherAesSivCreateValid(t *testing.T) {
+	_, err := NewAESSIVLayerBlockCipher(256)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = NewGCMLayerBlockCipher(256)
+	_, err = NewAESSIVLayerBlockCipher(512)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestBlockCipherAesGcmCreateInvalid(t *testing.T) {
-	_, err := NewGCMLayerBlockCipher(8)
+func TestBlockCipherAesSivCreateInvalid(t *testing.T) {
+	_, err := NewAESSIVLayerBlockCipher(8)
 	if err == nil {
-		t.Fatal(err)
+		t.Fatal("Test should have failed due to invalid cipher size")
 	}
-	_, err = NewGCMLayerBlockCipher(255)
+	_, err = NewAESSIVLayerBlockCipher(255)
 	if err == nil {
-		t.Fatal(err)
+		t.Fatal("Test should have failed due to invalid cipher size")
 	}
 }
 
-func TestBlockCipherAesGcmEncryption(t *testing.T) {
+func TestBlockCipherAesSivEncryption(t *testing.T) {
 	var (
 		symKey = []byte("01234567890123456789012345678912")
 		opt    = LayerBlockCipherOptions{
@@ -54,7 +55,7 @@ func TestBlockCipherAesGcmEncryption(t *testing.T) {
 		layerData = []byte("this is some data")
 	)
 
-	bc, err := NewGCMLayerBlockCipher(256)
+	bc, err := NewAESSIVLayerBlockCipher(256)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +67,7 @@ func TestBlockCipherAesGcmEncryption(t *testing.T) {
 	}
 
 	// Use a different instantiated object to indicate an invokation at a diff time
-	bc2, err := NewGCMLayerBlockCipher(256)
+	bc2, err := NewAESSIVLayerBlockCipher(256)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,14 +82,17 @@ func TestBlockCipherAesGcmEncryption(t *testing.T) {
 	}
 
 	plaintext := make([]byte, 1024)
-	plaintextReader.Read(plaintext)
+	_, err = plaintextReader.Read(plaintext)
+	if err != nil && err != io.EOF {
+		t.Fatal(err)
+	}
 
 	if string(plaintext[:plaintextReader.Size()]) != string(layerData) {
 		t.Fatal("Decrypted data is incorrect")
 	}
 }
 
-func TestBlockCipherAesGcmEncryptionInvalidKey(t *testing.T) {
+func TestBlockCipherAesSivEncryptionInvalidKey(t *testing.T) {
 	var (
 		symKey = []byte("01234567890123456789012345678912")
 		opt    = LayerBlockCipherOptions{
@@ -97,7 +101,7 @@ func TestBlockCipherAesGcmEncryptionInvalidKey(t *testing.T) {
 		layerData = []byte("this is some data")
 	)
 
-	bc, err := NewGCMLayerBlockCipher(256)
+	bc, err := NewAESSIVLayerBlockCipher(256)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +113,7 @@ func TestBlockCipherAesGcmEncryptionInvalidKey(t *testing.T) {
 	}
 
 	// Use a different instantiated object to indicate an invokation at a diff time
-	bc2, err := NewGCMLayerBlockCipher(256)
+	bc2, err := NewAESSIVLayerBlockCipher(256)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +136,7 @@ func TestBlockCipherAesGcmEncryptionInvalidKey(t *testing.T) {
 	}
 }
 
-func TestBlockCipherAesGcmEncryptionInvalidKeyLength(t *testing.T) {
+func TestBlockCipherAesSivEncryptionInvalidKeyLength(t *testing.T) {
 	var (
 		symKey = []byte("012345")
 		opt    = LayerBlockCipherOptions{
@@ -141,7 +145,7 @@ func TestBlockCipherAesGcmEncryptionInvalidKeyLength(t *testing.T) {
 		layerData = []byte("this is some data")
 	)
 
-	bc, err := NewGCMLayerBlockCipher(256)
+	bc, err := NewAESSIVLayerBlockCipher(256)
 	if err != nil {
 		t.Fatal(err)
 	}

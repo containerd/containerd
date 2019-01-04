@@ -33,8 +33,8 @@ type LayerCipherType string
 
 // TODO: Should be obtained from OCI spec once included
 const (
-	AEADAES128GCM LayerCipherType = "AEAD_AES_128_GCM"
-	AEADAES256GCM LayerCipherType = "AEAD_AES_256_GCM"
+	AESSIVCMAC256 LayerCipherType = "AES-SIV-CMAC-256"
+	AESSIVCMAC512 LayerCipherType = "AES-SIV-CMAC-512"
 	CipherTypeOpt string          = "type"
 )
 
@@ -91,14 +91,14 @@ func NewLayerBlockCipherHandler() (*LayerBlockCipherHandler, error) {
 	}
 
 	var err error
-	h.cipherMap[AEADAES128GCM], err = NewGCMLayerBlockCipher(128)
+	h.cipherMap[AESSIVCMAC256], err = NewAESSIVLayerBlockCipher(256)
 	if err != nil {
-		return nil, errors.Wrap(err, "Unable to set up Cipher GCM 128")
+		return nil, errors.Wrap(err, "Unable to set up Cipher AES-SIV-CMAC-256")
 	}
 
-	h.cipherMap[AEADAES256GCM], err = NewGCMLayerBlockCipher(256)
+	h.cipherMap[AESSIVCMAC512], err = NewAESSIVLayerBlockCipher(512)
 	if err != nil {
-		return nil, errors.Wrap(err, "Unable to set up Cipher GCM 256")
+		return nil, errors.Wrap(err, "Unable to set up Cipher AES-SIV-CMAC-512")
 	}
 
 	return &h, nil
