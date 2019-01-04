@@ -225,7 +225,7 @@ func TestTarWithXattr(t *testing.T) {
 		})
 		w := tartest.TarAll(tc.File("/file", []byte{}, 0755))
 		validator := fileXattrExist("file", at.key, at.value)
-		t.Run(at.name, makeWriterToTarTest(w, nil, validator, at.err))
+		runWriterToTarTest(t, at.name, w, nil, validator, at.err)
 	}
 }
 
@@ -575,41 +575,50 @@ func TestBreakouts(t *testing.T) {
 		{
 			name: "SymlinkOverrideDirectory",
 			apply: fstest.Apply(
-				fstest.CreateDir("/etc/", 0755),
-				fstest.CreateFile("/etc/passwd", []byte("inside"), 0644),
 				fstest.CreateDir("/localetc/", 0755),
 			),
 			w: tartest.TarAll(
+				tc.Dir("etc", 0755),
+				tc.File("/etc/passwd", []byte("inside"), 0644),
 				tc.Symlink("/etc", "localetc"),
 				tc.Link("/etc/passwd", "/localetc/localpasswd"),
 			),
-			validator: sameFile("/localetc/localpasswd", "/etc/passwd"),
+			validator: all(
+				sameFile("/localetc/localpasswd", "/etc/passwd"),
+				sameFile("/etc/localpasswd", "/etc/passwd"),
+			),
 		},
 		{
 			name: "SymlinkOverrideDirectoryRelative",
 			apply: fstest.Apply(
-				fstest.CreateDir("/etc/", 0755),
-				fstest.CreateFile("/etc/passwd", []byte("inside"), 0644),
 				fstest.CreateDir("/localetc/", 0755),
 			),
 			w: tartest.TarAll(
+				tc.Dir("/etc/", 0755),
+				tc.File("/etc/passwd", []byte("inside"), 0644),
 				tc.Symlink("../../etc", "localetc"),
 				tc.Link("/etc/passwd", "/localetc/localpasswd"),
 			),
-			validator: sameFile("/localetc/localpasswd", "/etc/passwd"),
+			validator: all(
+				sameFile("/localetc/localpasswd", "/etc/passwd"),
+				sameFile("/etc/localpasswd", "/etc/passwd"),
+			),
 		},
 		{
 			name: "DirectoryOverrideSymlink",
 			apply: fstest.Apply(
-				fstest.CreateDir("/etc/", 0755),
-				fstest.CreateFile("/etc/passwd", []byte("inside"), 0644),
 				fstest.Symlink("/etc", "localetc"),
 			),
 			w: tartest.TarAll(
 				tc.Dir("/localetc/", 0755),
+				tc.Dir("/etc/", 0755),
+				tc.File("/etc/passwd", []byte("inside"), 0644),
 				tc.Link("/etc/passwd", "/localetc/localpasswd"),
 			),
-			validator: sameFile("/localetc/localpasswd", "/etc/passwd"),
+			validator: all(
+				sameFile("/localetc/localpasswd", "/etc/passwd"),
+				fileNotExists("/etc/localpasswd"),
+			),
 		},
 		{
 			name: "DirectoryOverrideSymlinkAndHardlink",
@@ -692,30 +701,14 @@ func TestBreakouts(t *testing.T) {
 				fstest.CreateDir("/etc/", 0755),
 				fstest.CreateFile("/etc/passwd", []byte("all users"), 0644),
 				fstest.CreateFile("/etc/whitedout", []byte("ahhhh whiteout"), 0644),
-				fstest.Symlink("/etc", "localetc"),
 			),
 			w: tartest.TarAll(
+				tc.Symlink("/etc", "localetc"),
 				tc.File("localetc/.wh.whitedout", []byte{}, 0644),
 			),
 			validator: all(
 				fileValue("etc/passwd", []byte("all users")),
 				fileNotExists("etc/whitedout"),
-			),
-		},
-		{
-			name: "WhiteoutDirectoryName",
-			apply: fstest.Apply(
-				fstest.CreateDir("/etc/", 0755),
-				fstest.CreateFile("/etc/passwd", []byte("all users"), 0644),
-				fstest.CreateFile("/etc/whitedout", []byte("ahhhh whiteout"), 0644),
-				fstest.Symlink("/etc", "localetc"),
-			),
-			w: tartest.TarAll(
-				tc.File(".wh.etc/somefile", []byte("non-empty"), 0644),
-			),
-			validator: all(
-				fileValue("etc/passwd", []byte("all users")),
-				fileValue(".wh.etc/somefile", []byte("non-empty")),
 			),
 		},
 		{
@@ -747,7 +740,7 @@ func TestBreakouts(t *testing.T) {
 	}
 
 	for _, bo := range breakouts {
-		t.Run(bo.name, makeWriterToTarTest(bo.w, bo.apply, bo.validator, bo.err))
+		runWriterToTarTest(t, bo.name, bo.w, bo.apply, bo.validator, bo.err)
 	}
 }
 
@@ -802,7 +795,7 @@ func TestApplyTar(t *testing.T) {
 	}
 
 	for _, at := range tests {
-		t.Run(at.name, makeWriterToTarTest(at.w, at.apply, at.validator, at.err))
+		runWriterToTarTest(t, at.name, at.w, at.apply, at.validator, at.err)
 	}
 }
 
@@ -913,7 +906,17 @@ func testDiffApply(appliers ...fstest.Applier) error {
 	return fstest.CheckDirectoryEqual(td, dest)
 }
 
-func makeWriterToTarTest(wt tartest.WriterToTar, a fstest.Applier, validate func(string) error, applyErr error) func(*testing.T) {
+func makeWriterToTarNaiveTest(wt tartest.WriterToTar, a fstest.Applier, validate func(string) error, applyErr error) func(*testing.T) {
+	return func(t *testing.T) {
+		apply := func(ctx context.Context, td string, tr io.Reader) error {
+			_, err := Apply(ctx, td, tr)
+			return err
+		}
+		makeWriterToTarTest(wt, a, apply, validate, applyErr)(t)
+	}
+}
+
+func makeWriterToTarTest(wt tartest.WriterToTar, a fstest.Applier, apply func(context.Context, string, io.Reader) error, validate func(string) error, applyErr error) func(*testing.T) {
 	return func(t *testing.T) {
 		td, err := ioutil.TempDir("", "test-writer-to-tar-")
 		if err != nil {
@@ -929,7 +932,7 @@ func makeWriterToTarTest(wt tartest.WriterToTar, a fstest.Applier, validate func
 
 		tr := tartest.TarFromWriterTo(wt)
 
-		if _, err := Apply(context.Background(), td, tr); err != nil {
+		if err := apply(context.Background(), td, tr); err != nil {
 			if applyErr == nil {
 				t.Fatalf("Failed to apply tar: %v", err)
 			} else if errors.Cause(err) != applyErr {
@@ -944,9 +947,7 @@ func makeWriterToTarTest(wt tartest.WriterToTar, a fstest.Applier, validate func
 			if err := validate(td); err != nil {
 				t.Errorf("Validation failed: %v", err)
 			}
-
 		}
-
 	}
 }
 

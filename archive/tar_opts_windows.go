@@ -20,9 +20,10 @@ package archive
 
 // ApplyOptions provides additional options for an Apply operation
 type ApplyOptions struct {
-	ParentLayerPaths        []string // Parent layer paths used for Windows layer apply
-	IsWindowsContainerLayer bool     // True if the tar stream to be applied is a Windows Container Layer
-	Filter                  Filter   // Filter tar headers
+	ParentLayerPaths        []string        // Parent layer paths used for Windows layer apply
+	IsWindowsContainerLayer bool            // True if the tar stream to be applied is a Windows Container Layer
+	Filter                  Filter          // Filter tar headers
+	ConvertWhiteout         ConvertWhiteout // Convert whiteout files
 }
 
 // WithParentLayers adds parent layers to the apply process this is required

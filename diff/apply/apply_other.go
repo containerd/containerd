@@ -1,4 +1,4 @@
-// +build !windows
+// +build !linux
 
 /*
    Copyright The containerd Authors.
@@ -16,9 +16,19 @@
    limitations under the License.
 */
 
-package archive
+package apply
 
-// ApplyOptions provides additional options for an Apply operation
-type ApplyOptions struct {
-	Filter Filter // Filter tar headers
+import (
+	"context"
+	"io"
+
+	"github.com/containerd/containerd/archive"
+	"github.com/containerd/containerd/mount"
+)
+
+func apply(ctx context.Context, mounts []mount.Mount, r io.Reader) error {
+	return mount.WithTempMount(ctx, mounts, func(root string) error {
+		_, err := archive.Apply(ctx, root, r)
+		return err
+	})
 }

@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
@@ -71,49 +70,41 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 		return emptyDesc, errors.Wrapf(errdefs.ErrNotImplemented, "unsupported diff media type: %v", desc.MediaType)
 	}
 
-	var ocidesc ocispec.Descriptor
-	if err := mount.WithTempMount(ctx, mounts, func(root string) error {
-		ra, err := s.store.ReaderAt(ctx, desc)
+	ra, err := s.store.ReaderAt(ctx, desc)
+	if err != nil {
+		return emptyDesc, errors.Wrap(err, "failed to get reader from content store")
+	}
+	defer ra.Close()
+
+	r := content.NewReader(ra)
+	if isCompressed {
+		ds, err := compression.DecompressStream(r)
 		if err != nil {
-			return errors.Wrap(err, "failed to get reader from content store")
+			return emptyDesc, err
 		}
-		defer ra.Close()
+		defer ds.Close()
+		r = ds
+	}
 
-		r := content.NewReader(ra)
-		if isCompressed {
-			ds, err := compression.DecompressStream(r)
-			if err != nil {
-				return err
-			}
-			defer ds.Close()
-			r = ds
-		}
+	digester := digest.Canonical.Digester()
+	rc := &readCounter{
+		r: io.TeeReader(r, digester.Hash()),
+	}
 
-		digester := digest.Canonical.Digester()
-		rc := &readCounter{
-			r: io.TeeReader(r, digester.Hash()),
-		}
-
-		if _, err := archive.Apply(ctx, root, rc); err != nil {
-			return err
-		}
-
-		// Read any trailing data
-		if _, err := io.Copy(ioutil.Discard, rc); err != nil {
-			return err
-		}
-
-		ocidesc = ocispec.Descriptor{
-			MediaType: ocispec.MediaTypeImageLayer,
-			Size:      rc.c,
-			Digest:    digester.Digest(),
-		}
-		return nil
-
-	}); err != nil {
+	if err := apply(ctx, mounts, rc); err != nil {
 		return emptyDesc, err
 	}
-	return ocidesc, nil
+
+	// Read any trailing data
+	if _, err := io.Copy(ioutil.Discard, rc); err != nil {
+		return emptyDesc, err
+	}
+
+	return ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageLayer,
+		Size:      rc.c,
+		Digest:    digester.Digest(),
+	}, nil
 }
 
 type readCounter struct {

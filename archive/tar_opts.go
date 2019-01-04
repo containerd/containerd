@@ -24,6 +24,9 @@ type ApplyOpt func(options *ApplyOptions) error
 // Filter specific files from the archive
 type Filter func(*tar.Header) (bool, error)
 
+// ConvertWhiteout converts whiteout files from the archive
+type ConvertWhiteout func(*tar.Header, string) (bool, error)
+
 // all allows all files
 func all(_ *tar.Header) (bool, error) {
 	return true, nil
@@ -33,6 +36,14 @@ func all(_ *tar.Header) (bool, error) {
 func WithFilter(f Filter) ApplyOpt {
 	return func(options *ApplyOptions) error {
 		options.Filter = f
+		return nil
+	}
+}
+
+// WithConvertWhiteout uses the convert function to convert the whiteout files.
+func WithConvertWhiteout(c ConvertWhiteout) ApplyOpt {
+	return func(options *ApplyOptions) error {
+		options.ConvertWhiteout = c
 		return nil
 	}
 }
