@@ -571,8 +571,7 @@ func cryptLayer(ctx context.Context, cs content.Store, desc ocispec.Descriptor, 
 	}
 	// some operations, such as changing recipients, may not touch the layer at all
 	if resultReader != nil {
-		ref := fmt.Sprintf("layer-%s", newDesc.Digest.String())
-		newDesc.Size, err = content.WriteLayer(ctx, cs, ref, resultReader, newDesc)
+		newDesc.Size, err = content.WriteLayer(ctx, cs, resultReader, newDesc)
 	}
 	return newDesc, err
 }

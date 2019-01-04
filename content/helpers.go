@@ -18,6 +18,7 @@ package content
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -83,7 +84,8 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, desc o
 // WriteLayer writes a layer's data into the content store.
 //
 // This is useful when the size is NOT known beforehand.
-func WriteLayer(ctx context.Context, cs Store, ref string, r io.Reader, desc ocispec.Descriptor, opts ...Opt) (int64, error) {
+func WriteLayer(ctx context.Context, cs Store, r io.Reader, desc ocispec.Descriptor, opts ...Opt) (int64, error) {
+	ref := fmt.Sprintf("blob-%d-%d", rand.Int(), rand.Int())
 	cw, err := OpenWriter(ctx, cs, WithRef(ref), WithDescriptor(desc))
 	if err != nil {
 		if !errdefs.IsAlreadyExists(err) {
