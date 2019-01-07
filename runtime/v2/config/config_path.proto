@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package containerd.config.v2;
+
+import weak "gogoproto/gogo.proto";
+
+option go_package = "github.com/containerd/containerd/runtime/v2/config;config";
+
+message Options {
+	// ConfigPath specifies the filesystem location of the configuration file used by the shimv2 runtime
+	string config_path = 1;
+}

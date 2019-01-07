@@ -1,0 +1,20 @@
+file {
+  name: "github.com/containerd/containerd/runtime/v2/config/config_path.proto"
+  package: "containerd.config.v2"
+  dependency: "gogoproto/gogo.proto"
+  message_type {
+    name: "Options"
+    field {
+      name: "config_path"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "configPath"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/runtime/v2/config;config"
+  }
+  weak_dependency: 0
+  syntax: "proto3"
+}
