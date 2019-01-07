@@ -26,6 +26,28 @@ file {
       type: TYPE_STRING
       json_name: "registryRoot"
     }
+    field {
+      name: "sandbox_image"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxImage"
+    }
+    field {
+      name: "sandbox_platform"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxPlatform"
+    }
+    field {
+      name: "sandbox_isolation"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_ENUM
+      type_name: ".containerd.runhcs.v1.Options.SandboxIsolation"
+      json_name: "sandboxIsolation"
+    }
     enum_type {
       name: "DebugType"
       value {
@@ -34,6 +56,21 @@ file {
       }
       value {
         name: "FILE"
+        number: 1
+      }
+      value {
+        name: "ETW"
+        number: 2
+      }
+    }
+    enum_type {
+      name: "SandboxIsolation"
+      value {
+        name: "PROCESS"
+        number: 0
+      }
+      value {
+        name: "HYPERVISOR"
         number: 1
       }
     }
