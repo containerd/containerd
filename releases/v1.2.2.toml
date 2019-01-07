@@ -1,0 +1,35 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.2.1"
+
+pre_release = false
+
+preface = """\
+The second patch release for `containerd` 1.2 includes important
+runtime and CRI fixes.
+
+## Runtime
+* Fix rare deadlock on FIFO creation with timeout
+
+## CRI
+
+**ACTION REQUIRED:**
+For Kubernetes support, when upgrading containerd from 1.2.0 (including rc releases)
+to 1.2.1+, a node reboot is recommended to avoid a known deadlock in 1.2.0.
+See [containerd/cri#1018](https://github.com/containerd/cri/issues/1018)
+
+* Fix a bug that a container can't be stopped or inspected when its corresponding image is deleted
+* Fix a bug that the cri plugin handles containerd events outside of `k8s.io` namespace"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
+
+[rename_deps]
