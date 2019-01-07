@@ -212,11 +212,6 @@ See [PLUGINS.md](PLUGINS.md) for how to create plugins
 Please see [RELEASES.md](RELEASES.md) for details on versioning and stability
 of containerd components.
 
-### Development reports.
-
-Weekly summary on the progress and what is being worked on.
-https://github.com/containerd/containerd/tree/master/reports
-
 ### Communication
 
 For async communication and long running discussions please use issues and pull requests on the github repo.
@@ -226,6 +221,10 @@ For sync communication we have a community slack with a #containerd channel that
 
 **Slack:** Catch us in the #containerd and #containerd-dev channels on dockercommunity.slack.com.
 [Click here for an invite to docker community slack.](https://join.slack.com/t/dockercommunity/shared_invite/enQtNDY4MDc1Mzc0MzIwLTgxZDBlMmM4ZGEyNDc1N2FkMzlhODJkYmE1YTVkYjM1MDE3ZjAwZjBkOGFlOTJkZjRmZGYzNjYyY2M3ZTUxYzQ)
+
+### Security audit
+
+A third party security audit was performed by Cure53 in 4Q2018; the [full report](docs/SECURITY_AUDIT.pdf) is available in our docs/ directory.
 
 ### Reporting security issues
 
