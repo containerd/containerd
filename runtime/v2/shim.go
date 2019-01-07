@@ -112,7 +112,7 @@ func (s *shim) Shutdown(ctx context.Context) error {
 	_, err := s.task.Shutdown(ctx, &task.ShutdownRequest{
 		ID: s.ID(),
 	})
-	if err != nil && err != ttrpc.ErrClosed {
+	if err != nil && errors.Cause(err) != ttrpc.ErrClosed {
 		return errdefs.FromGRPC(err)
 	}
 	return nil
