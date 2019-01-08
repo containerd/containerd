@@ -23,6 +23,14 @@ import (
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
+func TestRunPodSandboxWithoutMetadata(t *testing.T) {
+	sbConfig := &runtime.PodSandboxConfig{}
+	_, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
+	require.Error(t, err)
+	_, err = runtimeService.Status()
+	require.NoError(t, err)
+}
+
 func TestCreateContainerWithoutMetadata(t *testing.T) {
 	sbConfig := PodSandboxConfig("sandbox", "container-create")
 	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
