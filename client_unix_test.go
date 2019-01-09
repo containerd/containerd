@@ -20,6 +20,9 @@ package containerd
 
 import (
 	"runtime"
+	"testing"
+
+	"github.com/containerd/containerd/platforms"
 )
 
 const (
@@ -46,5 +49,22 @@ func init() {
 		testImage = "docker.io/s390x/alpine:latest"
 	default:
 		testImage = "docker.io/library/alpine:latest"
+	}
+}
+
+func TestImagePullSchema1WithEmptyLayers(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	ctx, cancel := testContext(t)
+	defer cancel()
+
+	schema1TestImageWithEmptyLayers := "gcr.io/google-containers/busybox@sha256:d8d3bc2c183ed2f9f10e7258f84971202325ee6011ba137112e01e30f206de67"
+	_, err = client.Pull(ctx, schema1TestImageWithEmptyLayers, WithPlatform(platforms.DefaultString()), WithSchema1Conversion, WithPullUnpack)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
