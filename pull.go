@@ -32,7 +32,7 @@ import (
 
 // Pull downloads the provided content into containerd's content store
 // and returns a platform specific image object
-func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image, error) {
+func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Image, retErr error) {
 	pullCtx := defaultRemoteContext()
 	for _, o := range opts {
 		if err := o(c, pullCtx); err != nil {
@@ -61,6 +61,30 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 	}
 	defer done(ctx)
 
+	var unpacks int32
+	if pullCtx.Unpack {
+		// unpacker only supports schema 2 image, for schema 1 this is noop.
+		u, err := c.newUnpacker(ctx, pullCtx)
+		if err != nil {
+			return nil, errors.Wrap(err, "create unpacker")
+		}
+		unpackWrapper, eg := u.handlerWrapper(ctx, &unpacks)
+		defer func() {
+			if err := eg.Wait(); err != nil {
+				if retErr == nil {
+					retErr = errors.Wrap(err, "unpack")
+				}
+			}
+		}()
+		wrapper := pullCtx.HandlerWrapper
+		pullCtx.HandlerWrapper = func(h images.Handler) images.Handler {
+			if wrapper == nil {
+				return unpackWrapper(h)
+			}
+			return wrapper(unpackWrapper(h))
+		}
+	}
+
 	img, err := c.fetch(ctx, pullCtx, ref, 1)
 	if err != nil {
 		return nil, err
@@ -69,8 +93,12 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (Image
 	i := NewImageWithPlatform(c, img, pullCtx.PlatformMatcher)
 
 	if pullCtx.Unpack {
-		if err := i.Unpack(ctx, pullCtx.Snapshotter, pullCtx.UnpackOpts...); err != nil {
-			return nil, errors.Wrapf(err, "failed to unpack image on snapshotter %s", pullCtx.Snapshotter)
+		if unpacks == 0 {
+			// Try to unpack is none is done previously.
+			// This is at least required for schema 1 image.
+			if err := i.Unpack(ctx, pullCtx.Snapshotter, pullCtx.UnpackOpts...); err != nil {
+				return nil, errors.Wrapf(err, "failed to unpack image on snapshotter %s", pullCtx.Snapshotter)
+			}
 		}
 	}
 
