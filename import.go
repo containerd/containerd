@@ -65,7 +65,6 @@ func WithIndexName(name string) ImportOpt {
 }
 
 // Import imports an image from a Tar stream using reader.
-// Caller needs to specify importer. Future version may use oci.v1 as the default.
 // Note that unreferrenced blobs may be imported to the content store as well.
 func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt) ([]images.Image, error) {
 	var iopts importOpts

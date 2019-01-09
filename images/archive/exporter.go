@@ -14,13 +14,14 @@
    limitations under the License.
 */
 
-package oci
+package archive
 
 import (
 	"archive/tar"
 	"context"
 	"encoding/json"
 	"io"
+	"path"
 	"sort"
 
 	"github.com/containerd/containerd/content"
@@ -30,23 +31,29 @@ import (
 	"github.com/pkg/errors"
 )
 
-// V1Exporter implements OCI Image Spec v1.
+// Export exports an image tarball into writer.
+// The out tarball conforms to OCI Image Format Specification.
+//
 // It is up to caller to put "org.opencontainers.image.ref.name" annotation to desc.
 //
-// TODO(AkihiroSuda): add V1Exporter{TranslateMediaTypes: true} that transforms media types,
-//                    e.g. application/vnd.docker.image.rootfs.diff.tar.gzip
-//                         -> application/vnd.oci.image.layer.v1.tar+gzip
-type V1Exporter struct {
-}
-
-// Export implements Exporter.
-func (oe *V1Exporter) Export(ctx context.Context, store content.Provider, desc ocispec.Descriptor, writer io.Writer) error {
+// When dockerName is non-empty, the output tarball becomes also compatible with
+// Docker Combined Image JSON + Filesystem Changeset Format v1.1
+// https://github.com/moby/moby/blob/master/image/spec/v1.1.md#combined-image-json--filesystem-changeset-format
+func Export(ctx context.Context, store content.Provider, desc ocispec.Descriptor, dockerName string, writer io.Writer) error {
 	tw := tar.NewWriter(writer)
 	defer tw.Close()
 
 	records := []tarRecord{
 		ociLayoutFile(""),
 		ociIndexRecord(desc),
+	}
+
+	if dockerName != "" {
+		dockerManifest, err := dockerManifestRecord(ctx, store, desc, dockerName)
+		if err != nil {
+			return err
+		}
+		records = append(records, *dockerManifest)
 	}
 
 	algorithms := map[string]struct{}{}
@@ -80,6 +87,57 @@ func (oe *V1Exporter) Export(ctx context.Context, store content.Provider, desc o
 type tarRecord struct {
 	Header *tar.Header
 	CopyTo func(context.Context, io.Writer) (int64, error)
+}
+
+func dockerManifestRecord(ctx context.Context, provider content.Provider, desc ocispec.Descriptor, name string) (*tarRecord, error) {
+	switch desc.MediaType {
+	case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+		p, err := content.ReadBlob(ctx, provider, desc)
+		if err != nil {
+			return nil, err
+		}
+		var manifest ocispec.Manifest
+		if err := json.Unmarshal(p, &manifest); err != nil {
+			return nil, err
+		}
+		type mfstItem struct {
+			Config   string
+			RepoTags []string
+			Layers   []string
+		}
+		item := mfstItem{
+			Config: path.Join("blobs", manifest.Config.Digest.Algorithm().String(), manifest.Config.Digest.Hex()),
+		}
+
+		for _, l := range manifest.Layers {
+			item.Layers = append(item.Layers, path.Join("blobs", l.Digest.Algorithm().String(), l.Digest.Hex()))
+		}
+
+		if name != "" {
+			item.RepoTags = append(item.RepoTags, name)
+		}
+
+		dt, err := json.Marshal([]mfstItem{item})
+		if err != nil {
+			return nil, err
+		}
+
+		return &tarRecord{
+			Header: &tar.Header{
+				Name:     "manifest.json",
+				Mode:     0444,
+				Size:     int64(len(dt)),
+				Typeflag: tar.TypeReg,
+			},
+			CopyTo: func(ctx context.Context, w io.Writer) (int64, error) {
+				n, err := w.Write(dt)
+				return int64(n), err
+			},
+		}, nil
+	default:
+		return nil, errors.Errorf("%v not supported for Docker exporter", desc.MediaType)
+	}
+
 }
 
 func blobRecord(cs content.Provider, desc ocispec.Descriptor) tarRecord {

@@ -20,8 +20,10 @@ import (
 	"io"
 	"os"
 
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	oci "github.com/containerd/containerd/images/oci"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/reference"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -34,7 +36,9 @@ var exportCommand = cli.Command{
 	Usage:     "export an image",
 	ArgsUsage: "[flags] <out> <image>",
 	Description: `Export an image to a tar stream.
-Currently, only OCI format is supported.
+The out tarball conforms to OCI Image Format Specification.
+
+When --docker-name is specified, the output tarball becomes also compatible with "docker load"
 `,
 	Flags: []cli.Flag{
 		// TODO(AkihiroSuda): make this map[string]string as in moby/moby#33355?
@@ -51,6 +55,10 @@ Currently, only OCI format is supported.
 			Name:  "manifest-type",
 			Usage: "media type of manifest digest",
 			Value: ocispec.MediaTypeImageManifest,
+		},
+		cli.StringFlag{
+			Name:  "docker-name",
+			Usage: "docker manifest name, e.g. foo/bar:baz",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -79,6 +87,14 @@ Currently, only OCI format is supported.
 				return errors.Wrap(err, "unable to resolve image to manifest")
 			}
 			desc = img.Target
+			if context.String("docker-name") != "" {
+				if desc.MediaType == images.MediaTypeDockerSchema2ManifestList {
+					desc, err = images.ManifestDescriptor(ctx, client.ContentStore(), desc, platforms.Default())
+					if err != nil {
+						return errors.Wrapf(err, "unable to get platform manifest from manifest list %s (%s)", desc.Digest, desc.MediaType)
+					}
+				}
+			}
 		}
 
 		if desc.Annotations == nil {
@@ -101,7 +117,11 @@ Currently, only OCI format is supported.
 				return nil
 			}
 		}
-		r, err := client.Export(ctx, &oci.V1Exporter{}, desc)
+		var opts []containerd.ExportOpt
+		if dockerName := context.String("docker-name"); dockerName != "" {
+			opts = append(opts, containerd.WithDockerManifest(dockerName))
+		}
+		r, err := client.Export(ctx, desc, opts...)
 		if err != nil {
 			return err
 		}
