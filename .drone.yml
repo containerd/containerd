@@ -1,0 +1,13 @@
+kind: pipeline
+name: drone-containerd
+
+workspace:
+  base: /go
+  path: src/github.com/vielmetti/containerd
+  
+steps:
+- name: test
+  image: golang:1.11
+  commands:
+    - go get
+    - go test
