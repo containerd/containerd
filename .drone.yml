@@ -11,3 +11,9 @@ steps:
   commands:
     - go get
     - go test
+- name: staticcheck
+  image: golang:1.11
+  commands:
+    - go get honnef.co/go/tools/cmd/staticcheck
+    - go get
+    - staticcheck ./...
