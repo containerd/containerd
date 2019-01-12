@@ -90,6 +90,8 @@ type Config struct {
 	Runtime string `toml:"runtime"`
 	// RuntimeRoot is the path that shall be used by the OCI runtime for its data
 	RuntimeRoot string `toml:"runtime_root"`
+	// ContainerdBinary is the path to the containerd binary
+	ContainerdBinary string `toml:"containerd_binary"`
 	// NoShim calls runc directly from within the pkg
 	NoShim bool `toml:"no_shim"`
 	// Debug enable debug on the shim

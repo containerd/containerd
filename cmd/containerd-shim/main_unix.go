@@ -146,12 +146,13 @@ func executeShim() error {
 	}
 	sv, err := shim.NewService(
 		shim.Config{
-			Path:          path,
-			Namespace:     namespaceFlag,
-			WorkDir:       workdirFlag,
-			Criu:          criuFlag,
-			SystemdCgroup: systemdCgroupFlag,
-			RuntimeRoot:   runtimeRootFlag,
+			Path:             path,
+			Namespace:        namespaceFlag,
+			WorkDir:          workdirFlag,
+			Criu:             criuFlag,
+			SystemdCgroup:    systemdCgroupFlag,
+			RuntimeRoot:      runtimeRootFlag,
+			ContainerdBinary: containerdBinaryFlag,
 		},
 		&remoteEventsPublisher{address: addressFlag},
 	)

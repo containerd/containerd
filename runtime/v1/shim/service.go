@@ -62,12 +62,13 @@ var (
 
 // Config contains shim specific configuration
 type Config struct {
-	Path          string
-	Namespace     string
-	WorkDir       string
-	Criu          string
-	RuntimeRoot   string
-	SystemdCgroup bool
+	Path             string
+	Namespace        string
+	WorkDir          string
+	Criu             string
+	RuntimeRoot      string
+	ContainerdBinary string
+	SystemdCgroup    bool
 }
 
 // NewService returns a new shim service that can be used via GRPC

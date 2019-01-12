@@ -129,17 +129,21 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 }
 
 func newCommand(binary, daemonAddress string, debug bool, config shim.Config, socket *os.File, stdout, stderr io.Writer) (*exec.Cmd, error) {
-	selfExe, err := os.Executable()
-	if err != nil {
-		return nil, err
-	}
 	args := []string{
 		"-namespace", config.Namespace,
 		"-workdir", config.WorkDir,
 		"-address", daemonAddress,
-		"-containerd-binary", selfExe,
 	}
 
+	if config.ContainerdBinary != "" {
+		args = append(args, "-containerd-binary", config.ContainerdBinary)
+	} else {
+		selfExe, err := os.Executable()
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, "-containerd-binary", selfExe)
+	}
 	if config.Criu != "" {
 		args = append(args, "-criu-path", config.Criu)
 	}

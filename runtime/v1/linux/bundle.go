@@ -145,12 +145,13 @@ func (b *bundle) shimConfig(namespace string, c *Config, runcOptions *runctypes.
 		}
 	}
 	return shim.Config{
-		Path:          b.path,
-		WorkDir:       b.workDir,
-		Namespace:     namespace,
-		Criu:          criuPath,
-		RuntimeRoot:   runtimeRoot,
-		SystemdCgroup: systemdCgroup,
+		Path:             b.path,
+		WorkDir:          b.workDir,
+		Namespace:        namespace,
+		Criu:             criuPath,
+		RuntimeRoot:      runtimeRoot,
+		SystemdCgroup:    systemdCgroup,
+		ContainerdBinary: c.ContainerdBinary,
 	}
 }
 
