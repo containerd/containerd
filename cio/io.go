@@ -216,6 +216,10 @@ type pipes struct {
 	Stderr io.ReadCloser
 }
 
+func (p *pipes) closers() []io.Closer {
+	return []io.Closer{p.Stdin, p.Stdout, p.Stderr}
+}
+
 // DirectIO allows task IO to be handled externally by the caller
 type DirectIO struct {
 	pipes
