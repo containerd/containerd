@@ -37,6 +37,7 @@ import (
 
 	winio "github.com/Microsoft/go-winio"
 	"github.com/Microsoft/hcsshim/pkg/go-runhcs"
+	eventstypes "github.com/containerd/containerd/api/events"
 	containerd_types "github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
@@ -44,6 +45,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/v2/runhcs/options"
 	"github.com/containerd/containerd/runtime/v2/shim"
 	taskAPI "github.com/containerd/containerd/runtime/v2/task"
@@ -593,6 +595,22 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (*ta
 	}
 	s.processes[r.ID] = process
 
+	s.publisher.Publish(ctx,
+		runtime.TaskCreateEventTopic,
+		&eventstypes.TaskCreate{
+			ContainerID: process.id,
+			Bundle:      process.bundle,
+			Rootfs:      r.Rootfs,
+			IO: &eventstypes.TaskIO{
+				Stdin:    r.Stdin,
+				Stdout:   r.Stdout,
+				Stderr:   r.Stderr,
+				Terminal: r.Terminal,
+			},
+			Checkpoint: "",
+			Pid:        uint32(pid),
+		})
+
 	return &taskAPI.CreateTaskResponse{
 		Pid: uint32(pid),
 	}, nil
@@ -711,9 +729,29 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 			time.Sleep(1 * time.Second)
 		}
 	}
-	stat := p.stat()
+
+	pid := p.stat().pid
+	if r.ExecID != "" {
+		s.publisher.Publish(ctx,
+			runtime.TaskExecStartedEventTopic,
+			&eventstypes.TaskExecStarted{
+				ContainerID: p.cid,
+				ExecID:      p.id,
+				Pid:         pid,
+			})
+	} else {
+		s.publisher.Publish(ctx,
+			runtime.TaskStartEventTopic,
+			&eventstypes.TaskStart{
+				ContainerID: p.id,
+				Pid:         pid,
+			})
+	}
+
+	p.startedWg.Done()
+
 	return &taskAPI.StartResponse{
-		Pid: stat.pid,
+		Pid: pid,
 	}, nil
 }
 
@@ -750,6 +788,14 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAP
 	s.mu.Lock()
 	delete(s.processes, p.id)
 	s.mu.Unlock()
+
+	s.publisher.Publish(ctx, runtime.TaskDeleteEventTopic, &eventstypes.TaskDelete{
+		ContainerID: p.id,
+		Pid:         exit.pid,
+		ExitStatus:  exit.exitStatus,
+		ExitedAt:    exit.exitedAt,
+	})
+
 	return &taskAPI.DeleteResponse{
 		ExitedAt:   exit.exitedAt,
 		ExitStatus: exit.exitStatus,
@@ -780,6 +826,10 @@ func (s *service) Pause(ctx context.Context, r *taskAPI.PauseRequest) (*ptypes.E
 		return nil, err
 	}
 
+	s.publisher.Publish(ctx, runtime.TaskPausedEventTopic, &eventstypes.TaskPaused{
+		r.ID,
+	})
+
 	return empty, nil
 }
 
@@ -798,6 +848,10 @@ func (s *service) Resume(ctx context.Context, r *taskAPI.ResumeRequest) (*ptypes
 	if err = rhcs.Resume(ctx, p.id); err != nil {
 		return nil, err
 	}
+
+	s.publisher.Publish(ctx, runtime.TaskResumedEventTopic, &eventstypes.TaskResumed{
+		r.ID,
+	})
 
 	return empty, nil
 }
@@ -909,6 +963,13 @@ func (s *service) Exec(ctx context.Context, r *taskAPI.ExecProcessRequest) (*pty
 		return nil, err
 	}
 	s.processes[r.ExecID] = process
+
+	s.publisher.Publish(ctx,
+		runtime.TaskExecAddedEventTopic,
+		&eventstypes.TaskExecAdded{
+			ContainerID: process.cid,
+			ExecID:      process.id,
+		})
 
 	return empty, nil
 }
