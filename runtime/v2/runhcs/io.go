@@ -145,7 +145,7 @@ func (pr *pipeRelay) wait() {
 // closeIO closes stdin to unblock an waiters
 func (pr *pipeRelay) closeIO() {
 	if pr.ps.stdin != nil {
-		pr.ps.Close()
+		pr.ps.stdin.Close()
 		pr.io.Stdin().Close()
 	}
 }
