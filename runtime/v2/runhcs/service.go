@@ -325,7 +325,7 @@ func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.
 	return &taskAPI.StateResponse{
 		ID:         p.id,
 		Bundle:     p.bundle,
-		Pid:        p.pid,
+		Pid:        pe.pid,
 		Status:     status,
 		Stdin:      p.stdin,
 		Stdout:     p.stdout,
@@ -667,7 +667,6 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to find exec process pid")
 		}
-		p.pid = uint32(pid)
 		go waitForProcess(ctx, p, proc, s)
 	} else {
 		if err := rhcs.Start(ctx, p.id); err != nil {
@@ -697,8 +696,9 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 			time.Sleep(1 * time.Second)
 		}
 	}
+	stat := p.stat()
 	return &taskAPI.StartResponse{
-		Pid: p.pid,
+		Pid: stat.pid,
 	}, nil
 }
 
@@ -738,7 +738,7 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAP
 	return &taskAPI.DeleteResponse{
 		ExitedAt:   exit.exitedAt,
 		ExitStatus: exit.exitStatus,
-		Pid:        p.pid,
+		Pid:        exit.pid,
 	}, nil
 }
 
@@ -908,7 +908,7 @@ func (s *service) ResizePty(ctx context.Context, r *taskAPI.ResizePtyRequest) (*
 		return nil, err
 	}
 
-	pid := int(p.pid)
+	pid := int(p.stat().pid)
 	opts := runhcs.ResizeTTYOpts{
 		Pid: &pid,
 	}
@@ -967,9 +967,15 @@ func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.
 func (s *service) Connect(ctx context.Context, r *taskAPI.ConnectRequest) (*taskAPI.ConnectResponse, error) {
 	log.G(ctx).Debugf("Connect: %s", r.ID)
 
+	var taskpid uint32
+	p, _ := s.getProcess(r.ID, "")
+	if p != nil {
+		taskpid = p.stat().pid
+	}
+
 	return &taskAPI.ConnectResponse{
 		ShimPid: uint32(os.Getpid()),
-		TaskPid: s.processes[s.id].pid,
+		TaskPid: taskpid,
 		Version: runhcsShimVersion,
 	}, nil
 }
