@@ -337,7 +337,25 @@ func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.
 }
 
 func writeMountsToConfig(bundle string, mounts []*containerd_types.Mount) error {
-	if len(mounts) != 1 {
+	cf, err := os.OpenFile(path.Join(bundle, "config.json"), os.O_RDWR, 0)
+	if err != nil {
+		return errors.Wrap(err, "bundle does not contain config.json")
+	}
+	defer cf.Close()
+	var spec oci.Spec
+	if err := json.NewDecoder(cf).Decode(&spec); err != nil {
+		return errors.Wrap(err, "bundle config.json is not valid oci spec")
+	}
+
+	if len(mounts) == 0 {
+		// If no mounts are passed via the snapshotter its the callers full
+		// responsibility to manage the storage. Just move on without affecting
+		// the config.json at all.
+		if spec.Windows == nil || len(spec.Windows.LayerFolders) < 2 {
+			return errors.New("no Windows.LayerFolders found in oci spec")
+		}
+		return nil
+	} else if len(mounts) != 1 {
 		return errors.New("Rootfs does not contain exactly 1 mount for the root file system")
 	}
 
@@ -367,29 +385,19 @@ func writeMountsToConfig(bundle string, mounts []*containerd_types.Mount) error 
 			opp := len(parentLayerPaths) - 1 - i
 			parentLayerPaths[i], parentLayerPaths[opp] = parentLayerPaths[opp], parentLayerPaths[i]
 		}
-	}
 
-	cf, err := os.OpenFile(path.Join(bundle, "config.json"), os.O_RDWR, 0)
-	if err != nil {
-		return errors.Wrap(err, "bundle does not contain config.json")
-	}
-	defer cf.Close()
-	var spec oci.Spec
-	if err := json.NewDecoder(cf).Decode(&spec); err != nil {
-		return errors.Wrap(err, "bundle config.json is not valid oci spec")
-	}
-	if err := cf.Truncate(0); err != nil {
-		return errors.Wrap(err, "failed to truncate config.json")
-	}
-	if _, err := cf.Seek(0, 0); err != nil {
-		return errors.Wrap(err, "failed to seek to 0 in config.json")
-	}
-
-	// If we are creating LCOW make sure that spec.Windows is filled out before
-	// appending layer folders.
-	if m.Type == "lcow-layer" && spec.Windows == nil {
-		spec.Windows = &oci.Windows{
-			HyperV: &oci.WindowsHyperV{},
+		// If we are creating LCOW make sure that spec.Windows is filled out before
+		// appending layer folders.
+		if spec.Windows == nil {
+			spec.Windows = &oci.Windows{}
+		}
+		if spec.Windows.HyperV == nil {
+			spec.Windows.HyperV = &oci.WindowsHyperV{}
+		}
+	} else if spec.Windows.HyperV == nil {
+		// This is a Windows Argon make sure that we have a Root filled in.
+		if spec.Root == nil {
+			spec.Root = &oci.Root{}
 		}
 	}
 
@@ -397,6 +405,13 @@ func writeMountsToConfig(bundle string, mounts []*containerd_types.Mount) error 
 	spec.Windows.LayerFolders = append(spec.Windows.LayerFolders, parentLayerPaths...)
 	// Append the scratch
 	spec.Windows.LayerFolders = append(spec.Windows.LayerFolders, m.Source)
+
+	if err := cf.Truncate(0); err != nil {
+		return errors.Wrap(err, "failed to truncate config.json")
+	}
+	if _, err := cf.Seek(0, 0); err != nil {
+		return errors.Wrap(err, "failed to seek to 0 in config.json")
+	}
 
 	if err := json.NewEncoder(cf).Encode(spec); err != nil {
 		return errors.Wrap(err, "failed to write Mounts into config.json")
