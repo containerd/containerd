@@ -38,8 +38,16 @@ import (
 	"gotest.tools/assert"
 )
 
+const (
+	emptyDigest = "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+)
+
+// StoreInitFn initializes content store with given root and returns a function for
+// destroying the content store
+type StoreInitFn func(ctx context.Context, root string) (context.Context, content.Store, func() error, error)
+
 // ContentSuite runs a test suite on the content store given a factory function.
-func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, root string) (context.Context, content.Store, func() error, error)) {
+func ContentSuite(t *testing.T, name string, storeFn StoreInitFn) {
 	t.Run("Writer", makeTest(t, name, storeFn, checkContentStoreWriter))
 	t.Run("UpdateStatus", makeTest(t, name, storeFn, checkUpdateStatus))
 	t.Run("CommitExists", makeTest(t, name, storeFn, checkCommitExists))
@@ -52,10 +60,18 @@ func ContentSuite(t *testing.T, name string, storeFn func(ctx context.Context, r
 	t.Run("SmallBlob", makeTest(t, name, storeFn, checkSmallBlob))
 	t.Run("Labels", makeTest(t, name, storeFn, checkLabels))
 
+	t.Run("CommitErrorState", makeTest(t, name, storeFn, checkCommitErrorState))
+}
+
+// ContentCrossNSSharedSuite runs a test suite under shared content policy
+func ContentCrossNSSharedSuite(t *testing.T, name string, storeFn StoreInitFn) {
 	t.Run("CrossNamespaceAppend", makeTest(t, name, storeFn, checkCrossNSAppend))
 	t.Run("CrossNamespaceShare", makeTest(t, name, storeFn, checkCrossNSShare))
+}
 
-	t.Run("CommitErrorState", makeTest(t, name, storeFn, checkCommitErrorState))
+// ContentCrossNSIsolatedSuite runs a test suite under isolated content policy
+func ContentCrossNSIsolatedSuite(t *testing.T, name string, storeFn StoreInitFn) {
+	t.Run("CrossNamespaceIsolate", makeTest(t, name, storeFn, checkCrossNSIsolate))
 }
 
 // ContextWrapper is used to decorate new context used inside the test
@@ -890,6 +906,38 @@ func checkCrossNSAppend(ctx context.Context, t *testing.T, cs content.Store) {
 
 }
 
+func checkCrossNSIsolate(ctx context.Context, t *testing.T, cs content.Store) {
+	wrap, ok := ctx.Value(wrapperKey{}).(ContextWrapper)
+	if !ok {
+		t.Skip("multiple contexts not supported")
+	}
+
+	var size int64 = 1000
+	b, d := createContent(size)
+	ref := fmt.Sprintf("ref-%d", size)
+	t1 := time.Now()
+
+	if err := content.WriteBlob(ctx, cs, ref, bytes.NewReader(b), ocispec.Descriptor{Size: size, Digest: d}); err != nil {
+		t.Fatal(err)
+	}
+	t2 := time.Now()
+
+	ctx2, done, err := wrap(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer done(ctx2)
+
+	t3 := time.Now()
+	w, err := cs.Writer(ctx2, content.WithRef(ref), content.WithDescriptor(ocispec.Descriptor{Size: size, Digest: d}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t4 := time.Now()
+
+	checkNewlyCreated(t, w, t1, t2, t3, t4)
+}
+
 func checkStatus(t *testing.T, w content.Writer, expected content.Status, d digest.Digest, preStart, postStart, preUpdate, postUpdate time.Time) {
 	t.Helper()
 	st, err := w.Status()
@@ -930,6 +978,29 @@ func checkStatus(t *testing.T, w content.Writer, expected content.Status, d dige
 		t.Logf("compare update %v against (%v, %v)", st.UpdatedAt, preUpdate, postUpdate)
 		if st.UpdatedAt.After(postUpdate) || st.UpdatedAt.Before(preUpdate) {
 			t.Fatalf("unexpected updated at time %s, expected between %s and %s", st.UpdatedAt, preUpdate, postUpdate)
+		}
+	}
+}
+
+func checkNewlyCreated(t *testing.T, w content.Writer, preStart, postStart, preUpdate, postUpdate time.Time) {
+	t.Helper()
+	st, err := w.Status()
+	if err != nil {
+		t.Fatalf("failed to get status: %v", err)
+	}
+
+	wd := w.Digest()
+	if wd != emptyDigest {
+		t.Fatalf("unexpected digest %v, expected %v", wd, emptyDigest)
+	}
+
+	if st.Offset != 0 {
+		t.Fatalf("unexpected offset %v", st.Offset)
+	}
+
+	if runtime.GOOS != "windows" {
+		if st.StartedAt.After(postUpdate) || st.StartedAt.Before(postStart) {
+			t.Fatalf("unexpected started at time %s, expected between %s and %s", st.StartedAt, postStart, postUpdate)
 		}
 	}
 }

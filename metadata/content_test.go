@@ -36,7 +36,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-func createContentStore(ctx context.Context, root string) (context.Context, content.Store, func() error, error) {
+func createContentStore(ctx context.Context, root string, opts ...DBOpt) (context.Context, content.Store, func() error, error) {
 	// TODO: Use mocked or in-memory store
 	cs, err := local.NewStore(root)
 	if err != nil {
@@ -60,13 +60,24 @@ func createContentStore(ctx context.Context, root string) (context.Context, cont
 	}
 	ctx = testsuite.SetContextWrapper(ctx, wrap)
 
-	return ctx, NewDB(db, cs, nil).ContentStore(), func() error {
+	return ctx, NewDB(db, cs, nil, opts...).ContentStore(), func() error {
 		return db.Close()
 	}, nil
 }
 
+func createContentStoreWithPolicy(opts ...DBOpt) testsuite.StoreInitFn {
+	return func(ctx context.Context, root string) (context.Context, content.Store, func() error, error) {
+		return createContentStore(ctx, root, opts...)
+	}
+}
+
 func TestContent(t *testing.T) {
-	testsuite.ContentSuite(t, "metadata", createContentStore)
+	testsuite.ContentSuite(t, "metadata", createContentStoreWithPolicy())
+	testsuite.ContentCrossNSSharedSuite(t, "metadata", createContentStoreWithPolicy())
+	testsuite.ContentCrossNSIsolatedSuite(
+		t, "metadata", createContentStoreWithPolicy([]DBOpt{
+			WithPolicyIsolated,
+		}...))
 }
 
 func TestContentLeased(t *testing.T) {
