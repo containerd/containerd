@@ -21,7 +21,6 @@ package runhcs
 import (
 	"context"
 	"os"
-	"os/exec"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -69,15 +68,14 @@ func waitForProcess(ctx context.Context, process *process, p *os.Process, s *ser
 	})
 
 	var status int
-	_, eerr := p.Wait()
+	processState, eerr := p.Wait()
 	if eerr != nil {
 		status = 255
-		if exitErr, ok := eerr.(*exec.ExitError); ok {
-			if ws, ok := exitErr.Sys().(syscall.WaitStatus); ok {
-				status = ws.ExitStatus()
-			}
-		}
+		p.Kill()
+	} else {
+		status = processState.Sys().(syscall.WaitStatus).ExitStatus()
 	}
+
 	now := time.Now()
 	process.exit.Store(&processExit{
 		pid:        pid,
