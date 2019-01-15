@@ -93,9 +93,9 @@ The current state is available in the following table:
 | [0.0](https://github.com/containerd/containerd/releases/tag/0.0.5)  | End of Life | Dec 4, 2015  | - |
 | [0.1](https://github.com/containerd/containerd/releases/tag/v0.1.0) | End of Life | Mar 21, 2016 | - |
 | [0.2](https://github.com/containerd/containerd/tree/v0.2.x)         | End of Life | Apr 21, 2016      | December 5, 2017 |
-| [1.0](https://github.com/containerd/containerd/releases/tag/v1.0.0) | Active   | December 5, 2017  | December 5, 2018 |
-| [1.1](https://github.com/containerd/containerd/releases/tag/v1.1.0) | Active   | April 23, 2018  | max(April 23, 2019, release of 1.2.0, Kubernetes 1.10 EOL) |
-| [1.2](https://github.com/containerd/containerd/releases/tag/v1.2.0) | Active   | October 24, 2018 | max(October 24, 2019, release of 1.3.0) |
+| [1.0](https://github.com/containerd/containerd/releases/tag/v1.0.3) | End of Life | December 5, 2017  | December 5, 2018 |
+| [1.1](https://github.com/containerd/containerd/releases/tag/v1.1.5) | Active   | April 23, 2018  | max(April 23, 2019, Kubernetes 1.10 EOL) |
+| [1.2](https://github.com/containerd/containerd/releases/tag/v1.2.2) | Active   | October 24, 2018 | max(October 24, 2019, release of 1.3.0) |
 | [1.3](https://github.com/containerd/containerd/milestone/20)        | Next   | TBD  | max(TBD+1 year, release of 1.4.0) |
 
 Note that branches and release from before 1.0 may not follow these rules.
