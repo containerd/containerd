@@ -41,7 +41,7 @@ type V1Exporter struct {
 	AllPlatforms bool
 }
 
-// V1ExporterOpt allows to set  additional options to a newly V1Exporter
+// V1ExporterOpt allows the caller to set additional options to a new V1Exporter
 type V1ExporterOpt func(c *V1Exporter) error
 
 // DefaultV1Exporter return a default V1Exporter pointer
@@ -91,11 +91,7 @@ func (oe *V1Exporter) Export(ctx context.Context, store content.Provider, desc o
 
 	if !oe.AllPlatforms {
 		// get local default platform to fetch image manifest
-		p, err := platforms.Parse(platforms.DefaultString())
-		if err != nil {
-			return errors.Wrapf(err, "invalid platform %s", platforms.DefaultString())
-		}
-		childrenHandler = images.FilterPlatforms(childrenHandler, platforms.Any(p))
+		childrenHandler = images.FilterPlatforms(childrenHandler, platforms.Any(platforms.DefaultSpec()))
 	}
 
 	handlers := images.Handlers(
