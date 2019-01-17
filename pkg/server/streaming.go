@@ -176,7 +176,7 @@ func handleResizing(resize <-chan remotecommand.TerminalSize, resizeFunc func(si
 
 // newTLSCert returns a self CA signed tls.certificate.
 // TODO (mikebrow): replace / rewrite this function to support using CA
-// signing of the cetificate. Requires a security plan for kubernetes regarding
+// signing of the certificate. Requires a security plan for kubernetes regarding
 // CRI connections / streaming, etc. For example, kubernetes could configure or
 // require a CA service and pass a configuration down through CRI.
 func newTLSCert() (tls.Certificate, error) {
