@@ -113,6 +113,7 @@ func handleSignals(logger *logrus.Entry, signals chan os.Signal) error {
 		for s := range signals {
 			switch s {
 			case os.Interrupt:
+				return nil
 			}
 		}
 	}
