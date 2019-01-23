@@ -201,7 +201,7 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 		return e.parent.runtimeError(err, "OCI runtime exec failed")
 	}
 	if e.stdio.Stdin != "" {
-		sc, err := fifo.OpenFifo(ctx, e.stdio.Stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
+		sc, err := fifo.OpenFifo(context.Background(), e.stdio.Stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
 		if err != nil {
 			return errors.Wrapf(err, "failed to open stdin fifo %s", e.stdio.Stdin)
 		}
@@ -210,26 +210,23 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 	}
 	var copyWaitGroup sync.WaitGroup
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 	if socket != nil {
 		console, err := socket.ReceiveMaster()
 		if err != nil {
-			cancel()
 			return errors.Wrap(err, "failed to retrieve console master")
 		}
 		if e.console, err = e.parent.Platform.CopyConsole(ctx, console, e.stdio.Stdin, e.stdio.Stdout, e.stdio.Stderr, &e.wg, &copyWaitGroup); err != nil {
-			cancel()
 			return errors.Wrap(err, "failed to start console copy")
 		}
 	} else if !e.stdio.IsNull() {
 		if err := copyPipes(ctx, e.io, e.stdio.Stdin, e.stdio.Stdout, e.stdio.Stderr, &e.wg, &copyWaitGroup); err != nil {
-			cancel()
 			return errors.Wrap(err, "failed to start io pipe copy")
 		}
 	}
 	copyWaitGroup.Wait()
 	pid, err := runc.ReadPidFile(opts.PidFile)
 	if err != nil {
-		cancel()
 		return errors.Wrap(err, "failed to retrieve OCI runtime exec pid")
 	}
 	e.pid = pid
