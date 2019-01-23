@@ -134,7 +134,7 @@ func TestContainerStart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if pid := task.Pid(); pid <= 0 {
+	if pid := task.Pid(); pid < 1 {
 		t.Errorf("invalid task pid %d", pid)
 	}
 	if err := task.Start(ctx); err != nil {
@@ -433,7 +433,7 @@ func TestContainerPids(t *testing.T) {
 	}
 
 	pid := task.Pid()
-	if pid <= 0 {
+	if pid < 1 {
 		t.Errorf("invalid task pid %d", pid)
 	}
 	processes, err := task.Pids(ctx)
@@ -783,7 +783,7 @@ func TestWaitStoppedTask(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if pid := task.Pid(); pid <= 0 {
+	if pid := task.Pid(); pid < 1 {
 		t.Errorf("invalid task pid %d", pid)
 	}
 	if err := task.Start(ctx); err != nil {

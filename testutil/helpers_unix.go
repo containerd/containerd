@@ -49,7 +49,7 @@ func RequiresRootM() {
 		fmt.Fprintln(os.Stderr, "skipping test that requires root")
 		os.Exit(0)
 	}
-	if 0 != os.Getuid() {
+	if os.Getuid() != 0 {
 		fmt.Fprintln(os.Stderr, "This test must be run as root.")
 		os.Exit(1)
 	}
