@@ -99,7 +99,7 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 	defer func() {
 		if err == nil {
 			log.G(ctx).WithFields(logrus.Fields{
-				"d":     time.Now().Sub(t1),
+				"d":     time.Since(t1),
 				"dgst":  desc.Digest,
 				"size":  desc.Size,
 				"media": desc.MediaType,
