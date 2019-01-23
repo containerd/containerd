@@ -329,7 +329,7 @@ func TestBreakouts(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			if bytes.Compare(b, content) != 0 {
+			if !bytes.Equal(b, content) {
 				return errors.Errorf("content differs: expected %v, got %v", content, b)
 			}
 			return nil
@@ -1179,7 +1179,7 @@ func fileEntry(name string, expected []byte, mode int) tarEntryValidator {
 		if hdr.Mode != int64(mode) {
 			return errors.Errorf("wrong mode %o, expected %o", hdr.Mode, mode)
 		}
-		if bytes.Compare(b, expected) != 0 {
+		if !bytes.Equal(b, expected) {
 			return errors.Errorf("different file content")
 		}
 		return nil
