@@ -75,13 +75,13 @@ func parseInfoFile(r io.Reader) ([]Info, error) {
 		if _, err := fmt.Sscanf(text, mountinfoFormat,
 			&p.ID, &p.Parent, &p.Major, &p.Minor,
 			&p.Root, &p.Mountpoint, &p.Options, &optionalFields); err != nil {
-			return nil, fmt.Errorf("Scanning '%s' failed: %s", text, err)
+			return nil, fmt.Errorf("scanning '%s' failed: %s", text, err)
 		}
 		// Safe as mountinfo encodes mountpoints with spaces as \040.
 		index := strings.Index(text, " - ")
 		postSeparatorFields := strings.Fields(text[index+3:])
 		if len(postSeparatorFields) < 3 {
-			return nil, fmt.Errorf("Error found less than 3 fields post '-' in %q", text)
+			return nil, fmt.Errorf("found less than 3 fields post '-' in %q", text)
 		}
 
 		if optionalFields != "-" {
