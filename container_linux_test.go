@@ -911,7 +911,7 @@ func TestDaemonRestartWithRunningShim(t *testing.T) {
 	}
 
 	pid := task.Pid()
-	if pid <= 0 {
+	if pid < 1 {
 		t.Fatalf("invalid task pid %d", pid)
 	}
 
@@ -1201,7 +1201,7 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 		t.Fatal(err)
 	}
 
-	if pid := task.Pid(); pid <= 0 {
+	if pid := task.Pid(); pid < 1 {
 		t.Errorf("invalid task pid %d", pid)
 	}
 	if err := task.Start(ctx); err != nil {
