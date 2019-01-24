@@ -72,7 +72,7 @@ func TestRedirectLogs(t *testing.T) {
 			maxLen: maxLen,
 			tag: []runtime.LogTag{
 				runtime.LogTagFull,
-				runtime.LogTagFull,
+				runtime.LogTagPartial,
 			},
 			content: []string{
 				"test stderr log 1",
@@ -220,6 +220,19 @@ func TestRedirectLogs(t *testing.T) {
 			content: []string{
 				strings.Repeat("a", defaultBufSize*10+10),
 				strings.Repeat("a", defaultBufSize*10+20),
+			},
+		},
+		"log length longer than buffer size with tailing \\r\\n": {
+			input:  strings.Repeat("a", defaultBufSize-1) + "\r\n" + strings.Repeat("a", defaultBufSize-1) + "\r\n",
+			stream: Stdout,
+			maxLen: -1,
+			tag: []runtime.LogTag{
+				runtime.LogTagFull,
+				runtime.LogTagFull,
+			},
+			content: []string{
+				strings.Repeat("a", defaultBufSize-1),
+				strings.Repeat("a", defaultBufSize-1),
 			},
 		},
 	} {
