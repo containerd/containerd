@@ -84,7 +84,7 @@ func TestPodHostnameEnv(t *testing.T) {
 			t.Log("Create a container to print env")
 			cnConfig := ContainerConfig(
 				containerName,
-				"busybox",
+				testImage,
 				WithCommand("env"),
 				WithLogPath(containerName),
 			)
