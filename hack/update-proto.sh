@@ -20,7 +20,7 @@ set -o nounset
 set -o pipefail
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
-API_ROOT="${ROOT}/pkg/api/v1"
+API_ROOT="${ROOT}/${API_PATH-"pkg/api/v1"}"
 
 go get k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
 if ! which protoc-gen-gogo >/dev/null; then
@@ -29,7 +29,7 @@ if ! which protoc-gen-gogo >/dev/null; then
 fi
 
 function cleanup {
-	rm -f ${API_ROOT}/api.pb.go.bak
+  rm -f ${API_ROOT}/api.pb.go.bak
 }
 
 trap cleanup EXIT
@@ -41,6 +41,6 @@ protoc \
 
 # Update boilerplate for the generated file.
 echo "$(cat hack/boilerplate/boilerplate.go.txt ${API_ROOT}/api.pb.go)" > ${API_ROOT}/api.pb.go
-sed -i".bak" "s/Copyright YEAR AUTHORS/Copyright $(date '+%Y') The containerd Authors/g" ${API_ROOT}/api.pb.go
+sed -i".bak" "s/Copyright AUTHORS/Copyright $(date '+%Y') The containerd Authors/g" ${API_ROOT}/api.pb.go
 
 gofmt -l -s -w ${API_ROOT}/api.pb.go
