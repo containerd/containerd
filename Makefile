@@ -154,7 +154,8 @@ push: $(BUILD_DIR)/$(TARBALL)
 	@BUILD_DIR=$(BUILD_DIR) TARBALL=$(TARBALL) VERSION=$(VERSION) ./hack/push.sh
 
 proto:
-	@hack/update-proto.sh
+	@API_PATH=pkg/api/v1 hack/update-proto.sh
+	@API_PATH=pkg/api/runtimeoptions/v1 hack/update-proto.sh
 
 .PHONY: install.deps
 

@@ -41,6 +41,7 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
+	runtimeoptions "github.com/containerd/cri/pkg/api/runtimeoptions/v1"
 	criconfig "github.com/containerd/cri/pkg/config"
 	"github.com/containerd/cri/pkg/store"
 	imagestore "github.com/containerd/cri/pkg/store/image"
@@ -481,8 +482,10 @@ func getRuntimeOptionsType(t string) interface{} {
 	switch t {
 	case runcRuntime:
 		return &runcoptions.Options{}
-	default:
+	case linuxRuntime:
 		return &runctypes.RuncOptions{}
+	default:
+		return &runtimeoptions.Options{}
 	}
 }
 

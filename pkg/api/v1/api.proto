@@ -1,4 +1,4 @@
-// To regenerate api.pb.go run `make proto`hack/update-generated-runtime.sh
+// To regenerate api.pb.go run `make proto`
 syntax = 'proto3';
 
 package api.v1;
