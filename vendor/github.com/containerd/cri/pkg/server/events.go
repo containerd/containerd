@@ -112,17 +112,17 @@ func convertEvent(e *gogotypes.Any) (string, interface{}, error) {
 		return "", nil, errors.Wrap(err, "failed to unmarshalany")
 	}
 
-	switch evt.(type) {
+	switch e := evt.(type) {
 	case *eventtypes.TaskExit:
-		id = evt.(*eventtypes.TaskExit).ContainerID
+		id = e.ContainerID
 	case *eventtypes.TaskOOM:
-		id = evt.(*eventtypes.TaskOOM).ContainerID
+		id = e.ContainerID
 	case *eventtypes.ImageCreate:
-		id = evt.(*eventtypes.ImageCreate).Name
+		id = e.Name
 	case *eventtypes.ImageUpdate:
-		id = evt.(*eventtypes.ImageUpdate).Name
+		id = e.Name
 	case *eventtypes.ImageDelete:
-		id = evt.(*eventtypes.ImageDelete).Name
+		id = e.Name
 	default:
 		return "", nil, errors.New("unsupported event")
 	}
@@ -200,9 +200,8 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 	ctx, cancel := context.WithTimeout(ctx, handleEventTimeout)
 	defer cancel()
 
-	switch any.(type) {
+	switch e := any.(type) {
 	case *eventtypes.TaskExit:
-		e := any.(*eventtypes.TaskExit)
 		logrus.Infof("TaskExit event %+v", e)
 		// Use ID instead of ContainerID to rule out TaskExit event for exec.
 		cntr, err := em.c.containerStore.Get(e.ID)
@@ -226,7 +225,6 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 		}
 		return nil
 	case *eventtypes.TaskOOM:
-		e := any.(*eventtypes.TaskOOM)
 		logrus.Infof("TaskOOM event %+v", e)
 		// For TaskOOM, we only care which container it belongs to.
 		cntr, err := em.c.containerStore.Get(e.ContainerID)
@@ -244,15 +242,12 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 			return errors.Wrap(err, "failed to update container status for TaskOOM event")
 		}
 	case *eventtypes.ImageCreate:
-		e := any.(*eventtypes.ImageCreate)
 		logrus.Infof("ImageCreate event %+v", e)
 		return em.c.updateImage(ctx, e.Name)
 	case *eventtypes.ImageUpdate:
-		e := any.(*eventtypes.ImageUpdate)
 		logrus.Infof("ImageUpdate event %+v", e)
 		return em.c.updateImage(ctx, e.Name)
 	case *eventtypes.ImageDelete:
-		e := any.(*eventtypes.ImageDelete)
 		logrus.Infof("ImageDelete event %+v", e)
 		return em.c.updateImage(ctx, e.Name)
 	}
