@@ -24,7 +24,6 @@ import (
 	gruntime "runtime"
 	"strings"
 
-	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/runtime"
@@ -152,13 +151,6 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 	// remove self from the runtime task list
 	// this seems dirty but it cleans up the API across runtimes, tasks, and the service
 	b.rtTasks.Delete(ctx, b.bundle.ID)
-	// shim will send the exit event
-	b.events.Publish(ctx, runtime.TaskDeleteEventTopic, &eventstypes.TaskDelete{
-		ContainerID: b.bundle.ID,
-		ExitStatus:  response.ExitStatus,
-		ExitedAt:    response.ExitedAt,
-		Pid:         response.Pid,
-	})
 	return &runtime.Exit{
 		Status:    response.ExitStatus,
 		Timestamp: response.ExitedAt,

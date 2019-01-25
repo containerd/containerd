@@ -149,8 +149,27 @@ Filesystems are provided by the containerd snapshotters.
 
 ### Events
 
-The shim MUST publish a `runtime.TaskExitEventTopic` when the container exits.
-If the shim collects Out of Memory events, it SHOULD also publish a `runtime.TaskOOMEventTopic`.
+The Runtime v2 supports an async event model. In order for the an upstream caller (such as Docker) to get these events in the correct order a Runtime v2 shim MUST implement the following events where `Compliance=MUST`. This avoids race conditions between the shim and shim client where for example a call to `Start` can signal a `TaskExitEventTopic` before even returning the results from the `Start` call. With these guarantees of a Runtime v2 shim a call to `Start` is required to have published the async event `TaskStartEventTopic` before the shim can publish the `TaskExitEventTopic`.
+
+#### Tasks
+
+| Topic | Compliance | Description |
+| ----- | ---------- | ----------- |
+| `runtime.TaskCreateEventTopic`       | MUST                                                                          | When a task is successfully created |
+| `runtime.TaskStartEventTopic`        | MUST (follow `TaskCreateEventTopic`)                                          | When a task is successfully started |
+| `runtime.TaskExitEventTopic`         | MUST (follow `TaskStartEventTopic`)                                           | When a task exits expected or unexpected |
+| `runtime.TaskDeleteEventTopic`       | MUST (follow `TaskExitEventTopic` or `TaskCreateEventTopic` if never started) | When a task is removed from a shim |
+| `runtime.TaskPausedEventTopic`       | SHOULD                                                                        | When a task is successfully paused |
+| `runtime.TaskResumedEventTopic`      | SHOULD (follow `TaskPausedEventTopic`)                                        | When a task is successfully resumed |
+| `runtime.TaskCheckpointedEventTopic` | SHOULD                                                                        | When a task is checkpointed |
+| `runtime.TaskOOMEventTopic`          | SHOULD                                                                        | If the shim collects Out of Memory events |
+
+#### Execs
+
+| Topic | Compliance | Description |
+| ----- | ---------- | ----------- |
+| `runtime.TaskExecAddedEventTopic`   | MUST (follow `TaskCreateEventTopic` )     | When an exec is successfully added |
+| `runtime.TaskExecStartedEventTopic` | MUST (follow `TaskExecStartedEventTopic`) | When an exec is successfully started |
 
 ### Other
 
