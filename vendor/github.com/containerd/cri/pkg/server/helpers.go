@@ -18,6 +18,7 @@ package server
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -40,6 +41,7 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
+	runtimeoptions "github.com/containerd/cri/pkg/api/runtimeoptions/v1"
 	criconfig "github.com/containerd/cri/pkg/config"
 	"github.com/containerd/cri/pkg/store"
 	imagestore "github.com/containerd/cri/pkg/store/image"
@@ -480,8 +482,10 @@ func getRuntimeOptionsType(t string) interface{} {
 	switch t {
 	case runcRuntime:
 		return &runcoptions.Options{}
-	default:
+	case linuxRuntime:
 		return &runctypes.RuncOptions{}
+	default:
+		return &runtimeoptions.Options{}
 	}
 }
 
@@ -495,4 +499,28 @@ func getRuntimeOptions(c containers.Container) (interface{}, error) {
 		return nil, err
 	}
 	return opts, nil
+}
+
+func getCurrentOOMScoreAdj() (int, error) {
+	b, err := ioutil.ReadFile("/proc/self/oom_score_adj")
+	if err != nil {
+		return 0, errors.Wrap(err, "could not get the daemon oom_score_adj")
+	}
+	s := strings.TrimSpace(string(b))
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, errors.Wrap(err, "could not get the daemon oom_score_adj")
+	}
+	return i, nil
+}
+
+func restrictOOMScoreAdj(preferredOOMScoreAdj int) (int, error) {
+	currentOOMScoreAdj, err := getCurrentOOMScoreAdj()
+	if err != nil {
+		return preferredOOMScoreAdj, err
+	}
+	if preferredOOMScoreAdj < currentOOMScoreAdj {
+		return currentOOMScoreAdj, nil
+	}
+	return preferredOOMScoreAdj, nil
 }

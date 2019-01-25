@@ -92,7 +92,11 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	// Reserve the container name to avoid concurrent `CreateContainer` request creating
 	// the same container.
 	id := util.GenerateID()
-	name := makeContainerName(config.GetMetadata(), sandboxConfig.GetMetadata())
+	metadata := config.GetMetadata()
+	if metadata == nil {
+		return nil, errors.New("container config must include metadata")
+	}
+	name := makeContainerName(metadata, sandboxConfig.GetMetadata())
 	logrus.Debugf("Generated id %q for container %q", id, name)
 	if err = c.containerNameIndex.Reserve(name, id); err != nil {
 		return nil, errors.Wrapf(err, "failed to reserve container name %q", name)
@@ -417,12 +421,18 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 
 	g.SetRootReadonly(securityContext.GetReadonlyRootfs())
 
-	setOCILinuxResource(&g, config.GetLinux().GetResources())
-
-	if sandboxConfig.GetLinux().GetCgroupParent() != "" {
-		cgroupsPath := getCgroupsPath(sandboxConfig.GetLinux().GetCgroupParent(), id,
-			c.config.SystemdCgroup)
-		g.SetLinuxCgroupsPath(cgroupsPath)
+	if c.config.DisableCgroup {
+		g.SetLinuxCgroupsPath("")
+	} else {
+		setOCILinuxResourceCgroup(&g, config.GetLinux().GetResources())
+		if sandboxConfig.GetLinux().GetCgroupParent() != "" {
+			cgroupsPath := getCgroupsPath(sandboxConfig.GetLinux().GetCgroupParent(), id,
+				c.config.SystemdCgroup)
+			g.SetLinuxCgroupsPath(cgroupsPath)
+		}
+	}
+	if err := setOCILinuxResourceOOMScoreAdj(&g, config.GetLinux().GetResources(), c.config.RestrictOOMScoreAdj); err != nil {
+		return nil, err
 	}
 
 	// Set namespaces, share namespace with sandbox container.
@@ -744,8 +754,8 @@ func setOCIBindMountsPrivileged(g *generate.Generator) {
 	spec.Linux.MaskedPaths = nil
 }
 
-// setOCILinuxResource set container resource limit.
-func setOCILinuxResource(g *generate.Generator, resources *runtime.LinuxContainerResources) {
+// setOCILinuxResourceCgroup set container cgroup resource limit.
+func setOCILinuxResourceCgroup(g *generate.Generator, resources *runtime.LinuxContainerResources) {
 	if resources == nil {
 		return
 	}
@@ -753,9 +763,26 @@ func setOCILinuxResource(g *generate.Generator, resources *runtime.LinuxContaine
 	g.SetLinuxResourcesCPUQuota(resources.GetCpuQuota())
 	g.SetLinuxResourcesCPUShares(uint64(resources.GetCpuShares()))
 	g.SetLinuxResourcesMemoryLimit(resources.GetMemoryLimitInBytes())
-	g.SetProcessOOMScoreAdj(int(resources.GetOomScoreAdj()))
 	g.SetLinuxResourcesCPUCpus(resources.GetCpusetCpus())
 	g.SetLinuxResourcesCPUMems(resources.GetCpusetMems())
+}
+
+// setOCILinuxResourceOOMScoreAdj set container OOMScoreAdj resource limit.
+func setOCILinuxResourceOOMScoreAdj(g *generate.Generator, resources *runtime.LinuxContainerResources, restrictOOMScoreAdjFlag bool) error {
+	if resources == nil {
+		return nil
+	}
+	adj := int(resources.GetOomScoreAdj())
+	if restrictOOMScoreAdjFlag {
+		var err error
+		adj, err = restrictOOMScoreAdj(adj)
+		if err != nil {
+			return err
+		}
+	}
+	g.SetProcessOOMScoreAdj(adj)
+
+	return nil
 }
 
 // getOCICapabilitiesList returns a list of all available capabilities.
