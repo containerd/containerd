@@ -23,4 +23,3 @@ trap "rm -rf ${tmpdir}" EXIT
 
 git clone "https://github.com/containerd/project" "${tmpdir}"
 "${tmpdir}"/script/validate/vendor
-unset tmpdir
