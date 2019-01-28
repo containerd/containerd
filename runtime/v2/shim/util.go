@@ -63,7 +63,19 @@ func Command(ctx context.Context, runtime, containerdAddress, path string, cmdAr
 		if cmdPath, lerr = exec.LookPath(name); lerr != nil {
 			if eerr, ok := lerr.(*exec.Error); ok {
 				if eerr.Err == exec.ErrNotFound {
-					return nil, errors.Wrapf(os.ErrNotExist, "runtime %q binary not installed %q", runtime, name)
+					// LookPath only finds current directory matches based on
+					// the callers current directory but the caller is not
+					// likely in the same directory as the containerd
+					// executables. Instead match the calling binaries path
+					// (containerd) and see if they are side by side. If so
+					// execute the shim found there.
+					testPath := filepath.Join(filepath.Dir(self), name)
+					if _, serr := os.Stat(testPath); serr == nil {
+						path = testPath
+					}
+					if path == "" {
+						return nil, errors.Wrapf(os.ErrNotExist, "runtime %q binary not installed %q", runtime, name)
+					}
 				}
 			}
 		}
