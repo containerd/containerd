@@ -35,9 +35,22 @@ func getCommandPath() string {
 	if pathi == nil {
 		path, err := exec.LookPath(command)
 		if err != nil {
-			// Failed to look up command just use it directly and let the
-			// Windows loader find it.
-			path = command
+			// LookPath only finds current directory matches based on the
+			// callers current directory but the caller is not likely in the
+			// same directory as the containerd executables. Instead match the
+			// calling binaries path (a containerd shim usually) and see if they
+			// are side by side. If so execute the runhcs.exe found there.
+			if self, serr := os.Executable(); serr == nil {
+				testPath := filepath.Join(filepath.Dir(self), command)
+				if _, serr := os.Stat(testPath); serr == nil {
+					path = testPath
+				}
+			}
+			if path == "" {
+				// Failed to look up command just use it directly and let the
+				// Windows loader find it.
+				path = command
+			}
 			runhcsPath.Store(path)
 			return path
 		}
