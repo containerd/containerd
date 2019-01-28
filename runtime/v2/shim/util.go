@@ -31,8 +31,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const shimBinaryFormat = "containerd-shim-%s-%s"
-
 var runtimePaths sync.Map
 
 // Command returns the shim command with the provided args and configuration
