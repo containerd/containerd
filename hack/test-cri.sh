@@ -25,6 +25,8 @@ FOCUS=${FOCUS:-}
 SKIP=${SKIP:-""}
 # REPORT_DIR is the the directory to store test logs.
 REPORT_DIR=${REPORT_DIR:-"/tmp/test-cri"}
+# RUNTIME is the runtime handler to use in the test.
+RUNTIME=${RUNTIME:-""}
 
 # Check GOPATH
 if [[ -z "${GOPATH}" ]]; then
@@ -58,7 +60,7 @@ mkdir -p ${REPORT_DIR}
 test_setup ${REPORT_DIR}
 
 # Run cri validation test
-sudo env PATH=${PATH} GOPATH=${GOPATH} ${CRITEST} --runtime-endpoint=${CONTAINERD_SOCK} --ginkgo.focus="${FOCUS}" --ginkgo.skip="${SKIP}" --parallel=8
+sudo env PATH=${PATH} GOPATH=${GOPATH} ${CRITEST} --runtime-endpoint=${CONTAINERD_SOCK} --ginkgo.focus="${FOCUS}" --ginkgo.skip="${SKIP}" --parallel=8 --runtime-handler=${RUNTIME}
 test_exit_code=$?
 
 test_teardown
