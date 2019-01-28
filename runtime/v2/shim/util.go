@@ -71,9 +71,9 @@ func Command(ctx context.Context, runtime, containerdAddress, path string, cmdAr
 					// execute the shim found there.
 					testPath := filepath.Join(filepath.Dir(self), name)
 					if _, serr := os.Stat(testPath); serr == nil {
-						path = testPath
+						cmdPath = testPath
 					}
-					if path == "" {
+					if cmdPath == "" {
 						return nil, errors.Wrapf(os.ErrNotExist, "runtime %q binary not installed %q", runtime, name)
 					}
 				}
