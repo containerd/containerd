@@ -50,6 +50,15 @@ else
 	endif
 endif
 
+ifndef GODEBUG
+	EXTRA_LDFLAGS += -s -w
+	DEBUG_GO_GCFLAGS :=
+	DEBUG_TAGS :=
+else
+	DEBUG_GO_GCFLAGS := -gcflags=all="-N -l"
+	DEBUG_TAGS := static_build
+endif
+
 WHALE = "🇩"
 ONI = "👹"
 
@@ -74,11 +83,15 @@ TEST_REQUIRES_ROOT_PACKAGES=$(filter \
 COMMANDS=ctr containerd containerd-stress
 MANPAGES=ctr.1 containerd.1 containerd-config.1 containerd-config.toml.5
 
+ifdef BUILDTAGS
+    GO_BUILDTAGS = ${BUILDTAGS}
+endif
 # Build tags seccomp and apparmor are needed by CRI plugin.
-BUILDTAGS ?= seccomp apparmor
-GO_TAGS=$(if $(BUILDTAGS),-tags "$(BUILDTAGS)",)
-GO_LDFLAGS=-ldflags '-s -w -X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG) $(EXTRA_LDFLAGS)'
-SHIM_GO_LDFLAGS=-ldflags '-s -w -X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG) -extldflags "-static"'
+GO_BUILDTAGS ?= seccomp apparmor
+GO_BUILDTAGS += ${DEBUG_TAGS}
+GO_TAGS=$(if $(GO_BUILDTAGS),-tags "$(GO_BUILDTAGS)",)
+GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG) $(EXTRA_LDFLAGS)'
+SHIM_GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG) -extldflags "-static" $(EXTRA_LDFLAGS)'
 
 #Replaces ":" (*nix), ";" (windows) with newline for easy parsing
 GOPATHS=$(shell echo ${GOPATH} | tr ":" "\n" | tr ";" "\n")
@@ -143,7 +156,7 @@ proto-fmt: ## check format of proto files
 
 build: ## build the go packages
 	@echo "$(WHALE) $@"
-	@go build ${GO_GCFLAGS} ${GO_BUILD_FLAGS} ${EXTRA_FLAGS} ${GO_LDFLAGS} ${PACKAGES}
+	@go build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} ${EXTRA_FLAGS} ${GO_LDFLAGS} ${PACKAGES}
 
 test: ## run tests, except integration tests and tests that require root
 	@echo "$(WHALE) $@"
@@ -166,7 +179,7 @@ FORCE:
 # Build a binary from a cmd.
 bin/%: cmd/% FORCE
 	@echo "$(WHALE) $@${BINARY_SUFFIX}"
-	@go build ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o $@${BINARY_SUFFIX} ${GO_LDFLAGS} ${GO_TAGS}  ./$<
+	@go build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o $@${BINARY_SUFFIX} ${GO_LDFLAGS} ${GO_TAGS}  ./$<
 
 bin/containerd-shim: cmd/containerd-shim FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
 	@echo "$(WHALE) bin/containerd-shim"
