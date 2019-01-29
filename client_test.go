@@ -327,6 +327,23 @@ func TestImagePullSchema1(t *testing.T) {
 	}
 }
 
+func TestImagePullWithConcurrencyLimit(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	ctx, cancel := testContext()
+	defer cancel()
+	_, err = client.Pull(ctx, testImage,
+		WithPlatformMatcher(platforms.Default()),
+		WithMaxConcurrentDownloads(2))
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestClientReconnect(t *testing.T) {
 	t.Parallel()
 

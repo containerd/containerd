@@ -181,7 +181,7 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, pr
 		pushHandler,
 	)
 
-	if err := images.Dispatch(ctx, images.Handlers(handlers...), desc); err != nil {
+	if err := images.Dispatch(ctx, images.Handlers(handlers...), nil, desc); err != nil {
 		return err
 	}
 

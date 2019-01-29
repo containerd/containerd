@@ -61,6 +61,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
@@ -292,6 +293,9 @@ type RemoteContext struct {
 	// platforms will be used to create a PlatformMatcher with no ordering
 	// preference.
 	Platforms []string
+
+	// MaxConcurrentDownloads is the max concurrent content downloads for each pull.
+	MaxConcurrentDownloads int
 }
 
 func defaultRemoteContext() *RemoteContext {
@@ -407,6 +411,7 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 
 		isConvertible bool
 		converterFunc func(context.Context, ocispec.Descriptor) (ocispec.Descriptor, error)
+		limiter       *semaphore.Weighted
 	)
 
 	if desc.MediaType == images.MediaTypeDockerSchema1Manifest && rCtx.ConvertSchema1 {
@@ -453,7 +458,10 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 		}
 	}
 
-	if err := images.Dispatch(ctx, handler, desc); err != nil {
+	if rCtx.MaxConcurrentDownloads > 0 {
+		limiter = semaphore.NewWeighted(int64(rCtx.MaxConcurrentDownloads))
+	}
+	if err := images.Dispatch(ctx, handler, limiter, desc); err != nil {
 		return images.Image{}, err
 	}
 
