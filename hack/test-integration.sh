@@ -24,6 +24,8 @@ cd ${ROOT}
 FOCUS=${FOCUS:-""}
 # REPORT_DIR is the the directory to store test logs.
 REPORT_DIR=${REPORT_DIR:-"/tmp/test-integration"}
+# RUNTIME is the runtime handler to use in the test.
+RUNTIME=${RUNTIME:-""}
 
 CRI_ROOT="/var/lib/containerd/io.containerd.grpc.v1.cri"
 
@@ -33,7 +35,8 @@ test_setup ${REPORT_DIR}
 # Run integration test.
 sudo ${ROOT}/_output/integration.test --test.run="${FOCUS}" --test.v \
   --cri-endpoint=${CONTAINERD_SOCK} \
-  --cri-root=${CRI_ROOT}
+  --cri-root=${CRI_ROOT} \
+  --runtime-handler=${RUNTIME}
 
 test_exit_code=$?
 
