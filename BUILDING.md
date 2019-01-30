@@ -80,7 +80,8 @@ result in undefined behavior.
 `containerd` uses `make` to create a repeatable build flow. It means that you
 can run:
 
-```sudo
+```
+cd $GOPATH/src/github.com/containerd/containerd
 make
 ```
 
