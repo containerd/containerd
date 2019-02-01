@@ -407,6 +407,7 @@ func (p *Init) exec(ctx context.Context, path string, r *ExecConfig) (proc.Proce
 			Terminal: r.Terminal,
 		},
 		waitBlock: make(chan struct{}),
+		pid:       &safePid{},
 	}
 	e.execState = &execCreatedState{p: e}
 	return e, nil
