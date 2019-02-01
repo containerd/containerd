@@ -53,13 +53,17 @@ func newProcess(ctx context.Context, s *service, id string, pid uint32, pr *pipe
 		relay:     pr,
 		waitBlock: make(chan struct{}),
 	}
+	process.startedWg.Add(1)
 	go waitForProcess(ctx, process, p, s)
 	return process, nil
 }
 
+// waitForProcess waits for `p` to exit.
+//
+// The caller of `waitForProcess` MUST have incremented `process.startedWg` to
+// synchronize event start/exit publishing.
 func waitForProcess(ctx context.Context, process *process, p *os.Process, s *service) {
 	pid := uint32(p.Pid)
-	process.startedWg.Add(1)
 
 	// Store the default non-exited value for calls to stat
 	process.exit.Store(&processExit{
@@ -121,7 +125,6 @@ func newExecProcess(ctx context.Context, s *service, cid, id string, pr *pipeRel
 		relay:     pr,
 		waitBlock: make(chan struct{}),
 	}
-	process.startedWg.Add(1)
 
 	// Store the default non-exited value for calls to stat
 	process.exit.Store(&processExit{
