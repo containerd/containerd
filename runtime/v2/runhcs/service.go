@@ -682,6 +682,17 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 			}
 		}
 
+		// For the exec case increment the startedWg to make sure we publish the
+		// started event previous to the exit published in `waitForProcess`.
+		p.startedWg.Add(1)
+		defer func() {
+			if err != nil {
+				// If an exec failure takes place decrement the startedWg so we
+				// dont get off on counts.
+				p.startedWg.Done()
+			}
+		}()
+
 		// ID here is the containerID to exec the process in.
 		err = rhcs.Exec(ctx, r.ID, procConfig, eopts)
 		if err != nil {
