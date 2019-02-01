@@ -69,10 +69,8 @@ func (e *execProcess) ID() string {
 }
 
 func (e *execProcess) Pid() int {
-	return e.execState.Pid()
-}
-
-func (e *execProcess) pidv() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	return e.pid
 }
 
