@@ -172,11 +172,9 @@ checkpoint, err := task.Checkpoint(context)
 err := client.Push(context, "myregistry/checkpoints/redis:master", checkpoint)
 
 // on a new machine pull the checkpoint and restore the redis container
-image, err := client.Pull(context, "myregistry/checkpoints/redis:master")
+checkpoint, err := client.Pull(context, "myregistry/checkpoints/redis:master")
 
-checkpoint := image.Target()
-
-redis, err = client.NewContainer(context, "redis-master", containerd.WithCheckpoint(checkpoint, "redis-rootfs"))
+redis, err = client.NewContainer(context, "redis-master", containerd.WithNewSnapshot("redis-rootfs", checkpoint))
 defer container.Delete(context)
 
 task, err = redis.NewTask(context, cio.Stdio, containerd.WithTaskCheckpoint(checkpoint))
