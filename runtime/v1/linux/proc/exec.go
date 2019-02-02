@@ -49,7 +49,7 @@ type execProcess struct {
 	io      runc.IO
 	status  int
 	exited  time.Time
-	pid     int
+	pid     *safePid
 	closers []io.Closer
 	stdin   io.Closer
 	stdio   proc.Stdio
@@ -69,11 +69,7 @@ func (e *execProcess) ID() string {
 }
 
 func (e *execProcess) Pid() int {
-	return e.execState.Pid()
-}
-
-func (e *execProcess) pidv() int {
-	return e.pid
+	return e.pid.get()
 }
 
 func (e *execProcess) ExitStatus() int {
@@ -145,7 +141,7 @@ func (e *execProcess) Kill(ctx context.Context, sig uint32, _ bool) error {
 }
 
 func (e *execProcess) kill(ctx context.Context, sig uint32, _ bool) error {
-	pid := e.pid
+	pid := e.pid.get()
 	if pid != 0 {
 		if err := unix.Kill(pid, syscall.Signal(sig)); err != nil {
 			return errors.Wrapf(checkKillError(err), "exec kill error")
@@ -170,6 +166,12 @@ func (e *execProcess) Start(ctx context.Context) error {
 }
 
 func (e *execProcess) start(ctx context.Context) (err error) {
+	// The reaper may receive exit signal right after
+	// the container is started, before the e.pid is updated.
+	// In that case, we want to block the signal handler to
+	// access e.pid until it is updated.
+	e.pid.Lock()
+	defer e.pid.Unlock()
 	var (
 		socket  *runc.Socket
 		pidfile = filepath.Join(e.path, fmt.Sprintf("%s.pid", e.id))
@@ -229,7 +231,7 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 	if err != nil {
 		return errors.Wrap(err, "failed to retrieve OCI runtime exec pid")
 	}
-	e.pid = pid
+	e.pid.pid = pid
 	return nil
 }
 
@@ -247,11 +249,11 @@ func (e *execProcess) Status(ctx context.Context) (string, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	// if we don't have a pid then the exec process has just been created
-	if e.pid == 0 {
+	if e.pid.get() == 0 {
 		return "created", nil
 	}
 	// if we have a pid and it can be signaled, the process is running
-	if err := unix.Kill(e.pid, 0); err == nil {
+	if err := unix.Kill(e.pid.get(), 0); err == nil {
 		return "running", nil
 	}
 	// else if we have a pid but it can nolonger be signaled, it has stopped
