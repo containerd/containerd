@@ -1,0 +1,38 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.2.2"
+
+pre_release = false
+
+preface = """\
+The third patch release for `containerd` 1.2 contains important fixes
+for container image backwards compatibility as well as some runtime and
+CRI issues.
+
+### Notable Updates
+* fix in Tar xattrs to restore compatibility with older container images [#2953](https://github.com/containerd/containerd/pull/2953)
+* background `O_NONBLOCK` in OpenFifo to fix uncancelled context timeout issue
+* updated `PlatformRuntime` interface to include Add/Delete methods
+* runtime: exec race condition fixed [#2970](https://github.com/containerd/containerd/pull/2970)
+* cri: fixed issues with extra newline character in log without an extra newline [#2984](https://github.com/containerd/containerd/pull/2984)
+* cri: fixed an issue with pods being ignored after load failures [#2984](https://github.com/containerd/containerd/pull/2984)
+* runc updated to 12f6a991201fdb8f82579582d5e00e28fba06d0a
+* cri updated to c3cf754321fc38c6af5dfd2552fdde0ad192b31d
+
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
+
+[rename_deps]
+	[rename_deps.ttrpc]
+	old = "github.com/stevvooe/ttrpc"
+	new = "github.com/containerd/ttrpc"
