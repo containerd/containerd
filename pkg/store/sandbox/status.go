@@ -22,15 +22,15 @@ import (
 )
 
 // State is the sandbox state we use in containerd/cri.
-// It has unknown state defined.
+// It has init state defined.
 type State uint32
 
 const (
-	// StateUnknown is unknown state of sandbox. Sandbox
-	// is in unknown state before its corresponding sandbox container
-	// is created. Sandbox in unknown state should be ignored by most
+	// StateInit is init state of sandbox. Sandbox
+	// is in init state before its corresponding sandbox container
+	// is created. Sandbox in init state should be ignored by most
 	// functions, unless the caller needs to update sandbox state.
-	StateUnknown State = iota
+	StateInit State = iota
 	// StateReady is ready state, it means sandbox container
 	// is running.
 	StateReady

@@ -213,7 +213,7 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 		} else if err != store.ErrNotExist {
 			return errors.Wrap(err, "can't find container for TaskExit event")
 		}
-		// Use GetAll to include sandbox in unknown state.
+		// Use GetAll to include sandbox in init state.
 		sb, err := em.c.sandboxStore.GetAll(e.ID)
 		if err == nil {
 			if err := handleSandboxExit(ctx, e, sb); err != nil {
@@ -313,13 +313,13 @@ func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxst
 		}
 	}
 	err = sb.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
-		// NOTE(random-liu): We SHOULD NOT change UNKNOWN state here.
-		// If sandbox state is UNKNOWN when event monitor receives an TaskExit event,
+		// NOTE(random-liu): We SHOULD NOT change INIT state here.
+		// If sandbox state is INIT when event monitor receives an TaskExit event,
 		// it means that sandbox start has failed. In that case, `RunPodSandbox` will
 		// cleanup everything immediately.
-		// Once sandbox state goes out of UNKNOWN, it becomes visable to the user, which
+		// Once sandbox state goes out of INIT, it becomes visable to the user, which
 		// is not what we want.
-		if status.State != sandboxstore.StateUnknown {
+		if status.State != sandboxstore.StateInit {
 			status.State = sandboxstore.StateNotReady
 		}
 		status.Pid = 0

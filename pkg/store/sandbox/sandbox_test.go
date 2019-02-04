@@ -106,7 +106,7 @@ func TestSandboxStore(t *testing.T) {
 			},
 			NetNSPath: "TestNetNS-3defg",
 		},
-		Status{State: StateUnknown},
+		Status{State: StateInit},
 	)
 	assert := assertlib.New(t)
 	s := NewStore()
