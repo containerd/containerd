@@ -17,8 +17,11 @@ limitations under the License.
 package integration
 
 import (
+	"os"
+	"os/exec"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/stretchr/testify/assert"
@@ -191,4 +194,150 @@ func TestContainerdRestart(t *testing.T) {
 		}
 		assert.True(t, found, "should find image %+v", i1)
 	}
+}
+
+// Note: The test moves runc binary.
+// The test requires:
+// 1) The runtime is runc;
+// 2) runc is in PATH;
+func TestUnknownStateAfterContainerdRestart(t *testing.T) {
+	if *runtimeHandler != "" {
+		t.Skip("unsupported config: runtime handler is set")
+	}
+	runcPath, err := exec.LookPath("runc")
+	if err != nil {
+		t.Skip("unsupported config: runc not in PATH")
+	}
+
+	const testImage = "busybox"
+	t.Logf("Pull test image %q", testImage)
+	img, err := imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil)
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: img}))
+	}()
+
+	sbConfig := PodSandboxConfig("sandbox", "sandbox-unknown-state")
+	t.Log("Should not be able to create sandbox without runc")
+	tmpRuncPath := Randomize(runcPath)
+	require.NoError(t, os.Rename(runcPath, tmpRuncPath))
+	defer func() {
+		os.Rename(tmpRuncPath, runcPath)
+	}()
+	sb, err := runtimeService.RunPodSandbox(sbConfig, "")
+	if err == nil {
+		assert.NoError(t, runtimeService.StopPodSandbox(sb))
+		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
+		t.Skip("unsupported config: runc is not being used")
+	}
+	require.NoError(t, os.Rename(tmpRuncPath, runcPath))
+
+	t.Log("Create a sandbox")
+	sb, err = runtimeService.RunPodSandbox(sbConfig, "")
+	require.NoError(t, err)
+	defer func() {
+		// Make sure the sandbox is cleaned up in any case.
+		runtimeService.StopPodSandbox(sb)
+		runtimeService.RemovePodSandbox(sb)
+	}()
+	ps, err := runtimeService.PodSandboxStatus(sb)
+	require.NoError(t, err)
+	assert.Equal(t, runtime.PodSandboxState_SANDBOX_READY, ps.GetState())
+
+	t.Log("Create a container")
+	cnConfig := ContainerConfig(
+		"container-unknown-state",
+		testImage,
+		WithCommand("sleep", "1000"),
+	)
+	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+	require.NoError(t, err)
+
+	t.Log("Start the container")
+	require.NoError(t, runtimeService.StartContainer(cn))
+	cs, err := runtimeService.ContainerStatus(cn)
+	require.NoError(t, err)
+	assert.Equal(t, runtime.ContainerState_CONTAINER_RUNNING, cs.GetState())
+
+	t.Log("Move runc binary, so that container/sandbox can't be loaded after restart")
+	tmpRuncPath = Randomize(runcPath)
+	require.NoError(t, os.Rename(runcPath, tmpRuncPath))
+	defer func() {
+		os.Rename(tmpRuncPath, runcPath)
+	}()
+
+	t.Log("Restart containerd")
+	RestartContainerd(t)
+
+	t.Log("Sandbox should be in NOTREADY state after containerd restart")
+	ps, err = runtimeService.PodSandboxStatus(sb)
+	require.NoError(t, err)
+	assert.Equal(t, runtime.PodSandboxState_SANDBOX_NOTREADY, ps.GetState())
+
+	t.Log("Container should be in UNKNOWN state after containerd restart")
+	cs, err = runtimeService.ContainerStatus(cn)
+	require.NoError(t, err)
+	assert.Equal(t, runtime.ContainerState_CONTAINER_UNKNOWN, cs.GetState())
+
+	t.Log("Stop/remove the sandbox should fail for the lack of runc")
+	assert.Error(t, runtimeService.StopPodSandbox(sb))
+	assert.Error(t, runtimeService.RemovePodSandbox(sb))
+
+	t.Log("Stop/remove the container should fail for the lack of runc")
+	assert.Error(t, runtimeService.StopContainer(cn, 10))
+	assert.Error(t, runtimeService.RemoveContainer(cn))
+
+	t.Log("Move runc back")
+	require.NoError(t, os.Rename(tmpRuncPath, runcPath))
+
+	t.Log("Sandbox should still be in NOTREADY state")
+	ps, err = runtimeService.PodSandboxStatus(sb)
+	require.NoError(t, err)
+	assert.Equal(t, runtime.PodSandboxState_SANDBOX_NOTREADY, ps.GetState())
+
+	t.Log("Container should still be in UNKNOWN state")
+	cs, err = runtimeService.ContainerStatus(cn)
+	require.NoError(t, err)
+	assert.Equal(t, runtime.ContainerState_CONTAINER_UNKNOWN, cs.GetState())
+
+	t.Log("Sandbox operations which require running state should fail")
+	_, err = runtimeService.PortForward(&runtime.PortForwardRequest{
+		PodSandboxId: sb,
+		Port:         []int32{8080},
+	})
+	assert.Error(t, err)
+
+	t.Log("Container operations which require running state should fail")
+	assert.Error(t, runtimeService.ReopenContainerLog(cn))
+	_, _, err = runtimeService.ExecSync(cn, []string{"ls"}, 10*time.Second)
+	assert.Error(t, err)
+	_, err = runtimeService.Attach(&runtime.AttachRequest{
+		ContainerId: cn,
+		Stdin:       true,
+		Stdout:      true,
+		Stderr:      true,
+	})
+	assert.Error(t, err)
+
+	t.Log("Containerd should still be running now")
+	_, err = runtimeService.Status()
+	require.NoError(t, err)
+
+	t.Log("Remove the container should fail in this state")
+	assert.Error(t, runtimeService.RemoveContainer(cn))
+
+	t.Log("Remove the sandbox should fail in this state")
+	assert.Error(t, runtimeService.RemovePodSandbox(sb))
+
+	t.Log("Should be able to stop container in this state")
+	assert.NoError(t, runtimeService.StopContainer(cn, 10))
+
+	t.Log("Should be able to stop sandbox in this state")
+	assert.NoError(t, runtimeService.StopPodSandbox(sb))
+
+	t.Log("Should be able to remove container after stop")
+	assert.NoError(t, runtimeService.RemoveContainer(cn))
+
+	t.Log("Should be able to remove sandbox after stop")
+	assert.NoError(t, runtimeService.RemovePodSandbox(sb))
 }
