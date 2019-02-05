@@ -64,6 +64,8 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			opts = append(opts, oci.WithRootFSPath(""))
 		} else {
 			opts = append(opts, oci.WithDefaultSpec())
+			opts = append(opts, oci.WithWindowNetworksAllowUnqualifiedDNSQuery())
+			opts = append(opts, oci.WithWindowsIgnoreFlushesDuringBoot())
 		}
 		opts = append(opts, oci.WithEnv(context.StringSlice("env")))
 		opts = append(opts, withMounts(context))
