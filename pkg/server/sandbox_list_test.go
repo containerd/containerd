@@ -63,6 +63,10 @@ func TestToCRISandbox(t *testing.T) {
 			state:         sandboxstore.StateNotReady,
 			expectedState: runtime.PodSandboxState_SANDBOX_NOTREADY,
 		},
+		"sandbox state unknown": {
+			state:         sandboxstore.StateUnknown,
+			expectedState: runtime.PodSandboxState_SANDBOX_NOTREADY,
+		},
 	} {
 		status := sandboxstore.Status{
 			CreatedAt: createdAt,

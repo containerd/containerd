@@ -260,7 +260,16 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 	// Attach container IO so that `Delete` could cleanup the stream properly.
 	task, err := cntr.Container.Task(ctx,
 		func(*containerdio.FIFOSet) (containerdio.IO, error) {
-			return cntr.IO, nil
+			// We can't directly return cntr.IO here, because
+			// even if cntr.IO is nil, the cio.IO interface
+			// is not.
+			// See https://tour.golang.org/methods/12:
+			//   Note that an interface value that holds a nil
+			//   concrete value is itself non-nil.
+			if cntr.IO != nil {
+				return cntr.IO, nil
+			}
+			return nil, nil
 		},
 	)
 	if err != nil {
