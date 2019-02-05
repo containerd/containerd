@@ -40,7 +40,7 @@ import (
 )
 
 // setupSignals creates a new signal handler for all signals
-func setupSignals() (chan os.Signal, error) {
+func setupSignals(config Config) (chan os.Signal, error) {
 	signals := make(chan os.Signal, 32)
 	return signals, nil
 }
@@ -108,12 +108,12 @@ func serveListener(path string) (net.Listener, error) {
 
 func handleSignals(logger *logrus.Entry, signals chan os.Signal) error {
 	logger.Info("starting signal loop")
+
 	for {
-		select {
-		case s := <-signals:
+		for s := range signals {
 			switch s {
 			case os.Interrupt:
-				break
+				return nil
 			}
 		}
 	}

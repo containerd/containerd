@@ -24,7 +24,6 @@ import (
 	"path/filepath"
 	"time"
 
-	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/api/types"
 	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
@@ -112,7 +111,7 @@ func (s *shim) Shutdown(ctx context.Context) error {
 	_, err := s.task.Shutdown(ctx, &task.ShutdownRequest{
 		ID: s.ID(),
 	})
-	if err != nil && err != ttrpc.ErrClosed {
+	if err != nil && errors.Cause(err) != ttrpc.ErrClosed {
 		return errdefs.FromGRPC(err)
 	}
 	return nil
@@ -163,12 +162,6 @@ func (s *shim) Delete(ctx context.Context) (*runtime.Exit, error) {
 	// remove self from the runtime task list
 	// this seems dirty but it cleans up the API across runtimes, tasks, and the service
 	s.rtTasks.Delete(ctx, s.ID())
-	s.events.Publish(ctx, runtime.TaskDeleteEventTopic, &eventstypes.TaskDelete{
-		ContainerID: s.ID(),
-		ExitStatus:  response.ExitStatus,
-		ExitedAt:    response.ExitedAt,
-		Pid:         response.Pid,
-	})
 	return &runtime.Exit{
 		Status:    response.ExitStatus,
 		Timestamp: response.ExitedAt,
@@ -212,9 +205,6 @@ func (s *shim) Pause(ctx context.Context) error {
 	}); err != nil {
 		return errdefs.FromGRPC(err)
 	}
-	s.events.Publish(ctx, runtime.TaskPausedEventTopic, &eventstypes.TaskPaused{
-		ContainerID: s.ID(),
-	})
 	return nil
 }
 
@@ -224,9 +214,6 @@ func (s *shim) Resume(ctx context.Context) error {
 	}); err != nil {
 		return errdefs.FromGRPC(err)
 	}
-	s.events.Publish(ctx, runtime.TaskResumedEventTopic, &eventstypes.TaskResumed{
-		ContainerID: s.ID(),
-	})
 	return nil
 }
 
@@ -238,10 +225,6 @@ func (s *shim) Start(ctx context.Context) error {
 		return errdefs.FromGRPC(err)
 	}
 	s.taskPid = int(response.Pid)
-	s.events.Publish(ctx, runtime.TaskStartEventTopic, &eventstypes.TaskStart{
-		ContainerID: s.ID(),
-		Pid:         uint32(s.taskPid),
-	})
 	return nil
 }
 
@@ -340,9 +323,6 @@ func (s *shim) Checkpoint(ctx context.Context, path string, options *ptypes.Any)
 	if _, err := s.task.Checkpoint(ctx, request); err != nil {
 		return errdefs.FromGRPC(err)
 	}
-	s.events.Publish(ctx, runtime.TaskCheckpointedEventTopic, &eventstypes.TaskCheckpointed{
-		ContainerID: s.ID(),
-	})
 	return nil
 }
 

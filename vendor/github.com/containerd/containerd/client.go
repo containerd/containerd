@@ -61,6 +61,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
@@ -292,6 +293,9 @@ type RemoteContext struct {
 	// platforms will be used to create a PlatformMatcher with no ordering
 	// preference.
 	Platforms []string
+
+	// MaxConcurrentDownloads is the max concurrent content downloads for each pull.
+	MaxConcurrentDownloads int
 }
 
 func defaultRemoteContext() *RemoteContext {
@@ -403,12 +407,23 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 	}
 
 	var (
-		schema1Converter *schema1.Converter
-		handler          images.Handler
+		handler images.Handler
+
+		isConvertible bool
+		converterFunc func(context.Context, ocispec.Descriptor) (ocispec.Descriptor, error)
+		limiter       *semaphore.Weighted
 	)
+
 	if desc.MediaType == images.MediaTypeDockerSchema1Manifest && rCtx.ConvertSchema1 {
-		schema1Converter = schema1.NewConverter(store, fetcher)
+		schema1Converter := schema1.NewConverter(store, fetcher)
+
 		handler = images.Handlers(append(rCtx.BaseHandlers, schema1Converter)...)
+
+		isConvertible = true
+
+		converterFunc = func(ctx context.Context, _ ocispec.Descriptor) (ocispec.Descriptor, error) {
+			return schema1Converter.Convert(ctx)
+		}
 	} else {
 		// Get all the children for a descriptor
 		childrenHandler := images.ChildrenHandler(store)
@@ -421,18 +436,37 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 			childrenHandler = images.LimitManifests(childrenHandler, rCtx.PlatformMatcher, limit)
 		}
 
+		// set isConvertible to true if there is application/octet-stream media type
+		convertibleHandler := images.HandlerFunc(
+			func(_ context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+				if desc.MediaType == docker.LegacyConfigMediaType {
+					isConvertible = true
+				}
+
+				return []ocispec.Descriptor{}, nil
+			},
+		)
+
 		handler = images.Handlers(append(rCtx.BaseHandlers,
 			remotes.FetchHandler(store, fetcher),
+			convertibleHandler,
 			childrenHandler,
 		)...)
+
+		converterFunc = func(ctx context.Context, desc ocispec.Descriptor) (ocispec.Descriptor, error) {
+			return docker.ConvertManifest(ctx, store, desc)
+		}
 	}
 
-	if err := images.Dispatch(ctx, handler, desc); err != nil {
+	if rCtx.MaxConcurrentDownloads > 0 {
+		limiter = semaphore.NewWeighted(int64(rCtx.MaxConcurrentDownloads))
+	}
+	if err := images.Dispatch(ctx, handler, limiter, desc); err != nil {
 		return images.Image{}, err
 	}
-	if schema1Converter != nil {
-		desc, err = schema1Converter.Convert(ctx)
-		if err != nil {
+
+	if isConvertible {
+		if desc, err = converterFunc(ctx, desc); err != nil {
 			return images.Image{}, err
 		}
 	}

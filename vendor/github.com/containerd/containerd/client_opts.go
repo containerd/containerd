@@ -178,3 +178,11 @@ func WithImageHandler(h images.Handler) RemoteOpt {
 		return nil
 	}
 }
+
+// WithMaxConcurrentDownloads sets max concurrent download limit.
+func WithMaxConcurrentDownloads(max int) RemoteOpt {
+	return func(client *Client, c *RemoteContext) error {
+		c.MaxConcurrentDownloads = max
+		return nil
+	}
+}

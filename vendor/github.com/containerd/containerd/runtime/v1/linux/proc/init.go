@@ -76,6 +76,7 @@ type Init struct {
 	IoGID        int
 	NoPivotRoot  bool
 	NoNewKeyring bool
+	CriuWorkPath string
 }
 
 // NewRunc returns a new runc instance for a process
@@ -132,7 +133,7 @@ func (p *Init) Create(ctx context.Context, r *CreateConfig) error {
 		opts := &runc.RestoreOpts{
 			CheckpointOpts: runc.CheckpointOpts{
 				ImagePath:  r.Checkpoint,
-				WorkDir:    p.WorkDir,
+				WorkDir:    p.CriuWorkPath,
 				ParentPath: r.ParentCheckpoint,
 			},
 			PidFile:     pidFile,
@@ -160,7 +161,7 @@ func (p *Init) Create(ctx context.Context, r *CreateConfig) error {
 		return p.runtimeError(err, "OCI runtime create failed")
 	}
 	if r.Stdin != "" {
-		sc, err := fifo.OpenFifo(ctx, r.Stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
+		sc, err := fifo.OpenFifo(context.Background(), r.Stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
 		if err != nil {
 			return errors.Wrapf(err, "failed to open stdin fifo %s", r.Stdin)
 		}
@@ -168,6 +169,8 @@ func (p *Init) Create(ctx context.Context, r *CreateConfig) error {
 		p.closers = append(p.closers, sc)
 	}
 	var copyWaitGroup sync.WaitGroup
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 	if socket != nil {
 		console, err := socket.ReceiveMaster()
 		if err != nil {
@@ -404,6 +407,7 @@ func (p *Init) exec(ctx context.Context, path string, r *ExecConfig) (proc.Proce
 			Terminal: r.Terminal,
 		},
 		waitBlock: make(chan struct{}),
+		pid:       &safePid{},
 	}
 	e.execState = &execCreatedState{p: e}
 	return e, nil
@@ -422,8 +426,12 @@ func (p *Init) checkpoint(ctx context.Context, r *CheckpointConfig) error {
 	if !r.Exit {
 		actions = append(actions, runc.LeaveRunning)
 	}
-	work := filepath.Join(p.WorkDir, "criu-work")
-	defer os.RemoveAll(work)
+	// keep criu work directory if criu work dir is set
+	work := r.WorkDir
+	if work == "" {
+		work = filepath.Join(p.WorkDir, "criu-work")
+		defer os.RemoveAll(work)
+	}
 	if err := p.runtime.Checkpoint(ctx, p.id, &runc.CheckpointOpts{
 		WorkDir:                  work,
 		ImagePath:                r.Path,
