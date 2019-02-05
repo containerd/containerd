@@ -86,6 +86,10 @@ func TestPodSandboxStatus(t *testing.T) {
 			state:         sandboxstore.StateNotReady,
 			expectedState: runtime.PodSandboxState_SANDBOX_NOTREADY,
 		},
+		"sandbox state unknown": {
+			state:         sandboxstore.StateUnknown,
+			expectedState: runtime.PodSandboxState_SANDBOX_NOTREADY,
+		},
 	} {
 		t.Logf("TestCase: %s", desc)
 		status := sandboxstore.Status{

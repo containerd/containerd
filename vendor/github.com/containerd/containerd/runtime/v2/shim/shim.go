@@ -62,6 +62,17 @@ type Opts struct {
 	Debug      bool
 }
 
+// BinaryOpts allows the configuration of a shims binary setup
+type BinaryOpts func(*Config)
+
+// Config of shim binary options provided by shim implementations
+type Config struct {
+	// NoSubreaper disables setting the shim as a child subreaper
+	NoSubreaper bool
+	// NoReaper disables the shim binary from reaping any child process implicitly
+	NoReaper bool
+}
+
 var (
 	debugFlag            bool
 	idFlag               string
@@ -118,27 +129,34 @@ func setLogger(ctx context.Context, id string) error {
 }
 
 // Run initializes and runs a shim server
-func Run(id string, initFunc Init) {
-	if err := run(id, initFunc); err != nil {
+func Run(id string, initFunc Init, opts ...BinaryOpts) {
+	var config Config
+	for _, o := range opts {
+		o(&config)
+	}
+	if err := run(id, initFunc, config); err != nil {
 		fmt.Fprintf(os.Stderr, "%s: %s\n", id, err)
 		os.Exit(1)
 	}
 }
 
-func run(id string, initFunc Init) error {
+func run(id string, initFunc Init, config Config) error {
 	parseFlags()
 	setRuntime()
 
-	signals, err := setupSignals()
+	signals, err := setupSignals(config)
 	if err != nil {
 		return err
 	}
-	if err := subreaper(); err != nil {
-		return err
+	if !config.NoSubreaper {
+		if err := subreaper(); err != nil {
+			return err
+		}
 	}
 	publisher := &remoteEventsPublisher{
 		address:              addressFlag,
 		containerdBinaryPath: containerdBinaryFlag,
+		noReaper:             config.NoReaper,
 	}
 	if namespaceFlag == "" {
 		return fmt.Errorf("shim namespace cannot be empty")
@@ -266,4 +284,5 @@ func dumpStacks(logger *logrus.Entry) {
 type remoteEventsPublisher struct {
 	address              string
 	containerdBinaryPath string
+	noReaper             bool
 }

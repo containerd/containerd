@@ -124,6 +124,10 @@ var (
 			Name:  "allow-new-privs",
 			Usage: "turn off OCI spec's NoNewPrivileges feature flag",
 		},
+		cli.Uint64Flag{
+			Name:  "memory-limit",
+			Usage: "memory limit (in bytes) for the container",
+		},
 	}
 )
 

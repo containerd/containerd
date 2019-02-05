@@ -387,18 +387,16 @@ func (h *handler) Execute(_ []string, r <-chan svc.ChangeRequest, s chan<- svc.S
 	h.fromsvc <- nil
 
 	s <- svc.Status{State: svc.Running, Accepts: svc.AcceptStop | svc.AcceptShutdown | svc.Accepted(windows.SERVICE_ACCEPT_PARAMCHANGE)}
+
 Loop:
-	for {
-		select {
-		case c := <-r:
-			switch c.Cmd {
-			case svc.Interrogate:
-				s <- c.CurrentStatus
-			case svc.Stop, svc.Shutdown:
-				s <- svc.Status{State: svc.StopPending, Accepts: 0}
-				h.s.Stop()
-				break Loop
-			}
+	for c := range r {
+		switch c.Cmd {
+		case svc.Interrogate:
+			s <- c.CurrentStatus
+		case svc.Stop, svc.Shutdown:
+			s <- svc.Status{State: svc.StopPending, Accepts: 0}
+			h.s.Stop()
+			break Loop
 		}
 	}
 

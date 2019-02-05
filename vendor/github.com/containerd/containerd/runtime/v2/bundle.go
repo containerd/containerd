@@ -18,6 +18,7 @@ package v2
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -114,20 +115,30 @@ type Bundle struct {
 // Delete a bundle atomically
 func (b *Bundle) Delete() error {
 	work, werr := os.Readlink(filepath.Join(b.Path, "work"))
-	err := os.RemoveAll(b.Path)
+	err := atomicDelete(b.Path)
 	if err == nil {
 		if werr == nil {
-			return os.RemoveAll(work)
+			return atomicDelete(work)
 		}
 		return nil
 	}
 	// error removing the bundle path; still attempt removing work dir
 	var err2 error
 	if werr == nil {
-		err2 = os.RemoveAll(work)
+		err2 = atomicDelete(work)
 		if err2 == nil {
 			return err
 		}
 	}
 	return errors.Wrapf(err, "failed to remove both bundle and workdir locations: %v", err2)
+}
+
+// atomicDelete renames the path to a hidden file before removal
+func atomicDelete(path string) error {
+	// create a hidden dir for an atomic removal
+	atomicPath := filepath.Join(filepath.Dir(path), fmt.Sprintf(".%s", filepath.Base(path)))
+	if err := os.Rename(path, atomicPath); err != nil {
+		return err
+	}
+	return os.RemoveAll(atomicPath)
 }

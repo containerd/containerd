@@ -28,9 +28,10 @@ import (
 
 //TODO:(jessvalarezo) exec-id is optional here, update to required arg
 var execCommand = cli.Command{
-	Name:      "exec",
-	Usage:     "execute additional processes in an existing container",
-	ArgsUsage: "[flags] CONTAINER CMD [ARG...]",
+	Name:           "exec",
+	Usage:          "execute additional processes in an existing container",
+	ArgsUsage:      "[flags] CONTAINER CMD [ARG...]",
+	SkipArgReorder: true,
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "cwd",
