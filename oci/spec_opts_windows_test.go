@@ -56,3 +56,57 @@ func TestWithCPUCount(t *testing.T) {
 		}
 	}
 }
+
+func TestWithWindowsIgnoreFlushesDuringBoot(t *testing.T) {
+	var (
+		ctx = namespaces.WithNamespace(context.Background(), "testing")
+		c   = containers.Container{ID: t.Name()}
+		o   = WithWindowsIgnoreFlushesDuringBoot()
+	)
+	// Test with all supported scenarios
+	platforms := []string{"", "windows/amd64"}
+	for _, p := range platforms {
+		var spec *Spec
+		var err error
+		if p == "" {
+			t.Log("Testing GenerateSpec default platform")
+			spec, err = GenerateSpec(ctx, nil, &c, o)
+		} else {
+			t.Logf("Testing GenerateSpecWithPlatform with platform: '%s'", p)
+			spec, err = GenerateSpecWithPlatform(ctx, nil, p, &c, o)
+		}
+		if err != nil {
+			t.Fatalf("failed to generate spec with: %v", err)
+		}
+		if spec.Windows.IgnoreFlushesDuringBoot != true {
+			t.Fatalf("spec.Windows.IgnoreFlushesDuringBoot expected: true")
+		}
+	}
+}
+
+func TestWithWindowNetworksAllowUnqualifiedDNSQuery(t *testing.T) {
+	var (
+		ctx = namespaces.WithNamespace(context.Background(), "testing")
+		c   = containers.Container{ID: t.Name()}
+		o   = WithWindowNetworksAllowUnqualifiedDNSQuery()
+	)
+	// Test with all supported scenarios
+	platforms := []string{"", "windows/amd64"}
+	for _, p := range platforms {
+		var spec *Spec
+		var err error
+		if p == "" {
+			t.Log("Testing GenerateSpec default platform")
+			spec, err = GenerateSpec(ctx, nil, &c, o)
+		} else {
+			t.Logf("Testing GenerateSpecWithPlatform with platform: '%s'", p)
+			spec, err = GenerateSpecWithPlatform(ctx, nil, p, &c, o)
+		}
+		if err != nil {
+			t.Fatalf("failed to generate spec with: %v", err)
+		}
+		if spec.Windows.Network.AllowUnqualifiedDNSQuery != true {
+			t.Fatalf("spec.Windows.Network.AllowUnqualifiedDNSQuery expected: true")
+		}
+	}
+}
