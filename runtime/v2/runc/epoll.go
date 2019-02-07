@@ -30,19 +30,22 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func newOOMEpoller(publisher events.Publisher) (*epoller, error) {
+// NewOOMEpoller returns an epoll implementation that listens to OOM events
+// from a container's cgroups.
+func NewOOMEpoller(publisher events.Publisher) (*Epoller, error) {
 	fd, err := unix.EpollCreate1(unix.EPOLL_CLOEXEC)
 	if err != nil {
 		return nil, err
 	}
-	return &epoller{
+	return &Epoller{
 		fd:        fd,
 		publisher: publisher,
 		set:       make(map[uintptr]*item),
 	}, nil
 }
 
-type epoller struct {
+// Epoller implementation for handling OOM events from a container's cgroup
+type Epoller struct {
 	mu sync.Mutex
 
 	fd        int
@@ -55,11 +58,13 @@ type item struct {
 	cg cgroups.Cgroup
 }
 
-func (e *epoller) Close() error {
+// Close the epoll fd
+func (e *Epoller) Close() error {
 	return unix.Close(e.fd)
 }
 
-func (e *epoller) run(ctx context.Context) {
+// Run the epoll loop
+func (e *Epoller) Run(ctx context.Context) {
 	var events [128]unix.EpollEvent
 	for {
 		select {
@@ -81,7 +86,8 @@ func (e *epoller) run(ctx context.Context) {
 	}
 }
 
-func (e *epoller) add(id string, cg cgroups.Cgroup) error {
+// Add the cgroup to the epoll monitor
+func (e *Epoller) Add(id string, cg cgroups.Cgroup) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	fd, err := cg.OOMEventFD()
@@ -99,7 +105,7 @@ func (e *epoller) add(id string, cg cgroups.Cgroup) error {
 	return unix.EpollCtl(e.fd, unix.EPOLL_CTL_ADD, int(fd), &event)
 }
 
-func (e *epoller) process(ctx context.Context, fd uintptr) {
+func (e *Epoller) process(ctx context.Context, fd uintptr) {
 	flush(fd)
 	e.mu.Lock()
 	i, ok := e.set[fd]

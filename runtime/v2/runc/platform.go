@@ -1,3 +1,5 @@
+// +build linux
+
 /*
    Copyright The containerd Authors.
 
@@ -23,9 +25,29 @@ import (
 	"syscall"
 
 	"github.com/containerd/console"
+	rproc "github.com/containerd/containerd/runtime/proc"
 	"github.com/containerd/fifo"
 	"github.com/pkg/errors"
 )
+
+var bufPool = sync.Pool{
+	New: func() interface{} {
+		buffer := make([]byte, 32<<10)
+		return &buffer
+	},
+}
+
+// NewPlatform returns a linux platform for use with I/O operations
+func NewPlatform() (rproc.Platform, error) {
+	epoller, err := console.NewEpoller()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to initialize epoller")
+	}
+	go epoller.Wait()
+	return &linuxPlatform{
+		epoller: epoller,
+	}, nil
+}
 
 type linuxPlatform struct {
 	epoller *console.Epoller
@@ -69,9 +91,9 @@ func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console
 	cwg.Add(1)
 	go func() {
 		cwg.Done()
-		p := bufPool.Get().(*[]byte)
-		defer bufPool.Put(p)
-		io.CopyBuffer(outw, epollConsole, *p)
+		buf := bufPool.Get().(*[]byte)
+		defer bufPool.Put(buf)
+		io.CopyBuffer(outw, epollConsole, *buf)
 		epollConsole.Close()
 		outr.Close()
 		outw.Close()
@@ -93,21 +115,4 @@ func (p *linuxPlatform) ShutdownConsole(ctx context.Context, cons console.Consol
 
 func (p *linuxPlatform) Close() error {
 	return p.epoller.Close()
-}
-
-// initialize a single epoll fd to manage our consoles. `initPlatform` should
-// only be called once.
-func (s *service) initPlatform() error {
-	if s.platform != nil {
-		return nil
-	}
-	epoller, err := console.NewEpoller()
-	if err != nil {
-		return errors.Wrap(err, "failed to initialize epoller")
-	}
-	s.platform = &linuxPlatform{
-		epoller: epoller,
-	}
-	go epoller.Wait()
-	return nil
 }
