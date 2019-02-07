@@ -50,7 +50,6 @@ import (
 	containerstore "github.com/containerd/cri/pkg/store/container"
 	imagestore "github.com/containerd/cri/pkg/store/image"
 	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
-	"github.com/containerd/cri/pkg/util"
 )
 
 const (
@@ -264,7 +263,7 @@ func (c *criService) localResolve(refOrID string) (imagestore.Image, error) {
 		return func(ref string) string {
 			// ref is not image id, try to resolve it locally.
 			// TODO(random-liu): Handle this error better for debugging.
-			normalized, err := util.NormalizeImageRef(ref)
+			normalized, err := reference.ParseDockerRef(ref)
 			if err != nil {
 				return ""
 			}

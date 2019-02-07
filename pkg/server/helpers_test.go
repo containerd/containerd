@@ -23,6 +23,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
+	"github.com/docker/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,7 +32,6 @@ import (
 	criconfig "github.com/containerd/cri/pkg/config"
 	"github.com/containerd/cri/pkg/store"
 	imagestore "github.com/containerd/cri/pkg/store/image"
-	"github.com/containerd/cri/pkg/util"
 )
 
 // TestGetUserFromImage tests the logic of getting image uid or user name of image user.
@@ -104,7 +104,7 @@ func TestGetRepoDigestAndTag(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		named, err := util.NormalizeImageRef(test.ref)
+		named, err := reference.ParseDockerRef(test.ref)
 		assert.NoError(t, err)
 		repoDigest, repoTag := getRepoDigestAndTag(named, digest, test.schema1)
 		assert.Equal(t, test.expectedRepoDigest, repoDigest)
