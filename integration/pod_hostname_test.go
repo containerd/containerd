@@ -28,7 +28,7 @@ import (
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
-func TestPodHostnameEnv(t *testing.T) {
+func TestPodHostname(t *testing.T) {
 	hostname, err := os.Hostname()
 	require.NoError(t, err)
 	for name, test := range map[string]struct {
@@ -56,13 +56,13 @@ func TestPodHostnameEnv(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			testPodLogDir, err := ioutil.TempDir("/tmp", "hostname-env")
+			testPodLogDir, err := ioutil.TempDir("/tmp", "hostname")
 			require.NoError(t, err)
 			defer os.RemoveAll(testPodLogDir)
 
 			opts := append(test.opts, WithPodLogDirectory(testPodLogDir))
 			t.Log("Create a sandbox with hostname")
-			sbConfig := PodSandboxConfig("sandbox", "hostname-env", opts...)
+			sbConfig := PodSandboxConfig("sandbox", "hostname", opts...)
 			sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 			require.NoError(t, err)
 			defer func() {
@@ -85,7 +85,8 @@ func TestPodHostnameEnv(t *testing.T) {
 			cnConfig := ContainerConfig(
 				containerName,
 				testImage,
-				WithCommand("env"),
+				WithCommand("sh", "-c",
+					"echo -n /etc/hostname= && cat /etc/hostname && env"),
 				WithLogPath(containerName),
 			)
 			cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
@@ -106,10 +107,14 @@ func TestPodHostnameEnv(t *testing.T) {
 				return false, nil
 			}, time.Second, 30*time.Second))
 
-			t.Log("Search hostname env in container log")
 			content, err := ioutil.ReadFile(filepath.Join(testPodLogDir, containerName))
 			assert.NoError(t, err)
+
+			t.Log("Search hostname env in container log")
 			assert.Contains(t, string(content), "HOSTNAME="+test.expectedHostname)
+
+			t.Log("Search /etc/hostname content in container log")
+			assert.Contains(t, string(content), "/etc/hostname="+test.expectedHostname)
 		})
 	}
 }

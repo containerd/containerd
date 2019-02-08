@@ -535,6 +535,11 @@ func TestGenerateContainerMounts(t *testing.T) {
 			},
 			expectedMounts: []*runtime.Mount{
 				{
+					ContainerPath: "/etc/hostname",
+					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"),
+					Readonly:      true,
+				},
+				{
 					ContainerPath: "/etc/hosts",
 					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
 					Readonly:      true,
@@ -554,6 +559,11 @@ func TestGenerateContainerMounts(t *testing.T) {
 		"should setup rw mount when rootfs is read-write": {
 			securityContext: &runtime.LinuxContainerSecurityContext{},
 			expectedMounts: []*runtime.Mount{
+				{
+					ContainerPath: "/etc/hostname",
+					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"),
+					Readonly:      false,
+				},
 				{
 					ContainerPath: "/etc/hosts",
 					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
@@ -577,6 +587,11 @@ func TestGenerateContainerMounts(t *testing.T) {
 			},
 			expectedMounts: []*runtime.Mount{
 				{
+					ContainerPath: "/etc/hostname",
+					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"),
+					Readonly:      false,
+				},
+				{
 					ContainerPath: "/etc/hosts",
 					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
 					Readonly:      false,
@@ -595,6 +610,10 @@ func TestGenerateContainerMounts(t *testing.T) {
 		},
 		"should skip container mounts if already mounted by CRI": {
 			criMounts: []*runtime.Mount{
+				{
+					ContainerPath: "/etc/hostname",
+					HostPath:      "/test-etc-hostname",
+				},
 				{
 					ContainerPath: "/etc/hosts",
 					HostPath:      "/test-etc-host",

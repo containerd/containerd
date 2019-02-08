@@ -339,8 +339,7 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 
 	// Add HOSTNAME env.
 	hostname := sandboxConfig.GetHostname()
-	if sandboxConfig.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE &&
-		hostname == "" {
+	if sandboxConfig.GetHostname() == "" {
 		hostname, err = c.os.Hostname()
 		if err != nil {
 			return nil, err
@@ -483,6 +482,14 @@ func (c *criService) generateVolumeMounts(containerRootDir string, criMounts []*
 func (c *criService) generateContainerMounts(sandboxID string, config *runtime.ContainerConfig) []*runtime.Mount {
 	var mounts []*runtime.Mount
 	securityContext := config.GetLinux().GetSecurityContext()
+	if !isInCRIMounts(etcHostname, config.GetMounts()) {
+		mounts = append(mounts, &runtime.Mount{
+			ContainerPath: etcHostname,
+			HostPath:      c.getSandboxHostname(sandboxID),
+			Readonly:      securityContext.GetReadonlyRootfs(),
+		})
+	}
+
 	if !isInCRIMounts(etcHosts, config.GetMounts()) {
 		mounts = append(mounts, &runtime.Mount{
 			ContainerPath: etcHosts,

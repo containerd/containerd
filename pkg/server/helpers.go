@@ -99,6 +99,8 @@ const (
 	devShm = "/dev/shm"
 	// etcHosts is the default path of /etc/hosts file.
 	etcHosts = "/etc/hosts"
+	// etcHostname is the default path of /etc/hostname file.
+	etcHostname = "/etc/hostname"
 	// resolvConfPath is the abs path of resolv.conf on host or container.
 	resolvConfPath = "/etc/resolv.conf"
 	// hostnameEnv is the key for HOSTNAME env.
@@ -197,6 +199,11 @@ func (c *criService) getContainerRootDir(id string) string {
 // e.g. named pipes.
 func (c *criService) getVolatileContainerRootDir(id string) string {
 	return filepath.Join(c.config.StateDir, containersDir, id)
+}
+
+// getSandboxHostname returns the hostname file path inside the sandbox root directory.
+func (c *criService) getSandboxHostname(id string) string {
+	return filepath.Join(c.getSandboxRootDir(id), "hostname")
 }
 
 // getSandboxHosts returns the hosts file path inside the sandbox root directory.

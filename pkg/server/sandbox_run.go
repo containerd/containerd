@@ -233,7 +233,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 	}()
 
-	// Setup sandbox /dev/shm, /etc/hosts and /etc/resolv.conf.
+	// Setup sandbox /dev/shm, /etc/hosts, /etc/resolv.conf and /etc/hostname.
 	if err = c.setupSandboxFiles(id, config); err != nil {
 		return nil, errors.Wrapf(err, "failed to setup sandbox files")
 	}
@@ -456,9 +456,22 @@ func (c *criService) generateSandboxContainerSpec(id string, config *runtime.Pod
 	return g.Config, nil
 }
 
-// setupSandboxFiles sets up necessary sandbox files including /dev/shm, /etc/hosts
-// and /etc/resolv.conf.
+// setupSandboxFiles sets up necessary sandbox files including /dev/shm, /etc/hosts,
+// /etc/resolv.conf and /etc/hostname.
 func (c *criService) setupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
+	sandboxEtcHostname := c.getSandboxHostname(id)
+	hostname := config.GetHostname()
+	if hostname == "" {
+		var err error
+		hostname, err = c.os.Hostname()
+		if err != nil {
+			return errors.Wrap(err, "failed to get hostname")
+		}
+	}
+	if err := c.os.WriteFile(sandboxEtcHostname, []byte(hostname+"\n"), 0644); err != nil {
+		return errors.Wrapf(err, "failed to write hostname to %q", sandboxEtcHostname)
+	}
+
 	// TODO(random-liu): Consider whether we should maintain /etc/hosts and /etc/resolv.conf in kubelet.
 	sandboxEtcHosts := c.getSandboxHosts(id)
 	if err := c.os.CopyFile(etcHosts, sandboxEtcHosts, 0644); err != nil {
