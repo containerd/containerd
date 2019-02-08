@@ -99,7 +99,9 @@ type shim struct {
 }
 
 func (s *shim) Connect(ctx context.Context) error {
-	response, err := s.task.Connect(ctx, &task.ConnectRequest{})
+	response, err := s.task.Connect(ctx, &task.ConnectRequest{
+		ID: s.ID(),
+	})
 	if err != nil {
 		return err
 	}
@@ -317,6 +319,7 @@ func (s *shim) Wait(ctx context.Context) (*runtime.Exit, error) {
 
 func (s *shim) Checkpoint(ctx context.Context, path string, options *ptypes.Any) error {
 	request := &task.CheckpointTaskRequest{
+		ID:      s.ID(),
 		Path:    path,
 		Options: options,
 	}

@@ -29,6 +29,7 @@ import (
 
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/testutil"
+	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 )
@@ -140,7 +141,7 @@ func TestDaemonRuntimeRoot(t *testing.T) {
 	}
 
 	id := t.Name()
-	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("top")), WithRuntime("io.containerd.runc.v1", &options.Options{
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("top")), WithRuntime(plugin.RuntimeRuncV1, &options.Options{
 		Root: runtimeRoot,
 	}))
 	if err != nil {

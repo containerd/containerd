@@ -30,6 +30,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/plugin"
 	metrics "github.com/docker/go-metrics"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -146,7 +147,7 @@ func main() {
 		cli.StringFlag{
 			Name:  "runtime",
 			Usage: "set the runtime to stress test",
-			Value: "io.containerd.runtime.v1.linux",
+			Value: plugin.RuntimeLinuxV1,
 		},
 	}
 	app.Before = func(context *cli.Context) error {

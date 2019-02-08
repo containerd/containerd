@@ -38,6 +38,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// NewContainer returns a new runc container
 func NewContainer(ctx context.Context, platform rproc.Platform, r *task.CreateTaskRequest) (*Container, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
@@ -130,6 +131,7 @@ func NewContainer(ctx context.Context, platform rproc.Platform, r *task.CreateTa
 	return container, nil
 }
 
+// ReadRuntime reads the runtime information from the path
 func ReadRuntime(path string) (string, error) {
 	data, err := ioutil.ReadFile(filepath.Join(path, "runtime"))
 	if err != nil {
@@ -138,6 +140,7 @@ func ReadRuntime(path string) (string, error) {
 	return string(data), nil
 }
 
+// WriteRuntime writes the runtime information into the path
 func WriteRuntime(path, runtime string) error {
 	return ioutil.WriteFile(filepath.Join(path, "runtime"), []byte(runtime), 0600)
 }
@@ -168,10 +171,13 @@ func newInit(ctx context.Context, path, workDir, namespace string, platform rpro
 	return p, nil
 }
 
+// Container for operating on a runc container and its processes
 type Container struct {
 	mu sync.Mutex
 
-	ID     string
+	// ID of the container
+	ID string
+	// Bundle path
 	Bundle string
 
 	cgroup    cgroups.Cgroup
@@ -179,6 +185,7 @@ type Container struct {
 	processes map[string]rproc.Process
 }
 
+// All processes in the container
 func (c *Container) All() (o []rproc.Process) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -192,6 +199,7 @@ func (c *Container) All() (o []rproc.Process) {
 	return o
 }
 
+// ExecdProcesses added to the container
 func (c *Container) ExecdProcesses() (o []rproc.Process) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -208,27 +216,38 @@ func (c *Container) Pid() int {
 	return c.process.Pid()
 }
 
+// Cgroup of the container
 func (c *Container) Cgroup() cgroups.Cgroup {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.cgroup
 }
 
+// CgroupSet sets the cgroup to the container
 func (c *Container) CgroupSet(cg cgroups.Cgroup) {
 	c.mu.Lock()
 	c.cgroup = cg
 	c.mu.Unlock()
 }
 
-func (c *Container) Process(id string) rproc.Process {
+// Process returns the process by id
+func (c *Container) Process(id string) (rproc.Process, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if id == "" {
-		return c.process
+		if c.process == nil {
+			return nil, errors.Wrapf(errdefs.ErrFailedPrecondition, "container must be created")
+		}
+		return c.process, nil
 	}
-	return c.processes[id]
+	p, ok := c.processes[id]
+	if !ok {
+		return nil, errors.Wrapf(errdefs.ErrNotFound, "process does not exist %s", id)
+	}
+	return p, nil
 }
 
+// ProcessExists returns true if the process by id exists
 func (c *Container) ProcessExists(id string) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -236,22 +255,25 @@ func (c *Container) ProcessExists(id string) bool {
 	return ok
 }
 
+// ProcessAdd adds a new process to the container
 func (c *Container) ProcessAdd(process rproc.Process) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.processes[process.ID()] = process
 }
 
+// ProcessRemove removes the process by id from the container
 func (c *Container) ProcessRemove(id string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.processes, id)
 }
 
+// Start a container process
 func (c *Container) Start(ctx context.Context, r *task.StartRequest) (rproc.Process, error) {
-	p := c.Process(r.ExecID)
-	if p == nil {
-		return nil, errors.Wrapf(errdefs.ErrNotFound, "process does not exist %s", r.ExecID)
+	p, err := c.Process(r.ExecID)
+	if err != nil {
+		return nil, err
 	}
 	if err := p.Start(ctx); err != nil {
 		return nil, err
@@ -266,10 +288,11 @@ func (c *Container) Start(ctx context.Context, r *task.StartRequest) (rproc.Proc
 	return p, nil
 }
 
+// Delete the container or a process by id
 func (c *Container) Delete(ctx context.Context, r *task.DeleteRequest) (rproc.Process, error) {
-	p := c.Process(r.ExecID)
-	if p == nil {
-		return nil, errors.Wrapf(errdefs.ErrNotFound, "process does not exist %s", r.ExecID)
+	p, err := c.Process(r.ExecID)
+	if err != nil {
+		return nil, err
 	}
 	if err := p.Delete(ctx); err != nil {
 		return nil, err
@@ -280,6 +303,7 @@ func (c *Container) Delete(ctx context.Context, r *task.DeleteRequest) (rproc.Pr
 	return p, nil
 }
 
+// Exec an additional process
 func (c *Container) Exec(ctx context.Context, r *task.ExecProcessRequest) (rproc.Process, error) {
 	process, err := c.process.(*proc.Init).Exec(ctx, c.Bundle, &proc.ExecConfig{
 		ID:       r.ExecID,
@@ -296,18 +320,21 @@ func (c *Container) Exec(ctx context.Context, r *task.ExecProcessRequest) (rproc
 	return process, nil
 }
 
+// Pause the container
 func (c *Container) Pause(ctx context.Context) error {
 	return c.process.(*proc.Init).Pause(ctx)
 }
 
+// Resume the container
 func (c *Container) Resume(ctx context.Context) error {
 	return c.process.(*proc.Init).Resume(ctx)
 }
 
+// ResizePty of a process
 func (c *Container) ResizePty(ctx context.Context, r *task.ResizePtyRequest) error {
-	p := c.Process(r.ExecID)
-	if p == nil {
-		return errors.Wrapf(errdefs.ErrNotFound, "process does not exist %s", r.ExecID)
+	p, err := c.Process(r.ExecID)
+	if err != nil {
+		return err
 	}
 	ws := console.WinSize{
 		Width:  uint16(r.Width),
@@ -316,18 +343,20 @@ func (c *Container) ResizePty(ctx context.Context, r *task.ResizePtyRequest) err
 	return p.Resize(ws)
 }
 
+// Kill a process
 func (c *Container) Kill(ctx context.Context, r *task.KillRequest) error {
-	p := c.Process(r.ExecID)
-	if p == nil {
-		return errors.Wrapf(errdefs.ErrNotFound, "process does not exist %s", r.ExecID)
+	p, err := c.Process(r.ExecID)
+	if err != nil {
+		return err
 	}
 	return p.Kill(ctx, r.Signal, r.All)
 }
 
+// CloseIO of a process
 func (c *Container) CloseIO(ctx context.Context, r *task.CloseIORequest) error {
-	p := c.Process(r.ExecID)
-	if p == nil {
-		return errors.Wrapf(errdefs.ErrNotFound, "process does not exist %s", r.ExecID)
+	p, err := c.Process(r.ExecID)
+	if err != nil {
+		return err
 	}
 	if stdin := p.Stdin(); stdin != nil {
 		if err := stdin.Close(); err != nil {
@@ -337,10 +366,11 @@ func (c *Container) CloseIO(ctx context.Context, r *task.CloseIORequest) error {
 	return nil
 }
 
+// Checkpoint the container
 func (c *Container) Checkpoint(ctx context.Context, r *task.CheckpointTaskRequest) error {
-	p := c.Process("")
-	if p == nil {
-		return errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
+	p, err := c.Process("")
+	if err != nil {
+		return err
 	}
 	var opts options.CheckpointOptions
 	if r.Options != nil {
@@ -362,10 +392,24 @@ func (c *Container) Checkpoint(ctx context.Context, r *task.CheckpointTaskReques
 	})
 }
 
+// Update the resource information of a running container
 func (c *Container) Update(ctx context.Context, r *task.UpdateTaskRequest) error {
-	p := c.Process("")
-	if p == nil {
-		return errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container must be created")
+	p, err := c.Process("")
+	if err != nil {
+		return err
 	}
 	return p.(*proc.Init).Update(ctx, r.Resources)
+}
+
+// HasPid returns true if the container owns a specific pid
+func (c *Container) HasPid(pid int) bool {
+	if c.Pid() == pid {
+		return true
+	}
+	for _, p := range c.All() {
+		if p.Pid() == pid {
+			return true
+		}
+	}
+	return false
 }

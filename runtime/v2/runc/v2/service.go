@@ -16,7 +16,7 @@
    limitations under the License.
 */
 
-package v1
+package v2
 
 import (
 	"context"
@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -57,6 +58,18 @@ var (
 	empty = &ptypes.Empty{}
 )
 
+// group labels specifies how the shim groups services.
+// currently supports a runc.v2 specific .group label and the
+// standard k8s pod label.  Order matters in this list
+var groupLabels = []string{
+	"io.containerd.runc.v2.group",
+	"io.kubernetes.cri.sandbox-id",
+}
+
+type spec struct {
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
 // New returns a new shim service that can be used via GRPC
 func New(ctx context.Context, id string, publisher events.Publisher) (shim.Shim, error) {
 	ep, err := runc.NewOOMEpoller(publisher)
@@ -66,12 +79,13 @@ func New(ctx context.Context, id string, publisher events.Publisher) (shim.Shim,
 	ctx, cancel := context.WithCancel(ctx)
 	go ep.Run(ctx)
 	s := &service{
-		id:      id,
-		context: ctx,
-		events:  make(chan interface{}, 128),
-		ec:      shim.Default.Subscribe(),
-		ep:      ep,
-		cancel:  cancel,
+		id:         id,
+		context:    ctx,
+		events:     make(chan interface{}, 128),
+		ec:         shim.Default.Subscribe(),
+		ep:         ep,
+		cancel:     cancel,
+		containers: make(map[string]*runc.Container),
 	}
 	go s.processExits()
 	runcC.Monitor = shim.Default
@@ -94,8 +108,10 @@ type service struct {
 	ec       chan runcC.Exit
 	ep       *runc.Epoller
 
-	id        string
-	container *runc.Container
+	// id only used in cleanup case
+	id string
+
+	containers map[string]*runc.Container
 
 	cancel func()
 }
@@ -121,11 +137,24 @@ func newCommand(ctx context.Context, id, containerdBinary, containerdAddress str
 	}
 	cmd := exec.Command(self, args...)
 	cmd.Dir = cwd
-	cmd.Env = append(os.Environ(), "GOMAXPROCS=2")
+	cmd.Env = append(os.Environ(), "GOMAXPROCS=4")
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
 	return cmd, nil
+}
+
+func readSpec() (*spec, error) {
+	f, err := os.Open("config.json")
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	var s spec
+	if err := json.NewDecoder(f).Decode(&s); err != nil {
+		return nil, err
+	}
+	return &s, nil
 }
 
 func (s *service) StartShim(ctx context.Context, id, containerdBinary, containerdAddress string) (string, error) {
@@ -133,12 +162,29 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 	if err != nil {
 		return "", err
 	}
-	address, err := shim.SocketAddress(ctx, id)
+	grouping := id
+	spec, err := readSpec()
+	if err != nil {
+		return "", err
+	}
+	for _, group := range groupLabels {
+		if groupID, ok := spec.Annotations[group]; ok {
+			grouping = groupID
+			break
+		}
+	}
+	address, err := shim.SocketAddress(ctx, grouping)
 	if err != nil {
 		return "", err
 	}
 	socket, err := shim.NewSocket(address)
 	if err != nil {
+		if strings.Contains(err.Error(), "address already in use") {
+			if err := shim.WriteAddress("address", address); err != nil {
+				return "", err
+			}
+			return address, nil
+		}
 		return "", err
 	}
 	defer socket.Close()
@@ -160,9 +206,6 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 	}()
 	// make sure to wait after start
 	go cmd.Wait()
-	if err := shim.WritePidFile("shim.pid", cmd.Process.Pid); err != nil {
-		return "", err
-	}
 	if err := shim.WriteAddress("address", address); err != nil {
 		return "", err
 	}
@@ -173,14 +216,16 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 }
 
 func (s *service) Cleanup(ctx context.Context) (*taskAPI.DeleteResponse, error) {
-	path, err := os.Getwd()
+	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
 	}
+	path := filepath.Join(filepath.Dir(cwd), s.id)
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
 	}
+
 	runtime, err := runc.ReadRuntime(path)
 	if err != nil {
 		return nil, err
@@ -210,7 +255,7 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 		return nil, err
 	}
 
-	s.container = container
+	s.containers[r.ID] = container
 
 	s.send(&eventstypes.TaskCreate{
 		ContainerID: r.ID,
@@ -233,7 +278,7 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 
 // Start a process
 func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.StartResponse, error) {
-	container, err := s.getContainer()
+	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +314,7 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 
 // Delete the initial process and container
 func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAPI.DeleteResponse, error) {
-	container, err := s.getContainer()
+	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +324,11 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAP
 	}
 	// if we deleted our init task, close the platform and send the task delete event
 	if r.ExecID == "" {
-		if s.platform != nil {
+		s.mu.Lock()
+		delete(s.containers, r.ID)
+		hasContainers := len(s.containers) > 0
+		s.mu.Unlock()
+		if s.platform != nil && !hasContainers {
 			s.platform.Close()
 		}
 		s.send(&eventstypes.TaskDelete{
@@ -298,7 +347,7 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAP
 
 // Exec an additional process inside the container
 func (s *service) Exec(ctx context.Context, r *taskAPI.ExecProcessRequest) (*ptypes.Empty, error) {
-	container, err := s.getContainer()
+	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -311,7 +360,7 @@ func (s *service) Exec(ctx context.Context, r *taskAPI.ExecProcessRequest) (*pty
 	}
 
 	s.send(&eventstypes.TaskExecAdded{
-		ContainerID: s.container.ID,
+		ContainerID: container.ID,
 		ExecID:      process.ID(),
 	})
 	return empty, nil
@@ -319,7 +368,7 @@ func (s *service) Exec(ctx context.Context, r *taskAPI.ExecProcessRequest) (*pty
 
 // ResizePty of a process
 func (s *service) ResizePty(ctx context.Context, r *taskAPI.ResizePtyRequest) (*ptypes.Empty, error) {
-	container, err := s.getContainer()
+	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +380,11 @@ func (s *service) ResizePty(ctx context.Context, r *taskAPI.ResizePtyRequest) (*
 
 // State returns runtime state information for a process
 func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.StateResponse, error) {
-	p, err := s.getProcess(r.ExecID)
+	container, err := s.getContainer(r.ID)
+	if err != nil {
+		return nil, err
+	}
+	p, err := container.Process(r.ExecID)
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +408,7 @@ func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.
 	sio := p.Stdio()
 	return &taskAPI.StateResponse{
 		ID:         p.ID(),
-		Bundle:     s.container.Bundle,
+		Bundle:     container.Bundle,
 		Pid:        uint32(p.Pid()),
 		Status:     status,
 		Stdin:      sio.Stdin,
@@ -369,7 +422,7 @@ func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.
 
 // Pause the container
 func (s *service) Pause(ctx context.Context, r *taskAPI.PauseRequest) (*ptypes.Empty, error) {
-	container, err := s.getContainer()
+	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +437,7 @@ func (s *service) Pause(ctx context.Context, r *taskAPI.PauseRequest) (*ptypes.E
 
 // Resume the container
 func (s *service) Resume(ctx context.Context, r *taskAPI.ResumeRequest) (*ptypes.Empty, error) {
-	container, err := s.getContainer()
+	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -399,7 +452,7 @@ func (s *service) Resume(ctx context.Context, r *taskAPI.ResumeRequest) (*ptypes
 
 // Kill a process with the provided signal
 func (s *service) Kill(ctx context.Context, r *taskAPI.KillRequest) (*ptypes.Empty, error) {
-	container, err := s.getContainer()
+	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -411,7 +464,7 @@ func (s *service) Kill(ctx context.Context, r *taskAPI.KillRequest) (*ptypes.Emp
 
 // Pids returns all pids inside the container
 func (s *service) Pids(ctx context.Context, r *taskAPI.PidsRequest) (*taskAPI.PidsResponse, error) {
-	container, err := s.getContainer()
+	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -446,7 +499,7 @@ func (s *service) Pids(ctx context.Context, r *taskAPI.PidsRequest) (*taskAPI.Pi
 
 // CloseIO of a process
 func (s *service) CloseIO(ctx context.Context, r *taskAPI.CloseIORequest) (*ptypes.Empty, error) {
-	container, err := s.getContainer()
+	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -458,7 +511,7 @@ func (s *service) CloseIO(ctx context.Context, r *taskAPI.CloseIORequest) (*ptyp
 
 // Checkpoint the container
 func (s *service) Checkpoint(ctx context.Context, r *taskAPI.CheckpointTaskRequest) (*ptypes.Empty, error) {
-	container, err := s.getContainer()
+	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -470,7 +523,7 @@ func (s *service) Checkpoint(ctx context.Context, r *taskAPI.CheckpointTaskReque
 
 // Update a running container
 func (s *service) Update(ctx context.Context, r *taskAPI.UpdateTaskRequest) (*ptypes.Empty, error) {
-	container, err := s.getContainer()
+	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -482,7 +535,7 @@ func (s *service) Update(ctx context.Context, r *taskAPI.UpdateTaskRequest) (*pt
 
 // Wait for a process to exit
 func (s *service) Wait(ctx context.Context, r *taskAPI.WaitRequest) (*taskAPI.WaitResponse, error) {
-	container, err := s.getContainer()
+	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -501,8 +554,8 @@ func (s *service) Wait(ctx context.Context, r *taskAPI.WaitRequest) (*taskAPI.Wa
 // Connect returns shim information such as the shim's pid
 func (s *service) Connect(ctx context.Context, r *taskAPI.ConnectRequest) (*taskAPI.ConnectResponse, error) {
 	var pid int
-	if s.container != nil {
-		pid = s.container.Pid()
+	if container, err := s.getContainer(r.ID); err == nil {
+		pid = container.Pid()
 	}
 	return &taskAPI.ConnectResponse{
 		ShimPid: uint32(os.Getpid()),
@@ -511,13 +564,23 @@ func (s *service) Connect(ctx context.Context, r *taskAPI.ConnectRequest) (*task
 }
 
 func (s *service) Shutdown(ctx context.Context, r *taskAPI.ShutdownRequest) (*ptypes.Empty, error) {
+	s.mu.Lock()
+	// return out if the shim is still servicing containers
+	if len(s.containers) > 0 {
+		s.mu.Unlock()
+		return empty, nil
+	}
 	s.cancel()
 	os.Exit(0)
 	return empty, nil
 }
 
 func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.StatsResponse, error) {
-	cg := s.container.Cgroup()
+	container, err := s.getContainer(r.ID)
+	if err != nil {
+		return nil, err
+	}
+	cg := container.Cgroup()
 	if cg == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "cgroup does not exist")
 	}
@@ -551,35 +614,38 @@ func (s *service) sendL(evt interface{}) {
 }
 
 func (s *service) checkProcesses(e runcC.Exit) {
-	container, err := s.getContainer()
-	if err != nil {
-		return
-	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	shouldKillAll, err := shouldKillAllOnExit(container.Bundle)
-	if err != nil {
-		log.G(s.context).WithError(err).Error("failed to check shouldKillAll")
-	}
+	for _, container := range s.containers {
+		if container.HasPid(e.Pid) {
+			shouldKillAll, err := shouldKillAllOnExit(container.Bundle)
+			if err != nil {
+				log.G(s.context).WithError(err).Error("failed to check shouldKillAll")
+			}
 
-	for _, p := range container.All() {
-		if p.Pid() == e.Pid {
-			if shouldKillAll {
-				if ip, ok := p.(*proc.Init); ok {
-					// Ensure all children are killed
-					if err := ip.KillAll(s.context); err != nil {
-						logrus.WithError(err).WithField("id", ip.ID()).
-							Error("failed to kill init's children")
+			for _, p := range container.All() {
+				if p.Pid() == e.Pid {
+					if shouldKillAll {
+						if ip, ok := p.(*proc.Init); ok {
+							// Ensure all children are killed
+							if err := ip.KillAll(s.context); err != nil {
+								logrus.WithError(err).WithField("id", ip.ID()).
+									Error("failed to kill init's children")
+							}
+						}
 					}
+					p.SetExited(e.Status)
+					s.sendL(&eventstypes.TaskExit{
+						ContainerID: container.ID,
+						ID:          p.ID(),
+						Pid:         uint32(e.Pid),
+						ExitStatus:  uint32(e.Status),
+						ExitedAt:    p.ExitedAt(),
+					})
+					return
 				}
 			}
-			p.SetExited(e.Status)
-			s.sendL(&eventstypes.TaskExit{
-				ContainerID: container.ID,
-				ID:          p.ID(),
-				Pid:         uint32(e.Pid),
-				ExitStatus:  uint32(e.Status),
-				ExitedAt:    p.ExitedAt(),
-			})
 			return
 		}
 	}
@@ -605,7 +671,11 @@ func shouldKillAllOnExit(bundlePath string) (bool, error) {
 }
 
 func (s *service) getContainerPids(ctx context.Context, id string) ([]uint32, error) {
-	p, err := s.container.Process("")
+	container, err := s.getContainer(id)
+	if err != nil {
+		return nil, err
+	}
+	p, err := container.Process("")
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -631,26 +701,14 @@ func (s *service) forward(publisher events.Publisher) {
 	}
 }
 
-func (s *service) getContainer() (*runc.Container, error) {
+func (s *service) getContainer(id string) (*runc.Container, error) {
 	s.mu.Lock()
-	container := s.container
+	container := s.containers[id]
 	s.mu.Unlock()
 	if container == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "container not created")
 	}
 	return container, nil
-}
-
-func (s *service) getProcess(execID string) (rproc.Process, error) {
-	container, err := s.getContainer()
-	if err != nil {
-		return nil, err
-	}
-	p, err := container.Process(execID)
-	if err != nil {
-		return nil, errdefs.ToGRPC(err)
-	}
-	return p, nil
 }
 
 // initialize a single epoll fd to manage our consoles. `initPlatform` should

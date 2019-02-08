@@ -16,7 +16,7 @@
 #linux specific settings
 WHALE="+"
 ONI="-"
-COMMANDS += containerd-shim containerd-shim-runc-v1
+COMMANDS += containerd-shim containerd-shim-runc-v1 containerd-shim-runc-v2
 
 # check GOOS for cross compile builds
 ifeq ($(GOOS),linux)

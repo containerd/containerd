@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	api "github.com/containerd/containerd/api/services/tasks/v1"
@@ -687,8 +688,8 @@ func getCheckpointPath(runtime string, option *ptypes.Any) (string, error) {
 	}
 
 	var checkpointPath string
-	switch runtime {
-	case "io.containerd.runc.v1":
+	switch {
+	case checkRuntime(runtime, "io.containerd.runc"):
 		v, err := typeurl.UnmarshalAny(option)
 		if err != nil {
 			return "", err
@@ -699,7 +700,7 @@ func getCheckpointPath(runtime string, option *ptypes.Any) (string, error) {
 		}
 		checkpointPath = opts.ImagePath
 
-	case "io.containerd.runtime.v1.linux":
+	case runtime == plugin.RuntimeLinuxV1:
 		v, err := typeurl.UnmarshalAny(option)
 		if err != nil {
 			return "", err
@@ -721,8 +722,8 @@ func getRestorePath(runtime string, option *ptypes.Any) (string, error) {
 	}
 
 	var restorePath string
-	switch runtime {
-	case "io.containerd.runc.v1":
+	switch {
+	case checkRuntime(runtime, "io.containerd.runc"):
 		v, err := typeurl.UnmarshalAny(option)
 		if err != nil {
 			return "", err
@@ -732,8 +733,7 @@ func getRestorePath(runtime string, option *ptypes.Any) (string, error) {
 			return "", fmt.Errorf("invalid task create option for %s", runtime)
 		}
 		restorePath = opts.CriuImagePath
-
-	case "io.containerd.runtime.v1.linux":
+	case runtime == plugin.RuntimeLinuxV1:
 		v, err := typeurl.UnmarshalAny(option)
 		if err != nil {
 			return "", err
@@ -746,4 +746,21 @@ func getRestorePath(runtime string, option *ptypes.Any) (string, error) {
 	}
 
 	return restorePath, nil
+}
+
+// checkRuntime returns true if the current runtime matches the expected
+// runtime. Providing various parts of the runtime schema will match those
+// parts of the expected runtime
+func checkRuntime(current, expected string) bool {
+	cp := strings.Split(current, ".")
+	l := len(cp)
+	for i, p := range strings.Split(expected, ".") {
+		if i > l {
+			return false
+		}
+		if p != cp[i] {
+			return false
+		}
+	}
+	return true
 }

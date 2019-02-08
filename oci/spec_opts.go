@@ -1063,3 +1063,17 @@ func WithMemoryLimit(limit uint64) SpecOpts {
 		return nil
 	}
 }
+
+// WithAnnotations appends or replaces the annotations on the spec with the
+// provided annotations
+func WithAnnotations(annotations map[string]string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		if s.Annotations == nil {
+			s.Annotations = make(map[string]string)
+		}
+		for k, v := range annotations {
+			s.Annotations[k] = v
+		}
+		return nil
+	}
+}
