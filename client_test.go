@@ -28,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
@@ -405,7 +406,7 @@ func TestDefaultRuntimeWithNamespaceLabels(t *testing.T) {
 	defer cancel()
 	namespaces := client.NamespaceService()
 	testRuntime := "testRuntime"
-	runtimeLabel := "containerd.io/defaults/runtime"
+	runtimeLabel := defaults.DefaultRuntimeNSLabel
 	if err := namespaces.SetLabel(ctx, testNamespace, runtimeLabel, testRuntime); err != nil {
 		t.Fatal(err)
 	}

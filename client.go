@@ -144,7 +144,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 		namespaces := c.NamespaceService()
 		ctx := context.Background()
 		if labels, err := namespaces.Labels(ctx, copts.defaultns); err == nil {
-			if defaultRuntime, ok := labels["containerd.io/defaults/runtime"]; ok {
+			if defaultRuntime, ok := labels[defaults.DefaultRuntimeNSLabel]; ok {
 				c.runtime = defaultRuntime
 			}
 		} else {
@@ -174,7 +174,7 @@ func NewWithConn(conn *grpc.ClientConn, opts ...ClientOpt) (*Client, error) {
 		namespaces := c.NamespaceService()
 		ctx := context.Background()
 		if labels, err := namespaces.Labels(ctx, copts.defaultns); err == nil {
-			if defaultRuntime, ok := labels["containerd.io/defaults/runtime"]; ok {
+			if defaultRuntime, ok := labels[defaults.DefaultRuntimeNSLabel]; ok {
 				c.runtime = defaultRuntime
 			}
 		} else {
