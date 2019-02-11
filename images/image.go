@@ -64,6 +64,9 @@ type DeleteOptions struct {
 // DeleteOpt allows configuring a delete operation
 type DeleteOpt func(context.Context, *DeleteOptions) error
 
+// LayerFilter allows to select Layers by certain criteria
+type LayerFilter func(desc ocispec.Descriptor) bool
+
 // SynchronousDelete is used to indicate that an image deletion and removal of
 // the image resources should occur synchronously before returning a result.
 func SynchronousDelete() DeleteOpt {
@@ -85,6 +88,14 @@ type Store interface {
 
 	Delete(ctx context.Context, name string, opts ...DeleteOpt) error
 }
+
+type cryptoOp int
+
+const (
+	cryptoOpEncrypt    cryptoOp = iota
+	cryptoOpDecrypt             = iota
+	cryptoOpUnwrapOnly          = iota
+)
 
 // TODO(stevvooe): Many of these functions make strong platform assumptions,
 // which are untrue in a lot of cases. More refactoring must be done here to
@@ -359,6 +370,7 @@ func Children(ctx context.Context, provider content.Provider, desc ocispec.Descr
 
 		descs = append(descs, index.Manifests...)
 	case MediaTypeDockerSchema2Layer, MediaTypeDockerSchema2LayerGzip,
+		MediaTypeDockerSchema2LayerEnc, MediaTypeDockerSchema2LayerGzipEnc,
 		MediaTypeDockerSchema2LayerForeign, MediaTypeDockerSchema2LayerForeignGzip,
 		MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig,
 		ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerGzip,
@@ -396,7 +408,7 @@ func RootFS(ctx context.Context, provider content.Provider, configDesc ocispec.D
 func IsCompressedDiff(ctx context.Context, mediaType string) (bool, error) {
 	switch mediaType {
 	case ocispec.MediaTypeImageLayer, MediaTypeDockerSchema2Layer:
-	case ocispec.MediaTypeImageLayerGzip, MediaTypeDockerSchema2LayerGzip:
+	case ocispec.MediaTypeImageLayerGzip, MediaTypeDockerSchema2LayerGzip, MediaTypeDockerSchema2LayerGzipEnc:
 		return true, nil
 	default:
 		// Still apply all generic media types *.tar[.+]gzip and *.tar
@@ -407,4 +419,50 @@ func IsCompressedDiff(ctx context.Context, mediaType string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+// GetImageLayerDescriptors gets the image layer Descriptors of an image; the array contains
+// a list of Descriptors belonging to one platform followed by lists of other platforms
+func GetImageLayerDescriptors(ctx context.Context, cs content.Store, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	var lis []ocispec.Descriptor
+
+	ds := platforms.DefaultSpec()
+	platform := &ds
+
+	switch desc.MediaType {
+	case MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex,
+		MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+		children, err := Children(ctx, cs, desc)
+		if err != nil {
+			if errdefs.IsNotFound(err) {
+				return []ocispec.Descriptor{}, nil
+			}
+			return []ocispec.Descriptor{}, err
+		}
+
+		if desc.Platform != nil {
+			platform = desc.Platform
+		}
+
+		for _, child := range children {
+			var tmp []ocispec.Descriptor
+
+			if isDescriptorALayer(child) {
+				tdesc := child
+				tdesc.Platform = platform
+				tmp = append(tmp, tdesc)
+			} else {
+				tmp, err = GetImageLayerDescriptors(ctx, cs, child)
+			}
+			if err != nil {
+				return []ocispec.Descriptor{}, err
+			}
+
+			lis = append(lis, tmp...)
+		}
+	case MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig:
+	default:
+		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "GetImageLayerInfo: unhandled media type %s", desc.MediaType)
+	}
+	return lis, nil
 }
