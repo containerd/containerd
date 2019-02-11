@@ -1,0 +1,36 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.1.5"
+
+pre_release = false
+
+preface = """\
+This is the sixth patch release for the `containerd` 1.1 release. This
+release specifically re-vendors `runc` to capture the fix for the critical
+CVE-2019-5736 container escape. Several CRI fixes were also included in
+this release and are listed below.
+
+## Runtime
+* Update runc to 6635b4f0c6af3810594d2770f662f34ddc15b40d to fix CVE-2019-5736
+
+## CRI
+* containerd/cri#984 filter events for non k8s.io namespaces (resolves https://github.com/firecracker-microvm/firecracker-containerd/issues/35)
+* containerd/cri#991 Remove container lifecycle image dependency (fixes containerd/cri#990)
+* containerd/cri#1016 Specify platform for image pull (fixes containerd/cri#1015)
+* containerd/cri#1027 Fix the log ending newline handling (fixes containerd/cri#1026)
+* containerd/cri#1042 Set /etc/hostname (fixes containerd/cri#1041)
+* containerd/cri#1045 Fix env performance issue (fixes containerd/cri#1044)
+* Update cri to f0b5665a959119b6a6234001e6d55206d9200e95
+
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
