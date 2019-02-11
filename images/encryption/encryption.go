@@ -285,7 +285,7 @@ func GetCryptoConfigFromAnnotations(desc *ocispec.Descriptor) (*config.CryptoCon
 		Dc: &config.DecryptConfig{},
 	}
 
-	dcparametersStr, _ := desc.Annotations["_dcparameters"]
+	dcparametersStr := desc.Annotations["_dcparameters"]
 	if len(dcparametersStr) == 0 {
 		return cc, nil
 	}

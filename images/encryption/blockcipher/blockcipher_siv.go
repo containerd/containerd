@@ -150,7 +150,7 @@ func (bc *AESSIVLayerBlockCipher) init(encrypt bool, reader content.ReaderAt, op
 
 	key := opt.SymmetricKey
 	if len(key) != bc.bits/8 {
-		return LayerBlockCipherOptions{}, fmt.Errorf("Invalid key length of %d bytes; need %d bytes", len(key), bc.bits/8)
+		return LayerBlockCipherOptions{}, fmt.Errorf("invalid key length of %d bytes; need %d bytes", len(key), bc.bits/8)
 	}
 
 	nonceStr := opt.CipherOptions["nonce"]

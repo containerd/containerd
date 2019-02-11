@@ -116,9 +116,9 @@ func newGPGClient(version *GPGVersion, homedir string) (GPGClient, error) {
 			gpgClient: gpgClient{gpgHomeDir: homedir},
 		}, nil
 	case GPGVersionUndetermined:
-		return nil, fmt.Errorf("Unable to determine GPG version")
+		return nil, fmt.Errorf("unable to determine GPG version")
 	default:
-		return nil, fmt.Errorf("Unhandled case: NewGPGClient")
+		return nil, fmt.Errorf("unhandled case: NewGPGClient")
 	}
 }
 
@@ -261,7 +261,7 @@ func runGPGGetOutput(cmd *exec.Cmd) ([]byte, error) {
 	stderrstr, _ := ioutil.ReadAll(stderr)
 
 	if err := cmd.Wait(); err != nil {
-		return nil, fmt.Errorf("Error from %s: %s", cmd.Path, string(stderrstr))
+		return nil, fmt.Errorf("error from %s: %s", cmd.Path, string(stderrstr))
 	}
 
 	return stdoutstr, err2

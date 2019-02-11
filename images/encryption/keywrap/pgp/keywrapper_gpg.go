@@ -109,7 +109,7 @@ func (kw *gpgKeyWrapper) UnwrapKey(dc *config.DecryptConfig, pgpPacket []byte) (
 			responded := false
 			prompt = func(keys []openpgp.Key, symmetric bool) ([]byte, error) {
 				if responded {
-					return nil, fmt.Errorf("Don't seem to have the right password")
+					return nil, fmt.Errorf("don't seem to have the right password")
 				}
 				responded = true
 				for _, key := range keys {
