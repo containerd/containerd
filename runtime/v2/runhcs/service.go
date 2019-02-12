@@ -366,11 +366,11 @@ func writeMountsToConfig(bundle string, mounts []*containerd_types.Mount) error 
 		return errors.Errorf("unsupported mount type '%s'", m.Type)
 	}
 
-	// parentLayerPaths are passed in layerN, layerN-1, ..., layer 0
+	// parentLayerPaths are passed in:
+	//   layerN, layerN-1, ..., layer0
 	//
 	// The OCI spec expects:
-	//   windows-layer order is layerN, layerN-1, ..., layer0, scratch
-	//   lcow-layer    order is layer0,   layer1, ..., layerN, scratch
+	//   layerN, layerN-1, ..., layer0, scratch
 	var parentLayerPaths []string
 	for _, option := range mounts[0].Options {
 		if strings.HasPrefix(option, mount.ParentLayerPathsFlag) {
@@ -382,12 +382,6 @@ func writeMountsToConfig(bundle string, mounts []*containerd_types.Mount) error 
 	}
 
 	if m.Type == "lcow-layer" {
-		// Reverse the lcow-layer parents
-		for i := len(parentLayerPaths)/2 - 1; i >= 0; i-- {
-			opp := len(parentLayerPaths) - 1 - i
-			parentLayerPaths[i], parentLayerPaths[opp] = parentLayerPaths[opp], parentLayerPaths[i]
-		}
-
 		// If we are creating LCOW make sure that spec.Windows is filled out before
 		// appending layer folders.
 		if spec.Windows == nil {
