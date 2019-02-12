@@ -25,6 +25,7 @@ import (
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/docker/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -324,6 +325,7 @@ func TestRestrictOOMScoreAdj(t *testing.T) {
 
 func TestCustomGenerator(t *testing.T) {
 	for desc, test := range map[string]struct {
+		existing  []string
 		kv        [][2]string
 		expected  []string
 		expectNil bool
@@ -356,16 +358,44 @@ func TestCustomGenerator(t *testing.T) {
 				{"k3", "v3"},
 				{"k3", "v4"},
 				{"k1", "v5"},
+				{"k4", "v6"},
 			},
 			expected: []string{
 				"k1=v5",
 				"k2=v2",
 				"k3=v4",
+				"k4=v6",
+			},
+		},
+		"existing env": {
+			existing: []string{
+				"k1=v1",
+				"k2=v2",
+				"k3=v3",
+			},
+			kv: [][2]string{
+				{"k3", "v4"},
+				{"k2", "v5"},
+				{"k4", "v6"},
+			},
+			expected: []string{
+				"k1=v1",
+				"k2=v5",
+				"k3=v4",
+				"k4=v6",
 			},
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		g := newSpecGenerator(nil)
+		var spec *runtimespec.Spec
+		if len(test.existing) > 0 {
+			spec = &runtimespec.Spec{
+				Process: &runtimespec.Process{
+					Env: test.existing,
+				},
+			}
+		}
+		g := newSpecGenerator(spec)
 		for _, kv := range test.kv {
 			g.AddProcessEnv(kv[0], kv[1])
 		}
