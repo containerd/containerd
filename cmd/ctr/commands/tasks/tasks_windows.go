@@ -64,7 +64,7 @@ func NewTask(ctx gocontext.Context, client *containerd.Client, container contain
 		if nullIO {
 			return nil, errors.New("tty and null-io cannot be used together")
 		}
-		ioCreator = cio.NewCreator(append([]cio.Opt{cio.WithStreams(con, con, con), cio.WithTerminal}, ioOpts...)...)
+		ioCreator = cio.NewCreator(append([]cio.Opt{cio.WithStreams(con, con, nil), cio.WithTerminal}, ioOpts...)...)
 	} else if nullIO {
 		ioCreator = cio.NullIO
 	} else {
