@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/oci"
 	cni "github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
+	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -55,6 +56,7 @@ func init() {
 // the sandbox is in ready state.
 func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandboxRequest) (_ *runtime.RunPodSandboxResponse, retErr error) {
 	config := r.GetConfig()
+	logrus.Debugf("Sandbox config %+v", config)
 
 	// Generate unique id and name for the sandbox and reserve the name.
 	id := util.GenerateID()
@@ -149,7 +151,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate sandbox container spec")
 	}
-	logrus.Debugf("Sandbox container spec: %+v", spec)
+	logrus.Debugf("Sandbox container %q spec: %#+v", id, spew.NewFormatter(spec))
 
 	var specOpts []oci.SpecOpts
 	userstr, err := generateUserString(
