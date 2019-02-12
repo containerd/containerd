@@ -39,3 +39,29 @@ func WithWindowsCPUCount(count uint64) SpecOpts {
 		return nil
 	}
 }
+
+// WithWindowsIgnoreFlushesDuringBoot sets `Windows.IgnoreFlushesDuringBoot`.
+func WithWindowsIgnoreFlushesDuringBoot() SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		if s.Windows == nil {
+			s.Windows = &specs.Windows{}
+		}
+		s.Windows.IgnoreFlushesDuringBoot = true
+		return nil
+	}
+}
+
+// WithWindowNetworksAllowUnqualifiedDNSQuery sets `Windows.IgnoreFlushesDuringBoot`.
+func WithWindowNetworksAllowUnqualifiedDNSQuery() SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		if s.Windows == nil {
+			s.Windows = &specs.Windows{}
+		}
+		if s.Windows.Network == nil {
+			s.Windows.Network = &specs.WindowsNetwork{}
+		}
+
+		s.Windows.Network.AllowUnqualifiedDNSQuery = true
+		return nil
+	}
+}
