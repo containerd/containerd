@@ -321,3 +321,58 @@ func TestRestrictOOMScoreAdj(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, got, current+1)
 }
+
+func TestCustomGenerator(t *testing.T) {
+	for desc, test := range map[string]struct {
+		kv        [][2]string
+		expected  []string
+		expectNil bool
+	}{
+		"empty": {
+			expectNil: true,
+		},
+		"single env": {
+			kv: [][2]string{
+				{"a", "b"},
+			},
+			expected: []string{"a=b"},
+		},
+		"multiple envs": {
+			kv: [][2]string{
+				{"a", "b"},
+				{"c", "d"},
+				{"e", "f"},
+			},
+			expected: []string{
+				"a=b",
+				"c=d",
+				"e=f",
+			},
+		},
+		"env override": {
+			kv: [][2]string{
+				{"k1", "v1"},
+				{"k2", "v2"},
+				{"k3", "v3"},
+				{"k3", "v4"},
+				{"k1", "v5"},
+			},
+			expected: []string{
+				"k1=v5",
+				"k2=v2",
+				"k3=v4",
+			},
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		g := newSpecGenerator(nil)
+		for _, kv := range test.kv {
+			g.AddProcessEnv(kv[0], kv[1])
+		}
+		if test.expectNil {
+			assert.Nil(t, g.Config)
+		} else {
+			assert.Equal(t, test.expected, g.Config.Process.Env)
+		}
+	}
+}

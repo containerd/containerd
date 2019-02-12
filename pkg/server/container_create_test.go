@@ -450,8 +450,9 @@ func TestContainerSpecCommand(t *testing.T) {
 	} {
 
 		config, _, imageConfig, _ := getCreateContainerTestData()
-		g, err := generate.New("linux")
+		og, err := generate.New("linux")
 		assert.NoError(t, err)
+		g := newCustomGenerator(og)
 		config.Command = test.criEntrypoint
 		config.Args = test.criArgs
 		imageConfig.Entrypoint = test.imageEntrypoint
@@ -645,8 +646,9 @@ func TestPrivilegedBindMount(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		g, err := generate.New("linux")
+		og, err := generate.New("linux")
 		assert.NoError(t, err)
+		g := newCustomGenerator(og)
 		c := newTestCRIService()
 		c.addOCIBindMounts(&g, nil, "")
 		if test.privileged {
@@ -754,8 +756,9 @@ func TestMountPropagation(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		g, err := generate.New("linux")
+		og, err := generate.New("linux")
 		assert.NoError(t, err)
+		g := newCustomGenerator(og)
 		c := newTestCRIService()
 		c.os.(*ostesting.FakeOS).LookupMountFn = test.fakeLookupMountFn
 		err = c.addOCIBindMounts(&g, []*runtime.Mount{test.criMount}, "")
