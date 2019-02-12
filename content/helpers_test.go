@@ -81,7 +81,7 @@ func TestCopy(t *testing.T) {
 				testcase.source.digest)
 
 			assert.NilError(t, err)
-			assert.Check(t, is.Equal(testcase.source.digest, testcase.writer.commitedDigest))
+			assert.Check(t, is.Equal(testcase.source.digest, testcase.writer.committedDigest))
 			assert.Check(t, is.Equal(testcase.expected, testcase.writer.String()))
 		})
 	}
@@ -97,9 +97,9 @@ func newCopySource(raw string) copySource {
 
 type fakeWriter struct {
 	bytes.Buffer
-	commitedDigest digest.Digest
-	status         Status
-	commitFunc     func() error
+	committedDigest digest.Digest
+	status          Status
+	commitFunc      func() error
 }
 
 func (f *fakeWriter) Close() error {
@@ -108,7 +108,7 @@ func (f *fakeWriter) Close() error {
 }
 
 func (f *fakeWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...Opt) error {
-	f.commitedDigest = expected
+	f.committedDigest = expected
 	if f.commitFunc == nil {
 		return nil
 	}
@@ -116,7 +116,7 @@ func (f *fakeWriter) Commit(ctx context.Context, size int64, expected digest.Dig
 }
 
 func (f *fakeWriter) Digest() digest.Digest {
-	return f.commitedDigest
+	return f.committedDigest
 }
 
 func (f *fakeWriter) Status() (Status, error) {
