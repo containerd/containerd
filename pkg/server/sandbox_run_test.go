@@ -180,15 +180,30 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 }
 
 func TestSetupSandboxFiles(t *testing.T) {
-	const testID = "test-id"
+	const (
+		testID       = "test-id"
+		realhostname = "test-real-hostname"
+	)
 	for desc, test := range map[string]struct {
 		dnsConfig     *runtime.DNSConfig
+		hostname      string
 		ipcMode       runtime.NamespaceMode
 		expectedCalls []ostesting.CalledDetail
 	}{
 		"should check host /dev/shm existence when ipc mode is NODE": {
 			ipcMode: runtime.NamespaceMode_NODE,
 			expectedCalls: []ostesting.CalledDetail{
+				{
+					Name: "Hostname",
+				},
+				{
+					Name: "WriteFile",
+					Arguments: []interface{}{
+						filepath.Join(testRootDir, sandboxesDir, testID, "hostname"),
+						[]byte(realhostname + "\n"),
+						os.FileMode(0644),
+					},
+				},
 				{
 					Name: "CopyFile",
 					Arguments: []interface{}{
@@ -220,6 +235,17 @@ func TestSetupSandboxFiles(t *testing.T) {
 			ipcMode: runtime.NamespaceMode_NODE,
 			expectedCalls: []ostesting.CalledDetail{
 				{
+					Name: "Hostname",
+				},
+				{
+					Name: "WriteFile",
+					Arguments: []interface{}{
+						filepath.Join(testRootDir, sandboxesDir, testID, "hostname"),
+						[]byte(realhostname + "\n"),
+						os.FileMode(0644),
+					},
+				},
+				{
 					Name: "CopyFile",
 					Arguments: []interface{}{
 						"/etc/hosts",
@@ -246,6 +272,17 @@ options timeout:1
 		"should create sandbox shm when ipc namespace mode is not NODE": {
 			ipcMode: runtime.NamespaceMode_POD,
 			expectedCalls: []ostesting.CalledDetail{
+				{
+					Name: "Hostname",
+				},
+				{
+					Name: "WriteFile",
+					Arguments: []interface{}{
+						filepath.Join(testRootDir, sandboxesDir, testID, "hostname"),
+						[]byte(realhostname + "\n"),
+						os.FileMode(0644),
+					},
+				},
 				{
 					Name: "CopyFile",
 					Arguments: []interface{}{
@@ -275,10 +312,48 @@ options timeout:1
 				},
 			},
 		},
+		"should create /etc/hostname when hostname is set": {
+			hostname: "test-hostname",
+			ipcMode:  runtime.NamespaceMode_NODE,
+			expectedCalls: []ostesting.CalledDetail{
+				{
+					Name: "WriteFile",
+					Arguments: []interface{}{
+						filepath.Join(testRootDir, sandboxesDir, testID, "hostname"),
+						[]byte("test-hostname\n"),
+						os.FileMode(0644),
+					},
+				},
+				{
+					Name: "CopyFile",
+					Arguments: []interface{}{
+						"/etc/hosts",
+						filepath.Join(testRootDir, sandboxesDir, testID, "hosts"),
+						os.FileMode(0644),
+					},
+				},
+				{
+					Name: "CopyFile",
+					Arguments: []interface{}{
+						"/etc/resolv.conf",
+						filepath.Join(testRootDir, sandboxesDir, testID, "resolv.conf"),
+						os.FileMode(0644),
+					},
+				},
+				{
+					Name:      "Stat",
+					Arguments: []interface{}{"/dev/shm"},
+				},
+			},
+		},
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIService()
+		c.os.(*ostesting.FakeOS).HostnameFn = func() (string, error) {
+			return realhostname, nil
+		}
 		cfg := &runtime.PodSandboxConfig{
+			Hostname:  test.hostname,
 			DnsConfig: test.dnsConfig,
 			Linux: &runtime.LinuxPodSandboxConfig{
 				SecurityContext: &runtime.LinuxSandboxSecurityContext{
