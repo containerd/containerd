@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/platforms"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -104,6 +105,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	image, err := c.client.Pull(ctx, ref,
 		containerd.WithSchema1Conversion,
 		containerd.WithResolver(resolver),
+		containerd.WithPlatform(platforms.Default()),
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to pull image %q", ref)

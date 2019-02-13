@@ -31,6 +31,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/util/clock"
 
+	"github.com/containerd/cri/pkg/constants"
 	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
 	"github.com/containerd/cri/pkg/store"
 	containerstore "github.com/containerd/cri/pkg/store/container"
@@ -77,7 +78,6 @@ type backOffQueue struct {
 // Create new event monitor. New event monitor will start subscribing containerd event. All events
 // happen after it should be monitored.
 func newEventMonitor(c *containerstore.Store, s *sandboxstore.Store) *eventMonitor {
-	// event subscribe doesn't need namespace.
 	ctx, cancel := context.WithCancel(context.Background())
 	return &eventMonitor{
 		containerStore: c,
@@ -90,6 +90,8 @@ func newEventMonitor(c *containerstore.Store, s *sandboxstore.Store) *eventMonit
 
 // subscribe starts to subscribe containerd events.
 func (em *eventMonitor) subscribe(subscriber events.Subscriber) {
+	// note: filters are any match, if you want any match but not in namespace foo
+	// then you have to manually filter namespace foo
 	filters := []string{
 		`topic=="/tasks/exit"`,
 		`topic=="/tasks/oom"`,
@@ -104,11 +106,11 @@ func convertEvent(e *gogotypes.Any) (string, interface{}, error) {
 		return "", nil, errors.Wrap(err, "failed to unmarshalany")
 	}
 
-	switch evt.(type) {
+	switch e := evt.(type) {
 	case *eventtypes.TaskExit:
-		containerID = evt.(*eventtypes.TaskExit).ContainerID
+		containerID = e.ContainerID
 	case *eventtypes.TaskOOM:
-		containerID = evt.(*eventtypes.TaskOOM).ContainerID
+		containerID = e.ContainerID
 	default:
 		return "", nil, errors.New("unsupported event")
 	}
@@ -130,6 +132,10 @@ func (em *eventMonitor) start() <-chan error {
 			select {
 			case e := <-em.ch:
 				logrus.Debugf("Received containerd event timestamp - %v, namespace - %q, topic - %q", e.Timestamp, e.Namespace, e.Topic)
+				if e.Namespace != constants.K8sContainerdNamespace {
+					logrus.Debugf("Ignoring events in namespace - %q", e.Namespace)
+					break
+				}
 				cID, evt, err := convertEvent(e.Event)
 				if err != nil {
 					logrus.WithError(err).Errorf("Failed to convert event %+v", e)
@@ -179,13 +185,12 @@ func (em *eventMonitor) stop() {
 // handleEvent handles a containerd event.
 func (em *eventMonitor) handleEvent(any interface{}) error {
 	ctx := ctrdutil.NamespacedContext()
-	switch any.(type) {
+	switch e := any.(type) {
 	// If containerd-shim exits unexpectedly, there will be no corresponding event.
 	// However, containerd could not retrieve container state in that case, so it's
 	// fine to leave out that case for now.
 	// TODO(random-liu): [P2] Handle containerd-shim exit.
 	case *eventtypes.TaskExit:
-		e := any.(*eventtypes.TaskExit)
 		cntr, err := em.containerStore.Get(e.ContainerID)
 		if err == nil {
 			if err := handleContainerExit(ctx, e, cntr); err != nil {
@@ -207,7 +212,6 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 		}
 		return nil
 	case *eventtypes.TaskOOM:
-		e := any.(*eventtypes.TaskOOM)
 		logrus.Infof("TaskOOM event %+v", e)
 		cntr, err := em.containerStore.Get(e.ContainerID)
 		if err != nil {
