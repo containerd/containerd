@@ -627,6 +627,13 @@ file {
       }
       json_name: "exitedAt"
     }
+    field {
+      name: "id"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
   }
   message_type {
     name: "TaskIO"
