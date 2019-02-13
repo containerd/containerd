@@ -179,6 +179,14 @@ func WithImageHandler(h images.Handler) RemoteOpt {
 	}
 }
 
+// WithImageHandlerWrapper wraps the handlers to be called on dispatch.
+func WithImageHandlerWrapper(w func(images.Handler) images.Handler) RemoteOpt {
+	return func(client *Client, c *RemoteContext) error {
+		c.HandlerWrapper = w
+		return nil
+	}
+}
+
 // WithMaxConcurrentDownloads sets max concurrent download limit.
 func WithMaxConcurrentDownloads(max int) RemoteOpt {
 	return func(client *Client, c *RemoteContext) error {
