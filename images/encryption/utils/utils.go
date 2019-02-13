@@ -196,6 +196,11 @@ func SortDecryptionKeys(b64ItemList string) (map[string][][]byte, error) {
 		}
 		if isPrivKey {
 			key = "privkeys"
+			if _, ok := dcparameters["privkeys-passwords"]; !ok {
+				dcparameters["privkeys-passwords"] = [][]byte{password}
+			} else {
+				dcparameters["privkeys-passwords"] = append(dcparameters["privkeys-passwords"], password)
+			}
 		} else if IsCertificate(keyData) {
 			key = "x509s"
 		} else if IsGPGPrivateKeyRing(keyData) {
