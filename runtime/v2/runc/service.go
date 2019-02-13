@@ -412,8 +412,9 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAP
 // Exec an additional process inside the container
 func (s *service) Exec(ctx context.Context, r *taskAPI.ExecProcessRequest) (*ptypes.Empty, error) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	p := s.processes[r.ExecID]
-	s.mu.Unlock()
 	if p != nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrAlreadyExists, "id %s", r.ExecID)
 	}
@@ -432,9 +433,7 @@ func (s *service) Exec(ctx context.Context, r *taskAPI.ExecProcessRequest) (*pty
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-	s.mu.Lock()
 	s.processes[r.ExecID] = process
-	s.mu.Unlock()
 
 	s.send(&eventstypes.TaskExecAdded{
 		ContainerID: s.id,
