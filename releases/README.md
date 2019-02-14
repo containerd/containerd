@@ -54,4 +54,7 @@
    3. Check CI has completed and uploaded the binaries. Remove any binaries which get
       uploaded but are not intended as part of the release (e.g. Darwin binaries).
 
-4. Promote on Slack, Twitter, mailing lists, etc
+4. Update [`config.toml`](https://github.com/containerd/containerd.io/blob/f827d53826a426cb48f24cc08e43cc8722ad6d01/config.toml#L35) with latest release in the [containerd/containerd.io project](https://github.com/containerd/containerd.io); open PR to
+   force website downloads update.
+
+5. Promote on Slack, Twitter, mailing lists, etc
