@@ -39,6 +39,17 @@ See [test dashboard](https://k8s-testgrid.appspot.com/sig-node-containerd)
 |                        |        v1.2        |        1.10+       |   v1alpha2  |
 |                        |        HEAD        |        1.10+       |   v1alpha2  |
 
+**Note:** The support table above specifies the Kubernetes Version that was supported at time of release of the containerd - cri integration.
+
+The following is the current support table for containerd CRI integration taking into account that Kubernetes only supports n-3 minor release versions and 1.10 is now end-of-life.
+
+| Containerd Version | Kubernetes Version | CRI Version |
+|:------------------:|:------------------:|:-----------:|
+|        v1.1        |        1.11+       |   v1alpha2  |
+|        v1.2        |        1.11+       |   v1alpha2  |
+|        HEAD        |        1.11+       |   v1alpha2  |
+
+
 ## Production Quality Cluster on GCE
 For a production quality cluster on GCE brought up with `kube-up.sh` refer [here](docs/kube-up.md).
 ## Installing with Ansible and Kubeadm
