@@ -1,0 +1,31 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.2.3"
+
+pre_release = false
+
+preface = """\
+The fourth patch release for `containerd` 1.2 re-vendors
+`runc` which includes the patch for the critical CVE-2019-5736 escape
+vulnerability. This release also includes a few fixes for the CRI plugin as
+well as a change for Windows; all these changes are noted below.
+
+### Notable Updates
+* cri: Set /etc/hostname [#1042](https://github.com/containerd/cri/pull/1042)
+* cri: Fix env performance issue [#1045](https://github.com/containerd/cri/pull/1045)
+* runc updated to 6635b4f0c6af3810594d2770f662f34ddc15b40d to solve CVE-2019-5736
+* cri updated to da0c016c830b2ea97fd1d737c49a568a816bf964
+* Windows: NewDirectIOFromFIFOSet [#2934](https://github.com/containerd/containerd/pull/2934)
+
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
