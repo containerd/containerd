@@ -65,7 +65,7 @@ type Config struct {
 	BaseImageSizeBytes uint64 `toml:"-"`
 }
 
-// LoadConfig reads devmapper configuration file JSON format from disk
+// LoadConfig reads devmapper configuration file from disk in TOML format
 func LoadConfig(path string) (*Config, error) {
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {

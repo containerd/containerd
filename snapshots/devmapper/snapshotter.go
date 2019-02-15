@@ -39,12 +39,9 @@ import (
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type: plugin.SnapshotPlugin,
-		ID:   "devmapper",
-		Config: &Config{
-			PoolName:      "containerd-pool",
-			BaseImageSize: "128Mb",
-		},
+		Type:   plugin.SnapshotPlugin,
+		ID:     "devmapper",
+		Config: &Config{},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			ic.Meta.Platforms = append(ic.Meta.Platforms, ocispec.Platform{
 				OS:           "linux",
@@ -54,6 +51,10 @@ func init() {
 			config, ok := ic.Config.(*Config)
 			if !ok {
 				return nil, errors.New("invalid devmapper configuration")
+			}
+
+			if config.PoolName == "" {
+				return nil, errors.New("devmapper not configured")
 			}
 
 			if config.RootPath == "" {
