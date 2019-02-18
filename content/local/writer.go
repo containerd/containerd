@@ -181,10 +181,14 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 // To abandon a transaction completely, first call close then `IngestManager.Abort` to
 // clean up the associated resources.
 func (w *writer) Close() (err error) {
+	ctx := context.TODO()
+	log.G(ctx).WithField("issue", "2835").Infof("start to close writer")
 	if w.fp != nil {
 		w.fp.Sync()
 		err = w.fp.Close()
-		writeTimestampFile(filepath.Join(w.path, "updatedat"), w.updatedAt)
+		if werr := writeTimestampFile(filepath.Join(w.path, "updatedat"), w.updatedAt); werr != nil {
+			log.G(ctx).WithField("issue", "2835").Errorf("failed to close writer: %v", werr)
+		}
 		w.fp = nil
 		unlock(w.ref)
 		return

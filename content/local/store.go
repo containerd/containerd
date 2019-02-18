@@ -587,6 +587,7 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 // be cancelled. Any resources associated with the ingest will be cleaned.
 func (s *store) Abort(ctx context.Context, ref string) error {
 	root := s.ingestRoot(ref)
+	log.G(ctx).WithField("issue", "2835").Infof("start to clean")
 	if err := os.RemoveAll(root); err != nil {
 		if os.IsNotExist(err) {
 			return errors.Wrapf(errdefs.ErrNotFound, "ingest ref %q", ref)
