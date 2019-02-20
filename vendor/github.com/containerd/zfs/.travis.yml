@@ -1,0 +1,18 @@
+dist: trusty
+sudo: required
+language: go
+go:
+  - 1.9.x
+go_import_path: github.com/containerd/zfs
+install:
+  - sudo apt-add-repository -y ppa:zfs-native/stable && sudo apt-get update && sudo apt-get -y install linux-headers-$(uname -r) && sudo apt-get -y install ubuntu-zfs && sudo modprobe zfs
+# until containerd v1.0.0 GA, we don't pin containerd version. 
+  - mkdir -p $GOPATH/src/github.com/containerd && cd $GOPATH/src/github.com/containerd && git clone https://github.com/containerd/containerd.git
+  - mkdir -p $GOPATH/src/github.com/mistifyio && cd $GOPATH/src/github.com/mistifyio && git clone https://github.com/mistifyio/go-zfs.git && cd go-zfs && git checkout 386bffe89f421c8509066037225e1c0fda6b4933
+  - cd $GOPATH/src/github.com/containerd/zfs
+  - go get -t ./...
+script:
+  - go test -race -covermode=atomic -c .
+  - sudo ./zfs.test -test.root -test.v -test.coverprofile=coverage.txt
+after_success:
+    - bash <(curl -s https://codecov.io/bash)

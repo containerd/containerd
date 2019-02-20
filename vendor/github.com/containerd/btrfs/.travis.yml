@@ -1,0 +1,20 @@
+dist: xenial
+sudo: required
+language: go
+go:
+  - "1.9.x"
+  - "1.10.x"
+  - master
+
+before_install:
+    - sudo apt-get update
+    - sudo apt-get install -y btrfs-tools linux-headers-generic
+    - dpkg -L btrfs-tools
+    - ls /usr/include/btrfs
+    #   - go get golang.org/x/tools/cmd/vet
+    #- go get golang.org/x/tools/cmd/cover
+    - go get github.com/golang/lint/golint
+    #- go get github.com/mattn/goveralls
+
+install:
+    - go get -d ./...
