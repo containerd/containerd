@@ -29,10 +29,18 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	bolt "go.etcd.io/bbolt"
 )
+
+// Config for the v2 runtime
+type Config struct {
+	// Supported platforms
+	Platforms []string `toml:"platforms"`
+}
 
 func init() {
 	plugin.Register(&plugin.Registration{
@@ -41,8 +49,16 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.MetadataPlugin,
 		},
+		Config: &Config{
+			Platforms: defaultPlatforms(),
+		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			ic.Meta.Platforms = supportedPlatforms()
+			supportedPlatforms, err := parsePlatforms(ic.Config.(*Config).Platforms)
+			if err != nil {
+				return nil, err
+			}
+
+			ic.Meta.Platforms = supportedPlatforms
 			if err := os.MkdirAll(ic.Root, 0711); err != nil {
 				return nil, err
 			}
@@ -261,4 +277,16 @@ func (m *TaskManager) cleanupWorkDirs(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func parsePlatforms(platformStr []string) ([]ocispec.Platform, error) {
+	p := make([]ocispec.Platform, len(platformStr))
+	for i, v := range platformStr {
+		parsed, err := platforms.Parse(v)
+		if err != nil {
+			return nil, err
+		}
+		p[i] = parsed
+	}
+	return p, nil
 }
