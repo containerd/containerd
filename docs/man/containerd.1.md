@@ -1,5 +1,10 @@
 # containerd 1 01/29/2018
 
+## NAME
+
+containerd - an industry-standard container runtime with an emphasis on simplicity,
+robustness and portability
+
 ## SYNOPSIS
 
 containerd [global options] command [command options] [arguments...]
