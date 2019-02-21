@@ -310,7 +310,9 @@ func (s *Snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		}
 
 		if err := s.mkfs(ctx, deviceName); err != nil {
-			return nil, err
+			// Rollback thin device creation if mkfs failed
+			return nil, multierror.Append(err,
+				s.pool.RemoveDevice(ctx, deviceName))
 		}
 	} else {
 		parentDeviceName := s.getDeviceName(snap.ParentIDs[0])
