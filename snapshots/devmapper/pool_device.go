@@ -188,9 +188,8 @@ func (p *PoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName string
 		return errors.Wrapf(err, "failed to query device metadata for %q", deviceName)
 	}
 
-	isActivated := baseInfo.State == Activated
-
 	// Suspend thin device if it was activated previously
+	isActivated := p.IsActivated(baseInfo.Name)
 	if isActivated {
 		if err := p.transition(ctx, baseInfo.Name, Suspending, Suspended, func() error {
 			return dmsetup.SuspendDevice(baseInfo.Name)
@@ -245,13 +244,8 @@ func (p *PoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName string
 
 // DeactivateDevice deactivates thin device
 func (p *PoolDevice) DeactivateDevice(ctx context.Context, deviceName string, deferred bool) error {
-	devicePath := dmsetup.GetFullDevicePath(deviceName)
-	if _, err := os.Stat(devicePath); err != nil {
-		if os.IsNotExist(err) {
-			return ErrNotFound
-		}
-
-		return err
+	if !p.IsActivated(deviceName) {
+		return nil
 	}
 
 	opts := []dmsetup.RemoveDeviceOpt{dmsetup.RemoveWithForce, dmsetup.RemoveWithRetries}
@@ -268,6 +262,21 @@ func (p *PoolDevice) DeactivateDevice(ctx context.Context, deviceName string, de
 	return nil
 }
 
+// IsActivated returns true if thin-device is activated and not suspended
+func (p *PoolDevice) IsActivated(deviceName string) bool {
+	infos, err := dmsetup.Info(deviceName)
+	if err != nil || len(infos) == 0 {
+		// Couldn't query device info, device not active
+		return false
+	}
+
+	if devInfo := infos[0]; devInfo.Suspended {
+		return false
+	}
+
+	return true
+}
+
 // RemoveDevice completely wipes out thin device from thin-pool and frees it's device ID
 func (p *PoolDevice) RemoveDevice(ctx context.Context, deviceName string) error {
 	info, err := p.metadata.GetDevice(ctx, deviceName)
@@ -275,7 +284,7 @@ func (p *PoolDevice) RemoveDevice(ctx context.Context, deviceName string) error 
 		return errors.Wrapf(err, "can't query metadata for device %q", deviceName)
 	}
 
-	if err := p.DeactivateDevice(ctx, deviceName, true); err != nil && err != ErrNotFound {
+	if err := p.DeactivateDevice(ctx, deviceName, true); err != nil {
 		return err
 	}
 
@@ -305,7 +314,7 @@ func (p *PoolDevice) RemovePool(ctx context.Context) error {
 
 	// Deactivate devices if any
 	for _, name := range deviceNames {
-		if err := p.DeactivateDevice(ctx, name, true); err != nil && err != ErrNotFound {
+		if err := p.DeactivateDevice(ctx, name, true); err != nil {
 			result = multierror.Append(result, errors.Wrapf(err, "failed to remove %q", name))
 		}
 	}
