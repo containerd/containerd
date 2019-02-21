@@ -20,11 +20,13 @@ package devmapper
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/snapshots/devmapper/dmsetup"
@@ -65,6 +67,10 @@ func TestPoolDevice(t *testing.T) {
 	_, loopDataDevice := createLoopbackDevice(t, tempDir)
 	_, loopMetaDevice := createLoopbackDevice(t, tempDir)
 
+	poolName := fmt.Sprintf("test-pool-device-%d", time.Now().Nanosecond())
+	err = dmsetup.CreatePool(poolName, loopDataDevice, loopMetaDevice, 64*1024/dmsetup.SectorSize)
+	assert.NilError(t, err, "failed to create pool %q", poolName)
+
 	defer func() {
 		// Detach loop devices and remove images
 		err := losetup.DetachLoopDevice(loopDataDevice, loopMetaDevice)
@@ -75,14 +81,10 @@ func TestPoolDevice(t *testing.T) {
 	}()
 
 	config := &Config{
-		PoolName:             "test-pool-device-1",
-		RootPath:             tempDir,
-		DataDevice:           loopDataDevice,
-		MetadataDevice:       loopMetaDevice,
-		DataBlockSize:        "65536",
-		DataBlockSizeSectors: 128,
-		BaseImageSize:        "16mb",
-		BaseImageSizeBytes:   16 * 1024 * 1024,
+		PoolName:           poolName,
+		RootPath:           tempDir,
+		BaseImageSize:      "16mb",
+		BaseImageSizeBytes: 16 * 1024 * 1024,
 	}
 
 	pool, err := NewPoolDevice(ctx, config)

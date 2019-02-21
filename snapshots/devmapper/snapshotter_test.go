@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/snapshots/devmapper/dmsetup"
 	"github.com/containerd/containerd/snapshots/devmapper/losetup"
 	"github.com/containerd/containerd/snapshots/testsuite"
+	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
 	"gotest.tools/assert"
 )
@@ -59,22 +60,18 @@ func TestSnapshotterSuite(t *testing.T) {
 			return nil, nil, err
 		}
 
-		// Remove device mapper pool after test completes
+		// Remove device mapper pool and detach loop devices after test completes
 		removePool := func() error {
-			return snap.pool.RemovePool(ctx)
+			result := multierror.Append(
+				snap.pool.RemovePool(ctx),
+				losetup.DetachLoopDevice(loopDataDevice, loopMetaDevice))
+
+			return result.ErrorOrNil()
 		}
 
 		// Pool cleanup should be called before closing metadata store (as we need to retrieve device names)
 		snap.cleanupFn = append([]closeFunc{removePool}, snap.cleanupFn...)
 
-		return snap, func() error {
-			err := snap.Close()
-			assert.NilError(t, err, "failed to close snapshotter")
-
-			err = losetup.DetachLoopDevice(loopDataDevice, loopMetaDevice)
-			assert.NilError(t, err, "failed to detach loop devices")
-
-			return err
-		}, nil
+		return snap, snap.Close, nil
 	})
 }
