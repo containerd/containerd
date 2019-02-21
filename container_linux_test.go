@@ -39,6 +39,7 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -132,7 +133,7 @@ func TestShimInCgroup(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	if client.runtime == "io.containerd.runc.v1" {
+	if CheckRuntime(client.runtime, "io.containerd.runc") {
 		t.Skip()
 	}
 
@@ -450,7 +451,7 @@ func writeToFile(t *testing.T, filePath, message string) {
 func getLogDirPath(runtimeVersion, id string) string {
 	switch runtimeVersion {
 	case "v1":
-		return filepath.Join(defaultRoot, "io.containerd.runtime.v1.linux", testNamespace, id)
+		return filepath.Join(defaultRoot, plugin.RuntimeLinuxV1, testNamespace, id)
 	case "v2":
 		return filepath.Join(defaultState, "io.containerd.runtime.v2.task", testNamespace, id)
 	default:
@@ -460,7 +461,7 @@ func getLogDirPath(runtimeVersion, id string) string {
 
 func getRuntimeVersion() string {
 	switch rt := os.Getenv("TEST_RUNTIME"); rt {
-	case "io.containerd.runc.v1":
+	case plugin.RuntimeRuncV1, plugin.RuntimeRuncV2:
 		return "v2"
 	default:
 		return "v1"
@@ -1188,7 +1189,7 @@ func TestContainerRuntimeOptionsv1(t *testing.T) {
 		ctx, id,
 		WithNewSnapshot(id, image),
 		WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)),
-		WithRuntime("io.containerd.runtime.v1.linux", &runctypes.RuncOptions{Runtime: "no-runc"}),
+		WithRuntime(plugin.RuntimeLinuxV1, &runctypes.RuncOptions{Runtime: "no-runc"}),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1231,7 +1232,7 @@ func TestContainerRuntimeOptionsv2(t *testing.T) {
 		ctx, id,
 		WithNewSnapshot(id, image),
 		WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)),
-		WithRuntime("io.containerd.runc.v1", &options.Options{BinaryName: "no-runc"}),
+		WithRuntime(plugin.RuntimeRuncV1, &options.Options{BinaryName: "no-runc"}),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1384,7 +1385,7 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	var copts interface{}
-	if client.runtime == "io.containerd.runc.v1" {
+	if CheckRuntime(client.runtime, "io.containerd.runc") {
 		copts = &options.Options{
 			IoUid: 1000,
 			IoGid: 1000,

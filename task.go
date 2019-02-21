@@ -642,12 +642,12 @@ func isCheckpointPathExist(runtime string, v interface{}) bool {
 	}
 
 	switch runtime {
-	case "io.containerd.runc.v1":
+	case plugin.RuntimeRuncV1, plugin.RuntimeRuncV2:
 		if opts, ok := v.(*options.CheckpointOptions); ok && opts.ImagePath != "" {
 			return true
 		}
 
-	case "io.containerd.runtime.v1.linux":
+	case plugin.RuntimeLinuxV1:
 		if opts, ok := v.(*runctypes.CheckpointOptions); ok && opts.ImagePath != "" {
 			return true
 		}

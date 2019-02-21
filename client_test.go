@@ -124,6 +124,7 @@ func TestMain(m *testing.M) {
 	log.G(ctx).WithFields(logrus.Fields{
 		"version":  version.Version,
 		"revision": version.Revision,
+		"runtime":  os.Getenv("TEST_RUNTIME"),
 	}).Info("running tests against containerd")
 
 	// pull a seed image

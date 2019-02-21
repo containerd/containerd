@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -613,4 +614,21 @@ func (c *Client) Version(ctx context.Context) (Version, error) {
 		Version:  response.Version,
 		Revision: response.Revision,
 	}, nil
+}
+
+// CheckRuntime returns true if the current runtime matches the expected
+// runtime. Providing various parts of the runtime schema will match those
+// parts of the expected runtime
+func CheckRuntime(current, expected string) bool {
+	cp := strings.Split(current, ".")
+	l := len(cp)
+	for i, p := range strings.Split(expected, ".") {
+		if i > l {
+			return false
+		}
+		if p != cp[i] {
+			return false
+		}
+	}
+	return true
 }

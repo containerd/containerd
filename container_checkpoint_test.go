@@ -32,6 +32,7 @@ import (
 
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/plugin"
 )
 
 const (
@@ -47,7 +48,7 @@ func TestCheckpointRestorePTY(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	if client.runtime == v1runtime {
+	if client.runtime == plugin.RuntimeLinuxV1 {
 		t.Skip()
 	}
 
@@ -173,7 +174,7 @@ func TestCheckpointRestore(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	if client.runtime == v1runtime {
+	if client.runtime == plugin.RuntimeLinuxV1 {
 		t.Skip()
 	}
 
@@ -263,7 +264,7 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	if client.runtime == v1runtime {
+	if client.runtime == plugin.RuntimeLinuxV1 {
 		t.Skip()
 	}
 
@@ -353,7 +354,7 @@ func TestCheckpointLeaveRunning(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	if client.runtime == v1runtime {
+	if client.runtime == plugin.RuntimeLinuxV1 {
 		t.Skip()
 	}
 
