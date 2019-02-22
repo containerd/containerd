@@ -195,7 +195,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	// Get container log path.
 	if config.GetLogPath() != "" {
-		meta.LogPath = filepath.Join(sandbox.Config.GetLogDirectory(), config.GetLogPath())
+		meta.LogPath = filepath.Join(sandboxConfig.GetLogDirectory(), config.GetLogPath())
 	}
 
 	containerIO, err := cio.NewContainerIO(id,
