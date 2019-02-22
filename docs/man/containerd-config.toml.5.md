@@ -1,5 +1,9 @@
 # /etc/containerd/config.toml 5 08/08/2018
 
+## NAME
+
+containerd-config.toml - configuration file for containerd
+
 ## SYNOPSIS
 
 The **config.toml** file is a configuration file for the containerd daemon. The

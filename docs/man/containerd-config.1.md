@@ -1,5 +1,9 @@
 # containerd-config 1 01/30/2018
 
+## NAME
+
+containerd-config - information on the containerd config
+
 ## SYNOPSIS
 
 containerd config [command]
