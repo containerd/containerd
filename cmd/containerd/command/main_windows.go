@@ -24,6 +24,7 @@ import (
 	"unsafe"
 
 	winio "github.com/Microsoft/go-winio"
+	"github.com/Microsoft/go-winio/pkg/etwlogrus"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/services/server"
 	"github.com/sirupsen/logrus"
@@ -88,4 +89,13 @@ func setupDumpStacks() {
 			dumpStacks()
 		}
 	}()
+}
+
+func init() {
+	// Provider ID: {2acb92c0-eb9b-571a-69cf-8f3410f383ad}
+	// Hook isn't closed explicitly, as it will exist until process exit.
+	// GUID is generated based on name - see Microsoft/go-winio/tools/etw-provider-gen.
+	if hook, err := etwlogrus.NewHook("ContainerD"); err == nil {
+		logrus.AddHook(hook)
+	}
 }
