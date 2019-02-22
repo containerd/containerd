@@ -24,10 +24,6 @@ The following configuration flags are supported:
   default location for `containerd` plugins will be used)
 * `pool_name` - a name to use for the devicemapper thin pool. Pool name
   should be the same as in `/dev/mapper/` directory
-* `data_device` - path to the data volume that should be used by the thin pool
-* `meta_device` - path to the metadata volume that should be used by the thin-pool
-* `data_block_size` - the size of allocation chunks in data file, between 128
-  sectors (64KB) and and 2097152 sectors (1GB) and a multiple of 128 sectors (64KB)
 * `base_image_size` - defines how much space to allocate when creating the base device
 
 Pool name and base image size are required snapshotter parameters.
@@ -42,5 +38,5 @@ ctr run --snapshotter devmapper docker.io/library/hello-world:latest test
 
 ## Requirements
 
-The devicemapper snapshotter requires `dmsetup` command line tool to be installed and available on your computer.
-On Ubuntu, it can be installed with `apt-get install dmsetup` command.
+The devicemapper snapshotter requires `dmsetup` (>= 1.02.110) command line tool to be installed and
+available on your computer. On Ubuntu, it can be installed with `apt-get install dmsetup` command.
