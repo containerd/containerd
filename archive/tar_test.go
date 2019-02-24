@@ -33,10 +33,12 @@ import (
 
 	_ "crypto/sha256"
 
+	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/archive/tartest"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/continuity/fs/fstest"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
 
@@ -863,14 +865,19 @@ func testBaseDiff(a fstest.Applier) error {
 		return errors.Wrap(err, "failed to apply filesystem changes")
 	}
 
-	arch := Diff(context.Background(), "", td)
-
+	var st DiffStat
+	onWriteDiffCompletion := func(v DiffStat) {
+		st = v
+	}
+	arch := Diff(context.Background(), "", td, WithOnWriteDiffCompletion(onWriteDiffCompletion))
 	cmd := exec.Command(tarCmd, "x", "-C", dest)
 	cmd.Stdin = arch
 	if err := cmd.Run(); err != nil {
 		return errors.Wrap(err, "tar command failed")
 	}
-
+	if st.Empty {
+		return errors.New("expected Empty to be false, got true")
+	}
 	return fstest.CheckDirectoryEqual(td, dest)
 }
 
@@ -1324,4 +1331,70 @@ func requireTar(t *testing.T) {
 	if _, err := exec.LookPath(tarCmd); err != nil {
 		t.Skipf("%s not found, skipping", tarCmd)
 	}
+}
+
+const (
+	// emptyLayer consists of 1024 zero bytes
+	emptyLayer = "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+	// emptyGZLayer is the digest of the "canonical" form of gzip-compressed emptyLayer.
+	// BuildKit is known to use this hard-coded digest for detecting empty layers.
+	emptyGZLayer = "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1"
+)
+
+func TestDiffEmpty(t *testing.T) {
+	left, err := ioutil.TempDir("", "test-diff-empty-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(left)
+	right, err := ioutil.TempDir("", "test-diff-empty-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(right)
+	if err := baseApplier.Apply(left); err != nil {
+		t.Fatal(err)
+	}
+	if err = fs.CopyDir(right, left); err != nil {
+		t.Fatal(err)
+	}
+	var (
+		buf bytes.Buffer
+		st  DiffStat
+	)
+	onWriteDiffCompletion := func(v DiffStat) {
+		st = v
+	}
+	if err = WriteDiff(context.TODO(), &buf, left, right, WithOnWriteDiffCompletion(onWriteDiffCompletion)); err != nil {
+		t.Fatal(err)
+	}
+	if !st.Empty {
+		t.Fatal("expected Empty to be true, got false")
+	}
+	b := buf.Bytes()
+	if dgst := digest.SHA256.FromBytes(b).String(); dgst != emptyLayer {
+		t.Fatalf("expected emptyLayer %s, got %s", emptyLayer, dgst)
+	}
+	var gzBuf bytes.Buffer
+	gzW, err := compression.CompressStream(&nopCloser{&gzBuf}, compression.Gzip)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.Copy(gzW, bytes.NewReader(b)); err != nil {
+		t.Fatal(err)
+	}
+	if err := gzW.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if gzDgst := digest.SHA256.FromBytes(gzBuf.Bytes()).String(); gzDgst != emptyGZLayer {
+		t.Fatalf("expected emptyGZLayer %s, got %s", emptyGZLayer, gzDgst)
+	}
+}
+
+type nopCloser struct {
+	io.Writer
+}
+
+func (n *nopCloser) Close() error {
+	return nil
 }

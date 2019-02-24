@@ -36,3 +36,24 @@ func WithFilter(f Filter) ApplyOpt {
 		return nil
 	}
 }
+
+// DiffOpt allows setting mutable archive diff properties on creation
+type DiffOpt func(options *DiffOptions) error
+
+// OnWriteDiffCompletion is called on a WriteDiff completion so as to notify
+// DiffStat to the caller.
+type OnWriteDiffCompletion func(st DiffStat)
+
+// DiffOptions provides additional options for a WriteDiff operation
+type DiffOptions struct {
+	// OnWriteDiffCompletion is called on a WriteDiff completion if set
+	OnWriteDiffCompletion
+}
+
+// WithOnWriteDiffCompletion sets OnDiffCompletion
+func WithOnWriteDiffCompletion(handler OnWriteDiffCompletion) DiffOpt {
+	return func(options *DiffOptions) error {
+		options.OnWriteDiffCompletion = handler
+		return nil
+	}
+}

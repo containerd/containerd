@@ -51,11 +51,11 @@ var errInvalidArchive = errors.New("invalid archive")
 // files will be prepended with the prefix ".wh.". This style is
 // based off AUFS whiteouts.
 // See https://github.com/opencontainers/image-spec/blob/master/layer.md
-func Diff(ctx context.Context, a, b string) io.ReadCloser {
+func Diff(ctx context.Context, a, b string, opts ...DiffOpt) io.ReadCloser {
 	r, w := io.Pipe()
 
 	go func() {
-		err := WriteDiff(ctx, w, a, b)
+		err := WriteDiff(ctx, w, a, b, opts...)
 		if err = w.CloseWithError(err); err != nil {
 			log.G(ctx).WithError(err).Debugf("closing tar pipe failed")
 		}
@@ -71,13 +71,39 @@ func Diff(ctx context.Context, a, b string) io.ReadCloser {
 // files will be prepended with the prefix ".wh.". This style is
 // based off AUFS whiteouts.
 // See https://github.com/opencontainers/image-spec/blob/master/layer.md
-func WriteDiff(ctx context.Context, w io.Writer, a, b string) error {
+func WriteDiff(ctx context.Context, w io.Writer, a, b string, opts ...DiffOpt) error {
+	var options DiffOptions
+	for _, opt := range opts {
+		if err := opt(&options); err != nil {
+			return errors.Wrap(err, "failed to apply diff option")
+		}
+	}
+
 	cw := newChangeWriter(w, b)
-	err := fs.Changes(ctx, a, b, cw.HandleChange)
+	empty := true
+	handler := func(k fs.ChangeKind, s string, fi os.FileInfo, e error) error {
+		if k != fs.ChangeKindUnmodified {
+			empty = false
+		}
+		return cw.HandleChange(k, s, fi, e)
+	}
+	err := fs.Changes(ctx, a, b, handler)
 	if err != nil {
 		return errors.Wrap(err, "failed to create diff tar stream")
 	}
+	if options.OnWriteDiffCompletion != nil {
+		st := DiffStat{
+			Empty: empty,
+		}
+		options.OnWriteDiffCompletion(st)
+	}
 	return cw.Close()
+}
+
+// DiffStat represents the characteristics of a diff archive.
+type DiffStat struct {
+	// Empty archive
+	Empty bool
 }
 
 const (

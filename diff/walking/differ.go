@@ -41,7 +41,18 @@ type walkingDiff struct {
 }
 
 var emptyDesc = ocispec.Descriptor{}
-var uncompressed = "containerd.io/uncompressed"
+
+const (
+	// LabelUncompressed is set to the digest of uncompressed layer
+	// for a compressed layer.
+	LabelUncompressed = "containerd.io/uncompressed"
+	// LabelEmptyLayer is set for an empty layer.
+	// The value of the label is set to LabelValueEmptyLayer.
+	// LabelEmptyLayer was introduced in containerd v1.3.
+	LabelEmptyLayer = "containerd.io/empty-layer"
+	// LabelValueEmptyLayer is the value used for LabelEmptyLayer
+	LabelValueEmptyLayer = "true"
+)
 
 // NewWalkingDiff is a generic implementation of diff.Comparer.  The diff is
 // calculated by mounting both the upper and lower mount sets and walking the
@@ -57,6 +68,9 @@ func NewWalkingDiff(store content.Store) diff.Comparer {
 
 // Compare creates a diff between the given mounts and uploads the result
 // to the content store.
+//
+// The resulting blob may have labels such as LabelUncompressed and LabelEmptyLayer.
+// These labels are not set to the annotation field of the descriptor.
 func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
 	var config diff.Config
 	for _, opt := range opts {
@@ -67,6 +81,9 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 
 	if config.MediaType == "" {
 		config.MediaType = ocispec.MediaTypeImageLayerGzip
+	}
+	if config.Labels == nil {
+		config.Labels = map[string]string{}
 	}
 
 	var isCompressed bool
@@ -111,33 +128,34 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 				}
 			}
 
+			var st archive.DiffStat
+			onWriteDiffCompletion := func(v archive.DiffStat) {
+				st = v
+			}
+			diffOpts := []archive.DiffOpt{archive.WithOnWriteDiffCompletion(onWriteDiffCompletion)}
 			if isCompressed {
 				dgstr := digest.SHA256.Digester()
 				compressed, err := compression.CompressStream(cw, compression.Gzip)
 				if err != nil {
 					return errors.Wrap(err, "failed to get compressed stream")
 				}
-				err = archive.WriteDiff(ctx, io.MultiWriter(compressed, dgstr.Hash()), lowerRoot, upperRoot)
+				err = archive.WriteDiff(ctx, io.MultiWriter(compressed, dgstr.Hash()), lowerRoot, upperRoot, diffOpts...)
 				compressed.Close()
 				if err != nil {
 					return errors.Wrap(err, "failed to write compressed diff")
 				}
 
-				if config.Labels == nil {
-					config.Labels = map[string]string{}
-				}
-				config.Labels[uncompressed] = dgstr.Digest().String()
+				config.Labels[LabelUncompressed] = dgstr.Digest().String()
 			} else {
-				if err = archive.WriteDiff(ctx, cw, lowerRoot, upperRoot); err != nil {
+				if err = archive.WriteDiff(ctx, cw, lowerRoot, upperRoot, diffOpts...); err != nil {
 					return errors.Wrap(err, "failed to write diff")
 				}
 			}
-
-			var commitopts []content.Opt
-			if config.Labels != nil {
-				commitopts = append(commitopts, content.WithLabels(config.Labels))
+			if st.Empty {
+				config.Labels[LabelEmptyLayer] = LabelValueEmptyLayer
 			}
 
+			commitopts := []content.Opt{content.WithLabels(config.Labels)}
 			dgst := cw.Digest()
 			if err := cw.Commit(ctx, 0, dgst, commitopts...); err != nil {
 				if !errdefs.IsAlreadyExists(err) {
@@ -151,10 +169,19 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 			}
 
 			// Set uncompressed label if digest already existed without label
-			if _, ok := info.Labels[uncompressed]; !ok {
-				info.Labels[uncompressed] = config.Labels[uncompressed]
-				if _, err := s.store.Update(ctx, info, "labels."+uncompressed); err != nil {
+			if _, ok := info.Labels[LabelUncompressed]; !ok {
+				info.Labels[LabelUncompressed] = config.Labels[LabelUncompressed]
+				if _, err := s.store.Update(ctx, info, "labels."+LabelUncompressed); err != nil {
 					return errors.Wrap(err, "error setting uncompressed label")
+				}
+			}
+			if st.Empty {
+				// Set empty-layer label if digest already existed without label
+				if _, ok := info.Labels[LabelEmptyLayer]; !ok {
+					info.Labels[LabelEmptyLayer] = config.Labels[LabelEmptyLayer]
+					if _, err := s.store.Update(ctx, info, "labels."+LabelEmptyLayer); err != nil {
+						return errors.Wrapf(err, "error setting label %s", LabelEmptyLayer)
+					}
 				}
 			}
 
