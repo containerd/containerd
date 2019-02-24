@@ -110,7 +110,7 @@ func (s *createdState) SetExited(status int) {
 }
 
 func (s *createdState) Exec(ctx context.Context, path string, r *ExecConfig) (proc.Process, error) {
-	return s.p.exec(ctx, path, r)
+	return nil, errors.Errorf("cannot exec in a created state")
 }
 
 type createdCheckpointState struct {
@@ -225,7 +225,7 @@ func (s *createdCheckpointState) SetExited(status int) {
 }
 
 func (s *createdCheckpointState) Exec(ctx context.Context, path string, r *ExecConfig) (proc.Process, error) {
-	return nil, errors.Errorf("cannot exec in a created state")
+	return nil, errors.Errorf("cannot exec in a created checkpoint state")
 }
 
 type runningState struct {
