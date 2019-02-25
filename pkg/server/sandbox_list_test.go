@@ -39,17 +39,19 @@ func TestToCRISandbox(t *testing.T) {
 	}
 	createdAt := time.Now()
 	meta := sandboxstore.Metadata{
-		ID:        "test-id",
-		Name:      "test-name",
-		Config:    config,
-		NetNSPath: "test-netns",
+		ID:             "test-id",
+		Name:           "test-name",
+		Config:         config,
+		NetNSPath:      "test-netns",
+		RuntimeHandler: "test-runtime-handler",
 	}
 	expect := &runtime.PodSandbox{
-		Id:          "test-id",
-		Metadata:    config.GetMetadata(),
-		CreatedAt:   createdAt.UnixNano(),
-		Labels:      config.GetLabels(),
-		Annotations: config.GetAnnotations(),
+		Id:             "test-id",
+		Metadata:       config.GetMetadata(),
+		CreatedAt:      createdAt.UnixNano(),
+		Labels:         config.GetLabels(),
+		Annotations:    config.GetAnnotations(),
+		RuntimeHandler: "test-runtime-handler",
 	}
 	for desc, test := range map[string]struct {
 		state         sandboxstore.State
@@ -93,6 +95,7 @@ func TestFilterSandboxes(t *testing.T) {
 						Attempt:   1,
 					},
 				},
+				RuntimeHandler: "test-runtime-handler",
 			},
 			sandboxstore.Status{
 				CreatedAt: time.Now(),
@@ -112,6 +115,7 @@ func TestFilterSandboxes(t *testing.T) {
 					},
 					Labels: map[string]string{"a": "b"},
 				},
+				RuntimeHandler: "test-runtime-handler",
 			},
 			sandboxstore.Status{
 				CreatedAt: time.Now(),
@@ -131,6 +135,7 @@ func TestFilterSandboxes(t *testing.T) {
 					},
 					Labels: map[string]string{"c": "d"},
 				},
+				RuntimeHandler: "test-runtime-handler",
 			},
 			sandboxstore.Status{
 				CreatedAt: time.Now(),
