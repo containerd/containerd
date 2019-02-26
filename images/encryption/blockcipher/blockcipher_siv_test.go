@@ -65,7 +65,7 @@ func TestBlockCipherAesSivEncryption(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Use a different instantiated object to indicate an invokation at a diff time
+	// Use a different instantiated object to indicate an invocation at a diff time
 	bc2, err := NewAESSIVLayerBlockCipher(256)
 	if err != nil {
 		t.Fatal(err)
