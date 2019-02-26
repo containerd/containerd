@@ -43,7 +43,7 @@ func TestVolumeCopyUp(t *testing.T) {
 	}()
 
 	t.Logf("Pull test image")
-	_, err = imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil)
+	_, err = imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil, sbConfig)
 	require.NoError(t, err)
 
 	t.Logf("Create a container with volume-copy-up test image")
@@ -105,7 +105,7 @@ func TestVolumeOwnership(t *testing.T) {
 	}()
 
 	t.Logf("Pull test image")
-	_, err = imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil)
+	_, err = imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil, sbConfig)
 	require.NoError(t, err)
 
 	t.Logf("Create a container with volume-ownership test image")

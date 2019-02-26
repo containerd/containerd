@@ -75,7 +75,7 @@ func TestPodHostname(t *testing.T) {
 				containerName = "test-container"
 			)
 			t.Logf("Pull test image %q", testImage)
-			img, err := imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil)
+			img, err := imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil, sbConfig)
 			require.NoError(t, err)
 			defer func() {
 				assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: img}))

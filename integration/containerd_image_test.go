@@ -182,8 +182,9 @@ func TestContainerdImageInOtherNamespaces(t *testing.T) {
 	}
 	require.NoError(t, Consistently(checkImage, 100*time.Millisecond, time.Second))
 
+	sbConfig := PodSandboxConfig("sandbox", "test")
 	t.Logf("pull the image into cri plugin")
-	id, err := imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil)
+	id, err := imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil, sbConfig)
 	require.NoError(t, err)
 	defer func() {
 		assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: id}))
