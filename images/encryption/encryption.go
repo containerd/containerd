@@ -281,40 +281,17 @@ func GetCryptoConfigFromAnnotations(desc *ocispec.Descriptor) (*config.CryptoCon
 
 // DCParametersFromJSON converts a json representation of the dcparameters map into a native map
 func DCParametersFromJSON(dcparametersStr string) (map[string][][]byte, error) {
-	var m map[string]string
+	var m map[string][][]byte
 	err := json.Unmarshal([]byte(dcparametersStr), &m)
 	if err != nil {
 		return nil, errors.New("Could not json decode the 'dcparameters'")
 	}
-
-	dcparameters := make(map[string][][]byte)
-
-	for key, values := range m {
-		var v [][]byte
-		for _, value := range strings.Split(values, ",") {
-			bytes, err := base64.StdEncoding.DecodeString(value)
-			if err != nil {
-				return nil, errors.New("Could not base64 decode the 'dcparameters'")
-			}
-			v = append(v, bytes)
-		}
-		dcparameters[key] = v
-	}
-	return dcparameters, nil
+	return m, nil
 }
 
 // DCParametersToJSON converts the dcparametes map into its json representation
 func DCParametersToJSON(dcparameters map[string][][]byte) (string, error) {
-	m := make(map[string]string)
-
-	for key, values := range dcparameters {
-		var v []string
-		for _, value := range values {
-			v = append(v, base64.StdEncoding.EncodeToString(value))
-		}
-		m[key] = strings.Join(v, ",")
-	}
-	j, err := json.Marshal(m)
+	j, err := json.Marshal(dcparameters)
 	if err != nil {
 		return "", errors.New("Could not json encode the 'dcparameters'")
 	}
