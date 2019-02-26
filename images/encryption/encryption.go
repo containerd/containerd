@@ -17,7 +17,6 @@
 package encryption
 
 import (
-	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"io"
@@ -100,12 +99,6 @@ func EncryptLayer(ec *config.EncryptConfig, encOrPlainLayerReader io.ReaderAt, d
 		return nil, nil, errors.Wrapf(errdefs.ErrInvalidArgument, "EncryptConfig must not be nil")
 	}
 
-	symKey := make([]byte, 512/8)
-	_, err = io.ReadFull(rand.Reader, symKey)
-	if err != nil {
-		return nil, nil, errors.Wrapf(err, "Could not create symmetric key")
-	}
-
 	for annotationsID := range keyWrapperAnnotations {
 		annotation := desc.Annotations[annotationsID]
 		if annotation != "" {
@@ -122,7 +115,7 @@ func EncryptLayer(ec *config.EncryptConfig, encOrPlainLayerReader io.ReaderAt, d
 	for annotationsID, scheme := range keyWrapperAnnotations {
 		b64Annotations := desc.Annotations[annotationsID]
 		if b64Annotations == "" && optsData == nil {
-			encLayerReader, optsData, err = commonEncryptLayer(encOrPlainLayerReader, symKey, blockcipher.AESSIVCMAC512)
+			encLayerReader, optsData, err = commonEncryptLayer(encOrPlainLayerReader, blockcipher.AESSIVCMAC512)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -226,16 +219,13 @@ func preUnwrapKey(keywrapper keywrap.KeyWrapper, dc *config.DecryptConfig, b64An
 // commonEncryptLayer is a function to encrypt the plain layer using a new random
 // symmetric key and return the LayerBlockCipherHandler's JSON in string form for
 // later use during decryption
-func commonEncryptLayer(plainLayerReader io.ReaderAt, symKey []byte, typ blockcipher.LayerCipherType) (content.ReaderDigester, []byte, error) {
-	opts := blockcipher.LayerBlockCipherOptions{
-		SymmetricKey: symKey,
-	}
+func commonEncryptLayer(plainLayerReader io.ReaderAt, typ blockcipher.LayerCipherType) (content.ReaderDigester, []byte, error) {
 	lbch, err := blockcipher.NewLayerBlockCipherHandler()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	encLayerReader, opts, err := lbch.Encrypt(plainLayerReader, typ, opts)
+	encLayerReader, opts, err := lbch.Encrypt(plainLayerReader, typ)
 	if err != nil {
 		return nil, nil, err
 	}

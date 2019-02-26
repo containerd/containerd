@@ -31,10 +31,6 @@ func TestBlockCipherHandlerCreate(t *testing.T) {
 
 func TestBlockCipherEncryption(t *testing.T) {
 	var (
-		symKey = []byte("01234567890123456789012345678912")
-		opt    = LayerBlockCipherOptions{
-			SymmetricKey: symKey,
-		}
 		layerData = []byte("this is some data")
 	)
 
@@ -45,7 +41,7 @@ func TestBlockCipherEncryption(t *testing.T) {
 
 	layerDataReader := bytes.NewReader(layerData)
 
-	ciphertextReader, lbco, err := h.Encrypt(layerDataReader, AESSIVCMAC256, opt)
+	ciphertextReader, lbco, err := h.Encrypt(layerDataReader, AESSIVCMAC256)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,10 +72,6 @@ func TestBlockCipherEncryption(t *testing.T) {
 
 func TestBlockCipherEncryptionInvalidKey(t *testing.T) {
 	var (
-		symKey = []byte("0123456789012345678901234567890123456789012345678901234567890123")
-		opt    = LayerBlockCipherOptions{
-			SymmetricKey: symKey,
-		}
 		layerData = []byte("this is some data")
 	)
 
@@ -90,7 +82,7 @@ func TestBlockCipherEncryptionInvalidKey(t *testing.T) {
 
 	layerDataReader := bytes.NewReader(layerData)
 
-	ciphertextReader, lbco, err := h.Encrypt(layerDataReader, AESSIVCMAC512, opt)
+	ciphertextReader, lbco, err := h.Encrypt(layerDataReader, AESSIVCMAC512)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,27 +108,5 @@ func TestBlockCipherEncryptionInvalidKey(t *testing.T) {
 	_, err = plaintextReader.Read(plaintext)
 	if err == nil {
 		t.Fatal("Read() should have failed due to wrong key")
-	}
-}
-
-func TestBlockCipherEncryptionInvalidKeyLength(t *testing.T) {
-	var (
-		symKey = []byte("01234567890123456789012345678901")
-		opt    = LayerBlockCipherOptions{
-			SymmetricKey: symKey,
-		}
-		layerData = []byte("this is some data")
-	)
-
-	h, err := NewLayerBlockCipherHandler()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	layerDataReader := bytes.NewReader(layerData)
-
-	_, _, err = h.Encrypt(layerDataReader, AESSIVCMAC512, opt)
-	if err == nil {
-		t.Fatal("Test should have failed due to invalid key length")
 	}
 }

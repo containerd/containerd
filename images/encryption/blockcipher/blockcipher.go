@@ -50,6 +50,8 @@ type LayerBlockCipherOptions struct {
 // LayerBlockCipher returns a provider for encrypt/decrypt functionality
 // for handling the layer data for a specific algorithm
 type LayerBlockCipher interface {
+	// GenerateKey creates a symmetric key
+	GenerateKey() []byte
 	// Encrypt takes in layer data and returns the ciphertext and relevant LayerBlockCipherOptions
 	Encrypt(layerDataReader io.ReaderAt, opt LayerBlockCipherOptions) (CryptedDataReader, LayerBlockCipherOptions, error)
 	// Decrypt takes in layer ciphertext data and returns the plaintext and relevant LayerBlockCipherOptions
@@ -62,9 +64,12 @@ type LayerBlockCipherHandler struct {
 }
 
 // Encrypt is the handler for the layer decryption routine
-func (h *LayerBlockCipherHandler) Encrypt(plainDataReader io.ReaderAt, typ LayerCipherType, opt LayerBlockCipherOptions) (CryptedDataReader, LayerBlockCipherOptions, error) {
+func (h *LayerBlockCipherHandler) Encrypt(plainDataReader io.ReaderAt, typ LayerCipherType) (CryptedDataReader, LayerBlockCipherOptions, error) {
 
 	if c, ok := h.cipherMap[typ]; ok {
+		opt := LayerBlockCipherOptions{
+			SymmetricKey: c.GenerateKey(),
+		}
 		encDataReader, newopt, err := c.Encrypt(plainDataReader, opt)
 		if err == nil {
 			newopt.CipherOptions[CipherTypeOpt] = string(typ)

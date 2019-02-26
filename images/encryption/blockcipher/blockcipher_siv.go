@@ -198,6 +198,11 @@ func (bc *AESSIVLayerBlockCipher) init(encrypt bool, reader io.ReaderAt, opt Lay
 	return lbco, nil
 }
 
+// GenerateKey creates a synmmetric key
+func (bc *AESSIVLayerBlockCipher) GenerateKey() []byte {
+	return miscreant.GenerateKey(bc.bits / 8)
+}
+
 // Encrypt takes in layer data and returns the ciphertext and relevant LayerBlockCipherOptions
 func (bc *AESSIVLayerBlockCipher) Encrypt(plainDataReader io.ReaderAt, opt LayerBlockCipherOptions) (CryptedDataReader, LayerBlockCipherOptions, error) {
 	lbco, err := bc.init(true, plainDataReader, opt)
