@@ -44,7 +44,7 @@ const (
 // an image
 type LayerBlockCipherOptions struct {
 	SymmetricKey  []byte            `json:'symkey'`
-	CipherOptions map[string]string `json:'cipheroptions'`
+	CipherOptions map[string][]byte `json:'cipheroptions'`
 }
 
 // LayerBlockCipher returns a provider for encrypt/decrypt functionality
@@ -72,7 +72,7 @@ func (h *LayerBlockCipherHandler) Encrypt(plainDataReader io.ReaderAt, typ Layer
 		}
 		encDataReader, newopt, err := c.Encrypt(plainDataReader, opt)
 		if err == nil {
-			newopt.CipherOptions[CipherTypeOpt] = string(typ)
+			newopt.CipherOptions[CipherTypeOpt] = []byte(typ)
 		}
 		return encDataReader, newopt, err
 	}

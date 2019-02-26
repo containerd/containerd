@@ -18,7 +18,6 @@ package blockcipher
 
 import (
 	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"hash"
 	"io"
@@ -139,9 +138,8 @@ func (r *aessivcryptor) Hash() hash.Hash {
 // init initializes an instance
 func (bc *AESSIVLayerBlockCipher) init(encrypt bool, reader io.ReaderAt, opt LayerBlockCipherOptions) (LayerBlockCipherOptions, error) {
 	var (
-		err   error
-		nonce []byte
-		se    miscreant.StreamEncryptor
+		err error
+		se  miscreant.StreamEncryptor
 	)
 
 	bc.reader = reader
@@ -151,13 +149,8 @@ func (bc *AESSIVLayerBlockCipher) init(encrypt bool, reader io.ReaderAt, opt Lay
 		return LayerBlockCipherOptions{}, fmt.Errorf("invalid key length of %d bytes; need %d bytes", len(key), bc.bits/8)
 	}
 
-	nonceStr := opt.CipherOptions["nonce"]
-	if nonceStr != "" {
-		nonce, err = base64.StdEncoding.DecodeString(nonceStr)
-		if err != nil {
-			return LayerBlockCipherOptions{}, errors.New("Failed to decode nonce")
-		}
-	} else {
+	nonce := opt.CipherOptions["nonce"]
+	if len(nonce) == 0 {
 		nonce = make([]byte, se.NonceSize())
 		if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 			return LayerBlockCipherOptions{}, errors.Wrap(err, "Unable to generate random nonce")
@@ -190,8 +183,8 @@ func (bc *AESSIVLayerBlockCipher) init(encrypt bool, reader io.ReaderAt, opt Lay
 
 	lbco := LayerBlockCipherOptions{
 		SymmetricKey: key,
-		CipherOptions: map[string]string{
-			"nonce": base64.StdEncoding.EncodeToString(nonce),
+		CipherOptions: map[string][]byte{
+			"nonce": nonce,
 		},
 	}
 
