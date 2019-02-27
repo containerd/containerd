@@ -12,6 +12,12 @@ The explanation and default value of each configuration item are as follows:
   # stream_server_port is the port streaming server is listening on.
   stream_server_port = "0"
 
+  # stream_idle_timeout is the maximum time a streaming connection can be
+  # idle before the connection is automatically closed.
+  # The string is in the golang duration format, see:
+  #   https://golang.org/pkg/time/#ParseDuration
+  stream_idle_timeout = "4h"
+
   # enable_selinux indicates to enable the selinux support.
   enable_selinux = false
 

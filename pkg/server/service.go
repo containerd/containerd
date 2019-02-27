@@ -159,7 +159,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 		logrus.WithError(err).Error("Failed to load cni during init, please check CRI plugin status before setting up network for pods")
 	}
 	// prepare streaming server
-	c.streamServer, err = newStreamServer(c, config.StreamServerAddress, config.StreamServerPort)
+	c.streamServer, err = newStreamServer(c, config.StreamServerAddress, config.StreamServerPort, config.StreamIdleTimeout)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create stream server")
 	}
