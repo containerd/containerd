@@ -30,24 +30,49 @@ import (
 )
 
 // New returns a new control via the cgroup cgroups interface
-func New(hierarchy Hierarchy, path Path, resources *specs.LinuxResources) (Cgroup, error) {
+func New(hierarchy Hierarchy, path Path, resources *specs.LinuxResources, opts ...InitOpts) (Cgroup, error) {
+	config := newInitConfig()
+	for _, o := range opts {
+		if err := o(config); err != nil {
+			return nil, err
+		}
+	}
 	subsystems, err := hierarchy()
 	if err != nil {
 		return nil, err
 	}
+	var active []Subsystem
 	for _, s := range subsystems {
+		// check if subsystem exists
 		if err := initializeSubsystem(s, path, resources); err != nil {
+			if err == ErrControllerNotActive {
+				if config.InitCheck != nil {
+					if skerr := config.InitCheck(s, path, err); skerr != nil {
+						if skerr != ErrIgnoreSubsystem {
+							return nil, skerr
+						}
+					}
+				}
+				continue
+			}
 			return nil, err
 		}
+		active = append(active, s)
 	}
 	return &cgroup{
 		path:       path,
-		subsystems: subsystems,
+		subsystems: active,
 	}, nil
 }
 
 // Load will load an existing cgroup and allow it to be controlled
-func Load(hierarchy Hierarchy, path Path) (Cgroup, error) {
+func Load(hierarchy Hierarchy, path Path, opts ...InitOpts) (Cgroup, error) {
+	config := newInitConfig()
+	for _, o := range opts {
+		if err := o(config); err != nil {
+			return nil, err
+		}
+	}
 	var activeSubsystems []Subsystem
 	subsystems, err := hierarchy()
 	if err != nil {
@@ -59,6 +84,16 @@ func Load(hierarchy Hierarchy, path Path) (Cgroup, error) {
 		if err != nil {
 			if os.IsNotExist(errors.Cause(err)) {
 				return nil, ErrCgroupDeleted
+			}
+			if err == ErrControllerNotActive {
+				if config.InitCheck != nil {
+					if skerr := config.InitCheck(s, path, err); skerr != nil {
+						if skerr != ErrIgnoreSubsystem {
+							return nil, skerr
+						}
+					}
+				}
+				continue
 			}
 			return nil, err
 		}
