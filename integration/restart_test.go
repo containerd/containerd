@@ -133,7 +133,7 @@ func TestContainerdRestart(t *testing.T) {
 
 	t.Logf("Pull test images")
 	for _, image := range []string{"busybox", "alpine"} {
-		img, err := imageService.PullImage(&runtime.ImageSpec{image}, nil)
+		img, err := imageService.PullImage(&runtime.ImageSpec{image}, nil, nil)
 		require.NoError(t, err)
 		defer func() {
 			assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: img}))
@@ -209,15 +209,16 @@ func TestUnknownStateAfterContainerdRestart(t *testing.T) {
 		t.Skip("unsupported config: runc not in PATH")
 	}
 
+	sbConfig := PodSandboxConfig("sandbox", "sandbox-unknown-state")
+
 	const testImage = "busybox"
 	t.Logf("Pull test image %q", testImage)
-	img, err := imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil)
+	img, err := imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil, sbConfig)
 	require.NoError(t, err)
 	defer func() {
 		assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: img}))
 	}()
 
-	sbConfig := PodSandboxConfig("sandbox", "sandbox-unknown-state")
 	t.Log("Should not be able to create sandbox without runc")
 	tmpRuncPath := Randomize(runcPath)
 	require.NoError(t, os.Rename(runcPath, tmpRuncPath))

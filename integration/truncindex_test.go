@@ -29,9 +29,11 @@ func genTruncIndex(normalName string) string {
 }
 
 func TestTruncIndex(t *testing.T) {
+	sbConfig := PodSandboxConfig("sandbox", "truncindex")
+
 	t.Logf("Pull an image")
 	const appImage = "busybox"
-	imgID, err := imageService.PullImage(&runtimeapi.ImageSpec{Image: appImage}, nil)
+	imgID, err := imageService.PullImage(&runtimeapi.ImageSpec{Image: appImage}, nil, sbConfig)
 	require.NoError(t, err)
 	imgTruncId := genTruncIndex(imgID)
 	defer func() {
@@ -54,7 +56,6 @@ func TestTruncIndex(t *testing.T) {
 	// TODO(yanxuean): add test case for ListImages
 
 	t.Logf("Create a sandbox")
-	sbConfig := PodSandboxConfig("sandbox", "truncindex")
 	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.NoError(t, err)
 	sbTruncIndex := genTruncIndex(sb)

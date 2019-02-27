@@ -43,7 +43,7 @@
 //		Logs are written to standard error instead of to files.
 //	-alsologtostderr=false
 //		Logs are written to standard error as well as to files.
-//	-stderrthreshold=ERROR
+//	-stderrthreshold=INFO
 //		Log events at or above this severity are logged to standard
 //		error as well as to files.
 //	-log_dir=""
@@ -396,8 +396,8 @@ type flushSyncWriter interface {
 }
 
 func init() {
-	// Default stderrThreshold is ERROR.
-	logging.stderrThreshold = errorLog
+	// Default stderrThreshold is INFO.
+	logging.stderrThreshold = infoLog
 
 	logging.setVState(0, nil, false)
 	go logging.flushDaemon()
@@ -410,9 +410,9 @@ func InitFlags(flagset *flag.FlagSet) {
 	}
 	flagset.StringVar(&logging.logDir, "log_dir", "", "If non-empty, write log files in this directory")
 	flagset.StringVar(&logging.logFile, "log_file", "", "If non-empty, use this log file")
-	flagset.BoolVar(&logging.toStderr, "logtostderr", false, "log to standard error instead of files")
+	flagset.BoolVar(&logging.toStderr, "logtostderr", true, "log to standard error instead of files")
 	flagset.BoolVar(&logging.alsoToStderr, "alsologtostderr", false, "log to standard error as well as files")
-	flagset.Var(&logging.verbosity, "v", "log level for V logs")
+	flagset.Var(&logging.verbosity, "v", "number for the log level verbosity")
 	flagset.BoolVar(&logging.skipHeaders, "skip_headers", false, "If true, avoid header prefixes in the log messages")
 	flagset.Var(&logging.stderrThreshold, "stderrthreshold", "logs at or above this threshold go to stderr")
 	flagset.Var(&logging.vmodule, "vmodule", "comma-separated list of pattern=N settings for file-filtered logging")
@@ -739,7 +739,9 @@ func (l *loggingT) output(s severity, buf *buffer, file string, line int, alsoTo
 	}
 	data := buf.Bytes()
 	if l.toStderr {
-		os.Stderr.Write(data)
+		if s >= l.stderrThreshold.get() {
+			os.Stderr.Write(data)
+		}
 	} else {
 		if alsoToStderr || l.alsoToStderr || s >= l.stderrThreshold.get() {
 			os.Stderr.Write(data)
@@ -934,7 +936,7 @@ func (l *loggingT) createFiles(sev severity) error {
 	return nil
 }
 
-const flushInterval = 30 * time.Second
+const flushInterval = 5 * time.Second
 
 // flushDaemon periodically flushes the log file buffers.
 func (l *loggingT) flushDaemon() {
