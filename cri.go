@@ -19,6 +19,7 @@ package cri
 import (
 	"flag"
 	"path/filepath"
+	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/containers/v1"
@@ -118,6 +119,11 @@ func validateConfig(c *criconfig.Config) error {
 		}
 	}
 
+	if c.StreamIdleTimeout != "" {
+		if _, err := time.ParseDuration(c.StreamIdleTimeout); err != nil {
+			return errors.Wrap(err, "invalid stream idle timeout")
+		}
+	}
 	return nil
 }
 
