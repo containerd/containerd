@@ -52,9 +52,10 @@ func TestPodSandboxStatus(t *testing.T) {
 		Annotations: map[string]string{"c": "d"},
 	}
 	metadata := sandboxstore.Metadata{
-		ID:     id,
-		Name:   "test-name",
-		Config: config,
+		ID:             id,
+		Name:           "test-name",
+		Config:         config,
+		RuntimeHandler: "test-runtime-handler",
 	}
 
 	expected := &runtime.PodSandboxStatus{
@@ -71,8 +72,9 @@ func TestPodSandboxStatus(t *testing.T) {
 				},
 			},
 		},
-		Labels:      config.GetLabels(),
-		Annotations: config.GetAnnotations(),
+		Labels:         config.GetLabels(),
+		Annotations:    config.GetAnnotations(),
+		RuntimeHandler: "test-runtime-handler",
 	}
 	for desc, test := range map[string]struct {
 		state         sandboxstore.State
