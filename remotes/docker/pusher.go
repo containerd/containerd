@@ -18,6 +18,7 @@ package docker
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -29,6 +30,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/reference"
 	"github.com/containerd/containerd/remotes"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -40,7 +42,18 @@ type dockerPusher struct {
 	tag string
 
 	// TODO: namespace tracker
-	tracker StatusTracker
+	tracker        StatusTracker
+	originProvider func(ocispec.Descriptor) []reference.Spec
+}
+
+func findMatchingOrigins(targetRef reference.Spec, origins []reference.Spec) []reference.Spec {
+	var result []reference.Spec
+	for _, origin := range origins {
+		if origin.Hostname() == targetRef.Hostname() {
+			result = append(result, origin)
+		}
+	}
+	return result
 }
 
 func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (content.Writer, error) {
@@ -132,6 +145,49 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 		}
 		req.Header.Add("Content-Type", desc.MediaType)
 	} else {
+		mountCandidates := findMatchingOrigins(p.refspec, p.originProvider(desc))
+		for _, mountCandidate := range mountCandidates {
+			// this is important that ctx get shadowed here. We need to rollback to the previous context when we try the next candidate
+			ctx, err := contextWithRepositoryScope(ctx, mountCandidate, false)
+			if err != nil {
+				// try next candidate
+				continue
+			}
+			i := strings.Index(mountCandidate.Locator, "/")
+			originRepoPath := mountCandidate.Locator[i+1:]
+			req, err = http.NewRequest(http.MethodPost, fmt.Sprintf("%s/?mount=%s&from=%s", p.url("blobs", "uploads"), desc.Digest, originRepoPath), nil)
+			if err != nil {
+				// try next candidate
+				continue
+			}
+
+			resp, err = p.doRequestWithRetries(ctx, req, nil)
+			if err != nil {
+				// try next candidate
+				continue
+			}
+
+			switch resp.StatusCode {
+			case http.StatusCreated:
+			default:
+				// try next candidate
+				continue
+			}
+
+			p.tracker.SetStatus(ref, Status{
+				Status: content.Status{
+					Ref:       ref,
+					Total:     desc.Size,
+					Expected:  desc.Digest,
+					StartedAt: time.Now(),
+					Offset:    desc.Size,
+				},
+			})
+			// mount succeeded, returning a nil writer, without error
+			return nil, nil
+		}
+		// no mount candidates found, or mount failure, fallback to real push
+
 		// TODO: Do monolithic upload if size is small
 
 		// Start upload request
