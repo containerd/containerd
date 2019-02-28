@@ -78,7 +78,7 @@ func openShimLog(ctx context.Context, bundle *Bundle) (io.ReadCloser, error) {
 			time.Second*10,
 		)
 		if conerr != nil {
-			dpc.conerr = errors.Wrap(err, "failed to connect to shim log")
+			dpc.conerr = errors.Wrap(conerr, "failed to connect to shim log")
 		}
 		dpc.c = c
 		dpc.wg.Done()
