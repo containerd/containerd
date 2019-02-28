@@ -181,6 +181,16 @@ disabled_plugins = ["restart"]
 EOF
 chmod 644 "${config_path}"
 
+if [[ -n "${CONTAINERD_EXTRA_RUNTIME_HANDLER}" ]]; then
+  cat >> ${config_path} <<EOF
+[plugins.cri.containerd.runtimes.${CONTAINERD_EXTRA_RUNTIME_HANDLER}]
+  runtime_type = "${CONTAINERD_EXTRA_RUNTIME_TYPE:-io.containerd.runc.v1}"
+
+[plugins.cri.containerd.runtimes.${CONTAINERD_EXTRA_RUNTIME_HANDLER}.options]
+${CONTAINERD_EXTRA_RUNTIME_OPTIONS:-}
+EOF
+fi
+
 echo "export PATH=${CONTAINERD_HOME}/usr/local/bin/:${CONTAINERD_HOME}/usr/local/sbin/:\$PATH" > \
   /etc/profile.d/containerd_env.sh
 
