@@ -131,7 +131,11 @@ func (a *dockerAuthorizer) setTokenAuth(ctx context.Context, host string, params
 		service: params["service"],
 	}
 
-	to.scopes = getTokenScopes(ctx, params)
+	to.scopes, err = getTokenScopes(ctx, params)
+	if err != nil {
+		return errors.Wrap(err, "invalid token scopes")
+	}
+
 	if len(to.scopes) == 0 {
 		return errors.Errorf("no scope specified for token auth challenge")
 	}

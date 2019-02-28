@@ -17,6 +17,7 @@
 package docker
 
 import (
+	"context"
 	"testing"
 
 	"github.com/containerd/containerd/reference"
@@ -51,6 +52,40 @@ func TestRepositoryScope(t *testing.T) {
 			actual, err := repositoryScope(x.refspec, x.push)
 			assert.NilError(t, err)
 			assert.Equal(t, x.expected, actual)
+		})
+	}
+}
+
+func TestGetTokenScopes(t *testing.T) {
+	cases := []struct {
+		name       string
+		scopesFlat string
+		expected   []string
+	}{
+		{
+			name:       "Deduplication",
+			scopesFlat: "repository:foo/bar:pull repository:foo/bar:push repository:foo/bar:pull,push repository:foo/bar:push,pull repository:bar/foo:pull",
+			expected:   []string{"repository:bar/foo:pull", "repository:foo/bar:pull,push"},
+		},
+		{
+			name:       "Merging",
+			scopesFlat: "repository:foo/bar:pull repository:foo/bar:push",
+			expected:   []string{"repository:foo/bar:pull,push"},
+		},
+		{
+			name:       "Normalizing-Sort",
+			scopesFlat: "repository:foo/bar:push,pull repository:bar/foo:pull",
+			expected:   []string{"repository:bar/foo:pull", "repository:foo/bar:pull,push"},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			scopes, err := getTokenScopes(context.Background(), map[string]string{
+				"scope": c.scopesFlat,
+			})
+			assert.NilError(t, err)
+			assert.DeepEqual(t, scopes, c.expected)
 		})
 	}
 }
