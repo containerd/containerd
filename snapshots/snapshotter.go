@@ -163,7 +163,7 @@ func (u *Usage) Add(other Usage) {
 // key and descending from the empty parent "". To prevent our layer from being
 // garbage collected during unpacking, we add the `containerd.io/gc.root` label:
 //
-//	noGcOpt := snapshotter.WithLabels(map[string]string{
+//	noGcOpt := snapshots.WithLabels(map[string]string{
 //		"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
 //	})
 //	mounts, err := snapshotter.Prepare(ctx, key, "", noGcOpt)
