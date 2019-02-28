@@ -99,7 +99,7 @@ type ResolverOptions struct {
 
 	// OriginProvider returns a slice of refspecs where the Pusher may find candidates for mounting
 	// instead of pushing from local store.
-	// When the Pusher succeeds by mounting, it returns a nil writer.
+	// When the Pusher succeeds by mounting, it returns an AlreadyExists error
 	OriginProvider func(ocispec.Descriptor) []reference.Spec
 }
 

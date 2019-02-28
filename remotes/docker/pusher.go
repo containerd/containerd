@@ -184,7 +184,7 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 				},
 			})
 			// mount succeeded, returning a nil writer, without error
-			return nil, nil
+			return nil, errors.Wrapf(errdefs.ErrAlreadyExists, "content %v mounted from %s", desc.Digest, mountCandidate)
 		}
 		// no mount candidates found, or mount failure, fallback to real push
 
