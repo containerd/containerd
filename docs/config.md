@@ -1,5 +1,10 @@
 # CRI Plugin Config Guide
 This document provides the description of the CRI plugin configuration.
+The CRI plugin config is part of the containerd config (default
+path: `/etc/containerd/config.toml`).
+
+See [here](https://github.com/containerd/containerd/blob/master/docs/ops.md)
+for more information about containerd config.
 
 The explanation and default value of each configuration item are as follows:
 ```toml
