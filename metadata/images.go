@@ -272,7 +272,7 @@ func validateImage(image *images.Image) error {
 func validateTarget(target *ocispec.Descriptor) error {
 	// NOTE(stevvooe): Only validate fields we actually store.
 
-	if err := target.Digest.Validate(); err != nil {
+	if err := target.Digest.Validate(); err != nil && err != digest.ErrDigestUnsupported {
 		return errors.Wrapf(errdefs.ErrInvalidArgument, "Target.Digest %q invalid: %v", target.Digest, err)
 	}
 

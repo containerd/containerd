@@ -111,7 +111,7 @@ func (dst *Set) Lookup(d string) (digest.Digest, error) {
 // if the given digest is invalid. If the digest already exists in the
 // set, this operation will be a no-op.
 func (dst *Set) Add(d digest.Digest) error {
-	if err := d.Validate(); err != nil {
+	if err := d.Validate(); err != nil && err != digest.ErrDigestUnsupported {
 		return err
 	}
 	dst.mutex.Lock()
@@ -142,7 +142,7 @@ func (dst *Set) Add(d digest.Digest) error {
 // returned if the given digest is invalid. If the digest does
 // not exist in the set, this operation will be a no-op.
 func (dst *Set) Remove(d digest.Digest) error {
-	if err := d.Validate(); err != nil {
+	if err := d.Validate(); err != nil && err != digest.ErrDigestUnsupported {
 		return err
 	}
 	dst.mutex.Lock()

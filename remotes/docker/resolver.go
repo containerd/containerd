@@ -177,7 +177,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 	)
 
 	if dgst != "" {
-		if err := dgst.Validate(); err != nil {
+		if err := dgst.Validate(); err != nil && err != digest.ErrDigestUnsupported {
 			// need to fail here, since we can't actually resolve the invalid
 			// digest.
 			return "", ocispec.Descriptor{}, err
@@ -227,7 +227,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 		dgstHeader := digest.Digest(resp.Header.Get("Docker-Content-Digest"))
 
 		if dgstHeader != "" {
-			if err := dgstHeader.Validate(); err != nil {
+			if err := dgstHeader.Validate(); err != nil && err != digest.ErrDigestUnsupported {
 				return "", ocispec.Descriptor{}, errors.Wrapf(err, "%q in header not a valid digest", dgstHeader)
 			}
 			dgst = dgstHeader
