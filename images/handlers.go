@@ -175,14 +175,41 @@ func SetChildrenLabels(manager content.Manager, f HandlerFunc) HandlerFunc {
 		}
 
 		if len(children) > 0 {
-			info := content.Info{
-				Digest: desc.Digest,
-				Labels: map[string]string{},
-			}
-			fields := []string{}
-			for i, ch := range children {
-				info.Labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i)] = ch.Digest.String()
-				fields = append(fields, fmt.Sprintf("labels.containerd.io/gc.ref.content.%d", i))
+			var (
+				info = content.Info{
+					Digest: desc.Digest,
+					Labels: map[string]string{},
+				}
+				fields = []string{}
+				config bool
+				layers int
+				other  int
+			)
+			for _, ch := range children {
+				var key string
+				switch ch.MediaType {
+				case MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig:
+					if !config {
+						key = "containerd.io/gc.ref.content.config"
+						config = true
+					} else {
+						key = fmt.Sprintf("containerd.io/gc.ref.content.%d", other)
+						other++
+					}
+				case MediaTypeDockerSchema2Layer, MediaTypeDockerSchema2LayerGzip,
+					MediaTypeDockerSchema2LayerForeign, MediaTypeDockerSchema2LayerForeignGzip,
+					ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerGzip,
+					ocispec.MediaTypeImageLayerNonDistributable, ocispec.MediaTypeImageLayerNonDistributableGzip:
+
+					key = fmt.Sprintf("containerd.io/gc.ref.content.l%d", layers)
+					layers++
+				default:
+					key = fmt.Sprintf("containerd.io/gc.ref.content.%d", other)
+					other++
+				}
+
+				info.Labels[key] = ch.Digest.String()
+				fields = append(fields, "labels."+key)
 			}
 
 			_, err := manager.Update(ctx, info, fields...)
