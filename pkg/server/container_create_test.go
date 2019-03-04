@@ -307,7 +307,8 @@ func TestContainerSpecWithExtraMounts(t *testing.T) {
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 	c := newTestCRIService()
 	mountInConfig := &runtime.Mount{
-		ContainerPath: "test-container-path",
+		// Test cleanpath
+		ContainerPath: "test-container-path/",
 		HostPath:      "test-host-path",
 		Readonly:      false,
 	}
@@ -334,7 +335,7 @@ func TestContainerSpecWithExtraMounts(t *testing.T) {
 	specCheck(t, testID, testSandboxID, testPid, spec)
 	var mounts, sysMounts, devMounts []runtimespec.Mount
 	for _, m := range spec.Mounts {
-		if m.Destination == "test-container-path" {
+		if strings.HasPrefix(m.Destination, "test-container-path") {
 			mounts = append(mounts, m)
 		} else if m.Destination == "/sys" {
 			sysMounts = append(sysMounts, m)
@@ -497,6 +498,21 @@ func TestGenerateVolumeMounts(t *testing.T) {
 			},
 			expectedMountDest: []string{
 				"/test-volume-2",
+			},
+		},
+		"should compare and return cleanpath": {
+			criMounts: []*runtime.Mount{
+				{
+					ContainerPath: "/test-volume-1",
+					HostPath:      "/test-hostpath-1",
+				},
+			},
+			imageVolumes: map[string]struct{}{
+				"/test-volume-1/": {},
+				"/test-volume-2/": {},
+			},
+			expectedMountDest: []string{
+				"/test-volume-2/",
 			},
 		},
 	} {
