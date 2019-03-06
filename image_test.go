@@ -17,10 +17,16 @@
 package containerd
 
 import (
+	"context"
+	"fmt"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/platforms"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestImageIsUnpacked(t *testing.T) {
@@ -70,5 +76,62 @@ func TestImageIsUnpacked(t *testing.T) {
 	}
 	if !unpacked {
 		t.Fatalf("image should be unpacked")
+	}
+}
+
+func TestImagePullWithDistSourceLabel(t *testing.T) {
+	var (
+		source   = "docker.io"
+		repoName = "library/busybox"
+		tag      = "latest"
+	)
+
+	ctx, cancel := testContext()
+	defer cancel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	imageName := fmt.Sprintf("%s/%s:%s", source, repoName, tag)
+	pMatcher := platforms.Default()
+
+	// pull content without unpack and add distribution source label
+	image, err := client.Pull(ctx, imageName,
+		WithPlatformMatcher(pMatcher),
+		WithAppendDistributionSourceLabel())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.ImageService().Delete(ctx, imageName)
+
+	cs := client.ContentStore()
+	key := fmt.Sprintf("containerd.io/distribution.source.%s", source)
+
+	// only check the target platform
+	childrenHandler := images.FilterPlatforms(images.ChildrenHandler(cs), pMatcher)
+
+	checkLabelHandler := func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		children, err := childrenHandler(ctx, desc)
+		if err != nil {
+			return nil, err
+		}
+
+		info, err := cs.Info(ctx, desc.Digest)
+		if err != nil {
+			return nil, err
+		}
+
+		// check the label
+		if got := info.Labels[key]; !strings.Contains(got, repoName) {
+			return nil, fmt.Errorf("expected to have %s repo name in label, but got %s", repoName, got)
+		}
+		return children, nil
+	}
+
+	if err := images.Dispatch(ctx, images.HandlerFunc(checkLabelHandler), nil, image.Target()); err != nil {
+		t.Fatal(err)
 	}
 }
