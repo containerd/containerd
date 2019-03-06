@@ -485,7 +485,7 @@ func TestCRWithImagePath(t *testing.T) {
 	}
 	defer ncontainer.Delete(ctx, WithSnapshotCleanup)
 
-	ntask, err := ncontainer.NewTask(ctx, empty(), WithRestoreImagePath(client.runtime, imagePath))
+	ntask, err := ncontainer.NewTask(ctx, empty(), WithRestoreImagePath(imagePath))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -118,9 +118,9 @@ func WithCheckpointImagePath(rt, path string) CheckpointTaskOpts {
 }
 
 // WithRestoreImagePath sets image path for create option
-func WithRestoreImagePath(rt, path string) NewTaskOpts {
+func WithRestoreImagePath(path string) NewTaskOpts {
 	return func(ctx context.Context, c *Client, ti *TaskInfo) error {
-		if CheckRuntime(rt, "io.containerd.runc") {
+		if CheckRuntime(ti.Runtime(), "io.containerd.runc") {
 			if ti.Options == nil {
 				ti.Options = &options.Options{}
 			}

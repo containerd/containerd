@@ -43,7 +43,7 @@ import (
 	google_protobuf "github.com/gogo/protobuf/types"
 	digest "github.com/opencontainers/go-digest"
 	is "github.com/opencontainers/image-spec/specs-go"
-	"github.com/opencontainers/image-spec/specs-go/v1"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
@@ -131,6 +131,12 @@ type TaskInfo struct {
 	RootFS []mount.Mount
 	// Options hold runtime specific settings for task creation
 	Options interface{}
+	runtime string
+}
+
+// Runtime name for the container
+func (i *TaskInfo) Runtime() string {
+	return i.runtime
 }
 
 // Task is the executable object within containerd
