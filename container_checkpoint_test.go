@@ -461,7 +461,7 @@ func TestCRWithImagePath(t *testing.T) {
 	defer os.RemoveAll(crDir)
 	imagePath := filepath.Join(crDir, "cr")
 	// checkpoint task
-	if _, err := task.Checkpoint(ctx, WithCheckpointImagePath(client.runtime, imagePath)); err != nil {
+	if _, err := task.Checkpoint(ctx, WithCheckpointImagePath(imagePath)); err != nil {
 		t.Fatal(err)
 	}
 

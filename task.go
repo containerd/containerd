@@ -117,6 +117,13 @@ type CheckpointTaskInfo struct {
 	ParentCheckpoint digest.Digest
 	// Options hold runtime specific settings for checkpointing a task
 	Options interface{}
+
+	runtime string
+}
+
+// Runtime name for the container
+func (i *CheckpointTaskInfo) Runtime() string {
+	return i.runtime
 }
 
 // CheckpointTaskOpts allows the caller to set checkpoint options
@@ -407,11 +414,17 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 		return nil, err
 	}
 	defer done(ctx)
+	cr, err := t.client.ContainerService().Get(ctx, t.id)
+	if err != nil {
+		return nil, err
+	}
 
 	request := &tasks.CheckpointTaskRequest{
 		ContainerID: t.id,
 	}
-	var i CheckpointTaskInfo
+	i := CheckpointTaskInfo{
+		runtime: cr.Runtime.Name,
+	}
 	for _, o := range opts {
 		if err := o(&i); err != nil {
 			return nil, err
@@ -434,10 +447,6 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 		return nil, err
 	}
 	defer t.Resume(ctx)
-	cr, err := t.client.ContainerService().Get(ctx, t.id)
-	if err != nil {
-		return nil, err
-	}
 	index := v1.Index{
 		Versioned: is.Versioned{
 			SchemaVersion: 2,
