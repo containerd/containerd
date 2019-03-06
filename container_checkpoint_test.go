@@ -461,7 +461,7 @@ func TestCRWithImagePath(t *testing.T) {
 	defer os.RemoveAll(crDir)
 	imagePath := filepath.Join(crDir, "cr")
 	// checkpoint task
-	if _, err := task.Checkpoint(ctx, WithCheckpointImagePath(client.runtime, imagePath)); err != nil {
+	if _, err := task.Checkpoint(ctx, WithCheckpointImagePath(imagePath)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -485,7 +485,7 @@ func TestCRWithImagePath(t *testing.T) {
 	}
 	defer ncontainer.Delete(ctx, WithSnapshotCleanup)
 
-	ntask, err := ncontainer.NewTask(ctx, empty(), WithRestoreImagePath(client.runtime, imagePath))
+	ntask, err := ncontainer.NewTask(ctx, empty(), WithRestoreImagePath(imagePath))
 	if err != nil {
 		t.Fatal(err)
 	}

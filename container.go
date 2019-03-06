@@ -229,7 +229,9 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 			})
 		}
 	}
-	var info TaskInfo
+	info := TaskInfo{
+		runtime: r.Runtime.Name,
+	}
 	for _, o := range opts {
 		if err := o(ctx, c.client, &info); err != nil {
 			return nil, err

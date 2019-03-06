@@ -92,9 +92,9 @@ func WithCheckpointName(name string) CheckpointTaskOpts {
 }
 
 // WithCheckpointImagePath sets image path for checkpoint option
-func WithCheckpointImagePath(rt, path string) CheckpointTaskOpts {
+func WithCheckpointImagePath(path string) CheckpointTaskOpts {
 	return func(r *CheckpointTaskInfo) error {
-		if CheckRuntime(rt, "io.containerd.runc") {
+		if CheckRuntime(r.Runtime(), "io.containerd.runc") {
 			if r.Options == nil {
 				r.Options = &options.CheckpointOptions{}
 			}
@@ -118,9 +118,9 @@ func WithCheckpointImagePath(rt, path string) CheckpointTaskOpts {
 }
 
 // WithRestoreImagePath sets image path for create option
-func WithRestoreImagePath(rt, path string) NewTaskOpts {
+func WithRestoreImagePath(path string) NewTaskOpts {
 	return func(ctx context.Context, c *Client, ti *TaskInfo) error {
-		if CheckRuntime(rt, "io.containerd.runc") {
+		if CheckRuntime(ti.Runtime(), "io.containerd.runc") {
 			if ti.Options == nil {
 				ti.Options = &options.Options{}
 			}
