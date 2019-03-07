@@ -24,15 +24,22 @@ import (
 )
 
 var (
-	bucketKeyLabels    = []byte("labels")
-	bucketKeyCreatedAt = []byte("createdat")
-	bucketKeyUpdatedAt = []byte("updatedat")
+	bucketKeyAnnotations = []byte("annotations")
+	bucketKeyLabels      = []byte("labels")
+	bucketKeyCreatedAt   = []byte("createdat")
+	bucketKeyUpdatedAt   = []byte("updatedat")
 )
 
 // ReadLabels reads the labels key from the bucket
 // Uses the key "labels"
 func ReadLabels(bkt *bolt.Bucket) (map[string]string, error) {
 	return readMap(bkt, bucketKeyLabels)
+}
+
+// ReadAnnotations reads the OCI Descriptor Annotations key from the bucket
+// Uses the key "annotations"
+func ReadAnnotations(bkt *bolt.Bucket) (map[string]string, error) {
+	return readMap(bkt, bucketKeyAnnotations)
 }
 
 func readMap(bkt *bolt.Bucket, bucketName []byte) (map[string]string, error) {
@@ -58,6 +65,11 @@ func readMap(bkt *bolt.Bucket, bucketName []byte) (map[string]string, error) {
 // Uses the key "labels"
 func WriteLabels(bkt *bolt.Bucket, labels map[string]string) error {
 	return writeMap(bkt, bucketKeyLabels, labels)
+}
+
+// WriteAnnotations writes the OCI Descriptor Annotations
+func WriteAnnotations(bkt *bolt.Bucket, labels map[string]string) error {
+	return writeMap(bkt, bucketKeyAnnotations, labels)
 }
 
 func writeMap(bkt *bolt.Bucket, bucketName []byte, labels map[string]string) error {
