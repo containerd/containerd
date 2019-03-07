@@ -43,9 +43,16 @@ func TestGCRoots(t *testing.T) {
 	alters := []alterFunc{
 		addImage("ns1", "image1", dgst(1), nil),
 		addImage("ns1", "image2", dgst(2), labelmap(string(labelGCSnapRef)+"overlay", "sn2")),
+		addImage("ns2", "image3", dgst(10), labelmap(string(labelGCContentRef), dgst(11).String())),
 		addContainer("ns1", "container1", "overlay", "sn4", nil),
 		addContainer("ns1", "container2", "overlay", "sn5", labelmap(string(labelGCSnapRef)+"overlay", "sn6")),
-		addContainer("ns1", "container3", "overlay", "sn7", labelmap(string(labelGCSnapRef)+"overlay/anything-1", "sn8", string(labelGCSnapRef)+"overlay/anything-2", "sn9")),
+		addContainer("ns1", "container3", "overlay", "sn7", labelmap(
+			string(labelGCSnapRef)+"overlay/anything-1", "sn8",
+			string(labelGCSnapRef)+"overlay/anything-2", "sn9",
+			string(labelGCContentRef), dgst(7).String())),
+		addContainer("ns1", "container4", "", "", labelmap(
+			string(labelGCContentRef)+".0", dgst(8).String(),
+			string(labelGCContentRef)+".1", dgst(9).String())),
 		addContent("ns1", dgst(1), nil),
 		addContent("ns1", dgst(2), nil),
 		addContent("ns1", dgst(3), nil),
@@ -88,10 +95,15 @@ func TestGCRoots(t *testing.T) {
 	expected := []gc.Node{
 		gcnode(ResourceContent, "ns1", dgst(1).String()),
 		gcnode(ResourceContent, "ns1", dgst(2).String()),
+		gcnode(ResourceContent, "ns1", dgst(7).String()),
+		gcnode(ResourceContent, "ns1", dgst(8).String()),
+		gcnode(ResourceContent, "ns1", dgst(9).String()),
 		gcnode(ResourceContent, "ns2", dgst(2).String()),
 		gcnode(ResourceContent, "ns2", dgst(4).String()),
 		gcnode(ResourceContent, "ns2", dgst(5).String()),
 		gcnode(ResourceContent, "ns2", dgst(6).String()),
+		gcnode(ResourceContent, "ns2", dgst(10).String()),
+		gcnode(ResourceContent, "ns2", dgst(11).String()),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn2"),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn3"),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn4"),
@@ -253,6 +265,9 @@ func TestGCRefs(t *testing.T) {
 		addSnapshot("ns1", "btrfs", "sn1", "", nil),
 		addSnapshot("ns2", "overlay", "sn1", "", nil),
 		addSnapshot("ns2", "overlay", "sn2", "sn1", nil),
+		addSnapshot("ns2", "overlay", "sn3", "", labelmap(
+			string(labelGCContentRef), dgst(1).String(),
+			string(labelGCContentRef)+".keep-me", dgst(6).String())),
 	}
 
 	refs := map[gc.Node][]gc.Node{
@@ -292,6 +307,10 @@ func TestGCRefs(t *testing.T) {
 		gcnode(ResourceSnapshot, "ns2", "overlay/sn1"): nil,
 		gcnode(ResourceSnapshot, "ns2", "overlay/sn2"): {
 			gcnode(ResourceSnapshot, "ns2", "overlay/sn1"),
+		},
+		gcnode(ResourceSnapshot, "ns2", "overlay/sn3"): {
+			gcnode(ResourceContent, "ns2", dgst(1).String()),
+			gcnode(ResourceContent, "ns2", dgst(6).String()),
 		},
 		gcnode(ResourceIngest, "ns1", "ingest-1"): nil,
 		gcnode(ResourceIngest, "ns2", "ingest-2"): {
