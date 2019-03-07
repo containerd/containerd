@@ -49,6 +49,9 @@ func TestImagesList(t *testing.T) {
 				Size:      10,
 				MediaType: "application/vnd.containerd.test",
 				Digest:    digest.FromString(id),
+				Annotations: map[string]string{
+					"foo": "bar",
+				},
 			},
 		}
 
@@ -168,6 +171,9 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 				Target: ocispec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab",
+					Annotations: map[string]string{
+						"foo": "bar",
+					},
 				},
 			},
 			expected: images.Image{
@@ -178,6 +184,9 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 				Target: ocispec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab",
+					Annotations: map[string]string{
+						"foo": "bar",
+					},
 				},
 			},
 		},
@@ -203,6 +212,9 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 				Target: ocispec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab",
+					Annotations: map[string]string{
+						"foo": "bar",
+					},
 				},
 			},
 			expected: images.Image{
@@ -213,6 +225,9 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 				Target: ocispec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab",
+					Annotations: map[string]string{
+						"foo": "bar",
+					},
 				},
 			},
 		},
@@ -227,6 +242,10 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 				Target: ocispec.Descriptor{
 					Size:      20,                                 // ignored
 					MediaType: "application/vnd.oci.blab+ignored", // make sure other stuff is ignored
+					Annotations: map[string]string{
+						"not": "bar",
+						"new": "boo",
+					},
 				},
 			},
 			fieldpaths: []string{"labels"},
@@ -238,6 +257,41 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 				Target: ocispec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab",
+					Annotations: map[string]string{
+						"foo": "bar",
+						"baz": "boo",
+					},
+				},
+			},
+		},
+		{
+			name:     "ReplaceLabelsAnnotationsFieldPath",
+			original: imageBase(),
+			input: images.Image{
+				Labels: map[string]string{
+					"for": "bar",
+					"boo": "boo",
+				},
+				Target: ocispec.Descriptor{
+					Size:      20,                                 // ignored
+					MediaType: "application/vnd.oci.blab+ignored", // make sure other stuff is ignored
+					Annotations: map[string]string{
+						"foo": "boo",
+					},
+				},
+			},
+			fieldpaths: []string{"annotations", "labels"},
+			expected: images.Image{
+				Labels: map[string]string{
+					"for": "bar",
+					"boo": "boo",
+				},
+				Target: ocispec.Descriptor{
+					Size:      10,
+					MediaType: "application/vnd.oci.blab",
+					Annotations: map[string]string{
+						"foo": "boo",
+					},
 				},
 			},
 		},
@@ -252,6 +306,9 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 				Target: ocispec.Descriptor{
 					Size:      20,                                 // ignored
 					MediaType: "application/vnd.oci.blab+ignored", // make sure other stuff is ignored
+					Annotations: map[string]string{
+						"foo": "bar",
+					},
 				},
 			},
 			fieldpaths: []string{"labels.foo"},
@@ -263,6 +320,43 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 				Target: ocispec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab",
+					Annotations: map[string]string{
+						"foo": "bar",
+						"baz": "boo",
+					},
+				},
+			},
+		},
+		{
+			name:     "ReplaceAnnotation",
+			original: imageBase(),
+			input: images.Image{
+				Labels: map[string]string{
+					"foo": "baz",
+					"baz": "bunk",
+				},
+				Target: ocispec.Descriptor{
+					Size:      20,                                 // ignored
+					MediaType: "application/vnd.oci.blab+ignored", // make sure other stuff is ignored
+					Annotations: map[string]string{
+						"foo": "baz",
+						"baz": "bunk",
+					},
+				},
+			},
+			fieldpaths: []string{"annotations.foo"},
+			expected: images.Image{
+				Labels: map[string]string{
+					"foo": "bar",
+					"baz": "boo",
+				},
+				Target: ocispec.Descriptor{
+					Size:      10,
+					MediaType: "application/vnd.oci.blab",
+					Annotations: map[string]string{
+						"foo": "baz",
+						"baz": "boo",
+					},
 				},
 			},
 		},
@@ -273,6 +367,9 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 				Target: ocispec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab+replaced",
+					Annotations: map[string]string{
+						"fox": "dog",
+					},
 				},
 			},
 			fieldpaths: []string{"target"},
@@ -284,6 +381,9 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 				Target: ocispec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab+replaced",
+					Annotations: map[string]string{
+						"fox": "dog",
+					},
 				},
 			},
 		},
@@ -298,6 +398,9 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 				Target: ocispec.Descriptor{
 					Size:      0,
 					MediaType: "application/vnd.oci.blab",
+					Annotations: map[string]string{
+						"foo": "bar",
+					},
 				},
 			},
 			cause: errdefs.ErrInvalidArgument,
@@ -311,6 +414,9 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 				},
 				Target: ocispec.Descriptor{
 					MediaType: "application/vnd.oci.blab",
+					Annotations: map[string]string{
+						"foo": "bar",
+					},
 				},
 			},
 			createerr: errdefs.ErrInvalidArgument,
@@ -352,6 +458,9 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 				Target: ocispec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab",
+					Annotations: map[string]string{
+						"foo": "bar",
+					},
 				},
 			},
 			input: images.Image{
@@ -363,6 +472,9 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 				Target: ocispec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab",
+					Annotations: map[string]string{
+						"foo": "bar",
+					},
 				},
 			},
 			cause: errdefs.ErrNotFound,
@@ -440,6 +552,10 @@ func imageBase() images.Image {
 		Target: ocispec.Descriptor{
 			Size:      10,
 			MediaType: "application/vnd.oci.blab",
+			Annotations: map[string]string{
+				"foo": "bar",
+				"baz": "boo",
+			},
 		},
 	}
 }
