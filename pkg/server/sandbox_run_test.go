@@ -75,6 +75,9 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 
 		assert.Contains(t, spec.Annotations, annotations.ContainerType)
 		assert.EqualValues(t, spec.Annotations[annotations.ContainerType], annotations.ContainerTypeSandbox)
+
+		assert.Contains(t, spec.Annotations, annotations.SandboxLogDir)
+		assert.EqualValues(t, spec.Annotations[annotations.SandboxLogDir], "test-log-directory")
 	}
 	return config, imageConfig, specCheck
 }
