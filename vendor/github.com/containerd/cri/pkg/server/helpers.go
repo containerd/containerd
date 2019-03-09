@@ -373,7 +373,7 @@ func checkSelinuxLevel(level string) (bool, error) {
 // isInCRIMounts checks whether a destination is in CRI mount list.
 func isInCRIMounts(dst string, mounts []*runtime.Mount) bool {
 	for _, m := range mounts {
-		if m.ContainerPath == dst {
+		if filepath.Clean(m.ContainerPath) == filepath.Clean(dst) {
 			return true
 		}
 	}

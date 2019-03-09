@@ -435,6 +435,7 @@ func (c *criService) generateSandboxContainerSpec(id string, config *runtime.Pod
 
 	g.AddAnnotation(annotations.ContainerType, annotations.ContainerTypeSandbox)
 	g.AddAnnotation(annotations.SandboxID, id)
+	g.AddAnnotation(annotations.SandboxLogDir, config.GetLogDirectory())
 
 	return g.Config, nil
 }
