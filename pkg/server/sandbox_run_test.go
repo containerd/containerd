@@ -86,6 +86,7 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 	testID := "test-id"
 	nsPath := "test-cni"
 	for desc, test := range map[string]struct {
+		configCriService  func(*criService)
 		configChange      func(*runtime.PodSandboxConfig)
 		imageConfigChange func(*imagespec.ImageConfig)
 		specCheck         func(*testing.T, *runtimespec.Spec)
@@ -157,6 +158,56 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 				assert.Contains(t, spec.Process.User.AdditionalGids, uint32(2222))
 			},
 		},
+		// Scenario 1 - containerd config allows "c" and podSpec defines "c" to be passed to OCI
+		"passthroughAnnotations scenario 1": {
+			configCriService: func(c *criService) {
+				c.config.Runtimes = make(map[string]criconfig.Runtime)
+				c.config.Runtimes["runc"] = criconfig.Runtime{
+					PodAnnotations: []string{"c"},
+				}
+			}, //assert.Equal(t, passthroughAnnotations["c"], "d")
+			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
+				assert.Equal(t, spec.Annotations["c"], "d")
+			},
+		},
+		// Scenario 2 - containerd config allows only "c" but podSpec defines "c" and "d"
+		// Only annotation "c" will be injected in OCI annotations and "d" should be dropped.
+		"passthroughAnnotations scenario 2": {
+			configChange: func(c *runtime.PodSandboxConfig) {
+				c.Annotations["d"] = "e"
+			},
+			configCriService: func(c *criService) {
+				c.config.Runtimes = make(map[string]criconfig.Runtime)
+				c.config.Runtimes["runc"] = criconfig.Runtime{
+					PodAnnotations: []string{"c"},
+				}
+			},
+			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
+				assert.Equal(t, spec.Annotations["c"], "d")
+				_, ok := spec.Annotations["d"]
+				assert.Equal(t, ok, false)
+			},
+		},
+		// Scenario 3 - Let's test some wildcard support
+		// podSpec has following annotations
+		"passthroughAnnotations scenario 3": {
+			configChange: func(c *runtime.PodSandboxConfig) {
+				c.Annotations["t.f"] = "j"
+				c.Annotations["z.g"] = "o"
+				c.Annotations["y.ca"] = "b"
+			},
+			configCriService: func(c *criService) {
+				c.config.Runtimes = make(map[string]criconfig.Runtime)
+				c.config.Runtimes["runc"] = criconfig.Runtime{
+					PodAnnotations: []string{"t*", "z.*", "y.c*"},
+				}
+			},
+			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
+				assert.Equal(t, spec.Annotations["t.f"], "j")
+				assert.Equal(t, spec.Annotations["z.g"], "o")
+				assert.Equal(t, spec.Annotations["y.ca"], "b")
+			},
+		},
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIService()
@@ -164,10 +215,16 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 		if test.configChange != nil {
 			test.configChange(config)
 		}
+
+		if test.configCriService != nil {
+			test.configCriService(c)
+		}
+
 		if test.imageConfigChange != nil {
 			test.imageConfigChange(imageConfig)
 		}
-		spec, err := c.generateSandboxContainerSpec(testID, config, imageConfig, nsPath)
+		spec, err := c.generateSandboxContainerSpec(testID, config, imageConfig, nsPath,
+			c.config.Runtimes["runc"].PodAnnotations)
 		if test.expectErr {
 			assert.Error(t, err)
 			assert.Nil(t, spec)
@@ -355,6 +412,7 @@ options timeout:1
 		c.os.(*ostesting.FakeOS).HostnameFn = func() (string, error) {
 			return realhostname, nil
 		}
+
 		cfg := &runtime.PodSandboxConfig{
 			Hostname:  test.hostname,
 			DnsConfig: test.dnsConfig,
@@ -773,7 +831,7 @@ func TestSandboxDisableCgroup(t *testing.T) {
 	config, imageConfig, _ := getRunPodSandboxTestData()
 	c := newTestCRIService()
 	c.config.DisableCgroup = true
-	spec, err := c.generateSandboxContainerSpec("test-id", config, imageConfig, "test-cni")
+	spec, err := c.generateSandboxContainerSpec("test-id", config, imageConfig, "test-cni", []string{})
 	require.NoError(t, err)
 
 	t.Log("resource limit should not be set")

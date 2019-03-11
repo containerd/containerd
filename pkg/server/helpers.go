@@ -626,3 +626,20 @@ func getTaskStatus(ctx context.Context, task containerd.Task) (containerd.Status
 	}
 	return status, nil
 }
+
+// getPassthroughAnnotations filters requested pod annotations by comparing
+// against permitted annotations for the given runtime.
+func getPassthroughAnnotations(podAnnotations map[string]string,
+	runtimePodAnnotations []string) (passthroughAnnotations map[string]string) {
+	passthroughAnnotations = make(map[string]string)
+
+	for podAnnotationKey, podAnnotationValue := range podAnnotations {
+		for _, r := range runtimePodAnnotations {
+			match, _ := regexp.MatchString(r, podAnnotationKey)
+			if match {
+				passthroughAnnotations[podAnnotationKey] = podAnnotationValue
+			}
+		}
+	}
+	return passthroughAnnotations
+}

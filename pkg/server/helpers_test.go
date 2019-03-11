@@ -406,3 +406,40 @@ func TestCustomGenerator(t *testing.T) {
 		}
 	}
 }
+
+func TestPassThroughAnnotationsFilter(t *testing.T) {
+	for desc, test := range map[string]struct {
+		podAnnotations         map[string]string
+		runtimePodAnnotations  []string
+		passthroughAnnotations map[string]string
+	}{
+		// Scenario 1 - containerd config allows "c" and podSpec defines "c" to be passed to OCI
+		"scenario1": {
+			podAnnotations:         map[string]string{"c": "d"},
+			runtimePodAnnotations:  []string{"c"},
+			passthroughAnnotations: map[string]string{"c": "d"},
+		},
+		// Scenario 2 - containerd config allows only "c" but podSpec defines "c" and "d"
+		// Only annotation "c" will be injected in OCI annotations and "d" should be dropped.
+		"scenario2": {
+			podAnnotations:         map[string]string{"c": "d", "d": "e"},
+			runtimePodAnnotations:  []string{"c"},
+			passthroughAnnotations: map[string]string{"c": "d"},
+		},
+		// Scenario 3 - Let's test some wildcard support
+		// podSpec has following annotations
+		"scenario3": {
+			podAnnotations: map[string]string{"t.f": "j",
+				"z.g":  "o",
+				"y.ca": "b"},
+			runtimePodAnnotations: []string{"t*", "z.*", "y.c*"},
+			passthroughAnnotations: map[string]string{"t.f": "j",
+				"z.g":  "o",
+				"y.ca": "b"},
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		passthroughAnnotations := getPassthroughAnnotations(test.podAnnotations, test.runtimePodAnnotations)
+		assert.Equal(t, test.passthroughAnnotations, passthroughAnnotations)
+	}
+}

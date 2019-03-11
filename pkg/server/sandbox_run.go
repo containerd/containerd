@@ -147,7 +147,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 
 	// Create sandbox container.
-	spec, err := c.generateSandboxContainerSpec(id, config, &image.ImageSpec.Config, sandbox.NetNSPath)
+	spec, err := c.generateSandboxContainerSpec(id, config, &image.ImageSpec.Config, sandbox.NetNSPath, ociRuntime.PodAnnotations)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate sandbox container spec")
 	}
@@ -340,7 +340,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 }
 
 func (c *criService) generateSandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig, nsPath string) (*runtimespec.Spec, error) {
+	imageConfig *imagespec.ImageConfig, nsPath string, runtimePodAnnotations []string) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
 	// TODO(random-liu): [P1] Compare the default settings with docker and containerd default.
 	spec, err := defaultRuntimeSpec(id)
@@ -451,6 +451,11 @@ func (c *criService) generateSandboxContainerSpec(id string, config *runtime.Pod
 		}
 	}
 	g.SetProcessOOMScoreAdj(adj)
+
+	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
+		runtimePodAnnotations) {
+		g.AddAnnotation(pKey, pValue)
+	}
 
 	g.AddAnnotation(annotations.ContainerType, annotations.ContainerTypeSandbox)
 	g.AddAnnotation(annotations.SandboxID, id)
