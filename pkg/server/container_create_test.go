@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -29,6 +30,7 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -542,6 +544,7 @@ func TestGenerateVolumeMounts(t *testing.T) {
 func TestGenerateContainerMounts(t *testing.T) {
 	const testSandboxID = "test-id"
 	for desc, test := range map[string]struct {
+		statFn          func(string) (os.FileInfo, error)
 		criMounts       []*runtime.Mount
 		securityContext *runtime.LinuxContainerSecurityContext
 		expectedMounts  []*runtime.Mount
@@ -647,6 +650,30 @@ func TestGenerateContainerMounts(t *testing.T) {
 			securityContext: &runtime.LinuxContainerSecurityContext{},
 			expectedMounts:  nil,
 		},
+		"should skip hostname mount if the old sandbox doesn't have hostname file": {
+			statFn: func(path string) (os.FileInfo, error) {
+				assert.Equal(t, filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"), path)
+				return nil, errors.New("random error")
+			},
+			securityContext: &runtime.LinuxContainerSecurityContext{},
+			expectedMounts: []*runtime.Mount{
+				{
+					ContainerPath: "/etc/hosts",
+					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
+					Readonly:      false,
+				},
+				{
+					ContainerPath: resolvConfPath,
+					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
+					Readonly:      false,
+				},
+				{
+					ContainerPath: "/dev/shm",
+					HostPath:      filepath.Join(testStateDir, sandboxesDir, testSandboxID, "shm"),
+					Readonly:      false,
+				},
+			},
+		},
 	} {
 		config := &runtime.ContainerConfig{
 			Metadata: &runtime.ContainerMetadata{
@@ -659,6 +686,7 @@ func TestGenerateContainerMounts(t *testing.T) {
 			},
 		}
 		c := newTestCRIService()
+		c.os.(*ostesting.FakeOS).StatFn = test.statFn
 		mounts := c.generateContainerMounts(testSandboxID, config)
 		assert.Equal(t, test.expectedMounts, mounts, desc)
 	}
