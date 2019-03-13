@@ -1,0 +1,41 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.2.4"
+
+pre_release = false
+
+preface = """\
+The fifth patch release for `containerd` 1.2 contains fixes
+for image management, cgroup management and the
+CRI plugin.
+It also updates runc to include an improved fix for CVE-2019-5736
+to reduce the increased memory-consumption introduced by the original
+patch.
+All these changes are noted below.
+### Notable Updates
+* Fix an issue that non-existent parent directory in image layers is created with permission
+`0700`. [#3017](https://github.com/containerd/containerd/issues/3017)
+* Fix an issue that snapshots of the base image can be deleted by mistake, when images
+built on top of it are deleted. [#3087](https://github.com/containerd/containerd/pull/3087)
+* Support for GC references to content from snapshot and container objects. [#3080](https://github.com/containerd/containerd/pull/3080)
+* cri: Fix a bug that pod can't get started when the same volume is defined
+differently in the image and the pod spec. [cri#1059](https://github.com/containerd/cri/issues/1059)
+* cri: Fix a bug that causes container start failure after in-place upgrade containerd
+to 1.2.4+ or 1.1.6+. [cri#1082](https://github.com/containerd/cri/issues/1082)
+* cgroups updated to dbea6f2bd41658b84b00417ceefa416b97 to fix issues for systemd 420 and
+non-existent cgroups. [#3079](https://github.com/containerd/containerd/pull/3079)
+* runc updated to 2b18fe1d885ee5083ef9f0838fee39b62d653e30 to include the improved
+fix for CVE-2019-5736. [#3082](https://github.com/containerd/containerd/pull/3082)
+* cri updated to a92c40017473cbe0239ce180125f12669757e44f. [#3084](https://github.com/containerd/containerd/pull/3084)
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
