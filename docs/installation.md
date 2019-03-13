@@ -5,7 +5,9 @@ These steps have been verified on Ubuntu 16.04. For other OS distributions, the 
 
 *Note: You need to run the following steps on each node you are planning to use in your Kubernetes cluster.*
 ## Release Tarball
-For each `containerd` release, we'll publish a release tarball specifically for Kubernetes named `cri-containerd-${VERSION}.${OS}-${ARCH}.tar.gz`. The release tarball contains all required binaries and files for using `containerd` with Kubernetes.
+For each `containerd` release, we'll publish a release tarball specifically for Kubernetes named `cri-containerd-${VERSION}.${OS}-${ARCH}.tar.gz`. This release tarball contains all required binaries and files for using `containerd` with Kubernetes. For example, the 1.2.4 version is available at https://storage.googleapis.com/cri-containerd-release/cri-containerd-1.2.4.linux-amd64.tar.gz.
+
+Note: The VERSION tag specified for the tarball corresponds to the `containerd` release tag, not a containerd/cri repository release tag. The `containerd` release includes the containerd/cri repository code through vendoring. The containerd/cri version of the containerd/cri code included in `containerd` is specified via a commit hash for containerd/cri in containerd/containerd/vendor.conf.
 ### Content
 As shown below, the release tarball contains:
 1) `containerd`, `containerd-shim`, `containerd-stress`, `containerd-release`, `ctr`: binaries for containerd.
