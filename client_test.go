@@ -281,6 +281,10 @@ func TestImagePullSomePlatforms(t *testing.T) {
 	count := 0
 	for _, manifest := range manifests {
 		children, err := images.Children(ctx, cs, manifest)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		found := false
 		for _, matcher := range m {
 			if matcher.Match(*manifest.Platform) {
@@ -302,8 +306,6 @@ func TestImagePullSomePlatforms(t *testing.T) {
 				}
 				ra.Close()
 			}
-		} else if !found && err == nil {
-			t.Fatal("manifest should not have pulled children content")
 		}
 	}
 
