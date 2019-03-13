@@ -99,6 +99,10 @@ var Command = cli.Command{
 			Name:  "null-io",
 			Usage: "send all IO to /dev/null",
 		},
+		cli.StringFlag{
+			Name:  "log-uri",
+			Usage: "log uri",
+		},
 		cli.BoolFlag{
 			Name:  "detach,d",
 			Usage: "detach from the task after it has started execution",
@@ -161,7 +165,7 @@ var Command = cli.Command{
 		}
 		opts := getNewTaskOpts(context)
 		ioOpts := []cio.Opt{cio.WithFIFODir(context.String("fifo-dir"))}
-		task, err := tasks.NewTask(ctx, client, container, context.String("checkpoint"), con, context.Bool("null-io"), ioOpts, opts...)
+		task, err := tasks.NewTask(ctx, client, container, context.String("checkpoint"), con, context.Bool("null-io"), context.String("log-uri"), ioOpts, opts...)
 		if err != nil {
 			return err
 		}
