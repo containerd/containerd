@@ -372,6 +372,7 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 	// Apply masked paths if specified.
 	// When `MaskedPaths` is not specified, keep runtime default for backward compatibility;
 	// When `MaskedPaths` is specified, but length is zero, clear masked path list.
+	// Note: If the container is privileged, then we clear any masked paths later on in the call to setOCIPrivileged()
 	if securityContext.GetMaskedPaths() != nil {
 		g.Config.Linux.MaskedPaths = nil
 		for _, path := range securityContext.GetMaskedPaths() {
@@ -380,6 +381,7 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 	}
 
 	// Apply readonly paths if specified.
+	// Note: If the container is privileged, then we clear any readonly paths later on in the call to setOCIPrivileged()
 	if securityContext.GetReadonlyPaths() != nil {
 		g.Config.Linux.ReadonlyPaths = nil
 		for _, path := range securityContext.GetReadonlyPaths() {

@@ -1017,30 +1017,59 @@ func TestMaskedAndReadonlyPaths(t *testing.T) {
 		readonly         []string
 		expectedMasked   []string
 		expectedReadonly []string
+		privileged       bool
 	}{
 		"should apply default if not specified": {
 			expectedMasked:   defaultSpec.Linux.MaskedPaths,
 			expectedReadonly: defaultSpec.Linux.ReadonlyPaths,
+			privileged:       false,
 		},
 		"should be able to specify empty paths": {
 			masked:           []string{},
 			readonly:         []string{},
 			expectedMasked:   nil,
 			expectedReadonly: nil,
+			privileged:       false,
 		},
 		"should apply CRI specified paths": {
 			masked:           []string{"/proc"},
 			readonly:         []string{"/sys"},
 			expectedMasked:   []string{"/proc"},
 			expectedReadonly: []string{"/sys"},
+			privileged:       false,
+		},
+		"default should be nil for privileged": {
+			expectedMasked:   nil,
+			expectedReadonly: nil,
+			privileged:       true,
+		},
+		"should be able to specify empty paths, esp. if privileged": {
+			masked:           []string{},
+			readonly:         []string{},
+			expectedMasked:   nil,
+			expectedReadonly: nil,
+			privileged:       true,
+		},
+		"should not apply CRI specified paths if privileged": {
+			masked:           []string{"/proc"},
+			readonly:         []string{"/sys"},
+			expectedMasked:   nil,
+			expectedReadonly: nil,
+			privileged:       true,
 		},
 	} {
 		t.Logf("TestCase %q", desc)
 		config.Linux.SecurityContext.MaskedPaths = test.masked
 		config.Linux.SecurityContext.ReadonlyPaths = test.readonly
+		config.Linux.SecurityContext.Privileged = test.privileged
+		sandboxConfig.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
+			Privileged: test.privileged,
+		}
 		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil)
 		require.NoError(t, err)
-		specCheck(t, testID, testSandboxID, testPid, spec)
+		if !test.privileged { // specCheck presumes an unprivileged container
+			specCheck(t, testID, testSandboxID, testPid, spec)
+		}
 		assert.Equal(t, test.expectedMasked, spec.Linux.MaskedPaths)
 		assert.Equal(t, test.expectedReadonly, spec.Linux.ReadonlyPaths)
 	}
