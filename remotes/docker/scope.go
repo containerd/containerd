@@ -18,6 +18,7 @@ package docker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"sort"
@@ -38,12 +39,6 @@ func (scopes tokenScopes) add(ts tokenScope) {
 		match.actions[k] = nil
 	}
 	scopes[ts.resource] = match
-}
-
-func (scopes tokenScopes) merge(other tokenScopes) {
-	for _, v := range other {
-		scopes.add(v)
-	}
 }
 
 func (scopes tokenScopes) contains(other tokenScopes) bool {
@@ -108,7 +103,7 @@ func repositoryScope(refspec reference.Spec, push bool) (tokenScope, error) {
 }
 
 // tokenScopesKey is used for the key for context.WithValue().
-// value: []string (e.g. {"registry:foo/bar:pull"})
+// value: tokenScopes{}
 type tokenScopesKey struct{}
 
 // contextWithRepositoryScope returns a context with tokenScopesKey{} and the repository scope value.
@@ -172,9 +167,13 @@ func parseTokenScope(s string) (tokenScope, error) {
 	}, nil
 }
 
-// getTokenScopes returns a map of resource -> tokenScope from ctx.Value(tokenScopesKey{}) and params["scope"].
-func getTokenScopes(ctx context.Context, params map[string]string) (tokenScopes, error) {
-	tokenScopes := tokenScopes{}
+// mergeChallengeScopesIntoContextScopes merges scopes returned by an authentication challenge into the current context tokenScopes
+// it returns the mergedTokenScope
+func mergeChallengeScopesIntoContextScopes(ctx context.Context, params map[string]string) (tokenScopes, error) {
+	tokenScopes := getContextScopes(ctx)
+	if tokenScopes == nil {
+		return nil, errors.New("context has no attached tokenScopes")
+	}
 	if params != nil {
 		if paramScopesFlat, ok := params["scope"]; ok {
 			paramScopes := strings.Split(paramScopesFlat, " ")
@@ -186,9 +185,6 @@ func getTokenScopes(ctx context.Context, params map[string]string) (tokenScopes,
 				tokenScopes.add(parsedScope)
 			}
 		}
-	}
-	if contextScopes := getContextScopes(ctx); contextScopes != nil {
-		tokenScopes.merge(contextScopes)
 	}
 	return tokenScopes, nil
 }

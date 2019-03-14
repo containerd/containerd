@@ -18,6 +18,7 @@ package docker
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"github.com/containerd/containerd/reference"
@@ -56,7 +57,7 @@ func TestRepositoryScope(t *testing.T) {
 	}
 }
 
-func TestGetTokenScopes(t *testing.T) {
+func TestMergeTokenScopes(t *testing.T) {
 	cases := []struct {
 		name       string
 		scopesFlat string
@@ -81,11 +82,15 @@ func TestGetTokenScopes(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			scopes, err := getTokenScopes(context.Background(), map[string]string{
+			ctx := context.WithValue(context.Background(), tokenScopesKey{}, tokenScopes{})
+			scopes, err := mergeChallengeScopesIntoContextScopes(ctx, map[string]string{
 				"scope": c.scopesFlat,
 			})
 			assert.NilError(t, err)
 			assert.DeepEqual(t, scopes.flatten(), c.expected)
+			ctxScopes := getContextScopes(ctx)
+			// make sure the returned scopes is the same instance as the one in the context
+			assert.Check(t, reflect.ValueOf(ctxScopes) == reflect.ValueOf(scopes))
 		})
 	}
 }
