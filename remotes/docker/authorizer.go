@@ -42,7 +42,12 @@ type dockerAuthorizer struct {
 	client *http.Client
 	mu     sync.Mutex
 
-	auth map[string]string
+	auth map[string]authorization
+}
+
+type authorization struct {
+	scopes tokenScopes
+	token  string
 }
 
 // NewAuthorizer creates a Docker authorizer using the provided function to
@@ -54,13 +59,13 @@ func NewAuthorizer(client *http.Client, f func(string) (string, string, error)) 
 	return &dockerAuthorizer{
 		credentials: f,
 		client:      client,
-		auth:        map[string]string{},
+		auth:        map[string]authorization{},
 	}
 }
 
 func (a *dockerAuthorizer) Authorize(ctx context.Context, req *http.Request) error {
 	// TODO: Lookup matching challenge and scope rather than just host
-	if auth := a.getAuth(req.URL.Host); auth != "" {
+	if auth := a.getAuth(ctx, req.URL.Host); auth != "" {
 		req.Header.Set("Authorization", auth)
 	}
 
@@ -73,13 +78,9 @@ func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.R
 	for _, c := range parseAuthHeader(last.Header) {
 		if c.scheme == bearerAuth {
 			if err := invalidAuthorization(c, responses); err != nil {
-				// TODO: Clear token
-				a.setAuth(host, "")
 				return err
 			}
-
-			// TODO(dmcg): Store challenge, not token
-			// Move token fetching to authorize
+			// TODO: Move token fetching to authorize
 			return a.setTokenAuth(ctx, host, c.parameters)
 		} else if c.scheme == basicAuth && a.credentials != nil {
 			// TODO: Resolve credentials on authorize
@@ -89,7 +90,11 @@ func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.R
 			}
 			if username != "" && secret != "" {
 				auth := username + ":" + secret
-				a.setAuth(host, fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(auth))))
+				scopes, err := getTokenScopes(ctx, c.parameters)
+				if err != nil {
+					return err
+				}
+				a.setAuth(host, scopes, fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(auth))))
 				return nil
 			}
 		}
@@ -98,21 +103,25 @@ func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.R
 	return errors.Wrap(errdefs.ErrNotImplemented, "failed to find supported auth scheme")
 }
 
-func (a *dockerAuthorizer) getAuth(host string) string {
+func (a *dockerAuthorizer) getAuth(ctx context.Context, host string) string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	return a.auth[host]
+	auth, ok := a.auth[host]
+	if !ok {
+		return ""
+	}
+	requestedScopes := getContextScopes(ctx)
+	if auth.scopes.contains(requestedScopes) {
+		return auth.token
+	}
+	return ""
 }
 
-func (a *dockerAuthorizer) setAuth(host string, auth string) bool {
+func (a *dockerAuthorizer) setAuth(host string, scopes tokenScopes, token string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-
-	changed := a.auth[host] != auth
-	a.auth[host] = auth
-
-	return changed
+	a.auth[host] = authorization{scopes: scopes.cloneOrNew(), token: token}
 }
 
 func (a *dockerAuthorizer) setTokenAuth(ctx context.Context, host string, params map[string]string) error {
@@ -131,11 +140,16 @@ func (a *dockerAuthorizer) setTokenAuth(ctx context.Context, host string, params
 		service: params["service"],
 	}
 
-	to.scopes, err = getTokenScopes(ctx, params)
+	scopes, err := getTokenScopes(ctx, params)
 	if err != nil {
 		return errors.Wrap(err, "invalid token scopes")
 	}
-
+	// update the context tokenScopes
+	contextScopes := getContextScopes(ctx)
+	if contextScopes != nil {
+		contextScopes.merge(scopes)
+	}
+	to.scopes = scopes.flatten()
 	if len(to.scopes) == 0 {
 		return errors.Errorf("no scope specified for token auth challenge")
 	}
@@ -161,7 +175,7 @@ func (a *dockerAuthorizer) setTokenAuth(ctx context.Context, host string, params
 			return errors.Wrap(err, "failed to fetch anonymous token")
 		}
 	}
-	a.setAuth(host, fmt.Sprintf("Bearer %s", token))
+	a.setAuth(host, scopes, fmt.Sprintf("Bearer %s", token))
 
 	return nil
 }

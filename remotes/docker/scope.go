@@ -26,19 +26,85 @@ import (
 	"github.com/containerd/containerd/reference"
 )
 
+type tokenScopes map[string]tokenScope
+
+func (scopes tokenScopes) add(ts tokenScope) {
+	match, ok := scopes[ts.resource]
+	if !ok {
+		scopes[ts.resource] = ts
+		return
+	}
+	for k := range ts.actions {
+		match.actions[k] = nil
+	}
+	scopes[ts.resource] = match
+}
+
+func (scopes tokenScopes) merge(other tokenScopes) {
+	for _, v := range other {
+		scopes.add(v)
+	}
+}
+
+func (scopes tokenScopes) contains(other tokenScopes) bool {
+	if len(other) == 0 {
+		return true
+	}
+	if len(scopes) == 0 {
+		return false
+	}
+	for k, v := range other {
+		existing, exists := scopes[k]
+		if !exists {
+			return false
+		}
+		for action := range v.actions {
+			if _, ok := existing.actions[action]; !ok {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func (scopes tokenScopes) flatten() []string {
+	var result []string
+	for _, s := range scopes {
+		result = append(result, s.String())
+	}
+	sort.Strings(result)
+	return result
+}
+
+func (scopes tokenScopes) cloneOrNew() tokenScopes {
+	if scopes == nil {
+		return tokenScopes{}
+	}
+	result := tokenScopes{}
+	for k, v := range scopes {
+		result[k] = v.clone()
+	}
+	return result
+}
+
 // repositoryScope returns a repository scope string such as "repository:foo/bar:pull"
 // for "host/foo/bar:baz".
 // When push is true, both pull and push are added to the scope.
-func repositoryScope(refspec reference.Spec, push bool) (string, error) {
+func repositoryScope(refspec reference.Spec, push bool) (tokenScope, error) {
 	u, err := url.Parse("dummy://" + refspec.Locator)
 	if err != nil {
-		return "", err
+		return tokenScope{}, err
 	}
-	s := "repository:" + strings.TrimPrefix(u.Path, "/") + ":pull"
+	ts := tokenScope{
+		resource: "repository:" + strings.TrimPrefix(u.Path, "/"),
+		actions: map[string]interface{}{
+			"pull": struct{}{},
+		},
+	}
 	if push {
-		s += ",push"
+		ts.actions["push"] = struct{}{}
 	}
-	return s, nil
+	return ts, nil
 }
 
 // tokenScopesKey is used for the key for context.WithValue().
@@ -51,7 +117,18 @@ func contextWithRepositoryScope(ctx context.Context, refspec reference.Spec, pus
 	if err != nil {
 		return nil, err
 	}
-	return context.WithValue(ctx, tokenScopesKey{}, []string{s}), nil
+	scopes := getContextScopes(ctx).cloneOrNew()
+	scopes.add(s)
+
+	return context.WithValue(ctx, tokenScopesKey{}, scopes), nil
+}
+
+func getContextScopes(ctx context.Context) tokenScopes {
+	var existingTokens tokenScopes
+	if rawExiting := ctx.Value(tokenScopesKey{}); rawExiting != nil {
+		existingTokens, _ = rawExiting.(tokenScopes)
+	}
+	return existingTokens
 }
 
 type tokenScope struct {
@@ -66,6 +143,18 @@ func (ts tokenScope) String() string {
 	}
 	sort.Strings(actionSlice)
 	return fmt.Sprintf("%s:%s", ts.resource, strings.Join(actionSlice, ","))
+}
+
+func (ts tokenScope) clone() tokenScope {
+	result := tokenScope{resource: ts.resource}
+	if ts.actions == nil {
+		return result
+	}
+	result.actions = map[string]interface{}{}
+	for k, v := range ts.actions {
+		result.actions[k] = v
+	}
+	return result
 }
 
 func parseTokenScope(s string) (tokenScope, error) {
@@ -83,41 +172,23 @@ func parseTokenScope(s string) (tokenScope, error) {
 	}, nil
 }
 
-// mergeTokenScope add a scope to an existing scope collection, ensuring deduplication
-func mergeTokenScope(existing map[string]tokenScope, newElem tokenScope) {
-	match, ok := existing[newElem.resource]
-	if !ok {
-		existing[newElem.resource] = newElem
-		return
-	}
-	for k := range newElem.actions {
-		match.actions[k] = nil
-	}
-	existing[newElem.resource] = match
-}
-
-// getTokenScopes returns deduplicated and sorted scopes from ctx.Value(tokenScopesKey{}) and params["scope"].
-func getTokenScopes(ctx context.Context, params map[string]string) ([]string, error) {
-	var rawScopes []string
-	if x := ctx.Value(tokenScopesKey{}); x != nil {
-		rawScopes = x.([]string)
-	}
-	if paramScopesFlat, ok := params["scope"]; ok {
-		paramScopes := strings.Split(paramScopesFlat, " ")
-		rawScopes = append(rawScopes, paramScopes...)
-	}
-	tokenScopes := map[string]tokenScope{}
-	for _, rawScope := range rawScopes {
-		parsedScope, err := parseTokenScope(rawScope)
-		if err != nil {
-			return nil, err
+// getTokenScopes returns a map of resource -> tokenScope from ctx.Value(tokenScopesKey{}) and params["scope"].
+func getTokenScopes(ctx context.Context, params map[string]string) (tokenScopes, error) {
+	tokenScopes := tokenScopes{}
+	if params != nil {
+		if paramScopesFlat, ok := params["scope"]; ok {
+			paramScopes := strings.Split(paramScopesFlat, " ")
+			for _, rawScope := range paramScopes {
+				parsedScope, err := parseTokenScope(rawScope)
+				if err != nil {
+					return nil, err
+				}
+				tokenScopes.add(parsedScope)
+			}
 		}
-		mergeTokenScope(tokenScopes, parsedScope)
 	}
-	var scopes []string
-	for _, s := range tokenScopes {
-		scopes = append(scopes, s.String())
+	if contextScopes := getContextScopes(ctx); contextScopes != nil {
+		tokenScopes.merge(contextScopes)
 	}
-	sort.Strings(scopes)
-	return scopes, nil
+	return tokenScopes, nil
 }

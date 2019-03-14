@@ -51,7 +51,7 @@ func TestRepositoryScope(t *testing.T) {
 		t.Run(x.refspec.String(), func(t *testing.T) {
 			actual, err := repositoryScope(x.refspec, x.push)
 			assert.NilError(t, err)
-			assert.Equal(t, x.expected, actual)
+			assert.Equal(t, x.expected, actual.String())
 		})
 	}
 }
@@ -85,7 +85,7 @@ func TestGetTokenScopes(t *testing.T) {
 				"scope": c.scopesFlat,
 			})
 			assert.NilError(t, err)
-			assert.DeepEqual(t, scopes, c.expected)
+			assert.DeepEqual(t, scopes.flatten(), c.expected)
 		})
 	}
 }
