@@ -343,67 +343,61 @@ func (c *criService) generateSandboxContainerSpec(id string, config *runtime.Pod
 	imageConfig *imagespec.ImageConfig, nsPath string, runtimePodAnnotations []string) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
 	// TODO(random-liu): [P1] Compare the default settings with docker and containerd default.
-	spec, err := defaultRuntimeSpec(id)
-	if err != nil {
-		return nil, err
+	specOpts := []oci.SpecOpts{
+		customopts.WithoutRunMount,
+		customopts.WithoutDefaultSecuritySettings,
+		customopts.WithRelativeRoot(relativeRootfsPath),
+		oci.WithEnv(imageConfig.Env),
+		oci.WithRootFSReadonly(),
+		oci.WithHostname(config.GetHostname()),
 	}
-	g := newSpecGenerator(spec)
-
-	// Apply default config from image config.
-	if err := addImageEnvs(&g, imageConfig.Env); err != nil {
-		return nil, err
-	}
-
 	if imageConfig.WorkingDir != "" {
-		g.SetProcessCwd(imageConfig.WorkingDir)
+		specOpts = append(specOpts, oci.WithProcessCwd(imageConfig.WorkingDir))
 	}
 
 	if len(imageConfig.Entrypoint) == 0 && len(imageConfig.Cmd) == 0 {
 		// Pause image must have entrypoint or cmd.
 		return nil, errors.Errorf("invalid empty entrypoint and cmd in image config %+v", imageConfig)
 	}
-	// Set process commands.
-	g.SetProcessArgs(append(imageConfig.Entrypoint, imageConfig.Cmd...))
-
-	// Set relative root path.
-	g.SetRootPath(relativeRootfsPath)
-
-	// Make root of sandbox container read-only.
-	g.SetRootReadonly(true)
-
-	// Set hostname.
-	g.SetHostname(config.GetHostname())
+	specOpts = append(specOpts, oci.WithProcessArgs(append(imageConfig.Entrypoint, imageConfig.Cmd...)...))
 
 	// TODO(random-liu): [P2] Consider whether to add labels and annotations to the container.
 
 	// Set cgroups parent.
 	if c.config.DisableCgroup {
-		g.SetLinuxCgroupsPath("")
+		specOpts = append(specOpts, customopts.WithDisabledCgroups)
 	} else {
 		if config.GetLinux().GetCgroupParent() != "" {
 			cgroupsPath := getCgroupsPath(config.GetLinux().GetCgroupParent(), id,
 				c.config.SystemdCgroup)
-			g.SetLinuxCgroupsPath(cgroupsPath)
+			specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
 		}
 	}
+
 	// When cgroup parent is not set, containerd-shim will create container in a child cgroup
 	// of the cgroup itself is in.
 	// TODO(random-liu): [P2] Set default cgroup path if cgroup parent is not specified.
 
 	// Set namespace options.
-	securityContext := config.GetLinux().GetSecurityContext()
-	nsOptions := securityContext.GetNamespaceOptions()
+	var (
+		securityContext = config.GetLinux().GetSecurityContext()
+		nsOptions       = securityContext.GetNamespaceOptions()
+	)
 	if nsOptions.GetNetwork() == runtime.NamespaceMode_NODE {
-		g.RemoveLinuxNamespace(string(runtimespec.NetworkNamespace)) // nolint: errcheck
+		specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.NetworkNamespace))
 	} else {
 		//TODO(Abhi): May be move this to containerd spec opts (WithLinuxSpaceOption)
-		g.AddOrReplaceLinuxNamespace(string(runtimespec.NetworkNamespace), nsPath) // nolint: errcheck
+		specOpts = append(specOpts, oci.WithLinuxNamespace(
+			runtimespec.LinuxNamespace{
+				Type: runtimespec.NetworkNamespace,
+				Path: nsPath,
+			}))
 	}
 	if nsOptions.GetPid() == runtime.NamespaceMode_NODE {
-		g.RemoveLinuxNamespace(string(runtimespec.PIDNamespace)) // nolint: errcheck
+		specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.PIDNamespace))
 	}
 	if nsOptions.GetIpc() == runtime.NamespaceMode_NODE {
-		g.RemoveLinuxNamespace(string(runtimespec.IPCNamespace)) // nolint: errcheck
+		specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.IPCNamespace))
 	}
 
 	// It's fine to generate the spec before the sandbox /dev/shm
@@ -412,56 +406,50 @@ func (c *criService) generateSandboxContainerSpec(id string, config *runtime.Pod
 	if nsOptions.GetIpc() == runtime.NamespaceMode_NODE {
 		sandboxDevShm = devShm
 	}
-	g.AddMount(runtimespec.Mount{
-		Source:      sandboxDevShm,
-		Destination: devShm,
-		Type:        "bind",
-		Options:     []string{"rbind", "ro"},
-	})
+	specOpts = append(specOpts, oci.WithMounts([]runtimespec.Mount{
+		{
+			Source:      sandboxDevShm,
+			Destination: devShm,
+			Type:        "bind",
+			Options:     []string{"rbind", "ro"},
+		},
+	}))
 
 	selinuxOpt := securityContext.GetSelinuxOptions()
 	processLabel, mountLabel, err := initSelinuxOpts(selinuxOpt)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to init selinux options %+v", securityContext.GetSelinuxOptions())
 	}
-	g.SetProcessSelinuxLabel(processLabel)
-	g.SetLinuxMountLabel(mountLabel)
 
 	supplementalGroups := securityContext.GetSupplementalGroups()
-	for _, group := range supplementalGroups {
-		g.AddProcessAdditionalGid(uint32(group))
-	}
+	specOpts = append(specOpts,
+		customopts.WithSelinuxLabels(processLabel, mountLabel),
+		customopts.WithSupplementalGroups(supplementalGroups),
+	)
 
 	// Add sysctls
 	sysctls := config.GetLinux().GetSysctls()
-	for key, value := range sysctls {
-		g.AddLinuxSysctl(key, value)
-	}
+	specOpts = append(specOpts, customopts.WithSysctls(sysctls))
 
 	// Note: LinuxSandboxSecurityContext does not currently provide an apparmor profile
 
 	if !c.config.DisableCgroup {
-		g.SetLinuxResourcesCPUShares(uint64(defaultSandboxCPUshares))
+		specOpts = append(specOpts, customopts.WithDefaultSandboxShares)
 	}
-	adj := int(defaultSandboxOOMAdj)
-	if c.config.RestrictOOMScoreAdj {
-		adj, err = restrictOOMScoreAdj(adj)
-		if err != nil {
-			return nil, err
-		}
-	}
-	g.SetProcessOOMScoreAdj(adj)
+	specOpts = append(specOpts, customopts.WithPodOOMScoreAdj(int(defaultSandboxOOMAdj), c.config.RestrictOOMScoreAdj))
 
 	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
 		runtimePodAnnotations) {
-		g.AddAnnotation(pKey, pValue)
+		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
 	}
 
-	g.AddAnnotation(annotations.ContainerType, annotations.ContainerTypeSandbox)
-	g.AddAnnotation(annotations.SandboxID, id)
-	g.AddAnnotation(annotations.SandboxLogDir, config.GetLogDirectory())
+	specOpts = append(specOpts,
+		customopts.WithAnnotation(annotations.ContainerType, annotations.ContainerTypeSandbox),
+		customopts.WithAnnotation(annotations.SandboxID, id),
+		customopts.WithAnnotation(annotations.SandboxLogDir, config.GetLogDirectory()),
+	)
 
-	return g.Config, nil
+	return runtimeSpec(id, specOpts...)
 }
 
 // setupSandboxFiles sets up necessary sandbox files including /dev/shm, /etc/hosts,

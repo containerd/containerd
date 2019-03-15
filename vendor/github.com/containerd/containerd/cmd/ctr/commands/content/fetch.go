@@ -149,10 +149,13 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 		containerd.WithResolver(config.Resolver),
 		containerd.WithImageHandler(h),
 		containerd.WithSchema1Conversion,
+		containerd.WithAppendDistributionSourceLabel(),
 	}
+
 	for _, platform := range config.Platforms {
 		opts = append(opts, containerd.WithPlatform(platform))
 	}
+
 	img, err := client.Fetch(pctx, ref, opts...)
 	stopProgress()
 	if err != nil {

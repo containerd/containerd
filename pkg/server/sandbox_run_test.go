@@ -32,6 +32,7 @@ import (
 
 	"github.com/containerd/cri/pkg/annotations"
 	criconfig "github.com/containerd/cri/pkg/config"
+	"github.com/containerd/cri/pkg/containerd/opts"
 	ostesting "github.com/containerd/cri/pkg/os/testing"
 	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
 )
@@ -66,7 +67,7 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 		assert.Contains(t, spec.Process.Env, "a=b", "c=d")
 		assert.Equal(t, []string{"/pause", "forever"}, spec.Process.Args)
 		assert.Equal(t, "/workspace", spec.Process.Cwd)
-		assert.EqualValues(t, *spec.Linux.Resources.CPU.Shares, defaultSandboxCPUshares)
+		assert.EqualValues(t, *spec.Linux.Resources.CPU.Shares, opts.DefaultSandboxCPUshares)
 		assert.EqualValues(t, *spec.Process.OOMScoreAdj, defaultSandboxOOMAdj)
 
 		t.Logf("Check PodSandbox annotations")
@@ -136,13 +137,6 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 			imageConfigChange: func(c *imagespec.ImageConfig) {
 				c.Entrypoint = nil
 				c.Cmd = nil
-			},
-			expectErr: true,
-		},
-		"should return error when env is invalid ": {
-			// Also covers addImageEnvs.
-			imageConfigChange: func(c *imagespec.ImageConfig) {
-				c.Env = []string{"a"}
 			},
 			expectErr: true,
 		},

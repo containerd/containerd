@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build darwin dragonfly freebsd linux netbsd openbsd solaris
+// +build aix darwin dragonfly freebsd linux netbsd openbsd solaris
 
 package unix
 
 import (
 	"bytes"
-	"runtime"
 	"sort"
 	"sync"
 	"syscall"
@@ -21,19 +20,17 @@ var (
 	Stderr = 2
 )
 
-const (
-	darwin64Bit    = runtime.GOOS == "darwin" && sizeofPtr == 8
-	dragonfly64Bit = runtime.GOOS == "dragonfly" && sizeofPtr == 8
-	netbsd32Bit    = runtime.GOOS == "netbsd" && sizeofPtr == 4
-	solaris64Bit   = runtime.GOOS == "solaris" && sizeofPtr == 8
-)
-
 // Do the interface allocations only once for common
 // Errno values.
 var (
 	errEAGAIN error = syscall.EAGAIN
 	errEINVAL error = syscall.EINVAL
 	errENOENT error = syscall.ENOENT
+)
+
+var (
+	signalNameMapOnce sync.Once
+	signalNameMap     map[string]syscall.Signal
 )
 
 // errnoErr returns common boxed Errno values, to prevent
@@ -72,6 +69,19 @@ func SignalName(s syscall.Signal) string {
 		return signalList[i].name
 	}
 	return ""
+}
+
+// SignalNum returns the syscall.Signal for signal named s,
+// or 0 if a signal with such name is not found.
+// The signal name should start with "SIG".
+func SignalNum(s string) syscall.Signal {
+	signalNameMapOnce.Do(func() {
+		signalNameMap = make(map[string]syscall.Signal)
+		for _, signal := range signalList {
+			signalNameMap[signal.name] = signal.num
+		}
+	})
+	return signalNameMap[s]
 }
 
 // clen returns the index of the first NULL byte in n or len(n) if n contains no NULL byte.
@@ -357,13 +367,6 @@ func Socketpair(domain, typ, proto int) (fd [2]int, err error) {
 		fd[1] = int(fdx[1])
 	}
 	return
-}
-
-func Sendfile(outfd int, infd int, offset *int64, count int) (written int, err error) {
-	if raceenabled {
-		raceReleaseMerge(unsafe.Pointer(&ioSync))
-	}
-	return sendfile(outfd, infd, offset, count)
 }
 
 var ioSync int64

@@ -17,10 +17,10 @@ limitations under the License.
 package server
 
 import (
-	"sort"
 	"testing"
 
 	"github.com/BurntSushi/toml"
+	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/docker/distribution/reference"
@@ -28,7 +28,6 @@ import (
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	criconfig "github.com/containerd/cri/pkg/config"
 	"github.com/containerd/cri/pkg/store"
@@ -151,27 +150,6 @@ func TestBuildLabels(t *testing.T) {
 	newLabels["a"] = "e"
 	assert.Empty(t, configLabels[containerKindLabel], "should not add new labels into original label")
 	assert.Equal(t, "b", configLabels["a"], "change in new labels should not affect original label")
-}
-
-func TestOrderedMounts(t *testing.T) {
-	mounts := []*runtime.Mount{
-		{ContainerPath: "/a/b/c"},
-		{ContainerPath: "/a/b"},
-		{ContainerPath: "/a/b/c/d"},
-		{ContainerPath: "/a"},
-		{ContainerPath: "/b"},
-		{ContainerPath: "/b/c"},
-	}
-	expected := []*runtime.Mount{
-		{ContainerPath: "/a"},
-		{ContainerPath: "/b"},
-		{ContainerPath: "/a/b"},
-		{ContainerPath: "/b/c"},
-		{ContainerPath: "/a/b/c"},
-		{ContainerPath: "/a/b/c/d"},
-	}
-	sort.Stable(orderedMounts(mounts))
-	assert.Equal(t, expected, mounts)
 }
 
 func TestParseImageReferences(t *testing.T) {
@@ -306,33 +284,12 @@ systemd_cgroup = true
 	}
 }
 
-func TestRestrictOOMScoreAdj(t *testing.T) {
-	current, err := getCurrentOOMScoreAdj()
-	require.NoError(t, err)
-
-	got, err := restrictOOMScoreAdj(current - 1)
-	require.NoError(t, err)
-	assert.Equal(t, got, current)
-
-	got, err = restrictOOMScoreAdj(current)
-	require.NoError(t, err)
-	assert.Equal(t, got, current)
-
-	got, err = restrictOOMScoreAdj(current + 1)
-	require.NoError(t, err)
-	assert.Equal(t, got, current+1)
-}
-
-func TestCustomGenerator(t *testing.T) {
+func TestEnvDeduplication(t *testing.T) {
 	for desc, test := range map[string]struct {
-		existing  []string
-		kv        [][2]string
-		expected  []string
-		expectNil bool
+		existing []string
+		kv       [][2]string
+		expected []string
 	}{
-		"empty": {
-			expectNil: true,
-		},
 		"single env": {
 			kv: [][2]string{
 				{"a", "b"},
@@ -387,23 +344,16 @@ func TestCustomGenerator(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		var spec *runtimespec.Spec
+		var spec runtimespec.Spec
 		if len(test.existing) > 0 {
-			spec = &runtimespec.Spec{
-				Process: &runtimespec.Process{
-					Env: test.existing,
-				},
+			spec.Process = &runtimespec.Process{
+				Env: test.existing,
 			}
 		}
-		g := newSpecGenerator(spec)
 		for _, kv := range test.kv {
-			g.AddProcessEnv(kv[0], kv[1])
+			oci.WithEnv([]string{kv[0] + "=" + kv[1]})(nil, nil, nil, &spec)
 		}
-		if test.expectNil {
-			assert.Nil(t, g.Config)
-		} else {
-			assert.Equal(t, test.expected, g.Config.Process.Env)
-		}
+		assert.Equal(t, test.expected, spec.Process.Env)
 	}
 }
 
