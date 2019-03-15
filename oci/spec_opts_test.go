@@ -422,3 +422,47 @@ func TestWithImageConfigArgs(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestAddCaps(t *testing.T) {
+	t.Parallel()
+
+	var s specs.Spec
+
+	if err := WithAddedCapabilities([]string{"CAP_CHOWN"})(nil, nil, nil, &s); err != nil {
+		t.Fatal(err)
+	}
+	for i, cl := range [][]string{
+		s.Process.Capabilities.Bounding,
+		s.Process.Capabilities.Effective,
+		s.Process.Capabilities.Permitted,
+		s.Process.Capabilities.Inheritable,
+	} {
+		if !capsContain(cl, "CAP_CHOWN") {
+			t.Errorf("cap list %d does not contain added cap", i)
+		}
+	}
+}
+
+func TestDropCaps(t *testing.T) {
+	t.Parallel()
+
+	var s specs.Spec
+
+	if err := WithAllCapabilities(nil, nil, nil, &s); err != nil {
+		t.Fatal(err)
+	}
+	if err := WithDroppedCapabilities([]string{"CAP_CHOWN"})(nil, nil, nil, &s); err != nil {
+		t.Fatal(err)
+	}
+
+	for i, cl := range [][]string{
+		s.Process.Capabilities.Bounding,
+		s.Process.Capabilities.Effective,
+		s.Process.Capabilities.Permitted,
+		s.Process.Capabilities.Inheritable,
+	} {
+		if capsContain(cl, "CAP_CHOWN") {
+			t.Errorf("cap list %d contains dropped cap", i)
+		}
+	}
+}
