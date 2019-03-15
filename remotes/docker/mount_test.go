@@ -17,10 +17,19 @@
 package docker
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"testing"
 
+	"github.com/containerd/containerd/errdefs"
+	"github.com/pkg/errors"
+
 	"github.com/containerd/containerd/reference"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"gotest.tools/assert"
+	"gotest.tools/assert/cmp"
 )
 
 func TestOriginMatch(t *testing.T) {
@@ -74,4 +83,62 @@ func TestOriginMatch(t *testing.T) {
 			assert.DeepEqual(t, c.expected, actual)
 		})
 	}
+}
+
+type testAuthorizerCapturer struct {
+	contexts []context.Context
+}
+
+func (a *testAuthorizerCapturer) Authorize(ctx context.Context, _ *http.Request) error {
+	a.contexts = append(a.contexts, ctx)
+	return nil
+}
+
+func (a *testAuthorizerCapturer) AddResponses(context.Context, []*http.Response) error {
+	return nil
+}
+
+func TestMountShouldReturnErrAlreadyExist(t *testing.T) {
+	authorizer := &testAuthorizerCapturer{}
+	refspec, _ := reference.Parse("docker.io/test/nginx:latest")
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodHead {
+			rw.WriteHeader(404)
+		}
+		if r.Method == http.MethodPost {
+			url := r.URL
+			assert.Equal(t, "/blobs/uploads/", url.Path)
+			assert.Equal(t, "sha256:0d093c962a6c2dd8bb8727b661e2b5f13e9df884af9945b4cc7088d9350cd3ee", r.FormValue("mount"))
+			assert.Equal(t, "library/nginx", r.FormValue("from"))
+			rw.WriteHeader(http.StatusCreated)
+		}
+	}))
+	base, _ := url.Parse(s.URL)
+	defer s.Close()
+	p := dockerPusher{
+		dockerBase: &dockerBase{
+			client:  s.Client(),
+			refspec: refspec,
+			base:    *base,
+			auth:    authorizer,
+		},
+		originProvider: func(_ ocispec.Descriptor) []reference.Spec {
+			notmatch, _ := reference.Parse("otherregistry.io/test/nginx")
+			match, _ := reference.Parse("docker.io/library/nginx")
+			return []reference.Spec{notmatch, match}
+		},
+		tracker: NewInMemoryTracker(),
+	}
+	_, err := p.Push(context.Background(), ocispec.Descriptor{Digest: "sha256:0d093c962a6c2dd8bb8727b661e2b5f13e9df884af9945b4cc7088d9350cd3ee"})
+	assert.Check(t, errors.Cause(err) == errdefs.ErrAlreadyExists)
+
+	scopesForHead := tokenScopes{}.withEntry("repository:test/nginx", "push", "pull")
+	scopesForMount := tokenScopes{}.withEntry("repository:test/nginx", "push", "pull").withEntry("repository:library/nginx", "pull")
+	assert.Check(t, cmp.Len(authorizer.contexts, 2))
+	actualScopesForHead := getContextScopes(authorizer.contexts[0])
+	actualScopesForMount := getContextScopes(authorizer.contexts[1])
+	assert.Check(t, actualScopesForHead.contains(scopesForHead))
+	assert.Check(t, !actualScopesForHead.contains(scopesForMount))
+	assert.Check(t, actualScopesForMount.contains(scopesForHead))
+	assert.Check(t, actualScopesForMount.contains(scopesForMount))
 }
