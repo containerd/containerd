@@ -20,6 +20,8 @@ package shim
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
 	"net"
 	"path/filepath"
 	"strings"
@@ -50,7 +52,8 @@ func SocketAddress(ctx context.Context, id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(string(filepath.Separator), "containerd-shim", ns, id, "shim.sock"), nil
+	d := sha256.Sum256([]byte(filepath.Join(ns, id)))
+	return filepath.Join(string(filepath.Separator), "containerd-shim", fmt.Sprintf("%x.sock", d)), nil
 }
 
 // AnonDialer returns a dialer for an abstract socket
