@@ -161,6 +161,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"ioctl",
 				"io_destroy",
 				"io_getevents",
+				"io_pgetevents",
 				"ioprio_get",
 				"ioprio_set",
 				"io_setup",
