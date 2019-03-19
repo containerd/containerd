@@ -18,12 +18,18 @@ package docker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/docker/distribution/registry/api/errcode"
+	"github.com/pkg/errors"
+	"gotest.tools/assert"
 )
 
 func TestFetcherOpen(t *testing.T) {
@@ -90,5 +96,68 @@ func TestFetcherOpen(t *testing.T) {
 	_, err := f.open(ctx, s.URL, "", 20)
 	if err == nil {
 		t.Fatal("expected error opening with invalid server response")
+	}
+}
+
+// New set of test to test new error cases
+func Test_dockerFetcher_open(t *testing.T) {
+	tests := []struct {
+		name                   string
+		mockedStatus           int
+		mockedErr              error
+		want                   io.ReadCloser
+		wantErr                bool
+		wantServerMessageError bool
+		wantPlainError         bool
+	}{
+		{
+			name:         "should return status and error.message if it exists if the registry request fails",
+			mockedStatus: 500,
+			mockedErr: errcode.Errors{errcode.Error{
+				Code:    errcode.ErrorCodeUnknown,
+				Message: "Test Error",
+			}},
+			want:                   nil,
+			wantErr:                true,
+			wantServerMessageError: true,
+		},
+		{
+			name:           "should return just status if the registry request fails and does not return a docker error",
+			mockedStatus:   500,
+			mockedErr:      fmt.Errorf("Non-docker error"),
+			want:           nil,
+			wantErr:        true,
+			wantPlainError: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+				rw.WriteHeader(tt.mockedStatus)
+				bytes, _ := json.Marshal(tt.mockedErr)
+				rw.Write(bytes)
+			}))
+			defer s.Close()
+
+			r := dockerFetcher{&dockerBase{
+				client: s.Client(),
+			}}
+
+			got, err := r.open(context.TODO(), s.URL, "", 0)
+			assert.Equal(t, tt.wantErr, (err != nil))
+			assert.Equal(t, tt.want, got)
+			if tt.wantErr {
+				var expectedError error
+				if tt.wantServerMessageError {
+					expectedError = errors.Errorf("unexpected status code %v: %v %s - Server message: %s", s.URL, tt.mockedStatus, http.StatusText(tt.mockedStatus), tt.mockedErr.Error())
+				} else if tt.wantPlainError {
+					expectedError = errors.Errorf("unexpected status code %v: %v %s", s.URL, tt.mockedStatus, http.StatusText(tt.mockedStatus))
+				}
+				assert.Equal(t, expectedError.Error(), err.Error())
+
+			}
+
+		})
 	}
 }
