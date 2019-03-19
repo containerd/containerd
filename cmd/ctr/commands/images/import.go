@@ -64,6 +64,10 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			Name:  "index-name",
 			Usage: "image name to keep index as, by default index is discarded",
 		},
+		cli.BoolFlag{
+			Name:  "all-platforms",
+			Usage: "imports content for all platforms, false by default",
+		},
 	}, commands.SnapshotterFlags...),
 
 	Action: func(context *cli.Context) error {
@@ -88,6 +92,8 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 		if idxName := context.String("index-name"); idxName != "" {
 			opts = append(opts, containerd.WithIndexName(idxName))
 		}
+
+		opts = append(opts, containerd.WithAllPlatforms(context.Bool("all-platforms")))
 
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
