@@ -319,6 +319,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"stat64",
 				"statfs",
 				"statfs64",
+				"statx",
 				"symlink",
 				"symlinkat",
 				"sync",
