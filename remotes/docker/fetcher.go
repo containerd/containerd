@@ -26,11 +26,10 @@ import (
 	"path"
 	"strings"
 
-	"github.com/docker/distribution/registry/api/errcode"
-
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
+	"github.com/docker/distribution/registry/api/errcode"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"

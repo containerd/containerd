@@ -99,8 +99,8 @@ func TestFetcherOpen(t *testing.T) {
 	}
 }
 
-// New set of test to test new error cases
-func Test_dockerFetcher_open(t *testing.T) {
+// New set of tests to test new error cases
+func TestDockerFetcherOpen(t *testing.T) {
 	tests := []struct {
 		name                   string
 		mockedStatus           int
