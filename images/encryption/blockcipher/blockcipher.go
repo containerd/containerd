@@ -20,7 +20,6 @@ import (
 	"io"
 
 	"github.com/containerd/containerd/content"
-
 	"github.com/pkg/errors"
 )
 

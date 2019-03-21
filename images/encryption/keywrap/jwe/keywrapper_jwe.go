@@ -23,7 +23,6 @@ import (
 	"github.com/containerd/containerd/images/encryption/keywrap"
 	"github.com/containerd/containerd/images/encryption/utils"
 	"github.com/pkg/errors"
-
 	jose "gopkg.in/square/go-jose.v2"
 )
 

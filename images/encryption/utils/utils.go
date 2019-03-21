@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/errdefs"
-
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/openpgp"
 	json "gopkg.in/square/go-jose.v2"

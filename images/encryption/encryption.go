@@ -27,11 +27,9 @@ import (
 	"github.com/containerd/containerd/images/encryption/blockcipher"
 	"github.com/containerd/containerd/images/encryption/config"
 	"github.com/containerd/containerd/images/encryption/keywrap"
-
 	"github.com/containerd/containerd/images/encryption/keywrap/jwe"
 	"github.com/containerd/containerd/images/encryption/keywrap/pgp"
 	"github.com/containerd/containerd/images/encryption/keywrap/pkcs7"
-
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )

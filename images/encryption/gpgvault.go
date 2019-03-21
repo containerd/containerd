@@ -20,10 +20,9 @@ import (
 	"bytes"
 	"io/ioutil"
 
+	"github.com/pkg/errors"
 	"golang.org/x/crypto/openpgp"
 	"golang.org/x/crypto/openpgp/packet"
-
-	"github.com/pkg/errors"
 )
 
 // GPGVault defines an interface for wrapping multiple secret key rings

@@ -30,7 +30,7 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-// GPGVersion enum representing the versino of GPG client to use.
+// GPGVersion enum representing the GPG client version to use.
 type GPGVersion int
 
 const (
@@ -305,6 +305,17 @@ func extractEmailFromDetails(details []byte) string {
 	return string(emailPattern.Expand(nil, []byte("$email"), details, loc))
 }
 
+// uint64ToStringArray converts an array of uint64's to an array of strings
+// by applying a format string to each uint64
+func uint64ToStringArray(format string, in []uint64) []string {
+	var ret []string
+
+	for _, v := range in {
+		ret = append(ret, fmt.Sprintf(format, v))
+	}
+	return ret
+}
+
 // GPGGetPrivateKey walks the list of layerInfos and tries to decrypt the
 // wrapped symmetric keys. For this it determines whether a private key is
 // in the GPGVault or on this system and prompts for the passwords for those
@@ -383,7 +394,7 @@ func GPGGetPrivateKey(layerInfos []LayerInfo, gpgClient GPGClient, gpgVault GPGV
 				}
 			}
 			if !found && len(b64pgpPackets) > 0 && mustFindKey {
-				ids := Uint64ToStringArray("0x%x", keyIds)
+				ids := uint64ToStringArray("0x%x", keyIds)
 
 				return errors.Wrapf(errdefs.ErrNotFound, "Missing key for decryption of layer %d of %s. Need one of the following keys: %s", layerInfo.Index, layerInfo.Descriptor.Platform, strings.Join(ids, ", "))
 			}

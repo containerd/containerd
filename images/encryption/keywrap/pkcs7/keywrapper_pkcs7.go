@@ -24,7 +24,6 @@ import (
 	"github.com/containerd/containerd/images/encryption/keywrap"
 	"github.com/containerd/containerd/images/encryption/utils"
 	"github.com/fullsailor/pkcs7"
-
 	"github.com/pkg/errors"
 )
 
