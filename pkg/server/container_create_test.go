@@ -36,7 +36,6 @@ import (
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	"github.com/containerd/cri/pkg/annotations"
-	criconfig "github.com/containerd/cri/pkg/config"
 	ostesting "github.com/containerd/cri/pkg/os/testing"
 	"github.com/containerd/cri/pkg/util"
 )
@@ -295,82 +294,64 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 	testPid := uint32(1234)
 
 	for desc, test := range map[string]struct {
-		configCriService func(*criService)
-		configChange     func(*runtime.PodSandboxConfig)
-		specCheck        func(*testing.T, *runtimespec.Spec)
+		podAnnotations []string
+		configChange   func(*runtime.PodSandboxConfig)
+		specCheck      func(*testing.T, *runtimespec.Spec)
 	}{
-		// Scenario 1 - containerd config allows "c" and podSpec defines "c" to be passed to OCI
-		"passthroughAnnotations scenario 1": {
-			configCriService: func(c *criService) {
-				c.config.Runtimes = make(map[string]criconfig.Runtime)
-				c.config.Runtimes["runc"] = criconfig.Runtime{
-					PodAnnotations: []string{"c"},
-				}
-			},
+		"a passthrough annotation should be passed as an OCI annotation": {
+			podAnnotations: []string{"c"},
 			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
 				assert.Equal(t, spec.Annotations["c"], "d")
 			},
 		},
-		// Scenario 2 - containerd config allows only "c" but podSpec defines "c" and "d"
-		// Only annotation "c" will be injected in OCI annotations and "d" should be dropped.
-		"passthroughAnnotations scenario 2": {
+		"a non-passthrough annotation should not be passed as an OCI annotation": {
 			configChange: func(c *runtime.PodSandboxConfig) {
 				c.Annotations["d"] = "e"
 			},
-			configCriService: func(c *criService) {
-				c.config.Runtimes = make(map[string]criconfig.Runtime)
-				c.config.Runtimes["runc"] = criconfig.Runtime{
-					PodAnnotations: []string{"c"},
-				}
-			},
+			podAnnotations: []string{"c"},
 			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
 				assert.Equal(t, spec.Annotations["c"], "d")
 				_, ok := spec.Annotations["d"]
-				assert.Equal(t, ok, false)
+				assert.False(t, ok)
 			},
 		},
-		// Scenario 3 - Let's test some wildcard support
-		// podSpec has following annotations
-		"passthroughAnnotations scenario 3": {
+		"passthrough annotations should support wildcard match": {
 			configChange: func(c *runtime.PodSandboxConfig) {
 				c.Annotations["t.f"] = "j"
 				c.Annotations["z.g"] = "o"
+				c.Annotations["z"] = "o"
 				c.Annotations["y.ca"] = "b"
+				c.Annotations["y"] = "b"
 			},
-			configCriService: func(c *criService) {
-				c.config.Runtimes = make(map[string]criconfig.Runtime)
-				c.config.Runtimes["runc"] = criconfig.Runtime{
-					PodAnnotations: []string{"t*", "z.*", "y.c*"},
-				}
-			},
+			podAnnotations: []string{"t*", "z.*", "y.c*"},
 			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
+				t.Logf("%+v", spec.Annotations)
 				assert.Equal(t, spec.Annotations["t.f"], "j")
 				assert.Equal(t, spec.Annotations["z.g"], "o")
 				assert.Equal(t, spec.Annotations["y.ca"], "b")
+				_, ok := spec.Annotations["y"]
+				assert.False(t, ok)
+				_, ok = spec.Annotations["z"]
+				assert.False(t, ok)
 			},
 		},
 	} {
+		t.Run(desc, func(t *testing.T) {
+			c := newTestCRIService()
+			config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+			if test.configChange != nil {
+				test.configChange(sandboxConfig)
+			}
 
-		t.Logf("TestCase %q", desc)
-		c := newTestCRIService()
-		config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
-		if test.configChange != nil {
-			test.configChange(sandboxConfig)
-		}
-
-		if test.configCriService != nil {
-			test.configCriService(c)
-		}
-
-		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid,
-			config, sandboxConfig, imageConfig, nil, c.config.Runtimes["runc"].PodAnnotations)
-
-		assert.NoError(t, err)
-		assert.NotNil(t, spec)
-		specCheck(t, testID, testSandboxID, testPid, spec)
-		if test.specCheck != nil {
-			test.specCheck(t, spec)
-		}
+			spec, err := c.generateContainerSpec(testID, testSandboxID, testPid,
+				config, sandboxConfig, imageConfig, nil, test.podAnnotations)
+			assert.NoError(t, err)
+			assert.NotNil(t, spec)
+			specCheck(t, testID, testSandboxID, testPid, spec)
+			if test.specCheck != nil {
+				test.specCheck(t, spec)
+			}
+		})
 	}
 
 }
