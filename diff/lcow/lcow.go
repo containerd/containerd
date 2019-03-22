@@ -25,6 +25,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/Microsoft/go-winio/pkg/security"
 	"github.com/Microsoft/hcsshim/ext4/tar2ext4"
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
@@ -142,7 +143,6 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 	if err != nil {
 		return emptyDesc, err
 	}
-	defer outFile.Close()
 	defer func() {
 		if err != nil {
 			outFile.Close()
@@ -153,6 +153,12 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 	err = tar2ext4.Convert(rc, outFile, tar2ext4.ConvertWhiteout, tar2ext4.AppendVhdFooter, tar2ext4.MaximumDiskSize(maxLcowVhdSizeGB))
 	if err != nil {
 		return emptyDesc, errors.Wrapf(err, "failed to convert tar to ext4 vhd")
+	}
+	outFile.Close()
+
+	err = security.GrantVmGroupAccess(layerPath)
+	if err != nil {
+		return emptyDesc, errors.Wrapf(err, "failed GrantVmGroupAccess on layer vhd: %v", layerPath)
 	}
 
 	return ocispec.Descriptor{
