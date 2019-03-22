@@ -774,6 +774,7 @@ func removeCap(caps *[]string, s string) {
 	for i, c := range *caps {
 		if c == s {
 			*caps = append((*caps)[:i], (*caps)[i+1:]...)
+			return
 		}
 	}
 }

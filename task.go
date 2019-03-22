@@ -521,6 +521,9 @@ func (t *task) Update(ctx context.Context, opts ...UpdateTaskOpts) error {
 }
 
 func (t *task) LoadProcess(ctx context.Context, id string, ioAttach cio.Attach) (Process, error) {
+	if id == t.id && ioAttach == nil {
+		return t, nil
+	}
 	response, err := t.client.TaskService().Get(ctx, &tasks.GetRequest{
 		ContainerID: t.id,
 		ExecID:      id,
