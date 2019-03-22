@@ -138,6 +138,12 @@ The explanation and default value of each configuration item are as follows:
       # runtime_type is the runtime type to use in containerd e.g. io.containerd.runtime.v1.linux
       runtime_type = "io.containerd.runc.v1"
 
+      # pod_annotations is list of pod annotations passed to both pod sandbox as well as
+      # container OCI annotations. Pod_annotations also support golang supported
+      # regular expression - https://github.com/google/re2/wiki/Syntax.
+      # e.g. ["runc.com.github.containers.runc.*"]
+      pod_annotations = []
+
       # "plugins.cri.containerd.runtimes.runc.options" is options specific to
       # "io.containerd.runc.v1". Its corresponding options type is:
       #   https://github.com/containerd/containerd/blob/v1.2.0-rc.1/runtime/v2/runc/options/oci.pb.go#L39.

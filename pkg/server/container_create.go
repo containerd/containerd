@@ -165,7 +165,14 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	// Generate container runtime spec.
 	mounts := c.generateContainerMounts(sandboxID, config)
 
-	spec, err := c.generateContainerSpec(id, sandboxID, sandboxPid, config, sandboxConfig, &image.ImageSpec.Config, append(mounts, volumeMounts...))
+	ociRuntime, err := c.getSandboxRuntime(sandboxConfig, sandbox.Metadata.RuntimeHandler)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get sandbox runtime")
+	}
+	logrus.Debugf("Use OCI %+v for sandbox %q and container %q", ociRuntime, sandboxID, id)
+
+	spec, err := c.generateContainerSpec(id, sandboxID, sandboxPid, config, sandboxConfig,
+		&image.ImageSpec.Config, append(mounts, volumeMounts...), ociRuntime.PodAnnotations)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to generate container %q spec", id)
 	}
@@ -310,7 +317,8 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 }
 
 func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxPid uint32, config *runtime.ContainerConfig,
-	sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig, extraMounts []*runtime.Mount) (*runtimespec.Spec, error) {
+	sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig, extraMounts []*runtime.Mount,
+	runtimePodAnnotations []string) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
 	spec, err := defaultRuntimeSpec(id)
 	if err != nil {
@@ -442,6 +450,11 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 	supplementalGroups := securityContext.GetSupplementalGroups()
 	for _, group := range supplementalGroups {
 		g.AddProcessAdditionalGid(uint32(group))
+	}
+
+	for pKey, pValue := range getPassthroughAnnotations(sandboxConfig.Annotations,
+		runtimePodAnnotations) {
+		g.AddAnnotation(pKey, pValue)
 	}
 
 	g.AddAnnotation(annotations.ContainerType, annotations.ContainerTypeContainer)
