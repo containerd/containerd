@@ -585,6 +585,7 @@ func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tas
 				OS:           goruntime.GOOS,
 				Architecture: goruntime.GOARCH,
 			},
+			Annotations: d.Annotations,
 		})
 	}
 	return nil
