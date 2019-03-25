@@ -123,9 +123,9 @@ func NewFetchConfig(ctx context.Context, clicontext *cli.Context) (*FetchConfig,
 		}
 		config.Platforms = p
 	}
-	if clicontext.Bool("all-manifests") {
-		config.IsAllManifests = clicontext.Bool("all-manifests")
-	}
+
+	config.IsAllManifests = clicontext.Bool("all-manifests")
+
 	return config, nil
 }
 
