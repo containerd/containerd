@@ -82,9 +82,6 @@ command. As part of this process, we do the following:
 		if err != nil {
 			return err
 		}
-		if context.Bool("all-manifests") {
-			config.IsAllManifests = context.Bool("all-manifests")
-		}
 
 		img, err := content.Fetch(ctx, client, ref, config)
 		if err != nil {
