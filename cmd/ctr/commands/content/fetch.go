@@ -34,7 +34,7 @@ import (
 	"github.com/containerd/containerd/pkg/progress"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
 )
@@ -66,6 +66,10 @@ Most of this is experimental and there are few leaps to make this work.`,
 			Name:  "all-platforms",
 			Usage: "pull content from all platforms",
 		},
+		cli.BoolFlag{
+			Name:  "all-manifests",
+			Usage: "Pull manifests from all platforms and layers for a specific platform",
+		},
 	),
 	Action: func(clicontext *cli.Context) error {
 		var (
@@ -95,6 +99,8 @@ type FetchConfig struct {
 	Labels []string
 	// Platforms to fetch
 	Platforms []string
+	// Whether or not download all manifests
+	IsAllManifests bool
 }
 
 // NewFetchConfig returns the default FetchConfig from cli flags
@@ -116,6 +122,9 @@ func NewFetchConfig(ctx context.Context, clicontext *cli.Context) (*FetchConfig,
 			p = append(p, platforms.DefaultString())
 		}
 		config.Platforms = p
+	}
+	if clicontext.Bool("all-manifests") {
+		config.IsAllManifests = clicontext.Bool("all-manifests")
 	}
 	return config, nil
 }
@@ -149,7 +158,10 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 		containerd.WithResolver(config.Resolver),
 		containerd.WithImageHandler(h),
 		containerd.WithSchema1Conversion,
-		containerd.WithAppendDistributionSourceLabel(),
+	}
+
+	if config.IsAllManifests {
+		opts = append(opts, containerd.WithAppendDistributionSourceLabel())
 	}
 
 	for _, platform := range config.Platforms {
