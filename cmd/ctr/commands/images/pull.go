@@ -53,6 +53,10 @@ command. As part of this process, we do the following:
 			Name:  "all-platforms",
 			Usage: "pull content from all platforms",
 		},
+		cli.BoolFlag{
+			Name:  "all-manifests",
+			Usage: "Pull manifests from all platforms and layers for a specific platform",
+		},
 	),
 	Action: func(context *cli.Context) error {
 		var (
@@ -78,6 +82,10 @@ command. As part of this process, we do the following:
 		if err != nil {
 			return err
 		}
+		if context.Bool("all-manifests") {
+			config.IsAllManifests = context.Bool("all-manifests")
+		}
+
 		img, err := content.Fetch(ctx, client, ref, config)
 		if err != nil {
 			return err
