@@ -31,7 +31,7 @@ type Runtime struct {
 	// This only works for runtime type "io.containerd.runtime.v1.linux".
 	// DEPRECATED: use Options instead. Remove when shim v1 is deprecated.
 	Engine string `toml:"runtime_engine" json:"runtimeEngine"`
-	// PodAnnotations is list of pod annotations passed to both pod sandbox as well as
+	// PodAnnotations is a list of pod annotations passed to both pod sandbox as well as
 	// container OCI annotations.
 	PodAnnotations []string `toml:"pod_annotations" json:"PodAnnotations"`
 	// Root is the directory used by containerd for runtime state.

@@ -413,33 +413,105 @@ func TestPassThroughAnnotationsFilter(t *testing.T) {
 		runtimePodAnnotations  []string
 		passthroughAnnotations map[string]string
 	}{
-		// Scenario 1 - containerd config allows "c" and podSpec defines "c" to be passed to OCI
-		"scenario1": {
-			podAnnotations:         map[string]string{"c": "d"},
-			runtimePodAnnotations:  []string{"c"},
-			passthroughAnnotations: map[string]string{"c": "d"},
-		},
-		// Scenario 2 - containerd config allows only "c" but podSpec defines "c" and "d"
-		// Only annotation "c" will be injected in OCI annotations and "d" should be dropped.
-		"scenario2": {
+		"should support direct match": {
 			podAnnotations:         map[string]string{"c": "d", "d": "e"},
 			runtimePodAnnotations:  []string{"c"},
 			passthroughAnnotations: map[string]string{"c": "d"},
 		},
-		// Scenario 3 - Let's test some wildcard support
-		// podSpec has following annotations
-		"scenario3": {
-			podAnnotations: map[string]string{"t.f": "j",
+		"should support wildcard match": {
+			podAnnotations: map[string]string{
+				"t.f":  "j",
 				"z.g":  "o",
-				"y.ca": "b"},
-			runtimePodAnnotations: []string{"t*", "z.*", "y.c*"},
-			passthroughAnnotations: map[string]string{"t.f": "j",
+				"z":    "o",
+				"y.ca": "b",
+				"y":    "b",
+			},
+			runtimePodAnnotations: []string{"*.f", "z*g", "y.c*"},
+			passthroughAnnotations: map[string]string{
+				"t.f":  "j",
 				"z.g":  "o",
-				"y.ca": "b"},
+				"y.ca": "b",
+			},
+		},
+		"should support wildcard match all": {
+			podAnnotations: map[string]string{
+				"t.f":  "j",
+				"z.g":  "o",
+				"z":    "o",
+				"y.ca": "b",
+				"y":    "b",
+			},
+			runtimePodAnnotations: []string{"*"},
+			passthroughAnnotations: map[string]string{
+				"t.f":  "j",
+				"z.g":  "o",
+				"z":    "o",
+				"y.ca": "b",
+				"y":    "b",
+			},
+		},
+		"should support match including path separator": {
+			podAnnotations: map[string]string{
+				"matchend.com/end":    "1",
+				"matchend.com/end1":   "2",
+				"matchend.com/1end":   "3",
+				"matchmid.com/mid":    "4",
+				"matchmid.com/mi1d":   "5",
+				"matchmid.com/mid1":   "6",
+				"matchhead.com/head":  "7",
+				"matchhead.com/1head": "8",
+				"matchhead.com/head1": "9",
+				"matchall.com/abc":    "10",
+				"matchall.com/def":    "11",
+				"end/matchend":        "12",
+				"end1/matchend":       "13",
+				"1end/matchend":       "14",
+				"mid/matchmid":        "15",
+				"mi1d/matchmid":       "16",
+				"mid1/matchmid":       "17",
+				"head/matchhead":      "18",
+				"1head/matchhead":     "19",
+				"head1/matchhead":     "20",
+				"abc/matchall":        "21",
+				"def/matchall":        "22",
+				"match1/match2":       "23",
+				"nomatch/nomatch":     "24",
+			},
+			runtimePodAnnotations: []string{
+				"matchend.com/end*",
+				"matchmid.com/mi*d",
+				"matchhead.com/*head",
+				"matchall.com/*",
+				"end*/matchend",
+				"mi*d/matchmid",
+				"*head/matchhead",
+				"*/matchall",
+				"match*/match*",
+			},
+			passthroughAnnotations: map[string]string{
+				"matchend.com/end":    "1",
+				"matchend.com/end1":   "2",
+				"matchmid.com/mid":    "4",
+				"matchmid.com/mi1d":   "5",
+				"matchhead.com/head":  "7",
+				"matchhead.com/1head": "8",
+				"matchall.com/abc":    "10",
+				"matchall.com/def":    "11",
+				"end/matchend":        "12",
+				"end1/matchend":       "13",
+				"mid/matchmid":        "15",
+				"mi1d/matchmid":       "16",
+				"head/matchhead":      "18",
+				"1head/matchhead":     "19",
+				"abc/matchall":        "21",
+				"def/matchall":        "22",
+				"match1/match2":       "23",
+			},
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		passthroughAnnotations := getPassthroughAnnotations(test.podAnnotations, test.runtimePodAnnotations)
-		assert.Equal(t, test.passthroughAnnotations, passthroughAnnotations)
+		t.Run(desc, func(t *testing.T) {
+			passthroughAnnotations := getPassthroughAnnotations(test.podAnnotations, test.runtimePodAnnotations)
+			assert.Equal(t, test.passthroughAnnotations, passthroughAnnotations)
+		})
 	}
 }

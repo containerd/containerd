@@ -169,7 +169,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get sandbox runtime")
 	}
-	logrus.Debugf("Use OCI %+v for sandbox %q and container %q", ociRuntime, sandboxID, id)
+	logrus.Debugf("Use OCI runtime %+v for sandbox %q and container %q", ociRuntime, sandboxID, id)
 
 	spec, err := c.generateContainerSpec(id, sandboxID, sandboxPid, config, sandboxConfig,
 		&image.ImageSpec.Config, append(mounts, volumeMounts...), ociRuntime.PodAnnotations)

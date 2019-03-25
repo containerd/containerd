@@ -634,9 +634,11 @@ func getPassthroughAnnotations(podAnnotations map[string]string,
 	passthroughAnnotations = make(map[string]string)
 
 	for podAnnotationKey, podAnnotationValue := range podAnnotations {
-		for _, r := range runtimePodAnnotations {
-			match, _ := regexp.MatchString(r, podAnnotationKey)
-			if match {
+		for _, pattern := range runtimePodAnnotations {
+			// Use path.Match instead of filepath.Match here.
+			// filepath.Match treated `\\` as path separator
+			// on windows, which is not what we want.
+			if ok, _ := path.Match(pattern, podAnnotationKey); ok {
 				passthroughAnnotations[podAnnotationKey] = podAnnotationValue
 			}
 		}
