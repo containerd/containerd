@@ -17,6 +17,7 @@ option go_package = "github.com/containerd/containerd/runtime/v2/task;task";
 // for the container processes.
 service Task {
 	rpc State(StateRequest) returns (StateResponse);
+	// CreateTaskResponse will have a zero-pid on Windows. Pid is populated after Start.
 	rpc Create(CreateTaskRequest) returns (CreateTaskResponse);
 	rpc Start(StartRequest) returns (StartResponse);
 	rpc Delete(DeleteRequest) returns (DeleteResponse);

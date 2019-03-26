@@ -138,13 +138,18 @@ func TestContainerStart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if pid := task.Pid(); pid < 1 {
-		t.Errorf("invalid task pid %d", pid)
+	if runtime.GOOS != "windows" {
+		if pid := task.Pid(); pid < 1 {
+			t.Errorf("invalid task pid %d", pid)
+		}
 	}
 	if err := task.Start(ctx); err != nil {
 		t.Error(err)
 		task.Delete(ctx)
 		return
+	}
+	if pid := task.Pid(); pid < 1 {
+		t.Errorf("invalid task pid %d", pid)
 	}
 	status := <-statusC
 	code, _, err := status.Result()
@@ -787,13 +792,18 @@ func TestWaitStoppedTask(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if pid := task.Pid(); pid < 1 {
-		t.Errorf("invalid task pid %d", pid)
+	if runtime.GOOS != "windows" {
+		if pid := task.Pid(); pid < 1 {
+			t.Errorf("invalid task pid %d", pid)
+		}
 	}
 	if err := task.Start(ctx); err != nil {
 		t.Error(err)
 		task.Delete(ctx)
 		return
+	}
+	if pid := task.Pid(); pid < 1 {
+		t.Errorf("invalid task pid %d", pid)
 	}
 
 	// wait for the task to stop then call wait again
