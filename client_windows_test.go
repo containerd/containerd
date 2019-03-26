@@ -17,16 +17,39 @@
 package containerd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/Microsoft/hcsshim/osversion"
+	_ "github.com/containerd/containerd/resources"
 )
 
 const (
 	defaultAddress = `\\.\pipe\containerd-containerd-test`
-	testImage      = "docker.io/microsoft/nanoserver:latest"
 )
 
 var (
 	defaultRoot  = filepath.Join(os.Getenv("programfiles"), "containerd", "root-test")
 	defaultState = filepath.Join(os.Getenv("programfiles"), "containerd", "state-test")
+	testImage    string
 )
+
+func init() {
+	build := osversion.Get()
+
+	bv := uint32(build.Build)
+	switch bv {
+	case osversion.RS1:
+		testImage = "mcr.microsoft.com/windows/nanoserver:sac2016"
+	case osversion.RS3:
+		testImage = "mcr.microsoft.com/windows/nanoserver:1709"
+	case osversion.RS4:
+		testImage = "mcr.microsoft.com/windows/nanoserver:1803"
+	case osversion.RS5:
+		// testImage = "mcr.microsoft.com/windows/nanoserver:1809"
+		testImage = "mcr.microsoft.com/windows/nanoserver/insider:10.0.17763.55"
+	default:
+		panic(fmt.Sprintf("unsupported build (%d) for Windows containers", bv))
+	}
+}
