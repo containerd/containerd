@@ -34,7 +34,6 @@ import (
 	"github.com/containerd/typeurl"
 	"github.com/docker/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
-	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -322,7 +321,12 @@ func initSelinuxOpts(selinuxOpt *runtime.SELinuxOption) (string, string, error) 
 		selinuxOpt.GetRole(),
 		selinuxOpt.GetType(),
 		selinuxOpt.GetLevel())
-	return label.InitLabels(selinux.DupSecOpt(labelOpts))
+
+	options, err := label.DupSecOpt(labelOpts)
+	if err != nil {
+		return "", "", err
+	}
+	return label.InitLabels(options)
 }
 
 func checkSelinuxLevel(level string) (bool, error) {
