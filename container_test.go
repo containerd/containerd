@@ -1045,7 +1045,11 @@ func TestProcessForceDelete(t *testing.T) {
 	}
 
 	processSpec := spec.Process
-	withExecArgs(processSpec, "sleep", "20")
+	if runtime.GOOS != "windows" {
+		withExecArgs(processSpec, "sleep", "20")
+	} else {
+		withExecArgs(processSpec, "ping", "127.0.0.1", "-n", "30", ">", "nul")
+	}
 	execID := t.Name() + "_exec"
 	process, err := task.Exec(ctx, execID, processSpec, empty())
 	if err != nil {
