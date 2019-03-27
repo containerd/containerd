@@ -1088,8 +1088,12 @@ func TestContainerHostname(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image),
-		withProcessArgs("hostname"),
+	pa := withProcessArgs("hostname")
+	if runtime.GOOS == "windows" {
+		expected = "MYHOSTNAME"
+		pa = withProcessArgs("echo", "%COMPUTERNAME%")
+	}
+	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), pa,
 		oci.WithHostname(expected),
 	))
 	if err != nil {
