@@ -24,12 +24,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containerd/containerd/pkg/testutil"
-	"github.com/containerd/containerd/snapshots/devmapper/losetup"
 	"github.com/docker/go-units"
 	"golang.org/x/sys/unix"
 	"gotest.tools/assert"
 	is "gotest.tools/assert/cmp"
+
+	"github.com/containerd/containerd/pkg/testutil"
+	"github.com/containerd/containerd/snapshots/devmapper/losetup"
 )
 
 const (
@@ -83,6 +84,7 @@ func TestDMSetup(t *testing.T) {
 	t.Run("DeleteSnapshot", testDeleteSnapshot)
 
 	t.Run("ActivateDevice", testActivateDevice)
+	t.Run("DeviceStatus", testDeviceStatus)
 	t.Run("SuspendResumeDevice", testSuspendResumeDevice)
 	t.Run("RemoveDevice", testRemoveDevice)
 
@@ -137,6 +139,16 @@ func testActivateDevice(t *testing.T) {
 	info := list[0]
 	assert.Equal(t, testPoolName, info.Name)
 	assert.Assert(t, info.TableLive)
+}
+
+func testDeviceStatus(t *testing.T) {
+	status, err := Status(testDeviceName)
+	assert.NilError(t, err)
+
+	assert.Equal(t, int64(0), status.Offset)
+	assert.Equal(t, int64(2), status.Length)
+	assert.Equal(t, "thin", status.Target)
+	assert.DeepEqual(t, status.Params, []string{"0", "-"})
 }
 
 func testSuspendResumeDevice(t *testing.T) {
