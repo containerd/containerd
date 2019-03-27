@@ -102,6 +102,7 @@ make generate
 
 > *Note*: Several build tags are currently available:
 > * `no_btrfs`: A build tag disables building the btrfs snapshot driver.
+> * `no_lvm`: A build tag disables building the LVM block based snapshot driver.
 > * `no_cri`: A build tag disables building Kubernetes [CRI](http://blog.kubernetes.io/2016/12/container-runtime-interface-cri-in-kubernetes.html) support into containerd.
 > See [here](https://github.com/containerd/cri-containerd#build-tags) for build tags of CRI plugin.
 > * `no_devmapper`: A build tag disables building the device mapper snapshot driver.
