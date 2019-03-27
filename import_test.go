@@ -17,6 +17,7 @@
 package containerd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -26,6 +27,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/archive/tartest"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/images/archive"
@@ -274,6 +276,16 @@ func createContent(size int64, seed int64) ([]byte, digest.Digest) {
 	if err != nil {
 		panic(err)
 	}
+	wb := bytes.NewBuffer(nil)
+	cw, err := compression.CompressStream(wb, compression.Gzip)
+	if err != nil {
+		panic(err)
+	}
+
+	if _, err := cw.Write(b); err != nil {
+		panic(err)
+	}
+	b = wb.Bytes()
 	return b, digest.FromBytes(b)
 }
 
