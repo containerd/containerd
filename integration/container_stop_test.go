@@ -17,7 +17,9 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -70,4 +72,68 @@ func TestSharedPidMultiProcessContainerStop(t *testing.T) {
 			assert.Equal(t, s.GetState(), runtime.ContainerState_CONTAINER_EXITED)
 		})
 	}
+}
+
+func TestContainerStopCancellation(t *testing.T) {
+	t.Log("Create a pod sandbox")
+	sbConfig := PodSandboxConfig("sandbox", "cancel-container-stop")
+	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, runtimeService.StopPodSandbox(sb))
+		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
+	}()
+
+	const (
+		testImage     = "busybox"
+		containerName = "test-container"
+	)
+	t.Logf("Pull test image %q", testImage)
+	img, err := imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil, sbConfig)
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: img}))
+	}()
+
+	t.Log("Create a container which traps sigterm")
+	cnConfig := ContainerConfig(
+		containerName,
+		testImage,
+		WithCommand("sh", "-c", `trap "echo ignore sigterm" TERM; sleep 1000`),
+	)
+	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+	require.NoError(t, err)
+
+	t.Log("Start the container")
+	require.NoError(t, runtimeService.StartContainer(cn))
+
+	t.Log("Stop the container with 3s timeout, but 1s context timeout")
+	// Note that with container pid namespace, the sleep process
+	// is pid 1, and SIGTERM sent by `StopContainer` will be ignored.
+	rawClient, err := RawRuntimeClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	_, err = rawClient.StopContainer(ctx, &runtime.StopContainerRequest{
+		ContainerId: cn,
+		Timeout:     3,
+	})
+	assert.Error(t, err)
+
+	t.Log("The container should still be running even after 5 seconds")
+	assert.NoError(t, Consistently(func() (bool, error) {
+		s, err := runtimeService.ContainerStatus(cn)
+		if err != nil {
+			return false, err
+		}
+		return s.GetState() == runtime.ContainerState_CONTAINER_RUNNING, nil
+	}, 100*time.Millisecond, 5*time.Second))
+
+	t.Log("Stop the container with 1s timeout, without shorter context timeout")
+	assert.NoError(t, runtimeService.StopContainer(cn, 1))
+
+	t.Log("The container state should be exited")
+	s, err := runtimeService.ContainerStatus(cn)
+	require.NoError(t, err)
+	assert.Equal(t, s.GetState(), runtime.ContainerState_CONTAINER_EXITED)
 }
