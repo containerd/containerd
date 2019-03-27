@@ -259,7 +259,12 @@ func TestContainerExec(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")))
+	pa := withProcessArgs("sleep", "100")
+	if runtime.GOOS == "windows" {
+		pa = withProcessArgs("ping", "127.0.0.1", "-n", "100", ">", "nul")
+	}
+
+	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), pa))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -344,7 +349,12 @@ func TestContainerLargeExecArgs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")))
+	pa := withProcessArgs("sleep", "100")
+	if runtime.GOOS == "windows" {
+		pa = withProcessArgs("ping", "127.0.0.1", "-n", "100", ">", "nul")
+	}
+
+	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), pa))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -420,7 +430,12 @@ func TestContainerPids(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")))
+	pa := withProcessArgs("sleep", "100")
+	if runtime.GOOS == "windows" {
+		pa = withProcessArgs("ping", "127.0.0.1", "-n", "100", ">", "nul")
+	}
+
+	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), pa))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -553,7 +568,12 @@ func TestDeleteRunningContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")))
+	pa := withProcessArgs("sleep", "100")
+	if runtime.GOOS == "windows" {
+		pa = withProcessArgs("ping", "127.0.0.1", "-n", "100", ">", "nul")
+	}
+
+	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), pa))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -608,7 +628,12 @@ func TestContainerKill(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "10")))
+	pa := withProcessArgs("sleep", "10")
+	if runtime.GOOS == "windows" {
+		pa = withProcessArgs("ping", "127.0.0.1", "-n", "10", ">", "nul")
+	}
+
+	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), pa))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -710,7 +735,12 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")))
+	pa := withProcessArgs("sleep", "100")
+	if runtime.GOOS == "windows" {
+		pa = withProcessArgs("ping", "127.0.0.1", "-n", "100", ">", "nul")
+	}
+
+	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), pa))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -843,7 +873,12 @@ func TestWaitStoppedProcess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")))
+	pa := withProcessArgs("sleep", "100")
+	if runtime.GOOS == "windows" {
+		pa = withProcessArgs("ping", "127.0.0.1", "-n", "100", ">", "nul")
+	}
+
+	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), pa))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -930,7 +965,13 @@ func TestTaskForceDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30")))
+
+	pa := withProcessArgs("sleep", "30")
+	if runtime.GOOS == "windows" {
+		pa = withProcessArgs("ping", "127.0.0.1", "-n", "30", ">", "nul")
+	}
+
+	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), pa))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -971,7 +1012,13 @@ func TestProcessForceDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30")))
+
+	pa := withProcessArgs("sleep", "30")
+	if runtime.GOOS == "windows" {
+		pa = withProcessArgs("ping", "127.0.0.1", "-n", "30", ">", "nul")
+	}
+
+	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), pa))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1169,7 +1216,12 @@ func TestDeleteContainerExecCreated(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")))
+	pa := withProcessArgs("sleep", "100")
+	if runtime.GOOS == "windows" {
+		pa = withProcessArgs("ping", "127.0.0.1", "-n", "100", ">", "nul")
+	}
+
+	container, err := client.newContainerWithOpts(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), pa))
 	if err != nil {
 		t.Fatal(err)
 	}
