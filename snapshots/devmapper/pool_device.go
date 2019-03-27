@@ -21,11 +21,13 @@ package devmapper
 import (
 	"context"
 	"path/filepath"
+	"strconv"
+
+	"github.com/hashicorp/go-multierror"
+	"github.com/pkg/errors"
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/snapshots/devmapper/dmsetup"
-	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 )
 
 // PoolDevice ties together data and metadata volumes, represents thin-pool and manages volumes, snapshots and device ids.
@@ -296,6 +298,29 @@ func (p *PoolDevice) IsActivated(deviceName string) bool {
 	}
 
 	return true
+}
+
+// GetUsage reports total size in bytes consumed by a thin-device.
+// It relies on the number of used blocks reported by 'dmsetup status'.
+// The output looks like:
+//  device2: 0 204800 thin 17280 204799
+// Where 17280 is the number of used sectors
+func (p *PoolDevice) GetUsage(deviceName string) (int64, error) {
+	status, err := dmsetup.Status(deviceName)
+	if err != nil {
+		return 0, errors.Wrapf(err, "can't get status for device %q", deviceName)
+	}
+
+	if len(status.Params) == 0 {
+		return 0, errors.Errorf("failed to get the number of used blocks, unexpected output from dmsetup status")
+	}
+
+	count, err := strconv.ParseInt(status.Params[0], 10, 64)
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to parse status params: %q", status.Params[0])
+	}
+
+	return count * dmsetup.SectorSize, nil
 }
 
 // RemoveDevice completely wipes out thin device from thin-pool and frees it's device ID
