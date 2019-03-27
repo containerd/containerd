@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd"
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/oci"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -99,14 +100,16 @@ func (c *criService) execInContainer(ctx context.Context, id string, opts execOp
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load task")
 	}
-	if opts.tty {
-		g := newSpecGenerator(spec)
-		g.AddProcessEnv("TERM", "xterm")
-		spec = g.Config
-	}
 	pspec := spec.Process
-	pspec.Args = opts.cmd
+
 	pspec.Terminal = opts.tty
+	if opts.tty {
+		if err := oci.WithEnv([]string{"TERM=xterm"})(nil, nil, nil, spec); err != nil {
+			return nil, errors.Wrap(err, "add TERM env var to spec")
+		}
+	}
+
+	pspec.Args = opts.cmd
 
 	if opts.stdout == nil {
 		opts.stdout = cio.NewDiscardLogger()

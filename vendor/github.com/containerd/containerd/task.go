@@ -43,7 +43,7 @@ import (
 	google_protobuf "github.com/gogo/protobuf/types"
 	digest "github.com/opencontainers/go-digest"
 	is "github.com/opencontainers/image-spec/specs-go"
-	"github.com/opencontainers/image-spec/specs-go/v1"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
@@ -117,6 +117,13 @@ type CheckpointTaskInfo struct {
 	ParentCheckpoint digest.Digest
 	// Options hold runtime specific settings for checkpointing a task
 	Options interface{}
+
+	runtime string
+}
+
+// Runtime name for the container
+func (i *CheckpointTaskInfo) Runtime() string {
+	return i.runtime
 }
 
 // CheckpointTaskOpts allows the caller to set checkpoint options
@@ -131,6 +138,12 @@ type TaskInfo struct {
 	RootFS []mount.Mount
 	// Options hold runtime specific settings for task creation
 	Options interface{}
+	runtime string
+}
+
+// Runtime name for the container
+func (i *TaskInfo) Runtime() string {
+	return i.runtime
 }
 
 // Task is the executable object within containerd
@@ -401,11 +414,17 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 		return nil, err
 	}
 	defer done(ctx)
+	cr, err := t.client.ContainerService().Get(ctx, t.id)
+	if err != nil {
+		return nil, err
+	}
 
 	request := &tasks.CheckpointTaskRequest{
 		ContainerID: t.id,
 	}
-	var i CheckpointTaskInfo
+	i := CheckpointTaskInfo{
+		runtime: cr.Runtime.Name,
+	}
 	for _, o := range opts {
 		if err := o(&i); err != nil {
 			return nil, err
@@ -428,10 +447,6 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 		return nil, err
 	}
 	defer t.Resume(ctx)
-	cr, err := t.client.ContainerService().Get(ctx, t.id)
-	if err != nil {
-		return nil, err
-	}
 	index := v1.Index{
 		Versioned: is.Versioned{
 			SchemaVersion: 2,
@@ -642,12 +657,12 @@ func isCheckpointPathExist(runtime string, v interface{}) bool {
 	}
 
 	switch runtime {
-	case "io.containerd.runc.v1":
+	case plugin.RuntimeRuncV1, plugin.RuntimeRuncV2:
 		if opts, ok := v.(*options.CheckpointOptions); ok && opts.ImagePath != "" {
 			return true
 		}
 
-	case "io.containerd.runtime.v1.linux":
+	case plugin.RuntimeLinuxV1:
 		if opts, ok := v.(*runctypes.CheckpointOptions); ok && opts.ImagePath != "" {
 			return true
 		}

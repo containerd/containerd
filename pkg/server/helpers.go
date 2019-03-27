@@ -18,8 +18,6 @@ package server
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -36,8 +34,6 @@ import (
 	"github.com/containerd/typeurl"
 	"github.com/docker/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
@@ -69,8 +65,6 @@ const (
 const (
 	// defaultSandboxOOMAdj is default omm adj for sandbox container. (kubernetes#47938).
 	defaultSandboxOOMAdj = -998
-	// defaultSandboxCPUshares is default cpu shares for sandbox container.
-	defaultSandboxCPUshares = 2
 	// defaultShmSize is the default size of the sandbox shm.
 	defaultShmSize = int64(1024 * 1024 * 64)
 	// relativeRootfsPath is the rootfs path relative to bundle path.
@@ -86,14 +80,6 @@ const (
 	maxDNSSearches = 6
 	// Delimiter used to construct container/sandbox names.
 	nameDelimiter = "_"
-	// netNSFormat is the format of network namespace of a process.
-	netNSFormat = "/proc/%v/ns/net"
-	// ipcNSFormat is the format of ipc namespace of a process.
-	ipcNSFormat = "/proc/%v/ns/ipc"
-	// utsNSFormat is the format of uts namespace of a process.
-	utsNSFormat = "/proc/%v/ns/uts"
-	// pidNSFormat is the format of pid namespace of a process.
-	pidNSFormat = "/proc/%v/ns/pid"
 	// devShm is the default path of /dev/shm.
 	devShm = "/dev/shm"
 	// etcHosts is the default path of /etc/hosts file.
@@ -218,26 +204,6 @@ func (c *criService) getResolvPath(id string) string {
 // getSandboxDevShm returns the shm file path inside the sandbox root directory.
 func (c *criService) getSandboxDevShm(id string) string {
 	return filepath.Join(c.getVolatileSandboxRootDir(id), "shm")
-}
-
-// getNetworkNamespace returns the network namespace of a process.
-func getNetworkNamespace(pid uint32) string {
-	return fmt.Sprintf(netNSFormat, pid)
-}
-
-// getIPCNamespace returns the ipc namespace of a process.
-func getIPCNamespace(pid uint32) string {
-	return fmt.Sprintf(ipcNSFormat, pid)
-}
-
-// getUTSNamespace returns the uts namespace of a process.
-func getUTSNamespace(pid uint32) string {
-	return fmt.Sprintf(utsNSFormat, pid)
-}
-
-// getPIDNamespace returns the pid namespace of a process.
-func getPIDNamespace(pid uint32) string {
-	return fmt.Sprintf(pidNSFormat, pid)
 }
 
 // criContainerStateToString formats CRI container state to string.
@@ -397,54 +363,6 @@ func buildLabels(configLabels map[string]string, containerType string) map[strin
 	return labels
 }
 
-// newSpecGenerator creates a new spec generator for the runtime spec.
-func newSpecGenerator(spec *runtimespec.Spec) generator {
-	g := generate.NewFromSpec(spec)
-	g.HostSpecific = true
-	return newCustomGenerator(g)
-}
-
-// generator is a custom generator with some functions overridden
-// used by the cri plugin.
-// TODO(random-liu): Upstream this fix.
-type generator struct {
-	generate.Generator
-	envCache map[string]int
-}
-
-func newCustomGenerator(g generate.Generator) generator {
-	cg := generator{
-		Generator: g,
-		envCache:  make(map[string]int),
-	}
-	if g.Config != nil && g.Config.Process != nil {
-		for i, env := range g.Config.Process.Env {
-			kv := strings.SplitN(env, "=", 2)
-			cg.envCache[kv[0]] = i
-		}
-	}
-	return cg
-}
-
-// AddProcessEnv overrides the original AddProcessEnv. It uses
-// a map to cache and override envs.
-func (g *generator) AddProcessEnv(key, value string) {
-	if len(g.envCache) == 0 {
-		// Call AddProccessEnv once to initialize the spec.
-		g.Generator.AddProcessEnv(key, value)
-		g.envCache[key] = 0
-		return
-	}
-	spec := g.Config
-	env := fmt.Sprintf("%s=%s", key, value)
-	if idx, ok := g.envCache[key]; !ok {
-		spec.Process.Env = append(spec.Process.Env, env)
-		g.envCache[key] = len(spec.Process.Env) - 1
-	} else {
-		spec.Process.Env[idx] = env
-	}
-}
-
 func getPodCNILabels(id string, config *runtime.PodSandboxConfig) map[string]string {
 	return map[string]string{
 		"K8S_POD_NAMESPACE":          config.GetMetadata().GetNamespace(),
@@ -462,33 +380,6 @@ func toRuntimeAuthConfig(a criconfig.AuthConfig) *runtime.AuthConfig {
 		Auth:          a.Auth,
 		IdentityToken: a.IdentityToken,
 	}
-}
-
-// mounts defines how to sort runtime.Mount.
-// This is the same with the Docker implementation:
-//   https://github.com/moby/moby/blob/17.05.x/daemon/volumes.go#L26
-type orderedMounts []*runtime.Mount
-
-// Len returns the number of mounts. Used in sorting.
-func (m orderedMounts) Len() int {
-	return len(m)
-}
-
-// Less returns true if the number of parts (a/b/c would be 3 parts) in the
-// mount indexed by parameter 1 is less than that of the mount indexed by
-// parameter 2. Used in sorting.
-func (m orderedMounts) Less(i, j int) bool {
-	return m.parts(i) < m.parts(j)
-}
-
-// Swap swaps two items in an array of mounts. Used in sorting
-func (m orderedMounts) Swap(i, j int) {
-	m[i], m[j] = m[j], m[i]
-}
-
-// parts returns the number of parts in the destination of a mount. Used in sorting.
-func (m orderedMounts) parts(i int) int {
-	return strings.Count(filepath.Clean(m[i].ContainerPath), string(os.PathSeparator))
 }
 
 // parseImageReferences parses a list of arbitrary image references and returns
@@ -551,30 +442,6 @@ func getRuntimeOptions(c containers.Container) (interface{}, error) {
 		return nil, err
 	}
 	return opts, nil
-}
-
-func getCurrentOOMScoreAdj() (int, error) {
-	b, err := ioutil.ReadFile("/proc/self/oom_score_adj")
-	if err != nil {
-		return 0, errors.Wrap(err, "could not get the daemon oom_score_adj")
-	}
-	s := strings.TrimSpace(string(b))
-	i, err := strconv.Atoi(s)
-	if err != nil {
-		return 0, errors.Wrap(err, "could not get the daemon oom_score_adj")
-	}
-	return i, nil
-}
-
-func restrictOOMScoreAdj(preferredOOMScoreAdj int) (int, error) {
-	currentOOMScoreAdj, err := getCurrentOOMScoreAdj()
-	if err != nil {
-		return preferredOOMScoreAdj, err
-	}
-	if preferredOOMScoreAdj < currentOOMScoreAdj {
-		return currentOOMScoreAdj, nil
-	}
-	return preferredOOMScoreAdj, nil
 }
 
 const (

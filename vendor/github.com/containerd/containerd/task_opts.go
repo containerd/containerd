@@ -34,11 +34,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	v1runtime = "io.containerd.runtime.v1.linux"
-	v2runtime = "io.containerd.runc.v1"
-)
-
 // NewTaskOpts allows the caller to set options on a new task
 type NewTaskOpts func(context.Context, *Client, *TaskInfo) error
 
@@ -97,25 +92,24 @@ func WithCheckpointName(name string) CheckpointTaskOpts {
 }
 
 // WithCheckpointImagePath sets image path for checkpoint option
-func WithCheckpointImagePath(rt, path string) CheckpointTaskOpts {
+func WithCheckpointImagePath(path string) CheckpointTaskOpts {
 	return func(r *CheckpointTaskInfo) error {
-		switch rt {
-		case v1runtime:
-			if r.Options == nil {
-				r.Options = &runctypes.CheckpointOptions{}
-			}
-			opts, ok := r.Options.(*runctypes.CheckpointOptions)
-			if !ok {
-				return errors.New("invalid v1 checkpoint options format")
-			}
-			opts.ImagePath = path
-		case v2runtime:
+		if CheckRuntime(r.Runtime(), "io.containerd.runc") {
 			if r.Options == nil {
 				r.Options = &options.CheckpointOptions{}
 			}
 			opts, ok := r.Options.(*options.CheckpointOptions)
 			if !ok {
-				return errors.New("invalid v2 checkpoint options format")
+				return errors.New("invalid v2 shim checkpoint options format")
+			}
+			opts.ImagePath = path
+		} else {
+			if r.Options == nil {
+				r.Options = &runctypes.CheckpointOptions{}
+			}
+			opts, ok := r.Options.(*runctypes.CheckpointOptions)
+			if !ok {
+				return errors.New("invalid v1 shim checkpoint options format")
 			}
 			opts.ImagePath = path
 		}
@@ -124,25 +118,24 @@ func WithCheckpointImagePath(rt, path string) CheckpointTaskOpts {
 }
 
 // WithRestoreImagePath sets image path for create option
-func WithRestoreImagePath(rt, path string) NewTaskOpts {
+func WithRestoreImagePath(path string) NewTaskOpts {
 	return func(ctx context.Context, c *Client, ti *TaskInfo) error {
-		switch rt {
-		case v1runtime:
-			if ti.Options == nil {
-				ti.Options = &runctypes.CreateOptions{}
-			}
-			opts, ok := ti.Options.(*runctypes.CreateOptions)
-			if !ok {
-				return errors.New("invalid v1 create options format")
-			}
-			opts.CriuImagePath = path
-		case v2runtime:
+		if CheckRuntime(ti.Runtime(), "io.containerd.runc") {
 			if ti.Options == nil {
 				ti.Options = &options.Options{}
 			}
 			opts, ok := ti.Options.(*options.Options)
 			if !ok {
-				return errors.New("invalid v2 create options format")
+				return errors.New("invalid v2 shim create options format")
+			}
+			opts.CriuImagePath = path
+		} else {
+			if ti.Options == nil {
+				ti.Options = &runctypes.CreateOptions{}
+			}
+			opts, ok := ti.Options.(*runctypes.CreateOptions)
+			if !ok {
+				return errors.New("invalid v1 shim create options format")
 			}
 			opts.CriuImagePath = path
 		}

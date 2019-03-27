@@ -21,6 +21,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/pkg/errors"
@@ -86,7 +87,7 @@ func withCheckpointOpts(rt string, context *cli.Context) containerd.CheckpointTa
 		workPath := context.String("work-path")
 
 		switch rt {
-		case "io.containerd.runc.v1":
+		case plugin.RuntimeRuncV1, plugin.RuntimeRuncV2:
 			if r.Options == nil {
 				r.Options = &options.CheckpointOptions{}
 			}
@@ -101,7 +102,7 @@ func withCheckpointOpts(rt string, context *cli.Context) containerd.CheckpointTa
 			if workPath != "" {
 				opts.WorkPath = workPath
 			}
-		case "io.containerd.runtime.v1.linux":
+		case plugin.RuntimeLinuxV1:
 			if r.Options == nil {
 				r.Options = &runctypes.CheckpointOptions{}
 			}

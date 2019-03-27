@@ -88,7 +88,7 @@ func serviceFlags() []cli.Flag {
 	}
 }
 
-// applyPlatformFlags applys platform-specific flags.
+// applyPlatformFlags applies platform-specific flags.
 func applyPlatformFlags(context *cli.Context) {
 
 	if s := context.GlobalString("service-name"); s != "" {

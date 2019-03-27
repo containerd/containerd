@@ -147,6 +147,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 
 	cOpts = append(cOpts, containerd.WithRuntime(context.String("runtime"), nil))
 
+	opts = append(opts, oci.WithAnnotations(commands.LabelArgs(context.StringSlice("label"))))
 	var s specs.Spec
 	spec = containerd.WithSpec(&s, opts...)
 

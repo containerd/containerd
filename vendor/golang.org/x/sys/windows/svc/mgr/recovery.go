@@ -8,6 +8,7 @@ package mgr
 
 import (
 	"errors"
+	"syscall"
 	"time"
 	"unsafe"
 
@@ -93,4 +94,42 @@ func (s *Service) ResetPeriod() (uint32, error) {
 	}
 	p := (*windows.SERVICE_FAILURE_ACTIONS)(unsafe.Pointer(&b[0]))
 	return p.ResetPeriod, nil
+}
+
+// SetRebootMessage sets service s reboot message.
+// If msg is "", the reboot message is deleted and no message is broadcast.
+func (s *Service) SetRebootMessage(msg string) error {
+	rActions := windows.SERVICE_FAILURE_ACTIONS{
+		RebootMsg: syscall.StringToUTF16Ptr(msg),
+	}
+	return windows.ChangeServiceConfig2(s.Handle, windows.SERVICE_CONFIG_FAILURE_ACTIONS, (*byte)(unsafe.Pointer(&rActions)))
+}
+
+// RebootMessage is broadcast to server users before rebooting in response to the ComputerReboot service controller action.
+func (s *Service) RebootMessage() (string, error) {
+	b, err := s.queryServiceConfig2(windows.SERVICE_CONFIG_FAILURE_ACTIONS)
+	if err != nil {
+		return "", err
+	}
+	p := (*windows.SERVICE_FAILURE_ACTIONS)(unsafe.Pointer(&b[0]))
+	return toString(p.RebootMsg), nil
+}
+
+// SetRecoveryCommand sets the command line of the process to execute in response to the RunCommand service controller action.
+// If cmd is "", the command is deleted and no program is run when the service fails.
+func (s *Service) SetRecoveryCommand(cmd string) error {
+	rActions := windows.SERVICE_FAILURE_ACTIONS{
+		Command: syscall.StringToUTF16Ptr(cmd),
+	}
+	return windows.ChangeServiceConfig2(s.Handle, windows.SERVICE_CONFIG_FAILURE_ACTIONS, (*byte)(unsafe.Pointer(&rActions)))
+}
+
+// RecoveryCommand is the command line of the process to execute in response to the RunCommand service controller action. This process runs under the same account as the service.
+func (s *Service) RecoveryCommand() (string, error) {
+	b, err := s.queryServiceConfig2(windows.SERVICE_CONFIG_FAILURE_ACTIONS)
+	if err != nil {
+		return "", err
+	}
+	p := (*windows.SERVICE_FAILURE_ACTIONS)(unsafe.Pointer(&b[0]))
+	return toString(p.Command), nil
 }
