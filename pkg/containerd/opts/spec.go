@@ -64,15 +64,19 @@ func WithAdditionalGIDs(userstr string) oci.SpecOpts {
 }
 
 func mergeGids(gids1, gids2 []uint32) []uint32 {
+	gidsMap := make(map[uint32]struct{})
 	for _, gid1 := range gids1 {
-		for i, gid2 := range gids2 {
-			if gid1 == gid2 {
-				gids2 = append(gids2[:i], gids2[i+1:]...)
-				break
-			}
-		}
+		gidsMap[gid1] = struct{}{}
 	}
-	return append(gids1, gids2...)
+	for _, gid2 := range gids2 {
+		gidsMap[gid2] = struct{}{}
+	}
+	var gids []uint32
+	for gid := range gidsMap {
+		gids = append(gids, gid)
+	}
+	sort.Slice(gids, func(i, j int) bool { return gids[i] < gids[j] })
+	return gids
 }
 
 // WithoutRunMount removes the `/run` inside the spec
@@ -668,12 +672,13 @@ func WithoutNamespace(t runtimespec.LinuxNamespaceType) oci.SpecOpts {
 		if s.Linux == nil {
 			return nil
 		}
+		var namespaces []runtimespec.LinuxNamespace
 		for i, ns := range s.Linux.Namespaces {
-			if ns.Type == t {
-				s.Linux.Namespaces = append(s.Linux.Namespaces[:i], s.Linux.Namespaces[i+1:]...)
-				return nil
+			if ns.Type != t {
+				namespaces = append(namespaces, s.Linux.Namespaces[i])
 			}
 		}
+		s.Linux.Namespaces = namespaces
 		return nil
 	}
 }
