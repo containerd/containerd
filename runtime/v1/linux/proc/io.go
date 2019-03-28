@@ -27,6 +27,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"syscall"
 
 	"github.com/containerd/containerd/log"
@@ -123,7 +124,7 @@ func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio proc.Stdio
 }
 
 func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, wg, cwg *sync.WaitGroup) error {
-	var sameFile io.WriteCloser
+	var sameFile *countingWriteCloser
 	for _, i := range []struct {
 		name string
 		dest func(wc io.WriteCloser, rc io.Closer)
@@ -185,6 +186,7 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 			}
 		} else {
 			if sameFile != nil {
+				sameFile.count++
 				i.dest(sameFile, nil)
 				continue
 			}
@@ -192,7 +194,10 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 				return fmt.Errorf("containerd-shim: opening %s failed: %s", i.name, err)
 			}
 			if stdout == stderr {
-				sameFile = fw
+				sameFile = &countingWriteCloser{
+					WriteCloser: fw,
+					count:       1,
+				}
 			}
 		}
 		i.dest(fw, fr)
@@ -215,6 +220,19 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 		f.Close()
 	}()
 	return nil
+}
+
+// countingWriteCloser masks io.Closer() until close has been invoked a certain number of times.
+type countingWriteCloser struct {
+	io.WriteCloser
+	count int64
+}
+
+func (c *countingWriteCloser) Close() error {
+	if atomic.AddInt64(&c.count, -1) > 0 {
+		return nil
+	}
+	return c.WriteCloser.Close()
 }
 
 // isFifo checks if a file is a fifo
