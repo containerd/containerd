@@ -166,25 +166,25 @@ func TestWithEnv(t *testing.T) {
 		Env: []string{"DEFAULT=test"},
 	}
 
-	WithEnv([]string{"env=1"})(nil, nil, nil, &s)
+	WithEnv([]string{"env=1"})(context.Background(), nil, nil, &s)
 
 	if len(s.Process.Env) != 2 {
 		t.Fatal("didn't append")
 	}
 
-	WithEnv([]string{"env2=1"})(nil, nil, nil, &s)
+	WithEnv([]string{"env2=1"})(context.Background(), nil, nil, &s)
 
 	if len(s.Process.Env) != 3 {
 		t.Fatal("didn't append")
 	}
 
-	WithEnv([]string{"env2=2"})(nil, nil, nil, &s)
+	WithEnv([]string{"env2=2"})(context.Background(), nil, nil, &s)
 
 	if s.Process.Env[2] != "env2=2" {
 		t.Fatal("couldn't update")
 	}
 
-	WithEnv([]string{"env2"})(nil, nil, nil, &s)
+	WithEnv([]string{"env2"})(context.Background(), nil, nil, &s)
 
 	if len(s.Process.Env) != 2 {
 		t.Fatal("couldn't unset")
@@ -428,7 +428,7 @@ func TestAddCaps(t *testing.T) {
 
 	var s specs.Spec
 
-	if err := WithAddedCapabilities([]string{"CAP_CHOWN"})(nil, nil, nil, &s); err != nil {
+	if err := WithAddedCapabilities([]string{"CAP_CHOWN"})(context.Background(), nil, nil, &s); err != nil {
 		t.Fatal(err)
 	}
 	for i, cl := range [][]string{
@@ -448,10 +448,10 @@ func TestDropCaps(t *testing.T) {
 
 	var s specs.Spec
 
-	if err := WithAllCapabilities(nil, nil, nil, &s); err != nil {
+	if err := WithAllCapabilities(context.Background(), nil, nil, &s); err != nil {
 		t.Fatal(err)
 	}
-	if err := WithDroppedCapabilities([]string{"CAP_CHOWN"})(nil, nil, nil, &s); err != nil {
+	if err := WithDroppedCapabilities([]string{"CAP_CHOWN"})(context.Background(), nil, nil, &s); err != nil {
 		t.Fatal(err)
 	}
 
@@ -463,6 +463,46 @@ func TestDropCaps(t *testing.T) {
 	} {
 		if capsContain(cl, "CAP_CHOWN") {
 			t.Errorf("cap list %d contains dropped cap", i)
+		}
+	}
+
+	// Add all capabilities back and drop a different cap.
+	if err := WithAllCapabilities(context.Background(), nil, nil, &s); err != nil {
+		t.Fatal(err)
+	}
+	if err := WithDroppedCapabilities([]string{"CAP_FOWNER"})(context.Background(), nil, nil, &s); err != nil {
+		t.Fatal(err)
+	}
+
+	for i, cl := range [][]string{
+		s.Process.Capabilities.Bounding,
+		s.Process.Capabilities.Effective,
+		s.Process.Capabilities.Permitted,
+		s.Process.Capabilities.Inheritable,
+	} {
+		if capsContain(cl, "CAP_FOWNER") {
+			t.Errorf("cap list %d contains dropped cap", i)
+		}
+		if !capsContain(cl, "CAP_CHOWN") {
+			t.Errorf("cap list %d doesn't contain non-dropped cap", i)
+		}
+	}
+
+	// Drop all duplicated caps.
+	if err := WithCapabilities([]string{"CAP_CHOWN", "CAP_CHOWN"})(context.Background(), nil, nil, &s); err != nil {
+		t.Fatal(err)
+	}
+	if err := WithDroppedCapabilities([]string{"CAP_CHOWN"})(context.Background(), nil, nil, &s); err != nil {
+		t.Fatal(err)
+	}
+	for i, cl := range [][]string{
+		s.Process.Capabilities.Bounding,
+		s.Process.Capabilities.Effective,
+		s.Process.Capabilities.Permitted,
+		s.Process.Capabilities.Inheritable,
+	} {
+		if len(cl) != 0 {
+			t.Errorf("cap list %d is not empty", i)
 		}
 	}
 }
