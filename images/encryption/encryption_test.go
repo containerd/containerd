@@ -132,33 +132,3 @@ func TestEncryptLayer(t *testing.T) {
 		t.Fatalf("Expected %v, got %v", data, decLayer)
 	}
 }
-
-func TestJSONDCParameters(t *testing.T) {
-	var err error
-
-	annotations := make(map[string]string)
-	desc := ocispec.Descriptor{
-		Annotations: annotations,
-	}
-
-	mycc, err := GetCryptoConfigFromAnnotations(&desc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if mycc == nil || mycc.Dc == nil {
-		t.Fatalf("Expected mycc != nil and mycc.Dc != nil")
-	}
-
-	annotations["_dcparameters"], err = DCParametersToJSON(dc.Parameters)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	mycc, err = GetCryptoConfigFromAnnotations(&desc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(mycc.Dc.Parameters, dc.Parameters) {
-		t.Fatalf("Expected %v, got %v", dc.Parameters, mycc.Dc.Parameters)
-	}
-}
