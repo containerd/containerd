@@ -26,6 +26,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 )
@@ -52,7 +53,9 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 					cwg.Done()
 					p := bufPool.Get().(*[]byte)
 					defer bufPool.Put(p)
-					io.CopyBuffer(wc, rio.Stdout(), *p)
+					if _, err := io.CopyBuffer(wc, rio.Stdout(), *p); err != nil {
+						log.G(ctx).Warn("error copying stdout")
+					}
 					wg.Done()
 					wc.Close()
 					if rc != nil {
@@ -69,7 +72,9 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 					cwg.Done()
 					p := bufPool.Get().(*[]byte)
 					defer bufPool.Put(p)
-					io.CopyBuffer(wc, rio.Stderr(), *p)
+					if _, err := io.CopyBuffer(wc, rio.Stderr(), *p); err != nil {
+						log.G(ctx).Warn("error copying stderr")
+					}
 					wg.Done()
 					wc.Close()
 					if rc != nil {
