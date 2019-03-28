@@ -43,6 +43,7 @@ import (
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/containerd/containerd/snapshots"
 	ssproxy "github.com/containerd/containerd/snapshots/proxy"
+	"github.com/containerd/containerd/sys"
 	metrics "github.com/docker/go-metrics"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/pkg/errors"
@@ -61,10 +62,10 @@ func CreateTopLevelDirectories(config *srvconfig.Config) error {
 		return errors.New("root and state must be different paths")
 	}
 
-	if err := os.MkdirAll(config.Root, 0711); err != nil {
+	if err := sys.MkdirAllWithACL(config.Root, 0711); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(config.State, 0711); err != nil {
+	if err := sys.MkdirAllWithACL(config.State, 0711); err != nil {
 		return err
 	}
 	return nil
