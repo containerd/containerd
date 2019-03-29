@@ -17,12 +17,15 @@
 package containerd
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -169,4 +172,82 @@ func TestDaemonRuntimeRoot(t *testing.T) {
 		t.Error(err)
 	}
 	<-status
+}
+
+// code most copy from https://github.com/opencontainers/runc
+func getCgroupPath() (map[string]string, error) {
+	cgroupPath := make(map[string]string)
+	f, err := os.Open("/proc/self/mountinfo")
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		text := scanner.Text()
+		fields := strings.Split(text, " ")
+		// Safe as mountinfo encodes mountpoints with spaces as \040.
+		index := strings.Index(text, " - ")
+		postSeparatorFields := strings.Fields(text[index+3:])
+		numPostFields := len(postSeparatorFields)
+
+		// This is an error as we can't detect if the mount is for "cgroup"
+		if numPostFields == 0 {
+			continue
+		}
+
+		if postSeparatorFields[0] == "cgroup" {
+			// Check that the mount is properly formatted.
+			if numPostFields < 3 {
+				continue
+			}
+			cgroupPath[filepath.Base(fields[4])] = fields[4]
+		}
+	}
+
+	return cgroupPath, nil
+}
+
+// TestDaemonCustomCgroup ensures plugin.cgroup.path is not ignored
+func TestDaemonCustomCgroup(t *testing.T) {
+	cgroupPath, err := getCgroupPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cgroupPath) == 0 {
+		t.Skip("skip TestDaemonCustomCgroup since no cgroup path available")
+	}
+
+	customCgroup := fmt.Sprintf("%d", time.Now().Nanosecond())
+	configTOML := `
+[cgroup]
+  path = "` + customCgroup + `"`
+
+	_, _, cleanup := newDaemonWithConfig(t, configTOML)
+
+	defer func() {
+		// do cgroup path clean
+		for _, v := range cgroupPath {
+			if _, err := os.Stat(filepath.Join(v, customCgroup)); err == nil {
+				if err := os.RemoveAll(filepath.Join(v, customCgroup)); err != nil {
+					t.Logf("failed to remove cgroup path %s", filepath.Join(v, customCgroup))
+				}
+			}
+		}
+	}()
+
+	defer cleanup()
+
+	for k, v := range cgroupPath {
+		if k == "rmda" {
+			continue
+		}
+		path := filepath.Join(v, customCgroup)
+		if _, err := os.Stat(path); err != nil {
+			if os.IsNotExist(err) {
+				t.Fatalf("custom cgroup path %s should exist, actually not", path)
+			}
+		}
+	}
 }
