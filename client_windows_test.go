@@ -30,8 +30,8 @@ const (
 )
 
 var (
-	defaultRoot  = filepath.Join(os.Getenv("programfiles"), "containerd", "root-test")
-	defaultState = filepath.Join(os.Getenv("programfiles"), "containerd", "state-test")
+	defaultRoot  = filepath.Join(os.Getenv("programdata"), "containerd", "root-test")
+	defaultState = filepath.Join(os.Getenv("programdata"), "containerd", "state-test")
 	testImage    string
 )
 
