@@ -138,13 +138,13 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (_ *
 		Options:          r.Options,
 	}
 	rootfs := filepath.Join(r.Bundle, "rootfs")
-	defer func() {
+	defer func(rootfs string) {
 		if err != nil {
 			if err2 := mount.UnmountAll(rootfs, 0); err2 != nil {
 				log.G(ctx).WithError(err2).Warn("Failed to cleanup rootfs mount")
 			}
 		}
-	}()
+	}(rootfs)
 	for _, rm := range mounts {
 		m := &mount.Mount{
 			Type:    rm.Type,
@@ -159,6 +159,10 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (_ *
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if len(mounts) == 0 {
+		rootfs = ""
+	}
+
 	process, err := newInit(
 		ctx,
 		s.config.Path,
@@ -169,6 +173,7 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (_ *
 		s.config.SystemdCgroup,
 		s.platform,
 		config,
+		rootfs,
 	)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
@@ -631,7 +636,7 @@ func getTopic(ctx context.Context, e interface{}) string {
 	return runtime.TaskUnknownTopic
 }
 
-func newInit(ctx context.Context, path, workDir, runtimeRoot, namespace, criu string, systemdCgroup bool, platform rproc.Platform, r *proc.CreateConfig) (*proc.Init, error) {
+func newInit(ctx context.Context, path, workDir, runtimeRoot, namespace, criu string, systemdCgroup bool, platform rproc.Platform, r *proc.CreateConfig, rootfs string) (*proc.Init, error) {
 	var options runctypes.CreateOptions
 	if r.Options != nil {
 		v, err := typeurl.UnmarshalAny(r.Options)
@@ -641,7 +646,6 @@ func newInit(ctx context.Context, path, workDir, runtimeRoot, namespace, criu st
 		options = *v.(*runctypes.CreateOptions)
 	}
 
-	rootfs := filepath.Join(path, "rootfs")
 	runtime := proc.NewRunc(runtimeRoot, path, namespace, r.Runtime, criu, systemdCgroup)
 	p := proc.New(r.ID, runtime, rproc.Stdio{
 		Stdin:    r.Stdin,
