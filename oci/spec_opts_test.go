@@ -39,25 +39,25 @@ func TestWithEnv(t *testing.T) {
 		Env: []string{"DEFAULT=test"},
 	}
 
-	WithEnv([]string{"env=1"})(nil, nil, nil, &s)
+	WithEnv([]string{"env=1"})(context.Background(), nil, nil, &s)
 
 	if len(s.Process.Env) != 2 {
 		t.Fatal("didn't append")
 	}
 
-	WithEnv([]string{"env2=1"})(nil, nil, nil, &s)
+	WithEnv([]string{"env2=1"})(context.Background(), nil, nil, &s)
 
 	if len(s.Process.Env) != 3 {
 		t.Fatal("didn't append")
 	}
 
-	WithEnv([]string{"env2=2"})(nil, nil, nil, &s)
+	WithEnv([]string{"env2=2"})(context.Background(), nil, nil, &s)
 
 	if s.Process.Env[2] != "env2=2" {
 		t.Fatal("couldn't update")
 	}
 
-	WithEnv([]string{"env2"})(nil, nil, nil, &s)
+	WithEnv([]string{"env2"})(context.Background(), nil, nil, &s)
 
 	if len(s.Process.Env) != 2 {
 		t.Fatal("couldn't unset")
