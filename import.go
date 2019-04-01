@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"strings"
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
@@ -130,16 +131,12 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 		}
 
 		for _, m := range idx.Manifests {
-			if ref := m.Annotations[ocispec.AnnotationRefName]; ref != "" {
-				if iopts.imageRefT != nil {
-					ref = iopts.imageRefT(ref)
-				}
-				if ref != "" {
-					imgs = append(imgs, images.Image{
-						Name:   ref,
-						Target: m,
-					})
-				}
+			names := imageNames(m.Annotations, iopts.imageRefT)
+			for _, name := range names {
+				imgs = append(imgs, images.Image{
+					Name:   name,
+					Target: m,
+				})
 			}
 			if iopts.dgstRefT != nil {
 				ref := iopts.dgstRefT(m.Digest)
@@ -177,4 +174,36 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 	}
 
 	return imgs, nil
+}
+
+func imageNames(annotations map[string]string, ociCleanup func(string) string) []string {
+	var names []string
+	for k, v := range annotations {
+		if k == ocispec.AnnotationRefName {
+			if ociCleanup != nil {
+				v = ociCleanup(v)
+			}
+			if v != "" {
+				names = appendSorted(names, v)
+			}
+		} else if k == images.AnnotationImageName || strings.HasPrefix(k, images.AnnotationImageNamePrefix) {
+			names = appendSorted(names, v)
+
+		}
+	}
+	return names
+}
+
+func appendSorted(arr []string, s string) []string {
+	for i, c := range arr {
+		if s < c {
+			arr = append(arr, "")
+			copy(arr[i+1:], arr[i:])
+			arr[i] = s
+			return arr
+		} else if s == c {
+			return arr
+		}
+	}
+	return append(arr, s)
 }

@@ -18,13 +18,17 @@ package containerd
 
 import (
 	"archive/tar"
+	"bytes"
 	"io"
 	"runtime"
 	"testing"
+
+	"github.com/containerd/containerd/images/archive"
+	"github.com/containerd/containerd/platforms"
 )
 
-// TestOCIExport exports testImage as a tar stream
-func TestOCIExport(t *testing.T) {
+// TestExport exports testImage as a tar stream
+func TestExport(t *testing.T) {
 	// TODO: support windows
 	if testing.Short() || runtime.GOOS == "windows" {
 		t.Skip()
@@ -38,15 +42,16 @@ func TestOCIExport(t *testing.T) {
 	}
 	defer client.Close()
 
-	pulled, err := client.Fetch(ctx, testImage)
+	_, err = client.Fetch(ctx, testImage)
 	if err != nil {
 		t.Fatal(err)
 	}
-	exportedStream, err := client.Export(ctx, pulled.Target)
+	wb := bytes.NewBuffer(nil)
+	err = client.Export(ctx, wb, archive.WithPlatform(platforms.Default()), archive.WithImage(client.ImageService(), testImage))
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertOCITar(t, exportedStream)
+	assertOCITar(t, bytes.NewReader(wb.Bytes()))
 }
 
 func assertOCITar(t *testing.T, r io.Reader) {

@@ -77,6 +77,16 @@ func normalizeReference(ref string) (string, error) {
 	return normalized.String(), nil
 }
 
+func familiarizeReference(ref string) (string, error) {
+	named, err := reference.ParseNormalizedNamed(ref)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to parse %q", ref)
+	}
+	named = reference.TagNameOnly(named)
+
+	return reference.FamiliarString(named), nil
+}
+
 // DigestTranslator creates a digest reference by adding the
 // digest to an image name
 func DigestTranslator(prefix string) func(digest.Digest) string {
