@@ -28,6 +28,8 @@ type Config struct {
 	Root string `toml:"root"`
 	// State is the path to a directory where containerd will store transient data
 	State string `toml:"state"`
+	// PluginDir is the directory for dynamic plugins to be stored
+	PluginDir string `toml:"plugin_dir"`
 	// GRPC configuration settings
 	GRPC GRPCConfig `toml:"grpc"`
 	// Debug and profiling settings

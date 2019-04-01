@@ -220,7 +220,11 @@ func (s *Server) Stop() {
 // of all plugins.
 func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Registration, error) {
 	// load all plugins into containerd
-	if err := plugin.Load(filepath.Join(config.Root, "plugins")); err != nil {
+	path := config.PluginDir
+	if path == "" {
+		path = filepath.Join(config.Root, "plugins")
+	}
+	if err := plugin.Load(path); err != nil {
 		return nil, err
 	}
 	// load additional plugins that don't automatically register themselves
