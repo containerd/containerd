@@ -34,6 +34,7 @@ func TestPodHostname(t *testing.T) {
 	for name, test := range map[string]struct {
 		opts             []PodSandboxOpts
 		expectedHostname string
+		expectErr        bool
 	}{
 		"regular pod with custom hostname": {
 			opts: []PodSandboxOpts{
@@ -47,12 +48,12 @@ func TestPodHostname(t *testing.T) {
 			},
 			expectedHostname: hostname,
 		},
-		"host network pod with custom hostname": {
+		"host network pod with custom hostname should fail": {
 			opts: []PodSandboxOpts{
 				WithHostNetwork,
 				WithPodHostname("test-hostname"),
 			},
-			expectedHostname: "test-hostname",
+			expectErr: true,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -64,11 +65,21 @@ func TestPodHostname(t *testing.T) {
 			t.Log("Create a sandbox with hostname")
 			sbConfig := PodSandboxConfig("sandbox", "hostname", opts...)
 			sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-			require.NoError(t, err)
-			defer func() {
-				assert.NoError(t, runtimeService.StopPodSandbox(sb))
-				assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-			}()
+			if err != nil {
+				if !test.expectErr {
+					t.Fatalf("Unexpected RunPodSandbox error: %v", err)
+				}
+				return
+			} else {
+				// Make sure the sandbox is cleaned up.
+				defer func() {
+					assert.NoError(t, runtimeService.StopPodSandbox(sb))
+					assert.NoError(t, runtimeService.RemovePodSandbox(sb))
+				}()
+				if test.expectErr {
+					t.Fatalf("Expected RunPodSandbox to return error")
+				}
+			}
 
 			const (
 				testImage     = "busybox"

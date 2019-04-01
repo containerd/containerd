@@ -28,7 +28,7 @@ import (
 func TestMergeGids(t *testing.T) {
 	gids1 := []uint32{3, 2, 1}
 	gids2 := []uint32{2, 3, 4}
-	assert.Equal(t, []uint32{3, 2, 1, 4}, mergeGids(gids1, gids2))
+	assert.Equal(t, []uint32{1, 2, 3, 4}, mergeGids(gids1, gids2))
 }
 
 func TestOrderedMounts(t *testing.T) {

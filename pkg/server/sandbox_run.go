@@ -385,6 +385,7 @@ func (c *criService) generateSandboxContainerSpec(id string, config *runtime.Pod
 	)
 	if nsOptions.GetNetwork() == runtime.NamespaceMode_NODE {
 		specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.NetworkNamespace))
+		specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.UTSNamespace))
 	} else {
 		//TODO(Abhi): May be move this to containerd spec opts (WithLinuxSpaceOption)
 		specOpts = append(specOpts, oci.WithLinuxNamespace(
