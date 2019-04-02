@@ -28,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
@@ -395,4 +396,30 @@ func createShimDebugConfig() string {
 	}
 
 	return f.Name()
+}
+
+func TestDefaultRuntimeWithNamespaceLabels(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	ctx, cancel := testContext()
+	defer cancel()
+	namespaces := client.NamespaceService()
+	testRuntime := "testRuntime"
+	runtimeLabel := defaults.DefaultRuntimeNSLabel
+	if err := namespaces.SetLabel(ctx, testNamespace, runtimeLabel, testRuntime); err != nil {
+		t.Fatal(err)
+	}
+
+	testClient, err := New(address, WithDefaultNamespace(testNamespace))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer testClient.Close()
+	if testClient.runtime != testRuntime {
+		t.Error("failed to set default runtime from namespace labels")
+	}
 }
