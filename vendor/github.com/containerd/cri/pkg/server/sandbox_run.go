@@ -385,6 +385,7 @@ func (c *criService) generateSandboxContainerSpec(id string, config *runtime.Pod
 	nsOptions := securityContext.GetNamespaceOptions()
 	if nsOptions.GetNetwork() == runtime.NamespaceMode_NODE {
 		g.RemoveLinuxNamespace(string(runtimespec.NetworkNamespace)) // nolint: errcheck
+		g.RemoveLinuxNamespace(string(runtimespec.UTSNamespace))     // nolint: errcheck
 	} else {
 		//TODO(Abhi): May be move this to containerd spec opts (WithLinuxSpaceOption)
 		g.AddOrReplaceLinuxNamespace(string(runtimespec.NetworkNamespace), nsPath) // nolint: errcheck
