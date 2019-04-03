@@ -377,7 +377,7 @@ func (s *service) Pause(ctx context.Context, r *taskAPI.PauseRequest) (*ptypes.E
 		return nil, errdefs.ToGRPC(err)
 	}
 	s.send(&eventstypes.TaskPaused{
-		container.ID,
+		ContainerID: container.ID,
 	})
 	return empty, nil
 }
@@ -392,7 +392,7 @@ func (s *service) Resume(ctx context.Context, r *taskAPI.ResumeRequest) (*ptypes
 		return nil, errdefs.ToGRPC(err)
 	}
 	s.send(&eventstypes.TaskResumed{
-		container.ID,
+		ContainerID: container.ID,
 	})
 	return empty, nil
 }

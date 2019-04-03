@@ -832,7 +832,7 @@ func (s *service) Pause(ctx context.Context, r *taskAPI.PauseRequest) (*ptypes.E
 	}
 
 	s.publisher.Publish(ctx, runtime.TaskPausedEventTopic, &eventstypes.TaskPaused{
-		r.ID,
+		ContainerID: r.ID,
 	})
 
 	return empty, nil
@@ -855,7 +855,7 @@ func (s *service) Resume(ctx context.Context, r *taskAPI.ResumeRequest) (*ptypes
 	}
 
 	s.publisher.Publish(ctx, runtime.TaskResumedEventTopic, &eventstypes.TaskResumed{
-		r.ID,
+		ContainerID: r.ID,
 	})
 
 	return empty, nil
