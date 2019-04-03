@@ -181,14 +181,14 @@ disabled_plugins = ["restart"]
 EOF
 chmod 644 "${config_path}"
 
-# CONTAINERD_EXTRA_RUNTIME_HANDLER is the extra runtime handler to install.
-CONTAINERD_EXTRA_RUNTIME_HANDLER=${CONTAINERD_EXTRA_RUNTIME_HANDLER:-""}
-if [[ -n "${CONTAINERD_EXTRA_RUNTIME_HANDLER}" ]]; then
+# containerd_extra_runtime_handler is the extra runtime handler to install.
+containerd_extra_runtime_handler=${CONTAINERD_EXTRA_RUNTIME_HANDLER:-""}
+if [[ -n "${containerd_extra_runtime_handler}" ]]; then
   cat >> ${config_path} <<EOF
-[plugins.cri.containerd.runtimes.${CONTAINERD_EXTRA_RUNTIME_HANDLER}]
+[plugins.cri.containerd.runtimes.${containerd_extra_runtime_handler}]
   runtime_type = "${CONTAINERD_EXTRA_RUNTIME_TYPE:-io.containerd.runc.v1}"
 
-[plugins.cri.containerd.runtimes.${CONTAINERD_EXTRA_RUNTIME_HANDLER}.options]
+[plugins.cri.containerd.runtimes.${containerd_extra_runtime_handler}.options]
 ${CONTAINERD_EXTRA_RUNTIME_OPTIONS:-}
 EOF
 fi
