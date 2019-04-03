@@ -47,7 +47,7 @@ make
 
 ```bash
 sudo su -
-cd snapshots/testsuite/
+cd snapshots/benchsuite/
 go test -bench . \
     -dm.thinPoolDev=bench-docker--pool \
     -dm.rootPath=/mnt/disk1/data \
