@@ -18,24 +18,22 @@ package server
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
 	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl"
 	"github.com/docker/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/opencontainers/runtime-tools/generate"
-	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -44,8 +42,9 @@ import (
 	runtimeoptions "github.com/containerd/cri/pkg/api/runtimeoptions/v1"
 	criconfig "github.com/containerd/cri/pkg/config"
 	"github.com/containerd/cri/pkg/store"
+	containerstore "github.com/containerd/cri/pkg/store/container"
 	imagestore "github.com/containerd/cri/pkg/store/image"
-	"github.com/containerd/cri/pkg/util"
+	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
 )
 
 const (
@@ -65,8 +64,6 @@ const (
 const (
 	// defaultSandboxOOMAdj is default omm adj for sandbox container. (kubernetes#47938).
 	defaultSandboxOOMAdj = -998
-	// defaultSandboxCPUshares is default cpu shares for sandbox container.
-	defaultSandboxCPUshares = 2
 	// defaultShmSize is the default size of the sandbox shm.
 	defaultShmSize = int64(1024 * 1024 * 64)
 	// relativeRootfsPath is the rootfs path relative to bundle path.
@@ -82,18 +79,12 @@ const (
 	maxDNSSearches = 6
 	// Delimiter used to construct container/sandbox names.
 	nameDelimiter = "_"
-	// netNSFormat is the format of network namespace of a process.
-	netNSFormat = "/proc/%v/ns/net"
-	// ipcNSFormat is the format of ipc namespace of a process.
-	ipcNSFormat = "/proc/%v/ns/ipc"
-	// utsNSFormat is the format of uts namespace of a process.
-	utsNSFormat = "/proc/%v/ns/uts"
-	// pidNSFormat is the format of pid namespace of a process.
-	pidNSFormat = "/proc/%v/ns/pid"
 	// devShm is the default path of /dev/shm.
 	devShm = "/dev/shm"
 	// etcHosts is the default path of /etc/hosts file.
 	etcHosts = "/etc/hosts"
+	// etcHostname is the default path of /etc/hostname file.
+	etcHostname = "/etc/hostname"
 	// resolvConfPath is the abs path of resolv.conf on host or container.
 	resolvConfPath = "/etc/resolv.conf"
 	// hostnameEnv is the key for HOSTNAME env.
@@ -194,6 +185,11 @@ func (c *criService) getVolatileContainerRootDir(id string) string {
 	return filepath.Join(c.config.StateDir, containersDir, id)
 }
 
+// getSandboxHostname returns the hostname file path inside the sandbox root directory.
+func (c *criService) getSandboxHostname(id string) string {
+	return filepath.Join(c.getSandboxRootDir(id), "hostname")
+}
+
 // getSandboxHosts returns the hosts file path inside the sandbox root directory.
 func (c *criService) getSandboxHosts(id string) string {
 	return filepath.Join(c.getSandboxRootDir(id), "hosts")
@@ -207,26 +203,6 @@ func (c *criService) getResolvPath(id string) string {
 // getSandboxDevShm returns the shm file path inside the sandbox root directory.
 func (c *criService) getSandboxDevShm(id string) string {
 	return filepath.Join(c.getVolatileSandboxRootDir(id), "shm")
-}
-
-// getNetworkNamespace returns the network namespace of a process.
-func getNetworkNamespace(pid uint32) string {
-	return fmt.Sprintf(netNSFormat, pid)
-}
-
-// getIPCNamespace returns the ipc namespace of a process.
-func getIPCNamespace(pid uint32) string {
-	return fmt.Sprintf(ipcNSFormat, pid)
-}
-
-// getUTSNamespace returns the uts namespace of a process.
-func getUTSNamespace(pid uint32) string {
-	return fmt.Sprintf(utsNSFormat, pid)
-}
-
-// getPIDNamespace returns the pid namespace of a process.
-func getPIDNamespace(pid uint32) string {
-	return fmt.Sprintf(pidNSFormat, pid)
 }
 
 // criContainerStateToString formats CRI container state to string.
@@ -259,7 +235,7 @@ func (c *criService) localResolve(refOrID string) (imagestore.Image, error) {
 		return func(ref string) string {
 			// ref is not image id, try to resolve it locally.
 			// TODO(random-liu): Handle this error better for debugging.
-			normalized, err := util.NormalizeImageRef(ref)
+			normalized, err := reference.ParseDockerRef(ref)
 			if err != nil {
 				return ""
 			}
@@ -345,7 +321,12 @@ func initSelinuxOpts(selinuxOpt *runtime.SELinuxOption) (string, string, error) 
 		selinuxOpt.GetRole(),
 		selinuxOpt.GetType(),
 		selinuxOpt.GetLevel())
-	return label.InitLabels(selinux.DupSecOpt(labelOpts))
+
+	options, err := label.DupSecOpt(labelOpts)
+	if err != nil {
+		return "", "", err
+	}
+	return label.InitLabels(options)
 }
 
 func checkSelinuxLevel(level string) (bool, error) {
@@ -363,7 +344,7 @@ func checkSelinuxLevel(level string) (bool, error) {
 // isInCRIMounts checks whether a destination is in CRI mount list.
 func isInCRIMounts(dst string, mounts []*runtime.Mount) bool {
 	for _, m := range mounts {
-		if m.ContainerPath == dst {
+		if filepath.Clean(m.ContainerPath) == filepath.Clean(dst) {
 			return true
 		}
 	}
@@ -386,13 +367,6 @@ func buildLabels(configLabels map[string]string, containerType string) map[strin
 	return labels
 }
 
-// newSpecGenerator creates a new spec generator for the runtime spec.
-func newSpecGenerator(spec *runtimespec.Spec) generate.Generator {
-	g := generate.NewFromSpec(spec)
-	g.HostSpecific = true
-	return g
-}
-
 func getPodCNILabels(id string, config *runtime.PodSandboxConfig) map[string]string {
 	return map[string]string{
 		"K8S_POD_NAMESPACE":          config.GetMetadata().GetNamespace(),
@@ -410,33 +384,6 @@ func toRuntimeAuthConfig(a criconfig.AuthConfig) *runtime.AuthConfig {
 		Auth:          a.Auth,
 		IdentityToken: a.IdentityToken,
 	}
-}
-
-// mounts defines how to sort runtime.Mount.
-// This is the same with the Docker implementation:
-//   https://github.com/moby/moby/blob/17.05.x/daemon/volumes.go#L26
-type orderedMounts []*runtime.Mount
-
-// Len returns the number of mounts. Used in sorting.
-func (m orderedMounts) Len() int {
-	return len(m)
-}
-
-// Less returns true if the number of parts (a/b/c would be 3 parts) in the
-// mount indexed by parameter 1 is less than that of the mount indexed by
-// parameter 2. Used in sorting.
-func (m orderedMounts) Less(i, j int) bool {
-	return m.parts(i) < m.parts(j)
-}
-
-// Swap swaps two items in an array of mounts. Used in sorting
-func (m orderedMounts) Swap(i, j int) {
-	m[i], m[j] = m[j], m[i]
-}
-
-// parts returns the number of parts in the destination of a mount. Used in sorting.
-func (m orderedMounts) parts(i int) int {
-	return strings.Count(filepath.Clean(m[i].ContainerPath), string(os.PathSeparator))
 }
 
 // parseImageReferences parses a list of arbitrary image references and returns
@@ -501,26 +448,71 @@ func getRuntimeOptions(c containers.Container) (interface{}, error) {
 	return opts, nil
 }
 
-func getCurrentOOMScoreAdj() (int, error) {
-	b, err := ioutil.ReadFile("/proc/self/oom_score_adj")
-	if err != nil {
-		return 0, errors.Wrap(err, "could not get the daemon oom_score_adj")
+const (
+	// unknownExitCode is the exit code when exit reason is unknown.
+	unknownExitCode = 255
+	// unknownExitReason is the exit reason when exit reason is unknown.
+	unknownExitReason = "Unknown"
+)
+
+// unknownContainerStatus returns the default container status when its status is unknown.
+func unknownContainerStatus() containerstore.Status {
+	return containerstore.Status{
+		CreatedAt:  0,
+		StartedAt:  0,
+		FinishedAt: 0,
+		ExitCode:   unknownExitCode,
+		Reason:     unknownExitReason,
 	}
-	s := strings.TrimSpace(string(b))
-	i, err := strconv.Atoi(s)
-	if err != nil {
-		return 0, errors.Wrap(err, "could not get the daemon oom_score_adj")
-	}
-	return i, nil
 }
 
-func restrictOOMScoreAdj(preferredOOMScoreAdj int) (int, error) {
-	currentOOMScoreAdj, err := getCurrentOOMScoreAdj()
+// unknownSandboxStatus returns the default sandbox status when its status is unknown.
+func unknownSandboxStatus() sandboxstore.Status {
+	return sandboxstore.Status{
+		State: sandboxstore.StateUnknown,
+	}
+}
+
+// unknownExitStatus generates containerd.Status for container exited with unknown exit code.
+func unknownExitStatus() containerd.Status {
+	return containerd.Status{
+		Status:     containerd.Stopped,
+		ExitStatus: unknownExitCode,
+		ExitTime:   time.Now(),
+	}
+}
+
+// getTaskStatus returns status for a given task. It returns unknown exit status if
+// the task is nil or not found.
+func getTaskStatus(ctx context.Context, task containerd.Task) (containerd.Status, error) {
+	if task == nil {
+		return unknownExitStatus(), nil
+	}
+	status, err := task.Status(ctx)
 	if err != nil {
-		return preferredOOMScoreAdj, err
+		if !errdefs.IsNotFound(err) {
+			return containerd.Status{}, err
+		}
+		return unknownExitStatus(), nil
 	}
-	if preferredOOMScoreAdj < currentOOMScoreAdj {
-		return currentOOMScoreAdj, nil
+	return status, nil
+}
+
+// getPassthroughAnnotations filters requested pod annotations by comparing
+// against permitted annotations for the given runtime.
+func getPassthroughAnnotations(podAnnotations map[string]string,
+	runtimePodAnnotations []string) (passthroughAnnotations map[string]string) {
+	passthroughAnnotations = make(map[string]string)
+
+	for podAnnotationKey, podAnnotationValue := range podAnnotations {
+		for _, pattern := range runtimePodAnnotations {
+			// Use path.Match instead of filepath.Match here.
+			// filepath.Match treated `\\` as path separator
+			// on windows, which is not what we want.
+			if ok, _ := path.Match(pattern, podAnnotationKey); ok {
+				passthroughAnnotations[podAnnotationKey] = podAnnotationValue
+			}
+		}
 	}
-	return preferredOOMScoreAdj, nil
+	return passthroughAnnotations
 }

@@ -28,13 +28,12 @@ import (
 	"github.com/containerd/containerd/reference"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
+	distribution "github.com/docker/distribution/reference"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
-
-	"github.com/containerd/cri/pkg/util"
 )
 
 // For image management:
@@ -81,7 +80,7 @@ import (
 // PullImage pulls an image with authentication config.
 func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (*runtime.PullImageResponse, error) {
 	imageRef := r.GetImage().GetImage()
-	namedRef, err := util.NormalizeImageRef(imageRef)
+	namedRef, err := distribution.ParseDockerRef(imageRef)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to parse image reference %q", imageRef)
 	}

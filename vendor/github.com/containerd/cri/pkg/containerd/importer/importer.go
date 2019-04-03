@@ -32,13 +32,13 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log"
+	"github.com/docker/distribution/reference"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 
 	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
-	"github.com/containerd/cri/pkg/util"
 )
 
 // This code reuses the docker import code from containerd/containerd#1602.
@@ -220,7 +220,7 @@ func Import(ctx context.Context, client *containerd.Client, reader io.Reader, op
 		}
 
 		for _, ref := range mfst.RepoTags {
-			normalized, err := util.NormalizeImageRef(ref)
+			normalized, err := reference.ParseDockerRef(ref)
 			if err != nil {
 				return refs, errors.Wrapf(err, "normalize image ref %q", ref)
 			}

@@ -22,6 +22,7 @@ import (
 	"math"
 	"net"
 	"os"
+	"time"
 
 	"github.com/pkg/errors"
 	k8snet "k8s.io/apimachinery/pkg/util/net"
@@ -64,7 +65,7 @@ func getStreamListenerMode(c *criService) (streamListenerMode, error) {
 	return withoutTLS, nil
 }
 
-func newStreamServer(c *criService, addr, port string) (streaming.Server, error) {
+func newStreamServer(c *criService, addr, port, streamIdleTimeout string) (streaming.Server, error) {
 	if addr == "" {
 		a, err := k8snet.ChooseBindAddress(nil)
 		if err != nil {
@@ -73,6 +74,13 @@ func newStreamServer(c *criService, addr, port string) (streaming.Server, error)
 		addr = a.String()
 	}
 	config := streaming.DefaultConfig
+	if streamIdleTimeout != "" {
+		var err error
+		config.StreamIdleTimeout, err = time.ParseDuration(streamIdleTimeout)
+		if err != nil {
+			return nil, errors.Wrap(err, "invalid stream idle timeout")
+		}
+	}
 	config.Addr = net.JoinHostPort(addr, port)
 	run := newStreamRuntime(c)
 	tlsMode, err := getStreamListenerMode(c)

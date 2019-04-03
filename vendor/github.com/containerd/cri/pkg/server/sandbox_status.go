@@ -42,6 +42,14 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 		return nil, errors.Wrap(err, "failed to get sandbox ip")
 	}
 	status := toCRISandboxStatus(sandbox.Metadata, sandbox.Status.Get(), ip)
+	if status.GetCreatedAt() == 0 {
+		// CRI doesn't allow CreatedAt == 0.
+		info, err := sandbox.Container.Info(ctx)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get CreatedAt for sandbox container in %q state", status.State)
+		}
+		status.CreatedAt = info.CreatedAt.UnixNano()
+	}
 	if !r.GetVerbose() {
 		return &runtime.PodSandboxStatusResponse{Status: status}, nil
 	}
@@ -99,21 +107,25 @@ func toCRISandboxStatus(meta sandboxstore.Metadata, status sandboxstore.Status, 
 				},
 			},
 		},
-		Labels:      meta.Config.GetLabels(),
-		Annotations: meta.Config.GetAnnotations(),
+		Labels:         meta.Config.GetLabels(),
+		Annotations:    meta.Config.GetAnnotations(),
+		RuntimeHandler: meta.RuntimeHandler,
 	}
 }
 
 // SandboxInfo is extra information for sandbox.
 // TODO (mikebrow): discuss predefining constants structures for some or all of these field names in CRI
 type SandboxInfo struct {
-	Pid            uint32                    `json:"pid"`
-	Status         string                    `json:"processStatus"`
-	NetNSClosed    bool                      `json:"netNamespaceClosed"`
-	Image          string                    `json:"image"`
-	SnapshotKey    string                    `json:"snapshotKey"`
-	Snapshotter    string                    `json:"snapshotter"`
-	RuntimeHandler string                    `json:"runtimeHandler"`
+	Pid         uint32 `json:"pid"`
+	Status      string `json:"processStatus"`
+	NetNSClosed bool   `json:"netNamespaceClosed"`
+	Image       string `json:"image"`
+	SnapshotKey string `json:"snapshotKey"`
+	Snapshotter string `json:"snapshotter"`
+	// Note: a new field `RuntimeHandler` has been added into the CRI PodSandboxStatus struct, and
+	// should be set. This `RuntimeHandler` field will be deprecated after containerd 1.3 (tracked
+	// in https://github.com/containerd/cri/issues/1064).
+	RuntimeHandler string                    `json:"runtimeHandler"` // see the Note above
 	RuntimeType    string                    `json:"runtimeType"`
 	RuntimeOptions interface{}               `json:"runtimeOptions"`
 	Config         *runtime.PodSandboxConfig `json:"config"`

@@ -29,6 +29,7 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
+	"github.com/containerd/cri/pkg/containerd/opts"
 	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
 	containerstore "github.com/containerd/cri/pkg/store/container"
 	"github.com/containerd/cri/pkg/util"
@@ -135,27 +136,11 @@ func updateOCILinuxResource(spec *runtimespec.Spec, new *runtime.LinuxContainerR
 	if err := util.DeepCopy(&cloned, spec); err != nil {
 		return nil, errors.Wrap(err, "failed to deep copy")
 	}
-	g := newSpecGenerator(&cloned)
-
-	if new.GetCpuPeriod() != 0 {
-		g.SetLinuxResourcesCPUPeriod(uint64(new.GetCpuPeriod()))
+	if cloned.Linux == nil {
+		cloned.Linux = &runtimespec.Linux{}
 	}
-	if new.GetCpuQuota() != 0 {
-		g.SetLinuxResourcesCPUQuota(new.GetCpuQuota())
+	if err := opts.WithResources(new)(nil, nil, nil, &cloned); err != nil {
+		return nil, errors.Wrap(err, "unable to set linux container resources")
 	}
-	if new.GetCpuShares() != 0 {
-		g.SetLinuxResourcesCPUShares(uint64(new.GetCpuShares()))
-	}
-	if new.GetMemoryLimitInBytes() != 0 {
-		g.SetLinuxResourcesMemoryLimit(new.GetMemoryLimitInBytes())
-	}
-	// OOMScore is not updatable.
-	if new.GetCpusetCpus() != "" {
-		g.SetLinuxResourcesCPUCpus(new.GetCpusetCpus())
-	}
-	if new.GetCpusetMems() != "" {
-		g.SetLinuxResourcesCPUMems(new.GetCpusetMems())
-	}
-
-	return g.Config, nil
+	return &cloned, nil
 }

@@ -19,6 +19,7 @@ package config
 import (
 	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd"
+	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 )
 
 // Runtime struct to contain the type(ID), engine, and root variables for a default runtime
@@ -30,6 +31,9 @@ type Runtime struct {
 	// This only works for runtime type "io.containerd.runtime.v1.linux".
 	// DEPRECATED: use Options instead. Remove when shim v1 is deprecated.
 	Engine string `toml:"runtime_engine" json:"runtimeEngine"`
+	// PodAnnotations is a list of pod annotations passed to both pod sandbox as well as
+	// container OCI annotations.
+	PodAnnotations []string `toml:"pod_annotations" json:"PodAnnotations"`
 	// Root is the directory used by containerd for runtime state.
 	// DEPRECATED: use Options instead. Remove when shim v1 is deprecated.
 	// This only works for runtime type "io.containerd.runtime.v1.linux".
@@ -124,6 +128,11 @@ type PluginConfig struct {
 	StreamServerAddress string `toml:"stream_server_address" json:"streamServerAddress"`
 	// StreamServerPort is the port streaming server is listening on.
 	StreamServerPort string `toml:"stream_server_port" json:"streamServerPort"`
+	// StreamIdleTimeout is the maximum time a streaming connection
+	// can be idle before the connection is automatically closed.
+	// The string is in the golang duration format, see:
+	//   https://golang.org/pkg/time/#ParseDuration
+	StreamIdleTimeout string `toml:"stream_idle_timeout" json:"streamIdleTimeout"`
 	// EnableSelinux indicates to enable the selinux support.
 	EnableSelinux bool `toml:"enable_selinux" json:"enableSelinux"`
 	// SandboxImage is the image used by sandbox container.
@@ -196,6 +205,7 @@ func DefaultConfig() PluginConfig {
 		},
 		StreamServerAddress: "127.0.0.1",
 		StreamServerPort:    "0",
+		StreamIdleTimeout:   streaming.DefaultConfig.StreamIdleTimeout.String(), // 4 hour
 		EnableSelinux:       false,
 		EnableTLSStreaming:  false,
 		X509KeyPairStreaming: X509KeyPairStreaming{
