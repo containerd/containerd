@@ -185,6 +185,8 @@ type task struct {
 	io  cio.IO
 	id  string
 	pid uint32
+
+	hasKillAll bool
 }
 
 // ID of the task
@@ -227,6 +229,9 @@ func (t *task) Kill(ctx context.Context, s syscall.Signal, opts ...KillOpts) err
 	})
 	if err != nil {
 		return errdefs.FromGRPC(err)
+	}
+	if i.All && s == syscall.SIGKILL && i.ExecID == "" {
+		t.hasKillAll = true
 	}
 	return nil
 }
@@ -304,6 +309,17 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 		fallthrough
 	default:
 		return nil, errors.Wrapf(errdefs.ErrFailedPrecondition, "task must be stopped before deletion: %s", status.Status)
+	}
+	if !t.hasKillAll {
+		response, err := t.client.TaskService().ListPids(ctx, &tasks.ListPidsRequest{
+			ContainerID: t.id,
+		})
+		if err != nil {
+			return nil, errdefs.FromGRPC(err)
+		}
+		if len(response.Processes) > 0 {
+			return nil, errors.Wrapf(errdefs.ErrChildProcessAlive, "child process must be stopped before init process deletion")
+		}
 	}
 	if t.io != nil {
 		t.io.Cancel()

@@ -43,6 +43,7 @@ var (
 	ErrFailedPrecondition = errors.New("failed precondition")
 	ErrUnavailable        = errors.New("unavailable")
 	ErrNotImplemented     = errors.New("not implemented") // represents not supported and unimplemented
+	ErrChildProcessAlive  = errors.New("container has alive child process")
 )
 
 // IsInvalidArgument returns true if the error is due to an invalid argument
