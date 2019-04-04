@@ -103,20 +103,16 @@ func (r dockerFetcher) open(ctx context.Context, u, mediatype string, offset int
 		// really distinguish between a 206 and a 200. In the case of 200, we
 		// can discard the bytes, hiding the seek behavior from the
 		// implementation.
-
 		defer resp.Body.Close()
+
 		if resp.StatusCode == http.StatusNotFound {
 			return nil, errors.Wrapf(errdefs.ErrNotFound, "content at %v not found", u)
 		}
-		body, err := ioutil.ReadAll(resp.Body)
-		if err == nil {
-			dockerErr := errcode.Errors{}
-			err := json.Unmarshal(body, &dockerErr)
-			if err == nil && dockerErr.Len() > 0 {
-				return nil, errors.Errorf("unexpected status code %v: %s - Server message: %s", u, resp.Status, dockerErr.Error())
-			}
+		var registryErr errcode.Errors
+		if err := json.NewDecoder(resp.Body).Decode(&registryErr); err != nil || registryErr.Len() < 1 {
+			return nil, errors.Errorf("unexpected status code %v: %v", u, resp.Status)
 		}
-		return nil, errors.Errorf("unexpected status code %v: %v", u, resp.Status)
+		return nil, errors.Errorf("unexpected status code %v: %s - Server message: %s", u, resp.Status, registryErr.Error())
 	}
 	if offset > 0 {
 		cr := resp.Header.Get("content-range")
