@@ -23,10 +23,42 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/docker/docker/pkg/ioutils"
+	"github.com/containerd/continuity"
 	"github.com/pkg/errors"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
+
+// The container state machine in the CRI plugin:
+//
+//                         +              +
+//                         |              |
+//                         | Create       | Load
+//                         |              |
+//                    +----v----+         |
+//                    |         |         |
+//                    | CREATED <---------+-----------+
+//                    |         |         |           |
+//                    +----+-----         |           |
+//                         |              |           |
+//                         | Start        |           |
+//                         |              |           |
+//                    +----v----+         |           |
+//   Exec    +--------+         |         |           |
+//  Attach   |        | RUNNING <---------+           |
+// LogReopen +-------->         |         |           |
+//                    +----+----+         |           |
+//                         |              |           |
+//                         | Stop/Exit    |           |
+//                         |              |           |
+//                    +----v----+         |           |
+//                    |         <---------+      +----v----+
+//                    |  EXITED |                |         |
+//                    |         <----------------+ UNKNOWN |
+//                    +----+----+       Stop     |         |
+//                         |                     +---------+
+//                         | Remove
+//                         v
+//                      DELETED
 
 // statusVersion is current version of container status.
 const statusVersion = "v1" // nolint
@@ -128,7 +160,7 @@ func StoreStatus(root, id string, status Status) (StatusStorage, error) {
 		return nil, errors.Wrap(err, "failed to encode status")
 	}
 	path := filepath.Join(root, "status")
-	if err := ioutils.AtomicWriteFile(path, data, 0600); err != nil {
+	if err := continuity.AtomicWriteFile(path, data, 0600); err != nil {
 		return nil, errors.Wrapf(err, "failed to checkpoint status to %q", path)
 	}
 	return &statusStorage{
@@ -177,7 +209,7 @@ func (s *statusStorage) UpdateSync(u UpdateFunc) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to encode status")
 	}
-	if err := ioutils.AtomicWriteFile(s.path, data, 0600); err != nil {
+	if err := continuity.AtomicWriteFile(s.path, data, 0600); err != nil {
 		return errors.Wrapf(err, "failed to checkpoint status to %q", s.path)
 	}
 	s.status = newStatus

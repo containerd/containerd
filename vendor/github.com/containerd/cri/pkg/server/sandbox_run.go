@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/oci"
 	cni "github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
+	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -55,6 +56,7 @@ func init() {
 // the sandbox is in ready state.
 func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandboxRequest) (_ *runtime.RunPodSandboxResponse, retErr error) {
 	config := r.GetConfig()
+	logrus.Debugf("Sandbox config %+v", config)
 
 	// Generate unique id and name for the sandbox and reserve the name.
 	id := util.GenerateID()
@@ -85,7 +87,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			RuntimeHandler: r.GetRuntimeHandler(),
 		},
 		sandboxstore.Status{
-			State: sandboxstore.StateUnknown,
+			State: sandboxstore.StateInit,
 		},
 	)
 
@@ -145,11 +147,11 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 
 	// Create sandbox container.
-	spec, err := c.generateSandboxContainerSpec(id, config, &image.ImageSpec.Config, sandbox.NetNSPath)
+	spec, err := c.generateSandboxContainerSpec(id, config, &image.ImageSpec.Config, sandbox.NetNSPath, ociRuntime.PodAnnotations)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate sandbox container spec")
 	}
-	logrus.Debugf("Sandbox container spec: %+v", spec)
+	logrus.Debugf("Sandbox container %q spec: %#+v", id, spew.NewFormatter(spec))
 
 	var specOpts []oci.SpecOpts
 	userstr, err := generateUserString(
@@ -233,7 +235,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 	}()
 
-	// Setup sandbox /dev/shm, /etc/hosts and /etc/resolv.conf.
+	// Setup sandbox /dev/shm, /etc/hosts, /etc/resolv.conf and /etc/hostname.
 	if err = c.setupSandboxFiles(id, config); err != nil {
 		return nil, errors.Wrapf(err, "failed to setup sandbox files")
 	}
@@ -258,7 +260,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, errors.Wrap(err, "failed to update sandbox created timestamp")
 	}
 
-	// Add sandbox into sandbox store in UNKNOWN state.
+	// Add sandbox into sandbox store in INIT state.
 	sandbox.Container = container
 	if err := c.sandboxStore.Add(sandbox); err != nil {
 		return nil, errors.Wrapf(err, "failed to add sandbox %+v into store", sandbox)
@@ -269,7 +271,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			c.sandboxStore.Delete(id)
 		}
 	}()
-	// NOTE(random-liu): Sandbox state only stay in UNKNOWN state after this point
+	// NOTE(random-liu): Sandbox state only stay in INIT state after this point
 	// and before the end of this function.
 	// * If `Update` succeeds, sandbox state will become READY in one transaction.
 	// * If `Update` fails, sandbox will be removed from the store in the defer above.
@@ -279,8 +281,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	//   * If the task is running, sandbox state will be READY,
 	//   * Or else, sandbox state will be NOTREADY.
 	//
-	// In any case, sandbox will leave UNKNOWN state, so it's safe to ignore sandbox
-	// in UNKNOWN state in other functions.
+	// In any case, sandbox will leave INIT state, so it's safe to ignore sandbox
+	// in INIT state in other functions.
 
 	// Start sandbox container in one transaction to avoid race condition with
 	// event monitor.
@@ -293,8 +295,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// see the sandbox disappear after the defer clean up, which may confuse
 		// them.
 		//
-		// Given so, we should keep the sandbox in UNKNOWN state if `Update` fails,
-		// and ignore sandbox in UNKNOWN state in all the inspection functions.
+		// Given so, we should keep the sandbox in INIT state if `Update` fails,
+		// and ignore sandbox in INIT state in all the inspection functions.
 
 		// Create sandbox task in containerd.
 		log.Tracef("Create sandbox container (id=%q, name=%q).",
@@ -338,70 +340,65 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 }
 
 func (c *criService) generateSandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig, nsPath string) (*runtimespec.Spec, error) {
+	imageConfig *imagespec.ImageConfig, nsPath string, runtimePodAnnotations []string) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
 	// TODO(random-liu): [P1] Compare the default settings with docker and containerd default.
-	spec, err := defaultRuntimeSpec(id)
-	if err != nil {
-		return nil, err
+	specOpts := []oci.SpecOpts{
+		customopts.WithoutRunMount,
+		customopts.WithoutDefaultSecuritySettings,
+		customopts.WithRelativeRoot(relativeRootfsPath),
+		oci.WithEnv(imageConfig.Env),
+		oci.WithRootFSReadonly(),
+		oci.WithHostname(config.GetHostname()),
 	}
-	g := newSpecGenerator(spec)
-
-	// Apply default config from image config.
-	if err := addImageEnvs(&g, imageConfig.Env); err != nil {
-		return nil, err
-	}
-
 	if imageConfig.WorkingDir != "" {
-		g.SetProcessCwd(imageConfig.WorkingDir)
+		specOpts = append(specOpts, oci.WithProcessCwd(imageConfig.WorkingDir))
 	}
 
 	if len(imageConfig.Entrypoint) == 0 && len(imageConfig.Cmd) == 0 {
 		// Pause image must have entrypoint or cmd.
 		return nil, errors.Errorf("invalid empty entrypoint and cmd in image config %+v", imageConfig)
 	}
-	// Set process commands.
-	g.SetProcessArgs(append(imageConfig.Entrypoint, imageConfig.Cmd...))
-
-	// Set relative root path.
-	g.SetRootPath(relativeRootfsPath)
-
-	// Make root of sandbox container read-only.
-	g.SetRootReadonly(true)
-
-	// Set hostname.
-	g.SetHostname(config.GetHostname())
+	specOpts = append(specOpts, oci.WithProcessArgs(append(imageConfig.Entrypoint, imageConfig.Cmd...)...))
 
 	// TODO(random-liu): [P2] Consider whether to add labels and annotations to the container.
 
 	// Set cgroups parent.
 	if c.config.DisableCgroup {
-		g.SetLinuxCgroupsPath("")
+		specOpts = append(specOpts, customopts.WithDisabledCgroups)
 	} else {
 		if config.GetLinux().GetCgroupParent() != "" {
 			cgroupsPath := getCgroupsPath(config.GetLinux().GetCgroupParent(), id,
 				c.config.SystemdCgroup)
-			g.SetLinuxCgroupsPath(cgroupsPath)
+			specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
 		}
 	}
+
 	// When cgroup parent is not set, containerd-shim will create container in a child cgroup
 	// of the cgroup itself is in.
 	// TODO(random-liu): [P2] Set default cgroup path if cgroup parent is not specified.
 
 	// Set namespace options.
-	securityContext := config.GetLinux().GetSecurityContext()
-	nsOptions := securityContext.GetNamespaceOptions()
+	var (
+		securityContext = config.GetLinux().GetSecurityContext()
+		nsOptions       = securityContext.GetNamespaceOptions()
+	)
 	if nsOptions.GetNetwork() == runtime.NamespaceMode_NODE {
-		g.RemoveLinuxNamespace(string(runtimespec.NetworkNamespace)) // nolint: errcheck
+		specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.NetworkNamespace))
+		specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.UTSNamespace))
 	} else {
 		//TODO(Abhi): May be move this to containerd spec opts (WithLinuxSpaceOption)
-		g.AddOrReplaceLinuxNamespace(string(runtimespec.NetworkNamespace), nsPath) // nolint: errcheck
+		specOpts = append(specOpts, oci.WithLinuxNamespace(
+			runtimespec.LinuxNamespace{
+				Type: runtimespec.NetworkNamespace,
+				Path: nsPath,
+			}))
 	}
 	if nsOptions.GetPid() == runtime.NamespaceMode_NODE {
-		g.RemoveLinuxNamespace(string(runtimespec.PIDNamespace)) // nolint: errcheck
+		specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.PIDNamespace))
 	}
 	if nsOptions.GetIpc() == runtime.NamespaceMode_NODE {
-		g.RemoveLinuxNamespace(string(runtimespec.IPCNamespace)) // nolint: errcheck
+		specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.IPCNamespace))
 	}
 
 	// It's fine to generate the spec before the sandbox /dev/shm
@@ -410,55 +407,68 @@ func (c *criService) generateSandboxContainerSpec(id string, config *runtime.Pod
 	if nsOptions.GetIpc() == runtime.NamespaceMode_NODE {
 		sandboxDevShm = devShm
 	}
-	g.AddMount(runtimespec.Mount{
-		Source:      sandboxDevShm,
-		Destination: devShm,
-		Type:        "bind",
-		Options:     []string{"rbind", "ro"},
-	})
+	specOpts = append(specOpts, oci.WithMounts([]runtimespec.Mount{
+		{
+			Source:      sandboxDevShm,
+			Destination: devShm,
+			Type:        "bind",
+			Options:     []string{"rbind", "ro"},
+		},
+	}))
 
 	selinuxOpt := securityContext.GetSelinuxOptions()
 	processLabel, mountLabel, err := initSelinuxOpts(selinuxOpt)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to init selinux options %+v", securityContext.GetSelinuxOptions())
 	}
-	g.SetProcessSelinuxLabel(processLabel)
-	g.SetLinuxMountLabel(mountLabel)
 
 	supplementalGroups := securityContext.GetSupplementalGroups()
-	for _, group := range supplementalGroups {
-		g.AddProcessAdditionalGid(uint32(group))
-	}
+	specOpts = append(specOpts,
+		customopts.WithSelinuxLabels(processLabel, mountLabel),
+		customopts.WithSupplementalGroups(supplementalGroups),
+	)
 
 	// Add sysctls
 	sysctls := config.GetLinux().GetSysctls()
-	for key, value := range sysctls {
-		g.AddLinuxSysctl(key, value)
-	}
+	specOpts = append(specOpts, customopts.WithSysctls(sysctls))
 
 	// Note: LinuxSandboxSecurityContext does not currently provide an apparmor profile
 
 	if !c.config.DisableCgroup {
-		g.SetLinuxResourcesCPUShares(uint64(defaultSandboxCPUshares))
+		specOpts = append(specOpts, customopts.WithDefaultSandboxShares)
 	}
-	adj := int(defaultSandboxOOMAdj)
-	if c.config.RestrictOOMScoreAdj {
-		adj, err = restrictOOMScoreAdj(adj)
-		if err != nil {
-			return nil, err
-		}
+	specOpts = append(specOpts, customopts.WithPodOOMScoreAdj(int(defaultSandboxOOMAdj), c.config.RestrictOOMScoreAdj))
+
+	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
+		runtimePodAnnotations) {
+		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
 	}
-	g.SetProcessOOMScoreAdj(adj)
 
-	g.AddAnnotation(annotations.ContainerType, annotations.ContainerTypeSandbox)
-	g.AddAnnotation(annotations.SandboxID, id)
+	specOpts = append(specOpts,
+		customopts.WithAnnotation(annotations.ContainerType, annotations.ContainerTypeSandbox),
+		customopts.WithAnnotation(annotations.SandboxID, id),
+		customopts.WithAnnotation(annotations.SandboxLogDir, config.GetLogDirectory()),
+	)
 
-	return g.Config, nil
+	return runtimeSpec(id, specOpts...)
 }
 
-// setupSandboxFiles sets up necessary sandbox files including /dev/shm, /etc/hosts
-// and /etc/resolv.conf.
+// setupSandboxFiles sets up necessary sandbox files including /dev/shm, /etc/hosts,
+// /etc/resolv.conf and /etc/hostname.
 func (c *criService) setupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
+	sandboxEtcHostname := c.getSandboxHostname(id)
+	hostname := config.GetHostname()
+	if hostname == "" {
+		var err error
+		hostname, err = c.os.Hostname()
+		if err != nil {
+			return errors.Wrap(err, "failed to get hostname")
+		}
+	}
+	if err := c.os.WriteFile(sandboxEtcHostname, []byte(hostname+"\n"), 0644); err != nil {
+		return errors.Wrapf(err, "failed to write hostname to %q", sandboxEtcHostname)
+	}
+
 	// TODO(random-liu): Consider whether we should maintain /etc/hosts and /etc/resolv.conf in kubelet.
 	sandboxEtcHosts := c.getSandboxHosts(id)
 	if err := c.os.CopyFile(etcHosts, sandboxEtcHosts, 0644); err != nil {
