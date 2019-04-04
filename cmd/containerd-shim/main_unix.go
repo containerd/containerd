@@ -59,6 +59,12 @@ var (
 	criuFlag             string
 	systemdCgroupFlag    bool
 	containerdBinaryFlag string
+
+	bufPool = sync.Pool{
+		New: func() interface{} {
+			return bytes.NewBuffer(nil)
+		},
+	}
 )
 
 func init() {
@@ -275,16 +281,20 @@ func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event
 	}
 	cmd := exec.CommandContext(ctx, containerdBinaryFlag, "--address", l.address, "publish", "--topic", topic, "--namespace", ns)
 	cmd.Stdin = bytes.NewReader(data)
+	b := bufPool.Get().(*bytes.Buffer)
+	defer bufPool.Put(b)
+	cmd.Stdout = b
+	cmd.Stderr = b
 	c, err := shim.Default.Start(cmd)
 	if err != nil {
 		return err
 	}
 	status, err := shim.Default.Wait(cmd, c)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to publish event: %s", b.String())
 	}
 	if status != 0 {
-		return errors.New("failed to publish event")
+		return errors.Errorf("failed to publish event: %s", b.String())
 	}
 	return nil
 }
