@@ -18,6 +18,7 @@ package docker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -28,6 +29,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
+	"github.com/docker/distribution/registry/api/errcode"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -102,9 +104,17 @@ func (r dockerFetcher) open(ctx context.Context, u, mediatype string, offset int
 		// can discard the bytes, hiding the seek behavior from the
 		// implementation.
 
-		resp.Body.Close()
+		defer resp.Body.Close()
 		if resp.StatusCode == http.StatusNotFound {
 			return nil, errors.Wrapf(errdefs.ErrNotFound, "content at %v not found", u)
+		}
+		body, err := ioutil.ReadAll(resp.Body)
+		if err == nil {
+			dockerErr := errcode.Errors{}
+			err := json.Unmarshal(body, &dockerErr)
+			if err == nil && dockerErr.Len() > 0 {
+				return nil, errors.Errorf("unexpected status code %v: %s - Server message: %s", u, resp.Status, dockerErr.Error())
+			}
 		}
 		return nil, errors.Errorf("unexpected status code %v: %v", u, resp.Status)
 	}
