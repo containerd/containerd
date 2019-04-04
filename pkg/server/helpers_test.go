@@ -215,7 +215,9 @@ systemd_cgroup = true
 [containerd.default_runtime]
   runtime_type = "` + linuxRuntime + `"
 [containerd.runtimes.runc]
-  runtime_type = "` + runcRuntime + `"
+  runtime_type = "` + runcRuntimeV1 + `"
+[containerd.runtimes.runcv2]
+  runtime_type = "` + runcRuntimeV2 + `"
 `
 	nonNilOpts := `
 systemd_cgroup = true
@@ -227,10 +229,16 @@ systemd_cgroup = true
   Runtime = "default"
   RuntimeRoot = "/default"
 [containerd.runtimes.runc]
-  runtime_type = "` + runcRuntime + `"
+  runtime_type = "` + runcRuntimeV1 + `"
 [containerd.runtimes.runc.options]
   BinaryName = "runc"
   Root = "/runc"
+  NoNewKeyring = true
+[containerd.runtimes.runcv2]
+  runtime_type = "` + runcRuntimeV2 + `"
+[containerd.runtimes.runcv2.options]
+  BinaryName = "runc"
+  Root = "/runcv2"
   NoNewKeyring = true
 `
 	var nilOptsConfig, nonNilOptsConfig criconfig.Config
@@ -238,16 +246,21 @@ systemd_cgroup = true
 	require.NoError(t, err)
 	_, err = toml.Decode(nonNilOpts, &nonNilOptsConfig)
 	require.NoError(t, err)
-	require.Len(t, nilOptsConfig.Runtimes, 1)
-	require.Len(t, nonNilOptsConfig.Runtimes, 1)
+	require.Len(t, nilOptsConfig.Runtimes, 2)
+	require.Len(t, nonNilOptsConfig.Runtimes, 2)
 
 	for desc, test := range map[string]struct {
 		r               criconfig.Runtime
 		c               criconfig.Config
 		expectedOptions interface{}
 	}{
-		"when options is nil, should return nil option for non legacy runtime": {
+		"when options is nil, should return nil option for io.containerd.runc.v1": {
 			r:               nilOptsConfig.Runtimes["runc"],
+			c:               nilOptsConfig,
+			expectedOptions: nil,
+		},
+		"when options is nil, should return nil option for io.containerd.runc.v2": {
+			r:               nilOptsConfig.Runtimes["runcv2"],
 			c:               nilOptsConfig,
 			expectedOptions: nil,
 		},
@@ -264,6 +277,15 @@ systemd_cgroup = true
 			expectedOptions: &runcoptions.Options{
 				BinaryName:   "runc",
 				Root:         "/runc",
+				NoNewKeyring: true,
+			},
+		},
+		"when options is not nil, should be able to decode for io.containerd.runc.v2": {
+			r: nonNilOptsConfig.Runtimes["runcv2"],
+			c: nonNilOptsConfig,
+			expectedOptions: &runcoptions.Options{
+				BinaryName:   "runc",
+				Root:         "/runcv2",
 				NoNewKeyring: true,
 			},
 		},
