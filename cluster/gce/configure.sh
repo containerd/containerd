@@ -164,10 +164,6 @@ disabled_plugins = ["restart"]
 [debug]
   level = "${log_level}"
 
-[plugins.linux]
-  shim = "${CONTAINERD_HOME}/usr/local/bin/containerd-shim"
-  runtime = "${CONTAINERD_HOME}/usr/local/sbin/runc"
-
 [plugins.cri]
   stream_server_address = "127.0.0.1"
   stream_server_port = "0"
@@ -178,6 +174,10 @@ disabled_plugins = ["restart"]
   conf_template = "${cni_template_path}"
 [plugins.cri.registry.mirrors."docker.io"]
   endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
+[plugins.cri.containerd.default_runtime]
+  runtime_type = "io.containerd.runc.v2"
+[plugins.cri.containerd.default_runtime.options]
+  BinaryName = "${CONTAINERD_HOME}/usr/local/sbin/runc"
 EOF
 chmod 644 "${config_path}"
 
