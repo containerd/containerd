@@ -304,12 +304,10 @@ func (p *Init) delete(ctx context.Context) error {
 		}
 		p.io.Close()
 	}
-	if p.Rootfs != "" {
-		if err2 := mount.UnmountAll(p.Rootfs, 0); err2 != nil {
-			log.G(ctx).WithError(err2).Warn("failed to cleanup rootfs mount")
-			if err == nil {
-				err = errors.Wrap(err2, "failed rootfs umount")
-			}
+	if err2 := mount.UnmountAll(p.Rootfs, 0); err2 != nil {
+		log.G(ctx).WithError(err2).Warn("failed to cleanup rootfs mount")
+		if err == nil {
+			err = errors.Wrap(err2, "failed rootfs umount")
 		}
 	}
 	return err

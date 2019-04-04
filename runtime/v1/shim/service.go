@@ -124,6 +124,14 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (_ *
 		})
 	}
 
+	rootfs := ""
+	if len(mounts) > 0 {
+		rootfs = filepath.Join(r.Bundle, "rootfs")
+		if err := os.Mkdir(rootfs, 0711); err != nil {
+			return nil, err
+		}
+	}
+
 	config := &proc.CreateConfig{
 		ID:               r.ID,
 		Bundle:           r.Bundle,
@@ -137,14 +145,13 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (_ *
 		ParentCheckpoint: r.ParentCheckpoint,
 		Options:          r.Options,
 	}
-	rootfs := filepath.Join(r.Bundle, "rootfs")
-	defer func(rootfs string) {
+	defer func() {
 		if err != nil {
 			if err2 := mount.UnmountAll(rootfs, 0); err2 != nil {
 				log.G(ctx).WithError(err2).Warn("Failed to cleanup rootfs mount")
 			}
 		}
-	}(rootfs)
+	}()
 	for _, rm := range mounts {
 		m := &mount.Mount{
 			Type:    rm.Type,
@@ -158,10 +165,6 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (_ *
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	if len(mounts) == 0 {
-		rootfs = ""
-	}
 
 	process, err := newInit(
 		ctx,

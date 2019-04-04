@@ -112,6 +112,9 @@ func unmount(target string, flags int) error {
 // are no mounts remaining (EINVAL is returned by mount), which is
 // useful for undoing a stack of mounts on the same mount point.
 func UnmountAll(mount string, flags int) error {
+	if _, err := os.Stat(mount); err != nil {
+		return nil
+	}
 	for {
 		if err := unmount(mount, flags); err != nil {
 			// EINVAL is returned if the target is not a
