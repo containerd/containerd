@@ -37,7 +37,6 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
-	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -396,7 +395,12 @@ func initSelinuxOpts(selinuxOpt *runtime.SELinuxOption) (string, string, error) 
 		selinuxOpt.GetRole(),
 		selinuxOpt.GetType(),
 		selinuxOpt.GetLevel())
-	return label.InitLabels(selinux.DupSecOpt(labelOpts))
+
+	options, err := label.DupSecOpt(labelOpts)
+	if err != nil {
+		return "", "", err
+	}
+	return label.InitLabels(options)
 }
 
 func checkSelinuxLevel(level string) (bool, error) {
