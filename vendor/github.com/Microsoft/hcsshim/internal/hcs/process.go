@@ -7,7 +7,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Microsoft/hcsshim/internal/guestrequest"
 	"github.com/Microsoft/hcsshim/internal/interop"
 	"github.com/Microsoft/hcsshim/internal/logfields"
 	"github.com/sirupsen/logrus"
@@ -24,8 +23,9 @@ type Process struct {
 
 	logctx logrus.Fields
 
-	waitBlock chan struct{}
-	waitError error
+	closedWaitOnce sync.Once
+	waitBlock      chan struct{}
+	waitError      error
 }
 
 func newProcess(process hcsProcess, processID int, computeSystem *System) *Process {
@@ -111,7 +111,11 @@ func (process *Process) logOperationEnd(operation string, err error) {
 }
 
 // Signal signals the process with `options`.
-func (process *Process) Signal(options guestrequest.SignalProcessOptions) (err error) {
+//
+// For LCOW `guestrequest.SignalProcessOptionsLCOW`.
+//
+// For WCOW `guestrequest.SignalProcessOptionsWCOW`.
+func (process *Process) Signal(options interface{}) (err error) {
 	process.handleLock.RLock()
 	defer process.handleLock.RUnlock()
 
@@ -174,7 +178,9 @@ func (process *Process) Kill() (err error) {
 // `WaitTimeout` are safe to call multiple times.
 func (process *Process) waitBackground() {
 	process.waitError = waitForNotification(process.callbackNumber, hcsNotificationProcessExited, nil)
-	close(process.waitBlock)
+	process.closedWaitOnce.Do(func() {
+		close(process.waitBlock)
+	})
 }
 
 // Wait waits for the process to exit. If the process has already exited returns
@@ -420,13 +426,18 @@ func (process *Process) Close() (err error) {
 	}
 
 	process.handle = 0
+	process.closedWaitOnce.Do(func() {
+		close(process.waitBlock)
+	})
 
 	return nil
 }
 
 func (process *Process) registerCallback() error {
 	context := &notifcationWatcherContext{
-		channels: newChannels(),
+		channels:  newProcessChannels(),
+		systemID:  process.SystemID(),
+		processID: process.processID,
 	}
 
 	callbackMapLock.Lock()

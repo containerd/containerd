@@ -44,8 +44,9 @@ type System struct {
 
 	logctx logrus.Fields
 
-	waitBlock chan struct{}
-	waitError error
+	closedWaitOnce sync.Once
+	waitBlock      chan struct{}
+	waitError      error
 }
 
 func newSystem(id string) *System {
@@ -287,7 +288,7 @@ func (computeSystem *System) Shutdown() (err error) {
 	operation := "hcsshim::ComputeSystem::Shutdown"
 	computeSystem.logOperationBegin(operation)
 	defer func() {
-		if IsAlreadyStopped(err) || IsPending(err) {
+		if IsAlreadyClosed(err) || IsAlreadyStopped(err) || IsPending(err) {
 			computeSystem.logOperationEnd(operation, nil)
 		} else {
 			computeSystem.logOperationEnd(operation, err)
@@ -319,7 +320,7 @@ func (computeSystem *System) Terminate() (err error) {
 	operation := "hcsshim::ComputeSystem::Terminate"
 	computeSystem.logOperationBegin(operation)
 	defer func() {
-		if IsPending(err) {
+		if IsAlreadyClosed(err) || IsAlreadyStopped(err) || IsPending(err) {
 			computeSystem.logOperationEnd(operation, nil)
 		} else {
 			computeSystem.logOperationEnd(operation, err)
@@ -350,7 +351,9 @@ func (computeSystem *System) Terminate() (err error) {
 // `WaitExpectedError`, and `WaitTimeout` are safe to call multiple times.
 func (computeSystem *System) waitBackground() {
 	computeSystem.waitError = waitForNotification(computeSystem.callbackNumber, hcsNotificationSystemExited, nil)
-	close(computeSystem.waitBlock)
+	computeSystem.closedWaitOnce.Do(func() {
+		close(computeSystem.waitBlock)
+	})
 }
 
 // Wait synchronously waits for the compute system to shutdown or terminate. If
@@ -411,18 +414,19 @@ func (computeSystem *System) Properties(types ...schema1.PropertyType) (_ *schem
 	computeSystem.logOperationBegin(operation)
 	defer func() { computeSystem.logOperationEnd(operation, err) }()
 
-	queryj, err := json.Marshal(schema1.PropertyQuery{types})
+	queryBytes, err := json.Marshal(schema1.PropertyQuery{PropertyTypes: types})
 	if err != nil {
 		return nil, makeSystemError(computeSystem, "Properties", "", err, nil)
 	}
 
+	queryString := string(queryBytes)
 	logrus.WithFields(computeSystem.logctx).
-		WithField(logfields.JSON, queryj).
+		WithField(logfields.JSON, queryString).
 		Debug("HCS ComputeSystem Properties Query")
 
 	var resultp, propertiesp *uint16
 	syscallWatcher(computeSystem.logctx, func() {
-		err = hcsGetComputeSystemProperties(computeSystem.handle, string(queryj), &propertiesp, &resultp)
+		err = hcsGetComputeSystemProperties(computeSystem.handle, string(queryString), &propertiesp, &resultp)
 	})
 	events := processHcsResult(resultp)
 	if err != nil {
@@ -613,13 +617,17 @@ func (computeSystem *System) Close() (err error) {
 	}
 
 	computeSystem.handle = 0
+	computeSystem.closedWaitOnce.Do(func() {
+		close(computeSystem.waitBlock)
+	})
 
 	return nil
 }
 
 func (computeSystem *System) registerCallback() error {
 	context := &notifcationWatcherContext{
-		channels: newChannels(),
+		channels: newSystemChannels(),
+		systemID: computeSystem.id,
 	}
 
 	callbackMapLock.Lock()
