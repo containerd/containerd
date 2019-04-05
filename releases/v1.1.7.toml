@@ -1,0 +1,42 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.1.6"
+
+pre_release = false
+
+preface = """\
+This is the seventh patch release for the `containerd` 1.1 release. This
+release contains fixes for image management, containerd client, CRI plugin
+and containerd io handling.
+
+It also updates runc to include an improved fix for [CVE-2019-5736](https://nvd.nist.gov/vuln/detail/CVE-2019-5736)
+to reduce the increased memory-consumption introduced by the original
+patch, updates CNI to v0.7.5 to include the fix for [CVE-2019-9946](https://nvd.nist.gov/vuln/detail/CVE-2019-9946),
+adds 2 new syscalls in the default seccomp profile.
+
+All these changes are noted below.
+## Notable Updates
+* Fix an issue that non-existent parent directory in image layers is created with permission `0700`. [#3017](https://github.com/containerd/containerd/issues/3017)
+* Fix an issue that snapshots of the base image can be deleted by mistake, when images built on top of it are deleted. [#3088](https://github.com/containerd/containerd/pull/3088)
+* Allow overriding package name in `containerd --version` output. [#3097](https://github.com/containerd/containerd/pull/3097)
+* Add 2 new syscalls `io_pgetevents` and `statx` in the default seccomp whitelist. [#3112](https://github.com/containerd/containerd/pull/3112) [#3114](https://github.com/containerd/containerd/pull/3114)
+* Fix a bug that container output can be incomplete when stdout and stderr are pointed to the same file. [#3156](https://github.com/containerd/containerd/issues/3156)
+* cri: fix a bug that pod can't get started when the same volume is defined differently in the image and the pod spec. [cri#1059](https://github.com/containerd/cri/issues/1059)
+* cri: fix a bug that causes container start failure after in-place upgrade containerd to 1.2.4+ or 1.1.6+. [cri#1082](https://github.com/containerd/cri/issues/1082)
+* cri: fix a bug that containers being gracefully stopped are SIGKILLed when kubelet is restarted. [cri#1098](https://github.com/containerd/cri/issues/1098)
+* cri: Fix a bug that pod UTS namespace is used for host network. [cri#1111](https://github.com/containerd/cri/pull/1111)
+* cri: Update CNI plugins to v0.7.5 for [CVE-2019-9946](https://nvd.nist.gov/vuln/detail/CVE-2019-9946)
+* Update cri to f8171b4530bed8992973cc4a2f24efe53b821d53. [3175](https://github.com/containerd/containerd/pull/3175)
+* Update runc to v1.0.0-rc7-6-g029124da [#3184](https://github.com/containerd/containerd/pull/3184) to include the improved fix for CVE-2019-5736, and fix a potential container start failure on non-SELinux system [runc#2030](https://github.com/opencontainers/runc/issues/2030).
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
