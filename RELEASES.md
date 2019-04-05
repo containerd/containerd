@@ -78,13 +78,16 @@ by `<major>.<minor>`. Releases branches will be in one of several states:
 
 - __*Next*__: The next planned release branch.
 - __*Active*__: The release is currently supported and accepting patches.
+- __*Extended*__: The release is only accepting security patches.
 - __*End of Life*__: The release branch is no longer supported and no new patches will be accepted.
 
 Releases will be supported up to one year after a _minor_ release. This means that
 we will accept bug reports and backports to release branches until the end of
 life date. If no new _minor_ release has been made, that release will be
-considered supported until the next _minor_ is released or one year, whichever
-is longer.
+considered supported until 6 months after the next _minor_ is released or one year,
+whichever is longer. Additionally, releases may have an extended security support
+period after the end of the active period to accept security backports. This
+timeframe will be decided by maintainers before the end of the active status.
 
 The current state is available in the following table:
 
@@ -94,9 +97,9 @@ The current state is available in the following table:
 | [0.1](https://github.com/containerd/containerd/releases/tag/v0.1.0) | End of Life | Mar 21, 2016 | - |
 | [0.2](https://github.com/containerd/containerd/tree/v0.2.x)         | End of Life | Apr 21, 2016      | December 5, 2017 |
 | [1.0](https://github.com/containerd/containerd/releases/tag/v1.0.3) | End of Life | December 5, 2017  | December 5, 2018 |
-| [1.1](https://github.com/containerd/containerd/releases/tag/v1.1.6) | Active   | April 23, 2018  | max(April 23, 2019, Kubernetes 1.10 EOL) |
-| [1.2](https://github.com/containerd/containerd/releases/tag/v1.2.4) | Active   | October 24, 2018 | max(October 24, 2019, release of 1.3.0) |
-| [1.3](https://github.com/containerd/containerd/milestone/20)        | Next   | TBD  | max(TBD+1 year, release of 1.4.0) |
+| [1.1](https://github.com/containerd/containerd/releases/tag/v1.1.7) | Active   | April 23, 2018  | July 23, 2019 (Active), October 23, 2019 (Extended) |
+| [1.2](https://github.com/containerd/containerd/releases/tag/v1.2.6) | Active   | October 24, 2018 | max(October 24, 2019, release of 1.3.0 + 6 months) |
+| [1.3](https://github.com/containerd/containerd/milestone/20)        | Next   | TBD  | max(TBD+1 year, release of 1.4.0 + 6 months) |
 
 Note that branches and release from before 1.0 may not follow these rules.
 
