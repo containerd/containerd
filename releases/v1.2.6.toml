@@ -1,0 +1,39 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.2.5"
+
+pre_release = false
+
+preface = """\
+The sixth patch release for `containerd` 1.2 contains fixes
+for the containerd client, the CRI plugin and containerd io
+and mount handling.
+
+It whitelists 2 new syscalls in the default seccomp profile,
+and also updates CNI to v0.7.5 to include the fix for [CVE-2019-9946](https://nvd.nist.gov/vuln/detail/CVE-2019-9946).
+
+All these changes are noted below.
+### Notable Updates
+* Allow overriding package name in `containerd --version` output. [#3098](https://github.com/containerd/containerd/pull/3098)
+* Add 2 new syscalls `io_pgetevents` and `statx` in the default seccomp whitelist. [#3113](https://github.com/containerd/containerd/pull/3113) [#3115](https://github.com/containerd/containerd/pull/3115)
+* Fix a bug that custom containerd cgroup path does not work in containerd 1.2.5. [#3143](https://github.com/containerd/containerd/pull/3143)
+* Fix a bug in the containerd client that `WithAllCapabilities` applies incomplete capability list. [#3147](https://github.com/containerd/containerd/pull/3147)
+* Fix a bug that container output can be incomplete when stdout and stderr are pointed to the same file. [#3118](https://github.com/containerd/containerd/issues/3118)
+* Fix a bug that containerd can't properly handle space in mount point path. [3161](https://github.com/containerd/containerd/pull/3161)
+* cri: fix a bug that containers being gracefully stopped are SIGKILLed when kubelet is restarted. [cri#1098](https://github.com/containerd/cri/issues/1098)
+* cri: Fix a bug that pod UTS namespace is used for host network. [cri#1111](https://github.com/containerd/cri/pull/1111)
+* cri: Update CNI plugins to v0.7.5 for [CVE-2019-9946](https://nvd.nist.gov/vuln/detail/CVE-2019-9946).
+* Update cri to eb926cd79d3bac188dcc4ed7694fc9298f8831be. [#3174](https://github.com/containerd/containerd/pull/3174)
+* Update runc to v1.0.0-rc7-6-g029124da [#3183](https://github.com/containerd/containerd/pull/3183) to fix potential container start failure on non-SELinux system. [runc#2030](https://github.com/opencontainers/runc/issues/2030)
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
