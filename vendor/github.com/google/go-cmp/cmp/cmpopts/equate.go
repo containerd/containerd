@@ -17,7 +17,7 @@ func equateAlways(_, _ interface{}) bool { return true }
 // EquateEmpty returns a Comparer option that determines all maps and slices
 // with a length of zero to be equal, regardless of whether they are nil.
 //
-// EquateEmpty can be used in conjuction with SortSlices and SortMaps.
+// EquateEmpty can be used in conjunction with SortSlices and SortMaps.
 func EquateEmpty() cmp.Option {
 	return cmp.FilterValues(isEmpty, cmp.Comparer(equateAlways))
 }
@@ -42,7 +42,7 @@ func isEmpty(x, y interface{}) bool {
 // The mathematical expression used is equivalent to:
 //	|x-y| ≤ max(fraction*min(|x|, |y|), margin)
 //
-// EquateApprox can be used in conjuction with EquateNaNs.
+// EquateApprox can be used in conjunction with EquateNaNs.
 func EquateApprox(fraction, margin float64) cmp.Option {
 	if margin < 0 || fraction < 0 || math.IsNaN(margin) || math.IsNaN(fraction) {
 		panic("margin or fraction must be a non-negative number")
@@ -73,7 +73,7 @@ func (a approximator) compareF32(x, y float32) bool {
 // EquateNaNs returns a Comparer option that determines float32 and float64
 // NaN values to be equal.
 //
-// EquateNaNs can be used in conjuction with EquateApprox.
+// EquateNaNs can be used in conjunction with EquateApprox.
 func EquateNaNs() cmp.Option {
 	return cmp.Options{
 		cmp.FilterValues(areNaNsF64s, cmp.Comparer(equateAlways)),

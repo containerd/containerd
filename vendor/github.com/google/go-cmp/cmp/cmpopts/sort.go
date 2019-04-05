@@ -24,7 +24,7 @@ import (
 // The less function does not have to be "total". That is, if !less(x, y) and
 // !less(y, x) for two elements x and y, their relative order is maintained.
 //
-// SortSlices can be used in conjuction with EquateEmpty.
+// SortSlices can be used in conjunction with EquateEmpty.
 func SortSlices(less interface{}) cmp.Option {
 	vf := reflect.ValueOf(less)
 	if !function.IsType(vf.Type(), function.Less) || vf.IsNil() {
@@ -95,7 +95,7 @@ func (ss sliceSorter) less(v reflect.Value, i, j int) bool {
 //	• Transitive: if !less(x, y) and !less(y, z), then !less(x, z)
 //	• Total: if x != y, then either less(x, y) or less(y, x)
 //
-// SortMaps can be used in conjuction with EquateEmpty.
+// SortMaps can be used in conjunction with EquateEmpty.
 func SortMaps(less interface{}) cmp.Option {
 	vf := reflect.ValueOf(less)
 	if !function.IsType(vf.Type(), function.Less) || vf.IsNil() {
