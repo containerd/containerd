@@ -122,8 +122,10 @@ const (
 const (
 	// linuxRuntime is the legacy linux runtime for shim v1.
 	linuxRuntime = "io.containerd.runtime.v1.linux"
-	// runcRuntime is the runc runtime for shim v2.
-	runcRuntime = "io.containerd.runc.v1"
+	// runcRuntimeV1 is the runc v1 runtime for shim v2.
+	runcRuntimeV1 = "io.containerd.runc.v1"
+	// runcRuntimeV2 is the runc v2 runtime for shim v2.
+	runcRuntimeV2 = "io.containerd.runc.v2"
 )
 
 // makeSandboxName generates sandbox name from sandbox metadata. The name
@@ -427,7 +429,9 @@ func generateRuntimeOptions(r criconfig.Runtime, c criconfig.Config) (interface{
 // getRuntimeOptionsType gets empty runtime options by the runtime type name.
 func getRuntimeOptionsType(t string) interface{} {
 	switch t {
-	case runcRuntime:
+	case runcRuntimeV1:
+		fallthrough
+	case runcRuntimeV2:
 		return &runcoptions.Options{}
 	case linuxRuntime:
 		return &runctypes.RuncOptions{}
