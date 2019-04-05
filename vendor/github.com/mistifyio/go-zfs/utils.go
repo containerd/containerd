@@ -48,7 +48,7 @@ func (c *command) Run(arg ...string) ([][]string, error) {
 	if err != nil {
 		return nil, &Error{
 			Err:    err,
-			Debug:  strings.Join([]string{cmd.Path, joinedArgs}, " "),
+			Debug:  strings.Join([]string{cmd.Path, joinedArgs[1:]}, " "),
 			Stderr: stderr.String(),
 		}
 	}
