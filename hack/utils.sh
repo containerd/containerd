@@ -81,7 +81,7 @@ from-vendor() {
                   BEGIN { rc=1 }                        # Assume we did not find what we were looking for.
                   // {
                      if ($1 == REPO) {
-                        if ($3 != "") { gsub(/http.*\/\//, "", $3); REPO = $3 };    # Override repo.
+                        if ($3 != "" && $3 !~ /#.*/ ) { gsub(/http.*\/\//, "", $3); REPO = $3 };    # Override repo.
                         printf("%s_VERSION=%s; %s_REPO=%s\n", WHAT, $2, WHAT, REPO);
                         rc=0;                           # Note success for use in END block.
                         exit                            # No point looking further.
