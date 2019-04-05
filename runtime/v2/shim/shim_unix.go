@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/containerd/containerd/events"
@@ -36,6 +37,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
+
+var bufPool = sync.Pool{
+	New: func() interface{} {
+		return bytes.NewBuffer(nil)
+	},
+}
 
 // setupSignals creates a new signal handler for all signals and sets the shim as a
 // sub-reaper so that the container processes are reparented
@@ -106,12 +113,16 @@ func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event
 	}
 	cmd := exec.CommandContext(ctx, l.containerdBinaryPath, "--address", l.address, "publish", "--topic", topic, "--namespace", ns)
 	cmd.Stdin = bytes.NewReader(data)
+	b := bufPool.Get().(*bytes.Buffer)
+	defer bufPool.Put(b)
+	cmd.Stdout = b
+	cmd.Stderr = b
 	if l.noReaper {
 		if err := cmd.Start(); err != nil {
 			return err
 		}
 		if err := cmd.Wait(); err != nil {
-			return errors.Wrap(err, "failed to publish event")
+			return errors.Wrapf(err, "failed to publish event: %s", b.String())
 		}
 		return nil
 	}
@@ -121,10 +132,10 @@ func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event
 	}
 	status, err := Default.Wait(cmd, c)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to publish event: %s", b.String())
 	}
 	if status != 0 {
-		return errors.New("failed to publish event")
+		return errors.Errorf("failed to publish event: %s", b.String())
 	}
 	return nil
 }
