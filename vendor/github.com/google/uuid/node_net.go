@@ -26,10 +26,7 @@ func getHardwareInterface(name string) (string, []byte) {
 	}
 	for _, ifs := range interfaces {
 		if len(ifs.HardwareAddr) >= 6 && (name == "" || name == ifs.Name) {
-			if setNodeID(ifs.HardwareAddr) {
-				ifname = ifs.Name
-				return ifname, nodeID
-			}
+			return ifs.Name, ifs.HardwareAddr
 		}
 	}
 	return "", nil
