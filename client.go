@@ -102,7 +102,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 			grpc.WithInsecure(),
 			grpc.FailOnNonTempDialError(true),
 			grpc.WithBackoffMaxDelay(3 * time.Second),
-			grpc.WithDialer(dialer.Dialer),
+			grpc.WithContextDialer(dialer.ContextDialer),
 
 			// TODO(stevvooe): We may need to allow configuration of this on the client.
 			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(defaults.DefaultMaxRecvMsgSize)),
@@ -225,7 +225,7 @@ func (c *Client) IsServing(ctx context.Context) (bool, error) {
 		return false, errors.New("no grpc connection available")
 	}
 	c.connMu.Unlock()
-	r, err := c.HealthService().Check(ctx, &grpc_health_v1.HealthCheckRequest{}, grpc.FailFast(false))
+	r, err := c.HealthService().Check(ctx, &grpc_health_v1.HealthCheckRequest{}, grpc.WaitForReady(true))
 	if err != nil {
 		return false, err
 	}
