@@ -44,6 +44,7 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	ssproxy "github.com/containerd/containerd/snapshots/proxy"
 	"github.com/containerd/containerd/sys"
+	"github.com/containerd/ttrpc"
 	metrics "github.com/docker/go-metrics"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/pkg/errors"
@@ -91,13 +92,19 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 	if config.GRPC.MaxSendMsgSize > 0 {
 		serverOpts = append(serverOpts, grpc.MaxSendMsgSize(config.GRPC.MaxSendMsgSize))
 	}
-	rpc := grpc.NewServer(serverOpts...)
+	ttrpcServer, err := newTTRPCServer()
+	if err != nil {
+		return nil, err
+	}
+	grpcServer := grpc.NewServer(serverOpts...)
 	var (
-		services []plugin.Service
-		s        = &Server{
-			rpc:    rpc,
-			events: exchange.NewExchange(),
-			config: config,
+		grpcServices  []plugin.Service
+		ttrpcServices []plugin.TTRPCService
+		s             = &Server{
+			grpcServer:  grpcServer,
+			ttrpcServer: ttrpcServer,
+			events:      exchange.NewExchange(),
+			config:      config,
 		}
 		initialized = plugin.NewPluginSet()
 	)
@@ -138,14 +145,22 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			continue
 		}
 		// check for grpc services that should be registered with the server
-		if service, ok := instance.(plugin.Service); ok {
-			services = append(services, service)
+		if src, ok := instance.(plugin.Service); ok {
+			grpcServices = append(grpcServices, src)
+		}
+		if src, ok := instance.(plugin.TTRPCService); ok {
+			ttrpcServices = append(ttrpcServices, src)
 		}
 		s.plugins = append(s.plugins, result)
 	}
 	// register services after all plugins have been initialized
-	for _, service := range services {
-		if err := service.Register(rpc); err != nil {
+	for _, service := range grpcServices {
+		if err := service.Register(grpcServer); err != nil {
+			return nil, err
+		}
+	}
+	for _, service := range ttrpcServices {
+		if err := service.RegisterTTRPC(ttrpcServer); err != nil {
 			return nil, err
 		}
 	}
@@ -154,10 +169,11 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 
 // Server is the containerd main daemon
 type Server struct {
-	rpc     *grpc.Server
-	events  *exchange.Exchange
-	config  *srvconfig.Config
-	plugins []*plugin.Plugin
+	grpcServer  *grpc.Server
+	ttrpcServer *ttrpc.Server
+	events      *exchange.Exchange
+	config      *srvconfig.Config
+	plugins     []*plugin.Plugin
 }
 
 // ServeGRPC provides the containerd grpc APIs on the provided listener
@@ -169,8 +185,13 @@ func (s *Server) ServeGRPC(l net.Listener) error {
 	// before we start serving the grpc API register the grpc_prometheus metrics
 	// handler.  This needs to be the last service registered so that it can collect
 	// metrics for every other service
-	grpc_prometheus.Register(s.rpc)
-	return trapClosedConnErr(s.rpc.Serve(l))
+	grpc_prometheus.Register(s.grpcServer)
+	return trapClosedConnErr(s.grpcServer.Serve(l))
+}
+
+// ServeTTRPC provides the containerd ttrpc APIs on the provided listener
+func (s *Server) ServeTTRPC(l net.Listener) error {
+	return trapClosedConnErr(s.ttrpcServer.Serve(context.Background(), l))
 }
 
 // ServeMetrics provides a prometheus endpoint for exposing metrics
@@ -196,7 +217,7 @@ func (s *Server) ServeDebug(l net.Listener) error {
 
 // Stop the containerd server canceling any open connections
 func (s *Server) Stop() {
-	s.rpc.Stop()
+	s.grpcServer.Stop()
 	for i := len(s.plugins) - 1; i >= 0; i-- {
 		p := s.plugins[i]
 		instance, err := p.Instance()
