@@ -75,7 +75,7 @@ func (h *LayerBlockCipherHandler) Encrypt(plainDataReader io.ReaderAt, typ Layer
 		}
 		return encDataReader, newopt, err
 	}
-	return nil, LayerBlockCipherOptions{}, errors.New("Not supported Cipher Type")
+	return nil, LayerBlockCipherOptions{}, errors.New("Unsupported cipher type")
 }
 
 // Decrypt is the handler for the layer decryption routine
@@ -87,7 +87,7 @@ func (h *LayerBlockCipherHandler) Decrypt(encDataReader io.ReaderAt, opt LayerBl
 	if c, ok := h.cipherMap[LayerCipherType(typ)]; ok {
 		return c.Decrypt(encDataReader, opt)
 	}
-	return nil, LayerBlockCipherOptions{}, errors.New("Not supported Cipher Type")
+	return nil, LayerBlockCipherOptions{}, errors.New("Unsupported cipher type")
 }
 
 // NewLayerBlockCipherHandler returns a new default handler
