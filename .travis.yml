@@ -3,7 +3,8 @@ git:
 
 language: go
 go:
-  - 1.11.x
+  # FIXME: change back to 1.11.x
+  - 1.11.6
   - tip
 
 matrix:
