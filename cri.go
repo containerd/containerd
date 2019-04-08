@@ -119,7 +119,7 @@ func validateConfig(ctx context.Context, c *criconfig.Config) error {
 
 	// Validation for deprecated untrusted_workload_runtime.
 	if c.ContainerdConfig.UntrustedWorkloadRuntime.Type != "" {
-		log.G(ctx).Warning("untrusted_workload_runtime is deprecated, please use `untrusted` runtime in `runtimes` instead")
+		log.G(ctx).Warning("`untrusted_workload_runtime` is deprecated, please use `untrusted` runtime in `runtimes` instead")
 		if _, ok := c.ContainerdConfig.Runtimes[criconfig.RuntimeUntrusted]; ok {
 			return errors.Errorf("conflicting definitions: configuration includes both `untrusted_workload_runtime` and `runtimes[%q]`", criconfig.RuntimeUntrusted)
 		}
@@ -128,7 +128,7 @@ func validateConfig(ctx context.Context, c *criconfig.Config) error {
 
 	// Validation for deprecated default_runtime field.
 	if c.ContainerdConfig.DefaultRuntime.Type != "" {
-		log.G(ctx).Warning("default_runtime is deprecated, please use default_runtime_name instead")
+		log.G(ctx).Warning("`default_runtime` is deprecated, please use `default_runtime_name` to reference the default configuration you have defined in `runtimes`")
 		c.ContainerdConfig.DefaultRuntimeName = criconfig.RuntimeDefault
 		c.ContainerdConfig.Runtimes[criconfig.RuntimeDefault] = c.ContainerdConfig.DefaultRuntime
 	}
