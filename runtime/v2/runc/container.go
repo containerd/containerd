@@ -401,15 +401,15 @@ func (c *Container) Update(ctx context.Context, r *task.UpdateTaskRequest) error
 	return p.(*proc.Init).Update(ctx, r.Resources)
 }
 
-// HasPid returns true if the container owns a specific pid
-func (c *Container) HasPid(pid int) bool {
+// ProcessByPid returns the process or nil for the process in the container
+func (c *Container) ProcessByPid(pid int) rproc.Process {
 	if c.Pid() == pid {
-		return true
+		return c.process
 	}
 	for _, p := range c.All() {
 		if p.Pid() == pid {
-			return true
+			return p
 		}
 	}
-	return false
+	return nil
 }

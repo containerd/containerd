@@ -58,6 +58,8 @@ var (
 	empty = &ptypes.Empty{}
 )
 
+const maxEventRetry = 5
+
 // group labels specifies how the shim groups services.
 // currently supports a runc.v2 specific .group label and the
 // standard k8s pod label.  Order matters in this list
@@ -81,7 +83,7 @@ func New(ctx context.Context, id string, publisher events.Publisher) (shim.Shim,
 	s := &service{
 		id:         id,
 		context:    ctx,
-		events:     make(chan interface{}, 128),
+		events:     make(chan *publishedEvent, 1024),
 		ec:         shim.Default.Subscribe(),
 		ep:         ep,
 		cancel:     cancel,
@@ -103,7 +105,7 @@ type service struct {
 	eventSendMu sync.Mutex
 
 	context  context.Context
-	events   chan interface{}
+	events   chan *publishedEvent
 	platform rproc.Platform
 	ec       chan runcC.Exit
 	ep       *runc.Epoller
@@ -604,51 +606,60 @@ func (s *service) processExits() {
 }
 
 func (s *service) send(evt interface{}) {
-	s.events <- evt
+	s.events <- &publishedEvent{
+		evt:   evt,
+		count: 1,
+	}
 }
 
 func (s *service) sendL(evt interface{}) {
 	s.eventSendMu.Lock()
-	s.events <- evt
+	s.events <- &publishedEvent{
+		evt:   evt,
+		count: 1,
+	}
 	s.eventSendMu.Unlock()
 }
 
 func (s *service) checkProcesses(e runcC.Exit) {
+	container, p := s.getContainerForPid(e.Pid)
+	if p == nil {
+		return
+	}
+	shouldKillAll, err := shouldKillAllOnExit(container.Bundle)
+	if err != nil {
+		log.G(s.context).WithError(err).Error("failed to check shouldKillAll")
+	}
+
+	if shouldKillAll {
+		if ip, ok := p.(*proc.Init); ok {
+			// Ensure all children are killed
+			if err := ip.KillAll(s.context); err != nil {
+				logrus.WithError(err).WithField("id", ip.ID()).
+					Error("failed to kill init's children")
+			}
+		}
+	}
+	p.SetExited(e.Status)
+	s.sendL(&eventstypes.TaskExit{
+		ContainerID: container.ID,
+		ID:          p.ID(),
+		Pid:         uint32(e.Pid),
+		ExitStatus:  uint32(e.Status),
+		ExitedAt:    p.ExitedAt(),
+	})
+}
+
+func (s *service) getContainerForPid(pid int) (*runc.Container, rproc.Process) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	for _, container := range s.containers {
-		if container.HasPid(e.Pid) {
-			shouldKillAll, err := shouldKillAllOnExit(container.Bundle)
-			if err != nil {
-				log.G(s.context).WithError(err).Error("failed to check shouldKillAll")
-			}
-
-			for _, p := range container.All() {
-				if p.Pid() == e.Pid {
-					if shouldKillAll {
-						if ip, ok := p.(*proc.Init); ok {
-							// Ensure all children are killed
-							if err := ip.KillAll(s.context); err != nil {
-								logrus.WithError(err).WithField("id", ip.ID()).
-									Error("failed to kill init's children")
-							}
-						}
-					}
-					p.SetExited(e.Status)
-					s.sendL(&eventstypes.TaskExit{
-						ContainerID: container.ID,
-						ID:          p.ID(),
-						Pid:         uint32(e.Pid),
-						ExitStatus:  uint32(e.Status),
-						ExitedAt:    p.ExitedAt(),
-					})
-					return
-				}
-			}
-			return
+		if p := container.ProcessByPid(pid); p != nil {
+			return container, p
 		}
 	}
+	return nil, nil
 }
 
 func shouldKillAllOnExit(bundlePath string) (bool, error) {
@@ -690,14 +701,30 @@ func (s *service) getContainerPids(ctx context.Context, id string) ([]uint32, er
 	return pids, nil
 }
 
+type publishedEvent struct {
+	count int
+	evt   interface{}
+}
+
 func (s *service) forward(publisher events.Publisher) {
 	for e := range s.events {
-		ctx, cancel := context.WithTimeout(s.context, 5*time.Second)
-		err := publisher.Publish(ctx, runc.GetTopic(e), e)
-		cancel()
-		if err != nil {
-			logrus.WithError(err).Error("post event")
+		if e.count > maxEventRetry {
+			logrus.WithFields(logrus.Fields{
+				"topic": runc.GetTopic(e.evt),
+			}).Error("max retry count reached for event")
+			continue
 		}
+		ctx, cancel := context.WithTimeout(s.context, time.Duration(5*e.count)*time.Second)
+		if err := publisher.Publish(ctx, runc.GetTopic(e.evt), e.evt); err != nil {
+			e.count++
+			go func() {
+				// short pause before requeue of the event
+				time.Sleep(100 * time.Millisecond)
+				s.events <- e
+			}()
+			logrus.WithError(err).Error("post event failure")
+		}
+		cancel()
 	}
 }
 

@@ -53,15 +53,17 @@ var publishCommand = cli.Command{
 		if topic == "" {
 			return errors.New("topic required to publish event")
 		}
+		c := connectEvents(context.GlobalString("address"))
 		payload, err := getEventPayload(os.Stdin)
 		if err != nil {
 			return err
 		}
-		client, err := connectEvents(context.GlobalString("address"))
-		if err != nil {
+		cCon := <-c
+		if cCon.err != nil {
 			return err
 		}
-		if _, err := client.Publish(ctx, &eventsapi.PublishRequest{
+		defer cCon.Close()
+		if _, err := cCon.client.Publish(ctx, &eventsapi.PublishRequest{
 			Topic: topic,
 			Event: payload,
 		}); err != nil {
@@ -69,6 +71,16 @@ var publishCommand = cli.Command{
 		}
 		return nil
 	},
+}
+
+type clientConnect struct {
+	conn   *grpc.ClientConn
+	client eventsapi.EventsClient
+	err    error
+}
+
+func (c *clientConnect) Close() error {
+	return c.conn.Close()
 }
 
 func getEventPayload(r io.Reader) (*types.Any, error) {
@@ -83,12 +95,22 @@ func getEventPayload(r io.Reader) (*types.Any, error) {
 	return &any, nil
 }
 
-func connectEvents(address string) (eventsapi.EventsClient, error) {
-	conn, err := connect(address, dialer.Dialer)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to dial %q", address)
-	}
-	return eventsapi.NewEventsClient(conn), nil
+func connectEvents(address string) <-chan *clientConnect {
+	c := make(chan *clientConnect, 1)
+	go func() {
+		conn, err := connect(address, dialer.Dialer)
+		if err != nil {
+			c <- &clientConnect{
+				err: errors.Wrapf(err, "failed to dial %q", address),
+			}
+			return
+		}
+		c <- &clientConnect{
+			client: eventsapi.NewEventsClient(conn),
+			conn:   conn,
+		}
+	}()
+	return c
 }
 
 func connect(address string, d func(string, time.Duration) (net.Conn, error)) (*grpc.ClientConn, error) {
