@@ -176,9 +176,11 @@ disabled_plugins = ["restart"]
   conf_template = "${cni_template_path}"
 [plugins.cri.registry.mirrors."docker.io"]
   endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
-[plugins.cri.containerd.default_runtime]
+[plugins.cri.containerd]
+  default_runtime_name = "${CONTAINERD_DEFAULT_RUNTIME:-"runc"}"
+[plugins.cri.containerd.runtimes.runc]
   runtime_type = "io.containerd.runc.v1"
-[plugins.cri.containerd.default_runtime.options]
+[plugins.cri.containerd.runtimes.runc.options]
   BinaryName = "${CONTAINERD_HOME}/usr/local/sbin/runc"
 EOF
 chmod 644 "${config_path}"
