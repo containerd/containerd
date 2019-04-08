@@ -29,7 +29,7 @@ import (
 
 // AESSIVLayerBlockCipher implements the AES SIV block cipher
 type AESSIVLayerBlockCipher struct {
-	bits      int // 256, 512
+	keylen    int // in bytes
 	reader    io.ReaderAt
 	encryptor *miscreant.StreamEncryptor
 	decryptor *miscreant.StreamDecryptor
@@ -60,7 +60,7 @@ func NewAESSIVLayerBlockCipher(bits int) (LayerBlockCipher, error) {
 	if bits != 256 && bits != 512 {
 		return nil, errors.New("AES SIV bit count not supported")
 	}
-	return &AESSIVLayerBlockCipher{bits: bits}, nil
+	return &AESSIVLayerBlockCipher{keylen: bits / 8}, nil
 }
 
 func (r *aessivcryptor) Read(p []byte) (int, error) {
@@ -145,8 +145,8 @@ func (bc *AESSIVLayerBlockCipher) init(encrypt bool, reader io.ReaderAt, opt Lay
 	bc.reader = reader
 
 	key := opt.SymmetricKey
-	if len(key) != bc.bits/8 {
-		return LayerBlockCipherOptions{}, fmt.Errorf("invalid key length of %d bytes; need %d bytes", len(key), bc.bits/8)
+	if len(key) != bc.keylen {
+		return LayerBlockCipherOptions{}, fmt.Errorf("invalid key length of %d bytes; need %d bytes", len(key), bc.keylen)
 	}
 
 	nonce := opt.CipherOptions["nonce"]
@@ -193,7 +193,7 @@ func (bc *AESSIVLayerBlockCipher) init(encrypt bool, reader io.ReaderAt, opt Lay
 
 // GenerateKey creates a synmmetric key
 func (bc *AESSIVLayerBlockCipher) GenerateKey() []byte {
-	return miscreant.GenerateKey(bc.bits / 8)
+	return miscreant.GenerateKey(bc.keylen)
 }
 
 // Encrypt takes in layer data and returns the ciphertext and relevant LayerBlockCipherOptions
