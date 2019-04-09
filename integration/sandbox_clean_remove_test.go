@@ -34,48 +34,6 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
-func TestSandboxCleanRemove(t *testing.T) {
-	ctx := context.Background()
-	t.Logf("Create a sandbox")
-	sbConfig := PodSandboxConfig("sandbox", "clean-remove")
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		// Make sure the sandbox is cleaned up in any case.
-		runtimeService.StopPodSandbox(sb)
-		runtimeService.RemovePodSandbox(sb)
-	}()
-
-	t.Logf("Should not be able to remove the sandbox when it's still running")
-	assert.Error(t, runtimeService.RemovePodSandbox(sb))
-
-	t.Logf("Delete sandbox task from containerd")
-	cntr, err := containerdClient.LoadContainer(ctx, sb)
-	require.NoError(t, err)
-	task, err := cntr.Task(ctx, nil)
-	require.NoError(t, err)
-	// Kill the task with signal SIGKILL, once the task exited,
-	// the TaskExit event will trigger the task.Delete().
-	err = task.Kill(ctx, syscall.SIGKILL, containerd.WithKillAll)
-	require.NoError(t, err)
-
-	t.Logf("Sandbox state should be NOTREADY")
-	assert.NoError(t, Eventually(func() (bool, error) {
-		status, err := runtimeService.PodSandboxStatus(sb)
-		if err != nil {
-			return false, err
-		}
-		return status.GetState() == runtime.PodSandboxState_SANDBOX_NOTREADY, nil
-	}, time.Second, 30*time.Second), "sandbox state should become NOTREADY")
-
-	t.Logf("Should not be able to remove the sandbox when netns is not closed")
-	assert.Error(t, runtimeService.RemovePodSandbox(sb))
-
-	t.Logf("Should be able to remove the sandbox after properly stopped")
-	assert.NoError(t, runtimeService.StopPodSandbox(sb))
-	assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-}
-
 func TestSandboxRemoveWithoutIPLeakage(t *testing.T) {
 	const hostLocalCheckpointDir = "/var/lib/cni"
 
