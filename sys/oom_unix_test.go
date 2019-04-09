@@ -20,12 +20,8 @@ package sys
 
 import (
 	"errors"
-	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -85,7 +81,7 @@ func adjustOom(adjustment int) (int, error) {
 		return 0, err
 	}
 
-	return readOomScoreAdj(pid)
+	return GetOOMScoreAdj(pid)
 }
 
 func waitForPid(process *os.Process) (int, error) {
@@ -105,18 +101,4 @@ func waitForPid(process *os.Process) (int, error) {
 	case <-time.After(10 * time.Second):
 		return 0, errors.New("process did not start in 10 seconds")
 	}
-}
-
-func readOomScoreAdj(pid int) (int, error) {
-	oomScore, err := ioutil.ReadFile(fmt.Sprintf("/proc/%d/oom_score_adj", pid))
-	if err != nil {
-		return 0, err
-	}
-
-	scoreAsInt, err := strconv.Atoi(strings.TrimSpace(string(oomScore)))
-	if err != nil {
-		return 0, err
-	}
-
-	return scoreAsInt, nil
 }
