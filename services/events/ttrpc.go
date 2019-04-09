@@ -21,7 +21,6 @@ import (
 
 	api "github.com/containerd/containerd/api/services/ttrpc/events/v1"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/events/exchange"
 	ptypes "github.com/gogo/protobuf/types"
 )
@@ -36,25 +35,4 @@ func (s *ttrpcService) Publish(ctx context.Context, r *api.PublishRequest) (*pty
 	}
 
 	return &ptypes.Empty{}, nil
-}
-
-func (s *ttrpcService) Forward(ctx context.Context, r *api.ForwardRequest) (*ptypes.Empty, error) {
-	if err := s.events.Forward(ctx, fromTTProto(r.Envelope)); err != nil {
-		return nil, errdefs.ToGRPC(err)
-	}
-
-	return &ptypes.Empty{}, nil
-}
-
-func (s *ttrpcService) Subscribe(ctx context.Context, req *api.SubscribeRequest) (*api.Envelope, error) {
-	return nil, errdefs.ToGRPCf(errdefs.ErrNotImplemented, "ttrpc does not support streaming")
-}
-
-func fromTTProto(env *api.Envelope) *events.Envelope {
-	return &events.Envelope{
-		Timestamp: env.Timestamp,
-		Namespace: env.Namespace,
-		Topic:     env.Topic,
-		Event:     env.Event,
-	}
 }

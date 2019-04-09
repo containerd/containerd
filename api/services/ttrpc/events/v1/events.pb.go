@@ -7,22 +7,18 @@ import (
 	context "context"
 	fmt "fmt"
 	github_com_containerd_ttrpc "github.com/containerd/ttrpc"
-	github_com_containerd_typeurl "github.com/containerd/typeurl"
 	proto "github.com/gogo/protobuf/proto"
-	github_com_gogo_protobuf_types "github.com/gogo/protobuf/types"
 	types "github.com/gogo/protobuf/types"
 	io "io"
 	math "math"
 	reflect "reflect"
 	strings "strings"
-	time "time"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
-var _ = time.Kitchen
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -70,131 +66,8 @@ func (m *PublishRequest) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_PublishRequest proto.InternalMessageInfo
 
-type ForwardRequest struct {
-	Envelope             *Envelope `protobuf:"bytes,1,opt,name=envelope,proto3" json:"envelope,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}  `json:"-"`
-	XXX_unrecognized     []byte    `json:"-"`
-	XXX_sizecache        int32     `json:"-"`
-}
-
-func (m *ForwardRequest) Reset()      { *m = ForwardRequest{} }
-func (*ForwardRequest) ProtoMessage() {}
-func (*ForwardRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_19f98672016720b5, []int{1}
-}
-func (m *ForwardRequest) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ForwardRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_ForwardRequest.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *ForwardRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ForwardRequest.Merge(m, src)
-}
-func (m *ForwardRequest) XXX_Size() int {
-	return m.Size()
-}
-func (m *ForwardRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_ForwardRequest.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ForwardRequest proto.InternalMessageInfo
-
-type SubscribeRequest struct {
-	Filters              []string `protobuf:"bytes,1,rep,name=filters,proto3" json:"filters,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *SubscribeRequest) Reset()      { *m = SubscribeRequest{} }
-func (*SubscribeRequest) ProtoMessage() {}
-func (*SubscribeRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_19f98672016720b5, []int{2}
-}
-func (m *SubscribeRequest) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *SubscribeRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_SubscribeRequest.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *SubscribeRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SubscribeRequest.Merge(m, src)
-}
-func (m *SubscribeRequest) XXX_Size() int {
-	return m.Size()
-}
-func (m *SubscribeRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_SubscribeRequest.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SubscribeRequest proto.InternalMessageInfo
-
-type Envelope struct {
-	Timestamp            time.Time  `protobuf:"bytes,1,opt,name=timestamp,proto3,stdtime" json:"timestamp"`
-	Namespace            string     `protobuf:"bytes,2,opt,name=namespace,proto3" json:"namespace,omitempty"`
-	Topic                string     `protobuf:"bytes,3,opt,name=topic,proto3" json:"topic,omitempty"`
-	Event                *types.Any `protobuf:"bytes,4,opt,name=event,proto3" json:"event,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}   `json:"-"`
-	XXX_unrecognized     []byte     `json:"-"`
-	XXX_sizecache        int32      `json:"-"`
-}
-
-func (m *Envelope) Reset()      { *m = Envelope{} }
-func (*Envelope) ProtoMessage() {}
-func (*Envelope) Descriptor() ([]byte, []int) {
-	return fileDescriptor_19f98672016720b5, []int{3}
-}
-func (m *Envelope) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *Envelope) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_Envelope.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *Envelope) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Envelope.Merge(m, src)
-}
-func (m *Envelope) XXX_Size() int {
-	return m.Size()
-}
-func (m *Envelope) XXX_DiscardUnknown() {
-	xxx_messageInfo_Envelope.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Envelope proto.InternalMessageInfo
-
 func init() {
 	proto.RegisterType((*PublishRequest)(nil), "containerd.services.events.ttrpc.v1.PublishRequest")
-	proto.RegisterType((*ForwardRequest)(nil), "containerd.services.events.ttrpc.v1.ForwardRequest")
-	proto.RegisterType((*SubscribeRequest)(nil), "containerd.services.events.ttrpc.v1.SubscribeRequest")
-	proto.RegisterType((*Envelope)(nil), "containerd.services.events.ttrpc.v1.Envelope")
 }
 
 func init() {
@@ -202,66 +75,29 @@ func init() {
 }
 
 var fileDescriptor_19f98672016720b5 = []byte{
-	// 478 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x94, 0xcf, 0x8e, 0xd3, 0x30,
-	0x10, 0xc6, 0xeb, 0xfd, 0xdb, 0x78, 0xa5, 0x15, 0x8a, 0x2a, 0x54, 0x02, 0x4a, 0xab, 0x72, 0xa9,
-	0x10, 0x38, 0x6c, 0x57, 0x5c, 0xe0, 0x02, 0x15, 0x45, 0x82, 0x13, 0x0a, 0x08, 0xad, 0x40, 0x42,
-	0x4a, 0xd2, 0x69, 0x6a, 0x29, 0x89, 0x4d, 0xec, 0x04, 0xed, 0x6d, 0x1f, 0x81, 0x17, 0xe1, 0xc6,
-	0x85, 0x37, 0xe8, 0x91, 0x23, 0x27, 0x60, 0xfb, 0x24, 0xa8, 0x8e, 0xdd, 0xb0, 0x5d, 0x50, 0x8b,
-	0xf6, 0x36, 0xf6, 0xcc, 0xf7, 0x9b, 0xcc, 0x37, 0x56, 0xf0, 0x8b, 0x98, 0xca, 0x69, 0x11, 0x92,
-	0x88, 0xa5, 0x5e, 0xc4, 0x32, 0x19, 0xd0, 0x0c, 0xf2, 0xf1, 0x9f, 0x61, 0xc0, 0xa9, 0x27, 0x20,
-	0x2f, 0x69, 0x04, 0xc2, 0x93, 0x32, 0xe7, 0x91, 0x07, 0x25, 0x64, 0x52, 0x78, 0xe5, 0x91, 0x8e,
-	0x08, 0xcf, 0x99, 0x64, 0xf6, 0xed, 0x5a, 0x45, 0x8c, 0x82, 0xe8, 0x0a, 0x25, 0x24, 0xe5, 0x91,
-	0xf3, 0x78, 0x6d, 0x43, 0x05, 0x0b, 0x8b, 0x89, 0xc7, 0x93, 0x22, 0xa6, 0x99, 0x37, 0xa1, 0x90,
-	0x8c, 0x79, 0x20, 0xa7, 0x55, 0x1b, 0xa7, 0x15, 0xb3, 0x98, 0xa9, 0xd0, 0x5b, 0x44, 0xfa, 0xf6,
-	0x46, 0xcc, 0x58, 0x9c, 0x40, 0xad, 0x0e, 0xb2, 0x53, 0x9d, 0xba, 0xb9, 0x9a, 0x82, 0x94, 0x4b,
-	0x93, 0xec, 0xac, 0x26, 0x25, 0x4d, 0x41, 0xc8, 0x20, 0xe5, 0x55, 0x41, 0xcf, 0xc7, 0x87, 0x2f,
-	0x8b, 0x30, 0xa1, 0x62, 0xea, 0xc3, 0x87, 0x02, 0x84, 0xb4, 0x5b, 0x78, 0x57, 0x32, 0x4e, 0xa3,
-	0x36, 0xea, 0xa2, 0xbe, 0xe5, 0x57, 0x07, 0xfb, 0x0e, 0xde, 0x55, 0xb3, 0xb6, 0xb7, 0xba, 0xa8,
-	0x7f, 0x30, 0x68, 0x91, 0x0a, 0x4c, 0x0c, 0x98, 0x3c, 0xc9, 0x4e, 0xfd, 0xaa, 0xa4, 0xf7, 0x0e,
-	0x1f, 0x3e, 0x63, 0xf9, 0xc7, 0x20, 0x1f, 0x1b, 0xe6, 0x73, 0xdc, 0x84, 0xac, 0x84, 0x84, 0x71,
-	0x50, 0xd8, 0x83, 0xc1, 0x3d, 0xb2, 0x81, 0x9d, 0x64, 0xa4, 0x45, 0xfe, 0x52, 0xde, 0xbb, 0x8b,
-	0xaf, 0xbd, 0x2a, 0x42, 0x11, 0xe5, 0x34, 0x04, 0x83, 0x6f, 0xe3, 0xfd, 0x09, 0x4d, 0x24, 0xe4,
-	0xa2, 0x8d, 0xba, 0xdb, 0x7d, 0xcb, 0x37, 0xc7, 0xde, 0x17, 0x84, 0x9b, 0x06, 0x62, 0x0f, 0xb1,
-	0xb5, 0x1c, 0x5f, 0x7f, 0x86, 0x73, 0x69, 0x8e, 0xd7, 0xa6, 0x62, 0xd8, 0x9c, 0xfd, 0xe8, 0x34,
-	0x3e, 0xfd, 0xec, 0x20, 0xbf, 0x96, 0xd9, 0xb7, 0xb0, 0x95, 0x05, 0x29, 0x08, 0x1e, 0x44, 0xa0,
-	0xbc, 0xb0, 0xfc, 0xfa, 0xa2, 0xf6, 0x6e, 0xfb, 0xaf, 0xde, 0xed, 0xac, 0xf5, 0xee, 0xe1, 0xce,
-	0xd9, 0xd7, 0x0e, 0x1a, 0x7c, 0xde, 0xc2, 0x7b, 0x23, 0xe5, 0x85, 0xfd, 0x06, 0xef, 0xeb, 0x05,
-	0xd9, 0xc7, 0x1b, 0x79, 0x76, 0x71, 0x9d, 0xce, 0xf5, 0x4b, 0xdd, 0x46, 0x8b, 0xf7, 0xb1, 0xe0,
-	0xea, 0x25, 0x6d, 0xc8, 0xbd, 0xb8, 0xd2, 0x7f, 0x72, 0x05, 0xb6, 0x96, 0xfb, 0xb1, 0x1f, 0x6c,
-	0x44, 0x5e, 0xdd, 0xa7, 0xf3, 0x7f, 0x8f, 0xe3, 0x3e, 0x1a, 0xbe, 0x9f, 0x9d, 0xbb, 0x8d, 0xef,
-	0xe7, 0x6e, 0xe3, 0x6c, 0xee, 0xa2, 0xd9, 0xdc, 0x45, 0xdf, 0xe6, 0x2e, 0xfa, 0x35, 0x77, 0xd1,
-	0xdb, 0xa7, 0x57, 0xfa, 0x03, 0x3c, 0xaa, 0xa2, 0x93, 0xc6, 0x09, 0x0a, 0xf7, 0xd4, 0xa0, 0xc7,
-	0xbf, 0x03, 0x00, 0x00, 0xff, 0xff, 0x8c, 0x5b, 0x8a, 0x72, 0x54, 0x04, 0x00, 0x00,
+	// 311 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x51, 0x3f, 0x4b, 0x33, 0x31,
+	0x18, 0x6f, 0x5e, 0x68, 0x5f, 0x8c, 0xe0, 0x70, 0x14, 0xa9, 0x15, 0x62, 0xd1, 0xa5, 0x38, 0x24,
+	0xb4, 0x1d, 0x5d, 0x54, 0xec, 0xe2, 0x24, 0x37, 0x48, 0x71, 0x10, 0xef, 0xae, 0x69, 0x1a, 0xb8,
+	0x4b, 0xe2, 0xe5, 0xb9, 0x83, 0x6e, 0x7e, 0xbc, 0x8e, 0x8e, 0x8e, 0xf6, 0x3e, 0x89, 0x34, 0xb9,
+	0x52, 0xad, 0x83, 0x82, 0xdb, 0x2f, 0xf9, 0xfd, 0xcb, 0xf3, 0x04, 0xdf, 0x0a, 0x09, 0xf3, 0x22,
+	0xa6, 0x89, 0xce, 0x58, 0xa2, 0x15, 0x44, 0x52, 0xf1, 0x7c, 0xfa, 0x19, 0x46, 0x46, 0x32, 0xcb,
+	0xf3, 0x52, 0x26, 0xdc, 0x32, 0x80, 0xdc, 0x24, 0x8c, 0x97, 0x5c, 0x81, 0x65, 0xe5, 0xa0, 0x46,
+	0xd4, 0xe4, 0x1a, 0x74, 0x70, 0xb6, 0x75, 0xd1, 0x8d, 0x83, 0xd6, 0x0a, 0x67, 0xa4, 0xe5, 0xa0,
+	0x7b, 0xf9, 0x63, 0xa1, 0x0b, 0x8b, 0x8b, 0x19, 0x33, 0x69, 0x21, 0xa4, 0x62, 0x33, 0xc9, 0xd3,
+	0xa9, 0x89, 0x60, 0xee, 0x6b, 0xba, 0x6d, 0xa1, 0x85, 0x76, 0x90, 0xad, 0x51, 0x7d, 0x7b, 0x24,
+	0xb4, 0x16, 0x29, 0xdf, 0xba, 0x23, 0xb5, 0xa8, 0xa9, 0xe3, 0x5d, 0x8a, 0x67, 0x06, 0x36, 0xe4,
+	0xc9, 0x2e, 0x09, 0x32, 0xe3, 0x16, 0xa2, 0xcc, 0x78, 0xc1, 0x69, 0x88, 0x0f, 0xee, 0x8a, 0x38,
+	0x95, 0x76, 0x1e, 0xf2, 0xe7, 0x82, 0x5b, 0x08, 0xda, 0xb8, 0x09, 0xda, 0xc8, 0xa4, 0x83, 0x7a,
+	0xa8, 0xbf, 0x17, 0xfa, 0x43, 0x70, 0x8e, 0x9b, 0x6e, 0xd6, 0xce, 0xbf, 0x1e, 0xea, 0xef, 0x0f,
+	0xdb, 0xd4, 0x07, 0xd3, 0x4d, 0x30, 0xbd, 0x52, 0x8b, 0xd0, 0x4b, 0x86, 0x4f, 0xb8, 0x35, 0x76,
+	0x7b, 0x09, 0xee, 0xf1, 0xff, 0x3a, 0x3d, 0x18, 0xd1, 0x5f, 0xec, 0x8f, 0x7e, 0x7d, 0x4b, 0xf7,
+	0xf0, 0x5b, 0xcd, 0x78, 0x3d, 0xdc, 0xf5, 0xe3, 0x72, 0x45, 0x1a, 0x6f, 0x2b, 0xd2, 0x78, 0xa9,
+	0x08, 0x5a, 0x56, 0x04, 0xbd, 0x56, 0x04, 0xbd, 0x57, 0x04, 0x3d, 0xdc, 0xfc, 0xe9, 0xc7, 0x2f,
+	0x3c, 0x9a, 0x34, 0x26, 0x28, 0x6e, 0xb9, 0xce, 0xd1, 0x47, 0x00, 0x00, 0x00, 0xff, 0xff, 0x8d,
+	0x47, 0xe0, 0xf5, 0x44, 0x02, 0x00, 0x00,
 }
 
-// Field returns the value for the given fieldpath as a string, if defined.
-// If the value is not defined, the second value will be false.
-func (m *Envelope) Field(fieldpath []string) (string, bool) {
-	if len(fieldpath) == 0 {
-		return "", false
-	}
-
-	switch fieldpath[0] {
-	// unhandled: timestamp
-	case "namespace":
-		return string(m.Namespace), len(m.Namespace) > 0
-	case "topic":
-		return string(m.Topic), len(m.Topic) > 0
-	case "event":
-		decoded, err := github_com_containerd_typeurl.UnmarshalAny(m.Event)
-		if err != nil {
-			return "", false
-		}
-
-		adaptor, ok := decoded.(interface{ Field([]string) (string, bool) })
-		if !ok {
-			return "", false
-		}
-		return adaptor.Field(fieldpath[1:])
-	}
-	return "", false
-}
 func (m *PublishRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -299,124 +135,6 @@ func (m *PublishRequest) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ForwardRequest) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *ForwardRequest) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.Envelope != nil {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintEvents(dAtA, i, uint64(m.Envelope.Size()))
-		n2, err := m.Envelope.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n2
-	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
-	}
-	return i, nil
-}
-
-func (m *SubscribeRequest) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *SubscribeRequest) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if len(m.Filters) > 0 {
-		for _, s := range m.Filters {
-			dAtA[i] = 0xa
-			i++
-			l = len(s)
-			for l >= 1<<7 {
-				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
-				l >>= 7
-				i++
-			}
-			dAtA[i] = uint8(l)
-			i++
-			i += copy(dAtA[i:], s)
-		}
-	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
-	}
-	return i, nil
-}
-
-func (m *Envelope) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *Envelope) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	dAtA[i] = 0xa
-	i++
-	i = encodeVarintEvents(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.Timestamp)))
-	n3, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.Timestamp, dAtA[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n3
-	if len(m.Namespace) > 0 {
-		dAtA[i] = 0x12
-		i++
-		i = encodeVarintEvents(dAtA, i, uint64(len(m.Namespace)))
-		i += copy(dAtA[i:], m.Namespace)
-	}
-	if len(m.Topic) > 0 {
-		dAtA[i] = 0x1a
-		i++
-		i = encodeVarintEvents(dAtA, i, uint64(len(m.Topic)))
-		i += copy(dAtA[i:], m.Topic)
-	}
-	if m.Event != nil {
-		dAtA[i] = 0x22
-		i++
-		i = encodeVarintEvents(dAtA, i, uint64(m.Event.Size()))
-		n4, err := m.Event.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n4
-	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
-	}
-	return i, nil
-}
-
 func encodeVarintEvents(dAtA []byte, offset int, v uint64) int {
 	for v >= 1<<7 {
 		dAtA[offset] = uint8(v&0x7f | 0x80)
@@ -432,66 +150,6 @@ func (m *PublishRequest) Size() (n int) {
 	}
 	var l int
 	_ = l
-	l = len(m.Topic)
-	if l > 0 {
-		n += 1 + l + sovEvents(uint64(l))
-	}
-	if m.Event != nil {
-		l = m.Event.Size()
-		n += 1 + l + sovEvents(uint64(l))
-	}
-	if m.XXX_unrecognized != nil {
-		n += len(m.XXX_unrecognized)
-	}
-	return n
-}
-
-func (m *ForwardRequest) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if m.Envelope != nil {
-		l = m.Envelope.Size()
-		n += 1 + l + sovEvents(uint64(l))
-	}
-	if m.XXX_unrecognized != nil {
-		n += len(m.XXX_unrecognized)
-	}
-	return n
-}
-
-func (m *SubscribeRequest) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if len(m.Filters) > 0 {
-		for _, s := range m.Filters {
-			l = len(s)
-			n += 1 + l + sovEvents(uint64(l))
-		}
-	}
-	if m.XXX_unrecognized != nil {
-		n += len(m.XXX_unrecognized)
-	}
-	return n
-}
-
-func (m *Envelope) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.Timestamp)
-	n += 1 + l + sovEvents(uint64(l))
-	l = len(m.Namespace)
-	if l > 0 {
-		n += 1 + l + sovEvents(uint64(l))
-	}
 	l = len(m.Topic)
 	if l > 0 {
 		n += 1 + l + sovEvents(uint64(l))
@@ -531,42 +189,6 @@ func (this *PublishRequest) String() string {
 	}, "")
 	return s
 }
-func (this *ForwardRequest) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&ForwardRequest{`,
-		`Envelope:` + strings.Replace(fmt.Sprintf("%v", this.Envelope), "Envelope", "Envelope", 1) + `,`,
-		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
-		`}`,
-	}, "")
-	return s
-}
-func (this *SubscribeRequest) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&SubscribeRequest{`,
-		`Filters:` + fmt.Sprintf("%v", this.Filters) + `,`,
-		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
-		`}`,
-	}, "")
-	return s
-}
-func (this *Envelope) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&Envelope{`,
-		`Timestamp:` + strings.Replace(strings.Replace(this.Timestamp.String(), "Timestamp", "types.Timestamp", 1), `&`, ``, 1) + `,`,
-		`Namespace:` + fmt.Sprintf("%v", this.Namespace) + `,`,
-		`Topic:` + fmt.Sprintf("%v", this.Topic) + `,`,
-		`Event:` + strings.Replace(fmt.Sprintf("%v", this.Event), "Any", "types.Any", 1) + `,`,
-		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
-		`}`,
-	}, "")
-	return s
-}
 func valueToStringEvents(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -578,8 +200,6 @@ func valueToStringEvents(v interface{}) string {
 
 type EventsService interface {
 	Publish(ctx context.Context, req *PublishRequest) (*types.Empty, error)
-	Forward(ctx context.Context, req *ForwardRequest) (*types.Empty, error)
-	Subscribe(ctx context.Context, req *SubscribeRequest) (*Envelope, error)
 }
 
 func RegisterEventsService(srv *github_com_containerd_ttrpc.Server, svc EventsService) {
@@ -590,20 +210,6 @@ func RegisterEventsService(srv *github_com_containerd_ttrpc.Server, svc EventsSe
 				return nil, err
 			}
 			return svc.Publish(ctx, &req)
-		},
-		"Forward": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
-			var req ForwardRequest
-			if err := unmarshal(&req); err != nil {
-				return nil, err
-			}
-			return svc.Forward(ctx, &req)
-		},
-		"Subscribe": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
-			var req SubscribeRequest
-			if err := unmarshal(&req); err != nil {
-				return nil, err
-			}
-			return svc.Subscribe(ctx, &req)
 		},
 	})
 }
@@ -621,22 +227,6 @@ func NewEventsClient(client *github_com_containerd_ttrpc.Client) EventsService {
 func (c *eventsClient) Publish(ctx context.Context, req *PublishRequest) (*types.Empty, error) {
 	var resp types.Empty
 	if err := c.client.Call(ctx, "containerd.services.events.ttrpc.v1.Events", "Publish", req, &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
-func (c *eventsClient) Forward(ctx context.Context, req *ForwardRequest) (*types.Empty, error) {
-	var resp types.Empty
-	if err := c.client.Call(ctx, "containerd.services.events.ttrpc.v1.Events", "Forward", req, &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
-func (c *eventsClient) Subscribe(ctx context.Context, req *SubscribeRequest) (*Envelope, error) {
-	var resp Envelope
-	if err := c.client.Call(ctx, "containerd.services.events.ttrpc.v1.Events", "Subscribe", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -703,369 +293,6 @@ func (m *PublishRequest) Unmarshal(dAtA []byte) error {
 			m.Topic = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Event", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowEvents
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthEvents
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthEvents
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.Event == nil {
-				m.Event = &types.Any{}
-			}
-			if err := m.Event.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipEvents(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthEvents
-			}
-			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthEvents
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *ForwardRequest) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowEvents
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: ForwardRequest: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ForwardRequest: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Envelope", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowEvents
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthEvents
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthEvents
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.Envelope == nil {
-				m.Envelope = &Envelope{}
-			}
-			if err := m.Envelope.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipEvents(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthEvents
-			}
-			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthEvents
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *SubscribeRequest) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowEvents
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: SubscribeRequest: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: SubscribeRequest: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Filters", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowEvents
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthEvents
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthEvents
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Filters = append(m.Filters, string(dAtA[iNdEx:postIndex]))
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipEvents(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthEvents
-			}
-			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthEvents
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *Envelope) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowEvents
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: Envelope: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: Envelope: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Timestamp", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowEvents
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthEvents
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthEvents
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if err := github_com_gogo_protobuf_types.StdTimeUnmarshal(&m.Timestamp, dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Namespace", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowEvents
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthEvents
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthEvents
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Namespace = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Topic", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowEvents
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthEvents
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthEvents
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Topic = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Event", wireType)
 			}

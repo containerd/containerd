@@ -19,30 +19,20 @@
 package shim
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"net"
 	"os"
-	"os/exec"
 	"os/signal"
-	"sync"
+	"strings"
 	"syscall"
+	"time"
 
-	"github.com/containerd/containerd/events"
-	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/fifo"
-	"github.com/containerd/typeurl"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
-
-var bufPool = sync.Pool{
-	New: func() interface{} {
-		return bytes.NewBuffer(nil)
-	},
-}
 
 // setupSignals creates a new signal handler for all signals and sets the shim as a
 // sub-reaper so that the container processes are reparented
@@ -101,41 +91,7 @@ func openLog(ctx context.Context, _ string) (io.Writer, error) {
 	return fifo.OpenFifo(ctx, "log", unix.O_WRONLY, 0700)
 }
 
-func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event events.Event) error {
-	ns, _ := namespaces.Namespace(ctx)
-	encoded, err := typeurl.MarshalAny(event)
-	if err != nil {
-		return err
-	}
-	data, err := encoded.Marshal()
-	if err != nil {
-		return err
-	}
-	cmd := exec.CommandContext(ctx, l.containerdBinaryPath, "--address", l.address, "publish", "--topic", topic, "--namespace", ns)
-	cmd.Stdin = bytes.NewReader(data)
-	b := bufPool.Get().(*bytes.Buffer)
-	defer bufPool.Put(b)
-	cmd.Stdout = b
-	cmd.Stderr = b
-	if l.noReaper {
-		if err := cmd.Start(); err != nil {
-			return err
-		}
-		if err := cmd.Wait(); err != nil {
-			return errors.Wrapf(err, "failed to publish event: %s", b.String())
-		}
-		return nil
-	}
-	c, err := Default.Start(cmd)
-	if err != nil {
-		return err
-	}
-	status, err := Default.Wait(cmd, c)
-	if err != nil {
-		return errors.Wrapf(err, "failed to publish event: %s", b.String())
-	}
-	if status != 0 {
-		return errors.Errorf("failed to publish event: %s", b.String())
-	}
-	return nil
+func dialer(address string, timeout time.Duration) (net.Conn, error) {
+	address = strings.TrimPrefix(address, "unix://")
+	return net.DialTimeout("unix", address, timeout)
 }
