@@ -295,13 +295,21 @@ type remoteEventsPublisher struct {
 }
 
 func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event events.Event) error {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return err
+	}
 	any, err := typeurl.MarshalAny(event)
 	if err != nil {
 		return err
 	}
-	_, err = l.client.Publish(ctx, &v1.PublishRequest{
-		Topic: topic,
-		Event: any,
+	_, err = l.client.Forward(ctx, &v1.ForwardRequest{
+		Envelope: &v1.Envelope{
+			Timestamp: time.Now(),
+			Namespace: ns,
+			Topic:     topic,
+			Event:     any,
+		},
 	})
 	return err
 }

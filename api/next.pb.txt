@@ -4211,28 +4211,61 @@ file {
   dependency: "google/protobuf/empty.proto"
   dependency: "google/protobuf/timestamp.proto"
   message_type {
-    name: "PublishRequest"
+    name: "ForwardRequest"
+    field {
+      name: "envelope"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.events.ttrpc.v1.Envelope"
+      json_name: "envelope"
+    }
+  }
+  message_type {
+    name: "Envelope"
+    field {
+      name: "timestamp"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      options {
+        65001: 0
+        65010: 1
+      }
+      json_name: "timestamp"
+    }
+    field {
+      name: "namespace"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "namespace"
+    }
     field {
       name: "topic"
-      number: 1
+      number: 3
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "topic"
     }
     field {
       name: "event"
-      number: 2
+      number: 4
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Any"
       json_name: "event"
     }
+    options {
+      64400: 1
+    }
   }
   service {
     name: "Events"
     method {
-      name: "Publish"
-      input_type: ".containerd.services.events.ttrpc.v1.PublishRequest"
+      name: "Forward"
+      input_type: ".containerd.services.events.ttrpc.v1.ForwardRequest"
       output_type: ".google.protobuf.Empty"
     }
   }
