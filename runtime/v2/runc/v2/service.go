@@ -133,7 +133,6 @@ func newCommand(ctx context.Context, id, containerdBinary, containerdAddress str
 		"-namespace", ns,
 		"-id", id,
 		"-address", containerdAddress,
-		"-publish-binary", containerdBinary,
 	}
 	cmd := exec.Command(self, args...)
 	cmd.Dir = cwd

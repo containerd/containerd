@@ -20,17 +20,20 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"runtime"
 	"runtime/debug"
 	"strings"
 	"time"
 
+	v1 "github.com/containerd/containerd/api/services/ttrpc/events/v1"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	shimapi "github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/ttrpc"
+	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -153,11 +156,16 @@ func run(id string, initFunc Init, config Config) error {
 			return err
 		}
 	}
+
 	publisher := &remoteEventsPublisher{
-		address:              addressFlag,
-		containerdBinaryPath: containerdBinaryFlag,
-		noReaper:             config.NoReaper,
+		address: fmt.Sprintf("%s.ttrpc", addressFlag),
 	}
+	conn, err := connect(publisher.address, dialer)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	publisher.client = v1.NewEventsClient(ttrpc.NewClient(conn))
 	if namespaceFlag == "" {
 		return fmt.Errorf("shim namespace cannot be empty")
 	}
@@ -282,7 +290,22 @@ func dumpStacks(logger *logrus.Entry) {
 }
 
 type remoteEventsPublisher struct {
-	address              string
-	containerdBinaryPath string
-	noReaper             bool
+	address string
+	client  v1.EventsService
+}
+
+func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event events.Event) error {
+	any, err := typeurl.MarshalAny(event)
+	if err != nil {
+		return err
+	}
+	_, err = l.client.Publish(ctx, &v1.PublishRequest{
+		Topic: topic,
+		Event: any,
+	})
+	return err
+}
+
+func connect(address string, d func(string, time.Duration) (net.Conn, error)) (net.Conn, error) {
+	return d(address, 100*time.Second)
 }

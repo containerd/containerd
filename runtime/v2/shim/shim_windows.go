@@ -25,15 +25,13 @@ import (
 	"io"
 	"net"
 	"os"
-	"os/exec"
 	"sync"
+	"time"
 	"unsafe"
 
 	winio "github.com/Microsoft/go-winio"
-	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/ttrpc"
-	"github.com/containerd/typeurl"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
@@ -286,17 +284,34 @@ func openLog(ctx context.Context, id string) (io.Writer, error) {
 	return dswl, nil
 }
 
-func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event events.Event) error {
-	ns, _ := namespaces.Namespace(ctx)
-	encoded, err := typeurl.MarshalAny(event)
-	if err != nil {
-		return err
+func dialer(address string, timeout time.Duration) (net.Conn, error) {
+	var c net.Conn
+	var lastError error
+	timedOutError := errors.Errorf("timed out waiting for npipe %s", address)
+	start := time.Now()
+	for {
+		remaining := timeout - time.Since(start)
+		if remaining <= 0 {
+			lastError = timedOutError
+			break
+		}
+		c, lastError = winio.DialPipe(address, &remaining)
+		if lastError == nil {
+			break
+		}
+		if !os.IsNotExist(lastError) {
+			break
+		}
+		// There is nobody serving the pipe. We limit the timeout for this case
+		// to 5 seconds because any shim that would serve this endpoint should
+		// serve it within 5 seconds. We use the passed in timeout for the
+		// `DialPipe` timeout if the pipe exists however to give the pipe time
+		// to `Accept` the connection.
+		if time.Since(start) >= 5*time.Second {
+			lastError = timedOutError
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
-	data, err := encoded.Marshal()
-	if err != nil {
-		return err
-	}
-	cmd := exec.CommandContext(ctx, l.containerdBinaryPath, "--address", l.address, "publish", "--topic", topic, "--namespace", ns)
-	cmd.Stdin = bytes.NewReader(data)
-	return cmd.Run()
+	return c, lastError
 }

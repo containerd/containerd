@@ -1,5 +1,3 @@
-// +build !linux,!windows,!solaris
-
 /*
    Copyright The containerd Authors.
 
@@ -16,19 +14,25 @@
    limitations under the License.
 */
 
-package server
+package events
 
 import (
 	"context"
 
-	srvconfig "github.com/containerd/containerd/services/server/config"
-	"github.com/containerd/ttrpc"
+	api "github.com/containerd/containerd/api/services/ttrpc/events/v1"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/events/exchange"
+	ptypes "github.com/gogo/protobuf/types"
 )
 
-func apply(_ context.Context, _ *srvconfig.Config) error {
-	return nil
+type ttrpcService struct {
+	events *exchange.Exchange
 }
 
-func newTTRPCServer() (*ttrpc.Server, error) {
-	return ttrpc.NewServer()
+func (s *ttrpcService) Publish(ctx context.Context, r *api.PublishRequest) (*ptypes.Empty, error) {
+	if err := s.events.Publish(ctx, r.Topic, r.Event); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+
+	return &ptypes.Empty{}, nil
 }

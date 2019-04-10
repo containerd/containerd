@@ -4203,6 +4203,47 @@ file {
   syntax: "proto3"
 }
 file {
+  name: "github.com/containerd/containerd/api/services/ttrpc/events/v1/events.proto"
+  package: "containerd.services.events.ttrpc.v1"
+  dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
+  dependency: "gogoproto/gogo.proto"
+  dependency: "google/protobuf/any.proto"
+  dependency: "google/protobuf/empty.proto"
+  dependency: "google/protobuf/timestamp.proto"
+  message_type {
+    name: "PublishRequest"
+    field {
+      name: "topic"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "topic"
+    }
+    field {
+      name: "event"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "event"
+    }
+  }
+  service {
+    name: "Events"
+    method {
+      name: "Publish"
+      input_type: ".containerd.services.events.ttrpc.v1.PublishRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/services/ttrpc/events/v1;events"
+  }
+  weak_dependency: 0
+  weak_dependency: 1
+  syntax: "proto3"
+}
+file {
   name: "github.com/containerd/containerd/api/services/version/v1/version.proto"
   package: "containerd.services.version.v1"
   dependency: "google/protobuf/empty.proto"
