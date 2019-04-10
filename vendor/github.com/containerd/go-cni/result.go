@@ -54,6 +54,9 @@ type Config struct {
 // c) DNS information. Dictionary that includes DNS information for nameservers,
 // domain, search domains and options.
 func (c *libcni) GetCNIResultFromResults(results []*current.Result) (*CNIResult, error) {
+	c.RLock()
+	defer c.RUnlock()
+
 	r := &CNIResult{
 		Interfaces: make(map[string]*Config),
 	}

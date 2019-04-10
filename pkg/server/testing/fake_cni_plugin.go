@@ -50,3 +50,8 @@ func (f *FakeCNIPlugin) Status() error {
 func (f *FakeCNIPlugin) Load(opts ...cni.CNIOpt) error {
 	return f.LoadErr
 }
+
+// GetConfig returns a copy of the CNI plugin configurations as parsed by CNI
+func (f *FakeCNIPlugin) GetConfig() *cni.ConfigResult {
+	return nil
+}
