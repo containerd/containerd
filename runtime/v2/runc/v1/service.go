@@ -33,7 +33,6 @@ import (
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
@@ -58,12 +57,11 @@ var (
 )
 
 // New returns a new shim service that can be used via GRPC
-func New(ctx context.Context, id string, publisher events.Publisher) (shim.Shim, error) {
+func New(ctx context.Context, id string, publisher shim.Publisher, shutdown func()) (shim.Shim, error) {
 	ep, err := runc.NewOOMEpoller(publisher)
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithCancel(ctx)
 	go ep.Run(ctx)
 	s := &service{
 		id:      id,
@@ -71,15 +69,15 @@ func New(ctx context.Context, id string, publisher events.Publisher) (shim.Shim,
 		events:  make(chan interface{}, 128),
 		ec:      shim.Default.Subscribe(),
 		ep:      ep,
-		cancel:  cancel,
+		cancel:  shutdown,
 	}
 	go s.processExits()
 	runcC.Monitor = shim.Default
 	if err := s.initPlatform(); err != nil {
-		cancel()
+		shutdown()
 		return nil, errors.Wrap(err, "failed to initialized platform behavior")
 	}
-	go s.forward(publisher)
+	go s.forward(ctx, publisher)
 	return s, nil
 }
 
@@ -511,7 +509,7 @@ func (s *service) Connect(ctx context.Context, r *taskAPI.ConnectRequest) (*task
 
 func (s *service) Shutdown(ctx context.Context, r *taskAPI.ShutdownRequest) (*ptypes.Empty, error) {
 	s.cancel()
-	os.Exit(0)
+	close(s.events)
 	return empty, nil
 }
 
@@ -619,15 +617,18 @@ func (s *service) getContainerPids(ctx context.Context, id string) ([]uint32, er
 	return pids, nil
 }
 
-func (s *service) forward(publisher events.Publisher) {
+func (s *service) forward(ctx context.Context, publisher shim.Publisher) {
+	ns, _ := namespaces.Namespace(ctx)
+	ctx = namespaces.WithNamespace(context.Background(), ns)
 	for e := range s.events {
-		ctx, cancel := context.WithTimeout(s.context, 5*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		err := publisher.Publish(ctx, runc.GetTopic(e), e)
 		cancel()
 		if err != nil {
 			logrus.WithError(err).Error("post event")
 		}
 	}
+	publisher.Close()
 }
 
 func (s *service) getContainer() (*runc.Container, error) {

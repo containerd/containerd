@@ -71,11 +71,14 @@ func serveListener(path string) (net.Listener, error) {
 	return l, nil
 }
 
-func handleSignals(logger *logrus.Entry, signals chan os.Signal) error {
+func handleSignals(ctx context.Context, logger *logrus.Entry, signals chan os.Signal) error {
 	logger.Info("starting signal loop")
 
 	for {
-		for s := range signals {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case s := <-signals:
 			switch s {
 			case unix.SIGCHLD:
 				if err := Reap(); err != nil {

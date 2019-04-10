@@ -23,7 +23,6 @@ import (
 	"os"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/runtime/v2/shim"
 	taskAPI "github.com/containerd/containerd/runtime/v2/task"
 	ptypes "github.com/gogo/protobuf/types"
@@ -37,7 +36,7 @@ var (
 )
 
 // New returns a new shim service
-func New(ctx context.Context, id string, publisher events.Publisher) (shim.Shim, error) {
+func New(ctx context.Context, id string, publisher shim.Publisher, shutdown func()) (shim.Shim, error) {
 	return &service{}, nil
 }
 
