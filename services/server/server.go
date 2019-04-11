@@ -107,7 +107,11 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			config:      config,
 		}
 		initialized = plugin.NewPluginSet()
+		required    = make(map[string]struct{})
 	)
+	for _, r := range config.RequiredPlugins {
+		required[r] = struct{}{}
+	}
 	for _, p := range plugins {
 		id := p.URI()
 		log.G(ctx).WithField("type", p.Type).Infof("loading plugin %q...", id)
@@ -142,8 +146,12 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			} else {
 				log.G(ctx).WithError(err).Warnf("failed to load plugin %s", id)
 			}
+			if _, ok := required[p.ID]; ok {
+				return nil, errors.Wrapf(err, "load required plugin %s", id)
+			}
 			continue
 		}
+		delete(required, p.ID)
 		// check for grpc services that should be registered with the server
 		if src, ok := instance.(plugin.Service); ok {
 			grpcServices = append(grpcServices, src)
@@ -153,6 +161,14 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		}
 		s.plugins = append(s.plugins, result)
 	}
+	if len(required) != 0 {
+		var missing []string
+		for id := range required {
+			missing = append(missing, id)
+		}
+		return nil, errors.Errorf("required plugin %s not included", missing)
+	}
+
 	// register services after all plugins have been initialized
 	for _, service := range grpcServices {
 		if err := service.Register(grpcServer); err != nil {
