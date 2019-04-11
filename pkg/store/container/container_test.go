@@ -112,7 +112,7 @@ func TestContainerStore(t *testing.T) {
 			ExitCode:   3,
 			Reason:     "TestReason-4a333",
 			Message:    "TestMessage-4a333",
-			Removing:   true,
+			Starting:   true,
 		},
 		"4abcd": {
 			Pid:        4,

@@ -75,6 +75,7 @@ func TestStatusEncodeDecode(t *testing.T) {
 		Reason:     "test-reason",
 		Message:    "test-message",
 		Removing:   true,
+		Starting:   true,
 	}
 	assert := assertlib.New(t)
 	data, err := s.encode()
@@ -82,6 +83,7 @@ func TestStatusEncodeDecode(t *testing.T) {
 	newS := &Status{}
 	assert.NoError(newS.decode(data))
 	s.Removing = false // Removing should not be encoded.
+	s.Starting = false // Starting should not be encoded.
 	assert.Equal(s, newS)
 
 	unsupported, err := json.Marshal(&versionedStatus{

@@ -106,7 +106,7 @@ func TestSandboxStore(t *testing.T) {
 			},
 			NetNSPath: "TestNetNS-3defg",
 		},
-		Status{State: StateInit},
+		Status{State: StateUnknown},
 	)
 	assert := assertlib.New(t)
 	s := NewStore()
@@ -125,21 +125,16 @@ func TestSandboxStore(t *testing.T) {
 		assert.Equal(sb, got)
 	}
 
-	t.Logf("should not be able to get unknown sandbox")
+	t.Logf("should be able to get sandbox in unknown state with Get")
 	got, err := s.Get(unknown.ID)
-	assert.Equal(store.ErrNotExist, err)
-	assert.Equal(Sandbox{}, got)
-
-	t.Logf("should be able to get unknown sandbox with GetAll")
-	got, err = s.GetAll(unknown.ID)
 	assert.NoError(err)
 	assert.Equal(unknown, got)
 
 	t.Logf("should be able to list sandboxes")
+	sbNum := len(sandboxes) + 1
 	sbs := s.List()
-	assert.Len(sbs, len(sandboxes))
+	assert.Len(sbs, sbNum)
 
-	sbNum := len(sandboxes)
 	for testID, v := range sandboxes {
 		truncID := genTruncIndex(testID)
 

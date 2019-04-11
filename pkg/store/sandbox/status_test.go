@@ -28,7 +28,7 @@ func TestStatus(t *testing.T) {
 	testStatus := Status{
 		Pid:       123,
 		CreatedAt: time.Now(),
-		State:     StateInit,
+		State:     StateUnknown,
 	}
 	updateStatus := Status{
 		Pid:       456,
