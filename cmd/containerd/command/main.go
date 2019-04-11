@@ -198,6 +198,13 @@ func App() *cli.App {
 		}
 		serve(ctx, tl, server.ServeTTRPC)
 
+		if config.GRPC.TCPAddress != "" {
+			l, err := net.Listen("tcp", config.GRPC.TCPAddress)
+			if err != nil {
+				return errors.Wrapf(err, "failed to get listener for TCP grpc endpoint")
+			}
+			serve(ctx, l, server.ServeTCP)
+		}
 		// setup the main grpc endpoint
 		l, err := sys.GetLocalListener(address, config.GRPC.UID, config.GRPC.GID)
 		if err != nil {

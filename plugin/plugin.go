@@ -129,6 +129,11 @@ type TTRPCService interface {
 	RegisterTTRPC(*ttrpc.Server) error
 }
 
+// TCPService allows GRPC services to be registered with the underlying tcp server
+type TCPService interface {
+	RegisterTCP(*grpc.Server) error
+}
+
 var register = struct {
 	sync.RWMutex
 	r []*Registration
