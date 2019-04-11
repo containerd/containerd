@@ -11,15 +11,22 @@ import "google/protobuf/timestamp.proto";
 option go_package = "github.com/containerd/containerd/api/services/ttrpc/events/v1;events";
 
 service Events {
-	// Publish an event to a topic.
+	// Forward sends an event that has already been packaged into an envelope
+	// with a timestamp and namespace.
 	//
-	// The event will be packed into a timestamp envelope with the namespace
-	// introspected from the context. The envelope will then be dispatched.
-	rpc Publish(PublishRequest) returns (google.protobuf.Empty);
-
+	// This is useful if earlier timestamping is required or when forwarding on
+	// behalf of another component, namespace or publisher.
+	rpc Forward(ForwardRequest) returns (google.protobuf.Empty);
 }
 
-message PublishRequest {
-	string topic = 1;
-	google.protobuf.Any event = 2;
+message ForwardRequest {
+	Envelope envelope = 1;
+}
+
+message Envelope {
+	option (containerd.plugin.fieldpath) = true;
+	google.protobuf.Timestamp timestamp = 1 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	string namespace = 2;
+	string topic = 3;
+	google.protobuf.Any event = 4;
 }

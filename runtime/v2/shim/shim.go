@@ -20,20 +20,18 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"net"
+	"io"
 	"os"
 	"runtime"
 	"runtime/debug"
 	"strings"
 	"time"
 
-	v1 "github.com/containerd/containerd/api/services/ttrpc/events/v1"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	shimapi "github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/ttrpc"
-	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -46,8 +44,14 @@ type Client struct {
 	signals chan os.Signal
 }
 
+// Publisher for events
+type Publisher interface {
+	events.Publisher
+	io.Closer
+}
+
 // Init func for the creation of a shim server
-type Init func(context.Context, string, events.Publisher) (Shim, error)
+type Init func(context.Context, string, Publisher, func()) (Shim, error)
 
 // Shim server interface
 type Shim interface {
@@ -156,24 +160,20 @@ func run(id string, initFunc Init, config Config) error {
 			return err
 		}
 	}
+	address := fmt.Sprintf("%s.ttrpc", addressFlag)
 
-	publisher := &remoteEventsPublisher{
-		address: fmt.Sprintf("%s.ttrpc", addressFlag),
-	}
-	conn, err := connect(publisher.address, dialer)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	publisher.client = v1.NewEventsClient(ttrpc.NewClient(conn))
+	publisher := newPublisher(address)
+	defer publisher.Close()
+
 	if namespaceFlag == "" {
 		return fmt.Errorf("shim namespace cannot be empty")
 	}
 	ctx := namespaces.WithNamespace(context.Background(), namespaceFlag)
 	ctx = context.WithValue(ctx, OptsKey{}, Opts{BundlePath: bundlePath, Debug: debugFlag})
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("runtime", id))
+	ctx, cancel := context.WithCancel(ctx)
 
-	service, err := initFunc(ctx, idFlag, publisher)
+	service, err := initFunc(ctx, idFlag, publisher, cancel)
 	if err != nil {
 		return err
 	}
@@ -183,7 +183,7 @@ func run(id string, initFunc Init, config Config) error {
 			"pid":       os.Getpid(),
 			"namespace": namespaceFlag,
 		})
-		go handleSignals(logger, signals)
+		go handleSignals(ctx, logger, signals)
 		response, err := service.Cleanup(ctx)
 		if err != nil {
 			return err
@@ -210,7 +210,17 @@ func run(id string, initFunc Init, config Config) error {
 			return err
 		}
 		client := NewShimClient(ctx, service, signals)
-		return client.Serve()
+		if err := client.Serve(); err != nil {
+			if err != context.Canceled {
+				return err
+			}
+		}
+		select {
+		case <-publisher.Done():
+			return nil
+		case <-time.After(5 * time.Second):
+			return errors.New("publisher not closed")
+		}
 	}
 }
 
@@ -254,7 +264,7 @@ func (s *Client) Serve() error {
 			dumpStacks(logger)
 		}
 	}()
-	return handleSignals(logger, s.signals)
+	return handleSignals(s.context, logger, s.signals)
 }
 
 // serve serves the ttrpc API over a unix socket at the provided path
@@ -287,25 +297,4 @@ func dumpStacks(logger *logrus.Entry) {
 	}
 	buf = buf[:stackSize]
 	logger.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
-}
-
-type remoteEventsPublisher struct {
-	address string
-	client  v1.EventsService
-}
-
-func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event events.Event) error {
-	any, err := typeurl.MarshalAny(event)
-	if err != nil {
-		return err
-	}
-	_, err = l.client.Publish(ctx, &v1.PublishRequest{
-		Topic: topic,
-		Event: any,
-	})
-	return err
-}
-
-func connect(address string, d func(string, time.Duration) (net.Conn, error)) (net.Conn, error) {
-	return d(address, 100*time.Second)
 }

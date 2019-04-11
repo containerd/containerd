@@ -71,11 +71,14 @@ func serveListener(path string) (net.Listener, error) {
 	return l, nil
 }
 
-func handleSignals(logger *logrus.Entry, signals chan os.Signal) error {
+func handleSignals(ctx context.Context, logger *logrus.Entry, signals chan os.Signal) error {
 	logger.Info("starting signal loop")
 
 	for {
-		for s := range signals {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case s := <-signals:
 			switch s {
 			case unix.SIGCHLD:
 				if err := Reap(); err != nil {
@@ -91,7 +94,7 @@ func openLog(ctx context.Context, _ string) (io.Writer, error) {
 	return fifo.OpenFifo(ctx, "log", unix.O_WRONLY, 0700)
 }
 
-func dialer(address string, timeout time.Duration) (net.Conn, error) {
+func dial(address string, timeout time.Duration) (net.Conn, error) {
 	address = strings.TrimPrefix(address, "unix://")
 	return net.DialTimeout("unix", address, timeout)
 }

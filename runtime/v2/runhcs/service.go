@@ -41,7 +41,6 @@ import (
 	containerd_types "github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
@@ -129,12 +128,13 @@ func forwardRunhcsLogs(ctx context.Context, c net.Conn, fields logrus.Fields) {
 }
 
 // New returns a new runhcs shim service that can be used via GRPC
-func New(ctx context.Context, id string, publisher events.Publisher) (shim.Shim, error) {
+func New(ctx context.Context, id string, publisher shim.Publisher, shutdown func()) (shim.Shim, error) {
 	return &service{
 		context:   ctx,
 		id:        id,
 		processes: make(map[string]*process),
 		publisher: publisher,
+		shutdown:  shutdown,
 	}, nil
 }
 
@@ -159,7 +159,8 @@ type service struct {
 	id        string
 	processes map[string]*process
 
-	publisher events.Publisher
+	publisher shim.Publisher
+	shutdown  func()
 }
 
 func (s *service) newRunhcs() *runhcs.Runhcs {
@@ -1068,7 +1069,8 @@ func (s *service) Shutdown(ctx context.Context, r *taskAPI.ShutdownRequest) (*pt
 	if s.debugListener != nil {
 		s.debugListener.Close()
 	}
+	s.publisher.Close()
+	s.shutdown()
 
-	os.Exit(0)
 	return empty, nil
 }
