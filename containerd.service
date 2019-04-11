@@ -13,7 +13,7 @@ KillMode=process
 # in the kernel. We recommend using cgroups to do container-local accounting.
 LimitNPROC=infinity
 LimitCORE=infinity
-LimitNOFILE=infinity
+LimitNOFILE=1048576
 # Comment TasksMax if your systemd version does not supports it.
 # Only systemd 226 and above support this version.
 TasksMax=infinity
