@@ -21,21 +21,17 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"runtime"
 	"runtime/debug"
 	"strings"
-	"sync"
 	"time"
 
-	v1 "github.com/containerd/containerd/api/services/ttrpc/events/v1"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	shimapi "github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/ttrpc"
-	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -165,18 +161,10 @@ func run(id string, initFunc Init, config Config) error {
 		}
 	}
 	address := fmt.Sprintf("%s.ttrpc", addressFlag)
-	conn, err := connect(address, dialer)
-	if err != nil {
-		return err
-	}
-	publisher := &remoteEventsPublisher{
-		address: address,
-		conn:    conn,
-		closed:  make(chan struct{}),
-	}
+
+	publisher := newPublisher(address)
 	defer publisher.Close()
 
-	publisher.client = v1.NewEventsClient(ttrpc.NewClient(conn))
 	if namespaceFlag == "" {
 		return fmt.Errorf("shim namespace cannot be empty")
 	}
@@ -309,48 +297,4 @@ func dumpStacks(logger *logrus.Entry) {
 	}
 	buf = buf[:stackSize]
 	logger.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
-}
-
-type remoteEventsPublisher struct {
-	address string
-	conn    net.Conn
-	client  v1.EventsService
-	closed  chan struct{}
-	closer  sync.Once
-}
-
-func (l *remoteEventsPublisher) Done() <-chan struct{} {
-	return l.closed
-}
-
-func (l *remoteEventsPublisher) Close() (err error) {
-	l.closer.Do(func() {
-		err = l.conn.Close()
-		close(l.closed)
-	})
-	return err
-}
-
-func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event events.Event) error {
-	ns, err := namespaces.NamespaceRequired(ctx)
-	if err != nil {
-		return err
-	}
-	any, err := typeurl.MarshalAny(event)
-	if err != nil {
-		return err
-	}
-	_, err = l.client.Forward(ctx, &v1.ForwardRequest{
-		Envelope: &v1.Envelope{
-			Timestamp: time.Now(),
-			Namespace: ns,
-			Topic:     topic,
-			Event:     any,
-		},
-	})
-	return err
-}
-
-func connect(address string, d func(string, time.Duration) (net.Conn, error)) (net.Conn, error) {
-	return d(address, 100*time.Second)
 }

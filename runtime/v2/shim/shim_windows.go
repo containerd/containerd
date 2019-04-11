@@ -287,7 +287,7 @@ func openLog(ctx context.Context, id string) (io.Writer, error) {
 	return dswl, nil
 }
 
-func dialer(address string, timeout time.Duration) (net.Conn, error) {
+func dial(address string, timeout time.Duration) (net.Conn, error) {
 	var c net.Conn
 	var lastError error
 	timedOutError := errors.Errorf("timed out waiting for npipe %s", address)
