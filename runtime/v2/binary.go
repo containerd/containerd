@@ -52,7 +52,7 @@ type binary struct {
 	rtTasks           *runtime.TaskList
 }
 
-func (b *binary) Start(ctx context.Context) (_ *shim, err error) {
+func (b *binary) Start(ctx context.Context, onClose func()) (_ *shim, err error) {
 	args := []string{"-id", b.bundle.ID}
 	if logrus.GetLevel() == logrus.DebugLevel {
 		args = append(args, "-debug")
@@ -96,7 +96,7 @@ func (b *binary) Start(ctx context.Context) (_ *shim, err error) {
 	if err != nil {
 		return nil, err
 	}
-	client := ttrpc.NewClient(conn, ttrpc.WithOnClose(func() { _ = conn.Close() }))
+	client := ttrpc.NewClient(conn, ttrpc.WithOnClose(onClose))
 	return &shim{
 		bundle:  b.bundle,
 		client:  client,
@@ -147,9 +147,6 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 	if err := b.bundle.Delete(); err != nil {
 		return nil, err
 	}
-	// remove self from the runtime task list
-	// this seems dirty but it cleans up the API across runtimes, tasks, and the service
-	b.rtTasks.Delete(ctx, b.bundle.ID)
 	return &runtime.Exit{
 		Status:    response.ExitStatus,
 		Timestamp: response.ExitedAt,

@@ -113,6 +113,10 @@ func (m *TaskManager) ID() string {
 
 // Create a new task
 func (m *TaskManager) Create(ctx context.Context, id string, opts runtime.CreateOpts) (_ runtime.Task, err error) {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return nil, err
+	}
 	bundle, err := NewBundle(ctx, m.root, m.state, id, opts.Spec.Value)
 	if err != nil {
 		return nil, err
@@ -123,7 +127,15 @@ func (m *TaskManager) Create(ctx context.Context, id string, opts runtime.Create
 		}
 	}()
 	b := shimBinary(ctx, bundle, opts.Runtime, m.containerdAddress, m.events, m.tasks)
-	shim, err := b.Start(ctx)
+	shim, err := b.Start(ctx, func() {
+		log.G(ctx).WithField("id", id).Info("shim disconnected")
+		_, err := m.tasks.Get(ctx, id)
+		if err != nil {
+			// Task was never started or was already successfully deleted
+			return
+		}
+		cleanupAfterDeadShim(context.Background(), id, ns, m.events, b)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -219,23 +231,27 @@ func (m *TaskManager) loadTasks(ctx context.Context) error {
 			bundle.Delete()
 			continue
 		}
-		shim, err := loadShim(ctx, bundle, m.events, m.tasks)
+		container, err := m.container(ctx, id)
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("cleanup dead shim %s", id)
-			container, err := m.container(ctx, id)
+			log.G(ctx).WithError(err).Errorf("loading container %s", id)
+			if err := mount.UnmountAll(filepath.Join(bundle.Path, "rootfs"), 0); err != nil {
+				log.G(ctx).WithError(err).Errorf("forceful unmount of rootfs %s", id)
+			}
+			bundle.Delete()
+			continue
+		}
+		binaryCall := shimBinary(ctx, bundle, container.Runtime.Name, m.containerdAddress, m.events, m.tasks)
+		shim, err := loadShim(ctx, bundle, m.events, m.tasks, func() {
+			log.G(ctx).WithField("id", id).Info("shim disconnected")
+			_, err := m.tasks.Get(ctx, id)
 			if err != nil {
-				log.G(ctx).WithError(err).Errorf("loading dead container %s", id)
-				if err := mount.UnmountAll(filepath.Join(bundle.Path, "rootfs"), 0); err != nil {
-					log.G(ctx).WithError(err).Errorf("forceful unmount of rootfs %s", id)
-				}
-				bundle.Delete()
-				continue
+				// Task was never started or was already successfully deleted
+				return
 			}
-			binaryCall := shimBinary(ctx, bundle, container.Runtime.Name, m.containerdAddress, m.events, m.tasks)
-			if _, err := binaryCall.Delete(ctx); err != nil {
-				log.G(ctx).WithError(err).Errorf("binary call to delete for %s", id)
-				continue
-			}
+			cleanupAfterDeadShim(context.Background(), id, ns, m.events, binaryCall)
+		})
+		if err != nil {
+			cleanupAfterDeadShim(ctx, id, ns, m.events, binaryCall)
 			continue
 		}
 		m.tasks.Add(ctx, shim)
