@@ -107,7 +107,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 	}
 	var (
 		grpcServer = grpc.NewServer(serverOpts...)
-		hrpc       = grpc.NewServer(tcpServerOpts...)
+		tcpServer  = grpc.NewServer(tcpServerOpts...)
 
 		grpcServices  []plugin.Service
 		tcpServices   []plugin.TCPService
@@ -115,7 +115,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 
 		s = &Server{
 			grpcServer:  grpcServer,
-			hrpc:        hrpc,
+			tcpServer:   tcpServer,
 			ttrpcServer: ttrpcServer,
 			events:      exchange.NewExchange(),
 			config:      config,
@@ -199,7 +199,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		}
 	}
 	for _, service := range tcpServices {
-		if err := service.RegisterTCP(hrpc); err != nil {
+		if err := service.RegisterTCP(tcpServer); err != nil {
 			return nil, err
 		}
 	}
@@ -210,7 +210,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 type Server struct {
 	grpcServer  *grpc.Server
 	ttrpcServer *ttrpc.Server
-	hrpc        *grpc.Server
+	tcpServer   *grpc.Server
 	events      *exchange.Exchange
 	config      *srvconfig.Config
 	plugins     []*plugin.Plugin
@@ -243,8 +243,8 @@ func (s *Server) ServeMetrics(l net.Listener) error {
 
 // ServeTCP allows services to serve over tcp
 func (s *Server) ServeTCP(l net.Listener) error {
-	grpc_prometheus.Register(s.hrpc)
-	return trapClosedConnErr(s.hrpc.Serve(l))
+	grpc_prometheus.Register(s.tcpServer)
+	return trapClosedConnErr(s.tcpServer.Serve(l))
 }
 
 // ServeDebug provides a debug endpoint
