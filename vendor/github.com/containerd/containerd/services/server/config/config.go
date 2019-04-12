@@ -39,6 +39,9 @@ type Config struct {
 	// DisabledPlugins are IDs of plugins to disable. Disabled plugins won't be
 	// initialized and started.
 	DisabledPlugins []string `toml:"disabled_plugins"`
+	// RequiredPlugins are IDs of required plugins. Containerd exits if any
+	// required plugin doesn't exist or fails to be initialized or started.
+	RequiredPlugins []string `toml:"required_plugins"`
 	// Plugins provides plugin specific configuration for the initialization of a plugin
 	Plugins map[string]toml.Primitive `toml:"plugins"`
 	// OOMScore adjust the containerd's oom score
@@ -54,6 +57,9 @@ type Config struct {
 // GRPCConfig provides GRPC configuration for the socket
 type GRPCConfig struct {
 	Address        string `toml:"address"`
+	TCPAddress     string `toml:"tcp_address"`
+	TCPTLSCert     string `toml:"tcp_tls_cert"`
+	TCPTLSKey      string `toml:"tcp_tls_key"`
 	UID            int    `toml:"uid"`
 	GID            int    `toml:"gid"`
 	MaxRecvMsgSize int    `toml:"max_recv_message_size"`

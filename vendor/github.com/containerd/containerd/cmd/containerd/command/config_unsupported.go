@@ -34,5 +34,7 @@ func defaultConfig() *srvconfig.Config {
 			Level:   "info",
 			Address: defaults.DefaultDebugAddress,
 		},
+		DisabledPlugins: []string{},
+		RequiredPlugins: []string{},
 	}
 }

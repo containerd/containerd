@@ -30,5 +30,7 @@ func defaultConfig() *srvconfig.Config {
 			MaxRecvMsgSize: defaults.DefaultMaxRecvMsgSize,
 			MaxSendMsgSize: defaults.DefaultMaxSendMsgSize,
 		},
+		DisabledPlugins: []string{},
+		RequiredPlugins: []string{},
 	}
 }
