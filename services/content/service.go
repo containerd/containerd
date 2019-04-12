@@ -27,7 +27,7 @@ import (
 func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
-		ID:   "content",
+		ID:   "content-grpc",
 		Requires: []plugin.Type{
 			plugin.ServicePlugin,
 		},
