@@ -147,7 +147,10 @@ func App() *cli.App {
 		for _, w := range warnings {
 			log.G(ctx).WithError(w).Warn("cleanup temp mount")
 		}
-		address := config.GRPC.Address
+		var (
+			address      = config.GRPC.Address
+			ttrpcAddress = fmt.Sprintf("%s.ttrpc", config.GRPC.Address)
+		)
 		if address == "" {
 			return errors.New("grpc address cannot be empty")
 		}
@@ -188,7 +191,21 @@ func App() *cli.App {
 			}
 			serve(ctx, l, server.ServeMetrics)
 		}
+		// setup the ttrpc endpoint
+		tl, err := sys.GetLocalListener(ttrpcAddress, config.GRPC.UID, config.GRPC.GID)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get listener for main ttrpc endpoint")
+		}
+		serve(ctx, tl, server.ServeTTRPC)
 
+		if config.GRPC.TCPAddress != "" {
+			l, err := net.Listen("tcp", config.GRPC.TCPAddress)
+			if err != nil {
+				return errors.Wrapf(err, "failed to get listener for TCP grpc endpoint")
+			}
+			serve(ctx, l, server.ServeTCP)
+		}
+		// setup the main grpc endpoint
 		l, err := sys.GetLocalListener(address, config.GRPC.UID, config.GRPC.GID)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get listener for main endpoint")

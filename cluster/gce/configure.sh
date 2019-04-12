@@ -158,6 +158,8 @@ fi
 log_level="${CONTAINERD_LOG_LEVEL:-"info"}"
 max_container_log_line="${CONTAINERD_MAX_CONTAINER_LOG_LINE:-16384}"
 cat > ${config_path} <<EOF
+# Kubernetes requires the cri plugin.
+required_plugins = ["cri"]
 # Kubernetes doesn't use containerd restart manager.
 disabled_plugins = ["restart"]
 

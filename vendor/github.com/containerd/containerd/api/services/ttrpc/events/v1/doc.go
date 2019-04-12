@@ -14,23 +14,5 @@
    limitations under the License.
 */
 
-package command
-
-import (
-	"github.com/containerd/containerd/defaults"
-	srvconfig "github.com/containerd/containerd/services/server/config"
-)
-
-func defaultConfig() *srvconfig.Config {
-	return &srvconfig.Config{
-		Root:  defaults.DefaultRootDir,
-		State: defaults.DefaultStateDir,
-		GRPC: srvconfig.GRPCConfig{
-			Address:        defaults.DefaultAddress,
-			MaxRecvMsgSize: defaults.DefaultMaxRecvMsgSize,
-			MaxSendMsgSize: defaults.DefaultMaxSendMsgSize,
-		},
-		DisabledPlugins: []string{},
-		RequiredPlugins: []string{},
-	}
-}
+// Package events defines the event pushing and subscription service.
+package events
