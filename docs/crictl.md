@@ -54,7 +54,8 @@ $ docker save k8s.gcr.io/pause-amd64:3.1 -o pause.tar
 Then use [`ctr`](https://github.com/containerd/containerd/blob/master/docs/man/ctr.1.md)
 to load the container image into the container runtime:
 ```console
-$ sudo ctr cri load pause.tar
+# The cri plugin uses the "k8s.io" containerd namespace.
+$ sudo ctr -n=k8s.io images import pause.tar
   Loaded image: k8s.gcr.io/pause-amd64:3.1
 ```
 List images and inspect the pause image:

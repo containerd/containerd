@@ -13,7 +13,7 @@ export KUBE_NODE_EXTRA_METADATA="user-data=${GCE_DIR}/cloud-init/node.yaml,conta
 export KUBE_CONTAINER_RUNTIME="remote"
 export KUBE_CONTAINER_RUNTIME_ENDPOINT="unix:///run/containerd/containerd.sock"
 export KUBE_CONTAINER_RUNTIME_NAME=containerd
-export KUBE_LOAD_IMAGE_COMMAND="/home/containerd/usr/local/bin/ctr cri load"
+export KUBE_LOAD_IMAGE_COMMAND="/home/containerd/usr/local/bin/ctr -n=k8s.io images import"
 export NETWORK_PROVIDER=""
 export NON_MASQUERADE_CIDR="0.0.0.0/0"
 export KUBE_KUBELET_EXTRA_ARGS="--runtime-cgroups=/system.slice/containerd.service"
