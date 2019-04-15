@@ -30,7 +30,6 @@ var validGpgCcs = []*config.CryptoConfig{
 				"gpg-pubkeyringfile": {gpgPubKeyRing},
 				"gpg-recipients":     {gpgRecipient1},
 			},
-			Operation: config.OperationAddRecipients,
 			DecryptConfig: config.DecryptConfig{
 				Parameters: map[string][][]byte{
 					"gpg-privatekeys": {gpgPrivKey1},
@@ -52,7 +51,6 @@ var validGpgCcs = []*config.CryptoConfig{
 				"gpg-pubkeyringfile": {gpgPubKeyRing},
 				"gpg-recipients":     {gpgRecipient2},
 			},
-			Operation: config.OperationAddRecipients,
 			DecryptConfig: config.DecryptConfig{
 				Parameters: map[string][][]byte{
 					"gpg-privatekeys": {gpgPrivKey2},
@@ -74,7 +72,6 @@ var validGpgCcs = []*config.CryptoConfig{
 				"gpg-pubkeyringfile": {gpgPubKeyRing},
 				"gpg-recipients":     {gpgRecipient1},
 			},
-			Operation: config.OperationAddRecipients,
 		},
 
 		DecryptConfig: &config.DecryptConfig{
@@ -91,7 +88,6 @@ var validGpgCcs = []*config.CryptoConfig{
 				"gpg-pubkeyringfile": {gpgPubKeyRing},
 				"gpg-recipients":     {gpgRecipient2},
 			},
-			Operation: config.OperationAddRecipients,
 		},
 
 		DecryptConfig: &config.DecryptConfig{
@@ -110,7 +106,6 @@ var invalidGpgCcs = []*config.CryptoConfig{
 				"gpg-pubkeyringfile": {gpgPubKeyRing},
 				"gpg-recipients":     {gpgRecipient1},
 			},
-			Operation: config.OperationAddRecipients,
 		},
 		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{
@@ -126,7 +121,6 @@ var invalidGpgCcs = []*config.CryptoConfig{
 				"gpg-pubkeyringfile": {gpgPubKeyRing},
 				"gpg-recipients":     {gpgRecipient1},
 			},
-			Operation: config.OperationAddRecipients,
 		},
 		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{},
@@ -140,7 +134,6 @@ var invalidGpgCcs = []*config.CryptoConfig{
 				"gpg-pubkeyringfile": {gpgPrivKey1},
 				"gpg-recipients":     {gpgRecipient1},
 			},
-			Operation: config.OperationAddRecipients,
 		},
 		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{

@@ -31,7 +31,6 @@ var validPkcs7Ccs = []*config.CryptoConfig{
 			Parameters: map[string][][]byte{
 				"x509s": {pkcs7ClientCert},
 			},
-			Operation: config.OperationAddRecipients,
 			DecryptConfig: config.DecryptConfig{
 				Parameters: map[string][][]byte{
 					"privkeys":           {pkcs7ClientCertKey},
@@ -55,7 +54,6 @@ var validPkcs7Ccs = []*config.CryptoConfig{
 			Parameters: map[string][][]byte{
 				"x509s": {pkcs7Client2Cert},
 			},
-			Operation: config.OperationAddRecipients,
 			DecryptConfig: config.DecryptConfig{
 				Parameters: map[string][][]byte{
 					"privkeys":           {pkcs7Client2CertKey},
@@ -79,7 +77,6 @@ var validPkcs7Ccs = []*config.CryptoConfig{
 			Parameters: map[string][][]byte{
 				"x509s": {pkcs7ClientCert},
 			},
-			Operation: config.OperationAddRecipients,
 		},
 		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{
@@ -96,7 +93,6 @@ var validPkcs7Ccs = []*config.CryptoConfig{
 			Parameters: map[string][][]byte{
 				"x509s": {pkcs7Client2Cert},
 			},
-			Operation: config.OperationAddRecipients,
 		},
 		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{
@@ -115,7 +111,6 @@ var invalidPkcs7Ccs = []*config.CryptoConfig{
 			Parameters: map[string][][]byte{
 				"x509s": {pkcs7ClientCert},
 			},
-			Operation: config.OperationAddRecipients,
 		},
 		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{
@@ -132,7 +127,6 @@ var invalidPkcs7Ccs = []*config.CryptoConfig{
 			Parameters: map[string][][]byte{
 				"x509s": {pkcs7ClientCert},
 			},
-			Operation: config.OperationAddRecipients,
 		},
 		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{},
@@ -145,7 +139,6 @@ var invalidPkcs7Ccs = []*config.CryptoConfig{
 			Parameters: map[string][][]byte{
 				"x509s": {pkcs7ClientCertKey},
 			},
-			Operation: config.OperationAddRecipients,
 		},
 		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{

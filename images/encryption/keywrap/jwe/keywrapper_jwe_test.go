@@ -31,7 +31,6 @@ var validJweCcs = []*config.CryptoConfig{
 			Parameters: map[string][][]byte{
 				"pubkeys": {jwePubKeyPem},
 			},
-			Operation: config.OperationAddRecipients,
 			DecryptConfig: config.DecryptConfig{
 				Parameters: map[string][][]byte{
 					"privkeys":           {jwePrivKeyPem},
@@ -54,7 +53,6 @@ var validJweCcs = []*config.CryptoConfig{
 			Parameters: map[string][][]byte{
 				"pubkeys": {jwePubKey2Pem},
 			},
-			Operation: config.OperationAddRecipients,
 			DecryptConfig: config.DecryptConfig{
 				Parameters: map[string][][]byte{
 					"privkeys":           {jwePrivKey2Pem},
@@ -77,7 +75,6 @@ var validJweCcs = []*config.CryptoConfig{
 			Parameters: map[string][][]byte{
 				"pubkeys": {jwePubKeyPem},
 			},
-			Operation: config.OperationAddRecipients,
 		},
 
 		DecryptConfig: &config.DecryptConfig{
@@ -94,7 +91,6 @@ var validJweCcs = []*config.CryptoConfig{
 			Parameters: map[string][][]byte{
 				"pubkeys": {jwePubKey2Pem},
 			},
-			Operation: config.OperationAddRecipients,
 		},
 
 		DecryptConfig: &config.DecryptConfig{
@@ -111,7 +107,6 @@ var validJweCcs = []*config.CryptoConfig{
 			Parameters: map[string][][]byte{
 				"pubkeys": {jwePubKey3Pem},
 			},
-			Operation: config.OperationAddRecipients,
 		},
 
 		DecryptConfig: &config.DecryptConfig{
@@ -128,7 +123,6 @@ var validJweCcs = []*config.CryptoConfig{
 			Parameters: map[string][][]byte{
 				"pubkeys": {jwePubKeyDer},
 			},
-			Operation: config.OperationAddRecipients,
 			DecryptConfig: config.DecryptConfig{
 				Parameters: map[string][][]byte{
 					"privkeys":           {jwePrivKeyDer},
@@ -150,7 +144,6 @@ var validJweCcs = []*config.CryptoConfig{
 			Parameters: map[string][][]byte{
 				"pubkeys": {jwePubKeyJwk},
 			},
-			Operation: config.OperationAddRecipients,
 			DecryptConfig: config.DecryptConfig{
 				Parameters: map[string][][]byte{
 					"privkeys":           {jwePrivKeyJwk},
@@ -172,7 +165,6 @@ var validJweCcs = []*config.CryptoConfig{
 			Parameters: map[string][][]byte{
 				"pubkeys": {jweEcPubKeyPem},
 			},
-			Operation: config.OperationAddRecipients,
 			DecryptConfig: config.DecryptConfig{
 				Parameters: map[string][][]byte{
 					"privkeys":           {jweEcPrivKeyDer},
@@ -197,7 +189,6 @@ var invalidJweCcs = []*config.CryptoConfig{
 			Parameters: map[string][][]byte{
 				"pubkeys": {jwePubKeyPem},
 			},
-			Operation: config.OperationAddRecipients,
 		},
 		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{
@@ -213,7 +204,6 @@ var invalidJweCcs = []*config.CryptoConfig{
 			Parameters: map[string][][]byte{
 				"pubkeys": {jwePubKeyPem},
 			},
-			Operation: config.OperationAddRecipients,
 		},
 		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{},
@@ -226,7 +216,6 @@ var invalidJweCcs = []*config.CryptoConfig{
 			Parameters: map[string][][]byte{
 				"pubkeys": {jwePubKeyPem},
 			},
-			Operation: config.OperationAddRecipients,
 		},
 		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{

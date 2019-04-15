@@ -23,19 +23,8 @@ type EncryptConfig struct {
 	// map holding 'gpg-recipients', 'gpg-pubkeyringfile', 'pubkeys', 'x509s'
 	Parameters map[string][][]byte
 
-	// for adding recipients on an already encrypted image we need the
-	// symmetric keys for the layers so we can wrap them with the recpient's
-	// public key
-	Operation     int32 // currently only OperationAddRecipients is supported, if at all
 	DecryptConfig DecryptConfig
 }
-
-const (
-	// OperationAddRecipients instructs to add a recipient
-	OperationAddRecipients = int32(iota)
-	// OperationRemoveRecipients instructs to remove a recipient
-	OperationRemoveRecipients = int32(iota)
-)
 
 // DecryptConfig wraps the Parameters map that holds the decryption key
 type DecryptConfig struct {
