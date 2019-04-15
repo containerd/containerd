@@ -100,7 +100,7 @@ func EncryptLayer(ec *config.EncryptConfig, encOrPlainLayerReader io.ReaderAt, d
 	for annotationsID := range keyWrapperAnnotations {
 		annotation := desc.Annotations[annotationsID]
 		if annotation != "" {
-			optsData, err = decryptLayerKeyOptsData(&ec.Dc, desc)
+			optsData, err = decryptLayerKeyOptsData(&ec.DecryptConfig, desc)
 			if err != nil {
 				return nil, nil, err
 			}

@@ -83,7 +83,7 @@ func init() {
 	ec = &config.EncryptConfig{
 		Parameters: parameters,
 		Operation:  config.OperationAddRecipients,
-		Dc: config.DecryptConfig{
+		DecryptConfig: config.DecryptConfig{
 			Parameters: dcparameters,
 		},
 	}

@@ -25,20 +25,20 @@ import (
 var validGpgCcs = []*config.CryptoConfig{
 	// Key 1
 	{
-		Ec: &config.EncryptConfig{
+		EncryptConfig: &config.EncryptConfig{
 			Parameters: map[string][][]byte{
 				"gpg-pubkeyringfile": {gpgPubKeyRing},
 				"gpg-recipients":     {gpgRecipient1},
 			},
 			Operation: config.OperationAddRecipients,
-			Dc: config.DecryptConfig{
+			DecryptConfig: config.DecryptConfig{
 				Parameters: map[string][][]byte{
 					"gpg-privatekeys": {gpgPrivKey1},
 				},
 			},
 		},
 
-		Dc: &config.DecryptConfig{
+		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{
 				"gpg-privatekeys": {gpgPrivKey1},
 			},
@@ -47,20 +47,20 @@ var validGpgCcs = []*config.CryptoConfig{
 
 	// Key 2
 	{
-		Ec: &config.EncryptConfig{
+		EncryptConfig: &config.EncryptConfig{
 			Parameters: map[string][][]byte{
 				"gpg-pubkeyringfile": {gpgPubKeyRing},
 				"gpg-recipients":     {gpgRecipient2},
 			},
 			Operation: config.OperationAddRecipients,
-			Dc: config.DecryptConfig{
+			DecryptConfig: config.DecryptConfig{
 				Parameters: map[string][][]byte{
 					"gpg-privatekeys": {gpgPrivKey2},
 				},
 			},
 		},
 
-		Dc: &config.DecryptConfig{
+		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{
 				"gpg-privatekeys": {gpgPrivKey2},
 			},
@@ -69,7 +69,7 @@ var validGpgCcs = []*config.CryptoConfig{
 
 	// Key 1 without enc private key
 	{
-		Ec: &config.EncryptConfig{
+		EncryptConfig: &config.EncryptConfig{
 			Parameters: map[string][][]byte{
 				"gpg-pubkeyringfile": {gpgPubKeyRing},
 				"gpg-recipients":     {gpgRecipient1},
@@ -77,7 +77,7 @@ var validGpgCcs = []*config.CryptoConfig{
 			Operation: config.OperationAddRecipients,
 		},
 
-		Dc: &config.DecryptConfig{
+		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{
 				"gpg-privatekeys": {gpgPrivKey1},
 			},
@@ -86,7 +86,7 @@ var validGpgCcs = []*config.CryptoConfig{
 
 	// Key 2 without enc private key
 	{
-		Ec: &config.EncryptConfig{
+		EncryptConfig: &config.EncryptConfig{
 			Parameters: map[string][][]byte{
 				"gpg-pubkeyringfile": {gpgPubKeyRing},
 				"gpg-recipients":     {gpgRecipient2},
@@ -94,7 +94,7 @@ var validGpgCcs = []*config.CryptoConfig{
 			Operation: config.OperationAddRecipients,
 		},
 
-		Dc: &config.DecryptConfig{
+		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{
 				"gpg-privatekeys": {gpgPrivKey2},
 			},
@@ -105,14 +105,14 @@ var validGpgCcs = []*config.CryptoConfig{
 var invalidGpgCcs = []*config.CryptoConfig{
 	// Client key 1 public with client 2 private decrypt
 	{
-		Ec: &config.EncryptConfig{
+		EncryptConfig: &config.EncryptConfig{
 			Parameters: map[string][][]byte{
 				"gpg-pubkeyringfile": {gpgPubKeyRing},
 				"gpg-recipients":     {gpgRecipient1},
 			},
 			Operation: config.OperationAddRecipients,
 		},
-		Dc: &config.DecryptConfig{
+		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{
 				"gpg-privatekeys": {gpgPrivKey2},
 			},
@@ -121,28 +121,28 @@ var invalidGpgCcs = []*config.CryptoConfig{
 
 	// Client key 1 public with no private key
 	{
-		Ec: &config.EncryptConfig{
+		EncryptConfig: &config.EncryptConfig{
 			Parameters: map[string][][]byte{
 				"gpg-pubkeyringfile": {gpgPubKeyRing},
 				"gpg-recipients":     {gpgRecipient1},
 			},
 			Operation: config.OperationAddRecipients,
 		},
-		Dc: &config.DecryptConfig{
+		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{},
 		},
 	},
 
 	// Invalid Client key 1 private key
 	{
-		Ec: &config.EncryptConfig{
+		EncryptConfig: &config.EncryptConfig{
 			Parameters: map[string][][]byte{
 				"gpg-pubkeyringfile": {gpgPrivKey1},
 				"gpg-recipients":     {gpgRecipient1},
 			},
 			Operation: config.OperationAddRecipients,
 		},
-		Dc: &config.DecryptConfig{
+		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{
 				"gpg-privatekeys": {gpgPrivKey1},
 			},
@@ -156,12 +156,12 @@ func TestKeyWrapGpgSuccess(t *testing.T) {
 
 		data := []byte("This is some secret text")
 
-		wk, err := kw.WrapKeys(cc.Ec, data)
+		wk, err := kw.WrapKeys(cc.EncryptConfig, data)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		ud, err := kw.UnwrapKey(cc.Dc, wk)
+		ud, err := kw.UnwrapKey(cc.DecryptConfig, wk)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -178,12 +178,12 @@ func TestKeyWrapGpgInvalid(t *testing.T) {
 
 		data := []byte("This is some secret text")
 
-		wk, err := kw.WrapKeys(cc.Ec, data)
+		wk, err := kw.WrapKeys(cc.EncryptConfig, data)
 		if err != nil {
 			return
 		}
 
-		ud, err := kw.UnwrapKey(cc.Dc, wk)
+		ud, err := kw.UnwrapKey(cc.DecryptConfig, wk)
 		if err != nil {
 			return
 		}

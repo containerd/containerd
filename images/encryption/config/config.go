@@ -26,8 +26,8 @@ type EncryptConfig struct {
 	// for adding recipients on an already encrypted image we need the
 	// symmetric keys for the layers so we can wrap them with the recpient's
 	// public key
-	Operation int32 // currently only OperationAddRecipients is supported, if at all
-	Dc        DecryptConfig
+	Operation     int32 // currently only OperationAddRecipients is supported, if at all
+	DecryptConfig DecryptConfig
 }
 
 const (
@@ -46,6 +46,6 @@ type DecryptConfig struct {
 // CryptoConfig is a common wrapper for EncryptConfig and DecrypConfig that can
 // be passed through functions that share much code for encryption and decryption
 type CryptoConfig struct {
-	Ec *EncryptConfig
-	Dc *DecryptConfig
+	EncryptConfig *EncryptConfig
+	DecryptConfig *DecryptConfig
 }

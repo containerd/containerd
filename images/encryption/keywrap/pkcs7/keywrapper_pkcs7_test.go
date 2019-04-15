@@ -27,12 +27,12 @@ var oneEmpty []byte
 var validPkcs7Ccs = []*config.CryptoConfig{
 	// Client key 1
 	{
-		Ec: &config.EncryptConfig{
+		EncryptConfig: &config.EncryptConfig{
 			Parameters: map[string][][]byte{
 				"x509s": {pkcs7ClientCert},
 			},
 			Operation: config.OperationAddRecipients,
-			Dc: config.DecryptConfig{
+			DecryptConfig: config.DecryptConfig{
 				Parameters: map[string][][]byte{
 					"privkeys":           {pkcs7ClientCertKey},
 					"privkeys-passwords": {oneEmpty},
@@ -40,7 +40,7 @@ var validPkcs7Ccs = []*config.CryptoConfig{
 				},
 			},
 		},
-		Dc: &config.DecryptConfig{
+		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{
 				"privkeys":           {pkcs7ClientCertKey},
 				"privkeys-passwords": {oneEmpty},
@@ -51,12 +51,12 @@ var validPkcs7Ccs = []*config.CryptoConfig{
 
 	// Client key 2
 	{
-		Ec: &config.EncryptConfig{
+		EncryptConfig: &config.EncryptConfig{
 			Parameters: map[string][][]byte{
 				"x509s": {pkcs7Client2Cert},
 			},
 			Operation: config.OperationAddRecipients,
-			Dc: config.DecryptConfig{
+			DecryptConfig: config.DecryptConfig{
 				Parameters: map[string][][]byte{
 					"privkeys":           {pkcs7Client2CertKey},
 					"privkeys-passwords": {oneEmpty},
@@ -64,7 +64,7 @@ var validPkcs7Ccs = []*config.CryptoConfig{
 				},
 			},
 		},
-		Dc: &config.DecryptConfig{
+		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{
 				"privkeys":           {pkcs7Client2CertKey},
 				"privkeys-passwords": {oneEmpty},
@@ -75,13 +75,13 @@ var validPkcs7Ccs = []*config.CryptoConfig{
 
 	// Client key 1 without enc private key
 	{
-		Ec: &config.EncryptConfig{
+		EncryptConfig: &config.EncryptConfig{
 			Parameters: map[string][][]byte{
 				"x509s": {pkcs7ClientCert},
 			},
 			Operation: config.OperationAddRecipients,
 		},
-		Dc: &config.DecryptConfig{
+		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{
 				"privkeys":           {pkcs7ClientCertKey},
 				"privkeys-passwords": {oneEmpty},
@@ -92,13 +92,13 @@ var validPkcs7Ccs = []*config.CryptoConfig{
 
 	// Client key 2 without enc private key
 	{
-		Ec: &config.EncryptConfig{
+		EncryptConfig: &config.EncryptConfig{
 			Parameters: map[string][][]byte{
 				"x509s": {pkcs7Client2Cert},
 			},
 			Operation: config.OperationAddRecipients,
 		},
-		Dc: &config.DecryptConfig{
+		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{
 				"privkeys":           {pkcs7Client2CertKey},
 				"privkeys-passwords": {oneEmpty},
@@ -111,13 +111,13 @@ var validPkcs7Ccs = []*config.CryptoConfig{
 var invalidPkcs7Ccs = []*config.CryptoConfig{
 	// Client key 1 public with client 2 private decrypt
 	{
-		Ec: &config.EncryptConfig{
+		EncryptConfig: &config.EncryptConfig{
 			Parameters: map[string][][]byte{
 				"x509s": {pkcs7ClientCert},
 			},
 			Operation: config.OperationAddRecipients,
 		},
-		Dc: &config.DecryptConfig{
+		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{
 				"privkeys":           {pkcs7Client2CertKey},
 				"privkeys-passwords": {oneEmpty},
@@ -128,26 +128,26 @@ var invalidPkcs7Ccs = []*config.CryptoConfig{
 
 	// Client key 1 public with no private key
 	{
-		Ec: &config.EncryptConfig{
+		EncryptConfig: &config.EncryptConfig{
 			Parameters: map[string][][]byte{
 				"x509s": {pkcs7ClientCert},
 			},
 			Operation: config.OperationAddRecipients,
 		},
-		Dc: &config.DecryptConfig{
+		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{},
 		},
 	},
 
 	// Invalid Client key 1 private key
 	{
-		Ec: &config.EncryptConfig{
+		EncryptConfig: &config.EncryptConfig{
 			Parameters: map[string][][]byte{
 				"x509s": {pkcs7ClientCertKey},
 			},
 			Operation: config.OperationAddRecipients,
 		},
-		Dc: &config.DecryptConfig{
+		DecryptConfig: &config.DecryptConfig{
 			Parameters: map[string][][]byte{
 				"privkeys":           {pkcs7ClientCert},
 				"privkeys-passwords": {oneEmpty},
@@ -163,12 +163,12 @@ func TestKeyWrapPkcs7Success(t *testing.T) {
 
 		data := []byte("This is some secret text")
 
-		wk, err := kw.WrapKeys(cc.Ec, data)
+		wk, err := kw.WrapKeys(cc.EncryptConfig, data)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		ud, err := kw.UnwrapKey(cc.Dc, wk)
+		ud, err := kw.UnwrapKey(cc.DecryptConfig, wk)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -185,12 +185,12 @@ func TestKeyWrapPkcs7Invalid(t *testing.T) {
 
 		data := []byte("This is some secret text")
 
-		wk, err := kw.WrapKeys(cc.Ec, data)
+		wk, err := kw.WrapKeys(cc.EncryptConfig, data)
 		if err != nil {
 			return
 		}
 
-		ud, err := kw.UnwrapKey(cc.Dc, wk)
+		ud, err := kw.UnwrapKey(cc.DecryptConfig, wk)
 		if err != nil {
 			return
 		}
