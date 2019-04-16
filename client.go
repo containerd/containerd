@@ -622,6 +622,13 @@ func (c *Client) VersionService() versionservice.VersionClient {
 	return versionservice.NewVersionClient(c.conn)
 }
 
+// Conn returns the underlying GRPC connection object
+func (c *Client) Conn() *grpc.ClientConn {
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
+	return c.conn
+}
+
 // Version of containerd
 type Version struct {
 	// Version number
