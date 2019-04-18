@@ -23,7 +23,7 @@ import (
 
 const (
 	defaultAddress = `\\.\pipe\containerd-containerd-test`
-	testImage      = "docker.io/microsoft/nanoserver:latest"
+	testImage      = "mcr.microsoft.com/windows/nanoserver:1709"
 )
 
 var (
