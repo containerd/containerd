@@ -111,10 +111,11 @@ func TestMain(m *testing.M) {
 	}).Info("running tests against containerd")
 
 	// pull a seed image
+	log.G(ctx).Info("start to pull seed image")
 	if _, err = client.Pull(ctx, testImage, WithPullUnpack); err != nil {
-		ctrd.Stop()
-		ctrd.Wait()
 		fmt.Fprintf(os.Stderr, "%s: %s\n", err, buf.String())
+		ctrd.Kill()
+		ctrd.Wait()
 		os.Exit(1)
 	}
 
