@@ -21,9 +21,7 @@ import (
 	"time"
 
 	eventtypes "github.com/containerd/containerd/api/events"
-	//"github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/typeurl"
-	//gogotypes "github.com/gogo/protobuf/types"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/util/clock"
 )
@@ -35,22 +33,22 @@ func TestBackOff(t *testing.T) {
 	inputQueues := map[string]*backOffQueue{
 		"container1": {
 			events: []interface{}{
-				&eventtypes.TaskExit{ContainerID: "container1", ID: "1"},
-				&eventtypes.TaskExit{ContainerID: "container1", ID: "2"},
+				&eventtypes.TaskOOM{ContainerID: "container1"},
+				&eventtypes.TaskOOM{ContainerID: "container1"},
 			},
 		},
 		"container2": {
 			events: []interface{}{
-				&eventtypes.TaskExit{ContainerID: "container2", ID: "1"},
-				&eventtypes.TaskExit{ContainerID: "container2", ID: "2"},
+				&eventtypes.TaskOOM{ContainerID: "container2"},
+				&eventtypes.TaskOOM{ContainerID: "container2"},
 			},
 		},
 	}
 	expectedQueues := map[string]*backOffQueue{
 		"container2": {
 			events: []interface{}{
-				&eventtypes.TaskExit{ContainerID: "container2", ID: "1"},
-				&eventtypes.TaskExit{ContainerID: "container2", ID: "2"},
+				&eventtypes.TaskOOM{ContainerID: "container2"},
+				&eventtypes.TaskOOM{ContainerID: "container2"},
 			},
 			expireTime: testClock.Now().Add(backOffInitDuration),
 			duration:   backOffInitDuration,
@@ -58,8 +56,8 @@ func TestBackOff(t *testing.T) {
 		},
 		"container1": {
 			events: []interface{}{
-				&eventtypes.TaskExit{ContainerID: "container1", ID: "1"},
-				&eventtypes.TaskExit{ContainerID: "container1", ID: "2"},
+				&eventtypes.TaskOOM{ContainerID: "container1"},
+				&eventtypes.TaskOOM{ContainerID: "container1"},
 			},
 			expireTime: testClock.Now().Add(backOffInitDuration),
 			duration:   backOffInitDuration,

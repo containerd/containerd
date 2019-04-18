@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2019 The containerd Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,18 +25,41 @@ import (
 	containerstore "github.com/containerd/cri/pkg/store/container"
 )
 
-// TestSetContainerRemoving tests setContainerRemoving sets removing
+// TestSetContainerStarting tests setContainerStarting sets removing
 // state correctly.
-func TestSetContainerRemoving(t *testing.T) {
+func TestSetContainerStarting(t *testing.T) {
 	testID := "test-id"
 	for desc, test := range map[string]struct {
 		status    containerstore.Status
 		expectErr bool
 	}{
+
+		"should not return error when container is in created state": {
+			status: containerstore.Status{
+				CreatedAt: time.Now().UnixNano(),
+			},
+			expectErr: false,
+		},
 		"should return error when container is in running state": {
 			status: containerstore.Status{
 				CreatedAt: time.Now().UnixNano(),
 				StartedAt: time.Now().UnixNano(),
+			},
+			expectErr: true,
+		},
+		"should return error when container is in exited state": {
+			status: containerstore.Status{
+				CreatedAt:  time.Now().UnixNano(),
+				StartedAt:  time.Now().UnixNano(),
+				FinishedAt: time.Now().UnixNano(),
+			},
+			expectErr: true,
+		},
+		"should return error when container is in unknown state": {
+			status: containerstore.Status{
+				CreatedAt:  0,
+				StartedAt:  0,
+				FinishedAt: 0,
 			},
 			expectErr: true,
 		},
@@ -49,20 +72,10 @@ func TestSetContainerRemoving(t *testing.T) {
 		},
 		"should return error when container is in removing state": {
 			status: containerstore.Status{
-				CreatedAt:  time.Now().UnixNano(),
-				StartedAt:  time.Now().UnixNano(),
-				FinishedAt: time.Now().UnixNano(),
-				Removing:   true,
+				CreatedAt: time.Now().UnixNano(),
+				Removing:  true,
 			},
 			expectErr: true,
-		},
-		"should not return error when container is not running and removing": {
-			status: containerstore.Status{
-				CreatedAt:  time.Now().UnixNano(),
-				StartedAt:  time.Now().UnixNano(),
-				FinishedAt: time.Now().UnixNano(),
-			},
-			expectErr: false,
 		},
 	} {
 		t.Logf("TestCase %q", desc)
@@ -71,15 +84,15 @@ func TestSetContainerRemoving(t *testing.T) {
 			containerstore.WithFakeStatus(test.status),
 		)
 		assert.NoError(t, err)
-		err = setContainerRemoving(container)
+		err = setContainerStarting(container)
 		if test.expectErr {
 			assert.Error(t, err)
 			assert.Equal(t, test.status, container.Status.Get(), "metadata should not be updated")
 		} else {
 			assert.NoError(t, err)
-			assert.True(t, container.Status.Get().Removing, "removing should be set")
-			assert.NoError(t, resetContainerRemoving(container))
-			assert.False(t, container.Status.Get().Removing, "removing should be reset")
+			assert.True(t, container.Status.Get().Starting, "starting should be set")
+			assert.NoError(t, resetContainerStarting(container))
+			assert.False(t, container.Status.Get().Starting, "starting should be reset")
 		}
 	}
 }
