@@ -88,14 +88,14 @@ func setupDumpStacks() {
 		logrus.Debugf("Stackdump - waiting signal at %s", event)
 		for {
 			windows.WaitForSingleObject(h, windows.INFINITE)
-			dumpStacks()
+			dumpStacks(true)
 		}
 	}()
 }
 
 func etwCallback(sourceID *guid.GUID, state etw.ProviderState, level etw.Level, matchAnyKeyword uint64, matchAllKeyword uint64, filterData uintptr) {
 	if state == etw.ProviderStateCaptureState {
-		dumpStacks()
+		dumpStacks(false)
 	}
 }
 
