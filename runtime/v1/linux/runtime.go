@@ -330,6 +330,10 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			continue
 		}
 		id := path.Name()
+		// skip hidden directories
+		if len(id) > 0 && id[0] == '.' {
+			continue
+		}
 		bundle := loadBundle(
 			id,
 			filepath.Join(r.state, ns, id),

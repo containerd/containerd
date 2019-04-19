@@ -202,6 +202,10 @@ func (m *TaskManager) loadTasks(ctx context.Context) error {
 			continue
 		}
 		id := sd.Name()
+		// skip hidden directories
+		if len(id) > 0 && id[0] == '.' {
+			continue
+		}
 		bundle, err := LoadBundle(ctx, m.state, id)
 		if err != nil {
 			// fine to return error here, it is a programmer error if the context

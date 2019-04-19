@@ -181,7 +181,8 @@ func (b *bundle) shimConfig(namespace string, c *Config, runcOptions *runctypes.
 func atomicDelete(path string) error {
 	// create a hidden dir for an atomic removal
 	atomicPath := filepath.Join(filepath.Dir(path), fmt.Sprintf(".%s", filepath.Base(path)))
-	if err := os.Rename(path, atomicPath); err != nil {
+	if err := os.Rename(path, atomicPath); err != nil &&
+		!os.IsNotExist(err) {
 		return err
 	}
 	return os.RemoveAll(atomicPath)
