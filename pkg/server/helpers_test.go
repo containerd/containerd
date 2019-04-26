@@ -212,7 +212,8 @@ func TestGenerateRuntimeOptions(t *testing.T) {
 systemd_cgroup = true
 [containerd]
   no_pivot = true
-[containerd.default_runtime]
+  default_runtime_name = "default"
+[containerd.runtimes.legacy]
   runtime_type = "` + linuxRuntime + `"
 [containerd.runtimes.runc]
   runtime_type = "` + runcRuntimeV1 + `"
@@ -223,11 +224,12 @@ systemd_cgroup = true
 systemd_cgroup = true
 [containerd]
   no_pivot = true
-[containerd.default_runtime]
+  default_runtime_name = "default"
+[containerd.runtimes.legacy]
   runtime_type = "` + linuxRuntime + `"
-[containerd.default_runtime.options]
-  Runtime = "default"
-  RuntimeRoot = "/default"
+[containerd.runtimes.legacy.options]
+  Runtime = "legacy"
+  RuntimeRoot = "/legacy"
 [containerd.runtimes.runc]
   runtime_type = "` + runcRuntimeV1 + `"
 [containerd.runtimes.runc.options]
@@ -246,8 +248,8 @@ systemd_cgroup = true
 	require.NoError(t, err)
 	_, err = toml.Decode(nonNilOpts, &nonNilOptsConfig)
 	require.NoError(t, err)
-	require.Len(t, nilOptsConfig.Runtimes, 2)
-	require.Len(t, nonNilOptsConfig.Runtimes, 2)
+	require.Len(t, nilOptsConfig.Runtimes, 3)
+	require.Len(t, nonNilOptsConfig.Runtimes, 3)
 
 	for desc, test := range map[string]struct {
 		r               criconfig.Runtime
@@ -265,7 +267,7 @@ systemd_cgroup = true
 			expectedOptions: nil,
 		},
 		"when options is nil, should use legacy fields for legacy runtime": {
-			r: nilOptsConfig.DefaultRuntime,
+			r: nilOptsConfig.Runtimes["legacy"],
 			c: nilOptsConfig,
 			expectedOptions: &runctypes.RuncOptions{
 				SystemdCgroup: true,
@@ -290,11 +292,11 @@ systemd_cgroup = true
 			},
 		},
 		"when options is not nil, should be able to decode for legacy runtime": {
-			r: nonNilOptsConfig.DefaultRuntime,
+			r: nonNilOptsConfig.Runtimes["legacy"],
 			c: nonNilOptsConfig,
 			expectedOptions: &runctypes.RuncOptions{
-				Runtime:     "default",
-				RuntimeRoot: "/default",
+				Runtime:     "legacy",
+				RuntimeRoot: "/legacy",
 			},
 		},
 	} {

@@ -47,14 +47,14 @@ type Runtime struct {
 type ContainerdConfig struct {
 	// Snapshotter is the snapshotter used by containerd.
 	Snapshotter string `toml:"snapshotter" json:"snapshotter"`
+	// DefaultRuntimeName is the default runtime name to use from the runtimes table.
+	DefaultRuntimeName string `toml:"default_runtime_name" json:"defaultRuntimeName"`
 	// DefaultRuntime is the default runtime to use in containerd.
 	// This runtime is used when no runtime handler (or the empty string) is provided.
+	// DEPRECATED: use DefaultRuntimeName instead. Remove in containerd 1.4.
 	DefaultRuntime Runtime `toml:"default_runtime" json:"defaultRuntime"`
 	// UntrustedWorkloadRuntime is a runtime to run untrusted workloads on it.
-	// DEPRECATED: use Runtimes instead. If provided, this runtime is mapped to the runtime handler
-	//     named 'untrusted'. It is a configuration error to provide both the (now deprecated)
-	//     UntrustedWorkloadRuntime and a handler in the Runtimes handler map (below) for 'untrusted'
-	//     workloads at the same time. Please provide one or the other.
+	// DEPRECATED: use `untrusted` runtime in Runtimes instead. Remove in containerd 1.4.
 	UntrustedWorkloadRuntime Runtime `toml:"untrusted_workload_runtime" json:"untrustedWorkloadRuntime"`
 	// Runtimes is a map from CRI RuntimeHandler strings, which specify types of runtime
 	// configurations, to the matching configurations.
@@ -195,13 +195,14 @@ func DefaultConfig() PluginConfig {
 			NetworkPluginConfTemplate: "",
 		},
 		ContainerdConfig: ContainerdConfig{
-			Snapshotter: containerd.DefaultSnapshotter,
-			DefaultRuntime: Runtime{
-				Type:   "io.containerd.runtime.v1.linux",
-				Engine: "",
-				Root:   "",
+			Snapshotter:        containerd.DefaultSnapshotter,
+			DefaultRuntimeName: "runc",
+			NoPivot:            false,
+			Runtimes: map[string]Runtime{
+				"runc": {
+					Type: "io.containerd.runc.v1",
+				},
 			},
-			NoPivot: false,
 		},
 		StreamServerAddress: "127.0.0.1",
 		StreamServerPort:    "0",
@@ -229,4 +230,6 @@ func DefaultConfig() PluginConfig {
 const (
 	// RuntimeUntrusted is the implicit runtime defined for ContainerdConfig.UntrustedWorkloadRuntime
 	RuntimeUntrusted = "untrusted"
+	// RuntimeDefault is the implicit runtime defined for ContainerdConfig.DefaultRuntime
+	RuntimeDefault = "default"
 )

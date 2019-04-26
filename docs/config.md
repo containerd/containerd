@@ -80,60 +80,22 @@ The explanation and default value of each configuration item are as follows:
     #   For runtime "io.containerd.runc.v1", use the option `NoPivotRoot`.
     no_pivot = false
 
+    # default_runtime_name is the default runtime name to use.
+    default_runtime_name = "runc"
+
     # "plugins.cri.containerd.default_runtime" is the runtime to use in containerd.
+    # DEPRECATED: use `default_runtime_name` and `plugins.cri.runtimes` instead.
+    # Remove in containerd 1.4.
     [plugins.cri.containerd.default_runtime]
-      # runtime_type is the runtime type to use in containerd e.g. io.containerd.runtime.v1.linux
-      runtime_type = "io.containerd.runtime.v1.linux"
-
-      # runtime_engine is the name of the runtime engine used by containerd.
-      # This only works for runtime type "io.containerd.runtime.v1.linux".
-      # DEPRECATED: use Runtime.Options for runtime specific config for shim v2 runtimes.
-      #   For runtime "io.containerd.runc.v1", use the option `BinaryName`.
-      runtime_engine = ""
-
-      # runtime_root is the directory used by containerd for runtime state.
-      # This only works for runtime type "io.containerd.runtime.v1.linux".
-      # DEPRECATED: use Runtime.Options for runtime specific config for shim v2 runtimes.
-      #   For runtime "io.containerd.runc.v1", use the option `Root`.
-      runtime_root = ""
-
-      # "plugins.cri.containerd.default_runtime.options" is options specific to
-      # the default runtime. The options type for "io.containerd.runtime.v1.linux" is:
-      #   https://github.com/containerd/containerd/blob/v1.2.0-rc.1/runtime/linux/runctypes/runc.pb.go#L40
-      # NOTE: when `options` is specified, all related deprecated options will
-      #   be ignored, including `systemd_cgroup`, `no_pivot`, `runtime_engine`
-      #   and `runtime_root`.
-      [plugins.cri.containerd.default_runtime.options]
-        # Runtime is the binary name of the runtime.
-        Runtime = ""
-
-        # RuntimeRoot is the root directory of the runtime.
-        RuntimeRoot = ""
-
-        # CriuPath is the criu binary path.
-        CriuPath = ""
-
-        # SystemdCgroup enables systemd cgroups.
-        SystemdCgroup = false
 
     # "plugins.cri.containerd.untrusted_workload_runtime" is a runtime to run untrusted workloads on it.
-    # DEPRECATED: use plugins.cri.runtimes instead. If provided, this runtime is mapped to the
-    #   runtime handler named 'untrusted'. It is a configuration error to provide both the (now
-    #   deprecated) UntrustedWorkloadRuntime and a handler in the Runtimes handler map (below) for
-    #   'untrusted' workloads at the same time. Please provide one or the other.
+    # DEPRECATED: use `untrusted` runtime in `plugins.cri.runtimes` instead.
+    # Remove in containerd 1.4.
     [plugins.cri.containerd.untrusted_workload_runtime]
-      # runtime_type is the runtime type to use in containerd e.g. io.containerd.runtime.v1.linux
-      runtime_type = ""
-
-      # runtime_engine is the name of the runtime engine used by containerd.
-      runtime_engine = ""
-
-      # runtime_root is the directory used by containerd for runtime state.
-      runtime_root = ""
 
     # plugins.cri.containerd.runtimes is a map from CRI RuntimeHandler strings, which specify types
-    # of runtime configurations, to the matching configurations. In this example,
-    # 'runc' is the RuntimeHandler string to match.
+    # of runtime configurations, to the matching configurations.
+    # In this example, 'runc' is the RuntimeHandler string to match.
     [plugins.cri.containerd.runtimes.runc]
       # runtime_type is the runtime type to use in containerd e.g. io.containerd.runtime.v1.linux
       runtime_type = "io.containerd.runc.v1"
@@ -205,3 +167,25 @@ The explanation and default value of each configuration item are as follows:
       [plugins.cri.registry.mirrors."docker.io"]
         endpoint = ["https://registry-1.docker.io", ]
 ```
+
+## Untrusted Workload
+
+The recommended way to run untrusted workload is to use
+[`RuntimeClass`](https://kubernetes.io/docs/concepts/containers/runtime-class/) api
+introduced in Kubernetes 1.12 to select RuntimeHandlers configured to run
+untrusted workload in `plugins.cri.containerd.runtimes`.
+
+However, if you are using the legacy `io.kubernetes.cri.untrusted-workload`pod annotation
+to request a pod be run using a runtime for untrusted workloads, the RuntimeHandler
+`plugins.cri.containerd.runtimes.untrusted` must be defined first. When the annotation
+`io.kubernetes.cri.untrusted-workload` is set to `true` the `untrusted` runtime will be
+used. For example, see
+[Create an untrusted pod using Kata Containers](https://github.com/kata-containers/documentation/blob/master/how-to/how-to-use-k8s-with-cri-containerd-and-kata.md#create-an-untrusted-pod-using-kata-containers).
+
+## Deprecation
+The config options of the CRI plugin follow the [Kubernetes deprecation
+policy of "admin-facing CLI components"](https://kubernetes.io/docs/reference/using-api/deprecation-policy/#deprecating-a-flag-or-cli).
+
+In summary, when a config option is announced to be deprecated:
+* It is kept functional for 6 months or 1 release (whichever is longer);
+* A warning is emitted when it is used.
