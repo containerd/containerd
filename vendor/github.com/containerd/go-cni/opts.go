@@ -55,7 +55,7 @@ func WithPluginConfDir(dir string) CNIOpt {
 }
 
 // WithMinNetworkCount can be used to configure the
-// minimum networks to be configured and initalized
+// minimum networks to be configured and initialized
 // for the status to report success. By default its 1.
 func WithMinNetworkCount(count int) CNIOpt {
 	return func(c *libcni) error {

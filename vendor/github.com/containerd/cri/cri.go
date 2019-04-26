@@ -17,6 +17,7 @@ limitations under the License.
 package cri
 
 import (
+	"context"
 	"flag"
 	"path/filepath"
 	"time"
@@ -73,7 +74,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	}
 	log.G(ctx).Infof("Start cri plugin with config %+v", c)
 
-	if err := validateConfig(&c); err != nil {
+	if err := validateConfig(ctx, &c); err != nil {
 		return nil, errors.Wrap(err, "invalid config")
 	}
 
@@ -111,14 +112,36 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 }
 
 // validateConfig validates the given configuration.
-func validateConfig(c *criconfig.Config) error {
-	// It is an error to provide both an UntrustedWorkloadRuntime & define an 'untrusted' runtime.
-	if _, ok := c.ContainerdConfig.Runtimes[criconfig.RuntimeUntrusted]; ok {
-		if c.ContainerdConfig.UntrustedWorkloadRuntime.Type != "" {
-			return errors.New("conflicting definitions: configuration includes untrusted_workload_runtime and runtimes['untrusted']")
-		}
+func validateConfig(ctx context.Context, c *criconfig.Config) error {
+	if c.ContainerdConfig.Runtimes == nil {
+		c.ContainerdConfig.Runtimes = make(map[string]criconfig.Runtime)
 	}
 
+	// Validation for deprecated untrusted_workload_runtime.
+	if c.ContainerdConfig.UntrustedWorkloadRuntime.Type != "" {
+		log.G(ctx).Warning("`untrusted_workload_runtime` is deprecated, please use `untrusted` runtime in `runtimes` instead")
+		if _, ok := c.ContainerdConfig.Runtimes[criconfig.RuntimeUntrusted]; ok {
+			return errors.Errorf("conflicting definitions: configuration includes both `untrusted_workload_runtime` and `runtimes[%q]`", criconfig.RuntimeUntrusted)
+		}
+		c.ContainerdConfig.Runtimes[criconfig.RuntimeUntrusted] = c.ContainerdConfig.UntrustedWorkloadRuntime
+	}
+
+	// Validation for deprecated default_runtime field.
+	if c.ContainerdConfig.DefaultRuntime.Type != "" {
+		log.G(ctx).Warning("`default_runtime` is deprecated, please use `default_runtime_name` to reference the default configuration you have defined in `runtimes`")
+		c.ContainerdConfig.DefaultRuntimeName = criconfig.RuntimeDefault
+		c.ContainerdConfig.Runtimes[criconfig.RuntimeDefault] = c.ContainerdConfig.DefaultRuntime
+	}
+
+	// Validation for default_runtime_name
+	if c.ContainerdConfig.DefaultRuntimeName == "" {
+		return errors.New("`default_runtime_name` is empty")
+	}
+	if _, ok := c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName]; !ok {
+		return errors.New("no corresponding runtime configured in `runtimes` for `default_runtime_name`")
+	}
+
+	// Validation for stream_idle_timeout
 	if c.StreamIdleTimeout != "" {
 		if _, err := time.ParseDuration(c.StreamIdleTimeout); err != nil {
 			return errors.Wrap(err, "invalid stream idle timeout")
