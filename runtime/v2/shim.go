@@ -75,8 +75,7 @@ func loadShim(ctx context.Context, bundle *Bundle, events *exchange.Exchange, rt
 		}
 	}()
 
-	client := ttrpc.NewClient(conn)
-	client.OnClose(func() { conn.Close() })
+	client := ttrpc.NewClient(conn, ttrpc.WithOnClose(func() { _ = conn.Close() }))
 	s := &shim{
 		client:  client,
 		task:    task.NewTaskClient(client),
