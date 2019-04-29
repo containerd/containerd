@@ -179,7 +179,7 @@ disabled_plugins = ["restart"]
 [plugins.cri.containerd]
   default_runtime_name = "${CONTAINERD_DEFAULT_RUNTIME:-"runc"}"
 [plugins.cri.containerd.runtimes.runc]
-  runtime_type = "io.containerd.runc.v1"
+  runtime_type = "io.containerd.runc.v2"
 [plugins.cri.containerd.runtimes.runc.options]
   BinaryName = "${CONTAINERD_HOME}/usr/local/sbin/runc"
 EOF
