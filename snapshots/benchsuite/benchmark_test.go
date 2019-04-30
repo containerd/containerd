@@ -192,7 +192,7 @@ func benchmarkSnapshotter(b *testing.B, snapshotter snapshots.Snapshotter) {
 				assert.NilError(b, err)
 				writeDuration += time.Since(timer)
 
-				parent = fmt.Sprintf("comitted-%d", atomic.AddInt64(&layerIndex, 1))
+				parent = fmt.Sprintf("committed-%d", atomic.AddInt64(&layerIndex, 1))
 
 				timer = time.Now()
 				err = snapshotter.Commit(ctx, parent, current)
