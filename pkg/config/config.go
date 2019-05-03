@@ -106,6 +106,13 @@ type AuthConfig struct {
 	IdentityToken string `toml:"identitytoken" json:"identitytoken"`
 }
 
+// TLSConfig contains the CA/Cert/Key used for a registry
+type TLSConfig struct {
+	CAFile   string `toml:"ca_file" json:"caFile"`
+	CertFile string `toml:"cert_file" json:"certFile"`
+	KeyFile  string `toml:"key_file" json:"keyFile"`
+}
+
 // Registry is registry settings configured
 type Registry struct {
 	// Mirrors are namespace to mirror mapping for all namespaces.
@@ -113,6 +120,9 @@ type Registry struct {
 	// Auths are registry endpoint to auth config mapping. The registry endpoint must
 	// be a valid url with host specified.
 	Auths map[string]AuthConfig `toml:"auths" json:"auths"`
+	// TLSConfigs are pairs of CA/Cert/Key which then are used when creating the transport
+	// that communicates with the registry.
+	TLSConfigs map[string]TLSConfig `toml:"tls_configs" json:"tlsConfigs"`
 }
 
 // PluginConfig contains toml config related to CRI plugin,

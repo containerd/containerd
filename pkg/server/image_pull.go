@@ -17,7 +17,10 @@ limitations under the License.
 package server
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -28,6 +31,7 @@ import (
 	"github.com/containerd/containerd/reference"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
+	"github.com/containerd/cri/pkg/config"
 	distribution "github.com/docker/distribution/reference"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -246,6 +250,33 @@ func (c *criService) credentials(auth *runtime.AuthConfig) func(string) (string,
 	}
 }
 
+// getRegistryTLSTransport returns a http.Transport configured with a CA/Cert/Key specified by registryTLSConfig
+func (c *criService) getRegistryTLSTransport(ctx context.Context, registryTLSConfig config.TLSConfig) (*http.Transport, error) {
+	cert, err := tls.LoadX509KeyPair(registryTLSConfig.CertFile, registryTLSConfig.KeyFile)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to load cert file")
+	}
+
+	caCertPool, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get system cert pool")
+	}
+	caCert, err := ioutil.ReadFile(registryTLSConfig.CAFile)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to load CA file")
+	}
+	caCertPool.AppendCertsFromPEM(caCert)
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      caCertPool,
+	}
+	tlsConfig.BuildNameToCertificate()
+	transport := &http.Transport{TLSClientConfig: tlsConfig}
+
+	return transport, nil
+}
+
 // getResolver tries registry mirrors and the default registry, and returns the resolver and descriptor
 // from the first working registry.
 func (c *criService) getResolver(ctx context.Context, ref string, cred func(string) (string, string, error)) (remotes.Resolver, imagespec.Descriptor, error) {
@@ -253,15 +284,27 @@ func (c *criService) getResolver(ctx context.Context, ref string, cred func(stri
 	if err != nil {
 		return nil, imagespec.Descriptor{}, errors.Wrap(err, "parse image reference")
 	}
+
+	httpClient := http.DefaultClient
+
 	// Try mirrors in order first, and then try default host name.
 	for _, e := range c.config.Registry.Mirrors[refspec.Hostname()].Endpoints {
 		u, err := url.Parse(e)
 		if err != nil {
 			return nil, imagespec.Descriptor{}, errors.Wrapf(err, "parse registry endpoint %q", e)
 		}
+
+		if registryTLSConfig, ok := c.config.Registry.TLSConfigs[u.Host]; ok {
+			tlsTransport, err := c.getRegistryTLSTransport(ctx, registryTLSConfig)
+			if err != nil {
+				return nil, imagespec.Descriptor{}, errors.Wrapf(err, "get tlsTransport for registry %q", refspec.Hostname())
+			}
+			httpClient = &http.Client{Transport: tlsTransport}
+		}
+
 		resolver := docker.NewResolver(docker.ResolverOptions{
 			Authorizer: docker.NewAuthorizer(http.DefaultClient, cred),
-			Client:     http.DefaultClient,
+			Client:     httpClient,
 			Host:       func(string) (string, error) { return u.Host, nil },
 			// By default use "https".
 			PlainHTTP: u.Scheme == "http",
@@ -273,9 +316,22 @@ func (c *criService) getResolver(ctx context.Context, ref string, cred func(stri
 		logrus.WithError(err).Debugf("Tried registry mirror %q but failed", e)
 		// Continue to try next endpoint
 	}
+
+	hostname, err := docker.DefaultHost(refspec.Hostname())
+	if err != nil {
+		return nil, imagespec.Descriptor{}, errors.Wrapf(err, "get host for refspec %q", refspec.Hostname())
+	}
+	if registryTLSConfig, ok := c.config.Registry.TLSConfigs[hostname]; ok {
+		tlsTransport, err := c.getRegistryTLSTransport(ctx, registryTLSConfig)
+		if err != nil {
+			return nil, imagespec.Descriptor{}, errors.Wrapf(err, "get tlsTransport for registry %q", refspec.Hostname())
+		}
+		httpClient = &http.Client{Transport: tlsTransport}
+	}
+
 	resolver := docker.NewResolver(docker.ResolverOptions{
 		Credentials: cred,
-		Client:      http.DefaultClient,
+		Client:      httpClient,
 	})
 	_, desc, err := resolver.Resolve(ctx, ref)
 	if err != nil {
