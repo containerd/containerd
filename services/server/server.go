@@ -67,10 +67,8 @@ func CreateTopLevelDirectories(config *srvconfig.Config) error {
 	if err := sys.MkdirAllWithACL(config.Root, 0711); err != nil {
 		return err
 	}
-	if err := sys.MkdirAllWithACL(config.State, 0711); err != nil {
-		return err
-	}
-	return nil
+
+	return sys.MkdirAllWithACL(config.State, 0711)
 }
 
 // New creates and initializes a new containerd server

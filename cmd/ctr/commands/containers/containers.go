@@ -427,10 +427,6 @@ var restoreCommand = cli.Command{
 			return err
 		}
 
-		if err := task.Start(ctx); err != nil {
-			return err
-		}
-
-		return nil
+		return task.Start(ctx)
 	},
 }

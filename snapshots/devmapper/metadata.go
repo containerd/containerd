@@ -241,11 +241,7 @@ func (m *PoolMetadata) RemoveDevice(ctx context.Context, name string) error {
 			return errors.Wrapf(err, "failed to delete device info for %q", name)
 		}
 
-		if err := markDeviceID(tx, device.DeviceID, deviceFree); err != nil {
-			return err
-		}
-
-		return nil
+		return markDeviceID(tx, device.DeviceID, deviceFree)
 	})
 }
 
