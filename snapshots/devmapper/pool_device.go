@@ -124,7 +124,7 @@ func (p *PoolDevice) CreateThinDevice(ctx context.Context, deviceName string, vi
 	}
 
 	defer func() {
-		if retErr == nil {
+		if err == nil {
 			return
 		}
 
@@ -138,7 +138,7 @@ func (p *PoolDevice) CreateThinDevice(ctx context.Context, deviceName string, vi
 	}
 
 	defer func() {
-		if retErr == nil {
+		if err == nil {
 			return
 		}
 
@@ -204,7 +204,7 @@ func (p *PoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName string
 	}
 
 	defer func() {
-		if retErr == nil {
+		if err == nil {
 			return
 		}
 
@@ -218,7 +218,7 @@ func (p *PoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName string
 	}
 
 	defer func() {
-		if retErr == nil {
+		if err == nil {
 			return
 		}
 
