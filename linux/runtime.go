@@ -320,7 +320,7 @@ func (r *Runtime) Delete(ctx context.Context, c runtime.Task) (*runtime.Exit, er
 	)
 
 	rsp, err := lc.shim.Delete(ctx, empty)
-	if err != nil {
+	if err != nil && !errdefs.IsNotFound(err) {
 		if cerr := r.cleanupAfterDeadShim(ctx, bundle, namespace, c.ID(), lc.pid); cerr != nil {
 			log.G(ctx).WithError(err).Error("unable to cleanup task")
 		}
