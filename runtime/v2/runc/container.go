@@ -21,6 +21,7 @@ package runc
 import (
 	"context"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sync"
 
@@ -63,6 +64,15 @@ func NewContainer(ctx context.Context, platform rproc.Platform, r *task.CreateTa
 			Options: m.Options,
 		})
 	}
+
+	rootfs := ""
+	if len(mounts) > 0 {
+		rootfs = filepath.Join(r.Bundle, "rootfs")
+		if err := os.Mkdir(rootfs, 0711); err != nil {
+			return nil, err
+		}
+	}
+
 	config := &proc.CreateConfig{
 		ID:               r.ID,
 		Bundle:           r.Bundle,
@@ -80,7 +90,6 @@ func NewContainer(ctx context.Context, platform rproc.Platform, r *task.CreateTa
 	if err := WriteRuntime(r.Bundle, opts.BinaryName); err != nil {
 		return nil, err
 	}
-	rootfs := filepath.Join(r.Bundle, "rootfs")
 	defer func() {
 		if err != nil {
 			if err2 := mount.UnmountAll(rootfs, 0); err2 != nil {
@@ -107,6 +116,7 @@ func NewContainer(ctx context.Context, platform rproc.Platform, r *task.CreateTa
 		platform,
 		config,
 		&opts,
+		rootfs,
 	)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
@@ -146,8 +156,7 @@ func WriteRuntime(path, runtime string) error {
 }
 
 func newInit(ctx context.Context, path, workDir, namespace string, platform rproc.Platform,
-	r *proc.CreateConfig, options *options.Options) (*proc.Init, error) {
-	rootfs := filepath.Join(path, "rootfs")
+	r *proc.CreateConfig, options *options.Options, rootfs string) (*proc.Init, error) {
 	runtime := proc.NewRunc(options.Root, path, namespace, options.BinaryName, options.CriuPath, options.SystemdCgroup)
 	p := proc.New(r.ID, runtime, rproc.Stdio{
 		Stdin:    r.Stdin,

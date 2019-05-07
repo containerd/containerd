@@ -89,10 +89,6 @@ func NewBundle(ctx context.Context, root, state, id string, spec []byte) (b *Bun
 		}
 	}
 	paths = append(paths, work)
-	// create rootfs dir
-	if err := os.Mkdir(filepath.Join(b.Path, "rootfs"), 0711); err != nil {
-		return nil, err
-	}
 	// symlink workdir
 	if err := os.Symlink(work, filepath.Join(b.Path, "work")); err != nil {
 		return nil, err
