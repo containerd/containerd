@@ -156,7 +156,7 @@ func (s *shim) Delete(ctx context.Context) (*runtime.Exit, error) {
 	response, err := s.task.Delete(ctx, &task.DeleteRequest{
 		ID: s.ID(),
 	})
-	if err != nil && errdefs.IsNotFound(err) {
+	if err != nil && !errdefs.IsNotFound(err) {
 		return nil, errdefs.FromGRPC(err)
 	}
 	if err := s.waitShutdown(ctx); err != nil {
