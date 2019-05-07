@@ -23,6 +23,7 @@ import (
 
 	"io/ioutil"
 	"math/rand"
+	"reflect"
 	"runtime"
 	"testing"
 
@@ -95,11 +96,11 @@ func TestImport(t *testing.T) {
 
 	c1, d2 := createConfig()
 
-	m1, d3 := createManifest(c1, [][]byte{b1})
+	m1, d3, expManifest := createManifest(c1, [][]byte{b1})
 
 	provider := client.ContentStore()
 
-	checkManifest := func(ctx context.Context, t *testing.T, d ocispec.Descriptor) {
+	checkManifest := func(ctx context.Context, t *testing.T, d ocispec.Descriptor, expManifest *ocispec.Manifest) {
 		m, err := images.Manifest(ctx, provider, d, nil)
 		if err != nil {
 			t.Fatalf("unable to read target blob: %+v", err)
@@ -115,6 +116,15 @@ func TestImport(t *testing.T) {
 
 		if m.Layers[0].Digest != d1 {
 			t.Fatalf("unexpected layer hash %s, expected %s", m.Layers[0].Digest, d1)
+		}
+
+		if expManifest != nil {
+			if !reflect.DeepEqual(m.Layers, expManifest.Layers) {
+				t.Fatalf("DeepEqual on Layers failed: %v vs. %v", m.Layers, expManifest.Layers)
+			}
+			if !reflect.DeepEqual(m.Config, expManifest.Config) {
+				t.Fatalf("DeepEqual on Config failed: %v vs. %v", m.Config, expManifest.Config)
+			}
 		}
 	}
 
@@ -155,7 +165,7 @@ func TestImport(t *testing.T) {
 				}
 
 				checkImages(t, imgs[0].Target.Digest, imgs, names...)
-				checkManifest(ctx, t, imgs[0].Target)
+				checkManifest(ctx, t, imgs[0].Target, nil)
 			},
 		},
 		{
@@ -182,7 +192,7 @@ func TestImport(t *testing.T) {
 				}
 
 				checkImages(t, d3, imgs, names...)
-				checkManifest(ctx, t, imgs[0].Target)
+				checkManifest(ctx, t, imgs[0].Target, expManifest)
 			},
 		},
 		{
@@ -203,7 +213,7 @@ func TestImport(t *testing.T) {
 				}
 
 				checkImages(t, d3, imgs, names...)
-				checkManifest(ctx, t, imgs[0].Target)
+				checkManifest(ctx, t, imgs[0].Target, expManifest)
 			},
 			Opts: []ImportOpt{
 				WithImageRefTranslator(archive.AddRefPrefix("localhost:5000/myimage")),
@@ -227,7 +237,7 @@ func TestImport(t *testing.T) {
 				}
 
 				checkImages(t, d3, imgs, names...)
-				checkManifest(ctx, t, imgs[0].Target)
+				checkManifest(ctx, t, imgs[0].Target, expManifest)
 			},
 			Opts: []ImportOpt{
 				WithImageRefTranslator(archive.FilterRefPrefix("localhost:5000/myimage")),
@@ -289,7 +299,7 @@ func createConfig() ([]byte, digest.Digest) {
 	return b, digest.FromBytes(b)
 }
 
-func createManifest(config []byte, layers [][]byte) ([]byte, digest.Digest) {
+func createManifest(config []byte, layers [][]byte) ([]byte, digest.Digest, *ocispec.Manifest) {
 	manifest := ocispec.Manifest{
 		Versioned: specs.Versioned{
 			SchemaVersion: 2,
@@ -298,6 +308,9 @@ func createManifest(config []byte, layers [][]byte) ([]byte, digest.Digest) {
 			MediaType: ocispec.MediaTypeImageConfig,
 			Digest:    digest.FromBytes(config),
 			Size:      int64(len(config)),
+			Annotations: map[string]string{
+				"ocispec": "manifest.config.descriptor",
+			},
 		},
 	}
 	for _, l := range layers {
@@ -305,12 +318,15 @@ func createManifest(config []byte, layers [][]byte) ([]byte, digest.Digest) {
 			MediaType: ocispec.MediaTypeImageLayer,
 			Digest:    digest.FromBytes(l),
 			Size:      int64(len(l)),
+			Annotations: map[string]string{
+				"ocispec": "manifest.layers.descriptor",
+			},
 		})
 	}
 
 	b, _ := json.Marshal(manifest)
 
-	return b, digest.FromBytes(b)
+	return b, digest.FromBytes(b), &manifest
 }
 
 func createIndex(manifest []byte, tags ...string) []byte {
