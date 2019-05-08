@@ -329,7 +329,7 @@ func TestShimDoesNotLeakPipes(t *testing.T) {
 }
 
 func numPipes(pid int) (int, error) {
-	cmd := exec.Command("sh", "-c", fmt.Sprintf("lsof -p %d | grep pipe", pid))
+	cmd := exec.Command("sh", "-c", fmt.Sprintf("lsof -p %d | grep FIFO", pid))
 
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
