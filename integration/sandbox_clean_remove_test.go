@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -53,7 +54,9 @@ func TestSandboxCleanRemove(t *testing.T) {
 	require.NoError(t, err)
 	task, err := cntr.Task(ctx, nil)
 	require.NoError(t, err)
-	_, err = task.Delete(ctx, containerd.WithProcessKill)
+	// Kill the task with signal SIGKILL, once the task exited,
+	// the TaskExit event will trigger the task.Delete().
+	err = task.Kill(ctx, syscall.SIGKILL, containerd.WithKillAll)
 	require.NoError(t, err)
 
 	t.Logf("Sandbox state should be NOTREADY")
