@@ -78,13 +78,24 @@ func (m *Monitor) Start(c *exec.Cmd) (chan runc.Exit, error) {
 // User should rely on the value of the exit status to determine if the
 // command was successful or not.
 func (m *Monitor) Wait(c *exec.Cmd, ec chan runc.Exit) (int, error) {
-	for e := range ec {
-		if e.Pid == c.Process.Pid {
-			// make sure we flush all IO
-			c.Wait()
-			m.Unsubscribe(ec)
-			return e.Status, nil
+	var (
+		hasExit = make(chan bool, 1)
+		exit    runc.Exit
+	)
+
+	go func() {
+		for e := range ec {
+			if e.Pid == c.Process.Pid {
+				exit = e
+				hasExit <- true
+			}
 		}
+	}()
+	if e := <-hasExit; e {
+		// make sure we flush all IO
+		c.Wait()
+		m.Unsubscribe(ec)
+		return exit.Status, nil
 	}
 	// return no such process if the ec channel is closed and no more exit
 	// events will be sent
