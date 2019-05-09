@@ -201,6 +201,13 @@ func RemoveDevice(deviceName string, opts ...RemoveDeviceOpt) error {
 	args = append(args, GetFullDevicePath(deviceName))
 
 	_, err := dmsetup(args...)
+	if err == unix.ENXIO {
+		// Ignore "No such device or address" error because we dmsetup
+		// remove with "deferred" option, there is chance for the device
+		// having been removed.
+		return nil
+	}
+
 	return err
 }
 
@@ -372,9 +379,13 @@ func parseDmsetupError(output string) string {
 		return ""
 	}
 
-	const failedSubstr = "failed: "
-
 	line := lines[0]
+	// Handle output like "Device /dev/mapper/snapshotter-suite-pool-snap-1 not found"
+	if strings.HasSuffix(line, "not found") {
+		return unix.ENXIO.Error()
+	}
+
+	const failedSubstr = "failed: "
 	idx := strings.LastIndex(line, failedSubstr)
 	if idx == -1 {
 		return ""

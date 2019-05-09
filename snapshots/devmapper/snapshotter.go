@@ -272,7 +272,18 @@ func (s *Snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		}
 
 		_, err = storage.CommitActive(ctx, key, name, usage, opts...)
-		return err
+		if err != nil {
+			return err
+		}
+
+		// The thin snapshot is not used for IO after committed, so
+		// suspend to flush the IO and deactivate the device.
+		err = s.pool.SuspendDevice(ctx, deviceName)
+		if err != nil {
+			return err
+		}
+
+		return s.pool.DeactivateDevice(ctx, deviceName, true, false)
 	})
 }
 

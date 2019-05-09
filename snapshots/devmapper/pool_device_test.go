@@ -107,19 +107,24 @@ func TestPoolDevice(t *testing.T) {
 		testMakeFileSystem(t, pool)
 	})
 
-	// Mount 'thin-1'
+	// Mount 'thin-1' and write v1 test file on 'thin-1' device
 	err = mount.WithTempMount(ctx, getMounts(thinDevice1), func(thin1MountPath string) error {
 		// Write v1 test file on 'thin-1' device
 		thin1TestFilePath := filepath.Join(thin1MountPath, "TEST")
 		err := ioutil.WriteFile(thin1TestFilePath, []byte("test file (v1)"), 0700)
 		assert.NilError(t, err, "failed to write test file v1 on '%s' volume", thinDevice1)
 
-		// Take snapshot of 'thin-1'
-		t.Run("CreateSnapshotDevice", func(t *testing.T) {
-			testCreateSnapshot(t, pool)
-		})
+		return nil
+	})
 
-		// Update TEST file on 'thin-1' to v2
+	// Take snapshot of 'thin-1'
+	t.Run("CreateSnapshotDevice", func(t *testing.T) {
+		testCreateSnapshot(t, pool)
+	})
+
+	// Update TEST file on 'thin-1' to v2
+	err = mount.WithTempMount(ctx, getMounts(thinDevice1), func(thin1MountPath string) error {
+		thin1TestFilePath := filepath.Join(thin1MountPath, "TEST")
 		err = ioutil.WriteFile(thin1TestFilePath, []byte("test file (v2)"), 0700)
 		assert.NilError(t, err, "failed to write test file v2 on 'thin-1' volume after taking snapshot")
 
@@ -204,7 +209,7 @@ func testDeactivateThinDevice(t *testing.T, pool *PoolDevice) {
 	for _, deviceName := range deviceList {
 		assert.Assert(t, pool.IsActivated(deviceName))
 
-		err := pool.DeactivateDevice(context.Background(), deviceName, false)
+		err := pool.DeactivateDevice(context.Background(), deviceName, false, true)
 		assert.NilError(t, err, "failed to remove '%s'", deviceName)
 
 		assert.Assert(t, !pool.IsActivated(deviceName))

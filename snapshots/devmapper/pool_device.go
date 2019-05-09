@@ -178,19 +178,6 @@ func (p *PoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName string
 		return errors.Wrapf(err, "failed to query device metadata for %q", deviceName)
 	}
 
-	// Suspend thin device if it was activated previously to avoid corruptions
-	isActivated := p.IsActivated(baseInfo.Name)
-	if isActivated {
-		if err := p.suspendDevice(ctx, baseInfo); err != nil {
-			return err
-		}
-
-		// Resume back base thin device on exit
-		defer func() {
-			retErr = multierror.Append(retErr, p.resumeDevice(ctx, baseInfo)).ErrorOrNil()
-		}()
-	}
-
 	snapInfo := &DeviceInfo{
 		Name:       snapshotName,
 		Size:       virtualSizeBytes,
@@ -230,26 +217,6 @@ func (p *PoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName string
 	return p.activateDevice(ctx, snapInfo)
 }
 
-func (p *PoolDevice) suspendDevice(ctx context.Context, info *DeviceInfo) error {
-	if err := p.transition(ctx, info.Name, Suspending, Suspended, func() error {
-		return dmsetup.SuspendDevice(info.Name)
-	}); err != nil {
-		return errors.Wrapf(err, "failed to suspend device %q", info.Name)
-	}
-
-	return nil
-}
-
-func (p *PoolDevice) resumeDevice(ctx context.Context, info *DeviceInfo) error {
-	if err := p.transition(ctx, info.Name, Resuming, Resumed, func() error {
-		return dmsetup.ResumeDevice(info.Name)
-	}); err != nil {
-		return errors.Wrapf(err, "failed to resume device %q", info.Name)
-	}
-
-	return nil
-}
-
 func (p *PoolDevice) createSnapshot(ctx context.Context, baseInfo, snapInfo *DeviceInfo) error {
 	if err := p.transition(ctx, snapInfo.Name, Creating, Created, func() error {
 		return dmsetup.CreateSnapshot(p.poolName, snapInfo.DeviceID, baseInfo.DeviceID)
@@ -265,15 +232,29 @@ func (p *PoolDevice) createSnapshot(ctx context.Context, baseInfo, snapInfo *Dev
 	return nil
 }
 
+// SuspendDevice flushes the outstanding IO and blocks the further IO
+func (p *PoolDevice) SuspendDevice(ctx context.Context, deviceName string) error {
+	if err := p.transition(ctx, deviceName, Suspending, Suspended, func() error {
+		return dmsetup.SuspendDevice(deviceName)
+	}); err != nil {
+		return errors.Wrapf(err, "failed to suspend device %q", deviceName)
+	}
+
+	return nil
+}
+
 // DeactivateDevice deactivates thin device
-func (p *PoolDevice) DeactivateDevice(ctx context.Context, deviceName string, deferred bool) error {
-	if !p.IsActivated(deviceName) {
+func (p *PoolDevice) DeactivateDevice(ctx context.Context, deviceName string, deferred, withForce bool) error {
+	if !p.IsLoaded(deviceName) {
 		return nil
 	}
 
-	opts := []dmsetup.RemoveDeviceOpt{dmsetup.RemoveWithForce, dmsetup.RemoveWithRetries}
+	opts := []dmsetup.RemoveDeviceOpt{dmsetup.RemoveWithRetries}
 	if deferred {
 		opts = append(opts, dmsetup.RemoveDeferred)
+	}
+	if withForce {
+		opts = append(opts, dmsetup.RemoveWithForce)
 	}
 
 	if err := p.transition(ctx, deviceName, Deactivating, Deactivated, func() error {
@@ -298,6 +279,12 @@ func (p *PoolDevice) IsActivated(deviceName string) bool {
 	}
 
 	return true
+}
+
+// IsLoaded returns true if thin-device is visible for dmsetup
+func (p *PoolDevice) IsLoaded(deviceName string) bool {
+	_, err := dmsetup.Info(deviceName)
+	return err == nil
 }
 
 // GetUsage reports total size in bytes consumed by a thin-device.
@@ -330,7 +317,7 @@ func (p *PoolDevice) RemoveDevice(ctx context.Context, deviceName string) error 
 		return errors.Wrapf(err, "can't query metadata for device %q", deviceName)
 	}
 
-	if err := p.DeactivateDevice(ctx, deviceName, true); err != nil {
+	if err := p.DeactivateDevice(ctx, deviceName, true, true); err != nil {
 		return err
 	}
 
@@ -368,7 +355,7 @@ func (p *PoolDevice) RemovePool(ctx context.Context) error {
 
 	// Deactivate devices if any
 	for _, name := range deviceNames {
-		if err := p.DeactivateDevice(ctx, name, true); err != nil {
+		if err := p.DeactivateDevice(ctx, name, true, true); err != nil {
 			result = multierror.Append(result, errors.Wrapf(err, "failed to remove %q", name))
 		}
 	}

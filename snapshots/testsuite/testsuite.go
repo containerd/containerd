@@ -149,11 +149,12 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	if err := mount.All(mounts, preparing); err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
-	defer testutil.Unmount(t, preparing)
 
 	if err := initialApplier.Apply(preparing); err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
+	// unmount before commit
+	testutil.Unmount(t, preparing)
 
 	committed := filepath.Join(work, "committed")
 	if err := snapshotter.Commit(ctx, committed, preparing, opt); err != nil {
@@ -185,7 +186,6 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	if err := mount.All(mounts, next); err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
-	defer testutil.Unmount(t, next)
 
 	if err := fstest.CheckDirectoryEqualWithApplier(next, initialApplier); err != nil {
 		t.Fatalf("failure reason: %+v", err)
@@ -194,6 +194,8 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	if err := diffApplier.Apply(next); err != nil {
 		t.Fatalf("failure reason: %+v", err)
 	}
+	// unmount before commit
+	testutil.Unmount(t, next)
 
 	ni, err := snapshotter.Stat(ctx, next)
 	if err != nil {
