@@ -270,6 +270,7 @@ func (c *criService) getResolver(ctx context.Context, ref string, cred func(stri
 		if err == nil {
 			return resolver, desc, nil
 		}
+		logrus.WithError(err).Debugf("Tried registry mirror %q but failed", e)
 		// Continue to try next endpoint
 	}
 	resolver := docker.NewResolver(docker.ResolverOptions{
