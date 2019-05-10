@@ -275,7 +275,7 @@ func getUserFromImage(user string) (*int64, string) {
 
 // ensureImageExists returns corresponding metadata of the image reference, if image is not
 // pulled yet, the function will pull the image.
-func (c *criService) ensureImageExists(ctx context.Context, ref string) (*imagestore.Image, error) {
+func (c *criService) ensureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig) (*imagestore.Image, error) {
 	image, err := c.localResolve(ref)
 	if err != nil && err != store.ErrNotExist {
 		return nil, errors.Wrapf(err, "failed to get image %q", ref)
@@ -284,7 +284,7 @@ func (c *criService) ensureImageExists(ctx context.Context, ref string) (*images
 		return &image, nil
 	}
 	// Pull image to ensure the image exists
-	resp, err := c.PullImage(ctx, &runtime.PullImageRequest{Image: &runtime.ImageSpec{Image: ref}})
+	resp, err := c.PullImage(ctx, &runtime.PullImageRequest{Image: &runtime.ImageSpec{Image: ref}, SandboxConfig: config})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to pull image %q", ref)
 	}
