@@ -41,6 +41,15 @@ type NewContainerOpts func(ctx context.Context, client *Client, c *containers.Co
 // UpdateContainerOpts allows the caller to set additional options when updating a container
 type UpdateContainerOpts func(ctx context.Context, client *Client, c *containers.Container) error
 
+// InfoOpts controls how container metadata is fetched and returned
+type InfoOpts func(*InfoConfig)
+
+// InfoConfig specifies how container metadata is fetched
+type InfoConfig struct {
+	// Refresh will to a fetch of the latest container metadata
+	Refresh bool
+}
+
 // WithRuntime allows a user to specify the runtime name and additional options that should
 // be used to create tasks for the container
 func WithRuntime(name string, options interface{}) NewContainerOpts {
@@ -234,4 +243,9 @@ func WithSpec(s *oci.Spec, opts ...oci.SpecOpts) NewContainerOpts {
 		c.Spec, err = typeurl.MarshalAny(s)
 		return err
 	}
+}
+
+// WithoutRefreshedMetadata will use the current metadata attached to the container object
+func WithoutRefreshedMetadata(i *InfoConfig) {
+	i.Refresh = false
 }
