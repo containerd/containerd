@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"syscall"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -25,7 +26,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
-	"golang.org/x/sys/unix"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
@@ -149,7 +149,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 	}
 
 	logrus.Infof("Kill container %q", id)
-	if err = task.Kill(ctx, unix.SIGKILL); err != nil && !errdefs.IsNotFound(err) {
+	if err = task.Kill(ctx, syscall.SIGKILL); err != nil && !errdefs.IsNotFound(err) {
 		return errors.Wrapf(err, "failed to kill container %q", id)
 	}
 
