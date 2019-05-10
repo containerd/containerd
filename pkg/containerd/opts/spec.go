@@ -83,9 +83,9 @@ func mergeGids(gids1, gids2 []uint32) []uint32 {
 func WithoutRunMount(_ context.Context, _ oci.Client, c *containers.Container, s *runtimespec.Spec) error {
 	var (
 		mounts  []runtimespec.Mount
-		currnet = s.Mounts
+		current = s.Mounts
 	)
-	for _, m := range currnet {
+	for _, m := range current {
 		if filepath.Clean(m.Destination) == "/run" {
 			continue
 		}
