@@ -124,7 +124,7 @@ var listCommand = cli.Command{
 		w := tabwriter.NewWriter(os.Stdout, 4, 8, 4, ' ', 0)
 		fmt.Fprintln(w, "CONTAINER\tIMAGE\tRUNTIME\t")
 		for _, c := range containers {
-			info, err := c.Info(ctx)
+			info, err := c.Info(ctx, containerd.WithoutRefreshedMetadata)
 			if err != nil {
 				return err
 			}
@@ -261,7 +261,7 @@ var infoCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		info, err := container.Info(ctx)
+		info, err := container.Info(ctx, containerd.WithoutRefreshedMetadata)
 		if err != nil {
 			return err
 		}
