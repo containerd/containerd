@@ -104,6 +104,10 @@ func main() {
 		stderr.Close()
 	}()
 
+	// redirect the following output into fifo to make sure that containerd
+	// still can read the log after restart
+	logrus.SetOutput(stdout)
+
 	if err := executeShim(); err != nil {
 		fmt.Fprintf(os.Stderr, "containerd-shim: %s\n", err)
 		os.Exit(1)
@@ -113,7 +117,7 @@ func main() {
 // If containerd server process dies, we need the shim to keep stdout/err reader
 // FDs so that Linux does not SIGPIPE the shim process if it tries to use its end of
 // these pipes.
-func openStdioKeepAlivePipes(dir string) (io.ReadCloser, io.ReadCloser, error) {
+func openStdioKeepAlivePipes(dir string) (io.ReadWriteCloser, io.ReadWriteCloser, error) {
 	background := context.Background()
 	keepStdoutAlive, err := shimlog.OpenShimStdoutLog(background, dir)
 	if err != nil {
