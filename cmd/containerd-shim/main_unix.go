@@ -159,7 +159,9 @@ func serve(server *ttrpc.Server, path string) error {
 		err error
 	)
 	if path == "" {
-		l, err = net.FileListener(os.NewFile(3, "socket"))
+		f := os.NewFile(3, "socket")
+		l, err = net.FileListener(f)
+		f.Close()
 		path = "[inherited from parent]"
 	} else {
 		if len(path) > 106 {
