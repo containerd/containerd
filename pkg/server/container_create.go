@@ -192,9 +192,14 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	meta.ImageRef = image.ID
 	meta.StopSignal = image.ImageSpec.Config.StopSignal
 
-	// Get container log path.
-	if config.GetLogPath() != "" {
+	// Validate log paths and compose full container log path.
+	if sandboxConfig.GetLogDirectory() != "" && config.GetLogPath() != "" {
 		meta.LogPath = filepath.Join(sandboxConfig.GetLogDirectory(), config.GetLogPath())
+		logrus.Debugf("Composed container full log path %q using sandbox log dir %q and container log path %q",
+			meta.LogPath, sandboxConfig.GetLogDirectory(), config.GetLogPath())
+	} else {
+		logrus.Infof("Logging will be disabled due to empty log paths for sandbox (%q) or container (%q)",
+			sandboxConfig.GetLogDirectory(), config.GetLogPath())
 	}
 
 	containerIO, err := cio.NewContainerIO(id,
