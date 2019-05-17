@@ -17,6 +17,7 @@
 package containerd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -35,9 +36,9 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-// TestOCIExportAndImport exports testImage as a tar stream,
+// TestExportAndImport exports testImage as a tar stream,
 // and import the tar stream as a new image.
-func TestOCIExportAndImport(t *testing.T) {
+func TestExportAndImport(t *testing.T) {
 	// TODO: support windows
 	if testing.Short() || runtime.GOOS == "windows" {
 		t.Skip()
@@ -51,12 +52,13 @@ func TestOCIExportAndImport(t *testing.T) {
 	}
 	defer client.Close()
 
-	pulled, err := client.Fetch(ctx, testImage)
+	_, err = client.Fetch(ctx, testImage)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	exported, err := client.Export(ctx, pulled.Target)
+	wb := bytes.NewBuffer(nil)
+	err = client.Export(ctx, wb, archive.WithAllPlatforms(), archive.WithImage(client.ImageService(), testImage))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,12 +66,15 @@ func TestOCIExportAndImport(t *testing.T) {
 	opts := []ImportOpt{
 		WithImageRefTranslator(archive.AddRefPrefix("foo/bar")),
 	}
-	imgrecs, err := client.Import(ctx, exported, opts...)
+	imgrecs, err := client.Import(ctx, bytes.NewReader(wb.Bytes()), opts...)
 	if err != nil {
 		t.Fatalf("Import failed: %+v", err)
 	}
 
 	for _, imgrec := range imgrecs {
+		if imgrec.Name == testImage {
+			continue
+		}
 		err = client.ImageService().Delete(ctx, imgrec.Name)
 		if err != nil {
 			t.Fatal(err)

@@ -14,18 +14,15 @@
    limitations under the License.
 */
 
-package containerd
+package images
 
-import (
-	"context"
-	"io"
+const (
+	// AnnotationImageName is an annotation on a Descriptor in an index.json
+	// containing the `Name` value as used by an `Image` struct
+	AnnotationImageName = "io.containerd.image.name"
 
-	"github.com/containerd/containerd/images/archive"
+	// AnnotationImageNamePrefix is used the same way as AnnotationImageName
+	// but may be used to refer to additional names in the annotation map
+	// using user-defined suffixes (i.e. "extra.1")
+	AnnotationImageNamePrefix = AnnotationImageName + "."
 )
-
-// Export exports images to a Tar stream.
-// The tar archive is in OCI format with a Docker compatible manifest
-// when a single target platform is given.
-func (c *Client) Export(ctx context.Context, w io.Writer, opts ...archive.ExportOpt) error {
-	return archive.Export(ctx, c.ContentStore(), w, opts...)
-}
