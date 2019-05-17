@@ -17,6 +17,7 @@
 package shim
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -29,13 +30,15 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/namespaces"
+	"github.com/gogo/protobuf/proto"
+	"github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 )
 
 var runtimePaths sync.Map
 
 // Command returns the shim command with the provided args and configuration
-func Command(ctx context.Context, runtime, containerdAddress, path string, cmdArgs ...string) (*exec.Cmd, error) {
+func Command(ctx context.Context, runtime, containerdAddress, path string, opts *types.Any, cmdArgs ...string) (*exec.Cmd, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -94,6 +97,13 @@ func Command(ctx context.Context, runtime, containerdAddress, path string, cmdAr
 	cmd.Dir = path
 	cmd.Env = append(os.Environ(), "GOMAXPROCS=2")
 	cmd.SysProcAttr = getSysProcAttr()
+	if opts != nil {
+		d, err := proto.Marshal(opts)
+		if err != nil {
+			return nil, err
+		}
+		cmd.Stdin = bytes.NewReader(d)
+	}
 	return cmd, nil
 }
 
