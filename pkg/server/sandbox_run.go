@@ -36,6 +36,7 @@ import (
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/util/bandwidth"
 
 	"github.com/containerd/cri/pkg/annotations"
 	criconfig "github.com/containerd/cri/pkg/config"
@@ -540,10 +541,21 @@ func (c *criService) setupPod(id string, path string, config *runtime.PodSandbox
 	}
 
 	labels := getPodCNILabels(id, config)
+
+	// Will return an error if the bandwidth limitation has the wrong unit
+	// or an unreasonable valure see validateBandwidthIsReasonable()
+	bandWidth, err := toCNIBandWidth(config.Annotations)
+	if err != nil {
+		"", nil, errors.Errorf("failed to find network info for sandbox %q", id)
+	}
+
 	result, err := c.netPlugin.Setup(id,
 		path,
 		cni.WithLabels(labels),
-		cni.WithCapabilityPortMap(toCNIPortMappings(config.GetPortMappings())))
+		cni.WithCapabilityPortMap(toCNIPortMappings(config.GetPortMappings())),
+		cni.WithCapabilityBandWidth(bandWidth),
+	)
+
 	if err != nil {
 		return "", nil, err
 	}
@@ -557,6 +569,21 @@ func (c *criService) setupPod(id string, path string, config *runtime.PodSandbox
 		logrus.WithError(err).Errorf("Failed to destroy network for sandbox %q", id)
 	}
 	return "", result, errors.Errorf("failed to find network info for sandbox %q", id)
+}
+
+// toCNIPortMappings converts CRI annotations to CNI bandwidth.
+func toCNIBandWidth(annotations map[string]string) (cni.BandWidth, error) {
+	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(annotations)
+	if err != nil {
+		return nil, fmt.Errorf("Error reading pod bandwidth annotations: %v", err)
+	}
+
+	return cni.BandWidth{
+		IngressRate:  uint64(ingress.Value()),
+		IngressBurst: 0,
+		EgressRate:   uint64(ingress.Value()),
+		EgressBurst:  0,
+	}
 }
 
 // toCNIPortMappings converts CRI port mappings to CNI.
