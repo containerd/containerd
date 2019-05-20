@@ -23,13 +23,14 @@ import (
 
 	v1 "github.com/containerd/containerd/api/services/ttrpc/events/v1"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/ttrpcutil"
 	"github.com/containerd/ttrpc"
 	"github.com/gogo/protobuf/types"
 	"gotest.tools/assert"
 )
 
 func TestClientTTRPC_New(t *testing.T) {
-	client, err := NewTTRPC(address + ".ttrpc")
+	client, err := ttrpcutil.NewClient(address + ".ttrpc")
 	assert.NilError(t, err)
 
 	err = client.Close()
@@ -37,7 +38,7 @@ func TestClientTTRPC_New(t *testing.T) {
 }
 
 func TestClientTTRPC_Reconnect(t *testing.T) {
-	client, err := NewTTRPC(address + ".ttrpc")
+	client, err := ttrpcutil.NewClient(address + ".ttrpc")
 	assert.NilError(t, err)
 
 	err = client.Reconnect()
@@ -59,7 +60,7 @@ func TestClientTTRPC_Reconnect(t *testing.T) {
 }
 
 func TestClientTTRPC_Close(t *testing.T) {
-	client, err := NewTTRPC(address + ".ttrpc")
+	client, err := ttrpcutil.NewClient(address + ".ttrpc")
 	assert.NilError(t, err)
 
 	err = client.Close()

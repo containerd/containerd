@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package containerd
+package ttrpcutil
 
 import (
 	"sync"
@@ -29,16 +29,16 @@ const ttrpcDialTimeout = 5 * time.Second
 
 type ttrpcConnector func() (*ttrpc.Client, error)
 
-// ClientTTRPC is the client to interact with TTRPC part of containerd server (plugins, events)
-type ClientTTRPC struct {
+// Client is the client to interact with TTRPC part of containerd server (plugins, events)
+type Client struct {
 	mu        sync.Mutex
 	connector ttrpcConnector
 	client    *ttrpc.Client
 	closed    bool
 }
 
-// NewTTRPC returns a new containerd TTRPC client that is connected to the containerd instance provided by address
-func NewTTRPC(address string, opts ...ttrpc.ClientOpts) (*ClientTTRPC, error) {
+// NewClient returns a new containerd TTRPC client that is connected to the containerd instance provided by address
+func NewClient(address string, opts ...ttrpc.ClientOpts) (*Client, error) {
 	connector := func() (*ttrpc.Client, error) {
 		conn, err := ttrpcDial(address, ttrpcDialTimeout)
 		if err != nil {
@@ -54,14 +54,14 @@ func NewTTRPC(address string, opts ...ttrpc.ClientOpts) (*ClientTTRPC, error) {
 		return nil, err
 	}
 
-	return &ClientTTRPC{
+	return &Client{
 		connector: connector,
 		client:    client,
 	}, nil
 }
 
 // Reconnect re-establishes the TTRPC connection to the containerd daemon
-func (c *ClientTTRPC) Reconnect() error {
+func (c *Client) Reconnect() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -83,12 +83,12 @@ func (c *ClientTTRPC) Reconnect() error {
 }
 
 // EventsService creates an EventsService client
-func (c *ClientTTRPC) EventsService() v1.EventsService {
+func (c *Client) EventsService() v1.EventsService {
 	return v1.NewEventsClient(c.Client())
 }
 
 // Client returns the underlying TTRPC client object
-func (c *ClientTTRPC) Client() *ttrpc.Client {
+func (c *Client) Client() *ttrpc.Client {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -96,7 +96,7 @@ func (c *ClientTTRPC) Client() *ttrpc.Client {
 }
 
 // Close closes the clients TTRPC connection to containerd
-func (c *ClientTTRPC) Close() error {
+func (c *Client) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

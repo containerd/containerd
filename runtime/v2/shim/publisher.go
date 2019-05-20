@@ -21,14 +21,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/ttrpc"
-	"github.com/containerd/typeurl"
-	"github.com/sirupsen/logrus"
-
-	"github.com/containerd/containerd"
 	v1 "github.com/containerd/containerd/api/services/ttrpc/events/v1"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/ttrpcutil"
+	"github.com/containerd/ttrpc"
+	"github.com/containerd/typeurl"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -43,7 +42,7 @@ type item struct {
 }
 
 func newPublisher(address string) (*remoteEventsPublisher, error) {
-	client, err := containerd.NewTTRPC(address)
+	client, err := ttrpcutil.NewClient(address)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +58,7 @@ func newPublisher(address string) (*remoteEventsPublisher, error) {
 }
 
 type remoteEventsPublisher struct {
-	client  *containerd.ClientTTRPC
+	client  *ttrpcutil.Client
 	closed  chan struct{}
 	closer  sync.Once
 	requeue chan *item
