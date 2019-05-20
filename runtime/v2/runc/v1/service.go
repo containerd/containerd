@@ -44,6 +44,8 @@ import (
 	taskAPI "github.com/containerd/containerd/runtime/v2/task"
 	runcC "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
+	"github.com/gogo/protobuf/proto"
+	"github.com/gogo/protobuf/types"
 	ptypes "github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -162,6 +164,31 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 	}
 	if err := shim.WriteAddress("address", address); err != nil {
 		return "", err
+	}
+	if data, err := ioutil.ReadAll(os.Stdin); err == nil {
+		if len(data) > 0 {
+			var any types.Any
+			if err := proto.Unmarshal(data, &any); err != nil {
+				return "", err
+			}
+			v, err := typeurl.UnmarshalAny(&any)
+			if err != nil {
+				return "", err
+			}
+			if opts, ok := v.(*options.Options); ok {
+				if opts.ShimCgroup != "" {
+					cg, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(opts.ShimCgroup))
+					if err != nil {
+						return "", errors.Wrapf(err, "failed to load cgroup %s", opts.ShimCgroup)
+					}
+					if err := cg.Add(cgroups.Process{
+						Pid: cmd.Process.Pid,
+					}); err != nil {
+						return "", errors.Wrapf(err, "failed to join cgroup %s", opts.ShimCgroup)
+					}
+				}
+			}
+		}
 	}
 	if err := shim.SetScore(cmd.Process.Pid); err != nil {
 		return "", errors.Wrap(err, "failed to set OOM Score on shim")
