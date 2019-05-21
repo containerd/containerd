@@ -20,11 +20,9 @@ import (
 	"archive/tar"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"path"
 	"sort"
-	"strings"
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
@@ -83,9 +81,8 @@ func WithImage(is images.Store, name string) ExportOpt {
 			return err
 		}
 
-		var i int
-		o.manifests, i = appendDescriptor(o.manifests, img.Target)
-		o.manifests[i].Annotations = addNameAnnotation(name, o.manifests[i].Annotations)
+		img.Target.Annotations = addNameAnnotation(name, img.Target.Annotations)
+		o.manifests = append(o.manifests, img.Target)
 
 		return nil
 	}
@@ -96,9 +93,7 @@ func WithImage(is images.Store, name string) ExportOpt {
 // descriptor if needed.
 func WithManifest(manifest ocispec.Descriptor) ExportOpt {
 	return func(ctx context.Context, o *exportOptions) error {
-		var i int
-		o.manifests, i = appendDescriptor(o.manifests, manifest)
-		o.manifests[i].Annotations = manifest.Annotations
+		o.manifests = append(o.manifests, manifest)
 		return nil
 	}
 }
@@ -107,25 +102,13 @@ func WithManifest(manifest ocispec.Descriptor) ExportOpt {
 // with the provided names.
 func WithNamedManifest(manifest ocispec.Descriptor, names ...string) ExportOpt {
 	return func(ctx context.Context, o *exportOptions) error {
-		var i int
-		o.manifests, i = appendDescriptor(o.manifests, manifest)
 		for _, name := range names {
-			o.manifests[i].Annotations = addNameAnnotation(name, o.manifests[i].Annotations)
+			manifest.Annotations = addNameAnnotation(name, manifest.Annotations)
+			o.manifests = append(o.manifests, manifest)
 		}
 
 		return nil
 	}
-}
-
-func appendDescriptor(descs []ocispec.Descriptor, desc ocispec.Descriptor) ([]ocispec.Descriptor, int) {
-	i := 0
-	for i < len(descs) {
-		if descs[i].Digest == desc.Digest {
-			return descs, i
-		}
-		i++
-	}
-	return append(descs, desc), i
 }
 
 func addNameAnnotation(name string, annotations map[string]string) map[string]string {
@@ -133,23 +116,9 @@ func addNameAnnotation(name string, annotations map[string]string) map[string]st
 		annotations = map[string]string{}
 	}
 
-	i := 0
-	for {
-		key := images.AnnotationImageName
-		if i > 0 {
-			key = fmt.Sprintf("%sextra.%d", images.AnnotationImageNamePrefix, i)
-		}
-		i++
+	annotations[images.AnnotationImageName] = name
+	annotations[ocispec.AnnotationRefName] = ociReferenceName(name)
 
-		if val, ok := annotations[key]; ok {
-			if val != name {
-				continue
-			}
-		} else {
-			annotations[key] = name
-		}
-		break
-	}
 	return annotations
 }
 
@@ -168,78 +137,100 @@ func Export(ctx context.Context, store content.Provider, writer io.Writer, opts 
 	}
 
 	algorithms := map[string]struct{}{}
-	manifestTags := map[string]ocispec.Descriptor{}
+	dManifests := map[digest.Digest]*exportManifest{}
+	resolvedIndex := map[digest.Digest]digest.Digest{}
 	for _, desc := range eo.manifests {
 		switch desc.MediaType {
 		case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
-			r, err := getRecords(ctx, store, desc, algorithms)
-			if err != nil {
-				return err
-			}
-			records = append(records, r...)
+			mt, ok := dManifests[desc.Digest]
+			if !ok {
+				// TODO(containerd): Skip if already added
+				r, err := getRecords(ctx, store, desc, algorithms)
+				if err != nil {
+					return err
+				}
+				records = append(records, r...)
 
-			for _, name := range imageNames(desc.Annotations) {
-				manifestTags[name] = desc
+				mt = &exportManifest{
+					manifest: desc,
+				}
+				dManifests[desc.Digest] = mt
+			}
+
+			name := desc.Annotations[images.AnnotationImageName]
+			if name != "" && !eo.skipDockerManifest {
+				mt.names = append(mt.names, name)
 			}
 		case images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
-			records = append(records, blobRecord(store, desc))
+			d, ok := resolvedIndex[desc.Digest]
+			if !ok {
+				records = append(records, blobRecord(store, desc))
 
-			p, err := content.ReadBlob(ctx, store, desc)
-			if err != nil {
-				return err
-			}
-
-			var index ocispec.Index
-			if err := json.Unmarshal(p, &index); err != nil {
-				return err
-			}
-
-			names := imageNames(desc.Annotations)
-			var manifests []ocispec.Descriptor
-			for _, m := range index.Manifests {
-				if eo.platform != nil {
-					if m.Platform == nil || eo.platform.Match(*m.Platform) {
-						manifests = append(manifests, m)
-					} else if !eo.allPlatforms {
-						continue
-					}
-				}
-
-				r, err := getRecords(ctx, store, m, algorithms)
+				p, err := content.ReadBlob(ctx, store, desc)
 				if err != nil {
 					return err
 				}
 
-				records = append(records, r...)
-			}
-
-			if len(names) > 0 && !eo.skipDockerManifest {
-				if len(manifests) >= 1 {
-					if len(manifests) > 1 {
-						sort.SliceStable(manifests, func(i, j int) bool {
-							if manifests[i].Platform == nil {
-								return false
-							}
-							if manifests[j].Platform == nil {
-								return true
-							}
-							return eo.platform.Less(*manifests[i].Platform, *manifests[j].Platform)
-						})
-					}
-					for _, name := range names {
-						manifestTags[name] = manifests[0]
-					}
-				} else if eo.platform != nil {
-					return errors.Wrap(errdefs.ErrNotFound, "no manifest found for platform")
+				var index ocispec.Index
+				if err := json.Unmarshal(p, &index); err != nil {
+					return err
 				}
+
+				var manifests []ocispec.Descriptor
+				for _, m := range index.Manifests {
+					if eo.platform != nil {
+						if m.Platform == nil || eo.platform.Match(*m.Platform) {
+							manifests = append(manifests, m)
+						} else if !eo.allPlatforms {
+							continue
+						}
+					}
+
+					r, err := getRecords(ctx, store, m, algorithms)
+					if err != nil {
+						return err
+					}
+
+					records = append(records, r...)
+				}
+
+				if !eo.skipDockerManifest {
+					if len(manifests) >= 1 {
+						if len(manifests) > 1 {
+							sort.SliceStable(manifests, func(i, j int) bool {
+								if manifests[i].Platform == nil {
+									return false
+								}
+								if manifests[j].Platform == nil {
+									return true
+								}
+								return eo.platform.Less(*manifests[i].Platform, *manifests[j].Platform)
+							})
+						}
+						d = manifests[0].Digest
+						dManifests[d] = &exportManifest{
+							manifest: manifests[0],
+						}
+					} else if eo.platform != nil {
+						return errors.Wrap(errdefs.ErrNotFound, "no manifest found for platform")
+					}
+				}
+				resolvedIndex[desc.Digest] = d
+			}
+			if d != "" {
+				if name := desc.Annotations[images.AnnotationImageName]; name != "" {
+					mt := dManifests[d]
+					mt.names = append(mt.names, name)
+				}
+
 			}
 		default:
 			return errors.Wrap(errdefs.ErrInvalidArgument, "only manifests may be exported")
 		}
 	}
 
-	if len(manifestTags) > 0 {
-		tr, err := manifestsRecord(ctx, store, manifestTags)
+	if len(dManifests) > 0 {
+		tr, err := manifestsRecord(ctx, store, dManifests)
 		if err != nil {
 			return errors.Wrap(err, "unable to create manifests file")
 		}
@@ -257,16 +248,6 @@ func Export(ctx context.Context, store content.Provider, writer io.Writer, opts 
 	tw := tar.NewWriter(writer)
 	defer tw.Close()
 	return writeTar(ctx, tw, records)
-}
-
-func imageNames(annotations map[string]string) []string {
-	var names []string
-	for k, v := range annotations {
-		if k == images.AnnotationImageName || strings.HasPrefix(k, images.AnnotationImageName) {
-			names = append(names, v)
-		}
-	}
-	return names
 }
 
 func getRecords(ctx context.Context, store content.Provider, desc ocispec.Descriptor, algorithms map[string]struct{}) ([]tarRecord, error) {
@@ -394,16 +375,21 @@ func ociIndexRecord(manifests []ocispec.Descriptor) tarRecord {
 	}
 }
 
-func manifestsRecord(ctx context.Context, store content.Provider, manifests map[string]ocispec.Descriptor) (tarRecord, error) {
-	type mfst struct {
+type exportManifest struct {
+	manifest ocispec.Descriptor
+	names    []string
+}
+
+func manifestsRecord(ctx context.Context, store content.Provider, manifests map[digest.Digest]*exportManifest) (tarRecord, error) {
+	mfsts := make([]struct {
 		Config   string
 		RepoTags []string
 		Layers   []string
-	}
+	}, len(manifests))
 
-	images := map[digest.Digest]mfst{}
-	for name, m := range manifests {
-		p, err := content.ReadBlob(ctx, store, m)
+	var i int
+	for _, m := range manifests {
+		p, err := content.ReadBlob(ctx, store, m.manifest)
 		if err != nil {
 			return tarRecord{}, err
 		}
@@ -413,32 +399,26 @@ func manifestsRecord(ctx context.Context, store content.Provider, manifests map[
 			return tarRecord{}, err
 		}
 		if err := manifest.Config.Digest.Validate(); err != nil {
-			return tarRecord{}, errors.Wrapf(err, "invalid manifest %q", m.Digest)
-		}
-
-		nname, err := familiarizeReference(name)
-		if err != nil {
-			return tarRecord{}, err
+			return tarRecord{}, errors.Wrapf(err, "invalid manifest %q", m.manifest.Digest)
 		}
 
 		dgst := manifest.Config.Digest
-		mf, ok := images[dgst]
-		if !ok {
-			mf.Config = path.Join("blobs", dgst.Algorithm().String(), dgst.Encoded())
-			for _, l := range manifest.Layers {
-				path := path.Join("blobs", l.Digest.Algorithm().String(), l.Digest.Encoded())
-				mf.Layers = append(mf.Layers, path)
-			}
+		mfsts[i].Config = path.Join("blobs", dgst.Algorithm().String(), dgst.Encoded())
+		for _, l := range manifest.Layers {
+			path := path.Join("blobs", l.Digest.Algorithm().String(), l.Digest.Encoded())
+			mfsts[i].Layers = append(mfsts[i].Layers, path)
 		}
 
-		mf.RepoTags = append(mf.RepoTags, nname)
+		for _, name := range m.names {
+			nname, err := familiarizeReference(name)
+			if err != nil {
+				return tarRecord{}, err
+			}
 
-		images[dgst] = mf
-	}
+			mfsts[i].RepoTags = append(mfsts[i].RepoTags, nname)
+		}
 
-	var mfsts []mfst
-	for _, mf := range images {
-		mfsts = append(mfsts, mf)
+		i++
 	}
 
 	b, err := json.Marshal(mfsts)

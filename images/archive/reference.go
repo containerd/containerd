@@ -19,7 +19,8 @@ package archive
 import (
 	"strings"
 
-	"github.com/docker/distribution/reference"
+	"github.com/containerd/containerd/reference"
+	distref "github.com/docker/distribution/reference"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
@@ -69,7 +70,7 @@ func isImagePrefix(s, prefix string) bool {
 
 func normalizeReference(ref string) (string, error) {
 	// TODO: Replace this function to not depend on reference package
-	normalized, err := reference.ParseDockerRef(ref)
+	normalized, err := distref.ParseDockerRef(ref)
 	if err != nil {
 		return "", errors.Wrapf(err, "normalize image ref %q", ref)
 	}
@@ -78,13 +79,28 @@ func normalizeReference(ref string) (string, error) {
 }
 
 func familiarizeReference(ref string) (string, error) {
-	named, err := reference.ParseNormalizedNamed(ref)
+	named, err := distref.ParseNormalizedNamed(ref)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to parse %q", ref)
 	}
-	named = reference.TagNameOnly(named)
+	named = distref.TagNameOnly(named)
 
-	return reference.FamiliarString(named), nil
+	return distref.FamiliarString(named), nil
+}
+
+func ociReferenceName(name string) string {
+	// OCI defines the reference name as only a tag excluding the
+	// repository. The containerd annotation contains the full image name
+	// since the tag is insufficent for correctly naming and referring to an
+	// image
+	var ociRef string
+	if spec, err := reference.Parse(name); err == nil {
+		ociRef = spec.Object
+	} else {
+		ociRef = name
+	}
+
+	return ociRef
 }
 
 // DigestTranslator creates a digest reference by adding the
