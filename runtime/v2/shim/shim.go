@@ -162,9 +162,13 @@ func run(id string, initFunc Init, config Config) error {
 			return err
 		}
 	}
-	address := fmt.Sprintf("%s.ttrpc", addressFlag)
 
-	publisher := newPublisher(address)
+	address := fmt.Sprintf("%s.ttrpc", addressFlag)
+	publisher, err := newPublisher(address)
+	if err != nil {
+		return err
+	}
+
 	defer publisher.Close()
 
 	if namespaceFlag == "" {
