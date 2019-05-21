@@ -567,6 +567,8 @@ func (nw *namespacedWriter) createAndCopy(ctx context.Context, desc ocispec.Desc
 }
 
 func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
+	ctx = namespaces.WithNamespace(ctx, nw.namespace)
+
 	nw.l.RLock()
 	defer nw.l.RUnlock()
 
