@@ -142,18 +142,15 @@ func (c *criService) stopSandboxContainer(ctx context.Context, sandbox sandboxst
 		return errors.Wrap(err, "failed to kill sandbox container")
 	}
 
-	return c.waitSandboxStop(ctx, sandbox, killContainerTimeout)
+	return c.waitSandboxStop(ctx, sandbox)
 }
 
-// waitSandboxStop waits for sandbox to be stopped until timeout exceeds or context is cancelled.
-func (c *criService) waitSandboxStop(ctx context.Context, sandbox sandboxstore.Sandbox, timeout time.Duration) error {
-	timeoutTimer := time.NewTimer(timeout)
-	defer timeoutTimer.Stop()
+// waitSandboxStop waits for sandbox to be stopped until context is cancelled or
+// the context deadline is exceeded.
+func (c *criService) waitSandboxStop(ctx context.Context, sandbox sandboxstore.Sandbox) error {
 	select {
 	case <-ctx.Done():
-		return errors.Wrapf(ctx.Err(), "wait sandbox container %q is cancelled", sandbox.ID)
-	case <-timeoutTimer.C:
-		return errors.Errorf("wait sandbox container %q stop timeout", sandbox.ID)
+		return errors.Wrapf(ctx.Err(), "wait sandbox container %q", sandbox.ID)
 	case <-sandbox.Stopped():
 		return nil
 	}
