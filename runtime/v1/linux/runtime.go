@@ -191,18 +191,13 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 		}
 		exitHandler := func() {
 			log.G(ctx).WithField("id", id).Info("shim reaped")
-			t, err := r.tasks.Get(ctx, id)
-			if err != nil {
+
+			if _, err := r.tasks.Get(ctx, id); err != nil {
 				// Task was never started or was already successfully deleted
 				return
 			}
-			lc := t.(*Task)
 
-			log.G(ctx).WithFields(logrus.Fields{
-				"id":        id,
-				"namespace": namespace,
-			}).Warn("cleaning up after killed shim")
-			if err = r.cleanupAfterDeadShim(context.Background(), bundle, namespace, id, lc.pid); err != nil {
+			if err = r.cleanupAfterDeadShim(context.Background(), bundle, namespace, id); err != nil {
 				log.G(ctx).WithError(err).WithFields(logrus.Fields{
 					"id":        id,
 					"namespace": namespace,
@@ -342,12 +337,12 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 		ctx = namespaces.WithNamespace(ctx, ns)
 		pid, _ := runc.ReadPidFile(filepath.Join(bundle.path, proc.InitPidFile))
 		s, err := bundle.NewShimClient(ctx, ns, ShimConnect(r.config, func() {
-			_, err := r.tasks.Get(ctx, id)
-			if err != nil {
+			if _, err := r.tasks.Get(ctx, id); err != nil {
 				// Task was never started or was already successfully deleted
 				return
 			}
-			if err := r.cleanupAfterDeadShim(ctx, bundle, ns, id, pid); err != nil {
+
+			if err := r.cleanupAfterDeadShim(ctx, bundle, ns, id); err != nil {
 				log.G(ctx).WithError(err).WithField("bundle", bundle.path).
 					Error("cleaning up after dead shim")
 			}
@@ -357,7 +352,7 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 				"id":        id,
 				"namespace": ns,
 			}).Error("connecting to shim")
-			err := r.cleanupAfterDeadShim(ctx, bundle, ns, id, pid)
+			err := r.cleanupAfterDeadShim(ctx, bundle, ns, id)
 			if err != nil {
 				log.G(ctx).WithError(err).WithField("bundle", bundle.path).
 					Error("cleaning up after dead shim")
@@ -407,7 +402,13 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 	return o, nil
 }
 
-func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, id string, pid int) error {
+func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, id string) error {
+	log.G(ctx).WithFields(logrus.Fields{
+		"id":        id,
+		"namespace": ns,
+	}).Warn("cleaning up after shim dead")
+
+	pid, _ := runc.ReadPidFile(filepath.Join(bundle.path, proc.InitPidFile))
 	ctx = namespaces.WithNamespace(ctx, ns)
 	if err := r.terminate(ctx, bundle, ns, id); err != nil {
 		if r.config.ShimDebug {
@@ -429,6 +430,10 @@ func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, 
 	r.tasks.Delete(ctx, id)
 	if err := bundle.Delete(); err != nil {
 		log.G(ctx).WithError(err).Error("delete bundle")
+	}
+	// kill shim
+	if shimPid, err := runc.ReadPidFile(filepath.Join(bundle.path, "shim.pid")); err == nil && shimPid > 0 {
+		unix.Kill(shimPid, unix.SIGKILL)
 	}
 
 	r.events.Publish(ctx, runtime.TaskDeleteEventTopic, &eventstypes.TaskDelete{

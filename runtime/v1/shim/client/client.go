@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -110,7 +111,10 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 			"debug":   debug,
 		}).Infof("shim %s started", binary)
 
-		if err := writeAddress(filepath.Join(config.Path, "address"), address); err != nil {
+		if err := writeFile(filepath.Join(config.Path, "address"), address); err != nil {
+			return nil, nil, err
+		}
+		if err := writeFile(filepath.Join(config.Path, "shim.pid"), strconv.Itoa(cmd.Process.Pid)); err != nil {
 			return nil, nil, err
 		}
 		// set shim in cgroup if it is provided
@@ -172,8 +176,8 @@ func newCommand(binary, daemonAddress string, debug bool, config shim.Config, so
 	return cmd, nil
 }
 
-// writeAddress writes a address file atomically
-func writeAddress(path, address string) error {
+// writeFile writes a address file atomically
+func writeFile(path, address string) error {
 	path, err := filepath.Abs(path)
 	if err != nil {
 		return err
