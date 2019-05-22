@@ -224,7 +224,7 @@ func TestImport(t *testing.T) {
 			},
 		},
 		{
-			Name: "OCIPrefixName",
+			Name: "OCIPrefixName2",
 			Writer: tartest.TarAll(
 				tc.Dir("blobs", 0755),
 				tc.Dir("blobs/sha256", 0755),

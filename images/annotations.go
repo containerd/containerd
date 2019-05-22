@@ -20,9 +20,4 @@ const (
 	// AnnotationImageName is an annotation on a Descriptor in an index.json
 	// containing the `Name` value as used by an `Image` struct
 	AnnotationImageName = "io.containerd.image.name"
-
-	// AnnotationImageNamePrefix is used the same way as AnnotationImageName
-	// but may be used to refer to additional names in the annotation map
-	// using user-defined suffixes (i.e. "extra.1")
-	AnnotationImageNamePrefix = AnnotationImageName + "."
 )

@@ -181,7 +181,8 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader) (oc
 				}
 
 				mfstdesc.Annotations = map[string]string{
-					ocispec.AnnotationRefName: normalized,
+					images.AnnotationImageName: normalized,
+					ocispec.AnnotationRefName:  ociReferenceName(normalized),
 				}
 
 				idx.Manifests = append(idx.Manifests, mfstdesc)
