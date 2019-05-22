@@ -37,9 +37,8 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/pkg/oom"
-	"github.com/containerd/containerd/pkg/process"
-	"github.com/containerd/containerd/pkg/stdio"
+	rproc "github.com/containerd/containerd/runtime/proc"
+	"github.com/containerd/containerd/runtime/v1/linux/proc"
 	"github.com/containerd/containerd/runtime/v2/runc"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/runtime/v2/shim"
@@ -74,7 +73,7 @@ type spec struct {
 
 // New returns a new shim service that can be used via GRPC
 func New(ctx context.Context, id string, publisher shim.Publisher, shutdown func()) (shim.Shim, error) {
-	ep, err := oom.New(publisher)
+	ep, err := runc.NewOOMEpoller(publisher)
 	if err != nil {
 		return nil, err
 	}
@@ -105,9 +104,9 @@ type service struct {
 
 	context  context.Context
 	events   chan interface{}
-	platform stdio.Platform
+	platform rproc.Platform
 	ec       chan runcC.Exit
-	ep       *oom.Epoller
+	ep       *runc.Epoller
 
 	// id only used in cleanup case
 	id string
@@ -234,8 +233,8 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 			}
 		}
 	}
-	if err := shim.AdjustOOMScore(cmd.Process.Pid); err != nil {
-		return "", errors.Wrap(err, "failed to adjust OOM score for shim")
+	if err := shim.SetScore(cmd.Process.Pid); err != nil {
+		return "", errors.Wrap(err, "failed to set OOM Score on shim")
 	}
 	return address, nil
 }
@@ -255,7 +254,7 @@ func (s *service) Cleanup(ctx context.Context) (*taskAPI.DeleteResponse, error) 
 	if err != nil {
 		return nil, err
 	}
-	r := process.NewRunc(process.RuncRoot, path, ns, runtime, "", false)
+	r := proc.NewRunc(proc.RuncRoot, path, ns, runtime, "", false)
 	if err := r.Delete(ctx, s.id, &runcC.DeleteOpts{
 		Force: true,
 	}); err != nil {
@@ -376,13 +375,11 @@ func (s *service) Exec(ctx context.Context, r *taskAPI.ExecProcessRequest) (*pty
 	if err != nil {
 		return nil, err
 	}
-	ok, cancel := container.ReserveProcess(r.ExecID)
-	if !ok {
+	if container.ProcessExists(r.ExecID) {
 		return nil, errdefs.ToGRPCf(errdefs.ErrAlreadyExists, "id %s", r.ExecID)
 	}
 	process, err := container.Exec(ctx, r)
 	if err != nil {
-		cancel()
 		return nil, errdefs.ToGRPC(err)
 	}
 
@@ -654,7 +651,7 @@ func (s *service) checkProcesses(e runcC.Exit) {
 			for _, p := range container.All() {
 				if p.Pid() == e.Pid {
 					if shouldKillAll {
-						if ip, ok := p.(*process.Init); ok {
+						if ip, ok := p.(*proc.Init); ok {
 							// Ensure all children are killed
 							if err := ip.KillAll(s.context); err != nil {
 								logrus.WithError(err).WithField("id", ip.ID()).
@@ -706,7 +703,7 @@ func (s *service) getContainerPids(ctx context.Context, id string) ([]uint32, er
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-	ps, err := p.(*process.Init).Runtime().Ps(ctx, id)
+	ps, err := p.(*proc.Init).Runtime().Ps(ctx, id)
 	if err != nil {
 		return nil, err
 	}

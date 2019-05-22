@@ -120,11 +120,7 @@ func WithSnapshot(id string) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		setSnapshotterIfEmpty(ctx, client, c)
 		// check that the snapshot exists, if not, fail on creation
-		s, err := client.getSnapshotter(c.Snapshotter)
-		if err != nil {
-			return err
-		}
-		if _, err := s.Mounts(ctx, id); err != nil {
+		if _, err := client.SnapshotService(c.Snapshotter).Mounts(ctx, id); err != nil {
 			return err
 		}
 		c.SnapshotKey = id
@@ -142,11 +138,7 @@ func WithNewSnapshot(id string, i Image, opts ...snapshots.Opt) NewContainerOpts
 		}
 		setSnapshotterIfEmpty(ctx, client, c)
 		parent := identity.ChainID(diffIDs).String()
-		s, err := client.getSnapshotter(c.Snapshotter)
-		if err != nil {
-			return err
-		}
-		if _, err := s.Prepare(ctx, id, parent, opts...); err != nil {
+		if _, err := client.SnapshotService(c.Snapshotter).Prepare(ctx, id, parent, opts...); err != nil {
 			return err
 		}
 		c.SnapshotKey = id
@@ -161,11 +153,7 @@ func WithSnapshotCleanup(ctx context.Context, client *Client, c containers.Conta
 		if c.Snapshotter == "" {
 			return errors.Wrapf(errdefs.ErrInvalidArgument, "container.Snapshotter must be set to cleanup rootfs snapshot")
 		}
-		s, err := client.getSnapshotter(c.Snapshotter)
-		if err != nil {
-			return err
-		}
-		return s.Remove(ctx, c.SnapshotKey)
+		return client.SnapshotService(c.Snapshotter).Remove(ctx, c.SnapshotKey)
 	}
 	return nil
 }
@@ -180,11 +168,7 @@ func WithNewSnapshotView(id string, i Image, opts ...snapshots.Opt) NewContainer
 		}
 		setSnapshotterIfEmpty(ctx, client, c)
 		parent := identity.ChainID(diffIDs).String()
-		s, err := client.getSnapshotter(c.Snapshotter)
-		if err != nil {
-			return err
-		}
-		if _, err := s.View(ctx, id, parent, opts...); err != nil {
+		if _, err := client.SnapshotService(c.Snapshotter).View(ctx, id, parent, opts...); err != nil {
 			return err
 		}
 		c.SnapshotKey = id

@@ -36,52 +36,36 @@ import (
 // closed.
 var ErrClosed = errors.New("ttrpc: closed")
 
-// Client for a ttrpc server
 type Client struct {
 	codec   codec
 	conn    net.Conn
 	channel *channel
 	calls   chan *callRequest
 
-	ctx    context.Context
-	closed func()
-
-	closeOnce     sync.Once
-	userCloseFunc func()
-
-	errOnce     sync.Once
-	err         error
-	interceptor UnaryClientInterceptor
+	closed    chan struct{}
+	closeOnce sync.Once
+	closeFunc func()
+	done      chan struct{}
+	err       error
 }
 
-// ClientOpts configures a client
 type ClientOpts func(c *Client)
 
-// WithOnClose sets the close func whenever the client's Close() method is called
 func WithOnClose(onClose func()) ClientOpts {
 	return func(c *Client) {
-		c.userCloseFunc = onClose
-	}
-}
-
-// WithUnaryClientInterceptor sets the provided client interceptor
-func WithUnaryClientInterceptor(i UnaryClientInterceptor) ClientOpts {
-	return func(c *Client) {
-		c.interceptor = i
+		c.closeFunc = onClose
 	}
 }
 
 func NewClient(conn net.Conn, opts ...ClientOpts) *Client {
-	ctx, cancel := context.WithCancel(context.Background())
 	c := &Client{
-		codec:         codec{},
-		conn:          conn,
-		channel:       newChannel(conn),
-		calls:         make(chan *callRequest),
-		closed:        cancel,
-		ctx:           ctx,
-		userCloseFunc: func() {},
-		interceptor:   defaultClientInterceptor,
+		codec:     codec{},
+		conn:      conn,
+		channel:   newChannel(conn),
+		calls:     make(chan *callRequest),
+		closed:    make(chan struct{}),
+		done:      make(chan struct{}),
+		closeFunc: func() {},
 	}
 
 	for _, o := range opts {
@@ -115,18 +99,11 @@ func (c *Client) Call(ctx context.Context, service, method string, req, resp int
 		cresp = &Response{}
 	)
 
-	if metadata, ok := GetMetadata(ctx); ok {
-		metadata.setRequest(creq)
-	}
-
 	if dl, ok := ctx.Deadline(); ok {
 		creq.TimeoutNano = dl.Sub(time.Now()).Nanoseconds()
 	}
 
-	info := &UnaryClientInfo{
-		FullMethod: fullPath(service, method),
-	}
-	if err := c.interceptor(ctx, creq, cresp, info, c.dispatch); err != nil {
+	if err := c.dispatch(ctx, creq, cresp); err != nil {
 		return err
 	}
 
@@ -154,8 +131,8 @@ func (c *Client) dispatch(ctx context.Context, req *Request, resp *Response) err
 	case <-ctx.Done():
 		return ctx.Err()
 	case c.calls <- call:
-	case <-c.ctx.Done():
-		return c.error()
+	case <-c.done:
+		return c.err
 	}
 
 	select {
@@ -163,15 +140,16 @@ func (c *Client) dispatch(ctx context.Context, req *Request, resp *Response) err
 		return ctx.Err()
 	case err := <-errs:
 		return filterCloseErr(err)
-	case <-c.ctx.Done():
-		return c.error()
+	case <-c.done:
+		return c.err
 	}
 }
 
 func (c *Client) Close() error {
 	c.closeOnce.Do(func() {
-		c.closed()
+		close(c.closed)
 	})
+
 	return nil
 }
 
@@ -181,82 +159,51 @@ type message struct {
 	err error
 }
 
-type receiver struct {
-	wg       *sync.WaitGroup
-	messages chan *message
-	err      error
-}
+func (c *Client) run() {
+	var (
+		streamID    uint32 = 1
+		waiters            = make(map[uint32]*callRequest)
+		calls              = c.calls
+		incoming           = make(chan *message)
+		shutdown           = make(chan struct{})
+		shutdownErr error
+	)
 
-func (r *receiver) run(ctx context.Context, c *channel) {
-	defer r.wg.Done()
+	go func() {
+		defer close(shutdown)
 
-	for {
-		select {
-		case <-ctx.Done():
-			r.err = ctx.Err()
-			return
-		default:
-			mh, p, err := c.recv()
+		// start one more goroutine to recv messages without blocking.
+		for {
+			mh, p, err := c.channel.recv(context.TODO())
 			if err != nil {
 				_, ok := status.FromError(err)
 				if !ok {
 					// treat all errors that are not an rpc status as terminal.
 					// all others poison the connection.
-					r.err = filterCloseErr(err)
+					shutdownErr = err
 					return
 				}
 			}
 			select {
-			case r.messages <- &message{
+			case incoming <- &message{
 				messageHeader: mh,
 				p:             p[:mh.Length],
 				err:           err,
 			}:
-			case <-ctx.Done():
-				r.err = ctx.Err()
+			case <-c.done:
 				return
 			}
 		}
-	}
-}
-
-func (c *Client) run() {
-	var (
-		streamID      uint32 = 1
-		waiters              = make(map[uint32]*callRequest)
-		calls                = c.calls
-		incoming             = make(chan *message)
-		receiversDone        = make(chan struct{})
-		wg            sync.WaitGroup
-	)
-
-	// broadcast the shutdown error to the remaining waiters.
-	abortWaiters := func(wErr error) {
-		for _, waiter := range waiters {
-			waiter.errs <- wErr
-		}
-	}
-	recv := &receiver{
-		wg:       &wg,
-		messages: incoming,
-	}
-	wg.Add(1)
-
-	go func() {
-		wg.Wait()
-		close(receiversDone)
 	}()
-	go recv.run(c.ctx, c.channel)
 
-	defer func() {
-		c.conn.Close()
-		c.userCloseFunc()
-	}()
+	defer c.conn.Close()
+	defer close(c.done)
+	defer c.closeFunc()
 
 	for {
 		select {
 		case call := <-calls:
-			if err := c.send(streamID, messageTypeRequest, call.req); err != nil {
+			if err := c.send(call.ctx, streamID, messageTypeRequest, call.req); err != nil {
 				call.errs <- err
 				continue
 			}
@@ -272,42 +219,41 @@ func (c *Client) run() {
 
 			call.errs <- c.recv(call.resp, msg)
 			delete(waiters, msg.StreamID)
-		case <-receiversDone:
-			// all the receivers have exited
-			if recv.err != nil {
-				c.setError(recv.err)
+		case <-shutdown:
+			if shutdownErr != nil {
+				shutdownErr = filterCloseErr(shutdownErr)
+			} else {
+				shutdownErr = ErrClosed
 			}
-			// don't return out, let the close of the context trigger the abort of waiters
+
+			shutdownErr = errors.Wrapf(shutdownErr, "ttrpc: client shutting down")
+
+			c.err = shutdownErr
+			for _, waiter := range waiters {
+				waiter.errs <- shutdownErr
+			}
 			c.Close()
-		case <-c.ctx.Done():
-			abortWaiters(c.error())
+			return
+		case <-c.closed:
+			if c.err == nil {
+				c.err = ErrClosed
+			}
+			// broadcast the shutdown error to the remaining waiters.
+			for _, waiter := range waiters {
+				waiter.errs <- c.err
+			}
 			return
 		}
 	}
 }
 
-func (c *Client) error() error {
-	c.errOnce.Do(func() {
-		if c.err == nil {
-			c.err = ErrClosed
-		}
-	})
-	return c.err
-}
-
-func (c *Client) setError(err error) {
-	c.errOnce.Do(func() {
-		c.err = err
-	})
-}
-
-func (c *Client) send(streamID uint32, mtype messageType, msg interface{}) error {
+func (c *Client) send(ctx context.Context, streamID uint32, mtype messageType, msg interface{}) error {
 	p, err := c.codec.Marshal(msg)
 	if err != nil {
 		return err
 	}
 
-	return c.channel.send(streamID, mtype, p)
+	return c.channel.send(ctx, streamID, mtype, p)
 }
 
 func (c *Client) recv(resp *Response, msg *message) error {
@@ -328,21 +274,22 @@ func (c *Client) recv(resp *Response, msg *message) error {
 //
 // This purposely ignores errors with a wrapped cause.
 func filterCloseErr(err error) error {
-	switch {
-	case err == nil:
+	if err == nil {
 		return nil
-	case err == io.EOF:
+	}
+
+	if err == io.EOF {
 		return ErrClosed
-	case errors.Cause(err) == io.EOF:
+	}
+
+	if strings.Contains(err.Error(), "use of closed network connection") {
 		return ErrClosed
-	case strings.Contains(err.Error(), "use of closed network connection"):
-		return ErrClosed
-	default:
-		// if we have an epipe on a write, we cast to errclosed
-		if oerr, ok := err.(*net.OpError); ok && oerr.Op == "write" {
-			if serr, ok := oerr.Err.(*os.SyscallError); ok && serr.Err == syscall.EPIPE {
-				return ErrClosed
-			}
+	}
+
+	// if we have an epipe on a write, we cast to errclosed
+	if oerr, ok := err.(*net.OpError); ok && oerr.Op == "write" {
+		if serr, ok := oerr.Err.(*os.SyscallError); ok && serr.Err == syscall.EPIPE {
+			return ErrClosed
 		}
 	}
 

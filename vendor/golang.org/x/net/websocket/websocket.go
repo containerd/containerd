@@ -241,10 +241,7 @@ func (ws *Conn) Close() error {
 	return err1
 }
 
-// IsClientConn reports whether ws is a client-side connection.
 func (ws *Conn) IsClientConn() bool { return ws.request == nil }
-
-// IsServerConn reports whether ws is a server-side connection.
 func (ws *Conn) IsServerConn() bool { return ws.request != nil }
 
 // LocalAddr returns the WebSocket Origin for the connection for client, or

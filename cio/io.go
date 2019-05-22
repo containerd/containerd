@@ -18,13 +18,10 @@ package cio
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
-	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/containerd/containerd/defaults"
@@ -245,24 +242,17 @@ func LogURI(uri *url.URL) Creator {
 // BinaryIO forwards container STDOUT|STDERR directly to a logging binary
 func BinaryIO(binary string, args map[string]string) Creator {
 	return func(_ string) (IO, error) {
-		binary = filepath.Clean(binary)
-		if !strings.HasPrefix(binary, "/") {
-			return nil, errors.New("absolute path needed")
-		}
 		uri := &url.URL{
 			Scheme: "binary",
-			Path:   binary,
+			Host:   binary,
 		}
-		q := uri.Query()
 		for k, v := range args {
-			q.Set(k, v)
+			uri.Query().Set(k, v)
 		}
-		uri.RawQuery = q.Encode()
-		res := uri.String()
 		return &logURI{
 			config: Config{
-				Stdout: res,
-				Stderr: res,
+				Stdout: uri.String(),
+				Stderr: uri.String(),
 			},
 		}, nil
 	}
@@ -272,19 +262,14 @@ func BinaryIO(binary string, args map[string]string) Creator {
 // If the log file already exists, the logs will be appended to the file.
 func LogFile(path string) Creator {
 	return func(_ string) (IO, error) {
-		path = filepath.Clean(path)
-		if !strings.HasPrefix(path, "/") {
-			return nil, errors.New("absolute path needed")
-		}
 		uri := &url.URL{
 			Scheme: "file",
-			Path:   path,
+			Host:   path,
 		}
-		res := uri.String()
 		return &logURI{
 			config: Config{
-				Stdout: res,
-				Stderr: res,
+				Stdout: uri.String(),
+				Stderr: uri.String(),
 			},
 		}, nil
 	}

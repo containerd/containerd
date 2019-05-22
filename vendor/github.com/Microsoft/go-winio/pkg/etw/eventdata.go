@@ -3,7 +3,6 @@ package etw
 import (
 	"bytes"
 	"encoding/binary"
-	"syscall"
 )
 
 // eventData maintains a buffer which builds up the data for an ETW event. It
@@ -62,10 +61,5 @@ func (ed *eventData) writeUint32(value uint32) {
 
 // writeUint64 appends a uint64 to the buffer.
 func (ed *eventData) writeUint64(value uint64) {
-	binary.Write(&ed.buffer, binary.LittleEndian, value)
-}
-
-// writeFiletime appends a FILETIME to the buffer.
-func (ed *eventData) writeFiletime(value syscall.Filetime) {
 	binary.Write(&ed.buffer, binary.LittleEndian, value)
 }

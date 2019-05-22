@@ -1,8 +1,6 @@
 package etwlogrus
 
 import (
-	"sort"
-
 	"github.com/Microsoft/go-winio/pkg/etw"
 	"github.com/sirupsen/logrus"
 )
@@ -33,7 +31,15 @@ func NewHookFromProvider(provider *etw.Provider) (*Hook, error) {
 // Levels returns the set of levels that this hook wants to receive log entries
 // for.
 func (h *Hook) Levels() []logrus.Level {
-	return logrus.AllLevels
+	return []logrus.Level{
+		logrus.TraceLevel,
+		logrus.DebugLevel,
+		logrus.InfoLevel,
+		logrus.WarnLevel,
+		logrus.ErrorLevel,
+		logrus.FatalLevel,
+		logrus.PanicLevel,
+	}
 }
 
 var logrusToETWLevelMap = map[logrus.Level]etw.Level{
@@ -56,42 +62,19 @@ func (h *Hook) Fire(e *logrus.Entry) error {
 		return nil
 	}
 
-	// Sort the fields by name so they are consistent in each instance
-	// of an event. Otherwise, the fields don't line up in WPA.
-	names := make([]string, 0, len(e.Data))
-	hasError := false
-	for k := range e.Data {
-		if k == logrus.ErrorKey {
-			// Always put the error last because it is optional in some events.
-			hasError = true
-		} else {
-			names = append(names, k)
-		}
-	}
-	sort.Strings(names)
+	// Reserve extra space for the message field.
+	fields := make([]etw.FieldOpt, 0, len(e.Data)+1)
 
-	// Reserve extra space for the message and time fields.
-	fields := make([]etw.FieldOpt, 0, len(e.Data)+2)
 	fields = append(fields, etw.StringField("Message", e.Message))
-	fields = append(fields, etw.Time("Time", e.Time))
-	for _, k := range names {
-		fields = append(fields, etw.SmartField(k, e.Data[k]))
-	}
-	if hasError {
-		fields = append(fields, etw.SmartField(logrus.ErrorKey, e.Data[logrus.ErrorKey]))
+
+	for k, v := range e.Data {
+		fields = append(fields, etw.SmartField(k, v))
 	}
 
-	// Firing an ETW event is essentially best effort, as the event write can
-	// fail for reasons completely out of the control of the event writer (such
-	// as a session listening for the event having no available space in its
-	// buffers). Therefore, we don't return the error from WriteEvent, as it is
-	// just noise in many cases.
-	h.provider.WriteEvent(
+	return h.provider.WriteEvent(
 		"LogrusEntry",
 		etw.WithEventOpts(etw.WithLevel(level)),
 		fields)
-
-	return nil
 }
 
 // Close cleans up the hook and closes the ETW provider. If the provder was

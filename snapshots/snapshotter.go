@@ -86,15 +86,10 @@ func (k *Kind) UnmarshalJSON(b []byte) error {
 // Info provides information about a particular snapshot.
 // JSON marshallability is supported for interactive with tools like ctr,
 type Info struct {
-	Kind   Kind   // active or committed snapshot
-	Name   string // name or key of snapshot
-	Parent string `json:",omitempty"` // name of parent snapshot
-
-	// Labels for a snapshot.
-	//
-	// Note: only labels prefixed with `containerd.io/snapshot/` will be inherited by the
-	// snapshotter's `Prepare`, `View`, or `Commit` calls.
-	Labels  map[string]string `json:",omitempty"`
+	Kind    Kind              // active or committed snapshot
+	Name    string            // name or key of snapshot
+	Parent  string            `json:",omitempty"` // name of parent snapshot
+	Labels  map[string]string `json:",omitempty"` // Labels for snapshot
 	Created time.Time         `json:",omitempty"` // Created time
 	Updated time.Time         `json:",omitempty"` // Last update time
 }

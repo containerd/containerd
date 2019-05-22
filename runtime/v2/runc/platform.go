@@ -25,7 +25,7 @@ import (
 	"syscall"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/pkg/stdio"
+	rproc "github.com/containerd/containerd/runtime/proc"
 	"github.com/containerd/fifo"
 	"github.com/pkg/errors"
 )
@@ -38,7 +38,7 @@ var bufPool = sync.Pool{
 }
 
 // NewPlatform returns a linux platform for use with I/O operations
-func NewPlatform() (stdio.Platform, error) {
+func NewPlatform() (rproc.Platform, error) {
 	epoller, err := console.NewEpoller()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to initialize epoller")

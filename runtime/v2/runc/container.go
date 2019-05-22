@@ -30,8 +30,8 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/pkg/process"
-	"github.com/containerd/containerd/pkg/stdio"
+	rproc "github.com/containerd/containerd/runtime/proc"
+	"github.com/containerd/containerd/runtime/v1/linux/proc"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/typeurl"
@@ -40,7 +40,7 @@ import (
 )
 
 // NewContainer returns a new runc container
-func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTaskRequest) (*Container, error) {
+func NewContainer(ctx context.Context, platform rproc.Platform, r *task.CreateTaskRequest) (*Container, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "create namespace")
@@ -55,9 +55,9 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		opts = *v.(*options.Options)
 	}
 
-	var mounts []process.Mount
+	var mounts []proc.Mount
 	for _, m := range r.Rootfs {
-		mounts = append(mounts, process.Mount{
+		mounts = append(mounts, proc.Mount{
 			Type:    m.Type,
 			Source:  m.Source,
 			Target:  m.Target,
@@ -73,7 +73,7 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		}
 	}
 
-	config := &process.CreateConfig{
+	config := &proc.CreateConfig{
 		ID:               r.ID,
 		Bundle:           r.Bundle,
 		Runtime:          opts.BinaryName,
@@ -108,7 +108,7 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		}
 	}
 
-	p, err := newInit(
+	process, err := newInit(
 		ctx,
 		r.Bundle,
 		filepath.Join(r.Bundle, "work"),
@@ -121,17 +121,16 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-	if err := p.Create(ctx, config); err != nil {
+	if err := process.Create(ctx, config); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 	container := &Container{
-		ID:              r.ID,
-		Bundle:          r.Bundle,
-		process:         p,
-		processes:       make(map[string]process.Process),
-		reservedProcess: make(map[string]struct{}),
+		ID:        r.ID,
+		Bundle:    r.Bundle,
+		process:   process,
+		processes: make(map[string]rproc.Process),
 	}
-	pid := p.Pid()
+	pid := process.Pid()
 	if pid > 0 {
 		cg, err := cgroups.Load(cgroups.V1, cgroups.PidPath(pid))
 		if err != nil {
@@ -156,10 +155,10 @@ func WriteRuntime(path, runtime string) error {
 	return ioutil.WriteFile(filepath.Join(path, "runtime"), []byte(runtime), 0600)
 }
 
-func newInit(ctx context.Context, path, workDir, namespace string, platform stdio.Platform,
-	r *process.CreateConfig, options *options.Options, rootfs string) (*process.Init, error) {
-	runtime := process.NewRunc(options.Root, path, namespace, options.BinaryName, options.CriuPath, options.SystemdCgroup)
-	p := process.New(r.ID, runtime, stdio.Stdio{
+func newInit(ctx context.Context, path, workDir, namespace string, platform rproc.Platform,
+	r *proc.CreateConfig, options *options.Options, rootfs string) (*proc.Init, error) {
+	runtime := proc.NewRunc(options.Root, path, namespace, options.BinaryName, options.CriuPath, options.SystemdCgroup)
+	p := proc.New(r.ID, runtime, rproc.Stdio{
 		Stdin:    r.Stdin,
 		Stdout:   r.Stdout,
 		Stderr:   r.Stderr,
@@ -190,14 +189,13 @@ type Container struct {
 	// Bundle path
 	Bundle string
 
-	cgroup          cgroups.Cgroup
-	process         process.Process
-	processes       map[string]process.Process
-	reservedProcess map[string]struct{}
+	cgroup    cgroups.Cgroup
+	process   rproc.Process
+	processes map[string]rproc.Process
 }
 
 // All processes in the container
-func (c *Container) All() (o []process.Process) {
+func (c *Container) All() (o []rproc.Process) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -211,7 +209,7 @@ func (c *Container) All() (o []process.Process) {
 }
 
 // ExecdProcesses added to the container
-func (c *Container) ExecdProcesses() (o []process.Process) {
+func (c *Container) ExecdProcesses() (o []rproc.Process) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for _, p := range c.processes {
@@ -242,7 +240,7 @@ func (c *Container) CgroupSet(cg cgroups.Cgroup) {
 }
 
 // Process returns the process by id
-func (c *Container) Process(id string) (process.Process, error) {
+func (c *Container) Process(id string) (rproc.Process, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if id == "" {
@@ -258,35 +256,18 @@ func (c *Container) Process(id string) (process.Process, error) {
 	return p, nil
 }
 
-// ReserveProcess checks for the existence of an id and atomically
-// reserves the process id if it does not already exist
-//
-// Returns true if the process id was sucessfully reserved and a
-// cancel func to release the reservation
-func (c *Container) ReserveProcess(id string) (bool, func()) {
+// ProcessExists returns true if the process by id exists
+func (c *Container) ProcessExists(id string) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
-	if _, ok := c.processes[id]; ok {
-		return false, nil
-	}
-	if _, ok := c.reservedProcess[id]; ok {
-		return false, nil
-	}
-	c.reservedProcess[id] = struct{}{}
-	return true, func() {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		delete(c.reservedProcess, id)
-	}
+	_, ok := c.processes[id]
+	return ok
 }
 
 // ProcessAdd adds a new process to the container
-func (c *Container) ProcessAdd(process process.Process) {
+func (c *Container) ProcessAdd(process rproc.Process) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
-	delete(c.reservedProcess, process.ID())
 	c.processes[process.ID()] = process
 }
 
@@ -298,7 +279,7 @@ func (c *Container) ProcessRemove(id string) {
 }
 
 // Start a container process
-func (c *Container) Start(ctx context.Context, r *task.StartRequest) (process.Process, error) {
+func (c *Container) Start(ctx context.Context, r *task.StartRequest) (rproc.Process, error) {
 	p, err := c.Process(r.ExecID)
 	if err != nil {
 		return nil, err
@@ -317,7 +298,7 @@ func (c *Container) Start(ctx context.Context, r *task.StartRequest) (process.Pr
 }
 
 // Delete the container or a process by id
-func (c *Container) Delete(ctx context.Context, r *task.DeleteRequest) (process.Process, error) {
+func (c *Container) Delete(ctx context.Context, r *task.DeleteRequest) (rproc.Process, error) {
 	p, err := c.Process(r.ExecID)
 	if err != nil {
 		return nil, err
@@ -332,8 +313,8 @@ func (c *Container) Delete(ctx context.Context, r *task.DeleteRequest) (process.
 }
 
 // Exec an additional process
-func (c *Container) Exec(ctx context.Context, r *task.ExecProcessRequest) (process.Process, error) {
-	process, err := c.process.(*process.Init).Exec(ctx, c.Bundle, &process.ExecConfig{
+func (c *Container) Exec(ctx context.Context, r *task.ExecProcessRequest) (rproc.Process, error) {
+	process, err := c.process.(*proc.Init).Exec(ctx, c.Bundle, &proc.ExecConfig{
 		ID:       r.ExecID,
 		Terminal: r.Terminal,
 		Stdin:    r.Stdin,
@@ -350,12 +331,12 @@ func (c *Container) Exec(ctx context.Context, r *task.ExecProcessRequest) (proce
 
 // Pause the container
 func (c *Container) Pause(ctx context.Context) error {
-	return c.process.(*process.Init).Pause(ctx)
+	return c.process.(*proc.Init).Pause(ctx)
 }
 
 // Resume the container
 func (c *Container) Resume(ctx context.Context) error {
-	return c.process.(*process.Init).Resume(ctx)
+	return c.process.(*proc.Init).Resume(ctx)
 }
 
 // ResizePty of a process
@@ -408,7 +389,7 @@ func (c *Container) Checkpoint(ctx context.Context, r *task.CheckpointTaskReques
 		}
 		opts = *v.(*options.CheckpointOptions)
 	}
-	return p.(*process.Init).Checkpoint(ctx, &process.CheckpointConfig{
+	return p.(*proc.Init).Checkpoint(ctx, &proc.CheckpointConfig{
 		Path:                     r.Path,
 		Exit:                     opts.Exit,
 		AllowOpenTCP:             opts.OpenTcp,
@@ -426,7 +407,7 @@ func (c *Container) Update(ctx context.Context, r *task.UpdateTaskRequest) error
 	if err != nil {
 		return err
 	}
-	return p.(*process.Init).Update(ctx, r.Resources)
+	return p.(*proc.Init).Update(ctx, r.Resources)
 }
 
 // HasPid returns true if the container owns a specific pid

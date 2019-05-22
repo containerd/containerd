@@ -226,7 +226,6 @@ release: $(BINARIES)
 	@install -d releases/$(RELEASE)/bin
 	@install $(BINARIES) releases/$(RELEASE)/bin
 	@cd releases/$(RELEASE) && tar -czf ../$(RELEASE).tar.gz *
-	@cd releases && sha256sum $(RELEASE).tar.gz >$(RELEASE).tar.gz.sha256sum
 
 clean: ## clean up binaries
 	@echo "$(WHALE) $@"

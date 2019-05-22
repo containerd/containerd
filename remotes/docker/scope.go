@@ -18,7 +18,6 @@ package docker
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 	"sort"
 	"strings"
@@ -54,38 +53,24 @@ func contextWithRepositoryScope(ctx context.Context, refspec reference.Spec, pus
 	return context.WithValue(ctx, tokenScopesKey{}, []string{s}), nil
 }
 
-// contextWithAppendPullRepositoryScope is used to append repository pull
-// scope into existing scopes indexed by the tokenScopesKey{}.
-func contextWithAppendPullRepositoryScope(ctx context.Context, repo string) context.Context {
-	var scopes []string
-
-	if v := ctx.Value(tokenScopesKey{}); v != nil {
-		scopes = append(scopes, v.([]string)...)
-	}
-	scopes = append(scopes, fmt.Sprintf("repository:%s:pull", repo))
-	return context.WithValue(ctx, tokenScopesKey{}, scopes)
-}
-
-// getTokenScopes returns deduplicated and sorted scopes from ctx.Value(tokenScopesKey{}) and common scopes.
-func getTokenScopes(ctx context.Context, common []string) []string {
+// getTokenScopes returns deduplicated and sorted scopes from ctx.Value(tokenScopesKey{}) and params["scope"].
+func getTokenScopes(ctx context.Context, params map[string]string) []string {
 	var scopes []string
 	if x := ctx.Value(tokenScopesKey{}); x != nil {
 		scopes = append(scopes, x.([]string)...)
 	}
-
-	scopes = append(scopes, common...)
-	sort.Strings(scopes)
-
-	l := 0
-	for idx := 1; idx < len(scopes); idx++ {
-		// Note: this comparison is unaware of the scope grammar (https://docs.docker.com/registry/spec/auth/scope/)
-		// So, "repository:foo/bar:pull,push" != "repository:foo/bar:push,pull", although semantically they are equal.
-		if scopes[l] == scopes[idx] {
-			continue
+	if scope, ok := params["scope"]; ok {
+		for _, s := range scopes {
+			// Note: this comparison is unaware of the scope grammar (https://docs.docker.com/registry/spec/auth/scope/)
+			// So, "repository:foo/bar:pull,push" != "repository:foo/bar:push,pull", although semantically they are equal.
+			if s == scope {
+				// already appended
+				goto Sort
+			}
 		}
-
-		l++
-		scopes[l] = scopes[idx]
+		scopes = append(scopes, scope)
 	}
-	return scopes[:l+1]
+Sort:
+	sort.Strings(scopes)
+	return scopes
 }

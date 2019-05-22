@@ -100,8 +100,6 @@ func loadShim(ctx context.Context, bundle *Bundle, events *exchange.Exchange, rt
 		events:  events,
 		rtTasks: rt,
 	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
 	if err := s.Connect(ctx); err != nil {
 		return nil, err
 	}

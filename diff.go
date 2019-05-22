@@ -45,15 +45,9 @@ type diffRemote struct {
 	client diffapi.DiffClient
 }
 
-func (r *diffRemote) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (ocispec.Descriptor, error) {
-	var config diff.ApplyConfig
-	for _, opt := range opts {
-		if err := opt(&config); err != nil {
-			return ocispec.Descriptor{}, err
-		}
-	}
+func (r *diffRemote) Apply(ctx context.Context, diff ocispec.Descriptor, mounts []mount.Mount) (ocispec.Descriptor, error) {
 	req := &diffapi.ApplyRequest{
-		Diff:   fromDescriptor(desc),
+		Diff:   fromDescriptor(diff),
 		Mounts: fromMounts(mounts),
 	}
 	resp, err := r.client.Apply(ctx, req)

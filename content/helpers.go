@@ -55,14 +55,7 @@ func ReadBlob(ctx context.Context, provider Provider, desc ocispec.Descriptor) (
 
 	p := make([]byte, ra.Size())
 
-	n, err := ra.ReadAt(p, 0)
-	if err == io.EOF {
-		if int64(n) != ra.Size() {
-			err = io.ErrUnexpectedEOF
-		} else {
-			err = nil
-		}
-	}
+	_, err = ra.ReadAt(p, 0)
 	return p, err
 }
 

@@ -25,9 +25,8 @@ import (
 
 func defaultConfig() *srvconfig.Config {
 	return &srvconfig.Config{
-		Version: 1,
-		Root:    defaults.DefaultRootDir,
-		State:   defaults.DefaultStateDir,
+		Root:  defaults.DefaultRootDir,
+		State: defaults.DefaultStateDir,
 		GRPC: srvconfig.GRPCConfig{
 			Address: defaults.DefaultAddress,
 		},

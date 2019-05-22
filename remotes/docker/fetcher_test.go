@@ -109,7 +109,6 @@ func TestDockerFetcherOpen(t *testing.T) {
 		wantErr                bool
 		wantServerMessageError bool
 		wantPlainError         bool
-		retries                int
 	}{
 		{
 			name:         "should return status and error.message if it exists if the registry request fails",
@@ -129,31 +128,12 @@ func TestDockerFetcherOpen(t *testing.T) {
 			want:           nil,
 			wantErr:        true,
 			wantPlainError: true,
-		}, {
-			name:           "should return StatusRequestTimeout after 5 retries",
-			mockedStatus:   http.StatusRequestTimeout,
-			mockedErr:      fmt.Errorf(http.StatusText(http.StatusRequestTimeout)),
-			want:           nil,
-			wantErr:        true,
-			wantPlainError: true,
-			retries:        5,
-		}, {
-			name:           "should return StatusTooManyRequests after 5 retries",
-			mockedStatus:   http.StatusTooManyRequests,
-			mockedErr:      fmt.Errorf(http.StatusText(http.StatusTooManyRequests)),
-			want:           nil,
-			wantErr:        true,
-			wantPlainError: true,
-			retries:        5,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
 			s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-				if tt.retries > 0 {
-					tt.retries--
-				}
 				rw.WriteHeader(tt.mockedStatus)
 				bytes, _ := json.Marshal(tt.mockedErr)
 				rw.Write(bytes)
@@ -167,7 +147,6 @@ func TestDockerFetcherOpen(t *testing.T) {
 			got, err := r.open(context.TODO(), s.URL, "", 0)
 			assert.Equal(t, tt.wantErr, (err != nil))
 			assert.Equal(t, tt.want, got)
-			assert.Equal(t, tt.retries, 0)
 			if tt.wantErr {
 				var expectedError error
 				if tt.wantServerMessageError {

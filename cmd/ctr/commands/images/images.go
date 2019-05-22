@@ -46,7 +46,6 @@ var Command = cli.Command{
 		pullCommand,
 		pushCommand,
 		removeCommand,
-		tagCommand,
 		setLabelsCommand,
 	},
 }

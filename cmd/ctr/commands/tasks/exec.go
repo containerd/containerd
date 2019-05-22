@@ -18,7 +18,6 @@ package tasks
 
 import (
 	"errors"
-	"net/url"
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/cio"
@@ -54,10 +53,6 @@ var execCommand = cli.Command{
 			Name:  "fifo-dir",
 			Usage: "directory used for storing IO FIFOs",
 		},
-		cli.StringFlag{
-			Name:  "log-uri",
-			Usage: "log uri for custom shim logging",
-		},
 	},
 	Action: func(context *cli.Context) error {
 		var (
@@ -91,31 +86,11 @@ var execCommand = cli.Command{
 		pspec.Terminal = tty
 		pspec.Args = args
 
-		var ioCreator cio.Creator
-
-		if logURI := context.String("log-uri"); logURI != "" {
-			uri, err := url.Parse(logURI)
-			if err != nil {
-				return err
-			}
-
-			if dir := context.String("fifo-dir"); dir != "" {
-				return errors.New("can't use log-uri with fifo-dir")
-			}
-
-			if tty {
-				return errors.New("can't use log-uri with tty")
-			}
-
-			ioCreator = cio.LogURI(uri)
-		} else {
-			cioOpts := []cio.Opt{cio.WithStdio, cio.WithFIFODir(context.String("fifo-dir"))}
-			if tty {
-				cioOpts = append(cioOpts, cio.WithTerminal)
-			}
-			ioCreator = cio.NewCreator(cioOpts...)
+		cioOpts := []cio.Opt{cio.WithStdio, cio.WithFIFODir(context.String("fifo-dir"))}
+		if tty {
+			cioOpts = append(cioOpts, cio.WithTerminal)
 		}
-
+		ioCreator := cio.NewCreator(cioOpts...)
 		process, err := task.Exec(ctx, context.String("exec-id"), pspec, ioCreator)
 		if err != nil {
 			return err

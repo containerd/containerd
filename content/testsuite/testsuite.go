@@ -338,7 +338,7 @@ func checkRefNotAvailable(ctx context.Context, t *testing.T, cs content.Store, r
 
 	w, err := cs.Writer(ctx, content.WithRef(ref))
 	if err == nil {
-		defer w.Close()
+		w.Close()
 		t.Fatal("writer created with ref, expected to be in use")
 	}
 	if !errdefs.IsUnavailable(err) {
@@ -402,7 +402,6 @@ func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) 
 		}
 		t.Fatalf("Unexpected error: %+v", err)
 	}
-	w.Close()
 
 	w, err = cs.Writer(ctx, content.WithRef(ref))
 	if err != nil {
@@ -426,7 +425,6 @@ func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) 
 		t.Errorf("Unexpected error: %+v", err)
 	}
 
-	w.Close()
 	w, err = cs.Writer(ctx, content.WithRef(ref))
 	if err != nil {
 		t.Fatal(err)
@@ -442,7 +440,6 @@ func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) 
 		t.Errorf("Unexpected error: %+v", err)
 	}
 
-	w.Close()
 	w, err = cs.Writer(ctx, content.WithRef(ref))
 	if err != nil {
 		t.Fatal(err)
@@ -458,7 +455,6 @@ func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) 
 		t.Fatalf("Failed to commit: %+v", err)
 	}
 
-	w.Close()
 	// Create another writer with same reference
 	w, err = cs.Writer(ctx, content.WithRef(ref))
 	if err != nil {
@@ -485,7 +481,6 @@ func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) 
 		t.Fatalf("Unexpected error: %+v", err)
 	}
 
-	w.Close()
 	w, err = cs.Writer(ctx, content.WithRef(ref))
 	if err != nil {
 		t.Fatal(err)

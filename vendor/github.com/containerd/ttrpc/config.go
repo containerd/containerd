@@ -19,11 +19,9 @@ package ttrpc
 import "github.com/pkg/errors"
 
 type serverConfig struct {
-	handshaker  Handshaker
-	interceptor UnaryServerInterceptor
+	handshaker Handshaker
 }
 
-// ServerOpt for configuring a ttrpc server
 type ServerOpt func(*serverConfig) error
 
 // WithServerHandshaker can be passed to NewServer to ensure that the
@@ -36,17 +34,6 @@ func WithServerHandshaker(handshaker Handshaker) ServerOpt {
 			return errors.New("only one handshaker allowed per server")
 		}
 		c.handshaker = handshaker
-		return nil
-	}
-}
-
-// WithUnaryServerInterceptor sets the provided interceptor on the server
-func WithUnaryServerInterceptor(i UnaryServerInterceptor) ServerOpt {
-	return func(c *serverConfig) error {
-		if c.interceptor != nil {
-			return errors.New("only one interceptor allowed per server")
-		}
-		c.interceptor = i
 		return nil
 	}
 }

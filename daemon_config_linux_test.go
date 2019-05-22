@@ -127,7 +127,6 @@ func TestDaemonRuntimeRoot(t *testing.T) {
 		}
 	}()
 	configTOML := `
-version = 1
 [plugins]
  [plugins.cri]
    stream_server_port = "0"
@@ -222,7 +221,6 @@ func TestDaemonCustomCgroup(t *testing.T) {
 
 	customCgroup := fmt.Sprintf("%d", time.Now().Nanosecond())
 	configTOML := `
-version = 1
 [cgroup]
   path = "` + customCgroup + `"`
 
