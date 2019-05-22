@@ -126,8 +126,13 @@ func (m *TaskManager) Create(ctx context.Context, id string, opts runtime.Create
 			bundle.Delete()
 		}
 	}()
+	topts := opts.TaskOptions
+	if topts == nil {
+		topts = opts.RuntimeOptions
+	}
+
 	b := shimBinary(ctx, bundle, opts.Runtime, m.containerdAddress, m.events, m.tasks)
-	shim, err := b.Start(ctx, func() {
+	shim, err := b.Start(ctx, topts, func() {
 		log.G(ctx).WithField("id", id).Info("shim disconnected")
 		_, err := m.tasks.Get(ctx, id)
 		if err != nil {

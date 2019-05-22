@@ -30,6 +30,7 @@ import (
 	client "github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/ttrpc"
+	"github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -52,7 +53,7 @@ type binary struct {
 	rtTasks           *runtime.TaskList
 }
 
-func (b *binary) Start(ctx context.Context, onClose func()) (_ *shim, err error) {
+func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ *shim, err error) {
 	args := []string{"-id", b.bundle.ID}
 	if logrus.GetLevel() == logrus.DebugLevel {
 		args = append(args, "-debug")
@@ -64,6 +65,7 @@ func (b *binary) Start(ctx context.Context, onClose func()) (_ *shim, err error)
 		b.runtime,
 		b.containerdAddress,
 		b.bundle.Path,
+		opts,
 		args...,
 	)
 	if err != nil {
@@ -126,6 +128,7 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 		b.runtime,
 		b.containerdAddress,
 		bundlePath,
+		nil,
 		"-id", b.bundle.ID,
 		"-bundle", b.bundle.Path,
 		"delete")

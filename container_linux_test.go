@@ -133,10 +133,6 @@ func TestShimInCgroup(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	if CheckRuntime(client.runtime, "io.containerd.runc") {
-		t.Skip()
-	}
-
 	var (
 		ctx, cancel = testContext()
 		id          = t.Name()
@@ -160,12 +156,7 @@ func TestShimInCgroup(t *testing.T) {
 	}
 	defer cg.Delete()
 
-	task, err := container.NewTask(ctx, empty(), func(_ context.Context, client *Client, r *TaskInfo) error {
-		r.Options = &runctypes.CreateOptions{
-			ShimCgroup: path,
-		}
-		return nil
-	})
+	task, err := container.NewTask(ctx, empty(), WithShimCgroup(path))
 	if err != nil {
 		t.Fatal(err)
 	}
