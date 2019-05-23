@@ -7,6 +7,7 @@ After=network.target
 ExecStartPre=-/sbin/modprobe overlay
 ExecStart=/usr/local/bin/containerd
 
+Restart=always
 Delegate=yes
 KillMode=process
 # Having non-zero Limit*s causes performance problems due to accounting overhead
