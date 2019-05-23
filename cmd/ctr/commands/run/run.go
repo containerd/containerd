@@ -115,6 +115,10 @@ var Command = cli.Command{
 			Name:  "cgroup",
 			Usage: "cgroup path (To disable use of cgroup, set to \"\" explicitly)",
 		},
+		cli.StringFlag{
+			Name:  "platform",
+			Usage: "run image for specific platform",
+		},
 	}, append(platformRunFlags, append(commands.SnapshotterFlags, commands.ContainerFlags...)...)...),
 	Action: func(context *cli.Context) error {
 		var (
