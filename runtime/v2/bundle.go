@@ -79,6 +79,11 @@ func NewBundle(ctx context.Context, root, state, id string, spec []byte) (b *Bun
 	if err := os.MkdirAll(filepath.Dir(work), 0711); err != nil {
 		return nil, err
 	}
+	rootfs := filepath.Join(b.Path, "rootfs")
+	if err := os.MkdirAll(rootfs, 0711); err != nil {
+		return nil, err
+	}
+	paths = append(paths, rootfs)
 	if err := os.Mkdir(work, 0711); err != nil {
 		if !os.IsExist(err) {
 			return nil, err

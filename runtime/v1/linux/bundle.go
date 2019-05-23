@@ -65,6 +65,10 @@ func newBundle(id, path, workDir string, spec []byte) (b *bundle, err error) {
 			os.RemoveAll(workDir)
 		}
 	}()
+	rootfs := filepath.Join(path, "rootfs")
+	if err := os.MkdirAll(rootfs, 0711); err != nil {
+		return nil, err
+	}
 	err = ioutil.WriteFile(filepath.Join(path, configFilename), spec, 0666)
 	return &bundle{
 		id:      id,
