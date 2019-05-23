@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/contrib/nvidia"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/platforms"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -73,10 +74,21 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			opts = append(opts, oci.WithRootFSPath(rootfs))
 		} else {
 			snapshotter := context.String("snapshotter")
-			image, err := client.GetImage(ctx, ref)
+			var image containerd.Image
+			i, err := client.ImageService().Get(ctx, ref)
 			if err != nil {
 				return nil, err
 			}
+			if ps := context.String("platform"); ps != "" {
+				platform, err := platforms.Parse(ps)
+				if err != nil {
+					return nil, err
+				}
+				image = containerd.NewImageWithPlatform(client, i, platforms.Only(platform))
+			} else {
+				image = containerd.NewImage(client, i)
+			}
+
 			unpacked, err := image.IsUnpacked(ctx, snapshotter)
 			if err != nil {
 				return nil, err

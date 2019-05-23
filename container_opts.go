@@ -132,7 +132,7 @@ func WithSnapshot(id string) NewContainerOpts {
 // root filesystem in read-write mode
 func WithNewSnapshot(id string, i Image, opts ...snapshots.Opt) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore(), platforms.Default())
+		diffIDs, err := i.RootFS(ctx)
 		if err != nil {
 			return err
 		}
