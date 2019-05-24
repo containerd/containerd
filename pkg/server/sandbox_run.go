@@ -500,7 +500,7 @@ func parseDNSOptions(servers, searches, options []string) (string, error) {
 	resolvContent := ""
 
 	if len(searches) > maxDNSSearches {
-		return "", errors.New("DNSOption.Searches has more than 6 domains")
+		return "", errors.Errorf("DNSOption.Searches has more than %d domains", maxDNSSearches)
 	}
 
 	if len(searches) > 0 {
