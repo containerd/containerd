@@ -21,6 +21,7 @@ import (
 	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
+	"go.opencensus.io/trace"
 )
 
 var (
@@ -62,15 +63,26 @@ func WithLogger(ctx context.Context, logger *logrus.Entry) context.Context {
 }
 
 // GetLogger retrieves the current logger from the context. If no logger is
-// available, the default logger is returned.
+// available, the default logger is returned. If the context has a span
+// associated with it, add correlating information to the returned logger.
 func GetLogger(ctx context.Context) *logrus.Entry {
-	logger := ctx.Value(loggerKey{})
-
-	if logger == nil {
-		return L
+	e, _ := ctx.Value(loggerKey{}).(*logrus.Entry)
+	if e == nil {
+		e = L
 	}
-
-	return logger.(*logrus.Entry)
+	if span := trace.FromContext(ctx); span != nil {
+		spanCtx := span.SpanContext()
+		// The field names used are are specified in the OpenCensus log
+		// correlation document, tweaked to match with general Golang naming
+		// conventions.
+		// https://github.com/census-instrumentation/opencensus-specs/blob/master/trace/LogCorrelation.md
+		e = e.WithFields(logrus.Fields{
+			"traceID":      spanCtx.TraceID,
+			"spanID":       spanCtx.SpanID,
+			"traceSampled": spanCtx.IsSampled(),
+		})
+	}
+	return e
 }
 
 // Trace logs a message at level Trace with the log entry passed-in.
