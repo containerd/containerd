@@ -43,3 +43,11 @@ type IPRanges struct {
 	RangeEnd   string
 	Gateway    string
 }
+
+// BandWidth defines the ingress/egress rate and burst limits
+type BandWidth struct {
+	IngressRate  uint64
+	IngressBurst uint64
+	EgressRate   uint64
+	EgressBurst  uint64
+}

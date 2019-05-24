@@ -19,6 +19,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"strings"
 
@@ -546,14 +547,14 @@ func (c *criService) setupPod(id string, path string, config *runtime.PodSandbox
 	// or an unreasonable valure see validateBandwidthIsReasonable()
 	bandWidth, err := toCNIBandWidth(config.Annotations)
 	if err != nil {
-		"", nil, errors.Errorf("failed to find network info for sandbox %q", id)
+		return "", nil, errors.Errorf("failed to find network info for sandbox %q", id)
 	}
 
 	result, err := c.netPlugin.Setup(id,
 		path,
 		cni.WithLabels(labels),
 		cni.WithCapabilityPortMap(toCNIPortMappings(config.GetPortMappings())),
-		cni.WithCapabilityBandWidth(bandWidth),
+		cni.WithCapabilityBandWidth(*bandWidth),
 	)
 
 	if err != nil {
@@ -572,18 +573,29 @@ func (c *criService) setupPod(id string, path string, config *runtime.PodSandbox
 }
 
 // toCNIPortMappings converts CRI annotations to CNI bandwidth.
-func toCNIBandWidth(annotations map[string]string) (cni.BandWidth, error) {
+func toCNIBandWidth(annotations map[string]string) (*cni.BandWidth, error) {
 	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(annotations)
 	if err != nil {
 		return nil, fmt.Errorf("Error reading pod bandwidth annotations: %v", err)
 	}
 
-	return cni.BandWidth{
-		IngressRate:  uint64(ingress.Value()),
-		IngressBurst: 0,
-		EgressRate:   uint64(ingress.Value()),
-		EgressBurst:  0,
+	bandWidth := &cni.BandWidth{}
+
+	if ingress == nil && egress == nil {
+		return bandWidth, nil
 	}
+
+	if ingress != nil {
+		bandWidth.IngressRate = uint64(ingress.Value())
+		bandWidth.IngressBurst = math.MaxUint32
+	}
+
+	if egress != nil {
+		bandWidth.EgressRate = uint64(egress.Value())
+		bandWidth.EgressRate = math.MaxUint32
+	}
+
+	return bandWidth, nil
 }
 
 // toCNIPortMappings converts CRI port mappings to CNI.
