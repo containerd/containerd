@@ -264,3 +264,181 @@ func TestLeasesList(t *testing.T) {
 		}
 	}
 }
+
+func TestLeaseResource(t *testing.T) {
+	ctx, db, cancel := testEnv(t)
+	defer cancel()
+
+	var (
+		leaseID = "l1"
+
+		lease = leases.Lease{
+			ID: leaseID,
+		}
+
+		snapshotterKey = "RstMI3X8vguKoPFkmIStZ5fQFI7F1L0o"
+	)
+
+	// prepare lease
+	if err := db.Update(func(tx *bolt.Tx) error {
+		_, err0 := NewLeaseManager(tx).Create(ctx, leases.WithID(leaseID))
+		return err0
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	testCases := []struct {
+		lease    leases.Lease
+		resource leases.Resource
+		err      error
+	}{
+		{
+			lease: lease,
+			resource: leases.Resource{
+				ID:   "sha256:29f5d56d12684887bdfa50dcd29fc31eea4aaf4ad3bec43daf19026a7ce69912",
+				Type: "content",
+			},
+		},
+		{
+			lease: lease,
+			resource: leases.Resource{
+				ID:   "d2UdcINOwrBTQG9kS8rySAM3eMNBSojH",
+				Type: "ingests",
+			},
+		},
+		{
+			// allow to add resource which exists
+			lease: lease,
+			resource: leases.Resource{
+				ID:   "d2UdcINOwrBTQG9kS8rySAM3eMNBSojH",
+				Type: "ingests",
+			},
+		},
+		{
+			// not allow to reference to lease
+			lease: lease,
+			resource: leases.Resource{
+				ID:   "xCAV3F6PddlXitbtby0Vo23Qof6RTWpG",
+				Type: "leases",
+			},
+			err: errdefs.ErrNotImplemented,
+		},
+		{
+			// not allow to reference to container
+			lease: lease,
+			resource: leases.Resource{
+				ID:   "05O9ljptPu5Qq9kZGOacEfymBwQFM8ZH",
+				Type: "containers",
+			},
+			err: errdefs.ErrNotImplemented,
+		},
+		{
+			// not allow to reference to image
+			lease: lease,
+			resource: leases.Resource{
+				ID:   "qBUHpWBn03YaCt9cL3PPGKWoxBqTlLfu",
+				Type: "image",
+			},
+			err: errdefs.ErrNotImplemented,
+		},
+		{
+			lease: lease,
+			resource: leases.Resource{
+				ID:   "HMemOhlygombYhkhHhAZj5aRbDy2a3z2",
+				Type: "snapshots",
+			},
+			err: errdefs.ErrInvalidArgument,
+		},
+		{
+			lease: lease,
+			resource: leases.Resource{
+				ID:   snapshotterKey,
+				Type: "snapshots/overlayfs",
+			},
+		},
+		{
+			lease: lease,
+			resource: leases.Resource{
+				ID:   "HMemOhlygombYhkhHhAZj5aRbDy2a3z2",
+				Type: "snapshots/overlayfs/type1",
+			},
+			err: errdefs.ErrInvalidArgument,
+		},
+		{
+			lease: leases.Lease{
+				ID: "non-found",
+			},
+			resource: leases.Resource{
+				ID:   "HMemOhlygombYhkhHhAZj5aRbDy2a3z2",
+				Type: "snapshots/overlayfs",
+			},
+			err: errdefs.ErrNotFound,
+		},
+	}
+
+	idxList := make(map[leases.Resource]bool)
+	for i, tc := range testCases {
+		if err := db.Update(func(tx *bolt.Tx) error {
+			err0 := NewLeaseManager(tx).AddResource(ctx, tc.lease, tc.resource)
+			if got := errors.Cause(err0); got != tc.err {
+				return errors.Errorf("expect error (%v), but got (%v)", tc.err, err0)
+			}
+
+			if err0 == nil {
+				// not visited yet
+				idxList[tc.resource] = false
+			}
+			return nil
+		}); err != nil {
+			t.Fatalf("failed to run case %d with resource: %v", i, err)
+		}
+	}
+
+	// check list function
+	var gotList []leases.Resource
+	if err := db.View(func(tx *bolt.Tx) error {
+		var err error
+		gotList, err = NewLeaseManager(tx).ListResources(ctx, lease)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(gotList) != len(idxList) {
+		t.Fatalf("expected (%d) resources, but got (%d)", len(idxList), len(gotList))
+	}
+
+	for _, r := range gotList {
+		visited, ok := idxList[r]
+		if !ok {
+			t.Fatalf("unexpected resource(%v)", r)
+		}
+		if visited {
+			t.Fatalf("duplicate resource(%v)", r)
+		}
+		idxList[r] = true
+	}
+
+	// remove snapshots
+	if err := db.Update(func(tx *bolt.Tx) error {
+		return NewLeaseManager(tx).DeleteResource(ctx, lease, leases.Resource{
+			ID:   snapshotterKey,
+			Type: "snapshots/overlayfs",
+		})
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// check list number
+	if err := db.View(func(tx *bolt.Tx) error {
+		var err error
+		gotList, err = NewLeaseManager(tx).ListResources(ctx, lease)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(gotList)+1 != len(idxList) {
+		t.Fatalf("expected (%d) resources, but got (%d)", len(idxList)-1, len(gotList))
+	}
+}

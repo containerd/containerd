@@ -2627,6 +2627,89 @@ file {
       json_name: "leases"
     }
   }
+  message_type {
+    name: "Resource"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "type"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "type"
+    }
+  }
+  message_type {
+    name: "AddResourceRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "resource"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.leases.v1.Resource"
+      options {
+        65001: 0
+      }
+      json_name: "resource"
+    }
+  }
+  message_type {
+    name: "DeleteResourceRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "resource"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.leases.v1.Resource"
+      options {
+        65001: 0
+      }
+      json_name: "resource"
+    }
+  }
+  message_type {
+    name: "ListResourcesRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+  }
+  message_type {
+    name: "ListResourcesResponse"
+    field {
+      name: "resources"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.leases.v1.Resource"
+      options {
+        65001: 0
+      }
+      json_name: "resources"
+    }
+  }
   service {
     name: "Leases"
     method {
@@ -2643,6 +2726,21 @@ file {
       name: "List"
       input_type: ".containerd.services.leases.v1.ListRequest"
       output_type: ".containerd.services.leases.v1.ListResponse"
+    }
+    method {
+      name: "AddResource"
+      input_type: ".containerd.services.leases.v1.AddResourceRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+    method {
+      name: "DeleteResource"
+      input_type: ".containerd.services.leases.v1.DeleteResourceRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+    method {
+      name: "ListResources"
+      input_type: ".containerd.services.leases.v1.ListResourcesRequest"
+      output_type: ".containerd.services.leases.v1.ListResourcesResponse"
     }
   }
   options {
