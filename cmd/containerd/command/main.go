@@ -88,6 +88,11 @@ func App() *cli.App {
 			Usage: "containerd root directory",
 		},
 		cli.StringFlag{
+			Name:  "conf-dir,d",
+			Usage: "store config toml file into directory, it is readonly",
+			Value: defaultConfigDir,
+		},
+		cli.StringFlag{
 			Name:  "state",
 			Usage: "containerd state directory",
 		},
@@ -119,6 +124,14 @@ func App() *cli.App {
 		// Make sure top-level directories are created early.
 		if err := server.CreateTopLevelDirectories(config); err != nil {
 			return err
+		}
+
+		if d := context.GlobalString("conf-dir"); d == "" {
+			return fmt.Errorf("option conf-dir should not be nil")
+		} else {
+			if err := server.SaveConfig(config, d); err != nil {
+				return err
+			}
 		}
 
 		// Stop if we are registering or unregistering against Windows SCM.

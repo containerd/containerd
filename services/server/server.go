@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -69,6 +70,27 @@ func CreateTopLevelDirectories(config *srvconfig.Config) error {
 	}
 
 	return sys.MkdirAllWithACL(config.State, 0711)
+}
+
+// SaveConfig save config into dir
+func SaveConfig(conf *srvconfig.Config, dir string) error {
+	switch {
+	case conf.Root == dir:
+		return errors.New("save dir must not same with root")
+	case conf.State == dir:
+		return errors.New("save dir must not same with state")
+	}
+
+	if err := sys.MkdirAllWithACL(dir, 0711); err != nil {
+		return err
+	}
+	fpath := path.Join(dir, "config.toml")
+	if f, err := os.OpenFile(fpath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0744); err != nil {
+		return err
+	} else {
+		defer f.Close()
+		return conf.WriteTo(f)
+	}
 }
 
 // New creates and initializes a new containerd server

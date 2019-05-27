@@ -39,6 +39,7 @@ var (
 		windows.SIGTERM,
 		windows.SIGINT,
 	}
+	defaultConfigDir = filepath.Join(os.Getenv("programfiles"), "containerd", "conf.d")
 )
 
 func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *server.Server) chan struct{} {
