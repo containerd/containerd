@@ -84,13 +84,15 @@ func SaveConfig(conf *srvconfig.Config, dir string) error {
 	if err := sys.MkdirAllWithACL(dir, 0711); err != nil {
 		return err
 	}
-	fpath := path.Join(dir, "config.toml")
-	if f, err := os.OpenFile(fpath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0744); err != nil {
+
+	f, err := os.OpenFile(path.Join(dir, "config.toml"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0744)
+	if err != nil {
 		return err
-	} else {
-		defer f.Close()
-		return conf.WriteTo(f)
 	}
+
+	defer f.Close()
+	_, err = conf.WriteTo(f)
+	return err
 }
 
 // New creates and initializes a new containerd server

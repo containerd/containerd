@@ -126,12 +126,13 @@ func App() *cli.App {
 			return err
 		}
 
-		if d := context.GlobalString("conf-dir"); d == "" {
+		confd := context.GlobalString("conf-dir")
+		if confd == "" {
 			return fmt.Errorf("option conf-dir should not be nil")
-		} else {
-			if err := server.SaveConfig(config, d); err != nil {
-				return err
-			}
+		}
+
+		if err := server.SaveConfig(config, confd); err != nil {
+			return err
 		}
 
 		// Stop if we are registering or unregistering against Windows SCM.

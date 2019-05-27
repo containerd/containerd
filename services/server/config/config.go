@@ -144,8 +144,8 @@ func (c *Config) Decode(id string, v interface{}) (interface{}, error) {
 }
 
 // serialization config into writer
-func (c *Config) WriteTo(w io.Writer) error {
-	return toml.NewEncoder(w).Encode(c)
+func (c *Config) WriteTo(w io.Writer) (int64, error) {
+	return 0, toml.NewEncoder(w).Encode(c)
 }
 
 // LoadConfig loads the containerd server config from the provided path
