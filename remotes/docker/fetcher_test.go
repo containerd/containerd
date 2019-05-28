@@ -25,6 +25,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/docker/distribution/registry/api/errcode"
@@ -46,14 +47,30 @@ func TestFetcherOpen(t *testing.T) {
 	}))
 	defer s.Close()
 
+	u, err := url.Parse(s.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	f := dockerFetcher{&dockerBase{
-		client: s.Client(),
+		namespace: "nonempty",
 	}}
+
+	host := RegistryHost{
+		Client: s.Client(),
+		Host:   u.Host,
+		Scheme: u.Scheme,
+		Path:   u.Path,
+	}
+
 	ctx := context.Background()
+
+	req := f.request(host, http.MethodGet)
 
 	checkReader := func(o int64) {
 		t.Helper()
-		rc, err := f.open(ctx, s.URL, "", o)
+
+		rc, err := f.open(ctx, req, "", o)
 		if err != nil {
 			t.Fatalf("failed to open: %+v", err)
 		}
@@ -93,7 +110,7 @@ func TestFetcherOpen(t *testing.T) {
 	// Check that server returning a different content range
 	// then requested errors
 	start = 30
-	_, err := f.open(ctx, s.URL, "", 20)
+	_, err = f.open(ctx, req, "", 20)
 	if err == nil {
 		t.Fatal("expected error opening with invalid server response")
 	}
@@ -160,20 +177,34 @@ func TestDockerFetcherOpen(t *testing.T) {
 			}))
 			defer s.Close()
 
-			r := dockerFetcher{&dockerBase{
-				client: s.Client(),
+			u, err := url.Parse(s.URL)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			f := dockerFetcher{&dockerBase{
+				namespace: "ns",
 			}}
 
-			got, err := r.open(context.TODO(), s.URL, "", 0)
+			host := RegistryHost{
+				Client: s.Client(),
+				Host:   u.Host,
+				Scheme: u.Scheme,
+				Path:   u.Path,
+			}
+
+			req := f.request(host, http.MethodGet)
+
+			got, err := f.open(context.TODO(), req, "", 0)
 			assert.Equal(t, tt.wantErr, (err != nil))
 			assert.Equal(t, tt.want, got)
 			assert.Equal(t, tt.retries, 0)
 			if tt.wantErr {
 				var expectedError error
 				if tt.wantServerMessageError {
-					expectedError = errors.Errorf("unexpected status code %v: %v %s - Server message: %s", s.URL, tt.mockedStatus, http.StatusText(tt.mockedStatus), tt.mockedErr.Error())
+					expectedError = errors.Errorf("unexpected status code %v/ns: %v %s - Server message: %s", s.URL, tt.mockedStatus, http.StatusText(tt.mockedStatus), tt.mockedErr.Error())
 				} else if tt.wantPlainError {
-					expectedError = errors.Errorf("unexpected status code %v: %v %s", s.URL, tt.mockedStatus, http.StatusText(tt.mockedStatus))
+					expectedError = errors.Errorf("unexpected status code %v/ns: %v %s", s.URL, tt.mockedStatus, http.StatusText(tt.mockedStatus))
 				}
 				assert.Equal(t, expectedError.Error(), err.Error())
 

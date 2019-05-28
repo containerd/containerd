@@ -41,9 +41,7 @@ func TestHTTPResolver(t *testing.T) {
 	s := func(h http.Handler) (string, ResolverOptions, func()) {
 		s := httptest.NewServer(h)
 
-		options := ResolverOptions{
-			PlainHTTP: true,
-		}
+		options := ResolverOptions{}
 		base := s.URL[7:] // strip "http://"
 		return base, options, s.Close
 	}
@@ -69,9 +67,12 @@ func TestBasicResolver(t *testing.T) {
 		})
 
 		base, options, close := tlsServer(wrapped)
-		options.Authorizer = NewAuthorizer(options.Client, func(string) (string, string, error) {
-			return "user1", "password1", nil
-		})
+		options.Hosts = ConfigureDefaultRegistries(
+			WithClient(options.Client),
+			WithAuthorizer(NewAuthorizer(options.Client, func(string) (string, string, error) {
+				return "user1", "password1", nil
+			})),
+		)
 		return base, options, close
 	}
 	runBasicTest(t, "testname", basicAuth)
@@ -215,7 +216,13 @@ func withTokenServer(th http.Handler, creds func(string) (string, string, error)
 		})
 
 		base, options, close := tlsServer(wrapped)
-		options.Authorizer = NewAuthorizer(options.Client, creds)
+		options.Hosts = ConfigureDefaultRegistries(
+			WithClient(options.Client),
+			WithAuthorizer(NewDockerAuthorizer(
+				WithAuthClient(options.Client),
+				WithAuthCreds(creds),
+			)),
+		)
 		options.Client.Transport.(*http.Transport).TLSClientConfig.RootCAs.AddCert(cert)
 		return base, options, func() {
 			s.Close()
@@ -232,14 +239,17 @@ func tlsServer(h http.Handler) (string, ResolverOptions, func()) {
 	cert, _ := x509.ParseCertificate(s.TLS.Certificates[0].Certificate[0])
 	capool.AddCert(cert)
 
-	options := ResolverOptions{
-		Client: &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					RootCAs: capool,
-				},
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs: capool,
 			},
 		},
+	}
+	options := ResolverOptions{
+		Hosts: ConfigureDefaultRegistries(WithClient(client)),
+		// Set deprecated field for tests to use for configuration
+		Client: client,
 	}
 	base := s.URL[8:] // strip "https://"
 	return base, options, s.Close

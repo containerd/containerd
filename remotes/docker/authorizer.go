@@ -31,7 +31,6 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/version"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context/ctxhttp"
@@ -41,7 +40,7 @@ type dockerAuthorizer struct {
 	credentials func(string) (string, string, error)
 
 	client *http.Client
-	ua     string
+	header http.Header
 	mu     sync.Mutex
 
 	// indexed by host name
@@ -50,15 +49,58 @@ type dockerAuthorizer struct {
 
 // NewAuthorizer creates a Docker authorizer using the provided function to
 // get credentials for the token server or basic auth.
+// Deprecated: Use NewDockerAuthorizer
 func NewAuthorizer(client *http.Client, f func(string) (string, string, error)) Authorizer {
-	if client == nil {
-		client = http.DefaultClient
+	return NewDockerAuthorizer(WithAuthClient(client), WithAuthCreds(f))
+}
+
+type authorizerConfig struct {
+	credentials func(string) (string, string, error)
+	client      *http.Client
+	header      http.Header
+}
+
+// AuthorizerOpt configures an authorizer
+type AuthorizerOpt func(*authorizerConfig)
+
+// WithAuthClient provides the HTTP client for the authorizer
+func WithAuthClient(client *http.Client) AuthorizerOpt {
+	return func(opt *authorizerConfig) {
+		opt.client = client
+	}
+}
+
+// WithAuthCreds provides a credential function to the authorizer
+func WithAuthCreds(creds func(string) (string, string, error)) AuthorizerOpt {
+	return func(opt *authorizerConfig) {
+		opt.credentials = creds
+	}
+}
+
+// WithAuthHeader provides HTTP headers for authorization
+func WithAuthHeader(hdr http.Header) AuthorizerOpt {
+	return func(opt *authorizerConfig) {
+		opt.header = hdr
+	}
+}
+
+// NewDockerAuthorizer creates an authorizer using Docker's registry
+// authentication spec.
+// See https://docs.docker.com/registry/spec/auth/
+func NewDockerAuthorizer(opts ...AuthorizerOpt) Authorizer {
+	var ao authorizerConfig
+	for _, opt := range opts {
+		opt(&ao)
+	}
+
+	if ao.client == nil {
+		ao.client = http.DefaultClient
 	}
 
 	return &dockerAuthorizer{
-		credentials: f,
-		client:      client,
-		ua:          "containerd/" + version.Version,
+		credentials: ao.credentials,
+		client:      ao.client,
+		header:      ao.header,
 		handlers:    make(map[string]*authHandler),
 	}
 }
@@ -115,7 +157,7 @@ func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.R
 				return err
 			}
 
-			a.handlers[host] = newAuthHandler(a.client, a.ua, c.scheme, common)
+			a.handlers[host] = newAuthHandler(a.client, a.header, c.scheme, common)
 			return nil
 		} else if c.scheme == basicAuth && a.credentials != nil {
 			username, secret, err := a.credentials(host)
@@ -129,7 +171,7 @@ func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.R
 					secret:   secret,
 				}
 
-				a.handlers[host] = newAuthHandler(a.client, a.ua, c.scheme, common)
+				a.handlers[host] = newAuthHandler(a.client, a.header, c.scheme, common)
 				return nil
 			}
 		}
@@ -179,7 +221,7 @@ type authResult struct {
 type authHandler struct {
 	sync.Mutex
 
-	ua string
+	header http.Header
 
 	client *http.Client
 
@@ -194,13 +236,9 @@ type authHandler struct {
 	scopedTokens map[string]*authResult
 }
 
-func newAuthHandler(client *http.Client, ua string, scheme authenticationScheme, opts tokenOptions) *authHandler {
-	if client == nil {
-		client = http.DefaultClient
-	}
-
+func newAuthHandler(client *http.Client, hdr http.Header, scheme authenticationScheme, opts tokenOptions) *authHandler {
 	return &authHandler{
-		ua:           ua,
+		header:       hdr,
 		client:       client,
 		scheme:       scheme,
 		common:       opts,
@@ -313,8 +351,10 @@ func (ah *authHandler) fetchTokenWithOAuth(ctx context.Context, to tokenOptions)
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
-	if ah.ua != "" {
-		req.Header.Set("User-Agent", ah.ua)
+	if ah.header != nil {
+		for k, v := range ah.header {
+			req.Header[k] = append(req.Header[k], v...)
+		}
 	}
 
 	resp, err := ctxhttp.Do(ctx, ah.client, req)
@@ -363,8 +403,10 @@ func (ah *authHandler) fetchToken(ctx context.Context, to tokenOptions) (string,
 		return "", err
 	}
 
-	if ah.ua != "" {
-		req.Header.Set("User-Agent", ah.ua)
+	if ah.header != nil {
+		for k, v := range ah.header {
+			req.Header[k] = append(req.Header[k], v...)
+		}
 	}
 
 	reqParams := req.URL.Query()
