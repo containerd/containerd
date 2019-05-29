@@ -57,7 +57,6 @@ containerd offers a full client package to help you integrate containerd into yo
 
 import (
   "github.com/containerd/containerd"
-  "github.com/containerd/containerd/cio"
 )
 
 
