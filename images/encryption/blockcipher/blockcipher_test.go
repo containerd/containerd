@@ -47,11 +47,11 @@ func TestBlockCipherEncryption(t *testing.T) {
 	}
 
 	ciphertext := make([]byte, 1024)
-	_, err = ciphertextReader.Read(ciphertext)
+	encsize, err := ciphertextReader.Read(ciphertext)
 	if err != nil && err != io.EOF {
 		t.Fatal("Reading the ciphertext should not have failed")
 	}
-	ciphertextReaderAt := bytes.NewReader(ciphertext[:ciphertextReader.Size()])
+	ciphertextReaderAt := bytes.NewReader(ciphertext[:encsize])
 
 	// Use a different instantiated object to indicate an invokation at a diff time
 	plaintextReader, _, err := h.Decrypt(ciphertextReaderAt, lbco)
@@ -60,12 +60,12 @@ func TestBlockCipherEncryption(t *testing.T) {
 	}
 
 	plaintext := make([]byte, 1024)
-	_, err = plaintextReader.Read(plaintext)
+	decsize, err := plaintextReader.Read(plaintext)
 	if err != nil && err != io.EOF {
 		t.Fatal("Read the plaintext should not have failed")
 	}
 
-	if string(plaintext[:plaintextReader.Size()]) != string(layerData) {
+	if string(plaintext[:decsize]) != string(layerData) {
 		t.Fatal("Decrypted data is incorrect")
 	}
 }
@@ -96,8 +96,11 @@ func TestBlockCipherEncryptionInvalidKey(t *testing.T) {
 	lbco.SymmetricKey = []byte("aaa3456789012345678901234567890123456789012345678901234567890123")
 
 	ciphertext := make([]byte, 1024)
-	ciphertextReader.Read(ciphertext)
-	ciphertextReaderAt := bytes.NewReader(ciphertext[:ciphertextReader.Size()])
+	encsize, err := ciphertextReader.Read(ciphertext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ciphertextReaderAt := bytes.NewReader(ciphertext[:encsize])
 
 	plaintextReader, _, err := bc2.Decrypt(ciphertextReaderAt, lbco)
 	if err != nil {

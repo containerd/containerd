@@ -65,7 +65,7 @@ func (kw *gpgKeyWrapper) WrapKeys(ec *config.EncryptConfig, optsData []byte) ([]
 	ciphertext := new(bytes.Buffer)
 	el, err := kw.createEntityList(ec)
 	if err != nil {
-		return nil, errors.Wrap(err, "Unable to create entity list")
+		return nil, errors.Wrap(err, "unable to create entity list")
 	}
 	if len(el) == 0 {
 		// nothing to do -- not an error
@@ -101,7 +101,7 @@ func (kw *gpgKeyWrapper) UnwrapKey(dc *config.DecryptConfig, pgpPacket []byte) (
 		r := bytes.NewBuffer(pgpPrivateKey)
 		entityList, err := openpgp.ReadKeyRing(r)
 		if err != nil {
-			return nil, errors.Wrap(err, "Unable to parse private keys")
+			return nil, errors.Wrap(err, "unable to parse private keys")
 		}
 
 		var prompt openpgp.PromptFunction
@@ -143,7 +143,7 @@ func (kw *gpgKeyWrapper) GetKeyIdsFromPacket(b64pgpPackets string) ([]uint64, er
 	for _, b64pgpPacket := range strings.Split(b64pgpPackets, ",") {
 		pgpPacket, err := base64.StdEncoding.DecodeString(b64pgpPacket)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Could not decode base64 encoded PGP packet")
+			return nil, errors.Wrapf(err, "could not decode base64 encoded PGP packet")
 		}
 		newids, err := kw.getKeyIDs(pgpPacket)
 		if err != nil {

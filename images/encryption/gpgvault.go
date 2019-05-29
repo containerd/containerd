@@ -55,7 +55,7 @@ func (g *gpgVault) AddSecretKeyRingData(gpgSecretKeyRingData []byte) error {
 	r := bytes.NewReader(gpgSecretKeyRingData)
 	entityList, err := openpgp.ReadKeyRing(r)
 	if err != nil {
-		return errors.Wrapf(err, "Could not read keyring")
+		return errors.Wrapf(err, "could not read keyring")
 	}
 	g.entityLists = append(g.entityLists, entityList)
 	g.keyDataList = append(g.keyDataList, gpgSecretKeyRingData)

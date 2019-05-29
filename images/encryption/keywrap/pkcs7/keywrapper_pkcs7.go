@@ -83,11 +83,11 @@ func (kw *pkcs7KeyWrapper) getPrivateKeysPasswords(dcparameters map[string][][]b
 func (kw *pkcs7KeyWrapper) UnwrapKey(dc *config.DecryptConfig, pkcs7Packet []byte) ([]byte, error) {
 	privKeys := kw.GetPrivateKeys(dc.Parameters)
 	if len(privKeys) == 0 {
-		return nil, errors.New("No private keys found for PKCS7 decryption")
+		return nil, errors.New("no private keys found for PKCS7 decryption")
 	}
 	privKeysPasswords := kw.getPrivateKeysPasswords(dc.Parameters)
 	if len(privKeysPasswords) != len(privKeys) {
-		return nil, errors.New("Private key password array length must be same as that of private keys")
+		return nil, errors.New("private key password array length must be same as that of private keys")
 	}
 
 	x509Certs, err := collectX509s(dc.Parameters["x509s"])
@@ -95,12 +95,12 @@ func (kw *pkcs7KeyWrapper) UnwrapKey(dc *config.DecryptConfig, pkcs7Packet []byt
 		return nil, err
 	}
 	if len(x509Certs) == 0 {
-		return nil, errors.New("No x509 certificates found needed for PKCS7 decryption")
+		return nil, errors.New("no x509 certificates found needed for PKCS7 decryption")
 	}
 
 	p7, err := pkcs7.Parse(pkcs7Packet)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Could not parse PKCS7 packet")
+		return nil, errors.Wrapf(err, "could not parse PKCS7 packet")
 	}
 
 	for idx, privKey := range privKeys {
