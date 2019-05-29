@@ -20,11 +20,15 @@ import (
 	"context"
 	"expvar"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/pprof"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -51,6 +55,10 @@ import (
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+)
+
+var (
+	refileName = regexp.MustCompile(`^([0-9]+)-.*\.toml$`)
 )
 
 // CreateTopLevelDirectories creates the top-level root and state directories.
@@ -417,6 +425,66 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 
 	// return the ordered graph for plugins
 	return plugin.Graph(config.DisabledPlugins), nil
+}
+
+type sortInfos []os.FileInfo
+
+func (sf sortInfos) Len() int           { return len(sf) }
+func (sf sortInfos) Less(i, j int) bool { return numFileName(sf[i].Name()) < numFileName(sf[j].Name()) }
+func (sf sortInfos) Swap(i, j int)      { sf[i], sf[j] = sf[j], sf[i] }
+
+func numFileName(name string) int {
+	nums := refileName.FindStringSubmatch(name)
+	if nums == nil || nums[1] == "" {
+		return -1
+	}
+
+	n, _ := strconv.Atoi(nums[1])
+	return n
+}
+
+func vaildConf(info os.FileInfo) bool {
+	if info.Mode().IsRegular() == false {
+		return false
+	}
+	if numFileName(info.Name()) < 0 {
+		return false
+	}
+	return true
+}
+
+// MergeConfd search file in confd , require filename like [0-0]-xx.toml
+// merge conf by Positive sequence into config
+func MergeConfd(config *srvconfig.Config, confd string) error {
+	fs, err := ioutil.ReadDir(confd)
+	if err == os.ErrNotExist {
+		log.L.WithField("path", confd).Warn("not exist")
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var (
+		newfs []os.FileInfo
+	)
+
+	for _, f := range fs {
+		if vaildConf(f) {
+			newfs = append(newfs, f)
+		} else {
+			log.L.WithField("path", confd).Warnf("%s is not valid config file", f.Name())
+		}
+	}
+
+	sort.Sort(sortInfos(newfs))
+	for _, fs := range newfs {
+		err = config.Merge(filepath.Join(confd, fs.Name()))
+		if err != nil {
+			log.L.WithField("path", confd).WithField("file", fs.Name()).Errorf("toml parse failed: %s", err.Error())
+			return err
+		}
+	}
+	return nil
 }
 
 type proxyClients struct {

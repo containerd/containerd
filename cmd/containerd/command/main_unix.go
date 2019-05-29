@@ -27,7 +27,10 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const defaultConfigPath = "/etc/containerd/config.toml"
+const (
+	defaultConfigPath = "/etc/containerd/config.toml"
+	defaultConfigDir  = "/etc/containerd/conf.d"
+)
 
 var handledSignals = []os.Signal{
 	unix.SIGTERM,

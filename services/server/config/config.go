@@ -19,6 +19,7 @@ package config
 import (
 	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
 )
 
@@ -139,6 +140,20 @@ func (c *Config) Decode(id string, v interface{}) (interface{}, error) {
 		return nil, err
 	}
 	return v, nil
+}
+
+// Merge merge conf to Config by override
+func (c *Config) Merge(fpath string) error {
+	conf := new(Config)
+	md, err := toml.DecodeFile(fpath, conf)
+	if err != nil {
+		return err
+	}
+	err = mergo.Merge(c, *conf)
+	if err != nil {
+		return err
+	}
+	return mergo.Merge(&c.md, md)
 }
 
 // LoadConfig loads the containerd server config from the provided path

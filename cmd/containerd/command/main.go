@@ -84,6 +84,11 @@ func App() *cli.App {
 			Usage: "address for containerd's GRPC server",
 		},
 		cli.StringFlag{
+			Name:  "conf-dir",
+			Usage: "directory store config toml files",
+			Value: defaultConfigDir,
+		},
+		cli.StringFlag{
 			Name:  "root",
 			Usage: "containerd root directory",
 		},
@@ -108,6 +113,10 @@ func App() *cli.App {
 		)
 
 		if err := srvconfig.LoadConfig(context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+
+		if err := server.MergeConfd(config, context.GlobalString("conf-dir")); err != nil {
 			return err
 		}
 

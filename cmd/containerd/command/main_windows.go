@@ -35,6 +35,7 @@ import (
 
 var (
 	defaultConfigPath = filepath.Join(os.Getenv("programfiles"), "containerd", "config.toml")
+	defaultConfigDir  = filepath.Join(os.Getenv("programfiles"), "containerd", "conf.d")
 	handledSignals    = []os.Signal{
 		windows.SIGTERM,
 		windows.SIGINT,
