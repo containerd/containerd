@@ -576,7 +576,7 @@ func (c *criService) setupPod(id string, path string, config *runtime.PodSandbox
 func toCNIBandWidth(annotations map[string]string) (*cni.BandWidth, error) {
 	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(annotations)
 	if err != nil {
-		return nil, fmt.Errorf("Error reading pod bandwidth annotations: %v", err)
+		return nil, errors.Errorf("reaing pod bandwidth annotations: %v", err)
 	}
 
 	bandWidth := &cni.BandWidth{}
