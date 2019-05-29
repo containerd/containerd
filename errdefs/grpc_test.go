@@ -17,6 +17,7 @@
 package errdefs
 
 import (
+	"context"
 	"testing"
 
 	"google.golang.org/grpc/codes"
@@ -55,6 +56,26 @@ func TestGRPCRoundTrip(t *testing.T) {
 			input: errShouldLeaveAlone,
 			cause: ErrUnknown,
 			str:   errShouldLeaveAlone.Error() + ": " + ErrUnknown.Error(),
+		},
+		{
+			input: context.Canceled,
+			cause: context.Canceled,
+			str:   "context canceled",
+		},
+		{
+			input: errors.Wrapf(context.Canceled, "this is a test cancel"),
+			cause: context.Canceled,
+			str:   "this is a test cancel: context canceled",
+		},
+		{
+			input: context.DeadlineExceeded,
+			cause: context.DeadlineExceeded,
+			str:   "context deadline exceeded",
+		},
+		{
+			input: errors.Wrapf(context.DeadlineExceeded, "this is a test deadline exceeded"),
+			cause: context.DeadlineExceeded,
+			str:   "this is a test deadline exceeded: context deadline exceeded",
 		},
 	} {
 		t.Run(testcase.input.Error(), func(t *testing.T) {
