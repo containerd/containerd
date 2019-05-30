@@ -19,6 +19,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"strings"
 
@@ -36,6 +37,7 @@ import (
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/util/bandwidth"
 
 	"github.com/containerd/cri/pkg/annotations"
 	criconfig "github.com/containerd/cri/pkg/config"
@@ -540,10 +542,21 @@ func (c *criService) setupPod(id string, path string, config *runtime.PodSandbox
 	}
 
 	labels := getPodCNILabels(id, config)
+
+	// Will return an error if the bandwidth limitation has the wrong unit
+	// or an unreasonable valure see validateBandwidthIsReasonable()
+	bandWidth, err := toCNIBandWidth(config.Annotations)
+	if err != nil {
+		return "", nil, errors.Errorf("failed to find network info for sandbox %q", id)
+	}
+
 	result, err := c.netPlugin.Setup(id,
 		path,
 		cni.WithLabels(labels),
-		cni.WithCapabilityPortMap(toCNIPortMappings(config.GetPortMappings())))
+		cni.WithCapabilityPortMap(toCNIPortMappings(config.GetPortMappings())),
+		cni.WithCapabilityBandWidth(*bandWidth),
+	)
+
 	if err != nil {
 		return "", nil, err
 	}
@@ -557,6 +570,28 @@ func (c *criService) setupPod(id string, path string, config *runtime.PodSandbox
 		logrus.WithError(err).Errorf("Failed to destroy network for sandbox %q", id)
 	}
 	return "", result, errors.Errorf("failed to find network info for sandbox %q", id)
+}
+
+// toCNIPortMappings converts CRI annotations to CNI bandwidth.
+func toCNIBandWidth(annotations map[string]string) (*cni.BandWidth, error) {
+	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(annotations)
+	if err != nil {
+		return nil, errors.Errorf("reaing pod bandwidth annotations: %v", err)
+	}
+
+	bandWidth := &cni.BandWidth{}
+
+	if ingress != nil {
+		bandWidth.IngressRate = uint64(ingress.Value())
+		bandWidth.IngressBurst = math.MaxUint32
+	}
+
+	if egress != nil {
+		bandWidth.EgressRate = uint64(egress.Value())
+		bandWidth.EgressBurst = math.MaxUint32
+	}
+
+	return bandWidth, nil
 }
 
 // toCNIPortMappings converts CRI port mappings to CNI.
