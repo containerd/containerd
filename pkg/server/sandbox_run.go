@@ -581,10 +581,6 @@ func toCNIBandWidth(annotations map[string]string) (*cni.BandWidth, error) {
 
 	bandWidth := &cni.BandWidth{}
 
-	if ingress == nil && egress == nil {
-		return bandWidth, nil
-	}
-
 	if ingress != nil {
 		bandWidth.IngressRate = uint64(ingress.Value())
 		bandWidth.IngressBurst = math.MaxUint32
@@ -592,7 +588,7 @@ func toCNIBandWidth(annotations map[string]string) (*cni.BandWidth, error) {
 
 	if egress != nil {
 		bandWidth.EgressRate = uint64(egress.Value())
-		bandWidth.EgressRate = math.MaxUint32
+		bandWidth.EgressBurst = math.MaxUint32
 	}
 
 	return bandWidth, nil
