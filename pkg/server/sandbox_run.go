@@ -572,11 +572,11 @@ func (c *criService) setupPod(id string, path string, config *runtime.PodSandbox
 	return "", result, errors.Errorf("failed to find network info for sandbox %q", id)
 }
 
-// toCNIPortMappings converts CRI annotations to CNI bandwidth.
+// toCNIBandWidth converts CRI annotations to CNI bandwidth.
 func toCNIBandWidth(annotations map[string]string) (*cni.BandWidth, error) {
 	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(annotations)
 	if err != nil {
-		return nil, errors.Errorf("reaing pod bandwidth annotations: %v", err)
+		return nil, errors.Errorf("reading pod bandwidth annotations: %v", err)
 	}
 
 	bandWidth := &cni.BandWidth{}
