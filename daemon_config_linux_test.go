@@ -123,6 +123,7 @@ func TestDaemonRuntimeRoot(t *testing.T) {
 		}
 	}()
 	configTOML := `
+version = 1
 [plugins]
  [plugins.cri]
    stream_server_port = "0"
