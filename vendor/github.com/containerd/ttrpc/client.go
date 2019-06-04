@@ -99,6 +99,10 @@ func (c *Client) Call(ctx context.Context, service, method string, req, resp int
 		cresp = &Response{}
 	)
 
+	if metadata, ok := GetMetadata(ctx); ok {
+		creq.Metadata = metadata
+	}
+
 	if dl, ok := ctx.Deadline(); ok {
 		creq.TimeoutNano = dl.Sub(time.Now()).Nanoseconds()
 	}
