@@ -57,7 +57,7 @@ type Metadata struct {
 	IP string
 	// RuntimeHandler is the runtime handler name of the pod.
 	RuntimeHandler string
-	// CNI result
+	// CNIresult resulting configuration for attached network namespace interfaces
 	CNIResult *cni.CNIResult
 }
 
