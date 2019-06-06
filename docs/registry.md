@@ -22,6 +22,22 @@ from a registry, containerd will try these endpoint URLs one by one, and use the
 
 After modify this config, you need restart the `containerd` service.
 
+## Configure Registry TLS Communication
+`cri` plugin also supports configuring TLS settings when communicating with a registry.
+
+To configure the TLS settings for a specific registry, create/modify the `/ec/containerd/config.toml` as follows:
+```toml
+[plugins.cri.registry.tls_configs]
+  [plugins.cri.registry.tls_configs."my.custom.registry"]
+    ca_file   = "ca.pem"
+    cert_file = "cert.pem"
+    key_file  = "key.pem"
+```
+
+In the config example shown above, TLS mutual authentication will be used for communications with the registry endpoint located at https://my.custom.registry.
+`ca_file` is file name of the certificate authority (CA) certificate used to authenticate the x509 certificate/key pair specified by the files respectively pointed to by `cert_file` and `key_file`.
+
+
 ## Configure Registry Credentials
 
 `cri` plugin also supports docker like registry credential config.
