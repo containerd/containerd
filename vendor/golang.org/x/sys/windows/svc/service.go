@@ -72,6 +72,7 @@ type Status struct {
 	Accepts    Accepted
 	CheckPoint uint32 // used to report progress during a lengthy operation
 	WaitHint   uint32 // estimated time required for a pending operation, in milliseconds
+	ProcessId  uint32 // if the service is running, the process identifier of it, and otherwise zero
 }
 
 // ChangeRequest is sent to the service Handler to request service status change.
@@ -115,11 +116,11 @@ var (
 )
 
 func init() {
-	k := syscall.MustLoadDLL("kernel32.dll")
-	cSetEvent = k.MustFindProc("SetEvent").Addr()
-	cWaitForSingleObject = k.MustFindProc("WaitForSingleObject").Addr()
-	a := syscall.MustLoadDLL("advapi32.dll")
-	cRegisterServiceCtrlHandlerExW = a.MustFindProc("RegisterServiceCtrlHandlerExW").Addr()
+	k := windows.NewLazySystemDLL("kernel32.dll")
+	cSetEvent = k.NewProc("SetEvent").Addr()
+	cWaitForSingleObject = k.NewProc("WaitForSingleObject").Addr()
+	a := windows.NewLazySystemDLL("advapi32.dll")
+	cRegisterServiceCtrlHandlerExW = a.NewProc("RegisterServiceCtrlHandlerExW").Addr()
 }
 
 type ctlEvent struct {
@@ -328,7 +329,7 @@ func Run(name string, handler Handler) error {
 		}
 		s.c <- e
 		// Always return NO_ERROR (0) for now.
-		return 0
+		return windows.NO_ERROR
 	}
 
 	var svcmain uintptr
