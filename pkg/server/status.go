@@ -72,6 +72,12 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 			return nil, err
 		}
 		resp.Info["golang"] = string(versionByt)
+
+		cniConfig, err := json.Marshal(c.netPlugin.GetConfig())
+		if err != nil {
+			logrus.WithError(err).Errorf("Failed to marshal CNI config %v", err)
+		}
+		resp.Info["cniconfig"] = string(cniConfig)
 	}
 	return resp, nil
 }
