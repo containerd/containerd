@@ -4,14 +4,16 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// +build !go1.10
+
 // Package idna implements IDNA2008 using the compatibility processing
 // defined by UTS (Unicode Technical Standard) #46, which defines a standard to
 // deal with the transition from IDNA2003.
 //
 // IDNA2008 (Internationalized Domain Names for Applications), is defined in RFC
 // 5890, RFC 5891, RFC 5892, RFC 5893 and RFC 5894.
-// UTS #46 is defined in http://www.unicode.org/reports/tr46.
-// See http://unicode.org/cldr/utility/idna.jsp for a visualization of the
+// UTS #46 is defined in https://www.unicode.org/reports/tr46.
+// See https://unicode.org/cldr/utility/idna.jsp for a visualization of the
 // differences between these two standards.
 package idna // import "golang.org/x/net/idna"
 
@@ -68,7 +70,7 @@ func VerifyDNSLength(verify bool) Option {
 }
 
 // RemoveLeadingDots removes leading label separators. Leading runes that map to
-// dots, such as U+3002, are removed as well.
+// dots, such as U+3002 IDEOGRAPHIC FULL STOP, are removed as well.
 //
 // This is the behavior suggested by the UTS #46 and is adopted by some
 // browsers.
@@ -299,7 +301,7 @@ func (e runeError) Error() string {
 }
 
 // process implements the algorithm described in section 4 of UTS #46,
-// see http://www.unicode.org/reports/tr46.
+// see https://www.unicode.org/reports/tr46.
 func (p *Profile) process(s string, toASCII bool) (string, error) {
 	var err error
 	if p.mapping != nil {
