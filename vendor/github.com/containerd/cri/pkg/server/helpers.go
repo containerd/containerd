@@ -24,12 +24,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl"
@@ -577,29 +574,4 @@ func unknownSandboxStatus() sandboxstore.Status {
 	return sandboxstore.Status{
 		State: sandboxstore.StateUnknown,
 	}
-}
-
-// unknownExitStatus generates containerd.Status for container exited with unknown exit code.
-func unknownExitStatus() containerd.Status {
-	return containerd.Status{
-		Status:     containerd.Stopped,
-		ExitStatus: unknownExitCode,
-		ExitTime:   time.Now(),
-	}
-}
-
-// getTaskStatus returns status for a given task. It returns unknown exit status if
-// the task is nil or not found.
-func getTaskStatus(ctx context.Context, task containerd.Task) (containerd.Status, error) {
-	if task == nil {
-		return unknownExitStatus(), nil
-	}
-	status, err := task.Status(ctx)
-	if err != nil {
-		if !errdefs.IsNotFound(err) {
-			return containerd.Status{}, err
-		}
-		return unknownExitStatus(), nil
-	}
-	return status, nil
 }
