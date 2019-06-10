@@ -90,7 +90,6 @@ type Status struct {
 	Message string
 	// Starting indicates that the container is in starting state.
 	// This field doesn't need to be checkpointed.
-	// TODO(now): Add unit test.
 	Starting bool `json:"-"`
 	// Removing indicates that the container is in removing state.
 	// This field doesn't need to be checkpointed.
