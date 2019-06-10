@@ -148,6 +148,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 	// of the default network interface as the pod IP.
 	c.netPlugin, err = cni.New(cni.WithMinNetworkCount(networkAttachCount),
 		cni.WithPluginConfDir(config.NetworkPluginConfDir),
+		cni.WithPluginMaxConfNum(config.NetworkPluginMaxConfNum),
 		cni.WithPluginDir([]string{config.NetworkPluginBinDir}))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to initialize cni")

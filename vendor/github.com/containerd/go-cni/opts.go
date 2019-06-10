@@ -54,6 +54,15 @@ func WithPluginConfDir(dir string) CNIOpt {
 	}
 }
 
+// WithPluginMaxConfNum can be used to configure the
+// max cni plugin config file num.
+func WithPluginMaxConfNum(max int) CNIOpt {
+	return func(c *libcni) error {
+		c.pluginMaxConfNum = max
+		return nil
+	}
+}
+
 // WithMinNetworkCount can be used to configure the
 // minimum networks to be configured and initialized
 // for the status to report success. By default its 1.
@@ -159,7 +168,7 @@ func WithConfListFile(fileName string) CNIOpt {
 // the convention chosen is - the first network configuration in the sorted
 // list of network conf files as the default network.
 func WithDefaultConf(c *libcni) error {
-	return loadFromConfDir(c, 1)
+	return loadFromConfDir(c, c.pluginMaxConfNum)
 }
 
 // WithAllConf can be used to detect all network config

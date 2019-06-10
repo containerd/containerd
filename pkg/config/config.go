@@ -71,6 +71,8 @@ type CniConfig struct {
 	NetworkPluginBinDir string `toml:"bin_dir" json:"binDir"`
 	// NetworkPluginConfDir is the directory in which the admin places a CNI conf.
 	NetworkPluginConfDir string `toml:"conf_dir" json:"confDir"`
+	// NetworkPluginMaxConfNum is the max number of plugin config file will load
+	NetworkPluginMaxConfNum int `toml:"max_conf_num" json:"maxConfNum"`
 	// NetworkPluginConfTemplate is the file path of golang template used to generate
 	// cni config.
 	// When it is set, containerd will get cidr from kubelet to replace {{.PodCIDR}} in
@@ -202,6 +204,7 @@ func DefaultConfig() PluginConfig {
 		CniConfig: CniConfig{
 			NetworkPluginBinDir:       "/opt/cni/bin",
 			NetworkPluginConfDir:      "/etc/cni/net.d",
+			NetworkPluginMaxConfNum:   1,
 			NetworkPluginConfTemplate: "",
 		},
 		ContainerdConfig: ContainerdConfig{
