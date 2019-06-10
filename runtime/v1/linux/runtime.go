@@ -336,7 +336,9 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 		)
 		ctx = namespaces.WithNamespace(ctx, ns)
 		pid, _ := runc.ReadPidFile(filepath.Join(bundle.path, proc.InitPidFile))
+		shimExit := make(chan struct{})
 		s, err := bundle.NewShimClient(ctx, ns, ShimConnect(r.config, func() {
+			defer close(shimExit)
 			if _, err := r.tasks.Get(ctx, id); err != nil {
 				// Task was never started or was already successfully deleted
 				return
@@ -362,6 +364,18 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 
 		logDirPath := filepath.Join(r.root, ns, id)
 
+		copyAndClose := func(dst io.Writer, src io.ReadWriteCloser) {
+			copyDone := make(chan struct{})
+			go func() {
+				io.Copy(dst, src)
+				close(copyDone)
+			}()
+			select {
+			case <-shimExit:
+			case <-copyDone:
+			}
+			src.Close()
+		}
 		shimStdoutLog, err := v1.OpenShimStdoutLog(ctx, logDirPath)
 		if err != nil {
 			log.G(ctx).WithError(err).WithFields(logrus.Fields{
@@ -372,9 +386,9 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			continue
 		}
 		if r.config.ShimDebug {
-			go io.Copy(os.Stdout, shimStdoutLog)
+			go copyAndClose(os.Stdout, shimStdoutLog)
 		} else {
-			go io.Copy(ioutil.Discard, shimStdoutLog)
+			go copyAndClose(ioutil.Discard, shimStdoutLog)
 		}
 
 		shimStderrLog, err := v1.OpenShimStderrLog(ctx, logDirPath)
@@ -387,9 +401,9 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			continue
 		}
 		if r.config.ShimDebug {
-			go io.Copy(os.Stderr, shimStderrLog)
+			go copyAndClose(os.Stderr, shimStderrLog)
 		} else {
-			go io.Copy(ioutil.Discard, shimStderrLog)
+			go copyAndClose(ioutil.Discard, shimStderrLog)
 		}
 
 		t, err := newTask(id, ns, pid, s, r.events, r.tasks, bundle)
