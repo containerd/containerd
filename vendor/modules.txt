@@ -1,0 +1,401 @@
+# github.com/BurntSushi/toml v0.3.1
+github.com/BurntSushi/toml
+# github.com/Microsoft/go-winio v0.0.0-20190408173621-84b4ab48a507
+github.com/Microsoft/go-winio
+github.com/Microsoft/go-winio/pkg/etw
+github.com/Microsoft/go-winio/pkg/etwlogrus
+github.com/Microsoft/go-winio/pkg/guid
+github.com/Microsoft/go-winio/pkg/security
+github.com/Microsoft/go-winio/vhd
+# github.com/Microsoft/hcsshim v0.0.0-20190325164909-8abdbb8205e4
+github.com/Microsoft/hcsshim
+github.com/Microsoft/hcsshim/ext4/tar2ext4
+github.com/Microsoft/hcsshim/pkg/go-runhcs
+github.com/Microsoft/hcsshim/internal/guid
+github.com/Microsoft/hcsshim/internal/hcs
+github.com/Microsoft/hcsshim/internal/hcserror
+github.com/Microsoft/hcsshim/internal/hns
+github.com/Microsoft/hcsshim/internal/mergemaps
+github.com/Microsoft/hcsshim/internal/schema1
+github.com/Microsoft/hcsshim/internal/wclayer
+github.com/Microsoft/hcsshim/ext4/internal/compactext4
+github.com/Microsoft/hcsshim/internal/runhcs
+github.com/Microsoft/hcsshim/internal/guestrequest
+github.com/Microsoft/hcsshim/internal/interop
+github.com/Microsoft/hcsshim/internal/logfields
+github.com/Microsoft/hcsshim/internal/timeout
+github.com/Microsoft/hcsshim/internal/schema2
+github.com/Microsoft/hcsshim/internal/longpath
+github.com/Microsoft/hcsshim/internal/safefile
+github.com/Microsoft/hcsshim/ext4/internal/format
+# github.com/beorn7/perks v0.0.0-20160804104726-4c0e84591b9a
+github.com/beorn7/perks/quantile
+# github.com/containerd/aufs v0.0.0-20190114185352-f894a800659b
+github.com/containerd/aufs
+# github.com/containerd/btrfs v0.0.0-20181101203652-af5082808c83
+github.com/containerd/btrfs
+# github.com/containerd/cgroups v0.0.0-20190328223300-4994991857f9
+github.com/containerd/cgroups
+# github.com/containerd/console v0.0.0-20181022165439-0650fd9eeb50
+github.com/containerd/console
+# github.com/containerd/continuity v0.0.0-20181001140422-bd77b46c8352
+github.com/containerd/continuity/fs
+github.com/containerd/continuity/sysx
+github.com/containerd/continuity/fs/fstest
+github.com/containerd/continuity/syscallx
+github.com/containerd/continuity/testutil
+github.com/containerd/continuity/testutil/loopback
+github.com/containerd/continuity
+github.com/containerd/continuity/devices
+github.com/containerd/continuity/driver
+github.com/containerd/continuity/pathdriver
+github.com/containerd/continuity/proto
+# github.com/containerd/cri v0.0.0-20190426014833-2fc62db8146c
+github.com/containerd/cri
+github.com/containerd/cri/cli
+github.com/containerd/cri/pkg/config
+github.com/containerd/cri/pkg/constants
+github.com/containerd/cri/pkg/server
+github.com/containerd/cri/pkg/api/v1
+github.com/containerd/cri/pkg/client
+github.com/containerd/cri/pkg/annotations
+github.com/containerd/cri/pkg/api/runtimeoptions/v1
+github.com/containerd/cri/pkg/atomic
+github.com/containerd/cri/pkg/containerd/importer
+github.com/containerd/cri/pkg/containerd/opts
+github.com/containerd/cri/pkg/containerd/util
+github.com/containerd/cri/pkg/ioutil
+github.com/containerd/cri/pkg/log
+github.com/containerd/cri/pkg/netns
+github.com/containerd/cri/pkg/os
+github.com/containerd/cri/pkg/registrar
+github.com/containerd/cri/pkg/server/io
+github.com/containerd/cri/pkg/store
+github.com/containerd/cri/pkg/store/container
+github.com/containerd/cri/pkg/store/image
+github.com/containerd/cri/pkg/store/sandbox
+github.com/containerd/cri/pkg/store/snapshot
+github.com/containerd/cri/pkg/util
+# github.com/containerd/fifo v0.0.0-20180307165137-3d5202aec260
+github.com/containerd/fifo
+# github.com/containerd/go-cni v0.0.0-20190409231530-891c2a41e181
+github.com/containerd/go-cni
+# github.com/containerd/go-runc v0.0.0-20180907222934-5a6d9f37cfa3
+github.com/containerd/go-runc
+# github.com/containerd/ttrpc v0.0.0-20190529185706-a5bd8ce9e40b
+github.com/containerd/ttrpc
+github.com/containerd/ttrpc/plugin
+# github.com/containerd/typeurl v0.0.0-20180627222232-a93fcdb778cd
+github.com/containerd/typeurl
+# github.com/containerd/zfs v0.0.0-20181107152433-31af176f2ae8
+github.com/containerd/zfs
+# github.com/containernetworking/cni v0.6.0
+github.com/containernetworking/cni/libcni
+github.com/containernetworking/cni/pkg/types
+github.com/containernetworking/cni/pkg/types/current
+github.com/containernetworking/cni/pkg/invoke
+github.com/containernetworking/cni/pkg/version
+github.com/containernetworking/cni/pkg/types/020
+# github.com/containernetworking/plugins v0.7.0
+github.com/containernetworking/plugins/pkg/ns
+# github.com/coreos/go-systemd v0.0.0-20161114122254-48702e0da86b
+github.com/coreos/go-systemd/dbus
+# github.com/davecgh/go-spew v1.1.1
+github.com/davecgh/go-spew/spew
+# github.com/docker/distribution v0.0.0-20190205005809-0d3efadf0154
+github.com/docker/distribution/reference
+github.com/docker/distribution/registry/api/errcode
+github.com/docker/distribution/digestset
+# github.com/docker/docker v0.0.0-20171019062838-86f080cff091
+github.com/docker/docker/pkg/system
+github.com/docker/docker/pkg/symlink
+github.com/docker/docker/pkg/truncindex
+github.com/docker/docker/pkg/mount
+github.com/docker/docker/pkg/longpath
+# github.com/docker/go-events v0.0.0-20170721190031-9461782956ad
+github.com/docker/go-events
+# github.com/docker/go-metrics v0.0.0-20180131145841-4ea375f7759c
+github.com/docker/go-metrics
+# github.com/docker/go-units v0.4.0
+github.com/docker/go-units
+# github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96
+github.com/docker/spdystream
+github.com/docker/spdystream/spdy
+# github.com/emicklei/go-restful v2.2.1+incompatible
+github.com/emicklei/go-restful
+github.com/emicklei/go-restful/log
+# github.com/godbus/dbus v0.0.0-20151105175453-c7fdd8b5cd55
+github.com/godbus/dbus
+# github.com/gogo/googleapis v1.2.0
+github.com/gogo/googleapis/google/rpc
+# github.com/gogo/protobuf v1.2.1
+github.com/gogo/protobuf/proto
+github.com/gogo/protobuf/types
+github.com/gogo/protobuf/sortkeys
+github.com/gogo/protobuf/gogoproto
+github.com/gogo/protobuf/protoc-gen-gogo/descriptor
+github.com/gogo/protobuf/protoc-gen-gogo/generator
+github.com/gogo/protobuf/vanity
+github.com/gogo/protobuf/vanity/command
+github.com/gogo/protobuf/protoc-gen-gogo/generator/internal/remap
+github.com/gogo/protobuf/protoc-gen-gogo/plugin
+github.com/gogo/protobuf/plugin/compare
+github.com/gogo/protobuf/plugin/defaultcheck
+github.com/gogo/protobuf/plugin/description
+github.com/gogo/protobuf/plugin/embedcheck
+github.com/gogo/protobuf/plugin/enumstringer
+github.com/gogo/protobuf/plugin/equal
+github.com/gogo/protobuf/plugin/face
+github.com/gogo/protobuf/plugin/gostring
+github.com/gogo/protobuf/plugin/marshalto
+github.com/gogo/protobuf/plugin/oneofcheck
+github.com/gogo/protobuf/plugin/populate
+github.com/gogo/protobuf/plugin/size
+github.com/gogo/protobuf/plugin/stringer
+github.com/gogo/protobuf/plugin/testgen
+github.com/gogo/protobuf/plugin/union
+github.com/gogo/protobuf/plugin/unmarshal
+github.com/gogo/protobuf/protoc-gen-gogo/grpc
+# github.com/golang/protobuf v1.2.0
+github.com/golang/protobuf/proto
+github.com/golang/protobuf/ptypes
+github.com/golang/protobuf/ptypes/any
+github.com/golang/protobuf/ptypes/duration
+github.com/golang/protobuf/ptypes/timestamp
+# github.com/google/go-cmp v0.2.0
+github.com/google/go-cmp/cmp/cmpopts
+github.com/google/go-cmp/cmp
+github.com/google/go-cmp/cmp/internal/function
+github.com/google/go-cmp/cmp/internal/diff
+github.com/google/go-cmp/cmp/internal/value
+# github.com/google/gofuzz v0.0.0-20161122191042-44d81051d367
+github.com/google/gofuzz
+# github.com/google/uuid v1.1.1
+github.com/google/uuid
+# github.com/grpc-ecosystem/go-grpc-prometheus v0.0.0-20160910222444-6b7015e65d36
+github.com/grpc-ecosystem/go-grpc-prometheus
+# github.com/hashicorp/errwrap v0.0.0-20141028054710-7554cd9344ce
+github.com/hashicorp/errwrap
+# github.com/hashicorp/go-multierror v0.0.0-20161216184304-ed905158d874
+github.com/hashicorp/go-multierror
+# github.com/json-iterator/go v1.1.5
+github.com/json-iterator/go
+# github.com/konsorten/go-windows-terminal-sequences v1.0.1
+github.com/konsorten/go-windows-terminal-sequences
+# github.com/matttproud/golang_protobuf_extensions v1.0.1
+github.com/matttproud/golang_protobuf_extensions/pbutil
+# github.com/mistifyio/go-zfs v0.0.0-20190413222219-f784269be439
+github.com/mistifyio/go-zfs
+# github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
+github.com/modern-go/concurrent
+# github.com/modern-go/reflect2 v0.0.0-20180701023420-4b7aa43c6742
+github.com/modern-go/reflect2
+# github.com/opencontainers/go-digest v0.0.0-20180430190053-c9281466c8b2
+github.com/opencontainers/go-digest
+# github.com/opencontainers/image-spec v1.0.1
+github.com/opencontainers/image-spec/identity
+github.com/opencontainers/image-spec/specs-go
+github.com/opencontainers/image-spec/specs-go/v1
+# github.com/opencontainers/runc v1.0.0-rc8
+github.com/opencontainers/runc/libcontainer/system
+github.com/opencontainers/runc/libcontainer/user
+github.com/opencontainers/runc/libcontainer/apparmor
+github.com/opencontainers/runc/libcontainer/seccomp
+github.com/opencontainers/runc/libcontainer/devices
+github.com/opencontainers/runc/libcontainer/configs
+# github.com/opencontainers/runtime-spec v0.0.0-20190207185410-29686dbc5559
+github.com/opencontainers/runtime-spec/specs-go
+# github.com/opencontainers/selinux v1.2.2
+github.com/opencontainers/selinux/go-selinux
+github.com/opencontainers/selinux/go-selinux/label
+# github.com/pkg/errors v0.8.1
+github.com/pkg/errors
+# github.com/prometheus/client_golang v0.0.0-20180131142826-f4fb1b73fb09
+github.com/prometheus/client_golang/prometheus
+# github.com/prometheus/client_model v0.0.0-20171117100541-99fa1f4be8e5
+github.com/prometheus/client_model/go
+# github.com/prometheus/common v0.0.0-20180110214958-89604d197083
+github.com/prometheus/common/expfmt
+github.com/prometheus/common/model
+github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
+# github.com/prometheus/procfs v0.0.0-20180125133057-cb4147076ac7
+github.com/prometheus/procfs
+github.com/prometheus/procfs/nfs
+github.com/prometheus/procfs/xfs
+github.com/prometheus/procfs/internal/util
+# github.com/seccomp/libseccomp-golang v0.0.0-20160531183505-32f571b70023
+github.com/seccomp/libseccomp-golang
+# github.com/sirupsen/logrus v1.4.1
+github.com/sirupsen/logrus
+# github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
+github.com/syndtr/gocapability/capability
+# github.com/tchap/go-patricia v2.2.6+incompatible
+github.com/tchap/go-patricia/patricia
+# github.com/urfave/cli v0.0.0-20171014202726-7bc6a0acffa5
+github.com/urfave/cli
+# go.etcd.io/bbolt v0.0.0-20190528202153-2eb7227adea1
+go.etcd.io/bbolt
+# golang.org/x/crypto v0.0.0-20190411191339-88737f569e3a
+golang.org/x/crypto/ssh/terminal
+# golang.org/x/net v0.0.0-20190522155817-f3200d17e092
+golang.org/x/net/context/ctxhttp
+golang.org/x/net/trace
+golang.org/x/net/context
+golang.org/x/net/internal/timeseries
+golang.org/x/net/http2
+golang.org/x/net/http2/hpack
+golang.org/x/net/http/httpguts
+golang.org/x/net/idna
+golang.org/x/net/websocket
+# golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be
+golang.org/x/oauth2
+golang.org/x/oauth2/internal
+# golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
+golang.org/x/sync/semaphore
+golang.org/x/sync/errgroup
+# golang.org/x/sys v0.0.0-20190602015325-4c4f7f33c9ed
+golang.org/x/sys/unix
+golang.org/x/sys/windows
+golang.org/x/sys/windows/svc
+golang.org/x/sys/windows/svc/debug
+golang.org/x/sys/windows/svc/eventlog
+golang.org/x/sys/windows/svc/mgr
+golang.org/x/sys/windows/registry
+# golang.org/x/text v0.3.0
+golang.org/x/text/secure/bidirule
+golang.org/x/text/unicode/bidi
+golang.org/x/text/unicode/norm
+golang.org/x/text/transform
+# golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
+golang.org/x/time/rate
+# google.golang.org/appengine v1.1.0
+google.golang.org/appengine/urlfetch
+google.golang.org/appengine/internal
+google.golang.org/appengine/internal/urlfetch
+google.golang.org/appengine/internal/base
+google.golang.org/appengine/internal/datastore
+google.golang.org/appengine/internal/log
+google.golang.org/appengine/internal/remote_api
+# google.golang.org/genproto v0.0.0-20180817151627-c66870c02cf8
+google.golang.org/genproto/googleapis/rpc/status
+# google.golang.org/grpc v1.20.1
+google.golang.org/grpc
+google.golang.org/grpc/codes
+google.golang.org/grpc/health/grpc_health_v1
+google.golang.org/grpc/status
+google.golang.org/grpc/grpclog
+google.golang.org/grpc/metadata
+google.golang.org/grpc/health
+google.golang.org/grpc/credentials
+google.golang.org/grpc/balancer
+google.golang.org/grpc/balancer/roundrobin
+google.golang.org/grpc/connectivity
+google.golang.org/grpc/encoding
+google.golang.org/grpc/encoding/proto
+google.golang.org/grpc/internal
+google.golang.org/grpc/internal/backoff
+google.golang.org/grpc/internal/balancerload
+google.golang.org/grpc/internal/binarylog
+google.golang.org/grpc/internal/channelz
+google.golang.org/grpc/internal/envconfig
+google.golang.org/grpc/internal/grpcrand
+google.golang.org/grpc/internal/grpcsync
+google.golang.org/grpc/internal/transport
+google.golang.org/grpc/keepalive
+google.golang.org/grpc/naming
+google.golang.org/grpc/peer
+google.golang.org/grpc/resolver
+google.golang.org/grpc/resolver/dns
+google.golang.org/grpc/resolver/passthrough
+google.golang.org/grpc/stats
+google.golang.org/grpc/tap
+google.golang.org/grpc/credentials/internal
+google.golang.org/grpc/balancer/base
+google.golang.org/grpc/binarylog/grpc_binarylog_v1
+google.golang.org/grpc/internal/syscall
+# gopkg.in/inf.v0 v0.9.0
+gopkg.in/inf.v0
+# gopkg.in/yaml.v2 v2.2.1
+gopkg.in/yaml.v2
+# gotest.tools v0.0.0-20181223230014-1083505acf35
+gotest.tools/assert
+gotest.tools/assert/cmp
+gotest.tools/internal/format
+gotest.tools/internal/source
+gotest.tools/internal/difflib
+# k8s.io/api v0.0.0-20190219093303-35c66765f3ca
+k8s.io/api/core/v1
+# k8s.io/apimachinery v0.0.0-20190216013122-f05b8decd79c
+k8s.io/apimachinery/pkg/util/clock
+k8s.io/apimachinery/pkg/util/net
+k8s.io/apimachinery/pkg/util/runtime
+k8s.io/apimachinery/pkg/types
+k8s.io/apimachinery/pkg/util/remotecommand
+k8s.io/apimachinery/pkg/util/sets
+k8s.io/apimachinery/pkg/apis/meta/v1
+k8s.io/apimachinery/pkg/util/httpstream
+k8s.io/apimachinery/pkg/util/httpstream/spdy
+k8s.io/apimachinery/pkg/api/errors
+k8s.io/apimachinery/pkg/api/resource
+k8s.io/apimachinery/pkg/runtime
+k8s.io/apimachinery/pkg/runtime/schema
+k8s.io/apimachinery/pkg/util/intstr
+k8s.io/apimachinery/pkg/conversion
+k8s.io/apimachinery/pkg/fields
+k8s.io/apimachinery/pkg/labels
+k8s.io/apimachinery/pkg/selection
+k8s.io/apimachinery/pkg/watch
+k8s.io/apimachinery/pkg/runtime/serializer/streaming
+k8s.io/apimachinery/pkg/runtime/serializer
+k8s.io/apimachinery/third_party/forked/golang/netutil
+k8s.io/apimachinery/pkg/apis/meta/internalversion
+k8s.io/apimachinery/pkg/util/validation/field
+k8s.io/apimachinery/pkg/conversion/queryparams
+k8s.io/apimachinery/pkg/util/errors
+k8s.io/apimachinery/pkg/util/json
+k8s.io/apimachinery/pkg/util/naming
+k8s.io/apimachinery/third_party/forked/golang/reflect
+k8s.io/apimachinery/pkg/util/validation
+k8s.io/apimachinery/pkg/version
+k8s.io/apimachinery/pkg/runtime/serializer/json
+k8s.io/apimachinery/pkg/runtime/serializer/protobuf
+k8s.io/apimachinery/pkg/runtime/serializer/recognizer
+k8s.io/apimachinery/pkg/runtime/serializer/versioning
+k8s.io/apimachinery/pkg/apis/meta/v1beta1
+k8s.io/apimachinery/pkg/util/framer
+k8s.io/apimachinery/pkg/util/yaml
+k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
+# k8s.io/apiserver v0.0.0-20190219213931-e783488c2f43
+k8s.io/apiserver/pkg/server/httplog
+k8s.io/apiserver/pkg/util/wsstream
+# k8s.io/client-go v0.0.0-20190219213553-1f401a01c752
+k8s.io/client-go/tools/remotecommand
+k8s.io/client-go/util/cert
+k8s.io/client-go/rest
+k8s.io/client-go/transport/spdy
+k8s.io/client-go/util/exec
+k8s.io/client-go/pkg/version
+k8s.io/client-go/plugin/pkg/client/auth/exec
+k8s.io/client-go/rest/watch
+k8s.io/client-go/tools/clientcmd/api
+k8s.io/client-go/tools/metrics
+k8s.io/client-go/transport
+k8s.io/client-go/util/flowcontrol
+k8s.io/client-go/pkg/apis/clientauthentication
+k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1
+k8s.io/client-go/pkg/apis/clientauthentication/v1beta1
+k8s.io/client-go/util/connrotation
+# k8s.io/klog v0.0.0-20181108234604-8139d8cb77af
+k8s.io/klog
+# k8s.io/kubernetes v1.15.0-alpha.0
+k8s.io/kubernetes/pkg/kubelet/server/streaming
+k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2
+k8s.io/kubernetes/pkg/kubelet/util
+k8s.io/kubernetes/pkg/kubelet/server/portforward
+k8s.io/kubernetes/pkg/kubelet/server/remotecommand
+k8s.io/kubernetes/pkg/apis/core
+# k8s.io/utils v0.0.0-20190221042446-c2654d5206da
+k8s.io/utils/exec
+k8s.io/utils/integer
+# sigs.k8s.io/yaml v1.1.0
+sigs.k8s.io/yaml

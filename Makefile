@@ -94,6 +94,9 @@ GO_TAGS=$(if $(GO_BUILDTAGS),-tags "$(GO_BUILDTAGS)",)
 GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) $(EXTRA_LDFLAGS)'
 SHIM_GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) -extldflags "-static" $(EXTRA_LDFLAGS)'
 
+# add specific Go flags
+GOFLAGS=-mod=vendor
+
 #Replaces ":" (*nix), ";" (windows) with newline for easy parsing
 GOPATHS=$(shell echo ${GOPATH} | tr ":" "\n" | tr ";" "\n")
 

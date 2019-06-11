@@ -67,6 +67,8 @@ before_script:
 script:
   - export GOOS=$TRAVIS_GOOS
   - export CGO_ENABLED=$TRAVIS_CGO_ENABLED
+  - export GO111MODULE=on
+  - export GOFLAGS=-mod=vendor
   - DCO_VERBOSITY=-q ../project/script/validate/dco
   - ../project/script/validate/fileheader ../project/
   - travis_wait ../project/script/validate/vendor

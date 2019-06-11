@@ -1,0 +1,24 @@
+dist: xenial
+sudo: required
+language: go
+go:
+  - "1.11.x"
+  - "tip"
+
+before_install:
+    - sudo apt-get update
+    - sudo apt-get install -y btrfs-tools linux-headers-generic
+    - dpkg -L btrfs-tools
+    - ls /usr/include/btrfs
+
+install:
+    - go get -d ./...
+    - go get -u github.com/vbatts/git-validation
+    - go get -u github.com/kunalkushwaha/ltag
+
+before_script:
+    - pushd ..; git clone https://github.com/containerd/project; popd
+
+script:
+    - DCO_VERBOSITY=-q ../project/script/validate/dco
+    - ../project/script/validate/fileheader ../project/
