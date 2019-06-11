@@ -71,7 +71,9 @@ type CniConfig struct {
 	NetworkPluginBinDir string `toml:"bin_dir" json:"binDir"`
 	// NetworkPluginConfDir is the directory in which the admin places a CNI conf.
 	NetworkPluginConfDir string `toml:"conf_dir" json:"confDir"`
-	// NetworkPluginMaxConfNum is the max number of plugin config file will load
+	// NetworkPluginMaxConfNum is the max number of plugin config files that will
+	// be loaded from the cni config directory by go-cni. Set the value to 0 to
+	// load all config files (no arbitrary limit). The legacy default value is 1.
 	NetworkPluginMaxConfNum int `toml:"max_conf_num" json:"maxConfNum"`
 	// NetworkPluginConfTemplate is the file path of golang template used to generate
 	// cni config.
@@ -204,7 +206,7 @@ func DefaultConfig() PluginConfig {
 		CniConfig: CniConfig{
 			NetworkPluginBinDir:       "/opt/cni/bin",
 			NetworkPluginConfDir:      "/etc/cni/net.d",
-			NetworkPluginMaxConfNum:   1,
+			NetworkPluginMaxConfNum:   1, // only one CNI plugin config file will be loaded
 			NetworkPluginConfTemplate: "",
 		},
 		ContainerdConfig: ContainerdConfig{

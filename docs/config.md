@@ -149,10 +149,12 @@ The explanation and default value of each configuration item are as follows:
     # conf_dir is the directory in which the admin places a CNI conf.
     conf_dir = "/etc/cni/net.d"
 
-    # max_conf_num is the max number of CNI plugin config file will load
-    # By default, the containerd will load only 1 CRI plugin. If you want load multiple CRI plugins,
-    # set max_conf_num > 1. You should know exactly each CRI plugin do, whether they are compatible.
-    # max i<= 0 means no limit.
+    # max_conf_num specifies the maximum number of CNI plugin config files to
+    # load from the CNI config directory. By default, only 1 CNI plugin config
+    # file will be loaded. If you want to load multiple CNI plugin config files
+    # set max_conf_num to the number desired. Setting max_config_num to 0 is
+    # interpreted as no limit is desired and will result in all CNI plugin
+    # config files being loaded from the CNI config directory. 
     max_conf_num = 1
 
     # conf_template is the file path of golang template used to generate
