@@ -270,8 +270,8 @@ func registerService() error {
 		Delay uint32
 	}
 	t := []scAction{
-		{Type: scActionRestart, Delay: uint32(60 * time.Second / time.Millisecond)},
-		{Type: scActionRestart, Delay: uint32(60 * time.Second / time.Millisecond)},
+		{Type: scActionRestart, Delay: uint32(15 * time.Second / time.Millisecond)},
+		{Type: scActionRestart, Delay: uint32(15 * time.Second / time.Millisecond)},
 		{Type: scActionNone},
 	}
 	lpInfo := serviceFailureActions{ResetPeriod: uint32(24 * time.Hour / time.Second), ActionsCount: uint32(3), Actions: uintptr(unsafe.Pointer(&t[0]))}

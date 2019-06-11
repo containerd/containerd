@@ -60,7 +60,7 @@ var configCommand = cli.Command{
 						if p.Config == nil {
 							continue
 						}
-						config.Plugins[p.ID] = p.Config
+						config.Plugins[p.URI()] = p.Config
 					}
 				}
 				_, err = config.WriteTo(os.Stdout)

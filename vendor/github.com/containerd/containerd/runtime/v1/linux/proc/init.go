@@ -324,13 +324,6 @@ func (p *Init) Resize(ws console.WinSize) error {
 	return p.console.Resize(ws)
 }
 
-func (p *Init) resize(ws console.WinSize) error {
-	if p.console == nil {
-		return nil
-	}
-	return p.console.Resize(ws)
-}
-
 // Pause the init process and all its child processes
 func (p *Init) Pause(ctx context.Context) error {
 	p.mu.Lock()

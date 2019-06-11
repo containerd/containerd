@@ -56,6 +56,7 @@ func getLastRuntimeError(r *runc.Runc) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer f.Close()
 
 	var (
 		errMsg string

@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 
 	"github.com/containerd/containerd/identifiers"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/pkg/errors"
 )
@@ -79,6 +80,11 @@ func NewBundle(ctx context.Context, root, state, id string, spec []byte) (b *Bun
 	if err := os.MkdirAll(filepath.Dir(work), 0711); err != nil {
 		return nil, err
 	}
+	rootfs := filepath.Join(b.Path, "rootfs")
+	if err := os.MkdirAll(rootfs, 0711); err != nil {
+		return nil, err
+	}
+	paths = append(paths, rootfs)
 	if err := os.Mkdir(work, 0711); err != nil {
 		if !os.IsExist(err) {
 			return nil, err
@@ -89,10 +95,6 @@ func NewBundle(ctx context.Context, root, state, id string, spec []byte) (b *Bun
 		}
 	}
 	paths = append(paths, work)
-	// create rootfs dir
-	if err := os.Mkdir(filepath.Join(b.Path, "rootfs"), 0711); err != nil {
-		return nil, err
-	}
 	// symlink workdir
 	if err := os.Symlink(work, filepath.Join(b.Path, "work")); err != nil {
 		return nil, err
@@ -115,6 +117,13 @@ type Bundle struct {
 // Delete a bundle atomically
 func (b *Bundle) Delete() error {
 	work, werr := os.Readlink(filepath.Join(b.Path, "work"))
+	rootfs := filepath.Join(b.Path, "rootfs")
+	if err := mount.UnmountAll(rootfs, 0); err != nil {
+		return errors.Wrapf(err, "unmount rootfs %s", rootfs)
+	}
+	if err := os.Remove(rootfs); err != nil && os.IsNotExist(err) {
+		return errors.Wrap(err, "failed to remove bundle rootfs")
+	}
 	err := atomicDelete(b.Path)
 	if err == nil {
 		if werr == nil {
@@ -138,6 +147,9 @@ func atomicDelete(path string) error {
 	// create a hidden dir for an atomic removal
 	atomicPath := filepath.Join(filepath.Dir(path), fmt.Sprintf(".%s", filepath.Base(path)))
 	if err := os.Rename(path, atomicPath); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return err
 	}
 	return os.RemoveAll(atomicPath)

@@ -24,9 +24,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
-	"time"
 
 	"github.com/containerd/fifo"
 	"github.com/pkg/errors"
@@ -92,9 +90,4 @@ func handleSignals(ctx context.Context, logger *logrus.Entry, signals chan os.Si
 
 func openLog(ctx context.Context, _ string) (io.Writer, error) {
 	return fifo.OpenFifo(ctx, "log", unix.O_WRONLY, 0700)
-}
-
-func dial(address string, timeout time.Duration) (net.Conn, error) {
-	address = strings.TrimPrefix(address, "unix://")
-	return net.DialTimeout("unix", address, timeout)
 }

@@ -107,3 +107,27 @@ func (l *local) List(ctx context.Context, filters ...string) ([]leases.Lease, er
 	}
 	return ll, nil
 }
+
+func (l *local) AddResource(ctx context.Context, lease leases.Lease, r leases.Resource) error {
+	return l.db.Update(func(tx *bolt.Tx) error {
+		return metadata.NewLeaseManager(tx).AddResource(ctx, lease, r)
+	})
+}
+
+func (l *local) DeleteResource(ctx context.Context, lease leases.Lease, r leases.Resource) error {
+	return l.db.Update(func(tx *bolt.Tx) error {
+		return metadata.NewLeaseManager(tx).DeleteResource(ctx, lease, r)
+	})
+}
+
+func (l *local) ListResources(ctx context.Context, lease leases.Lease) ([]leases.Resource, error) {
+	var rs []leases.Resource
+	if err := l.db.View(func(tx *bolt.Tx) error {
+		var err error
+		rs, err = metadata.NewLeaseManager(tx).ListResources(ctx, lease)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return rs, nil
+}

@@ -18,13 +18,14 @@ package shim
 
 import (
 	"context"
-	"net"
 	"sync"
 	"time"
 
 	v1 "github.com/containerd/containerd/api/services/ttrpc/events/v1"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/ttrpcutil"
+	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl"
 	"github.com/sirupsen/logrus"
 )
@@ -40,20 +41,24 @@ type item struct {
 	count int
 }
 
-func newPublisher(address string) *remoteEventsPublisher {
+func newPublisher(address string) (*remoteEventsPublisher, error) {
+	client, err := ttrpcutil.NewClient(address)
+	if err != nil {
+		return nil, err
+	}
+
 	l := &remoteEventsPublisher{
-		dialer: newDialier(func() (net.Conn, error) {
-			return connect(address, dial)
-		}),
+		client:  client,
 		closed:  make(chan struct{}),
 		requeue: make(chan *item, queueSize),
 	}
+
 	go l.processQueue()
-	return l
+	return l, nil
 }
 
 type remoteEventsPublisher struct {
-	dialer  *dialer
+	client  *ttrpcutil.Client
 	closed  chan struct{}
 	closer  sync.Once
 	requeue chan *item
@@ -64,7 +69,7 @@ func (l *remoteEventsPublisher) Done() <-chan struct{} {
 }
 
 func (l *remoteEventsPublisher) Close() (err error) {
-	err = l.dialer.Close()
+	err = l.client.Close()
 	l.closer.Do(func() {
 		close(l.closed)
 	})
@@ -79,18 +84,7 @@ func (l *remoteEventsPublisher) processQueue() {
 			continue
 		}
 
-		client, err := l.dialer.Get()
-		if err != nil {
-			l.dialer.Put(err)
-
-			l.queue(i)
-			logrus.WithError(err).Error("get events client")
-			continue
-		}
-		if _, err := client.Forward(i.ctx, &v1.ForwardRequest{
-			Envelope: i.ev,
-		}); err != nil {
-			l.dialer.Put(err)
+		if err := l.forwardRequest(i.ctx, &v1.ForwardRequest{Envelope: i.ev}); err != nil {
 			logrus.WithError(err).Error("forward event")
 			l.queue(i)
 		}
@@ -124,22 +118,33 @@ func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event
 		},
 		ctx: ctx,
 	}
-	client, err := l.dialer.Get()
-	if err != nil {
-		l.dialer.Put(err)
+
+	if err := l.forwardRequest(i.ctx, &v1.ForwardRequest{Envelope: i.ev}); err != nil {
 		l.queue(i)
 		return err
 	}
-	if _, err := client.Forward(i.ctx, &v1.ForwardRequest{
-		Envelope: i.ev,
-	}); err != nil {
-		l.dialer.Put(err)
-		l.queue(i)
-		return err
-	}
+
 	return nil
 }
 
-func connect(address string, d func(string, time.Duration) (net.Conn, error)) (net.Conn, error) {
-	return d(address, 5*time.Second)
+func (l *remoteEventsPublisher) forwardRequest(ctx context.Context, req *v1.ForwardRequest) error {
+	_, err := l.client.EventsService().Forward(ctx, req)
+	if err == nil {
+		return nil
+	}
+
+	if err != ttrpc.ErrClosed {
+		return err
+	}
+
+	// Reconnect and retry request
+	if err := l.client.Reconnect(); err != nil {
+		return err
+	}
+
+	if _, err := l.client.EventsService().Forward(ctx, req); err != nil {
+		return err
+	}
+
+	return nil
 }
