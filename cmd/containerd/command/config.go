@@ -50,6 +50,11 @@ var configCommand = cli.Command{
 				config := &Config{
 					Config: defaultConfig(),
 				}
+				// for the time being, keep the defaultConfig's version set at 1 so that
+				// when a config without a version is loaded from disk and has no version
+				// set, we assume it's a v1 config.  But when generating new configs via
+				// this command, generate the v2 config
+				config.Config.Version = 2
 				plugins, err := server.LoadPlugins(gocontext.Background(), config.Config)
 				if err != nil {
 					return err
