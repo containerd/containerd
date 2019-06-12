@@ -158,29 +158,30 @@ fi
 log_level="${CONTAINERD_LOG_LEVEL:-"info"}"
 max_container_log_line="${CONTAINERD_MAX_CONTAINER_LOG_LINE:-16384}"
 cat > ${config_path} <<EOF
+version = 2
 # Kubernetes requires the cri plugin.
-required_plugins = ["cri"]
+required_plugins = ["io.containerd.grpc.v1.cri"]
 # Kubernetes doesn't use containerd restart manager.
-disabled_plugins = ["restart"]
+disabled_plugins = ["io.containerd.internal.v1.restart"]
 
 [debug]
   level = "${log_level}"
 
-[plugins.cri]
+[plugins."io.containerd.grpc.v1.cri"]
   stream_server_address = "127.0.0.1"
   stream_server_port = "0"
   max_container_log_line_size = ${max_container_log_line}
-[plugins.cri.cni]
+[plugins."io.containerd.grpc.v1.cri".cni]
   bin_dir = "${cni_bin_dir}"
   conf_dir = "/etc/cni/net.d"
   conf_template = "${cni_template_path}"
-[plugins.cri.registry.mirrors."docker.io"]
+[plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
   endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
-[plugins.cri.containerd]
+[plugins."io.containerd.grpc.v1.cri".containerd]
   default_runtime_name = "${CONTAINERD_DEFAULT_RUNTIME:-"runc"}"
-[plugins.cri.containerd.runtimes.runc]
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
   runtime_type = "io.containerd.runc.v2"
-[plugins.cri.containerd.runtimes.runc.options]
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
   BinaryName = "${CONTAINERD_HOME}/usr/local/sbin/runc"
 EOF
 chmod 644 "${config_path}"
@@ -189,10 +190,10 @@ chmod 644 "${config_path}"
 containerd_extra_runtime_handler=${CONTAINERD_EXTRA_RUNTIME_HANDLER:-""}
 if [[ -n "${containerd_extra_runtime_handler}" ]]; then
   cat >> ${config_path} <<EOF
-[plugins.cri.containerd.runtimes.${containerd_extra_runtime_handler}]
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.${containerd_extra_runtime_handler}]
   runtime_type = "${CONTAINERD_EXTRA_RUNTIME_TYPE:-io.containerd.runc.v1}"
 
-[plugins.cri.containerd.runtimes.${containerd_extra_runtime_handler}.options]
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.${containerd_extra_runtime_handler}.options]
 ${CONTAINERD_EXTRA_RUNTIME_OPTIONS:-}
 EOF
 fi

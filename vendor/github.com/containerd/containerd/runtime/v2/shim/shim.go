@@ -78,6 +78,8 @@ type Config struct {
 	NoSubreaper bool
 	// NoReaper disables the shim binary from reaping any child process implicitly
 	NoReaper bool
+	// NoSetupLogger disables automatic configuration of logrus to use the shim FIFO
+	NoSetupLogger bool
 }
 
 var (
@@ -160,9 +162,13 @@ func run(id string, initFunc Init, config Config) error {
 			return err
 		}
 	}
-	address := fmt.Sprintf("%s.ttrpc", addressFlag)
 
-	publisher := newPublisher(address)
+	address := fmt.Sprintf("%s.ttrpc", addressFlag)
+	publisher, err := newPublisher(address)
+	if err != nil {
+		return err
+	}
+
 	defer publisher.Close()
 
 	if namespaceFlag == "" {
@@ -206,8 +212,10 @@ func run(id string, initFunc Init, config Config) error {
 		}
 		return nil
 	default:
-		if err := setLogger(ctx, idFlag); err != nil {
-			return err
+		if !config.NoSetupLogger {
+			if err := setLogger(ctx, idFlag); err != nil {
+				return err
+			}
 		}
 		client := NewShimClient(ctx, service, signals)
 		if err := client.Serve(); err != nil {

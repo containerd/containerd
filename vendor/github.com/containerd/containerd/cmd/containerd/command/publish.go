@@ -84,18 +84,18 @@ func getEventPayload(r io.Reader) (*types.Any, error) {
 }
 
 func connectEvents(address string) (eventsapi.EventsClient, error) {
-	conn, err := connect(address, dialer.Dialer)
+	conn, err := connect(address, dialer.ContextDialer)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to dial %q", address)
 	}
 	return eventsapi.NewEventsClient(conn), nil
 }
 
-func connect(address string, d func(string, time.Duration) (net.Conn, error)) (*grpc.ClientConn, error) {
+func connect(address string, d func(gocontext.Context, string) (net.Conn, error)) (*grpc.ClientConn, error) {
 	gopts := []grpc.DialOption{
 		grpc.WithBlock(),
 		grpc.WithInsecure(),
-		grpc.WithDialer(d),
+		grpc.WithContextDialer(d),
 		grpc.FailOnNonTempDialError(true),
 		grpc.WithBackoffMaxDelay(3 * time.Second),
 	}

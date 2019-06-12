@@ -315,7 +315,7 @@ func (tx *Tx) Copy(w io.Writer) error {
 // If err == nil then exactly tx.Size() bytes will be written into the writer.
 func (tx *Tx) WriteTo(w io.Writer) (n int64, err error) {
 	// Attempt to open reader with WriteFlag
-	f, err := os.OpenFile(tx.db.path, os.O_RDONLY|tx.WriteFlag, 0)
+	f, err := tx.db.openFile(tx.db.path, os.O_RDONLY|tx.WriteFlag, 0)
 	if err != nil {
 		return 0, err
 	}
@@ -369,7 +369,7 @@ func (tx *Tx) WriteTo(w io.Writer) (n int64, err error) {
 // A reader transaction is maintained during the copy so it is safe to continue
 // using the database while a copy is in progress.
 func (tx *Tx) CopyFile(path string, mode os.FileMode) error {
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode)
+	f, err := tx.db.openFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode)
 	if err != nil {
 		return err
 	}
