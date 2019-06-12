@@ -39,10 +39,8 @@ help:
 	@echo "Usage: make <target>"
 	@echo
 	@echo " * 'install'          	- Install binaries to system locations"
-	@echo " * 'binaries'         	- Build containerd and ctr"
-	@echo " * 'static-binaries   	- Build static containerd and ctr"
-	@echo " * 'ctr'  		- Build ctr"
-	@echo " * 'install-ctr' 	- Install ctr"
+	@echo " * 'binaries'         	- Build containerd"
+	@echo " * 'static-binaries   	- Build static containerd"
 	@echo " * 'containerd'  	- Build a customized containerd with CRI plugin for testing"
 	@echo " * 'install-containerd'	- Install customized containerd to system location"
 	@echo " * 'release'          	- Build release tarball"
@@ -93,13 +91,6 @@ sync-vendor:
 
 update-vendor: sync-vendor sort-vendor
 
-$(BUILD_DIR)/ctr: $(SOURCES)
-	$(GO) build -o $@ \
-		-tags '$(BUILD_TAGS)' \
-		-ldflags '$(GO_LDFLAGS)' \
-		-gcflags '$(GO_GCFLAGS)' \
-		$(PROJECT)/cmd/ctr
-
 $(BUILD_DIR)/containerd: $(SOURCES) $(PLUGIN_SOURCES)
 	$(GO) build -o $@ \
 		-tags '$(BUILD_TAGS)' \
@@ -128,26 +119,20 @@ test-e2e-node: binaries
 clean:
 	rm -rf $(BUILD_DIR)/*
 
-binaries: $(BUILD_DIR)/containerd $(BUILD_DIR)/ctr
+binaries: $(BUILD_DIR)/containerd
 
 static-binaries: GO_LDFLAGS += -extldflags "-fno-PIC -static"
-static-binaries: $(BUILD_DIR)/containerd $(BUILD_DIR)/ctr
-
-ctr: $(BUILD_DIR)/ctr
-
-install-ctr: ctr
-	install -D -m 755 $(BUILD_DIR)/ctr $(BINDIR)/ctr
+static-binaries: $(BUILD_DIR)/containerd
 
 containerd: $(BUILD_DIR)/containerd
 
 install-containerd: containerd
 	install -D -m 755 $(BUILD_DIR)/containerd $(BINDIR)/containerd
 
-install: install-ctr install-containerd
+install: install-containerd
 
 uninstall:
 	rm -f $(BINDIR)/containerd
-	rm -f $(BINDIR)/ctr
 
 $(BUILD_DIR)/$(TARBALL): static-binaries vendor.conf
 	@BUILD_DIR=$(BUILD_DIR) TARBALL=$(TARBALL) VERSION=$(VERSION) ./hack/release.sh
@@ -193,8 +178,6 @@ install.tools: .install.gitvalidation .install.gometalinter .install.vndr
 .PHONY: \
 	binaries \
 	static-binaries \
-	ctr \
-	install-ctr \
 	containerd \
 	install-containerd \
 	release \
