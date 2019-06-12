@@ -36,7 +36,6 @@ import (
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 
-	api "github.com/containerd/cri/pkg/api/v1"
 	"github.com/containerd/cri/pkg/atomic"
 	criconfig "github.com/containerd/cri/pkg/config"
 	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
@@ -52,7 +51,6 @@ import (
 type grpcServices interface {
 	runtime.RuntimeServiceServer
 	runtime.ImageServiceServer
-	api.CRIPluginServiceServer
 }
 
 // CRIService is the interface implement CRI remote service server.
@@ -176,7 +174,6 @@ func (c *criService) Register(s *grpc.Server) error {
 	instrumented := newInstrumentedService(c)
 	runtime.RegisterRuntimeServiceServer(s, instrumented)
 	runtime.RegisterImageServiceServer(s, instrumented)
-	api.RegisterCRIPluginServiceServer(s, instrumented)
 	return nil
 }
 

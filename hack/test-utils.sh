@@ -23,13 +23,23 @@ CONTAINERD_FLAGS="--log-level=debug "
 
 # Use a configuration file for containerd.
 CONTAINERD_CONFIG_FILE=${CONTAINERD_CONFIG_FILE:-""}
+# CONTAINERD_TEST_SUFFIX is the suffix appended to the root/state directory used
+# by test containerd.
+CONTAINERD_TEST_SUFFIX=${CONTAINERD_TEST_SUFFIX:-"-test"}
+# The containerd root directory.
+CONTAINERD_ROOT=${CONTAINERD_ROOT:-"/var/lib/containerd${CONTAINERD_TEST_SUFFIX}"}
+# The containerd state directory.
+CONTAINERD_STATE=${CONTAINERD_STATE:-"/run/containerd${CONTAINERD_TEST_SUFFIX}"}
+# The containerd socket address.
+CONTAINERD_SOCK=${CONTAINERD_SOCK:-unix://${CONTAINERD_STATE}/containerd.sock}
 if [ -f "${CONTAINERD_CONFIG_FILE}" ]; then
   CONTAINERD_FLAGS+="--config ${CONTAINERD_CONFIG_FILE} "
 fi
+CONTAINERD_FLAGS+="--address ${CONTAINERD_SOCK#"unix://"} \
+  --state ${CONTAINERD_STATE} \
+  --root ${CONTAINERD_ROOT}"
 
-CONTAINERD_SOCK=unix:///run/containerd/containerd.sock
-
-containerd_pid=
+containerd_groupid=
 
 # test_setup starts containerd.
 test_setup() {
@@ -39,10 +49,14 @@ test_setup() {
     echo "containerd is not built"
     exit 1
   fi
-  sudo pkill -x containerd
+  set -m
+  # Create containerd in a different process group
+  # so that we can easily clean them up.
   keepalive "sudo PATH=${PATH} ${ROOT}/_output/containerd ${CONTAINERD_FLAGS}" \
     ${RESTART_WAIT_PERIOD} &> ${report_dir}/containerd.log &
-  containerd_pid=$!
+  pid=$!
+  set +m
+  containerd_groupid=$(ps -o pgid= -p ${pid})
   # Wait for containerd to be running by using the containerd client ctr to check the version
   # of the containerd server. Wait an increasing amount of time after each of five attempts
   local -r ctr_path=$(which ctr)
@@ -61,10 +75,9 @@ test_setup() {
 
 # test_teardown kills containerd.
 test_teardown() {
-  if [ -n "${containerd_pid}" ]; then
-    kill ${containerd_pid}
+  if [ -n "${containerd_groupid}" ]; then
+    sudo pkill -g ${containerd_groupid}
   fi
-  sudo pkill -x containerd
 }
 
 # keepalive runs a command and keeps it alive.

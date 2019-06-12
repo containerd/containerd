@@ -27,7 +27,7 @@ REPORT_DIR=${REPORT_DIR:-"/tmp/test-integration"}
 # RUNTIME is the runtime handler to use in the test.
 RUNTIME=${RUNTIME:-""}
 
-CRI_ROOT="/var/lib/containerd/io.containerd.grpc.v1.cri"
+CRI_ROOT="${CONTAINERD_ROOT}/io.containerd.grpc.v1.cri"
 
 mkdir -p ${REPORT_DIR}
 test_setup ${REPORT_DIR}

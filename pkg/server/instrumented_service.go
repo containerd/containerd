@@ -23,7 +23,6 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
-	api "github.com/containerd/cri/pkg/api/v1"
 	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
 	"github.com/containerd/cri/pkg/log"
 )
@@ -446,21 +445,6 @@ func (in *instrumentedService) UpdateRuntimeConfig(ctx context.Context, r *runti
 		}
 	}()
 	return in.c.UpdateRuntimeConfig(ctrdutil.WithNamespace(ctx), r)
-}
-
-func (in *instrumentedService) LoadImage(ctx context.Context, r *api.LoadImageRequest) (res *api.LoadImageResponse, err error) {
-	if err := in.checkInitialized(); err != nil {
-		return nil, err
-	}
-	logrus.Debugf("LoadImage from file %q", r.GetFilePath())
-	defer func() {
-		if err != nil {
-			logrus.WithError(err).Error("LoadImage failed")
-		} else {
-			logrus.Debugf("LoadImage returns images %+v", res.GetImages())
-		}
-	}()
-	return in.c.LoadImage(ctrdutil.WithNamespace(ctx), r)
 }
 
 func (in *instrumentedService) ReopenContainerLog(ctx context.Context, r *runtime.ReopenContainerLogRequest) (res *runtime.ReopenContainerLogResponse, err error) {

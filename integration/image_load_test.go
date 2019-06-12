@@ -17,17 +17,15 @@ limitations under the License.
 package integration
 
 import (
-	"golang.org/x/net/context"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
-
-	api "github.com/containerd/cri/pkg/api/v1"
 )
 
 // Test to load an image from tarball.
@@ -58,14 +56,22 @@ func TestImageLoad(t *testing.T) {
 	}
 
 	t.Logf("load image in cri")
-	res, err := criPluginClient.LoadImage(context.Background(), &api.LoadImageRequest{FilePath: tar})
-	require.NoError(t, err)
-	require.Equal(t, []string{loadedImage}, res.GetImages())
+	ctr, err := exec.LookPath("ctr")
+	require.NoError(t, err, "ctr should be installed, make sure you've run `make install.deps`")
+	output, err = exec.Command(ctr, "-address="+containerdEndpoint,
+		"-n=k8s.io", "images", "import", tar).CombinedOutput()
+	require.NoError(t, err, "output: %q", output)
 
 	t.Logf("make sure image is loaded")
-	img, err = imageService.ImageStatus(&runtime.ImageSpec{Image: testImage})
-	require.NoError(t, err)
-	require.NotNil(t, img)
+	// Use Eventually because the cri plugin needs a short period of time
+	// to pick up images imported into containerd directly.
+	require.NoError(t, Eventually(func() (bool, error) {
+		img, err = imageService.ImageStatus(&runtime.ImageSpec{Image: testImage})
+		if err != nil {
+			return false, err
+		}
+		return img != nil, nil
+	}, 100*time.Millisecond, 10*time.Second))
 	require.Equal(t, []string{loadedImage}, img.RepoTags)
 
 	t.Logf("create a container with the loaded image")
