@@ -38,8 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/remote"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 
-	api "github.com/containerd/cri/pkg/api/v1"
-	"github.com/containerd/cri/pkg/client"
 	criconfig "github.com/containerd/cri/pkg/config"
 	"github.com/containerd/cri/pkg/constants"
 	"github.com/containerd/cri/pkg/server"
@@ -47,17 +45,16 @@ import (
 )
 
 const (
-	timeout            = 1 * time.Minute
-	pauseImage         = "k8s.gcr.io/pause:3.1" // This is the same with default sandbox image.
-	k8sNamespace       = constants.K8sContainerdNamespace
-	containerdEndpoint = "/run/containerd/containerd.sock"
+	timeout      = 1 * time.Minute
+	pauseImage   = "k8s.gcr.io/pause:3.1" // This is the same with default sandbox image.
+	k8sNamespace = constants.K8sContainerdNamespace
 )
 
 var (
-	runtimeService   cri.RuntimeService
-	imageService     cri.ImageManagerService
-	containerdClient *containerd.Client
-	criPluginClient  api.CRIPluginServiceClient
+	runtimeService     cri.RuntimeService
+	imageService       cri.ImageManagerService
+	containerdClient   *containerd.Client
+	containerdEndpoint string
 )
 
 var criEndpoint = flag.String("cri-endpoint", "unix:///run/containerd/containerd.sock", "The endpoint of cri plugin.")
@@ -93,15 +90,11 @@ func ConnectDaemons() error {
 	if err != nil {
 		return errors.Wrap(err, "failed to list images")
 	}
+	// containerdEndpoint is the same with criEndpoint now
+	containerdEndpoint = strings.TrimPrefix(*criEndpoint, "unix://")
 	containerdClient, err = containerd.New(containerdEndpoint, containerd.WithDefaultNamespace(k8sNamespace))
 	if err != nil {
 		return errors.Wrap(err, "failed to connect containerd")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	criPluginClient, err = client.NewCRIPluginClient(ctx, *criEndpoint)
-	if err != nil {
-		return errors.Wrap(err, "failed to connect cri plugin")
 	}
 	return nil
 }
