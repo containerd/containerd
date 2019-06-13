@@ -30,7 +30,7 @@ const (
 func withTTRPCNamespaceHeader(ctx context.Context, namespace string) context.Context {
 	md, ok := ttrpc.GetMetadata(ctx)
 	if !ok {
-		md = ttrpc.Metadata{}
+		md = ttrpc.MD{}
 	}
 	md.Set(TTRPCHeader, namespace)
 	return ttrpc.WithMetadata(ctx, md)
