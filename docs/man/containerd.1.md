@@ -13,7 +13,7 @@ containerd [global options] command [command options] [arguments...]
 
 **containerd** is a high performance container runtime whose daemon can be started
 by using this command. If none of the *config*, *publish*, or *help* commands
-are specified the default action of the **containerd** command is to start the
+are specified, the default action of the **containerd** command is to start the
 containerd daemon in the foreground.
 
 A default configuration is used if no TOML configuration is specified or located
