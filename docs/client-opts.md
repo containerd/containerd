@@ -19,7 +19,7 @@ func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContain
 
 ## Extending the Client
 
-As a consumer of the containerd client you need to be able add your domain specific functionality.
+As a consumer of the containerd client you need to be able to add your domain specific functionality.
 There are a few ways of doing this, changing the client code, submitting a PR to the containerd client, or forking the client.
 These ways of extending the client should only be considered after every other method has been tried.
 
