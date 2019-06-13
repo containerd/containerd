@@ -16,53 +16,74 @@
 
 package ttrpc
 
-import "context"
+import (
+	"context"
+	"strings"
+)
 
-// Metadata represents the key-value pairs (similar to http.Header) to be passed to ttrpc server from a client.
-type Metadata map[string]StringList
+// MD is the user type for ttrpc metadata
+type MD map[string][]string
 
 // Get returns the metadata for a given key when they exist.
 // If there is no metadata, a nil slice and false are returned.
-func (m Metadata) Get(key string) ([]string, bool) {
+func (m MD) Get(key string) ([]string, bool) {
+	key = strings.ToLower(key)
 	list, ok := m[key]
-	if !ok || len(list.List) == 0 {
+	if !ok || len(list) == 0 {
 		return nil, false
 	}
 
-	return list.List, true
+	return list, true
 }
 
 // Set sets the provided values for a given key.
 // The values will overwrite any existing values.
 // If no values provided, a key will be deleted.
-func (m Metadata) Set(key string, values ...string) {
+func (m MD) Set(key string, values ...string) {
+	key = strings.ToLower(key)
 	if len(values) == 0 {
 		delete(m, key)
 		return
 	}
-
-	m[key] = StringList{List: values}
+	m[key] = values
 }
 
 // Append appends additional values to the given key.
-func (m Metadata) Append(key string, values ...string) {
+func (m MD) Append(key string, values ...string) {
+	key = strings.ToLower(key)
 	if len(values) == 0 {
 		return
 	}
-
-	list, ok := m[key]
+	current, ok := m[key]
 	if ok {
-		m.Set(key, append(list.List, values...)...)
+		m.Set(key, append(current, values...)...)
 	} else {
 		m.Set(key, values...)
+	}
+}
+
+func (m MD) setRequest(r *Request) {
+	for k, values := range m {
+		for _, v := range values {
+			r.Metadata = append(r.Metadata, &KeyValue{
+				Key:   k,
+				Value: v,
+			})
+		}
+	}
+}
+
+func (m MD) fromRequest(r *Request) {
+	for _, kv := range r.Metadata {
+		m[kv.Key] = append(m[kv.Key], kv.Value)
 	}
 }
 
 type metadataKey struct{}
 
 // GetMetadata retrieves metadata from context.Context (previously attached with WithMetadata)
-func GetMetadata(ctx context.Context) (Metadata, bool) {
-	metadata, ok := ctx.Value(metadataKey{}).(Metadata)
+func GetMetadata(ctx context.Context) (MD, bool) {
+	metadata, ok := ctx.Value(metadataKey{}).(MD)
 	return metadata, ok
 }
 
@@ -81,6 +102,6 @@ func GetMetadataValue(ctx context.Context, name string) (string, bool) {
 }
 
 // WithMetadata attaches metadata map to a context.Context
-func WithMetadata(ctx context.Context, headers Metadata) context.Context {
-	return context.WithValue(ctx, metadataKey{}, headers)
+func WithMetadata(ctx context.Context, md MD) context.Context {
+	return context.WithValue(ctx, metadataKey{}, md)
 }
