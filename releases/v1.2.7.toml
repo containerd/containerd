@@ -1,0 +1,40 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.2.6"
+
+pre_release = false
+
+preface = """\
+The seventh patch release for `containerd` 1.2 introduces OCI
+image descriptor annotation support and contains fixes for
+containerd shim logs, container stop/deletion, cri plugin
+and selinux.
+
+It also contains several important bug fixes for goroutine and
+file descriptor leakage in containerd and containerd shims.
+### Notable Updates
+* Support annotations in the OCI image descriptor, and filtering image by annotations. [#3254](https://github.com/containerd/containerd/pull/3254)
+* Support context timeout in ttrpc which can help avoid containerd hangs when a shim is unresponsive. [ttrpc#31](https://github.com/containerd/ttrpc/pull/31)
+* Fix a bug that containerd shim leaks goroutine and file descriptor after containerd restarts. [ttrpc#37](https://github.com/containerd/ttrpc/pull/37)
+* Fix a bug that a container can't be deleted if first deletion attempt is canceled or timeout. [#3264](https://github.com/containerd/containerd/pull/3264)
+* Fix a bug that containerd leaks file descriptor when using v2 containerd shims, e.g. `containerd-shim-runc-v1`. [#3273](https://github.com/containerd/containerd/pull/3273)
+* Fix a bug that a container with lingering processes can't terminate when it shares pid namespace with another container. [moby/moby#38978)(https://github.com/moby/moby/issues/38978)
+* Fix a bug that containerd can't read shim logs after restart. [#3282](https://github.com/containerd/containerd/pull/3282)
+* Fix a bug that `shim_debug` option is not honored for existing containerd shims after containerd restarts. [#3283](https://github.com/containerd/containerd/pull/3283)
+* cri: Fix a bug that a container can't be stopped when the exit event is not successfully published by the containerd shim. [#3125](https://github.com/containerd/containerd/issues/3125), [#3177](https://github.com/containerd/containerd/issues/3177)
+* cri: Fix a bug that exec process is not cleaned up if grpc context is canceled or timeout. [cri#1159](https://github.com/containerd/cri/pull/1159)
+* Fix a selinux keyring labeling issue by updating runc to v1.0.0-rc.8 and selinux library to v1.2.2. [opencontainers/selinux#50](https://github.com/opencontainers/selinux/pull/50)
+* Update ttrpc to f82148331ad2181edea8f3f649a1f7add6c3f9c2. [#3316](https://github.com/containerd/containerd/pull/3316)
+* Update cri to 49ca74043390bc2eeea7a45a46005fbec58a3f88. [#3330](https://github.com/containerd/containerd/pull/3330)
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
