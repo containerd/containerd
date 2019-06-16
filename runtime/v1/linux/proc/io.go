@@ -101,7 +101,7 @@ func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio proc.Stdio
 		pio.copy = true
 		pio.io, err = runc.NewPipeIO(ioUID, ioGID, withConditionalIO(stdio))
 	case "binary":
-		pio.io, err = newBinaryIO(ctx, id, u)
+		pio.io, err = NewBinaryIO(ctx, id, u)
 	case "file":
 		if err := os.MkdirAll(filepath.Dir(u.Host), 0755); err != nil {
 			return nil, err
@@ -251,7 +251,8 @@ func isFifo(path string) (bool, error) {
 	return false, nil
 }
 
-func newBinaryIO(ctx context.Context, id string, uri *url.URL) (runc.IO, error) {
+// NewBinaryIO runs a custom binary process for pluggable shim logging
+func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (runc.IO, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
