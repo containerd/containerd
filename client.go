@@ -43,6 +43,7 @@ import (
 	"github.com/containerd/containerd/content"
 	contentproxy "github.com/containerd/containerd/content/proxy"
 	"github.com/containerd/containerd/defaults"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/leases"
@@ -653,6 +654,14 @@ func (c *Client) Version(ctx context.Context) (Version, error) {
 		Version:  response.Version,
 		Revision: response.Revision,
 	}, nil
+}
+
+func (c *Client) getSnapshotter(name string) (snapshots.Snapshotter, error) {
+	s := c.SnapshotService(name)
+	if s == nil {
+		return nil, errors.Wrapf(errdefs.ErrNotFound, "snapshotter %s was not found", name)
+	}
+	return s, nil
 }
 
 // CheckRuntime returns true if the current runtime matches the expected
