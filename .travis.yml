@@ -71,7 +71,7 @@ script:
   - export GOFLAGS=-mod=vendor
   - DCO_VERBOSITY=-q ../project/script/validate/dco
   - ../project/script/validate/fileheader ../project/
-  - travis_wait ../project/script/validate/vendor
+  - travis_wait ./script/validate/vendor
   - GOOS=linux script/setup/install-dev-tools
   - go build -i .
   - make check
