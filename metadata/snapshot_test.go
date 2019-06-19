@@ -20,6 +20,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"testing"
 
@@ -62,4 +63,42 @@ func TestMetadata(t *testing.T) {
 	// Snapshot tests require mounting, still requires root
 	testutil.RequiresRoot(t)
 	testsuite.SnapshotterSuite(t, "Metadata", newTestSnapshotter)
+}
+
+func TestFilterInheritedLabels(t *testing.T) {
+	tests := []struct {
+		labels   map[string]string
+		expected map[string]string
+	}{
+		{
+			nil,
+			nil,
+		},
+		{
+			map[string]string{},
+			map[string]string{},
+		},
+		{
+			map[string]string{"": ""},
+			map[string]string{},
+		},
+		{
+			map[string]string{"foo": "bar"},
+			map[string]string{},
+		},
+		{
+			map[string]string{inheritedLabelsPrefix + "foo": "bar"},
+			map[string]string{inheritedLabelsPrefix + "foo": "bar"},
+		},
+		{
+			map[string]string{inheritedLabelsPrefix + "foo": "bar", "qux": "qaz"},
+			map[string]string{inheritedLabelsPrefix + "foo": "bar"},
+		},
+	}
+
+	for _, test := range tests {
+		if actual := filterInheritedLabels(test.labels); !reflect.DeepEqual(actual, test.expected) {
+			t.Fatalf("expected %v but got %v", test.expected, actual)
+		}
+	}
 }
