@@ -265,7 +265,7 @@ func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (runc.IO, error) 
 		}
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	cmd := exec.CommandContext(ctx, uri.Host, args...)
+	cmd := exec.CommandContext(ctx, uri.Path, args...)
 	cmd.Env = append(cmd.Env,
 		"CONTAINER_ID="+id,
 		"CONTAINER_NAMESPACE="+ns,

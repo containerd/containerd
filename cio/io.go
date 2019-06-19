@@ -18,10 +18,13 @@ package cio
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/containerd/containerd/defaults"
@@ -242,13 +245,19 @@ func LogURI(uri *url.URL) Creator {
 // BinaryIO forwards container STDOUT|STDERR directly to a logging binary
 func BinaryIO(binary string, args map[string]string) Creator {
 	return func(_ string) (IO, error) {
+		binary = filepath.Clean(binary)
+		if !strings.HasPrefix(binary, "/") {
+			return nil, errors.New("absolute path needed")
+		}
 		uri := &url.URL{
 			Scheme: "binary",
-			Host:   binary,
+			Path:   binary,
 		}
+		q := uri.Query()
 		for k, v := range args {
-			uri.Query().Set(k, v)
+			q.Set(k, v)
 		}
+		uri.RawQuery = q.Encode()
 		return &logURI{
 			config: Config{
 				Stdout: uri.String(),
