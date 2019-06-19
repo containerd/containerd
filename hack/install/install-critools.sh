@@ -29,7 +29,7 @@ GOPATH=${TMPGOPATH}
 #Install crictl
 checkout_repo ${CRITOOL_PKG} ${CRITOOL_VERSION} ${CRITOOL_REPO}
 cd ${GOPATH}/src/${CRITOOL_PKG}
-make
+make VERSION=${CRITOOL_VERSION}
 ${SUDO} make install -e BINDIR=${CRITOOL_DIR} GOPATH=${GOPATH}
 ${SUDO} mkdir -p ${CRICTL_CONFIG_DIR}
 ${SUDO} bash -c 'cat >'${CRICTL_CONFIG_DIR}'/crictl.yaml <<EOF
