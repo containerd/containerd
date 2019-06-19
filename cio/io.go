@@ -258,10 +258,11 @@ func BinaryIO(binary string, args map[string]string) Creator {
 			q.Set(k, v)
 		}
 		uri.RawQuery = q.Encode()
+		res := uri.String()
 		return &logURI{
 			config: Config{
-				Stdout: uri.String(),
-				Stderr: uri.String(),
+				Stdout: res,
+				Stderr: res,
 			},
 		}, nil
 	}
@@ -271,14 +272,19 @@ func BinaryIO(binary string, args map[string]string) Creator {
 // If the log file already exists, the logs will be appended to the file.
 func LogFile(path string) Creator {
 	return func(_ string) (IO, error) {
+		path = filepath.Clean(path)
+		if !strings.HasPrefix(path, "/") {
+			return nil, errors.New("absolute path needed")
+		}
 		uri := &url.URL{
 			Scheme: "file",
-			Host:   path,
+			Path:   path,
 		}
+		res := uri.String()
 		return &logURI{
 			config: Config{
-				Stdout: uri.String(),
-				Stderr: uri.String(),
+				Stdout: res,
+				Stderr: res,
 			},
 		}, nil
 	}
