@@ -94,7 +94,7 @@ func (e *execProcess) setExited(status int) {
 }
 
 func (e *execProcess) delete(ctx context.Context) error {
-	e.wg.Wait()
+	waitTimeout(ctx, &e.wg, 2*time.Second)
 	if e.io != nil {
 		for _, c := range e.closers {
 			c.Close()
