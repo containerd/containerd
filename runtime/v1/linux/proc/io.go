@@ -103,11 +103,11 @@ func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio proc.Stdio
 	case "binary":
 		pio.io, err = NewBinaryIO(ctx, id, u)
 	case "file":
-		if err := os.MkdirAll(filepath.Dir(u.Host), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(u.Path), 0755); err != nil {
 			return nil, err
 		}
 		var f *os.File
-		f, err = os.OpenFile(u.Host, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		f, err = os.OpenFile(u.Path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			return nil, err
 		}
@@ -265,7 +265,7 @@ func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (runc.IO, error) 
 		}
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	cmd := exec.CommandContext(ctx, uri.Host, args...)
+	cmd := exec.CommandContext(ctx, uri.Path, args...)
 	cmd.Env = append(cmd.Env,
 		"CONTAINER_ID="+id,
 		"CONTAINER_NAMESPACE="+ns,
