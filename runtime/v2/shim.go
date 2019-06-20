@@ -89,7 +89,7 @@ func loadShim(ctx context.Context, bundle *Bundle, events *exchange.Exchange, rt
 
 	client := ttrpc.NewClient(conn, ttrpc.WithOnClose(onClose))
 	defer func() {
-		if err != nil {
+		if err != nil && err != context.DeadlineExceeded {
 			client.Close()
 		}
 	}()

@@ -260,6 +260,10 @@ func (m *TaskManager) loadTasks(ctx context.Context) error {
 			cleanupAfterDeadShim(context.Background(), id, ns, m.events, binaryCall)
 		})
 		if err != nil {
+			if err == context.DeadlineExceeded {
+				log.G(ctx).WithField("id", id).Warn("connect shim timeout")
+				continue
+			}
 			cleanupAfterDeadShim(ctx, id, ns, m.events, binaryCall)
 			continue
 		}
