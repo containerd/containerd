@@ -23,7 +23,11 @@ import (
 )
 
 // RuncRoot is the path to the root runc state directory
-const RuncRoot = "/run/containerd/runc"
+const (
+	RuncRoot = "/run/containerd/runc"
+	// StoppedPID is the pid assigned after a container has run and stopped
+	StoppedPID = -1
+)
 
 func stateName(v interface{}) string {
 	switch v.(type) {

@@ -67,7 +67,7 @@ type Init struct {
 	runtime      *runc.Runc
 	status       int
 	exited       time.Time
-	pid          int
+	pid          safePid
 	closers      []io.Closer
 	stdin        io.Closer
 	stdio        proc.Stdio
@@ -113,6 +113,9 @@ func (p *Init) Create(ctx context.Context, r *CreateConfig) error {
 		err    error
 		socket *runc.Socket
 	)
+	p.pid.Lock()
+	defer p.pid.Unlock()
+
 	if r.Terminal {
 		if socket, err = runc.NewTempConsoleSocket(); err != nil {
 			return errors.Wrap(err, "failed to create OCI runtime console socket")
@@ -191,7 +194,7 @@ func (p *Init) Create(ctx context.Context, r *CreateConfig) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to retrieve OCI runtime container pid")
 	}
-	p.pid = pid
+	p.pid.pid = pid
 	return nil
 }
 
@@ -207,7 +210,7 @@ func (p *Init) ID() string {
 
 // Pid of the process
 func (p *Init) Pid() int {
-	return p.pid
+	return p.pid.get()
 }
 
 // ExitStatus of the process
@@ -266,6 +269,7 @@ func (p *Init) setExited(status int) {
 	p.exited = time.Now()
 	p.status = status
 	p.Platform.ShutdownConsole(context.Background(), p.console)
+	p.pid.set(StoppedPID)
 	close(p.waitBlock)
 }
 
@@ -408,7 +412,6 @@ func (p *Init) exec(ctx context.Context, path string, r *ExecConfig) (proc.Proce
 			Terminal: r.Terminal,
 		},
 		waitBlock: make(chan struct{}),
-		pid:       &safePid{},
 	}
 	e.execState = &execCreatedState{p: e}
 	return e, nil
