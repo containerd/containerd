@@ -15,6 +15,10 @@ version = 2
 # The 'plugins."io.containerd.grpc.v1.cri"' table contains all of the server options.
 [plugins."io.containerd.grpc.v1.cri"]
 
+  # disable_tcp_service disables serving CRI on the TCP server.
+  # Note that a TCP server is enabled for containerd if TCPAddress is set in section [grpc].
+  disable_tcp_service = true
+
   # stream_server_address is the ip address streaming server is listening on.
   stream_server_address = "127.0.0.1"
 

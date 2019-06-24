@@ -171,9 +171,15 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 // Register registers all required services onto a specific grpc server.
 // This is used by containerd cri plugin.
 func (c *criService) Register(s *grpc.Server) error {
-	instrumented := newInstrumentedService(c)
-	runtime.RegisterRuntimeServiceServer(s, instrumented)
-	runtime.RegisterImageServiceServer(s, instrumented)
+	return c.register(s)
+}
+
+// RegisterTCP register all required services onto a GRPC server on TCP.
+// This is used by containerd CRI plugin.
+func (c *criService) RegisterTCP(s *grpc.Server) error {
+	if !c.config.DisableTCPService {
+		return c.register(s)
+	}
 	return nil
 }
 
@@ -264,6 +270,13 @@ func (c *criService) Close() error {
 	if err := c.streamServer.Stop(); err != nil {
 		return errors.Wrap(err, "failed to stop stream server")
 	}
+	return nil
+}
+
+func (c *criService) register(s *grpc.Server) error {
+	instrumented := newInstrumentedService(c)
+	runtime.RegisterRuntimeServiceServer(s, instrumented)
+	runtime.RegisterImageServiceServer(s, instrumented)
 	return nil
 }
 

@@ -138,6 +138,8 @@ type PluginConfig struct {
 	CniConfig `toml:"cni" json:"cni"`
 	// Registry contains config related to the registry
 	Registry Registry `toml:"registry" json:"registry"`
+	// DisableTCPService disables serving CRI on the TCP server.
+	DisableTCPService bool `toml:"disable_tcp_service" json:"disableTCPService"`
 	// StreamServerAddress is the ip address streaming server is listening on.
 	StreamServerAddress string `toml:"stream_server_address" json:"streamServerAddress"`
 	// StreamServerPort is the port streaming server is listening on.
@@ -219,6 +221,7 @@ func DefaultConfig() PluginConfig {
 				},
 			},
 		},
+		DisableTCPService:   true,
 		StreamServerAddress: "127.0.0.1",
 		StreamServerPort:    "0",
 		StreamIdleTimeout:   streaming.DefaultConfig.StreamIdleTimeout.String(), // 4 hour
