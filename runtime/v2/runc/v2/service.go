@@ -375,11 +375,13 @@ func (s *service) Exec(ctx context.Context, r *taskAPI.ExecProcessRequest) (*pty
 	if err != nil {
 		return nil, err
 	}
-	if container.ProcessExists(r.ExecID) {
+	ok, cancel := container.ReserveProcess(r.ExecID)
+	if !ok {
 		return nil, errdefs.ToGRPCf(errdefs.ErrAlreadyExists, "id %s", r.ExecID)
 	}
 	process, err := container.Exec(ctx, r)
 	if err != nil {
+		cancel()
 		return nil, errdefs.ToGRPC(err)
 	}
 
