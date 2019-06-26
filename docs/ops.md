@@ -216,9 +216,6 @@ The linux runtime allows a few options to be set to configure the shim and the r
 	no_shim = false
 	# display shim logs in the containerd daemon's log output
 	shim_debug = true
-	# do not put the shim in its own mount namespace
-	# (this only need to be set on kernel < 3.18)
-	shim_no_newns = true
 ```
 
 ### Bolt Metadata Plugin
