@@ -23,6 +23,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -44,6 +45,21 @@ func getSysProcAttr() *syscall.SysProcAttr {
 // SetScore sets the oom score for a process
 func SetScore(pid int) error {
 	return sys.SetOOMScore(pid, sys.OOMScoreMaxKillable)
+}
+
+// AdjustOOMScore sets the OOM score for the process to the parents OOM score +1
+// to ensure that they parent has a lower* score than the shim
+func AdjustOOMScore(pid int) error {
+	parent := os.Getppid()
+	score, err := sys.GetOOMScoreAdj(parent)
+	if err != nil {
+		return errors.Wrap(err, "get parent OOM score")
+	}
+	shimScore := score + 1
+	if err := sys.SetOOMScore(pid, shimScore); err != nil {
+		return errors.Wrap(err, "set shim OOM score")
+	}
+	return nil
 }
 
 // SocketAddress returns an abstract socket address

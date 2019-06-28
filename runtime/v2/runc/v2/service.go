@@ -233,8 +233,8 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 			}
 		}
 	}
-	if err := shim.SetScore(cmd.Process.Pid); err != nil {
-		return "", errors.Wrap(err, "failed to set OOM Score on shim")
+	if err := shim.AdjustOOMScore(cmd.Process.Pid); err != nil {
+		return "", errors.Wrap(err, "failed to adjust OOM score for shim")
 	}
 	return address, nil
 }

@@ -40,6 +40,12 @@ func SetScore(pid int) error {
 	return nil
 }
 
+// AdjustOOMScore sets the OOM score for the process to the parents OOM score +1
+// to ensure that they parent has a lower* score than the shim
+func AdjustOOMScore(pid int) error {
+	return nil
+}
+
 // SocketAddress returns a npipe address
 func SocketAddress(ctx context.Context, id string) (string, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)

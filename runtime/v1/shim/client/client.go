@@ -127,8 +127,8 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 				"address": address,
 			}).Infof("shim placed in cgroup %s", cgroup)
 		}
-		if err = sys.SetOOMScore(cmd.Process.Pid, sys.OOMScoreMaxKillable); err != nil {
-			return nil, nil, errors.Wrap(err, "failed to set OOM Score on shim")
+		if err = setupOOMScore(cmd.Process.Pid); err != nil {
+			return nil, nil, err
 		}
 		c, clo, err := WithConnect(address, func() {})(ctx, config)
 		if err != nil {
@@ -136,6 +136,21 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 		}
 		return c, clo, nil
 	}
+}
+
+// setupOOMScore gets containerd's oom score and adds +1 to it
+// to ensure a shim has a lower* score than the daemons
+func setupOOMScore(shimPid int) error {
+	pid := os.Getpid()
+	score, err := sys.GetOOMScoreAdj(pid)
+	if err != nil {
+		return errors.Wrap(err, "get daemon OOM score")
+	}
+	shimScore := score + 1
+	if err := sys.SetOOMScore(shimPid, shimScore); err != nil {
+		return errors.Wrap(err, "set shim OOM score")
+	}
+	return nil
 }
 
 func newCommand(binary, daemonAddress string, debug bool, config shim.Config, socket *os.File, stdout, stderr io.Writer) (*exec.Cmd, error) {

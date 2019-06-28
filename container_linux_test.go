@@ -42,6 +42,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
+	"github.com/containerd/containerd/sys"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
@@ -1730,4 +1731,76 @@ func TestContainerNoSTDIN(t *testing.T) {
 	if code != 0 {
 		t.Errorf("expected status 0 from wait but received %d", code)
 	}
+}
+
+func TestShimOOMScore(t *testing.T) {
+	containerdPid := ctrd.cmd.Process.Pid
+	containerdScore, err := sys.GetOOMScoreAdj(containerdPid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	path := "/containerd/oomshim"
+	cg, err := cgroups.New(cgroups.V1, cgroups.StaticPath(path), &specs.LinuxResources{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cg.Delete()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty(), WithShimCgroup(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	processes, err := cg.Processes(cgroups.Devices, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedScore := containerdScore + 1
+	// find the shim's pid
+	for _, p := range processes {
+		score, err := sys.GetOOMScoreAdj(p.Pid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if score != expectedScore {
+			t.Errorf("expected score %d but got %d for shim process", expectedScore, score)
+		}
+	}
+
+	if err := task.Kill(ctx, unix.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+
+	<-statusC
 }
