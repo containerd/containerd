@@ -47,6 +47,12 @@ func (s *safePid) get() int {
 	return s.pid
 }
 
+func (s *safePid) set(pid int) {
+	s.Lock()
+	s.pid = pid
+	s.Unlock()
+}
+
 // TODO(mlaventure): move to runc package?
 func getLastRuntimeError(r *runc.Runc) (string, error) {
 	if r.Log == "" {

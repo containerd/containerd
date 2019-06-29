@@ -31,6 +31,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/runtime/proc"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
@@ -49,7 +50,7 @@ type execProcess struct {
 	io      *processIO
 	status  int
 	exited  time.Time
-	pid     *safePid
+	pid     safePid
 	closers []io.Closer
 	stdin   io.Closer
 	stdio   proc.Stdio
@@ -95,6 +96,7 @@ func (e *execProcess) setExited(status int) {
 	e.status = status
 	e.exited = time.Now()
 	e.parent.Platform.ShutdownConsole(context.Background(), e.console)
+	e.pid.set(StoppedPID)
 	close(e.waitBlock)
 }
 
@@ -142,7 +144,12 @@ func (e *execProcess) Kill(ctx context.Context, sig uint32, _ bool) error {
 
 func (e *execProcess) kill(ctx context.Context, sig uint32, _ bool) error {
 	pid := e.pid.get()
-	if pid != 0 {
+	switch {
+	case pid == 0:
+		return errors.Wrap(errdefs.ErrFailedPrecondition, "process not created")
+	case pid < 0:
+		return errors.Wrapf(errdefs.ErrNotFound, "process already finished")
+	default:
 		if err := unix.Kill(pid, syscall.Signal(sig)); err != nil {
 			return errors.Wrapf(checkKillError(err), "exec kill error")
 		}
@@ -254,9 +261,12 @@ func (e *execProcess) Status(ctx context.Context) (string, error) {
 	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	// if we don't have a pid then the exec process has just been created
+	// if we don't have a pid(pid=0) then the exec process has just been created
 	if e.pid.get() == 0 {
 		return "created", nil
+	}
+	if e.pid.get() == StoppedPID {
+		return "stopped", nil
 	}
 	// if we have a pid and it can be signaled, the process is running
 	if err := unix.Kill(e.pid.get(), 0); err == nil {
