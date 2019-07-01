@@ -455,7 +455,8 @@ func (r *dockerBase) retryRequest(ctx context.Context, req *http.Request, respon
 		return nil, nil
 	}
 	last := responses[len(responses)-1]
-	if last.StatusCode == http.StatusUnauthorized {
+	switch last.StatusCode {
+	case http.StatusUnauthorized:
 		log.G(ctx).WithField("header", last.Header.Get("WWW-Authenticate")).Debug("Unauthorized")
 		if r.auth != nil {
 			if err := r.auth.AddResponses(ctx, responses); err == nil {
@@ -464,16 +465,17 @@ func (r *dockerBase) retryRequest(ctx context.Context, req *http.Request, respon
 				return nil, err
 			}
 		}
-
 		return nil, nil
-	} else if last.StatusCode == http.StatusMethodNotAllowed && req.Method == http.MethodHead {
+	case http.StatusMethodNotAllowed:
 		// Support registries which have not properly implemented the HEAD method for
 		// manifests endpoint
-		if strings.Contains(req.URL.Path, "/manifests/") {
+		if req.Method == http.MethodHead && strings.Contains(req.URL.Path, "/manifests/") {
 			// TODO: copy request?
 			req.Method = http.MethodGet
 			return copyRequest(req)
 		}
+	case http.StatusRequestTimeout, http.StatusTooManyRequests:
+		return copyRequest(req)
 	}
 
 	// TODO: Handle 50x errors accounting for attempt history
