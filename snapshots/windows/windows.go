@@ -24,9 +24,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
-	"unsafe"
 
+	winfs "github.com/Microsoft/go-winio/pkg/fs"
 	"github.com/Microsoft/go-winio/vhd"
 	"github.com/Microsoft/hcsshim"
 	"github.com/containerd/containerd/errdefs"
@@ -37,7 +36,6 @@ import (
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/continuity/fs"
 	"github.com/pkg/errors"
-	"golang.org/x/sys/windows"
 )
 
 func init() {
@@ -58,7 +56,7 @@ type snapshotter struct {
 
 // NewSnapshotter returns a new windows snapshotter
 func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
-	fsType, err := getFileSystemType(root)
+	fsType, err := winfs.GetFileSystemType(root)
 	if err != nil {
 		return nil, err
 	}
@@ -337,36 +335,4 @@ func (s *snapshotter) parentIDsToParentPaths(parentIDs []string) []string {
 		parentLayerPaths = append(parentLayerPaths, s.getSnapshotDir(ID))
 	}
 	return parentLayerPaths
-}
-
-// getFileSystemType obtains the type of a file system through GetVolumeInformation
-// https://msdn.microsoft.com/en-us/library/windows/desktop/aa364993(v=vs.85).aspx
-func getFileSystemType(path string) (fsType string, hr error) {
-	drive := filepath.VolumeName(path)
-	if len(drive) != 2 {
-		return "", errors.New("getFileSystemType path must start with a drive letter")
-	}
-
-	var (
-		modkernel32              = windows.NewLazySystemDLL("kernel32.dll")
-		procGetVolumeInformation = modkernel32.NewProc("GetVolumeInformationW")
-		buf                      = make([]uint16, 255)
-		size                     = windows.MAX_PATH + 1
-	)
-	drive += `\`
-	n := uintptr(unsafe.Pointer(nil))
-	r0, _, _ := syscall.Syscall9(procGetVolumeInformation.Addr(), 8, uintptr(unsafe.Pointer(windows.StringToUTF16Ptr(drive))), n, n, n, n, n, uintptr(unsafe.Pointer(&buf[0])), uintptr(size), 0)
-	if int32(r0) < 0 {
-		hr = syscall.Errno(win32FromHresult(r0))
-	}
-	fsType = windows.UTF16ToString(buf)
-	return
-}
-
-// win32FromHresult is a helper function to get the win32 error code from an HRESULT
-func win32FromHresult(hr uintptr) uintptr {
-	if hr&0x1fff0000 == 0x00070000 {
-		return hr & 0xffff
-	}
-	return hr
 }
