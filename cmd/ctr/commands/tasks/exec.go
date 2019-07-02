@@ -98,6 +98,15 @@ var execCommand = cli.Command{
 			if err != nil {
 				return err
 			}
+
+			if dir := context.String("fifo-dir"); dir != "" {
+				return errors.New("can't use log-uri with fifo-dir")
+			}
+
+			if tty {
+				return errors.New("can't use log-uri with tty")
+			}
+
 			ioCreator = cio.LogURI(uri)
 		} else {
 			cioOpts := []cio.Opt{cio.WithStdio, cio.WithFIFODir(context.String("fifo-dir"))}
