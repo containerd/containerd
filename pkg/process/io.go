@@ -16,7 +16,7 @@
    limitations under the License.
 */
 
-package proc
+package process
 
 import (
 	"context"
@@ -32,7 +32,7 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/runtime/proc"
+	"github.com/containerd/containerd/pkg/stdio"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	"github.com/pkg/errors"
@@ -50,7 +50,7 @@ type processIO struct {
 
 	uri   *url.URL
 	copy  bool
-	stdio proc.Stdio
+	stdio stdio.Stdio
 }
 
 func (p *processIO) Close() error {
@@ -76,7 +76,7 @@ func (p *processIO) Copy(ctx context.Context, wg *sync.WaitGroup) error {
 	return nil
 }
 
-func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio proc.Stdio) (*processIO, error) {
+func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio stdio.Stdio) (*processIO, error) {
 	pio := &processIO{
 		stdio: stdio,
 	}
