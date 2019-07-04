@@ -429,4 +429,4 @@ redis-server exited with status: 0
 In the end, we really did not write that much code when you use the client package.
 
 I hope this guide helped to get you up and running with containerd.
-Feel free to join the [slack channel](https://dockr.ly/community) if you have any questions and like all things, if you want to help contribute to containerd or this guide, submit a pull request.
+Feel free to join the [slack channel](https://slack.containerd.io/) if you have any questions and like all things, if you want to help contribute to containerd or this guide, submit a pull request.
