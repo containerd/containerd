@@ -25,7 +25,7 @@ After modify this config, you need restart the `containerd` service.
 ## Configure Registry TLS Communication
 `cri` plugin also supports configuring TLS settings when communicating with a registry.
 
-To configure the TLS settings for a specific registry, create/modify the `/ec/containerd/config.toml` as follows:
+To configure the TLS settings for a specific registry, create/modify the `/etc/containerd/config.toml` as follows:
 ```toml
 [plugins.cri.registry.tls_configs]
   [plugins.cri.registry.tls_configs."my.custom.registry"]
