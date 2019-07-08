@@ -16,7 +16,7 @@
    limitations under the License.
 */
 
-package runc
+package oom
 
 import (
 	"context"
@@ -30,9 +30,9 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// NewOOMEpoller returns an epoll implementation that listens to OOM events
+// New returns an epoll implementation that listens to OOM events
 // from a container's cgroups.
-func NewOOMEpoller(publisher shim.Publisher) (*Epoller, error) {
+func New(publisher shim.Publisher) (*Epoller, error) {
 	fd, err := unix.EpollCreate1(unix.EPOLL_CLOEXEC)
 	if err != nil {
 		return nil, err

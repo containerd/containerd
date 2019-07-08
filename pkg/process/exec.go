@@ -16,7 +16,7 @@
    limitations under the License.
 */
 
-package proc
+package process
 
 import (
 	"context"
@@ -32,7 +32,7 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/runtime/proc"
+	"github.com/containerd/containerd/pkg/stdio"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -53,7 +53,7 @@ type execProcess struct {
 	pid     safePid
 	closers []io.Closer
 	stdin   io.Closer
-	stdio   proc.Stdio
+	stdio   stdio.Stdio
 	path    string
 	spec    specs.Process
 
@@ -161,7 +161,7 @@ func (e *execProcess) Stdin() io.Closer {
 	return e.stdin
 }
 
-func (e *execProcess) Stdio() proc.Stdio {
+func (e *execProcess) Stdio() stdio.Stdio {
 	return e.stdio
 }
 
