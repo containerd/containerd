@@ -194,7 +194,7 @@ func Parse(specifier string) (specs.Platform, error) {
 				return specs.Platform{}, errors.Wrapf(errdefs.ErrNotImplemented, "arm support not fully implemented")
 			}
 
-			return p, nil
+			return Normalize(p), nil
 		}
 
 		p.Architecture, p.Variant = normalizeArch(parts[0], "")
@@ -203,7 +203,7 @@ func Parse(specifier string) (specs.Platform, error) {
 		}
 		if isKnownArch(p.Architecture) {
 			p.OS = runtime.GOOS
-			return p, nil
+			return Normalize(p), nil
 		}
 
 		return specs.Platform{}, errors.Wrapf(errdefs.ErrInvalidArgument, "%q: unknown operating system or architecture", specifier)
@@ -216,7 +216,7 @@ func Parse(specifier string) (specs.Platform, error) {
 			p.Variant = ""
 		}
 
-		return p, nil
+		return Normalize(p), nil
 	case 3:
 		// we have a fully specified variant, this is rare
 		p.OS = normalizeOS(parts[0])
@@ -225,7 +225,7 @@ func Parse(specifier string) (specs.Platform, error) {
 			p.Variant = "v8"
 		}
 
-		return p, nil
+		return Normalize(p), nil
 	}
 
 	return specs.Platform{}, errors.Wrapf(errdefs.ErrInvalidArgument, "%q: cannot parse platform specifier", specifier)
@@ -243,6 +243,7 @@ func MustParse(specifier string) specs.Platform {
 
 // Format returns a string specifier from the provided platform specification.
 func Format(platform specs.Platform) string {
+	platform = Normalize(platform)
 	if platform.OS == "" {
 		return "unknown"
 	}
