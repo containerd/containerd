@@ -56,9 +56,9 @@ install:
   - if [ "$TRAVIS_GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-runc ; fi
   - if [ "$TRAVIS_GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-cni ; fi
   - if [ "$TRAVIS_GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-critools ; fi
-  - if [ "$TRAVIS_GOOS" = "linux" ]; then wget https://github.com/checkpoint-restore/criu/archive/v3.7.tar.gz -O /tmp/criu.tar.gz ; fi
+  - if [ "$TRAVIS_GOOS" = "linux" ]; then wget https://github.com/checkpoint-restore/criu/archive/v3.12.tar.gz -O /tmp/criu.tar.gz ; fi
   - if [ "$TRAVIS_GOOS" = "linux" ]; then tar -C /tmp/ -zxf /tmp/criu.tar.gz ; fi
-  - if [ "$TRAVIS_GOOS" = "linux" ]; then cd /tmp/criu-3.7 && sudo make install-criu ; fi
+  - if [ "$TRAVIS_GOOS" = "linux" ]; then cd /tmp/criu-3.12 && sudo make install-criu ; fi
   - cd $TRAVIS_BUILD_DIR
 
 before_script:
