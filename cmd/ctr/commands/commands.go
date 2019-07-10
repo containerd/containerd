@@ -24,7 +24,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/containerd/containerd"
 	"github.com/urfave/cli"
 )
 
@@ -34,7 +33,6 @@ var (
 		cli.StringFlag{
 			Name:   "snapshotter",
 			Usage:  "snapshotter name. Empty value stands for the default value.",
-			Value:  containerd.DefaultSnapshotter,
 			EnvVar: "CONTAINERD_SNAPSHOTTER",
 		},
 	}

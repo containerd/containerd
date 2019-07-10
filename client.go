@@ -332,7 +332,6 @@ func defaultRemoteContext() *RemoteContext {
 		Resolver: docker.NewResolver(docker.ResolverOptions{
 			Client: http.DefaultClient,
 		}),
-		Snapshotter: DefaultSnapshotter,
 	}
 }
 
@@ -672,7 +671,13 @@ func (c *Client) Version(ctx context.Context) (Version, error) {
 	}, nil
 }
 
-func (c *Client) getSnapshotter(name string) (snapshots.Snapshotter, error) {
+func (c *Client) getSnapshotter(ctx context.Context, name string) (snapshots.Snapshotter, error) {
+	if name == "" {
+		if err := c.GetLabel(ctx, defaults.DefaultSnapshotterNSLabel, &name, DefaultSnapshotter); err != nil {
+			return nil, err
+		}
+	}
+
 	s := c.SnapshotService(name)
 	if s == nil {
 		return nil, errors.Wrapf(errdefs.ErrNotFound, "snapshotter %s was not found", name)

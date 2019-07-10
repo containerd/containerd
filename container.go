@@ -233,7 +233,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 		}
 
 		// get the rootfs from the snapshotter and add it to the request
-		s, err := c.client.getSnapshotter(r.Snapshotter)
+		s, err := c.client.getSnapshotter(ctx, r.Snapshotter)
 		if err != nil {
 			return nil, err
 		}
