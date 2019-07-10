@@ -43,6 +43,7 @@ import (
 	"github.com/containerd/containerd/content"
 	contentproxy "github.com/containerd/containerd/content/proxy"
 	"github.com/containerd/containerd/defaults"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/leases"
@@ -134,7 +135,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 		c.conn, c.connector = conn, connector
 	}
 	if copts.services == nil && c.conn == nil {
-		return nil, errors.New("no grpc connection or services is available")
+		return nil, errdefs.ErrNoGRPCAndService
 	}
 
 	// check namespace labels for default runtime
@@ -199,7 +200,7 @@ type Client struct {
 // Reconnect re-establishes the GRPC connection to the containerd daemon
 func (c *Client) Reconnect() error {
 	if c.connector == nil {
-		return errors.New("unable to reconnect to containerd, no connector available")
+		return errdefs.ErrReconnectFailed
 	}
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
@@ -222,7 +223,7 @@ func (c *Client) IsServing(ctx context.Context) (bool, error) {
 	c.connMu.Lock()
 	if c.conn == nil {
 		c.connMu.Unlock()
-		return false, errors.New("no grpc connection available")
+		return false, errdefs.ErrNoGRPC
 	}
 	c.connMu.Unlock()
 	r, err := c.HealthService().Check(ctx, &grpc_health_v1.HealthCheckRequest{}, grpc.WaitForReady(true))
@@ -354,7 +355,7 @@ func (c *Client) Fetch(ctx context.Context, ref string, opts ...RemoteOpt) (imag
 	}
 
 	if fetchCtx.Unpack {
-		return images.Image{}, errors.New("unpack on fetch not supported, try pull")
+		return images.Image{}, errdefs.ErrUnpackNotSupported
 	}
 
 	if fetchCtx.PlatformMatcher == nil {
@@ -642,7 +643,7 @@ func (c *Client) Version(ctx context.Context) (Version, error) {
 	c.connMu.Lock()
 	if c.conn == nil {
 		c.connMu.Unlock()
-		return Version{}, errors.New("no grpc connection available")
+		return Version{}, errdefs.ErrNoGRPC
 	}
 	c.connMu.Unlock()
 	response, err := c.VersionService().Version(ctx, &ptypes.Empty{})

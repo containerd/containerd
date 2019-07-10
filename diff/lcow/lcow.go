@@ -152,7 +152,11 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 
 	err = tar2ext4.Convert(rc, outFile, tar2ext4.ConvertWhiteout, tar2ext4.AppendVhdFooter, tar2ext4.MaximumDiskSize(maxLcowVhdSizeGB))
 	if err != nil {
-		return emptyDesc, errors.Wrapf(err, "failed to convert tar to ext4 vhd")
+		return emptyDesc, errors.Wrapf(err, "failed to convert tar2ext4 vhd")
+	}
+	err = outFile.Sync()
+	if err != nil {
+		return emptyDesc, errors.Wrapf(err, "failed to sync tar2ext4 vhd to disk")
 	}
 	outFile.Close()
 

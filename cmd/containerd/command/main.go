@@ -36,6 +36,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+	"github.com/containerd/containerd/errdefs"
 	"google.golang.org/grpc/grpclog"
 )
 
@@ -152,7 +153,7 @@ func App() *cli.App {
 			ttrpcAddress = fmt.Sprintf("%s.ttrpc", config.GRPC.Address)
 		)
 		if address == "" {
-			return errors.New("grpc address cannot be empty")
+			return errdefs.ErrEmptyGRCPAddress
 		}
 		log.G(ctx).WithFields(logrus.Fields{
 			"version":  version.Version,

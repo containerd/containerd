@@ -18,7 +18,6 @@ package command
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -28,9 +27,11 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/services/server"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
@@ -162,7 +163,7 @@ func (h *etwHook) Fire(e *logrus.Entry) error {
 		etype = windows.EVENTLOG_INFORMATION_TYPE
 		eid = eventDebug
 	default:
-		return errors.New("unknown level")
+		return errdefs.ErrUnknownLevel
 	}
 
 	// If there is additional data, include it as a second string.
@@ -270,8 +271,8 @@ func registerService() error {
 		Delay uint32
 	}
 	t := []scAction{
-		{Type: scActionRestart, Delay: uint32(60 * time.Second / time.Millisecond)},
-		{Type: scActionRestart, Delay: uint32(60 * time.Second / time.Millisecond)},
+		{Type: scActionRestart, Delay: uint32(15 * time.Second / time.Millisecond)},
+		{Type: scActionRestart, Delay: uint32(15 * time.Second / time.Millisecond)},
 		{Type: scActionNone},
 	}
 	lpInfo := serviceFailureActions{ResetPeriod: uint32(24 * time.Hour / time.Second), ActionsCount: uint32(3), Actions: uintptr(unsafe.Pointer(&t[0]))}
@@ -311,7 +312,7 @@ func registerUnregisterService(root string) (bool, error) {
 
 	if unregisterServiceFlag {
 		if registerServiceFlag {
-			return true, errors.New("--register-service and --unregister-service cannot be used together")
+			return true, errdefs.ErrRegisterAndUnregisterService
 		}
 		return true, unregisterService()
 	}
