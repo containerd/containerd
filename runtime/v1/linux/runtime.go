@@ -37,12 +37,12 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/process"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
-	"github.com/containerd/containerd/runtime/v1"
-	"github.com/containerd/containerd/runtime/v1/linux/proc"
+	v1 "github.com/containerd/containerd/runtime/v1"
 	shim "github.com/containerd/containerd/runtime/v1/shim/v1"
 	runc "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
@@ -335,8 +335,10 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			filepath.Join(r.root, ns, id),
 		)
 		ctx = namespaces.WithNamespace(ctx, ns)
-		pid, _ := runc.ReadPidFile(filepath.Join(bundle.path, proc.InitPidFile))
+		pid, _ := runc.ReadPidFile(filepath.Join(bundle.path, process.InitPidFile))
+		shimExit := make(chan struct{})
 		s, err := bundle.NewShimClient(ctx, ns, ShimConnect(r.config, func() {
+			defer close(shimExit)
 			if _, err := r.tasks.Get(ctx, id); err != nil {
 				// Task was never started or was already successfully deleted
 				return
@@ -362,6 +364,18 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 
 		logDirPath := filepath.Join(r.root, ns, id)
 
+		copyAndClose := func(dst io.Writer, src io.ReadWriteCloser) {
+			copyDone := make(chan struct{})
+			go func() {
+				io.Copy(dst, src)
+				close(copyDone)
+			}()
+			select {
+			case <-shimExit:
+			case <-copyDone:
+			}
+			src.Close()
+		}
 		shimStdoutLog, err := v1.OpenShimStdoutLog(ctx, logDirPath)
 		if err != nil {
 			log.G(ctx).WithError(err).WithFields(logrus.Fields{
@@ -372,9 +386,9 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			continue
 		}
 		if r.config.ShimDebug {
-			go io.Copy(os.Stdout, shimStdoutLog)
+			go copyAndClose(os.Stdout, shimStdoutLog)
 		} else {
-			go io.Copy(ioutil.Discard, shimStdoutLog)
+			go copyAndClose(ioutil.Discard, shimStdoutLog)
 		}
 
 		shimStderrLog, err := v1.OpenShimStderrLog(ctx, logDirPath)
@@ -387,9 +401,9 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			continue
 		}
 		if r.config.ShimDebug {
-			go io.Copy(os.Stderr, shimStderrLog)
+			go copyAndClose(os.Stderr, shimStderrLog)
 		} else {
-			go io.Copy(ioutil.Discard, shimStderrLog)
+			go copyAndClose(ioutil.Discard, shimStderrLog)
 		}
 
 		t, err := newTask(id, ns, pid, s, r.events, r.tasks, bundle)
@@ -408,7 +422,7 @@ func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, 
 		"namespace": ns,
 	}).Warn("cleaning up after shim dead")
 
-	pid, _ := runc.ReadPidFile(filepath.Join(bundle.path, proc.InitPidFile))
+	pid, _ := runc.ReadPidFile(filepath.Join(bundle.path, process.InitPidFile))
 	ctx = namespaces.WithNamespace(ctx, ns)
 	if err := r.terminate(ctx, bundle, ns, id); err != nil {
 		if r.config.ShimDebug {
@@ -473,7 +487,7 @@ func (r *Runtime) getRuntime(ctx context.Context, ns, id string) (*runc.Runc, er
 
 	var (
 		cmd  = r.config.Runtime
-		root = proc.RuncRoot
+		root = process.RuncRoot
 	)
 	if ropts != nil {
 		if ropts.Runtime != "" {

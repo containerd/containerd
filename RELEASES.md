@@ -173,6 +173,7 @@ containerd versions:
 | GRPC API         | Stable   | 1.0                | [api/](api) |
 | Metrics API      | Stable   | 1.0                | - |
 | Runtime Shim API | Stable   | 1.2                | - |
+| Daemon Config    | Stable   | 1.0			       | - |
 | Go client API    | Unstable | _future_           | [godoc](https://godoc.org/github.com/containerd/containerd) |
 | CRI GRPC API     | Unstable | v1alpha2 _current_ | [api/](https://github.com/kubernetes/kubernetes/tree/master/pkg/kubelet/apis/cri/runtime/v1alpha2) |
 | `ctr` tool       | Unstable | Out of scope       | - |
@@ -270,6 +271,13 @@ API. At this time, it is not considered a primary offering of the project. It
 may be completely refactored or have breaking changes in _minor_ releases.
 
 We will try not break the tool in _patch_ releases.
+
+### Daemon Configuration
+
+The daemon's configuration file, commonly located in `/etc/containerd/config.toml`
+is versioned and backwards compatible.  The `version = 2` field in the config
+file specifies the config's version.  If no version number is specified inside
+the config file then it is assumed to be a version 1 config and parsed as such.
 
 ### Not Covered
 

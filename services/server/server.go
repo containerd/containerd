@@ -126,6 +126,10 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 	}
 	for _, p := range plugins {
 		id := p.URI()
+		reqID := id
+		if config.GetVersion() == 1 {
+			reqID = p.ID
+		}
 		log.G(ctx).WithField("type", p.Type).Infof("loading plugin %q...", id)
 
 		initContext := plugin.NewContext(
@@ -140,11 +144,11 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 
 		// load the plugin specific configuration if it is provided
 		if p.Config != nil {
-			pluginConfig, err := config.Decode(p.ID, p.Config)
+			pc, err := config.Decode(p)
 			if err != nil {
 				return nil, err
 			}
-			initContext.Config = pluginConfig
+			initContext.Config = pc
 		}
 		result := p.Init(initContext)
 		if err := initialized.Add(result); err != nil {
@@ -158,12 +162,13 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			} else {
 				log.G(ctx).WithError(err).Warnf("failed to load plugin %s", id)
 			}
-			if _, ok := required[p.ID]; ok {
+			if _, ok := required[reqID]; ok {
 				return nil, errors.Wrapf(err, "load required plugin %s", id)
 			}
 			continue
 		}
-		delete(required, p.ID)
+
+		delete(required, reqID)
 		// check for grpc services that should be registered with the server
 		if src, ok := instance.(plugin.Service); ok {
 			grpcServices = append(grpcServices, src)
@@ -266,7 +271,7 @@ func (s *Server) Stop() {
 		p := s.plugins[i]
 		instance, err := p.Instance()
 		if err != nil {
-			log.L.WithError(err).WithField("id", p.Registration.ID).
+			log.L.WithError(err).WithField("id", p.Registration.URI()).
 				Errorf("could not get plugin instance")
 			continue
 		}
@@ -275,7 +280,7 @@ func (s *Server) Stop() {
 			continue
 		}
 		if err := closer.Close(); err != nil {
-			log.L.WithError(err).WithField("id", p.Registration.ID).
+			log.L.WithError(err).WithField("id", p.Registration.URI()).
 				Errorf("failed to close plugin")
 		}
 	}
@@ -415,8 +420,12 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 
 	}
 
+	filter := srvconfig.V2DisabledFilter
+	if config.GetVersion() == 1 {
+		filter = srvconfig.V1DisabledFilter
+	}
 	// return the ordered graph for plugins
-	return plugin.Graph(config.DisabledPlugins), nil
+	return plugin.Graph(filter(config.DisabledPlugins)), nil
 }
 
 type proxyClients struct {

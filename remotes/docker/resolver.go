@@ -111,6 +111,7 @@ type dockerResolver struct {
 	auth      Authorizer
 	host      func(string) (string, error)
 	headers   http.Header
+	uagent    string
 	plainHTTP bool
 	client    *http.Client
 	tracker   StatusTracker
@@ -135,16 +136,22 @@ func NewResolver(options ResolverOptions) remotes.Resolver {
 			ocispec.MediaTypeImageManifest,
 			ocispec.MediaTypeImageIndex, "*"}, ", "))
 	}
-	if _, ok := options.Headers["User-Agent"]; !ok {
-		options.Headers.Set("User-Agent", "containerd/"+version.Version)
+	ua := options.Headers.Get("User-Agent")
+	if ua != "" {
+		options.Headers.Del("User-Agent")
+	} else {
+		ua = "containerd/" + version.Version
 	}
+
 	if options.Authorizer == nil {
 		options.Authorizer = NewAuthorizer(options.Client, options.Credentials)
+		options.Authorizer.(*dockerAuthorizer).ua = ua
 	}
 	return &dockerResolver{
 		auth:      options.Authorizer,
 		host:      options.Host,
 		headers:   options.Headers,
+		uagent:    ua,
 		plainHTTP: options.PlainHTTP,
 		client:    options.Client,
 		tracker:   options.Tracker,
@@ -351,6 +358,7 @@ func (r *dockerResolver) Pusher(ctx context.Context, ref string) (remotes.Pusher
 type dockerBase struct {
 	refspec reference.Spec
 	base    url.URL
+	uagent  string
 
 	client *http.Client
 	auth   Authorizer
@@ -382,6 +390,7 @@ func (r *dockerResolver) base(refspec reference.Spec) (*dockerBase, error) {
 	return &dockerBase{
 		refspec: refspec,
 		base:    base,
+		uagent:  r.uagent,
 		client:  r.client,
 		auth:    r.auth,
 	}, nil
@@ -407,6 +416,7 @@ func (r *dockerBase) authorize(ctx context.Context, req *http.Request) error {
 func (r *dockerBase) doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", req.URL.String()))
 	log.G(ctx).WithField("request.headers", req.Header).WithField("request.method", req.Method).Debug("do request")
+	req.Header.Set("User-Agent", r.uagent)
 	if err := r.authorize(ctx, req); err != nil {
 		return nil, errors.Wrap(err, "failed to authorize")
 	}
@@ -445,7 +455,8 @@ func (r *dockerBase) retryRequest(ctx context.Context, req *http.Request, respon
 		return nil, nil
 	}
 	last := responses[len(responses)-1]
-	if last.StatusCode == http.StatusUnauthorized {
+	switch last.StatusCode {
+	case http.StatusUnauthorized:
 		log.G(ctx).WithField("header", last.Header.Get("WWW-Authenticate")).Debug("Unauthorized")
 		if r.auth != nil {
 			if err := r.auth.AddResponses(ctx, responses); err == nil {
@@ -454,16 +465,17 @@ func (r *dockerBase) retryRequest(ctx context.Context, req *http.Request, respon
 				return nil, err
 			}
 		}
-
 		return nil, nil
-	} else if last.StatusCode == http.StatusMethodNotAllowed && req.Method == http.MethodHead {
+	case http.StatusMethodNotAllowed:
 		// Support registries which have not properly implemented the HEAD method for
 		// manifests endpoint
-		if strings.Contains(req.URL.Path, "/manifests/") {
+		if req.Method == http.MethodHead && strings.Contains(req.URL.Path, "/manifests/") {
 			// TODO: copy request?
 			req.Method = http.MethodGet
 			return copyRequest(req)
 		}
+	case http.StatusRequestTimeout, http.StatusTooManyRequests:
+		return copyRequest(req)
 	}
 
 	// TODO: Handle 50x errors accounting for attempt history

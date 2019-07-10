@@ -37,8 +37,8 @@ import (
 
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/process"
 	shimlog "github.com/containerd/containerd/runtime/v1"
-	"github.com/containerd/containerd/runtime/v1/linux/proc"
 	"github.com/containerd/containerd/runtime/v1/shim"
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/ttrpc"
@@ -73,7 +73,7 @@ func init() {
 	flag.StringVar(&socketFlag, "socket", "", "abstract socket path to serve")
 	flag.StringVar(&addressFlag, "address", "", "grpc address back to main containerd")
 	flag.StringVar(&workdirFlag, "workdir", "", "path used to storge large temporary data")
-	flag.StringVar(&runtimeRootFlag, "runtime-root", proc.RuncRoot, "root directory for the runtime")
+	flag.StringVar(&runtimeRootFlag, "runtime-root", process.RuncRoot, "root directory for the runtime")
 	flag.StringVar(&criuFlag, "criu", "", "path to criu binary")
 	flag.BoolVar(&systemdCgroupFlag, "systemd-cgroup", false, "set runtime to use systemd-cgroup")
 	// currently, the `containerd publish` utility is embedded in the daemon binary.
@@ -196,7 +196,9 @@ func serve(ctx context.Context, server *ttrpc.Server, path string) error {
 		err error
 	)
 	if path == "" {
-		l, err = net.FileListener(os.NewFile(3, "socket"))
+		f := os.NewFile(3, "socket")
+		l, err = net.FileListener(f)
+		f.Close()
 		path = "[inherited from parent]"
 	} else {
 		if len(path) > 106 {

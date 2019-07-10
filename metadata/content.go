@@ -637,11 +637,11 @@ func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64,
 			return "", errors.Wrapf(errdefs.ErrFailedPrecondition, "%q failed size validation: %v != %v", nw.ref, status.Offset, size)
 		}
 		size = status.Offset
-		actual = nw.w.Digest()
 
 		if err := nw.w.Commit(ctx, size, expected); err != nil && !errdefs.IsAlreadyExists(err) {
 			return "", err
 		}
+		actual = nw.w.Digest()
 	}
 
 	bkt, err := createBlobBucket(tx, nw.namespace, actual)
