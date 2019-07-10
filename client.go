@@ -87,13 +87,15 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 	if copts.timeout == 0 {
 		copts.timeout = 10 * time.Second
 	}
-	rt := fmt.Sprintf("%s.%s", plugin.RuntimePlugin, runtime.GOOS)
+
+	c := &Client{}
+
 	if copts.defaultRuntime != "" {
-		rt = copts.defaultRuntime
+		c.runtime = copts.defaultRuntime
+	} else {
+		c.runtime = fmt.Sprintf("%s.%s", plugin.RuntimePlugin, runtime.GOOS)
 	}
-	c := &Client{
-		runtime: rt,
-	}
+
 	if copts.services != nil {
 		c.services = *copts.services
 	}
@@ -140,13 +142,8 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 
 	// check namespace labels for default runtime
 	if copts.defaultRuntime == "" && copts.defaultns != "" {
-		namespaces := c.NamespaceService()
-		ctx := context.Background()
-		if labels, err := namespaces.Labels(ctx, copts.defaultns); err == nil {
-			if defaultRuntime, ok := labels[defaults.DefaultRuntimeNSLabel]; ok {
-				c.runtime = defaultRuntime
-			}
-		} else {
+		ctx := namespaces.WithNamespace(context.Background(), copts.defaultns)
+		if err := c.GetLabel(ctx, defaults.DefaultRuntimeNSLabel, &c.runtime, ""); err != nil {
 			return nil, err
 		}
 	}
@@ -170,13 +167,8 @@ func NewWithConn(conn *grpc.ClientConn, opts ...ClientOpt) (*Client, error) {
 
 	// check namespace labels for default runtime
 	if copts.defaultRuntime == "" && copts.defaultns != "" {
-		namespaces := c.NamespaceService()
-		ctx := context.Background()
-		if labels, err := namespaces.Labels(ctx, copts.defaultns); err == nil {
-			if defaultRuntime, ok := labels[defaults.DefaultRuntimeNSLabel]; ok {
-				c.runtime = defaultRuntime
-			}
-		} else {
+		ctx := namespaces.WithNamespace(context.Background(), copts.defaultns)
+		if err := c.GetLabel(ctx, defaults.DefaultRuntimeNSLabel, &c.runtime, ""); err != nil {
 			return nil, err
 		}
 	}
@@ -489,6 +481,30 @@ func writeIndex(ctx context.Context, index *ocispec.Index, client *Client, ref s
 		return ocispec.Descriptor{}, err
 	}
 	return writeContent(ctx, client.ContentStore(), ocispec.MediaTypeImageIndex, ref, bytes.NewReader(data), content.WithLabels(labels))
+}
+
+// GetLabel gets a label value from namespace store and saves it in 'out' variable.
+// If there is no value, a fallback value will be used instead.
+func (c *Client) GetLabel(ctx context.Context, label string, out *string, fallback string) error {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return err
+	}
+
+	srv := c.NamespaceService()
+	labels, err := srv.Labels(ctx, ns)
+	if err != nil {
+		return err
+	}
+
+	value, ok := labels[label]
+	if ok {
+		*out = value
+	} else {
+		*out = fallback
+	}
+
+	return nil
 }
 
 // Subscribe to events that match one or more of the provided filters.
