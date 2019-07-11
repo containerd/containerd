@@ -143,8 +143,10 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 	// check namespace labels for default runtime
 	if copts.defaultRuntime == "" && copts.defaultns != "" {
 		ctx := namespaces.WithNamespace(context.Background(), copts.defaultns)
-		if err := c.GetLabel(ctx, defaults.DefaultRuntimeNSLabel, &c.runtime, ""); err != nil {
+		if label, err := c.GetLabel(ctx, defaults.DefaultRuntimeNSLabel); err != nil {
 			return nil, err
+		} else if label != "" {
+			c.runtime = label
 		}
 	}
 
@@ -168,8 +170,10 @@ func NewWithConn(conn *grpc.ClientConn, opts ...ClientOpt) (*Client, error) {
 	// check namespace labels for default runtime
 	if copts.defaultRuntime == "" && copts.defaultns != "" {
 		ctx := namespaces.WithNamespace(context.Background(), copts.defaultns)
-		if err := c.GetLabel(ctx, defaults.DefaultRuntimeNSLabel, &c.runtime, ""); err != nil {
+		if label, err := c.GetLabel(ctx, defaults.DefaultRuntimeNSLabel); err != nil {
 			return nil, err
+		} else if label != "" {
+			c.runtime = label
 		}
 	}
 
@@ -482,28 +486,22 @@ func writeIndex(ctx context.Context, index *ocispec.Index, client *Client, ref s
 	return writeContent(ctx, client.ContentStore(), ocispec.MediaTypeImageIndex, ref, bytes.NewReader(data), content.WithLabels(labels))
 }
 
-// GetLabel gets a label value from namespace store and saves it in 'out' variable.
-// If there is no value, a fallback value will be used instead.
-func (c *Client) GetLabel(ctx context.Context, label string, out *string, fallback string) error {
+// GetLabel gets a label value from namespace store
+// If there is no default label, an empty string returned with nil error
+func (c *Client) GetLabel(ctx context.Context, label string) (string, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	srv := c.NamespaceService()
 	labels, err := srv.Labels(ctx, ns)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	value, ok := labels[label]
-	if ok {
-		*out = value
-	} else {
-		*out = fallback
-	}
-
-	return nil
+	value := labels[label]
+	return value, nil
 }
 
 // Subscribe to events that match one or more of the provided filters.
@@ -671,17 +669,34 @@ func (c *Client) Version(ctx context.Context) (Version, error) {
 	}, nil
 }
 
-func (c *Client) getSnapshotter(ctx context.Context, name string) (snapshots.Snapshotter, error) {
+func (c *Client) resolveSnapshotterName(ctx context.Context, name string) (string, error) {
 	if name == "" {
-		if err := c.GetLabel(ctx, defaults.DefaultSnapshotterNSLabel, &name, DefaultSnapshotter); err != nil {
-			return nil, err
+		label, err := c.GetLabel(ctx, defaults.DefaultSnapshotterNSLabel)
+		if err != nil {
+			return "", err
 		}
+
+		if label != "" {
+			name = label
+		} else {
+			name = DefaultSnapshotter
+		}
+	}
+
+	return name, nil
+}
+
+func (c *Client) getSnapshotter(ctx context.Context, name string) (snapshots.Snapshotter, error) {
+	name, err := c.resolveSnapshotterName(ctx, name)
+	if err != nil {
+		return nil, err
 	}
 
 	s := c.SnapshotService(name)
 	if s == nil {
 		return nil, errors.Wrapf(errdefs.ErrNotFound, "snapshotter %s was not found", name)
 	}
+
 	return s, nil
 }
 

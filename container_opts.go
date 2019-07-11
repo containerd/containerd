@@ -117,6 +117,11 @@ func WithSnapshotter(name string) NewContainerOpts {
 func WithSnapshot(id string) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		// check that the snapshot exists, if not, fail on creation
+		var err error
+		c.Snapshotter, err = client.resolveSnapshotterName(ctx, c.Snapshotter)
+		if err != nil {
+			return err
+		}
 		s, err := client.getSnapshotter(ctx, c.Snapshotter)
 		if err != nil {
 			return err
@@ -139,6 +144,10 @@ func WithNewSnapshot(id string, i Image, opts ...snapshots.Opt) NewContainerOpts
 		}
 
 		parent := identity.ChainID(diffIDs).String()
+		c.Snapshotter, err = client.resolveSnapshotterName(ctx, c.Snapshotter)
+		if err != nil {
+			return err
+		}
 		s, err := client.getSnapshotter(ctx, c.Snapshotter)
 		if err != nil {
 			return err
@@ -177,6 +186,10 @@ func WithNewSnapshotView(id string, i Image, opts ...snapshots.Opt) NewContainer
 		}
 
 		parent := identity.ChainID(diffIDs).String()
+		c.Snapshotter, err = client.resolveSnapshotterName(ctx, c.Snapshotter)
+		if err != nil {
+			return err
+		}
 		s, err := client.getSnapshotter(ctx, c.Snapshotter)
 		if err != nil {
 			return err
