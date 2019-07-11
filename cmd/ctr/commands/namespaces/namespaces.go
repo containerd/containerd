@@ -33,7 +33,7 @@ import (
 // Command is the cli command for managing namespaces
 var Command = cli.Command{
 	Name:    "namespaces",
-	Aliases: []string{"namespace"},
+	Aliases: []string{"namespace", "ns"},
 	Usage:   "manage namespaces",
 	Subcommands: cli.Commands{
 		createCommand,
@@ -45,6 +45,7 @@ var Command = cli.Command{
 
 var createCommand = cli.Command{
 	Name:        "create",
+	Aliases:     []string{"c"},
 	Usage:       "create a new namespace",
 	ArgsUsage:   "<name> [<key>=<value]",
 	Description: "create a new namespace. it must be unique",

@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/rootfs"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -108,7 +108,7 @@ func (i *image) Config(ctx context.Context) (ocispec.Descriptor, error) {
 }
 
 func (i *image) IsUnpacked(ctx context.Context, snapshotterName string) (bool, error) {
-	sn, err := i.client.getSnapshotter(snapshotterName)
+	sn, err := i.client.getSnapshotter(ctx, snapshotterName)
 	if err != nil {
 		return false, err
 	}
@@ -149,7 +149,11 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
 		chain    []digest.Digest
 		unpacked bool
 	)
-	sn, err := i.client.getSnapshotter(snapshotterName)
+	snapshotterName, err = i.client.resolveSnapshotterName(ctx, snapshotterName)
+	if err != nil {
+		return err
+	}
+	sn, err := i.client.getSnapshotter(ctx, snapshotterName)
 	if err != nil {
 		return err
 	}

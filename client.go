@@ -87,13 +87,15 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 	if copts.timeout == 0 {
 		copts.timeout = 10 * time.Second
 	}
-	rt := fmt.Sprintf("%s.%s", plugin.RuntimePlugin, runtime.GOOS)
+
+	c := &Client{}
+
 	if copts.defaultRuntime != "" {
-		rt = copts.defaultRuntime
+		c.runtime = copts.defaultRuntime
+	} else {
+		c.runtime = fmt.Sprintf("%s.%s", plugin.RuntimePlugin, runtime.GOOS)
 	}
-	c := &Client{
-		runtime: rt,
-	}
+
 	if copts.services != nil {
 		c.services = *copts.services
 	}
@@ -140,14 +142,11 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 
 	// check namespace labels for default runtime
 	if copts.defaultRuntime == "" && copts.defaultns != "" {
-		namespaces := c.NamespaceService()
-		ctx := context.Background()
-		if labels, err := namespaces.Labels(ctx, copts.defaultns); err == nil {
-			if defaultRuntime, ok := labels[defaults.DefaultRuntimeNSLabel]; ok {
-				c.runtime = defaultRuntime
-			}
-		} else {
+		ctx := namespaces.WithNamespace(context.Background(), copts.defaultns)
+		if label, err := c.GetLabel(ctx, defaults.DefaultRuntimeNSLabel); err != nil {
 			return nil, err
+		} else if label != "" {
+			c.runtime = label
 		}
 	}
 
@@ -170,14 +169,11 @@ func NewWithConn(conn *grpc.ClientConn, opts ...ClientOpt) (*Client, error) {
 
 	// check namespace labels for default runtime
 	if copts.defaultRuntime == "" && copts.defaultns != "" {
-		namespaces := c.NamespaceService()
-		ctx := context.Background()
-		if labels, err := namespaces.Labels(ctx, copts.defaultns); err == nil {
-			if defaultRuntime, ok := labels[defaults.DefaultRuntimeNSLabel]; ok {
-				c.runtime = defaultRuntime
-			}
-		} else {
+		ctx := namespaces.WithNamespace(context.Background(), copts.defaultns)
+		if label, err := c.GetLabel(ctx, defaults.DefaultRuntimeNSLabel); err != nil {
 			return nil, err
+		} else if label != "" {
+			c.runtime = label
 		}
 	}
 
@@ -340,7 +336,6 @@ func defaultRemoteContext() *RemoteContext {
 		Resolver: docker.NewResolver(docker.ResolverOptions{
 			Client: http.DefaultClient,
 		}),
-		Snapshotter: DefaultSnapshotter,
 	}
 }
 
@@ -489,6 +484,24 @@ func writeIndex(ctx context.Context, index *ocispec.Index, client *Client, ref s
 		return ocispec.Descriptor{}, err
 	}
 	return writeContent(ctx, client.ContentStore(), ocispec.MediaTypeImageIndex, ref, bytes.NewReader(data), content.WithLabels(labels))
+}
+
+// GetLabel gets a label value from namespace store
+// If there is no default label, an empty string returned with nil error
+func (c *Client) GetLabel(ctx context.Context, label string) (string, error) {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	srv := c.NamespaceService()
+	labels, err := srv.Labels(ctx, ns)
+	if err != nil {
+		return "", err
+	}
+
+	value := labels[label]
+	return value, nil
 }
 
 // Subscribe to events that match one or more of the provided filters.
@@ -656,11 +669,34 @@ func (c *Client) Version(ctx context.Context) (Version, error) {
 	}, nil
 }
 
-func (c *Client) getSnapshotter(name string) (snapshots.Snapshotter, error) {
+func (c *Client) resolveSnapshotterName(ctx context.Context, name string) (string, error) {
+	if name == "" {
+		label, err := c.GetLabel(ctx, defaults.DefaultSnapshotterNSLabel)
+		if err != nil {
+			return "", err
+		}
+
+		if label != "" {
+			name = label
+		} else {
+			name = DefaultSnapshotter
+		}
+	}
+
+	return name, nil
+}
+
+func (c *Client) getSnapshotter(ctx context.Context, name string) (snapshots.Snapshotter, error) {
+	name, err := c.resolveSnapshotterName(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
 	s := c.SnapshotService(name)
 	if s == nil {
 		return nil, errors.Wrapf(errdefs.ErrNotFound, "snapshotter %s was not found", name)
 	}
+
 	return s, nil
 }
 

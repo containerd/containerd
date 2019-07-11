@@ -20,9 +20,7 @@ import (
 	"context"
 
 	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/snapshots"
@@ -118,9 +116,13 @@ func WithSnapshotter(name string) NewContainerOpts {
 // WithSnapshot uses an existing root filesystem for the container
 func WithSnapshot(id string) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		setSnapshotterIfEmpty(ctx, client, c)
 		// check that the snapshot exists, if not, fail on creation
-		s, err := client.getSnapshotter(c.Snapshotter)
+		var err error
+		c.Snapshotter, err = client.resolveSnapshotterName(ctx, c.Snapshotter)
+		if err != nil {
+			return err
+		}
+		s, err := client.getSnapshotter(ctx, c.Snapshotter)
 		if err != nil {
 			return err
 		}
@@ -140,9 +142,13 @@ func WithNewSnapshot(id string, i Image, opts ...snapshots.Opt) NewContainerOpts
 		if err != nil {
 			return err
 		}
-		setSnapshotterIfEmpty(ctx, client, c)
+
 		parent := identity.ChainID(diffIDs).String()
-		s, err := client.getSnapshotter(c.Snapshotter)
+		c.Snapshotter, err = client.resolveSnapshotterName(ctx, c.Snapshotter)
+		if err != nil {
+			return err
+		}
+		s, err := client.getSnapshotter(ctx, c.Snapshotter)
 		if err != nil {
 			return err
 		}
@@ -161,7 +167,7 @@ func WithSnapshotCleanup(ctx context.Context, client *Client, c containers.Conta
 		if c.Snapshotter == "" {
 			return errors.Wrapf(errdefs.ErrInvalidArgument, "container.Snapshotter must be set to cleanup rootfs snapshot")
 		}
-		s, err := client.getSnapshotter(c.Snapshotter)
+		s, err := client.getSnapshotter(ctx, c.Snapshotter)
 		if err != nil {
 			return err
 		}
@@ -178,9 +184,13 @@ func WithNewSnapshotView(id string, i Image, opts ...snapshots.Opt) NewContainer
 		if err != nil {
 			return err
 		}
-		setSnapshotterIfEmpty(ctx, client, c)
+
 		parent := identity.ChainID(diffIDs).String()
-		s, err := client.getSnapshotter(c.Snapshotter)
+		c.Snapshotter, err = client.resolveSnapshotterName(ctx, c.Snapshotter)
+		if err != nil {
+			return err
+		}
+		s, err := client.getSnapshotter(ctx, c.Snapshotter)
 		if err != nil {
 			return err
 		}
@@ -190,21 +200,6 @@ func WithNewSnapshotView(id string, i Image, opts ...snapshots.Opt) NewContainer
 		c.SnapshotKey = id
 		c.Image = i.Name()
 		return nil
-	}
-}
-
-func setSnapshotterIfEmpty(ctx context.Context, client *Client, c *containers.Container) {
-	if c.Snapshotter == "" {
-		defaultSnapshotter := DefaultSnapshotter
-		namespaceService := client.NamespaceService()
-		if ns, err := namespaces.NamespaceRequired(ctx); err == nil {
-			if labels, err := namespaceService.Labels(ctx, ns); err == nil {
-				if snapshotLabel, ok := labels[defaults.DefaultSnapshotterNSLabel]; ok {
-					defaultSnapshotter = snapshotLabel
-				}
-			}
-		}
-		c.Snapshotter = defaultSnapshotter
 	}
 }
 
