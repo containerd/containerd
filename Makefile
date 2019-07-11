@@ -111,7 +111,7 @@ GO_GCFLAGS=$(shell				\
 BINARIES=$(addprefix bin/,$(COMMANDS))
 
 # Flags passed to `go test`
-TESTFLAGS ?= -v $(TESTFLAGS_RACE)
+TESTFLAGS ?= $(TESTFLAGS_RACE)
 TESTFLAGS_PARALLEL ?= 8
 
 .PHONY: clean all AUTHORS build binaries test integration generate protos checkprotos coverage ci check help install uninstall vendor release mandir install-man
