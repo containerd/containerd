@@ -18,7 +18,6 @@ package command
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -28,6 +27,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/services/server"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -162,7 +162,7 @@ func (h *etwHook) Fire(e *logrus.Entry) error {
 		etype = windows.EVENTLOG_INFORMATION_TYPE
 		eid = eventDebug
 	default:
-		return errors.New("unknown level")
+		return errdefs.ErrUnknownLevel
 	}
 
 	// If there is additional data, include it as a second string.
@@ -311,7 +311,7 @@ func registerUnregisterService(root string) (bool, error) {
 
 	if unregisterServiceFlag {
 		if registerServiceFlag {
-			return true, errors.New("--register-service and --unregister-service cannot be used together")
+			return true, errdefs.ErrRegisterAndUnregisterService
 		}
 		return true, unregisterService()
 	}

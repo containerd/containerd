@@ -51,7 +51,7 @@ var publishCommand = cli.Command{
 		ctx := namespaces.WithNamespace(gocontext.Background(), context.String("namespace"))
 		topic := context.String("topic")
 		if topic == "" {
-			return errors.New("topic required to publish event")
+			return errdefs.ErrEmptyTopic
 		}
 		payload, err := getEventPayload(os.Stdin)
 		if err != nil {
