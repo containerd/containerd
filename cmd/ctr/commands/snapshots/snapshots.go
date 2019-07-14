@@ -37,6 +37,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
+	"golang.org/x/net/context"
 )
 
 // Command is the cli command for managing snapshots
@@ -150,18 +151,7 @@ var diffCommand = cli.Command{
 				return err
 			}
 		} else {
-			var a, b []mount.Mount
-			ds := client.DiffService()
-
-			a, err = getMounts(ctx, idA, snapshotter)
-			if err != nil {
-				return err
-			}
-			b, err = getMounts(ctx, idB, snapshotter)
-			if err != nil {
-				return err
-			}
-			desc, err = ds.Compare(ctx, a, b, opts...)
+			desc, err = createDiff(ctx, idA, idB, snapshotter, client.DiffService(), opts...)
 			if err != nil {
 				return err
 			}
@@ -177,26 +167,51 @@ var diffCommand = cli.Command{
 	},
 }
 
-func getMounts(ctx gocontext.Context, id string, sn snapshots.Snapshotter) ([]mount.Mount, error) {
-	var mounts []mount.Mount
-	info, err := sn.Stat(ctx, id)
+func createDiff(ctx context.Context, aSnapshotID, bSnapshotID string, sn snapshots.Snapshotter, d diff.Comparer, opts ...diff.Opt) (ocispec.Descriptor, error) {
+	getMounts := func(id string) ([]mount.Mount, string, error) {
+		var mounts []mount.Mount
+		viewKey := ""
+		info, err := sn.Stat(ctx, id)
+		if err != nil {
+			return nil, "", err
+		}
+		if info.Kind == snapshots.KindActive {
+			mounts, err = sn.Mounts(ctx, id)
+			if err != nil {
+				return nil, "", err
+			}
+		} else {
+			key := fmt.Sprintf("%s-view-key", id)
+			mounts, err = sn.View(ctx, key, id)
+			if err != nil {
+				return nil, "", err
+			}
+			viewKey = key
+		}
+		return mounts, viewKey, nil
+	}
+
+	aMounts, aKey, err := getMounts(aSnapshotID)
 	if err != nil {
-		return nil, err
+		return ocispec.Descriptor{}, err
 	}
-	if info.Kind == snapshots.KindActive {
-		mounts, err = sn.Mounts(ctx, id)
-		if err != nil {
-			return nil, err
+	defer func() {
+		if aKey != "" {
+			sn.Remove(ctx, aKey)
 		}
-	} else {
-		key := fmt.Sprintf("%s-view-key", id)
-		mounts, err = sn.View(ctx, key, id)
-		if err != nil {
-			return nil, err
-		}
-		defer sn.Remove(ctx, key)
+	}()
+
+	bMounts, bKey, err := getMounts(bSnapshotID)
+	if err != nil {
+		return ocispec.Descriptor{}, err
 	}
-	return mounts, nil
+	defer func() {
+		if bKey != "" {
+			sn.Remove(ctx, bKey)
+		}
+	}()
+
+	return d.Compare(ctx, aMounts, bMounts, opts...)
 }
 
 var usageCommand = cli.Command{
