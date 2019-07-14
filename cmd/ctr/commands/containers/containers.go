@@ -75,7 +75,7 @@ var createCommand = cli.Command{
 			}
 		}
 		if id == "" {
-			return errdefs.ErrEmptyContainerId
+			return errdefs.ErrEmptyContainerID
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -214,7 +214,7 @@ var setLabelsCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		containerID, labels := commands.ObjectWithLabelArgs(context)
 		if containerID == "" {
-			return errdefs.ErrEmptyContainerId
+			return errdefs.ErrEmptyContainerID
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -250,7 +250,7 @@ var infoCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		id := context.Args().First()
 		if id == "" {
-			return errdefs.ErrEmptyContainerId
+			return errdefs.ErrEmptyContainerID
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
