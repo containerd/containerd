@@ -57,7 +57,7 @@ var (
 	ErrRegisterAndUnregisterService = errors.New("--register-service and --unregister-service cannot be used together")
 	ErrArgConfigFile                = errors.New("with spec config file, only container id should be provided")
 	ErrUnprovidedImageRef           = errors.New("image ref must be provided")
-	ErrEmptyContainerId             = errors.New("container id must be provided")
+	ErrEmptyContainerID             = errors.New("container id must be provided")
 	ErrDeleteNoneContainer          = errors.New("must specify at least one container to delete")
 )
 
