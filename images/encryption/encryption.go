@@ -475,3 +475,13 @@ func CheckAuthorization(ctx context.Context, cs content.Store, desc ocispec.Desc
 	}
 	return nil
 }
+
+// GetCryptoConfigFromDcParameters expects the dcparameters and returns
+// the descriptor's Annotations
+func GetCryptoConfigFromDcParameters(dcparameters map[string][][]byte) *encconfig.CryptoConfig {
+	return &encconfig.CryptoConfig{
+		DecryptConfig: &encconfig.DecryptConfig{
+			Parameters: dcparameters,
+		},
+	}
+}
