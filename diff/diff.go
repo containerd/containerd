@@ -18,6 +18,7 @@ package diff
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/containerd/containerd/mount"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -53,6 +54,8 @@ type Comparer interface {
 
 // ApplyConfig is used to hold parameters needed for a apply operation
 type ApplyConfig struct {
+	// DcParameters holds the Decryption Config parameters map
+	DcParameters map[string][][]byte
 }
 
 // ApplyOpt is used to configure an Apply operation
@@ -92,5 +95,23 @@ func WithLabels(labels map[string]string) Opt {
 	return func(c *Config) error {
 		c.Labels = labels
 		return nil
+	}
+}
+
+// WithDcParameters is use to set the decryption parameters needed for
+// decrypting an encrypted image.
+func WithDcParameters(dcparameters map[string][][]byte) ApplyOpt {
+	return func(c *ApplyConfig) error {
+		c.DcParameters = dcparameters
+		return nil
+	}
+}
+
+// WithDcParametersJSON is used to set the JSON representation of the
+// dcparameters and convert them back to a map. This call is used on
+// the receiving (server) side of the gRPC call.
+func WithDcParametersJSON(dcparametersjson []byte) ApplyOpt {
+	return func(c *ApplyConfig) error {
+		return json.Unmarshal(dcparametersjson, &c.DcParameters)
 	}
 }
