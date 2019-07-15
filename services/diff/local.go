@@ -100,6 +100,9 @@ func (l *local) Apply(ctx context.Context, er *diffapi.ApplyRequest, _ ...grpc.C
 	)
 
 	var opts []diff.ApplyOpt
+	if len(er.Dcparametersjson) > 0 {
+		opts = append(opts, diff.WithDcParametersJSON(er.Dcparametersjson))
+	}
 
 	for _, differ := range l.differs {
 		ocidesc, err = differ.Apply(ctx, desc, mounts, opts...)
