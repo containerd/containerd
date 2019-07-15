@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/containerd/containerd/mount"
+	encconfig "github.com/containerd/containerd/pkg/encryption/config"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -53,6 +54,8 @@ type Comparer interface {
 
 // ApplyConfig is used to hold parameters needed for a apply operation
 type ApplyConfig struct {
+	// DecryptConfig holds the Decryption parameters
+	DecryptConfig encconfig.DecryptConfig
 }
 
 // ApplyOpt is used to configure an Apply operation
@@ -91,6 +94,15 @@ func WithReference(ref string) Opt {
 func WithLabels(labels map[string]string) Opt {
 	return func(c *Config) error {
 		c.Labels = labels
+		return nil
+	}
+}
+
+// WithDecryptConfig is used to set the decryption parameters needed for
+// decrypting an encrypted image.
+func WithDecryptConfig(dc encconfig.DecryptConfig) ApplyOpt {
+	return func(c *ApplyConfig) error {
+		c.DecryptConfig = dc
 		return nil
 	}
 }
