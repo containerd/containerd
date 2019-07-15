@@ -24,6 +24,9 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
+	encconfig "github.com/containerd/containerd/pkg/encryption/config"
+	"github.com/containerd/typeurl"
+	types1 "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -45,16 +48,32 @@ type diffRemote struct {
 	client diffapi.DiffClient
 }
 
+func init() {
+	typeurl.Register(&encconfig.DecryptConfig{}, "encconfig.DecryptConfig")
+}
+
 func (r *diffRemote) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (ocispec.Descriptor, error) {
-	var config diff.ApplyConfig
+	var (
+		config  diff.ApplyConfig
+		err     error
+		options []*types1.Any
+	)
+
 	for _, opt := range opts {
 		if err := opt(&config); err != nil {
 			return ocispec.Descriptor{}, err
 		}
 	}
+	any, err := typeurl.MarshalAny(&config.DecryptConfig)
+	if err != nil {
+		return ocispec.Descriptor{}, err
+	}
+	options = append(options, any)
+
 	req := &diffapi.ApplyRequest{
-		Diff:   fromDescriptor(desc),
-		Mounts: fromMounts(mounts),
+		Diff:    fromDescriptor(desc),
+		Mounts:  fromMounts(mounts),
+		Options: options,
 	}
 	resp, err := r.client.Apply(ctx, req)
 	if err != nil {
