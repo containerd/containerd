@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/platforms"
@@ -56,9 +57,12 @@ func init() {
 	flag.Parse()
 }
 
-func testContext() (context.Context, context.CancelFunc) {
+func testContext(t testing.TB) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = namespaces.WithNamespace(ctx, testNamespace)
+	if t != nil {
+		ctx = logtest.WithT(ctx, t)
+	}
 	return ctx, cancel
 }
 
@@ -73,7 +77,7 @@ func TestMain(m *testing.M) {
 
 	var (
 		buf         = bytes.NewBuffer(nil)
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(nil)
 	)
 	defer cancel()
 
@@ -203,7 +207,7 @@ func TestImagePull(t *testing.T) {
 	}
 	defer client.Close()
 
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 	_, err = client.Pull(ctx, testImage, WithPlatformMatcher(platforms.Default()))
 	if err != nil {
@@ -217,7 +221,7 @@ func TestImagePullAllPlatforms(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 
 	cs := client.ContentStore()
@@ -252,7 +256,7 @@ func TestImagePullSomePlatforms(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 
 	cs := client.ContentStore()
@@ -323,7 +327,7 @@ func TestImagePullSchema1(t *testing.T) {
 	}
 	defer client.Close()
 
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 	schema1TestImage := "gcr.io/google_containers/pause:3.0@sha256:0d093c962a6c2dd8bb8727b661e2b5f13e9df884af9945b4cc7088d9350cd3ee"
 	_, err = client.Pull(ctx, schema1TestImage, WithPlatform(platforms.DefaultString()), WithSchema1Conversion)
@@ -339,7 +343,7 @@ func TestImagePullWithConcurrencyLimit(t *testing.T) {
 	}
 	defer client.Close()
 
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 	_, err = client.Pull(ctx, testImage,
 		WithPlatformMatcher(platforms.Default()),
@@ -352,7 +356,7 @@ func TestImagePullWithConcurrencyLimit(t *testing.T) {
 func TestClientReconnect(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 
 	client, err := newClient(t, address)
@@ -410,7 +414,7 @@ func TestDefaultRuntimeWithNamespaceLabels(t *testing.T) {
 	}
 	defer client.Close()
 
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 	namespaces := client.NamespaceService()
 	testRuntime := "testRuntime"

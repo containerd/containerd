@@ -35,7 +35,7 @@ func TestImageIsUnpacked(t *testing.T) {
 	}
 
 	const imageName = "docker.io/library/busybox:latest"
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 
 	client, err := newClient(t, address)
@@ -86,7 +86,7 @@ func TestImagePullWithDistSourceLabel(t *testing.T) {
 		tag      = "latest"
 	)
 
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 
 	client, err := newClient(t, address)

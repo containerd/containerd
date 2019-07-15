@@ -53,7 +53,7 @@ func TestCheckpointRestorePTY(t *testing.T) {
 	}
 
 	var (
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -179,7 +179,7 @@ func TestCheckpointRestore(t *testing.T) {
 	}
 
 	var (
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -269,7 +269,7 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 	}
 
 	id := t.Name()
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 
 	image, err := client.GetImage(ctx, testImage)
@@ -359,7 +359,7 @@ func TestCheckpointLeaveRunning(t *testing.T) {
 	}
 
 	var (
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -425,7 +425,7 @@ func TestCRWithImagePath(t *testing.T) {
 	defer client.Close()
 
 	var (
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name() + "-checkpoint"
 	)
 	defer cancel()

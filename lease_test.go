@@ -32,7 +32,7 @@ func TestLeaseResources(t *testing.T) {
 		t.Skip()
 	}
 
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 
 	client, err := newClient(t, address)

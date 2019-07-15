@@ -31,7 +31,7 @@ func BenchmarkContainerCreate(b *testing.B) {
 	}
 	defer client.Close()
 
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(b)
 	defer cancel()
 
 	image, err := client.GetImage(ctx, testImage)
@@ -74,7 +74,7 @@ func BenchmarkContainerStart(b *testing.B) {
 	}
 	defer client.Close()
 
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(b)
 	defer cancel()
 
 	image, err := client.GetImage(ctx, testImage)

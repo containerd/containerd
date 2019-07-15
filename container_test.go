@@ -60,7 +60,7 @@ func TestContainerList(t *testing.T) {
 	}
 	defer client.Close()
 
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 
 	containers, err := client.Containers(ctx)
@@ -82,7 +82,7 @@ func TestNewContainer(t *testing.T) {
 	}
 	defer client.Close()
 
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 
 	container, err := client.NewContainer(ctx, id, WithNewSpec())
@@ -112,7 +112,7 @@ func TestContainerStart(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -175,7 +175,7 @@ func TestContainerOutput(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 		expected    = "kingkoye"
 	)
@@ -244,7 +244,7 @@ func TestContainerExec(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -329,7 +329,7 @@ func TestContainerLargeExecArgs(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -405,7 +405,7 @@ func TestContainerPids(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -482,7 +482,7 @@ func TestContainerCloseIO(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -538,7 +538,7 @@ func TestDeleteRunningContainer(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -593,7 +593,7 @@ func TestContainerKill(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -648,7 +648,7 @@ func TestContainerNoBinaryExists(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -695,7 +695,7 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -760,7 +760,7 @@ func TestWaitStoppedTask(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -823,7 +823,7 @@ func TestWaitStoppedProcess(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -911,7 +911,7 @@ func TestTaskForceDelete(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -952,7 +952,7 @@ func TestProcessForceDelete(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -1020,7 +1020,7 @@ func TestContainerHostname(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 		expected    = "myhostname"
 	)
@@ -1089,7 +1089,7 @@ func TestContainerExitedAtSet(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -1149,7 +1149,7 @@ func TestDeleteContainerExecCreated(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -1219,7 +1219,7 @@ func TestContainerMetrics(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -1276,7 +1276,7 @@ func TestDeletedContainerMetrics(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -1321,7 +1321,7 @@ func TestDeletedContainerMetrics(t *testing.T) {
 func TestContainerExtensions(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 	id := t.Name()
 
@@ -1366,7 +1366,7 @@ func TestContainerExtensions(t *testing.T) {
 func TestContainerUpdate(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 	id := t.Name()
 
@@ -1411,7 +1411,7 @@ func TestContainerUpdate(t *testing.T) {
 func TestContainerInfo(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 	id := t.Name()
 
@@ -1439,7 +1439,7 @@ func TestContainerInfo(t *testing.T) {
 func TestContainerLabels(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 	id := t.Name()
 
@@ -1484,7 +1484,7 @@ func TestContainerHook(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()

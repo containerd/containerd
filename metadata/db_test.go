@@ -36,6 +36,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/native"
@@ -330,7 +331,7 @@ func TestMetadataCollector(t *testing.T) {
 	defer cleanup()
 
 	var (
-		ctx = context.Background()
+		ctx = logtest.WithT(context.Background(), t)
 
 		objects = []object{
 			blob(bytesFor(1), true),

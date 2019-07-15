@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
+	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/types"
@@ -748,6 +749,7 @@ func checkContainersEqual(t *testing.T, a, b *containers.Container, format strin
 func testEnv(t *testing.T) (context.Context, *bolt.DB, func()) {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = namespaces.WithNamespace(ctx, "testing")
+	ctx = logtest.WithT(ctx, t)
 
 	dirname, err := ioutil.TempDir("", strings.Replace(t.Name(), "/", "_", -1)+"-")
 	if err != nil {

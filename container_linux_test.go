@@ -58,7 +58,7 @@ func TestTaskUpdate(t *testing.T) {
 	defer client.Close()
 
 	var (
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -135,7 +135,7 @@ func TestShimInCgroup(t *testing.T) {
 	}
 	defer client.Close()
 	var (
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -192,7 +192,7 @@ func TestDaemonRestart(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -268,7 +268,7 @@ func TestShimDoesNotLeakPipes(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -341,7 +341,7 @@ func TestDaemonReconnectsToShimIOPipesOnRestart(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -471,7 +471,7 @@ func TestContainerPTY(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -548,7 +548,7 @@ func TestContainerAttach(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -693,7 +693,7 @@ func TestContainerUsername(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -768,7 +768,7 @@ func testContainerUser(t *testing.T, userstr, expectedOutput string) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = strings.Replace(t.Name(), "/", "_", -1)
 	)
 	defer cancel()
@@ -843,7 +843,7 @@ func TestContainerAttachProcess(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -960,7 +960,7 @@ func TestContainerUserID(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -1029,7 +1029,7 @@ func TestContainerKillAll(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -1086,7 +1086,7 @@ func TestDaemonRestartWithRunningShim(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -1167,7 +1167,7 @@ func TestContainerRuntimeOptionsv1(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -1210,7 +1210,7 @@ func TestContainerRuntimeOptionsv2(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -1251,7 +1251,7 @@ func initContainerAndCheckChildrenDieOnKill(t *testing.T, opts ...oci.SpecOpts) 
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -1350,7 +1350,7 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = strings.Replace(t.Name(), "/", "-", -1)
 	)
 	defer cancel()
@@ -1439,7 +1439,7 @@ func TestTaskResize(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -1474,7 +1474,7 @@ func TestTaskResize(t *testing.T) {
 func TestContainerImage(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 	id := t.Name()
 
@@ -1507,7 +1507,7 @@ func TestContainerImage(t *testing.T) {
 func TestContainerNoImage(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 	id := t.Name()
 
@@ -1535,7 +1535,7 @@ func TestContainerNoImage(t *testing.T) {
 func TestUIDNoGID(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 	id := t.Name()
 
@@ -1578,7 +1578,7 @@ func TestBindLowPortNonRoot(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -1634,7 +1634,7 @@ func TestBindLowPortNonOpt(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -1695,7 +1695,7 @@ func TestContainerNoSTDIN(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()
@@ -1748,7 +1748,7 @@ func TestShimOOMScore(t *testing.T) {
 
 	var (
 		image       Image
-		ctx, cancel = testContext()
+		ctx, cancel = testContext(t)
 		id          = t.Name()
 	)
 	defer cancel()

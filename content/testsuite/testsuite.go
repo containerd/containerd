@@ -31,6 +31,7 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/pkg/testutil"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -101,6 +102,7 @@ func Name(ctx context.Context) string {
 func makeTest(t *testing.T, name string, storeFn func(ctx context.Context, root string) (context.Context, content.Store, func() error, error), fn func(ctx context.Context, t *testing.T, cs content.Store)) func(t *testing.T) {
 	return func(t *testing.T) {
 		ctx := context.WithValue(context.Background(), nameKey{}, name)
+		ctx = logtest.WithT(ctx, t)
 
 		tmpDir, err := ioutil.TempDir("", "content-suite-"+name+"-")
 		if err != nil {
