@@ -101,7 +101,7 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 		parent  = identity.ChainID(chain[:len(chain)-1])
 		chainID = identity.ChainID(chain)
 		layer   = layers[len(layers)-1]
-		diff    ocispec.Descriptor
+		desc    ocispec.Descriptor
 		key     string
 		mounts  []mount.Mount
 		err     error
@@ -144,14 +144,13 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 			}
 		}
 	}()
-
-	diff, err = a.Apply(ctx, layer.Blob, mounts)
+	desc, err = a.Apply(ctx, layer.Blob, mounts, diff.WithDcParameters(layer.DcParameters))
 	if err != nil {
 		err = errors.Wrapf(err, "failed to extract layer %s", layer.Diff.Digest)
 		return err
 	}
-	if diff.Digest != layer.Diff.Digest {
-		err = errors.Errorf("wrong diff id calculated on extraction %q", diff.Digest)
+	if desc.Digest != layer.Diff.Digest {
+		err = errors.Errorf("wrong diff id calculated on extraction %q", desc.Digest)
 		return err
 	}
 
