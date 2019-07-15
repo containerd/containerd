@@ -24,8 +24,10 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
+	encconfig "github.com/containerd/containerd/pkg/encryption/config"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
+	"github.com/containerd/typeurl"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -100,6 +102,21 @@ func (l *local) Apply(ctx context.Context, er *diffapi.ApplyRequest, _ ...grpc.C
 	)
 
 	var opts []diff.ApplyOpt
+	for _, option := range er.Options {
+		any, err := typeurl.UnmarshalAny(option)
+		if err != nil {
+			return nil, errdefs.ToGRPC(err)
+		}
+		url, err := typeurl.TypeURL(any)
+		if err != nil {
+			return nil, errdefs.ToGRPC(err)
+		}
+		switch url {
+		case "encconfig.DecryptConfig":
+			dc, _ := any.(*encconfig.DecryptConfig)
+			opts = append(opts, diff.WithDecryptConfig(*dc))
+		}
+	}
 
 	for _, differ := range l.differs {
 		ocidesc, err = differ.Apply(ctx, desc, mounts, opts...)
