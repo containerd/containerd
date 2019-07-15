@@ -50,6 +50,7 @@ import (
 	leasesproxy "github.com/containerd/containerd/leases/proxy"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/dialer"
+	encconfig "github.com/containerd/containerd/pkg/encryption/config"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/remotes"
@@ -329,6 +330,9 @@ type RemoteContext struct {
 	// AppendDistributionSourceLabel allows fetcher to add distribute source
 	// label for each blob content, which doesn't work for legacy schema1.
 	AppendDistributionSourceLabel bool
+
+	// DecryptConfig hold the image decryption keys
+	DecryptConfig encconfig.DecryptConfig
 }
 
 func defaultRemoteContext() *RemoteContext {

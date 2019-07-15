@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/images"
+	encconfig "github.com/containerd/containerd/pkg/encryption/config"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
 	"google.golang.org/grpc"
@@ -119,6 +120,15 @@ func WithPlatformMatcher(m platforms.MatchComparer) RemoteOpt {
 func WithPullUnpack(_ *Client, c *RemoteContext) error {
 	c.Unpack = true
 	return nil
+}
+
+// WithDecryptImageUnpack sets the decryption keys for the client
+func WithDecryptImageUnpack(dc encconfig.DecryptConfig) RemoteOpt {
+	return func(_ *Client, c *RemoteContext) error {
+		c.DecryptConfig = dc
+		c.Unpack = true
+		return nil
+	}
 }
 
 // WithPullSnapshotter specifies snapshotter name used for unpacking
