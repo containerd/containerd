@@ -40,7 +40,7 @@ type Image interface {
 	// Labels of the image
 	Labels() map[string]string
 	// Unpack unpacks the image's content into a snapshot
-	Unpack(context.Context, string) error
+	Unpack(context.Context, string, ...ImageUnpackOpt) error
 	// RootFS returns the unpacked diffids that make up images rootfs.
 	RootFS(ctx context.Context) ([]digest.Digest, error)
 	// Size returns the total size of the image's packed resources.
@@ -130,7 +130,14 @@ func (i *image) IsUnpacked(ctx context.Context, snapshotterName string) (bool, e
 	return false, nil
 }
 
-func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
+func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...ImageUnpackOpt) error {
+	var iopts imageUnpackOpts
+	for _, o := range opts {
+		if err := o(&iopts); err != nil {
+			return err
+		}
+	}
+
 	ctx, done, err := i.client.WithLease(ctx)
 	if err != nil {
 		return err
@@ -158,6 +165,8 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
 		return err
 	}
 	for _, layer := range layers {
+		layer.DecryptConfig = iopts.decryptconfig
+
 		unpacked, err = rootfs.ApplyLayer(ctx, layer, chain, sn, a)
 		if err != nil {
 			return err

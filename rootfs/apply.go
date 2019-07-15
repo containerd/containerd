@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
+	encconfig "github.com/containerd/containerd/pkg/encryption/config"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
@@ -38,9 +39,11 @@ import (
 // include the descriptor for the uncompressed tar diff as well as a blob
 // used to transport that tar. The blob descriptor may or may not describe
 // a compressed object.
+// The CryptoConfig holds the parameters necessary to decrypt an image
 type Layer struct {
-	Diff ocispec.Descriptor
-	Blob ocispec.Descriptor
+	Diff          ocispec.Descriptor
+	Blob          ocispec.Descriptor
+	DecryptConfig encconfig.DecryptConfig
 }
 
 // ApplyLayers applies all the layers using the given snapshotter and applier.
