@@ -19,7 +19,7 @@
 package main
 
 import (
-	"github.com/containerd/containerd/runtime/v2/runc/v2"
+	v2 "github.com/containerd/containerd/runtime/v2/runc/v2"
 	"github.com/containerd/containerd/runtime/v2/shim"
 )
 

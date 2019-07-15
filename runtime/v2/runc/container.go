@@ -261,7 +261,7 @@ func (c *Container) Process(id string) (process.Process, error) {
 // ReserveProcess checks for the existence of an id and atomically
 // reserves the process id if it does not already exist
 //
-// Returns true if the process id was sucessfully reserved and a
+// Returns true if the process id was successfully reserved and a
 // cancel func to release the reservation
 func (c *Container) ReserveProcess(id string) (bool, func()) {
 	c.mu.Lock()
