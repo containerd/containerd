@@ -122,6 +122,30 @@ func encryptLayer(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc 
 	return newDesc, encLayerReader, nil
 }
 
+// DecryptLayer decrypts the layer using the DecryptConfig and creates a new OCI Descriptor.
+// The caller is expected to store the returned plain data and OCI Descriptor
+func DecryptLayer(dc *encconfig.DecryptConfig, dataReader io.Reader, desc ocispec.Descriptor, unwrapOnly bool) (ocispec.Descriptor, io.Reader, digest.Digest, error) {
+	resultReader, layerDigest, err := encryption.DecryptLayer(dc, dataReader, desc, unwrapOnly)
+	if err != nil || unwrapOnly {
+		return ocispec.Descriptor{}, nil, "", err
+	}
+
+	newDesc := ocispec.Descriptor{
+		Size:     0,
+		Platform: desc.Platform,
+	}
+
+	switch desc.MediaType {
+	case images.MediaTypeDockerSchema2LayerGzipEnc:
+		newDesc.MediaType = images.MediaTypeDockerSchema2LayerGzip
+	case images.MediaTypeDockerSchema2LayerEnc:
+		newDesc.MediaType = images.MediaTypeDockerSchema2Layer
+	default:
+		return ocispec.Descriptor{}, nil, "", errors.Errorf("Decryption: unsupporter layer MediaType: %s\n", desc.MediaType)
+	}
+	return newDesc, resultReader, layerDigest, nil
+}
+
 // decryptLayer decrypts the layer using the CryptoConfig and creates a new OCI Descriptor.
 // The caller is expected to store the returned plain data and OCI Descriptor
 func decryptLayer(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc ocispec.Descriptor, unwrapOnly bool) (ocispec.Descriptor, io.Reader, error) {

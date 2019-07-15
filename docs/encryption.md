@@ -80,6 +80,10 @@ func EncryptImage(ctx context.Context, cs content.Store, desc ocispec.Descriptor
 // DecryptImage decrypts an image; it accepts either an OCI descriptor representing a manifest list or a single manifest
 func DecryptImage(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf *LayerFilter) (ocispec.Descriptor, bool, error)
 
+// DecryptLayer decrypts the layer using the DecryptConfig and creates a new OCI Descriptor.
+// The caller is expected to store the returned plain data and OCI Descriptor
+func DecryptLayer(dc *encconfig.DecryptConfig, dataReader io.Reader, desc ocispec.Descriptor, unwrapOnly bool) (ocispec.Descriptor, io.Reader, digest.Digest, error) {
+
 // CheckAuthorization checks whether a user has the right keys to be allowed to access an image (every layer)
 // It takes decrypting of the layers only as far as decrypting the asymmetrically encrypted data
 // The decryption is only done for the current platform
