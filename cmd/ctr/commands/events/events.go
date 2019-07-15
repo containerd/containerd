@@ -42,8 +42,7 @@ var Command = cli.Command{
 		defer cancel()
 		eventsClient := client.EventService()
 		eventsCh, errCh := eventsClient.Subscribe(ctx, context.Args()...)
-		open := true
-		for open {
+		for {
 			var e *events.Envelope
 			select {
 			case e = <-eventsCh:
@@ -72,6 +71,5 @@ var Command = cli.Command{
 				}
 			}
 		}
-		return nil
 	},
 }
