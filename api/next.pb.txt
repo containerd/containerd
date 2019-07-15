@@ -1809,6 +1809,7 @@ file {
 file {
   name: "github.com/containerd/containerd/api/services/diff/v1/diff.proto"
   package: "containerd.services.diff.v1"
+  dependency: "google/protobuf/any.proto"
   dependency: "gogoproto/gogo.proto"
   dependency: "github.com/containerd/containerd/api/types/mount.proto"
   dependency: "github.com/containerd/containerd/api/types/descriptor.proto"
@@ -1829,6 +1830,14 @@ file {
       type: TYPE_MESSAGE
       type_name: ".containerd.types.Mount"
       json_name: "mounts"
+    }
+    field {
+      name: "options"
+      number: 3
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "options"
     }
   }
   message_type {
@@ -1930,7 +1939,7 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/diff/v1;diff"
   }
-  weak_dependency: 0
+  weak_dependency: 1
   syntax: "proto3"
 }
 file {
