@@ -50,7 +50,7 @@ e.g.
 If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadbeef", the command will create
 "foo/bar:latest" and "foo/bar@sha256:deadbeef" images in the containerd store.
 `,
-	Flags: append([]cli.Flag{
+	Flags: append(append([]cli.Flag{
 		cli.StringFlag{
 			Name:  "base-name",
 			Value: "",
@@ -76,7 +76,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			Name:  "compress-blobs",
 			Usage: "compress uncompressed blobs when creating manifest (Docker format only)",
 		},
-	}, commands.SnapshotterFlags...),
+	}, commands.SnapshotterFlags...), commands.ImageDecryptionFlags...),
 
 	Action: func(context *cli.Context) error {
 		var (
@@ -131,6 +131,11 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			return closeErr
 		}
 
+		cc, err := CreateDecryptCryptoConfig(context, nil)
+		if err != nil {
+			return err
+		}
+
 		if !context.Bool("no-unpack") {
 			log.G(ctx).Debugf("unpacking %d images", len(imgs))
 
@@ -140,7 +145,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 
 				// TODO: Show unpack status
 				fmt.Printf("unpacking %s (%s)...", img.Name, img.Target.Digest)
-				err = image.Unpack(ctx, context.String("snapshotter"))
+				err = image.Unpack(ctx, context.String("snapshotter"), containerd.WithDecryptConfig(*cc.DecryptConfig))
 				if err != nil {
 					return err
 				}
