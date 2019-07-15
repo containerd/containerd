@@ -108,7 +108,7 @@ all: binaries
 
 check: proto-fmt ## run all linters
 	@echo "$(WHALE) $@"
-	gometalinter --config .gometalinter.json ./...
+	golangci-lint run
 
 ci: check binaries checkprotos coverage coverage-integration ## to be used by the CI
 

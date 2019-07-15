@@ -21,6 +21,5 @@
 set -eu -o pipefail
 
 go get -u github.com/stevvooe/protobuild
-go get -u github.com/alecthomas/gometalinter
-gometalinter --install >/dev/null
+go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
 go get -u github.com/cpuguy83/go-md2man
