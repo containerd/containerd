@@ -186,6 +186,7 @@ func NewWithConn(conn *grpc.ClientConn, opts ...ClientOpt) (*Client, error) {
 // Client is the client to interact with containerd and its various services
 // using a uniform interface
 type Client struct {
+	decryptionKeys []string
 	services
 	connMu    sync.Mutex
 	conn      *grpc.ClientConn
