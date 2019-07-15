@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/images/archive"
+	"github.com/containerd/containerd/images/encryption"
 	"github.com/containerd/containerd/log"
 	"github.com/urfave/cli"
 )
@@ -50,7 +51,7 @@ e.g.
 If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadbeef", the command will create
 "foo/bar:latest" and "foo/bar@sha256:deadbeef" images in the containerd store.
 `,
-	Flags: append([]cli.Flag{
+	Flags: append(append([]cli.Flag{
 		cli.StringFlag{
 			Name:  "base-name",
 			Value: "",
@@ -76,7 +77,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			Name:  "compress-blobs",
 			Usage: "compress uncompressed blobs when creating manifest (Docker format only)",
 		},
-	}, commands.SnapshotterFlags...),
+	}, commands.SnapshotterFlags...), commands.ImageDecryptionFlags...),
 
 	Action: func(context *cli.Context) error {
 		var (
@@ -132,6 +133,15 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 		}
 
 		if !context.Bool("no-unpack") {
+			cc, err := CreateDecryptCryptoConfig(context, nil)
+			if err != nil {
+				return err
+			}
+
+			ltdd := encryption.LayerToolDecryptData{
+				DecryptConfig: *cc.DecryptConfig,
+			}
+			opts := containerd.WithUnpackConfigApplyOpts(encryption.WithDecryptedUnpack(&ltdd))
 			log.G(ctx).Debugf("unpacking %d images", len(imgs))
 
 			for _, img := range imgs {
@@ -140,7 +150,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 
 				// TODO: Show unpack status
 				fmt.Printf("unpacking %s (%s)...", img.Name, img.Target.Digest)
-				err = image.Unpack(ctx, context.String("snapshotter"))
+				err = image.Unpack(ctx, context.String("snapshotter"), opts)
 				if err != nil {
 					return err
 				}
