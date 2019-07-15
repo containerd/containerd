@@ -50,7 +50,7 @@ e.g.
 If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadbeef", the command will create
 "foo/bar:latest" and "foo/bar@sha256:deadbeef" images in the containerd store.
 `,
-	Flags: append([]cli.Flag{
+	Flags: append(append([]cli.Flag{
 		cli.StringFlag{
 			Name:  "base-name",
 			Value: "",
@@ -72,7 +72,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			Name:  "no-unpack",
 			Usage: "skip unpacking the images, false by default",
 		},
-	}, commands.SnapshotterFlags...),
+	}, commands.SnapshotterFlags...), commands.ImageDecryptionFlags...),
 
 	Action: func(context *cli.Context) error {
 		var (
@@ -123,12 +123,18 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			return closeErr
 		}
 
+		dcparameters, err := CreateDcParameters(context, nil)
+		if err != nil {
+			return err
+		}
+
 		if !context.Bool("no-unpack") {
 			log.G(ctx).Debugf("unpacking %d images", len(imgs))
 
 			for _, img := range imgs {
 				// TODO: Allow configuration of the platform
 				image := containerd.NewImage(client, img)
+				image.SetDecryptionParameters(dcparameters)
 
 				// TODO: Show unpack status
 				fmt.Printf("unpacking %s (%s)...", img.Name, img.Target.Digest)
