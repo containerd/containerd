@@ -18,6 +18,7 @@ package containerd
 
 import (
 	"context"
+	"encoding/json"
 
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	"github.com/containerd/containerd/api/types"
@@ -46,15 +47,29 @@ type diffRemote struct {
 }
 
 func (r *diffRemote) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (ocispec.Descriptor, error) {
-	var config diff.ApplyConfig
+	var (
+		config           diff.ApplyConfig
+		dcparametersjson []byte
+		err              error
+	)
+
 	for _, opt := range opts {
 		if err := opt(&config); err != nil {
 			return ocispec.Descriptor{}, err
 		}
 	}
+
+	if len(config.DcParameters) > 0 {
+		dcparametersjson, err = json.Marshal(config.DcParameters)
+		if err != nil {
+			return ocispec.Descriptor{}, err
+		}
+	}
+
 	req := &diffapi.ApplyRequest{
-		Diff:   fromDescriptor(desc),
-		Mounts: fromMounts(mounts),
+		Diff:             fromDescriptor(desc),
+		Mounts:           fromMounts(mounts),
+		Dcparametersjson: dcparametersjson,
 	}
 	resp, err := r.client.Apply(ctx, req)
 	if err != nil {
