@@ -23,6 +23,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/cmd/ctr/commands/content"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/images/encryption"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -43,7 +44,7 @@ command. As part of this process, we do the following:
 2. Prepare the snapshot filesystem with the pulled resources.
 3. Register metadata for the image.
 `,
-	Flags: append(append(commands.RegistryFlags, append(commands.SnapshotterFlags, commands.LabelFlag)...),
+	Flags: append(append(append(commands.RegistryFlags, append(commands.SnapshotterFlags, commands.LabelFlag)...),
 		cli.StringSliceFlag{
 			Name:  "platform",
 			Usage: "Pull content from a specific platform",
@@ -53,6 +54,7 @@ command. As part of this process, we do the following:
 			Name:  "all-platforms",
 			Usage: "pull content from all platforms",
 		},
+	), commands.ImageDecryptionFlags...,
 	),
 	Action: func(context *cli.Context) error {
 		var (
@@ -106,10 +108,19 @@ command. As part of this process, we do the following:
 			p = append(p, platforms.DefaultSpec())
 		}
 
+		cc, err := CreateDecryptCryptoConfig(context, nil)
+		if err != nil {
+			return err
+		}
+		ltdd := encryption.LayerToolDecryptData{
+			DecryptConfig: *cc.DecryptConfig,
+		}
+		opts := containerd.WithUnpackConfigApplyOpts(encryption.WithDecryptedUnpack(&ltdd))
+
 		for _, platform := range p {
 			fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
 			i := containerd.NewImageWithPlatform(client, img, platforms.Only(platform))
-			err = i.Unpack(ctx, context.String("snapshotter"))
+			err = i.Unpack(ctx, context.String("snapshotter"), opts)
 			if err != nil {
 				return err
 			}
