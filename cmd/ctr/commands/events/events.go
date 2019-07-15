@@ -47,7 +47,7 @@ var Command = cli.Command{
 			var e *events.Envelope
 			select {
 			case e = <-eventsCh:
-			case err, open = <-errCh:
+			case err = <-errCh:
 				return err
 			}
 			if e != nil {
