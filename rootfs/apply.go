@@ -39,8 +39,9 @@ import (
 // used to transport that tar. The blob descriptor may or may not describe
 // a compressed object.
 type Layer struct {
-	Diff ocispec.Descriptor
-	Blob ocispec.Descriptor
+	Diff         ocispec.Descriptor
+	Blob         ocispec.Descriptor
+	DcParameters map[string][][]byte
 }
 
 // ApplyLayers applies all the layers using the given snapshotter and applier.

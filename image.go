@@ -23,6 +23,9 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/images/encryption"
+	encryption2 "github.com/containerd/containerd/pkg/encryption"
+	encconfig "github.com/containerd/containerd/pkg/encryption/config"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/opencontainers/go-digest"
@@ -51,6 +54,8 @@ type Image interface {
 	IsUnpacked(context.Context, string) (bool, error)
 	// ContentStore provides a content store which contains image blob data
 	ContentStore() content.Store
+	// SetDecryptionParameters sets the map holding the decryption keys
+	SetDecryptionParameters(dcparameters map[string][][]byte)
 }
 
 var _ = (Image)(&image{})
@@ -76,8 +81,9 @@ func NewImageWithPlatform(client *Client, i images.Image, platform platforms.Mat
 type image struct {
 	client *Client
 
-	i        images.Image
-	platform platforms.MatchComparer
+	i            images.Image
+	platform     platforms.MatchComparer
+	dcparameters map[string][][]byte
 }
 
 func (i *image) Name() string {
@@ -158,6 +164,22 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
 		return err
 	}
 	for _, layer := range layers {
+		if len(i.dcparameters) > 0 {
+			ds := platforms.DefaultSpec()
+			desc := ocispec.Descriptor{
+				Digest:      layer.Blob.Digest,
+				Platform:    &ds,
+				Annotations: layer.Blob.Annotations,
+			}
+
+			err = encryption2.GPGSetupPrivateKeys(i.dcparameters, []ocispec.Descriptor{desc})
+			if err != nil {
+				return err
+			}
+
+			layer.DcParameters = i.dcparameters
+		}
+
 		unpacked, err = rootfs.ApplyLayer(ctx, layer, chain, sn, a)
 		if err != nil {
 			return err
@@ -174,6 +196,19 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
 			}
 			if _, err := cs.Update(ctx, cinfo, "labels.containerd.io/uncompressed"); err != nil {
 				return err
+			}
+		} else {
+			// The cached image is served, so we need to do an image authorization check.
+			// Image authorization check prevents access to the cached encrypted images
+			// without valid private keys that can decrypt those encrypted images.
+			if encryption.IsEncryptedDiff(ctx, layer.Blob.MediaType) {
+				dc := &encconfig.DecryptConfig{
+					Parameters: i.dcparameters,
+				}
+				err = encryption.CheckAuthorization(ctx, cs, i.Target(), dc)
+				if err != nil {
+					return err
+				}
 			}
 		}
 
@@ -227,4 +262,8 @@ func (i *image) getLayers(ctx context.Context, platform platforms.MatchComparer)
 
 func (i *image) ContentStore() content.Store {
 	return i.client.ContentStore()
+}
+
+func (i *image) SetDecryptionParameters(dcparameters map[string][][]byte) {
+	i.dcparameters = dcparameters
 }
