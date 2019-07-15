@@ -1830,6 +1830,13 @@ file {
       type_name: ".containerd.types.Mount"
       json_name: "mounts"
     }
+    field {
+      name: "dcparametersjson"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_BYTES
+      json_name: "dcparametersjson"
+    }
   }
   message_type {
     name: "ApplyResponse"

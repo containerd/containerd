@@ -25,6 +25,8 @@ message ApplyRequest {
 	containerd.types.Descriptor diff = 1;
 
 	repeated containerd.types.Mount mounts = 2;
+
+	bytes dcparametersjson = 3;
 }
 
 message ApplyResponse {
