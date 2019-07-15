@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/images/encryption"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
@@ -108,6 +109,13 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 		}
 	}()
 
+	var config diff.ApplyConfig
+	for _, opt := range opts {
+		if err := opt(&config); err != nil {
+			return emptyDesc, err
+		}
+	}
+
 	layer, _, err := mountsToLayerAndParents(mounts)
 	if err != nil {
 		return emptyDesc, err
@@ -124,6 +132,19 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 	}
 	defer ra.Close()
 	rdr := content.NewReader(ra)
+
+	if encryption.IsEncryptedDiff(ctx, desc.MediaType) {
+		cc := encryption.GetCryptoConfigFromDcParameters(config.DcParameters)
+
+		newDesc, plainLayerReader, err := encryption.DecryptLayer(cc, ra, desc, false)
+		if err != nil {
+			return emptyDesc, err
+		}
+
+		desc = newDesc
+		rdr = plainLayerReader
+	}
+
 	if isCompressed {
 		ds, err := compression.DecompressStream(rdr)
 		if err != nil {
