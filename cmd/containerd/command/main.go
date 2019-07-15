@@ -27,7 +27,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/services/server"
@@ -153,7 +152,7 @@ func App() *cli.App {
 			ttrpcAddress = fmt.Sprintf("%s.ttrpc", config.GRPC.Address)
 		)
 		if address == "" {
-			return errdefs.ErrEmptyGRCPAddress
+			return ErrEmptyGRCPAddress
 		}
 		log.G(ctx).WithFields(logrus.Fields{
 			"version":  version.Version,

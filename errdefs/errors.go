@@ -40,25 +40,13 @@ import (
 // For the most part, we just try to provide local grpc errors. Most conditions
 // map very well to those defined by grpc.
 var (
-	ErrUnknown                      = errors.New("unknown") // used internally to represent a missed mapping.
-	ErrInvalidArgument              = errors.New("invalid argument")
-	ErrNotFound                     = errors.New("not found")
-	ErrAlreadyExists                = errors.New("already exists")
-	ErrFailedPrecondition           = errors.New("failed precondition")
-	ErrUnavailable                  = errors.New("unavailable")
-	ErrNotImplemented               = errors.New("not implemented") // represents not supported and unimplemented
-	ErrNoGRPCAndService             = errors.New("no grpc connection and services is available")
-	ErrNoGRPC                       = errors.New("no grpc connection available")
-	ErrReconnectFailed              = errors.New("unable to reconnect to containerd, no connector available")
-	ErrUnpackNotSupported           = errors.New("unpack on fetch not supported, try pull")
-	ErrEmptyGRCPAddress             = errors.New("grpc address cannot be empty")
-	ErrEmptyTopic                   = errors.New("topic required to publish event")
-	ErrUnknownLevel                 = errors.New("unknown level")
-	ErrRegisterAndUnregisterService = errors.New("--register-service and --unregister-service cannot be used together")
-	ErrArgConfigFile                = errors.New("with spec config file, only container id should be provided")
-	ErrUnprovidedImageRef           = errors.New("image ref must be provided")
-	ErrEmptyContainerID             = errors.New("container id must be provided")
-	ErrDeleteNoneContainer          = errors.New("must specify at least one container to delete")
+	ErrUnknown            = errors.New("unknown") // used internally to represent a missed mapping.
+	ErrInvalidArgument    = errors.New("invalid argument")
+	ErrNotFound           = errors.New("not found")
+	ErrAlreadyExists      = errors.New("already exists")
+	ErrFailedPrecondition = errors.New("failed precondition")
+	ErrUnavailable        = errors.New("unavailable")
+	ErrNotImplemented     = errors.New("not implemented") // represents not supported and unimplemented
 )
 
 // IsInvalidArgument returns true if the error is due to an invalid argument
