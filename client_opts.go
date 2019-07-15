@@ -121,6 +121,15 @@ func WithPullUnpack(_ *Client, c *RemoteContext) error {
 	return nil
 }
 
+// WithDecryptImageUnpack sets the decryption keys for the client
+func WithDecryptImageUnpack(unpackOpt UnpackOpt) RemoteOpt {
+	return func(_ *Client, c *RemoteContext) error {
+		c.UnpackOpts = append(c.UnpackOpts, unpackOpt)
+		c.Unpack = true
+		return nil
+	}
+}
+
 // WithPullSnapshotter specifies snapshotter name used for unpacking
 func WithPullSnapshotter(snapshotterName string) RemoteOpt {
 	return func(_ *Client, c *RemoteContext) error {

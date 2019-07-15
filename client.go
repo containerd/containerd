@@ -330,6 +330,9 @@ type RemoteContext struct {
 	// AppendDistributionSourceLabel allows fetcher to add distribute source
 	// label for each blob content, which doesn't work for legacy schema1.
 	AppendDistributionSourceLabel bool
+
+	// UnpackOpt holds the image decryption keys
+	UnpackOpts []UnpackOpt
 }
 
 func defaultRemoteContext() *RemoteContext {
