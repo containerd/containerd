@@ -152,7 +152,7 @@ func App() *cli.App {
 			ttrpcAddress = fmt.Sprintf("%s.ttrpc", config.GRPC.Address)
 		)
 		if address == "" {
-			return errors.New("grpc address cannot be empty")
+			return ErrEmptyGRCPAddress
 		}
 		log.G(ctx).WithFields(logrus.Fields{
 			"version":  version.Version,

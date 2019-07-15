@@ -30,7 +30,6 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/typeurl"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
@@ -65,17 +64,17 @@ var createCommand = cli.Command{
 		if config {
 			id = context.Args().First()
 			if context.NArg() > 1 {
-				return errors.New("with spec config file, only container id should be provided")
+				return commands.ErrArgConfigFile
 			}
 		} else {
 			id = context.Args().Get(1)
 			ref = context.Args().First()
 			if ref == "" {
-				return errors.New("image ref must be provided")
+				return commands.ErrUnprovidedImageRef
 			}
 		}
 		if id == "" {
-			return errors.New("container id must be provided")
+			return commands.ErrEmptyContainerID
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -168,7 +167,7 @@ var deleteCommand = cli.Command{
 		}
 
 		if context.NArg() == 0 {
-			return errors.New("must specify at least one container to delete")
+			return commands.ErrDeleteNoneContainer
 		}
 		for _, arg := range context.Args() {
 			if err := deleteContainer(ctx, client, arg, deleteOpts...); err != nil {
@@ -214,7 +213,7 @@ var setLabelsCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		containerID, labels := commands.ObjectWithLabelArgs(context)
 		if containerID == "" {
-			return errors.New("container id must be provided")
+			return commands.ErrEmptyContainerID
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -250,7 +249,7 @@ var infoCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		id := context.Args().First()
 		if id == "" {
-			return errors.New("container id must be provided")
+			return commands.ErrEmptyContainerID
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
