@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/images/encryption"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	digest "github.com/opencontainers/go-digest"
@@ -66,6 +67,13 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 		}
 	}()
 
+	var config diff.ApplyConfig
+	for _, opt := range opts {
+		if err := opt(&config); err != nil {
+			return emptyDesc, err
+		}
+	}
+
 	isCompressed, err := images.IsCompressedDiff(ctx, desc.MediaType)
 	if err != nil {
 		return emptyDesc, errors.Wrapf(errdefs.ErrNotImplemented, "unsupported diff media type: %v", desc.MediaType)
@@ -80,6 +88,19 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 		defer ra.Close()
 
 		r := content.NewReader(ra)
+
+		if encryption.IsEncryptedDiff(ctx, desc.MediaType) {
+			cc := encryption.GetCryptoConfigFromDcParameters(config.DcParameters)
+
+			newDesc, plainLayerReader, err := encryption.DecryptLayer(cc, ra, desc, false)
+			if err != nil {
+				return err
+			}
+
+			desc = newDesc
+			r = plainLayerReader
+		}
+
 		if isCompressed {
 			ds, err := compression.DecompressStream(r)
 			if err != nil {
