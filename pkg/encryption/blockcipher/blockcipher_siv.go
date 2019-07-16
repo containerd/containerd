@@ -169,8 +169,8 @@ func (bc *AESSIVLayerBlockCipher) init(encrypt bool, reader io.Reader, opt Layer
 }
 
 // GenerateKey creates a synmmetric key
-func (bc *AESSIVLayerBlockCipher) GenerateKey() []byte {
-	return miscreant.GenerateKey(bc.keylen)
+func (bc *AESSIVLayerBlockCipher) GenerateKey() ([]byte, error) {
+	return miscreant.GenerateKey(bc.keylen), nil
 }
 
 // Encrypt takes in layer data and returns the ciphertext and relevant LayerBlockCipherOptions

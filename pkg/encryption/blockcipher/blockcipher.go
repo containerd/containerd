@@ -53,7 +53,7 @@ type LayerBlockCipherOptions struct {
 // for handling the layer data for a specific algorithm
 type LayerBlockCipher interface {
 	// GenerateKey creates a symmetric key
-	GenerateKey() []byte
+	GenerateKey() ([]byte, error)
 	// Encrypt takes in layer data and returns the ciphertext and relevant LayerBlockCipherOptions
 	Encrypt(layerDataReader io.Reader, opt LayerBlockCipherOptions) (io.Reader, LayerBlockCipherOptions, error)
 	// Decrypt takes in layer ciphertext data and returns the plaintext and relevant LayerBlockCipherOptions
@@ -69,8 +69,12 @@ type LayerBlockCipherHandler struct {
 func (h *LayerBlockCipherHandler) Encrypt(plainDataReader io.Reader, typ LayerCipherType) (io.Reader, LayerBlockCipherOptions, error) {
 
 	if c, ok := h.cipherMap[typ]; ok {
+		sk, err := c.GenerateKey()
+		if err != nil {
+			return nil, LayerBlockCipherOptions{}, err
+		}
 		opt := LayerBlockCipherOptions{
-			SymmetricKey: c.GenerateKey(),
+			SymmetricKey: sk,
 		}
 		encDataReader, newopt, err := c.Encrypt(plainDataReader, opt)
 		if err == nil {
