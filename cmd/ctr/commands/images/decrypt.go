@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/images"
-	encconfig "github.com/containerd/containerd/images/encryption/config"
+	imgenc "github.com/containerd/containerd/images/encryption"
+	encconfig "github.com/containerd/containerd/pkg/encryption/config"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -77,7 +77,7 @@ var decryptCommand = cli.Command{
 			return err
 		}
 
-		isEncrypted := images.HasEncryptedLayer(ctx, descs)
+		isEncrypted := imgenc.HasEncryptedLayer(ctx, descs)
 		if !isEncrypted {
 			fmt.Printf("Nothing to decrypted.\n")
 			return nil

@@ -20,8 +20,8 @@ import (
 	"crypto/x509"
 	"testing"
 
-	"github.com/containerd/containerd/images/encryption/config"
-	"github.com/containerd/containerd/images/encryption/utils"
+	"github.com/containerd/containerd/pkg/encryption/config"
+	"github.com/containerd/containerd/pkg/encryption/utils"
 )
 
 var oneEmpty []byte

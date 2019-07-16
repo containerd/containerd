@@ -17,228 +17,461 @@
 package encryption
 
 import (
-	"encoding/base64"
+	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
-	"strings"
+	"math/rand"
 
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/pkg/encryption"
+	encconfig "github.com/containerd/containerd/pkg/encryption/config"
+
+	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/images/encryption/blockcipher"
-	"github.com/containerd/containerd/images/encryption/config"
-	"github.com/containerd/containerd/images/encryption/keywrap"
-	"github.com/containerd/containerd/images/encryption/keywrap/jwe"
-	"github.com/containerd/containerd/images/encryption/keywrap/pgp"
-	"github.com/containerd/containerd/images/encryption/keywrap/pkcs7"
-	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/containerd/containerd/leases"
+	"github.com/containerd/containerd/platforms"
+	digest "github.com/opencontainers/go-digest"
+	specs "github.com/opencontainers/image-spec/specs-go"
 	"github.com/pkg/errors"
+
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-func init() {
-	keyWrappers = make(map[string]keywrap.KeyWrapper)
-	keyWrapperAnnotations = make(map[string]string)
-	RegisterKeyWrapper("pgp", pgp.NewKeyWrapper())
-	RegisterKeyWrapper("jwe", jwe.NewKeyWrapper())
-	RegisterKeyWrapper("pkcs7", pkcs7.NewKeyWrapper())
+type cryptoOp int
+
+const (
+	cryptoOpEncrypt    cryptoOp = iota
+	cryptoOpDecrypt             = iota
+	cryptoOpUnwrapOnly          = iota
+)
+
+// LayerFilter allows to select Layers by certain criteria
+type LayerFilter func(desc ocispec.Descriptor) bool
+
+// IsEncryptedDiff returns true if mediaType is a known encrypted media type.
+func IsEncryptedDiff(ctx context.Context, mediaType string) bool {
+	switch mediaType {
+	case images.MediaTypeDockerSchema2LayerGzipEnc, images.MediaTypeDockerSchema2LayerEnc:
+		return true
+	}
+	return false
 }
 
-var keyWrappers map[string]keywrap.KeyWrapper
-var keyWrapperAnnotations map[string]string
-
-// RegisterKeyWrapper allows to register key wrappers by their encryption scheme
-func RegisterKeyWrapper(scheme string, iface keywrap.KeyWrapper) {
-	keyWrappers[scheme] = iface
-	keyWrapperAnnotations[iface.GetAnnotationID()] = scheme
-}
-
-// GetKeyWrapper looks up the encryptor interface given an encryption scheme (gpg, jwe)
-func GetKeyWrapper(scheme string) keywrap.KeyWrapper {
-	return keyWrappers[scheme]
-}
-
-// GetWrappedKeysMap returns a map of wrappedKeys as values in a
-// map with the encryption scheme(s) as the key(s)
-func GetWrappedKeysMap(desc ocispec.Descriptor) map[string]string {
-	wrappedKeysMap := make(map[string]string)
-
-	for annotationsID, scheme := range keyWrapperAnnotations {
-		if annotation, ok := desc.Annotations[annotationsID]; ok {
-			wrappedKeysMap[scheme] = annotation
+// HasEncryptedLayer returns true if any LayerInfo indicates that the layer is encrypted
+func HasEncryptedLayer(ctx context.Context, layerInfos []ocispec.Descriptor) bool {
+	for i := 0; i < len(layerInfos); i++ {
+		if IsEncryptedDiff(ctx, layerInfos[i].MediaType) {
+			return true
 		}
 	}
-	return wrappedKeysMap
+	return false
 }
 
-// EncryptLayer encrypts the layer by running one encryptor after the other
-func EncryptLayer(ec *config.EncryptConfig, encOrPlainLayerReader io.Reader, desc ocispec.Descriptor) (io.Reader, map[string]string, error) {
+// encryptLayer encrypts the layer using the CryptoConfig and creates a new OCI Descriptor.
+// A call to this function may also only manipulate the wrapped keys list.
+// The caller is expected to store the returned encrypted data and OCI Descriptor
+func encryptLayer(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc ocispec.Descriptor) (ocispec.Descriptor, io.Reader, error) {
 	var (
-		encLayerReader io.Reader
-		err            error
-		optsData       []byte
+		size int64
+		d    digest.Digest
+		err  error
 	)
 
-	if ec == nil {
-		return nil, nil, errors.Wrapf(errdefs.ErrInvalidArgument, "EncryptConfig must not be nil")
+	encLayerReader, annotations, err := encryption.EncryptLayer(cc.EncryptConfig, encryption.ReaderFromReaderAt(dataReader), desc)
+	if err != nil {
+		return ocispec.Descriptor{}, nil, err
 	}
 
-	for annotationsID := range keyWrapperAnnotations {
-		annotation := desc.Annotations[annotationsID]
-		if annotation != "" {
-			optsData, err = decryptLayerKeyOptsData(&ec.DecryptConfig, desc)
-			if err != nil {
-				return nil, nil, err
-			}
-			// already encrypted!
-		}
+	// were data touched ?
+	if encLayerReader != nil {
+		size = 0
+		d = ""
+	} else {
+		size = desc.Size
+		d = desc.Digest
 	}
 
-	newAnnotations := make(map[string]string)
+	newDesc := ocispec.Descriptor{
+		Digest:      d,
+		Size:        size,
+		Platform:    desc.Platform,
+		Annotations: annotations,
+	}
 
-	for annotationsID, scheme := range keyWrapperAnnotations {
-		b64Annotations := desc.Annotations[annotationsID]
-		if b64Annotations == "" && optsData == nil {
-			encLayerReader, optsData, err = commonEncryptLayer(encOrPlainLayerReader, desc.Digest, blockcipher.AESSIVCMAC512)
-			if err != nil {
-				return nil, nil, err
-			}
-		}
-		keywrapper := GetKeyWrapper(scheme)
-		b64Annotations, err = preWrapKeys(keywrapper, ec, b64Annotations, optsData)
-		if err != nil {
-			return nil, nil, err
-		}
-		if b64Annotations != "" {
-			newAnnotations[annotationsID] = b64Annotations
-		}
+	switch desc.MediaType {
+	case images.MediaTypeDockerSchema2LayerGzip:
+		newDesc.MediaType = images.MediaTypeDockerSchema2LayerGzipEnc
+	case images.MediaTypeDockerSchema2Layer:
+		newDesc.MediaType = images.MediaTypeDockerSchema2LayerEnc
+	case images.MediaTypeDockerSchema2LayerGzipEnc:
+		newDesc.MediaType = images.MediaTypeDockerSchema2LayerGzipEnc
+	case images.MediaTypeDockerSchema2LayerEnc:
+		newDesc.MediaType = images.MediaTypeDockerSchema2LayerEnc
+
+	// TODO: Mediatypes to be added in ocispec
+	case ocispec.MediaTypeImageLayerGzip:
+		newDesc.MediaType = images.MediaTypeDockerSchema2LayerGzipEnc
+	case ocispec.MediaTypeImageLayer:
+		newDesc.MediaType = images.MediaTypeDockerSchema2LayerEnc
+
+	default:
+		return ocispec.Descriptor{}, nil, errors.Errorf("Encryption: unsupporter layer MediaType: %s\n", desc.MediaType)
 	}
-	if len(newAnnotations) == 0 {
-		err = errors.Errorf("no encryptor found to handle encryption")
-	}
-	// if nothing was encrypted, we just return encLayer = nil
-	return encLayerReader, newAnnotations, err
+
+	return newDesc, encLayerReader, nil
 }
 
-// preWrapKeys calls WrapKeys and handles the base64 encoding and concatenation of the
-// annotation data
-func preWrapKeys(keywrapper keywrap.KeyWrapper, ec *config.EncryptConfig, b64Annotations string, optsData []byte) (string, error) {
-	newAnnotation, err := keywrapper.WrapKeys(ec, optsData)
-	if err != nil || len(newAnnotation) == 0 {
-		return b64Annotations, err
-	}
-	b64newAnnotation := base64.StdEncoding.EncodeToString(newAnnotation)
-	if b64Annotations == "" {
-		return b64newAnnotation, nil
-	}
-	return b64Annotations + "," + b64newAnnotation, nil
-}
-
-// DecryptLayer decrypts a layer trying one keywrap.KeyWrapper after the other to see whether it
-// can apply the provided private key
-// If unwrapOnly is set we will only try to decrypt the layer encryption key and return
-func DecryptLayer(dc *config.DecryptConfig, encLayerReader io.Reader, desc ocispec.Descriptor, unwrapOnly bool) (io.Reader, digest.Digest, error) {
-	if dc == nil {
-		return nil, "", errors.Wrapf(errdefs.ErrInvalidArgument, "DecryptConfig must not be nil")
-	}
-	optsData, err := decryptLayerKeyOptsData(dc, desc)
+// decryptLayer decrypts the layer using the CryptoConfig and creates a new OCI Descriptor.
+// The caller is expected to store the returned plain data and OCI Descriptor
+func decryptLayer(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc ocispec.Descriptor, unwrapOnly bool) (ocispec.Descriptor, io.Reader, error) {
+	resultReader, d, err := encryption.DecryptLayer(cc.DecryptConfig, encryption.ReaderFromReaderAt(dataReader), desc, unwrapOnly)
 	if err != nil || unwrapOnly {
-		return nil, "", err
+		return ocispec.Descriptor{}, nil, err
 	}
 
-	return commonDecryptLayer(encLayerReader, optsData)
+	newDesc := ocispec.Descriptor{
+		Digest:   d,
+		Size:     0,
+		Platform: desc.Platform,
+	}
+
+	switch desc.MediaType {
+	case images.MediaTypeDockerSchema2LayerGzipEnc:
+		newDesc.MediaType = images.MediaTypeDockerSchema2LayerGzip
+	case images.MediaTypeDockerSchema2LayerEnc:
+		newDesc.MediaType = images.MediaTypeDockerSchema2Layer
+	default:
+		return ocispec.Descriptor{}, nil, errors.Errorf("Decryption: unsupporter layer MediaType: %s\n", desc.MediaType)
+	}
+	return newDesc, resultReader, nil
 }
 
-func decryptLayerKeyOptsData(dc *config.DecryptConfig, desc ocispec.Descriptor) ([]byte, error) {
-	privKeyGiven := false
-	for annotationsID, scheme := range keyWrapperAnnotations {
-		b64Annotation := desc.Annotations[annotationsID]
-		if b64Annotation != "" {
-			keywrapper := GetKeyWrapper(scheme)
+// cryptLayer handles the changes due to encryption or decryption of a layer
+func cryptLayer(ctx context.Context, cs content.Store, ls leases.Manager, l leases.Lease, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, cryptoOp cryptoOp) (ocispec.Descriptor, error) {
+	var (
+		resultReader io.Reader
+		newDesc      ocispec.Descriptor
+	)
 
-			if len(keywrapper.GetPrivateKeys(dc.Parameters)) == 0 {
-				continue
+	dataReader, err := cs.ReaderAt(ctx, desc)
+	if err != nil {
+		return ocispec.Descriptor{}, err
+	}
+	defer dataReader.Close()
+
+	if cryptoOp == cryptoOpEncrypt {
+		newDesc, resultReader, err = encryptLayer(cc, dataReader, desc)
+	} else {
+		newDesc, resultReader, err = decryptLayer(cc, dataReader, desc, cryptoOp == cryptoOpUnwrapOnly)
+	}
+	if err != nil || cryptoOp == cryptoOpUnwrapOnly {
+		return ocispec.Descriptor{}, err
+	}
+	// some operations, such as changing recipients, may not touch the layer at all
+	if resultReader != nil {
+		if ls == nil {
+			return ocispec.Descriptor{}, errors.New("Unexpected write to object without lease")
+		}
+
+		var rsrc leases.Resource
+		var ref string
+
+		// If we have the digest, write blob with checks
+		haveDigest := newDesc.Digest.String() != ""
+		if haveDigest {
+			ref = fmt.Sprintf("layer-%s", newDesc.Digest.String())
+			rsrc = leases.Resource{
+				ID:   newDesc.Digest.String(),
+				Type: "content",
 			}
-			privKeyGiven = true
+		} else {
+			ref = fmt.Sprintf("blob-%d-%d", rand.Int(), rand.Int())
+			rsrc = leases.Resource{
+				ID:   ref,
+				Type: "ingests",
+			}
 
-			optsData, err := preUnwrapKey(keywrapper, dc, b64Annotation)
+		}
+
+		// Add resource to lease and write blob
+		if err := ls.AddResource(ctx, l, rsrc); err != nil {
+			return ocispec.Descriptor{}, errors.Wrap(err, "Unable to add resource to lease")
+		}
+
+		if haveDigest {
+			if err := content.WriteBlob(ctx, cs, ref, resultReader, newDesc); err != nil {
+				return ocispec.Descriptor{}, errors.Wrap(err, "failed to write config")
+			}
+		} else {
+			newDesc.Digest, newDesc.Size, err = ingestReader(ctx, cs, ref, resultReader)
 			if err != nil {
-				// try next keywrap.KeyWrapper
-				continue
+				return ocispec.Descriptor{}, err
 			}
-			if optsData == nil {
-				// try next keywrap.KeyWrapper
-				continue
+		}
+	}
+	return newDesc, err
+}
+
+func ingestReader(ctx context.Context, cs content.Ingester, ref string, r io.Reader) (digest.Digest, int64, error) {
+	cw, err := content.OpenWriter(ctx, cs, content.WithRef(ref))
+	if err != nil {
+		return "", 0, errors.Wrap(err, "failed to open writer")
+	}
+	defer cw.Close()
+
+	if _, err := content.CopyReader(cw, r); err != nil {
+		return "", 0, errors.Wrap(err, "copy failed")
+	}
+
+	st, err := cw.Status()
+	if err != nil {
+		return "", 0, errors.Wrap(err, "failed to get state")
+	}
+
+	if err := cw.Commit(ctx, st.Offset, ""); err != nil {
+		if !errdefs.IsAlreadyExists(err) {
+			return "", 0, errors.Wrapf(err, "failed commit on ref %q", ref)
+		}
+	}
+
+	return cw.Digest(), st.Offset, nil
+}
+
+// Encrypt or decrypt all the Children of a given descriptor
+func cryptChildren(ctx context.Context, cs content.Store, ls leases.Manager, l leases.Lease, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter, cryptoOp cryptoOp, thisPlatform *ocispec.Platform) (ocispec.Descriptor, bool, error) {
+	children, err := images.Children(ctx, cs, desc)
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return desc, false, nil
+		}
+		return ocispec.Descriptor{}, false, err
+	}
+
+	var newLayers []ocispec.Descriptor
+	var config ocispec.Descriptor
+	modified := false
+
+	for _, child := range children {
+		// we only encrypt child layers and have to update their parents if encryption happened
+		switch child.MediaType {
+		case images.MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig:
+			config = child
+		case images.MediaTypeDockerSchema2LayerGzip, images.MediaTypeDockerSchema2Layer,
+			ocispec.MediaTypeImageLayerGzip, ocispec.MediaTypeImageLayer:
+			if cryptoOp == cryptoOpEncrypt && lf(child) {
+				nl, err := cryptLayer(ctx, cs, ls, l, child, cc, cryptoOp)
+				if err != nil {
+					return ocispec.Descriptor{}, false, err
+				}
+				modified = true
+				newLayers = append(newLayers, nl)
+			} else {
+				newLayers = append(newLayers, child)
 			}
-			return optsData, nil
+		case images.MediaTypeDockerSchema2LayerGzipEnc, images.MediaTypeDockerSchema2LayerEnc:
+			// this one can be decrypted but also its recipients list changed
+			if lf(child) {
+				nl, err := cryptLayer(ctx, cs, ls, l, child, cc, cryptoOp)
+				if err != nil || cryptoOp == cryptoOpUnwrapOnly {
+					return ocispec.Descriptor{}, false, err
+				}
+				modified = true
+				newLayers = append(newLayers, nl)
+			} else {
+				newLayers = append(newLayers, child)
+			}
+		case images.MediaTypeDockerSchema2LayerForeign, images.MediaTypeDockerSchema2LayerForeignGzip:
+			// never encrypt/decrypt
+			newLayers = append(newLayers, child)
+		default:
+			return ocispec.Descriptor{}, false, errors.Errorf("bad/unhandled MediaType %s in encryptChildren\n", child.MediaType)
 		}
 	}
-	if !privKeyGiven {
-		return nil, errors.New("missing private key needed for decryption")
-	}
-	return nil, errors.Errorf("no suitable key unwrapper found or none of the private keys could be used for decryption")
-}
 
-// preUnwrapKey decodes the comma separated base64 strings and calls the Unwrap function
-// of the given keywrapper with it and returns the result in case the Unwrap functions
-// does not return an error. If all attempts fail, an error is returned.
-func preUnwrapKey(keywrapper keywrap.KeyWrapper, dc *config.DecryptConfig, b64Annotations string) ([]byte, error) {
-	if b64Annotations == "" {
-		return nil, nil
-	}
-	for _, b64Annotation := range strings.Split(b64Annotations, ",") {
-		annotation, err := base64.StdEncoding.DecodeString(b64Annotation)
+	if modified && len(newLayers) > 0 {
+		newManifest := ocispec.Manifest{
+			Versioned: specs.Versioned{
+				SchemaVersion: 2,
+			},
+			Config: config,
+			Layers: newLayers,
+		}
+
+		mb, err := json.MarshalIndent(newManifest, "", "   ")
 		if err != nil {
-			return nil, errors.New("could not base64 decode the annotation")
+			return ocispec.Descriptor{}, false, errors.Wrap(err, "failed to marshal image")
 		}
-		optsData, err := keywrapper.UnwrapKey(dc, annotation)
+
+		newDesc := ocispec.Descriptor{
+			MediaType: ocispec.MediaTypeImageManifest,
+			Size:      int64(len(mb)),
+			Digest:    digest.Canonical.FromBytes(mb),
+			Platform:  desc.Platform,
+		}
+
+		labels := map[string]string{}
+		labels["containerd.io/gc.ref.content.0"] = newManifest.Config.Digest.String()
+		for i, ch := range newManifest.Layers {
+			labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i+1)] = ch.Digest.String()
+		}
+
+		ref := fmt.Sprintf("manifest-%s", newDesc.Digest.String())
+
+		if ls == nil {
+			return ocispec.Descriptor{}, false, errors.New("Unexpected write to object without lease")
+		}
+
+		rsrc := leases.Resource{
+			ID:   desc.Digest.String(),
+			Type: "content",
+		}
+
+		if err := ls.AddResource(ctx, l, rsrc); err != nil {
+			return ocispec.Descriptor{}, false, errors.Wrap(err, "Unable to add resource to lease")
+		}
+
+		if err := content.WriteBlob(ctx, cs, ref, bytes.NewReader(mb), newDesc, content.WithLabels(labels)); err != nil {
+			return ocispec.Descriptor{}, false, errors.Wrap(err, "failed to write config")
+		}
+		return newDesc, true, nil
+	}
+
+	return desc, modified, nil
+}
+
+// cryptManifest encrypts or decrypts the children of a top level manifest
+func cryptManifest(ctx context.Context, cs content.Store, ls leases.Manager, l leases.Lease, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter, cryptoOp cryptoOp) (ocispec.Descriptor, bool, error) {
+	p, err := content.ReadBlob(ctx, cs, desc)
+	if err != nil {
+		return ocispec.Descriptor{}, false, err
+	}
+	var manifest ocispec.Manifest
+	if err := json.Unmarshal(p, &manifest); err != nil {
+		return ocispec.Descriptor{}, false, err
+	}
+	platform := platforms.DefaultSpec()
+	newDesc, modified, err := cryptChildren(ctx, cs, ls, l, desc, cc, lf, cryptoOp, &platform)
+	if err != nil || cryptoOp == cryptoOpUnwrapOnly {
+		return ocispec.Descriptor{}, false, err
+	}
+	return newDesc, modified, nil
+}
+
+// cryptManifestList encrypts or decrypts the children of a top level manifest list
+func cryptManifestList(ctx context.Context, cs content.Store, ls leases.Manager, l leases.Lease, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter, cryptoOp cryptoOp) (ocispec.Descriptor, bool, error) {
+	// read the index; if any layer is encrypted and any manifests change we will need to rewrite it
+	b, err := content.ReadBlob(ctx, cs, desc)
+	if err != nil {
+		return ocispec.Descriptor{}, false, err
+	}
+
+	var index ocispec.Index
+	if err := json.Unmarshal(b, &index); err != nil {
+		return ocispec.Descriptor{}, false, err
+	}
+
+	var newManifests []ocispec.Descriptor
+	modified := false
+	for _, manifest := range index.Manifests {
+		newManifest, m, err := cryptChildren(ctx, cs, ls, l, manifest, cc, lf, cryptoOp, manifest.Platform)
+		if err != nil || cryptoOp == cryptoOpUnwrapOnly {
+			return ocispec.Descriptor{}, false, err
+		}
+		if m {
+			modified = true
+		}
+		newManifests = append(newManifests, newManifest)
+	}
+
+	if modified {
+		// we need to update the index
+		newIndex := ocispec.Index{
+			Versioned: index.Versioned,
+			Manifests: newManifests,
+		}
+
+		mb, err := json.MarshalIndent(newIndex, "", "   ")
 		if err != nil {
-			continue
+			return ocispec.Descriptor{}, false, errors.Wrap(err, "failed to marshal index")
 		}
-		return optsData, nil
+
+		newDesc := ocispec.Descriptor{
+			MediaType: ocispec.MediaTypeImageIndex,
+			Size:      int64(len(mb)),
+			Digest:    digest.Canonical.FromBytes(mb),
+		}
+
+		labels := map[string]string{}
+		for i, m := range newIndex.Manifests {
+			labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i)] = m.Digest.String()
+		}
+
+		ref := fmt.Sprintf("index-%s", newDesc.Digest.String())
+
+		if ls == nil {
+			return ocispec.Descriptor{}, false, errors.New("Unexpected write to object without lease")
+		}
+
+		rsrc := leases.Resource{
+			ID:   desc.Digest.String(),
+			Type: "content",
+		}
+
+		if err := ls.AddResource(ctx, l, rsrc); err != nil {
+			return ocispec.Descriptor{}, false, errors.Wrap(err, "Unable to add resource to lease")
+		}
+
+		if err = content.WriteBlob(ctx, cs, ref, bytes.NewReader(mb), newDesc, content.WithLabels(labels)); err != nil {
+			return ocispec.Descriptor{}, false, errors.Wrap(err, "failed to write index")
+		}
+		return newDesc, true, nil
 	}
-	return nil, errors.New("no suitable key found for decrypting layer key")
+
+	return desc, false, nil
 }
 
-// commonEncryptLayer is a function to encrypt the plain layer using a new random
-// symmetric key and return the LayerBlockCipherHandler's JSON in string form for
-// later use during decryption
-func commonEncryptLayer(plainLayerReader io.Reader, d digest.Digest, typ blockcipher.LayerCipherType) (io.Reader, []byte, error) {
-	lbch, err := blockcipher.NewLayerBlockCipherHandler()
-	if err != nil {
-		return nil, nil, err
+// cryptImage is the dispatcher to encrypt/decrypt an image; it accepts either an OCI descriptor
+// representing a manifest list or a single manifest
+func cryptImage(ctx context.Context, cs content.Store, ls leases.Manager, l leases.Lease, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter, cryptoOp cryptoOp) (ocispec.Descriptor, bool, error) {
+	if cc == nil {
+		return ocispec.Descriptor{}, false, errors.Wrapf(errdefs.ErrInvalidArgument, "CryptoConfig must not be nil")
 	}
-
-	encLayerReader, opts, err := lbch.Encrypt(plainLayerReader, typ)
-	if err != nil {
-		return nil, nil, err
+	switch desc.MediaType {
+	case ocispec.MediaTypeImageIndex, images.MediaTypeDockerSchema2ManifestList:
+		return cryptManifestList(ctx, cs, ls, l, desc, cc, lf, cryptoOp)
+	case ocispec.MediaTypeImageManifest, images.MediaTypeDockerSchema2Manifest:
+		return cryptManifest(ctx, cs, ls, l, desc, cc, lf, cryptoOp)
+	default:
+		return ocispec.Descriptor{}, false, errors.Errorf("CryptImage: Unhandled media type: %s", desc.MediaType)
 	}
-	opts.Digest = d
-
-	optsData, err := json.Marshal(opts)
-	if err != nil {
-		return nil, nil, errors.Wrapf(err, "could not JSON marshal opts")
-	}
-
-	return encLayerReader, optsData, err
 }
 
-// commonDecryptLayer decrypts an encrypted layer previously encrypted with commonEncryptLayer
-// by passing along the optsData
-func commonDecryptLayer(encLayerReader io.Reader, optsData []byte) (io.Reader, digest.Digest, error) {
-	opts := blockcipher.LayerBlockCipherOptions{}
-	err := json.Unmarshal(optsData, &opts)
-	if err != nil {
-		return nil, "", errors.Wrapf(err, "could not JSON unmarshal optsData")
-	}
+// EncryptImage encrypts an image; it accepts either an OCI descriptor representing a manifest list or a single manifest
+func EncryptImage(ctx context.Context, cs content.Store, ls leases.Manager, l leases.Lease, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter) (ocispec.Descriptor, bool, error) {
+	return cryptImage(ctx, cs, ls, l, desc, cc, lf, cryptoOpEncrypt)
+}
 
-	lbch, err := blockcipher.NewLayerBlockCipherHandler()
-	if err != nil {
-		return nil, "", err
-	}
+// DecryptImage decrypts an image; it accepts either an OCI descriptor representing a manifest list or a single manifest
+func DecryptImage(ctx context.Context, cs content.Store, ls leases.Manager, l leases.Lease, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter) (ocispec.Descriptor, bool, error) {
+	return cryptImage(ctx, cs, ls, l, desc, cc, lf, cryptoOpDecrypt)
+}
 
-	plainLayerReader, opts, err := lbch.Decrypt(encLayerReader, opts)
-	if err != nil {
-		return nil, "", err
+// CheckAuthorization checks whether a user has the right keys to be allowed to access an image (every layer)
+// It takes decrypting of the layers only as far as decrypting the asymmetrically encrypted data
+// The decryption is only done for the current platform
+func CheckAuthorization(ctx context.Context, cs content.Store, desc ocispec.Descriptor, dc *encconfig.DecryptConfig) error {
+	cc := encconfig.CryptoConfig{
+		DecryptConfig: dc,
 	}
-
-	return plainLayerReader, opts.Digest, nil
+	lf := func(desc ocispec.Descriptor) bool {
+		return true
+	}
+	// We shouldn't need to create any objects in CheckAuthorization, so no lease required.
+	_, _, err := cryptImage(ctx, cs, nil, leases.Lease{}, desc, &cc, lf, cryptoOpUnwrapOnly)
+	if err != nil {
+		return errors.Wrapf(err, "you are not authorized to use this image")
+	}
+	return nil
 }

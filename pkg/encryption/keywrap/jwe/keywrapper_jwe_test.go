@@ -20,8 +20,8 @@ import (
 	"crypto/elliptic"
 	"testing"
 
-	"github.com/containerd/containerd/images/encryption/config"
-	"github.com/containerd/containerd/images/encryption/utils"
+	"github.com/containerd/containerd/pkg/encryption/config"
+	"github.com/containerd/containerd/pkg/encryption/utils"
 	jose "gopkg.in/square/go-jose.v2"
 )
 

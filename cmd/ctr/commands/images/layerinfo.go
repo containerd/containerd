@@ -24,7 +24,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/images/encryption"
+	"github.com/containerd/containerd/pkg/encryption"
 	"github.com/containerd/containerd/platforms"
 
 	"github.com/pkg/errors"

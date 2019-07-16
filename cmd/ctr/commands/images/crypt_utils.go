@@ -28,10 +28,11 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/images/encryption"
-	encconfig "github.com/containerd/containerd/images/encryption/config"
-	encutils "github.com/containerd/containerd/images/encryption/utils"
+	imgenc "github.com/containerd/containerd/images/encryption"
 	"github.com/containerd/containerd/leases"
+	"github.com/containerd/containerd/pkg/encryption"
+	encconfig "github.com/containerd/containerd/pkg/encryption/config"
+	encutils "github.com/containerd/containerd/pkg/encryption/utils"
 	"github.com/containerd/containerd/platforms"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -209,7 +210,7 @@ func getGPGPrivateKeys(context *cli.Context, gpgSecretKeyRingFiles [][]byte, des
 	return encryption.GPGGetPrivateKey(descs, gpgClient, gpgVault, mustFindKey, dcparameters)
 }
 
-func createLayerFilter(client *containerd.Client, ctx gocontext.Context, desc ocispec.Descriptor, layers []int32, platformList []ocispec.Platform) (images.LayerFilter, error) {
+func createLayerFilter(client *containerd.Client, ctx gocontext.Context, desc ocispec.Descriptor, layers []int32, platformList []ocispec.Platform) (imgenc.LayerFilter, error) {
 	alldescs, err := images.GetImageLayerDescriptors(ctx, client.ContentStore(), desc)
 	if err != nil {
 		return nil, err
@@ -261,9 +262,9 @@ func cryptImage(client *containerd.Client, ctx gocontext.Context, name, newName 
 	defer ls.Delete(ctx, l, leases.SynchronousDelete)
 
 	if encrypt {
-		newSpec, modified, err = images.EncryptImage(ctx, client.ContentStore(), ls, l, image.Target, cc, lf)
+		newSpec, modified, err = imgenc.EncryptImage(ctx, client.ContentStore(), ls, l, image.Target, cc, lf)
 	} else {
-		newSpec, modified, err = images.DecryptImage(ctx, client.ContentStore(), ls, l, image.Target, cc, lf)
+		newSpec, modified, err = imgenc.DecryptImage(ctx, client.ContentStore(), ls, l, image.Target, cc, lf)
 	}
 	if err != nil {
 		return image, err

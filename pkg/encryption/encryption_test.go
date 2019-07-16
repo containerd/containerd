@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/containerd/containerd/images/encryption/config"
+	"github.com/containerd/containerd/pkg/encryption/config"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )

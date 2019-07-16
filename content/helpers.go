@@ -87,46 +87,6 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, desc o
 	return Copy(ctx, cw, r, desc.Size, desc.Digest, opts...)
 }
 
-// WriteBlobBlind writes data without expected digest into the content store. If
-// expected already exists, the method returns immediately and the reader will
-// not be consumed.
-//
-// This is useful when the digest and size are NOT known beforehand.
-//
-// Copy is buffered, so no need to wrap reader in buffered io.
-func WriteBlobBlind(ctx context.Context, cs Ingester, ref string, r io.Reader, opts ...Opt) (digest.Digest, int64, error) {
-	cw, err := OpenWriter(ctx, cs, WithRef(ref))
-	if err != nil {
-		return "", 0, errors.Wrap(err, "failed to open writer")
-	}
-	defer cw.Close()
-
-	ws, err := cw.Status()
-	if err != nil {
-		return "", 0, errors.Wrap(err, "failed to get status")
-	}
-
-	if ws.Offset > 0 {
-		// not needed
-		return "", 0, errors.New("ws.Offset > 0 is not supported")
-	}
-
-	size, err := copyWithBuffer(cw, r)
-	if err != nil {
-		return "", 0, errors.Wrap(err, "failed to copy")
-	}
-
-	digest := cw.Digest()
-
-	if err := cw.Commit(ctx, size, digest); err != nil {
-		if !errdefs.IsAlreadyExists(err) {
-			return "", 0, errors.Wrapf(err, "failed commit block")
-		}
-	}
-
-	return digest, size, err
-}
-
 // OpenWriter opens a new writer for the given reference, retrying if the writer
 // is locked until the reference is available or returns an error.
 func OpenWriter(ctx context.Context, cs Ingester, opts ...WriterOpt) (Writer, error) {
@@ -207,6 +167,28 @@ func CopyReaderAt(cw Writer, ra ReaderAt, n int64) error {
 
 	_, err = copyWithBuffer(cw, io.NewSectionReader(ra, ws.Offset, n))
 	return err
+}
+
+// CopyReader copies to a writer from a given reader, returning
+// the number of bytes copied.
+// Note: if the writer has a non-zero offset, the total number
+// of bytes read may be greater than those copied if the reader
+// is not an io.Seeker.
+// This copy does not commit the writer.
+func CopyReader(cw Writer, r io.Reader) (int64, error) {
+	ws, err := cw.Status()
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get status")
+	}
+
+	if ws.Offset > 0 {
+		r, err = seekReader(r, ws.Offset, 0)
+		if err != nil {
+			return 0, errors.Wrapf(err, "unable to resume write to %v", ws.Ref)
+		}
+	}
+
+	return copyWithBuffer(cw, r)
 }
 
 // seekReader attempts to seek the reader to the given offset, either by

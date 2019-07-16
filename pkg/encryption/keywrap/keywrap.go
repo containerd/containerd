@@ -17,7 +17,7 @@
 package keywrap
 
 import (
-	"github.com/containerd/containerd/images/encryption/config"
+	"github.com/containerd/containerd/pkg/encryption/config"
 )
 
 // KeyWrapper is the interface used for wrapping keys using

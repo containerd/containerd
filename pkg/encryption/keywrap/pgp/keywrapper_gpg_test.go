@@ -19,7 +19,7 @@ package pgp
 import (
 	"testing"
 
-	"github.com/containerd/containerd/images/encryption/config"
+	"github.com/containerd/containerd/pkg/encryption/config"
 )
 
 var validGpgCcs = []*config.CryptoConfig{

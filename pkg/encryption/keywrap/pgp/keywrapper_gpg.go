@@ -29,8 +29,8 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/images/encryption/config"
-	"github.com/containerd/containerd/images/encryption/keywrap"
+	"github.com/containerd/containerd/pkg/encryption/config"
+	"github.com/containerd/containerd/pkg/encryption/keywrap"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/openpgp"
 	"golang.org/x/crypto/openpgp/packet"

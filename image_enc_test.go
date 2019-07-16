@@ -25,9 +25,10 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
-	encconfig "github.com/containerd/containerd/images/encryption/config"
-	"github.com/containerd/containerd/images/encryption/utils"
+	imgenc "github.com/containerd/containerd/images/encryption"
 	"github.com/containerd/containerd/leases"
+	encconfig "github.com/containerd/containerd/pkg/encryption/config"
+	"github.com/containerd/containerd/pkg/encryption/utils"
 	"github.com/containerd/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -142,7 +143,7 @@ func TestImageEncryption(t *testing.T) {
 	defer ls.Delete(ctx, l, leases.SynchronousDelete)
 
 	// Perform encryption of image
-	encSpec, modified, err := images.EncryptImage(ctx, client.ContentStore(), ls, l, image.Target, cc, lf)
+	encSpec, modified, err := imgenc.EncryptImage(ctx, client.ContentStore(), ls, l, image.Target, cc, lf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +181,7 @@ func TestImageEncryption(t *testing.T) {
 	}
 	defer ls.Delete(ctx, l, leases.SynchronousDelete)
 
-	decSpec, modified, err := images.DecryptImage(ctx, client.ContentStore(), ls, l, encSpec, cc, lf)
+	decSpec, modified, err := imgenc.DecryptImage(ctx, client.ContentStore(), ls, l, encSpec, cc, lf)
 	if err != nil {
 		t.Fatal(err)
 	}
