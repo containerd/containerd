@@ -557,6 +557,10 @@ func (c *Client) ContentStore() content.Store {
 
 // SnapshotService returns the underlying snapshotter for the provided snapshotter name
 func (c *Client) SnapshotService(snapshotterName string) snapshots.Snapshotter {
+	snapshotterName, err := c.resolveSnapshotterName(context.Background(), snapshotterName)
+	if err != nil {
+		snapshotterName = DefaultSnapshotter
+	}
 	if c.snapshotters != nil {
 		return c.snapshotters[snapshotterName]
 	}
