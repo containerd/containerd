@@ -137,7 +137,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 		c.conn, c.connector = conn, connector
 	}
 	if copts.services == nil && c.conn == nil {
-		return nil, ErrNoGRPCAndService
+		return nil, errors.Wrap(errdefs.ErrUnavailable, "no grpc connection or services is available")
 	}
 
 	// check namespace labels for default runtime
@@ -196,7 +196,7 @@ type Client struct {
 // Reconnect re-establishes the GRPC connection to the containerd daemon
 func (c *Client) Reconnect() error {
 	if c.connector == nil {
-		return ErrReconnectFailed
+		return errors.Wrap(errdefs.ErrUnavailable, "unable to reconnect to containerd, no connector available")
 	}
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
@@ -219,7 +219,7 @@ func (c *Client) IsServing(ctx context.Context) (bool, error) {
 	c.connMu.Lock()
 	if c.conn == nil {
 		c.connMu.Unlock()
-		return false, ErrNoGRPC
+		return false, errors.Wrap(errdefs.ErrUnavailable, "no grpc connection available")
 	}
 	c.connMu.Unlock()
 	r, err := c.HealthService().Check(ctx, &grpc_health_v1.HealthCheckRequest{}, grpc.WaitForReady(true))
@@ -350,7 +350,7 @@ func (c *Client) Fetch(ctx context.Context, ref string, opts ...RemoteOpt) (imag
 	}
 
 	if fetchCtx.Unpack {
-		return images.Image{}, ErrUnpackNotSupported
+		return images.Image{}, errors.Wrap(errdefs.ErrNotImplemented, "unpack on fetch not supported, try pull")
 	}
 
 	if fetchCtx.PlatformMatcher == nil {
@@ -656,7 +656,7 @@ func (c *Client) Version(ctx context.Context) (Version, error) {
 	c.connMu.Lock()
 	if c.conn == nil {
 		c.connMu.Unlock()
-		return Version{}, ErrNoGRPC
+		return Version{}, errors.Wrap(errdefs.ErrUnavailable, "no grpc connection available")
 	}
 	c.connMu.Unlock()
 	response, err := c.VersionService().Version(ctx, &ptypes.Empty{})
