@@ -136,7 +136,7 @@ version = 1
 	client, _, cleanup := newDaemonWithConfig(t, configTOML)
 	defer cleanup()
 
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 	// FIXME(AkihiroSuda): import locally frozen image?
 	image, err := client.Pull(ctx, testImage, WithPullUnpack)

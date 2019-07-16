@@ -43,7 +43,7 @@ func TestExportAndImport(t *testing.T) {
 	if testing.Short() || runtime.GOOS == "windows" {
 		t.Skip()
 	}
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 
 	client, err := New(address)
@@ -83,7 +83,7 @@ func TestExportAndImport(t *testing.T) {
 }
 
 func TestImport(t *testing.T) {
-	ctx, cancel := testContext()
+	ctx, cancel := testContext(t)
 	defer cancel()
 
 	client, err := New(address)

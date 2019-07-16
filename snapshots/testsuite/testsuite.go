@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/testutil"
@@ -71,7 +72,7 @@ func makeTest(name string, snapshotterFn func(ctx context.Context, root string) 
 	return func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
+		ctx := logtest.WithT(context.Background(), t)
 		ctx = namespaces.WithNamespace(ctx, "testsuite")
 		// Make two directories: a snapshotter root and a play area for the tests:
 		//
