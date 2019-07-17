@@ -17,7 +17,7 @@
 ROOTDIR=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # Base path used to install.
-DESTDIR=/usr/local
+DESTDIR ?= /usr/local
 
 # Used to populate variables in version package.
 VERSION=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
