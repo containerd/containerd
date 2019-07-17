@@ -1139,3 +1139,12 @@ func WithAnnotations(annotations map[string]string) SpecOpts {
 		return nil
 	}
 }
+
+// WithLinuxDevices adds the provided linux devices to the spec
+func WithLinuxDevices(devices []specs.LinuxDevice) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setLinux(s)
+		s.Linux.Devices = append(s.Linux.Devices, devices...)
+		return nil
+	}
+}
