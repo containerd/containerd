@@ -52,6 +52,7 @@ func TestBlockCipherAesSivEncryption(t *testing.T) {
 			SymmetricKey: symKey,
 		}
 		layerData = []byte("this is some data")
+		myhmac    []byte
 	)
 
 	bc, err := NewAESSIVLayerBlockCipher(256)
@@ -60,7 +61,10 @@ func TestBlockCipherAesSivEncryption(t *testing.T) {
 	}
 
 	layerDataReader := bytes.NewReader(layerData)
-	ciphertextReader, lbco, err := bc.Encrypt(layerDataReader, opt)
+	setHmac := func(hmac []byte) {
+		myhmac = hmac
+	}
+	ciphertextReader, lbco, err := bc.Encrypt(layerDataReader, opt, setHmac)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +82,7 @@ func TestBlockCipherAesSivEncryption(t *testing.T) {
 	}
 	ciphertextTestReader := bytes.NewReader(ciphertext[:encsize])
 
-	plaintextReader, _, err := bc2.Decrypt(ciphertextTestReader, lbco)
+	plaintextReader, _, err := bc2.Decrypt(ciphertextTestReader, lbco, myhmac)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,6 +105,7 @@ func TestBlockCipherAesSivEncryptionInvalidKey(t *testing.T) {
 			SymmetricKey: symKey,
 		}
 		layerData = []byte("this is some data")
+		myhmac    []byte
 	)
 
 	bc, err := NewAESSIVLayerBlockCipher(256)
@@ -109,7 +114,11 @@ func TestBlockCipherAesSivEncryptionInvalidKey(t *testing.T) {
 	}
 
 	layerDataReader := bytes.NewReader(layerData)
-	ciphertextReader, lbco, err := bc.Encrypt(layerDataReader, opt)
+	setHmac := func(hmac []byte) {
+		myhmac = hmac
+	}
+
+	ciphertextReader, lbco, err := bc.Encrypt(layerDataReader, opt, setHmac)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +138,7 @@ func TestBlockCipherAesSivEncryptionInvalidKey(t *testing.T) {
 	}
 	ciphertextTestReader := bytes.NewReader(ciphertext[:encsize])
 
-	plaintextReader, _, err := bc2.Decrypt(ciphertextTestReader, lbco)
+	plaintextReader, _, err := bc2.Decrypt(ciphertextTestReader, lbco, myhmac)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +165,8 @@ func TestBlockCipherAesSivEncryptionInvalidKeyLength(t *testing.T) {
 	}
 
 	layerDataReader := bytes.NewReader(layerData)
-	_, _, err = bc.Encrypt(layerDataReader, opt)
+	setHmac := func(hmac []byte) {}
+	_, _, err = bc.Encrypt(layerDataReader, opt, setHmac)
 	if err == nil {
 		t.Fatal("Test should have failed due to invalid key length")
 	}

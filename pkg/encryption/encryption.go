@@ -94,10 +94,14 @@ func EncryptLayer(ec *config.EncryptConfig, encOrPlainLayerReader io.Reader, des
 
 	newAnnotations := make(map[string]string)
 
+	setHmac := func(hmac []byte) {
+		newAnnotations["org.opencontainers.image.enc.hmac"] = base64.StdEncoding.EncodeToString(hmac)
+	}
+
 	for annotationsID, scheme := range keyWrapperAnnotations {
 		b64Annotations := desc.Annotations[annotationsID]
 		if b64Annotations == "" && optsData == nil {
-			encLayerReader, optsData, err = commonEncryptLayer(encOrPlainLayerReader, desc.Digest, blockcipher.AESSIVCMAC512)
+			encLayerReader, optsData, err = commonEncryptLayer(encOrPlainLayerReader, desc.Digest, blockcipher.AESSIVCMAC512, setHmac)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -144,7 +148,7 @@ func DecryptLayer(dc *config.DecryptConfig, encLayerReader io.Reader, desc ocisp
 		return nil, "", err
 	}
 
-	return commonDecryptLayer(encLayerReader, optsData)
+	return commonDecryptLayer(encLayerReader, optsData, desc.Annotations["org.opencontainers.image.enc.hmac"])
 }
 
 func decryptLayerKeyOptsData(dc *config.DecryptConfig, desc ocispec.Descriptor) ([]byte, error) {
@@ -201,13 +205,13 @@ func preUnwrapKey(keywrapper keywrap.KeyWrapper, dc *config.DecryptConfig, b64An
 // commonEncryptLayer is a function to encrypt the plain layer using a new random
 // symmetric key and return the LayerBlockCipherHandler's JSON in string form for
 // later use during decryption
-func commonEncryptLayer(plainLayerReader io.Reader, d digest.Digest, typ blockcipher.LayerCipherType) (io.Reader, []byte, error) {
+func commonEncryptLayer(plainLayerReader io.Reader, d digest.Digest, typ blockcipher.LayerCipherType, setHmac blockcipher.SetHmac) (io.Reader, []byte, error) {
 	lbch, err := blockcipher.NewLayerBlockCipherHandler()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	encLayerReader, opts, err := lbch.Encrypt(plainLayerReader, typ)
+	encLayerReader, opts, err := lbch.Encrypt(plainLayerReader, typ, setHmac)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -223,7 +227,7 @@ func commonEncryptLayer(plainLayerReader io.Reader, d digest.Digest, typ blockci
 
 // commonDecryptLayer decrypts an encrypted layer previously encrypted with commonEncryptLayer
 // by passing along the optsData
-func commonDecryptLayer(encLayerReader io.Reader, optsData []byte) (io.Reader, digest.Digest, error) {
+func commonDecryptLayer(encLayerReader io.Reader, optsData []byte, b64hmac string) (io.Reader, digest.Digest, error) {
 	opts := blockcipher.LayerBlockCipherOptions{}
 	err := json.Unmarshal(optsData, &opts)
 	if err != nil {
@@ -235,7 +239,15 @@ func commonDecryptLayer(encLayerReader io.Reader, optsData []byte) (io.Reader, d
 		return nil, "", err
 	}
 
-	plainLayerReader, opts, err := lbch.Decrypt(encLayerReader, opts)
+	var hmac []byte
+	if len(b64hmac) > 0 {
+		hmac, err = base64.StdEncoding.DecodeString(b64hmac)
+		if err != nil {
+			return nil, "", errors.Wrapf(err, "could not bas64 decode HMAC")
+		}
+	}
+
+	plainLayerReader, opts, err := lbch.Decrypt(encLayerReader, opts, hmac)
 	if err != nil {
 		return nil, "", err
 	}

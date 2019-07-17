@@ -174,7 +174,7 @@ func (bc *AESSIVLayerBlockCipher) GenerateKey() ([]byte, error) {
 }
 
 // Encrypt takes in layer data and returns the ciphertext and relevant LayerBlockCipherOptions
-func (bc *AESSIVLayerBlockCipher) Encrypt(plainDataReader io.Reader, opt LayerBlockCipherOptions) (io.Reader, LayerBlockCipherOptions, error) {
+func (bc *AESSIVLayerBlockCipher) Encrypt(plainDataReader io.Reader, opt LayerBlockCipherOptions, setHmac SetHmac) (io.Reader, LayerBlockCipherOptions, error) {
 	lbco, err := bc.init(true, plainDataReader, opt)
 	if err != nil {
 		return nil, LayerBlockCipherOptions{}, err
@@ -184,7 +184,7 @@ func (bc *AESSIVLayerBlockCipher) Encrypt(plainDataReader io.Reader, opt LayerBl
 }
 
 // Decrypt takes in layer ciphertext data and returns the plaintext and relevant LayerBlockCipherOptions
-func (bc *AESSIVLayerBlockCipher) Decrypt(encDataReader io.Reader, opt LayerBlockCipherOptions) (io.Reader, LayerBlockCipherOptions, error) {
+func (bc *AESSIVLayerBlockCipher) Decrypt(encDataReader io.Reader, opt LayerBlockCipherOptions, hmac []byte) (io.Reader, LayerBlockCipherOptions, error) {
 	lbco, err := bc.init(false, encDataReader, opt)
 	if err != nil {
 		return nil, LayerBlockCipherOptions{}, err

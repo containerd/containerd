@@ -168,6 +168,14 @@ func cryptLayer(ctx context.Context, cs content.Store, desc ocispec.Descriptor, 
 	if err != nil || cryptoOp == cryptoOpUnwrapOnly {
 		return ocispec.Descriptor{}, err
 	}
+
+	if newDesc.Annotations == nil {
+		newDesc.Annotations = make(map[string]string)
+	}
+	if val, ok := desc.Annotations["org.opencontainers.image.enc.hmac"]; ok {
+		newDesc.Annotations["org.opencontainers.image.enc.hmac"] = val
+	}
+
 	// some operations, such as changing recipients, may not touch the layer at all
 	if resultReader != nil {
 		var ref string
