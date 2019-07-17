@@ -155,6 +155,9 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		if limit != 0 {
 			opts = append(opts, oci.WithMemoryLimit(limit))
 		}
+		for _, dev := range context.StringSlice("device") {
+			opts = append(opts, oci.WithLinuxDevice(dev, "rwm"))
+		}
 	}
 
 	cOpts = append(cOpts, containerd.WithRuntime(context.String("runtime"), nil))
