@@ -21,7 +21,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"path"
+	"net/url"
 	"strings"
 	"time"
 
@@ -59,9 +59,15 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 		return nil, errors.Wrap(err, "failed to get status")
 	}
 
+	hosts := p.filterHosts(HostCapabilityPush)
+	if len(hosts) == 0 {
+		return nil, errors.Wrap(errdefs.ErrNotFound, "no push hosts")
+	}
+
 	var (
 		isManifest bool
-		existCheck string
+		existCheck []string
+		host       = hosts[0]
 	)
 
 	switch desc.MediaType {
@@ -69,21 +75,20 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 		ocispec.MediaTypeImageManifest, ocispec.MediaTypeImageIndex:
 		isManifest = true
 		if p.tag == "" {
-			existCheck = path.Join("manifests", desc.Digest.String())
+			existCheck = []string{"manifests", desc.Digest.String()}
 		} else {
-			existCheck = path.Join("manifests", p.tag)
+			existCheck = []string{"manifests", p.tag}
 		}
 	default:
-		existCheck = path.Join("blobs", desc.Digest.String())
+		existCheck = []string{"blobs", desc.Digest.String()}
 	}
 
-	req, err := http.NewRequest(http.MethodHead, p.url(existCheck), nil)
-	if err != nil {
-		return nil, err
-	}
+	req := p.request(host, http.MethodHead, existCheck...)
+	req.header.Set("Accept", strings.Join([]string{desc.MediaType, `*`}, ", "))
 
-	req.Header.Set("Accept", strings.Join([]string{desc.MediaType, `*`}, ", "))
-	resp, err := p.doRequestWithRetries(ctx, req, nil)
+	log.G(ctx).WithField("url", req.String()).Debugf("checking and pushing to")
+
+	resp, err := req.doWithRetries(ctx, nil)
 	if err != nil {
 		if errors.Cause(err) != ErrInvalidAuthorization {
 			return nil, err
@@ -117,28 +122,22 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 	}
 
 	if isManifest {
-		var putPath string
+		var putPath []string
 		if p.tag != "" {
-			putPath = path.Join("manifests", p.tag)
+			putPath = []string{"manifests", p.tag}
 		} else {
-			putPath = path.Join("manifests", desc.Digest.String())
+			putPath = []string{"manifests", desc.Digest.String()}
 		}
 
-		req, err = http.NewRequest(http.MethodPut, p.url(putPath), nil)
-		if err != nil {
-			return nil, err
-		}
-		req.Header.Add("Content-Type", desc.MediaType)
+		req = p.request(host, http.MethodPut, putPath...)
+		req.header.Add("Content-Type", desc.MediaType)
 	} else {
 		// Start upload request
-		req, err = http.NewRequest(http.MethodPost, p.url("blobs", "uploads")+"/", nil)
-		if err != nil {
-			return nil, err
-		}
+		req = p.request(host, http.MethodPost, "blobs", "uploads/")
 
 		var resp *http.Response
 		if fromRepo := selectRepositoryMountCandidate(p.refspec, desc.Annotations); fromRepo != "" {
-			req = requestWithMountFrom(req, desc.Digest.String(), fromRepo)
+			preq := requestWithMountFrom(req, desc.Digest.String(), fromRepo)
 			pctx := contextWithAppendPullRepositoryScope(ctx, fromRepo)
 
 			// NOTE: the fromRepo might be private repo and
@@ -147,7 +146,8 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 			//
 			// for the private repo, we should remove mount-from
 			// query and send the request again.
-			resp, err = p.doRequest(pctx, req)
+			resp, err = preq.do(pctx)
+			//resp, err = p.doRequest(pctx, req)
 			if err != nil {
 				return nil, err
 			}
@@ -157,16 +157,11 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 
 				resp.Body.Close()
 				resp = nil
-
-				req, err = removeMountFromQuery(req)
-				if err != nil {
-					return nil, err
-				}
 			}
 		}
 
 		if resp == nil {
-			resp, err = p.doRequestWithRetries(ctx, req, nil)
+			resp, err = req.doWithRetries(ctx, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -186,31 +181,41 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 			return nil, errors.Errorf("unexpected response: %s", resp.Status)
 		}
 
-		location := resp.Header.Get("Location")
+		var (
+			location = resp.Header.Get("Location")
+			lurl     *url.URL
+			lhost    = host
+		)
 		// Support paths without host in location
 		if strings.HasPrefix(location, "/") {
-			// Support location string containing path and query
-			qmIndex := strings.Index(location, "?")
-			if qmIndex > 0 {
-				u := p.base
-				u.Path = location[:qmIndex]
-				u.RawQuery = location[qmIndex+1:]
-				location = u.String()
-			} else {
-				u := p.base
-				u.Path = location
-				location = u.String()
+			lurl, err = url.Parse(lhost.Scheme + "://" + lhost.Host + location)
+			if err != nil {
+				return nil, errors.Wrapf(err, "unable to parse location %v", location)
+			}
+		} else {
+			if !strings.Contains(location, "://") {
+				location = lhost.Scheme + "://" + location
+			}
+			lurl, err = url.Parse(location)
+			if err != nil {
+				return nil, errors.Wrapf(err, "unable to parse location %v", location)
+			}
+
+			if lurl.Host != lhost.Host || lhost.Scheme != lurl.Scheme {
+
+				lhost.Scheme = lurl.Scheme
+				lhost.Host = lurl.Host
+				log.G(ctx).WithField("host", lhost.Host).WithField("scheme", lhost.Scheme).Debug("upload changed destination")
+
+				// Strip authorizer if change to host or scheme
+				lhost.Authorizer = nil
 			}
 		}
-
-		req, err = http.NewRequest(http.MethodPut, location, nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
+		q := lurl.Query()
 		q.Add("digest", desc.Digest.String())
-		req.URL.RawQuery = q.Encode()
 
+		req = p.request(lhost, http.MethodPut)
+		req.path = lurl.Path + "?" + q.Encode()
 	}
 	p.tracker.SetStatus(ref, Status{
 		Status: content.Status{
@@ -226,12 +231,14 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 	pr, pw := io.Pipe()
 	respC := make(chan *http.Response, 1)
 
-	req.Body = ioutil.NopCloser(pr)
-	req.ContentLength = desc.Size
+	req.body = func() (io.ReadCloser, error) {
+		return ioutil.NopCloser(pr), nil
+	}
+	req.size = desc.Size
 
 	go func() {
 		defer close(respC)
-		resp, err = p.doRequest(ctx, req)
+		resp, err = req.do(ctx)
 		if err != nil {
 			pr.CloseWithError(err)
 			return
@@ -355,24 +362,15 @@ func (pw *pushWriter) Truncate(size int64) error {
 	return errors.New("cannot truncate remote upload")
 }
 
-func requestWithMountFrom(req *http.Request, mount, from string) *http.Request {
-	q := req.URL.Query()
+func requestWithMountFrom(req *request, mount, from string) *request {
+	creq := *req
 
-	q.Set("mount", mount)
-	q.Set("from", from)
-	req.URL.RawQuery = q.Encode()
-	return req
-}
-
-func removeMountFromQuery(req *http.Request) (*http.Request, error) {
-	req, err := copyRequest(req)
-	if err != nil {
-		return nil, err
+	sep := "?"
+	if strings.Contains(creq.path, sep) {
+		sep = "&"
 	}
 
-	q := req.URL.Query()
-	q.Del("mount")
-	q.Del("from")
-	req.URL.RawQuery = q.Encode()
-	return req, nil
+	creq.path = creq.path + sep + "mount=" + mount + "&from=" + from
+
+	return &creq
 }
