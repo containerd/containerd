@@ -28,8 +28,10 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/cmd/ctr/commands/run"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/typeurl"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
@@ -64,17 +66,17 @@ var createCommand = cli.Command{
 		if config {
 			id = context.Args().First()
 			if context.NArg() > 1 {
-				return commands.ErrArgConfigFile
+				return errors.Wrap(errdefs.ErrInvalidArgument, "with spec config file, only container id should be provided")
 			}
 		} else {
 			id = context.Args().Get(1)
 			ref = context.Args().First()
 			if ref == "" {
-				return commands.ErrUnprovidedImageRef
+				return errors.Wrap(errdefs.ErrInvalidArgument, "image ref must be provided")
 			}
 		}
 		if id == "" {
-			return commands.ErrEmptyContainerID
+			return errors.Wrap(errdefs.ErrInvalidArgument, "container id must be provided")
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -167,7 +169,7 @@ var deleteCommand = cli.Command{
 		}
 
 		if context.NArg() == 0 {
-			return commands.ErrDeleteNoneContainer
+			return errors.Wrap(errdefs.ErrInvalidArgument, "must specify at least one container to delete")
 		}
 		for _, arg := range context.Args() {
 			if err := deleteContainer(ctx, client, arg, deleteOpts...); err != nil {
@@ -213,7 +215,7 @@ var setLabelsCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		containerID, labels := commands.ObjectWithLabelArgs(context)
 		if containerID == "" {
-			return commands.ErrEmptyContainerID
+			return errors.Wrap(errdefs.ErrInvalidArgument, "container id must be provided")
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -249,7 +251,7 @@ var infoCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		id := context.Args().First()
 		if id == "" {
-			return commands.ErrEmptyContainerID
+			return errors.Wrap(errdefs.ErrInvalidArgument, "container id must be provided")
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {

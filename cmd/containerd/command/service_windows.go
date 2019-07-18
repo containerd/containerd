@@ -27,7 +27,9 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/services/server"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"golang.org/x/sys/windows"
@@ -161,7 +163,7 @@ func (h *etwHook) Fire(e *logrus.Entry) error {
 		etype = windows.EVENTLOG_INFORMATION_TYPE
 		eid = eventDebug
 	default:
-		return ErrUnknownLevel
+		return errors.Wrap(errdefs.ErrInvalidArgument, "unknown level")
 	}
 
 	// If there is additional data, include it as a second string.
@@ -310,7 +312,7 @@ func registerUnregisterService(root string) (bool, error) {
 
 	if unregisterServiceFlag {
 		if registerServiceFlag {
-			return true, ErrRegisterAndUnregisterService
+			return true, errors.Wrap(errdefs.ErrInvalidArgument, "--register-service and --unregister-service cannot be used together")
 		}
 		return true, unregisterService()
 	}
