@@ -205,16 +205,20 @@ func cryptLayer(ctx context.Context, cs content.Store, ls leases.Manager, l leas
 				return ocispec.Descriptor{}, errors.Wrap(err, "failed to write config")
 			}
 		} else {
-			newDesc.Digest, newDesc.Size, err = ingestReader(ctx, cs, ref, resultReader)
+			newDesc.Digest, newDesc.Size, err = ingestReaderLeaseContent(ctx, cs, ls, l, ref, resultReader)
 			if err != nil {
 				return ocispec.Descriptor{}, err
+			}
+			// Delete the ingest lease since the blob is protected now by the content lease
+			if err := ls.DeleteResource(ctx, l, rsrc); err != nil {
+				return ocispec.Descriptor{}, errors.Wrap(err, "Unable to delete resource from lease")
 			}
 		}
 	}
 	return newDesc, err
 }
 
-func ingestReader(ctx context.Context, cs content.Ingester, ref string, r io.Reader) (digest.Digest, int64, error) {
+func ingestReaderLeaseContent(ctx context.Context, cs content.Ingester, ls leases.Manager, l leases.Lease, ref string, r io.Reader) (digest.Digest, int64, error) {
 	cw, err := content.OpenWriter(ctx, cs, content.WithRef(ref))
 	if err != nil {
 		return "", 0, errors.Wrap(err, "failed to open writer")
@@ -230,7 +234,16 @@ func ingestReader(ctx context.Context, cs content.Ingester, ref string, r io.Rea
 		return "", 0, errors.Wrap(err, "failed to get state")
 	}
 
-	if err := cw.Commit(ctx, st.Offset, ""); err != nil {
+	rsrc := leases.Resource{
+		ID:   cw.Digest().String(),
+		Type: "content",
+	}
+
+	if err := ls.AddResource(ctx, l, rsrc); err != nil {
+		return "", 0, errors.Wrapf(err, "Unable to add resource to lease")
+	}
+
+	if err := cw.Commit(ctx, st.Offset, cw.Digest()); err != nil {
 		if !errdefs.IsAlreadyExists(err) {
 			return "", 0, errors.Wrapf(err, "failed commit on ref %q", ref)
 		}
@@ -324,7 +337,7 @@ func cryptChildren(ctx context.Context, cs content.Store, ls leases.Manager, l l
 		}
 
 		rsrc := leases.Resource{
-			ID:   desc.Digest.String(),
+			ID:   newDesc.Digest.String(),
 			Type: "content",
 		}
 
@@ -415,7 +428,7 @@ func cryptManifestList(ctx context.Context, cs content.Store, ls leases.Manager,
 		}
 
 		rsrc := leases.Resource{
-			ID:   desc.Digest.String(),
+			ID:   newDesc.Digest.String(),
 			Type: "content",
 		}
 
