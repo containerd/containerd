@@ -495,6 +495,11 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 	}
 	req.Header = r.header
 	if r.body != nil {
+		body, err := r.body()
+		if err != nil {
+			return nil, err
+		}
+		req.Body = body
 		req.GetBody = r.body
 		if r.size > 0 {
 			req.ContentLength = r.size
