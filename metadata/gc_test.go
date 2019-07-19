@@ -33,6 +33,15 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
+func TestResourceMax(t *testing.T) {
+	if ResourceContent != resourceContentFlat&gc.ResourceMax {
+		t.Fatalf("Invalid flat content type: %d (max %d)", resourceContentFlat, gc.ResourceMax)
+	}
+	if ResourceSnapshot != resourceSnapshotFlat&gc.ResourceMax {
+		t.Fatalf("Invalid flat snapshot type: %d (max %d)", resourceSnapshotFlat, gc.ResourceMax)
+	}
+}
+
 func TestGCRoots(t *testing.T) {
 	db, cleanup, err := newDatabase()
 	if err != nil {
@@ -90,6 +99,11 @@ func TestGCRoots(t *testing.T) {
 		addLeaseSnapshot("ns2", "l4", "overlay", "sn8"),
 		addLeaseIngest("ns2", "l4", "ingest-6"),
 		addLeaseIngest("ns2", "l4", "ingest-7"),
+
+		addLease("ns3", "l1", labelmap(string(labelGCFlat), time.Now().Add(time.Hour).Format(time.RFC3339))),
+		addLeaseContent("ns3", "l1", dgst(1)),
+		addLeaseSnapshot("ns3", "l1", "overlay", "sn1"),
+		addLeaseIngest("ns3", "l1", "ingest-1"),
 	}
 
 	expected := []gc.Node{
@@ -121,6 +135,10 @@ func TestGCRoots(t *testing.T) {
 		gcnode(ResourceIngest, "ns1", "ingest-3"),
 		gcnode(ResourceIngest, "ns2", "ingest-4"),
 		gcnode(ResourceIngest, "ns2", "ingest-5"),
+		gcnode(ResourceLease, "ns3", "l1"),
+		gcnode(ResourceIngest, "ns3", "ingest-1"),
+		gcnode(resourceContentFlat, "ns3", dgst(1).String()),
+		gcnode(resourceSnapshotFlat, "ns3", "overlay/sn1"),
 	}
 
 	if err := db.Update(func(tx *bolt.Tx) error {
@@ -268,6 +286,14 @@ func TestGCRefs(t *testing.T) {
 		addSnapshot("ns2", "overlay", "sn3", "", labelmap(
 			string(labelGCContentRef), dgst(1).String(),
 			string(labelGCContentRef)+".keep-me", dgst(6).String())),
+
+		// Test flat references don't follow label references
+		addContent("ns3", dgst(1), nil),
+		addContent("ns3", dgst(2), labelmap(string(labelGCContentRef)+".0", dgst(1).String())),
+
+		addSnapshot("ns3", "overlay", "sn1", "", nil),
+		addSnapshot("ns3", "overlay", "sn2", "sn1", nil),
+		addSnapshot("ns3", "overlay", "sn3", "", labelmap(string(labelGCSnapRef)+"btrfs", "sn1", string(labelGCSnapRef)+"overlay", "sn1")),
 	}
 
 	refs := map[gc.Node][]gc.Node{
@@ -315,6 +341,18 @@ func TestGCRefs(t *testing.T) {
 		gcnode(ResourceIngest, "ns1", "ingest-1"): nil,
 		gcnode(ResourceIngest, "ns2", "ingest-2"): {
 			gcnode(ResourceContent, "ns2", dgst(8).String()),
+		},
+		gcnode(resourceSnapshotFlat, "ns3", "overlay/sn2"): {
+			gcnode(resourceSnapshotFlat, "ns3", "overlay/sn1"),
+		},
+		gcnode(ResourceSnapshot, "ns3", "overlay/sn2"): {
+			gcnode(ResourceSnapshot, "ns3", "overlay/sn1"),
+		},
+		gcnode(resourceSnapshotFlat, "ns3", "overlay/sn1"): nil,
+		gcnode(resourceSnapshotFlat, "ns3", "overlay/sn3"): nil,
+		gcnode(ResourceSnapshot, "ns3", "overlay/sn3"): {
+			gcnode(ResourceSnapshot, "ns3", "btrfs/sn1"),
+			gcnode(ResourceSnapshot, "ns3", "overlay/sn1"),
 		},
 	}
 

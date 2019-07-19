@@ -36,6 +36,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/snapshots"
@@ -345,6 +346,40 @@ func TestMetadataCollector(t *testing.T) {
 			newSnapshot("5", "3", false, true),
 			container("1", "4"),
 			image("image-1", digestFor(2)),
+
+			// Test lease preservation
+			blob(bytesFor(5), false, "containerd.io/gc.ref.content.0", digestFor(6).String()),
+			blob(bytesFor(6), false),
+			blob(bytesFor(7), false),
+			newSnapshot("6", "", false, false, "containerd.io/gc.ref.content.0", digestFor(7).String()),
+			lease("lease-1", []leases.Resource{
+				{
+					ID:   digestFor(5).String(),
+					Type: "content",
+				},
+				{
+					ID:   "6",
+					Type: "snapshots/native",
+				},
+			}, false),
+
+			// Test flat lease
+			blob(bytesFor(8), false, "containerd.io/gc.ref.content.0", digestFor(9).String()),
+			blob(bytesFor(9), true),
+			blob(bytesFor(10), true),
+			newSnapshot("7", "", false, false, "containerd.io/gc.ref.content.0", digestFor(10).String()),
+			newSnapshot("8", "7", false, false),
+			newSnapshot("9", "8", false, false),
+			lease("lease-2", []leases.Resource{
+				{
+					ID:   digestFor(8).String(),
+					Type: "content",
+				},
+				{
+					ID:   "9",
+					Type: "snapshots/native",
+				},
+			}, false, "containerd.io/gc.flat", time.Now().String()),
 		}
 		remaining []gc.Node
 	)
@@ -588,6 +623,26 @@ func create(obj object, tx *bolt.Tx, is images.Store, cs content.Store, sn snaps
 		if err != nil {
 			return nil, err
 		}
+	case testLease:
+		lm := NewLeaseManager(tx)
+		l, err := lm.Create(ctx, leases.WithID(v.id), leases.WithLabels(obj.labels))
+		if err != nil {
+			return nil, err
+		}
+
+		for _, ref := range v.refs {
+			if err := lm.AddResource(ctx, l, ref); err != nil {
+				return nil, err
+			}
+		}
+
+		if !obj.removed {
+			node = &gc.Node{
+				Type:      ResourceLease,
+				Namespace: namespace,
+				Key:       v.id,
+			}
+		}
 	}
 
 	return node, nil
@@ -641,6 +696,17 @@ func container(id, s string, l ...string) object {
 	}
 }
 
+func lease(id string, refs []leases.Resource, r bool, l ...string) object {
+	return object{
+		data: testLease{
+			id:   id,
+			refs: refs,
+		},
+		removed: r,
+		labels:  labelmap(l...),
+	}
+}
+
 type testContent struct {
 	data []byte
 }
@@ -659,6 +725,11 @@ type testImage struct {
 type testContainer struct {
 	id       string
 	snapshot string
+}
+
+type testLease struct {
+	id   string
+	refs []leases.Resource
 }
 
 func newStores(t testing.TB) (*DB, content.Store, snapshots.Snapshotter, func()) {
