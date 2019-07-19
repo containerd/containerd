@@ -257,17 +257,19 @@ func test(c config) error {
 	}
 	var exec *execWorker
 	if c.Exec {
-		wg.Add(1)
-		exec = &execWorker{
-			worker: worker{
-				id:     c.Concurrency,
-				wg:     &wg,
-				image:  image,
-				client: client,
-				commit: v.Revision,
-			},
+		for i := c.Concurrency; i < c.Concurrency+c.Concurrency; i++ {
+			wg.Add(1)
+			exec = &execWorker{
+				worker: worker{
+					id:     i,
+					wg:     &wg,
+					image:  image,
+					client: client,
+					commit: v.Revision,
+				},
+			}
+			go exec.exec(ctx, tctx)
 		}
-		go exec.exec(ctx, tctx)
 	}
 
 	// start the timer and run the worker

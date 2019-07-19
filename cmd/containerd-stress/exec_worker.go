@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"syscall"
 	"time"
@@ -38,8 +39,9 @@ func (w *execWorker) exec(ctx, tctx context.Context) {
 		w.wg.Done()
 		logrus.Infof("worker %d finished", w.id)
 	}()
-	c, err := w.client.NewContainer(ctx, "exec-container",
-		containerd.WithNewSnapshot("exec-container", w.image),
+	id := fmt.Sprintf("exec-container-%d", w.id)
+	c, err := w.client.NewContainer(ctx, id,
+		containerd.WithNewSnapshot(id, w.image),
 		containerd.WithNewSpec(oci.WithImageConfig(w.image), oci.WithUsername("games"), oci.WithProcessArgs("sleep", "30d")),
 	)
 	if err != nil {

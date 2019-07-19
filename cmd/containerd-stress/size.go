@@ -27,6 +27,8 @@ var binaries = []string{
 	"ctr",
 	"containerd",
 	"containerd-shim",
+	"containerd-shim-runc-v1",
+	"containerd-shim-runc-v2",
 }
 
 // checkBinarySizes checks and reports the binary sizes for the containerd compiled binaries to prometheus
