@@ -161,10 +161,15 @@ func TestImageEncryption(t *testing.T) {
 			Parameters: dcparameters,
 		},
 	}
+	// Clean up function cancels lease before deleting the image so the images are
+	// properly deleted
+	defer func() {
+		done(ctx)
+		client.ImageService().Delete(ctx, imageName, images.SynchronousDelete())
+		client.ImageService().Delete(ctx, encImageName, images.SynchronousDelete())
+	}()
 
 	// Perform decryption of image
-	defer client.ImageService().Delete(ctx, imageName, images.SynchronousDelete())
-	defer client.ImageService().Delete(ctx, encImageName, images.SynchronousDelete())
 	lf = func(desc ocispec.Descriptor) bool {
 		return true
 	}
