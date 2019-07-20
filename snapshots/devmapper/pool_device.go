@@ -173,6 +173,8 @@ func (p *PoolDevice) activateDevice(ctx context.Context, info *DeviceInfo) error
 
 // CreateSnapshotDevice creates and activates new thin-device from parent thin-device (makes snapshot)
 func (p *PoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName string, snapshotName string, virtualSizeBytes uint64) (retErr error) {
+	var rollbackFailed = false
+
 	baseInfo, err := p.metadata.GetDevice(ctx, deviceName)
 	if err != nil {
 		return errors.Wrapf(err, "failed to query device metadata for %q", deviceName)
@@ -191,7 +193,9 @@ func (p *PoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName string
 	}
 
 	defer func() {
-		if retErr == nil {
+		// stop rollback if previous step failed, otherwise
+		// the metadata and thin pool gets inconsistent.
+		if retErr == nil || rollbackFailed {
 			return
 		}
 
@@ -210,7 +214,10 @@ func (p *PoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName string
 		}
 
 		// Rollback snapshot creation
-		retErr = multierror.Append(retErr, p.deleteDevice(ctx, snapInfo))
+		if err := p.deleteDevice(ctx, snapInfo); err != nil {
+			rollbackFailed = true
+			retErr = multierror.Append(retErr, err)
+		}
 	}()
 
 	// Activate snapshot device
