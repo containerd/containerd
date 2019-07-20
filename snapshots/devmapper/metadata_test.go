@@ -76,8 +76,9 @@ func TestPoolMetadata_AddDeviceDuplicate(t *testing.T) {
 	err := store.AddDevice(testCtx, &DeviceInfo{Name: "test"})
 	assert.NilError(t, err)
 
+	// Dumplicate device info will be moved into orphan devices bucket
 	err = store.AddDevice(testCtx, &DeviceInfo{Name: "test"})
-	assert.Equal(t, ErrAlreadyExists, err)
+	assert.Equal(t, nil, err)
 }
 
 func TestPoolMetadata_ReuseDeviceID(t *testing.T) {

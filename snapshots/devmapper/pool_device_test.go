@@ -160,9 +160,6 @@ func testCreateThinDevice(t *testing.T, pool *PoolDevice) {
 	err := pool.CreateThinDevice(ctx, thinDevice1, device1Size)
 	assert.NilError(t, err, "can't create first thin device")
 
-	err = pool.CreateThinDevice(ctx, thinDevice1, device1Size)
-	assert.Assert(t, err != nil, "device pool allows duplicated device names")
-
 	err = pool.CreateThinDevice(ctx, thinDevice2, device2Size)
 	assert.NilError(t, err, "can't create second thin device")
 

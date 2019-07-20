@@ -42,8 +42,9 @@ const (
 
 // Bucket names
 var (
-	devicesBucketName  = []byte("devices")    // Contains thin devices metadata <device_name>=<DeviceInfo>
-	deviceIDBucketName = []byte("device_ids") // Tracks used device ids <device_id_[0..maxDeviceID)>=<byte_[0/1]>
+	devicesBucketName  = []byte("devices")        // Contains thin devices metadata <device_name>=<DeviceInfo>
+	deviceIDBucketName = []byte("device_ids")     // Tracks used device ids <device_id_[0..maxDeviceID)>=<byte_[0/1]>
+	orphanBucketName   = []byte("orphan_devices") // Bad-state device moved from "devices"
 )
 
 var (
@@ -86,6 +87,10 @@ func (m *PoolMetadata) ensureDatabaseInitialized() error {
 			return err
 		}
 
+		if _, err := tx.CreateBucketIfNotExists(orphanBucketName); err != nil {
+			return err
+		}
+
 		return nil
 	})
 }
@@ -94,10 +99,15 @@ func (m *PoolMetadata) ensureDatabaseInitialized() error {
 func (m *PoolMetadata) AddDevice(ctx context.Context, info *DeviceInfo) error {
 	return m.db.Update(func(tx *bolt.Tx) error {
 		devicesBucket := tx.Bucket(devicesBucketName)
+		orphanBucket := tx.Bucket(orphanBucketName)
+		orphanDevice := &DeviceInfo{}
 
 		// Make sure device name is unique
-		if err := getObject(devicesBucket, info.Name, nil); err == nil {
-			return ErrAlreadyExists
+		if err := getObject(devicesBucket, info.Name, &orphanDevice); err == nil {
+			// Put conflict device into orphan table
+			if err := putObject(orphanBucket, info.Name, orphanDevice, true); err != nil {
+				return err
+			}
 		}
 
 		// Find next available device ID
@@ -108,7 +118,7 @@ func (m *PoolMetadata) AddDevice(ctx context.Context, info *DeviceInfo) error {
 
 		info.DeviceID = deviceID
 
-		return putObject(devicesBucket, info.Name, info, false)
+		return putObject(devicesBucket, info.Name, info, true)
 	})
 }
 
