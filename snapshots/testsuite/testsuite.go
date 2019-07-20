@@ -501,7 +501,12 @@ func checkRemoveIntermediateSnapshot(ctx context.Context, t *testing.T, snapshot
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer testutil.Unmount(t, base)
+	needUmount := true
+	defer func() {
+		if needUmount {
+			testutil.Unmount(t, base)
+		}
+	}()
 
 	committedBase := filepath.Join(work, "committed-base")
 	if err = snapshotter.Commit(ctx, committedBase, base, opt); err != nil {
@@ -540,6 +545,10 @@ func checkRemoveIntermediateSnapshot(ctx context.Context, t *testing.T, snapshot
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	testutil.Unmount(t, base)
+	needUmount = false
+
 	err = snapshotter.Remove(ctx, committedBase)
 	if err != nil {
 		t.Fatal(err)
