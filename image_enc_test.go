@@ -31,12 +31,12 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-func setupBusyboxImage(t *testing.T) {
+func setupNginxImage(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip()
 	}
 
-	const imageName = "docker.io/library/busybox:latest"
+	const imageName = "docker.io/library/nginx:latest"
 	ctx, cancel := testContext(t)
 	defer cancel()
 
@@ -65,15 +65,15 @@ func setupBusyboxImage(t *testing.T) {
 }
 
 func TestImageEncryption(t *testing.T) {
-	setupBusyboxImage(t)
+	setupNginxImage(t)
 
 	publicKey, privateKey, err := utils.CreateRSATestKey(2048, nil, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	const imageName = "docker.io/library/busybox:latest"
-	const encImageName = "docker.io/library/busybox:enc"
+	const imageName = "docker.io/library/nginx:latest"
+	const encImageName = "docker.io/library/nginx:enc"
 	ctx, cancel := testContext(t)
 	defer cancel()
 
@@ -165,7 +165,7 @@ func TestImageEncryption(t *testing.T) {
 	// properly deleted
 	defer func() {
 		done(ctx)
-		client.ImageService().Delete(ctx, imageName, images.SynchronousDelete())
+		client.ImageService().Delete(ctx, imageName)
 		client.ImageService().Delete(ctx, encImageName, images.SynchronousDelete())
 	}()
 
