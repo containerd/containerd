@@ -293,6 +293,9 @@ func TestImagePullSomePlatforms(t *testing.T) {
 
 		found := false
 		for _, matcher := range m {
+			if manifest.Platform == nil {
+				t.Fatal("manifest should have proper platform")
+			}
 			if matcher.Match(*manifest.Platform) {
 				count++
 				found = true
