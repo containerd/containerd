@@ -76,6 +76,20 @@ func setLinux(s *Spec) {
 	}
 }
 
+// nolint
+func setResources(s *Spec) {
+	if s.Linux != nil {
+		if s.Linux.Resources == nil {
+			s.Linux.Resources = &specs.LinuxResources{}
+		}
+	}
+	if s.Windows != nil {
+		if s.Windows.Resources == nil {
+			s.Windows.Resources = &specs.WindowsResources{}
+		}
+	}
+}
+
 // setCapabilities sets Linux Capabilities to empty if unset
 func setCapabilities(s *Spec) {
 	setProcess(s)
@@ -1136,6 +1150,42 @@ func WithAnnotations(annotations map[string]string) SpecOpts {
 		for k, v := range annotations {
 			s.Annotations[k] = v
 		}
+		return nil
+	}
+}
+
+// WithLinuxDevices adds the provided linux devices to the spec
+func WithLinuxDevices(devices []specs.LinuxDevice) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setLinux(s)
+		s.Linux.Devices = append(s.Linux.Devices, devices...)
+		return nil
+	}
+}
+
+var ErrNotADevice = errors.New("not a device node")
+
+// WithLinuxDevice adds the device specified by path to the spec
+func WithLinuxDevice(path, permissions string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setLinux(s)
+		setResources(s)
+
+		dev, err := deviceFromPath(path, permissions)
+		if err != nil {
+			return err
+		}
+
+		s.Linux.Devices = append(s.Linux.Devices, *dev)
+
+		s.Linux.Resources.Devices = append(s.Linux.Resources.Devices, specs.LinuxDeviceCgroup{
+			Type:   dev.Type,
+			Allow:  true,
+			Major:  &dev.Major,
+			Minor:  &dev.Minor,
+			Access: permissions,
+		})
+
 		return nil
 	}
 }

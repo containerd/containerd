@@ -126,6 +126,10 @@ var (
 			Name:  "memory-limit",
 			Usage: "memory limit (in bytes) for the container",
 		},
+		cli.StringSliceFlag{
+			Name:  "device",
+			Usage: "add a device to a container",
+		},
 	}
 	// ImageDecryptionFlags are cli flags needed when decrypting an image
 	ImageDecryptionFlags = []cli.Flag{
