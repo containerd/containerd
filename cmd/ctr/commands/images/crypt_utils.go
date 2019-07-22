@@ -24,12 +24,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/images"
 	imgenc "github.com/containerd/containerd/images/encryption"
-	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/pkg/encryption"
 	encconfig "github.com/containerd/containerd/pkg/encryption/config"
 	encutils "github.com/containerd/containerd/pkg/encryption/utils"
@@ -254,17 +252,16 @@ func cryptImage(client *containerd.Client, ctx gocontext.Context, name, newName 
 		newSpec  ocispec.Descriptor
 	)
 
-	ls := client.LeasesService()
-	l, err := ls.Create(ctx, leases.WithRandomID(), leases.WithExpiration(5*time.Minute))
+	ctx, done, err := client.WithLease(ctx)
 	if err != nil {
 		return images.Image{}, err
 	}
-	defer ls.Delete(ctx, l, leases.SynchronousDelete)
+	defer done(ctx)
 
 	if encrypt {
-		newSpec, modified, err = imgenc.EncryptImage(ctx, client.ContentStore(), ls, l, image.Target, cc, lf)
+		newSpec, modified, err = imgenc.EncryptImage(ctx, client.ContentStore(), image.Target, cc, lf)
 	} else {
-		newSpec, modified, err = imgenc.DecryptImage(ctx, client.ContentStore(), ls, l, image.Target, cc, lf)
+		newSpec, modified, err = imgenc.DecryptImage(ctx, client.ContentStore(), image.Target, cc, lf)
 	}
 	if err != nil {
 		return image, err

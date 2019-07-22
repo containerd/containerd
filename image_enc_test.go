@@ -20,25 +20,23 @@ import (
 	"context"
 	"runtime"
 	"testing"
-	"time"
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	imgenc "github.com/containerd/containerd/images/encryption"
-	"github.com/containerd/containerd/leases"
 	encconfig "github.com/containerd/containerd/pkg/encryption/config"
 	"github.com/containerd/containerd/pkg/encryption/utils"
 	"github.com/containerd/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-func setupBusyboxImage(t *testing.T) {
+func setupNginxImage(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip()
 	}
 
-	const imageName = "docker.io/library/busybox:latest"
+	const imageName = "docker.io/library/nginx:latest"
 	ctx, cancel := testContext(t)
 	defer cancel()
 
@@ -67,15 +65,15 @@ func setupBusyboxImage(t *testing.T) {
 }
 
 func TestImageEncryption(t *testing.T) {
-	setupBusyboxImage(t)
+	setupNginxImage(t)
 
 	publicKey, privateKey, err := utils.CreateRSATestKey(2048, nil, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	const imageName = "docker.io/library/busybox:latest"
-	const encImageName = "docker.io/library/busybox:enc"
+	const imageName = "docker.io/library/nginx:latest"
+	const encImageName = "docker.io/library/nginx:enc"
 	ctx, cancel := testContext(t)
 	defer cancel()
 
@@ -86,7 +84,11 @@ func TestImageEncryption(t *testing.T) {
 	defer client.Close()
 
 	s := client.ImageService()
-	ls := client.LeasesService()
+	ctx, done, err := client.WithLease(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer done(ctx)
 
 	image, err := s.Get(ctx, imageName)
 	if err != nil {
@@ -136,14 +138,8 @@ func TestImageEncryption(t *testing.T) {
 		},
 	}
 
-	l, err := ls.Create(ctx, leases.WithRandomID(), leases.WithExpiration(5*time.Minute))
-	if err != nil {
-		t.Fatal("Unable to create lease for encryption")
-	}
-	defer ls.Delete(ctx, l, leases.SynchronousDelete)
-
 	// Perform encryption of image
-	encSpec, modified, err := imgenc.EncryptImage(ctx, client.ContentStore(), ls, l, image.Target, cc, lf)
+	encSpec, modified, err := imgenc.EncryptImage(ctx, client.ContentStore(), image.Target, cc, lf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,29 +155,26 @@ func TestImageEncryption(t *testing.T) {
 	if _, err := s.Create(ctx, image); err != nil {
 		t.Fatalf("Unable to create image: %v", err)
 	}
-	// Force deletion of lease early to check for proper referencing
-	ls.Delete(ctx, l, leases.SynchronousDelete)
 
 	cc = &encconfig.CryptoConfig{
 		DecryptConfig: &encconfig.DecryptConfig{
 			Parameters: dcparameters,
 		},
 	}
+	// Clean up function cancels lease before deleting the image so the images are
+	// properly deleted
+	defer func() {
+		done(ctx)
+		client.ImageService().Delete(ctx, imageName)
+		client.ImageService().Delete(ctx, encImageName, images.SynchronousDelete())
+	}()
 
 	// Perform decryption of image
-	defer client.ImageService().Delete(ctx, imageName, images.SynchronousDelete())
-	defer client.ImageService().Delete(ctx, encImageName, images.SynchronousDelete())
 	lf = func(desc ocispec.Descriptor) bool {
 		return true
 	}
 
-	l, err = ls.Create(ctx, leases.WithRandomID(), leases.WithExpiration(5*time.Minute))
-	if err != nil {
-		t.Fatal("Unable to create lease for decryption")
-	}
-	defer ls.Delete(ctx, l, leases.SynchronousDelete)
-
-	decSpec, modified, err := imgenc.DecryptImage(ctx, client.ContentStore(), ls, l, encSpec, cc, lf)
+	decSpec, modified, err := imgenc.DecryptImage(ctx, client.ContentStore(), encSpec, cc, lf)
 	if err != nil {
 		t.Fatal(err)
 	}

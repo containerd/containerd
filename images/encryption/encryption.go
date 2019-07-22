@@ -30,7 +30,6 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/platforms"
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go"
@@ -149,7 +148,7 @@ func decryptLayer(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc 
 }
 
 // cryptLayer handles the changes due to encryption or decryption of a layer
-func cryptLayer(ctx context.Context, cs content.Store, ls leases.Manager, l leases.Lease, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, cryptoOp cryptoOp) (ocispec.Descriptor, error) {
+func cryptLayer(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, cryptoOp cryptoOp) (ocispec.Descriptor, error) {
 	var (
 		resultReader io.Reader
 		newDesc      ocispec.Descriptor
@@ -171,33 +170,13 @@ func cryptLayer(ctx context.Context, cs content.Store, ls leases.Manager, l leas
 	}
 	// some operations, such as changing recipients, may not touch the layer at all
 	if resultReader != nil {
-		if ls == nil {
-			return ocispec.Descriptor{}, errors.New("Unexpected write to object without lease")
-		}
-
-		var rsrc leases.Resource
 		var ref string
-
 		// If we have the digest, write blob with checks
 		haveDigest := newDesc.Digest.String() != ""
 		if haveDigest {
 			ref = fmt.Sprintf("layer-%s", newDesc.Digest.String())
-			rsrc = leases.Resource{
-				ID:   newDesc.Digest.String(),
-				Type: "content",
-			}
 		} else {
 			ref = fmt.Sprintf("blob-%d-%d", rand.Int(), rand.Int())
-			rsrc = leases.Resource{
-				ID:   ref,
-				Type: "ingests",
-			}
-
-		}
-
-		// Add resource to lease and write blob
-		if err := ls.AddResource(ctx, l, rsrc); err != nil {
-			return ocispec.Descriptor{}, errors.Wrap(err, "Unable to add resource to lease")
 		}
 
 		if haveDigest {
@@ -240,7 +219,7 @@ func ingestReader(ctx context.Context, cs content.Ingester, ref string, r io.Rea
 }
 
 // Encrypt or decrypt all the Children of a given descriptor
-func cryptChildren(ctx context.Context, cs content.Store, ls leases.Manager, l leases.Lease, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter, cryptoOp cryptoOp, thisPlatform *ocispec.Platform) (ocispec.Descriptor, bool, error) {
+func cryptChildren(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter, cryptoOp cryptoOp, thisPlatform *ocispec.Platform) (ocispec.Descriptor, bool, error) {
 	children, err := images.Children(ctx, cs, desc)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
@@ -261,7 +240,7 @@ func cryptChildren(ctx context.Context, cs content.Store, ls leases.Manager, l l
 		case images.MediaTypeDockerSchema2LayerGzip, images.MediaTypeDockerSchema2Layer,
 			ocispec.MediaTypeImageLayerGzip, ocispec.MediaTypeImageLayer:
 			if cryptoOp == cryptoOpEncrypt && lf(child) {
-				nl, err := cryptLayer(ctx, cs, ls, l, child, cc, cryptoOp)
+				nl, err := cryptLayer(ctx, cs, child, cc, cryptoOp)
 				if err != nil {
 					return ocispec.Descriptor{}, false, err
 				}
@@ -273,7 +252,7 @@ func cryptChildren(ctx context.Context, cs content.Store, ls leases.Manager, l l
 		case images.MediaTypeDockerSchema2LayerGzipEnc, images.MediaTypeDockerSchema2LayerEnc:
 			// this one can be decrypted but also its recipients list changed
 			if lf(child) {
-				nl, err := cryptLayer(ctx, cs, ls, l, child, cc, cryptoOp)
+				nl, err := cryptLayer(ctx, cs, child, cc, cryptoOp)
 				if err != nil || cryptoOp == cryptoOpUnwrapOnly {
 					return ocispec.Descriptor{}, false, err
 				}
@@ -319,19 +298,6 @@ func cryptChildren(ctx context.Context, cs content.Store, ls leases.Manager, l l
 
 		ref := fmt.Sprintf("manifest-%s", newDesc.Digest.String())
 
-		if ls == nil {
-			return ocispec.Descriptor{}, false, errors.New("Unexpected write to object without lease")
-		}
-
-		rsrc := leases.Resource{
-			ID:   desc.Digest.String(),
-			Type: "content",
-		}
-
-		if err := ls.AddResource(ctx, l, rsrc); err != nil {
-			return ocispec.Descriptor{}, false, errors.Wrap(err, "Unable to add resource to lease")
-		}
-
 		if err := content.WriteBlob(ctx, cs, ref, bytes.NewReader(mb), newDesc, content.WithLabels(labels)); err != nil {
 			return ocispec.Descriptor{}, false, errors.Wrap(err, "failed to write config")
 		}
@@ -342,7 +308,7 @@ func cryptChildren(ctx context.Context, cs content.Store, ls leases.Manager, l l
 }
 
 // cryptManifest encrypts or decrypts the children of a top level manifest
-func cryptManifest(ctx context.Context, cs content.Store, ls leases.Manager, l leases.Lease, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter, cryptoOp cryptoOp) (ocispec.Descriptor, bool, error) {
+func cryptManifest(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter, cryptoOp cryptoOp) (ocispec.Descriptor, bool, error) {
 	p, err := content.ReadBlob(ctx, cs, desc)
 	if err != nil {
 		return ocispec.Descriptor{}, false, err
@@ -352,7 +318,7 @@ func cryptManifest(ctx context.Context, cs content.Store, ls leases.Manager, l l
 		return ocispec.Descriptor{}, false, err
 	}
 	platform := platforms.DefaultSpec()
-	newDesc, modified, err := cryptChildren(ctx, cs, ls, l, desc, cc, lf, cryptoOp, &platform)
+	newDesc, modified, err := cryptChildren(ctx, cs, desc, cc, lf, cryptoOp, &platform)
 	if err != nil || cryptoOp == cryptoOpUnwrapOnly {
 		return ocispec.Descriptor{}, false, err
 	}
@@ -360,7 +326,7 @@ func cryptManifest(ctx context.Context, cs content.Store, ls leases.Manager, l l
 }
 
 // cryptManifestList encrypts or decrypts the children of a top level manifest list
-func cryptManifestList(ctx context.Context, cs content.Store, ls leases.Manager, l leases.Lease, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter, cryptoOp cryptoOp) (ocispec.Descriptor, bool, error) {
+func cryptManifestList(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter, cryptoOp cryptoOp) (ocispec.Descriptor, bool, error) {
 	// read the index; if any layer is encrypted and any manifests change we will need to rewrite it
 	b, err := content.ReadBlob(ctx, cs, desc)
 	if err != nil {
@@ -375,7 +341,7 @@ func cryptManifestList(ctx context.Context, cs content.Store, ls leases.Manager,
 	var newManifests []ocispec.Descriptor
 	modified := false
 	for _, manifest := range index.Manifests {
-		newManifest, m, err := cryptChildren(ctx, cs, ls, l, manifest, cc, lf, cryptoOp, manifest.Platform)
+		newManifest, m, err := cryptChildren(ctx, cs, manifest, cc, lf, cryptoOp, manifest.Platform)
 		if err != nil || cryptoOp == cryptoOpUnwrapOnly {
 			return ocispec.Descriptor{}, false, err
 		}
@@ -410,19 +376,6 @@ func cryptManifestList(ctx context.Context, cs content.Store, ls leases.Manager,
 
 		ref := fmt.Sprintf("index-%s", newDesc.Digest.String())
 
-		if ls == nil {
-			return ocispec.Descriptor{}, false, errors.New("Unexpected write to object without lease")
-		}
-
-		rsrc := leases.Resource{
-			ID:   desc.Digest.String(),
-			Type: "content",
-		}
-
-		if err := ls.AddResource(ctx, l, rsrc); err != nil {
-			return ocispec.Descriptor{}, false, errors.Wrap(err, "Unable to add resource to lease")
-		}
-
 		if err = content.WriteBlob(ctx, cs, ref, bytes.NewReader(mb), newDesc, content.WithLabels(labels)); err != nil {
 			return ocispec.Descriptor{}, false, errors.Wrap(err, "failed to write index")
 		}
@@ -434,28 +387,28 @@ func cryptManifestList(ctx context.Context, cs content.Store, ls leases.Manager,
 
 // cryptImage is the dispatcher to encrypt/decrypt an image; it accepts either an OCI descriptor
 // representing a manifest list or a single manifest
-func cryptImage(ctx context.Context, cs content.Store, ls leases.Manager, l leases.Lease, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter, cryptoOp cryptoOp) (ocispec.Descriptor, bool, error) {
+func cryptImage(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter, cryptoOp cryptoOp) (ocispec.Descriptor, bool, error) {
 	if cc == nil {
 		return ocispec.Descriptor{}, false, errors.Wrapf(errdefs.ErrInvalidArgument, "CryptoConfig must not be nil")
 	}
 	switch desc.MediaType {
 	case ocispec.MediaTypeImageIndex, images.MediaTypeDockerSchema2ManifestList:
-		return cryptManifestList(ctx, cs, ls, l, desc, cc, lf, cryptoOp)
+		return cryptManifestList(ctx, cs, desc, cc, lf, cryptoOp)
 	case ocispec.MediaTypeImageManifest, images.MediaTypeDockerSchema2Manifest:
-		return cryptManifest(ctx, cs, ls, l, desc, cc, lf, cryptoOp)
+		return cryptManifest(ctx, cs, desc, cc, lf, cryptoOp)
 	default:
 		return ocispec.Descriptor{}, false, errors.Errorf("CryptImage: Unhandled media type: %s", desc.MediaType)
 	}
 }
 
 // EncryptImage encrypts an image; it accepts either an OCI descriptor representing a manifest list or a single manifest
-func EncryptImage(ctx context.Context, cs content.Store, ls leases.Manager, l leases.Lease, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter) (ocispec.Descriptor, bool, error) {
-	return cryptImage(ctx, cs, ls, l, desc, cc, lf, cryptoOpEncrypt)
+func EncryptImage(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter) (ocispec.Descriptor, bool, error) {
+	return cryptImage(ctx, cs, desc, cc, lf, cryptoOpEncrypt)
 }
 
 // DecryptImage decrypts an image; it accepts either an OCI descriptor representing a manifest list or a single manifest
-func DecryptImage(ctx context.Context, cs content.Store, ls leases.Manager, l leases.Lease, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter) (ocispec.Descriptor, bool, error) {
-	return cryptImage(ctx, cs, ls, l, desc, cc, lf, cryptoOpDecrypt)
+func DecryptImage(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter) (ocispec.Descriptor, bool, error) {
+	return cryptImage(ctx, cs, desc, cc, lf, cryptoOpDecrypt)
 }
 
 // CheckAuthorization checks whether a user has the right keys to be allowed to access an image (every layer)
@@ -465,11 +418,12 @@ func CheckAuthorization(ctx context.Context, cs content.Store, desc ocispec.Desc
 	cc := encconfig.CryptoConfig{
 		DecryptConfig: dc,
 	}
+
 	lf := func(desc ocispec.Descriptor) bool {
 		return true
 	}
-	// We shouldn't need to create any objects in CheckAuthorization, so no lease required.
-	_, _, err := cryptImage(ctx, cs, nil, leases.Lease{}, desc, &cc, lf, cryptoOpUnwrapOnly)
+
+	_, _, err := cryptImage(ctx, cs, desc, &cc, lf, cryptoOpUnwrapOnly)
 	if err != nil {
 		return errors.Wrapf(err, "you are not authorized to use this image")
 	}

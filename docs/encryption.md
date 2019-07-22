@@ -75,10 +75,10 @@ The current draft of exposed interfaces we believe will be used by consumers are
 /* Functions */
 
 // EncryptImage encrypts an image; it accepts either an OCI descriptor representing a manifest list or a single manifest
-func EncryptImage(ctx context.Context, cs content.Store, ls leases.Manager, l leases.Lease, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf *LayerFilter) (ocispec.Descriptor, bool, error)
+func EncryptImage(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf *LayerFilter) (ocispec.Descriptor, bool, error)
 
 // DecryptImage decrypts an image; it accepts either an OCI descriptor representing a manifest list or a single manifest
-func DecryptImage(ctx context.Context, cs content.Store, ls leases.Manager, l leases.Lease, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf *LayerFilter) (ocispec.Descriptor, bool, error)
+func DecryptImage(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf *LayerFilter) (ocispec.Descriptor, bool, error)
 
 // CheckAuthorization checks whether a user has the right keys to be allowed to access an image (every layer)
 // It takes decrypting of the layers only as far as decrypting the asymmetrically encrypted data
