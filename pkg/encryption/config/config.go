@@ -38,3 +38,26 @@ type CryptoConfig struct {
 	EncryptConfig *EncryptConfig
 	DecryptConfig *DecryptConfig
 }
+
+// InitDecryption initialized a CryptoConfig object with parameters used for decryption
+func InitDecryption(dcparameters map[string][][]byte) *CryptoConfig {
+	return &CryptoConfig{
+		DecryptConfig: &DecryptConfig{
+			Parameters: dcparameters,
+		},
+	}
+}
+
+// InitEncryption initializes a CryptoConfig object with parameters used for encryption
+// It also takes dcparameters that may be needed for decryption when adding a recipient
+// to an already encrypted image
+func InitEncryption(parameters, dcparameters map[string][][]byte) *CryptoConfig {
+	return &CryptoConfig{
+		EncryptConfig: &EncryptConfig{
+			Parameters: parameters,
+			DecryptConfig: DecryptConfig{
+				Parameters: dcparameters,
+			},
+		},
+	}
+}

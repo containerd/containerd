@@ -415,15 +415,13 @@ func DecryptImage(ctx context.Context, cs content.Store, desc ocispec.Descriptor
 // It takes decrypting of the layers only as far as decrypting the asymmetrically encrypted data
 // The decryption is only done for the current platform
 func CheckAuthorization(ctx context.Context, cs content.Store, desc ocispec.Descriptor, dc *encconfig.DecryptConfig) error {
-	cc := encconfig.CryptoConfig{
-		DecryptConfig: dc,
-	}
+	cc := encconfig.InitDecryption(dc.Parameters)
 
 	lf := func(desc ocispec.Descriptor) bool {
 		return true
 	}
 
-	_, _, err := cryptImage(ctx, cs, desc, &cc, lf, cryptoOpUnwrapOnly)
+	_, _, err := cryptImage(ctx, cs, desc, cc, lf, cryptoOpUnwrapOnly)
 	if err != nil {
 		return errors.Wrapf(err, "you are not authorized to use this image")
 	}

@@ -133,14 +133,8 @@ var encryptCommand = cli.Command{
 		dcparameters["privkeys-passwords"] = privKeysPasswords
 		dcparameters["x509s"] = decX509s
 
-		cc := &encconfig.CryptoConfig{
-			EncryptConfig: &encconfig.EncryptConfig{
-				Parameters: parameters,
-				DecryptConfig: encconfig.DecryptConfig{
-					Parameters: dcparameters,
-				},
-			},
-		}
+		cc := encconfig.InitEncryption(parameters, dcparameters)
+
 		_, err = encryptImage(client, ctx, local, newName, cc, layers32, context.StringSlice("platform"))
 
 		return err
