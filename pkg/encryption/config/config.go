@@ -61,3 +61,45 @@ func InitEncryption(parameters, dcparameters map[string][][]byte) *CryptoConfig 
 		},
 	}
 }
+
+// CombineCryptoConfigs takes a CryptoConfig list and creates a single CryptoConfig
+// containing the crypto configuration of all the key bundles
+func CombineCryptoConfigs(ccs []CryptoConfig) CryptoConfig {
+	ecparam := map[string][][]byte{}
+	ecdcparam := map[string][][]byte{}
+	dcparam := map[string][][]byte{}
+
+	for _, cc := range ccs {
+		if ec := cc.EncryptConfig; ec != nil {
+			addToMap(ecparam, ec.Parameters)
+			addToMap(ecdcparam, ec.DecryptConfig.Parameters)
+		}
+
+		if dc := cc.DecryptConfig; dc != nil {
+			addToMap(dcparam, dc.Parameters)
+		}
+	}
+
+	return CryptoConfig{
+		EncryptConfig: &EncryptConfig{
+			Parameters: ecparam,
+			DecryptConfig: DecryptConfig{
+				Parameters: ecdcparam,
+			},
+		},
+		DecryptConfig: &DecryptConfig{
+			Parameters: dcparam,
+		},
+	}
+
+}
+
+func addToMap(orig map[string][][]byte, add map[string][][]byte) {
+	for k, v := range add {
+		if ov, ok := orig[k]; ok {
+			orig[k] = append(ov, v...)
+		} else {
+			orig[k] = v
+		}
+	}
+}
