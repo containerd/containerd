@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
+	"github.com/containerd/containerd/defaults"
 	"github.com/urfave/cli"
 )
 
@@ -100,7 +100,7 @@ var (
 		cli.StringFlag{
 			Name:  "runtime",
 			Usage: "runtime name",
-			Value: fmt.Sprintf("io.containerd.runtime.v1.%s", runtime.GOOS),
+			Value: defaults.DefaultRuntime,
 		},
 		cli.BoolFlag{
 			Name:  "tty,t",

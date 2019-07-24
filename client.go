@@ -93,7 +93,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 	if copts.defaultRuntime != "" {
 		c.runtime = copts.defaultRuntime
 	} else {
-		c.runtime = fmt.Sprintf("%s.%s", plugin.RuntimePlugin, runtime.GOOS)
+		c.runtime = defaults.DefaultRuntime
 	}
 
 	if copts.services != nil {
