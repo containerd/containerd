@@ -88,11 +88,8 @@ var decryptCommand = cli.Command{
 			return err
 		}
 
-		cc := &encconfig.CryptoConfig{
-			DecryptConfig: &encconfig.DecryptConfig{
-				Parameters: dcparameters,
-			},
-		}
+		cc := encconfig.InitDecryption(dcparameters)
+
 		_, err = decryptImage(client, ctx, local, newName, cc, layers32, context.StringSlice("platform"))
 
 		return err

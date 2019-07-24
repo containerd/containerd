@@ -129,14 +129,7 @@ func TestImageEncryption(t *testing.T) {
 	dcparameters["privkeys"] = [][]byte{privateKey}
 	dcparameters["privkeys-passwords"] = [][]byte{{}}
 
-	cc := &encconfig.CryptoConfig{
-		EncryptConfig: &encconfig.EncryptConfig{
-			Parameters: parameters,
-			DecryptConfig: encconfig.DecryptConfig{
-				Parameters: dcparameters,
-			},
-		},
-	}
+	cc := encconfig.InitEncryption(parameters, dcparameters)
 
 	// Perform encryption of image
 	encSpec, modified, err := imgenc.EncryptImage(ctx, client.ContentStore(), image.Target, cc, lf)
@@ -156,11 +149,8 @@ func TestImageEncryption(t *testing.T) {
 		t.Fatalf("Unable to create image: %v", err)
 	}
 
-	cc = &encconfig.CryptoConfig{
-		DecryptConfig: &encconfig.DecryptConfig{
-			Parameters: dcparameters,
-		},
-	}
+	cc = encconfig.InitDecryption(dcparameters)
+
 	// Clean up function cancels lease before deleting the image so the images are
 	// properly deleted
 	defer func() {
