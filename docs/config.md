@@ -8,8 +8,12 @@ for more information about containerd config.
 
 The explanation and default value of each configuration item are as follows:
 ```toml
-# The "plugins.cri" table contains all of the server options.
-[plugins.cri]
+# Use config version 2 to enable new configuration fields.
+# Config file is parsed as version 1 by default.
+version = 2
+
+# The 'plugins."io.containerd.grpc.v1.cri"' table contains all of the server options.
+[plugins."io.containerd.grpc.v1.cri"]
 
   # stream_server_address is the ip address streaming server is listening on.
   stream_server_address = "127.0.0.1"
@@ -42,8 +46,8 @@ The explanation and default value of each configuration item are as follows:
   # It generates a self-sign certificate unless the following x509_key_pair_streaming are both set.
   enable_tls_streaming = false
 
-  # "plugins.cri.x509_key_pair_streaming" contains a x509 valid key pair to stream with tls.
-  [plugins.cri.x509_key_pair_streaming]
+  # 'plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming' contains a x509 valid key pair to stream with tls.
+  [plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming]
     # tls_cert_file is the filepath to the certificate paired with the "tls_key_file"
     tls_cert_file = ""
 
@@ -68,8 +72,8 @@ The explanation and default value of each configuration item are as follows:
   # This is useful when the containerd does not have permission to decrease OOMScoreAdj.
   restrict_oom_score_adj = false
 
-  # "plugins.cri.containerd" contains config related to containerd
-  [plugins.cri.containerd]
+  # 'plugins."io.containerd.grpc.v1.cri".containerd' contains config related to containerd
+  [plugins."io.containerd.grpc.v1.cri".containerd]
 
     # snapshotter is the snapshotter used by containerd.
     snapshotter = "overlayfs"
@@ -83,20 +87,20 @@ The explanation and default value of each configuration item are as follows:
     # default_runtime_name is the default runtime name to use.
     default_runtime_name = "runc"
 
-    # "plugins.cri.containerd.default_runtime" is the runtime to use in containerd.
-    # DEPRECATED: use `default_runtime_name` and `plugins.cri.runtimes` instead.
+    # 'plugins."io.containerd.grpc.v1.cri".containerd.default_runtime' is the runtime to use in containerd.
+    # DEPRECATED: use `default_runtime_name` and `plugins."io.containerd.grpc.v1.cri".runtimes` instead.
     # Remove in containerd 1.4.
-    [plugins.cri.containerd.default_runtime]
+    [plugins."io.containerd.grpc.v1.cri".containerd.default_runtime]
 
-    # "plugins.cri.containerd.untrusted_workload_runtime" is a runtime to run untrusted workloads on it.
-    # DEPRECATED: use `untrusted` runtime in `plugins.cri.runtimes` instead.
+    # 'plugins."io.containerd.grpc.v1.cri".containerd.untrusted_workload_runtime' is a runtime to run untrusted workloads on it.
+    # DEPRECATED: use `untrusted` runtime in `plugins."io.containerd.grpc.v1.cri".runtimes` instead.
     # Remove in containerd 1.4.
-    [plugins.cri.containerd.untrusted_workload_runtime]
+    [plugins."io.containerd.grpc.v1.cri".containerd.untrusted_workload_runtime]
 
-    # plugins.cri.containerd.runtimes is a map from CRI RuntimeHandler strings, which specify types
+    # 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes' is a map from CRI RuntimeHandler strings, which specify types
     # of runtime configurations, to the matching configurations.
     # In this example, 'runc' is the RuntimeHandler string to match.
-    [plugins.cri.containerd.runtimes.runc]
+    [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
       # runtime_type is the runtime type to use in containerd e.g. io.containerd.runtime.v1.linux
       runtime_type = "io.containerd.runc.v1"
 
@@ -110,10 +114,10 @@ The explanation and default value of each configuration item are as follows:
       # * OCI: https://github.com/opencontainers/image-spec/blob/master/annotations.md
       pod_annotations = []
 
-      # "plugins.cri.containerd.runtimes.runc.options" is options specific to
+      # 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options' is options specific to
       # "io.containerd.runc.v1". Its corresponding options type is:
       #   https://github.com/containerd/containerd/blob/v1.2.0-rc.1/runtime/v2/runc/options/oci.pb.go#L39.
-      [plugins.cri.containerd.runtimes.runc.options]
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
         # NoPivotRoot disables pivot root when creating a container.
         NoPivotRoot = false
 
@@ -141,8 +145,8 @@ The explanation and default value of each configuration item are as follows:
         # SystemdCgroup enables systemd cgroups.
         SystemdCgroup = false
 
-  # "plugins.cri.cni" contains config related to cni
-  [plugins.cri.cni]
+  # 'plugins."io.containerd.grpc.v1.cri".cni' contains config related to cni
+  [plugins."io.containerd.grpc.v1.cri".cni]
     # bin_dir is the directory in which the binaries for the plugin is kept.
     bin_dir = "/opt/cni/bin"
 
@@ -167,12 +171,12 @@ The explanation and default value of each configuration item are as follows:
     # This will be deprecated when kubenet is deprecated.
     conf_template = ""
 
-  # "plugins.cri.registry" contains config related to the registry
-  [plugins.cri.registry]
+  # 'plugins."io.containerd.grpc.v1.cri".registry' contains config related to the registry
+  [plugins."io.containerd.grpc.v1.cri".registry]
 
-    # "plugins.cri.registry.mirrors" are namespace to mirror mapping for all namespaces.
-    [plugins.cri.registry.mirrors]
-      [plugins.cri.registry.mirrors."docker.io"]
+    # 'plugins."io.containerd.grpc.v1.cri".registry.mirrors' are namespace to mirror mapping for all namespaces.
+    [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
+      [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
         endpoint = ["https://registry-1.docker.io", ]
 ```
 
@@ -181,13 +185,13 @@ The explanation and default value of each configuration item are as follows:
 The recommended way to run untrusted workload is to use
 [`RuntimeClass`](https://kubernetes.io/docs/concepts/containers/runtime-class/) api
 introduced in Kubernetes 1.12 to select RuntimeHandlers configured to run
-untrusted workload in `plugins.cri.containerd.runtimes`.
+untrusted workload in `plugins."io.containerd.grpc.v1.cri".containerd.runtimes`.
 
 However, if you are using the legacy `io.kubernetes.cri.untrusted-workload`pod annotation
 to request a pod be run using a runtime for untrusted workloads, the RuntimeHandler
-`plugins.cri.containerd.runtimes.untrusted` must be defined first. When the annotation
-`io.kubernetes.cri.untrusted-workload` is set to `true` the `untrusted` runtime will be
-used. For example, see
+`plugins."io.containerd.grpc.v1.cri"cri.containerd.runtimes.untrusted` must be defined first.
+When the annotation `io.kubernetes.cri.untrusted-workload` is set to `true` the `untrusted`
+runtime will be used. For example, see
 [Create an untrusted pod using Kata Containers](https://github.com/kata-containers/documentation/blob/master/how-to/how-to-use-k8s-with-cri-containerd-and-kata.md#create-an-untrusted-pod-using-kata-containers).
 
 ## Deprecation
