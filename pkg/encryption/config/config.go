@@ -40,8 +40,8 @@ type CryptoConfig struct {
 }
 
 // InitDecryption initialized a CryptoConfig object with parameters used for decryption
-func InitDecryption(dcparameters map[string][][]byte) *CryptoConfig {
-	return &CryptoConfig{
+func InitDecryption(dcparameters map[string][][]byte) CryptoConfig {
+	return CryptoConfig{
 		DecryptConfig: &DecryptConfig{
 			Parameters: dcparameters,
 		},
@@ -51,8 +51,8 @@ func InitDecryption(dcparameters map[string][][]byte) *CryptoConfig {
 // InitEncryption initializes a CryptoConfig object with parameters used for encryption
 // It also takes dcparameters that may be needed for decryption when adding a recipient
 // to an already encrypted image
-func InitEncryption(parameters, dcparameters map[string][][]byte) *CryptoConfig {
-	return &CryptoConfig{
+func InitEncryption(parameters, dcparameters map[string][][]byte) CryptoConfig {
+	return CryptoConfig{
 		EncryptConfig: &EncryptConfig{
 			Parameters: parameters,
 			DecryptConfig: DecryptConfig{
@@ -92,6 +92,15 @@ func CombineCryptoConfigs(ccs []CryptoConfig) CryptoConfig {
 		},
 	}
 
+}
+
+// AttachDecryptConfig adds DecryptConfig to the field of EncryptConfig so that
+// the decryption parameters can be used to add recipients to an existing image
+// if the user is able to decrypt it.
+func (ec *EncryptConfig) AttachDecryptConfig(dc *DecryptConfig) {
+	if dc != nil {
+		addToMap(ec.DecryptConfig.Parameters, dc.Parameters)
+	}
 }
 
 func addToMap(orig map[string][][]byte, add map[string][][]byte) {

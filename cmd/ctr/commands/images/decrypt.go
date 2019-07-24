@@ -21,7 +21,6 @@ import (
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	imgenc "github.com/containerd/containerd/images/encryption"
-	encconfig "github.com/containerd/containerd/pkg/encryption/config"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -83,14 +82,12 @@ var decryptCommand = cli.Command{
 			return nil
 		}
 
-		dcparameters, err := CreateDcParameters(context, descs)
+		cc, err := CreateDecryptCryptoConfig(context, descs)
 		if err != nil {
 			return err
 		}
 
-		cc := encconfig.InitDecryption(dcparameters)
-
-		_, err = decryptImage(client, ctx, local, newName, cc, layers32, context.StringSlice("platform"))
+		_, err = decryptImage(client, ctx, local, newName, &cc, layers32, context.StringSlice("platform"))
 
 		return err
 	},

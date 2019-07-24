@@ -191,10 +191,10 @@ func createGPGClient(context *cli.Context) (encryption.GPGClient, error) {
 	return encryption.NewGPGClient(context.String("gpg-version"), context.String("gpg-homedir"))
 }
 
-func getGPGPrivateKeys(context *cli.Context, gpgSecretKeyRingFiles [][]byte, descs []ocispec.Descriptor, mustFindKey bool, dcparameters map[string][][]byte) error {
+func getGPGPrivateKeys(context *cli.Context, gpgSecretKeyRingFiles [][]byte, descs []ocispec.Descriptor, mustFindKey bool) (gpgPrivKeys [][]byte, gpgPrivKeysPwds [][]byte, err error) {
 	gpgClient, err := createGPGClient(context)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	var gpgVault encryption.GPGVault
@@ -202,10 +202,10 @@ func getGPGPrivateKeys(context *cli.Context, gpgSecretKeyRingFiles [][]byte, des
 		gpgVault = encryption.NewGPGVault()
 		err = gpgVault.AddSecretKeyRingDataArray(gpgSecretKeyRingFiles)
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
 	}
-	return encryption.GPGGetPrivateKey(descs, gpgClient, gpgVault, mustFindKey, dcparameters)
+	return encryption.GPGGetPrivateKey(descs, gpgClient, gpgVault, mustFindKey)
 }
 
 func createLayerFilter(client *containerd.Client, ctx gocontext.Context, desc ocispec.Descriptor, layers []int32, platformList []ocispec.Platform) (imgenc.LayerFilter, error) {
@@ -359,20 +359,21 @@ func filterLayerDescriptors(alldescs []ocispec.Descriptor, layers []int32, pl []
 	return layerInfos, descs
 }
 
-// CreateDcParameters creates the decryption parameter map from command line options and possibly
+// CreateDecryptCryptoConfig creates the CryptoConfig object that contains the necessary
+// information to perform decryption from command line options and possibly
 // LayerInfos describing the image and helping us to query for the PGP decryption keys
-func CreateDcParameters(context *cli.Context, descs []ocispec.Descriptor) (map[string][][]byte, error) {
-	dcparameters := make(map[string][][]byte)
+func CreateDecryptCryptoConfig(context *cli.Context, descs []ocispec.Descriptor) (encconfig.CryptoConfig, error) {
+	ccs := []encconfig.CryptoConfig{}
 
 	// x509 cert is needed for PKCS7 decryption
 	_, _, x509s, err := processRecipientKeys(context.StringSlice("dec-recipient"))
 	if err != nil {
-		return nil, err
+		return encconfig.CryptoConfig{}, err
 	}
 
 	gpgSecretKeyRingFiles, gpgSecretKeyPasswords, privKeys, privKeysPasswords, err := processPrivateKeyFiles(context.StringSlice("key"))
 	if err != nil {
-		return nil, err
+		return encconfig.CryptoConfig{}, err
 	}
 
 	_, err = createGPGClient(context)
@@ -380,26 +381,40 @@ func CreateDcParameters(context *cli.Context, descs []ocispec.Descriptor) (map[s
 	if gpgInstalled {
 		if len(gpgSecretKeyRingFiles) == 0 && len(privKeys) == 0 && descs != nil {
 			// Get pgp private keys from keyring only if no private key was passed
-			err = getGPGPrivateKeys(context, gpgSecretKeyRingFiles, descs, true, dcparameters)
+			gpgPrivKeys, gpgPrivKeyPasswords, err := getGPGPrivateKeys(context, gpgSecretKeyRingFiles, descs, true)
 			if err != nil {
-				return nil, err
+				return encconfig.CryptoConfig{}, err
 			}
-		} else {
-			if len(gpgSecretKeyRingFiles) == 0 {
-				dcparameters["gpg-client"] = [][]byte{[]byte("1")}
-				dcparameters["gpg-client-version"] = [][]byte{[]byte(context.String("gpg-version"))}
-				dcparameters["gpg-client-homedir"] = [][]byte{[]byte(context.String("gpg-homedir"))}
-			} else {
-				dcparameters["gpg-privatekeys"] = gpgSecretKeyRingFiles
-				dcparameters["gpg-privatekeys-passwords"] = gpgSecretKeyPasswords
+
+			gpgCc, err := encconfig.DecryptWithGpgPrivKeys(gpgPrivKeys, gpgPrivKeyPasswords)
+			if err != nil {
+				return encconfig.CryptoConfig{}, err
 			}
+			ccs = append(ccs, gpgCc)
+
+		} else if len(gpgSecretKeyRingFiles) > 0 {
+			gpgCc, err := encconfig.DecryptWithGpgPrivKeys(gpgSecretKeyRingFiles, gpgSecretKeyPasswords)
+			if err != nil {
+				return encconfig.CryptoConfig{}, err
+			}
+			ccs = append(ccs, gpgCc)
+
 		}
 	}
-	dcparameters["privkeys"] = privKeys
-	dcparameters["privkeys-passwords"] = privKeysPasswords
-	dcparameters["x509s"] = x509s
 
-	return dcparameters, nil
+	x509sCc, err := encconfig.DecryptWithX509s(x509s)
+	if err != nil {
+		return encconfig.CryptoConfig{}, err
+	}
+	ccs = append(ccs, x509sCc)
+
+	privKeysCc, err := encconfig.DecryptWithPrivKeys(privKeys, privKeysPasswords)
+	if err != nil {
+		return encconfig.CryptoConfig{}, err
+	}
+	ccs = append(ccs, privKeysCc)
+
+	return encconfig.CombineCryptoConfigs(ccs), nil
 }
 
 // parsePlatformArray parses an array of specifiers and converts them into an array of specs.Platform

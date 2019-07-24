@@ -421,7 +421,7 @@ func CheckAuthorization(ctx context.Context, cs content.Store, desc ocispec.Desc
 		return true
 	}
 
-	_, _, err := cryptImage(ctx, cs, desc, cc, lf, cryptoOpUnwrapOnly)
+	_, _, err := cryptImage(ctx, cs, desc, &cc, lf, cryptoOpUnwrapOnly)
 	if err != nil {
 		return errors.Wrapf(err, "you are not authorized to use this image")
 	}

@@ -122,17 +122,13 @@ func TestImageEncryption(t *testing.T) {
 		return false
 	}
 
-	dcparameters := make(map[string][][]byte)
-	parameters := make(map[string][][]byte)
-
-	parameters["pubkeys"] = [][]byte{publicKey}
-	dcparameters["privkeys"] = [][]byte{privateKey}
-	dcparameters["privkeys-passwords"] = [][]byte{{}}
-
-	cc := encconfig.InitEncryption(parameters, dcparameters)
+	cc, err := encconfig.EncryptWithJwe([][]byte{publicKey})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Perform encryption of image
-	encSpec, modified, err := imgenc.EncryptImage(ctx, client.ContentStore(), image.Target, cc, lf)
+	encSpec, modified, err := imgenc.EncryptImage(ctx, client.ContentStore(), image.Target, &cc, lf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +145,10 @@ func TestImageEncryption(t *testing.T) {
 		t.Fatalf("Unable to create image: %v", err)
 	}
 
-	cc = encconfig.InitDecryption(dcparameters)
+	cc, err = encconfig.DecryptWithPrivKeys([][]byte{privateKey}, [][]byte{{}})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Clean up function cancels lease before deleting the image so the images are
 	// properly deleted
@@ -164,7 +163,7 @@ func TestImageEncryption(t *testing.T) {
 		return true
 	}
 
-	decSpec, modified, err := imgenc.DecryptImage(ctx, client.ContentStore(), encSpec, cc, lf)
+	decSpec, modified, err := imgenc.DecryptImage(ctx, client.ContentStore(), encSpec, &cc, lf)
 	if err != nil {
 		t.Fatal(err)
 	}

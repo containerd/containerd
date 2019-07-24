@@ -16,30 +16,13 @@
 
 package config
 
-// NewJweCryptoConfig returns a CryptoConfig that contains the required configuration for using
-// the jwe keyunwrap interface
-func NewJweCryptoConfig(pubKey *[]byte, privKey *[]byte, privKeyPassword *string) CryptoConfig {
-	pubKeys := [][]byte{}
-	privKeys := [][]byte{}
-	privKeysPasswords := [][]byte{}
+import (
+	"github.com/pkg/errors"
+)
 
-	if pubKey != nil {
-		pubKeys = append(pubKeys, *pubKey)
-	}
-	if privKey != nil {
-		privKeys = append(privKeys, *privKey)
-	}
-	if privKeyPassword != nil {
-		privKeysPasswords = append(privKeysPasswords, []byte(*privKeyPassword))
-	}
-
-	dc := DecryptConfig{
-		Parameters: map[string][][]byte{
-			"privkeys":           privKeys,
-			"privkeys-passwords": privKeysPasswords,
-		},
-	}
-
+// EncryptWithJwe returns a CryptoConfig to encrypt with jwe public keys
+func EncryptWithJwe(pubKeys [][]byte) (CryptoConfig, error) {
+	dc := DecryptConfig{}
 	ep := map[string][][]byte{
 		"pubkeys": pubKeys,
 	}
@@ -50,32 +33,12 @@ func NewJweCryptoConfig(pubKey *[]byte, privKey *[]byte, privKeyPassword *string
 			DecryptConfig: dc,
 		},
 		DecryptConfig: &dc,
-	}
+	}, nil
 }
 
-// NewPkcs7CryptoConfig returns a CryptoConfig that contains the required configuration for using
-// the pkcs7 keyunwrap interface
-func NewPkcs7CryptoConfig(x509 *[]byte, privKey *[]byte, privKeyPassword *string) CryptoConfig {
-	x509s := [][]byte{}
-	privKeys := [][]byte{}
-	privKeysPasswords := [][]byte{}
-
-	if x509 != nil {
-		x509s = append(x509s, *x509)
-	}
-	if privKey != nil {
-		privKeys = append(privKeys, *privKey)
-	}
-	if privKeyPassword != nil {
-		privKeysPasswords = append(privKeysPasswords, []byte(*privKeyPassword))
-	}
-
-	dc := DecryptConfig{
-		Parameters: map[string][][]byte{
-			"privkeys":           privKeys,
-			"privkeys-passwords": privKeysPasswords,
-		},
-	}
+// EncryptWithPkcs7 returns a CryptoConfig to encrypt with pkcs7 x509 certs
+func EncryptWithPkcs7(x509s [][]byte) (CryptoConfig, error) {
+	dc := DecryptConfig{}
 
 	ep := map[string][][]byte{
 		"x509s": x509s,
@@ -87,5 +50,85 @@ func NewPkcs7CryptoConfig(x509 *[]byte, privKey *[]byte, privKeyPassword *string
 			DecryptConfig: dc,
 		},
 		DecryptConfig: &dc,
+	}, nil
+}
+
+// EncryptWithGpg returns a CryptoConfig to encrypt with configured gpg parameters
+func EncryptWithGpg(gpgRecipients [][]byte, gpgPubRingFile []byte) (CryptoConfig, error) {
+	dc := DecryptConfig{}
+	ep := map[string][][]byte{
+		"gpg-recipients":     gpgRecipients,
+		"gpg-pubkeyringfile": {gpgPubRingFile},
 	}
+
+	return CryptoConfig{
+		EncryptConfig: &EncryptConfig{
+			Parameters:    ep,
+			DecryptConfig: dc,
+		},
+		DecryptConfig: &dc,
+	}, nil
+}
+
+// DecryptWithPrivKeys returns a CryptoConfig to decrypt with configured private keys
+func DecryptWithPrivKeys(privKeys [][]byte, privKeysPasswords [][]byte) (CryptoConfig, error) {
+	if len(privKeys) != len(privKeysPasswords) {
+		return CryptoConfig{}, errors.New("Length of privKeys should match length of privKeysPasswords")
+	}
+
+	dc := DecryptConfig{
+		Parameters: map[string][][]byte{
+			"privkeys":           privKeys,
+			"privkeys-passwords": privKeysPasswords,
+		},
+	}
+
+	ep := map[string][][]byte{}
+
+	return CryptoConfig{
+		EncryptConfig: &EncryptConfig{
+			Parameters:    ep,
+			DecryptConfig: dc,
+		},
+		DecryptConfig: &dc,
+	}, nil
+}
+
+// DecryptWithX509s returns a CryptoConfig to decrypt with configured x509 certs
+func DecryptWithX509s(x509s [][]byte) (CryptoConfig, error) {
+	dc := DecryptConfig{
+		Parameters: map[string][][]byte{
+			"x509s": x509s,
+		},
+	}
+
+	ep := map[string][][]byte{}
+
+	return CryptoConfig{
+		EncryptConfig: &EncryptConfig{
+			Parameters:    ep,
+			DecryptConfig: dc,
+		},
+		DecryptConfig: &dc,
+	}, nil
+}
+
+// DecryptWithGpgPrivKeys returns a CryptoConfig to decrypt with configured gpg private keys
+func DecryptWithGpgPrivKeys(gpgPrivKeys, gpgPrivKeysPwds [][]byte) (CryptoConfig, error) {
+	dc := DecryptConfig{
+		Parameters: map[string][][]byte{
+			"gpg-privatekeys":           gpgPrivKeys,
+			"gpg-privatekeys-passwords": gpgPrivKeysPwds,
+		},
+	}
+
+	ep := map[string][][]byte{}
+
+	return CryptoConfig{
+		EncryptConfig: &EncryptConfig{
+			Parameters:    ep,
+			DecryptConfig: dc,
+		},
+		DecryptConfig: &dc,
+	}, nil
 }

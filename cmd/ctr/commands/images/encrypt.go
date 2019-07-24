@@ -77,45 +77,21 @@ var encryptCommand = cli.Command{
 
 		layers32 := commands.IntToInt32Array(context.IntSlice("layer"))
 
-		gpgSecretKeyRingFiles, _, privKeys, privKeysPasswords, err := processPrivateKeyFiles(context.StringSlice("key"))
-		if err != nil {
-			return err
-		}
-
 		gpgRecipients, pubKeys, x509s, err := processRecipientKeys(recipients)
 		if err != nil {
 			return err
 		}
-
-		_, _, decX509s, err := processRecipientKeys(context.StringSlice("dec-recipient"))
-		if err != nil {
-			return err
-		}
-
-		dcparameters := make(map[string][][]byte)
-		parameters := make(map[string][][]byte)
-
-		parameters["pubkeys"] = pubKeys
-		parameters["x509s"] = x509s
 
 		_, descs, err := getImageLayerInfos(client, ctx, local, layers32, context.StringSlice("platform"))
 		if err != nil {
 			return err
 		}
 
+		encryptCcs := []encconfig.CryptoConfig{}
 		_, err = createGPGClient(context)
 		gpgInstalled := err == nil
-		if len(privKeys) == 0 && gpgInstalled {
-			// Get pgp private keys from keyring only if no private key was passed
-			err = getGPGPrivateKeys(context, gpgSecretKeyRingFiles, descs, true, dcparameters)
-			if err != nil {
-				return err
-			}
-		}
 
 		if len(gpgRecipients) > 0 && gpgInstalled {
-			parameters["gpg-recipients"] = gpgRecipients
-
 			gpgClient, err := createGPGClient(context)
 			if err != nil {
 				return err
@@ -126,16 +102,38 @@ var encryptCommand = cli.Command{
 				return err
 			}
 
-			parameters["gpg-pubkeyringfile"] = [][]byte{gpgPubRingFile}
+			gpgCc, err := encconfig.EncryptWithGpg(gpgRecipients, gpgPubRingFile)
+			if err != nil {
+				return err
+			}
+			encryptCcs = append(encryptCcs, gpgCc)
+
 		}
 
-		dcparameters["privkeys"] = privKeys
-		dcparameters["privkeys-passwords"] = privKeysPasswords
-		dcparameters["x509s"] = decX509s
+		// Create Encryption Crypto Config
+		pkcs7Cc, err := encconfig.EncryptWithPkcs7(x509s)
+		if err != nil {
+			return err
+		}
+		encryptCcs = append(encryptCcs, pkcs7Cc)
 
-		cc := encconfig.InitEncryption(parameters, dcparameters)
+		jweCc, err := encconfig.EncryptWithJwe(pubKeys)
+		if err != nil {
+			return err
+		}
+		encryptCcs = append(encryptCcs, jweCc)
 
-		_, err = encryptImage(client, ctx, local, newName, cc, layers32, context.StringSlice("platform"))
+		cc := encconfig.CombineCryptoConfigs(encryptCcs)
+
+		// Create Decryption CryptoConfig for use in adding recipients to
+		// existing image if decryptable.
+		decryptCc, err := CreateDecryptCryptoConfig(context, descs)
+		if err != nil {
+			return err
+		}
+		cc.EncryptConfig.AttachDecryptConfig(decryptCc.DecryptConfig)
+
+		_, err = encryptImage(client, ctx, local, newName, &cc, layers32, context.StringSlice("platform"))
 
 		return err
 	},
