@@ -98,6 +98,11 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 
 			for _, host := range r.hosts {
 				req := r.request(host, http.MethodGet, "manifests", desc.Digest.String())
+				if host.isMirror() {
+					if err := req.addNamespace(r.refspec.Hostname()); err != nil {
+						return nil, err
+					}
+				}
 
 				rc, err := r.open(ctx, req, desc.MediaType, offset)
 				if err != nil {
@@ -115,6 +120,11 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 		// Finally use blobs endpoints
 		for _, host := range r.hosts {
 			req := r.request(host, http.MethodGet, "blobs", desc.Digest.String())
+			if host.isMirror() {
+				if err := req.addNamespace(r.refspec.Hostname()); err != nil {
+					return nil, err
+				}
+			}
 
 			rc, err := r.open(ctx, req, desc.MediaType, offset)
 			if err != nil {

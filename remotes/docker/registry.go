@@ -72,6 +72,10 @@ type RegistryHost struct {
 	Capabilities HostCapabilities
 }
 
+func (h RegistryHost) isMirror() bool {
+	return !h.Capabilities.Has(HostCapabilityPush)
+}
+
 // RegistryHosts fetches the registry hosts for a given namespace,
 // provided by the host component of an distribution image reference.
 type RegistryHosts func(string) ([]RegistryHost, error)
