@@ -135,18 +135,16 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 		}
 
 		sigTermCtx, sigTermCtxCancel := context.WithTimeout(ctx, timeout)
+		defer sigTermCtxCancel()
 		err = c.waitContainerStop(sigTermCtx, container)
 		if err == nil {
 			// Container stopped on first signal no need for SIGKILL
-			sigTermCtxCancel()
 			return nil
 		}
 		// If the parent context was cancelled or exceeded return immediately
 		if ctx.Err() != nil {
-			sigTermCtxCancel()
 			return ctx.Err()
 		}
-		sigTermCtxCancel()
 		// sigTermCtx was exceeded. Send SIGKILL
 		logrus.Debugf("Stop container %q with signal %v timed out", id, sig)
 	}
