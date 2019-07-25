@@ -38,6 +38,22 @@ import (
 	"github.com/pkg/errors"
 )
 
+type importOpts struct {
+	compress bool
+}
+
+// ImportOpt is an option for importing an OCI index
+type ImportOpt func(*importOpts) error
+
+// WithImportCompression compresses uncompressed layers on import.
+// This is used for import formats which do not include the manifest.
+func WithImportCompression() ImportOpt {
+	return func(io *importOpts) error {
+		io.compress = true
+		return nil
+	}
+}
+
 // ImportIndex imports an index from a tar archive image bundle
 // - implements Docker v1.1, v1.2 and OCI v1.
 // - prefers OCI v1 when provided
@@ -45,8 +61,7 @@ import (
 // - normalizes Docker references and adds as OCI ref name
 //      e.g. alpine:latest -> docker.io/library/alpine:latest
 // - existing OCI reference names are untouched
-// - TODO: support option to compress layers on ingest
-func ImportIndex(ctx context.Context, store content.Store, reader io.Reader) (ocispec.Descriptor, error) {
+func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opts ...ImportOpt) (ocispec.Descriptor, error) {
 	var (
 		tr = tar.NewReader(reader)
 
@@ -58,7 +73,15 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader) (oc
 		}
 		symlinks = make(map[string]string)
 		blobs    = make(map[string]ocispec.Descriptor)
+		iopts    importOpts
 	)
+
+	for _, o := range opts {
+		if err := o(&iopts); err != nil {
+			return ocispec.Descriptor{}, err
+		}
+	}
+
 	for {
 		hdr, err := tr.Next()
 		if err == io.EOF {
@@ -141,7 +164,7 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader) (oc
 		}
 		config.MediaType = images.MediaTypeDockerSchema2Config
 
-		layers, err := resolveLayers(ctx, store, mfst.Layers, blobs)
+		layers, err := resolveLayers(ctx, store, mfst.Layers, blobs, iopts.compress)
 		if err != nil {
 			return ocispec.Descriptor{}, errors.Wrap(err, "failed to resolve layers")
 		}
@@ -217,7 +240,7 @@ func onUntarBlob(ctx context.Context, r io.Reader, store content.Ingester, size 
 	return dgstr.Digest(), nil
 }
 
-func resolveLayers(ctx context.Context, store content.Store, layerFiles []string, blobs map[string]ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+func resolveLayers(ctx context.Context, store content.Store, layerFiles []string, blobs map[string]ocispec.Descriptor, compress bool) ([]ocispec.Descriptor, error) {
 	layers := make([]ocispec.Descriptor, len(layerFiles))
 	descs := map[digest.Digest]*ocispec.Descriptor{}
 	filters := []string{}
@@ -261,17 +284,23 @@ func resolveLayers(ctx context.Context, store content.Store, layerFiles []string
 			return nil, errors.Wrapf(err, "failed to detect compression for %q", layerFiles[i])
 		}
 		if s.GetCompression() == compression.Uncompressed {
-			ref := fmt.Sprintf("compress-blob-%s-%s", desc.Digest.Algorithm().String(), desc.Digest.Encoded())
-			labels := map[string]string{
-				"containerd.io/uncompressed": desc.Digest.String(),
+			if compress {
+				ref := fmt.Sprintf("compress-blob-%s-%s", desc.Digest.Algorithm().String(), desc.Digest.Encoded())
+				labels := map[string]string{
+					"containerd.io/uncompressed": desc.Digest.String(),
+				}
+				layers[i], err = compressBlob(ctx, store, s, ref, content.WithLabels(labels))
+				if err != nil {
+					s.Close()
+					return nil, err
+				}
+				layers[i].MediaType = images.MediaTypeDockerSchema2LayerGzip
+			} else {
+				layers[i].MediaType = images.MediaTypeDockerSchema2Layer
 			}
-			layers[i], err = compressBlob(ctx, store, s, ref, content.WithLabels(labels))
-			if err != nil {
-				s.Close()
-				return nil, err
-			}
+		} else {
+			layers[i].MediaType = images.MediaTypeDockerSchema2LayerGzip
 		}
-		layers[i].MediaType = images.MediaTypeDockerSchema2LayerGzip
 		s.Close()
 
 	}

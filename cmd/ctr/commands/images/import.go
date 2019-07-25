@@ -72,6 +72,10 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			Name:  "no-unpack",
 			Usage: "skip unpacking the images, false by default",
 		},
+		cli.BoolFlag{
+			Name:  "compress-blobs",
+			Usage: "compress uncompressed blobs when creating manifest (Docker format only)",
+		},
 	}, commands.SnapshotterFlags...),
 
 	Action: func(context *cli.Context) error {
@@ -95,6 +99,10 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 
 		if idxName := context.String("index-name"); idxName != "" {
 			opts = append(opts, containerd.WithIndexName(idxName))
+		}
+
+		if context.Bool("compress-blobs") {
+			opts = append(opts, containerd.WithImportCompression())
 		}
 
 		opts = append(opts, containerd.WithAllPlatforms(context.Bool("all-platforms")))
