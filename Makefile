@@ -15,8 +15,8 @@
 GO := go
 GOOS := $(shell $(GO) env GOOS)
 GOARCH := $(shell $(GO) env GOARCH)
-WHALE = "+"
-ONI = "-"
+WHALE = "🇩"
+ONI = "👹"
 EPOCH_TEST_COMMIT := f9e02affccd51702191e5312665a16045ffef8ab
 PROJECT := github.com/containerd/cri
 BINDIR := ${DESTDIR}/usr/local/bin
