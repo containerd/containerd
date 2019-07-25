@@ -62,7 +62,12 @@ func TestWaitSandboxStop(t *testing.T) {
 			cancel()
 			ctx = cancelledCtx
 		}
-		err := c.waitSandboxStop(ctx, sandbox, test.timeout)
+		if test.timeout > 0 {
+			timeoutCtx, cancel := context.WithTimeout(ctx, test.timeout)
+			defer cancel()
+			ctx = timeoutCtx
+		}
+		err := c.waitSandboxStop(ctx, sandbox)
 		assert.Equal(t, test.expectErr, err != nil, desc)
 	}
 }
