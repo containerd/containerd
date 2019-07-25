@@ -69,7 +69,7 @@ test_setup() {
     echo "crictl is not in PATH"
     exit 1
   fi
-  readiness_check "sudo ${ctr_path} version"
+  readiness_check "sudo ${ctr_path} --address ${CONTAINERD_SOCK#"unix://"} version"
   readiness_check "sudo ${crictl_path} --runtime-endpoint=${CONTAINERD_SOCK} info"
 }
 
