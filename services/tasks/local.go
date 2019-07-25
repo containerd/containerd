@@ -266,12 +266,18 @@ func (l *local) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest, 
 	}, nil
 }
 
-func processFromContainerd(ctx context.Context, p runtime.Process) (*task.Process, error) {
+func getProcessState(ctx context.Context, p runtime.Process) (*task.Process, error) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
 	state, err := p.State(ctx)
 	if err != nil {
-		return nil, err
+		if errdefs.IsNotFound(err) {
+			return nil, err
+		}
+		log.G(ctx).WithError(err).Errorf("get state for %s", p.ID())
 	}
-	var status task.Status
+	status := task.StatusUnknown
 	switch state.Status {
 	case runtime.CreatedStatus:
 		status = task.StatusCreated
@@ -310,7 +316,7 @@ func (l *local) Get(ctx context.Context, r *api.GetRequest, _ ...grpc.CallOption
 			return nil, errdefs.ToGRPC(err)
 		}
 	}
-	t, err := processFromContainerd(ctx, p)
+	t, err := getProcessState(ctx, p)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -333,7 +339,7 @@ func (l *local) List(ctx context.Context, r *api.ListTasksRequest, _ ...grpc.Cal
 
 func addTasks(ctx context.Context, r *api.ListTasksResponse, tasks []runtime.Task) {
 	for _, t := range tasks {
-		tt, err := processFromContainerd(ctx, t)
+		tt, err := getProcessState(ctx, t)
 		if err != nil {
 			if !errdefs.IsNotFound(err) { // handle race with deletion
 				log.G(ctx).WithError(err).WithField("id", t.ID()).Error("converting task to protobuf")
