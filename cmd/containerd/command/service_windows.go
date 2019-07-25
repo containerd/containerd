@@ -45,7 +45,9 @@ var (
 	unregisterServiceFlag bool
 	runServiceFlag        bool
 
-	setStdHandle = windows.NewLazySystemDLL("kernel32.dll").NewProc("SetStdHandle")
+	kernel32     = windows.NewLazySystemDLL("kernel32.dll")
+	setStdHandle = kernel32.NewProc("SetStdHandle")
+	allocConsole = kernel32.NewProc("AllocConsole")
 	oldStderr    windows.Handle
 	panicFile    *os.File
 
@@ -322,6 +324,23 @@ func registerUnregisterService(root string) (bool, error) {
 	}
 
 	if runServiceFlag {
+		// Allocate a conhost for containerd here. We don't actually use this
+		// at all in containerd, but it will be inherited by any processes
+		// containerd executes, so they won't need to allocate their own
+		// conhosts. This is important for two reasons:
+		// - Creating a conhost slows down process launch.
+		// - We have seen reliability issues when launching many processes.
+		//   Sometimes the process invocation will fail due to an error when
+		//   creating the conhost.
+		//
+		// This needs to be done before initializing the panic file, as
+		// AllocConsole sets the stdio handles to point to the new conhost,
+		// and we want to make sure stderr goes to the panic file.
+		r, _, err := allocConsole.Call()
+		if r == 0 && err != nil {
+			return true, fmt.Errorf("error allocating conhost: %s", err)
+		}
+
 		if err := initPanicFile(filepath.Join(root, "panic.log")); err != nil {
 			return true, err
 		}
@@ -341,7 +360,6 @@ func registerUnregisterService(root string) (bool, error) {
 
 		logrus.AddHook(&etwHook{log})
 		logrus.SetOutput(ioutil.Discard)
-
 	}
 	return false, nil
 }
