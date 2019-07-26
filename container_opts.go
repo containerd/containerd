@@ -171,7 +171,9 @@ func WithSnapshotCleanup(ctx context.Context, client *Client, c containers.Conta
 		if err != nil {
 			return err
 		}
-		return s.Remove(ctx, c.SnapshotKey)
+		if err := s.Remove(ctx, c.SnapshotKey); err != nil && !errdefs.IsNotFound(err) {
+			return err
+		}
 	}
 	return nil
 }
