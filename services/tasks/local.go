@@ -40,6 +40,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
@@ -61,6 +62,10 @@ var (
 	empty = &ptypes.Empty{}
 )
 
+const (
+	stateTimeout = "io.containerd.timeout.task.state"
+)
+
 func init() {
 	plugin.Register(&plugin.Registration{
 		Type:     plugin.ServicePlugin,
@@ -68,6 +73,8 @@ func init() {
 		Requires: tasksServiceRequires,
 		InitFn:   initFunc,
 	})
+
+	timeout.Set(stateTimeout, 2*time.Second)
 }
 
 func initFunc(ic *plugin.InitContext) (interface{}, error) {
@@ -266,7 +273,7 @@ func (l *local) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest, 
 }
 
 func getProcessState(ctx context.Context, p runtime.Process) (*task.Process, error) {
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	ctx, cancel := timeout.WithContext(ctx, stateTimeout)
 	defer cancel()
 
 	state, err := p.State(ctx)

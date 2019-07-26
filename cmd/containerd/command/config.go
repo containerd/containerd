@@ -22,6 +22,7 @@ import (
 	"os"
 
 	"github.com/BurntSushi/toml"
+	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/services/server"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/urfave/cli"
@@ -68,6 +69,12 @@ var configCommand = cli.Command{
 						config.Plugins[p.URI()] = p.Config
 					}
 				}
+				timeouts := timeout.All()
+				config.Timeouts = make(map[string]string)
+				for k, v := range timeouts {
+					config.Timeouts[k] = v.String()
+				}
+
 				_, err = config.WriteTo(os.Stdout)
 				return err
 			},
