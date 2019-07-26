@@ -25,8 +25,8 @@ The option `--layer -1` specifies the layer filter for encryption, -1 indicating
 
 ```
 $ ctr images encrypt \
-    --recipient /tmp/tmp.AGrSDkaSad/mypubkey.pem \
-    --recipient /tmp/tmp.AGrSDkaSad/clientcert.pem \
+    --recipient jwe:/tmp/tmp.AGrSDkaSad/mypubkey.pem \
+    --recipient pkcs7:/tmp/tmp.AGrSDkaSad/clientcert.pem \
     --layer -1 \
     docker.io/library/alpine:latest docker.io/library/alpine:enc
 

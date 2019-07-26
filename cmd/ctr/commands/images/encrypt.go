@@ -41,10 +41,15 @@ var encryptCommand = cli.Command{
 	This tool also allows management of the recipients of the image through changes
 	to the list of recipients.
 	Once the image has been encrypted it may be pushed to a registry.
+
+    Recipients are declared with the protocol prefix as follows:
+    - pgp:<email-address>
+    - jwe:<public-key-file-path>
+    - pkcs7:<x509-file-path>
 `,
 	Flags: append(append(commands.RegistryFlags, cli.StringSliceFlag{
 		Name:  "recipient",
-		Usage: "Recipient of the image is the person who can decrypt it",
+		Usage: "Recipient of the image is the person who can decrypt it in the form specified above (i.e. jwe:/path/to/key)",
 	}, cli.IntSliceFlag{
 		Name:  "layer",
 		Usage: "The layer to encrypt; this must be either the layer number or a negative number starting with -1 for topmost layer",
