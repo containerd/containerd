@@ -21,6 +21,7 @@ package v2
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -209,35 +210,46 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 	if err := shim.WriteAddress("address", address); err != nil {
 		return "", err
 	}
-	if data, err := ioutil.ReadAll(os.Stdin); err == nil {
-		if len(data) > 0 {
-			var any types.Any
-			if err := proto.Unmarshal(data, &any); err != nil {
-				return "", err
-			}
-			v, err := typeurl.UnmarshalAny(&any)
-			if err != nil {
-				return "", err
-			}
-			if opts, ok := v.(*options.Options); ok {
-				if opts.ShimCgroup != "" {
-					cg, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(opts.ShimCgroup))
-					if err != nil {
-						return "", errors.Wrapf(err, "failed to load cgroup %s", opts.ShimCgroup)
-					}
-					if err := cg.Add(cgroups.Process{
-						Pid: cmd.Process.Pid,
-					}); err != nil {
-						return "", errors.Wrapf(err, "failed to join cgroup %s", opts.ShimCgroup)
-					}
-				}
-			}
+	opts, err := readOptions(os.Stdin)
+	if err != nil && err != errNoOptionsProvided {
+		return "", err
+	}
+	if opts != nil && opts.ShimCgroup != "" {
+		cg, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(opts.ShimCgroup))
+		if err != nil {
+			return "", errors.Wrapf(err, "failed to load cgroup %s", opts.ShimCgroup)
+		}
+		if err := cg.Add(cgroups.Process{
+			Pid: cmd.Process.Pid,
+		}); err != nil {
+			return "", errors.Wrapf(err, "failed to join cgroup %s", opts.ShimCgroup)
 		}
 	}
 	if err := shim.AdjustOOMScore(cmd.Process.Pid); err != nil {
 		return "", errors.Wrap(err, "failed to adjust OOM score for shim")
 	}
 	return address, nil
+}
+
+var errNoOptionsProvided = errors.New("no options provided")
+
+func readOptions(r io.Reader) (*options.Options, error) {
+	if data, err := ioutil.ReadAll(r); err == nil {
+		if len(data) > 0 {
+			var any types.Any
+			if err := proto.Unmarshal(data, &any); err != nil {
+				return nil, errors.Wrap(err, "unmarshal stdin proto")
+			}
+			v, err := typeurl.UnmarshalAny(&any)
+			if err != nil {
+				return nil, errors.Wrap(err, "unmarshal any")
+			}
+			if opts, ok := v.(*options.Options); ok {
+				return opts, nil
+			}
+		}
+	}
+	return nil, errNoOptionsProvided
 }
 
 func (s *service) Cleanup(ctx context.Context) (*taskAPI.DeleteResponse, error) {
@@ -250,7 +262,6 @@ func (s *service) Cleanup(ctx context.Context) (*taskAPI.DeleteResponse, error) 
 	if err != nil {
 		return nil, err
 	}
-
 	runtime, err := runc.ReadRuntime(path)
 	if err != nil {
 		return nil, err
