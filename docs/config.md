@@ -79,6 +79,10 @@ version = 2
   # max_concurrent_downloads restricts the number of concurrent downloads for each image.
   max_concurrent_downloads = 3
 
+  # disable_proc_mount disables Kubernetes ProcMount support. This MUST be set to `true`
+  # when using containerd with Kubernetes <=1.11.
+  disable_proc_mount = false
+
   # 'plugins."io.containerd.grpc.v1.cri".containerd' contains config related to containerd
   [plugins."io.containerd.grpc.v1.cri".containerd]
 
