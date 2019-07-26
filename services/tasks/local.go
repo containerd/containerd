@@ -182,24 +182,23 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 	if err != nil {
 		return nil, err
 	}
-	if _, err := rtime.Get(ctx, r.ContainerID); err != runtime.ErrTaskNotExists {
+	_, err = rtime.Get(ctx, r.ContainerID)
+	if err != nil && err != runtime.ErrTaskNotExists {
+		return nil, errdefs.ToGRPC(err)
+	}
+	if err == nil {
 		return nil, errdefs.ToGRPC(fmt.Errorf("task %s already exists", r.ContainerID))
 	}
 	c, err := rtime.Create(ctx, r.ContainerID, opts)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-	// TODO: fast path for getting pid on create
 	if err := l.monitor.Monitor(c); err != nil {
 		return nil, errors.Wrap(err, "monitor task")
 	}
-	state, err := c.State(ctx)
-	if err != nil {
-		log.G(ctx).Error(err)
-	}
 	return &api.CreateTaskResponse{
 		ContainerID: r.ContainerID,
-		Pid:         state.Pid,
+		Pid:         c.PID(),
 	}, nil
 }
 
