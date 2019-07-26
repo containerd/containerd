@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/runtime"
 	client "github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/containerd/runtime/v2/task"
@@ -40,6 +41,18 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
+
+const (
+	loadTimeout     = "io.containerd.timeout.shim.load"
+	cleanupTimeout  = "io.containerd.timeout.shim.cleanup"
+	shutdownTimeout = "io.containerd.timeout.shim.shutdown"
+)
+
+func init() {
+	timeout.Set(loadTimeout, 5*time.Second)
+	timeout.Set(cleanupTimeout, 5*time.Second)
+	timeout.Set(shutdownTimeout, 3*time.Second)
+}
 
 func loadAddress(path string) (string, error) {
 	data, err := ioutil.ReadFile(path)
@@ -100,7 +113,7 @@ func loadShim(ctx context.Context, bundle *Bundle, events *exchange.Exchange, rt
 		events:  events,
 		rtTasks: rt,
 	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := timeout.WithContext(ctx, loadTimeout)
 	defer cancel()
 	if err := s.Connect(ctx); err != nil {
 		return nil, err
@@ -110,7 +123,7 @@ func loadShim(ctx context.Context, bundle *Bundle, events *exchange.Exchange, rt
 
 func cleanupAfterDeadShim(ctx context.Context, id, ns string, events *exchange.Exchange, binaryCall *binary) {
 	ctx = namespaces.WithNamespace(ctx, ns)
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := timeout.WithContext(ctx, cleanupTimeout)
 	defer cancel()
 
 	log.G(ctx).WithFields(logrus.Fields{
@@ -185,7 +198,7 @@ func (s *shim) Shutdown(ctx context.Context) error {
 }
 
 func (s *shim) waitShutdown(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	ctx, cancel := timeout.WithContext(ctx, shutdownTimeout)
 	defer cancel()
 	return s.Shutdown(ctx)
 }
