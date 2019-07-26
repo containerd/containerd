@@ -298,7 +298,7 @@ func (c *Client) KillShim(ctx context.Context) error {
 	return c.signalShim(ctx, unix.SIGKILL)
 }
 
-// Close the cient connection
+// Close the client connection
 func (c *Client) Close() error {
 	if c.c == nil {
 		return nil
