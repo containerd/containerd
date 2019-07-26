@@ -18,9 +18,12 @@ package tasks
 
 import (
 	"errors"
+	"io"
 	"net/url"
+	"os"
 
 	"github.com/containerd/console"
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/sirupsen/logrus"
@@ -91,7 +94,12 @@ var execCommand = cli.Command{
 		pspec.Terminal = tty
 		pspec.Args = args
 
-		var ioCreator cio.Creator
+		var (
+			ioCreator cio.Creator
+			stdinC    = &stdinCloser{
+				stdin: os.Stdin,
+			}
+		)
 
 		if logURI := context.String("log-uri"); logURI != "" {
 			uri, err := url.Parse(logURI)
@@ -109,7 +117,7 @@ var execCommand = cli.Command{
 
 			ioCreator = cio.LogURI(uri)
 		} else {
-			cioOpts := []cio.Opt{cio.WithStdio, cio.WithFIFODir(context.String("fifo-dir"))}
+			cioOpts := []cio.Opt{cio.WithStreams(stdinC, os.Stdout, os.Stderr), cio.WithFIFODir(context.String("fifo-dir"))}
 			if tty {
 				cioOpts = append(cioOpts, cio.WithTerminal)
 			}
@@ -119,6 +127,9 @@ var execCommand = cli.Command{
 		process, err := task.Exec(ctx, context.String("exec-id"), pspec, ioCreator)
 		if err != nil {
 			return err
+		}
+		stdinC.closer = func() {
+			process.CloseIO(ctx, containerd.WithStdinCloser)
 		}
 		// if detach, we should not call this defer
 		if !detach {
@@ -165,4 +176,19 @@ var execCommand = cli.Command{
 		}
 		return nil
 	},
+}
+
+type stdinCloser struct {
+	stdin  *os.File
+	closer func()
+}
+
+func (s *stdinCloser) Read(p []byte) (int, error) {
+	n, err := s.stdin.Read(p)
+	if err == io.EOF {
+		if s.closer != nil {
+			s.closer()
+		}
+	}
+	return n, err
 }
