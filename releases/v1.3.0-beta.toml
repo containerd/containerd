@@ -1,0 +1,54 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.2.0"
+
+pre_release = true
+
+preface = """\
+The fourth major release of containerd comes over 9 months after the previous
+major release and covers a period of both significant project growth and
+further stabilization. Similar to previous releases, the number of API changes
+are small and, as always, backwards compatible. The growing ecosystem of plugins
+and users have driven improvements to make containerd more configurable, usable,
+and pluggable. On Windows, this release brings a new runtime utilizing the shim
+API. For clients, there are many new features and improvements completely
+implemented in the client libraries without requiring daemon upgrade.
+
+## Runtime
+* New Windows runtime using hcsshim
+* Improvements to ttrpc for daemon to shim communication (https://github.com/containerd/containerd/pull/3341)
+
+## Snapshots
+* Devmapper snapshotter (https://github.com/containerd/containerd/pull/3022)
+* Improved label support for plugins
+
+## Plugins
+* Support for plugins registering as a TCP service
+* Configurable plugin directory
+
+## CRI
+
+## Client
+* Default handling from namespace labels (https://github.com/containerd/containerd/pull/3403)
+* Improved Docker resolver with mirroring support
+* Support for cross repository push (https://github.com/containerd/containerd/pull/3218)
+
+## Other
+* [API] Add support for direct resource management in leases (https://github.com/containerd/containerd/pull/3304)
+* [API] Add ttrpc service for shim event publishing
+* [API] Add annotations to descriptors in API
+* [API] Add id to TaskDelete event message to match exec id
+* Support additional garbage collection labels
+
+And many more improvements and bug fixes in the complete changelog"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
