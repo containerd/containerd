@@ -195,6 +195,11 @@ func (s *shim) ID() string {
 	return s.bundle.ID
 }
 
+// PID of the task
+func (s *shim) PID() uint32 {
+	return uint32(s.taskPid)
+}
+
 func (s *shim) Namespace() string {
 	return s.bundle.Namespace
 }
