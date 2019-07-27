@@ -76,6 +76,9 @@ version = 2
   # This is useful when the containerd does not have permission to decrease OOMScoreAdj.
   restrict_oom_score_adj = false
 
+  # max_concurrent_downloads restricts the number of concurrent downloads for each image.
+  max_concurrent_downloads = 3
+
   # 'plugins."io.containerd.grpc.v1.cri".containerd' contains config related to containerd
   [plugins."io.containerd.grpc.v1.cri".containerd]
 
