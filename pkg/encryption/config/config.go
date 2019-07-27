@@ -48,6 +48,13 @@ func InitDecryption(dcparameters map[string][][]byte) CryptoConfig {
 	}
 }
 
+// InitDecryptConfig initialized a DecrytConfig object with parameters used for decryption
+func InitDecryptConfig(dcparameters map[string][][]byte) DecryptConfig {
+	return DecryptConfig{
+		Parameters: dcparameters,
+	}
+}
+
 // InitEncryption initializes a CryptoConfig object with parameters used for encryption
 // It also takes dcparameters that may be needed for decryption when adding a recipient
 // to an already encrypted image
