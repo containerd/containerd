@@ -213,6 +213,15 @@ func (s *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 		bkey = string(sbkt.Get(bucketKeyName))
 		local.Parent = string(sbkt.Get(bucketKeyParent))
 
+		inner := snapshots.Info{
+			Name:   bkey,
+			Labels: filterInheritedLabels(local.Labels),
+		}
+
+		if _, err := s.Snapshotter.Update(ctx, inner, fieldpaths...); err != nil {
+			return err
+		}
+
 		return nil
 	}); err != nil {
 		return snapshots.Info{}, err
