@@ -177,6 +177,8 @@ type PluginConfig struct {
 	// current OOMScoreADj.
 	// This is useful when the containerd does not have permission to decrease OOMScoreAdj.
 	RestrictOOMScoreAdj bool `toml:"restrict_oom_score_adj" json:"restrictOOMScoreAdj"`
+	// MaxConcurrentDownloads restricts the number of concurrent downloads for each image.
+	MaxConcurrentDownloads int `toml:"max_concurrent_downloads" json:"maxConcurrentDownloads"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
@@ -242,6 +244,7 @@ func DefaultConfig() PluginConfig {
 				},
 			},
 		},
+		MaxConcurrentDownloads: 3,
 	}
 }
 
