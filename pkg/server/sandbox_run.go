@@ -551,7 +551,7 @@ func (c *criService) setupPod(id string, path string, config *runtime.PodSandbox
 	// or an unreasonable valure see validateBandwidthIsReasonable()
 	bandWidth, err := toCNIBandWidth(config.Annotations)
 	if err != nil {
-		return "", nil, errors.Errorf("failed to find network info for sandbox %q", id)
+		return "", nil, errors.Wrap(err, "failed to get bandwidth info from annotations")
 	}
 
 	result, err := c.netPlugin.Setup(id,
