@@ -110,11 +110,15 @@ func Apply(ctx context.Context, root string, r io.Reader, opts ...ApplyOpt) (int
 	if options.Filter == nil {
 		options.Filter = all
 	}
+	if options.applyFunc == nil {
+		options.applyFunc = applyNaive
+	}
 
-	return apply(ctx, root, tar.NewReader(r), options)
+	return options.applyFunc(ctx, root, tar.NewReader(r), options)
 }
 
-// applyNaive applies a tar stream of an OCI style diff tar.
+// applyNaive applies a tar stream of an OCI style diff tar to a directory
+// applying each file as either a whole file or whiteout.
 // See https://github.com/opencontainers/image-spec/blob/master/layer.md#applying-changesets
 func applyNaive(ctx context.Context, root string, tr *tar.Reader, options ApplyOptions) (size int64, err error) {
 	var (
@@ -123,7 +127,49 @@ func applyNaive(ctx context.Context, root string, tr *tar.Reader, options ApplyO
 		// Used for handling opaque directory markers which
 		// may occur out of order
 		unpackedPaths = make(map[string]struct{})
+
+		convertWhiteout = options.ConvertWhiteout
 	)
+
+	if convertWhiteout == nil {
+		// handle whiteouts by removing the target files
+		convertWhiteout = func(hdr *tar.Header, path string) (bool, error) {
+			base := filepath.Base(path)
+			dir := filepath.Dir(path)
+			if base == whiteoutOpaqueDir {
+				_, err := os.Lstat(dir)
+				if err != nil {
+					return false, err
+				}
+				err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+					if err != nil {
+						if os.IsNotExist(err) {
+							err = nil // parent was deleted
+						}
+						return err
+					}
+					if path == dir {
+						return nil
+					}
+					if _, exists := unpackedPaths[path]; !exists {
+						err := os.RemoveAll(path)
+						return err
+					}
+					return nil
+				})
+				return false, err
+			}
+
+			if strings.HasPrefix(base, whiteoutPrefix) {
+				originalBase := base[len(whiteoutPrefix):]
+				originalPath := filepath.Join(dir, originalBase)
+
+				return false, os.RemoveAll(originalPath)
+			}
+
+			return true, nil
+		}
+	}
 
 	// Iterate through the files in the archive.
 	for {
@@ -182,55 +228,13 @@ func applyNaive(ctx context.Context, root string, tr *tar.Reader, options ApplyO
 			if base == "" {
 				parentPath = filepath.Dir(path)
 			}
-			if _, err := os.Lstat(parentPath); err != nil && os.IsNotExist(err) {
-				err = mkdirAll(parentPath, 0755)
-				if err != nil {
-					return 0, err
-				}
+			if err := mkparent(ctx, parentPath, root, options.Parents); err != nil {
+				return 0, err
 			}
 		}
 
 		// Naive whiteout convert function which handles whiteout files by
 		// removing the target files.
-		convertWhiteout := func(hdr *tar.Header, path string) (bool, error) {
-			base := filepath.Base(path)
-			dir := filepath.Dir(path)
-			if base == whiteoutOpaqueDir {
-				_, err := os.Lstat(dir)
-				if err != nil {
-					return false, err
-				}
-				err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-					if err != nil {
-						if os.IsNotExist(err) {
-							err = nil // parent was deleted
-						}
-						return err
-					}
-					if path == dir {
-						return nil
-					}
-					if _, exists := unpackedPaths[path]; !exists {
-						err := os.RemoveAll(path)
-						return err
-					}
-					return nil
-				})
-				return false, err
-			}
-
-			if strings.HasPrefix(base, whiteoutPrefix) {
-				originalBase := base[len(whiteoutPrefix):]
-				originalPath := filepath.Join(dir, originalBase)
-
-				return false, os.RemoveAll(originalPath)
-			}
-
-			return true, nil
-		}
-		if options.ConvertWhiteout != nil {
-			convertWhiteout = options.ConvertWhiteout
-		}
 		if err := validateWhiteout(path); err != nil {
 			return 0, err
 		}
@@ -373,6 +377,66 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 	}
 
 	return chtimes(path, boundTime(latestTime(hdr.AccessTime, hdr.ModTime)), boundTime(hdr.ModTime))
+}
+
+func mkparent(ctx context.Context, path, root string, parents []string) error {
+	if dir, err := os.Lstat(path); err == nil {
+		if dir.IsDir() {
+			return nil
+		}
+		return &os.PathError{
+			Op:   "mkparent",
+			Path: path,
+			Err:  syscall.ENOTDIR,
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+
+	i := len(path)
+	for i > len(root) && !os.IsPathSeparator(path[i-1]) {
+		i--
+	}
+
+	if i > len(root)+1 {
+		if err := mkparent(ctx, path[:i-1], root, parents); err != nil {
+			return err
+		}
+	}
+
+	if err := mkdir(path, 0755); err != nil {
+		// Check that still doesn't exist
+		dir, err1 := os.Lstat(path)
+		if err1 == nil && dir.IsDir() {
+			return nil
+		}
+		return err
+	}
+
+	for _, p := range parents {
+		ppath, err := fs.RootPath(p, path[len(root):])
+		if err != nil {
+			return err
+		}
+
+		dir, err := os.Lstat(ppath)
+		if err == nil {
+			if !dir.IsDir() {
+				// Replaced, do not copy attributes
+				break
+			}
+			if err := copyDirInfo(dir, path); err != nil {
+				return err
+			}
+			return copyUpXAttrs(path, ppath)
+		} else if !os.IsNotExist(err) {
+			return err
+		}
+	}
+
+	log.G(ctx).Debugf("parent directory %q not found: default permissions(0755) used", path)
+
+	return nil
 }
 
 type changeWriter struct {
@@ -545,6 +609,9 @@ func (cw *changeWriter) Close() error {
 }
 
 func (cw *changeWriter) includeParents(hdr *tar.Header) error {
+	if cw.addedDirs == nil {
+		return nil
+	}
 	name := strings.TrimRight(hdr.Name, "/")
 	fname := filepath.Join(cw.source, name)
 	parent := filepath.Dir(name)

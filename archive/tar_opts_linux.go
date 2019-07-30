@@ -27,12 +27,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// ApplyOptions provides additional options for an Apply operation
-type ApplyOptions struct {
-	Filter          Filter          // Filter tar headers
-	ConvertWhiteout ConvertWhiteout // Convert whiteout files
-}
-
 // AufsConvertWhiteout converts whiteout files for aufs.
 func AufsConvertWhiteout(_ *tar.Header, _ string) (bool, error) {
 	return true, nil

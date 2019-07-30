@@ -23,34 +23,32 @@ import (
 )
 
 func TestGetOverlayPath(t *testing.T) {
-	good := []string{"upperdir=/test/upper", "lowerdir=/test/lower", "workdir=/test/work"}
-	path, err := getOverlayPath(good)
+	good := []string{"upperdir=/test/upper", "lowerdir=/test/lower1:/test/lower2", "workdir=/test/work"}
+	path, parents, err := getOverlayPath(good)
 	if err != nil {
 		t.Fatalf("Get overlay path failed: %v", err)
 	}
 	if path != "/test/upper" {
 		t.Fatalf("Unexpected upperdir: %q", path)
 	}
+	if len(parents) != 2 || parents[0] != "/test/lower1" || parents[1] != "/test/lower2" {
+		t.Fatalf("Unexpected parents: %v", parents)
+	}
 
 	bad := []string{"lowerdir=/test/lower"}
-	_, err = getOverlayPath(bad)
+	_, _, err = getOverlayPath(bad)
 	if err == nil {
 		t.Fatalf("An error is expected")
 	}
 }
 
 func TestGetAufsPath(t *testing.T) {
-	rwDir := "/test/rw"
 	for _, test := range []struct {
 		options   []string
 		expectErr bool
 	}{
 		{
-			options:   []string{"random:option", "br:" + rwDir + "=rw:/test/ro=ro+wh"},
-			expectErr: false,
-		},
-		{
-			options:   []string{"random:option", "br=" + rwDir + "=rw:/test/ro=ro+wh"},
+			options:   []string{"random:option", "br:/test/rw=rw:/test/ro=ro+wh"},
 			expectErr: false,
 		},
 		{
@@ -62,7 +60,7 @@ func TestGetAufsPath(t *testing.T) {
 			expectErr: true,
 		},
 	} {
-		path, err := getAufsPath(test.options)
+		path, parents, err := getAufsPath(test.options)
 		if test.expectErr {
 			if err == nil {
 				t.Fatalf("An error is expected")
@@ -72,8 +70,12 @@ func TestGetAufsPath(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Get aufs path failed: %v", err)
 		}
-		if path != rwDir {
+		if path != "/test/rw" {
 			t.Fatalf("Unexpected rw dir: %q", path)
 		}
+		if len(parents) != 1 || parents[0] != "/test/ro" {
+			t.Fatalf("Unexpected parents: %v", parents)
+		}
+
 	}
 }

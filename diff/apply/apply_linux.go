@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/archive"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/pkg/errors"
 )
@@ -31,60 +32,97 @@ import (
 func apply(ctx context.Context, mounts []mount.Mount, r io.Reader) error {
 	switch {
 	case len(mounts) == 1 && mounts[0].Type == "overlay":
-		path, err := getOverlayPath(mounts[0].Options)
+		path, parents, err := getOverlayPath(mounts[0].Options)
 		if err != nil {
+			if errdefs.IsInvalidArgument(err) {
+				break
+			}
 			return err
 		}
-		_, err = archive.Apply(ctx, path, r,
-			archive.WithConvertWhiteout(archive.OverlayConvertWhiteout))
+		opts := []archive.ApplyOpt{
+			archive.WithConvertWhiteout(archive.OverlayConvertWhiteout),
+		}
+		if len(parents) > 0 {
+			opts = append(opts, archive.WithParents(parents))
+		}
+		_, err = archive.Apply(ctx, path, r, opts...)
 		return err
 	case len(mounts) == 1 && mounts[0].Type == "aufs":
-		path, err := getAufsPath(mounts[0].Options)
+		path, parents, err := getAufsPath(mounts[0].Options)
 		if err != nil {
+			if errdefs.IsInvalidArgument(err) {
+				break
+			}
 			return err
 		}
-		_, err = archive.Apply(ctx, path, r,
-			archive.WithConvertWhiteout(archive.AufsConvertWhiteout))
+		opts := []archive.ApplyOpt{
+			archive.WithConvertWhiteout(archive.AufsConvertWhiteout),
+		}
+		if len(parents) > 0 {
+			opts = append(opts, archive.WithParents(parents))
+		}
+		_, err = archive.Apply(ctx, path, r, opts...)
 		return err
-	default:
-		return mount.WithTempMount(ctx, mounts, func(root string) error {
-			_, err := archive.Apply(ctx, root, r)
-			return err
-		})
 	}
+	return mount.WithTempMount(ctx, mounts, func(root string) error {
+		_, err := archive.Apply(ctx, root, r)
+		return err
+	})
 }
 
-func getOverlayPath(options []string) (string, error) {
+func getOverlayPath(options []string) (upper string, lower []string, err error) {
 	const upperdirPrefix = "upperdir="
+	const lowerdirPrefix = "lowerdir="
+
 	for _, o := range options {
 		if strings.HasPrefix(o, upperdirPrefix) {
-			return strings.TrimPrefix(o, upperdirPrefix), nil
+			upper = strings.TrimPrefix(o, upperdirPrefix)
+		} else if strings.HasPrefix(o, lowerdirPrefix) {
+			lower = strings.Split(strings.TrimPrefix(o, lowerdirPrefix), ":")
 		}
 	}
-	return "", errors.New("upperdir not found")
+	if upper == "" {
+		return "", nil, errors.Wrap(errdefs.ErrInvalidArgument, "upperdir not found")
+	}
+
+	return
 }
 
-func getAufsPath(options []string) (string, error) {
+// getAufsPath handles options as given by the containerd aufs package only,
+// formatted as "br:<upper>=rw[:<lower>=ro+wh]*"
+func getAufsPath(options []string) (upper string, lower []string, err error) {
 	const (
-		sep       = ":"
-		brPrefix1 = "br:"
-		brPrefix2 = "br="
-		rwSuffix  = "=rw"
+		sep      = ":"
+		brPrefix = "br:"
+		rwSuffix = "=rw"
+		roSuffix = "=ro+wh"
 	)
 	for _, o := range options {
-		if strings.HasPrefix(o, brPrefix1) {
-			o = strings.TrimPrefix(o, brPrefix1)
-		} else if strings.HasPrefix(o, brPrefix2) {
-			o = strings.TrimPrefix(o, brPrefix2)
+		if strings.HasPrefix(o, brPrefix) {
+			o = strings.TrimPrefix(o, brPrefix)
 		} else {
 			continue
 		}
+
 		for _, b := range strings.Split(o, sep) {
 			if strings.HasSuffix(b, rwSuffix) {
-				return strings.TrimSuffix(b, rwSuffix), nil
+				if upper != "" {
+					return "", nil, errors.Wrap(errdefs.ErrInvalidArgument, "multiple rw branch found")
+				}
+				upper = strings.TrimSuffix(b, rwSuffix)
+			} else if strings.HasSuffix(b, roSuffix) {
+				if upper == "" {
+					return "", nil, errors.Wrap(errdefs.ErrInvalidArgument, "rw branch be first")
+				}
+				lower = append(lower, strings.TrimSuffix(b, roSuffix))
+			} else {
+				return "", nil, errors.Wrap(errdefs.ErrInvalidArgument, "unhandled aufs suffix")
 			}
+
 		}
-		break
 	}
-	return "", errors.New("rw branch not found")
+	if upper == "" {
+		return "", nil, errors.Wrap(errdefs.ErrInvalidArgument, "rw branch not found")
+	}
+	return
 }
