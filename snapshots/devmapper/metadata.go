@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
 )
@@ -127,23 +126,25 @@ func (m *PoolMetadata) AddDevice(ctx context.Context, info *DeviceInfo) error {
 // The snapshotter might attempt to recreate a device in 'Faulty' state with another devmapper ID in
 // subsequent calls, and in case of success it's status will be changed to 'Created' or 'Activated'.
 // The devmapper dev ID will remain in 'deviceFaulty' state until manually handled by a user.
-func (m *PoolMetadata) MarkFaulty(ctx context.Context, info *DeviceInfo) error {
-	var result error
+func (m *PoolMetadata) MarkFaulty(ctx context.Context, name string) error {
+	return m.db.Update(func(tx *bolt.Tx) error {
+		var (
+			device    = DeviceInfo{}
+			devBucket = tx.Bucket(devicesBucketName)
+		)
 
-	if err := m.UpdateDevice(ctx, info.Name, func(deviceInfo *DeviceInfo) error {
-		deviceInfo.State = Faulty
-		return nil
-	}); err != nil {
-		result = multierror.Append(result, err)
-	}
+		if err := getObject(devBucket, name, &device); err != nil {
+			return err
+		}
 
-	if err := m.db.Update(func(tx *bolt.Tx) error {
-		return markDeviceID(tx, info.DeviceID, deviceFaulty)
-	}); err != nil {
-		result = multierror.Append(result, err)
-	}
+		device.State = Faulty
 
-	return result
+		if err := putObject(devBucket, name, &device, true); err != nil {
+			return err
+		}
+
+		return markDeviceID(tx, device.DeviceID, deviceFaulty)
+	})
 }
 
 // getNextDeviceID finds the next free device ID by taking a cursor

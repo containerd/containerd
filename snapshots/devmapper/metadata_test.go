@@ -162,7 +162,7 @@ func TestPoolMetadata_MarkFaulty(t *testing.T) {
 	err := store.AddDevice(testCtx, info)
 	assert.NilError(t, err)
 
-	err = store.MarkFaulty(testCtx, info)
+	err = store.MarkFaulty(testCtx, "test")
 	assert.NilError(t, err)
 
 	saved, err := store.GetDevice(testCtx, info.Name)

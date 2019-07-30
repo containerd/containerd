@@ -132,7 +132,7 @@ func (p *PoolDevice) CreateThinDevice(ctx context.Context, deviceName string, vi
 			if delErr != nil {
 				// Failed to rollback, mark the device as faulty and keep metadata in order to
 				// preserve the faulty device ID
-				retErr = multierror.Append(retErr, delErr, p.metadata.MarkFaulty(ctx, info))
+				retErr = multierror.Append(retErr, delErr, p.metadata.MarkFaulty(ctx, info.Name))
 				return
 			}
 
@@ -147,7 +147,7 @@ func (p *PoolDevice) CreateThinDevice(ctx context.Context, deviceName string, vi
 
 		// We're unable to create the devmapper device, most likely something wrong with the deviceID
 		if devErr != nil {
-			retErr = multierror.Append(retErr, p.metadata.MarkFaulty(ctx, info))
+			retErr = multierror.Append(retErr, p.metadata.MarkFaulty(ctx, info.Name))
 			return
 		}
 	}()
@@ -223,7 +223,7 @@ func (p *PoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName string
 			if delErr != nil {
 				// Failed to rollback, mark the device as faulty and keep metadata in order to
 				// preserve the faulty device ID
-				retErr = multierror.Append(retErr, delErr, p.metadata.MarkFaulty(ctx, snapInfo))
+				retErr = multierror.Append(retErr, delErr, p.metadata.MarkFaulty(ctx, snapInfo.Name))
 				return
 			}
 
@@ -238,7 +238,7 @@ func (p *PoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName string
 
 		// We're unable to create the devmapper device, most likely something wrong with the deviceID
 		if devErr != nil {
-			retErr = multierror.Append(retErr, p.metadata.MarkFaulty(ctx, snapInfo))
+			retErr = multierror.Append(retErr, p.metadata.MarkFaulty(ctx, snapInfo.Name))
 			return
 		}
 	}()
