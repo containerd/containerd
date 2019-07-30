@@ -118,35 +118,59 @@ func (p *PoolDevice) CreateThinDevice(ctx context.Context, deviceName string, vi
 		State: Unknown,
 	}
 
-	// Save initial device metadata and allocate new device ID from store
-	if err := p.metadata.AddDevice(ctx, info); err != nil {
-		return errors.Wrapf(err, "failed to save initial metadata for new thin device %q", deviceName)
-	}
+	var (
+		metaErr   error
+		devErr    error
+		activeErr error
+	)
 
 	defer func() {
-		if retErr == nil {
+		// We've created a devmapper device, but failed to activate it, try rollback everything
+		if activeErr != nil {
+			// Delete the device first.
+			delErr := p.deleteDevice(ctx, info)
+			if delErr != nil {
+				// Failed to rollback, mark the device as faulty and keep metadata in order to
+				// preserve the faulty device ID
+				retErr = multierror.Append(retErr, delErr, p.metadata.MarkFaulty(ctx, info))
+				return
+			}
+
+			// The devmapper device has been successfully deleted, deallocate device ID
+			if err := p.RemoveDevice(ctx, info.Name); err != nil {
+				retErr = multierror.Append(retErr, err)
+				return
+			}
+
 			return
 		}
 
-		// Rollback metadata
-		retErr = multierror.Append(retErr, p.metadata.RemoveDevice(ctx, info.Name))
+		// We're unable to create the devmapper device, most likely something wrong with the deviceID
+		if devErr != nil {
+			retErr = multierror.Append(retErr, p.metadata.MarkFaulty(ctx, info))
+			return
+		}
 	}()
+
+	// Save initial device metadata and allocate new device ID from store
+	metaErr = p.metadata.AddDevice(ctx, info)
+	if metaErr != nil {
+		return metaErr
+	}
 
 	// Create thin device
-	if err := p.createDevice(ctx, info); err != nil {
-		return err
+	devErr = p.createDevice(ctx, info)
+	if devErr != nil {
+		return devErr
 	}
 
-	defer func() {
-		if retErr == nil {
-			return
-		}
+	// Activate thin device
+	activeErr = p.activateDevice(ctx, info)
+	if activeErr != nil {
+		return activeErr
+	}
 
-		// Rollback creation
-		retErr = multierror.Append(retErr, p.deleteDevice(ctx, info))
-	}()
-
-	return p.activateDevice(ctx, info)
+	return nil
 }
 
 // createDevice creates thin device
@@ -185,36 +209,59 @@ func (p *PoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName string
 		State:      Unknown,
 	}
 
-	// Save snapshot metadata and allocate new device ID
-	if err := p.metadata.AddDevice(ctx, snapInfo); err != nil {
-		return errors.Wrapf(err, "failed to save initial metadata for snapshot %q", snapshotName)
-	}
+	var (
+		metaErr   error
+		devErr    error
+		activeErr error
+	)
 
 	defer func() {
-		if retErr == nil {
+		// We've created a devmapper device, but failed to activate it, try rollback everything
+		if activeErr != nil {
+			// Delete the device first.
+			delErr := p.deleteDevice(ctx, snapInfo)
+			if delErr != nil {
+				// Failed to rollback, mark the device as faulty and keep metadata in order to
+				// preserve the faulty device ID
+				retErr = multierror.Append(retErr, delErr, p.metadata.MarkFaulty(ctx, snapInfo))
+				return
+			}
+
+			// The devmapper device has been successfully deleted, deallocate device ID
+			if err := p.RemoveDevice(ctx, snapInfo.Name); err != nil {
+				retErr = multierror.Append(retErr, err)
+				return
+			}
+
 			return
 		}
 
-		// Rollback metadata
-		retErr = multierror.Append(retErr, p.metadata.RemoveDevice(ctx, snapInfo.Name))
+		// We're unable to create the devmapper device, most likely something wrong with the deviceID
+		if devErr != nil {
+			retErr = multierror.Append(retErr, p.metadata.MarkFaulty(ctx, snapInfo))
+			return
+		}
 	}()
+
+	// Save snapshot metadata and allocate new device ID
+	metaErr = p.metadata.AddDevice(ctx, snapInfo)
+	if metaErr != nil {
+		return metaErr
+	}
 
 	// Create thin device snapshot
-	if err := p.createSnapshot(ctx, baseInfo, snapInfo); err != nil {
-		return err
+	devErr = p.createSnapshot(ctx, baseInfo, snapInfo)
+	if devErr != nil {
+		return devErr
 	}
 
-	defer func() {
-		if retErr == nil {
-			return
-		}
+	// Activate the snapshot device
+	activeErr = p.activateDevice(ctx, snapInfo)
+	if activeErr != nil {
+		return activeErr
+	}
 
-		// Rollback snapshot creation
-		retErr = multierror.Append(retErr, p.deleteDevice(ctx, snapInfo))
-	}()
-
-	// Activate snapshot device
-	return p.activateDevice(ctx, snapInfo)
+	return nil
 }
 
 func (p *PoolDevice) createSnapshot(ctx context.Context, baseInfo, snapInfo *DeviceInfo) error {

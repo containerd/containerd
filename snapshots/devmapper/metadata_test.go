@@ -23,8 +23,11 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
+	"github.com/pkg/errors"
+	"go.etcd.io/bbolt"
 	"gotest.tools/assert"
 	is "gotest.tools/assert/cmp"
 )
@@ -77,7 +80,7 @@ func TestPoolMetadata_AddDeviceDuplicate(t *testing.T) {
 	assert.NilError(t, err)
 
 	err = store.AddDevice(testCtx, &DeviceInfo{Name: "test"})
-	assert.Equal(t, ErrAlreadyExists, err)
+	assert.Equal(t, ErrAlreadyExists, errors.Cause(err))
 }
 
 func TestPoolMetadata_ReuseDeviceID(t *testing.T) {
@@ -149,6 +152,33 @@ func TestPoolMetadata_UpdateDevice(t *testing.T) {
 	assert.Equal(t, "test5", newInfo.ParentName)
 	assert.Assert(t, newInfo.Size == 6)
 	assert.Equal(t, Created, newInfo.State)
+}
+
+func TestPoolMetadata_MarkFaulty(t *testing.T) {
+	tempDir, store := createStore(t)
+	defer cleanupStore(t, tempDir, store)
+
+	info := &DeviceInfo{Name: "test"}
+	err := store.AddDevice(testCtx, info)
+	assert.NilError(t, err)
+
+	err = store.MarkFaulty(testCtx, info)
+	assert.NilError(t, err)
+
+	saved, err := store.GetDevice(testCtx, info.Name)
+	assert.NilError(t, err)
+	assert.Equal(t, saved.State, Faulty)
+	assert.Assert(t, saved.DeviceID > 0)
+
+	// Make sure a device ID marked as faulty as well
+	err = store.db.View(func(tx *bbolt.Tx) error {
+		bucket := tx.Bucket(deviceIDBucketName)
+		key := strconv.FormatUint(uint64(saved.DeviceID), 10)
+		value := bucket.Get([]byte(key))
+		assert.Equal(t, value[0], byte(deviceFaulty))
+		return nil
+	})
+	assert.NilError(t, err)
 }
 
 func TestPoolMetadata_GetDeviceNames(t *testing.T) {

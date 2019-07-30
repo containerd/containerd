@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
 )
@@ -38,6 +39,7 @@ type deviceIDState byte
 const (
 	deviceFree deviceIDState = iota
 	deviceTaken
+	deviceFaulty
 )
 
 // Bucket names
@@ -92,11 +94,14 @@ func (m *PoolMetadata) ensureDatabaseInitialized() error {
 
 // AddDevice saves device info to database.
 func (m *PoolMetadata) AddDevice(ctx context.Context, info *DeviceInfo) error {
-	return m.db.Update(func(tx *bolt.Tx) error {
+	err := m.db.Update(func(tx *bolt.Tx) error {
 		devicesBucket := tx.Bucket(devicesBucketName)
 
-		// Make sure device name is unique
-		if err := getObject(devicesBucket, info.Name, nil); err == nil {
+		// Make sure device name is unique. If there is already a device with the same name,
+		// but in Faulty state, give it a try with another devmapper device ID.
+		// See https://github.com/containerd/containerd/pull/3436 for more context.
+		var existing DeviceInfo
+		if err := getObject(devicesBucket, info.Name, &existing); err == nil && existing.State != Faulty {
 			return ErrAlreadyExists
 		}
 
@@ -108,8 +113,37 @@ func (m *PoolMetadata) AddDevice(ctx context.Context, info *DeviceInfo) error {
 
 		info.DeviceID = deviceID
 
-		return putObject(devicesBucket, info.Name, info, false)
+		return putObject(devicesBucket, info.Name, info, true)
 	})
+
+	if err != nil {
+		return errors.Wrapf(err, "failed to save metadata for device %q (parent: %q)", info.Name, info.ParentName)
+	}
+
+	return nil
+}
+
+// MarkFaulty marks the given device and corresponding devmapper device ID as faulty.
+// The snapshotter might attempt to recreate a device in 'Faulty' state with another devmapper ID in
+// subsequent calls, and in case of success it's status will be changed to 'Created' or 'Activated'.
+// The devmapper dev ID will remain in 'deviceFaulty' state until manually handled by a user.
+func (m *PoolMetadata) MarkFaulty(ctx context.Context, info *DeviceInfo) error {
+	var result error
+
+	if err := m.UpdateDevice(ctx, info.Name, func(deviceInfo *DeviceInfo) error {
+		deviceInfo.State = Faulty
+		return nil
+	}); err != nil {
+		result = multierror.Append(result, err)
+	}
+
+	if err := m.db.Update(func(tx *bolt.Tx) error {
+		return markDeviceID(tx, info.DeviceID, deviceFaulty)
+	}); err != nil {
+		result = multierror.Append(result, err)
+	}
+
+	return result
 }
 
 // getNextDeviceID finds the next free device ID by taking a cursor

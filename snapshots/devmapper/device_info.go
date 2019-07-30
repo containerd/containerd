@@ -56,6 +56,8 @@ const (
 	Removing
 	// Removed means that device successfully removed but not yet deleted from meta store
 	Removed
+	// Faulty means that the device is errored and the snapshotter failed to rollback it
+	Faulty
 )
 
 func (s DeviceState) String() string {
@@ -84,6 +86,8 @@ func (s DeviceState) String() string {
 		return "Removing"
 	case Removed:
 		return "Removed"
+	case Faulty:
+		return "Faulty"
 	default:
 		return fmt.Sprintf("unknown %d", s)
 	}
