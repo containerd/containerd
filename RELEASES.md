@@ -199,6 +199,10 @@ enumerating the support services and messages. See [api/](api) for details.
 Note that new services may be added in _minor_ releases. New service methods
 and new fields on messages may be added if they are optional.
 
+`*.pb.txt` files are generated at each API release. They prevent unintentional changes
+to the API by having a diff that the CI can run. These files are not intended to be
+consumed or used by clients.
+
 ### Metrics API
 
 The metrics API that outputs prometheus style metrics will be versioned independently,
