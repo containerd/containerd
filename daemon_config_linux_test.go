@@ -241,8 +241,16 @@ version = 1
 
 	defer cleanup()
 
-	for k, v := range cgroupPath {
-		if k == "rmda" {
+	paths := []string{
+		"devices",
+		"memory",
+		"cpu",
+		"blkio",
+	}
+
+	for _, p := range paths {
+		v := cgroupPath[p]
+		if v == "" {
 			continue
 		}
 		path := filepath.Join(v, customCgroup)
