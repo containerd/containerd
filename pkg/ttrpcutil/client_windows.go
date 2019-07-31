@@ -19,6 +19,7 @@
 package ttrpcutil
 
 import (
+	"context"
 	"net"
 	"os"
 	"time"
@@ -28,33 +29,31 @@ import (
 )
 
 func ttrpcDial(address string, timeout time.Duration) (net.Conn, error) {
-	var c net.Conn
-	var lastError error
-	timedOutError := errors.Errorf("timed out waiting for npipe %s", address)
-	start := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	// If there is nobody serving the pipe we limit the timeout for this case to
+	// 5 seconds because any shim that would serve this endpoint should serve it
+	// within 5 seconds.
+	serveTimer := time.NewTimer(5 * time.Second)
+	defer serveTimer.Stop()
 	for {
-		remaining := timeout - time.Since(start)
-		if remaining <= 0 {
-			lastError = timedOutError
-			break
+		c, err := winio.DialPipeContext(ctx, address)
+		if err != nil {
+			if os.IsNotExist(err) {
+				select {
+				case <-serveTimer.C:
+					return nil, errors.Wrap(os.ErrNotExist, "pipe not found before timeout")
+				default:
+					// Wait 10ms for the shim to serve and try again.
+					time.Sleep(10 * time.Millisecond)
+					continue
+				}
+			} else if err == context.DeadlineExceeded {
+				return nil, errors.Wrapf(err, "timed out waiting for npipe %s", address)
+			}
+			return nil, err
 		}
-		c, lastError = winio.DialPipe(address, &remaining)
-		if lastError == nil {
-			break
-		}
-		if !os.IsNotExist(lastError) {
-			break
-		}
-		// There is nobody serving the pipe. We limit the timeout for this case
-		// to 5 seconds because any shim that would serve this endpoint should
-		// serve it within 5 seconds. We use the passed in timeout for the
-		// `DialPipe` timeout if the pipe exists however to give the pipe time
-		// to `Accept` the connection.
-		if time.Since(start) >= 5*time.Second {
-			lastError = timedOutError
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
+		return c, nil
 	}
-	return c, lastError
 }
