@@ -2368,6 +2368,7 @@ file {
   package: "containerd.services.introspection.v1"
   dependency: "github.com/containerd/containerd/api/types/platform.proto"
   dependency: "google/rpc/status.proto"
+  dependency: "google/protobuf/empty.proto"
   dependency: "gogoproto/gogo.proto"
   message_type {
     name: "Plugin"
@@ -2471,6 +2472,19 @@ file {
       json_name: "plugins"
     }
   }
+  message_type {
+    name: "ServerResponse"
+    field {
+      name: "uuid"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      options {
+        65004: "UUID"
+      }
+      json_name: "uuid"
+    }
+  }
   service {
     name: "Introspection"
     method {
@@ -2478,11 +2492,16 @@ file {
       input_type: ".containerd.services.introspection.v1.PluginsRequest"
       output_type: ".containerd.services.introspection.v1.PluginsResponse"
     }
+    method {
+      name: "Server"
+      input_type: ".google.protobuf.Empty"
+      output_type: ".containerd.services.introspection.v1.ServerResponse"
+    }
   }
   options {
     go_package: "github.com/containerd/containerd/api/services/introspection/v1;introspection"
   }
-  weak_dependency: 2
+  weak_dependency: 3
   syntax: "proto3"
 }
 file {
