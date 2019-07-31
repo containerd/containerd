@@ -131,18 +131,24 @@ func (gc *gpgv2Client) GetGPGPrivateKey(keyid uint64, passphrase string) ([]byte
 		args = append(args, []string{"--homedir", gc.gpgHomeDir}...)
 	}
 
-	tempfile, err := ioutil.TempFile("", "gpg2*")
+	rfile, wfile, err := os.Pipe()
 	if err != nil {
-		return nil, errors.Wrapf(err, "could not create temporary file")
+		return nil, errors.Wrapf(err, "could not create pipe")
 	}
-	defer os.Remove(tempfile.Name())
-	if err := ioutil.WriteFile(tempfile.Name(), []byte(passphrase), 0600); err != nil {
-		return nil, errors.Wrapf(err, "could not write to temporary file")
-	}
+	defer func() {
+		rfile.Close()
+		wfile.Close()
+	}()
+	// fill pipe in background
+	go func(passphrase string) {
+		wfile.Write([]byte(passphrase))
+		wfile.Close()
+	}(passphrase)
 
-	args = append(args, []string{"--pinentry-mode", "loopback", "--batch", "--passphrase-file", tempfile.Name(), "--export-secret-key", fmt.Sprintf("0x%x", keyid)}...)
+	args = append(args, []string{"--pinentry-mode", "loopback", "--batch", "--passphrase-fd", fmt.Sprintf("%d", 3), "--export-secret-key", fmt.Sprintf("0x%x", keyid)}...)
 
 	cmd := exec.Command("gpg2", args...)
+	cmd.ExtraFiles = []*os.File{rfile}
 
 	return runGPGGetOutput(cmd)
 }
