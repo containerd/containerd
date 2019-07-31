@@ -28,8 +28,6 @@ type LayerCipherType string
 
 // TODO: Should be obtained from OCI spec once included
 const (
-	AESSIVCMAC256 LayerCipherType = "AEAD_AES_SIV_CMAC_STREAM_256"
-	AESSIVCMAC512 LayerCipherType = "AEAD_AES_SIV_CMAC_STREAM_512"
 	AES256CTR     LayerCipherType = "AES_256_CTR"
 	CipherTypeOpt string          = "type"
 )
@@ -109,16 +107,6 @@ func NewLayerBlockCipherHandler() (*LayerBlockCipherHandler, error) {
 	}
 
 	var err error
-	h.cipherMap[AESSIVCMAC256], err = NewAESSIVLayerBlockCipher(256)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to set up Cipher AES-SIV-CMAC-256")
-	}
-
-	h.cipherMap[AESSIVCMAC512], err = NewAESSIVLayerBlockCipher(512)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to set up Cipher AES-SIV-CMAC-512")
-	}
-
 	h.cipherMap[AES256CTR], err = NewAESCTRLayerBlockCipher(256)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to set up Cipher AES-256-CTR")
