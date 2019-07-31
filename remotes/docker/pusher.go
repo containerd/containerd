@@ -37,7 +37,7 @@ import (
 
 type dockerPusher struct {
 	*dockerBase
-	tag string
+	object string
 
 	// TODO: namespace tracker
 	tracker StatusTracker
@@ -74,11 +74,7 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 	case images.MediaTypeDockerSchema2Manifest, images.MediaTypeDockerSchema2ManifestList,
 		ocispec.MediaTypeImageManifest, ocispec.MediaTypeImageIndex:
 		isManifest = true
-		if p.tag == "" {
-			existCheck = []string{"manifests", desc.Digest.String()}
-		} else {
-			existCheck = []string{"manifests", p.tag}
-		}
+		existCheck = getManifestPath(p.object, desc.Digest)
 	default:
 		existCheck = []string{"blobs", desc.Digest.String()}
 	}
@@ -97,7 +93,7 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 	} else {
 		if resp.StatusCode == http.StatusOK {
 			var exists bool
-			if isManifest && p.tag != "" {
+			if isManifest && existCheck[1] != desc.Digest.String() {
 				dgstHeader := digest.Digest(resp.Header.Get("Docker-Content-Digest"))
 				if dgstHeader == desc.Digest {
 					exists = true
@@ -122,13 +118,7 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 	}
 
 	if isManifest {
-		var putPath []string
-		if p.tag != "" {
-			putPath = []string{"manifests", p.tag}
-		} else {
-			putPath = []string{"manifests", desc.Digest.String()}
-		}
-
+		putPath := getManifestPath(p.object, desc.Digest)
 		req = p.request(host, http.MethodPut, putPath...)
 		req.header.Add("Content-Type", desc.MediaType)
 	} else {
@@ -269,6 +259,25 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 		expected:   desc.Digest,
 		tracker:    p.tracker,
 	}, nil
+}
+
+func getManifestPath(object string, dgst digest.Digest) []string {
+	if i := strings.IndexByte(object, '@'); i >= 0 {
+		if object[i+1:] != dgst.String() {
+			// use digest, not tag
+			object = ""
+		} else {
+			// strip @<digest> for registry path to make tag
+			object = object[:i]
+		}
+
+	}
+
+	if object == "" {
+		return []string{"manifests", dgst.String()}
+	}
+
+	return []string{"manifests", object}
 }
 
 type pushWriter struct {

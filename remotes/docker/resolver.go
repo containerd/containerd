@@ -399,13 +399,6 @@ func (r *dockerResolver) Pusher(ctx context.Context, ref string) (remotes.Pusher
 		return nil, err
 	}
 
-	// Manifests can be pushed by digest like any other object, but the passed in
-	// reference cannot take a digest without the associated content. A tag is allowed
-	// and will be used to tag pushed manifests.
-	if refspec.Object != "" && strings.Contains(refspec.Object, "@") {
-		return nil, errors.New("cannot use digest reference for push locator")
-	}
-
 	base, err := r.base(refspec)
 	if err != nil {
 		return nil, err
@@ -413,7 +406,7 @@ func (r *dockerResolver) Pusher(ctx context.Context, ref string) (remotes.Pusher
 
 	return dockerPusher{
 		dockerBase: base,
-		tag:        refspec.Object,
+		object:     refspec.Object,
 		tracker:    r.tracker,
 	}, nil
 }
