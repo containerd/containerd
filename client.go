@@ -57,6 +57,7 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	snproxy "github.com/containerd/containerd/snapshots/proxy"
 	"github.com/containerd/typeurl"
+	"github.com/gogo/protobuf/types"
 	ptypes "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -675,6 +676,27 @@ func (c *Client) Version(ctx context.Context) (Version, error) {
 	return Version{
 		Version:  response.Version,
 		Revision: response.Revision,
+	}, nil
+}
+
+type ServerInfo struct {
+	UUID string
+}
+
+func (c *Client) Server(ctx context.Context) (ServerInfo, error) {
+	c.connMu.Lock()
+	if c.conn == nil {
+		c.connMu.Unlock()
+		return ServerInfo{}, errors.Wrap(errdefs.ErrUnavailable, "no grpc connection available")
+	}
+	c.connMu.Unlock()
+
+	response, err := c.IntrospectionService().Server(ctx, &types.Empty{})
+	if err != nil {
+		return ServerInfo{}, err
+	}
+	return ServerInfo{
+		UUID: response.UUID,
 	}, nil
 }
 
