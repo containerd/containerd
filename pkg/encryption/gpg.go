@@ -131,7 +131,16 @@ func (gc *gpgv2Client) GetGPGPrivateKey(keyid uint64, passphrase string) ([]byte
 		args = append(args, []string{"--homedir", gc.gpgHomeDir}...)
 	}
 
-	args = append(args, []string{"--pinentry-mode", "loopback", "--batch", "--passphrase", passphrase, "--export-secret-key", fmt.Sprintf("0x%x", keyid)}...)
+	tempfile, err := ioutil.TempFile("", "gpg2*")
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not create temporary file")
+	}
+	defer os.Remove(tempfile.Name())
+	if err := ioutil.WriteFile(tempfile.Name(), []byte(passphrase), 0600); err != nil {
+		return nil, errors.Wrapf(err, "could not write to temporary file")
+	}
+
+	args = append(args, []string{"--pinentry-mode", "loopback", "--batch", "--passphrase-file", tempfile.Name(), "--export-secret-key", fmt.Sprintf("0x%x", keyid)}...)
 
 	cmd := exec.Command("gpg2", args...)
 
