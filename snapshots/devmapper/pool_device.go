@@ -364,7 +364,7 @@ func (p *PoolDevice) RemoveDevice(ctx context.Context, deviceName string) error 
 		return errors.Wrapf(err, "can't query metadata for device %q", deviceName)
 	}
 
-	if err := p.DeactivateDevice(ctx, deviceName, true, true); err != nil {
+	if err := p.DeactivateDevice(ctx, deviceName, false, true); err != nil {
 		return err
 	}
 
