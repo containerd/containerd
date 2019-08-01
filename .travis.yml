@@ -77,6 +77,7 @@ script:
   - make build
   - make binaries
   - if [ "$TRAVIS_GOOS" = "linux" ]; then sudo make install ; fi
+  - if [ "$TRAVIS_GOOS" = "linux" ] && [ "${TRAVIS_JOB_NUMBER##*.}" = "1" ]; then ./script/tests/test_encryption.sh; fi
   - if [ "$TRAVIS_GOOS" = "linux" ]; then make coverage ; fi
   - if [ "$TRAVIS_GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH make root-coverage ; fi
   - if [ "$TRAVIS_GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH make integration ; fi
