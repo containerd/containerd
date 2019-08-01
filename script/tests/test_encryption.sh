@@ -94,7 +94,7 @@ failExit() {
 	if [ $rc -ne 0 ]; then
 		echo -e "Error: $msg" >&2
 		echo >&2
-		exit 1
+#		exit 1
 	fi
 }
 
