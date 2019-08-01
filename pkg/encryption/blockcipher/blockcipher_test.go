@@ -45,16 +45,21 @@ func TestBlockCipherEncryption(t *testing.T) {
 		myhmac = hmac
 	}
 
-	ciphertextReader, lbco, err := h.Encrypt(layerDataReader, AESSIVCMAC256, setHmac)
+	ciphertextReader, lbco, err := h.Encrypt(layerDataReader, AES256CTR, setHmac)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ciphertext := make([]byte, 1024)
 	encsize, err := ciphertextReader.Read(ciphertext)
-	if err != nil && err != io.EOF {
-		t.Fatal("Reading the ciphertext should not have failed")
+	if err != io.EOF {
+		t.Fatal("Expected EOF")
 	}
+	// HMAC must be available after Read() of encrypted data
+	if len(myhmac) == 0 {
+		t.Fatal("HMAC has not been calculated")
+	}
+
 	ciphertextTestReader := bytes.NewReader(ciphertext[:encsize])
 
 	// Use a different instantiated object to indicate an invokation at a diff time
@@ -66,7 +71,7 @@ func TestBlockCipherEncryption(t *testing.T) {
 	plaintext := make([]byte, 1024)
 	decsize, err := plaintextReader.Read(plaintext)
 	if err != nil && err != io.EOF {
-		t.Fatal("Read the plaintext should not have failed")
+		t.Fatal("Reading the plaintext should not have failed")
 	}
 
 	if string(plaintext[:decsize]) != string(layerData) {
@@ -90,24 +95,29 @@ func TestBlockCipherEncryptionInvalidKey(t *testing.T) {
 		myhmac = hmac
 	}
 
-	ciphertextReader, lbco, err := h.Encrypt(layerDataReader, AESSIVCMAC512, setHmac)
+	ciphertextReader, lbco, err := h.Encrypt(layerDataReader, AES256CTR, setHmac)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Use a different instantiated object to indicate an invokation at a diff time
-	bc2, err := NewAESSIVLayerBlockCipher(512)
+	bc2, err := NewAESCTRLayerBlockCipher(256)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	lbco.SymmetricKey = []byte("aaa3456789012345678901234567890123456789012345678901234567890123")
+	lbco.SymmetricKey = []byte("aaa34567890123456789012345678901")
 
 	ciphertext := make([]byte, 1024)
 	encsize, err := ciphertextReader.Read(ciphertext)
-	if err != nil {
-		t.Fatal(err)
+	if err != io.EOF {
+		t.Fatal("Expected EOF")
 	}
+	// HMAC must be available after Read() of encrypted data
+	if len(myhmac) == 0 {
+		t.Fatal("HMAC has not been calculated")
+	}
+
 	ciphertextTestReader := bytes.NewReader(ciphertext[:encsize])
 
 	plaintextReader, _, err := bc2.Decrypt(ciphertextTestReader, lbco, myhmac)
@@ -117,7 +127,7 @@ func TestBlockCipherEncryptionInvalidKey(t *testing.T) {
 
 	plaintext := make([]byte, 1024)
 	_, err = plaintextReader.Read(plaintext)
-	if err == nil {
+	if err == nil || err == io.EOF {
 		t.Fatal("Read() should have failed due to wrong key")
 	}
 }
