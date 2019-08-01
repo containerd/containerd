@@ -22,7 +22,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 func TestUpdateOCILinuxResource(t *testing.T) {

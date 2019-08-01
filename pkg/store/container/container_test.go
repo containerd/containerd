@@ -21,7 +21,7 @@ import (
 	"time"
 
 	assertlib "github.com/stretchr/testify/assert"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	cio "github.com/containerd/cri/pkg/server/io"
 	"github.com/containerd/cri/pkg/store"

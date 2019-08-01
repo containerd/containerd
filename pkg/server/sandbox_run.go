@@ -36,7 +36,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 
 	"github.com/containerd/cri/pkg/annotations"

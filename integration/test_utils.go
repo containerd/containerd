@@ -33,8 +33,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
-	"k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	"k8s.io/cri-api/pkg/apis"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 

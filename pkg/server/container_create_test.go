@@ -32,7 +32,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	"github.com/containerd/cri/pkg/annotations"
 	"github.com/containerd/cri/pkg/containerd/opts"
