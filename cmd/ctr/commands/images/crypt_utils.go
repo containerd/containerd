@@ -90,17 +90,40 @@ func processRecipientKeys(recipients []string) ([][]byte, [][]byte, [][]byte, er
 		x509s         [][]byte
 	)
 	for _, recipient := range recipients {
-		tmp, err := ioutil.ReadFile(recipient)
-		if err != nil {
-			gpgRecipients = append(gpgRecipients, []byte(recipient))
-			continue
+
+		idx := strings.Index(recipient, ":")
+		if idx < 0 {
+			return nil, nil, nil, errors.New("Invalid recipient format")
 		}
-		if encutils.IsCertificate(tmp) {
-			x509s = append(x509s, tmp)
-		} else if encutils.IsPublicKey(tmp) {
+
+		protocol := recipient[:idx]
+		value := recipient[idx+1:]
+
+		switch protocol {
+		case "pgp":
+			gpgRecipients = append(gpgRecipients, []byte(value))
+		case "jwe":
+			tmp, err := ioutil.ReadFile(value)
+			if err != nil {
+				return nil, nil, nil, errors.Wrap(err, "Unable to read file")
+			}
+			if !encutils.IsPublicKey(tmp) {
+				return nil, nil, nil, errors.New("File provided is not a public key")
+			}
 			pubkeys = append(pubkeys, tmp)
-		} else {
-			gpgRecipients = append(gpgRecipients, []byte(recipient))
+
+		case "pkcs7":
+			tmp, err := ioutil.ReadFile(value)
+			if err != nil {
+				return nil, nil, nil, errors.Wrap(err, "Unable to read file")
+			}
+			if !encutils.IsCertificate(tmp) {
+				return nil, nil, nil, errors.New("File provided is not an x509 cert")
+			}
+			x509s = append(x509s, tmp)
+
+		default:
+			return nil, nil, nil, errors.New("Provided protocol not recognized")
 		}
 	}
 	return gpgRecipients, pubkeys, x509s, nil
