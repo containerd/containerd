@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	criconfig "github.com/containerd/cri/pkg/config"
 )
