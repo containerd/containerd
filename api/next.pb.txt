@@ -840,6 +840,7 @@ file {
     java_outer_classname: "FieldMaskProto"
     java_multiple_files: true
     go_package: "google.golang.org/genproto/protobuf/field_mask;field_mask"
+    cc_enable_arenas: true
     objc_class_prefix: "GPB"
     csharp_namespace: "Google.Protobuf.WellKnownTypes"
   }
