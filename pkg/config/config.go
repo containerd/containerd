@@ -179,6 +179,9 @@ type PluginConfig struct {
 	RestrictOOMScoreAdj bool `toml:"restrict_oom_score_adj" json:"restrictOOMScoreAdj"`
 	// MaxConcurrentDownloads restricts the number of concurrent downloads for each image.
 	MaxConcurrentDownloads int `toml:"max_concurrent_downloads" json:"maxConcurrentDownloads"`
+	// DisableProcMount disables Kubernetes ProcMount support. This MUST be set to `true`
+	// when using containerd with Kubernetes <=1.11.
+	DisableProcMount bool `toml:"disable_proc_mount" json:"disableProcMount"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
@@ -245,6 +248,7 @@ func DefaultConfig() PluginConfig {
 			},
 		},
 		MaxConcurrentDownloads: 3,
+		DisableProcMount:       false,
 	}
 }
 

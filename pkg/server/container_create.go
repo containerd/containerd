@@ -366,20 +366,14 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 	}
 	specOpts = append(specOpts, customopts.WithMounts(c.os, config, extraMounts, mountLabel))
 
-	// Apply masked paths if specified.
-	// When `MaskedPaths` is not specified, keep runtime default for backward compatibility;
-	// When `MaskedPaths` is specified, but length is zero, clear masked path list.
-	// Note: If the container is privileged, then we clear any masked paths later on in the call to setOCIPrivileged()
-	if maskedPaths := securityContext.GetMaskedPaths(); maskedPaths != nil {
-		specOpts = append(specOpts, oci.WithMaskedPaths(maskedPaths))
-	}
+	if !c.config.DisableProcMount {
+		// Apply masked paths if specified.
+		// Note: If the container is privileged, then we clear any masked paths later on in the call to setOCIPrivileged()
+		specOpts = append(specOpts, oci.WithMaskedPaths(securityContext.GetMaskedPaths()))
 
-	// Apply readonly paths if specified.
-	// Note: If the container is privileged, then we clear any readonly paths later on in the call to setOCIPrivileged()
-
-	// Apply readonly paths if specified.
-	if roPaths := securityContext.GetReadonlyPaths(); roPaths != nil {
-		specOpts = append(specOpts, oci.WithReadonlyPaths(roPaths))
+		// Apply readonly paths if specified.
+		// Note: If the container is privileged, then we clear any readonly paths later on in the call to setOCIPrivileged()
+		specOpts = append(specOpts, oci.WithReadonlyPaths(securityContext.GetReadonlyPaths()))
 	}
 
 	if securityContext.GetPrivileged() {
