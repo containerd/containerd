@@ -89,31 +89,29 @@ func WithImage(is images.Store, name string) ExportOpt {
 }
 
 // WithManifest adds a manifest to the exported archive.
-// It is up to caller to put name annotation to on the manifest
-// descriptor if needed.
-func WithManifest(manifest ocispec.Descriptor) ExportOpt {
+// When names are given they will be set on the manifest in the
+// exported archive, creating an index record for each name.
+// When no names are provided, it is up to caller to put name annotation to
+// on the manifest descriptor if needed.
+func WithManifest(manifest ocispec.Descriptor, names ...string) ExportOpt {
 	return func(ctx context.Context, o *exportOptions) error {
-		o.manifests = append(o.manifests, manifest)
-		return nil
-	}
-}
-
-// WithNamedManifest adds a manifest to the exported archive
-// with the provided names.
-func WithNamedManifest(manifest ocispec.Descriptor, names ...string) ExportOpt {
-	return func(ctx context.Context, o *exportOptions) error {
-		for _, name := range names {
-			manifest.Annotations = addNameAnnotation(name, manifest.Annotations)
+		if len(names) == 0 {
 			o.manifests = append(o.manifests, manifest)
+		}
+		for _, name := range names {
+			mc := manifest
+			mc.Annotations = addNameAnnotation(name, manifest.Annotations)
+			o.manifests = append(o.manifests, mc)
 		}
 
 		return nil
 	}
 }
 
-func addNameAnnotation(name string, annotations map[string]string) map[string]string {
-	if annotations == nil {
-		annotations = map[string]string{}
+func addNameAnnotation(name string, base map[string]string) map[string]string {
+	annotations := map[string]string{}
+	for k, v := range base {
+		annotations[k] = v
 	}
 
 	annotations[images.AnnotationImageName] = name
