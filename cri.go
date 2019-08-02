@@ -141,6 +141,28 @@ func validateConfig(ctx context.Context, c *criconfig.Config) error {
 		return errors.New("no corresponding runtime configured in `runtimes` for `default_runtime_name`")
 	}
 
+	// Validation for deprecated runtime options.
+	if c.SystemdCgroup {
+		if c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName].Type != plugin.RuntimeLinuxV1 {
+			return errors.Errorf("`systemd_cgroup` only works for runtime %s", plugin.RuntimeLinuxV1)
+		}
+		log.G(ctx).Warning("`systemd_cgroup` is deprecated, please use runtime `options` instead")
+	}
+	for _, r := range c.ContainerdConfig.Runtimes {
+		if r.Engine != "" {
+			if r.Type != plugin.RuntimeLinuxV1 {
+				return errors.Errorf("`runtime_engine` only works for runtime %s", plugin.RuntimeLinuxV1)
+			}
+			log.G(ctx).Warning("`runtime_engine` is deprecated, please use runtime `options` instead")
+		}
+		if r.Root != "" {
+			if r.Type != plugin.RuntimeLinuxV1 {
+				return errors.Errorf("`runtime_root` only works for runtime %s", plugin.RuntimeLinuxV1)
+			}
+			log.G(ctx).Warning("`runtime_root` is deprecated, please use runtime `options` instead")
+		}
+	}
+
 	// Validation for stream_idle_timeout
 	if c.StreamIdleTimeout != "" {
 		if _, err := time.ParseDuration(c.StreamIdleTimeout); err != nil {

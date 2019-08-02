@@ -27,6 +27,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl"
@@ -114,16 +115,6 @@ const (
 	// networkAttachCount is the minimum number of networks the PodSandbox
 	// attaches to
 	networkAttachCount = 2
-)
-
-// Runtime type strings for various runtimes.
-const (
-	// linuxRuntime is the legacy linux runtime for shim v1.
-	linuxRuntime = "io.containerd.runtime.v1.linux"
-	// runcRuntimeV1 is the runc v1 runtime for shim v2.
-	runcRuntimeV1 = "io.containerd.runc.v1"
-	// runcRuntimeV2 is the runc v2 runtime for shim v2.
-	runcRuntimeV2 = "io.containerd.runc.v2"
 )
 
 // makeSandboxName generates sandbox name from sandbox metadata. The name
@@ -416,7 +407,7 @@ func parseImageReferences(refs []string) ([]string, []string) {
 // generateRuntimeOptions generates runtime options from cri plugin config.
 func generateRuntimeOptions(r criconfig.Runtime, c criconfig.Config) (interface{}, error) {
 	if r.Options == nil {
-		if r.Type != linuxRuntime {
+		if r.Type != plugin.RuntimeLinuxV1 {
 			return nil, nil
 		}
 		// This is a legacy config, generate runctypes.RuncOptions.
@@ -436,11 +427,11 @@ func generateRuntimeOptions(r criconfig.Runtime, c criconfig.Config) (interface{
 // getRuntimeOptionsType gets empty runtime options by the runtime type name.
 func getRuntimeOptionsType(t string) interface{} {
 	switch t {
-	case runcRuntimeV1:
+	case plugin.RuntimeRuncV1:
 		fallthrough
-	case runcRuntimeV2:
+	case plugin.RuntimeRuncV2:
 		return &runcoptions.Options{}
-	case linuxRuntime:
+	case plugin.RuntimeLinuxV1:
 		return &runctypes.RuncOptions{}
 	default:
 		return &runtimeoptions.Options{}
