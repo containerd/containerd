@@ -403,6 +403,11 @@ func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, 
 		}
 	}
 
+	// Annotate ref with digest to push only push tag for single digest
+	if !strings.Contains(ref, "@") {
+		ref = ref + "@" + desc.Digest.String()
+	}
+
 	pusher, err := pushCtx.Resolver.Pusher(ctx, ref)
 	if err != nil {
 		return err
