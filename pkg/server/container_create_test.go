@@ -23,10 +23,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
+	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -1093,19 +1095,31 @@ func TestMaskedAndReadonlyPaths(t *testing.T) {
 	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 	c := newTestCRIService()
 
-	defaultSpec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil, nil)
+	defaultSpec, err := oci.GenerateSpec(ctrdutil.NamespacedContext(), nil, &containers.Container{ID: testID})
 	require.NoError(t, err)
 
 	for desc, test := range map[string]struct {
+		disableProcMount bool
 		masked           []string
 		readonly         []string
 		expectedMasked   []string
 		expectedReadonly []string
 		privileged       bool
 	}{
-		"should apply default if not specified": {
+		"should apply default if not specified when disable_proc_mount = true": {
+			disableProcMount: true,
+			masked:           nil,
+			readonly:         nil,
 			expectedMasked:   defaultSpec.Linux.MaskedPaths,
 			expectedReadonly: defaultSpec.Linux.ReadonlyPaths,
+			privileged:       false,
+		},
+		"should always apply CRI specified paths when disable_proc_mount = false": {
+			disableProcMount: false,
+			masked:           nil,
+			readonly:         nil,
+			expectedMasked:   nil,
+			expectedReadonly: nil,
 			privileged:       false,
 		},
 		"should be able to specify empty paths": {
@@ -1143,6 +1157,7 @@ func TestMaskedAndReadonlyPaths(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
+		c.config.DisableProcMount = test.disableProcMount
 		config.Linux.SecurityContext.MaskedPaths = test.masked
 		config.Linux.SecurityContext.ReadonlyPaths = test.readonly
 		config.Linux.SecurityContext.Privileged = test.privileged
