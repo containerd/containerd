@@ -21,6 +21,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/docker/distribution/reference"
@@ -214,11 +215,11 @@ systemd_cgroup = true
   no_pivot = true
   default_runtime_name = "default"
 [containerd.runtimes.legacy]
-  runtime_type = "` + linuxRuntime + `"
+  runtime_type = "` + plugin.RuntimeLinuxV1 + `"
 [containerd.runtimes.runc]
-  runtime_type = "` + runcRuntimeV1 + `"
+  runtime_type = "` + plugin.RuntimeRuncV1 + `"
 [containerd.runtimes.runcv2]
-  runtime_type = "` + runcRuntimeV2 + `"
+  runtime_type = "` + plugin.RuntimeRuncV2 + `"
 `
 	nonNilOpts := `
 systemd_cgroup = true
@@ -226,18 +227,18 @@ systemd_cgroup = true
   no_pivot = true
   default_runtime_name = "default"
 [containerd.runtimes.legacy]
-  runtime_type = "` + linuxRuntime + `"
+  runtime_type = "` + plugin.RuntimeLinuxV1 + `"
 [containerd.runtimes.legacy.options]
   Runtime = "legacy"
   RuntimeRoot = "/legacy"
 [containerd.runtimes.runc]
-  runtime_type = "` + runcRuntimeV1 + `"
+  runtime_type = "` + plugin.RuntimeRuncV1 + `"
 [containerd.runtimes.runc.options]
   BinaryName = "runc"
   Root = "/runc"
   NoNewKeyring = true
 [containerd.runtimes.runcv2]
-  runtime_type = "` + runcRuntimeV2 + `"
+  runtime_type = "` + plugin.RuntimeRuncV2 + `"
 [containerd.runtimes.runcv2.options]
   BinaryName = "runc"
   Root = "/runcv2"

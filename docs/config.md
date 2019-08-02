@@ -40,12 +40,6 @@ version = 2
   # stats_collect_period is the period (in seconds) of snapshots stats collection.
   stats_collect_period = 10
 
-  # systemd_cgroup enables systemd cgroup support. This only works for runtime
-  # type "io.containerd.runtime.v1.linux".
-  # DEPRECATED: use Runtime.Options for runtime specific config for shim v2 runtimes.
-  #   For runtime "io.containerd.runc.v1", use the option `SystemdCgroup`.
-  systemd_cgroup = false
-
   # enable_tls_streaming enables the TLS streaming support.
   # It generates a self-sign certificate unless the following x509_key_pair_streaming are both set.
   enable_tls_streaming = false

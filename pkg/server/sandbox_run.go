@@ -27,6 +27,7 @@ import (
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/plugin"
 	cni "github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
@@ -266,7 +267,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	var taskOpts []containerd.NewTaskOpts
 	// TODO(random-liu): Remove this after shim v1 is deprecated.
-	if c.config.NoPivot && ociRuntime.Type == linuxRuntime {
+	if c.config.NoPivot && ociRuntime.Type == plugin.RuntimeRuncV1 {
 		taskOpts = append(taskOpts, containerd.WithNoPivotRoot)
 	}
 	// We don't need stdio for sandbox container.
