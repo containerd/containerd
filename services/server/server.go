@@ -51,6 +51,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/keepalive"
 )
 
 // CreateTopLevelDirectories creates the top-level root and state directories.
@@ -89,6 +90,11 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 	}
 	if config.GRPC.MaxSendMsgSize > 0 {
 		serverOpts = append(serverOpts, grpc.MaxSendMsgSize(config.GRPC.MaxSendMsgSize))
+	}
+	if config.GRPC.MaxConnectionIdle > 0 {
+		serverOpts = append(serverOpts, grpc.KeepaliveParams(keepalive.ServerParameters{
+			MaxConnectionIdle: config.GRPC.MaxConnectionIdle,
+		}))
 	}
 	ttrpcServer, err := newTTRPCServer()
 	if err != nil {

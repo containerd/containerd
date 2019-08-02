@@ -18,6 +18,7 @@ package config
 
 import (
 	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd/errdefs"
@@ -97,14 +98,15 @@ func (c *Config) ValidateV2() error {
 
 // GRPCConfig provides GRPC configuration for the socket
 type GRPCConfig struct {
-	Address        string `toml:"address"`
-	TCPAddress     string `toml:"tcp_address"`
-	TCPTLSCert     string `toml:"tcp_tls_cert"`
-	TCPTLSKey      string `toml:"tcp_tls_key"`
-	UID            int    `toml:"uid"`
-	GID            int    `toml:"gid"`
-	MaxRecvMsgSize int    `toml:"max_recv_message_size"`
-	MaxSendMsgSize int    `toml:"max_send_message_size"`
+	Address           string        `toml:"address"`
+	TCPAddress        string        `toml:"tcp_address"`
+	TCPTLSCert        string        `toml:"tcp_tls_cert"`
+	TCPTLSKey         string        `toml:"tcp_tls_key"`
+	UID               int           `toml:"uid"`
+	GID               int           `toml:"gid"`
+	MaxRecvMsgSize    int           `toml:"max_recv_message_size"`
+	MaxSendMsgSize    int           `toml:"max_send_message_size"`
+	MaxConnectionIdle time.Duration `toml:"max_connection_idle"`
 }
 
 // Debug provides debug configuration
