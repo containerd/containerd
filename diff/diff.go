@@ -53,6 +53,8 @@ type Comparer interface {
 
 // ApplyConfig is used to hold parameters needed for a apply operation
 type ApplyConfig struct {
+	// ProcessorPayloads specifies the payload sent to various processors
+	ProcessorPayloads map[string]interface{}
 }
 
 // ApplyOpt is used to configure an Apply operation
