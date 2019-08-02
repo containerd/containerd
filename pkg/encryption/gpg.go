@@ -131,9 +131,24 @@ func (gc *gpgv2Client) GetGPGPrivateKey(keyid uint64, passphrase string) ([]byte
 		args = append(args, []string{"--homedir", gc.gpgHomeDir}...)
 	}
 
-	args = append(args, []string{"--pinentry-mode", "loopback", "--batch", "--passphrase", passphrase, "--export-secret-key", fmt.Sprintf("0x%x", keyid)}...)
+	rfile, wfile, err := os.Pipe()
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not create pipe")
+	}
+	defer func() {
+		rfile.Close()
+		wfile.Close()
+	}()
+	// fill pipe in background
+	go func(passphrase string) {
+		wfile.Write([]byte(passphrase))
+		wfile.Close()
+	}(passphrase)
+
+	args = append(args, []string{"--pinentry-mode", "loopback", "--batch", "--passphrase-fd", fmt.Sprintf("%d", 3), "--export-secret-key", fmt.Sprintf("0x%x", keyid)}...)
 
 	cmd := exec.Command("gpg2", args...)
+	cmd.ExtraFiles = []*os.File{rfile}
 
 	return runGPGGetOutput(cmd)
 }
