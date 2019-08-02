@@ -18,12 +18,15 @@ package diff
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
 
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/images"
+	"github.com/gogo/protobuf/proto"
+	"github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
@@ -31,7 +34,7 @@ import (
 var (
 	handlers []Handler
 
-	// ErrNoProcessor is returned when no stream processor is avaliable for a media-type
+	// ErrNoProcessor is returned when no stream processor is available for a media-type
 	ErrNoProcessor = errors.New("no processor for media-type")
 )
 
@@ -46,10 +49,10 @@ func RegisterProcessor(handler Handler) {
 }
 
 // GetProcessor returns the processor for a media-type
-func GetProcessor(ctx context.Context, mediaType string, stream StreamProcessor, payloads map[string]interface{}) (StreamProcessor, error) {
+func GetProcessor(ctx context.Context, stream StreamProcessor, payloads map[string]*types.Any) (StreamProcessor, error) {
 	// reverse this list so that user configured handlers come up first
-	for i := len(handlers); i >= 0; i-- {
-		processor, ok := handlers[i](ctx, mediaType)
+	for i := len(handlers) - 1; i >= 0; i-- {
+		processor, ok := handlers[i](ctx, stream.MediaType())
 		if ok {
 			return processor(ctx, stream, payloads)
 		}
@@ -71,7 +74,7 @@ func StaticHandler(expectedMediaType string, fn StreamProcessorInit) Handler {
 }
 
 // StreamProcessorInit returns the initialized stream processor
-type StreamProcessorInit func(ctx context.Context, stream StreamProcessor, payloads map[string]interface{}) (StreamProcessor, error)
+type StreamProcessorInit func(ctx context.Context, stream StreamProcessor, payloads map[string]*types.Any) (StreamProcessor, error)
 
 // RawProcessor provides access to direct fd for processing
 type RawProcessor interface {
@@ -93,7 +96,7 @@ func compressedHandler(ctx context.Context, mediaType string) (StreamProcessorIn
 		return nil, false
 	}
 	if compressed {
-		return func(ctx context.Context, stream StreamProcessor, payloads map[string]interface{}) (StreamProcessor, error) {
+		return func(ctx context.Context, stream StreamProcessor, payloads map[string]*types.Any) (StreamProcessor, error) {
 			ds, err := compression.DecompressStream(stream)
 			if err != nil {
 				return nil, err
@@ -104,7 +107,7 @@ func compressedHandler(ctx context.Context, mediaType string) (StreamProcessorIn
 			}, nil
 		}, true
 	}
-	return func(ctx context.Context, stream StreamProcessor, payloads map[string]interface{}) (StreamProcessor, error) {
+	return func(ctx context.Context, stream StreamProcessor, payloads map[string]*types.Any) (StreamProcessor, error) {
 		return &stdProcessor{
 			rc: stream,
 		}, nil
@@ -168,24 +171,48 @@ func (c *compressedProcessor) Close() error {
 	return c.rc.Close()
 }
 
+func BinaryHandler(id, returnsMediaType string, mediaTypes []string, path string, args []string) Handler {
+	set := make(map[string]struct{}, len(mediaTypes))
+	for _, m := range mediaTypes {
+		set[m] = struct{}{}
+	}
+	return func(_ context.Context, mediaType string) (StreamProcessorInit, bool) {
+		if _, ok := set[mediaType]; ok {
+			return func(ctx context.Context, stream StreamProcessor, payloads map[string]*types.Any) (StreamProcessor, error) {
+				payload := payloads[id]
+				return NewBinaryProcessor(ctx, mediaType, returnsMediaType, stream, path, args, payload)
+			}, true
+		}
+		return nil, false
+	}
+}
+
+const (
+	payloadEnvVar   = "STREAM_PROCESSOR_PAYLOAD"
+	mediaTypeEnvVar = "STEAM_PROCESSOR_MEDIATYPE"
+)
+
 // NewBinaryProcessor returns a binary processor for use with processing content streams
-func NewBinaryProcessor(ctx context.Context, mt string, stream StreamProcessor, name string, args ...string) (StreamProcessor, error) {
+func NewBinaryProcessor(ctx context.Context, imt, rmt string, stream StreamProcessor, name string, args []string, payload *types.Any) (StreamProcessor, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
-	var (
-		stdin *os.File
-		err   error
-	)
-	if f, ok := stream.(RawProcessor); ok {
-		stdin = f.File()
-	} else {
-		r, w, err := os.Pipe()
+	if payload != nil {
+		data, err := proto.Marshal(payload)
 		if err != nil {
 			return nil, err
 		}
-		stdin = r
-		go func() {
-			io.Copy(w, stream)
-		}()
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", payloadEnvVar, data))
+	}
+	cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", mediaTypeEnvVar, imt))
+	var (
+		stdin  io.Reader
+		closer func() error
+		err    error
+	)
+	if f, ok := stream.(RawProcessor); ok {
+		stdin = f.File()
+		closer = f.File().Close
+	} else {
+		stdin = stream
 	}
 	cmd.Stdin = stdin
 	r, w, err := os.Pipe()
@@ -193,17 +220,22 @@ func NewBinaryProcessor(ctx context.Context, mt string, stream StreamProcessor, 
 		return nil, err
 	}
 	cmd.Stdout = w
+
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
+	go cmd.Wait()
+
 	// close after start and dup
-	stdin.Close()
 	w.Close()
+	if closer != nil {
+		closer()
+	}
 
 	return &binaryProcessor{
 		cmd: cmd,
 		r:   r,
-		mt:  mt,
+		mt:  rmt,
 	}, nil
 }
 

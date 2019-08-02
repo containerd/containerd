@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/containerd/containerd/mount"
+	"github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -54,7 +55,7 @@ type Comparer interface {
 // ApplyConfig is used to hold parameters needed for a apply operation
 type ApplyConfig struct {
 	// ProcessorPayloads specifies the payload sent to various processors
-	ProcessorPayloads map[string]interface{}
+	ProcessorPayloads map[string]*types.Any
 }
 
 // ApplyOpt is used to configure an Apply operation

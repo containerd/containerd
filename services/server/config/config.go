@@ -56,7 +56,23 @@ type Config struct {
 	// ProxyPlugins configures plugins which are communicated to over GRPC
 	ProxyPlugins map[string]ProxyPlugin `toml:"proxy_plugins"`
 
+	StreamProcessors []StreamProcessor `toml:"stream_processors"`
+
 	md toml.MetaData
+}
+
+// StreamProcessor provides configuration for diff content processors
+type StreamProcessor struct {
+	// ID of the processor, also used to fetch the specific payload
+	ID string `toml:"id"`
+	// Accepts specific media-types
+	Accepts []string `toml:"accepts"`
+	// Returns the media-type
+	Returns string `toml:"returns"`
+	// Path or name of the binary
+	Path string `toml:"path"`
+	// Args to the binary
+	Args []string `toml:"args"`
 }
 
 // GetVersion returns the config file's version

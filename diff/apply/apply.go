@@ -78,7 +78,7 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 
 	processor := diff.NewProcessorChain(desc.MediaType, content.NewReader(ra))
 	for {
-		if processor, err = diff.GetProcessor(ctx, desc.MediaType, processor, config.ProcessorPayloads); err != nil {
+		if processor, err = diff.GetProcessor(ctx, processor, config.ProcessorPayloads); err != nil {
 			return emptyDesc, errors.Wrapf(err, "failed to get stream processor for %s", desc.MediaType)
 		}
 		if processor.MediaType() == ocispec.MediaTypeImageLayer {

@@ -35,6 +35,7 @@ import (
 	"github.com/containerd/containerd/content/local"
 	csproxy "github.com/containerd/containerd/content/proxy"
 	"github.com/containerd/containerd/defaults"
+	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
@@ -80,6 +81,10 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	for _, p := range config.StreamProcessors {
+		diff.RegisterProcessor(diff.BinaryHandler(p.ID, p.Returns, p.Accepts, p.Path, p.Args))
+	}
+
 	serverOpts := []grpc.ServerOption{
 		grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
 		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
