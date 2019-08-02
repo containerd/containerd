@@ -23,11 +23,8 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/archive"
-	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	digest "github.com/opencontainers/go-digest"
@@ -66,54 +63,50 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 		}
 	}()
 
-	isCompressed, err := images.IsCompressedDiff(ctx, desc.MediaType)
-	if err != nil {
-		return emptyDesc, errors.Wrapf(errdefs.ErrNotImplemented, "unsupported diff media type: %v", desc.MediaType)
+	var config diff.ApplyConfig
+	for _, o := range opts {
+		if err := o(&config); err != nil {
+			return emptyDesc, errors.Wrap(err, "failed to apply config opt")
+		}
 	}
 
-	var ocidesc ocispec.Descriptor
+	ra, err := s.store.ReaderAt(ctx, desc)
+	if err != nil {
+		return emptyDesc, errors.Wrap(err, "failed to get reader from content store")
+	}
+	defer ra.Close()
+
+	processor := diff.NewProcessorChain(desc.MediaType, content.NewReader(ra))
+	for {
+		if processor, err = diff.GetProcessor(ctx, desc.MediaType, processor, config.ProcessorPayloads); err != nil {
+			return emptyDesc, errors.Wrapf(err, "failed to get stream processor for %s", desc.MediaType)
+		}
+		if processor.MediaType() == ocispec.MediaTypeImageLayer {
+			break
+		}
+	}
+	defer processor.Close()
+
+	digester := digest.Canonical.Digester()
+	rc := &readCounter{
+		r: io.TeeReader(processor, digester.Hash()),
+	}
 	if err := mount.WithTempMount(ctx, mounts, func(root string) error {
-		ra, err := s.store.ReaderAt(ctx, desc)
-		if err != nil {
-			return errors.Wrap(err, "failed to get reader from content store")
-		}
-		defer ra.Close()
-
-		r := content.NewReader(ra)
-		if isCompressed {
-			ds, err := compression.DecompressStream(r)
-			if err != nil {
-				return err
-			}
-			defer ds.Close()
-			r = ds
-		}
-
-		digester := digest.Canonical.Digester()
-		rc := &readCounter{
-			r: io.TeeReader(r, digester.Hash()),
-		}
-
 		if _, err := archive.Apply(ctx, root, rc); err != nil {
 			return err
 		}
 
 		// Read any trailing data
-		if _, err := io.Copy(ioutil.Discard, rc); err != nil {
-			return err
-		}
-
-		ocidesc = ocispec.Descriptor{
-			MediaType: ocispec.MediaTypeImageLayer,
-			Size:      rc.c,
-			Digest:    digester.Digest(),
-		}
-		return nil
-
+		_, err := io.Copy(ioutil.Discard, rc)
+		return err
 	}); err != nil {
 		return emptyDesc, err
 	}
-	return ocidesc, nil
+	return ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageLayer,
+		Size:      rc.c,
+		Digest:    digester.Digest(),
+	}, nil
 }
 
 type readCounter struct {
