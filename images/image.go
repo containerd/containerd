@@ -119,7 +119,7 @@ func (image *Image) Size(ctx context.Context, provider content.Provider, platfor
 		}
 		size += desc.Size
 		return nil, nil
-	}), FilterPlatforms(ChildrenHandler(provider), platform)), image.Target)
+	}), LimitManifests(FilterPlatforms(ChildrenHandler(provider), platform), platform, 1)), image.Target)
 }
 
 type platformManifest struct {
