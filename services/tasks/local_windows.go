@@ -1,4 +1,4 @@
-// +build ignore
+// +build windows
 
 /*
    Copyright The containerd Authors.
@@ -23,8 +23,6 @@ import (
 	"github.com/containerd/containerd/runtime"
 )
 
-// TODO: JTERRY75 - When Windows V1 runtime is removed change this to only build
-// on Windows.
 var tasksServiceRequires = []plugin.Type{
 	plugin.RuntimePluginV2,
 	plugin.MetadataPlugin,
