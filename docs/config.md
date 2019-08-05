@@ -85,8 +85,6 @@ version = 2
 
     # no_pivot disables pivot-root (linux only), required when running a container in a RamDisk with runc.
     # This only works for runtime type "io.containerd.runtime.v1.linux".
-    # DEPRECATED: use Runtime.Options for runtime specific config for shim v2 runtimes.
-    #   For runtime "io.containerd.runc.v1", use the option `NoPivotRoot`.
     no_pivot = false
 
     # default_runtime_name is the default runtime name to use.

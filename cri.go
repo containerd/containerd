@@ -148,6 +148,13 @@ func validateConfig(ctx context.Context, c *criconfig.Config) error {
 		}
 		log.G(ctx).Warning("`systemd_cgroup` is deprecated, please use runtime `options` instead")
 	}
+	if c.NoPivot {
+		if c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName].Type != plugin.RuntimeLinuxV1 {
+			return errors.Errorf("`no_pivot` only works for runtime %s", plugin.RuntimeLinuxV1)
+		}
+		// NoPivot can't be deprecated yet, because there is no alternative config option
+		// for `io.containerd.runtime.v1.linux`.
+	}
 	for _, r := range c.ContainerdConfig.Runtimes {
 		if r.Engine != "" {
 			if r.Type != plugin.RuntimeLinuxV1 {
