@@ -30,16 +30,17 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/reference"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
-	"github.com/containerd/cri/pkg/config"
 	distribution "github.com/docker/distribution/reference"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+
+	"github.com/containerd/cri/pkg/config"
 )
 
 // For image management:
@@ -92,7 +93,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	}
 	ref := namedRef.String()
 	if ref != imageRef {
-		logrus.Debugf("PullImage using normalized image ref: %q", ref)
+		log.G(ctx).Debugf("PullImage using normalized image ref: %q", ref)
 	}
 	resolver, desc, err := c.getResolver(ctx, ref, c.credentials(r.GetAuth()))
 	if err != nil {
@@ -136,7 +137,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		}
 	}
 
-	logrus.Debugf("Pulled image %q with image id %q, repo tag %q, repo digest %q", imageRef, imageID,
+	log.G(ctx).Debugf("Pulled image %q with image id %q, repo tag %q, repo digest %q", imageRef, imageID,
 		repoTag, repoDigest)
 	// NOTE(random-liu): the actual state in containerd is the source of truth, even we maintain
 	// in-memory image store, it's only for in-memory indexing. The image could be removed
@@ -317,7 +318,7 @@ func (c *criService) getResolver(ctx context.Context, ref string, cred func(stri
 		if err == nil {
 			return resolver, desc, nil
 		}
-		logrus.WithError(err).Debugf("Tried registry mirror %q but failed", e)
+		log.G(ctx).WithError(err).Debugf("Tried registry mirror %q but failed", e)
 		// Continue to try next endpoint
 	}
 
