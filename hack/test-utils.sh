@@ -32,6 +32,8 @@ CONTAINERD_ROOT=${CONTAINERD_ROOT:-"/var/lib/containerd${CONTAINERD_TEST_SUFFIX}
 CONTAINERD_STATE=${CONTAINERD_STATE:-"/run/containerd${CONTAINERD_TEST_SUFFIX}"}
 # The containerd socket address.
 CONTAINERD_SOCK=${CONTAINERD_SOCK:-unix://${CONTAINERD_STATE}/containerd.sock}
+# The containerd binary name.
+CONTAINERD_BIN=${CONTAINERD_BIN:-"containerd${CONTAINERD_TEST_SUFFIX}"}
 if [ -f "${CONTAINERD_CONFIG_FILE}" ]; then
   CONTAINERD_FLAGS+="--config ${CONTAINERD_CONFIG_FILE} "
 fi
@@ -49,10 +51,13 @@ test_setup() {
     echo "containerd is not built"
     exit 1
   fi
+  # rename the test containerd binary, so that we can easily
+  # distinguish it.
+  cp ${ROOT}/_output/containerd ${ROOT}/_output/${CONTAINERD_BIN}
   set -m
   # Create containerd in a different process group
   # so that we can easily clean them up.
-  keepalive "sudo PATH=${PATH} ${ROOT}/_output/containerd ${CONTAINERD_FLAGS}" \
+  keepalive "sudo PATH=${PATH} ${ROOT}/_output/${CONTAINERD_BIN} ${CONTAINERD_FLAGS}" \
     ${RESTART_WAIT_PERIOD} &> ${report_dir}/containerd.log &
   pid=$!
   set +m

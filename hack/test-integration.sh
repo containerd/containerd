@@ -36,7 +36,8 @@ test_setup ${REPORT_DIR}
 sudo PATH=${PATH} ${ROOT}/_output/integration.test --test.run="${FOCUS}" --test.v \
   --cri-endpoint=${CONTAINERD_SOCK} \
   --cri-root=${CRI_ROOT} \
-  --runtime-handler=${RUNTIME}
+  --runtime-handler=${RUNTIME} \
+  --containerd-bin=${CONTAINERD_BIN}
 
 test_exit_code=$?
 
