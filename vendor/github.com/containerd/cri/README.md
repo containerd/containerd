@@ -15,7 +15,7 @@ for information about the standalone version of `cri-containerd`.*
 [![Build Status](https://api.travis-ci.org/containerd/cri.svg?style=flat-square)](https://travis-ci.org/containerd/cri)
 [![Go Report Card](https://goreportcard.com/badge/github.com/containerd/cri)](https://goreportcard.com/report/github.com/containerd/cri)
 
-`cri` is a [containerd](https://containerd.io/) plugin implementation of Kubernetes [container runtime interface (CRI)](https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/apis/cri/runtime/v1alpha2/api.proto).
+`cri` is a [containerd](https://containerd.io/) plugin implementation of Kubernetes [container runtime interface (CRI)](https://github.com/kubernetes/cri-api/blob/master/pkg/apis/runtime/v1alpha2/api.proto).
 
 With it, you could run Kubernetes using containerd as the container runtime.
 ![cri](./docs/cri.png)
@@ -162,7 +162,7 @@ For sync communication we have a community slack with a #containerd channel that
 everyone is welcome to join and chat about development.
 
 **Slack:** Catch us in the #containerd and #containerd-dev channels on dockercommunity.slack.com.
-[Click here for an invite to docker community slack.](https://join.slack.com/t/dockercommunity/shared_invite/enQtNDY4MDc1Mzc0MzIwLTgxZDBlMmM4ZGEyNDc1N2FkMzlhODJkYmE1YTVkYjM1MDE3ZjAwZjBkOGFlOTJkZjRmZGYzNjYyY2M3ZTUxYzQ)
+[Click here for an invite to docker community slack.](https://dockr.ly/slack)
 
 ## Other Communications
 As this project is tightly coupled to CRI and CRI-Tools and they are Kubernetes

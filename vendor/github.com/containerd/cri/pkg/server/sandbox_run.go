@@ -19,6 +19,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"strings"
 
@@ -26,6 +27,7 @@ import (
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/plugin"
 	cni "github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
@@ -35,7 +37,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/util/bandwidth"
 
 	"github.com/containerd/cri/pkg/annotations"
 	criconfig "github.com/containerd/cri/pkg/config"
@@ -92,9 +95,13 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	)
 
 	// Ensure sandbox container image snapshot.
-	image, err := c.ensureImageExists(ctx, c.config.SandboxImage)
+	image, err := c.ensureImageExists(ctx, c.config.SandboxImage, config)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get sandbox image %q", c.config.SandboxImage)
+	}
+	containerdImage, err := c.toContainerdImage(ctx, *image)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get image from containerd %q", image.ID)
 	}
 
 	ociRuntime, err := c.getSandboxRuntime(config, r.GetRuntimeHandler())
@@ -185,7 +192,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 	opts := []containerd.NewContainerOpts{
 		containerd.WithSnapshotter(c.config.ContainerdConfig.Snapshotter),
-		customopts.WithNewSnapshot(id, image.Image),
+		customopts.WithNewSnapshot(id, containerdImage),
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(sandboxLabels),
 		containerd.WithContainerExtension(sandboxMetadataExtension, &sandbox.Metadata),
@@ -260,7 +267,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	var taskOpts []containerd.NewTaskOpts
 	// TODO(random-liu): Remove this after shim v1 is deprecated.
-	if c.config.NoPivot && ociRuntime.Type == linuxRuntime {
+	if c.config.NoPivot && ociRuntime.Type == plugin.RuntimeRuncV1 {
 		taskOpts = append(taskOpts, containerd.WithNoPivotRoot)
 	}
 	// We don't need stdio for sandbox container.
@@ -500,7 +507,7 @@ func parseDNSOptions(servers, searches, options []string) (string, error) {
 	resolvContent := ""
 
 	if len(searches) > maxDNSSearches {
-		return "", errors.New("DNSOption.Searches has more than 6 domains")
+		return "", errors.Errorf("DNSOption.Searches has more than %d domains", maxDNSSearches)
 	}
 
 	if len(searches) > 0 {
@@ -540,10 +547,21 @@ func (c *criService) setupPod(id string, path string, config *runtime.PodSandbox
 	}
 
 	labels := getPodCNILabels(id, config)
+
+	// Will return an error if the bandwidth limitation has the wrong unit
+	// or an unreasonable valure see validateBandwidthIsReasonable()
+	bandWidth, err := toCNIBandWidth(config.Annotations)
+	if err != nil {
+		return "", nil, errors.Wrap(err, "failed to get bandwidth info from annotations")
+	}
+
 	result, err := c.netPlugin.Setup(id,
 		path,
 		cni.WithLabels(labels),
-		cni.WithCapabilityPortMap(toCNIPortMappings(config.GetPortMappings())))
+		cni.WithCapabilityPortMap(toCNIPortMappings(config.GetPortMappings())),
+		cni.WithCapabilityBandWidth(*bandWidth),
+	)
+
 	if err != nil {
 		return "", nil, err
 	}
@@ -557,6 +575,28 @@ func (c *criService) setupPod(id string, path string, config *runtime.PodSandbox
 		logrus.WithError(err).Errorf("Failed to destroy network for sandbox %q", id)
 	}
 	return "", result, errors.Errorf("failed to find network info for sandbox %q", id)
+}
+
+// toCNIBandWidth converts CRI annotations to CNI bandwidth.
+func toCNIBandWidth(annotations map[string]string) (*cni.BandWidth, error) {
+	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(annotations)
+	if err != nil {
+		return nil, errors.Errorf("reading pod bandwidth annotations: %v", err)
+	}
+
+	bandWidth := &cni.BandWidth{}
+
+	if ingress != nil {
+		bandWidth.IngressRate = uint64(ingress.Value())
+		bandWidth.IngressBurst = math.MaxUint32
+	}
+
+	if egress != nil {
+		bandWidth.EgressRate = uint64(egress.Value())
+		bandWidth.EgressBurst = math.MaxUint32
+	}
+
+	return bandWidth, nil
 }
 
 // toCNIPortMappings converts CRI port mappings to CNI.

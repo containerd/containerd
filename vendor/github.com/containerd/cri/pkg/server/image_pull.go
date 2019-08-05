@@ -17,10 +17,15 @@ limitations under the License.
 package server
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
+	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
@@ -28,12 +33,13 @@ import (
 	"github.com/containerd/containerd/reference"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
+	"github.com/containerd/cri/pkg/config"
 	distribution "github.com/docker/distribution/reference"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 // For image management:
@@ -101,6 +107,8 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		containerd.WithResolver(resolver),
 		containerd.WithPullSnapshotter(c.config.ContainerdConfig.Snapshotter),
 		containerd.WithPullUnpack,
+		containerd.WithPullLabel(imageLabelKey, imageLabelValue),
+		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to pull and unpack image %q", ref)
@@ -246,6 +254,31 @@ func (c *criService) credentials(auth *runtime.AuthConfig) func(string) (string,
 	}
 }
 
+// getTLSConfig returns a TLSConfig configured with a CA/Cert/Key specified by registryTLSConfig
+func (c *criService) getTLSConfig(registryTLSConfig config.TLSConfig) (*tls.Config, error) {
+	cert, err := tls.LoadX509KeyPair(registryTLSConfig.CertFile, registryTLSConfig.KeyFile)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to load cert file")
+	}
+
+	caCertPool, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get system cert pool")
+	}
+	caCert, err := ioutil.ReadFile(registryTLSConfig.CAFile)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to load CA file")
+	}
+	caCertPool.AppendCertsFromPEM(caCert)
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      caCertPool,
+	}
+	tlsConfig.BuildNameToCertificate()
+	return tlsConfig, nil
+}
+
 // getResolver tries registry mirrors and the default registry, and returns the resolver and descriptor
 // from the first working registry.
 func (c *criService) getResolver(ctx context.Context, ref string, cred func(string) (string, string, error)) (remotes.Resolver, imagespec.Descriptor, error) {
@@ -253,15 +286,29 @@ func (c *criService) getResolver(ctx context.Context, ref string, cred func(stri
 	if err != nil {
 		return nil, imagespec.Descriptor{}, errors.Wrap(err, "parse image reference")
 	}
+
+	var (
+		transport  = newTransport()
+		httpClient = &http.Client{Transport: transport}
+	)
+
 	// Try mirrors in order first, and then try default host name.
 	for _, e := range c.config.Registry.Mirrors[refspec.Hostname()].Endpoints {
 		u, err := url.Parse(e)
 		if err != nil {
 			return nil, imagespec.Descriptor{}, errors.Wrapf(err, "parse registry endpoint %q", e)
 		}
+
+		if registryTLSConfig, ok := c.config.Registry.TLSConfigs[u.Host]; ok {
+			transport.TLSClientConfig, err = c.getTLSConfig(registryTLSConfig)
+			if err != nil {
+				return nil, imagespec.Descriptor{}, errors.Wrapf(err, "get TLSConfig for registry %q", refspec.Hostname())
+			}
+		}
+
 		resolver := docker.NewResolver(docker.ResolverOptions{
-			Authorizer: docker.NewAuthorizer(http.DefaultClient, cred),
-			Client:     http.DefaultClient,
+			Authorizer: docker.NewAuthorizer(httpClient, cred),
+			Client:     httpClient,
 			Host:       func(string) (string, error) { return u.Host, nil },
 			// By default use "https".
 			PlainHTTP: u.Scheme == "http",
@@ -270,15 +317,45 @@ func (c *criService) getResolver(ctx context.Context, ref string, cred func(stri
 		if err == nil {
 			return resolver, desc, nil
 		}
+		logrus.WithError(err).Debugf("Tried registry mirror %q but failed", e)
 		// Continue to try next endpoint
 	}
+
+	hostname, err := docker.DefaultHost(refspec.Hostname())
+	if err != nil {
+		return nil, imagespec.Descriptor{}, errors.Wrapf(err, "get host for refspec %q", refspec.Hostname())
+	}
+	if registryTLSConfig, ok := c.config.Registry.TLSConfigs[hostname]; ok {
+		transport.TLSClientConfig, err = c.getTLSConfig(registryTLSConfig)
+		if err != nil {
+			return nil, imagespec.Descriptor{}, errors.Wrapf(err, "get TLSConfig for registry %q", refspec.Hostname())
+		}
+	}
+
 	resolver := docker.NewResolver(docker.ResolverOptions{
 		Credentials: cred,
-		Client:      http.DefaultClient,
+		Client:      httpClient,
 	})
 	_, desc, err := resolver.Resolve(ctx, ref)
 	if err != nil {
 		return nil, imagespec.Descriptor{}, errors.Wrap(err, "no available registry endpoint")
 	}
 	return resolver, desc, nil
+}
+
+// newTransport returns a new HTTP transport used to pull image.
+// TODO(random-liu): Create a library and share this code with `ctr`.
+func newTransport() *http.Transport {
+	return &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          10,
+		IdleConnTimeout:       30 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 5 * time.Second,
+	}
 }

@@ -25,7 +25,9 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl"
@@ -34,7 +36,7 @@ import (
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	runtimeoptions "github.com/containerd/cri/pkg/api/runtimeoptions/v1"
 	criconfig "github.com/containerd/cri/pkg/config"
@@ -113,16 +115,6 @@ const (
 	// networkAttachCount is the minimum number of networks the PodSandbox
 	// attaches to
 	networkAttachCount = 2
-)
-
-// Runtime type strings for various runtimes.
-const (
-	// linuxRuntime is the legacy linux runtime for shim v1.
-	linuxRuntime = "io.containerd.runtime.v1.linux"
-	// runcRuntimeV1 is the runc v1 runtime for shim v2.
-	runcRuntimeV1 = "io.containerd.runc.v1"
-	// runcRuntimeV2 is the runc v2 runtime for shim v2.
-	runcRuntimeV2 = "io.containerd.runc.v2"
 )
 
 // makeSandboxName generates sandbox name from sandbox metadata. The name
@@ -254,6 +246,15 @@ func (c *criService) localResolve(refOrID string) (imagestore.Image, error) {
 	return c.imageStore.Get(imageID)
 }
 
+// toContainerdImage converts an image object in image store to containerd image handler.
+func (c *criService) toContainerdImage(ctx context.Context, image imagestore.Image) (containerd.Image, error) {
+	// image should always have at least one reference.
+	if len(image.References) == 0 {
+		return nil, errors.Errorf("invalid image with no reference %q", image.ID)
+	}
+	return c.client.GetImage(ctx, image.References[0])
+}
+
 // getUserFromImage gets uid or user name of the image user.
 // If user is numeric, it will be treated as uid; or else, it is treated as user name.
 func getUserFromImage(user string) (*int64, string) {
@@ -275,7 +276,7 @@ func getUserFromImage(user string) (*int64, string) {
 
 // ensureImageExists returns corresponding metadata of the image reference, if image is not
 // pulled yet, the function will pull the image.
-func (c *criService) ensureImageExists(ctx context.Context, ref string) (*imagestore.Image, error) {
+func (c *criService) ensureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig) (*imagestore.Image, error) {
 	image, err := c.localResolve(ref)
 	if err != nil && err != store.ErrNotExist {
 		return nil, errors.Wrapf(err, "failed to get image %q", ref)
@@ -284,7 +285,7 @@ func (c *criService) ensureImageExists(ctx context.Context, ref string) (*images
 		return &image, nil
 	}
 	// Pull image to ensure the image exists
-	resp, err := c.PullImage(ctx, &runtime.PullImageRequest{Image: &runtime.ImageSpec{Image: ref}})
+	resp, err := c.PullImage(ctx, &runtime.PullImageRequest{Image: &runtime.ImageSpec{Image: ref}, SandboxConfig: config})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to pull image %q", ref)
 	}
@@ -406,7 +407,7 @@ func parseImageReferences(refs []string) ([]string, []string) {
 // generateRuntimeOptions generates runtime options from cri plugin config.
 func generateRuntimeOptions(r criconfig.Runtime, c criconfig.Config) (interface{}, error) {
 	if r.Options == nil {
-		if r.Type != linuxRuntime {
+		if r.Type != plugin.RuntimeLinuxV1 {
 			return nil, nil
 		}
 		// This is a legacy config, generate runctypes.RuncOptions.
@@ -426,11 +427,11 @@ func generateRuntimeOptions(r criconfig.Runtime, c criconfig.Config) (interface{
 // getRuntimeOptionsType gets empty runtime options by the runtime type name.
 func getRuntimeOptionsType(t string) interface{} {
 	switch t {
-	case runcRuntimeV1:
+	case plugin.RuntimeRuncV1:
 		fallthrough
-	case runcRuntimeV2:
+	case plugin.RuntimeRuncV2:
 		return &runcoptions.Options{}
-	case linuxRuntime:
+	case plugin.RuntimeLinuxV1:
 		return &runctypes.RuncOptions{}
 	default:
 		return &runtimeoptions.Options{}

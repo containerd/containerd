@@ -34,7 +34,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	"github.com/containerd/cri/pkg/annotations"
 	customopts "github.com/containerd/cri/pkg/containerd/opts"
@@ -114,6 +114,10 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to resolve image %q", config.GetImage().GetImage())
 	}
+	containerdImage, err := c.toContainerdImage(ctx, image)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get image from containerd %q", image.ID)
+	}
 
 	// Run container using the same runtime with sandbox.
 	sandboxInfo, err := sandbox.Container.Info(ctx)
@@ -179,7 +183,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		// the runtime (runc) a chance to modify (e.g. to create mount
 		// points corresponding to spec.Mounts) before making the
 		// rootfs readonly (requested by spec.Root.Readonly).
-		customopts.WithNewSnapshot(id, image.Image),
+		customopts.WithNewSnapshot(id, containerdImage),
 	}
 
 	if len(volumeMounts) > 0 {
@@ -192,9 +196,14 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	meta.ImageRef = image.ID
 	meta.StopSignal = image.ImageSpec.Config.StopSignal
 
-	// Get container log path.
-	if config.GetLogPath() != "" {
+	// Validate log paths and compose full container log path.
+	if sandboxConfig.GetLogDirectory() != "" && config.GetLogPath() != "" {
 		meta.LogPath = filepath.Join(sandboxConfig.GetLogDirectory(), config.GetLogPath())
+		logrus.Debugf("Composed container full log path %q using sandbox log dir %q and container log path %q",
+			meta.LogPath, sandboxConfig.GetLogDirectory(), config.GetLogPath())
+	} else {
+		logrus.Infof("Logging will be disabled due to empty log paths for sandbox (%q) or container (%q)",
+			sandboxConfig.GetLogDirectory(), config.GetLogPath())
 	}
 
 	containerIO, err := cio.NewContainerIO(id,
@@ -357,20 +366,14 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 	}
 	specOpts = append(specOpts, customopts.WithMounts(c.os, config, extraMounts, mountLabel))
 
-	// Apply masked paths if specified.
-	// When `MaskedPaths` is not specified, keep runtime default for backward compatibility;
-	// When `MaskedPaths` is specified, but length is zero, clear masked path list.
-	// Note: If the container is privileged, then we clear any masked paths later on in the call to setOCIPrivileged()
-	if maskedPaths := securityContext.GetMaskedPaths(); maskedPaths != nil {
-		specOpts = append(specOpts, oci.WithMaskedPaths(maskedPaths))
-	}
+	if !c.config.DisableProcMount {
+		// Apply masked paths if specified.
+		// Note: If the container is privileged, then we clear any masked paths later on in the call to setOCIPrivileged()
+		specOpts = append(specOpts, oci.WithMaskedPaths(securityContext.GetMaskedPaths()))
 
-	// Apply readonly paths if specified.
-	// Note: If the container is privileged, then we clear any readonly paths later on in the call to setOCIPrivileged()
-
-	// Apply readonly paths if specified.
-	if roPaths := securityContext.GetReadonlyPaths(); roPaths != nil {
-		specOpts = append(specOpts, oci.WithReadonlyPaths(roPaths))
+		// Apply readonly paths if specified.
+		// Note: If the container is privileged, then we clear any readonly paths later on in the call to setOCIPrivileged()
+		specOpts = append(specOpts, oci.WithReadonlyPaths(securityContext.GetReadonlyPaths()))
 	}
 
 	if securityContext.GetPrivileged() {

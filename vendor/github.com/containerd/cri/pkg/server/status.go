@@ -24,7 +24,7 @@ import (
 	cni "github.com/containerd/go-cni"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 // networkNotReadyReason is the reason reported when network is not ready.
@@ -72,6 +72,12 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 			return nil, err
 		}
 		resp.Info["golang"] = string(versionByt)
+
+		cniConfig, err := json.Marshal(c.netPlugin.GetConfig())
+		if err != nil {
+			logrus.WithError(err).Errorf("Failed to marshal CNI config %v", err)
+		}
+		resp.Info["cniconfig"] = string(cniConfig)
 	}
 	return resp, nil
 }

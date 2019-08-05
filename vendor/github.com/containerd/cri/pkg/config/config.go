@@ -71,6 +71,10 @@ type CniConfig struct {
 	NetworkPluginBinDir string `toml:"bin_dir" json:"binDir"`
 	// NetworkPluginConfDir is the directory in which the admin places a CNI conf.
 	NetworkPluginConfDir string `toml:"conf_dir" json:"confDir"`
+	// NetworkPluginMaxConfNum is the max number of plugin config files that will
+	// be loaded from the cni config directory by go-cni. Set the value to 0 to
+	// load all config files (no arbitrary limit). The legacy default value is 1.
+	NetworkPluginMaxConfNum int `toml:"max_conf_num" json:"maxConfNum"`
 	// NetworkPluginConfTemplate is the file path of golang template used to generate
 	// cni config.
 	// When it is set, containerd will get cidr from kubelet to replace {{.PodCIDR}} in
@@ -106,6 +110,13 @@ type AuthConfig struct {
 	IdentityToken string `toml:"identitytoken" json:"identitytoken"`
 }
 
+// TLSConfig contains the CA/Cert/Key used for a registry
+type TLSConfig struct {
+	CAFile   string `toml:"ca_file" json:"caFile"`
+	CertFile string `toml:"cert_file" json:"certFile"`
+	KeyFile  string `toml:"key_file" json:"keyFile"`
+}
+
 // Registry is registry settings configured
 type Registry struct {
 	// Mirrors are namespace to mirror mapping for all namespaces.
@@ -113,6 +124,9 @@ type Registry struct {
 	// Auths are registry endpoint to auth config mapping. The registry endpoint must
 	// be a valid url with host specified.
 	Auths map[string]AuthConfig `toml:"auths" json:"auths"`
+	// TLSConfigs are pairs of CA/Cert/Key which then are used when creating the transport
+	// that communicates with the registry.
+	TLSConfigs map[string]TLSConfig `toml:"tls_configs" json:"tlsConfigs"`
 }
 
 // PluginConfig contains toml config related to CRI plugin,
@@ -124,6 +138,8 @@ type PluginConfig struct {
 	CniConfig `toml:"cni" json:"cni"`
 	// Registry contains config related to the registry
 	Registry Registry `toml:"registry" json:"registry"`
+	// DisableTCPService disables serving CRI on the TCP server.
+	DisableTCPService bool `toml:"disable_tcp_service" json:"disableTCPService"`
 	// StreamServerAddress is the ip address streaming server is listening on.
 	StreamServerAddress string `toml:"stream_server_address" json:"streamServerAddress"`
 	// StreamServerPort is the port streaming server is listening on.
@@ -161,6 +177,11 @@ type PluginConfig struct {
 	// current OOMScoreADj.
 	// This is useful when the containerd does not have permission to decrease OOMScoreAdj.
 	RestrictOOMScoreAdj bool `toml:"restrict_oom_score_adj" json:"restrictOOMScoreAdj"`
+	// MaxConcurrentDownloads restricts the number of concurrent downloads for each image.
+	MaxConcurrentDownloads int `toml:"max_concurrent_downloads" json:"maxConcurrentDownloads"`
+	// DisableProcMount disables Kubernetes ProcMount support. This MUST be set to `true`
+	// when using containerd with Kubernetes <=1.11.
+	DisableProcMount bool `toml:"disable_proc_mount" json:"disableProcMount"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
@@ -192,6 +213,7 @@ func DefaultConfig() PluginConfig {
 		CniConfig: CniConfig{
 			NetworkPluginBinDir:       "/opt/cni/bin",
 			NetworkPluginConfDir:      "/etc/cni/net.d",
+			NetworkPluginMaxConfNum:   1, // only one CNI plugin config file will be loaded
 			NetworkPluginConfTemplate: "",
 		},
 		ContainerdConfig: ContainerdConfig{
@@ -204,6 +226,7 @@ func DefaultConfig() PluginConfig {
 				},
 			},
 		},
+		DisableTCPService:   true,
 		StreamServerAddress: "127.0.0.1",
 		StreamServerPort:    "0",
 		StreamIdleTimeout:   streaming.DefaultConfig.StreamIdleTimeout.String(), // 4 hour
@@ -224,6 +247,8 @@ func DefaultConfig() PluginConfig {
 				},
 			},
 		},
+		MaxConcurrentDownloads: 3,
+		DisableProcMount:       false,
 	}
 }
 

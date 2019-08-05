@@ -21,7 +21,7 @@ import (
 
 	cni "github.com/containerd/go-cni"
 	"github.com/pkg/errors"
-	runtime "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 // NOTE(random-liu):
@@ -57,7 +57,7 @@ type Metadata struct {
 	IP string
 	// RuntimeHandler is the runtime handler name of the pod.
 	RuntimeHandler string
-	// CNI result
+	// CNIresult resulting configuration for attached network namespace interfaces
 	CNIResult *cni.CNIResult
 }
 
