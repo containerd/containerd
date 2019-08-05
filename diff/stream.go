@@ -188,9 +188,7 @@ func BinaryHandler(id, returnsMediaType string, mediaTypes []string, path string
 	}
 }
 
-const (
-	mediaTypeEnvVar = "STEAM_PROCESSOR_MEDIATYPE"
-)
+const mediaTypeEnvVar = "STREAM_PROCESSOR_MEDIATYPE"
 
 // NewBinaryProcessor returns a binary processor for use with processing content streams
 func NewBinaryProcessor(ctx context.Context, imt, rmt string, stream StreamProcessor, name string, args []string, payload *types.Any) (StreamProcessor, error) {
