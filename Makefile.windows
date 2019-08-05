@@ -16,7 +16,6 @@
 #Windows specific settings.
 WHALE = "+"
 ONI = "-"
-COMMANDS += containerd-shim-runhcs-v1
 
 BINARY_SUFFIX=".exe"
 
