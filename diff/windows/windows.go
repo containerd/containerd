@@ -26,11 +26,9 @@ import (
 
 	winio "github.com/Microsoft/go-winio"
 	"github.com/containerd/containerd/archive"
-	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
@@ -100,9 +98,11 @@ func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 		}
 	}()
 
-	isCompressed, err := images.IsCompressedDiff(ctx, desc.MediaType)
-	if err != nil {
-		return emptyDesc, errors.Wrapf(errdefs.ErrNotImplemented, "unsupported diff media type: %v", desc.MediaType)
+	var config diff.ApplyConfig
+	for _, o := range opts {
+		if err := o(&config); err != nil {
+			return emptyDesc, errors.Wrap(err, "failed to apply config opt")
+		}
 	}
 
 	ra, err := s.store.ReaderAt(ctx, desc)
@@ -111,19 +111,20 @@ func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 	}
 	defer ra.Close()
 
-	r := content.NewReader(ra)
-	if isCompressed {
-		ds, err := compression.DecompressStream(r)
-		if err != nil {
-			return emptyDesc, err
+	processor := diff.NewProcessorChain(desc.MediaType, content.NewReader(ra))
+	for {
+		if processor, err = diff.GetProcessor(ctx, processor, config.ProcessorPayloads); err != nil {
+			return emptyDesc, errors.Wrapf(err, "failed to get stream processor for %s", desc.MediaType)
 		}
-		defer ds.Close()
-		r = ds
+		if processor.MediaType() == ocispec.MediaTypeImageLayer {
+			break
+		}
 	}
+	defer processor.Close()
 
 	digester := digest.Canonical.Digester()
 	rc := &readCounter{
-		r: io.TeeReader(r, digester.Hash()),
+		r: io.TeeReader(processor, digester.Hash()),
 	}
 
 	layer, parentLayerPaths, err := mountsToLayerAndParents(mounts)
