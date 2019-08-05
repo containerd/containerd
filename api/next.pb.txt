@@ -1811,6 +1811,7 @@ file {
   name: "github.com/containerd/containerd/api/services/diff/v1/diff.proto"
   package: "containerd.services.diff.v1"
   dependency: "gogoproto/gogo.proto"
+  dependency: "google/protobuf/any.proto"
   dependency: "github.com/containerd/containerd/api/types/mount.proto"
   dependency: "github.com/containerd/containerd/api/types/descriptor.proto"
   message_type {
@@ -1830,6 +1831,35 @@ file {
       type: TYPE_MESSAGE
       type_name: ".containerd.types.Mount"
       json_name: "mounts"
+    }
+    field {
+      name: "payloads"
+      number: 3
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.diff.v1.ApplyRequest.PayloadsEntry"
+      json_name: "payloads"
+    }
+    nested_type {
+      name: "PayloadsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_MESSAGE
+        type_name: ".google.protobuf.Any"
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
     }
   }
   message_type {

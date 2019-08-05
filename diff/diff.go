@@ -97,3 +97,11 @@ func WithLabels(labels map[string]string) Opt {
 		return nil
 	}
 }
+
+// WithPayloads sets the apply processor payloads to the config
+func WithPayloads(payloads map[string]*types.Any) ApplyOpt {
+	return func(c *ApplyConfig) error {
+		c.ProcessorPayloads = payloads
+		return nil
+	}
+}

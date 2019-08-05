@@ -17,6 +17,7 @@
 package diff
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -188,19 +189,30 @@ func BinaryHandler(id, returnsMediaType string, mediaTypes []string, path string
 }
 
 const (
-	payloadEnvVar   = "STREAM_PROCESSOR_PAYLOAD"
 	mediaTypeEnvVar = "STEAM_PROCESSOR_MEDIATYPE"
 )
 
 // NewBinaryProcessor returns a binary processor for use with processing content streams
 func NewBinaryProcessor(ctx context.Context, imt, rmt string, stream StreamProcessor, name string, args []string, payload *types.Any) (StreamProcessor, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
+
+	var payloadC io.Closer
 	if payload != nil {
 		data, err := proto.Marshal(payload)
 		if err != nil {
 			return nil, err
 		}
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", payloadEnvVar, data))
+		r, w, err := os.Pipe()
+		if err != nil {
+			return nil, err
+		}
+		go func() {
+			io.Copy(w, bytes.NewReader(data))
+			w.Close()
+		}()
+
+		cmd.ExtraFiles = append(cmd.ExtraFiles, r)
+		payloadC = r
 	}
 	cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", mediaTypeEnvVar, imt))
 	var (
@@ -231,7 +243,9 @@ func NewBinaryProcessor(ctx context.Context, imt, rmt string, stream StreamProce
 	if closer != nil {
 		closer()
 	}
-
+	if payloadC != nil {
+		payloadC.Close()
+	}
 	return &binaryProcessor{
 		cmd: cmd,
 		r:   r,
