@@ -17,16 +17,12 @@
 package diff
 
 import (
-	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"os"
-	"os/exec"
 
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/images"
-	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -189,90 +185,3 @@ func BinaryHandler(id, returnsMediaType string, mediaTypes []string, path string
 }
 
 const mediaTypeEnvVar = "STREAM_PROCESSOR_MEDIATYPE"
-
-// NewBinaryProcessor returns a binary processor for use with processing content streams
-func NewBinaryProcessor(ctx context.Context, imt, rmt string, stream StreamProcessor, name string, args []string, payload *types.Any) (StreamProcessor, error) {
-	cmd := exec.CommandContext(ctx, name, args...)
-
-	var payloadC io.Closer
-	if payload != nil {
-		data, err := proto.Marshal(payload)
-		if err != nil {
-			return nil, err
-		}
-		r, w, err := os.Pipe()
-		if err != nil {
-			return nil, err
-		}
-		go func() {
-			io.Copy(w, bytes.NewReader(data))
-			w.Close()
-		}()
-
-		cmd.ExtraFiles = append(cmd.ExtraFiles, r)
-		payloadC = r
-	}
-	cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", mediaTypeEnvVar, imt))
-	var (
-		stdin  io.Reader
-		closer func() error
-		err    error
-	)
-	if f, ok := stream.(RawProcessor); ok {
-		stdin = f.File()
-		closer = f.File().Close
-	} else {
-		stdin = stream
-	}
-	cmd.Stdin = stdin
-	r, w, err := os.Pipe()
-	if err != nil {
-		return nil, err
-	}
-	cmd.Stdout = w
-
-	if err := cmd.Start(); err != nil {
-		return nil, err
-	}
-	go cmd.Wait()
-
-	// close after start and dup
-	w.Close()
-	if closer != nil {
-		closer()
-	}
-	if payloadC != nil {
-		payloadC.Close()
-	}
-	return &binaryProcessor{
-		cmd: cmd,
-		r:   r,
-		mt:  rmt,
-	}, nil
-}
-
-type binaryProcessor struct {
-	cmd *exec.Cmd
-	r   *os.File
-	mt  string
-}
-
-func (c *binaryProcessor) File() *os.File {
-	return c.r
-}
-
-func (c *binaryProcessor) MediaType() string {
-	return c.mt
-}
-
-func (c *binaryProcessor) Read(p []byte) (int, error) {
-	return c.r.Read(p)
-}
-
-func (c *binaryProcessor) Close() error {
-	err := c.r.Close()
-	if kerr := c.cmd.Process.Kill(); err == nil {
-		err = kerr
-	}
-	return err
-}
