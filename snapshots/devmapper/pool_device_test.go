@@ -154,6 +154,41 @@ func TestPoolDevice(t *testing.T) {
 	})
 }
 
+func TestPoolDeviceMarkFaulty(t *testing.T) {
+	tempDir, store := createStore(t)
+	defer cleanupStore(t, tempDir, store)
+
+	err := store.AddDevice(testCtx, &DeviceInfo{Name: "1", State: Unknown})
+	assert.NilError(t, err)
+
+	err = store.AddDevice(testCtx, &DeviceInfo{Name: "2", State: Activated})
+	assert.NilError(t, err)
+
+	pool := &PoolDevice{metadata: store}
+	err = pool.ensureDeviceStates(testCtx)
+	assert.NilError(t, err)
+
+	called := 0
+	err = pool.metadata.WalkDevices(testCtx, func(info *DeviceInfo) error {
+		called++
+
+		switch called {
+		case 1:
+			assert.Equal(t, Faulty, info.State)
+			assert.Equal(t, "1", info.Name)
+		case 2:
+			assert.Equal(t, Activated, info.State)
+			assert.Equal(t, "2", info.Name)
+		default:
+			t.Error("unexpected walk call")
+		}
+
+		return nil
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, 2, called)
+}
+
 func testCreateThinDevice(t *testing.T, pool *PoolDevice) {
 	ctx := context.Background()
 

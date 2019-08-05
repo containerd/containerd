@@ -280,6 +280,22 @@ func (m *PoolMetadata) RemoveDevice(ctx context.Context, name string) error {
 	})
 }
 
+// WalkDevices walks all devmapper devices in metadata store and invokes the callback with device info.
+// The provided callback function must not modify the bucket.
+func (m *PoolMetadata) WalkDevices(ctx context.Context, cb func(info *DeviceInfo) error) error {
+	return m.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(devicesBucketName)
+		return bucket.ForEach(func(key, value []byte) error {
+			device := &DeviceInfo{}
+			if err := json.Unmarshal(value, device); err != nil {
+				return errors.Wrapf(err, "failed to unmarshal %s", key)
+			}
+
+			return cb(device)
+		})
+	})
+}
+
 // GetDeviceNames retrieves the list of device names currently stored in database
 func (m *PoolMetadata) GetDeviceNames(ctx context.Context) ([]string, error) {
 	var (

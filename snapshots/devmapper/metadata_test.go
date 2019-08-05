@@ -181,6 +181,38 @@ func TestPoolMetadata_MarkFaulty(t *testing.T) {
 	assert.NilError(t, err)
 }
 
+func TestPoolMetadata_WalkDevices(t *testing.T) {
+	tempDir, store := createStore(t)
+	defer cleanupStore(t, tempDir, store)
+
+	err := store.AddDevice(testCtx, &DeviceInfo{Name: "device1", DeviceID: 1, State: Created})
+	assert.NilError(t, err)
+
+	err = store.AddDevice(testCtx, &DeviceInfo{Name: "device2", DeviceID: 2, State: Faulty})
+	assert.NilError(t, err)
+
+	called := 0
+	err = store.WalkDevices(testCtx, func(info *DeviceInfo) error {
+		called++
+		switch called {
+		case 1:
+			assert.Equal(t, "device1", info.Name)
+			assert.Equal(t, uint32(1), info.DeviceID)
+			assert.Equal(t, Created, info.State)
+		case 2:
+			assert.Equal(t, "device2", info.Name)
+			assert.Equal(t, uint32(2), info.DeviceID)
+			assert.Equal(t, Faulty, info.State)
+		default:
+			t.Error("unexpected walk call")
+		}
+
+		return nil
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, called, 2)
+}
+
 func TestPoolMetadata_GetDeviceNames(t *testing.T) {
 	tempDir, store := createStore(t)
 	defer cleanupStore(t, tempDir, store)

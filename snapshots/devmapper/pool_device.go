@@ -61,10 +61,47 @@ func NewPoolDevice(ctx context.Context, config *Config) (*PoolDevice, error) {
 		return nil, errors.Wrapf(err, "failed to query pool %q", poolPath)
 	}
 
-	return &PoolDevice{
+	poolDevice := &PoolDevice{
 		poolName: config.PoolName,
 		metadata: poolMetaStore,
-	}, nil
+	}
+
+	if err := poolDevice.ensureDeviceStates(ctx); err != nil {
+		return nil, errors.Wrap(err, "failed to check devices state")
+	}
+
+	return poolDevice, nil
+}
+
+// ensureDeviceStates marks devices with incomplete states (after crash) as 'Faulty'
+func (p *PoolDevice) ensureDeviceStates(ctx context.Context) error {
+	var devices []*DeviceInfo
+
+	if err := p.metadata.WalkDevices(ctx, func(info *DeviceInfo) error {
+		switch info.State {
+		case Activated, Suspended, Resumed, Deactivated, Removed, Faulty:
+			return nil
+		}
+		devices = append(devices, info)
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "failed to query devices from metastore")
+	}
+
+	var result *multierror.Error
+	for _, dev := range devices {
+		log.G(ctx).
+			WithField("dev_id", dev.DeviceID).
+			WithField("parent", dev.ParentName).
+			WithField("error", dev.Error).
+			Warnf("devmapper device %q has invalid state %q, marking as faulty", dev.Name, dev.State)
+
+		if err := p.metadata.MarkFaulty(ctx, dev.Name); err != nil {
+			result = multierror.Append(result, err)
+		}
+	}
+
+	return multierror.Prefix(result.ErrorOrNil(), "devmapper:")
 }
 
 // transition invokes 'updateStateFn' callback to perform devmapper operation and reflects device state changes/errors in meta store.
