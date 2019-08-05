@@ -265,7 +265,7 @@ func (ah *authHandler) doBasicAuth(ctx context.Context) (string, error) {
 	}
 
 	auth := base64.StdEncoding.EncodeToString([]byte(username + ":" + secret))
-	return fmt.Sprintf("%s %s", "Basic", auth), nil
+	return fmt.Sprintf("Basic %s", auth), nil
 }
 
 func (ah *authHandler) doBearerAuth(ctx context.Context) (string, error) {
@@ -307,7 +307,7 @@ func (ah *authHandler) doBearerAuth(ctx context.Context) (string, error) {
 		token, err = ah.fetchToken(ctx, to)
 		err = errors.Wrap(err, "failed to fetch anonymous token")
 	}
-	token = fmt.Sprintf("%s %s", "Bearer", token)
+	token = fmt.Sprintf("Bearer %s", token)
 
 	r.token, r.err = token, err
 	r.Done()
