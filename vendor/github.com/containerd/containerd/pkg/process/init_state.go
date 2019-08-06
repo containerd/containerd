@@ -16,12 +16,11 @@
    limitations under the License.
 */
 
-package proc
+package process
 
 import (
 	"context"
 
-	"github.com/containerd/containerd/runtime/proc"
 	runc "github.com/containerd/go-runc"
 	google_protobuf "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
@@ -35,7 +34,7 @@ type initState interface {
 	Resume(context.Context) error
 	Update(context.Context, *google_protobuf.Any) error
 	Checkpoint(context.Context, *CheckpointConfig) error
-	Exec(context.Context, string, *ExecConfig) (proc.Process, error)
+	Exec(context.Context, string, *ExecConfig) (Process, error)
 	Kill(context.Context, uint32, bool) error
 	SetExited(int)
 }
@@ -100,7 +99,7 @@ func (s *createdState) SetExited(status int) {
 	}
 }
 
-func (s *createdState) Exec(ctx context.Context, path string, r *ExecConfig) (proc.Process, error) {
+func (s *createdState) Exec(ctx context.Context, path string, r *ExecConfig) (Process, error) {
 	return s.p.exec(ctx, path, r)
 }
 
@@ -143,6 +142,9 @@ func (s *createdCheckpointState) Start(ctx context.Context) error {
 	p := s.p
 	sio := p.stdio
 
+	p.pid.Lock()
+	defer p.pid.Unlock()
+
 	var (
 		err    error
 		socket *runc.Socket
@@ -182,7 +184,7 @@ func (s *createdCheckpointState) Start(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to retrieve OCI runtime container pid")
 	}
-	p.pid = pid
+	p.pid.pid = pid
 	return s.transition("running")
 }
 
@@ -205,7 +207,7 @@ func (s *createdCheckpointState) SetExited(status int) {
 	}
 }
 
-func (s *createdCheckpointState) Exec(ctx context.Context, path string, r *ExecConfig) (proc.Process, error) {
+func (s *createdCheckpointState) Exec(ctx context.Context, path string, r *ExecConfig) (Process, error) {
 	return nil, errors.Errorf("cannot exec in a created state")
 }
 
@@ -265,7 +267,7 @@ func (s *runningState) SetExited(status int) {
 	}
 }
 
-func (s *runningState) Exec(ctx context.Context, path string, r *ExecConfig) (proc.Process, error) {
+func (s *runningState) Exec(ctx context.Context, path string, r *ExecConfig) (Process, error) {
 	return s.p.exec(ctx, path, r)
 }
 
@@ -329,7 +331,7 @@ func (s *pausedState) SetExited(status int) {
 	}
 }
 
-func (s *pausedState) Exec(ctx context.Context, path string, r *ExecConfig) (proc.Process, error) {
+func (s *pausedState) Exec(ctx context.Context, path string, r *ExecConfig) (Process, error) {
 	return nil, errors.Errorf("cannot exec in a paused state")
 }
 
@@ -382,6 +384,6 @@ func (s *stoppedState) SetExited(status int) {
 	// no op
 }
 
-func (s *stoppedState) Exec(ctx context.Context, path string, r *ExecConfig) (proc.Process, error) {
+func (s *stoppedState) Exec(ctx context.Context, path string, r *ExecConfig) (Process, error) {
 	return nil, errors.Errorf("cannot exec in a stopped state")
 }

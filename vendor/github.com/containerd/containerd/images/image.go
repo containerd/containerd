@@ -142,6 +142,7 @@ type platformManifest struct {
 // this direction because this abstraction is not needed.`
 func Manifest(ctx context.Context, provider content.Provider, image ocispec.Descriptor, platform platforms.MatchComparer) (ocispec.Manifest, error) {
 	var (
+		limit    = 1
 		m        []platformManifest
 		wasIndex bool
 	)
@@ -210,10 +211,22 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 				}
 			}
 
+			sort.SliceStable(descs, func(i, j int) bool {
+				if descs[i].Platform == nil {
+					return false
+				}
+				if descs[j].Platform == nil {
+					return true
+				}
+				return platform.Less(*descs[i].Platform, *descs[j].Platform)
+			})
+
 			wasIndex = true
 
+			if len(descs) > limit {
+				return descs[:limit], nil
+			}
 			return descs, nil
-
 		}
 		return nil, errors.Wrapf(errdefs.ErrNotFound, "unexpected media type %v for %v", desc.MediaType, desc.Digest)
 	}), image); err != nil {
@@ -227,17 +240,6 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 		}
 		return ocispec.Manifest{}, err
 	}
-
-	sort.SliceStable(m, func(i, j int) bool {
-		if m[i].p == nil {
-			return false
-		}
-		if m[j].p == nil {
-			return true
-		}
-		return platform.Less(*m[i].p, *m[j].p)
-	})
-
 	return *m[0].m, nil
 }
 
@@ -357,6 +359,7 @@ func Children(ctx context.Context, provider content.Provider, desc ocispec.Descr
 
 		descs = append(descs, index.Manifests...)
 	case MediaTypeDockerSchema2Layer, MediaTypeDockerSchema2LayerGzip,
+		MediaTypeDockerSchema2LayerEnc, MediaTypeDockerSchema2LayerGzipEnc,
 		MediaTypeDockerSchema2LayerForeign, MediaTypeDockerSchema2LayerForeignGzip,
 		MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig,
 		ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerGzip,
@@ -405,4 +408,54 @@ func IsCompressedDiff(ctx context.Context, mediaType string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+// GetImageLayerDescriptors gets the image layer Descriptors of an image; the array contains
+// a list of Descriptors belonging to one platform followed by lists of other platforms
+func GetImageLayerDescriptors(ctx context.Context, cs content.Store, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	var lis []ocispec.Descriptor
+
+	ds := platforms.DefaultSpec()
+	platform := &ds
+
+	switch desc.MediaType {
+	case MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex,
+		MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+		children, err := Children(ctx, cs, desc)
+		if err != nil {
+			if errdefs.IsNotFound(err) {
+				return []ocispec.Descriptor{}, nil
+			}
+			return []ocispec.Descriptor{}, err
+		}
+
+		if desc.Platform != nil {
+			platform = desc.Platform
+		}
+
+		for _, child := range children {
+			var tmp []ocispec.Descriptor
+
+			switch child.MediaType {
+			case MediaTypeDockerSchema2LayerGzip, MediaTypeDockerSchema2Layer,
+				ocispec.MediaTypeImageLayerGzip, ocispec.MediaTypeImageLayer,
+				MediaTypeDockerSchema2LayerGzipEnc, MediaTypeDockerSchema2LayerEnc:
+				tdesc := child
+				tdesc.Platform = platform
+				tmp = append(tmp, tdesc)
+			default:
+				tmp, err = GetImageLayerDescriptors(ctx, cs, child)
+			}
+
+			if err != nil {
+				return []ocispec.Descriptor{}, err
+			}
+
+			lis = append(lis, tmp...)
+		}
+	case MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig:
+	default:
+		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "GetImageLayerInfo: unhandled media type %s", desc.MediaType)
+	}
+	return lis, nil
 }

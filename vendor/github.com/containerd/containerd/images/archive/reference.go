@@ -91,7 +91,7 @@ func familiarizeReference(ref string) (string, error) {
 func ociReferenceName(name string) string {
 	// OCI defines the reference name as only a tag excluding the
 	// repository. The containerd annotation contains the full image name
-	// since the tag is insufficent for correctly naming and referring to an
+	// since the tag is insufficient for correctly naming and referring to an
 	// image
 	var ociRef string
 	if spec, err := reference.Parse(name); err == nil {
