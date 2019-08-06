@@ -9,12 +9,17 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+var (
+	// ErrInvalidPath is returned when the location of a file path doesn't begin with a driver letter.
+	ErrInvalidPath = errors.New("the path provided to GetFileSystemType must start with a drive letter")
+)
+
 // GetFileSystemType obtains the type of a file system through GetVolumeInformation.
 // https://msdn.microsoft.com/en-us/library/windows/desktop/aa364993(v=vs.85).aspx
 func GetFileSystemType(path string) (fsType string, hr error) {
 	drive := filepath.VolumeName(path)
 	if len(drive) != 2 {
-		return "", errors.New("getFileSystemType path must start with a drive letter")
+		return "", ErrInvalidPath
 	}
 
 	var (

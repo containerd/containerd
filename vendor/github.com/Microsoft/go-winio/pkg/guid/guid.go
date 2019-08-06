@@ -7,6 +7,7 @@ package guid
 
 import (
 	"crypto/rand"
+	"crypto/sha1"
 	"encoding"
 	"encoding/binary"
 	"fmt"
@@ -52,10 +53,34 @@ func NewV4() (GUID, error) {
 		return GUID{}, err
 	}
 
-	b[6] = (b[6] & 0x0f) | 0x40 // Version 4 (randomly generated)
-	b[8] = (b[8] & 0x3f) | 0x80 // RFC4122 variant
+	g := FromArray(b)
+	g.setVersion(4) // Version 4 means randomly generated.
+	g.setVariant(VariantRFC4122)
 
-	return FromArray(b), nil
+	return g, nil
+}
+
+// NewV5 returns a new version 5 (generated from a string via SHA-1 hashing)
+// GUID, as defined by RFC 4122. The RFC is unclear on the encoding of the name,
+// and the sample code treats it as a series of bytes, so we do the same here.
+//
+// Some implementations, such as those found on Windows, treat the name as a
+// big-endian UTF16 stream of bytes. If that is desired, the string can be
+// encoded as such before being passed to this function.
+func NewV5(namespace GUID, name []byte) (GUID, error) {
+	b := sha1.New()
+	namespaceBytes := namespace.ToArray()
+	b.Write(namespaceBytes[:])
+	b.Write(name)
+
+	a := [16]byte{}
+	copy(a[:], b.Sum(nil))
+
+	g := FromArray(a)
+	g.setVersion(5) // Version 5 means generated from a string.
+	g.setVariant(VariantRFC4122)
+
+	return g, nil
 }
 
 func fromArray(b [16]byte, order binary.ByteOrder) GUID {
@@ -150,6 +175,25 @@ func FromString(s string) (GUID, error) {
 	return g, nil
 }
 
+func (g *GUID) setVariant(v Variant) {
+	d := g.Data4[0]
+	switch v {
+	case VariantNCS:
+		d = (d & 0x7f)
+	case VariantRFC4122:
+		d = (d & 0x3f) | 0x80
+	case VariantMicrosoft:
+		d = (d & 0x1f) | 0xc0
+	case VariantFuture:
+		d = (d & 0x0f) | 0xe0
+	case VariantUnknown:
+		fallthrough
+	default:
+		panic(fmt.Sprintf("invalid variant: %d", v))
+	}
+	g.Data4[0] = d
+}
+
 // Variant returns the GUID variant, as defined in RFC 4122.
 func (g GUID) Variant() Variant {
 	b := g.Data4[0]
@@ -163,6 +207,10 @@ func (g GUID) Variant() Variant {
 		return VariantFuture
 	}
 	return VariantUnknown
+}
+
+func (g *GUID) setVersion(v Version) {
+	g.Data3 = (g.Data3 & 0x0fff) | (uint16(v) << 12)
 }
 
 // Version returns the GUID version, as defined in RFC 4122.
