@@ -61,7 +61,6 @@ type ContainerdConfig struct {
 	Runtimes map[string]Runtime `toml:"runtimes" json:"runtimes"`
 	// NoPivot disables pivot-root (linux only), required when running a container in a RamDisk with runc
 	// This only works for runtime type "io.containerd.runtime.v1.linux".
-	// DEPRECATED: use Runtime.Options instead. Remove when shim v1 is deprecated.
 	NoPivot bool `toml:"no_pivot" json:"noPivot"`
 }
 
