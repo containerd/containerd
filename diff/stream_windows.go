@@ -27,10 +27,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 
 	winio "github.com/Microsoft/go-winio"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -39,6 +41,7 @@ const processorPipe = "STREAM_PROCESSOR_PIPE"
 // NewBinaryProcessor returns a binary processor for use with processing content streams
 func NewBinaryProcessor(ctx context.Context, imt, rmt string, stream StreamProcessor, name string, args []string, payload *types.Any) (StreamProcessor, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Env = os.Environ()
 
 	if payload != nil {
 		data, err := proto.Marshal(payload)
@@ -84,28 +87,52 @@ func NewBinaryProcessor(ctx context.Context, imt, rmt string, stream StreamProce
 		return nil, err
 	}
 	cmd.Stdout = w
+	stderr := bytes.NewBuffer(nil)
+	cmd.Stderr = stderr
 
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
-	go cmd.Wait()
+	p := &binaryProcessor{
+		cmd:    cmd,
+		r:      r,
+		mt:     rmt,
+		stderr: stderr,
+	}
+	go p.wait()
 
 	// close after start and dup
 	w.Close()
 	if closer != nil {
 		closer()
 	}
-	return &binaryProcessor{
-		cmd: cmd,
-		r:   r,
-		mt:  rmt,
-	}, nil
+	return p, nil
 }
 
 type binaryProcessor struct {
-	cmd *exec.Cmd
-	r   *os.File
-	mt  string
+	cmd    *exec.Cmd
+	r      *os.File
+	mt     string
+	stderr *bytes.Buffer
+
+	mu  sync.Mutex
+	err error
+}
+
+func (c *binaryProcessor) Err() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.err
+}
+
+func (c *binaryProcessor) wait() {
+	if err := c.cmd.Wait(); err != nil {
+		if _, ok := err.(*exec.ExitError); ok {
+			c.mu.Lock()
+			c.err = errors.New(c.stderr.String())
+			c.mu.Unlock()
+		}
+	}
 }
 
 func (c *binaryProcessor) File() *os.File {
