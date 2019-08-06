@@ -13,10 +13,16 @@ os:
 go:
   - "1.12.x"
 
+env:
+  - TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runc.v1 TRAVIS_CGO_ENABLED=1
+  - TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runc.v2 TRAVIS_CGO_ENABLED=1
+
 matrix:
   include:
-    - os: "linux"
+    - os: linux
       env: TRAVIS_GOOS=darwin TRAVIS_CGO_ENABLED=0
+    - os: linux
+      env: TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runtime.v1.linux TRAVIS_CGO_ENABLED=1
 
 go_import_path: github.com/containerd/containerd
 
@@ -35,16 +41,6 @@ addons:
       - libprotobuf-dev
       - socat
       - libseccomp-dev
-
-env:
-  - TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runc.v1 TRAVIS_CGO_ENABLED=1
-  - TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runc.v2 TRAVIS_CGO_ENABLED=1
-  - TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runtime.v1.linux TRAVIS_CGO_ENABLED=1
-
-matrix:
-    exclude:
-       - env: TRAVIS_GOOS=darwin TRAVIS_CGO_ENABLED=0
-         os: linux-ppc64le
 
 before_install:
   - uname -r
