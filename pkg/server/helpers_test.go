@@ -117,22 +117,31 @@ func TestGetCgroupsPath(t *testing.T) {
 	testID := "test-id"
 	for desc, test := range map[string]struct {
 		cgroupsParent string
-		systemdCgroup bool
 		expected      string
 	}{
 		"should support regular cgroup path": {
 			cgroupsParent: "/a/b",
-			systemdCgroup: false,
 			expected:      "/a/b/test-id",
 		},
 		"should support systemd cgroup path": {
 			cgroupsParent: "/a.slice/b.slice",
-			systemdCgroup: true,
 			expected:      "b.slice:cri-containerd:test-id",
+		},
+		"should support tailing slash for regular cgroup path": {
+			cgroupsParent: "/a/b/",
+			expected:      "/a/b/test-id",
+		},
+		"should support tailing slash for systemd cgroup path": {
+			cgroupsParent: "/a.slice/b.slice/",
+			expected:      "b.slice:cri-containerd:test-id",
+		},
+		"should treat root cgroup as regular cgroup path": {
+			cgroupsParent: "/",
+			expected:      "/test-id",
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		got := getCgroupsPath(test.cgroupsParent, testID, test.systemdCgroup)
+		got := getCgroupsPath(test.cgroupsParent, testID)
 		assert.Equal(t, test.expected, got)
 	}
 }

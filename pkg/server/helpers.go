@@ -142,12 +142,12 @@ func makeContainerName(c *runtime.ContainerMetadata, s *runtime.PodSandboxMetada
 }
 
 // getCgroupsPath generates container cgroups path.
-func getCgroupsPath(cgroupsParent, id string, systemdCgroup bool) string {
-	if systemdCgroup {
-		// Convert a.slice/b.slice/c.slice to c.slice.
-		p := path.Base(cgroupsParent)
+func getCgroupsPath(cgroupsParent, id string) string {
+	base := path.Base(cgroupsParent)
+	if strings.HasSuffix(base, ".slice") {
+		// For a.slice/b.slice/c.slice, base is c.slice.
 		// runc systemd cgroup path format is "slice:prefix:name".
-		return strings.Join([]string{p, "cri-containerd", id}, ":")
+		return strings.Join([]string{base, "cri-containerd", id}, ":")
 	}
 	return filepath.Join(cgroupsParent, id)
 }

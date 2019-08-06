@@ -352,8 +352,7 @@ func (c *criService) generateSandboxContainerSpec(id string, config *runtime.Pod
 		specOpts = append(specOpts, customopts.WithDisabledCgroups)
 	} else {
 		if config.GetLinux().GetCgroupParent() != "" {
-			cgroupsPath := getCgroupsPath(config.GetLinux().GetCgroupParent(), id,
-				c.config.SystemdCgroup)
+			cgroupsPath := getCgroupsPath(config.GetLinux().GetCgroupParent(), id)
 			specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
 		}
 	}
