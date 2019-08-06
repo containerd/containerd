@@ -65,7 +65,7 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 
 	var config diff.ApplyConfig
 	for _, o := range opts {
-		if err := o(&config); err != nil {
+		if err := o(ctx, desc, &config); err != nil {
 			return emptyDesc, errors.Wrap(err, "failed to apply config opt")
 		}
 	}

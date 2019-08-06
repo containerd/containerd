@@ -59,7 +59,7 @@ type ApplyConfig struct {
 }
 
 // ApplyOpt is used to configure an Apply operation
-type ApplyOpt func(*ApplyConfig) error
+type ApplyOpt func(context.Context, ocispec.Descriptor, *ApplyConfig) error
 
 // Applier allows applying diffs between mounts
 type Applier interface {
@@ -100,7 +100,7 @@ func WithLabels(labels map[string]string) Opt {
 
 // WithPayloads sets the apply processor payloads to the config
 func WithPayloads(payloads map[string]*types.Any) ApplyOpt {
-	return func(c *ApplyConfig) error {
+	return func(_ context.Context, _ ocispec.Descriptor, c *ApplyConfig) error {
 		c.ProcessorPayloads = payloads
 		return nil
 	}

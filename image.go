@@ -21,10 +21,12 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/rootfs"
+	"github.com/containerd/containerd/snapshots"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -40,7 +42,7 @@ type Image interface {
 	// Labels of the image
 	Labels() map[string]string
 	// Unpack unpacks the image's content into a snapshot
-	Unpack(context.Context, string) error
+	Unpack(context.Context, string, ...UnpackOpt) error
 	// RootFS returns the unpacked diffids that make up images rootfs.
 	RootFS(ctx context.Context) ([]digest.Digest, error)
 	// Size returns the total size of the image's packed resources.
@@ -130,12 +132,30 @@ func (i *image) IsUnpacked(ctx context.Context, snapshotterName string) (bool, e
 	return false, nil
 }
 
-func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
+// UnpackConfig provides configuration for the unpack of an image
+type UnpackConfig struct {
+	// ApplyOpts for applying a diff to a snapshotter
+	ApplyOpts []diff.ApplyOpt
+	// SnapshotOpts for configuring a snapshotter
+	SnapshotOpts []snapshots.Opt
+}
+
+// UnpackOpt provides configuration for unpack
+type UnpackOpt func(context.Context, *UnpackConfig) error
+
+func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...UnpackOpt) error {
 	ctx, done, err := i.client.WithLease(ctx)
 	if err != nil {
 		return err
 	}
 	defer done(ctx)
+
+	var config UnpackConfig
+	for _, o := range opts {
+		if err := o(ctx, &config); err != nil {
+			return err
+		}
+	}
 
 	layers, err := i.getLayers(ctx, i.platform)
 	if err != nil {
@@ -158,7 +178,7 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string) error {
 		return err
 	}
 	for _, layer := range layers {
-		unpacked, err = rootfs.ApplyLayer(ctx, layer, chain, sn, a)
+		unpacked, err = rootfs.ApplyLayerWithOpts(ctx, layer, chain, sn, a, config.SnapshotOpts, config.ApplyOpts)
 		if err != nil {
 			return err
 		}
