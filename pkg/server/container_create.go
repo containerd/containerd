@@ -408,8 +408,7 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 	} else {
 		specOpts = append(specOpts, customopts.WithResources(config.GetLinux().GetResources()))
 		if sandboxConfig.GetLinux().GetCgroupParent() != "" {
-			cgroupsPath := getCgroupsPath(sandboxConfig.GetLinux().GetCgroupParent(), id,
-				c.config.SystemdCgroup)
+			cgroupsPath := getCgroupsPath(sandboxConfig.GetLinux().GetCgroupParent(), id)
 			specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
 		}
 	}
