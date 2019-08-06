@@ -69,11 +69,3 @@ ignore_files = [
 	"google/protobuf/descriptor.proto",
 	"gogoproto/gogo.proto"
 ]
-
-[[descriptors]]
-prefix = "github.com/containerd/containerd/runtime/v2/runhcs/options"
-target = "runtime/v2/runhcs/options/next.pb.txt"
-ignore_files = [
-	"google/protobuf/descriptor.proto",
-	"gogoproto/gogo.proto"
-]
