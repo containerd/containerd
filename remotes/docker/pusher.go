@@ -353,7 +353,7 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 	}
 
 	if size > 0 && size != status.Offset {
-		return errors.Errorf("unxpected size %d, expected %d", status.Offset, size)
+		return errors.Errorf("unexpected size %d, expected %d", status.Offset, size)
 	}
 
 	if expected == "" {
