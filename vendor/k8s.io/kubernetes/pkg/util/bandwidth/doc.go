@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Utility functions.
-package util // import "k8s.io/kubernetes/pkg/kubelet/util"
+// Package bandwidth provides utilities for bandwidth shaping
+package bandwidth // import "k8s.io/kubernetes/pkg/util/bandwidth"

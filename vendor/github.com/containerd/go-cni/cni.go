@@ -41,10 +41,11 @@ type CNI interface {
 }
 
 type ConfigResult struct {
-	PluginDirs    []string
-	PluginConfDir string
-	Prefix        string
-	Networks      []*ConfNetwork
+	PluginDirs       []string
+	PluginConfDir    string
+	PluginMaxConfNum int
+	Prefix           string
+	Networks         []*ConfNetwork
 }
 
 type ConfNetwork struct {
@@ -78,9 +79,10 @@ type libcni struct {
 func defaultCNIConfig() *libcni {
 	return &libcni{
 		config: config{
-			pluginDirs:    []string{DefaultCNIDir},
-			pluginConfDir: DefaultNetDir,
-			prefix:        DefaultPrefix,
+			pluginDirs:       []string{DefaultCNIDir},
+			pluginConfDir:    DefaultNetDir,
+			pluginMaxConfNum: DefaultMaxConfNum,
+			prefix:           DefaultPrefix,
 		},
 		cniConfig: &cnilibrary.CNIConfig{
 			Path: []string{DefaultCNIDir},
@@ -187,9 +189,10 @@ func (c *libcni) GetConfig() *ConfigResult {
 	c.RLock()
 	defer c.RUnlock()
 	r := &ConfigResult{
-		PluginDirs:    c.config.pluginDirs,
-		PluginConfDir: c.config.pluginConfDir,
-		Prefix:        c.config.prefix,
+		PluginDirs:       c.config.pluginDirs,
+		PluginConfDir:    c.config.pluginConfDir,
+		PluginMaxConfNum: c.config.pluginMaxConfNum,
+		Prefix:           c.config.prefix,
 	}
 	for _, network := range c.networks {
 		conf := &NetworkConfList{
