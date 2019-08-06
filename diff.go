@@ -48,13 +48,14 @@ type diffRemote struct {
 func (r *diffRemote) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (ocispec.Descriptor, error) {
 	var config diff.ApplyConfig
 	for _, opt := range opts {
-		if err := opt(&config); err != nil {
+		if err := opt(ctx, desc, &config); err != nil {
 			return ocispec.Descriptor{}, err
 		}
 	}
 	req := &diffapi.ApplyRequest{
-		Diff:   fromDescriptor(desc),
-		Mounts: fromMounts(mounts),
+		Diff:     fromDescriptor(desc),
+		Mounts:   fromMounts(mounts),
+		Payloads: config.ProcessorPayloads,
 	}
 	resp, err := r.client.Apply(ctx, req)
 	if err != nil {
