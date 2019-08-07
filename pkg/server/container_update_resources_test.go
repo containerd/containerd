@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"testing"
 
 	"github.com/golang/protobuf/proto"
@@ -150,7 +151,7 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		got, err := updateOCILinuxResource(test.spec, test.resources)
+		got, err := updateOCILinuxResource(context.Background(), test.spec, test.resources)
 		if test.expectErr {
 			assert.Error(t, err)
 		} else {

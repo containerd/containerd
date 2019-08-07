@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -532,7 +533,7 @@ func TestContainerSpecCommand(t *testing.T) {
 		imageConfig.Cmd = test.imageArgs
 
 		var spec runtimespec.Spec
-		err := opts.WithProcessArgs(config, imageConfig)(nil, nil, nil, &spec)
+		err := opts.WithProcessArgs(config, imageConfig)(context.Background(), nil, nil, &spec)
 		if test.expectErr {
 			assert.Error(t, err)
 			continue
@@ -902,7 +903,7 @@ func TestMountPropagation(t *testing.T) {
 		var spec runtimespec.Spec
 		spec.Linux = &runtimespec.Linux{}
 
-		err := opts.WithMounts(c.os, config, []*runtime.Mount{test.criMount}, "")(nil, nil, nil, &spec)
+		err := opts.WithMounts(c.os, config, []*runtime.Mount{test.criMount}, "")(context.Background(), nil, nil, &spec)
 		if test.expectErr {
 			require.Error(t, err)
 		} else {

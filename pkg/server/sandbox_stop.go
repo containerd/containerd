@@ -22,9 +22,9 @@ import (
 
 	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/log"
 	cni "github.com/containerd/go-cni"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
@@ -88,7 +88,7 @@ func (c *criService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandb
 		}
 	}
 
-	logrus.Infof("TearDown network for sandbox %q successfully", id)
+	log.G(ctx).Infof("TearDown network for sandbox %q successfully", id)
 
 	return &runtime.StopPodSandboxResponse{}, nil
 }

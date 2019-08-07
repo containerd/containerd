@@ -22,10 +22,10 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/typeurl"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
@@ -70,7 +70,7 @@ func (c *criService) updateContainerResources(ctx context.Context,
 	if err != nil {
 		return errors.Wrap(err, "failed to get container spec")
 	}
-	newSpec, err := updateOCILinuxResource(oldSpec, resources)
+	newSpec, err := updateOCILinuxResource(ctx, oldSpec, resources)
 	if err != nil {
 		return errors.Wrap(err, "failed to update resource in spec")
 	}
@@ -84,7 +84,7 @@ func (c *criService) updateContainerResources(ctx context.Context,
 			defer deferCancel()
 			// Reset spec on error.
 			if err := updateContainerSpec(deferCtx, cntr.Container, oldSpec); err != nil {
-				logrus.WithError(err).Errorf("Failed to update spec %+v for container %q", oldSpec, id)
+				log.G(ctx).WithError(err).Errorf("Failed to update spec %+v for container %q", oldSpec, id)
 			}
 		}
 	}()
@@ -130,7 +130,7 @@ func updateContainerSpec(ctx context.Context, cntr containerd.Container, spec *r
 }
 
 // updateOCILinuxResource updates container resource limit.
-func updateOCILinuxResource(spec *runtimespec.Spec, new *runtime.LinuxContainerResources) (*runtimespec.Spec, error) {
+func updateOCILinuxResource(ctx context.Context, spec *runtimespec.Spec, new *runtime.LinuxContainerResources) (*runtimespec.Spec, error) {
 	// Copy to make sure old spec is not changed.
 	var cloned runtimespec.Spec
 	if err := util.DeepCopy(&cloned, spec); err != nil {
@@ -139,7 +139,7 @@ func updateOCILinuxResource(spec *runtimespec.Spec, new *runtime.LinuxContainerR
 	if cloned.Linux == nil {
 		cloned.Linux = &runtimespec.Linux{}
 	}
-	if err := opts.WithResources(new)(nil, nil, nil, &cloned); err != nil {
+	if err := opts.WithResources(new)(ctx, nil, nil, &cloned); err != nil {
 		return nil, errors.Wrap(err, "unable to set linux container resources")
 	}
 	return &cloned, nil

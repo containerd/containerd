@@ -26,13 +26,13 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
@@ -67,7 +67,7 @@ func init() {
 // CreateContainer creates a new container in the given PodSandbox.
 func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateContainerRequest) (_ *runtime.CreateContainerResponse, retErr error) {
 	config := r.GetConfig()
-	logrus.Debugf("Container config %+v", config)
+	log.G(ctx).Debugf("Container config %+v", config)
 	sandboxConfig := r.GetSandboxConfig()
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
@@ -89,7 +89,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, errors.New("container config must include metadata")
 	}
 	name := makeContainerName(metadata, sandboxConfig.GetMetadata())
-	logrus.Debugf("Generated id %q for container %q", id, name)
+	log.G(ctx).Debugf("Generated id %q for container %q", id, name)
 	if err = c.containerNameIndex.Reserve(name, id); err != nil {
 		return nil, errors.Wrapf(err, "failed to reserve container name %q", name)
 	}
@@ -135,7 +135,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		if retErr != nil {
 			// Cleanup the container root directory.
 			if err = c.os.RemoveAll(containerRootDir); err != nil {
-				logrus.WithError(err).Errorf("Failed to remove container root directory %q",
+				log.G(ctx).WithError(err).Errorf("Failed to remove container root directory %q",
 					containerRootDir)
 			}
 		}
@@ -149,7 +149,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		if retErr != nil {
 			// Cleanup the volatile container root directory.
 			if err = c.os.RemoveAll(volatileContainerRootDir); err != nil {
-				logrus.WithError(err).Errorf("Failed to remove volatile container root directory %q",
+				log.G(ctx).WithError(err).Errorf("Failed to remove volatile container root directory %q",
 					volatileContainerRootDir)
 			}
 		}
@@ -165,7 +165,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get sandbox runtime")
 	}
-	logrus.Debugf("Use OCI runtime %+v for sandbox %q and container %q", ociRuntime, sandboxID, id)
+	log.G(ctx).Debugf("Use OCI runtime %+v for sandbox %q and container %q", ociRuntime, sandboxID, id)
 
 	spec, err := c.generateContainerSpec(id, sandboxID, sandboxPid, config, sandboxConfig,
 		&image.ImageSpec.Config, append(mounts, volumeMounts...), ociRuntime.PodAnnotations)
@@ -173,7 +173,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, errors.Wrapf(err, "failed to generate container %q spec", id)
 	}
 
-	logrus.Debugf("Container %q spec: %#+v", id, spew.NewFormatter(spec))
+	log.G(ctx).Debugf("Container %q spec: %#+v", id, spew.NewFormatter(spec))
 
 	// Set snapshotter before any other options.
 	opts := []containerd.NewContainerOpts{
@@ -199,10 +199,10 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	// Validate log paths and compose full container log path.
 	if sandboxConfig.GetLogDirectory() != "" && config.GetLogPath() != "" {
 		meta.LogPath = filepath.Join(sandboxConfig.GetLogDirectory(), config.GetLogPath())
-		logrus.Debugf("Composed container full log path %q using sandbox log dir %q and container log path %q",
+		log.G(ctx).Debugf("Composed container full log path %q using sandbox log dir %q and container log path %q",
 			meta.LogPath, sandboxConfig.GetLogDirectory(), config.GetLogPath())
 	} else {
-		logrus.Infof("Logging will be disabled due to empty log paths for sandbox (%q) or container (%q)",
+		log.G(ctx).Infof("Logging will be disabled due to empty log paths for sandbox (%q) or container (%q)",
 			sandboxConfig.GetLogDirectory(), config.GetLogPath())
 	}
 
@@ -214,7 +214,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	defer func() {
 		if retErr != nil {
 			if err := containerIO.Close(); err != nil {
-				logrus.WithError(err).Errorf("Failed to close container io %q", id)
+				log.G(ctx).WithError(err).Errorf("Failed to close container io %q", id)
 			}
 		}
 	}()
@@ -286,7 +286,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 			deferCtx, deferCancel := ctrdutil.DeferContext()
 			defer deferCancel()
 			if err := cntr.Delete(deferCtx, containerd.WithSnapshotCleanup); err != nil {
-				logrus.WithError(err).Errorf("Failed to delete containerd container %q", id)
+				log.G(ctx).WithError(err).Errorf("Failed to delete containerd container %q", id)
 			}
 		}
 	}()
@@ -304,7 +304,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		if retErr != nil {
 			// Cleanup container checkpoint on error.
 			if err := container.Delete(); err != nil {
-				logrus.WithError(err).Errorf("Failed to cleanup container checkpoint for %q", id)
+				log.G(ctx).WithError(err).Errorf("Failed to cleanup container checkpoint for %q", id)
 			}
 		}
 	}()

@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"testing"
 
 	"github.com/BurntSushi/toml"
@@ -385,7 +386,7 @@ func TestEnvDeduplication(t *testing.T) {
 			}
 		}
 		for _, kv := range test.kv {
-			oci.WithEnv([]string{kv[0] + "=" + kv[1]})(nil, nil, nil, &spec)
+			oci.WithEnv([]string{kv[0] + "=" + kv[1]})(context.Background(), nil, nil, &spec)
 		}
 		assert.Equal(t, test.expected, spec.Process.Env)
 	}
