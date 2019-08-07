@@ -17,8 +17,14 @@ limitations under the License.
 package config
 
 import (
+	"context"
+	"time"
+
 	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/plugin"
+	"github.com/pkg/errors"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 )
 
@@ -272,3 +278,84 @@ const (
 	// RuntimeDefault is the implicit runtime defined for ContainerdConfig.DefaultRuntime
 	RuntimeDefault = "default"
 )
+
+// ValidatePluginConfig validates the given plugin configuration.
+func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
+	if c.ContainerdConfig.Runtimes == nil {
+		c.ContainerdConfig.Runtimes = make(map[string]Runtime)
+	}
+
+	// Validation for deprecated untrusted_workload_runtime.
+	if c.ContainerdConfig.UntrustedWorkloadRuntime.Type != "" {
+		log.G(ctx).Warning("`untrusted_workload_runtime` is deprecated, please use `untrusted` runtime in `runtimes` instead")
+		if _, ok := c.ContainerdConfig.Runtimes[RuntimeUntrusted]; ok {
+			return errors.Errorf("conflicting definitions: configuration includes both `untrusted_workload_runtime` and `runtimes[%q]`", RuntimeUntrusted)
+		}
+		c.ContainerdConfig.Runtimes[RuntimeUntrusted] = c.ContainerdConfig.UntrustedWorkloadRuntime
+	}
+
+	// Validation for deprecated default_runtime field.
+	if c.ContainerdConfig.DefaultRuntime.Type != "" {
+		log.G(ctx).Warning("`default_runtime` is deprecated, please use `default_runtime_name` to reference the default configuration you have defined in `runtimes`")
+		c.ContainerdConfig.DefaultRuntimeName = RuntimeDefault
+		c.ContainerdConfig.Runtimes[RuntimeDefault] = c.ContainerdConfig.DefaultRuntime
+	}
+
+	// Validation for default_runtime_name
+	if c.ContainerdConfig.DefaultRuntimeName == "" {
+		return errors.New("`default_runtime_name` is empty")
+	}
+	if _, ok := c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName]; !ok {
+		return errors.New("no corresponding runtime configured in `runtimes` for `default_runtime_name`")
+	}
+
+	// Validation for deprecated runtime options.
+	if c.SystemdCgroup {
+		if c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName].Type != plugin.RuntimeLinuxV1 {
+			return errors.Errorf("`systemd_cgroup` only works for runtime %s", plugin.RuntimeLinuxV1)
+		}
+		log.G(ctx).Warning("`systemd_cgroup` is deprecated, please use runtime `options` instead")
+	}
+	if c.NoPivot {
+		if c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName].Type != plugin.RuntimeLinuxV1 {
+			return errors.Errorf("`no_pivot` only works for runtime %s", plugin.RuntimeLinuxV1)
+		}
+		// NoPivot can't be deprecated yet, because there is no alternative config option
+		// for `io.containerd.runtime.v1.linux`.
+	}
+	for _, r := range c.ContainerdConfig.Runtimes {
+		if r.Engine != "" {
+			if r.Type != plugin.RuntimeLinuxV1 {
+				return errors.Errorf("`runtime_engine` only works for runtime %s", plugin.RuntimeLinuxV1)
+			}
+			log.G(ctx).Warning("`runtime_engine` is deprecated, please use runtime `options` instead")
+		}
+		if r.Root != "" {
+			if r.Type != plugin.RuntimeLinuxV1 {
+				return errors.Errorf("`runtime_root` only works for runtime %s", plugin.RuntimeLinuxV1)
+			}
+			log.G(ctx).Warning("`runtime_root` is deprecated, please use runtime `options` instead")
+		}
+	}
+
+	// Validation for deprecated auths options and mapping it to configs.
+	if len(c.Registry.Auths) != 0 {
+		if c.Registry.Configs == nil {
+			c.Registry.Configs = make(map[string]RegistryConfig)
+		}
+		for endpoint, auth := range c.Registry.Auths {
+			config := c.Registry.Configs[endpoint]
+			config.Auth = &auth
+			c.Registry.Configs[endpoint] = config
+		}
+		log.G(ctx).Warning("`auths` is deprecated, please use registry`configs` instead")
+	}
+
+	// Validation for stream_idle_timeout
+	if c.StreamIdleTimeout != "" {
+		if _, err := time.ParseDuration(c.StreamIdleTimeout); err != nil {
+			return errors.Wrap(err, "invalid stream idle timeout")
+		}
+	}
+	return nil
+}
