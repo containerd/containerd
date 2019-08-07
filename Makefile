@@ -45,7 +45,7 @@ version: ## print current cri plugin release version
 
 lint:
 	@echo "$(WHALE) $@"
-	@./hack/verify-lint.sh
+	golangci-lint run --skip-files .*_test.go
 
 gofmt:
 	@echo "$(WHALE) $@"
@@ -159,19 +159,18 @@ else
 	git-validation -v -run DCO,short-subject -range $(EPOCH_TEST_COMMIT)..HEAD
 endif
 
-.PHONY: install.tools .install.gitvalidation .install.gometalinter .install.vndr
+.PHONY: install.tools .install.gitvalidation .install.golangci-lint .install.vndr
 
-install.tools: .install.gitvalidation .install.gometalinter .install.vndr ## install tools used by verify
+install.tools: .install.gitvalidation .install.golangci-lint .install.vndr ## install tools used by verify
 	@echo "$(WHALE) $@"
 
 .install.gitvalidation:
 	@echo "$(WHALE) $@"
 	$(GO) get -u github.com/vbatts/git-validation
 
-.install.gometalinter:
+.install.golangci-lint:
 	@echo "$(WHALE) $@"
-	$(GO) get -u github.com/alecthomas/gometalinter
-	gometalinter --install
+	$(GO) get -u github.com/golangci/golangci-lint/cmd/golangci-lint
 
 .install.vndr:
 	@echo "$(WHALE) $@"
