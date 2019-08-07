@@ -227,10 +227,15 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	userstr, err := generateUserString(
 		securityContext.GetRunAsUsername(),
 		securityContext.GetRunAsUser(),
-		securityContext.GetRunAsGroup(),
-	)
+		securityContext.GetRunAsGroup())
+
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate user string")
+	}
+	if userstr == "" {
+		// Lastly, since no user override was passed via CRI try to set via OCI
+		// Image
+		userstr = image.ImageSpec.Config.User
 	}
 	if userstr != "" {
 		specOpts = append(specOpts, oci.WithUser(userstr))
@@ -589,7 +594,20 @@ func generateApparmorSpecOpts(apparmorProf string, privileged, apparmorEnabled b
 	}
 }
 
-// generateUserString generates valid user string based on OCI Image Spec v1.0.0.
+// generateUserString generates valid user string based on OCI Image Spec
+// v1.0.0.
+//
+// CRI defines that the following combinations are valid:
+//
+// (none) -> ""
+// username -> username
+// username, uid -> username
+// username, uid, gid -> username:gid
+// username, gid -> username:gid
+// uid -> uid
+// uid, gid -> uid:gid
+// gid -> error
+//
 // TODO(random-liu): Add group name support in CRI.
 func generateUserString(username string, uid, gid *runtime.Int64Value) (string, error) {
 	var userstr, groupstr string
