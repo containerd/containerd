@@ -271,10 +271,15 @@ version of Kubernetes which supports that version of CRI.
 ### `ctr` tool
 
 The `ctr` tool provides the ability to introspect and understand the containerd
-API. At this time, it is not considered a primary offering of the project. It
-may be completely refactored or have breaking changes in _minor_ releases.
+API. It is not considered a primary offering of the project and is unsupported in
+that sense. While we understand it's value as a debug tool, it may be completely
+refactored or have breaking changes in _minor_ releases.
 
-We will try not break the tool in _patch_ releases.
+Targeting `ctr` for feature additions reflects a misunderstanding of the containerd
+architecture. Feature addition should focus on the client Go API and additions to
+`ctr` may or may not be accepted at the discretion of the maintainers.
+
+We will do our best to not break compatibility in the tool in _patch_ releases.
 
 ### Daemon Configuration
 
