@@ -41,6 +41,9 @@ type Runtime struct {
 	// Options are config options for the runtime. If options is loaded
 	// from toml config, it will be toml.Primitive.
 	Options *toml.Primitive `toml:"options" json:"options"`
+	// PrivilegedWithoutHostDevices overloads the default behaviour for adding host devices to the
+	// runtime spec when the container is privileged. Defaults to false.
+	PrivilegedWithoutHostDevices bool `toml:"privileged_without_host_devices" json:"privileged_without_host_devices"`
 }
 
 // ContainerdConfig contains toml config related to containerd

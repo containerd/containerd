@@ -29,18 +29,19 @@ import (
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/cri/pkg/annotations"
+	"github.com/containerd/cri/pkg/config"
+	"github.com/containerd/cri/pkg/containerd/opts"
 	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
+	ostesting "github.com/containerd/cri/pkg/os/testing"
+	"github.com/containerd/cri/pkg/util"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/opencontainers/runc/libcontainer/devices"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-
-	"github.com/containerd/cri/pkg/annotations"
-	"github.com/containerd/cri/pkg/containerd/opts"
-	ostesting "github.com/containerd/cri/pkg/os/testing"
-	"github.com/containerd/cri/pkg/util"
 )
 
 func checkMount(t *testing.T, mounts []runtimespec.Mount, src, dest, typ string,
@@ -195,10 +196,11 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 func TestGeneralContainerSpec(t *testing.T) {
 	testID := "test-id"
 	testPid := uint32(1234)
-	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
 	testSandboxID := "sandbox-id"
-	spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil, []string{})
+	spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 	require.NoError(t, err)
 	specCheck(t, testID, testSandboxID, testPid, spec)
 }
@@ -250,11 +252,12 @@ func TestContainerCapabilities(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+		containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+		ociRuntime := config.Runtime{}
 		c := newTestCRIService()
 
-		config.Linux.SecurityContext.Capabilities = test.capability
-		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil, []string{})
+		containerConfig.Linux.SecurityContext.Capabilities = test.capability
+		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 		require.NoError(t, err)
 		specCheck(t, testID, testSandboxID, testPid, spec)
 		for _, include := range test.includes {
@@ -277,11 +280,12 @@ func TestContainerSpecTty(t *testing.T) {
 	testID := "test-id"
 	testSandboxID := "sandbox-id"
 	testPid := uint32(1234)
-	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
 	for _, tty := range []bool{true, false} {
-		config.Tty = tty
-		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil, []string{})
+		containerConfig.Tty = tty
+		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 		require.NoError(t, err)
 		specCheck(t, testID, testSandboxID, testPid, spec)
 		assert.Equal(t, tty, spec.Process.Terminal)
@@ -343,13 +347,16 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 	} {
 		t.Run(desc, func(t *testing.T) {
 			c := newTestCRIService()
-			config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+			containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 			if test.configChange != nil {
 				test.configChange(sandboxConfig)
 			}
 
+			ociRuntime := config.Runtime{
+				PodAnnotations: test.podAnnotations,
+			}
 			spec, err := c.generateContainerSpec(testID, testSandboxID, testPid,
-				config, sandboxConfig, imageConfig, nil, test.podAnnotations)
+				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
 			specCheck(t, testID, testSandboxID, testPid, spec)
@@ -365,11 +372,12 @@ func TestContainerSpecReadonlyRootfs(t *testing.T) {
 	testID := "test-id"
 	testSandboxID := "sandbox-id"
 	testPid := uint32(1234)
-	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
 	for _, readonly := range []bool{true, false} {
-		config.Linux.SecurityContext.ReadonlyRootfs = readonly
-		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil, []string{})
+		containerConfig.Linux.SecurityContext.ReadonlyRootfs = readonly
+		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 		require.NoError(t, err)
 		specCheck(t, testID, testSandboxID, testPid, spec)
 		assert.Equal(t, readonly, spec.Root.Readonly)
@@ -380,7 +388,8 @@ func TestContainerSpecWithExtraMounts(t *testing.T) {
 	testID := "test-id"
 	testSandboxID := "sandbox-id"
 	testPid := uint32(1234)
-	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
 	mountInConfig := &runtime.Mount{
 		// Test cleanpath
@@ -388,7 +397,7 @@ func TestContainerSpecWithExtraMounts(t *testing.T) {
 		HostPath:      "test-host-path",
 		Readonly:      false,
 	}
-	config.Mounts = append(config.Mounts, mountInConfig)
+	containerConfig.Mounts = append(containerConfig.Mounts, mountInConfig)
 	extraMounts := []*runtime.Mount{
 		{
 			ContainerPath: "test-container-path",
@@ -406,7 +415,7 @@ func TestContainerSpecWithExtraMounts(t *testing.T) {
 			Readonly:      false,
 		},
 	}
-	spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, extraMounts, []string{})
+	spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, containerConfig, sandboxConfig, imageConfig, extraMounts, ociRuntime)
 	require.NoError(t, err)
 	specCheck(t, testID, testSandboxID, testPid, spec)
 	var mounts, sysMounts, devMounts []runtimespec.Mount
@@ -439,7 +448,8 @@ func TestContainerAndSandboxPrivileged(t *testing.T) {
 	testID := "test-id"
 	testSandboxID := "sandbox-id"
 	testPid := uint32(1234)
-	config, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
 	for desc, test := range map[string]struct {
 		containerPrivileged bool
@@ -468,11 +478,11 @@ func TestContainerAndSandboxPrivileged(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		config.Linux.SecurityContext.Privileged = test.containerPrivileged
+		containerConfig.Linux.SecurityContext.Privileged = test.containerPrivileged
 		sandboxConfig.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
 			Privileged: test.sandboxPrivileged,
 		}
-		_, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil, []string{})
+		_, err := c.generateContainerSpec(testID, testSandboxID, testPid, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 		if test.expectError {
 			assert.Error(t, err)
 		} else {
@@ -769,7 +779,8 @@ func TestPrivilegedBindMount(t *testing.T) {
 	testPid := uint32(1234)
 	c := newTestCRIService()
 	testSandboxID := "sandbox-id"
-	config, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+	ociRuntime := config.Runtime{}
 
 	for desc, test := range map[string]struct {
 		privileged         bool
@@ -788,10 +799,10 @@ func TestPrivilegedBindMount(t *testing.T) {
 	} {
 		t.Logf("TestCase %q", desc)
 
-		config.Linux.SecurityContext.Privileged = test.privileged
+		containerConfig.Linux.SecurityContext.Privileged = test.privileged
 		sandboxConfig.Linux.SecurityContext.Privileged = test.privileged
 
-		spec, err := c.generateContainerSpec(t.Name(), testSandboxID, testPid, config, sandboxConfig, imageConfig, nil, nil)
+		spec, err := c.generateContainerSpec(t.Name(), testSandboxID, testPid, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 
 		assert.NoError(t, err)
 		if test.expectedSysFSRO {
@@ -917,7 +928,8 @@ func TestPidNamespace(t *testing.T) {
 	testID := "test-id"
 	testPid := uint32(1234)
 	testSandboxID := "sandbox-id"
-	config, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
 	for desc, test := range map[string]struct {
 		pidNS    runtime.NamespaceMode
@@ -945,8 +957,8 @@ func TestPidNamespace(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		config.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{Pid: test.pidNS}
-		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil, []string{})
+		containerConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{Pid: test.pidNS}
+		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 		require.NoError(t, err)
 		assert.Contains(t, spec.Linux.Namespaces, test.expected)
 	}
@@ -956,10 +968,11 @@ func TestNoDefaultRunMount(t *testing.T) {
 	testID := "test-id"
 	testPid := uint32(1234)
 	testSandboxID := "sandbox-id"
-	config, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
 
-	spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil, nil)
+	spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 	assert.NoError(t, err)
 	for _, mount := range spec.Mounts {
 		assert.NotEqual(t, "/run", mount.Destination)
@@ -1093,7 +1106,8 @@ func TestMaskedAndReadonlyPaths(t *testing.T) {
 	testID := "test-id"
 	testSandboxID := "sandbox-id"
 	testPid := uint32(1234)
-	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
 
 	defaultSpec, err := oci.GenerateSpec(ctrdutil.NamespacedContext(), nil, &containers.Container{ID: testID})
@@ -1159,13 +1173,13 @@ func TestMaskedAndReadonlyPaths(t *testing.T) {
 	} {
 		t.Logf("TestCase %q", desc)
 		c.config.DisableProcMount = test.disableProcMount
-		config.Linux.SecurityContext.MaskedPaths = test.masked
-		config.Linux.SecurityContext.ReadonlyPaths = test.readonly
-		config.Linux.SecurityContext.Privileged = test.privileged
+		containerConfig.Linux.SecurityContext.MaskedPaths = test.masked
+		containerConfig.Linux.SecurityContext.ReadonlyPaths = test.readonly
+		containerConfig.Linux.SecurityContext.Privileged = test.privileged
 		sandboxConfig.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
 			Privileged: test.privileged,
 		}
-		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil, []string{})
+		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 		require.NoError(t, err)
 		if !test.privileged { // specCheck presumes an unprivileged container
 			specCheck(t, testID, testSandboxID, testPid, spec)
@@ -1179,7 +1193,8 @@ func TestHostname(t *testing.T) {
 	testID := "test-id"
 	testSandboxID := "sandbox-id"
 	testPid := uint32(1234)
-	config, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
 	c.os.(*ostesting.FakeOS).HostnameFn = func() (string, error) {
 		return "real-hostname", nil
@@ -1210,7 +1225,7 @@ func TestHostname(t *testing.T) {
 		sandboxConfig.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
 			NamespaceOptions: &runtime.NamespaceOption{Network: test.networkNs},
 		}
-		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, config, sandboxConfig, imageConfig, nil, []string{})
+		spec, err := c.generateContainerSpec(testID, testSandboxID, testPid, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 		require.NoError(t, err)
 		specCheck(t, testID, testSandboxID, testPid, spec)
 		assert.Contains(t, spec.Process.Env, test.expectedEnv)
@@ -1218,10 +1233,11 @@ func TestHostname(t *testing.T) {
 }
 
 func TestDisableCgroup(t *testing.T) {
-	config, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
 	c.config.DisableCgroup = true
-	spec, err := c.generateContainerSpec("test-id", "sandbox-id", 1234, config, sandboxConfig, imageConfig, nil, []string{})
+	spec, err := c.generateContainerSpec("test-id", "sandbox-id", 1234, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 	require.NoError(t, err)
 
 	t.Log("resource limit should not be set")
@@ -1300,5 +1316,59 @@ func TestGenerateUserString(t *testing.T) {
 			}
 			assert.Equal(t, tc.result, r)
 		})
+	}
+}
+
+func TestPrivilegedDevices(t *testing.T) {
+	testPid := uint32(1234)
+	c := newTestCRIService()
+	testSandboxID := "sandbox-id"
+	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+
+	for desc, test := range map[string]struct {
+		privileged                   bool
+		privilegedWithoutHostDevices bool
+		expectHostDevices            bool
+	}{
+		"expect no host devices when privileged is false": {
+			privileged:                   false,
+			privilegedWithoutHostDevices: false,
+			expectHostDevices:            false,
+		},
+		"expect no host devices when privileged is false and privilegedWithoutHostDevices is true": {
+			privileged:                   false,
+			privilegedWithoutHostDevices: true,
+			expectHostDevices:            false,
+		},
+		"expect host devices when privileged is true": {
+			privileged:                   true,
+			privilegedWithoutHostDevices: false,
+			expectHostDevices:            true,
+		},
+		"expect no host devices when privileged is true and privilegedWithoutHostDevices is true": {
+			privileged:                   true,
+			privilegedWithoutHostDevices: true,
+			expectHostDevices:            false,
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+
+		containerConfig.Linux.SecurityContext.Privileged = test.privileged
+		sandboxConfig.Linux.SecurityContext.Privileged = test.privileged
+
+		ociRuntime := config.Runtime{
+			PrivilegedWithoutHostDevices: test.privilegedWithoutHostDevices,
+		}
+		spec, err := c.generateContainerSpec(t.Name(), testSandboxID, testPid, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+		assert.NoError(t, err)
+
+		hostDevices, err := devices.HostDevices()
+		assert.NoError(t, err)
+
+		if test.expectHostDevices {
+			assert.Len(t, spec.Linux.Devices, len(hostDevices))
+		} else {
+			assert.Empty(t, spec.Linux.Devices)
+		}
 	}
 }
