@@ -27,11 +27,9 @@ import (
 
 	"github.com/Microsoft/go-winio/pkg/security"
 	"github.com/Microsoft/hcsshim/ext4/tar2ext4"
-	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
@@ -108,14 +106,16 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 		}
 	}()
 
+	var config diff.ApplyConfig
+	for _, o := range opts {
+		if err := o(ctx, desc, &config); err != nil {
+			return emptyDesc, errors.Wrap(err, "failed to apply config opt")
+		}
+	}
+
 	layer, _, err := mountsToLayerAndParents(mounts)
 	if err != nil {
 		return emptyDesc, err
-	}
-
-	isCompressed, err := images.IsCompressedDiff(ctx, desc.MediaType)
-	if err != nil {
-		return emptyDesc, errors.Wrapf(errdefs.ErrNotImplemented, "unsupported diff media type: %v", desc.MediaType)
 	}
 
 	ra, err := s.store.ReaderAt(ctx, desc)
@@ -123,19 +123,22 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 		return emptyDesc, errors.Wrap(err, "failed to get reader from content store")
 	}
 	defer ra.Close()
-	rdr := content.NewReader(ra)
-	if isCompressed {
-		ds, err := compression.DecompressStream(rdr)
-		if err != nil {
-			return emptyDesc, err
+
+	processor := diff.NewProcessorChain(desc.MediaType, content.NewReader(ra))
+	for {
+		if processor, err = diff.GetProcessor(ctx, processor, config.ProcessorPayloads); err != nil {
+			return emptyDesc, errors.Wrapf(err, "failed to get stream processor for %s", desc.MediaType)
 		}
-		defer ds.Close()
-		rdr = ds
+		if processor.MediaType() == ocispec.MediaTypeImageLayer {
+			break
+		}
 	}
+	defer processor.Close()
+
 	// Calculate the Digest as we go
 	digester := digest.Canonical.Digester()
 	rc := &readCounter{
-		r: io.TeeReader(rdr, digester.Hash()),
+		r: io.TeeReader(processor, digester.Hash()),
 	}
 
 	layerPath := path.Join(layer, "layer.vhd")
