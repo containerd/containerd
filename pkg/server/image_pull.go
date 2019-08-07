@@ -31,16 +31,15 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/reference"
-	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
+	"github.com/containerd/cri/pkg/util"
 	distribution "github.com/docker/distribution/reference"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	"github.com/containerd/cri/pkg/config"
+	criconfig "github.com/containerd/cri/pkg/config"
 )
 
 // For image management:
@@ -95,7 +94,10 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	if ref != imageRef {
 		log.G(ctx).Debugf("PullImage using normalized image ref: %q", ref)
 	}
-	resolver, desc, err := c.getResolver(ctx, ref, c.credentials(r.GetAuth()))
+	resolver := docker.NewResolver(docker.ResolverOptions{
+		Hosts: c.registryHosts(r.GetAuth()),
+	})
+	_, desc, err := resolver.Resolve(ctx, ref)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to resolve image %q", ref)
 	}
@@ -148,9 +150,19 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 }
 
 // ParseAuth parses AuthConfig and returns username and password/secret required by containerd.
-func ParseAuth(auth *runtime.AuthConfig) (string, string, error) {
+func ParseAuth(auth *runtime.AuthConfig, host string) (string, string, error) {
 	if auth == nil {
 		return "", "", nil
+	}
+	if auth.ServerAddress != "" {
+		// Do not return the auth info when server address doesn't match.
+		u, err := url.Parse(auth.ServerAddress)
+		if err != nil {
+			return "", "", errors.Wrap(err, "parse server address")
+		}
+		if host != u.Host {
+			return "", "", nil
+		}
 	}
 	if auth.Username != "" {
 		return auth.Username, auth.Password, nil
@@ -235,28 +247,8 @@ func (c *criService) updateImage(ctx context.Context, r string) error {
 	return nil
 }
 
-// credentials returns a credential function for docker resolver to use.
-func (c *criService) credentials(auth *runtime.AuthConfig) func(string) (string, string, error) {
-	return func(host string) (string, string, error) {
-		if auth == nil {
-			// Get default auth from config.
-			for h, ac := range c.config.Registry.Auths {
-				u, err := url.Parse(h)
-				if err != nil {
-					return "", "", errors.Wrapf(err, "parse auth host %q", h)
-				}
-				if u.Host == host {
-					auth = toRuntimeAuthConfig(ac)
-					break
-				}
-			}
-		}
-		return ParseAuth(auth)
-	}
-}
-
 // getTLSConfig returns a TLSConfig configured with a CA/Cert/Key specified by registryTLSConfig
-func (c *criService) getTLSConfig(registryTLSConfig config.TLSConfig) (*tls.Config, error) {
+func (c *criService) getTLSConfig(registryTLSConfig criconfig.TLSConfig) (*tls.Config, error) {
 	cert, err := tls.LoadX509KeyPair(registryTLSConfig.CertFile, registryTLSConfig.KeyFile)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load cert file")
@@ -280,68 +272,79 @@ func (c *criService) getTLSConfig(registryTLSConfig config.TLSConfig) (*tls.Conf
 	return tlsConfig, nil
 }
 
-// getResolver tries registry mirrors and the default registry, and returns the resolver and descriptor
-// from the first working registry.
-func (c *criService) getResolver(ctx context.Context, ref string, cred func(string) (string, string, error)) (remotes.Resolver, imagespec.Descriptor, error) {
-	refspec, err := reference.Parse(ref)
-	if err != nil {
-		return nil, imagespec.Descriptor{}, errors.Wrap(err, "parse image reference")
-	}
+// registryHosts is the registry hosts to be used by the resolver.
+func (c *criService) registryHosts(auth *runtime.AuthConfig) docker.RegistryHosts {
+	return func(host string) ([]docker.RegistryHost, error) {
+		var registries []docker.RegistryHost
 
-	var (
-		transport  = newTransport()
-		httpClient = &http.Client{Transport: transport}
-	)
-
-	// Try mirrors in order first, and then try default host name.
-	for _, e := range c.config.Registry.Mirrors[refspec.Hostname()].Endpoints {
-		u, err := url.Parse(e)
+		// Try mirrors in order, and then try the default registry if not tried.
+		endpoints, err := addDefaultEndpoint(
+			c.config.Registry.Mirrors[host].Endpoints, host)
 		if err != nil {
-			return nil, imagespec.Descriptor{}, errors.Wrapf(err, "parse registry endpoint %q", e)
+			return nil, errors.Wrapf(err, "add default endpoint")
 		}
-
-		if registryTLSConfig, ok := c.config.Registry.TLSConfigs[u.Host]; ok {
-			transport.TLSClientConfig, err = c.getTLSConfig(registryTLSConfig)
+		for _, e := range endpoints {
+			u, err := url.Parse(e)
 			if err != nil {
-				return nil, imagespec.Descriptor{}, errors.Wrapf(err, "get TLSConfig for registry %q", refspec.Hostname())
+				return nil, errors.Wrapf(err, "parse registry endpoint %q from mirrors", e)
 			}
-		}
 
-		resolver := docker.NewResolver(docker.ResolverOptions{
-			Authorizer: docker.NewAuthorizer(httpClient, cred),
-			Client:     httpClient,
-			Host:       func(string) (string, error) { return u.Host, nil },
-			// By default use "https".
-			PlainHTTP: u.Scheme == "http",
-		})
-		_, desc, err := resolver.Resolve(ctx, ref)
-		if err == nil {
-			return resolver, desc, nil
+			var (
+				transport = newTransport()
+				client    = &http.Client{Transport: transport}
+				config    = c.config.Registry.Configs[u.Host]
+			)
+
+			if u.Scheme != "https" && config.TLS != nil {
+				return nil, errors.Errorf("tls provided for http endpoint %q", e)
+			}
+
+			if config.TLS != nil {
+				transport.TLSClientConfig, err = c.getTLSConfig(*config.TLS)
+				if err != nil {
+					return nil, errors.Wrapf(err, "get TLSConfig for registry %q", e)
+				}
+			}
+
+			if auth == nil && config.Auth != nil {
+				auth = toRuntimeAuthConfig(*config.Auth)
+			}
+
+			if u.Path == "" {
+				u.Path = "/v2"
+			}
+
+			registries = append(registries, docker.RegistryHost{
+				Client: client,
+				Authorizer: docker.NewDockerAuthorizer(
+					docker.WithAuthClient(client),
+					docker.WithAuthCreds(func(host string) (string, string, error) {
+						return ParseAuth(auth, host)
+					})),
+				Host:         u.Host,
+				Scheme:       u.Scheme,
+				Path:         u.Path,
+				Capabilities: docker.HostCapabilityResolve | docker.HostCapabilityPull,
+			})
 		}
-		log.G(ctx).WithError(err).Debugf("Tried registry mirror %q but failed", e)
-		// Continue to try next endpoint
+		return registries, nil
 	}
+}
 
-	hostname, err := docker.DefaultHost(refspec.Hostname())
+// addDefaultEndpoint add default registry endpoint if it does not
+// exist in the passed-in endpoint list.
+func addDefaultEndpoint(endpoints []string, host string) ([]string, error) {
+	defaultHost, err := docker.DefaultHost(host)
 	if err != nil {
-		return nil, imagespec.Descriptor{}, errors.Wrapf(err, "get host for refspec %q", refspec.Hostname())
+		return nil, errors.Wrapf(err, "get default host")
 	}
-	if registryTLSConfig, ok := c.config.Registry.TLSConfigs[hostname]; ok {
-		transport.TLSClientConfig, err = c.getTLSConfig(registryTLSConfig)
-		if err != nil {
-			return nil, imagespec.Descriptor{}, errors.Wrapf(err, "get TLSConfig for registry %q", refspec.Hostname())
+	// If the http endpoint is configured, do not try https.
+	if !util.InStringSlice(endpoints, "http://"+defaultHost) {
+		if !util.InStringSlice(endpoints, "https://"+defaultHost) {
+			return append(endpoints, "https://"+defaultHost), nil
 		}
 	}
-
-	resolver := docker.NewResolver(docker.ResolverOptions{
-		Credentials: cred,
-		Client:      httpClient,
-	})
-	_, desc, err := resolver.Resolve(ctx, ref)
-	if err != nil {
-		return nil, imagespec.Descriptor{}, errors.Wrap(err, "no available registry endpoint")
-	}
-	return resolver, desc, nil
+	return endpoints, nil
 }
 
 // newTransport returns a new HTTP transport used to pull image.

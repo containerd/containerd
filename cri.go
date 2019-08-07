@@ -170,6 +170,19 @@ func validateConfig(ctx context.Context, c *criconfig.Config) error {
 		}
 	}
 
+	// Validation for registry configurations.
+	if len(c.Registry.Auths) != 0 {
+		if c.Registry.Configs == nil {
+			c.Registry.Configs = make(map[string]criconfig.RegistryConfig)
+		}
+		for endpoint, auth := range c.Registry.Auths {
+			config := c.Registry.Configs[endpoint]
+			config.Auth = &auth
+			c.Registry.Configs[endpoint] = config
+		}
+		log.G(ctx).Warning("`auths` is deprecated, please use registry`configs` instead")
+	}
+
 	// Validation for stream_idle_timeout
 	if c.StreamIdleTimeout != "" {
 		if _, err := time.ParseDuration(c.StreamIdleTimeout); err != nil {

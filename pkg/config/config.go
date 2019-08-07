@@ -95,6 +95,7 @@ type Mirror struct {
 	// Endpoints are endpoints for a namespace. CRI plugin will try the endpoints
 	// one by one until a working one is found. The endpoint must be a valid url
 	// with host specified.
+	// The scheme, host and path from the endpoint URL will be used.
 	Endpoints []string `toml:"endpoint" json:"endpoint"`
 }
 
@@ -123,12 +124,23 @@ type TLSConfig struct {
 type Registry struct {
 	// Mirrors are namespace to mirror mapping for all namespaces.
 	Mirrors map[string]Mirror `toml:"mirrors" json:"mirrors"`
+	// Configs are configs for each registry.
+	// The key is the FDQN or IP of the registry.
+	Configs map[string]RegistryConfig `toml:"configs" json:"configs"`
+
 	// Auths are registry endpoint to auth config mapping. The registry endpoint must
 	// be a valid url with host specified.
+	// DEPRECATED: Use Configs instead. Remove in containerd 1.4.
 	Auths map[string]AuthConfig `toml:"auths" json:"auths"`
-	// TLSConfigs are pairs of CA/Cert/Key which then are used when creating the transport
+}
+
+// RegistryConfig contains configuration used to communicate with the registry.
+type RegistryConfig struct {
+	// Auth contains information to authenticate to the registry.
+	Auth *AuthConfig `toml:"auth" json:"auth"`
+	// TLS is a pair of CA/Cert/Key which then are used when creating the transport
 	// that communicates with the registry.
-	TLSConfigs map[string]TLSConfig `toml:"tls_configs" json:"tlsConfigs"`
+	TLS *TLSConfig `toml:"tls" json:"tls"`
 }
 
 // PluginConfig contains toml config related to CRI plugin,
