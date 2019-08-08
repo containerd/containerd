@@ -32,7 +32,8 @@ func deviceFromPath(path, permissions string) (*specs.LinuxDevice, error) {
 	}
 
 	var (
-		devNumber = stat.Rdev
+		// The type is 32bit on mips.
+		devNumber = uint64(stat.Rdev) // nolint: unconvert
 		major     = unix.Major(devNumber)
 		minor     = unix.Minor(devNumber)
 	)
