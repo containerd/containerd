@@ -298,6 +298,9 @@ type RemoteContext struct {
 	// afterwards. Unpacking is required to run an image.
 	Unpack bool
 
+	// UnpackOpts handles options to the unpack call.
+	UnpackOpts []UnpackOpt
+
 	// Snapshotter used for unpacking
 	Snapshotter string
 
