@@ -19,6 +19,8 @@ package containerd
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync/atomic"
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
@@ -31,6 +33,7 @@ import (
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/semaphore"
 )
 
 // Image describes an image used by containers
@@ -47,12 +50,57 @@ type Image interface {
 	RootFS(ctx context.Context) ([]digest.Digest, error)
 	// Size returns the total size of the image's packed resources.
 	Size(ctx context.Context) (int64, error)
+	// Usage returns a usage calculation for the image.
+	Usage(context.Context, ...UsageOpt) (int64, error)
 	// Config descriptor for the image.
 	Config(ctx context.Context) (ocispec.Descriptor, error)
 	// IsUnpacked returns whether or not an image is unpacked.
 	IsUnpacked(context.Context, string) (bool, error)
 	// ContentStore provides a content store which contains image blob data
 	ContentStore() content.Store
+}
+
+type usageOptions struct {
+	manifestLimit *int
+	manifestOnly  bool
+	snapshots     bool
+}
+
+// UsageOpt is used to configure the usage calculation
+type UsageOpt func(*usageOptions) error
+
+// WithUsageManifestLimit sets the limit to the number of manifests which will
+// be walked for usage. Setting this value to 0 will require all manifests to
+// be walked, returning ErrNotFound if manifests are missing.
+// NOTE: By default all manifests which exist will be walked
+// and any non-existent manifests and their subobjects will be ignored.
+func WithUsageManifestLimit(i int) UsageOpt {
+	// If 0 then don't filter any manifests
+	// By default limits to current platform
+	return func(o *usageOptions) error {
+		o.manifestLimit = &i
+		return nil
+	}
+}
+
+// WithSnapshotUsage will check for referenced snapshots from the image objects
+// and include the snapshot size in the total usage.
+func WithSnapshotUsage() UsageOpt {
+	return func(o *usageOptions) error {
+		o.snapshots = true
+		return nil
+	}
+}
+
+// WithManifestUsage is used to get the usage for an image based on what is
+// reported by the manifests rather than what exists in the content store.
+// NOTE: This function is best used with the manifest limit set to get a
+// consistent value, otherwise non-existent manifests will be excluded.
+func WithManifestUsage() UsageOpt {
+	return func(o *usageOptions) error {
+		o.manifestOnly = true
+		return nil
+	}
 }
 
 var _ = (Image)(&image{})
@@ -100,8 +148,95 @@ func (i *image) RootFS(ctx context.Context) ([]digest.Digest, error) {
 }
 
 func (i *image) Size(ctx context.Context) (int64, error) {
-	provider := i.client.ContentStore()
-	return i.i.Size(ctx, provider, i.platform)
+	return i.Usage(ctx, WithUsageManifestLimit(1), WithManifestUsage())
+}
+
+func (i *image) Usage(ctx context.Context, opts ...UsageOpt) (int64, error) {
+	var config usageOptions
+	for _, opt := range opts {
+		if err := opt(&config); err != nil {
+			return 0, err
+		}
+	}
+
+	var (
+		provider  = i.client.ContentStore()
+		handler   = images.ChildrenHandler(provider)
+		size      int64
+		mustExist bool
+	)
+
+	if config.manifestLimit != nil {
+		handler = images.LimitManifests(handler, i.platform, *config.manifestLimit)
+		mustExist = true
+	}
+
+	var wh images.HandlerFunc = func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		var usage int64
+		children, err := handler(ctx, desc)
+		if err != nil {
+			if !errdefs.IsNotFound(err) || mustExist {
+				return nil, err
+			}
+			if !config.manifestOnly {
+				// Do not count size of non-existent objects
+				desc.Size = 0
+			}
+		} else if config.snapshots || !config.manifestOnly {
+			info, err := provider.Info(ctx, desc.Digest)
+			if err != nil {
+				if !errdefs.IsNotFound(err) {
+					return nil, err
+				}
+				if !config.manifestOnly {
+					// Do not count size of non-existent objects
+					desc.Size = 0
+				}
+			} else if info.Size > desc.Size {
+				// Count actual usage, Size may be unset or -1
+				desc.Size = info.Size
+			}
+
+			for k, v := range info.Labels {
+				const prefix = "containerd.io/gc.ref.snapshot."
+				if !strings.HasPrefix(k, prefix) {
+					continue
+				}
+
+				sn := i.client.SnapshotService(k[len(prefix):])
+				if sn == nil {
+					continue
+				}
+
+				u, err := sn.Usage(ctx, v)
+				if err != nil {
+					if !errdefs.IsNotFound(err) && !errdefs.IsInvalidArgument(err) {
+						return nil, err
+					}
+				} else {
+					usage += u.Size
+				}
+			}
+		}
+
+		// Ignore unknown sizes. Generally unknown sizes should
+		// never be set in manifests, however, the usage
+		// calculation does not need to enforce this.
+		if desc.Size >= 0 {
+			usage += desc.Size
+		}
+
+		atomic.AddInt64(&size, usage)
+
+		return children, nil
+	}
+
+	l := semaphore.NewWeighted(3)
+	if err := images.Dispatch(ctx, wh, l, i.i.Target); err != nil {
+		return 0, err
+	}
+
+	return size, nil
 }
 
 func (i *image) Config(ctx context.Context) (ocispec.Descriptor, error) {
