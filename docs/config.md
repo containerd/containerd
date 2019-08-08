@@ -117,6 +117,12 @@ version = 2
       # * OCI: https://github.com/opencontainers/image-spec/blob/master/annotations.md
       pod_annotations = []
 
+      # privileged_without_host_devices allows overloading the default behaviour of passing host
+      # devices through to privileged containers. This is useful when using a runtime where it does
+      # not make sense to pass host devices to the container when privileged. Defaults to false -
+      # i.e pass host devices through to privileged containers.
+      privileged_without_host_devices = false
+
       # 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options' is options specific to
       # "io.containerd.runc.v1". Its corresponding options type is:
       #   https://github.com/containerd/containerd/blob/v1.2.0-rc.1/runtime/v2/runc/options/oci.pb.go#L39.

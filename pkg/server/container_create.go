@@ -28,6 +28,13 @@ import (
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/cri/pkg/annotations"
+	"github.com/containerd/cri/pkg/config"
+	customopts "github.com/containerd/cri/pkg/containerd/opts"
+	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
+	cio "github.com/containerd/cri/pkg/server/io"
+	containerstore "github.com/containerd/cri/pkg/store/container"
+	"github.com/containerd/cri/pkg/util"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -35,13 +42,6 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-
-	"github.com/containerd/cri/pkg/annotations"
-	customopts "github.com/containerd/cri/pkg/containerd/opts"
-	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
-	cio "github.com/containerd/cri/pkg/server/io"
-	containerstore "github.com/containerd/cri/pkg/store/container"
-	"github.com/containerd/cri/pkg/util"
 )
 
 const (
@@ -168,7 +168,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	log.G(ctx).Debugf("Use OCI runtime %+v for sandbox %q and container %q", ociRuntime, sandboxID, id)
 
 	spec, err := c.generateContainerSpec(id, sandboxID, sandboxPid, config, sandboxConfig,
-		&image.ImageSpec.Config, append(mounts, volumeMounts...), ociRuntime.PodAnnotations)
+		&image.ImageSpec.Config, append(mounts, volumeMounts...), ociRuntime)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to generate container %q spec", id)
 	}
@@ -323,7 +323,8 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 }
 
 func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxPid uint32, config *runtime.ContainerConfig,
-	sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig, extraMounts []*runtime.Mount, runtimePodAnnotations []string) (*runtimespec.Spec, error) {
+	sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig, extraMounts []*runtime.Mount,
+	ociRuntime config.Runtime) (*runtimespec.Spec, error) {
 
 	specOpts := []oci.SpecOpts{
 		customopts.WithoutRunMount,
@@ -385,7 +386,10 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 		if !sandboxConfig.GetLinux().GetSecurityContext().GetPrivileged() {
 			return nil, errors.New("no privileged container allowed in sandbox")
 		}
-		specOpts = append(specOpts, oci.WithPrivileged, customopts.WithPrivilegedDevices)
+		specOpts = append(specOpts, oci.WithPrivileged)
+		if !ociRuntime.PrivilegedWithoutHostDevices {
+			specOpts = append(specOpts, customopts.WithPrivilegedDevices)
+		}
 	} else { // not privileged
 		specOpts = append(specOpts, customopts.WithDevices(c.os, config), customopts.WithCapabilities(securityContext))
 	}
@@ -421,7 +425,7 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 	supplementalGroups := securityContext.GetSupplementalGroups()
 
 	for pKey, pValue := range getPassthroughAnnotations(sandboxConfig.Annotations,
-		runtimePodAnnotations) {
+		ociRuntime.PodAnnotations) {
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
 	}
 
