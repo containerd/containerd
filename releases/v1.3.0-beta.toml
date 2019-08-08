@@ -31,6 +31,7 @@ implemented in the client libraries without requiring daemon upgrade.
 ### Plugins
 * **Support for plugins registering as a TCP service**
 * **Configurable plugin directory**
+* **Add stream processor plugin.** Allow handling of custom media types during unpack (https://github.com/containerd/containerd/pull/3482)
 
 ### Client
 * **Default handling from namespace labels.** Allows defaults to be configured per containerd namespace (https://github.com/containerd/containerd/pull/3403)
@@ -42,6 +43,7 @@ implemented in the client libraries without requiring daemon upgrade.
 * **Add ttrpc service for shim event publishing**
 * **Add annotations to descriptors in API**
 * **Add id to TaskDelete event message to match exec id**
+* **Add payload parameter to apply in diff service API**
 
 ### CRI
 
