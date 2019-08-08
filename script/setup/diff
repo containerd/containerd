@@ -1,0 +1,13 @@
+diff --git a/plugins/main/bridge/bridge.go b/plugins/main/bridge/bridge.go
+index 63e0d89..c68272d 100644
+--- a/plugins/main/bridge/bridge.go
++++ b/plugins/main/bridge/bridge.go
+@@ -422,7 +422,7 @@ func cmdAdd(args *skel.CmdArgs) error {
+
+ 				err = ensureBridgeAddr(br, gws.family, &gw, n.ForceAddress)
+ 				if err != nil {
+-					return fmt.Errorf("failed to set bridge addr: %v", err)
++					return fmt.Errorf("failed to set bridge addr %q: %v, ipam result: %+v", gw, err, result)
+ 				}
+ 			}
+

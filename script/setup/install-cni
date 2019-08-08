@@ -28,6 +28,7 @@ CNI_CONFIG_DIR=/etc/cni/net.d
 go get -d github.com/containernetworking/plugins/...
 cd $GOPATH/src/github.com/containernetworking/plugins
 git checkout $CNI_COMMIT
+git apply ${GOPATH}/src/github.com/containerd/containerd/script/setup/diff
 FASTBUILD=true ./build.sh
 mkdir -p $CNI_DIR
 cp -r ./bin $CNI_DIR
