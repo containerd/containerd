@@ -23,6 +23,17 @@ source $(dirname "${BASH_SOURCE[0]}")/utils.sh
 cd ${ROOT}
 
 echo "Sort vendor.conf..."
-sort vendor.conf -o vendor.conf
+tmpdir="$(mktemp -d)"
+trap "rm -rf ${tmpdir}" EXIT
+
+awk -v RS= '{print > "'${tmpdir}/'TMP."NR}' vendor.conf
+for file in ${tmpdir}/*; do
+  if [[ -e "${tmpdir}/vendor.conf" ]]; then
+    echo >> "${tmpdir}/vendor.conf"
+  fi
+  sort -Vru "${file}" >> "${tmpdir}/vendor.conf"
+done
+
+mv "${tmpdir}/vendor.conf" vendor.conf
 
 echo "Please commit the change made by this file..."
