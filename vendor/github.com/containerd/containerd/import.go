@@ -35,6 +35,7 @@ type importOpts struct {
 	imageRefT    func(string) string
 	dgstRefT     func(digest.Digest) string
 	allPlatforms bool
+	compress     bool
 }
 
 // ImportOpt allows the caller to specify import specific options
@@ -74,6 +75,15 @@ func WithAllPlatforms(allPlatforms bool) ImportOpt {
 	}
 }
 
+// WithImportCompression compresses uncompressed layers on import.
+// This is used for import formats which do not include the manifest.
+func WithImportCompression() ImportOpt {
+	return func(c *importOpts) error {
+		c.compress = true
+		return nil
+	}
+}
+
 // Import imports an image from a Tar stream using reader.
 // Caller needs to specify importer. Future version may use oci.v1 as the default.
 // Note that unreferrenced blobs may be imported to the content store as well.
@@ -91,7 +101,12 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 	}
 	defer done(ctx)
 
-	index, err := archive.ImportIndex(ctx, c.ContentStore(), reader)
+	var aio []archive.ImportOpt
+	if iopts.compress {
+		aio = append(aio, archive.WithImportCompression())
+	}
+
+	index, err := archive.ImportIndex(ctx, c.ContentStore(), reader, aio...)
 	if err != nil {
 		return nil, err
 	}

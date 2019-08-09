@@ -27,8 +27,8 @@ After modify this config, you need restart the `containerd` service.
 
 To configure the TLS settings for a specific registry, create/modify the `/etc/containerd/config.toml` as follows:
 ```toml
-[plugins.cri.registry.tls_configs]
-  [plugins.cri.registry.tls_configs."my.custom.registry"]
+# The registry host has to be an FDQN or IP.
+[plugins.cri.registry.configs."my.custom.registry".tls]
     ca_file   = "ca.pem"
     cert_file = "cert.pem"
     key_file  = "key.pem"
@@ -37,20 +37,19 @@ To configure the TLS settings for a specific registry, create/modify the `/etc/c
 In the config example shown above, TLS mutual authentication will be used for communications with the registry endpoint located at https://my.custom.registry.
 `ca_file` is file name of the certificate authority (CA) certificate used to authenticate the x509 certificate/key pair specified by the files respectively pointed to by `cert_file` and `key_file`.
 
-
 ## Configure Registry Credentials
 
 `cri` plugin also supports docker like registry credential config.
 
-To configure a credential for a specific registry endpoint, create/modify the
+To configure a credential for a specific registry, create/modify the
 `/etc/containerd/config.toml` as follows:
 ```toml
-[plugins.cri.registry.auths]
-  [plugins.cri.registry.auths."https://gcr.io"]
-    username = ""
-    password = ""
-    auth = ""
-    identitytoken = ""
+# The registry host has to be an FDQN or IP.
+[plugins.cri.registry.configs."gcr.io".auth]
+  username = ""
+  password = ""
+  auth = ""
+  identitytoken = ""
 ```
 The meaning of each field is the same with the corresponding field in `.docker/config.json`.
 

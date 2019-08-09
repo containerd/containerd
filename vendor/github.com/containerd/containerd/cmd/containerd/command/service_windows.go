@@ -18,7 +18,6 @@ package command
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -28,7 +27,9 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/services/server"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"golang.org/x/sys/windows"
@@ -44,7 +45,9 @@ var (
 	unregisterServiceFlag bool
 	runServiceFlag        bool
 
-	setStdHandle = windows.NewLazySystemDLL("kernel32.dll").NewProc("SetStdHandle")
+	kernel32     = windows.NewLazySystemDLL("kernel32.dll")
+	setStdHandle = kernel32.NewProc("SetStdHandle")
+	allocConsole = kernel32.NewProc("AllocConsole")
 	oldStderr    windows.Handle
 	panicFile    *os.File
 
@@ -162,7 +165,7 @@ func (h *etwHook) Fire(e *logrus.Entry) error {
 		etype = windows.EVENTLOG_INFORMATION_TYPE
 		eid = eventDebug
 	default:
-		return errors.New("unknown level")
+		return errors.Wrap(errdefs.ErrInvalidArgument, "unknown level")
 	}
 
 	// If there is additional data, include it as a second string.
@@ -311,7 +314,7 @@ func registerUnregisterService(root string) (bool, error) {
 
 	if unregisterServiceFlag {
 		if registerServiceFlag {
-			return true, errors.New("--register-service and --unregister-service cannot be used together")
+			return true, errors.Wrap(errdefs.ErrInvalidArgument, "--register-service and --unregister-service cannot be used together")
 		}
 		return true, unregisterService()
 	}
@@ -321,6 +324,23 @@ func registerUnregisterService(root string) (bool, error) {
 	}
 
 	if runServiceFlag {
+		// Allocate a conhost for containerd here. We don't actually use this
+		// at all in containerd, but it will be inherited by any processes
+		// containerd executes, so they won't need to allocate their own
+		// conhosts. This is important for two reasons:
+		// - Creating a conhost slows down process launch.
+		// - We have seen reliability issues when launching many processes.
+		//   Sometimes the process invocation will fail due to an error when
+		//   creating the conhost.
+		//
+		// This needs to be done before initializing the panic file, as
+		// AllocConsole sets the stdio handles to point to the new conhost,
+		// and we want to make sure stderr goes to the panic file.
+		r, _, err := allocConsole.Call()
+		if r == 0 && err != nil {
+			return true, fmt.Errorf("error allocating conhost: %s", err)
+		}
+
 		if err := initPanicFile(filepath.Join(root, "panic.log")); err != nil {
 			return true, err
 		}
@@ -340,7 +360,6 @@ func registerUnregisterService(root string) (bool, error) {
 
 		logrus.AddHook(&etwHook{log})
 		logrus.SetOutput(ioutil.Discard)
-
 	}
 	return false, nil
 }

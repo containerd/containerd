@@ -37,12 +37,14 @@ type ServiceDesc struct {
 }
 
 type serviceSet struct {
-	services map[string]ServiceDesc
+	services    map[string]ServiceDesc
+	interceptor UnaryServerInterceptor
 }
 
-func newServiceSet() *serviceSet {
+func newServiceSet(interceptor UnaryServerInterceptor) *serviceSet {
 	return &serviceSet{
-		services: make(map[string]ServiceDesc),
+		services:    make(map[string]ServiceDesc),
+		interceptor: interceptor,
 	}
 }
 
@@ -84,7 +86,11 @@ func (s *serviceSet) dispatch(ctx context.Context, serviceName, methodName strin
 		return nil
 	}
 
-	resp, err := method(ctx, unmarshal)
+	info := &UnaryServerInfo{
+		FullMethod: fullPath(serviceName, methodName),
+	}
+
+	resp, err := s.interceptor(ctx, unmarshal, info, method)
 	if err != nil {
 		return nil, err
 	}

@@ -1,5 +1,3 @@
-// +build !windows
-
 /*
    Copyright The containerd Authors.
 
@@ -16,27 +14,23 @@
    limitations under the License.
 */
 
-package proc
+package containerd
 
 import (
-	"github.com/pkg/errors"
+	"context"
+
+	"github.com/containerd/cgroups"
+	"github.com/containerd/containerd/namespaces"
 )
 
-// RuncRoot is the path to the root runc state directory
-const RuncRoot = "/run/containerd/runc"
-
-func stateName(v interface{}) string {
-	switch v.(type) {
-	case *runningState, *execRunningState:
-		return "running"
-	case *createdState, *execCreatedState, *createdCheckpointState:
-		return "created"
-	case *pausedState:
-		return "paused"
-	case *deletedState:
-		return "deleted"
-	case *stoppedState:
-		return "stopped"
+// WithNamespaceCgroupDeletion removes the cgroup directory that was created for the namespace
+func WithNamespaceCgroupDeletion(ctx context.Context, i *namespaces.DeleteInfo) error {
+	cg, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(i.Name))
+	if err != nil {
+		if err == cgroups.ErrCgroupDeleted {
+			return nil
+		}
+		return err
 	}
-	panic(errors.Errorf("invalid state %v", v))
+	return cg.Delete()
 }

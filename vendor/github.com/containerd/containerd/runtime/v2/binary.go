@@ -87,7 +87,7 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 		defer f.Close()
 		if _, err := io.Copy(os.Stderr, f); err != nil {
 			// When using a multi-container shim the 2nd to Nth container in the
-			// shim will not have a seperate log pipe. Ignore the failure log
+			// shim will not have a separate log pipe. Ignore the failure log
 			// message here when the shim connect times out.
 			if !os.IsNotExist(errors.Cause(err)) {
 				log.G(ctx).WithError(err).Error("copy shim log")

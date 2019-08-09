@@ -140,6 +140,11 @@ func (m *TaskManager) Create(ctx context.Context, id string, opts runtime.Create
 			return
 		}
 		cleanupAfterDeadShim(context.Background(), id, ns, m.events, b)
+		// Remove self from the runtime task list. Even though the cleanupAfterDeadShim()
+		// would publish taskExit event, but the shim.Delete() would always failed with ttrpc
+		// disconnect and there is no chance to remove this dead task from runtime task lists.
+		// Thus it's better to delete it here.
+		m.tasks.Delete(ctx, id)
 	})
 	if err != nil {
 		return nil, err
@@ -258,6 +263,8 @@ func (m *TaskManager) loadTasks(ctx context.Context) error {
 				return
 			}
 			cleanupAfterDeadShim(context.Background(), id, ns, m.events, binaryCall)
+			// Remove self from the runtime task list.
+			m.tasks.Delete(ctx, id)
 		})
 		if err != nil {
 			cleanupAfterDeadShim(ctx, id, ns, m.events, binaryCall)
