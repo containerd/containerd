@@ -18,34 +18,35 @@ package namespaces
 
 import (
 	"context"
+	"reflect"
+	"testing"
 
 	"github.com/containerd/ttrpc"
 )
 
-const (
-	// TTRPCHeader defines the header name for specifying a containerd namespace
-	TTRPCHeader = "containerd-namespace-ttrpc"
-)
+func TestCopyTTRPCMetadata(t *testing.T) {
+	src := ttrpc.MD{}
+	src.Set("key", "a", "b", "c", "d")
+	md := copyMetadata(src)
 
-func copyMetadata(src ttrpc.MD) ttrpc.MD {
-	md := ttrpc.MD{}
-	for k, v := range src {
-		md[k] = append(md[k], v...)
+	if !reflect.DeepEqual(src, md) {
+		t.Fatalf("metadata is copied incorrectly")
 	}
-	return md
+
+	slice, _ := src.Get("key")
+	slice[0] = "z"
+	if reflect.DeepEqual(src, md) {
+		t.Fatalf("metadata is copied incorrectly")
+	}
 }
 
-func withTTRPCNamespaceHeader(ctx context.Context, namespace string) context.Context {
-	md, ok := ttrpc.GetMetadata(ctx)
-	if !ok {
-		md = ttrpc.MD{}
-	} else {
-		md = copyMetadata(md)
-	}
-	md.Set(TTRPCHeader, namespace)
-	return ttrpc.WithMetadata(ctx, md)
-}
+func TestTTRPCNamespaceHeader(t *testing.T) {
+	ctx := context.Background()
+	namespace := "test-namepace"
+	ctx = withTTRPCNamespaceHeader(ctx, namespace)
 
-func fromTTRPCHeader(ctx context.Context) (string, bool) {
-	return ttrpc.GetMetadataValue(ctx, TTRPCHeader)
+	header, ok := fromTTRPCHeader(ctx)
+	if !ok || header != namespace {
+		t.Fatalf("ttrp namespace header is set incorrectly")
+	}
 }
