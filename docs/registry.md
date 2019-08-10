@@ -37,6 +37,14 @@ To configure the TLS settings for a specific registry, create/modify the `/etc/c
 In the config example shown above, TLS mutual authentication will be used for communications with the registry endpoint located at https://my.custom.registry.
 `ca_file` is file name of the certificate authority (CA) certificate used to authenticate the x509 certificate/key pair specified by the files respectively pointed to by `cert_file` and `key_file`.
 
+`cert_file` and `key_file` are not needed when TLS mutual authentication is unused.
+
+```toml
+# The registry host has to be an FDQN or IP.
+[plugins.cri.registry.configs."my.custom.registry".tls]
+    ca_file   = "ca.pem"
+```
+
 ## Configure Registry Credentials
 
 `cri` plugin also supports docker like registry credential config.
