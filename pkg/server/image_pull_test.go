@@ -147,6 +147,19 @@ func TestAddDefaultEndpoint(t *testing.T) {
 				"https://registry-3.io",
 			},
 		},
+		"default endpoint in list with path": {
+			endpoints: []string{
+				"https://registry-1.io",
+				"https://registry-2.io",
+				"https://registry-3.io/path",
+			},
+			host: "registry-3.io",
+			expected: []string{
+				"https://registry-1.io",
+				"https://registry-2.io",
+				"https://registry-3.io/path",
+			},
+		},
 	} {
 		t.Logf("TestCase %q", desc)
 		got, err := addDefaultEndpoint(test.endpoints, test.host)

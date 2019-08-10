@@ -32,7 +32,6 @@ import (
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/remotes/docker"
-	"github.com/containerd/cri/pkg/util"
 	distribution "github.com/docker/distribution/reference"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -336,15 +335,19 @@ func (c *criService) registryHosts(auth *runtime.AuthConfig) docker.RegistryHost
 func addDefaultEndpoint(endpoints []string, host string) ([]string, error) {
 	defaultHost, err := docker.DefaultHost(host)
 	if err != nil {
-		return nil, errors.Wrapf(err, "get default host")
+		return nil, errors.Wrap(err, "get default host")
 	}
-	// If the http endpoint is configured, do not try https.
-	if !util.InStringSlice(endpoints, "http://"+defaultHost) {
-		if !util.InStringSlice(endpoints, "https://"+defaultHost) {
-			return append(endpoints, "https://"+defaultHost), nil
+	for _, e := range endpoints {
+		u, err := url.Parse(e)
+		if err != nil {
+			return nil, errors.Wrap(err, "parse endpoint url")
+		}
+		if u.Host == host {
+			// Do not add default if the endpoint already exists.
+			return endpoints, nil
 		}
 	}
-	return endpoints, nil
+	return append(endpoints, "https://"+defaultHost), nil
 }
 
 // newTransport returns a new HTTP transport used to pull image.
