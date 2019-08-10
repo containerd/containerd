@@ -21,15 +21,20 @@ import (
 	gocontext "context"
 	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/containerd/remotes/certutil"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -94,6 +99,7 @@ func GetResolver(ctx gocontext.Context, clicontext *cli.Context) (remotes.Resolv
 		},
 		ExpectContinueTimeout: 5 * time.Second,
 	}
+	loadCertsDir(tr.TLSClientConfig, clicontext.String("certs-dir"))
 
 	options.Client = &http.Client{
 		Transport: tr,
@@ -107,4 +113,31 @@ func GetResolver(ctx gocontext.Context, clicontext *cli.Context) (remotes.Resolv
 	options.Authorizer = docker.NewDockerAuthorizer(authOpts...)
 
 	return docker.NewResolver(options), nil
+}
+
+// loadCertsDir loads certs from certsDir like "/etc/docker/certs.d" .
+func loadCertsDir(config *tls.Config, certsDir string) {
+	if certsDir == "" {
+		return
+	}
+	fs, err := ioutil.ReadDir(certsDir)
+	if err != nil && !os.IsNotExist(err) {
+		logrus.WithError(err).Errorf("cannot read certs directory %q", certsDir)
+		return
+	}
+	for _, f := range fs {
+		if !f.IsDir() {
+			continue
+		}
+		// TODO: skip loading if f.Name() is not valid FQDN/IP
+		hostDir := filepath.Join(certsDir, f.Name())
+		caCertGlob := filepath.Join(hostDir, "*.crt")
+		if _, err = certutil.LoadCACerts(config, caCertGlob); err != nil {
+			logrus.WithError(err).Errorf("cannot load certs from %q", caCertGlob)
+		}
+		keyGlob := filepath.Join(hostDir, "*.key")
+		if _, _, err = certutil.LoadKeyPairs(config, keyGlob, certutil.DockerKeyPairCertLocator); err != nil {
+			logrus.WithError(err).Errorf("cannot load key pairs from %q", keyGlob)
+		}
+	}
 }
