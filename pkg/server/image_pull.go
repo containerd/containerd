@@ -93,17 +93,19 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	if ref != imageRef {
 		log.G(ctx).Debugf("PullImage using normalized image ref: %q", ref)
 	}
-	resolver := docker.NewResolver(docker.ResolverOptions{
-		Hosts: c.registryHosts(r.GetAuth()),
-	})
-	_, desc, err := resolver.Resolve(ctx, ref)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to resolve image %q", ref)
-	}
-	// We have to check schema1 here, because after `Pull`, schema1
-	// image has already been converted.
-	isSchema1 := desc.MediaType == containerdimages.MediaTypeDockerSchema1Manifest
-
+	var (
+		resolver = docker.NewResolver(docker.ResolverOptions{
+			Hosts: c.registryHosts(r.GetAuth()),
+		})
+		isSchema1    bool
+		imageHandler containerdimages.HandlerFunc = func(_ context.Context,
+			desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
+			if desc.MediaType == containerdimages.MediaTypeDockerSchema1Manifest {
+				isSchema1 = true
+			}
+			return nil, nil
+		}
+	)
 	image, err := c.client.Pull(ctx, ref,
 		containerd.WithSchema1Conversion,
 		containerd.WithResolver(resolver),
@@ -111,6 +113,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		containerd.WithPullUnpack,
 		containerd.WithPullLabel(imageLabelKey, imageLabelValue),
 		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
+		containerd.WithImageHandler(imageHandler),
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to pull and unpack image %q", ref)
