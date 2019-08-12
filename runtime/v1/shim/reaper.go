@@ -82,7 +82,7 @@ func (m *Monitor) Wait(c *exec.Cmd, ec chan runc.Exit) (int, error) {
 		if e.Pid == c.Process.Pid {
 			// make sure we flush all IO
 			c.Wait()
-			m.Unsubscribe(ec)
+			go m.Unsubscribe(ec)
 			return e.Status, nil
 		}
 	}
