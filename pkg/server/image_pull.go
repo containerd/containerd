@@ -251,9 +251,21 @@ func (c *criService) updateImage(ctx context.Context, r string) error {
 
 // getTLSConfig returns a TLSConfig configured with a CA/Cert/Key specified by registryTLSConfig
 func (c *criService) getTLSConfig(registryTLSConfig criconfig.TLSConfig) (*tls.Config, error) {
-	cert, err := tls.LoadX509KeyPair(registryTLSConfig.CertFile, registryTLSConfig.KeyFile)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to load cert file")
+	var (
+		cert tls.Certificate
+		err  error
+	)
+	if registryTLSConfig.CertFile != "" && registryTLSConfig.KeyFile != "" {
+		cert, err = tls.LoadX509KeyPair(registryTLSConfig.CertFile, registryTLSConfig.KeyFile)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to load cert file")
+		}
+	}
+	if registryTLSConfig.CertFile != "" && registryTLSConfig.KeyFile == "" {
+		return nil, errors.Errorf("cert file %q was specified, but no corresponding key file was specified", registryTLSConfig.CertFile)
+	}
+	if registryTLSConfig.CertFile == "" && registryTLSConfig.KeyFile != "" {
+		return nil, errors.Errorf("key file %q was specified, but no corresponding cert file was specified", registryTLSConfig.KeyFile)
 	}
 
 	caCertPool, err := x509.SystemCertPool()
@@ -267,8 +279,10 @@ func (c *criService) getTLSConfig(registryTLSConfig criconfig.TLSConfig) (*tls.C
 	caCertPool.AppendCertsFromPEM(caCert)
 
 	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		RootCAs:      caCertPool,
+		RootCAs: caCertPool,
+	}
+	if len(cert.Certificate) != 0 {
+		tlsConfig.Certificates = []tls.Certificate{cert}
 	}
 	tlsConfig.BuildNameToCertificate()
 	return tlsConfig, nil
