@@ -135,3 +135,101 @@ func TestImagePullWithDistSourceLabel(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestImageUsage(t *testing.T) {
+	if testing.Short() || runtime.GOOS == "windows" {
+		t.Skip()
+	}
+
+	imageName := "docker.io/library/busybox:latest"
+	ctx, cancel := testContext(t)
+	defer cancel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	// Cleanup
+	err = client.ImageService().Delete(ctx, imageName)
+	if err != nil && !errdefs.IsNotFound(err) {
+		t.Fatal(err)
+	}
+
+	testPlatform := platforms.Only(ocispec.Platform{
+		OS:           "linux",
+		Architecture: "amd64",
+	})
+
+	// Pull single platform, do not unpack
+	image, err := client.Pull(ctx, imageName, WithPlatformMatcher(testPlatform))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s1, err := image.Usage(ctx, WithUsageManifestLimit(1))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := image.Usage(ctx, WithUsageManifestLimit(0), WithManifestUsage()); err == nil {
+		t.Fatal("expected NotFound with missing manifests")
+	} else if !errdefs.IsNotFound(err) {
+		t.Fatalf("unexpected error: %+v", err)
+	}
+
+	// Pin image name to specific version for future fetches
+	imageName = imageName + "@" + image.Target().Digest.String()
+
+	// Fetch single platforms, but all manifests pulled
+	if _, err := client.Fetch(ctx, imageName, WithPlatformMatcher(testPlatform)); err != nil {
+		t.Fatal(err)
+	}
+
+	if s, err := image.Usage(ctx, WithUsageManifestLimit(1)); err != nil {
+		t.Fatal(err)
+	} else if s != s1 {
+		t.Fatalf("unexpected usage %d, expected %d", s, s1)
+	}
+
+	s2, err := image.Usage(ctx, WithUsageManifestLimit(0))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if s2 <= s1 {
+		t.Fatalf("Expected larger usage counting all manifests: %d <= %d", s2, s1)
+	}
+
+	s3, err := image.Usage(ctx, WithUsageManifestLimit(0), WithManifestUsage())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if s3 <= s2 {
+		t.Fatalf("Expected larger usage counting all manifest reported sizes: %d <= %d", s3, s2)
+	}
+
+	// Fetch everything
+	if _, err = client.Fetch(ctx, imageName); err != nil {
+		t.Fatal(err)
+	}
+
+	if s, err := image.Usage(ctx); err != nil {
+		t.Fatal(err)
+	} else if s != s3 {
+		t.Fatalf("Expected actual usage to equal manifest reported usage of %d: got %d", s3, s)
+	}
+
+	err = image.Unpack(ctx, DefaultSnapshotter)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if s, err := image.Usage(ctx, WithSnapshotUsage()); err != nil {
+		t.Fatal(err)
+	} else if s <= s3 {
+		t.Fatalf("Expected actual usage with snapshots to be greater: %d <= %d", s, s3)
+	}
+}
