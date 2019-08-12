@@ -68,7 +68,7 @@ var blkioMetrics = []*metric{
 	},
 	{
 		name:   "blkio_io_service_time_recursive",
-		help:   "The blkio io servie time recursive",
+		help:   "The blkio io service time recursive",
 		unit:   metrics.Total,
 		vt:     prometheus.GaugeValue,
 		labels: []string{"op", "device", "major", "minor"},
@@ -81,7 +81,7 @@ var blkioMetrics = []*metric{
 	},
 	{
 		name:   "blkio_io_serviced_recursive",
-		help:   "The blkio io servied recursive",
+		help:   "The blkio io serviced recursive",
 		unit:   metrics.Total,
 		vt:     prometheus.GaugeValue,
 		labels: []string{"op", "device", "major", "minor"},
