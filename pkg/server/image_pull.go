@@ -293,11 +293,9 @@ func (c *criService) registryHosts(auth *runtime.AuthConfig) docker.RegistryHost
 	return func(host string) ([]docker.RegistryHost, error) {
 		var registries []docker.RegistryHost
 
-		// Try mirrors in order, and then try the default registry if not tried.
-		endpoints, err := addDefaultEndpoint(
-			c.config.Registry.Mirrors[host].Endpoints, host)
+		endpoints, err := c.registryEndpoints(host)
 		if err != nil {
-			return nil, errors.Wrapf(err, "add default endpoint")
+			return nil, errors.Wrap(err, "get registry endpoints")
 		}
 		for _, e := range endpoints {
 			u, err := url.Parse(e)
@@ -347,9 +345,17 @@ func (c *criService) registryHosts(auth *runtime.AuthConfig) docker.RegistryHost
 	}
 }
 
-// addDefaultEndpoint add default registry endpoint if it does not
-// exist in the passed-in endpoint list.
-func addDefaultEndpoint(endpoints []string, host string) ([]string, error) {
+// registryEndpoints returns endpoints for a given host.
+// It adds default registry endpoint if it does not exist in the passed-in endpoint list.
+// It also supports wildcard host matching with `*`.
+func (c *criService) registryEndpoints(host string) ([]string, error) {
+	var endpoints []string
+	_, ok := c.config.Registry.Mirrors[host]
+	if ok {
+		endpoints = c.config.Registry.Mirrors[host].Endpoints
+	} else {
+		endpoints = c.config.Registry.Mirrors["*"].Endpoints
+	}
 	defaultHost, err := docker.DefaultHost(host)
 	if err != nil {
 		return nil, errors.Wrap(err, "get default host")
