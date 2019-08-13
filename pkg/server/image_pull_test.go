@@ -22,6 +22,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+
+	criconfig "github.com/containerd/cri/pkg/config"
 )
 
 func TestParseAuth(t *testing.T) {
@@ -103,16 +105,34 @@ func TestParseAuth(t *testing.T) {
 	}
 }
 
-func TestAddDefaultEndpoint(t *testing.T) {
+func TestRegistryEndpoints(t *testing.T) {
 	for desc, test := range map[string]struct {
-		endpoints []string
-		host      string
-		expected  []string
+		mirrors  map[string]criconfig.Mirror
+		host     string
+		expected []string
 	}{
-		"default endpoint not in list": {
-			endpoints: []string{
-				"https://registry-1.io",
-				"https://registry-2.io",
+		"no mirror configured": {
+			mirrors: map[string]criconfig.Mirror{
+				"registry-1.io": {
+					Endpoints: []string{
+						"https://registry-1.io",
+						"https://registry-2.io",
+					},
+				},
+			},
+			host: "registry-3.io",
+			expected: []string{
+				"https://registry-3.io",
+			},
+		},
+		"mirror configured": {
+			mirrors: map[string]criconfig.Mirror{
+				"registry-3.io": {
+					Endpoints: []string{
+						"https://registry-1.io",
+						"https://registry-2.io",
+					},
+				},
 			},
 			host: "registry-3.io",
 			expected: []string{
@@ -121,11 +141,50 @@ func TestAddDefaultEndpoint(t *testing.T) {
 				"https://registry-3.io",
 			},
 		},
-		"default endpoint in list with http": {
-			endpoints: []string{
+		"wildcard mirror configured": {
+			mirrors: map[string]criconfig.Mirror{
+				"*": {
+					Endpoints: []string{
+						"https://registry-1.io",
+						"https://registry-2.io",
+					},
+				},
+			},
+			host: "registry-3.io",
+			expected: []string{
 				"https://registry-1.io",
 				"https://registry-2.io",
-				"http://registry-3.io",
+				"https://registry-3.io",
+			},
+		},
+		"host should take precedence if both host and wildcard mirrors are configured": {
+			mirrors: map[string]criconfig.Mirror{
+				"*": {
+					Endpoints: []string{
+						"https://registry-1.io",
+					},
+				},
+				"registry-3.io": {
+					Endpoints: []string{
+						"https://registry-2.io",
+					},
+				},
+			},
+			host: "registry-3.io",
+			expected: []string{
+				"https://registry-2.io",
+				"https://registry-3.io",
+			},
+		},
+		"default endpoint in list with http": {
+			mirrors: map[string]criconfig.Mirror{
+				"registry-3.io": {
+					Endpoints: []string{
+						"https://registry-1.io",
+						"https://registry-2.io",
+						"http://registry-3.io",
+					},
+				},
 			},
 			host: "registry-3.io",
 			expected: []string{
@@ -135,10 +194,14 @@ func TestAddDefaultEndpoint(t *testing.T) {
 			},
 		},
 		"default endpoint in list with https": {
-			endpoints: []string{
-				"https://registry-1.io",
-				"https://registry-2.io",
-				"https://registry-3.io",
+			mirrors: map[string]criconfig.Mirror{
+				"registry-3.io": {
+					Endpoints: []string{
+						"https://registry-1.io",
+						"https://registry-2.io",
+						"https://registry-3.io",
+					},
+				},
 			},
 			host: "registry-3.io",
 			expected: []string{
@@ -148,10 +211,14 @@ func TestAddDefaultEndpoint(t *testing.T) {
 			},
 		},
 		"default endpoint in list with path": {
-			endpoints: []string{
-				"https://registry-1.io",
-				"https://registry-2.io",
-				"https://registry-3.io/path",
+			mirrors: map[string]criconfig.Mirror{
+				"registry-3.io": {
+					Endpoints: []string{
+						"https://registry-1.io",
+						"https://registry-2.io",
+						"https://registry-3.io/path",
+					},
+				},
 			},
 			host: "registry-3.io",
 			expected: []string{
@@ -162,7 +229,9 @@ func TestAddDefaultEndpoint(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		got, err := addDefaultEndpoint(test.endpoints, test.host)
+		c := newTestCRIService()
+		c.config.Registry.Mirrors = test.mirrors
+		got, err := c.registryEndpoints(test.host)
 		assert.NoError(t, err)
 		assert.Equal(t, test.expected, got)
 	}
