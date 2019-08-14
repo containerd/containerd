@@ -17,6 +17,7 @@
 package cni
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -29,9 +30,9 @@ import (
 
 type CNI interface {
 	// Setup setup the network for the namespace
-	Setup(id string, path string, opts ...NamespaceOpts) (*CNIResult, error)
+	Setup(ctx context.Context, id string, path string, opts ...NamespaceOpts) (*CNIResult, error)
 	// Remove tears down the network of the namespace.
-	Remove(id string, path string, opts ...NamespaceOpts) error
+	Remove(ctx context.Context, id string, path string, opts ...NamespaceOpts) error
 	// Load loads the cni network config
 	Load(opts ...CNIOpt) error
 	// Status checks the status of the cni initialization
@@ -139,7 +140,7 @@ func (c *libcni) Networks() []*Network {
 }
 
 // Setup setups the network in the namespace
-func (c *libcni) Setup(id string, path string, opts ...NamespaceOpts) (*CNIResult, error) {
+func (c *libcni) Setup(ctx context.Context, id string, path string, opts ...NamespaceOpts) (*CNIResult, error) {
 	if err := c.Status(); err != nil {
 		return nil, err
 	}
@@ -149,7 +150,7 @@ func (c *libcni) Setup(id string, path string, opts ...NamespaceOpts) (*CNIResul
 	}
 	var results []*current.Result
 	for _, network := range c.Networks() {
-		r, err := network.Attach(ns)
+		r, err := network.Attach(ctx, ns)
 		if err != nil {
 			return nil, err
 		}
@@ -159,7 +160,7 @@ func (c *libcni) Setup(id string, path string, opts ...NamespaceOpts) (*CNIResul
 }
 
 // Remove removes the network config from the namespace
-func (c *libcni) Remove(id string, path string, opts ...NamespaceOpts) error {
+func (c *libcni) Remove(ctx context.Context, id string, path string, opts ...NamespaceOpts) error {
 	if err := c.Status(); err != nil {
 		return err
 	}
@@ -168,7 +169,7 @@ func (c *libcni) Remove(id string, path string, opts ...NamespaceOpts) error {
 		return err
 	}
 	for _, network := range c.Networks() {
-		if err := network.Remove(ns); err != nil {
+		if err := network.Remove(ctx, ns); err != nil {
 			// Based on CNI spec v0.7.0, empty network namespace is allowed to
 			// do best effort cleanup. However, it is not handled consistently
 			// right now:
