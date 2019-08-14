@@ -220,11 +220,11 @@ func loadFromConfDir(c *libcni, max int) error {
 
 			confList, err = cnilibrary.ConfListFromConf(conf)
 			if err != nil {
-				return errors.Wrapf(ErrInvalidConfig, "failed to convert CNI config file %s to list: %v", confFile, err)
+				return errors.Wrapf(ErrInvalidConfig, "failed to convert CNI config file %s to CNI config list: %v", confFile, err)
 			}
 		}
 		if len(confList.Plugins) == 0 {
-			return errors.Wrapf(ErrInvalidConfig, "CNI config list %s has no networks, skipping", confFile)
+			return errors.Wrapf(ErrInvalidConfig, "CNI config list in config file %s has no networks, skipping", confFile)
 
 		}
 		networks = append(networks, &Network{

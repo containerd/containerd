@@ -17,6 +17,8 @@ limitations under the License.
 package testing
 
 import (
+	"context"
+
 	cni "github.com/containerd/go-cni"
 )
 
@@ -32,12 +34,12 @@ func NewFakeCNIPlugin() *FakeCNIPlugin {
 }
 
 // Setup setups the network of PodSandbox.
-func (f *FakeCNIPlugin) Setup(id, path string, opts ...cni.NamespaceOpts) (*cni.CNIResult, error) {
+func (f *FakeCNIPlugin) Setup(ctx context.Context, id, path string, opts ...cni.NamespaceOpts) (*cni.CNIResult, error) {
 	return nil, nil
 }
 
 // Remove teardown the network of PodSandbox.
-func (f *FakeCNIPlugin) Remove(id, path string, opts ...cni.NamespaceOpts) error {
+func (f *FakeCNIPlugin) Remove(ctx context.Context, id, path string, opts ...cni.NamespaceOpts) error {
 	return nil
 }
 
