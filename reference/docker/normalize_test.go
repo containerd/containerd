@@ -43,6 +43,8 @@ func TestValidateReferenceName(t *testing.T) {
 		// when specified with a hostname, it removes the ambiguity from about
 		// whether the value is an identifier or repository name
 		"docker.io/1a3f5e7d9c1b3a5f7e9d1c3b5a7f9e1d3c5b7a9f1e3d5d7c9b1a3f5e7d9c1b3a",
+		"Docker/docker",
+		"DOCKER/docker",
 	}
 	invalidRepoNames := []string{
 		"https://github.com/docker/docker",
@@ -243,6 +245,20 @@ func TestParseRepositoryInfo(t *testing.T) {
 			FullName:      "docker.io/store/foo/bar",
 			AmbiguousName: "",
 			Domain:        "docker.io",
+		},
+		{
+			RemoteName:    "bar",
+			FamiliarName:  "Foo/bar",
+			FullName:      "Foo/bar",
+			AmbiguousName: "",
+			Domain:        "Foo",
+		},
+		{
+			RemoteName:    "bar",
+			FamiliarName:  "FOO/bar",
+			FullName:      "FOO/bar",
+			AmbiguousName: "",
+			Domain:        "FOO",
 		},
 	}
 
