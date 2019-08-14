@@ -6,7 +6,7 @@
 # 3.) $ make binaries install test
 #
 
-ARG GOLANG_VERSION=1.12.13
+ARG GOLANG_VERSION=1.13.4
 
 FROM golang:${GOLANG_VERSION} AS golang-base
 RUN mkdir -p /go/src/github.com/containerd/containerd
@@ -34,6 +34,8 @@ RUN apt-get update && apt-get install -y \
 
 COPY vendor.conf vendor.conf
 COPY script/setup/install-runc install-runc
+ARG GOPROXY=direct
+ARG GO111MODULE=off
 RUN ./install-runc
 
 FROM golang-base AS dev
