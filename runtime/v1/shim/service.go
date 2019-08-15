@@ -40,6 +40,7 @@ import (
 	rproc "github.com/containerd/containerd/runtime/proc"
 	"github.com/containerd/containerd/runtime/v1/linux/proc"
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
+	"github.com/containerd/containerd/sys/reaper"
 	runc "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
@@ -86,7 +87,7 @@ func NewService(config Config, publisher events.Publisher) (*Service, error) {
 		context:   ctx,
 		processes: make(map[string]rproc.Process),
 		events:    make(chan interface{}, 128),
-		ec:        Default.Subscribe(),
+		ec:        reaper.Default.Subscribe(),
 	}
 	go s.processExits()
 	if err := s.initPlatform(); err != nil {
