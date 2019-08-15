@@ -43,6 +43,7 @@ import (
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/runtime/v2/shim"
 	taskAPI "github.com/containerd/containerd/runtime/v2/task"
+	"github.com/containerd/containerd/sys/reaper"
 	runcC "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/proto"
@@ -70,12 +71,12 @@ func New(ctx context.Context, id string, publisher shim.Publisher, shutdown func
 		id:      id,
 		context: ctx,
 		events:  make(chan interface{}, 128),
-		ec:      shim.Default.Subscribe(),
+		ec:      reaper.Default.Subscribe(),
 		ep:      ep,
 		cancel:  shutdown,
 	}
 	go s.processExits()
-	runcC.Monitor = shim.Default
+	runcC.Monitor = reaper.Default
 	if err := s.initPlatform(); err != nil {
 		shutdown()
 		return nil, errors.Wrap(err, "failed to initialized platform behavior")
