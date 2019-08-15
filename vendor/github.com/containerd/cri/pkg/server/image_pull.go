@@ -30,16 +30,15 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/reference"
-	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/remotes/docker"
-	"github.com/containerd/cri/pkg/config"
 	distribution "github.com/docker/distribution/reference"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+
+	criconfig "github.com/containerd/cri/pkg/config"
 )
 
 // For image management:
@@ -92,16 +91,21 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	}
 	ref := namedRef.String()
 	if ref != imageRef {
-		logrus.Debugf("PullImage using normalized image ref: %q", ref)
+		log.G(ctx).Debugf("PullImage using normalized image ref: %q", ref)
 	}
-	resolver, desc, err := c.getResolver(ctx, ref, c.credentials(r.GetAuth()))
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to resolve image %q", ref)
-	}
-	// We have to check schema1 here, because after `Pull`, schema1
-	// image has already been converted.
-	isSchema1 := desc.MediaType == containerdimages.MediaTypeDockerSchema1Manifest
-
+	var (
+		resolver = docker.NewResolver(docker.ResolverOptions{
+			Hosts: c.registryHosts(r.GetAuth()),
+		})
+		isSchema1    bool
+		imageHandler containerdimages.HandlerFunc = func(_ context.Context,
+			desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
+			if desc.MediaType == containerdimages.MediaTypeDockerSchema1Manifest {
+				isSchema1 = true
+			}
+			return nil, nil
+		}
+	)
 	image, err := c.client.Pull(ctx, ref,
 		containerd.WithSchema1Conversion,
 		containerd.WithResolver(resolver),
@@ -109,6 +113,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		containerd.WithPullUnpack,
 		containerd.WithPullLabel(imageLabelKey, imageLabelValue),
 		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
+		containerd.WithImageHandler(imageHandler),
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to pull and unpack image %q", ref)
@@ -136,7 +141,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		}
 	}
 
-	logrus.Debugf("Pulled image %q with image id %q, repo tag %q, repo digest %q", imageRef, imageID,
+	log.G(ctx).Debugf("Pulled image %q with image id %q, repo tag %q, repo digest %q", imageRef, imageID,
 		repoTag, repoDigest)
 	// NOTE(random-liu): the actual state in containerd is the source of truth, even we maintain
 	// in-memory image store, it's only for in-memory indexing. The image could be removed
@@ -147,9 +152,19 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 }
 
 // ParseAuth parses AuthConfig and returns username and password/secret required by containerd.
-func ParseAuth(auth *runtime.AuthConfig) (string, string, error) {
+func ParseAuth(auth *runtime.AuthConfig, host string) (string, string, error) {
 	if auth == nil {
 		return "", "", nil
+	}
+	if auth.ServerAddress != "" {
+		// Do not return the auth info when server address doesn't match.
+		u, err := url.Parse(auth.ServerAddress)
+		if err != nil {
+			return "", "", errors.Wrap(err, "parse server address")
+		}
+		if host != u.Host {
+			return "", "", nil
+		}
 	}
 	if auth.Username != "" {
 		return auth.Username, auth.Password, nil
@@ -234,31 +249,23 @@ func (c *criService) updateImage(ctx context.Context, r string) error {
 	return nil
 }
 
-// credentials returns a credential function for docker resolver to use.
-func (c *criService) credentials(auth *runtime.AuthConfig) func(string) (string, string, error) {
-	return func(host string) (string, string, error) {
-		if auth == nil {
-			// Get default auth from config.
-			for h, ac := range c.config.Registry.Auths {
-				u, err := url.Parse(h)
-				if err != nil {
-					return "", "", errors.Wrapf(err, "parse auth host %q", h)
-				}
-				if u.Host == host {
-					auth = toRuntimeAuthConfig(ac)
-					break
-				}
-			}
-		}
-		return ParseAuth(auth)
-	}
-}
-
 // getTLSConfig returns a TLSConfig configured with a CA/Cert/Key specified by registryTLSConfig
-func (c *criService) getTLSConfig(registryTLSConfig config.TLSConfig) (*tls.Config, error) {
-	cert, err := tls.LoadX509KeyPair(registryTLSConfig.CertFile, registryTLSConfig.KeyFile)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to load cert file")
+func (c *criService) getTLSConfig(registryTLSConfig criconfig.TLSConfig) (*tls.Config, error) {
+	var (
+		cert tls.Certificate
+		err  error
+	)
+	if registryTLSConfig.CertFile != "" && registryTLSConfig.KeyFile != "" {
+		cert, err = tls.LoadX509KeyPair(registryTLSConfig.CertFile, registryTLSConfig.KeyFile)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to load cert file")
+		}
+	}
+	if registryTLSConfig.CertFile != "" && registryTLSConfig.KeyFile == "" {
+		return nil, errors.Errorf("cert file %q was specified, but no corresponding key file was specified", registryTLSConfig.CertFile)
+	}
+	if registryTLSConfig.CertFile == "" && registryTLSConfig.KeyFile != "" {
+		return nil, errors.Errorf("key file %q was specified, but no corresponding cert file was specified", registryTLSConfig.KeyFile)
 	}
 
 	caCertPool, err := x509.SystemCertPool()
@@ -272,75 +279,98 @@ func (c *criService) getTLSConfig(registryTLSConfig config.TLSConfig) (*tls.Conf
 	caCertPool.AppendCertsFromPEM(caCert)
 
 	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		RootCAs:      caCertPool,
+		RootCAs: caCertPool,
+	}
+	if len(cert.Certificate) != 0 {
+		tlsConfig.Certificates = []tls.Certificate{cert}
 	}
 	tlsConfig.BuildNameToCertificate()
 	return tlsConfig, nil
 }
 
-// getResolver tries registry mirrors and the default registry, and returns the resolver and descriptor
-// from the first working registry.
-func (c *criService) getResolver(ctx context.Context, ref string, cred func(string) (string, string, error)) (remotes.Resolver, imagespec.Descriptor, error) {
-	refspec, err := reference.Parse(ref)
-	if err != nil {
-		return nil, imagespec.Descriptor{}, errors.Wrap(err, "parse image reference")
+// registryHosts is the registry hosts to be used by the resolver.
+func (c *criService) registryHosts(auth *runtime.AuthConfig) docker.RegistryHosts {
+	return func(host string) ([]docker.RegistryHost, error) {
+		var registries []docker.RegistryHost
+
+		endpoints, err := c.registryEndpoints(host)
+		if err != nil {
+			return nil, errors.Wrap(err, "get registry endpoints")
+		}
+		for _, e := range endpoints {
+			u, err := url.Parse(e)
+			if err != nil {
+				return nil, errors.Wrapf(err, "parse registry endpoint %q from mirrors", e)
+			}
+
+			var (
+				transport = newTransport()
+				client    = &http.Client{Transport: transport}
+				config    = c.config.Registry.Configs[u.Host]
+			)
+
+			if u.Scheme != "https" && config.TLS != nil {
+				return nil, errors.Errorf("tls provided for http endpoint %q", e)
+			}
+
+			if config.TLS != nil {
+				transport.TLSClientConfig, err = c.getTLSConfig(*config.TLS)
+				if err != nil {
+					return nil, errors.Wrapf(err, "get TLSConfig for registry %q", e)
+				}
+			}
+
+			if auth == nil && config.Auth != nil {
+				auth = toRuntimeAuthConfig(*config.Auth)
+			}
+
+			if u.Path == "" {
+				u.Path = "/v2"
+			}
+
+			registries = append(registries, docker.RegistryHost{
+				Client: client,
+				Authorizer: docker.NewDockerAuthorizer(
+					docker.WithAuthClient(client),
+					docker.WithAuthCreds(func(host string) (string, string, error) {
+						return ParseAuth(auth, host)
+					})),
+				Host:         u.Host,
+				Scheme:       u.Scheme,
+				Path:         u.Path,
+				Capabilities: docker.HostCapabilityResolve | docker.HostCapabilityPull,
+			})
+		}
+		return registries, nil
 	}
+}
 
-	var (
-		transport  = newTransport()
-		httpClient = &http.Client{Transport: transport}
-	)
-
-	// Try mirrors in order first, and then try default host name.
-	for _, e := range c.config.Registry.Mirrors[refspec.Hostname()].Endpoints {
+// registryEndpoints returns endpoints for a given host.
+// It adds default registry endpoint if it does not exist in the passed-in endpoint list.
+// It also supports wildcard host matching with `*`.
+func (c *criService) registryEndpoints(host string) ([]string, error) {
+	var endpoints []string
+	_, ok := c.config.Registry.Mirrors[host]
+	if ok {
+		endpoints = c.config.Registry.Mirrors[host].Endpoints
+	} else {
+		endpoints = c.config.Registry.Mirrors["*"].Endpoints
+	}
+	defaultHost, err := docker.DefaultHost(host)
+	if err != nil {
+		return nil, errors.Wrap(err, "get default host")
+	}
+	for _, e := range endpoints {
 		u, err := url.Parse(e)
 		if err != nil {
-			return nil, imagespec.Descriptor{}, errors.Wrapf(err, "parse registry endpoint %q", e)
+			return nil, errors.Wrap(err, "parse endpoint url")
 		}
-
-		if registryTLSConfig, ok := c.config.Registry.TLSConfigs[u.Host]; ok {
-			transport.TLSClientConfig, err = c.getTLSConfig(registryTLSConfig)
-			if err != nil {
-				return nil, imagespec.Descriptor{}, errors.Wrapf(err, "get TLSConfig for registry %q", refspec.Hostname())
-			}
-		}
-
-		resolver := docker.NewResolver(docker.ResolverOptions{
-			Authorizer: docker.NewAuthorizer(httpClient, cred),
-			Client:     httpClient,
-			Host:       func(string) (string, error) { return u.Host, nil },
-			// By default use "https".
-			PlainHTTP: u.Scheme == "http",
-		})
-		_, desc, err := resolver.Resolve(ctx, ref)
-		if err == nil {
-			return resolver, desc, nil
-		}
-		logrus.WithError(err).Debugf("Tried registry mirror %q but failed", e)
-		// Continue to try next endpoint
-	}
-
-	hostname, err := docker.DefaultHost(refspec.Hostname())
-	if err != nil {
-		return nil, imagespec.Descriptor{}, errors.Wrapf(err, "get host for refspec %q", refspec.Hostname())
-	}
-	if registryTLSConfig, ok := c.config.Registry.TLSConfigs[hostname]; ok {
-		transport.TLSClientConfig, err = c.getTLSConfig(registryTLSConfig)
-		if err != nil {
-			return nil, imagespec.Descriptor{}, errors.Wrapf(err, "get TLSConfig for registry %q", refspec.Hostname())
+		if u.Host == host {
+			// Do not add default if the endpoint already exists.
+			return endpoints, nil
 		}
 	}
-
-	resolver := docker.NewResolver(docker.ResolverOptions{
-		Credentials: cred,
-		Client:      httpClient,
-	})
-	_, desc, err := resolver.Resolve(ctx, ref)
-	if err != nil {
-		return nil, imagespec.Descriptor{}, errors.Wrap(err, "no available registry endpoint")
-	}
-	return resolver, desc, nil
+	return append(endpoints, "https://"+defaultHost), nil
 }
 
 // newTransport returns a new HTTP transport used to pull image.
