@@ -22,24 +22,25 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"syscall"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
-// New creates a loopback device, and returns its device name (/dev/loopX), and its clean-up function.
-func New(size int64) (string, func() error, error) {
+// New creates a loopback device
+func New(size int64) (*Loopback, error) {
 	// create temporary file for the disk image
 	file, err := ioutil.TempFile("", "containerd-test-loopback")
 	if err != nil {
-		return "", nil, errors.Wrap(err, "could not create temporary file for loopback")
+		return nil, errors.Wrap(err, "could not create temporary file for loopback")
 	}
 
 	if err := file.Truncate(size); err != nil {
 		file.Close()
 		os.Remove(file.Name())
-		return "", nil, errors.Wrap(err, "failed to resize temp file")
+		return nil, errors.Wrap(err, "failed to resize temp file")
 	}
 	file.Close()
 
@@ -48,7 +49,7 @@ func New(size int64) (string, func() error, error) {
 	p, err := losetup.Output()
 	if err != nil {
 		os.Remove(file.Name())
-		return "", nil, errors.Wrap(err, "loopback setup failed")
+		return nil, errors.Wrap(err, "loopback setup failed")
 	}
 
 	deviceName := strings.TrimSpace(string(p))
@@ -68,5 +69,47 @@ func New(size int64) (string, func() error, error) {
 		return os.Remove(file.Name())
 	}
 
-	return deviceName, cleanup, nil
+	l := Loopback{
+		File: file.Name(),
+		Device: deviceName,
+		close: cleanup,
+	}
+	return &l, nil
+}
+
+// Loopback device
+type Loopback struct {
+	// File is the underlying sparse file
+	File string
+	// Device is /dev/loopX
+	Device string
+	close func() error
+}
+
+// SoftSize returns st_size
+func (l *Loopback) SoftSize() (int64, error) {
+	st, err := os.Stat(l.File)
+	if err != nil {
+		return 0, err
+	}
+	return st.Size(), nil
+}
+
+// HardSize returns st_blocks * 512; see stat(2)
+func (l *Loopback) HardSize() (int64, error) {
+	st, err := os.Stat(l.File)
+	if err != nil {
+		return 0, err
+	}
+	st2, ok := st.Sys().(*syscall.Stat_t)
+	if !ok {
+		return 0, errors.New("st.Sys() is not a *syscall.Stat_t")
+	}
+	// NOTE: st_blocks has nothing to do with st_blksize; see stat(2)
+	return st2.Blocks * 512, nil
+}
+
+// Close detaches the device and removes the underlying file
+func (l *Loopback) Close() error {
+	return l.close()
 }
