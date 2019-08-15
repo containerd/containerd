@@ -1,0 +1,42 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.2.7"
+
+pre_release = false
+
+preface = """\
+The eighth patch release for `containerd` 1.2 provides a series of bug fixes, many
+of them backported from the master branch to correct several known issues around
+manifest lists/indexes and pulling multi-arch, CVEs related to Golang/http2,
+fd leakage in the Golang runtime, a shim hang, process and image environment config
+handling, and finally mount cleanup related to Cloud Foundry's use of containerd
+with rootless containers. A set of bug fixes/updates for the CRI plugin are also
+included; details for the CRI issues and fixes are shown below.
+
+### Notable Updates
+* Skip rootfs unmount when no mounts are provided. Fixed by [PR #3148](https://github.com/containerd/containerd/pull/3148) {cherry-picked as [PR #3402](https://github.com/containerd/containerd/pull/3402)}.
+* Close inherited socket file descriptor. Fixed in [PR #3359](https://github.com/containerd/containerd/pull/3359) {cherry-picked as [PR #3364](https://github.com/containerd/containerd/pull/3364)}.
+* Call CloseIO when stdin closes in ctr. Fixed by [PR #3462](https://github.com/containerd/containerd/pull/3462) {cherry-picked as [PR 3490](https://github.com/containerd/containerd/pull/3490)}.
+* Several multi-arch image fixes, including: ARM platform matching, selecting the proper manifest, and limited to best matched manifest to solve discrepancies with multi-arch image operations. Backported [PR #3270](https://github.com/containerd/containerd/pull/3270) as [PR #3404](https://github.com/containerd/containerd/pull/3404), [PR #3484](https://github.com/containerd/containerd/pull/3484) as [PR #3512](https://github.com/containerd/containerd/pull/3512), and added [PR #3421](https://github.com/containerd/containerd/pull/3421).
+* Override image's environment config with process config; including backport of fixes and tests for merging/replacing env variables; fix in [PR #3542](https://github.com/containerd/containerd/pull/3542), backported via [PR #3546](https://github.com/containerd/containerd/pull/3546) which included a backport of [PR #2887](https://github.com/containerd/containerd/pull/2887). Additional fix to logic for override re: image `$PATH` cherry-picked in [PR #3565](https://github.com/containerd/containerd/pull/3565).
+* Shim hang fix in master via [PR #3540](https://github.com/containerd/containerd/pull/3540) backported to `release/1.2` via [PR #3561](https://github.com/containerd/containerd/pull/3561).
+* Updated Golang version to 1.12.9 patch release:
+  * Resolves CVE-2019-9512 and CVE-2019-9514 from the 1.12.8 security release. Originally fixed via [PR #3531](https://github.com/containerd/containerd/pull/3531) which lists the details of the Golang CVEs, backported via [PR #3532](https://github.com/containerd/containerd/pull/3532) to `release/1.2`.
+  * Resolves fd leaks reported via [golang/go#33405](https://github.com/golang/go/issues/33405) and resolved in the 1.12.9 patch release, updated via [PR #3544](https://github.com/containerd/containerd/pull/3544). This fd leak bug was initially reported in containerd issue [#3481](https://github.com/containerd/containerd/issues/3481).
+* CRI: Fix a bug that if an image is deleted immediately after being pulled, the image may still exist after the deletion finishes successfully. (https://github.com/containerd/cri/issues/1161)
+* CRI: Fix a bug that `runc` and `crictl` binaries shipped in https://storage.googleapis.com/cri-containerd-release are versioned with the containerd version. (https://github.com/containerd/cri/pull/1193)
+* CRI: Fix a bug that the images become unusable if 2 images have the same image ID and RepoTag, but different RepoDigests. (https://github.com/containerd/containerd/issues/3401)
+* CRI: Fix [ProcMount](https://stupefied-goodall-e282f7.netlify.com/contributors/design-proposals/auth/proc-mount-type/) support (https://github.com/containerd/cri/pull/1216). ***NOTE: To use containerd 1.2.8+ with Kubernetes 1.11 or below, you MUST set `disable_proc_mount=true` in the cri plugin config.*** (https://github.com/containerd/cri/issues/1208)
+* CRI: Fix a bug that containerd tries to connect image registry with `https` even if the `http` endpoint is configured. (https://github.com/containerd/cri/issues/1201)
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
