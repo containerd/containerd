@@ -36,19 +36,25 @@ const bufferSize = 2048
 // Reap should be called when the process receives an SIGCHLD.  Reap will reap
 // all exited processes and close their wait channels
 func Reap() error {
-	now := time.Now()
+	var (
+		now     = time.Now()
+		current []chan runc.Exit
+	)
 	exits, err := sys.Reap(false)
+
 	Default.Lock()
 	for c := range Default.subscribers {
-		for _, e := range exits {
-			c <- runc.Exit{
-				Timestamp: now,
-				Pid:       e.Pid,
-				Status:    e.Status,
-			}
-		}
+		current = append(current, c)
 	}
 	Default.Unlock()
+
+	for _, e := range exits {
+		go notify(runc.Exit{
+			Timestamp: now,
+			Pid:       e.Pid,
+			Status:    e.Status,
+		}, current)
+	}
 	return err
 }
 
@@ -106,4 +112,29 @@ func (m *Monitor) Unsubscribe(c chan runc.Exit) {
 	delete(m.subscribers, c)
 	close(c)
 	m.Unlock()
+}
+
+func notify(e runc.Exit, subscribers []chan runc.Exit) {
+	const timeout = 10 * time.Millisecond
+	timer := time.NewTimer(timeout)
+	timer.Stop()
+
+	for i := 0; i < 50; i++ {
+		var failed []chan runc.Exit
+		for _, s := range subscribers {
+			timer.Reset(timeout)
+
+			select {
+			case s <- e:
+			case <-timer.C:
+				failed = append(failed, s)
+			}
+			timer.Stop()
+		}
+		// all subscribers received the message
+		if len(failed) == 0 {
+			return
+		}
+		subscribers = failed
+	}
 }
