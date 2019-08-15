@@ -52,24 +52,24 @@ func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshots.Snap
 		if os.Getpagesize() > 4096 {
 			loopbackSize = int64(650 << 20) // 650 MB
 		}
-		deviceName, cleanupDevice, err := loopback.New(loopbackSize)
+		loop, err := loopback.New(loopbackSize)
 
 		if err != nil {
 			return nil, nil, err
 		}
 
-		if out, err := exec.Command(mkbtrfs, deviceName).CombinedOutput(); err != nil {
-			cleanupDevice()
+		if out, err := exec.Command(mkbtrfs, loop.Device).CombinedOutput(); err != nil {
+			loop.Close()
 			return nil, nil, errors.Wrapf(err, "failed to make btrfs filesystem (out: %q)", out)
 		}
-		if out, err := exec.Command("mount", deviceName, root).CombinedOutput(); err != nil {
-			cleanupDevice()
-			return nil, nil, errors.Wrapf(err, "failed to mount device %s (out: %q)", deviceName, out)
+		if out, err := exec.Command("mount", loop.Device, root).CombinedOutput(); err != nil {
+			loop.Close()
+			return nil, nil, errors.Wrapf(err, "failed to mount device %s (out: %q)", loop.Device, out)
 		}
 
 		snapshotter, err := NewSnapshotter(root)
 		if err != nil {
-			cleanupDevice()
+			loop.Close()
 			return nil, nil, errors.Wrap(err, "failed to create new snapshotter")
 		}
 
@@ -78,7 +78,7 @@ func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshots.Snap
 				return err
 			}
 			err := mount.UnmountAll(root, unix.MNT_DETACH)
-			if cerr := cleanupDevice(); cerr != nil {
+			if cerr := loop.Close(); cerr != nil {
 				err = errors.Wrap(cerr, "device cleanup failed")
 			}
 			return err

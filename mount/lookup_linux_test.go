@@ -50,25 +50,25 @@ func testLookup(t *testing.T, fsType string) {
 	}
 	defer os.RemoveAll(mnt)
 
-	deviceName, cleanupDevice, err := loopback.New(100 << 20) // 100 MB
+	loop, err := loopback.New(100 << 20) // 100 MB
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out, err := exec.Command("mkfs", "-t", fsType, deviceName).CombinedOutput(); err != nil {
+	if out, err := exec.Command("mkfs", "-t", fsType, loop.Device).CombinedOutput(); err != nil {
 		// not fatal
-		cleanupDevice()
-		t.Skipf("could not mkfs (%s) %s: %v (out: %q)", fsType, deviceName, err, string(out))
+		loop.Close()
+		t.Skipf("could not mkfs (%s) %s: %v (out: %q)", fsType, loop.Device, err, string(out))
 	}
-	if out, err := exec.Command("mount", deviceName, mnt).CombinedOutput(); err != nil {
+	if out, err := exec.Command("mount", loop.Device, mnt).CombinedOutput(); err != nil {
 		// not fatal
-		cleanupDevice()
-		t.Skipf("could not mount %s: %v (out: %q)", deviceName, err, string(out))
+		loop.Close()
+		t.Skipf("could not mount %s: %v (out: %q)", loop.Device, err, string(out))
 	}
 	defer func() {
 		testutil.Unmount(t, mnt)
-		cleanupDevice()
+		loop.Close()
 	}()
-	assert.Check(t, strings.HasPrefix(deviceName, "/dev/loop"))
+	assert.Check(t, strings.HasPrefix(loop.Device, "/dev/loop"))
 	checkLookup(t, fsType, mnt, mnt)
 
 	newMnt, err := ioutil.TempDir("", "containerd-mountinfo-test-newMnt")
