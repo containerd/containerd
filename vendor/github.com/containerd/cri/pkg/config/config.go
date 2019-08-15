@@ -142,6 +142,9 @@ type PluginConfig struct {
 	// Log line longer than the limit will be split into multiple lines. Non-positive
 	// value means no limit.
 	MaxContainerLogLineSize int `toml:"max_container_log_line_size" json:"maxContainerLogSize"`
+	// DisableProcMount disables Kubernetes ProcMount support. This MUST be set to `true`
+	// when using containerd with Kubernetes <=1.11.
+	DisableProcMount bool `toml:"disable_proc_mount" json:"disableProcMount"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
@@ -203,6 +206,7 @@ func DefaultConfig() PluginConfig {
 				},
 			},
 		},
+		DisableProcMount: false,
 	}
 }
 
