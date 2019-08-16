@@ -30,3 +30,17 @@ import (
 func openShimLog(ctx context.Context, bundle *Bundle) (io.ReadCloser, error) {
 	return fifo.OpenFifo(ctx, filepath.Join(bundle.Path, "log"), unix.O_RDONLY|unix.O_CREAT|unix.O_NONBLOCK, 0700)
 }
+
+func checkCopyShimLogError(ctx context.Context, err error) error {
+	// When using a multi-container shim, the fifo of the 2nd to Nth
+	// container will not be opened when the ctx is done. This will
+	// cause an ErrReadClosed that can be ignored.
+	select {
+	case <-ctx.Done():
+		if err == fifo.ErrReadClosed {
+			return nil
+		}
+	default:
+	}
+	return err
+}
