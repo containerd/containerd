@@ -32,7 +32,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-// LeaseManager manages the create/delete lifecyle of leases
+// LeaseManager manages the create/delete lifecycle of leases
 // and also returns existing leases
 type LeaseManager struct {
 	tx *bolt.Tx
@@ -95,7 +95,7 @@ func (lm *LeaseManager) Create(ctx context.Context, opts ...leases.Opt) (leases.
 	return l, nil
 }
 
-// Delete delets the lease with the provided lease ID
+// Delete deletes the lease with the provided lease ID
 func (lm *LeaseManager) Delete(ctx context.Context, lease leases.Lease, _ ...leases.DeleteOpt) error {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
