@@ -406,7 +406,7 @@ func TestWithImageConfigArgs(t *testing.T) {
 		WithImageConfigArgs(img, []string{"--boo", "bar"}),
 	}
 
-	expectedEnv := []string{"x=foo", "y=baz", "z=bar"}
+	expectedEnv := []string{"z=bar", "y=boo", "x=foo"}
 	expectedArgs := []string{"create", "--namespace=test", "--boo", "bar"}
 
 	for _, opt := range opts {
