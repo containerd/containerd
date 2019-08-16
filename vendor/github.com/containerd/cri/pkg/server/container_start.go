@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd"
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -65,11 +66,11 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 				status.Message = retErr.Error()
 				return status, nil
 			}); err != nil {
-				logrus.WithError(err).Errorf("failed to set start failure state for container %q", id)
+				log.G(ctx).WithError(err).Errorf("failed to set start failure state for container %q", id)
 			}
 		}
 		if err := resetContainerStarting(cntr); err != nil {
-			logrus.WithError(err).Errorf("failed to reset starting state for container %q", id)
+			log.G(ctx).WithError(err).Errorf("failed to reset starting state for container %q", id)
 		}
 	}()
 
@@ -113,7 +114,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 			defer deferCancel()
 			// It's possible that task is deleted by event monitor.
 			if _, err := task.Delete(deferCtx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
-				logrus.WithError(err).Errorf("Failed to delete containerd task %q", id)
+				log.G(ctx).WithError(err).Errorf("Failed to delete containerd task %q", id)
 			}
 		}
 	}()

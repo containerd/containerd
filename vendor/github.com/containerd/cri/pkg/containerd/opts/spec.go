@@ -27,18 +27,20 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
-	osinterface "github.com/containerd/cri/pkg/os"
-	"github.com/containerd/cri/pkg/util"
+
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runc/libcontainer/devices"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+
+	osinterface "github.com/containerd/cri/pkg/os"
+	"github.com/containerd/cri/pkg/util"
 )
 
 const (
@@ -250,7 +252,7 @@ func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 					s.Linux.RootfsPropagation = "rslave"
 				}
 			default:
-				logrus.Warnf("Unknown propagation mode for hostPath %q", mount.HostPath)
+				log.G(ctx).Warnf("Unknown propagation mode for hostPath %q", mount.HostPath)
 				options = append(options, "rprivate")
 			}
 
