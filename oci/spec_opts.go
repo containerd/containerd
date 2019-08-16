@@ -326,7 +326,7 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 
 		setProcess(s)
 		if s.Linux != nil {
-			s.Process.Env = replaceOrAppendEnvValues(s.Process.Env, config.Env)
+			s.Process.Env = replaceOrAppendEnvValues(config.Env, s.Process.Env)
 			cmd := config.Cmd
 			if len(args) > 0 {
 				cmd = args
@@ -348,7 +348,7 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 			// even if there is no specified user in the image config
 			return WithAdditionalGIDs("root")(ctx, client, c, s)
 		} else if s.Windows != nil {
-			s.Process.Env = replaceOrAppendEnvValues(s.Process.Env, config.Env)
+			s.Process.Env = replaceOrAppendEnvValues(config.Env, s.Process.Env)
 			cmd := config.Cmd
 			if len(args) > 0 {
 				cmd = args
