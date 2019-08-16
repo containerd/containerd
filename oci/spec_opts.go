@@ -33,7 +33,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/continuity/fs"
-	"github.com/opencontainers/image-spec/specs-go/v1"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runc/libcontainer/user"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -310,7 +310,7 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 
 		setProcess(s)
 		if s.Linux != nil {
-			s.Process.Env = append(s.Process.Env, config.Env...)
+			s.Process.Env = replaceOrAppendEnvValues(config.Env, s.Process.Env)
 			cmd := config.Cmd
 			if len(args) > 0 {
 				cmd = args
@@ -332,8 +332,14 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 			// even if there is no specified user in the image config
 			return WithAdditionalGIDs("root")(ctx, client, c, s)
 		} else if s.Windows != nil {
-			s.Process.Env = config.Env
-			s.Process.Args = append(config.Entrypoint, config.Cmd...)
+			s.Process.Env = replaceOrAppendEnvValues(config.Env, s.Process.Env)
+			cmd := config.Cmd
+			if len(args) > 0 {
+				cmd = args
+			}
+			s.Process.Args = append(config.Entrypoint, cmd...)
+
+			s.Process.Cwd = config.WorkingDir
 			s.Process.User = specs.User{
 				Username: config.User,
 			}
