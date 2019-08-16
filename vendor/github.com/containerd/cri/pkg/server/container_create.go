@@ -26,22 +26,22 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
-	"github.com/containerd/typeurl"
-	"github.com/davecgh/go-spew/spew"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-
 	"github.com/containerd/cri/pkg/annotations"
+	"github.com/containerd/cri/pkg/config"
 	customopts "github.com/containerd/cri/pkg/containerd/opts"
 	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
 	cio "github.com/containerd/cri/pkg/server/io"
 	containerstore "github.com/containerd/cri/pkg/store/container"
 	"github.com/containerd/cri/pkg/util"
+	"github.com/containerd/typeurl"
+	"github.com/davecgh/go-spew/spew"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
+	"golang.org/x/net/context"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 const (
@@ -67,7 +67,7 @@ func init() {
 // CreateContainer creates a new container in the given PodSandbox.
 func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateContainerRequest) (_ *runtime.CreateContainerResponse, retErr error) {
 	config := r.GetConfig()
-	logrus.Debugf("Container config %+v", config)
+	log.G(ctx).Debugf("Container config %+v", config)
 	sandboxConfig := r.GetSandboxConfig()
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
@@ -89,7 +89,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, errors.New("container config must include metadata")
 	}
 	name := makeContainerName(metadata, sandboxConfig.GetMetadata())
-	logrus.Debugf("Generated id %q for container %q", id, name)
+	log.G(ctx).Debugf("Generated id %q for container %q", id, name)
 	if err = c.containerNameIndex.Reserve(name, id); err != nil {
 		return nil, errors.Wrapf(err, "failed to reserve container name %q", name)
 	}
@@ -135,7 +135,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		if retErr != nil {
 			// Cleanup the container root directory.
 			if err = c.os.RemoveAll(containerRootDir); err != nil {
-				logrus.WithError(err).Errorf("Failed to remove container root directory %q",
+				log.G(ctx).WithError(err).Errorf("Failed to remove container root directory %q",
 					containerRootDir)
 			}
 		}
@@ -149,7 +149,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		if retErr != nil {
 			// Cleanup the volatile container root directory.
 			if err = c.os.RemoveAll(volatileContainerRootDir); err != nil {
-				logrus.WithError(err).Errorf("Failed to remove volatile container root directory %q",
+				log.G(ctx).WithError(err).Errorf("Failed to remove volatile container root directory %q",
 					volatileContainerRootDir)
 			}
 		}
@@ -165,15 +165,15 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get sandbox runtime")
 	}
-	logrus.Debugf("Use OCI runtime %+v for sandbox %q and container %q", ociRuntime, sandboxID, id)
+	log.G(ctx).Debugf("Use OCI runtime %+v for sandbox %q and container %q", ociRuntime, sandboxID, id)
 
 	spec, err := c.generateContainerSpec(id, sandboxID, sandboxPid, config, sandboxConfig,
-		&image.ImageSpec.Config, append(mounts, volumeMounts...), ociRuntime.PodAnnotations)
+		&image.ImageSpec.Config, append(mounts, volumeMounts...), ociRuntime)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to generate container %q spec", id)
 	}
 
-	logrus.Debugf("Container %q spec: %#+v", id, spew.NewFormatter(spec))
+	log.G(ctx).Debugf("Container %q spec: %#+v", id, spew.NewFormatter(spec))
 
 	// Set snapshotter before any other options.
 	opts := []containerd.NewContainerOpts{
@@ -199,10 +199,10 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	// Validate log paths and compose full container log path.
 	if sandboxConfig.GetLogDirectory() != "" && config.GetLogPath() != "" {
 		meta.LogPath = filepath.Join(sandboxConfig.GetLogDirectory(), config.GetLogPath())
-		logrus.Debugf("Composed container full log path %q using sandbox log dir %q and container log path %q",
+		log.G(ctx).Debugf("Composed container full log path %q using sandbox log dir %q and container log path %q",
 			meta.LogPath, sandboxConfig.GetLogDirectory(), config.GetLogPath())
 	} else {
-		logrus.Infof("Logging will be disabled due to empty log paths for sandbox (%q) or container (%q)",
+		log.G(ctx).Infof("Logging will be disabled due to empty log paths for sandbox (%q) or container (%q)",
 			sandboxConfig.GetLogDirectory(), config.GetLogPath())
 	}
 
@@ -214,7 +214,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	defer func() {
 		if retErr != nil {
 			if err := containerIO.Close(); err != nil {
-				logrus.WithError(err).Errorf("Failed to close container io %q", id)
+				log.G(ctx).WithError(err).Errorf("Failed to close container io %q", id)
 			}
 		}
 	}()
@@ -227,10 +227,15 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	userstr, err := generateUserString(
 		securityContext.GetRunAsUsername(),
 		securityContext.GetRunAsUser(),
-		securityContext.GetRunAsGroup(),
-	)
+		securityContext.GetRunAsGroup())
+
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate user string")
+	}
+	if userstr == "" {
+		// Lastly, since no user override was passed via CRI try to set via OCI
+		// Image
+		userstr = image.ImageSpec.Config.User
 	}
 	if userstr != "" {
 		specOpts = append(specOpts, oci.WithUser(userstr))
@@ -286,7 +291,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 			deferCtx, deferCancel := ctrdutil.DeferContext()
 			defer deferCancel()
 			if err := cntr.Delete(deferCtx, containerd.WithSnapshotCleanup); err != nil {
-				logrus.WithError(err).Errorf("Failed to delete containerd container %q", id)
+				log.G(ctx).WithError(err).Errorf("Failed to delete containerd container %q", id)
 			}
 		}
 	}()
@@ -304,7 +309,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		if retErr != nil {
 			// Cleanup container checkpoint on error.
 			if err := container.Delete(); err != nil {
-				logrus.WithError(err).Errorf("Failed to cleanup container checkpoint for %q", id)
+				log.G(ctx).WithError(err).Errorf("Failed to cleanup container checkpoint for %q", id)
 			}
 		}
 	}()
@@ -318,7 +323,8 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 }
 
 func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxPid uint32, config *runtime.ContainerConfig,
-	sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig, extraMounts []*runtime.Mount, runtimePodAnnotations []string) (*runtimespec.Spec, error) {
+	sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig, extraMounts []*runtime.Mount,
+	ociRuntime config.Runtime) (*runtimespec.Spec, error) {
 
 	specOpts := []oci.SpecOpts{
 		customopts.WithoutRunMount,
@@ -380,7 +386,10 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 		if !sandboxConfig.GetLinux().GetSecurityContext().GetPrivileged() {
 			return nil, errors.New("no privileged container allowed in sandbox")
 		}
-		specOpts = append(specOpts, oci.WithPrivileged, customopts.WithPrivilegedDevices)
+		specOpts = append(specOpts, oci.WithPrivileged)
+		if !ociRuntime.PrivilegedWithoutHostDevices {
+			specOpts = append(specOpts, customopts.WithPrivilegedDevices)
+		}
 	} else { // not privileged
 		specOpts = append(specOpts, customopts.WithDevices(c.os, config), customopts.WithCapabilities(securityContext))
 	}
@@ -408,8 +417,7 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 	} else {
 		specOpts = append(specOpts, customopts.WithResources(config.GetLinux().GetResources()))
 		if sandboxConfig.GetLinux().GetCgroupParent() != "" {
-			cgroupsPath := getCgroupsPath(sandboxConfig.GetLinux().GetCgroupParent(), id,
-				c.config.SystemdCgroup)
+			cgroupsPath := getCgroupsPath(sandboxConfig.GetLinux().GetCgroupParent(), id)
 			specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
 		}
 	}
@@ -417,7 +425,7 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 	supplementalGroups := securityContext.GetSupplementalGroups()
 
 	for pKey, pValue := range getPassthroughAnnotations(sandboxConfig.Annotations,
-		runtimePodAnnotations) {
+		ociRuntime.PodAnnotations) {
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
 	}
 
@@ -590,7 +598,20 @@ func generateApparmorSpecOpts(apparmorProf string, privileged, apparmorEnabled b
 	}
 }
 
-// generateUserString generates valid user string based on OCI Image Spec v1.0.0.
+// generateUserString generates valid user string based on OCI Image Spec
+// v1.0.0.
+//
+// CRI defines that the following combinations are valid:
+//
+// (none) -> ""
+// username -> username
+// username, uid -> username
+// username, uid, gid -> username:gid
+// username, gid -> username:gid
+// uid -> uid
+// uid, gid -> uid:gid
+// gid -> error
+//
 // TODO(random-liu): Add group name support in CRI.
 func generateUserString(username string, uid, gid *runtime.Int64Value) (string, error) {
 	var userstr, groupstr string
