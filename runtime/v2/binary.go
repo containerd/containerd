@@ -35,22 +35,24 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func shimBinary(ctx context.Context, bundle *Bundle, runtime, containerdAddress string, events *exchange.Exchange, rt *runtime.TaskList) *binary {
+func shimBinary(ctx context.Context, bundle *Bundle, runtime, containerdAddress string, containerdTTRPCAddress string, events *exchange.Exchange, rt *runtime.TaskList) *binary {
 	return &binary{
-		bundle:            bundle,
-		runtime:           runtime,
-		containerdAddress: containerdAddress,
-		events:            events,
-		rtTasks:           rt,
+		bundle:                 bundle,
+		runtime:                runtime,
+		containerdAddress:      containerdAddress,
+		containerdTTRPCAddress: containerdTTRPCAddress,
+		events:                 events,
+		rtTasks:                rt,
 	}
 }
 
 type binary struct {
-	runtime           string
-	containerdAddress string
-	bundle            *Bundle
-	events            *exchange.Exchange
-	rtTasks           *runtime.TaskList
+	runtime                string
+	containerdAddress      string
+	containerdTTRPCAddress string
+	bundle                 *Bundle
+	events                 *exchange.Exchange
+	rtTasks                *runtime.TaskList
 }
 
 func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ *shim, err error) {
@@ -64,6 +66,7 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 		ctx,
 		b.runtime,
 		b.containerdAddress,
+		b.containerdTTRPCAddress,
 		b.bundle.Path,
 		opts,
 		args...,
@@ -124,6 +127,7 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 	cmd, err := client.Command(ctx,
 		b.runtime,
 		b.containerdAddress,
+		b.containerdTTRPCAddress,
 		bundlePath,
 		nil,
 		"-id", b.bundle.ID,
