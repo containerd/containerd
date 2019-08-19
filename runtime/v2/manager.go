@@ -69,25 +69,26 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			return New(ic.Context, ic.Root, ic.State, ic.Address, ic.Events, m.(*metadata.DB))
+			return New(ic.Context, ic.Root, ic.State, ic.Address, ic.TTRPCAddress, ic.Events, m.(*metadata.DB))
 		},
 	})
 }
 
 // New task manager for v2 shims
-func New(ctx context.Context, root, state, containerdAddress string, events *exchange.Exchange, db *metadata.DB) (*TaskManager, error) {
+func New(ctx context.Context, root, state, containerdAddress, containerdTTRPCAddress string, events *exchange.Exchange, db *metadata.DB) (*TaskManager, error) {
 	for _, d := range []string{root, state} {
 		if err := os.MkdirAll(d, 0711); err != nil {
 			return nil, err
 		}
 	}
 	m := &TaskManager{
-		root:              root,
-		state:             state,
-		containerdAddress: containerdAddress,
-		tasks:             runtime.NewTaskList(),
-		events:            events,
-		db:                db,
+		root:                   root,
+		state:                  state,
+		containerdAddress:      containerdAddress,
+		containerdTTRPCAddress: containerdTTRPCAddress,
+		tasks:                  runtime.NewTaskList(),
+		events:                 events,
+		db:                     db,
 	}
 	if err := m.loadExistingTasks(ctx); err != nil {
 		return nil, err
@@ -97,9 +98,10 @@ func New(ctx context.Context, root, state, containerdAddress string, events *exc
 
 // TaskManager manages v2 shim's and their tasks
 type TaskManager struct {
-	root              string
-	state             string
-	containerdAddress string
+	root                   string
+	state                  string
+	containerdAddress      string
+	containerdTTRPCAddress string
 
 	tasks  *runtime.TaskList
 	events *exchange.Exchange
@@ -131,7 +133,7 @@ func (m *TaskManager) Create(ctx context.Context, id string, opts runtime.Create
 		topts = opts.RuntimeOptions
 	}
 
-	b := shimBinary(ctx, bundle, opts.Runtime, m.containerdAddress, m.events, m.tasks)
+	b := shimBinary(ctx, bundle, opts.Runtime, m.containerdAddress, m.containerdTTRPCAddress, m.events, m.tasks)
 	shim, err := b.Start(ctx, topts, func() {
 		log.G(ctx).WithField("id", id).Info("shim disconnected")
 		_, err := m.tasks.Get(ctx, id)
@@ -254,7 +256,7 @@ func (m *TaskManager) loadTasks(ctx context.Context) error {
 			bundle.Delete()
 			continue
 		}
-		binaryCall := shimBinary(ctx, bundle, container.Runtime.Name, m.containerdAddress, m.events, m.tasks)
+		binaryCall := shimBinary(ctx, bundle, container.Runtime.Name, m.containerdAddress, m.containerdTTRPCAddress, m.events, m.tasks)
 		shim, err := loadShim(ctx, bundle, m.events, m.tasks, func() {
 			log.G(ctx).WithField("id", id).Info("shim disconnected")
 			_, err := m.tasks.Get(ctx, id)

@@ -118,7 +118,7 @@ type service struct {
 	cancel func()
 }
 
-func newCommand(ctx context.Context, id, containerdBinary, containerdAddress string) (*exec.Cmd, error) {
+func newCommand(ctx context.Context, id, containerdBinary, containerdAddress, containerdTTRPCAddress string) (*exec.Cmd, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -135,6 +135,7 @@ func newCommand(ctx context.Context, id, containerdBinary, containerdAddress str
 		"-namespace", ns,
 		"-id", id,
 		"-address", containerdAddress,
+		"-ttrpc-address", containerdTTRPCAddress,
 	}
 	cmd := exec.Command(self, args...)
 	cmd.Dir = cwd
@@ -158,8 +159,8 @@ func readSpec() (*spec, error) {
 	return &s, nil
 }
 
-func (s *service) StartShim(ctx context.Context, id, containerdBinary, containerdAddress string) (string, error) {
-	cmd, err := newCommand(ctx, id, containerdBinary, containerdAddress)
+func (s *service) StartShim(ctx context.Context, id, containerdBinary, containerdAddress, containerdTTRPCAddress string) (string, error) {
+	cmd, err := newCommand(ctx, id, containerdBinary, containerdAddress, containerdTTRPCAddress)
 	if err != nil {
 		return "", err
 	}
