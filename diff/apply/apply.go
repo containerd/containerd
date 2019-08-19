@@ -19,10 +19,8 @@ package apply
 import (
 	"context"
 	"io"
-	"io/ioutil"
 	"time"
 
-	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/log"
@@ -94,15 +92,8 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 	rc := &readCounter{
 		r: io.TeeReader(processor, digester.Hash()),
 	}
-	if err := mount.WithTempMount(ctx, mounts, func(root string) error {
-		if _, err := archive.Apply(ctx, root, rc); err != nil {
-			return err
-		}
 
-		// Read any trailing data
-		_, err := io.Copy(ioutil.Discard, rc)
-		return err
-	}); err != nil {
+	if err := apply(ctx, mounts, rc); err != nil {
 		return emptyDesc, err
 	}
 
