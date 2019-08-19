@@ -55,6 +55,8 @@ type Config struct {
 	Cgroup CgroupConfig `toml:"cgroup"`
 	// ProxyPlugins configures plugins which are communicated to over GRPC
 	ProxyPlugins map[string]ProxyPlugin `toml:"proxy_plugins"`
+	// Timeouts specified as a duration
+	Timeouts map[string]string `toml:"timeouts"`
 
 	StreamProcessors []StreamProcessor `toml:"stream_processors"`
 
