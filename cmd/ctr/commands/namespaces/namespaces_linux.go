@@ -17,15 +17,15 @@
 package namespaces
 
 import (
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/runtime/opts"
 	"github.com/urfave/cli"
 )
 
 func deleteOpts(context *cli.Context) []namespaces.DeleteOpts {
-	var opts []namespaces.DeleteOpts
+	var delOpts []namespaces.DeleteOpts
 	if context.Bool("cgroup") {
-		opts = append(opts, containerd.WithNamespaceCgroupDeletion)
+		delOpts = append(delOpts, opts.WithNamespaceCgroupDeletion)
 	}
-	return opts
+	return delOpts
 }
