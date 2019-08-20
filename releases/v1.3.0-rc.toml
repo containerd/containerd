@@ -21,8 +21,9 @@ API. For clients, there are many new features and improvements completely
 implemented in the client libraries without requiring daemon upgrade.
 
 ### Runtime
-* **New Windows V2 runtime using [hcsshim](https://github.com/microsoft/hcsshim/tree/master/cmd/containerd-shim-runhcs-v1)**
+* **New Windows V2 runtime using shim API.** Adds support for the Windows runtime shims in containerd. *NOTE: while containerd's runtime is stable in this release, running Windows containers are not yet fully supported until the [runhcs shim](https://github.com/microsoft/hcsshim/tree/master/cmd/containerd-shim-runhcs-v1) is fully supported.*
 * **Improvements to ttrpc.** For better daemon to shim communication (https://github.com/containerd/containerd/pull/3341)
+* **Removed experimental Windows V1 runtime**
 
 ### Snapshots
 * **New Devmapper snapshotter** (https://github.com/containerd/containerd/pull/3022)
