@@ -645,36 +645,41 @@ func (s *service) checkProcesses(e runcC.Exit) {
 	defer s.mu.Unlock()
 
 	for _, container := range s.containers {
-		if container.HasPid(e.Pid) {
-			shouldKillAll, err := shouldKillAllOnExit(container.Bundle)
-			if err != nil {
-				log.G(s.context).WithError(err).Error("failed to check shouldKillAll")
+		if !container.HasPid(e.Pid) {
+			continue
+		}
+
+		for _, p := range container.All() {
+			if p.Pid() != e.Pid {
+				continue
 			}
 
-			for _, p := range container.All() {
-				if p.Pid() == e.Pid {
-					if shouldKillAll {
-						if ip, ok := p.(*process.Init); ok {
-							// Ensure all children are killed
-							if err := ip.KillAll(s.context); err != nil {
-								logrus.WithError(err).WithField("id", ip.ID()).
-									Error("failed to kill init's children")
-							}
-						}
+			if ip, ok := p.(*process.Init); ok {
+				shouldKillAll, err := shouldKillAllOnExit(container.Bundle)
+				if err != nil {
+					log.G(s.context).WithError(err).Error("failed to check shouldKillAll")
+				}
+
+				// Ensure all children are killed
+				if shouldKillAll {
+					if err := ip.KillAll(s.context); err != nil {
+						logrus.WithError(err).WithField("id", ip.ID()).
+							Error("failed to kill init's children")
 					}
-					p.SetExited(e.Status)
-					s.sendL(&eventstypes.TaskExit{
-						ContainerID: container.ID,
-						ID:          p.ID(),
-						Pid:         uint32(e.Pid),
-						ExitStatus:  uint32(e.Status),
-						ExitedAt:    p.ExitedAt(),
-					})
-					return
 				}
 			}
+
+			p.SetExited(e.Status)
+			s.sendL(&eventstypes.TaskExit{
+				ContainerID: container.ID,
+				ID:          p.ID(),
+				Pid:         uint32(e.Pid),
+				ExitStatus:  uint32(e.Status),
+				ExitedAt:    p.ExitedAt(),
+			})
 			return
 		}
+		return
 	}
 }
 
