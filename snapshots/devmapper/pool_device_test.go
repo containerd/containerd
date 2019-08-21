@@ -161,7 +161,9 @@ func TestPoolDeviceMarkFaulty(t *testing.T) {
 	err := store.AddDevice(testCtx, &DeviceInfo{Name: "1", State: Unknown})
 	assert.NilError(t, err)
 
-	err = store.AddDevice(testCtx, &DeviceInfo{Name: "2", State: Activated})
+	// Note: do not use 'Activated' here because pool.ensureDeviceStates() will
+	// try to activate the real dm device, which will fail on a faked device.
+	err = store.AddDevice(testCtx, &DeviceInfo{Name: "2", State: Deactivated})
 	assert.NilError(t, err)
 
 	pool := &PoolDevice{metadata: store}
@@ -177,7 +179,7 @@ func TestPoolDeviceMarkFaulty(t *testing.T) {
 			assert.Equal(t, Faulty, info.State)
 			assert.Equal(t, "1", info.Name)
 		case 2:
-			assert.Equal(t, Activated, info.State)
+			assert.Equal(t, Deactivated, info.State)
 			assert.Equal(t, "2", info.Name)
 		default:
 			t.Error("unexpected walk call")

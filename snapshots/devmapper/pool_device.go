@@ -73,23 +73,41 @@ func NewPoolDevice(ctx context.Context, config *Config) (*PoolDevice, error) {
 	return poolDevice, nil
 }
 
-// ensureDeviceStates marks devices with incomplete states (after crash) as 'Faulty'
+// ensureDeviceStates updates devices to their real state:
+//   - marks devices with incomplete states (after crash) as 'Faulty'
+//   - activates devices if they are marked as 'Activated' but the dm
+//     device is not active, which can happen to a stopped container
+//     after a reboot
 func (p *PoolDevice) ensureDeviceStates(ctx context.Context) error {
-	var devices []*DeviceInfo
+	var faultyDevices []*DeviceInfo
+	var activatedDevices []*DeviceInfo
 
 	if err := p.metadata.WalkDevices(ctx, func(info *DeviceInfo) error {
 		switch info.State {
-		case Activated, Suspended, Resumed, Deactivated, Removed, Faulty:
-			return nil
+		case Suspended, Resumed, Deactivated, Removed, Faulty:
+		case Activated:
+			activatedDevices = append(activatedDevices, info)
+		default:
+			faultyDevices = append(faultyDevices, info)
 		}
-		devices = append(devices, info)
 		return nil
 	}); err != nil {
 		return errors.Wrap(err, "failed to query devices from metastore")
 	}
 
 	var result *multierror.Error
-	for _, dev := range devices {
+	for _, dev := range activatedDevices {
+		if p.IsActivated(dev.Name) {
+			continue
+		}
+
+		log.G(ctx).Warnf("devmapper device %q marked as %q but not active, activating it", dev.Name, dev.State)
+		if err := p.activateDevice(ctx, dev); err != nil {
+			result = multierror.Append(result, err)
+		}
+	}
+
+	for _, dev := range faultyDevices {
 		log.G(ctx).
 			WithField("dev_id", dev.DeviceID).
 			WithField("parent", dev.ParentName).
@@ -350,7 +368,7 @@ func (p *PoolDevice) DeactivateDevice(ctx context.Context, deviceName string, de
 	return nil
 }
 
-// IsActivated returns true if thin-device is activated and not suspended
+// IsActivated returns true if thin-device is activated
 func (p *PoolDevice) IsActivated(deviceName string) bool {
 	infos, err := dmsetup.Info(deviceName)
 	if err != nil || len(infos) != 1 {
@@ -358,11 +376,11 @@ func (p *PoolDevice) IsActivated(deviceName string) bool {
 		return false
 	}
 
-	if devInfo := infos[0]; devInfo.Suspended {
-		return false
+	if devInfo := infos[0]; devInfo.TableLive {
+		return true
 	}
 
-	return true
+	return false
 }
 
 // IsLoaded returns true if thin-device is visible for dmsetup
