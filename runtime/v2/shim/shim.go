@@ -89,9 +89,12 @@ var (
 	socketFlag           string
 	bundlePath           string
 	addressFlag          string
-	ttrpcAddressFlag     string
 	containerdBinaryFlag string
 	action               string
+)
+
+const (
+	ttrpcAddressEnv = "TTRPC_ADDRESS"
 )
 
 func parseFlags() {
@@ -102,7 +105,6 @@ func parseFlags() {
 	flag.StringVar(&bundlePath, "bundle", "", "path to the bundle if not workdir")
 
 	flag.StringVar(&addressFlag, "address", "", "grpc address back to main containerd")
-	flag.StringVar(&ttrpcAddressFlag, "ttrpc-address", "", "ttrpc address back to main containerd")
 	flag.StringVar(&containerdBinaryFlag, "publish-binary", "containerd", "path to publish binary (used for publishing events)")
 
 	flag.Parse()
@@ -165,7 +167,9 @@ func run(id string, initFunc Init, config Config) error {
 		}
 	}
 
-	publisher, err := newPublisher(ttrpcAddressFlag)
+	ttrpcAddress := os.Getenv(ttrpcAddressEnv)
+
+	publisher, err := newPublisher(ttrpcAddress)
 	if err != nil {
 		return err
 	}
@@ -204,7 +208,7 @@ func run(id string, initFunc Init, config Config) error {
 		}
 		return nil
 	case "start":
-		address, err := service.StartShim(ctx, idFlag, containerdBinaryFlag, addressFlag, ttrpcAddressFlag)
+		address, err := service.StartShim(ctx, idFlag, containerdBinaryFlag, addressFlag, ttrpcAddress)
 		if err != nil {
 			return err
 		}

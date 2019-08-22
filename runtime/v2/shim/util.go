@@ -50,7 +50,6 @@ func Command(ctx context.Context, runtime, containerdAddress, containerdTTRPCAdd
 	args := []string{
 		"-namespace", ns,
 		"-address", containerdAddress,
-		"-ttrpc-address", containerdTTRPCAddress,
 		"-publish-binary", self,
 	}
 	args = append(args, cmdArgs...)
@@ -96,7 +95,11 @@ func Command(ctx context.Context, runtime, containerdAddress, containerdTTRPCAdd
 
 	cmd := exec.Command(cmdPath, args...)
 	cmd.Dir = path
-	cmd.Env = append(os.Environ(), "GOMAXPROCS=2")
+	cmd.Env = append(
+		os.Environ(),
+		"GOMAXPROCS=2",
+		fmt.Sprintf("%s=%s", ttrpcAddressEnv, containerdTTRPCAddress),
+	)
 	cmd.SysProcAttr = getSysProcAttr()
 	if opts != nil {
 		d, err := proto.Marshal(opts)
