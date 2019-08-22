@@ -135,7 +135,6 @@ func newCommand(ctx context.Context, id, containerdBinary, containerdAddress, co
 		"-namespace", ns,
 		"-id", id,
 		"-address", containerdAddress,
-		"-ttrpc-address", containerdTTRPCAddress,
 	}
 	cmd := exec.Command(self, args...)
 	cmd.Dir = cwd
