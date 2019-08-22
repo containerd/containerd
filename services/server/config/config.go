@@ -17,12 +17,15 @@
 package config
 
 import (
+	"path/filepath"
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/imdario/mergo"
+	"github.com/pkg/errors"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/plugin"
-	"github.com/pkg/errors"
 )
 
 // Config provides containerd configuration data for the server
@@ -57,6 +60,8 @@ type Config struct {
 	ProxyPlugins map[string]ProxyPlugin `toml:"proxy_plugins"`
 	// Timeouts specified as a duration
 	Timeouts map[string]string `toml:"timeouts"`
+	// Imports are additional file path list to config files that can overwrite main config file fields
+	Imports []string `toml:"imports"`
 
 	StreamProcessors []StreamProcessor `toml:"stream_processors"`
 
@@ -205,16 +210,102 @@ func (c *Config) Decode(p *plugin.Registration) (interface{}, error) {
 }
 
 // LoadConfig loads the containerd server config from the provided path
-func LoadConfig(path string, v *Config) error {
-	if v == nil {
-		return errors.Wrapf(errdefs.ErrInvalidArgument, "argument v must not be nil")
+func LoadConfig(path string, out *Config) error {
+	if out == nil {
+		return errors.Wrapf(errdefs.ErrInvalidArgument, "argument out must not be nil")
 	}
-	md, err := toml.DecodeFile(path, v)
+
+	var (
+		loaded  = map[string]bool{}
+		pending = []string{path}
+	)
+
+	for len(pending) > 0 {
+		path, pending = pending[0], pending[1:]
+
+		// Check if a file at the given path already loaded to prevent circular imports
+		if _, ok := loaded[path]; ok {
+			continue
+		}
+
+		config, err := loadConfigFile(path)
+		if err != nil {
+			return err
+		}
+
+		if err := mergeConfig(out, config); err != nil {
+			return err
+		}
+
+		imports, err := resolveImports(path, config.Imports)
+		if err != nil {
+			return err
+		}
+
+		loaded[path] = true
+		pending = append(pending, imports...)
+	}
+
+	// Fix up the list of config files loaded
+	out.Imports = []string{}
+	for path := range loaded {
+		out.Imports = append(out.Imports, path)
+	}
+
+	return out.ValidateV2()
+}
+
+// loadConfigFile decodes a TOML file at the given path
+func loadConfigFile(path string) (*Config, error) {
+	config := &Config{}
+	md, err := toml.DecodeFile(path, &config)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	v.md = md
-	return v.ValidateV2()
+	config.md = md
+	return config, nil
+}
+
+// resolveImports resolves import strings list to absolute paths list:
+// - If path contains *, glob pattern matching applied
+// - Non abs path is relative to parent config file directory
+// - Abs paths returned as is
+func resolveImports(parent string, imports []string) ([]string, error) {
+	var out []string
+
+	for _, path := range imports {
+		if strings.Contains(path, "*") {
+			matches, err := filepath.Glob(path)
+			if err != nil {
+				return nil, err
+			}
+
+			out = append(out, matches...)
+		} else {
+			path = filepath.Clean(path)
+			if !filepath.IsAbs(path) {
+				path = filepath.Join(filepath.Dir(parent), path)
+			}
+
+			out = append(out, path)
+		}
+	}
+
+	return out, nil
+}
+
+// mergeConfig merges Config structs with the following rules:
+// 'to'         'from'      'result'        overwrite?
+// ""           "value"     "value"         yes
+// "value"      ""          "value"         no
+// 1            0           1               no
+// 0            1           1               yes
+// []{"1"}      []{"2"}     []{"2"}         yes
+// []{"1"}      []{}        []{"1"}         no
+func mergeConfig(to, from *Config) error {
+	return mergo.Merge(to, from, func(config *mergo.Config) {
+		config.Overwrite = true
+	})
 }
 
 // V1DisabledFilter matches based on ID
