@@ -550,22 +550,12 @@ func (c *criService) setupPod(ctx context.Context, id string, path string, confi
 		return "", nil, errors.New("cni config not initialized")
 	}
 
-	labels := getPodCNILabels(id, config)
-
-	// Will return an error if the bandwidth limitation has the wrong unit
-	// or an unreasonable valure see validateBandwidthIsReasonable()
-	bandWidth, err := toCNIBandWidth(config.Annotations)
+	opts, err := cniNamespaceOpts(id, config)
 	if err != nil {
-		return "", nil, errors.Wrap(err, "failed to get bandwidth info from annotations")
+		return "", nil, errors.Wrap(err, "get cni namespace options")
 	}
 
-	result, err := c.netPlugin.Setup(ctx, id,
-		path,
-		cni.WithLabels(labels),
-		cni.WithCapabilityPortMap(toCNIPortMappings(config.GetPortMappings())),
-		cni.WithCapabilityBandWidth(*bandWidth),
-	)
-
+	result, err := c.netPlugin.Setup(ctx, id, path, opts...)
 	if err != nil {
 		return "", nil, err
 	}
@@ -581,11 +571,54 @@ func (c *criService) setupPod(ctx context.Context, id string, path string, confi
 	return "", result, errors.Errorf("failed to find network info for sandbox %q", id)
 }
 
+// cniNamespaceOpts get CNI namespace options from sandbox config.
+func cniNamespaceOpts(id string, config *runtime.PodSandboxConfig) ([]cni.NamespaceOpts, error) {
+	opts := []cni.NamespaceOpts{
+		cni.WithLabels(toCNILabels(id, config)),
+	}
+
+	portMappings := toCNIPortMappings(config.GetPortMappings())
+	if len(portMappings) > 0 {
+		opts = append(opts, cni.WithCapabilityPortMap(portMappings))
+	}
+
+	// Will return an error if the bandwidth limitation has the wrong unit
+	// or an unreasonable value see validateBandwidthIsReasonable()
+	bandWidth, err := toCNIBandWidth(config.Annotations)
+	if err != nil {
+		return nil, err
+	}
+	if bandWidth != nil {
+		opts = append(opts, cni.WithCapabilityBandWidth(*bandWidth))
+	}
+
+	dns := toCNIDNS(config.GetDnsConfig())
+	if dns != nil {
+		opts = append(opts, cni.WithCapabilityDNS(*dns))
+	}
+
+	return opts, nil
+}
+
+// toCNILabels adds pod metadata into CNI labels.
+func toCNILabels(id string, config *runtime.PodSandboxConfig) map[string]string {
+	return map[string]string{
+		"K8S_POD_NAMESPACE":          config.GetMetadata().GetNamespace(),
+		"K8S_POD_NAME":               config.GetMetadata().GetName(),
+		"K8S_POD_INFRA_CONTAINER_ID": id,
+		"IgnoreUnknown":              "1",
+	}
+}
+
 // toCNIBandWidth converts CRI annotations to CNI bandwidth.
 func toCNIBandWidth(annotations map[string]string) (*cni.BandWidth, error) {
 	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(annotations)
 	if err != nil {
-		return nil, errors.Errorf("reading pod bandwidth annotations: %v", err)
+		return nil, errors.Wrap(err, "reading pod bandwidth annotations")
+	}
+
+	if ingress == nil && egress == nil {
+		return nil, nil
 	}
 
 	bandWidth := &cni.BandWidth{}
@@ -621,6 +654,18 @@ func toCNIPortMappings(criPortMappings []*runtime.PortMapping) []cni.PortMapping
 		})
 	}
 	return portMappings
+}
+
+// toCNIDNS converts CRI DNSConfig to CNI.
+func toCNIDNS(dns *runtime.DNSConfig) *cni.DNS {
+	if dns == nil {
+		return nil
+	}
+	return &cni.DNS{
+		Servers:  dns.GetServers(),
+		Searches: dns.GetSearches(),
+		Options:  dns.GetOptions(),
+	}
 }
 
 // selectPodIP select an ip from the ip list. It prefers ipv4 more than ipv6.
