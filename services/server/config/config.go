@@ -37,6 +37,8 @@ type Config struct {
 	PluginDir string `toml:"plugin_dir"`
 	// GRPC configuration settings
 	GRPC GRPCConfig `toml:"grpc"`
+	// TTRPC configuration settings
+	TTRPC TTRPCConfig `toml:"ttrpc"`
 	// Debug and profiling settings
 	Debug Debug `toml:"debug"`
 	// Metrics and monitoring settings
@@ -123,6 +125,13 @@ type GRPCConfig struct {
 	GID            int    `toml:"gid"`
 	MaxRecvMsgSize int    `toml:"max_recv_message_size"`
 	MaxSendMsgSize int    `toml:"max_send_message_size"`
+}
+
+// TTRPCConfig provides TTRPC configuration for the socket
+type TTRPCConfig struct {
+	Address string `toml:"address"`
+	UID     int    `toml:"uid"`
+	GID     int    `toml:"gid"`
 }
 
 // Debug provides debug configuration

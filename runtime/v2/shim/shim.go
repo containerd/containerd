@@ -57,7 +57,7 @@ type Init func(context.Context, string, Publisher, func()) (Shim, error)
 type Shim interface {
 	shimapi.TaskService
 	Cleanup(ctx context.Context) (*shimapi.DeleteResponse, error)
-	StartShim(ctx context.Context, id, containerdBinary, containerdAddress string) (string, error)
+	StartShim(ctx context.Context, id, containerdBinary, containerdAddress, containerdTTRPCAddress string) (string, error)
 }
 
 // OptsKey is the context key for the Opts value.
@@ -89,6 +89,7 @@ var (
 	socketFlag           string
 	bundlePath           string
 	addressFlag          string
+	ttrpcAddressFlag     string
 	containerdBinaryFlag string
 	action               string
 )
@@ -101,6 +102,7 @@ func parseFlags() {
 	flag.StringVar(&bundlePath, "bundle", "", "path to the bundle if not workdir")
 
 	flag.StringVar(&addressFlag, "address", "", "grpc address back to main containerd")
+	flag.StringVar(&ttrpcAddressFlag, "ttrpc-address", "", "ttrpc address back to main containerd")
 	flag.StringVar(&containerdBinaryFlag, "publish-binary", "containerd", "path to publish binary (used for publishing events)")
 
 	flag.Parse()
@@ -163,8 +165,7 @@ func run(id string, initFunc Init, config Config) error {
 		}
 	}
 
-	address := fmt.Sprintf("%s.ttrpc", addressFlag)
-	publisher, err := newPublisher(address)
+	publisher, err := newPublisher(ttrpcAddressFlag)
 	if err != nil {
 		return err
 	}
@@ -203,7 +204,7 @@ func run(id string, initFunc Init, config Config) error {
 		}
 		return nil
 	case "start":
-		address, err := service.StartShim(ctx, idFlag, containerdBinaryFlag, addressFlag)
+		address, err := service.StartShim(ctx, idFlag, containerdBinaryFlag, addressFlag, ttrpcAddressFlag)
 		if err != nil {
 			return err
 		}

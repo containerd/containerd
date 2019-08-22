@@ -38,7 +38,7 @@ import (
 var runtimePaths sync.Map
 
 // Command returns the shim command with the provided args and configuration
-func Command(ctx context.Context, runtime, containerdAddress, path string, opts *types.Any, cmdArgs ...string) (*exec.Cmd, error) {
+func Command(ctx context.Context, runtime, containerdAddress, containerdTTRPCAddress, path string, opts *types.Any, cmdArgs ...string) (*exec.Cmd, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -50,6 +50,7 @@ func Command(ctx context.Context, runtime, containerdAddress, path string, opts 
 	args := []string{
 		"-namespace", ns,
 		"-address", containerdAddress,
+		"-ttrpc-address", containerdTTRPCAddress,
 		"-publish-binary", self,
 	}
 	args = append(args, cmdArgs...)

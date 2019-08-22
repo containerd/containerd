@@ -154,6 +154,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		)
 		initContext.Events = s.events
 		initContext.Address = config.GRPC.Address
+		initContext.TTRPCAddress = config.TTRPC.Address
 
 		// load the plugin specific configuration if it is provided
 		if p.Config != nil {

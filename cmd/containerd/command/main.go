@@ -148,12 +148,15 @@ func App() *cli.App {
 		for _, w := range warnings {
 			log.G(ctx).WithError(w).Warn("cleanup temp mount")
 		}
-		var (
-			address      = config.GRPC.Address
-			ttrpcAddress = fmt.Sprintf("%s.ttrpc", config.GRPC.Address)
-		)
-		if address == "" {
+
+		if config.GRPC.Address == "" {
 			return errors.Wrap(errdefs.ErrInvalidArgument, "grpc address cannot be empty")
+		}
+		if config.TTRPC.Address == "" {
+			// If TTRPC was not explicitly configured, use defaults based on GRPC.
+			config.TTRPC.Address = fmt.Sprintf("%s.ttrpc", config.GRPC.Address)
+			config.TTRPC.UID = config.GRPC.UID
+			config.TTRPC.GID = config.GRPC.GID
 		}
 		log.G(ctx).WithFields(logrus.Fields{
 			"version":  version.Version,
@@ -193,7 +196,7 @@ func App() *cli.App {
 			serve(ctx, l, server.ServeMetrics)
 		}
 		// setup the ttrpc endpoint
-		tl, err := sys.GetLocalListener(ttrpcAddress, config.GRPC.UID, config.GRPC.GID)
+		tl, err := sys.GetLocalListener(config.TTRPC.Address, config.TTRPC.UID, config.TTRPC.GID)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get listener for main ttrpc endpoint")
 		}
@@ -207,7 +210,7 @@ func App() *cli.App {
 			serve(ctx, l, server.ServeTCP)
 		}
 		// setup the main grpc endpoint
-		l, err := sys.GetLocalListener(address, config.GRPC.UID, config.GRPC.GID)
+		l, err := sys.GetLocalListener(config.GRPC.Address, config.GRPC.UID, config.GRPC.GID)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get listener for main endpoint")
 		}
