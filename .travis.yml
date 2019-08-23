@@ -34,7 +34,6 @@ addons:
       - libprotobuf-c0-dev
       - libprotobuf-dev
       - socat
-      - libseccomp-dev
 
 env:
   - TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runc.v1 TRAVIS_CGO_ENABLED=1
@@ -52,6 +51,7 @@ install:
   - go get -u github.com/vbatts/git-validation
   - go get -u github.com/kunalkushwaha/ltag
   - go get -u github.com/LK4D4/vndr
+  - if [ "$TRAVIS_GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-seccomp ; fi
   - if [ "$TRAVIS_GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-runc ; fi
   - if [ "$TRAVIS_GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-cni ; fi
   - if [ "$TRAVIS_GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-critools ; fi
