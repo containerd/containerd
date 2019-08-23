@@ -195,11 +195,10 @@ func WithMaxConcurrentDownloads(max int) RemoteOpt {
 	}
 }
 
-// WithAppendDistributionSourceLabel allows fetcher to add distribute source
-// label for each blob content, which doesn't work for legacy schema1.
-func WithAppendDistributionSourceLabel() RemoteOpt {
+// WithAllMetadata downloads all manifests and known-configuration files
+func WithAllMetadata() RemoteOpt {
 	return func(_ *Client, c *RemoteContext) error {
-		c.AppendDistributionSourceLabel = true
+		c.AllMetadata = true
 		return nil
 	}
 }

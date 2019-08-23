@@ -99,9 +99,7 @@ func TestImagePullWithDistSourceLabel(t *testing.T) {
 	pMatcher := platforms.Default()
 
 	// pull content without unpack and add distribution source label
-	image, err := client.Pull(ctx, imageName,
-		WithPlatformMatcher(pMatcher),
-		WithAppendDistributionSourceLabel())
+	image, err := client.Pull(ctx, imageName, WithPlatformMatcher(pMatcher))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +181,7 @@ func TestImageUsage(t *testing.T) {
 	imageName = imageName + "@" + image.Target().Digest.String()
 
 	// Fetch single platforms, but all manifests pulled
-	if _, err := client.Fetch(ctx, imageName, WithPlatformMatcher(testPlatform)); err != nil {
+	if _, err := client.Fetch(ctx, imageName, WithPlatformMatcher(testPlatform), WithAllMetadata()); err != nil {
 		t.Fatal(err)
 	}
 

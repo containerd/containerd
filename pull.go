@@ -140,7 +140,7 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 		childrenHandler := images.ChildrenHandler(store)
 		// Set any children labels for that content
 		childrenHandler = images.SetChildrenLabels(store, childrenHandler)
-		if rCtx.AppendDistributionSourceLabel {
+		if rCtx.AllMetadata {
 			// Filter manifests by platforms but allow to handle manifest
 			// and configuration for not-target platforms
 			childrenHandler = remotes.FilterManifestByPlatformHandler(childrenHandler, rCtx.PlatformMatcher)
@@ -164,21 +164,17 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 			},
 		)
 
+		appendDistSrcLabelHandler, err := docker.AppendDistributionSourceLabel(store, ref)
+		if err != nil {
+			return images.Image{}, err
+		}
+
 		handlers := append(rCtx.BaseHandlers,
 			remotes.FetchHandler(store, fetcher),
 			convertibleHandler,
 			childrenHandler,
+			appendDistSrcLabelHandler,
 		)
-
-		// append distribution source label to blob data
-		if rCtx.AppendDistributionSourceLabel {
-			appendDistSrcLabelHandler, err := docker.AppendDistributionSourceLabel(store, ref)
-			if err != nil {
-				return images.Image{}, err
-			}
-
-			handlers = append(handlers, appendDistSrcLabelHandler)
-		}
 
 		handler = images.Handlers(handlers...)
 

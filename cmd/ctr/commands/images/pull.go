@@ -51,11 +51,11 @@ command. As part of this process, we do the following:
 		},
 		cli.BoolFlag{
 			Name:  "all-platforms",
-			Usage: "pull content from all platforms",
+			Usage: "pull content and metadata from all platforms",
 		},
 		cli.BoolFlag{
-			Name:  "all-manifests",
-			Usage: "Pull manifests from all platforms and layers for a specific platform",
+			Name:  "all-metadata",
+			Usage: "Pull metadata for all platforms",
 		},
 	),
 	Action: func(context *cli.Context) error {
