@@ -35,12 +35,14 @@ func TestMergeConfigs(t *testing.T) {
 		DisabledPlugins: []string{"old_plugin"},
 		State:           "old_state",
 		OOMScore:        1,
+		Timeouts:        map[string]string{"a": "1"},
 	}
 
 	b := &Config{
 		Root:            "new_root",
 		RequiredPlugins: []string{"new_plugin1", "new_plugin2"},
 		OOMScore:        2,
+		Timeouts:        map[string]string{"b": "2"},
 	}
 
 	err := mergeConfig(a, b)
@@ -50,8 +52,9 @@ func TestMergeConfigs(t *testing.T) {
 	assert.Equal(t, a.Root, "new_root")
 	assert.Equal(t, a.State, "old_state")
 	assert.Equal(t, a.OOMScore, 2)
-	assert.DeepEqual(t, a.RequiredPlugins, []string{"new_plugin1", "new_plugin2"})
+	assert.DeepEqual(t, a.RequiredPlugins, []string{"old_plugin", "new_plugin1", "new_plugin2"})
 	assert.DeepEqual(t, a.DisabledPlugins, []string{"old_plugin"})
+	assert.DeepEqual(t, a.Timeouts, map[string]string{"a": "1", "b": "2"})
 }
 
 func TestResolveImports(t *testing.T) {
