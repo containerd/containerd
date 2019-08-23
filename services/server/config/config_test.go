@@ -23,6 +23,8 @@ import (
 	"testing"
 
 	"gotest.tools/assert"
+
+	"github.com/containerd/containerd/plugin"
 )
 
 func TestMergeConfigs(t *testing.T) {
@@ -160,4 +162,29 @@ imports = ["data1.toml", "data2.toml"]
 		filepath.Join(tempDir, "data1.toml"),
 		filepath.Join(tempDir, "data2.toml"),
 	}, out.Imports)
+}
+
+func TestDecodePlugin(t *testing.T) {
+	data := `
+version = 1
+[plugins.linux]
+  shim_debug = true
+`
+
+	tempDir, err := ioutil.TempDir("", "containerd_")
+	assert.NilError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	path := filepath.Join(tempDir, "config.toml")
+	err = ioutil.WriteFile(path, []byte(data), 0600)
+	assert.NilError(t, err)
+
+	var out Config
+	err = LoadConfig(path, &out)
+	assert.NilError(t, err)
+
+	pluginConfig := map[string]interface{}{}
+	_, err = out.Decode(&plugin.Registration{ID: "linux", Config: &pluginConfig})
+	assert.NilError(t, err)
+	assert.Equal(t, true, pluginConfig["shim_debug"])
 }

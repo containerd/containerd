@@ -64,8 +64,6 @@ type Config struct {
 	Imports []string `toml:"imports"`
 
 	StreamProcessors []StreamProcessor `toml:"stream_processors"`
-
-	md toml.MetaData
 }
 
 // StreamProcessor provides configuration for diff content processors
@@ -203,7 +201,7 @@ func (c *Config) Decode(p *plugin.Registration) (interface{}, error) {
 	if !ok {
 		return p.Config, nil
 	}
-	if err := c.md.PrimitiveDecode(data, p.Config); err != nil {
+	if err := toml.PrimitiveDecode(data, p.Config); err != nil {
 		return nil, err
 	}
 	return p.Config, nil
@@ -258,11 +256,10 @@ func LoadConfig(path string, out *Config) error {
 // loadConfigFile decodes a TOML file at the given path
 func loadConfigFile(path string) (*Config, error) {
 	config := &Config{}
-	md, err := toml.DecodeFile(path, &config)
+	_, err := toml.DecodeFile(path, &config)
 	if err != nil {
 		return nil, err
 	}
-	config.md = md
 	return config, nil
 }
 
