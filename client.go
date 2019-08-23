@@ -294,6 +294,7 @@ type RemoteContext struct {
 	PlatformMatcher platforms.MatchComparer
 
 	// Unpack is done after an image is pulled to extract into a snapshotter.
+	// It is done simultaneously for schema 2 images when they are pulled.
 	// If an image is not unpacked on pull, it can be unpacked any time
 	// afterwards. Unpacking is required to run an image.
 	Unpack bool
