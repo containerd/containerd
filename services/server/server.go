@@ -89,8 +89,8 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, p := range config.StreamProcessors {
-		diff.RegisterProcessor(diff.BinaryHandler(p.ID, p.Returns, p.Accepts, p.Path, p.Args))
+	for id, p := range config.StreamProcessors {
+		diff.RegisterProcessor(diff.BinaryHandler(id, p.Returns, p.Accepts, p.Path, p.Args))
 	}
 
 	serverOpts := []grpc.ServerOption{
