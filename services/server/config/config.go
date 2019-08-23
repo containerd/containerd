@@ -65,13 +65,11 @@ type Config struct {
 	// Imports are additional file path list to config files that can overwrite main config file fields
 	Imports []string `toml:"imports"`
 
-	StreamProcessors []StreamProcessor `toml:"stream_processors"`
+	StreamProcessors map[string]StreamProcessor `toml:"stream_processors"`
 }
 
 // StreamProcessor provides configuration for diff content processors
 type StreamProcessor struct {
-	// ID of the processor, also used to fetch the specific payload
-	ID string `toml:"id"`
 	// Accepts specific media-types
 	Accepts []string `toml:"accepts"`
 	// Returns the media-type

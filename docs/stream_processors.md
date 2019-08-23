@@ -21,20 +21,20 @@ pipe's path set as the value of the environment variable `STREAM_PROCESSOR_PIPE`
 ## Configuration
 
 To configure stream processors for containerd, entries in the config file need to be made.
-The `stream_processors` field is an array so that users can chain together multiple processors
+The `stream_processors` field is a map so that users can chain together multiple processors
 to mutate content streams.
 
 Processor Fields:
 
-* `id` - ID of the processor, used for passing a specific payload to the processor.
+* Key - ID of the processor, used for passing a specific payload to the processor.
 * `accepts` - Accepted media-types for the processor that it can handle.
 * `returns` - The media-type that the processor returns.
 * `path` - Path to the processor binary.
 * `args` - Arguments passed to the processor binary.
 
 ```toml
-[[stream_processors]]
-	id = "io.containerd.processor.v1.pigz"
+[stream_processors]
+  [stream_processors."io.containerd.processor.v1.pigz"]
 	accepts = ["application/vnd.docker.image.rootfs.diff.tar.gzip"]
 	returns = "application/vnd.oci.image.layer.v1.tar"
 	path = "unpigz"

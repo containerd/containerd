@@ -86,6 +86,11 @@ func TestLoadSingleConfig(t *testing.T) {
 	data := `
 version = 2
 root = "/var/lib/containerd"
+
+[stream_processors]
+  [stream_processors."io.containerd.processor.v1.pigz"]
+	accepts = ["application/vnd.docker.image.rootfs.diff.tar.gzip"]
+	path = "unpigz"
 `
 	tempDir, err := ioutil.TempDir("", "containerd_")
 	assert.NilError(t, err)
@@ -100,6 +105,12 @@ root = "/var/lib/containerd"
 	assert.NilError(t, err)
 	assert.Equal(t, 2, out.Version)
 	assert.Equal(t, "/var/lib/containerd", out.Root)
+	assert.DeepEqual(t, map[string]StreamProcessor{
+		"io.containerd.processor.v1.pigz": {
+			Accepts: []string{"application/vnd.docker.image.rootfs.diff.tar.gzip"},
+			Path:    "unpigz",
+		},
+	}, out.StreamProcessors)
 }
 
 func TestLoadConfigWithImports(t *testing.T) {
