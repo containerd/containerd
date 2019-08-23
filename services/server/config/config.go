@@ -306,8 +306,27 @@ func resolveImports(parent string, imports []string) ([]string, error) {
 // 0            1           1
 // []{"1"}      []{"2"}     []{"1","2"}
 // []{"1"}      []{}        []{"1"}
+// Maps merged by keys, but values are replaced entirely.
 func mergeConfig(to, from *Config) error {
-	return mergo.Merge(to, from, mergo.WithOverride, mergo.WithAppendSlice)
+	err := mergo.Merge(to, from, mergo.WithOverride, mergo.WithAppendSlice)
+	if err != nil {
+		return err
+	}
+
+	// Replace entire sections instead of merging map's values.
+	for k, v := range from.Plugins {
+		to.Plugins[k] = v
+	}
+
+	for k, v := range from.StreamProcessors {
+		to.StreamProcessors[k] = v
+	}
+
+	for k, v := range from.ProxyPlugins {
+		to.ProxyPlugins[k] = v
+	}
+
+	return nil
 }
 
 // V1DisabledFilter matches based on ID
