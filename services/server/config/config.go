@@ -301,17 +301,15 @@ func resolveImports(parent string, imports []string) ([]string, error) {
 }
 
 // mergeConfig merges Config structs with the following rules:
-// 'to'         'from'      'result'        overwrite?
-// ""           "value"     "value"         yes
-// "value"      ""          "value"         no
-// 1            0           1               no
-// 0            1           1               yes
-// []{"1"}      []{"2"}     []{"2"}         yes
-// []{"1"}      []{}        []{"1"}         no
+// 'to'         'from'      'result'
+// ""           "value"     "value"
+// "value"      ""          "value"
+// 1            0           1
+// 0            1           1
+// []{"1"}      []{"2"}     []{"1","2"}
+// []{"1"}      []{}        []{"1"}
 func mergeConfig(to, from *Config) error {
-	return mergo.Merge(to, from, func(config *mergo.Config) {
-		config.Overwrite = true
-	})
+	return mergo.Merge(to, from, mergo.WithOverride, mergo.WithAppendSlice)
 }
 
 // V1DisabledFilter matches based on ID
