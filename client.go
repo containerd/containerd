@@ -333,9 +333,8 @@ type RemoteContext struct {
 	// MaxConcurrentDownloads is the max concurrent content downloads for each pull.
 	MaxConcurrentDownloads int
 
-	// AppendDistributionSourceLabel allows fetcher to add distribute source
-	// label for each blob content, which doesn't work for legacy schema1.
-	AppendDistributionSourceLabel bool
+	// AllMetadata downloads all manifests and known-configuration files
+	AllMetadata bool
 }
 
 func defaultRemoteContext() *RemoteContext {
