@@ -29,20 +29,22 @@ import (
 
 func TestMergeConfigs(t *testing.T) {
 	a := &Config{
-		Version:         2,
-		Root:            "old_root",
-		RequiredPlugins: []string{"old_plugin"},
-		DisabledPlugins: []string{"old_plugin"},
-		State:           "old_state",
-		OOMScore:        1,
-		Timeouts:        map[string]string{"a": "1"},
+		Version:          2,
+		Root:             "old_root",
+		RequiredPlugins:  []string{"old_plugin"},
+		DisabledPlugins:  []string{"old_plugin"},
+		State:            "old_state",
+		OOMScore:         1,
+		Timeouts:         map[string]string{"a": "1"},
+		StreamProcessors: map[string]StreamProcessor{"1": {Path: "2", Returns: "4"}, "2": {Path: "5"}},
 	}
 
 	b := &Config{
-		Root:            "new_root",
-		RequiredPlugins: []string{"new_plugin1", "new_plugin2"},
-		OOMScore:        2,
-		Timeouts:        map[string]string{"b": "2"},
+		Root:             "new_root",
+		RequiredPlugins:  []string{"new_plugin1", "new_plugin2"},
+		OOMScore:         2,
+		Timeouts:         map[string]string{"b": "2"},
+		StreamProcessors: map[string]StreamProcessor{"1": {Path: "3"}},
 	}
 
 	err := mergeConfig(a, b)
@@ -55,6 +57,7 @@ func TestMergeConfigs(t *testing.T) {
 	assert.DeepEqual(t, a.RequiredPlugins, []string{"old_plugin", "new_plugin1", "new_plugin2"})
 	assert.DeepEqual(t, a.DisabledPlugins, []string{"old_plugin"})
 	assert.DeepEqual(t, a.Timeouts, map[string]string{"a": "1", "b": "2"})
+	assert.DeepEqual(t, a.StreamProcessors, map[string]StreamProcessor{"1": {Path: "3"}, "2": {Path: "5"}})
 }
 
 func TestResolveImports(t *testing.T) {
