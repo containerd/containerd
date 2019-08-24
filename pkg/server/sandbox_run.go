@@ -29,6 +29,7 @@ import (
 	cni "github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -157,6 +158,18 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, errors.Wrap(err, "failed to generate sandbox container spec")
 	}
 	log.G(ctx).Debugf("Sandbox container %q spec: %#+v", id, spew.NewFormatter(spec))
+	sandbox.ProcessLabel = spec.Process.SelinuxLabel
+	defer func() {
+		if retErr != nil {
+			_ = label.ReleaseLabel(sandbox.ProcessLabel)
+		}
+	}()
+
+	if config.GetLinux().GetSecurityContext().GetPrivileged() {
+		// If privileged don't set selinux label, but we still record the MCS label so that
+		// the unused label can be freed later.
+		spec.Process.SelinuxLabel = ""
+	}
 
 	// Generate spec options that will be applied to the spec later.
 	specOpts, err := c.sandboxContainerSpecOpts(config, &image.ImageSpec.Config)

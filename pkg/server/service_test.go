@@ -23,6 +23,7 @@ import (
 	servertesting "github.com/containerd/cri/pkg/server/testing"
 	containerstore "github.com/containerd/cri/pkg/store/container"
 	imagestore "github.com/containerd/cri/pkg/store/image"
+	"github.com/containerd/cri/pkg/store/label"
 	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
 	snapshotstore "github.com/containerd/cri/pkg/store/snapshot"
 )
@@ -39,6 +40,7 @@ const (
 
 // newTestCRIService creates a fake criService for test.
 func newTestCRIService() *criService {
+	labels := label.NewStore()
 	return &criService{
 		config: criconfig.Config{
 			RootDir:  testRootDir,
@@ -49,11 +51,11 @@ func newTestCRIService() *criService {
 		},
 		imageFSPath:        testImageFSPath,
 		os:                 ostesting.NewFakeOS(),
-		sandboxStore:       sandboxstore.NewStore(),
+		sandboxStore:       sandboxstore.NewStore(labels),
 		imageStore:         imagestore.NewStore(nil),
 		snapshotStore:      snapshotstore.NewStore(),
 		sandboxNameIndex:   registrar.NewRegistrar(),
-		containerStore:     containerstore.NewStore(),
+		containerStore:     containerstore.NewStore(labels),
 		containerNameIndex: registrar.NewRegistrar(),
 		netPlugin:          servertesting.NewFakeCNIPlugin(),
 	}

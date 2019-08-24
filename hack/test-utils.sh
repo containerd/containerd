@@ -23,6 +23,15 @@ CONTAINERD_FLAGS="--log-level=debug "
 
 # Use a configuration file for containerd.
 CONTAINERD_CONFIG_FILE=${CONTAINERD_CONFIG_FILE:-""}
+if [ -z "${CONTAINERD_CONFIG_FILE}" ] && command -v sestatus >/dev/null 2>&1; then
+  selinux_config="/tmp/containerd-config-selinux.toml"
+  cat >${selinux_config} <<<'
+[plugins.cri]
+  enable_selinux = true
+'
+  CONTAINERD_CONFIG_FILE=${CONTAINERD_CONFIG_FILE:-"${selinux_config}"}
+fi
+
 # CONTAINERD_TEST_SUFFIX is the suffix appended to the root/state directory used
 # by test containerd.
 CONTAINERD_TEST_SUFFIX=${CONTAINERD_TEST_SUFFIX:-"-test"}
