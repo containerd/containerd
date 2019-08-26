@@ -113,6 +113,12 @@ func (u *unpacker) unpack(ctx context.Context, config ocispec.Descriptor, layers
 			if states[i].layer.Blob.Digest != layer.Digest {
 				continue
 			}
+			// Different layers may have the same digest. When that
+			// happens, we should continue marking the next layer
+			// as downloaded.
+			if states[i].downloaded {
+				continue
+			}
 			states[i].downloaded = true
 			break
 		}
