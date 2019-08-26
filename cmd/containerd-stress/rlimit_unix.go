@@ -31,6 +31,9 @@ func setRlimit() error {
 		}
 		if limit.Cur < rlimit {
 			limit.Cur = rlimit
+			if limit.Max < limit.Cur {
+				limit.Max = limit.Cur
+			}
 			if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
 				return err
 			}
