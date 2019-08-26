@@ -78,6 +78,14 @@ func WithImage(i Image) NewContainerOpts {
 	}
 }
 
+// WithImageName allows setting the image name as the base for the container
+func WithImageName(n string) NewContainerOpts {
+	return func(ctx context.Context, _ *Client, c *containers.Container) error {
+		c.Image = n
+		return nil
+	}
+}
+
 // WithContainerLabels adds the provided labels to the container
 func WithContainerLabels(labels map[string]string) NewContainerOpts {
 	return func(_ context.Context, _ *Client, c *containers.Container) error {
