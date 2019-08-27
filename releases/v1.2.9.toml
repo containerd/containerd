@@ -1,0 +1,47 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.2.8"
+
+pre_release = false
+
+preface = """\
+The ninth patch release for `containerd` 1.2 provides a handful of bug fixes and an
+update to the gRPC vendored codebase to include 3 CVE fixes provided in the upstream
+v1.23.0 release of gRPC. Note that updating gRPC to the current release required small
+changes to our core containerd codebase to match the upstream changes since gRPC v1.12.0.
+These changes have been backported from containerd's master branch, as well as a
+similar small change in ttrpc, requiring that package's vendoring to be updated.
+
+In addition to the gRPC update to include CVE fixes, fixes were made to correct a
+container's default Unix environment (introduced in 1.2.8), a small list of CRI plugin
+fixes, as well as fixes for registry interactions where `Docker-Content-Digest` is not
+returned (e.g. GitHub Package Registry), and a tar archive modification time bug found
+by the buildkit maintainers. A fix to the zfs snapshotter was also included via a
+re-vendoring of containerd's zfs import. More notes on these fixes are found below.
+
+### Notable Updates
+* Cherry-pick update to gRPC 1.23.0. [PR #3586](https://github.com/containerd/containerd/pull/3586) {cherry-picked from changes in master PRs [#3192](https://github.com/containerd/containerd/pull/3192) and [#3581](https://github.com/containerd/containerd/pull/3581)}.
+  - Fixes [grpc/grpc-go#2970](https://github.com/grpc/grpc-go/pull/2970) transport: block reading frames when too many transport control frames are queued.
+  - Addresses CVE-2019-9512 (Ping Flood), CVE-2019-9514 (Reset Flood), and CVE-2019-9515 (Settings Flood).
+  - Other changes can be found in the [gRPC release notes](https://github.com/grpc/grpc-go/releases/tag/v1.23.0).
+
+* CRI fixes:
+  - Fix a bug that the default apparmor profile is mistakenly applied to privileged containers with runtime/default specified. [containerd/cri#1239](https://github.com/containerd/cri/issues/1239)
+  - Fix a bug that image can't be pulled if an empty AuthConfig is specified. [containerd/cri#1249](https://github.com/containerd/cri/issues/1249)
+
+* Bug fix: Compute manifest data when not provided (Docker-Content-Digest header missing). [PR #3591](https://github.com/containerd/containerd/pull/3591) {cherry-picked from master [PR #3245](https://github.com/containerd/containerd/pull/3245) with backports of [#2871](https://github.com/containerd/containerd/pull/2871) and [#3335](https://github.com/containerd/containerd/pull/3335) required}.
+* Bug fix: Use default UNIX env when image has no environment. [PR #3601](https://github.com/containerd/containerd/pull/3601) {cherry-picked from master branch [PR #3599](https://github.com/containerd/containerd/pull/3599)}.
+* Bug fix: archive: truncate modification time. [PR #3602](https://github.com/containerd/containerd/pull/3602) {cherry-picked from master branch [PR #3589](https://github.com/containerd/containerd/pull/3589)}.
+* Bug fix: zfs: Datasets don't seem to be cleaned up properly on image removal. Reported in [containerd/zfs#22](https://github.com/containerd/zfs/issues/22) and fixed by [PR containerd/zfs#24](https://github.com/containerd/zfs/pull/24) and re-vendored into containerd `release/1.2` via [PR #3596](https://github.com/containerd/containerd/pull/3596).
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
