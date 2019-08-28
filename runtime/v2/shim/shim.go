@@ -169,7 +169,7 @@ func run(id string, initFunc Init, config Config) error {
 
 	ttrpcAddress := os.Getenv(ttrpcAddressEnv)
 
-	publisher, err := newPublisher(ttrpcAddress)
+	publisher, err := NewPublisher(ttrpcAddress)
 	if err != nil {
 		return err
 	}
