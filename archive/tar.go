@@ -504,6 +504,12 @@ func (cw *changeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 
 		hdr.Mode = int64(chmodTarEntry(os.FileMode(hdr.Mode)))
 
+		// truncate timestamp for compatibility. without PAX stdlib rounds timestamps instead
+		hdr.Format = tar.FormatPAX
+		hdr.ModTime = hdr.ModTime.Truncate(time.Second)
+		hdr.AccessTime = time.Time{}
+		hdr.ChangeTime = time.Time{}
+
 		name := p
 		if strings.HasPrefix(name, string(filepath.Separator)) {
 			name, err = filepath.Rel(string(filepath.Separator), name)
