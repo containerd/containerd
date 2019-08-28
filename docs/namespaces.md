@@ -64,7 +64,7 @@ Note that currently only these two labels are used to configure the defaults and
 
 If we need to inspect containers, images, or other resources in various namespaces the `ctr` tool allows you to do this.
 Simply set the `--namespace,-n` flag on `ctr` to change the namespace. If you do not provide a namespace, `ctr` client commands
-will all use the the default namespace, which is simply named "`default`".
+will all use the default namespace, which is simply named "`default`".
 
 ```bash
 > sudo ctr -n docker tasks
