@@ -29,7 +29,6 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/reference"
 	"github.com/containerd/containerd/remotes"
-	"github.com/containerd/containerd/version"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -106,7 +105,6 @@ func DefaultHost(ns string) (string, error) {
 type dockerResolver struct {
 	auth      Authorizer
 	host      func(string) (string, error)
-	uagent    string
 	plainHTTP bool
 	client    *http.Client
 	tracker   StatusTracker
@@ -120,15 +118,12 @@ func NewResolver(options ResolverOptions) remotes.Resolver {
 	if options.Host == nil {
 		options.Host = DefaultHost
 	}
-	ua := "containerd/" + version.Version
 	if options.Authorizer == nil {
 		options.Authorizer = NewAuthorizer(options.Client, options.Credentials)
-		options.Authorizer.(*dockerAuthorizer).ua = ua
 	}
 	return &dockerResolver{
 		auth:      options.Authorizer,
 		host:      options.Host,
-		uagent:    ua,
 		plainHTTP: options.PlainHTTP,
 		client:    options.Client,
 		tracker:   options.Tracker,
@@ -298,7 +293,6 @@ func (r *dockerResolver) Pusher(ctx context.Context, ref string) (remotes.Pusher
 type dockerBase struct {
 	refspec reference.Spec
 	base    url.URL
-	uagent  string
 
 	client *http.Client
 	auth   Authorizer
@@ -330,7 +324,6 @@ func (r *dockerResolver) base(refspec reference.Spec) (*dockerBase, error) {
 	return &dockerBase{
 		refspec: refspec,
 		base:    base,
-		uagent:  r.uagent,
 		client:  r.client,
 		auth:    r.auth,
 	}, nil
@@ -356,7 +349,6 @@ func (r *dockerBase) authorize(ctx context.Context, req *http.Request) error {
 func (r *dockerBase) doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", req.URL.String()))
 	log.G(ctx).WithField("request.headers", req.Header).WithField("request.method", req.Method).Debug("do request")
-	req.Header.Set("User-Agent", r.uagent)
 	if err := r.authorize(ctx, req); err != nil {
 		return nil, errors.Wrap(err, "failed to authorize")
 	}
