@@ -333,7 +333,11 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 
 		setProcess(s)
 		if s.Linux != nil {
-			s.Process.Env = replaceOrAppendEnvValues(config.Env, s.Process.Env)
+			defaults := config.Env
+			if len(defaults) == 0 {
+				defaults = defaultUnixEnv
+			}
+			s.Process.Env = replaceOrAppendEnvValues(defaults, s.Process.Env)
 			cmd := config.Cmd
 			if len(args) > 0 {
 				cmd = args
