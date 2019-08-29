@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 )
 
 type command struct {
@@ -38,7 +38,7 @@ func (c *command) Run(arg ...string) ([][]string, error) {
 	}
 	cmd.Stderr = &stderr
 
-	id := uuid.New()
+	id := uuid.New().String()
 	joinedArgs := strings.Join(cmd.Args, " ")
 
 	logger.Log([]string{"ID:" + id, "START", joinedArgs})
@@ -48,7 +48,7 @@ func (c *command) Run(arg ...string) ([][]string, error) {
 	if err != nil {
 		return nil, &Error{
 			Err:    err,
-			Debug:  strings.Join([]string{cmd.Path, joinedArgs}, " "),
+			Debug:  strings.Join([]string{cmd.Path, joinedArgs[1:]}, " "),
 			Stderr: stderr.String(),
 		}
 	}
