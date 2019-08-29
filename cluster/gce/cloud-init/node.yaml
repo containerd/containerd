@@ -45,6 +45,7 @@ write_files:
       # in the kernel. We recommend using cgroups to do container-local accounting.
       LimitNPROC=infinity
       LimitCORE=infinity
+      TasksMax=infinity
       ExecStartPre=/sbin/modprobe overlay
       ExecStart=/home/containerd/usr/local/bin/containerd
 
