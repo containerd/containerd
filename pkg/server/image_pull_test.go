@@ -42,9 +42,9 @@ func TestParseAuth(t *testing.T) {
 		expectErr      bool
 	}{
 		"should not return error if auth config is nil": {},
-		"should return error if no supported auth is provided": {
+		"should not return error if empty auth is provided for access to anonymous registry": {
 			auth:      &runtime.AuthConfig{},
-			expectErr: true,
+			expectErr: false,
 		},
 		"should support identity token": {
 			auth:           &runtime.AuthConfig{IdentityToken: "abcd"},
