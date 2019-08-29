@@ -298,18 +298,20 @@ func (z *snapshotter) Remove(ctx context.Context, key string) (err error) {
 
 	datasetName := filepath.Join(z.dataset.Name, id)
 	if k == snapshots.KindCommitted {
-		datasetName += "@" + snapshotSuffix
+		snapshotName := datasetName + "@" + snapshotSuffix
+		snapshot, err := zfs.GetDataset(snapshotName)
+		if err != nil {
+			return err
+		}
+		if err = destroySnapshot(snapshot); err != nil {
+			return err
+		}
 	}
 	dataset, err := zfs.GetDataset(datasetName)
 	if err != nil {
 		return err
 	}
-	if k == snapshots.KindCommitted {
-		err = destroySnapshot(dataset)
-	} else {
-		err = destroy(dataset)
-	}
-	if err != nil {
+	if err = destroy(dataset); err != nil {
 		return err
 	}
 	err = t.Commit()
