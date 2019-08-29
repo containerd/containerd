@@ -1,5 +1,21 @@
 // +build linux freebsd
 
+/*
+   Copyright The containerd Authors.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 package zfs
 
 import (
@@ -50,7 +66,7 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 		return nil, err
 	}
 	if m.FSType != "zfs" {
-		return nil, errors.Errorf("path %s must be a zfs filesystem to be used with the zfs snapshotter", root)
+		return nil, errors.Wrapf(plugin.ErrSkipPlugin, "path %s must be a zfs filesystem to be used with the zfs snapshotter", root)
 	}
 	dataset, err := zfs.GetDataset(m.Source)
 	if err != nil {
@@ -282,18 +298,20 @@ func (z *snapshotter) Remove(ctx context.Context, key string) (err error) {
 
 	datasetName := filepath.Join(z.dataset.Name, id)
 	if k == snapshots.KindCommitted {
-		datasetName += "@" + snapshotSuffix
+		snapshotName := datasetName + "@" + snapshotSuffix
+		snapshot, err := zfs.GetDataset(snapshotName)
+		if err != nil {
+			return err
+		}
+		if err = destroySnapshot(snapshot); err != nil {
+			return err
+		}
 	}
 	dataset, err := zfs.GetDataset(datasetName)
 	if err != nil {
 		return err
 	}
-	if k == snapshots.KindCommitted {
-		err = destroySnapshot(dataset)
-	} else {
-		err = destroy(dataset)
-	}
-	if err != nil {
+	if err = destroy(dataset); err != nil {
 		return err
 	}
 	err = t.Commit()

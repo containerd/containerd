@@ -1,4 +1,4 @@
-// Copyright 2011 Google Inc.  All rights reserved.
+// Copyright 2016 Google Inc.  All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -10,8 +10,9 @@ import (
 
 var (
 	nodeMu sync.Mutex
-	ifname string // name of interface being used
-	nodeID []byte // hardware for version 1 UUIDs
+	ifname string  // name of interface being used
+	nodeID [6]byte // hardware for version 1 UUIDs
+	zeroID [6]byte // nodeID with only 0's
 )
 
 // NodeInterface returns the name of the interface from which the NodeID was
@@ -32,17 +33,14 @@ func NodeInterface() string {
 func SetNodeInterface(name string) bool {
 	defer nodeMu.Unlock()
 	nodeMu.Lock()
-	if nodeID != nil {
-		return true
-	}
 	return setNodeInterface(name)
 }
 
 func setNodeInterface(name string) bool {
-
 	iname, addr := getHardwareInterface(name) // null implementation for js
-	if iname != "" && setNodeID(addr) {
+	if iname != "" && addr != nil {
 		ifname = iname
+		copy(nodeID[:], addr)
 		return true
 	}
 
@@ -50,10 +48,8 @@ func setNodeInterface(name string) bool {
 	// does not specify a specific interface generate a random Node ID
 	// (section 4.1.6)
 	if name == "" {
-		if nodeID == nil {
-			nodeID = make([]byte, 6)
-		}
-		randomBits(nodeID)
+		ifname = "random"
+		randomBits(nodeID[:])
 		return true
 	}
 	return false
@@ -64,45 +60,31 @@ func setNodeInterface(name string) bool {
 func NodeID() []byte {
 	defer nodeMu.Unlock()
 	nodeMu.Lock()
-	if nodeID == nil {
+	if nodeID == zeroID {
 		setNodeInterface("")
 	}
-	nid := make([]byte, 6)
-	copy(nid, nodeID)
-	return nid
+	nid := nodeID
+	return nid[:]
 }
 
 // SetNodeID sets the Node ID to be used for Version 1 UUIDs.  The first 6 bytes
 // of id are used.  If id is less than 6 bytes then false is returned and the
 // Node ID is not set.
 func SetNodeID(id []byte) bool {
-	defer nodeMu.Unlock()
-	nodeMu.Lock()
-	if setNodeID(id) {
-		ifname = "user"
-		return true
-	}
-	return false
-}
-
-func setNodeID(id []byte) bool {
 	if len(id) < 6 {
 		return false
 	}
-	if nodeID == nil {
-		nodeID = make([]byte, 6)
-	}
-	copy(nodeID, id)
+	defer nodeMu.Unlock()
+	nodeMu.Lock()
+	copy(nodeID[:], id)
+	ifname = "user"
 	return true
 }
 
 // NodeID returns the 6 byte node id encoded in uuid.  It returns nil if uuid is
 // not valid.  The NodeID is only well defined for version 1 and 2 UUIDs.
 func (uuid UUID) NodeID() []byte {
-	if len(uuid) != 16 {
-		return nil
-	}
-	node := make([]byte, 6)
-	copy(node, uuid[10:])
-	return node
+	var node [6]byte
+	copy(node[:], uuid[10:])
+	return node[:]
 }
