@@ -126,8 +126,8 @@ func (s *containerStore) Create(ctx context.Context, container containers.Contai
 		return containers.Container{}, err
 	}
 
-	container.CreatedAt = time.Now().UTC()
-	container.UpdatedAt = container.CreatedAt
+	container.CreatedAt = container.CreatedAt
+	container.UpdatedAt = time.Now().UTC()
 	if err := writeContainer(cbkt, &container); err != nil {
 		return containers.Container{}, errors.Wrapf(err, "failed to write container %q", container.ID)
 	}
