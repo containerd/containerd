@@ -135,6 +135,10 @@ var (
 			Name:  "device",
 			Usage: "add a device to a container",
 		},
+		cli.BoolFlag{
+			Name:  "seccomp",
+			Usage: "enable the default seccomp profile",
+		},
 	}
 )
 
