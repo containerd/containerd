@@ -1,4 +1,4 @@
-dist: xenial
+dist: bionic
 sudo: required
 # setup travis so that we can run containers for integration tests
 services:
@@ -18,6 +18,22 @@ env:
   - TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runtime.v1.linux TRAVIS_CGO_ENABLED=1
   - TRAVIS_GOOS=darwin TRAVIS_CGO_ENABLED=0
 
+matrix:
+  include:
+    # On master, also test against the previous LTS (Xenial / Ubuntu 16.04 LTS)
+    - if: branch = master
+      os: linux
+      dist: xenial
+      env: TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runc.v1 TRAVIS_CGO_ENABLED=1
+    - if: branch = master
+      os: linux
+      dist: xenial
+      env: TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runc.v2 TRAVIS_CGO_ENABLED=1
+    - if: branch = master
+      os: linux
+      dist: xenial
+      env: TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runtime.v1.linux TRAVIS_CGO_ENABLED=1
+
 go_import_path: github.com/containerd/containerd
 
 addons:
@@ -31,7 +47,7 @@ addons:
       - python-minimal
       - libcap-dev
       - libaio-dev
-      - libprotobuf-c0-dev
+      - libprotobuf-c-dev
       - libprotobuf-dev
       - socat
 
