@@ -371,14 +371,14 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 
 	if !c.config.DisableProcMount {
 		// Apply masked paths if specified.
-		// Note: If the container is privileged, then we clear any masked paths later on in the call to setOCIPrivileged()
+		// If the container is privileged, this will be cleared later on.
 		g.Config.Linux.MaskedPaths = nil
 		for _, path := range securityContext.GetMaskedPaths() {
 			g.AddLinuxMaskedPaths(path)
 		}
 
 		// Apply readonly paths if specified.
-		// Note: If the container is privileged, then we clear any readonly paths later on in the call to setOCIPrivileged()
+		// If the container is privileged, this will be cleared later on.
 		g.Config.Linux.ReadonlyPaths = nil
 		for _, path := range securityContext.GetReadonlyPaths() {
 			g.AddLinuxReadonlyPaths(path)
@@ -956,18 +956,17 @@ func generateApparmorSpecOpts(apparmorProf string, privileged, apparmorEnabled b
 		return nil, nil
 	}
 	switch apparmorProf {
-	case runtimeDefault:
+	// Based on kubernetes#51746, default apparmor profile should be applied
+	// for when apparmor is not specified.
+	case runtimeDefault, "":
+		if privileged {
+			// Do not set apparmor profile when container is privileged
+			return nil, nil
+		}
 		// TODO (mikebrow): delete created apparmor default profile
 		return apparmor.WithDefaultProfile(appArmorDefaultProfileName), nil
 	case unconfinedProfile:
 		return nil, nil
-	case "":
-		// Based on kubernetes#51746, default apparmor profile should be applied
-		// for non-privileged container when apparmor is not specified.
-		if privileged {
-			return nil, nil
-		}
-		return apparmor.WithDefaultProfile(appArmorDefaultProfileName), nil
 	default:
 		// Require and Trim default profile name prefix
 		if !strings.HasPrefix(apparmorProf, profileNamePrefix) {
