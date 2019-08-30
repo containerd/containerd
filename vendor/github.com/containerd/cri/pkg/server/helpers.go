@@ -367,15 +367,6 @@ func buildLabels(configLabels map[string]string, containerType string) map[strin
 	return labels
 }
 
-func getPodCNILabels(id string, config *runtime.PodSandboxConfig) map[string]string {
-	return map[string]string{
-		"K8S_POD_NAMESPACE":          config.GetMetadata().GetNamespace(),
-		"K8S_POD_NAME":               config.GetMetadata().GetName(),
-		"K8S_POD_INFRA_CONTAINER_ID": id,
-		"IgnoreUnknown":              "1",
-	}
-}
-
 // toRuntimeAuthConfig converts cri plugin auth config to runtime auth config.
 func toRuntimeAuthConfig(a criconfig.AuthConfig) *runtime.AuthConfig {
 	return &runtime.AuthConfig{

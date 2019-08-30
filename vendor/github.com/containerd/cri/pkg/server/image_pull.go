@@ -187,7 +187,8 @@ func ParseAuth(auth *runtime.AuthConfig, host string) (string, string, error) {
 		return user, strings.Trim(passwd, "\x00"), nil
 	}
 	// TODO(random-liu): Support RegistryToken.
-	return "", "", errors.New("invalid auth config")
+	// An empty auth config is valid for anonymous registry
+	return "", "", nil
 }
 
 // createImageReference creates image reference inside containerd image store.
