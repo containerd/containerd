@@ -131,7 +131,7 @@ type Registry struct {
 	// Mirrors are namespace to mirror mapping for all namespaces.
 	Mirrors map[string]Mirror `toml:"mirrors" json:"mirrors"`
 	// Configs are configs for each registry.
-	// The key is the FDQN or IP of the registry.
+	// The key is the domain name or IP of the registry.
 	Configs map[string]RegistryConfig `toml:"configs" json:"configs"`
 
 	// Auths are registry endpoint to auth config mapping. The registry endpoint must

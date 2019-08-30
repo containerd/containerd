@@ -38,7 +38,7 @@ After modify this config, you need restart the `containerd` service.
 
 To configure the TLS settings for a specific registry, create/modify the `/etc/containerd/config.toml` as follows:
 ```toml
-# The registry host has to be an FDQN or IP.
+# The registry host has to be an domain name or IP.
 [plugins.cri.registry.configs."my.custom.registry".tls]
     ca_file   = "ca.pem"
     cert_file = "cert.pem"
@@ -51,7 +51,7 @@ In the config example shown above, TLS mutual authentication will be used for co
 `cert_file` and `key_file` are not needed when TLS mutual authentication is unused.
 
 ```toml
-# The registry host has to be an FDQN or IP.
+# The registry host has to be an domain name or IP.
 [plugins.cri.registry.configs."my.custom.registry".tls]
     ca_file   = "ca.pem"
 ```
@@ -63,7 +63,7 @@ In the config example shown above, TLS mutual authentication will be used for co
 To configure a credential for a specific registry, create/modify the
 `/etc/containerd/config.toml` as follows:
 ```toml
-# The registry host has to be an FDQN or IP.
+# The registry host has to be an domain name or IP.
 [plugins.cri.registry.configs."gcr.io".auth]
   username = ""
   password = ""
