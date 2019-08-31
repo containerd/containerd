@@ -72,6 +72,16 @@ type execOptions struct {
 
 // execInContainer executes a command inside the container synchronously, and
 // redirects stdio stream properly.
+// This function only returns when the exec process exits, this means that:
+// 1) As long as the exec process is running, the goroutine in the cri plugin
+// will be running and wait for the exit code;
+// 2) `kubectl exec -it` will hang until the exec process exits, even after io
+// is detached. This is different from dockershim, which leaves the exec process
+// running in background after io is detached.
+// https://github.com/kubernetes/kubernetes/blob/v1.15.0/pkg/kubelet/dockershim/exec.go#L127
+// For example, if the `kubectl exec -it` process is killed, IO will be closed. In
+// this case, the CRI plugin will still have a goroutine waiting for the exec process
+// to exit and log the exit code, but dockershim won't.
 func (c *criService) execInContainer(ctx context.Context, id string, opts execOptions) (*uint32, error) {
 	// Cancel the context before returning to ensure goroutines are stopped.
 	// This is important, because if `Start` returns error, `Wait` will hang
