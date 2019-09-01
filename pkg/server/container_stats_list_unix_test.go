@@ -1,3 +1,5 @@
+// +build !windows
+
 /*
 Copyright 2018 The containerd Authors.
 

@@ -1,3 +1,5 @@
+// +build windows
+
 /*
 Copyright The containerd Authors.
 
@@ -14,33 +16,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package opts
+package server
 
 import (
-	"sort"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
+	"github.com/containerd/containerd/api/types"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+
+	containerstore "github.com/containerd/cri/pkg/store/container"
 )
 
-func TestOrderedMounts(t *testing.T) {
-	mounts := []*runtime.Mount{
-		{ContainerPath: "/a/b/c"},
-		{ContainerPath: "/a/b"},
-		{ContainerPath: "/a/b/c/d"},
-		{ContainerPath: "/a"},
-		{ContainerPath: "/b"},
-		{ContainerPath: "/b/c"},
-	}
-	expected := []*runtime.Mount{
-		{ContainerPath: "/a"},
-		{ContainerPath: "/b"},
-		{ContainerPath: "/a/b"},
-		{ContainerPath: "/b/c"},
-		{ContainerPath: "/a/b/c"},
-		{ContainerPath: "/a/b/c/d"},
-	}
-	sort.Stable(orderedMounts(mounts))
-	assert.Equal(t, expected, mounts)
+// TODO(windows): Implement a dummy version of this, and actually support this
+// when stats is supported by the hcs containerd shim.
+func (c *criService) containerMetrics(
+	meta containerstore.Metadata,
+	stats *types.Metric,
+) (*runtime.ContainerStats, error) {
+	return nil, nil
 }

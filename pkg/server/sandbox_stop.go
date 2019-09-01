@@ -57,8 +57,8 @@ func (c *criService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandb
 		}
 	}
 
-	if err := c.unmountSandboxFiles(id, sandbox.Config); err != nil {
-		return nil, errors.Wrap(err, "failed to unmount sandbox files")
+	if err := c.cleanupSandboxFiles(id, sandbox.Config); err != nil {
+		return nil, errors.Wrap(err, "failed to cleanup sandbox files")
 	}
 
 	// Only stop sandbox container when it's running or unknown.

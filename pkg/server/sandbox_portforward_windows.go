@@ -1,3 +1,5 @@
+// +build windows
+
 /*
 Copyright The containerd Authors.
 
@@ -14,33 +16,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package opts
+package server
 
 import (
-	"sort"
-	"testing"
+	"io"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/containerd/containerd/errdefs"
+	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
-func TestOrderedMounts(t *testing.T) {
-	mounts := []*runtime.Mount{
-		{ContainerPath: "/a/b/c"},
-		{ContainerPath: "/a/b"},
-		{ContainerPath: "/a/b/c/d"},
-		{ContainerPath: "/a"},
-		{ContainerPath: "/b"},
-		{ContainerPath: "/b/c"},
-	}
-	expected := []*runtime.Mount{
-		{ContainerPath: "/a"},
-		{ContainerPath: "/b"},
-		{ContainerPath: "/a/b"},
-		{ContainerPath: "/b/c"},
-		{ContainerPath: "/a/b/c"},
-		{ContainerPath: "/a/b/c/d"},
-	}
-	sort.Stable(orderedMounts(mounts))
-	assert.Equal(t, expected, mounts)
+// PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
+// TODO(windows): Implement this for windows.
+func (c *criService) PortForward(ctx context.Context, r *runtime.PortForwardRequest) (*runtime.PortForwardResponse, error) {
+	return nil, errdefs.ErrNotImplemented
+}
+
+func (c *criService) portForward(ctx context.Context, id string, port int32, stream io.ReadWriter) error {
+	return errdefs.ErrNotImplemented
 }

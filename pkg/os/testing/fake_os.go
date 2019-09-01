@@ -17,12 +17,10 @@ limitations under the License.
 package testing
 
 import (
-	"io"
 	"os"
 	"sync"
 
 	containerdmount "github.com/containerd/containerd/mount"
-	"golang.org/x/net/context"
 
 	osInterface "github.com/containerd/cri/pkg/os"
 )
@@ -42,7 +40,6 @@ type FakeOS struct {
 	sync.Mutex
 	MkdirAllFn             func(string, os.FileMode) error
 	RemoveAllFn            func(string) error
-	OpenFifoFn             func(context.Context, string, int, os.FileMode) (io.ReadWriteCloser, error)
 	StatFn                 func(string) (os.FileInfo, error)
 	ResolveSymbolicLinkFn  func(string) (string, error)
 	FollowSymlinkInScopeFn func(string, string) (string, error)
@@ -137,19 +134,6 @@ func (f *FakeOS) RemoveAll(path string) error {
 		return f.RemoveAllFn(path)
 	}
 	return nil
-}
-
-// OpenFifo is a fake call that invokes OpenFifoFn or just returns nil.
-func (f *FakeOS) OpenFifo(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
-	f.appendCalls("OpenFifo", ctx, fn, flag, perm)
-	if err := f.getError("OpenFifo"); err != nil {
-		return nil, err
-	}
-
-	if f.OpenFifoFn != nil {
-		return f.OpenFifoFn(ctx, fn, flag, perm)
-	}
-	return nil, nil
 }
 
 // Stat is a fake call that invokes StatFn or just return nil.

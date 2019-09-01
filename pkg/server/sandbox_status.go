@@ -18,6 +18,7 @@ package server
 
 import (
 	"encoding/json"
+	goruntime "runtime"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
@@ -69,7 +70,8 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 func (c *criService) getIP(sandbox sandboxstore.Sandbox) (string, error) {
 	config := sandbox.Config
 
-	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE {
+	if goruntime.GOOS != "windows" &&
+		config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE {
 		// For sandboxes using the node network we are not
 		// responsible for reporting the IP.
 		return "", nil

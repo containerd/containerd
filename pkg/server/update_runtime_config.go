@@ -22,7 +22,6 @@ import (
 	"text/template"
 
 	"github.com/containerd/containerd/log"
-	cni "github.com/containerd/go-cni"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -52,7 +51,7 @@ func (c *criService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateR
 	if err := c.netPlugin.Status(); err == nil {
 		log.G(ctx).Infof("Network plugin is ready, skip generating cni config from template %q", confTemplate)
 		return &runtime.UpdateRuntimeConfigResponse{}, nil
-	} else if err := c.netPlugin.Load(cni.WithLoNetwork, cni.WithDefaultConf); err == nil {
+	} else if err := c.netPlugin.Load(c.cniLoadOptions()...); err == nil {
 		log.G(ctx).Infof("CNI config is successfully loaded, skip generating cni config from template %q", confTemplate)
 		return &runtime.UpdateRuntimeConfigResponse{}, nil
 	}

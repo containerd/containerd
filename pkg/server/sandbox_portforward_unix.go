@@ -1,3 +1,5 @@
+// +build !windows
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -47,7 +49,7 @@ func (c *criService) PortForward(ctx context.Context, r *runtime.PortForwardRequ
 }
 
 // portForward requires `socat` on the node. It uses netns to enter the sandbox namespace,
-// and run `socat` insidethe namespace to forward stream for a specific port. The `socat`
+// and run `socat` inside the namespace to forward stream for a specific port. The `socat`
 // command keeps running until it exits or client disconnect.
 func (c *criService) portForward(ctx context.Context, id string, port int32, stream io.ReadWriter) error {
 	s, err := c.sandboxStore.Get(id)

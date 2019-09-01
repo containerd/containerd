@@ -1,3 +1,5 @@
+// +build !windows
+
 /*
 Copyright The containerd Authors.
 
@@ -17,30 +19,31 @@ limitations under the License.
 package opts
 
 import (
-	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"github.com/stretchr/testify/require"
 )
 
-func TestOrderedMounts(t *testing.T) {
-	mounts := []*runtime.Mount{
-		{ContainerPath: "/a/b/c"},
-		{ContainerPath: "/a/b"},
-		{ContainerPath: "/a/b/c/d"},
-		{ContainerPath: "/a"},
-		{ContainerPath: "/b"},
-		{ContainerPath: "/b/c"},
-	}
-	expected := []*runtime.Mount{
-		{ContainerPath: "/a"},
-		{ContainerPath: "/b"},
-		{ContainerPath: "/a/b"},
-		{ContainerPath: "/b/c"},
-		{ContainerPath: "/a/b/c"},
-		{ContainerPath: "/a/b/c/d"},
-	}
-	sort.Stable(orderedMounts(mounts))
-	assert.Equal(t, expected, mounts)
+func TestMergeGids(t *testing.T) {
+	gids1 := []uint32{3, 2, 1}
+	gids2 := []uint32{2, 3, 4}
+	assert.Equal(t, []uint32{1, 2, 3, 4}, mergeGids(gids1, gids2))
+}
+
+func TestRestrictOOMScoreAdj(t *testing.T) {
+	current, err := getCurrentOOMScoreAdj()
+	require.NoError(t, err)
+
+	got, err := restrictOOMScoreAdj(current - 1)
+	require.NoError(t, err)
+	assert.Equal(t, got, current)
+
+	got, err = restrictOOMScoreAdj(current)
+	require.NoError(t, err)
+	assert.Equal(t, got, current)
+
+	got, err = restrictOOMScoreAdj(current + 1)
+	require.NoError(t, err)
+	assert.Equal(t, got, current+1)
 }
