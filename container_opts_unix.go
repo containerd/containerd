@@ -28,7 +28,6 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
 )
 
@@ -45,7 +44,7 @@ func WithRemappedSnapshotView(id string, i Image, uid, gid uint32) NewContainerO
 
 func withRemappedSnapshotBase(id string, i Image, uid, gid uint32, readonly bool) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore(), platforms.Default())
+		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore(), client.platform)
 		if err != nil {
 			return err
 		}

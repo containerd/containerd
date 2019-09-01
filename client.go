@@ -99,6 +99,12 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 		c.runtime = defaults.DefaultRuntime
 	}
 
+	if copts.defaultPlatform != nil {
+		c.platform = copts.defaultPlatform
+	} else {
+		c.platform = platforms.Default()
+	}
+
 	if copts.services != nil {
 		c.services = *copts.services
 	}
@@ -193,6 +199,7 @@ type Client struct {
 	conn      *grpc.ClientConn
 	runtime   string
 	defaultns string
+	platform  platforms.MatchComparer
 	connector func() (*grpc.ClientConn, error)
 }
 

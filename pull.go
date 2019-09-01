@@ -44,7 +44,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		if len(pullCtx.Platforms) > 1 {
 			return nil, errors.New("cannot pull multiplatform image locally, try Fetch")
 		} else if len(pullCtx.Platforms) == 0 {
-			pullCtx.PlatformMatcher = platforms.Default()
+			pullCtx.PlatformMatcher = c.platform
 		} else {
 			p, err := platforms.Parse(pullCtx.Platforms[0])
 			if err != nil {
