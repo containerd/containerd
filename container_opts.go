@@ -22,7 +22,6 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/types"
@@ -190,7 +189,7 @@ func WithSnapshotCleanup(ctx context.Context, client *Client, c containers.Conta
 // root filesystem in read-only mode
 func WithNewSnapshotView(id string, i Image, opts ...snapshots.Opt) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore(), platforms.Default())
+		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore(), client.platform)
 		if err != nil {
 			return err
 		}

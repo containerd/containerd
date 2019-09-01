@@ -125,7 +125,7 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 	}
 	var platformMatcher = platforms.All
 	if !iopts.allPlatforms {
-		platformMatcher = platforms.Default()
+		platformMatcher = c.platform
 	}
 
 	var handler images.HandlerFunc = func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
