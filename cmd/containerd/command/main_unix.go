@@ -58,6 +58,7 @@ func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *se
 					}
 					server.Stop()
 					close(done)
+					return
 				}
 			}
 		}
