@@ -25,6 +25,8 @@ import (
 
 // ContainerStats returns stats of the container. If the container does not
 // exist, the call returns an error.
+// TODO(windows): hcsshim Stats is not implemented, add windows support after
+// that is implemented.
 func (c *criService) ContainerStats(ctx context.Context, in *runtime.ContainerStatsRequest) (*runtime.ContainerStatsResponse, error) {
 	cntr, err := c.containerStore.Get(in.GetContainerId())
 	if err != nil {
@@ -39,7 +41,7 @@ func (c *criService) ContainerStats(ctx context.Context, in *runtime.ContainerSt
 		return nil, errors.Errorf("unexpected metrics response: %+v", resp.Metrics)
 	}
 
-	cs, err := c.getContainerMetrics(cntr.Metadata, resp.Metrics[0])
+	cs, err := c.containerMetrics(cntr.Metadata, resp.Metrics[0])
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode container metrics")
 	}

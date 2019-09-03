@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The containerd Authors.
+Copyright The containerd Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,15 +21,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
-
-func TestMergeGids(t *testing.T) {
-	gids1 := []uint32{3, 2, 1}
-	gids2 := []uint32{2, 3, 4}
-	assert.Equal(t, []uint32{1, 2, 3, 4}, mergeGids(gids1, gids2))
-}
 
 func TestOrderedMounts(t *testing.T) {
 	mounts := []*runtime.Mount{
@@ -50,21 +43,4 @@ func TestOrderedMounts(t *testing.T) {
 	}
 	sort.Stable(orderedMounts(mounts))
 	assert.Equal(t, expected, mounts)
-}
-
-func TestRestrictOOMScoreAdj(t *testing.T) {
-	current, err := getCurrentOOMScoreAdj()
-	require.NoError(t, err)
-
-	got, err := restrictOOMScoreAdj(current - 1)
-	require.NoError(t, err)
-	assert.Equal(t, got, current)
-
-	got, err = restrictOOMScoreAdj(current)
-	require.NoError(t, err)
-	assert.Equal(t, got, current)
-
-	got, err = restrictOOMScoreAdj(current + 1)
-	require.NoError(t, err)
-	assert.Equal(t, got, current+1)
 }
