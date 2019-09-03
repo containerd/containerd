@@ -66,13 +66,13 @@ How to Test:
 Delete runc from your system.
 
 ```bash
-> sudo ctr run --rm  docker.io/library/redis:alpine redis
+> sudo ctr run --rm docker.io/library/redis:alpine redis
 ctr: OCI runtime create failed: unable to retrieve OCI runtime error (open /run/containerd/io.containerd.runtime.v1.linux/default/redis/log.json: no such file or directory): exec: "runc": executable file not found in $PATH: unknown
 
 > sudo ctr content fetch docker.io/crosbymichael/runc:latest
-> sudo ctr  install docker.io/crosbymichael/runc:latest
+> sudo ctr install docker.io/crosbymichael/runc:latest
 
-> sudo ctr run --rm  docker.io/library/redis:alpine redis
+> sudo ctr run --rm docker.io/library/redis:alpine redis
 1:C 01 Aug 15:59:52.864 # oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
 1:C 01 Aug 15:59:52.864 # Redis version=4.0.10, bits=64, commit=00000000, modified=0, pid=1, just started
 1:C 01 Aug 15:59:52.864 # Warning: no config file specified, using the default config. In order to specify a config file use redis-server /path/to/redis.conf

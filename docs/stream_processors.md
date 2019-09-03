@@ -6,7 +6,7 @@ Processors are a binary API that works off of content streams.
 
 The incoming content stream will be provided to the binary via `STDIN`
 and the stream processor is expected to output the processed stream on
-`STDOUT`.  If errors are encountered, errors MUST be returned via `STDERR`
+`STDOUT`. If errors are encountered, errors MUST be returned via `STDERR`
 with a non-zero exit status.
 
 Additional information can be provided to stream processors via a payload.

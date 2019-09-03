@@ -35,7 +35,7 @@ container, err := client.NewContainer(ctx, id)
 
 // add volumes with their config and bind mounts
 container.Labels["volumes"] = VolumeConfig{}
-container.Spec.Binds  = append({"/var/lib/docker/volumes..."})
+container.Spec.Binds = append({"/var/lib/docker/volumes..."})
 ```
 
 #### Good Extension Example
