@@ -86,7 +86,7 @@ func WithImportCompression() ImportOpt {
 
 // Import imports an image from a Tar stream using reader.
 // Caller needs to specify importer. Future version may use oci.v1 as the default.
-// Note that unreferrenced blobs may be imported to the content store as well.
+// Note that unreferenced blobs may be imported to the content store as well.
 func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt) ([]images.Image, error) {
 	var iopts importOpts
 	for _, o := range opts {
@@ -125,7 +125,7 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 	}
 	var platformMatcher = platforms.All
 	if !iopts.allPlatforms {
-		platformMatcher = platforms.Default()
+		platformMatcher = c.platform
 	}
 
 	var handler images.HandlerFunc = func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {

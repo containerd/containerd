@@ -99,6 +99,12 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 		c.runtime = defaults.DefaultRuntime
 	}
 
+	if copts.defaultPlatform != nil {
+		c.platform = copts.defaultPlatform
+	} else {
+		c.platform = platforms.Default()
+	}
+
 	if copts.services != nil {
 		c.services = *copts.services
 	}
@@ -193,6 +199,7 @@ type Client struct {
 	conn      *grpc.ClientConn
 	runtime   string
 	defaultns string
+	platform  platforms.MatchComparer
 	connector func() (*grpc.ClientConn, error)
 }
 
@@ -294,9 +301,13 @@ type RemoteContext struct {
 	PlatformMatcher platforms.MatchComparer
 
 	// Unpack is done after an image is pulled to extract into a snapshotter.
+	// It is done simultaneously for schema 2 images when they are pulled.
 	// If an image is not unpacked on pull, it can be unpacked any time
 	// afterwards. Unpacking is required to run an image.
 	Unpack bool
+
+	// UnpackOpts handles options to the unpack call.
+	UnpackOpts []UnpackOpt
 
 	// Snapshotter used for unpacking
 	Snapshotter string
@@ -329,9 +340,8 @@ type RemoteContext struct {
 	// MaxConcurrentDownloads is the max concurrent content downloads for each pull.
 	MaxConcurrentDownloads int
 
-	// AppendDistributionSourceLabel allows fetcher to add distribute source
-	// label for each blob content, which doesn't work for legacy schema1.
-	AppendDistributionSourceLabel bool
+	// AllMetadata downloads all manifests and known-configuration files
+	AllMetadata bool
 }
 
 func defaultRemoteContext() *RemoteContext {

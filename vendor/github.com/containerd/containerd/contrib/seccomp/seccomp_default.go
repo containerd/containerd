@@ -312,6 +312,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"sigaltstack",
 				"signalfd",
 				"signalfd4",
+				"sigprocmask",
 				"sigreturn",
 				"socket",
 				"socketcall",

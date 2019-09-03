@@ -254,17 +254,36 @@ func (tx *Tx) Rollback() error {
 	if tx.db == nil {
 		return ErrTxClosed
 	}
-	tx.rollback()
+	tx.nonPhysicalRollback()
 	return nil
 }
 
+// nonPhysicalRollback is called when user calls Rollback directly, in this case we do not need to reload the free pages from disk.
+func (tx *Tx) nonPhysicalRollback() {
+	if tx.db == nil {
+		return
+	}
+	if tx.writable {
+		tx.db.freelist.rollback(tx.meta.txid)
+	}
+	tx.close()
+}
+
+// rollback needs to reload the free pages from disk in case some system error happens like fsync error.
 func (tx *Tx) rollback() {
 	if tx.db == nil {
 		return
 	}
 	if tx.writable {
 		tx.db.freelist.rollback(tx.meta.txid)
-		tx.db.freelist.reload(tx.db.page(tx.db.meta().freelist))
+		if !tx.db.hasSyncedFreelist() {
+			// Reconstruct free page list by scanning the DB to get the whole free page list.
+			// Note: scaning the whole db is heavy if your db size is large in NoSyncFreeList mode.
+			tx.db.freelist.noSyncReload(tx.db.freepages())
+		} else {
+			// Read free page list from freelist page.
+			tx.db.freelist.reload(tx.db.page(tx.db.meta().freelist))
+		}
 	}
 	tx.close()
 }
