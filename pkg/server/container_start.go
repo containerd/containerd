@@ -18,7 +18,6 @@ package server
 
 import (
 	"io"
-	"os"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -175,7 +174,7 @@ func resetContainerStarting(container containerstore.Container) error {
 func (c *criService) createContainerLoggers(logPath string, tty bool) (stdout io.WriteCloser, stderr io.WriteCloser, err error) {
 	if logPath != "" {
 		// Only generate container log when log path is specified.
-		f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0640)
+		f, err := openLogFile(logPath)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "failed to create and open log file")
 		}
