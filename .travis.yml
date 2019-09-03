@@ -1,4 +1,4 @@
-dist: xenial
+dist: bionic
 sudo: required
 # setup travis so that we can run containers for integration tests
 services:
@@ -13,10 +13,26 @@ go:
   - "1.12.x"
 
 env:
-  - TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runc.v1 TRAVIS_CGO_ENABLED=1
-  - TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runc.v2 TRAVIS_CGO_ENABLED=1
-  - TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runtime.v1.linux TRAVIS_CGO_ENABLED=1
+  - TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runc.v1 TRAVIS_CGO_ENABLED=1 TRAVIS_DISTRO=bionic
+  - TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runc.v2 TRAVIS_CGO_ENABLED=1 TRAVIS_DISTRO=bionic
+  - TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runtime.v1.linux TRAVIS_CGO_ENABLED=1 TRAVIS_DISTRO=bionic
   - TRAVIS_GOOS=darwin TRAVIS_CGO_ENABLED=0
+
+matrix:
+  include:
+    # On master, also test against the previous LTS (Xenial / Ubuntu 16.04 LTS)
+    - if: branch = master AND type NOT IN (push, pull_request)
+      os: linux
+      dist: xenial
+      env: TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runc.v1 TRAVIS_CGO_ENABLED=1 TRAVIS_DISTRO=xenial
+    - if: branch = master AND type NOT IN (push, pull_request)
+      os: linux
+      dist: xenial
+      env: TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runc.v2 TRAVIS_CGO_ENABLED=1 TRAVIS_DISTRO=xenial
+    - if: branch = master AND type NOT IN (push, pull_request)
+      os: linux
+      dist: xenial
+      env: TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runtime.v1.linux TRAVIS_CGO_ENABLED=1 TRAVIS_DISTRO=xenial
 
 go_import_path: github.com/containerd/containerd
 
@@ -31,7 +47,7 @@ addons:
       - python-minimal
       - libcap-dev
       - libaio-dev
-      - libprotobuf-c0-dev
+      - libprotobuf-c-dev
       - libprotobuf-dev
       - socat
 
