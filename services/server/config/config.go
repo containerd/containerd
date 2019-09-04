@@ -108,11 +108,6 @@ func (c *Config) ValidateV2() error {
 			return errors.Errorf("invalid plugin key URI %q expect io.containerd.x.vx", p)
 		}
 	}
-	for p := range c.ProxyPlugins {
-		if len(strings.Split(p, ".")) < 4 {
-			return errors.Errorf("invalid proxy plugin key URI %q expect io.containerd.x.vx", p)
-		}
-	}
 	return nil
 }
 
