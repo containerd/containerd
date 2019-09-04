@@ -359,7 +359,8 @@ func Children(ctx context.Context, provider content.Provider, desc ocispec.Descr
 
 		descs = append(descs, index.Manifests...)
 	case MediaTypeDockerSchema2Layer, MediaTypeDockerSchema2LayerGzip,
-		MediaTypeDockerSchema2LayerEnc, MediaTypeDockerSchema2LayerGzipEnc,
+		MediaTypeOCILayerEnc, MediaTypeOCILayerGzipEnc,
+		MediaTypeOCINonDistributableLayerEnc, MediaTypeOCINonDistributableLayerGzipEnc,
 		MediaTypeDockerSchema2LayerForeign, MediaTypeDockerSchema2LayerForeignGzip,
 		MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig,
 		ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerGzip,
@@ -439,7 +440,7 @@ func GetImageLayerDescriptors(ctx context.Context, cs content.Store, desc ocispe
 			switch child.MediaType {
 			case MediaTypeDockerSchema2LayerGzip, MediaTypeDockerSchema2Layer,
 				ocispec.MediaTypeImageLayerGzip, ocispec.MediaTypeImageLayer,
-				MediaTypeDockerSchema2LayerGzipEnc, MediaTypeDockerSchema2LayerEnc:
+				MediaTypeOCILayerGzipEnc, MediaTypeOCILayerEnc:
 				tdesc := child
 				tdesc.Platform = platform
 				tmp = append(tmp, tdesc)

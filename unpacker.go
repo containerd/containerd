@@ -233,7 +233,8 @@ func (u *unpacker) handlerWrapper(uctx context.Context, unpacks *int32) (func(im
 				images.MediaTypeDockerSchema2LayerForeign, images.MediaTypeDockerSchema2LayerForeignGzip,
 				ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerGzip,
 				ocispec.MediaTypeImageLayerNonDistributable, ocispec.MediaTypeImageLayerNonDistributableGzip,
-				images.MediaTypeDockerSchema2LayerEnc, images.MediaTypeDockerSchema2LayerGzipEnc:
+				images.MediaTypeOCILayerEnc, images.MediaTypeOCILayerGzipEnc,
+				images.MediaTypeOCINonDistributableLayerEnc, images.MediaTypeOCINonDistributableLayerGzipEnc:
 				lock.Lock()
 				update := !schema1
 				lock.Unlock()

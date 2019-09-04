@@ -22,14 +22,21 @@ package images
 // here for clarity.
 const (
 	MediaTypeDockerSchema2Layer            = "application/vnd.docker.image.rootfs.diff.tar"
-	MediaTypeDockerSchema2LayerEnc         = "application/vnd.docker.image.rootfs.diff.tar+enc"
 	MediaTypeDockerSchema2LayerForeign     = "application/vnd.docker.image.rootfs.foreign.diff.tar"
 	MediaTypeDockerSchema2LayerGzip        = "application/vnd.docker.image.rootfs.diff.tar.gzip"
-	MediaTypeDockerSchema2LayerGzipEnc     = "application/vnd.docker.image.rootfs.diff.tar.gzip+enc"
 	MediaTypeDockerSchema2LayerForeignGzip = "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip"
 	MediaTypeDockerSchema2Config           = "application/vnd.docker.container.image.v1+json"
 	MediaTypeDockerSchema2Manifest         = "application/vnd.docker.distribution.manifest.v2+json"
 	MediaTypeDockerSchema2ManifestList     = "application/vnd.docker.distribution.manifest.list.v2+json"
+
+	// Proposed encryption media types for the OCI image-spec (opencontainers/image-spec#775)
+	// Once there is an accepted/released OCI spec with these included they can be removed here and used from
+	// the image-spec imports where needed.
+	MediaTypeOCILayerEnc                     = "application/vnd.oci.image.layer.v1.tar+enc"
+	MediaTypeOCILayerGzipEnc                 = "application/vnd.oci.image.layer.v1.tar+gzip+enc"
+	MediaTypeOCINonDistributableLayerEnc     = "application/vnd.oci.image.layer.nondistributable.v1.tar+enc"
+	MediaTypeOCINonDistributableLayerGzipEnc = "application/vnd.oci.image.layer.nondistributable.v1.tar+gzip+enc"
+
 	// Checkpoint/Restore Media Types
 	MediaTypeContainerd1Checkpoint               = "application/vnd.containerd.container.criu.checkpoint.criu.tar"
 	MediaTypeContainerd1CheckpointPreDump        = "application/vnd.containerd.container.criu.checkpoint.predump.tar"
