@@ -28,7 +28,7 @@ func isLinuxOS(os string) bool {
 	return os == "linux"
 }
 
-// These function are generated from from https://golang.org/src/go/build/syslist.go.
+// These function are generated from https://golang.org/src/go/build/syslist.go.
 //
 // We use switch statements because they are slightly faster than map lookups
 // and use a little less memory.

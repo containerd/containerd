@@ -63,7 +63,7 @@ func TestGenerateSpec(t *testing.T) {
 		}
 	} else {
 		if s.Windows == nil {
-			t.Fatal("Windows section of spec not filled on on Windows platform")
+			t.Fatal("Windows section of spec not filled in on Windows platform")
 		}
 	}
 
