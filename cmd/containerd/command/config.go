@@ -45,11 +45,6 @@ func outputConfig(cfg *srvconfig.Config) error {
 		Config: cfg,
 	}
 
-	// for the time being, keep the defaultConfig's version set at 1 so that
-	// when a config without a version is loaded from disk and has no version
-	// set, we assume it's a v1 config.  But when generating new configs via
-	// this command, generate the v2 config
-	config.Config.Version = 2
 	plugins, err := server.LoadPlugins(gocontext.Background(), config.Config)
 	if err != nil {
 		return err
@@ -60,14 +55,30 @@ func outputConfig(cfg *srvconfig.Config) error {
 			if p.Config == nil {
 				continue
 			}
-			config.Plugins[p.URI()] = p.Config
+
+			pc, err := config.Decode(p)
+			if err != nil {
+				return err
+			}
+
+			config.Plugins[p.URI()] = pc
 		}
 	}
+
 	timeouts := timeout.All()
 	config.Timeouts = make(map[string]string)
 	for k, v := range timeouts {
 		config.Timeouts[k] = v.String()
 	}
+
+	// for the time being, keep the defaultConfig's version set at 1 so that
+	// when a config without a version is loaded from disk and has no version
+	// set, we assume it's a v1 config.  But when generating new configs via
+	// this command, generate the v2 config
+	config.Config.Version = 2
+
+	// remove overridden Plugins type to avoid duplication in output
+	config.Config.Plugins = nil
 
 	_, err = config.WriteTo(os.Stdout)
 	return err
