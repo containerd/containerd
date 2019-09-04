@@ -210,6 +210,11 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
 	}
 
+	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
+		ociRuntime.ContainerAnnotations) {
+		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
+	}
+
 	specOpts = append(specOpts,
 		customopts.WithOOMScoreAdj(config, c.config.RestrictOOMScoreAdj),
 		customopts.WithPodNamespaces(securityContext, sandboxPid),
