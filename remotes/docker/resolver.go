@@ -18,10 +18,10 @@ package docker
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/url"
 	"path"
-	"strconv"
 	"strings"
 
 	"github.com/containerd/containerd/errdefs"
@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/reference"
 	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/containerd/remotes/docker/schema1"
 	"github.com/containerd/containerd/version"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -83,6 +84,9 @@ type ResolverOptions struct {
 	// Host provides the hostname given a namespace.
 	Host func(string) (string, error)
 
+	// Headers are the HTTP request header fields sent by the resolver
+	Headers http.Header
+
 	// PlainHTTP specifies to use plain http and not https
 	PlainHTTP bool
 
@@ -106,6 +110,7 @@ func DefaultHost(ns string) (string, error) {
 type dockerResolver struct {
 	auth      Authorizer
 	host      func(string) (string, error)
+	headers   http.Header
 	uagent    string
 	plainHTTP bool
 	client    *http.Client
@@ -120,7 +125,24 @@ func NewResolver(options ResolverOptions) remotes.Resolver {
 	if options.Host == nil {
 		options.Host = DefaultHost
 	}
-	ua := "containerd/" + version.Version
+	if options.Headers == nil {
+		options.Headers = make(http.Header)
+	}
+	if _, ok := options.Headers["Accept"]; !ok {
+		// set headers for all the types we support for resolution.
+		options.Headers.Set("Accept", strings.Join([]string{
+			images.MediaTypeDockerSchema2Manifest,
+			images.MediaTypeDockerSchema2ManifestList,
+			ocispec.MediaTypeImageManifest,
+			ocispec.MediaTypeImageIndex, "*"}, ", "))
+	}
+	ua := options.Headers.Get("User-Agent")
+	if ua != "" {
+		options.Headers.Del("User-Agent")
+	} else {
+		ua = "containerd/" + version.Version
+	}
+
 	if options.Authorizer == nil {
 		options.Authorizer = NewAuthorizer(options.Client, options.Credentials)
 		options.Authorizer.(*dockerAuthorizer).ua = ua
@@ -128,11 +150,38 @@ func NewResolver(options ResolverOptions) remotes.Resolver {
 	return &dockerResolver{
 		auth:      options.Authorizer,
 		host:      options.Host,
+		headers:   options.Headers,
 		uagent:    ua,
 		plainHTTP: options.PlainHTTP,
 		client:    options.Client,
 		tracker:   options.Tracker,
 	}
+}
+
+func getManifestMediaType(resp *http.Response) string {
+	// Strip encoding data (manifests should always be ascii JSON)
+	contentType := resp.Header.Get("Content-Type")
+	if sp := strings.IndexByte(contentType, ';'); sp != -1 {
+		contentType = contentType[0:sp]
+	}
+
+	// As of Apr 30 2019 the registry.access.redhat.com registry does not specify
+	// the content type of any data but uses schema1 manifests.
+	if contentType == "text/plain" {
+		contentType = images.MediaTypeDockerSchema1Manifest
+	}
+	return contentType
+}
+
+type countingReader struct {
+	reader    io.Reader
+	bytesRead int64
+}
+
+func (r *countingReader) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	r.bytesRead += int64(n)
+	return n, err
 }
 
 var _ remotes.Resolver = &dockerResolver{}
@@ -187,12 +236,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 			return "", ocispec.Descriptor{}, err
 		}
 
-		// set headers for all the types we support for resolution.
-		req.Header.Set("Accept", strings.Join([]string{
-			images.MediaTypeDockerSchema2Manifest,
-			images.MediaTypeDockerSchema2ManifestList,
-			ocispec.MediaTypeImageManifest,
-			ocispec.MediaTypeImageIndex, "*"}, ", "))
+		req.Header = r.headers
 
 		log.G(ctx).Debug("resolving")
 		resp, err := fetcher.doRequestWithRetries(ctx, req, nil)
@@ -210,40 +254,56 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 			}
 			return "", ocispec.Descriptor{}, errors.Errorf("unexpected status code %v: %v", u, resp.Status)
 		}
+		size := resp.ContentLength
 
 		// this is the only point at which we trust the registry. we use the
 		// content headers to assemble a descriptor for the name. when this becomes
 		// more robust, we mostly get this information from a secure trust store.
 		dgstHeader := digest.Digest(resp.Header.Get("Docker-Content-Digest"))
+		contentType := getManifestMediaType(resp)
 
-		if dgstHeader != "" {
+		if dgstHeader != "" && size != -1 {
 			if err := dgstHeader.Validate(); err != nil {
 				return "", ocispec.Descriptor{}, errors.Wrapf(err, "%q in header not a valid digest", dgstHeader)
 			}
 			dgst = dgstHeader
-		}
+		} else {
+			log.G(ctx).Debug("no Docker-Content-Digest header, fetching manifest instead")
 
-		if dgst == "" {
-			return "", ocispec.Descriptor{}, errors.Errorf("could not resolve digest for %v", ref)
-		}
+			req, err := http.NewRequest(http.MethodGet, u, nil)
+			if err != nil {
+				return "", ocispec.Descriptor{}, err
+			}
+			req.Header = r.headers
 
-		var (
-			size       int64
-			sizeHeader = resp.Header.Get("Content-Length")
-		)
+			resp, err := fetcher.doRequestWithRetries(ctx, req, nil)
+			if err != nil {
+				return "", ocispec.Descriptor{}, err
+			}
+			defer resp.Body.Close()
 
-		size, err = strconv.ParseInt(sizeHeader, 10, 64)
-		if err != nil {
+			bodyReader := countingReader{reader: resp.Body}
 
-			return "", ocispec.Descriptor{}, errors.Wrapf(err, "invalid size header: %q", sizeHeader)
-		}
-		if size < 0 {
-			return "", ocispec.Descriptor{}, errors.Errorf("%q in header not a valid size", sizeHeader)
+			contentType = getManifestMediaType(resp)
+			if contentType == images.MediaTypeDockerSchema1Manifest {
+				b, err := schema1.ReadStripSignature(&bodyReader)
+				if err != nil {
+					return "", ocispec.Descriptor{}, err
+				}
+
+				dgst = digest.FromBytes(b)
+			} else {
+				dgst, err = digest.FromReader(&bodyReader)
+				if err != nil {
+					return "", ocispec.Descriptor{}, err
+				}
+			}
+			size = bodyReader.bytesRead
 		}
 
 		desc := ocispec.Descriptor{
 			Digest:    dgst,
-			MediaType: resp.Header.Get("Content-Type"), // need to strip disposition?
+			MediaType: contentType,
 			Size:      size,
 		}
 
