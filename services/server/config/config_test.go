@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"gotest.tools/assert"
@@ -175,6 +176,7 @@ imports = ["data1.toml", "data2.toml"]
 	assert.Equal(t, "/var/lib/containerd", out.Root)
 	assert.DeepEqual(t, []string{"io.containerd.v1.xyz"}, out.DisabledPlugins)
 
+	sort.Strings(out.Imports)
 	assert.DeepEqual(t, []string{
 		filepath.Join(tempDir, "data1.toml"),
 		filepath.Join(tempDir, "data2.toml"),
