@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/containerd/typeurl"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
@@ -33,7 +32,6 @@ import (
 	"github.com/containerd/cri/pkg/annotations"
 	"github.com/containerd/cri/pkg/containerd/opts"
 	ostesting "github.com/containerd/cri/pkg/os/testing"
-	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
 )
 
 func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
@@ -82,15 +80,13 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 	return config, imageConfig, specCheck
 }
 
-func TestSandboxContainerSpec(t *testing.T) {
+func TestLinuxSandboxContainerSpec(t *testing.T) {
 	testID := "test-id"
 	nsPath := "test-cni"
 	for desc, test := range map[string]struct {
-		configChange      func(*runtime.PodSandboxConfig)
-		podAnnotations    []string
-		imageConfigChange func(*imagespec.ImageConfig)
-		specCheck         func(*testing.T, *runtimespec.Spec)
-		expectErr         bool
+		configChange func(*runtime.PodSandboxConfig)
+		specCheck    func(*testing.T, *runtimespec.Spec)
+		expectErr    bool
 	}{
 		"spec should reflect original config": {
 			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
@@ -138,13 +134,6 @@ func TestSandboxContainerSpec(t *testing.T) {
 				})
 			},
 		},
-		"should return error when entrypoint and cmd are empty": {
-			imageConfigChange: func(c *imagespec.ImageConfig) {
-				c.Entrypoint = nil
-				c.Cmd = nil
-			},
-			expectErr: true,
-		},
 		"should set supplemental groups correctly": {
 			configChange: func(c *runtime.PodSandboxConfig) {
 				c.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
@@ -157,42 +146,6 @@ func TestSandboxContainerSpec(t *testing.T) {
 				assert.Contains(t, spec.Process.User.AdditionalGids, uint32(2222))
 			},
 		},
-		"a passthrough annotation should be passed as an OCI annotation": {
-			podAnnotations: []string{"c"},
-			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
-				assert.Equal(t, spec.Annotations["c"], "d")
-			},
-		},
-		"a non-passthrough annotation should not be passed as an OCI annotation": {
-			configChange: func(c *runtime.PodSandboxConfig) {
-				c.Annotations["d"] = "e"
-			},
-			podAnnotations: []string{"c"},
-			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
-				assert.Equal(t, spec.Annotations["c"], "d")
-				_, ok := spec.Annotations["d"]
-				assert.False(t, ok)
-			},
-		},
-		"passthrough annotations should support wildcard match": {
-			configChange: func(c *runtime.PodSandboxConfig) {
-				c.Annotations["t.f"] = "j"
-				c.Annotations["z.g"] = "o"
-				c.Annotations["z"] = "o"
-				c.Annotations["y.ca"] = "b"
-				c.Annotations["y"] = "b"
-			},
-			podAnnotations: []string{"t*", "z.*", "y.c*"},
-			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
-				assert.Equal(t, spec.Annotations["t.f"], "j")
-				assert.Equal(t, spec.Annotations["z.g"], "o")
-				assert.Equal(t, spec.Annotations["y.ca"], "b")
-				_, ok := spec.Annotations["y"]
-				assert.False(t, ok)
-				_, ok = spec.Annotations["z"]
-				assert.False(t, ok)
-			},
-		},
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIService()
@@ -200,12 +153,7 @@ func TestSandboxContainerSpec(t *testing.T) {
 		if test.configChange != nil {
 			test.configChange(config)
 		}
-
-		if test.imageConfigChange != nil {
-			test.imageConfigChange(imageConfig)
-		}
-		spec, err := c.sandboxContainerSpec(testID, config, imageConfig, nsPath,
-			test.podAnnotations)
+		spec, err := c.sandboxContainerSpec(testID, config, imageConfig, nsPath, nil)
 		if test.expectErr {
 			assert.Error(t, err)
 			assert.Nil(t, spec)
@@ -457,47 +405,6 @@ options timeout:1
 		}
 		assert.NoError(t, err)
 		assert.Equal(t, resolvContent, test.expectedContent)
-	}
-}
-
-// TODO(windows): Move this to sandbox_run_test.go
-func TestTypeurlMarshalUnmarshalSandboxMeta(t *testing.T) {
-	for desc, test := range map[string]struct {
-		configChange func(*runtime.PodSandboxConfig)
-	}{
-		"should marshal original config": {},
-		"should marshal Linux": {
-			configChange: func(c *runtime.PodSandboxConfig) {
-				c.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
-					NamespaceOptions: &runtime.NamespaceOption{
-						Network: runtime.NamespaceMode_NODE,
-						Pid:     runtime.NamespaceMode_NODE,
-						Ipc:     runtime.NamespaceMode_NODE,
-					},
-					SupplementalGroups: []int64{1111, 2222},
-				}
-			},
-		},
-	} {
-		t.Logf("TestCase %q", desc)
-		meta := &sandboxstore.Metadata{
-			ID:        "1",
-			Name:      "sandbox_1",
-			NetNSPath: "/home/cloud",
-		}
-		meta.Config, _, _ = getRunPodSandboxTestData()
-		if test.configChange != nil {
-			test.configChange(meta.Config)
-		}
-
-		any, err := typeurl.MarshalAny(meta)
-		assert.NoError(t, err)
-		data, err := typeurl.UnmarshalAny(any)
-		assert.NoError(t, err)
-		assert.IsType(t, &sandboxstore.Metadata{}, data)
-		curMeta, ok := data.(*sandboxstore.Metadata)
-		assert.True(t, ok)
-		assert.Equal(t, meta, curMeta)
 	}
 }
 

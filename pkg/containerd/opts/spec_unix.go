@@ -137,7 +137,6 @@ func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 				mounts = append(mounts, e)
 			}
 		}
-		// ---
 
 		// Sort mounts in number of parts. This ensures that high level mounts don't
 		// shadow other mounts.

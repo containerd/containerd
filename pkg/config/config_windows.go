@@ -18,7 +18,53 @@ limitations under the License.
 
 package config
 
+import (
+	"os"
+	"path/filepath"
+
+	"github.com/containerd/containerd"
+	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
+)
+
 // DefaultConfig returns default configurations of cri plugin.
 func DefaultConfig() PluginConfig {
-	return PluginConfig{}
+	return PluginConfig{
+		CniConfig: CniConfig{
+			NetworkPluginBinDir:       filepath.Join(os.Getenv("ProgramFiles"), "containerd", "cni", "bin"),
+			NetworkPluginConfDir:      filepath.Join(os.Getenv("ProgramFiles"), "containerd", "cni", "conf"),
+			NetworkPluginMaxConfNum:   1,
+			NetworkPluginConfTemplate: "",
+		},
+		ContainerdConfig: ContainerdConfig{
+			Snapshotter:        containerd.DefaultSnapshotter,
+			DefaultRuntimeName: "runhcs-wcow-process",
+			NoPivot:            false,
+			Runtimes: map[string]Runtime{
+				"runhcs-wcow-process": {
+					Type: "io.containerd.runhcs.v1",
+				},
+			},
+		},
+		DisableTCPService:   true,
+		StreamServerAddress: "127.0.0.1",
+		StreamServerPort:    "0",
+		StreamIdleTimeout:   streaming.DefaultConfig.StreamIdleTimeout.String(), // 4 hour
+		EnableTLSStreaming:  false,
+		X509KeyPairStreaming: X509KeyPairStreaming{
+			TLSKeyFile:  "",
+			TLSCertFile: "",
+		},
+		SandboxImage:            "mcr.microsoft.com/k8s/core/pause:1.0.0",
+		StatsCollectPeriod:      10,
+		MaxContainerLogLineSize: 16 * 1024,
+		Registry: Registry{
+			Mirrors: map[string]Mirror{
+				"docker.io": {
+					Endpoints: []string{"https://registry-1.docker.io"},
+				},
+			},
+		},
+		MaxConcurrentDownloads: 3,
+		// TODO(windows): Add platform specific config, so that most common defaults can be shared.
+	}
 }

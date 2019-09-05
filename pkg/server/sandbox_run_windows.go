@@ -20,18 +20,53 @@ package server
 
 import (
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+
+	"github.com/containerd/cri/pkg/annotations"
+	customopts "github.com/containerd/cri/pkg/containerd/opts"
 )
 
-// TODO(windows): Add windows support.
 // TODO(windows): Configure windows sandbox shares
 func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
 	imageConfig *imagespec.ImageConfig, nsPath string, runtimePodAnnotations []string) (*runtimespec.Spec, error) {
-	return nil, errdefs.ErrNotImplemented
+	// Creates a spec Generator with the default spec.
+	specOpts := []oci.SpecOpts{
+		oci.WithEnv(imageConfig.Env),
+		oci.WithHostname(config.GetHostname()),
+	}
+	if imageConfig.WorkingDir != "" {
+		specOpts = append(specOpts, oci.WithProcessCwd(imageConfig.WorkingDir))
+	}
+
+	if len(imageConfig.Entrypoint) == 0 && len(imageConfig.Cmd) == 0 {
+		// Pause image must have entrypoint or cmd.
+		return nil, errors.Errorf("invalid empty entrypoint and cmd in image config %+v", imageConfig)
+	}
+	specOpts = append(specOpts, oci.WithProcessArgs(append(imageConfig.Entrypoint, imageConfig.Cmd...)...))
+
+	specOpts = append(specOpts,
+		// Clear the root location since hcsshim expects it.
+		// NOTE: readonly rootfs doesn't work on windows.
+		customopts.WithoutRoot,
+		customopts.WithWindowsNetworkNamespace(nsPath),
+	)
+
+	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
+		runtimePodAnnotations) {
+		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
+	}
+
+	specOpts = append(specOpts,
+		customopts.WithAnnotation(annotations.ContainerType, annotations.ContainerTypeSandbox),
+		customopts.WithAnnotation(annotations.SandboxID, id),
+		customopts.WithAnnotation(annotations.SandboxLogDir, config.GetLogDirectory()),
+	)
+
+	return runtimeSpec(id, specOpts...)
 }
 
 // No sandbox container spec options for windows yet.

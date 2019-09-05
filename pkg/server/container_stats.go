@@ -25,8 +25,6 @@ import (
 
 // ContainerStats returns stats of the container. If the container does not
 // exist, the call returns an error.
-// TODO(windows): hcsshim Stats is not implemented, add windows support after
-// that is implemented.
 func (c *criService) ContainerStats(ctx context.Context, in *runtime.ContainerStatsRequest) (*runtime.ContainerStatsResponse, error) {
 	cntr, err := c.containerStore.Get(in.GetContainerId())
 	if err != nil {

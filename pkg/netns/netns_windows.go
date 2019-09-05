@@ -18,33 +18,61 @@ limitations under the License.
 
 package netns
 
-// TODO(windows): Implement netns for windows.
-// NetNS holds network namespace.
+import "github.com/Microsoft/hcsshim/hcn"
+
+// NetNS holds network namespace for sandbox
 type NetNS struct {
+	path string
 }
 
-// NewNetNS creates a network namespace.
+// NewNetNS creates a network namespace for the sandbox
 func NewNetNS() (*NetNS, error) {
-	return nil, nil
+	temp := hcn.HostComputeNamespace{}
+	hcnNamespace, err := temp.Create()
+	if err != nil {
+		return nil, err
+	}
+
+	return &NetNS{path: string(hcnNamespace.Id)}, nil
 }
 
 // LoadNetNS loads existing network namespace.
 func LoadNetNS(path string) *NetNS {
-	return nil
+	return &NetNS{path: path}
 }
 
-// Remove removes network namepace. Remove is idempotent, meaning it might
-// be invoked multiple times and provides consistent result.
+// Remove removes network namepace if it exists and not closed. Remove is idempotent,
+// meaning it might be invoked multiple times and provides consistent result.
 func (n *NetNS) Remove() error {
-	return nil
+	hcnNamespace, err := hcn.GetNamespaceByID(n.path)
+	if err != nil {
+		if hcn.IsNotFoundError(err) {
+			return nil
+		}
+		return err
+	}
+	err = hcnNamespace.Delete()
+	if err == nil || hcn.IsNotFoundError(err) {
+		return nil
+	}
+	return err
 }
 
 // Closed checks whether the network namespace has been closed.
 func (n *NetNS) Closed() (bool, error) {
-	return false, nil
+	_, err := hcn.GetNamespaceByID(n.path)
+	if err == nil {
+		return false, nil
+	}
+	if hcn.IsNotFoundError(err) {
+		return true, nil
+	}
+	return false, err
 }
 
 // GetPath returns network namespace path for sandbox container
 func (n *NetNS) GetPath() string {
-	return ""
+	return n.path
 }
+
+// NOTE: Do function is not supported.

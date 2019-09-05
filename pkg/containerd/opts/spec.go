@@ -42,6 +42,12 @@ func WithRelativeRoot(root string) oci.SpecOpts {
 	}
 }
 
+// WithoutRoot sets the root to nil for the container.
+func WithoutRoot(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+	s.Root = nil
+	return nil
+}
+
 // WithProcessArgs sets the process args on the spec based on the image and runtime config
 func WithProcessArgs(config *runtime.ContainerConfig, image *imagespec.ImageConfig) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {

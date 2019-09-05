@@ -31,12 +31,6 @@ import (
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
-	"github.com/containerd/cri/pkg/annotations"
-	"github.com/containerd/cri/pkg/config"
-	"github.com/containerd/cri/pkg/containerd/opts"
-	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
-	ostesting "github.com/containerd/cri/pkg/os/testing"
-	"github.com/containerd/cri/pkg/util"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runc/libcontainer/devices"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -44,26 +38,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-)
 
-func checkMount(t *testing.T, mounts []runtimespec.Mount, src, dest, typ string,
-	contains, notcontains []string) {
-	found := false
-	for _, m := range mounts {
-		if m.Source == src && m.Destination == dest {
-			assert.Equal(t, m.Type, typ)
-			for _, c := range contains {
-				assert.Contains(t, m.Options, c)
-			}
-			for _, n := range notcontains {
-				assert.NotContains(t, m.Options, n)
-			}
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "mount from %q to %q not found", src, dest)
-}
+	"github.com/containerd/cri/pkg/annotations"
+	"github.com/containerd/cri/pkg/config"
+	"github.com/containerd/cri/pkg/containerd/opts"
+	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
+	ostesting "github.com/containerd/cri/pkg/os/testing"
+	"github.com/containerd/cri/pkg/util"
+)
 
 func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandboxConfig,
 	*imagespec.ImageConfig, func(*testing.T, string, string, uint32, *runtimespec.Spec)) {
@@ -195,18 +177,6 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 	return config, sandboxConfig, imageConfig, specCheck
 }
 
-func TestGeneralContainerSpec(t *testing.T) {
-	testID := "test-id"
-	testPid := uint32(1234)
-	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
-	ociRuntime := config.Runtime{}
-	c := newTestCRIService()
-	testSandboxID := "sandbox-id"
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, "", containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
-	require.NoError(t, err)
-	specCheck(t, testID, testSandboxID, testPid, spec)
-}
-
 func TestContainerCapabilities(t *testing.T) {
 	testID := "test-id"
 	testSandboxID := "sandbox-id"
@@ -296,134 +266,6 @@ func TestContainerSpecTty(t *testing.T) {
 		} else {
 			assert.NotContains(t, spec.Process.Env, "TERM=xterm")
 		}
-	}
-}
-
-func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
-	testID := "test-id"
-	testSandboxID := "sandbox-id"
-	testPid := uint32(1234)
-
-	for desc, test := range map[string]struct {
-		podAnnotations []string
-		configChange   func(*runtime.PodSandboxConfig)
-		specCheck      func(*testing.T, *runtimespec.Spec)
-	}{
-		"a passthrough annotation should be passed as an OCI annotation": {
-			podAnnotations: []string{"c"},
-			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
-				assert.Equal(t, spec.Annotations["c"], "d")
-			},
-		},
-		"a non-passthrough annotation should not be passed as an OCI annotation": {
-			configChange: func(c *runtime.PodSandboxConfig) {
-				c.Annotations["d"] = "e"
-			},
-			podAnnotations: []string{"c"},
-			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
-				assert.Equal(t, spec.Annotations["c"], "d")
-				_, ok := spec.Annotations["d"]
-				assert.False(t, ok)
-			},
-		},
-		"passthrough annotations should support wildcard match": {
-			configChange: func(c *runtime.PodSandboxConfig) {
-				c.Annotations["t.f"] = "j"
-				c.Annotations["z.g"] = "o"
-				c.Annotations["z"] = "o"
-				c.Annotations["y.ca"] = "b"
-				c.Annotations["y"] = "b"
-			},
-			podAnnotations: []string{"t*", "z.*", "y.c*"},
-			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
-				t.Logf("%+v", spec.Annotations)
-				assert.Equal(t, spec.Annotations["t.f"], "j")
-				assert.Equal(t, spec.Annotations["z.g"], "o")
-				assert.Equal(t, spec.Annotations["y.ca"], "b")
-				_, ok := spec.Annotations["y"]
-				assert.False(t, ok)
-				_, ok = spec.Annotations["z"]
-				assert.False(t, ok)
-			},
-		},
-	} {
-		t.Run(desc, func(t *testing.T) {
-			c := newTestCRIService()
-			containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
-			if test.configChange != nil {
-				test.configChange(sandboxConfig)
-			}
-
-			ociRuntime := config.Runtime{
-				PodAnnotations: test.podAnnotations,
-			}
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "",
-				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
-			assert.NoError(t, err)
-			assert.NotNil(t, spec)
-			specCheck(t, testID, testSandboxID, testPid, spec)
-			if test.specCheck != nil {
-				test.specCheck(t, spec)
-			}
-		})
-	}
-}
-
-func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
-	testID := "test-id"
-	testSandboxID := "sandbox-id"
-	testPid := uint32(1234)
-
-	for desc, test := range map[string]struct {
-		podAnnotations       []string
-		containerAnnotations []string
-		configChange         func(*runtime.PodSandboxConfig)
-		specCheck            func(*testing.T, *runtimespec.Spec)
-	}{
-		"passthrough annotations from pod and container should be passed as an OCI annotation": {
-			podAnnotations:       []string{"c"},
-			containerAnnotations: []string{"c*"}, // wildcard should pick up ca-c->ca-d pair in container
-			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
-				assert.Equal(t, "d", spec.Annotations["c"])
-				assert.Equal(t, "ca-d", spec.Annotations["ca-c"])
-			},
-		},
-		"annotations should not pass through if no passthrough annotations are configured": {
-			podAnnotations:       []string{},
-			containerAnnotations: []string{},
-			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
-				assert.Equal(t, "", spec.Annotations["c"])
-				assert.Equal(t, "", spec.Annotations["ca-c"])
-			},
-		},
-		"unmatched annotations should not pass through even if passthrough annotations are configured": {
-			podAnnotations:       []string{"x"},
-			containerAnnotations: []string{"x*"},
-			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
-				assert.Equal(t, "", spec.Annotations["c"])
-				assert.Equal(t, "", spec.Annotations["ca-c"])
-			},
-		},
-	} {
-		t.Run(desc, func(t *testing.T) {
-			c := newTestCRIService()
-			containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
-			if test.configChange != nil {
-				test.configChange(sandboxConfig)
-			}
-			ociRuntime := config.Runtime{
-				PodAnnotations:       test.podAnnotations,
-				ContainerAnnotations: test.containerAnnotations,
-			}
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "",
-				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
-			assert.NoError(t, err)
-			assert.NotNil(t, spec)
-			specCheck(t, testID, testSandboxID, testPid, spec)
-			if test.specCheck != nil {
-				test.specCheck(t, spec)
-			}
-		})
 	}
 }
 
@@ -547,68 +389,6 @@ func TestContainerAndSandboxPrivileged(t *testing.T) {
 		} else {
 			assert.NoError(t, err)
 		}
-	}
-}
-
-func TestContainerSpecCommand(t *testing.T) {
-	for desc, test := range map[string]struct {
-		criEntrypoint   []string
-		criArgs         []string
-		imageEntrypoint []string
-		imageArgs       []string
-		expected        []string
-		expectErr       bool
-	}{
-		"should use cri entrypoint if it's specified": {
-			criEntrypoint:   []string{"a", "b"},
-			imageEntrypoint: []string{"c", "d"},
-			imageArgs:       []string{"e", "f"},
-			expected:        []string{"a", "b"},
-		},
-		"should use cri entrypoint if it's specified even if it's empty": {
-			criEntrypoint:   []string{},
-			criArgs:         []string{"a", "b"},
-			imageEntrypoint: []string{"c", "d"},
-			imageArgs:       []string{"e", "f"},
-			expected:        []string{"a", "b"},
-		},
-		"should use cri entrypoint and args if they are specified": {
-			criEntrypoint:   []string{"a", "b"},
-			criArgs:         []string{"c", "d"},
-			imageEntrypoint: []string{"e", "f"},
-			imageArgs:       []string{"g", "h"},
-			expected:        []string{"a", "b", "c", "d"},
-		},
-		"should use image entrypoint if cri entrypoint is not specified": {
-			criArgs:         []string{"a", "b"},
-			imageEntrypoint: []string{"c", "d"},
-			imageArgs:       []string{"e", "f"},
-			expected:        []string{"c", "d", "a", "b"},
-		},
-		"should use image args if both cri entrypoint and args are not specified": {
-			imageEntrypoint: []string{"c", "d"},
-			imageArgs:       []string{"e", "f"},
-			expected:        []string{"c", "d", "e", "f"},
-		},
-		"should return error if both entrypoint and args are empty": {
-			expectErr: true,
-		},
-	} {
-
-		config, _, imageConfig, _ := getCreateContainerTestData()
-		config.Command = test.criEntrypoint
-		config.Args = test.criArgs
-		imageConfig.Entrypoint = test.imageEntrypoint
-		imageConfig.Cmd = test.imageArgs
-
-		var spec runtimespec.Spec
-		err := opts.WithProcessArgs(config, imageConfig)(context.Background(), nil, nil, &spec)
-		if test.expectErr {
-			assert.Error(t, err)
-			continue
-		}
-		assert.NoError(t, err)
-		assert.Equal(t, test.expected, spec.Process.Args, desc)
 	}
 }
 
