@@ -40,6 +40,7 @@ import (
 
 	criconfig "github.com/containerd/cri/pkg/config"
 	"github.com/containerd/cri/pkg/constants"
+	criplatforms "github.com/containerd/cri/pkg/containerd/platforms"
 	"github.com/containerd/cri/pkg/server"
 )
 
@@ -89,6 +90,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	client, err := containerd.New(
 		"",
 		containerd.WithDefaultNamespace(constants.K8sContainerdNamespace),
+		containerd.WithDefaultPlatform(criplatforms.Default()),
 		containerd.WithServices(servicesOpts...),
 	)
 	if err != nil {
