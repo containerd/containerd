@@ -67,6 +67,9 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			opts = append(opts, oci.WithWindowNetworksAllowUnqualifiedDNSQuery())
 			opts = append(opts, oci.WithWindowsIgnoreFlushesDuringBoot())
 		}
+		if ef := context.String("env-file"); ef != "" {
+			opts = append(opts, oci.WithEnvFile(ef))
+		}
 		opts = append(opts, oci.WithEnv(context.StringSlice("env")))
 		opts = append(opts, withMounts(context))
 
