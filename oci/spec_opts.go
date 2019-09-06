@@ -17,6 +17,7 @@
 package oci
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -1198,5 +1199,26 @@ func WithLinuxDevice(path, permissions string) SpecOpts {
 		})
 
 		return nil
+	}
+}
+
+// WithEnvFile adds environment variables from a file to the container's spec
+func WithEnvFile(path string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		var vars []string
+		f, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		sc := bufio.NewScanner(f)
+		for sc.Scan() {
+			if sc.Err() != nil {
+				return sc.Err()
+			}
+			vars = append(vars, sc.Text())
+		}
+		return WithEnv(vars)(nil, nil, nil, s)
 	}
 }

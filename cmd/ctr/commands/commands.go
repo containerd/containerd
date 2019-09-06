@@ -77,6 +77,10 @@ var (
 			Name:  "env",
 			Usage: "specify additional container environment variables (i.e. FOO=bar)",
 		},
+		cli.StringFlag{
+			Name:  "env-file",
+			Usage: "specify additional container environment variables in a file(i.e. FOO=bar, one per line)",
+		},
 		cli.StringSliceFlag{
 			Name:  "label",
 			Usage: "specify additional labels (i.e. foo=bar)",
