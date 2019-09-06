@@ -35,6 +35,10 @@ INCLUDE_CNI=${INCLUDE_CNI:-false}
 CUSTOM_CONTAINERD=${CUSTOM_CONTAINERD:-false}
 # OFFICIAL_RELEASE indicates whether to use official containerd release.
 OFFICIAL_RELEASE=${OFFICIAL_RELEASE:-false}
+# LOCAL_RELEASE indicates that containerd has been built and released
+# locally.
+LOCAL_RELEASE=${LOCAL_RELEASE:-false}
+
 
 destdir=${BUILD_DIR}/release-stage
 
@@ -56,6 +60,16 @@ download_containerd() {
   rm -rf "${tmppath}"
 }
 
+# copy_local_containerd copies local containerd release.
+copy_local_containerd() {
+  local -r tarball="${GOPATH}/src/github.com/containerd/containerd/releases/containerd-${VERSION}.linux-amd64.tar.gz"
+  if [[ ! -e "${tarball}" ]]; then
+    echo "Containerd release is not built"
+    exit 1
+  fi
+  tar -C "${destdir}/usr/local" -xzf "${tarball}"
+}
+
 # Install dependencies into release stage.
 # Install runc
 NOSUDO=true DESTDIR=${destdir} ./hack/install/install-runc.sh
@@ -71,6 +85,8 @@ NOSUDO=true DESTDIR=${destdir} ./hack/install/install-critools.sh
 # Install containerd
 if $OFFICIAL_RELEASE; then
   download_containerd
+elif $LOCAL_RELEASE; then
+  copy_local_containerd
 else
   # Build containerd from source
   NOSUDO=true DESTDIR=${destdir} ./hack/install/install-containerd.sh
