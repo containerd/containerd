@@ -117,14 +117,30 @@ before_deploy:
   - make release
 
 deploy:
-  provider: releases
-  api_key:
-    secure: HO+WSIVVUMMsbU74x+YyFsTP3ahqnR4xjwKAziedJ5lZXKJszQBhiYTFmcTeVBoouNjTISd07GQzpoLChuGC20U3+1NbT+CkK8xWR/x1ao2D3JY3Ds6AD9ubWRNWRLptt/xOn5Vq3F8xZyUYchwvDMl4zKCuTKxQGVdHKsINb2DehKcP5cVL6MMvqzEdfj2g99vqXAqs8uuo6dOmvxmHV43bfzDaAJSabjZZs6TKlWTqCQMet8uxyx2Dmjl2lxLwdqv12oJdrszacasn41NYuEyHI2bXyef1mhWGYN4n9bU/Y5winctZ8DOSOZvYg/2ziAaUN0+CTn1IESwVesrPz23P2Sy7wdLxu8dSIZ2yUHl7OsA5T5a5rDchAGguRVNBWvoGtuepEhdRacxTQUo1cMFZsEXjgRKKjdfc1emYQPVdN8mBv8GJwndty473ZXdvFt5R0kNVFtvWuYCa6UYJD2cKrsPSAfbZCDC/LiR3FOoTaUPMZUVkR2ACEO7Dn4+KlmBajqT40Osk/A7k1XA/TzVhMIpLtE0Vk2DfPmGsjCv8bC+MFd+R2Sc8SFdE92oEWRdoPQY5SxMYQtGxA+cbKVlT1kSw6y80yEbx5JZsBnT6+NTHwmDO3kVU9ztLdawOozTElKNAK8HoAyFmzIZ3wL64oThuDrv/TUuY8Iyn814=
-  file_glob: true
-  file:
-    - releases/*.tar.gz
-    - releases/*.tar.gz.sha256sum
-  skip_cleanup: true
-  on:
-    repo: containerd/containerd
-    tags: true
+  - provider: releases
+    api_key:
+      secure: HO+WSIVVUMMsbU74x+YyFsTP3ahqnR4xjwKAziedJ5lZXKJszQBhiYTFmcTeVBoouNjTISd07GQzpoLChuGC20U3+1NbT+CkK8xWR/x1ao2D3JY3Ds6AD9ubWRNWRLptt/xOn5Vq3F8xZyUYchwvDMl4zKCuTKxQGVdHKsINb2DehKcP5cVL6MMvqzEdfj2g99vqXAqs8uuo6dOmvxmHV43bfzDaAJSabjZZs6TKlWTqCQMet8uxyx2Dmjl2lxLwdqv12oJdrszacasn41NYuEyHI2bXyef1mhWGYN4n9bU/Y5winctZ8DOSOZvYg/2ziAaUN0+CTn1IESwVesrPz23P2Sy7wdLxu8dSIZ2yUHl7OsA5T5a5rDchAGguRVNBWvoGtuepEhdRacxTQUo1cMFZsEXjgRKKjdfc1emYQPVdN8mBv8GJwndty473ZXdvFt5R0kNVFtvWuYCa6UYJD2cKrsPSAfbZCDC/LiR3FOoTaUPMZUVkR2ACEO7Dn4+KlmBajqT40Osk/A7k1XA/TzVhMIpLtE0Vk2DfPmGsjCv8bC+MFd+R2Sc8SFdE92oEWRdoPQY5SxMYQtGxA+cbKVlT1kSw6y80yEbx5JZsBnT6+NTHwmDO3kVU9ztLdawOozTElKNAK8HoAyFmzIZ3wL64oThuDrv/TUuY8Iyn814=
+    file_glob: true
+    file:
+      - releases/*.tar.gz
+      - releases/*.tar.gz.sha256sum
+    skip_cleanup: true
+    on:
+      repo: containerd/containerd
+      tags: true
+  - provider: gcs
+    access_key_id: GOOG1EJPAMPUV4MOGUSPRFM427Q5QOTNODQTMJYPXJFDF46IZLX2NGUQX3T7Q
+    secret_access_key:
+      secure: l3ITadMltGpYXShigdyRfpA7VuNcpGNrY9adB/1dQ5UVp0ZyRyimWX5+ea45JArh95iQCp11kY/7gKgL3tKAPsOXa9Lbt59n3XtlrVk5sqmd4S5+ZaI4Za4cRnkhkIAqro/IYsnzdLHqhCFYEmEDyMiI45RBkYYea+fnZFAGaTePmGwnD2LOn7A1z+dDGHt5g1Rpmdj1kB/AsHG6Wr8oGhMg9RlzSkAw2EAc1X3/9ofjOVM0AyB/hAgm/vmgisnqRSKzILqhL04d5b3gavrFn2YjrSEqP102BgYksn7EsJd1NMjA6Hj/qfVNCTn+rL8M85IE6JIAjrBog/HFv8Ez1bl1kSbB9UmAYZizEi7VD/fcxukYOPgqjDUoLrNaS3q+K0DkE1jzzcr72iMM+I8WJga7Vh4+MYjXadD5V96i2QDpthkEMvy1EpWvwQSl/fexaz2nJA5/CiX/V9GnWVsZiWlq/qMxji/ZbWsB04zRDfk9JneI7tubTNYj5FHrzhCQ7jrZYnXY/pb0sQkF1qczpH4PaXXgLnN00xffNudhsA6xZe/d22Yq+LELXeEmfOKD5j/DGdJGINgMj8RcngyKK6znBlBZ7nF3yqhLg4fHrCk9iOivGUXvKqdruqH+Yl7DUAp1Y0sySFlPF4I8RzMPHGPFqAJ9Q+rN2BNslClHAuA=
+    # TODO: use cri-containerd-release after testing.
+    #bucket: cri-containerd-release
+    bucket: cri-containerd-staging
+    skip_cleanup: true
+    acl: public-read
+    file:
+    - releases/cri/*.tar.gz
+    - releases/cri/*.tar.gz.sha256
+    # TODO: only deploy on tag after testing.
+    #on:
+    #  repo: containerd/containerd
+    #  tags: true
