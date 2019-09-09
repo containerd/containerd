@@ -37,7 +37,6 @@ before_script:
 script:
   - make .install.gitvalidation
   - make .gitvalidation
-  - make binaries
   - make install.deps
   - make containerd
   - sudo PATH=$PATH GOPATH=$GOPATH make install-containerd

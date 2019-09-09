@@ -52,7 +52,8 @@ if [ ! -x "$(command -v ${CRITEST})" ]; then
   cd ${GOPATH}/src/${CRITOOL_PKG}
   git fetch --all
   git checkout ${CRITOOL_VERSION}
-  make
+  make critest
+  make install-critest -e BINDIR="${GOPATH}/bin"
 fi
 which ${CRITEST}
 

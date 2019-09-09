@@ -19,7 +19,7 @@ set -o nounset
 set -o pipefail
 
 source $(dirname "${BASH_SOURCE[0]}")/utils.sh
-CONTAINERD_DIR=${DESTDIR}/usr/local
+CONTAINERD_DIR=${CONTAINERD_DIR:-"${DESTDIR}/usr/local"}
 CONTAINERD_PKG=github.com/containerd/containerd
 
 # CHECKOUT_CONTAINERD indicates whether to checkout containerd repo.
@@ -29,8 +29,7 @@ CHECKOUT_CONTAINERD=${CHECKOUT_CONTAINERD:-true}
 
 if ${CHECKOUT_CONTAINERD}; then
   # Create a temporary GOPATH for containerd installation.
-  TMPGOPATH=$(mktemp -d /tmp/cri-install-containerd.XXXX)
-  GOPATH=${TMPGOPATH}
+  GOPATH=$(mktemp -d /tmp/cri-install-containerd.XXXX)
   from-vendor CONTAINERD github.com/containerd/containerd
   checkout_repo ${CONTAINERD_PKG} ${CONTAINERD_VERSION} ${CONTAINERD_REPO}
 fi
@@ -40,9 +39,11 @@ cd ${GOPATH}/src/${CONTAINERD_PKG}
 make BUILDTAGS="${BUILDTAGS}"
 # containerd make install requires `go` to work. Explicitly
 # set PATH to make sure it can find `go` even with `sudo`.
-${SUDO} sh -c "PATH=${PATH} make install -e DESTDIR=${CONTAINERD_DIR}"
+# The single quote is required because containerd Makefile
+# can't handle spaces in the path.
+${SUDO} make install -e DESTDIR="'${CONTAINERD_DIR}'"
 
 # Clean the tmp GOPATH dir.
 if ${CHECKOUT_CONTAINERD}; then
-  rm -rf ${TMPGOPATH}
+  rm -rf ${GOPATH}
 fi
