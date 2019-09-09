@@ -115,6 +115,7 @@ after_success:
 
 before_deploy:
   - make release
+  - if [ "$TRAVIS_GOOS" = "linux" ]; then make cri-release; fi
 
 deploy:
   - provider: releases
@@ -145,7 +146,8 @@ deploy:
     file:
       - releases/cri/*.tar.gz
       - releases/cri/*.tar.gz.sha256
-    # TODO: only deploy on tag after testing.
-    #on:
-    #  repo: containerd/containerd
-    #  tags: true
+    on:
+      repo: containerd/containerd
+      # TODO: switch `tags: true` after validating on master
+      branch: master
+      condition: $TRAVIS_GOOS = linux
