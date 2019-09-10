@@ -223,7 +223,7 @@ release: $(BINARIES)
 	@install $(BINARIES) releases/$(RELEASE)/bin
 	@cd releases/$(RELEASE) && tar -czf ../$(RELEASE).tar.gz *
 	@cd releases && sha256sum $(RELEASE).tar.gz >$(RELEASE).tar.gz.sha256sum
-	@VERSION=$(VERSION) script/release/release-cri
+	@VERSION=$(VERSION:v%=%) script/release/release-cri
 
 clean: ## clean up binaries
 	@echo "$(WHALE) $@"
