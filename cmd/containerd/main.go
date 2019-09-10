@@ -21,6 +21,7 @@ import (
 	"os"
 
 	"github.com/containerd/containerd/cmd/containerd/command"
+	"github.com/containerd/containerd/pkg/climan"
 	"github.com/containerd/containerd/pkg/seed"
 )
 
@@ -30,6 +31,7 @@ func init() {
 
 func main() {
 	app := command.App()
+	app.Commands = append(app.Commands, climan.Command)
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "containerd: %s\n", err)
 		os.Exit(1)
