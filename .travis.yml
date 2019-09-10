@@ -129,23 +129,8 @@ deploy:
     on:
       repo: containerd/containerd
       tags: true
-  - provider: gcs
-    # Use master branch to work around https://github.com/travis-ci/dpl/issues/792.
-    # TODO: Remove this when the fix for https://github.com/travis-ci/dpl/issues/792
-    # is rolled out.
-    edge:
-      branch: master
-    access_key_id: GOOG1EJPAMPUV4MOGUSPRFM427Q5QOTNODQTMJYPXJFDF46IZLX2NGUQX3T7Q
-    secret_access_key:
-      secure: l3ITadMltGpYXShigdyRfpA7VuNcpGNrY9adB/1dQ5UVp0ZyRyimWX5+ea45JArh95iQCp11kY/7gKgL3tKAPsOXa9Lbt59n3XtlrVk5sqmd4S5+ZaI4Za4cRnkhkIAqro/IYsnzdLHqhCFYEmEDyMiI45RBkYYea+fnZFAGaTePmGwnD2LOn7A1z+dDGHt5g1Rpmdj1kB/AsHG6Wr8oGhMg9RlzSkAw2EAc1X3/9ofjOVM0AyB/hAgm/vmgisnqRSKzILqhL04d5b3gavrFn2YjrSEqP102BgYksn7EsJd1NMjA6Hj/qfVNCTn+rL8M85IE6JIAjrBog/HFv8Ez1bl1kSbB9UmAYZizEi7VD/fcxukYOPgqjDUoLrNaS3q+K0DkE1jzzcr72iMM+I8WJga7Vh4+MYjXadD5V96i2QDpthkEMvy1EpWvwQSl/fexaz2nJA5/CiX/V9GnWVsZiWlq/qMxji/ZbWsB04zRDfk9JneI7tubTNYj5FHrzhCQ7jrZYnXY/pb0sQkF1qczpH4PaXXgLnN00xffNudhsA6xZe/d22Yq+LELXeEmfOKD5j/DGdJGINgMj8RcngyKK6znBlBZ7nF3yqhLg4fHrCk9iOivGUXvKqdruqH+Yl7DUAp1Y0sySFlPF4I8RzMPHGPFqAJ9Q+rN2BNslClHAuA=
-    # TODO: use cri-containerd-release after testing.
-    #bucket: cri-containerd-release
-    bucket: cri-containerd-staging
-    skip_cleanup: true
-    acl: public-read
-    file:
-      - releases/cri/*.tar.gz
-      - releases/cri/*.tar.gz.sha256
+  - provider: script
+    script: bash script/release/deploy-cri
     on:
       repo: containerd/containerd
       # TODO: switch `tags: true` after validating on master
