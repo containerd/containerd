@@ -21,6 +21,7 @@ import (
 	"os"
 
 	"github.com/containerd/containerd/cmd/ctr/app"
+	"github.com/containerd/containerd/pkg/climan"
 	"github.com/containerd/containerd/pkg/seed"
 	"github.com/urfave/cli"
 )
@@ -34,6 +35,7 @@ func init() {
 func main() {
 	app := app.New()
 	app.Commands = append(app.Commands, pluginCmds...)
+	app.Commands = append(app.Commands, climan.Command)
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "ctr: %s\n", err)
 		os.Exit(1)

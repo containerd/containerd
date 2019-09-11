@@ -82,6 +82,7 @@ TEST_REQUIRES_ROOT_PACKAGES=$(filter \
 
 # Project binaries.
 COMMANDS=ctr containerd containerd-stress
+MANBINARIES=ctr containerd containerd-stress
 MANPAGES=ctr.1 containerd.1 containerd-config.1 containerd-config.toml.5
 
 ifdef BUILDTAGS
@@ -114,7 +115,7 @@ BINARIES=$(addprefix bin/,$(COMMANDS))
 TESTFLAGS ?= $(TESTFLAGS_RACE)
 TESTFLAGS_PARALLEL ?= 8
 
-.PHONY: clean all AUTHORS build binaries test integration generate protos checkprotos coverage ci check help install uninstall vendor release mandir install-man
+.PHONY: clean all AUTHORS build binaries test integration generate protos checkprotos coverage ci check help install uninstall vendor release mandir install-man genman
 .DEFAULT: default
 
 all: binaries
@@ -202,6 +203,11 @@ man: mandir $(addprefix man/,$(MANPAGES))
 
 mandir:
 	@mkdir -p man
+
+genman: $(addprefix genman/,$(MANBINARIES))
+
+genman/%: bin/% FORCE
+	"$<" gen-man --format man man/
 
 man/%: docs/man/%.md FORCE
 	@echo "$(WHALE) $<"

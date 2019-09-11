@@ -19,3 +19,4 @@ run:
     - api
     - design
     - docs
+    - docs/man

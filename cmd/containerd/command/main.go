@@ -70,6 +70,17 @@ func App() *cli.App {
 	app.Name = "containerd"
 	app.Version = version.Version
 	app.Usage = usage
+	app.Description = `
+containerd is a high performance container runtime whose daemon can be started
+by using this command. If none of the *config*, *publish*, or *help* commands
+are specified, the default action of the **containerd** command is to start the
+containerd daemon in the foreground.
+
+
+A default configuration is used if no TOML configuration is specified or located
+at the default file location. The *containerd config* command can be used to
+generate the default configuration for containerd. The output of that command
+can be used and modified as necessary as a custom configuration.`
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:  "config,c",
