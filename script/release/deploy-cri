@@ -31,5 +31,11 @@ gcloud version
 openssl aes-256-cbc -K $encrypted_5a565171e51f_key -iv $encrypted_5a565171e51f_iv -in "${ROOT}/script/release/gcp-secret.json.enc" -out gcp-secret.json -d
 gcloud auth activate-service-account --key-file gcp-secret.json --project=k8s-cri-containerd
 
-gsutil cp "${ROOT}/releases/cri/*.tar.gz" "${BUCKET}"
-gsutil cp "${ROOT}/releases/cri/*.tar.gz.sha256" "${BUCKET}"
+for file in $(ls "${ROOT}"/releases/cri/*.tar.gz.sha256); do
+  output="$(gsutil cp -n "${file}" "${BUCKET}" 2>&1)"
+  if [[ "$output" =~ "Skipping existing item" ]];then
+    echo "$(basename ${file}) already exists, skip the release tarball"
+    continue
+  fi
+  gsutil cp "${file%.sha256}" "${BUCKET}"
+done
