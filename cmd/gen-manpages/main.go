@@ -17,21 +17,41 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	"github.com/containerd/containerd/cmd/containerd/command"
-	"github.com/containerd/containerd/pkg/seed"
+	"github.com/containerd/containerd/cmd/ctr/app"
+	"github.com/urfave/cli"
 )
 
-func init() {
-	seed.WithTimeAndRand()
-}
-
 func main() {
-	app := command.App()
-	if err := app.Run(os.Args); err != nil {
-		fmt.Fprintf(os.Stderr, "containerd: %s\n", err)
+	if err := run(); err != nil {
+		fmt.Fprint(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func run() error {
+	flag.Parse()
+	apps := map[string]*cli.App{
+		"containerd": command.App(),
+		"ctr":        app.New(),
+	}
+	dir := flag.Arg(0)
+	for name, app := range apps {
+		// clear out the usage as we use banners that do not display in man pages
+		app.Usage = ""
+		data, err := app.ToMan()
+		if err != nil {
+			return err
+		}
+		if err := ioutil.WriteFile(filepath.Join(dir, fmt.Sprintf("%s.1", name)), []byte(data), 0644); err != nil {
+			return err
+		}
+	}
+	return nil
 }
