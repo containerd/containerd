@@ -88,11 +88,11 @@ type StreamProcessor interface {
 }
 
 func compressedHandler(ctx context.Context, mediaType string) (StreamProcessorInit, bool) {
-	compressed, err := images.IsCompressedDiff(ctx, mediaType)
+	compressed, err := images.DiffCompression(ctx, mediaType)
 	if err != nil {
 		return nil, false
 	}
-	if compressed {
+	if compressed != "" {
 		return func(ctx context.Context, stream StreamProcessor, payloads map[string]*types.Any) (StreamProcessor, error) {
 			ds, err := compression.DecompressStream(stream)
 			if err != nil {
