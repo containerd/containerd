@@ -131,6 +131,7 @@ deploy:
       tags: true
   - provider: script
     script: bash script/release/deploy-cri
+    skip_cleanup: true
     on:
       repo: containerd/containerd
       # TODO: switch `tags: true` after validating on master
