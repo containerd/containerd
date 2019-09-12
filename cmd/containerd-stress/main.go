@@ -30,7 +30,6 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/pkg/climan"
 	"github.com/containerd/containerd/plugin"
 	metrics "github.com/docker/go-metrics"
 	"github.com/sirupsen/logrus"
@@ -162,7 +161,6 @@ func main() {
 	}
 	app.Commands = []cli.Command{
 		densityCommand,
-		climan.Command,
 	}
 	app.Action = func(context *cli.Context) error {
 		config := config{

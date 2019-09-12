@@ -82,7 +82,6 @@ TEST_REQUIRES_ROOT_PACKAGES=$(filter \
 
 # Project binaries.
 COMMANDS=ctr containerd containerd-stress
-MANBINARIES=ctr containerd containerd-stress
 MANPAGES=ctr.1 containerd.1 containerd-config.1 containerd-config.toml.5
 
 ifdef BUILDTAGS
@@ -204,10 +203,8 @@ man: mandir $(addprefix man/,$(MANPAGES))
 mandir:
 	@mkdir -p man
 
-genman: $(addprefix genman/,$(MANBINARIES))
-
-genman/%: bin/% FORCE
-	"$<" gen-man --format man man/
+genman: FORCE
+	go run cmd/gen-manpages/main.go man/
 
 man/%: docs/man/%.md FORCE
 	@echo "$(WHALE) $<"
