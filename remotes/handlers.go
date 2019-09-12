@@ -62,21 +62,17 @@ func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
 		}
 	}
 
-	switch desc.MediaType {
-	case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+	switch mt := desc.MediaType; {
+	case mt == images.MediaTypeDockerSchema2Manifest || mt == ocispec.MediaTypeImageManifest:
 		return "manifest-" + desc.Digest.String()
-	case images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+	case mt == images.MediaTypeDockerSchema2ManifestList || mt == ocispec.MediaTypeImageIndex:
 		return "index-" + desc.Digest.String()
-	case images.MediaTypeDockerSchema2Layer, images.MediaTypeDockerSchema2LayerGzip,
-		images.MediaTypeDockerSchema2LayerForeign, images.MediaTypeDockerSchema2LayerForeignGzip,
-		ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerGzip,
-		ocispec.MediaTypeImageLayerNonDistributable, ocispec.MediaTypeImageLayerNonDistributableGzip,
-		images.MediaTypeDockerSchema2LayerEnc, images.MediaTypeDockerSchema2LayerGzipEnc:
+	case images.IsLayerType(mt):
 		return "layer-" + desc.Digest.String()
-	case images.MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig:
+	case images.IsKnownConfig(mt):
 		return "config-" + desc.Digest.String()
 	default:
-		log.G(ctx).Warnf("reference for unknown type: %s", desc.MediaType)
+		log.G(ctx).Warnf("reference for unknown type: %s", mt)
 		return "unknown-" + desc.Digest.String()
 	}
 }
