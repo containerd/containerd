@@ -126,6 +126,5 @@ deploy:
     skip_cleanup: true
     on:
       repo: containerd/containerd
-      # TODO: switch `tags: true` after validating on master
-      branch: master
+      tags: true
       condition: $TRAVIS_GOOS = linux
