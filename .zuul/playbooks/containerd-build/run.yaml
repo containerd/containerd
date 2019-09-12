@@ -8,6 +8,10 @@
       shell:
         cmd: |
           set -xe
+
+          # Install the developer dependency
+          ./script/setup/install-dev-tools
+
           apt-get update
           apt-get install -y btrfs-tools libseccomp-dev git pkg-config
 
