@@ -20,8 +20,7 @@
 set -eu -o pipefail
 
 ROOT=${GOPATH}/src/github.com/containerd/containerd
-# TODO: Change cri-containerd-release after tested.
-BUCKET="gs://cri-containerd-staging"
+BUCKET="gs://cri-containerd-release"
 
 rm -rf "${HOME}/google-cloud-sdk"
 export CLOUDSDK_CORE_DISABLE_PROMPTS=1
