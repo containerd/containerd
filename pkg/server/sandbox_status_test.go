@@ -31,6 +31,7 @@ func TestPodSandboxStatus(t *testing.T) {
 		id = "test-id"
 		ip = "10.10.10.10"
 	)
+	additionalIPs := []string{"8.8.8.8", "2001:db8:85a3::8a2e:370:7334"}
 	createdAt := time.Now()
 	config := &runtime.PodSandboxConfig{
 		Metadata: &runtime.PodSandboxMetadata{
@@ -62,7 +63,17 @@ func TestPodSandboxStatus(t *testing.T) {
 		Id:        id,
 		Metadata:  config.GetMetadata(),
 		CreatedAt: createdAt.UnixNano(),
-		Network:   &runtime.PodSandboxNetworkStatus{Ip: ip},
+		Network: &runtime.PodSandboxNetworkStatus{
+			Ip: ip,
+			AdditionalIps: []*runtime.PodIP{
+				{
+					Ip: additionalIPs[0],
+				},
+				{
+					Ip: additionalIPs[1],
+				},
+			},
+		},
 		Linux: &runtime.LinuxPodSandboxStatus{
 			Namespaces: &runtime.Namespace{
 				Options: &runtime.NamespaceOption{
@@ -99,7 +110,7 @@ func TestPodSandboxStatus(t *testing.T) {
 			State:     test.state,
 		}
 		expected.State = test.expectedState
-		got := toCRISandboxStatus(metadata, status, ip)
+		got := toCRISandboxStatus(metadata, status, ip, additionalIPs)
 		assert.Equal(t, expected, got)
 	}
 }

@@ -79,7 +79,7 @@ func (c *criService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandb
 		} else if closed {
 			netNSPath = ""
 		}
-		if err := c.teardownPod(ctx, id, netNSPath, sandbox.Config); err != nil {
+		if err := c.teardownPodNetwork(ctx, id, netNSPath, sandbox.Config); err != nil {
 			return nil, errors.Wrapf(err, "failed to destroy network for sandbox %q", id)
 		}
 		if err = sandbox.NetNS.Remove(); err != nil {
@@ -155,8 +155,8 @@ func (c *criService) waitSandboxStop(ctx context.Context, sandbox sandboxstore.S
 	}
 }
 
-// teardownPod removes the network from the pod
-func (c *criService) teardownPod(ctx context.Context, id string, path string, config *runtime.PodSandboxConfig) error {
+// teardownPodNetwork removes the network from the pod
+func (c *criService) teardownPodNetwork(ctx context.Context, id string, path string, config *runtime.PodSandboxConfig) error {
 	if c.netPlugin == nil {
 		return errors.New("cni config not initialized")
 	}
