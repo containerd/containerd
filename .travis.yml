@@ -121,6 +121,7 @@ deploy:
     on:
       repo: containerd/containerd
       tags: true
+      condition: $TRAVIS_GOOS = linux
   - provider: script
     script: bash script/release/deploy-cri
     skip_cleanup: true
