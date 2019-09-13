@@ -69,10 +69,6 @@ func (a *App) prepareFishCommands(commands []Command, allCommands *[]string, pre
 	for i := range commands {
 		command := &commands[i]
 
-		if command.Hidden {
-			continue
-		}
-
 		var completion strings.Builder
 		completion.WriteString(fmt.Sprintf(
 			"complete -r -c %s -n '%s' -a '%s'",
