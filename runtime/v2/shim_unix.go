@@ -21,13 +21,15 @@ package v2
 import (
 	"context"
 	"io"
+	"net"
 	"path/filepath"
+	"time"
 
 	"github.com/containerd/fifo"
 	"golang.org/x/sys/unix"
 )
 
-func openShimLog(ctx context.Context, bundle *Bundle) (io.ReadCloser, error) {
+func openShimLog(ctx context.Context, bundle *Bundle, _ func(string, time.Duration) (net.Conn, error)) (io.ReadCloser, error) {
 	return fifo.OpenFifo(ctx, filepath.Join(bundle.Path, "log"), unix.O_RDONLY|unix.O_CREAT|unix.O_NONBLOCK, 0700)
 }
 

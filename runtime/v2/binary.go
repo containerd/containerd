@@ -74,7 +74,7 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 	if err != nil {
 		return nil, err
 	}
-	f, err := openShimLog(ctx, b.bundle)
+	f, err := openShimLog(ctx, b.bundle, client.AnonDialer)
 	if err != nil {
 		return nil, errors.Wrap(err, "open shim log pipe")
 	}

@@ -78,6 +78,10 @@ func AnonDialer(address string, timeout time.Duration) (net.Conn, error) {
 	return net.DialTimeout("unix", "\x00"+address, timeout)
 }
 
+func AnonReconnectDialer(address string, timeout time.Duration) (net.Conn, error) {
+	return AnonDialer(address, timeout)
+}
+
 // NewSocket returns a new socket
 func NewSocket(address string) (*net.UnixListener, error) {
 	if len(address) > 106 {
