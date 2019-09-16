@@ -442,3 +442,7 @@ func copyDirInfo(fi os.FileInfo, path string) error {
 func copyUpXAttrs(dst, src string) error {
 	return nil
 }
+
+func dirsync(dir string) error {
+	return nil
+}

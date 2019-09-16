@@ -131,6 +131,17 @@ func applyNaive(ctx context.Context, root string, tr *tar.Reader, options ApplyO
 		convertWhiteout = options.ConvertWhiteout
 	)
 
+	// flush metadata into disk
+	defer func() {
+		if err != nil {
+			return
+		}
+
+		if err = dirsync(root); err != nil {
+			size = 0
+		}
+	}()
+
 	if convertWhiteout == nil {
 		// handle whiteouts by removing the target files
 		convertWhiteout = func(hdr *tar.Header, path string) (bool, error) {
@@ -308,6 +319,10 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 		}
 
 		_, err = copyBuffered(ctx, file, reader)
+		if err == nil {
+			err = file.Sync()
+		}
+
 		if err1 := file.Close(); err == nil {
 			err = err1
 		}

@@ -214,3 +214,13 @@ func copyUpXAttrs(dst, src string) error {
 
 	return nil
 }
+
+func dirsync(dir string) error {
+	file, err := os.Open(dir)
+	if err != nil {
+		return errors.Wrapf(err, "failed to open root %s for sync", dir)
+	}
+	defer file.Close()
+
+	return errors.Wrapf(file.Sync(), "failed to sync root %s", dir)
+}
