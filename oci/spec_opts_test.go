@@ -27,6 +27,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/containerd/containerd/content"
@@ -505,4 +506,57 @@ func TestDropCaps(t *testing.T) {
 			t.Errorf("cap list %d is not empty", i)
 		}
 	}
+}
+
+func TestDevShmSize(t *testing.T) {
+	t.Parallel()
+	var (
+		s   Spec
+		c   = containers.Container{ID: t.Name()}
+		ctx = namespaces.WithNamespace(context.Background(), "test")
+	)
+
+	err := populateDefaultUnixSpec(ctx, &s, c.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := "1024k"
+	if err := WithDevShmSize(1024)(nil, nil, nil, &s); err != nil {
+		t.Fatal(err)
+	}
+	m := getShmMount(&s)
+	if m == nil {
+		t.Fatal("no shm mount found")
+	}
+	o := getShmSize(m.Options)
+	if o == "" {
+		t.Fatal("shm size not specified")
+	}
+	parts := strings.Split(o, "=")
+	if len(parts) != 2 {
+		t.Fatal("invalid size format")
+	}
+	size := parts[1]
+	if size != expected {
+		t.Fatalf("size %s not equal %s", size, expected)
+	}
+}
+
+func getShmMount(s *Spec) *specs.Mount {
+	for _, m := range s.Mounts {
+		if m.Source == "shm" && m.Type == "tmpfs" {
+			return &m
+		}
+	}
+	return nil
+}
+
+func getShmSize(opts []string) string {
+	for _, o := range opts {
+		if strings.HasPrefix(o, "size=") {
+			return o
+		}
+	}
+	return ""
 }
