@@ -32,7 +32,7 @@ func TestWithImageConfigNoEnv(t *testing.T) {
 	t.Parallel()
 	var (
 		s   Spec
-		c   = containers.Container{ID: "TestWithImageConfigNoEnv"}
+		c   = containers.Container{ID: t.Name()}
 		ctx = namespaces.WithNamespace(context.Background(), "test")
 	)
 

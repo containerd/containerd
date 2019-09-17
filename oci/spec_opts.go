@@ -1222,3 +1222,28 @@ func WithEnvFile(path string) SpecOpts {
 		return WithEnv(vars)(nil, nil, nil, s)
 	}
 }
+
+// ErrNoShmMount is returned when there is no /dev/shm mount specified in the config
+// and an Opts was trying to set a configuration value on the mount.
+var ErrNoShmMount = errors.New("no /dev/shm mount specified")
+
+// WithDevShmSize sets the size of the /dev/shm mount for the container.
+//
+// The size value is specified in kb, kilobytes.
+func WithDevShmSize(kb int64) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		for _, m := range s.Mounts {
+			if m.Source == "shm" && m.Type == "tmpfs" {
+				for i, o := range m.Options {
+					if strings.HasPrefix(o, "size=") {
+						m.Options[i] = fmt.Sprintf("size=%dk", kb)
+						return nil
+					}
+				}
+				m.Options = append(m.Options, fmt.Sprintf("size=%dk", kb))
+				return nil
+			}
+		}
+		return ErrNoShmMount
+	}
+}
