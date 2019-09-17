@@ -1,0 +1,37 @@
+name: Pull Requests
+on: [push]
+jobs:
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: OS Deps
+      run: |
+        apt-get update && apt-get install -y btrfs-tools
+        wget https://github.com/google/protobuf/releases/download/v3.1.0/protoc-3.1.0-linux-x86_64.zip -O /tmp/protoc-3.1.0-linux-x86_64.zip
+        unzip -o -d /tmp/protobuf /tmp/protoc-3.1.0-linux-x86_64.zip
+        export PATH=$PATH:/tmp/protobuf/bin/
+        go get -u github.com/vbatts/git-validation
+
+    - name: Go 1.12
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.12
+      id: go
+
+    - name: Checkout
+      uses: actions/checkout@v1
+
+    - name: Build
+      run: |
+        make fmt
+        make binaries
+        make coverage
+        make dco
+        sudo PATH=$PATH GOPATH=$GOPATH make root-coverage
+
+    - name: Codecov
+      run: |
+        bash <(curl -s https://codecov.io/bash)
