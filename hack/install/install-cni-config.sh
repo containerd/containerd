@@ -34,9 +34,17 @@ ${SUDO} bash -c 'cat >'${CNI_CONFIG_DIR}'/10-containerd-net.conflist <<EOF
       "promiscMode": true,
       "ipam": {
         "type": "host-local",
-        "subnet": "10.88.0.0/16",
+        "ranges": [
+          [{
+            "subnet": "10.88.0.0/16"
+          }],
+          [{
+            "subnet": "2001:4860:4860::8888/32"
+          }]
+        ],
         "routes": [
-          { "dst": "0.0.0.0/0" }
+          { "dst": "0.0.0.0/0" },
+          { "dst": "::/0" }
         ]
       }
     },
