@@ -33,13 +33,35 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type refKeyPrefix struct{}
+
+// WithMediaTypeKeyPrefix adds a custom key prefix for a media type which is used when storing
+// data in the content store from the FetchHandler.
+//
+// Used in `MakeRefKey` to determine what the key prefix should be.
+func WithMediaTypeKeyPrefix(ctx context.Context, mediaType, prefix string) context.Context {
+	var values map[string]string
+	if v := ctx.Value(refKeyPrefix{}); v != nil {
+		values = v.(map[string]string)
+	} else {
+		values = make(map[string]string)
+	}
+
+	values[mediaType] = prefix
+	return context.WithValue(ctx, refKeyPrefix{}, values)
+}
+
 // MakeRefKey returns a unique reference for the descriptor. This reference can be
 // used to lookup ongoing processes related to the descriptor. This function
 // may look to the context to namespace the reference appropriately.
 func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
-	// TODO(stevvooe): Need better remote key selection here. Should be a
-	// product of the context, which may include information about the ongoing
-	// fetch process.
+	if v := ctx.Value(refKeyPrefix{}); v != nil {
+		values := v.(map[string]string)
+		if prefix := values[desc.MediaType]; prefix != "" {
+			return prefix + "-" + desc.Digest.String()
+		}
+	}
+
 	switch desc.MediaType {
 	case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
 		return "manifest-" + desc.Digest.String()
