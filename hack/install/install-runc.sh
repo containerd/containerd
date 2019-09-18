@@ -23,8 +23,7 @@ RUNC_DIR=${DESTDIR}
 RUNC_PKG=github.com/opencontainers/runc
 
 # Create a temporary GOPATH for runc installation.
-TMPGOPATH=$(mktemp -d /tmp/cri-install-runc.XXXX)
-GOPATH=${TMPGOPATH}
+GOPATH=$(mktemp -d /tmp/cri-install-runc.XXXX)
 
 # Install runc
 from-vendor RUNC github.com/opencontainers/runc
@@ -35,4 +34,4 @@ ${SUDO} make install -e DESTDIR=${RUNC_DIR}
 
 # Clean the tmp GOPATH dir. Use sudo because runc build generates
 # some privileged files.
-${SUDO} rm -rf ${TMPGOPATH}
+${SUDO} rm -rf ${GOPATH}

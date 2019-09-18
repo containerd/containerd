@@ -38,7 +38,7 @@ import (
 var runtimePaths sync.Map
 
 // Command returns the shim command with the provided args and configuration
-func Command(ctx context.Context, runtime, containerdAddress, path string, opts *types.Any, cmdArgs ...string) (*exec.Cmd, error) {
+func Command(ctx context.Context, runtime, containerdAddress, containerdTTRPCAddress, path string, opts *types.Any, cmdArgs ...string) (*exec.Cmd, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -95,7 +95,11 @@ func Command(ctx context.Context, runtime, containerdAddress, path string, opts 
 
 	cmd := exec.Command(cmdPath, args...)
 	cmd.Dir = path
-	cmd.Env = append(os.Environ(), "GOMAXPROCS=2")
+	cmd.Env = append(
+		os.Environ(),
+		"GOMAXPROCS=2",
+		fmt.Sprintf("%s=%s", ttrpcAddressEnv, containerdTTRPCAddress),
+	)
 	cmd.SysProcAttr = getSysProcAttr()
 	if opts != nil {
 		d, err := proto.Marshal(opts)

@@ -25,11 +25,36 @@ import (
 	containerstore "github.com/containerd/cri/pkg/store/container"
 )
 
-// TODO(windows): Implement a dummy version of this, and actually support this
-// when stats is supported by the hcs containerd shim.
 func (c *criService) containerMetrics(
 	meta containerstore.Metadata,
 	stats *types.Metric,
 ) (*runtime.ContainerStats, error) {
-	return nil, nil
+	var cs runtime.ContainerStats
+	var usedBytes, inodesUsed uint64
+	sn, err := c.snapshotStore.Get(meta.ID)
+	// If snapshotstore doesn't have cached snapshot information
+	// set WritableLayer usage to zero
+	if err == nil {
+		usedBytes = sn.Size
+		inodesUsed = sn.Inodes
+	}
+	cs.WritableLayer = &runtime.FilesystemUsage{
+		Timestamp: sn.Timestamp,
+		FsId: &runtime.FilesystemIdentifier{
+			Mountpoint: c.imageFSPath,
+		},
+		UsedBytes:  &runtime.UInt64Value{Value: usedBytes},
+		InodesUsed: &runtime.UInt64Value{Value: inodesUsed},
+	}
+	cs.Attributes = &runtime.ContainerAttributes{
+		Id:          meta.ID,
+		Metadata:    meta.Config.GetMetadata(),
+		Labels:      meta.Config.GetLabels(),
+		Annotations: meta.Config.GetAnnotations(),
+	}
+
+	// TODO(windows): hcsshim Stats is not implemented, add windows support after
+	// that is implemented.
+
+	return &cs, nil
 }

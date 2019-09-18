@@ -40,6 +40,7 @@ import (
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
+	"github.com/containerd/containerd/sys/reaper"
 	runc "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
@@ -86,7 +87,7 @@ func NewService(config Config, publisher events.Publisher) (*Service, error) {
 		context:   ctx,
 		processes: make(map[string]process.Process),
 		events:    make(chan interface{}, 128),
-		ec:        Default.Subscribe(),
+		ec:        reaper.Default.Subscribe(),
 	}
 	go s.processExits()
 	if err := s.initPlatform(); err != nil {
@@ -514,33 +515,35 @@ func (s *Service) allProcesses() []process.Process {
 }
 
 func (s *Service) checkProcesses(e runc.Exit) {
-	shouldKillAll, err := shouldKillAllOnExit(s.bundle)
-	if err != nil {
-		log.G(s.context).WithError(err).Error("failed to check shouldKillAll")
-	}
-
 	for _, p := range s.allProcesses() {
-		if p.Pid() == e.Pid {
+		if p.Pid() != e.Pid {
+			continue
+		}
 
+		if ip, ok := p.(*process.Init); ok {
+			shouldKillAll, err := shouldKillAllOnExit(s.bundle)
+			if err != nil {
+				log.G(s.context).WithError(err).Error("failed to check shouldKillAll")
+			}
+
+			// Ensure all children are killed
 			if shouldKillAll {
-				if ip, ok := p.(*process.Init); ok {
-					// Ensure all children are killed
-					if err := ip.KillAll(s.context); err != nil {
-						log.G(s.context).WithError(err).WithField("id", ip.ID()).
-							Error("failed to kill init's children")
-					}
+				if err := ip.KillAll(s.context); err != nil {
+					log.G(s.context).WithError(err).WithField("id", ip.ID()).
+						Error("failed to kill init's children")
 				}
 			}
-			p.SetExited(e.Status)
-			s.events <- &eventstypes.TaskExit{
-				ContainerID: s.id,
-				ID:          p.ID(),
-				Pid:         uint32(e.Pid),
-				ExitStatus:  uint32(e.Status),
-				ExitedAt:    p.ExitedAt(),
-			}
-			return
 		}
+
+		p.SetExited(e.Status)
+		s.events <- &eventstypes.TaskExit{
+			ContainerID: s.id,
+			ID:          p.ID(),
+			Pid:         uint32(e.Pid),
+			ExitStatus:  uint32(e.Status),
+			ExitedAt:    p.ExitedAt(),
+		}
+		return
 	}
 }
 

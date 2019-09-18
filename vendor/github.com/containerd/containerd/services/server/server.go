@@ -40,6 +40,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/pkg/dialer"
+	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/containerd/containerd/snapshots"
@@ -77,12 +78,19 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 	if err := apply(ctx, config); err != nil {
 		return nil, err
 	}
+	for key, sec := range config.Timeouts {
+		d, err := time.ParseDuration(sec)
+		if err != nil {
+			return nil, errors.Errorf("unable to parse %s into a time duration", sec)
+		}
+		timeout.Set(key, d)
+	}
 	plugins, err := LoadPlugins(ctx, config)
 	if err != nil {
 		return nil, err
 	}
-	for _, p := range config.StreamProcessors {
-		diff.RegisterProcessor(diff.BinaryHandler(p.ID, p.Returns, p.Accepts, p.Path, p.Args))
+	for id, p := range config.StreamProcessors {
+		diff.RegisterProcessor(diff.BinaryHandler(id, p.Returns, p.Accepts, p.Path, p.Args))
 	}
 
 	serverOpts := []grpc.ServerOption{
@@ -146,6 +154,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		)
 		initContext.Events = s.events
 		initContext.Address = config.GRPC.Address
+		initContext.TTRPCAddress = config.TTRPC.Address
 
 		// load the plugin specific configuration if it is provided
 		if p.Config != nil {

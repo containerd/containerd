@@ -139,7 +139,7 @@ func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 		return emptyDesc, err
 	}
 
-	if _, err := archive.Apply(ctx, layer, rc, archive.WithParentLayers(parentLayerPaths), archive.AsWindowsContainerLayer()); err != nil {
+	if _, err := archive.Apply(ctx, layer, rc, archive.WithParents(parentLayerPaths), archive.AsWindowsContainerLayer()); err != nil {
 		return emptyDesc, err
 	}
 

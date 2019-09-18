@@ -20,16 +20,39 @@ package server
 
 import (
 	cni "github.com/containerd/go-cni"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
+// windowsNetworkAttachCount is the minimum number of networks the PodSandbox
+// attaches to
+const windowsNetworkAttachCount = 1
+
 // initPlatform handles linux specific initialization for the CRI service.
-// TODO(windows): Initialize CRI plugin for windows
 func (c *criService) initPlatform() error {
+	var err error
+	// For windows, the loopback network is added as default.
+	// There is no need to explicitly add one hence networkAttachCount is 1.
+	// If there are more network configs the pod will be attached to all the
+	// networks but we will only use the ip of the default network interface
+	// as the pod IP.
+	c.netPlugin, err = cni.New(cni.WithMinNetworkCount(windowsNetworkAttachCount),
+		cni.WithPluginConfDir(c.config.NetworkPluginConfDir),
+		cni.WithPluginMaxConfNum(c.config.NetworkPluginMaxConfNum),
+		cni.WithPluginDir([]string{c.config.NetworkPluginBinDir}))
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize cni")
+	}
+
+	// Try to load the config if it exists. Just log the error if load fails
+	// This is not disruptive for containerd to panic
+	if err := c.netPlugin.Load(c.cniLoadOptions()...); err != nil {
+		logrus.WithError(err).Error("Failed to load cni during init, please check CRI plugin status before setting up network for pods")
+	}
 	return nil
 }
 
 // cniLoadOptions returns cni load options for the windows.
-// TODO(windows): Implement CNI options for windows.
 func (c *criService) cniLoadOptions() []cni.CNIOpt {
-	return nil
+	return []cni.CNIOpt{cni.WithDefaultConf}
 }

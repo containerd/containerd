@@ -21,12 +21,139 @@ import (
 	"testing"
 
 	cni "github.com/containerd/go-cni"
+	"github.com/containerd/typeurl"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	"github.com/containerd/cri/pkg/annotations"
 	criconfig "github.com/containerd/cri/pkg/config"
+	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
 )
+
+func TestSandboxContainerSpec(t *testing.T) {
+	testID := "test-id"
+	nsPath := "test-cni"
+	for desc, test := range map[string]struct {
+		configChange      func(*runtime.PodSandboxConfig)
+		podAnnotations    []string
+		imageConfigChange func(*imagespec.ImageConfig)
+		specCheck         func(*testing.T, *runtimespec.Spec)
+		expectErr         bool
+	}{
+		"should return error when entrypoint and cmd are empty": {
+			imageConfigChange: func(c *imagespec.ImageConfig) {
+				c.Entrypoint = nil
+				c.Cmd = nil
+			},
+			expectErr: true,
+		},
+		"a passthrough annotation should be passed as an OCI annotation": {
+			podAnnotations: []string{"c"},
+			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
+				assert.Equal(t, spec.Annotations["c"], "d")
+			},
+		},
+		"a non-passthrough annotation should not be passed as an OCI annotation": {
+			configChange: func(c *runtime.PodSandboxConfig) {
+				c.Annotations["d"] = "e"
+			},
+			podAnnotations: []string{"c"},
+			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
+				assert.Equal(t, spec.Annotations["c"], "d")
+				_, ok := spec.Annotations["d"]
+				assert.False(t, ok)
+			},
+		},
+		"passthrough annotations should support wildcard match": {
+			configChange: func(c *runtime.PodSandboxConfig) {
+				c.Annotations["t.f"] = "j"
+				c.Annotations["z.g"] = "o"
+				c.Annotations["z"] = "o"
+				c.Annotations["y.ca"] = "b"
+				c.Annotations["y"] = "b"
+			},
+			podAnnotations: []string{"t*", "z.*", "y.c*"},
+			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
+				assert.Equal(t, spec.Annotations["t.f"], "j")
+				assert.Equal(t, spec.Annotations["z.g"], "o")
+				assert.Equal(t, spec.Annotations["y.ca"], "b")
+				_, ok := spec.Annotations["y"]
+				assert.False(t, ok)
+				_, ok = spec.Annotations["z"]
+				assert.False(t, ok)
+			},
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		c := newTestCRIService()
+		config, imageConfig, specCheck := getRunPodSandboxTestData()
+		if test.configChange != nil {
+			test.configChange(config)
+		}
+
+		if test.imageConfigChange != nil {
+			test.imageConfigChange(imageConfig)
+		}
+		spec, err := c.sandboxContainerSpec(testID, config, imageConfig, nsPath,
+			test.podAnnotations)
+		if test.expectErr {
+			assert.Error(t, err)
+			assert.Nil(t, spec)
+			continue
+		}
+		assert.NoError(t, err)
+		assert.NotNil(t, spec)
+		specCheck(t, testID, spec)
+		if test.specCheck != nil {
+			test.specCheck(t, spec)
+		}
+	}
+}
+
+func TestTypeurlMarshalUnmarshalSandboxMeta(t *testing.T) {
+	for desc, test := range map[string]struct {
+		configChange func(*runtime.PodSandboxConfig)
+	}{
+		"should marshal original config": {},
+		"should marshal Linux": {
+			configChange: func(c *runtime.PodSandboxConfig) {
+				if c.Linux == nil {
+					c.Linux = &runtime.LinuxPodSandboxConfig{}
+				}
+				c.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
+					NamespaceOptions: &runtime.NamespaceOption{
+						Network: runtime.NamespaceMode_NODE,
+						Pid:     runtime.NamespaceMode_NODE,
+						Ipc:     runtime.NamespaceMode_NODE,
+					},
+					SupplementalGroups: []int64{1111, 2222},
+				}
+			},
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		meta := &sandboxstore.Metadata{
+			ID:        "1",
+			Name:      "sandbox_1",
+			NetNSPath: "/home/cloud",
+		}
+		meta.Config, _, _ = getRunPodSandboxTestData()
+		if test.configChange != nil {
+			test.configChange(meta.Config)
+		}
+
+		any, err := typeurl.MarshalAny(meta)
+		assert.NoError(t, err)
+		data, err := typeurl.UnmarshalAny(any)
+		assert.NoError(t, err)
+		assert.IsType(t, &sandboxstore.Metadata{}, data)
+		curMeta, ok := data.(*sandboxstore.Metadata)
+		assert.True(t, ok)
+		assert.Equal(t, meta, curMeta)
+	}
+}
 
 func TestToCNIPortMappings(t *testing.T) {
 	for desc, test := range map[string]struct {

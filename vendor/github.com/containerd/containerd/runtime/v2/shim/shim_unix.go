@@ -26,6 +26,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/containerd/containerd/sys/reaper"
 	"github.com/containerd/fifo"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -79,7 +80,7 @@ func handleSignals(ctx context.Context, logger *logrus.Entry, signals chan os.Si
 		case s := <-signals:
 			switch s {
 			case unix.SIGCHLD:
-				if err := Reap(); err != nil {
+				if err := reaper.Reap(); err != nil {
 					logger.WithError(err).Error("reap exit status")
 				}
 			case unix.SIGPIPE:

@@ -284,8 +284,7 @@ func (c *criService) volumeMounts(containerRootDir string, criMounts []*runtime.
 }
 
 // runtimeSpec returns a default runtime spec used in cri-containerd.
-// TODO(windows): Remove nolint after windows starts using this helper.
-func runtimeSpec(id string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) { // nolint: deadcode, unused
+func runtimeSpec(id string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
 	// GenerateSpec needs namespace.
 	ctx := ctrdutil.NamespacedContext()
 	spec, err := oci.GenerateSpec(ctx, nil, &containers.Container{ID: id}, opts...)

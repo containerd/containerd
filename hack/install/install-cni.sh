@@ -23,8 +23,7 @@ CNI_DIR=${DESTDIR}/opt/cni
 CNI_PKG=github.com/containernetworking/plugins
 
 # Create a temporary GOPATH for cni installation.
-TMPGOPATH=$(mktemp -d /tmp/cri-install-cni.XXXX)
-GOPATH=${TMPGOPATH}
+GOPATH=$(mktemp -d /tmp/cri-install-cni.XXXX)
 
 # Install cni
 from-vendor CNI github.com/containernetworking/plugins
@@ -35,4 +34,4 @@ ${SUDO} mkdir -p ${CNI_DIR}
 ${SUDO} cp -r ./bin ${CNI_DIR}
 
 # Clean the tmp GOPATH dir.
-rm -rf ${TMPGOPATH}
+rm -rf ${GOPATH}

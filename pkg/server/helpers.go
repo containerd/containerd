@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/plugin"
@@ -86,6 +87,9 @@ const (
 
 	// defaultIfName is the default network interface for the pods
 	defaultIfName = "eth0"
+
+	// runtimeRunhcsV1 is the runtime type for runhcs.
+	runtimeRunhcsV1 = "io.containerd.runhcs.v1"
 )
 
 // makeSandboxName generates sandbox name from sandbox metadata. The name
@@ -321,6 +325,8 @@ func getRuntimeOptionsType(t string) interface{} {
 		return &runcoptions.Options{}
 	case plugin.RuntimeLinuxV1:
 		return &runctypes.RuncOptions{}
+	case runtimeRunhcsV1:
+		return &runhcsoptions.Options{}
 	default:
 		return &runtimeoptions.Options{}
 	}

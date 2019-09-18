@@ -129,14 +129,14 @@ containerd: $(BUILD_DIR)/containerd ## build a customized containerd with CRI pl
 
 install-containerd: containerd ## installs customized containerd to system location
 	@echo "$(WHALE) $@"
-	@install -D -m 755 $(BUILD_DIR)/containerd $(BINDIR)/containerd
+	@install -D -m 755 $(BUILD_DIR)/containerd "$(BINDIR)/containerd"
 
 install: install-containerd ## installs customized containerd to system location
 	@echo "$(WHALE) $@"
 
 uninstall: ## remove containerd from system location
 	@echo "$(WHALE) $@"
-	@rm -f $(BINDIR)/containerd
+	@rm -f "$(BINDIR)/containerd"
 
 $(BUILD_DIR)/$(TARBALL): static-binaries vendor.conf
 	@BUILD_DIR=$(BUILD_DIR) TARBALL=$(TARBALL) VERSION=$(VERSION) ./hack/release.sh
@@ -152,11 +152,21 @@ proto: ## update protobuf of the cri plugin api
 	@API_PATH=pkg/api/v1 hack/update-proto.sh
 	@API_PATH=pkg/api/runtimeoptions/v1 hack/update-proto.sh
 
-.PHONY: install.deps
+.PHONY: install.deps .install.deps.linux .install.deps.windows
 
-install.deps: ## install dependencies of cri (default 'seccomp apparmor' BUILDTAGS for runc build)
+ifeq ($(GOOS),windows)
+install.deps: .install.deps.windows ## install windows deps on windows
+else
+install.deps: .install.deps.linux ## install windows deps on linux
+endif
+
+.install.deps.linux: ## install dependencies of cri (default 'seccomp apparmor' BUILDTAGS for runc build)
 	@echo "$(WHALE) $@"
 	@./hack/install/install-deps.sh
+
+.install.deps.windows: ## install dependencies of cri on windows
+	@echo "$(WHALE) $@"
+	@./hack/install/windows/install-deps.sh
 
 .PHONY: .gitvalidation
 # When this is running in travis, it will only check the travis commit range.

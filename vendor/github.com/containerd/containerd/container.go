@@ -25,6 +25,7 @@ import (
 
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
+	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
@@ -382,7 +383,9 @@ func (c *container) loadTask(ctx context.Context, ioAttach cio.Attach) (Task, er
 		return nil, err
 	}
 	var i cio.IO
-	if ioAttach != nil {
+	if ioAttach != nil && response.Process.Status != tasktypes.StatusUnknown {
+		// Do not attach IO for task in unknown state, because there
+		// are no fifo paths anyway.
 		if i, err = attachExistingIO(response, ioAttach); err != nil {
 			return nil, err
 		}

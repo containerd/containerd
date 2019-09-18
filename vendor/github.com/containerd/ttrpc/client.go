@@ -29,6 +29,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
@@ -134,11 +135,10 @@ func (c *Client) Call(ctx context.Context, service, method string, req, resp int
 		return err
 	}
 
-	if cresp.Status == nil {
-		return errors.New("no status provided on response")
+	if cresp.Status != nil && cresp.Status.Code != int32(codes.OK) {
+		return status.ErrorProto(cresp.Status)
 	}
-
-	return status.ErrorProto(cresp.Status)
+	return nil
 }
 
 func (c *Client) dispatch(ctx context.Context, req *Request, resp *Response) error {

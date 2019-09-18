@@ -20,6 +20,7 @@ package server
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -134,4 +135,9 @@ func (c *criService) apparmorEnabled() bool {
 
 func (c *criService) seccompEnabled() bool {
 	return runcseccomp.IsEnabled()
+}
+
+// openLogFile opens/creates a container log file.
+func openLogFile(path string) (*os.File, error) {
+	return os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0640)
 }

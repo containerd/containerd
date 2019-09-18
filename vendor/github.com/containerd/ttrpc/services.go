@@ -152,5 +152,5 @@ func convertCode(err error) codes.Code {
 }
 
 func fullPath(service, method string) string {
-	return "/" + path.Join("/", service, method)
+	return "/" + path.Join(service, method)
 }

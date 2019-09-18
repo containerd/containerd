@@ -20,12 +20,62 @@ package io
 
 import (
 	"io"
+	"net"
 	"os"
+	"sync"
 
+	winio "github.com/Microsoft/go-winio"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
-// TODO(windows): Add windows FIFO support.
-func openFifo(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
-	return nil, nil
+type pipe struct {
+	l      net.Listener
+	con    net.Conn
+	conErr error
+	conWg  sync.WaitGroup
+}
+
+func openPipe(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
+	l, err := winio.ListenPipe(fn, nil)
+	if err != nil {
+		return nil, err
+	}
+	p := &pipe{l: l}
+	p.conWg.Add(1)
+	go func() {
+		defer p.conWg.Done()
+		c, err := l.Accept()
+		if err != nil {
+			p.conErr = err
+			return
+		}
+		p.con = c
+	}()
+	return p, nil
+}
+
+func (p *pipe) Write(b []byte) (int, error) {
+	p.conWg.Wait()
+	if p.conErr != nil {
+		return 0, errors.Wrap(p.conErr, "connection error")
+	}
+	return p.con.Write(b)
+}
+
+func (p *pipe) Read(b []byte) (int, error) {
+	p.conWg.Wait()
+	if p.conErr != nil {
+		return 0, errors.Wrap(p.conErr, "connection error")
+	}
+	return p.con.Read(b)
+}
+
+func (p *pipe) Close() error {
+	p.l.Close()
+	p.conWg.Wait()
+	if p.con != nil {
+		return p.con.Close()
+	}
+	return p.conErr
 }

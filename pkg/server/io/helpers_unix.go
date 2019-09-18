@@ -26,6 +26,6 @@ import (
 	"golang.org/x/net/context"
 )
 
-func openFifo(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
+func openPipe(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
 	return fifo.OpenFifo(ctx, fn, flag, perm)
 }
