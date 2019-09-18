@@ -121,7 +121,7 @@ all: binaries
 
 check: proto-fmt ## run all linters
 	@echo "$(WHALE) $@"
-	GOGC=75 golangci-lint run
+	GOGC=75 golangci-lint run --deadline 2m
 
 ci: check binaries checkprotos coverage coverage-integration ## to be used by the CI
 
