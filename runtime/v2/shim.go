@@ -67,7 +67,7 @@ func loadShim(ctx context.Context, bundle *Bundle, events *exchange.Exchange, rt
 	if err != nil {
 		return nil, err
 	}
-	conn, err := client.Connect(address, client.AnonDialer)
+	conn, err := client.Connect(address, client.AnonReconnectDialer)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func loadShim(ctx context.Context, bundle *Bundle, events *exchange.Exchange, rt
 			conn.Close()
 		}
 	}()
-	f, err := openShimLog(ctx, bundle)
+	f, err := openShimLog(ctx, bundle, client.AnonReconnectDialer)
 	if err != nil {
 		return nil, errors.Wrap(err, "open shim log pipe")
 	}
