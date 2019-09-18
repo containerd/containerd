@@ -22,6 +22,7 @@ import (
 
 	"github.com/containerd/containerd/reference"
 	"gotest.tools/assert"
+	"gotest.tools/assert/cmp"
 )
 
 func TestRepositoryScope(t *testing.T) {
@@ -93,4 +94,15 @@ func TestGetTokenScopes(t *testing.T) {
 		actual := getTokenScopes(ctx, tc.commonScopes)
 		assert.DeepEqual(t, tc.expected, actual)
 	}
+}
+
+func TestCustomScope(t *testing.T) {
+	scope := "whatever:foo/bar:pull"
+	ctx := WithScope(context.Background(), scope)
+	ctx = contextWithAppendPullRepositoryScope(ctx, "foo/bar")
+
+	scopes := getTokenScopes(ctx, []string{})
+	assert.Assert(t, cmp.Len(scopes, 2))
+	assert.Check(t, cmp.Equal(scopes[0], "repository:foo/bar:pull"))
+	assert.Check(t, cmp.Equal(scopes[1], scope))
 }
