@@ -51,19 +51,25 @@ func contextWithRepositoryScope(ctx context.Context, refspec reference.Spec, pus
 	if err != nil {
 		return nil, err
 	}
-	return context.WithValue(ctx, tokenScopesKey{}, []string{s}), nil
+	return WithScope(ctx, s), nil
+}
+
+// WithScope appends a custom registry auth scope to the context.
+func WithScope(ctx context.Context, scope string) context.Context {
+	var scopes []string
+	if v := ctx.Value(tokenScopesKey{}); v != nil {
+		scopes = v.([]string)
+		scopes = append(scopes, scope)
+	} else {
+		scopes = []string{scope}
+	}
+	return context.WithValue(ctx, tokenScopesKey{}, scopes)
 }
 
 // contextWithAppendPullRepositoryScope is used to append repository pull
 // scope into existing scopes indexed by the tokenScopesKey{}.
 func contextWithAppendPullRepositoryScope(ctx context.Context, repo string) context.Context {
-	var scopes []string
-
-	if v := ctx.Value(tokenScopesKey{}); v != nil {
-		scopes = append(scopes, v.([]string)...)
-	}
-	scopes = append(scopes, fmt.Sprintf("repository:%s:pull", repo))
-	return context.WithValue(ctx, tokenScopesKey{}, scopes)
+	return WithScope(ctx, fmt.Sprintf("repository:%s:pull", repo))
 }
 
 // getTokenScopes returns deduplicated and sorted scopes from ctx.Value(tokenScopesKey{}) and common scopes.
