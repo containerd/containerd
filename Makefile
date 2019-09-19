@@ -55,7 +55,7 @@ version: ## print current cri plugin release version
 
 lint:
 	@echo "$(WHALE) $@"
-	golangci-lint run --skip-files .*_test.go --skip-dirs='(integration)'
+	golangci-lint run
 
 gofmt:
 	@echo "$(WHALE) $@"
