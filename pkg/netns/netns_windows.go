@@ -33,7 +33,7 @@ func NewNetNS() (*NetNS, error) {
 		return nil, err
 	}
 
-	return &NetNS{path: string(hcnNamespace.Id)}, nil
+	return &NetNS{path: hcnNamespace.Id}, nil
 }
 
 // LoadNetNS loads existing network namespace.
