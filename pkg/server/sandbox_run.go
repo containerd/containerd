@@ -137,14 +137,13 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// In this case however caching the IP will add a subtle performance enhancement by avoiding
 		// calls to network namespace of the pod to query the IP of the veth interface on every
 		// SandboxStatus request.
-		sandbox.IP, sandbox.AdditionalIPs, sandbox.CNIResult, err = c.setupPodNetwork(ctx, id, sandbox.NetNSPath, config)
-		if err != nil {
+		if err := c.setupPodNetwork(ctx, &sandbox); err != nil {
 			return nil, errors.Wrapf(err, "failed to setup network for sandbox %q", id)
 		}
 		defer func() {
 			if retErr != nil {
 				// Teardown network if an error is returned.
-				if err := c.teardownPodNetwork(ctx, id, sandbox.NetNSPath, config); err != nil {
+				if err := c.teardownPodNetwork(ctx, sandbox); err != nil {
 					log.G(ctx).WithError(err).Errorf("Failed to destroy network for sandbox %q", id)
 				}
 			}
@@ -303,31 +302,37 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 }
 
 // setupPodNetwork setups up the network for a pod
-func (c *criService) setupPodNetwork(ctx context.Context, id string, path string, config *runtime.PodSandboxConfig) (string, []string, *cni.CNIResult, error) {
+func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.Sandbox) error {
+	var (
+		id     = sandbox.ID
+		config = sandbox.Config
+		path   = sandbox.NetNSPath
+	)
 	if c.netPlugin == nil {
-		return "", nil, nil, errors.New("cni config not initialized")
+		return errors.New("cni config not initialized")
 	}
 
 	opts, err := cniNamespaceOpts(id, config)
 	if err != nil {
-		return "", nil, nil, errors.Wrap(err, "get cni namespace options")
+		return errors.Wrap(err, "get cni namespace options")
 	}
 
 	result, err := c.netPlugin.Setup(ctx, id, path, opts...)
 	if err != nil {
-		return "", nil, nil, err
+		return err
 	}
 	logDebugCNIResult(ctx, id, result)
 	// Check if the default interface has IP config
 	if configs, ok := result.Interfaces[defaultIfName]; ok && len(configs.IPConfigs) > 0 {
-		ip, additionalIPs := selectPodIPs(configs.IPConfigs)
-		return ip, additionalIPs, result, nil
+		sandbox.IP, sandbox.AdditionalIPs = selectPodIPs(configs.IPConfigs)
+		sandbox.CNIResult = result
+		return nil
 	}
 	// If it comes here then the result was invalid so destroy the pod network and return error
-	if err := c.teardownPodNetwork(ctx, id, path, config); err != nil {
+	if err := c.teardownPodNetwork(ctx, *sandbox); err != nil {
 		log.G(ctx).WithError(err).Errorf("Failed to destroy network for sandbox %q", id)
 	}
-	return "", nil, result, errors.Errorf("failed to find network info for sandbox %q", id)
+	return errors.Errorf("failed to find network info for sandbox %q", id)
 }
 
 // cniNamespaceOpts get CNI namespace options from sandbox config.
