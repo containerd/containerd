@@ -58,7 +58,7 @@ func WithWindowsMounts(osi osinterface.OS, config *runtime.ContainerConfig, extr
 			criMounts = config.GetMounts()
 			mounts    = append([]*runtime.Mount{}, criMounts...)
 		)
-		// Copy all mounts from extra mounts, except for mounts overriden by CRI.
+		// Copy all mounts from extra mounts, except for mounts overridden by CRI.
 		for _, e := range extra {
 			found := false
 			for _, c := range criMounts {
@@ -77,7 +77,7 @@ func WithWindowsMounts(osi osinterface.OS, config *runtime.ContainerConfig, extr
 		sort.Sort(orderedMounts(mounts))
 
 		// Copy all mounts from default mounts, except for
-		// - mounts overriden by supplied mount;
+		// - mounts overridden by supplied mount;
 		// - all mounts under /dev if a supplied /dev is present.
 		mountSet := make(map[string]struct{})
 		for _, m := range mounts {
