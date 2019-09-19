@@ -29,6 +29,8 @@ func TestLeases(t *testing.T) {
 	ctx, db, cancel := testEnv(t)
 	defer cancel()
 
+	lm := NewLeaseManager(NewDB(db, nil, nil))
+
 	testCases := []struct {
 		ID        string
 		CreateErr error
@@ -51,7 +53,7 @@ func TestLeases(t *testing.T) {
 
 	for _, tc := range testCases {
 		if err := db.Update(func(tx *bolt.Tx) error {
-			lease, err := NewLeaseManager(tx).Create(ctx, leases.WithID(tc.ID))
+			lease, err := lm.Create(WithTransactionContext(ctx, tx), leases.WithID(tc.ID))
 			if err != nil {
 				if tc.CreateErr != nil && errors.Cause(err) == tc.CreateErr {
 					return nil
@@ -65,13 +67,8 @@ func TestLeases(t *testing.T) {
 		}
 	}
 
-	var listed []leases.Lease
-	// List leases, check same
-	if err := db.View(func(tx *bolt.Tx) error {
-		var err error
-		listed, err = NewLeaseManager(tx).List(ctx)
-		return err
-	}); err != nil {
+	listed, err := lm.List(ctx)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -88,10 +85,8 @@ func TestLeases(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if err := db.Update(func(tx *bolt.Tx) error {
-			return NewLeaseManager(tx).Delete(ctx, leases.Lease{
-				ID: tc.ID,
-			})
+		if err := lm.Delete(ctx, leases.Lease{
+			ID: tc.ID,
 		}); err != nil {
 			if tc.DeleteErr == nil && errors.Cause(err) != tc.DeleteErr {
 				t.Fatal(err)
@@ -100,11 +95,8 @@ func TestLeases(t *testing.T) {
 		}
 	}
 
-	if err := db.View(func(tx *bolt.Tx) error {
-		var err error
-		listed, err = NewLeaseManager(tx).List(ctx)
-		return err
-	}); err != nil {
+	listed, err = lm.List(ctx)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -116,6 +108,8 @@ func TestLeases(t *testing.T) {
 func TestLeasesList(t *testing.T) {
 	ctx, db, cancel := testEnv(t)
 	defer cancel()
+
+	lm := NewLeaseManager(NewDB(db, nil, nil))
 
 	testset := [][]leases.Opt{
 		{
@@ -143,14 +137,16 @@ func TestLeasesList(t *testing.T) {
 	}
 
 	// Insert all
-	for _, opts := range testset {
-		if err := db.Update(func(tx *bolt.Tx) error {
-			lm := NewLeaseManager(tx)
-			_, err := lm.Create(ctx, opts...)
-			return err
-		}); err != nil {
-			t.Fatal(err)
+	if err := db.Update(func(tx *bolt.Tx) error {
+		for _, opts := range testset {
+			_, err := lm.Create(WithTransactionContext(ctx, tx), opts...)
+			if err != nil {
+				return err
+			}
 		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 
 	for _, testcase := range []struct {
@@ -201,39 +197,33 @@ func TestLeasesList(t *testing.T) {
 		},
 	} {
 		t.Run(testcase.name, func(t *testing.T) {
-			if err := db.View(func(tx *bolt.Tx) error {
-				lm := NewLeaseManager(tx)
-				results, err := lm.List(ctx, testcase.filters...)
-				if err != nil {
-					return err
-				}
-
-				if len(results) != len(testcase.expected) {
-					t.Errorf("length of result does not match expected: %v != %v", len(results), len(testcase.expected))
-				}
-
-				expectedMap := map[string]struct{}{}
-				for _, expected := range testcase.expected {
-					expectedMap[expected] = struct{}{}
-				}
-
-				for _, result := range results {
-					if _, ok := expectedMap[result.ID]; !ok {
-						t.Errorf("unexpected match: %v", result.ID)
-					} else {
-						delete(expectedMap, result.ID)
-					}
-				}
-				if len(expectedMap) > 0 {
-					for match := range expectedMap {
-						t.Errorf("missing match: %v", match)
-					}
-				}
-
-				return nil
-			}); err != nil {
+			results, err := lm.List(ctx, testcase.filters...)
+			if err != nil {
 				t.Fatal(err)
 			}
+
+			if len(results) != len(testcase.expected) {
+				t.Errorf("length of result does not match expected: %v != %v", len(results), len(testcase.expected))
+			}
+
+			expectedMap := map[string]struct{}{}
+			for _, expected := range testcase.expected {
+				expectedMap[expected] = struct{}{}
+			}
+
+			for _, result := range results {
+				if _, ok := expectedMap[result.ID]; !ok {
+					t.Errorf("unexpected match: %v", result.ID)
+				} else {
+					delete(expectedMap, result.ID)
+				}
+			}
+			if len(expectedMap) > 0 {
+				for match := range expectedMap {
+					t.Errorf("missing match: %v", match)
+				}
+			}
+
 		})
 	}
 
@@ -246,18 +236,12 @@ func TestLeasesList(t *testing.T) {
 			}
 		}
 
-		if err := db.Update(func(tx *bolt.Tx) error {
-			lm := NewLeaseManager(tx)
-			return lm.Delete(ctx, lease)
-		}); err != nil {
+		if err := lm.Delete(ctx, lease); err != nil {
 			t.Fatal(err)
 		}
 
 		// try it again, get not found
-		if err := db.Update(func(tx *bolt.Tx) error {
-			lm := NewLeaseManager(tx)
-			return lm.Delete(ctx, lease)
-		}); err == nil {
+		if err := lm.Delete(ctx, lease); err == nil {
 			t.Fatalf("expected error deleting non-existent lease")
 		} else if !errdefs.IsNotFound(err) {
 			t.Fatalf("unexpected error: %s", err)
@@ -268,6 +252,8 @@ func TestLeasesList(t *testing.T) {
 func TestLeaseResource(t *testing.T) {
 	ctx, db, cancel := testEnv(t)
 	defer cancel()
+
+	lm := NewLeaseManager(NewDB(db, nil, nil))
 
 	var (
 		leaseID = "l1"
@@ -280,10 +266,7 @@ func TestLeaseResource(t *testing.T) {
 	)
 
 	// prepare lease
-	if err := db.Update(func(tx *bolt.Tx) error {
-		_, err0 := NewLeaseManager(tx).Create(ctx, leases.WithID(leaseID))
-		return err0
-	}); err != nil {
+	if _, err := lm.Create(ctx, leases.WithID(leaseID)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -379,7 +362,7 @@ func TestLeaseResource(t *testing.T) {
 	idxList := make(map[leases.Resource]bool)
 	for i, tc := range testCases {
 		if err := db.Update(func(tx *bolt.Tx) error {
-			err0 := NewLeaseManager(tx).AddResource(ctx, tc.lease, tc.resource)
+			err0 := lm.AddResource(WithTransactionContext(ctx, tx), tc.lease, tc.resource)
 			if got := errors.Cause(err0); got != tc.err {
 				return errors.Errorf("expect error (%v), but got (%v)", tc.err, err0)
 			}
@@ -396,11 +379,8 @@ func TestLeaseResource(t *testing.T) {
 
 	// check list function
 	var gotList []leases.Resource
-	if err := db.View(func(tx *bolt.Tx) error {
-		var err error
-		gotList, err = NewLeaseManager(tx).ListResources(ctx, lease)
-		return err
-	}); err != nil {
+	gotList, err := lm.ListResources(ctx, lease)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -420,21 +400,16 @@ func TestLeaseResource(t *testing.T) {
 	}
 
 	// remove snapshots
-	if err := db.Update(func(tx *bolt.Tx) error {
-		return NewLeaseManager(tx).DeleteResource(ctx, lease, leases.Resource{
-			ID:   snapshotterKey,
-			Type: "snapshots/overlayfs",
-		})
+	if err := lm.DeleteResource(ctx, lease, leases.Resource{
+		ID:   snapshotterKey,
+		Type: "snapshots/overlayfs",
 	}); err != nil {
 		t.Fatal(err)
 	}
 
 	// check list number
-	if err := db.View(func(tx *bolt.Tx) error {
-		var err error
-		gotList, err = NewLeaseManager(tx).ListResources(ctx, lease)
-		return err
-	}); err != nil {
+	gotList, err = lm.ListResources(ctx, lease)
+	if err != nil {
 		t.Fatal(err)
 	}
 

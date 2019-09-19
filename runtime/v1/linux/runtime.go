@@ -50,7 +50,6 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	bolt "go.etcd.io/bbolt"
 	"golang.org/x/sys/unix"
 )
 
@@ -112,13 +111,13 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	}
 	cfg := ic.Config.(*Config)
 	r := &Runtime{
-		root:    ic.Root,
-		state:   ic.State,
-		tasks:   runtime.NewTaskList(),
-		db:      m.(*metadata.DB),
-		address: ic.Address,
-		events:  ic.Events,
-		config:  cfg,
+		root:       ic.Root,
+		state:      ic.State,
+		tasks:      runtime.NewTaskList(),
+		containers: metadata.NewContainerStore(m.(*metadata.DB)),
+		address:    ic.Address,
+		events:     ic.Events,
+		config:     cfg,
 	}
 	tasks, err := r.restoreTasks(ic.Context)
 	if err != nil {
@@ -138,9 +137,9 @@ type Runtime struct {
 	state   string
 	address string
 
-	tasks  *runtime.TaskList
-	db     *metadata.DB
-	events *exchange.Exchange
+	tasks      *runtime.TaskList
+	containers containers.Store
+	events     *exchange.Exchange
 
 	config *Config
 }
@@ -508,14 +507,8 @@ func (r *Runtime) getRuntime(ctx context.Context, ns, id string) (*runc.Runc, er
 }
 
 func (r *Runtime) getRuncOptions(ctx context.Context, id string) (*runctypes.RuncOptions, error) {
-	var container containers.Container
-
-	if err := r.db.View(func(tx *bolt.Tx) error {
-		store := metadata.NewContainerStore(tx)
-		var err error
-		container, err = store.Get(ctx, id)
-		return err
-	}); err != nil {
+	container, err := r.containers.Get(ctx, id)
+	if err != nil {
 		return nil, err
 	}
 

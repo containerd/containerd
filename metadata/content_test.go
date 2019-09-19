@@ -166,17 +166,13 @@ func TestIngestLeased(t *testing.T) {
 }
 
 func createLease(ctx context.Context, db *DB, name string) (context.Context, func() error, error) {
-	if err := db.Update(func(tx *bolt.Tx) error {
-		_, err := NewLeaseManager(tx).Create(ctx, leases.WithID(name))
-		return err
-	}); err != nil {
+	lm := NewLeaseManager(db)
+	if _, err := lm.Create(ctx, leases.WithID(name)); err != nil {
 		return nil, nil, err
 	}
 	return leases.WithLease(ctx, name), func() error {
-		return db.Update(func(tx *bolt.Tx) error {
-			return NewLeaseManager(tx).Delete(ctx, leases.Lease{
-				ID: name,
-			})
+		return lm.Delete(ctx, leases.Lease{
+			ID: name,
 		})
 	}, nil
 }

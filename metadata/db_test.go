@@ -386,7 +386,7 @@ func TestMetadataCollector(t *testing.T) {
 
 	if err := mdb.Update(func(tx *bolt.Tx) error {
 		for _, obj := range objects {
-			node, err := create(obj, tx, NewImageStore(mdb), cs, sn)
+			node, err := create(obj, tx, mdb, cs, sn)
 			if err != nil {
 				return err
 			}
@@ -461,7 +461,7 @@ func benchmarkTrigger(n int) func(b *testing.B) {
 
 		if err := mdb.Update(func(tx *bolt.Tx) error {
 			for _, obj := range objects {
-				node, err := create(obj, tx, NewImageStore(mdb), cs, sn)
+				node, err := create(obj, tx, mdb, cs, sn)
 				if err != nil {
 					return err
 				}
@@ -541,16 +541,15 @@ type object struct {
 	labels  map[string]string
 }
 
-func create(obj object, tx *bolt.Tx, is images.Store, cs content.Store, sn snapshots.Snapshotter) (*gc.Node, error) {
+func create(obj object, tx *bolt.Tx, db *DB, cs content.Store, sn snapshots.Snapshotter) (*gc.Node, error) {
 	var (
 		node      *gc.Node
 		namespace = "test"
-		ctx       = namespaces.WithNamespace(context.Background(), namespace)
+		ctx       = WithTransactionContext(namespaces.WithNamespace(context.Background(), namespace), tx)
 	)
 
 	switch v := obj.data.(type) {
 	case testContent:
-		ctx := WithTransactionContext(ctx, tx)
 		expected := digest.FromBytes(v.data)
 		w, err := cs.Writer(ctx,
 			content.WithRef("test-ref"),
@@ -572,7 +571,6 @@ func create(obj object, tx *bolt.Tx, is images.Store, cs content.Store, sn snaps
 			}
 		}
 	case testSnapshot:
-		ctx := WithTransactionContext(ctx, tx)
 		if v.active {
 			_, err := sn.Prepare(ctx, v.key, v.parent, snapshots.WithLabels(obj.labels))
 			if err != nil {
@@ -596,14 +594,13 @@ func create(obj object, tx *bolt.Tx, is images.Store, cs content.Store, sn snaps
 			}
 		}
 	case testImage:
-		ctx := WithTransactionContext(ctx, tx)
-
 		image := images.Image{
 			Name:   v.name,
 			Target: v.target,
 			Labels: obj.labels,
 		}
-		_, err := is.Create(ctx, image)
+
+		_, err := NewImageStore(db).Create(ctx, image)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create image")
 		}
@@ -619,12 +616,13 @@ func create(obj object, tx *bolt.Tx, is images.Store, cs content.Store, sn snaps
 			},
 			Spec: &types.Any{},
 		}
-		_, err := NewContainerStore(tx).Create(ctx, container)
+		_, err := NewContainerStore(db).Create(ctx, container)
 		if err != nil {
 			return nil, err
 		}
 	case testLease:
-		lm := NewLeaseManager(tx)
+		lm := NewLeaseManager(db)
+
 		l, err := lm.Create(ctx, leases.WithID(v.id), leases.WithLabels(obj.labels))
 		if err != nil {
 			return nil, err
