@@ -112,6 +112,7 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 		customopts.WithoutDefaultSecuritySettings,
 		customopts.WithRelativeRoot(relativeRootfsPath),
 		customopts.WithProcessArgs(config, imageConfig),
+		oci.WithDefaultPathEnv,
 		// this will be set based on the security context below
 		oci.WithNewPrivileges,
 	}
