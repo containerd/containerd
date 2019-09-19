@@ -33,7 +33,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	bolt "go.etcd.io/bbolt"
 )
 
 // Config for the v2 runtime
@@ -69,13 +68,15 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			return New(ic.Context, ic.Root, ic.State, ic.Address, ic.TTRPCAddress, ic.Events, m.(*metadata.DB))
+			cs := metadata.NewContainerStore(m.(*metadata.DB))
+
+			return New(ic.Context, ic.Root, ic.State, ic.Address, ic.TTRPCAddress, ic.Events, cs)
 		},
 	})
 }
 
 // New task manager for v2 shims
-func New(ctx context.Context, root, state, containerdAddress, containerdTTRPCAddress string, events *exchange.Exchange, db *metadata.DB) (*TaskManager, error) {
+func New(ctx context.Context, root, state, containerdAddress, containerdTTRPCAddress string, events *exchange.Exchange, cs containers.Store) (*TaskManager, error) {
 	for _, d := range []string{root, state} {
 		if err := os.MkdirAll(d, 0711); err != nil {
 			return nil, err
@@ -88,7 +89,7 @@ func New(ctx context.Context, root, state, containerdAddress, containerdTTRPCAdd
 		containerdTTRPCAddress: containerdTTRPCAddress,
 		tasks:                  runtime.NewTaskList(),
 		events:                 events,
-		db:                     db,
+		containers:             cs,
 	}
 	if err := m.loadExistingTasks(ctx); err != nil {
 		return nil, err
@@ -103,9 +104,9 @@ type TaskManager struct {
 	containerdAddress      string
 	containerdTTRPCAddress string
 
-	tasks  *runtime.TaskList
-	events *exchange.Exchange
-	db     *metadata.DB
+	tasks      *runtime.TaskList
+	events     *exchange.Exchange
+	containers containers.Store
 }
 
 // ID of the task manager
@@ -278,13 +279,8 @@ func (m *TaskManager) loadTasks(ctx context.Context) error {
 }
 
 func (m *TaskManager) container(ctx context.Context, id string) (*containers.Container, error) {
-	var container containers.Container
-	if err := m.db.View(func(tx *bolt.Tx) error {
-		store := metadata.NewContainerStore(tx)
-		var err error
-		container, err = store.Get(ctx, id)
-		return err
-	}); err != nil {
+	container, err := m.containers.Get(ctx, id)
+	if err != nil {
 		return nil, err
 	}
 	return &container, nil
