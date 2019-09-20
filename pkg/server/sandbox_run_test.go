@@ -246,16 +246,29 @@ func TestToCNIPortMappings(t *testing.T) {
 
 func TestSelectPodIP(t *testing.T) {
 	for desc, test := range map[string]struct {
-		ips      []string
-		expected string
+		ips                   []string
+		expectedIP            string
+		expectedAdditionalIPs []string
 	}{
 		"ipv4 should be picked even if ipv6 comes first": {
-			ips:      []string{"2001:db8:85a3::8a2e:370:7334", "192.168.17.43"},
-			expected: "192.168.17.43",
+			ips:                   []string{"2001:db8:85a3::8a2e:370:7334", "192.168.17.43"},
+			expectedIP:            "192.168.17.43",
+			expectedAdditionalIPs: []string{"2001:db8:85a3::8a2e:370:7334"},
+		},
+		"ipv4 should be picked when there is only ipv4": {
+			ips:                   []string{"192.168.17.43"},
+			expectedIP:            "192.168.17.43",
+			expectedAdditionalIPs: nil,
 		},
 		"ipv6 should be picked when there is no ipv4": {
-			ips:      []string{"2001:db8:85a3::8a2e:370:7334"},
-			expected: "2001:db8:85a3::8a2e:370:7334",
+			ips:                   []string{"2001:db8:85a3::8a2e:370:7334"},
+			expectedIP:            "2001:db8:85a3::8a2e:370:7334",
+			expectedAdditionalIPs: nil,
+		},
+		"the first ipv4 should be picked when there are multiple ipv4": { // unlikely to happen
+			ips:                   []string{"2001:db8:85a3::8a2e:370:7334", "192.168.17.43", "2001:db8:85a3::8a2e:370:7335", "192.168.17.45"},
+			expectedIP:            "192.168.17.43",
+			expectedAdditionalIPs: []string{"2001:db8:85a3::8a2e:370:7334", "2001:db8:85a3::8a2e:370:7335", "192.168.17.45"},
 		},
 	} {
 		t.Logf("TestCase %q", desc)
@@ -265,7 +278,9 @@ func TestSelectPodIP(t *testing.T) {
 				IP: net.ParseIP(ip),
 			})
 		}
-		assert.Equal(t, test.expected, selectPodIP(ipConfigs))
+		ip, additionalIPs := selectPodIPs(ipConfigs)
+		assert.Equal(t, test.expectedIP, ip)
+		assert.Equal(t, test.expectedAdditionalIPs, additionalIPs)
 	}
 }
 

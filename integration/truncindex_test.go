@@ -74,7 +74,7 @@ func TestTruncIndex(t *testing.T) {
 	assert.Equal(t, sb, sbStatus.Id)
 
 	t.Logf("Forward port for sandbox by truncindex")
-	_, err = runtimeService.PortForward(&runtimeapi.PortForwardRequest{sbTruncIndex, []int32{80}})
+	_, err = runtimeService.PortForward(&runtimeapi.PortForwardRequest{PodSandboxId: sbTruncIndex, Port: []int32{80}})
 	assert.NoError(t, err)
 
 	// TODO(yanxuean): add test case for ListPodSandbox

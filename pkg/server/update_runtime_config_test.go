@@ -45,14 +45,13 @@ func TestUpdateRuntimeConfig(t *testing.T) {
 		"ipam": {
 			"type": "host-local",
 			"subnet": "{{.PodCIDR}}",
-			"routes": [
-			{"dst": "0.0.0.0/0"}
-			]
+			"ranges": [{{range $i, $range := .PodCIDRRanges}}{{if $i}}, {{end}}[{"subnet": "{{$range}}"}]{{end}}],
+			"routes": [{{range $i, $route := .Routes}}{{if $i}}, {{end}}{"dst": "{{$route}}"}{{end}}]
 		}
 	},
 	]
 }`
-		testCIDR = "10.0.0.0/24"
+		testCIDR = "10.0.0.0/24, 2001:4860:4860::8888/32"
 		expected = `
 {
 	"name": "test-pod-network",
@@ -64,9 +63,8 @@ func TestUpdateRuntimeConfig(t *testing.T) {
 		"ipam": {
 			"type": "host-local",
 			"subnet": "10.0.0.0/24",
-			"routes": [
-			{"dst": "0.0.0.0/0"}
-			]
+			"ranges": [[{"subnet": "10.0.0.0/24"}], [{"subnet": "2001:4860:4860::8888/32"}]],
+			"routes": [{"dst": "0.0.0.0/0"}, {"dst": "::/0"}]
 		}
 	},
 	]

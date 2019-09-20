@@ -172,7 +172,7 @@ version = 2
     # file will be loaded. If you want to load multiple CNI plugin config files
     # set max_conf_num to the number desired. Setting max_config_num to 0 is
     # interpreted as no limit is desired and will result in all CNI plugin
-    # config files being loaded from the CNI config directory. 
+    # config files being loaded from the CNI config directory.
     max_conf_num = 1
 
     # conf_template is the file path of golang template used to generate
@@ -183,6 +183,7 @@ version = 2
     # This is a temporary backward-compatible solution for kubenet users
     # who don't have a cni daemonset in production yet.
     # This will be deprecated when kubenet is deprecated.
+    # See the "CNI Config Template" section for more details.
     conf_template = ""
 
   # 'plugins."io.containerd.grpc.v1.cri".registry' contains config related to the registry
@@ -207,6 +208,35 @@ to request a pod be run using a runtime for untrusted workloads, the RuntimeHand
 When the annotation `io.kubernetes.cri.untrusted-workload` is set to `true` the `untrusted`
 runtime will be used. For example, see
 [Create an untrusted pod using Kata Containers](https://github.com/kata-containers/documentation/blob/master/how-to/how-to-use-k8s-with-cri-containerd-and-kata.md#create-an-untrusted-pod-using-kata-containers).
+
+## CNI Config Template
+
+Ideally the cni config should be placed by system admin or cni daemon like calico,
+weaveworks etc. However, there are still users using [kubenet](https://kubernetes.io/docs/concepts/cluster-administration/network-plugins/#kubenet)
+today, who don't have a cni daemonset in production. The cni config template is
+a temporary backward-compatible solution for them. This is expected to be
+deprecated when kubenet is deprecated.
+
+The cni config template uses the [golang
+template](https://golang.org/pkg/text/template/) format. Currently supported
+values are:
+* `.PodCIDR` is a string of the first CIDR assigned to the node.
+* `.PodCIDRRanges` is a string array of all CIDRs assigned to the node. It is
+  usually used for
+  [dualstack](https://github.com/kubernetes/enhancements/blob/master/keps/sig-network/20180612-ipv4-ipv6-dual-stack.md) support.
+* `.Routes` is a string array of all routes needed. It is usually used for
+  dualstack support or single stack but IPv4 or IPv6 is decided at runtime.
+
+The [golang template actions](https://golang.org/pkg/text/template/#hdr-Actions)
+can be used to render the cni config. For example, you can use the following
+template to add CIDRs and routes for dualstack in the CNI config:
+```
+"ipam": {
+  "type": "host-local",
+  "ranges": [{{range $i, $range := .PodCIDRRanges}}{{if $i}}, {{end}}[{"subnet": "{{$range}}"}]{{end}}],
+  "routes": [{{range $i, $route := .Routes}}{{if $i}}, {{end}}{"dst": "{{$route}}"}{{end}}]
+}
+```
 
 ## Deprecation
 The config options of the CRI plugin follow the [Kubernetes deprecation

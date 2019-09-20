@@ -133,7 +133,7 @@ func TestContainerdRestart(t *testing.T) {
 
 	t.Logf("Pull test images")
 	for _, image := range []string{"busybox", "alpine"} {
-		img, err := imageService.PullImage(&runtime.ImageSpec{image}, nil, nil)
+		img, err := imageService.PullImage(&runtime.ImageSpec{Image: image}, nil, nil)
 		require.NoError(t, err)
 		defer func() {
 			assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: img}))
