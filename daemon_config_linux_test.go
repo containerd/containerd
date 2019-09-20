@@ -164,9 +164,9 @@ version = 1
 		t.Fatal(err)
 	}
 
-	stateJSONPath := filepath.Join(runtimeRoot, testNamespace, id, "state.json")
-	if _, err = os.Stat(stateJSONPath); err != nil {
-		t.Errorf("error while getting stat for %s: %v", stateJSONPath, err)
+	containerPath := filepath.Join(runtimeRoot, testNamespace, id)
+	if _, err = os.Stat(containerPath); err != nil {
+		t.Errorf("error while getting stat for %s: %v", containerPath, err)
 	}
 
 	if err = task.Kill(ctx, syscall.SIGKILL); err != nil {
