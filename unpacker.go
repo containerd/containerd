@@ -204,12 +204,12 @@ func (u *unpacker) handlerWrapper(uctx context.Context, unpacks *int32) (func(im
 			// one manifest to handle, and manifest list can be
 			// safely skipped.
 			// TODO: support multi-platform unpack.
-			switch desc.MediaType {
-			case images.MediaTypeDockerSchema1Manifest:
+			switch mt := desc.MediaType; {
+			case mt == images.MediaTypeDockerSchema1Manifest:
 				lock.Lock()
 				schema1 = true
 				lock.Unlock()
-			case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+			case mt == images.MediaTypeDockerSchema2Manifest || mt == ocispec.MediaTypeImageManifest:
 				lock.Lock()
 				for _, child := range children {
 					if child.MediaType == images.MediaTypeDockerSchema2Config ||
@@ -219,7 +219,7 @@ func (u *unpacker) handlerWrapper(uctx context.Context, unpacks *int32) (func(im
 					layers = append(layers, child)
 				}
 				lock.Unlock()
-			case images.MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig:
+			case mt == images.MediaTypeDockerSchema2Config || mt == ocispec.MediaTypeImageConfig:
 				lock.Lock()
 				l := append([]ocispec.Descriptor{}, layers...)
 				lock.Unlock()
@@ -229,11 +229,7 @@ func (u *unpacker) handlerWrapper(uctx context.Context, unpacks *int32) (func(im
 						return u.unpack(uctx, desc, l)
 					})
 				}
-			case images.MediaTypeDockerSchema2Layer, images.MediaTypeDockerSchema2LayerGzip,
-				images.MediaTypeDockerSchema2LayerForeign, images.MediaTypeDockerSchema2LayerForeignGzip,
-				ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerGzip,
-				ocispec.MediaTypeImageLayerNonDistributable, ocispec.MediaTypeImageLayerNonDistributableGzip,
-				images.MediaTypeDockerSchema2LayerEnc, images.MediaTypeDockerSchema2LayerGzipEnc:
+			case images.IsLayerType(mt):
 				lock.Lock()
 				update := !schema1
 				lock.Unlock()
