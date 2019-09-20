@@ -33,28 +33,46 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type refKeyPrefix struct{}
+
+// WithMediaTypeKeyPrefix adds a custom key prefix for a media type which is used when storing
+// data in the content store from the FetchHandler.
+//
+// Used in `MakeRefKey` to determine what the key prefix should be.
+func WithMediaTypeKeyPrefix(ctx context.Context, mediaType, prefix string) context.Context {
+	var values map[string]string
+	if v := ctx.Value(refKeyPrefix{}); v != nil {
+		values = v.(map[string]string)
+	} else {
+		values = make(map[string]string)
+	}
+
+	values[mediaType] = prefix
+	return context.WithValue(ctx, refKeyPrefix{}, values)
+}
+
 // MakeRefKey returns a unique reference for the descriptor. This reference can be
 // used to lookup ongoing processes related to the descriptor. This function
 // may look to the context to namespace the reference appropriately.
 func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
-	// TODO(stevvooe): Need better remote key selection here. Should be a
-	// product of the context, which may include information about the ongoing
-	// fetch process.
-	switch desc.MediaType {
-	case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+	if v := ctx.Value(refKeyPrefix{}); v != nil {
+		values := v.(map[string]string)
+		if prefix := values[desc.MediaType]; prefix != "" {
+			return prefix + "-" + desc.Digest.String()
+		}
+	}
+
+	switch mt := desc.MediaType; {
+	case mt == images.MediaTypeDockerSchema2Manifest || mt == ocispec.MediaTypeImageManifest:
 		return "manifest-" + desc.Digest.String()
-	case images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+	case mt == images.MediaTypeDockerSchema2ManifestList || mt == ocispec.MediaTypeImageIndex:
 		return "index-" + desc.Digest.String()
-	case images.MediaTypeDockerSchema2Layer, images.MediaTypeDockerSchema2LayerGzip,
-		images.MediaTypeDockerSchema2LayerForeign, images.MediaTypeDockerSchema2LayerForeignGzip,
-		ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerGzip,
-		ocispec.MediaTypeImageLayerNonDistributable, ocispec.MediaTypeImageLayerNonDistributableGzip,
-		images.MediaTypeDockerSchema2LayerEnc, images.MediaTypeDockerSchema2LayerGzipEnc:
+	case images.IsLayerType(mt):
 		return "layer-" + desc.Digest.String()
-	case images.MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig:
+	case images.IsKnownConfig(mt):
 		return "config-" + desc.Digest.String()
 	default:
-		log.G(ctx).Warnf("reference for unknown type: %s", desc.MediaType)
+		log.G(ctx).Warnf("reference for unknown type: %s", mt)
 		return "unknown-" + desc.Digest.String()
 	}
 }
