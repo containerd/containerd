@@ -29,6 +29,7 @@ CLEANUP="${CLEANUP:-"true"}"
 root="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/../..
 script_path="${root}/test/windows"
 node_name="windows-cri-$(cat /proc/sys/kernel/random/uuid)"
+tempdir="$(mktemp -d)"
 
 # log logs the test logs.
 function log() {
@@ -36,22 +37,43 @@ function log() {
 }
 
 function cleanup() {
+  rm -rf "$tempdir"
   if [[ "$CLEANUP" == "true" ]]; then
     log "Delete the test instance"
     gcloud compute instances delete -q "${node_name}"
   fi
 }
 
-function retry() {
-  local -r MAX_ATTEMPTS=$1
+function retry_anyway() {
+  retry_on_error 36 5 "" "$@"
+}
+
+function retry_on_permission_error() {
+  retry_on_error 12 5 "Permission denied" "$@"
+}
+
+function retry_on_error() {
+  local -r MAX_ATTEMPTS="$1"
+  local -r SLEEP_PERIOD="$2"
+  local -r ON_ERROR="$3"
+  shift 3
   local attempts=1
-  shift
-  until "$@" || (( attempts == MAX_ATTEMPTS ))
-  do
-    log "$* failed, retry in 1 second..."
+  local -r stderr="$(mktemp -p "$tempdir")"
+  until "$@" 2>"$stderr"; do
+    cat "$stderr"
     (( attempts++ ))
-    sleep 1
+    if [[ -n "$ON_ERROR" ]] && (! grep "$ON_ERROR" "$stderr" > /dev/null); then
+      log "$* failed with unexpected error!"
+      exit 1
+    elif (( attempts > MAX_ATTEMPTS )); then
+      log "$* failed, $MAX_ATTEMPTS retry exceeded!"
+      exit 1
+    else
+      log "$* failed, retry in ${SLEEP_PERIOD} second..."
+    fi
+    sleep "${SLEEP_PERIOD}"
   done
+  rm "$stderr"
 }
 
 gcloud config set compute/zone "${ZONE}"
@@ -64,32 +86,32 @@ gcloud compute instances create "${node_name}" --machine-type=n1-standard-2 \
 trap cleanup EXIT
 
 log "Wait for ssh to be ready"
-retry 180 gcloud compute ssh "${node_name}" --command="echo ssh ready"
+retry_anyway gcloud compute ssh "${node_name}" --command="echo ssh ready"
 
 log "Setup test environment in the test instance"
-retry 5 gcloud compute scp "${script_path}/setup-vm.ps1" "${node_name}":"C:/setup-vm.ps1"
-gcloud compute ssh "${node_name}" --command="powershell /c C:/setup-vm.ps1"
+retry_on_permission_error gcloud compute scp "${script_path}/setup-vm.ps1" "${node_name}":"C:/setup-vm.ps1"
+retry_on_permission_error gcloud compute ssh "${node_name}" --command="powershell /c C:/setup-vm.ps1"
 
 log "Reboot the test instance to refresh environment variables"
-gcloud compute ssh "${node_name}" --command="powershell /c Restart-Computer"
+retry_on_permission_error gcloud compute ssh "${node_name}" --command="powershell /c Restart-Computer"
 
 log "Wait for ssh to be ready"
-retry 180 gcloud compute ssh "${node_name}" --command="echo ssh ready"
+retry_anyway gcloud compute ssh "${node_name}" --command="echo ssh ready"
 
 log "Run test on the test instance"
 cri_tar="/tmp/cri.tar.gz"
 tar -zcf "${cri_tar}" -C "${root}" . --owner=0 --group=0
-retry 5 gcloud compute scp "${script_path}/test.sh" "${node_name}":"C:/test.sh"
-retry 5 gcloud compute scp "${cri_tar}" "${node_name}":"C:/cri.tar.gz"
+retry_on_permission_error gcloud compute scp "${script_path}/test.sh" "${node_name}":"C:/test.sh"
+retry_on_permission_error gcloud compute scp "${cri_tar}" "${node_name}":"C:/cri.tar.gz"
 rm "${cri_tar}"
 # git-bash doesn't return test exit code, the command should
 # succeed. We'll collect test exit code from _artifacts/.
-gcloud compute ssh "${node_name}" --command='powershell /c "Start-Process -FilePath \"C:\Program Files\Git\git-bash.exe\" -ArgumentList \"-elc\",\"`\"/c/test.sh &> /c/test.log`\"\" -Wait"'
+retry_on_permission_error gcloud compute ssh "${node_name}" --command='powershell /c "Start-Process -FilePath \"C:\Program Files\Git\git-bash.exe\" -ArgumentList \"-elc\",\"`\"/c/test.sh &> /c/test.log`\"\" -Wait"'
 
 log "Collect test logs"
 mkdir -p "${ARTIFACTS}"
-retry 5 gcloud compute scp "${node_name}":"C:/test.log" "${ARTIFACTS}"
-retry 5 gcloud compute scp --recurse "${node_name}":"C:/_artifacts/*" "${ARTIFACTS}"
+retry_on_permission_error gcloud compute scp "${node_name}":"C:/test.log" "${ARTIFACTS}"
+retry_on_permission_error gcloud compute scp --recurse "${node_name}":"C:/_artifacts/*" "${ARTIFACTS}"
 
 log "Test output:"
 cat "${ARTIFACTS}/test.log"
