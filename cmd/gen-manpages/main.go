@@ -49,6 +49,9 @@ func run() error {
 		if err != nil {
 			return err
 		}
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			os.Mkdir(dir, os.ModePerm)
+		}
 		if err := ioutil.WriteFile(filepath.Join(dir, fmt.Sprintf("%s.1", name)), []byte(data), 0644); err != nil {
 			return err
 		}
