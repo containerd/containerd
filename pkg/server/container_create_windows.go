@@ -63,6 +63,7 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 		// NOTE: readonly rootfs doesn't work on windows.
 		customopts.WithoutRoot,
 		customopts.WithWindowsNetworkNamespace(netNSPath),
+		oci.WithHostname(sandboxConfig.GetHostname()),
 	)
 
 	specOpts = append(specOpts, customopts.WithWindowsMounts(c.os, config, extraMounts))
