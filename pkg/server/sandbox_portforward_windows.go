@@ -19,19 +19,62 @@ limitations under the License.
 package server
 
 import (
+	"bytes"
+	"fmt"
 	"io"
 
-	"github.com/containerd/containerd/errdefs"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/utils/exec"
+
+	"github.com/containerd/cri/pkg/ioutil"
+	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
 )
 
-// PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
-// TODO(windows): Implement this for windows.
-func (c *criService) PortForward(ctx context.Context, r *runtime.PortForwardRequest) (*runtime.PortForwardResponse, error) {
-	return nil, errdefs.ErrNotImplemented
+func (c *criService) portForward(ctx context.Context, id string, port int32, stream io.ReadWriter) error {
+	stdout := ioutil.NewNopWriteCloser(stream)
+	stderrBuffer := new(bytes.Buffer)
+	stderr := ioutil.NewNopWriteCloser(stderrBuffer)
+	// localhost is resolved to 127.0.0.1 in ipv4, and ::1 in ipv6.
+	// Explicitly using ipv4 IP address in here to avoid flakiness.
+	cmd := []string{"wincat.exe", "127.0.0.1", fmt.Sprint(port)}
+	err := c.execInSandbox(ctx, id, cmd, stream, stdout, stderr)
+	if err != nil {
+		return errors.Wrapf(err, "failed to execute port forward in sandbox: %s", stderrBuffer.String())
+	}
+	return nil
 }
 
-func (c *criService) portForward(ctx context.Context, id string, port int32, stream io.ReadWriter) error {
-	return errdefs.ErrNotImplemented
+func (c *criService) execInSandbox(ctx context.Context, sandboxID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser) error {
+	// Get sandbox from our sandbox store.
+	sb, err := c.sandboxStore.Get(sandboxID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to find sandbox %q in store", sandboxID)
+	}
+
+	// Check the sandbox state
+	state := sb.Status.Get().State
+	if state != sandboxstore.StateReady {
+		return errors.Errorf("sandbox is in %s state", fmt.Sprint(state))
+	}
+
+	opts := execOptions{
+		cmd:    cmd,
+		stdin:  stdin,
+		stdout: stdout,
+		stderr: stderr,
+		tty:    false,
+		resize: nil,
+	}
+	exitCode, err := c.execInternal(ctx, sb.Container, sandboxID, opts)
+	if err != nil {
+		return errors.Wrap(err, "failed to exec in sandbox")
+	}
+	if *exitCode == 0 {
+		return nil
+	}
+	return &exec.CodeExitError{
+		Err:  errors.Errorf("error executing command %v, exit code %d", cmd, *exitCode),
+		Code: int(*exitCode),
+	}
 }

@@ -21,7 +21,7 @@ set -o pipefail
 export PATH="/c/Program Files/Containerd:$PATH"
 REPO_TAR="${REPO_TAR:-"/c/cri.tar.gz"}"
 FOCUS="${FOCUS:-"Conformance"}"
-SKIP="${SKIP:-"portforward"}"
+SKIP="${SKIP:-""}"
 REPORT_DIR="${REPORT_DIR:-"/c/_artifacts"}"
 
 repo="$GOPATH/src/github.com/containerd/cri"
