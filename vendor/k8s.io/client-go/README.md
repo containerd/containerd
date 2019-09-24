@@ -2,7 +2,7 @@
 
 Go clients for talking to a [kubernetes](http://kubernetes.io/) cluster.
 
-We currently recommend using the v11.0.0 tag. See [INSTALL.md](/INSTALL.md) for
+We currently recommend using the v12.0.0 tag. See [INSTALL.md](/INSTALL.md) for
 detailed installation instructions. `go get k8s.io/client-go/...` works, but
 will build `master`, which doesn't handle the dependencies well.
 
@@ -92,16 +92,16 @@ We will backport bugfixes--but not new features--into older versions of
 
 #### Compatibility matrix
 
-|                     | Kubernetes 1.8 | Kubernetes 1.9 | Kubernetes 1.10 | Kubernetes 1.11 | Kubernetes 1.12 | Kubernetes 1.13 | Kubernetes 1.14 |
-|---------------------|----------------|----------------|-----------------|-----------------|-----------------|-----------------|-----------------|
-| client-go 5.0       | ✓              | +-             | +-              | +-              | +-              | +-              | +-              |
-| client-go 6.0       | +-             | ✓              | +-              | +-              | +-              | +-              | +-              |
-| client-go 7.0       | +-             | +-             | ✓               | +-              | +-              | +-              | +-              |
-| client-go 8.0       | +-             | +-             | +-              | ✓               | +-              | +-              | +-              |
-| client-go 9.0       | +-             | +-             | +-              | +-              | ✓               | +-              | +-              |
-| client-go 10.0      | +-             | +-             | +-              | +-              | +-              | ✓               | +-              |
-| client-go 11.0      | +-             | +-             | +-              | +-              | +-              | +-              | ✓               |
-| client-go HEAD      | +-             | +-             | +-              | +-              | +-              | +-              | +-              |
+|                     | Kubernetes 1.9 | Kubernetes 1.10 | Kubernetes 1.11 | Kubernetes 1.12 | Kubernetes 1.13 | Kubernetes 1.14 | Kubernetes 1.15 |
+|---------------------|----------------|-----------------|-----------------|-----------------|-----------------|-----------------|-----------------|
+| client-go 6.0       | ✓              | +-              | +-              | +-              | +-              | +-              | +-              |
+| client-go 7.0       | +-             | ✓               | +-              | +-              | +-              | +-              | +-              |
+| client-go 8.0       | +-             | +-              | ✓               | +-              | +-              | +-              | +-              |
+| client-go 9.0       | +-             | +-              | +-              | ✓               | +-              | +-              | +-              |
+| client-go 10.0      | +-             | +-              | +-              | +-              | ✓               | +-              | +-              |
+| client-go 11.0      | +-             | +-              | +-              | +-              | +-              | ✓               | +-              |
+| client-go 12.0      | +-             | +-              | +-              | +-              | +-              | +-              | ✓               |
+| client-go HEAD      | +-             | +-              | +-              | +-              | +-              | +-              | +-              |
 
 Key:
 
@@ -131,9 +131,10 @@ between client-go versions.
 | client-go 6.0  | Kubernetes main repo, 1.9 branch     | = -                           |
 | client-go 7.0  | Kubernetes main repo, 1.10 branch    | = -                           |
 | client-go 8.0  | Kubernetes main repo, 1.11 branch    | =-                            |
-| client-go 9.0  | Kubernetes main repo, 1.12 branch    | ✓                             |
+| client-go 9.0  | Kubernetes main repo, 1.12 branch    | =-                            |
 | client-go 10.0 | Kubernetes main repo, 1.13 branch    | ✓                             |
 | client-go 11.0 | Kubernetes main repo, 1.14 branch    | ✓                             |
+| client-go 12.0 | Kubernetes main repo, 1.15 branch    | ✓                             |
 | client-go HEAD | Kubernetes main repo, master branch  | ✓                             |
 
 Key:
