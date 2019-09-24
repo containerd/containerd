@@ -264,6 +264,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get runtime options")
 	}
+
 	opts = append(opts,
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithRuntime(sandboxInfo.Runtime.Name, runtimeOptions),
@@ -904,6 +905,8 @@ func defaultRuntimeSpec(id string) (*runtimespec.Spec, error) {
 	}
 	if spec.Linux != nil {
 		spec.Linux.Seccomp = nil
+		// add default UNIX path; will be optionally overwritten by image config PATH env
+		spec.Process.Env = append(spec.Process.Env, "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
 	}
 
 	// Remove default rlimits (See issue #515)
