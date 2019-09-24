@@ -85,33 +85,35 @@ gcloud compute instances create "${node_name}" --machine-type=n1-standard-2 \
   --metadata-from-file=windows-startup-script-ps1="${script_path}/setup-ssh.ps1"
 trap cleanup EXIT
 
+ssh=(gcloud compute ssh --ssh-flag="-ServerAliveInterval=30")
+scp=(gcloud compute scp)
 log "Wait for ssh to be ready"
-retry_anyway gcloud compute ssh "${node_name}" --command="echo ssh ready"
+retry_anyway "${ssh[@]}" "${node_name}" --command="echo ssh ready"
 
 log "Setup test environment in the test instance"
-retry_on_permission_error gcloud compute scp "${script_path}/setup-vm.ps1" "${node_name}":"C:/setup-vm.ps1"
-retry_on_permission_error gcloud compute ssh "${node_name}" --command="powershell /c C:/setup-vm.ps1"
+retry_on_permission_error "${scp[@]}" "${script_path}/setup-vm.ps1" "${node_name}":"C:/setup-vm.ps1"
+retry_on_permission_error "${ssh[@]}" "${node_name}" --command="powershell /c C:/setup-vm.ps1"
 
 log "Reboot the test instance to refresh environment variables"
-retry_on_permission_error gcloud compute ssh "${node_name}" --command="powershell /c Restart-Computer"
+retry_on_permission_error "${ssh[@]}" "${node_name}" --command="powershell /c Restart-Computer"
 
 log "Wait for ssh to be ready"
-retry_anyway gcloud compute ssh "${node_name}" --command="echo ssh ready"
+retry_anyway "${ssh[@]}" "${node_name}" --command="echo ssh ready"
 
 log "Run test on the test instance"
 cri_tar="/tmp/cri.tar.gz"
 tar -zcf "${cri_tar}" -C "${root}" . --owner=0 --group=0
-retry_on_permission_error gcloud compute scp "${script_path}/test.sh" "${node_name}":"C:/test.sh"
-retry_on_permission_error gcloud compute scp "${cri_tar}" "${node_name}":"C:/cri.tar.gz"
+retry_on_permission_error "${scp[@]}" "${script_path}/test.sh" "${node_name}":"C:/test.sh"
+retry_on_permission_error "${scp[@]}" "${cri_tar}" "${node_name}":"C:/cri.tar.gz"
 rm "${cri_tar}"
 # git-bash doesn't return test exit code, the command should
 # succeed. We'll collect test exit code from _artifacts/.
-retry_on_permission_error gcloud compute ssh "${node_name}" --command='powershell /c "Start-Process -FilePath \"C:\Program Files\Git\git-bash.exe\" -ArgumentList \"-elc\",\"`\"/c/test.sh &> /c/test.log`\"\" -Wait"'
+retry_on_permission_error "${ssh[@]}" "${node_name}" --command='powershell /c "Start-Process -FilePath \"C:\Program Files\Git\git-bash.exe\" -ArgumentList \"-elc\",\"`\"/c/test.sh &> /c/test.log`\"\" -Wait"'
 
 log "Collect test logs"
 mkdir -p "${ARTIFACTS}"
-retry_on_permission_error gcloud compute scp "${node_name}":"C:/test.log" "${ARTIFACTS}"
-retry_on_permission_error gcloud compute scp --recurse "${node_name}":"C:/_artifacts/*" "${ARTIFACTS}"
+retry_on_permission_error "${scp[@]}" "${node_name}":"C:/test.log" "${ARTIFACTS}"
+retry_on_permission_error "${scp[@]}" --recurse "${node_name}":"C:/_artifacts/*" "${ARTIFACTS}"
 
 log "Test output:"
 cat "${ARTIFACTS}/test.log"
