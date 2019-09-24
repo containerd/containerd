@@ -31,22 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-
-	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
 )
-
-// PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
-func (c *criService) PortForward(ctx context.Context, r *runtime.PortForwardRequest) (retRes *runtime.PortForwardResponse, retErr error) {
-	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to find sandbox %q", r.GetPodSandboxId())
-	}
-	if sandbox.Status.Get().State != sandboxstore.StateReady {
-		return nil, errors.New("sandbox container is not running")
-	}
-	// TODO(random-liu): Verify that ports are exposed.
-	return c.streamServer.GetPortForward(r)
-}
 
 // portForward requires `socat` on the node. It uses netns to enter the sandbox namespace,
 // and run `socat` inside the namespace to forward stream for a specific port. The `socat`
