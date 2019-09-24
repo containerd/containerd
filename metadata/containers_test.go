@@ -47,6 +47,8 @@ func TestContainersList(t *testing.T) {
 	ctx, db, cancel := testEnv(t)
 	defer cancel()
 
+	store := NewContainerStore(NewDB(db, nil, nil))
+
 	spec := &specs.Spec{}
 	encoded, err := typeurl.MarshalAny(spec)
 	if err != nil {
@@ -73,9 +75,8 @@ func TestContainersList(t *testing.T) {
 		}
 
 		if err := db.Update(func(tx *bolt.Tx) error {
-			store := NewContainerStore(tx)
 			now := time.Now()
-			result, err := store.Create(ctx, *testset[id])
+			result, err := store.Create(WithTransactionContext(ctx, tx), *testset[id])
 			if err != nil {
 				return err
 			}
@@ -138,46 +139,35 @@ func TestContainersList(t *testing.T) {
 				testset = newtestset
 			}
 
-			if err := db.View(func(tx *bolt.Tx) error {
-				store := NewContainerStore(tx)
-				results, err := store.List(ctx, testcase.filters...)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				if len(results) == 0 { // all tests return a non-empty result set
-					t.Fatalf("not results returned")
-				}
-
-				if len(results) != len(testset) {
-					t.Fatalf("length of result does not match testset: %v != %v", len(results), len(testset))
-				}
-
-				for _, result := range results {
-					checkContainersEqual(t, &result, testset[result.ID], "list results did not match")
-				}
-
-				return nil
-			}); err != nil {
+			results, err := store.List(ctx, testcase.filters...)
+			if err != nil {
 				t.Fatal(err)
+			}
+
+			if len(results) == 0 { // all tests return a non-empty result set
+				t.Fatalf("not results returned")
+			}
+
+			if len(results) != len(testset) {
+				t.Fatalf("length of result does not match testset: %v != %v", len(results), len(testset))
+			}
+
+			for _, result := range results {
+				checkContainersEqual(t, &result, testset[result.ID], "list results did not match")
 			}
 		})
 	}
 
 	// delete everything to test it
 	for id := range testset {
-		if err := db.Update(func(tx *bolt.Tx) error {
-			store := NewContainerStore(tx)
-			return store.Delete(ctx, id)
-		}); err != nil {
+		if err := store.Delete(ctx, id); err != nil {
 			t.Fatal(err)
 		}
 
 		// try it again, get NotFound
-		if err := db.Update(func(tx *bolt.Tx) error {
-			store := NewContainerStore(tx)
-			return store.Delete(ctx, id)
-		}); errors.Cause(err) != errdefs.ErrNotFound {
+		if err := store.Delete(ctx, id); err == nil {
+			t.Fatalf("expected error deleting non-existent container")
+		} else if errors.Cause(err) != errdefs.ErrNotFound {
 			t.Fatalf("unexpected error %v", err)
 		}
 	}
@@ -187,6 +177,8 @@ func TestContainersList(t *testing.T) {
 func TestContainersCreateUpdateDelete(t *testing.T) {
 	ctx, db, cancel := testEnv(t)
 	defer cancel()
+
+	store := NewContainerStore(NewDB(db, nil, nil))
 
 	spec := &specs.Spec{}
 	encoded, err := typeurl.MarshalAny(spec)
@@ -641,79 +633,51 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 			}
 			testcase.expected.ID = testcase.name
 
-			done := errors.New("test complete")
-			if err := db.Update(func(tx *bolt.Tx) error {
-				var (
-					now   = time.Now().UTC()
-					store = NewContainerStore(tx)
-				)
+			now := time.Now().UTC()
 
-				result, err := store.Create(ctx, testcase.original)
-				if errors.Cause(err) != testcase.createerr {
-					if testcase.createerr == nil {
-						t.Fatalf("unexpected error: %v", err)
-					} else {
-						t.Fatalf("cause of %v (cause: %v) != %v", err, errors.Cause(err), testcase.createerr)
-					}
-				} else if testcase.createerr != nil {
-					return done
+			result, err := store.Create(ctx, testcase.original)
+			if errors.Cause(err) != testcase.createerr {
+				if testcase.createerr == nil {
+					t.Fatalf("unexpected error: %v", err)
+				} else {
+					t.Fatalf("cause of %v (cause: %v) != %v", err, errors.Cause(err), testcase.createerr)
 				}
+			} else if testcase.createerr != nil {
+				return
+			}
 
-				checkContainerTimestamps(t, &result, now, true)
+			checkContainerTimestamps(t, &result, now, true)
 
-				// ensure that createdat is never tampered with
-				testcase.original.CreatedAt = result.CreatedAt
-				testcase.expected.CreatedAt = result.CreatedAt
-				testcase.original.UpdatedAt = result.UpdatedAt
-				testcase.expected.UpdatedAt = result.UpdatedAt
+			// ensure that createdat is never tampered with
+			testcase.original.CreatedAt = result.CreatedAt
+			testcase.expected.CreatedAt = result.CreatedAt
+			testcase.original.UpdatedAt = result.UpdatedAt
+			testcase.expected.UpdatedAt = result.UpdatedAt
 
-				checkContainersEqual(t, &result, &testcase.original, "unexpected result on container update")
-				return nil
-			}); err != nil {
-				if err == done {
-					return
+			checkContainersEqual(t, &result, &testcase.original, "unexpected result on container update")
+
+			now = time.Now()
+			result, err = store.Update(ctx, testcase.input, testcase.fieldpaths...)
+			if errors.Cause(err) != testcase.cause {
+				if testcase.cause == nil {
+					t.Fatalf("unexpected error: %v", err)
+				} else {
+					t.Fatalf("cause of %v (cause: %v) != %v", err, errors.Cause(err), testcase.cause)
 				}
+			} else if testcase.cause != nil {
+				return
+			}
+
+			checkContainerTimestamps(t, &result, now, false)
+			testcase.expected.UpdatedAt = result.UpdatedAt
+			checkContainersEqual(t, &result, &testcase.expected, "updated failed to get expected result")
+
+			result, err = store.Get(ctx, testcase.original.ID)
+			if err != nil {
 				t.Fatal(err)
 			}
 
-			if err := db.Update(func(tx *bolt.Tx) error {
-				now := time.Now()
-				store := NewContainerStore(tx)
-				result, err := store.Update(ctx, testcase.input, testcase.fieldpaths...)
-				if errors.Cause(err) != testcase.cause {
-					if testcase.cause == nil {
-						t.Fatalf("unexpected error: %v", err)
-					} else {
-						t.Fatalf("cause of %v (cause: %v) != %v", err, errors.Cause(err), testcase.cause)
-					}
-				} else if testcase.cause != nil {
-					return done
-				}
-
-				checkContainerTimestamps(t, &result, now, false)
-				testcase.expected.UpdatedAt = result.UpdatedAt
-				checkContainersEqual(t, &result, &testcase.expected, "updated failed to get expected result")
-				return nil
-			}); err != nil {
-				if err == done {
-					return
-				}
-				t.Fatal(err)
-			}
-
-			if err := db.View(func(tx *bolt.Tx) error {
-				store := NewContainerStore(tx)
-				result, err := store.Get(ctx, testcase.original.ID)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				checkContainersEqual(t, &result, &testcase.expected, "get after failed to get expected result")
-				return nil
-			}); err != nil {
-				t.Fatal(err)
-			}
-
+			checkContainersEqual(t, &result, &testcase.expected, "get after failed to get expected result")
 		})
 	}
 }

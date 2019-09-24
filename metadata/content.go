@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/containerd/containerd/content"
@@ -221,9 +222,8 @@ func (cs *contentStore) Delete(ctx context.Context, dgst digest.Digest) error {
 		}
 
 		// Mark content store as dirty for triggering garbage collection
-		cs.db.dirtyL.Lock()
+		atomic.AddUint32(&cs.db.dirty, 1)
 		cs.db.dirtyCS = true
-		cs.db.dirtyL.Unlock()
 
 		return nil
 	})
