@@ -67,6 +67,7 @@ This version of containerd is validated against v1.15, but it is also compatible
 * **Added tcp endpoint for CRI service.** The tcp service can be disabled with the `disable_tcp_service` option, and it is disabled by default. (https://github.com/containerd/cri/issues/1181)
 * **Added `max_concurrent_downloads` option to restrict the number of concurrent downloads for each image.** The default concurrency is `3`. (https://github.com/containerd/cri/pull/1211)
 * **Added `privileged_without_host_devices` runtime option to disable host devices for privileged pods for the runtime.** This is especially useful for runtimes like kata. (https://github.com/containerd/cri/issues/1213)
+* **Supported IPv4/IPv6 dualstack.** See Kubernetes [dual-stack doc](https://kubernetes.io/docs/concepts/services-networking/dual-stack) for more information. To enable dual-stack, your CNI plugin needs to support it. If you are using the CNI config template, see [how to configure it to support dual-stack](https://github.com/containerd/cri/blob/release/1.3/docs/config.md#cni-config-template).
 
 #### Enhancements
 * Avoided `Status` lockup when CNI network setup/teardown is slow. (https://github.com/containerd/cri/issues/1078)
