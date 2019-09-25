@@ -18,14 +18,12 @@ package server
 
 import (
 	"io"
-	"os"
 	"time"
 
 	"github.com/containerd/containerd"
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/plugin"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -99,11 +97,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		return nil, errors.Wrap(err, "failed to get container info")
 	}
 
-	var taskOpts []containerd.NewTaskOpts
-	// TODO(random-liu): Remove this after shim v1 is deprecated.
-	if c.config.NoPivot && ctrInfo.Runtime.Name == plugin.RuntimeLinuxV1 {
-		taskOpts = append(taskOpts, containerd.WithNoPivotRoot)
-	}
+	taskOpts := c.taskOpts(ctrInfo.Runtime.Name)
 	task, err := container.NewTask(ctx, ioCreation, taskOpts...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create containerd task")
@@ -180,7 +174,7 @@ func resetContainerStarting(container containerstore.Container) error {
 func (c *criService) createContainerLoggers(logPath string, tty bool) (stdout io.WriteCloser, stderr io.WriteCloser, err error) {
 	if logPath != "" {
 		// Only generate container log when log path is specified.
-		f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0640)
+		f, err := openLogFile(logPath)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "failed to create and open log file")
 		}

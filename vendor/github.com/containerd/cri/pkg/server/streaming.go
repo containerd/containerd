@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 	k8snet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/remotecommand"
@@ -156,7 +155,8 @@ func (s *streamRuntime) PortForward(podSandboxID string, port int32, stream io.R
 	if port <= 0 || port > math.MaxUint16 {
 		return errors.Errorf("invalid port %d", port)
 	}
-	return s.c.portForward(context.Background(), podSandboxID, port, stream)
+	ctx := ctrdutil.NamespacedContext()
+	return s.c.portForward(ctx, podSandboxID, port, stream)
 }
 
 // handleResizing spawns a goroutine that processes the resize channel, calling resizeFunc for each
