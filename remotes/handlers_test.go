@@ -30,7 +30,7 @@ func TestContextCustomKeyPrefix(t *testing.T) {
 	ctx = WithMediaTypeKeyPrefix(ctx, images.MediaTypeDockerSchema2Layer, "bananas")
 	ctx = WithMediaTypeKeyPrefix(ctx, cmt, "apples")
 
-	// makes sure tha even though we've supplied some custom handling, the built-in still works
+	// makes sure that even though we've supplied some custom handling, the built-in still works
 	t.Run("normal supported case", func(t *testing.T) {
 		desc := ocispec.Descriptor{MediaType: ocispec.MediaTypeImageLayer}
 		expected := "layer-"
