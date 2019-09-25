@@ -76,7 +76,7 @@ type DB struct {
 	// sweep phases without preventing read transactions.
 	wlock sync.RWMutex
 
-	// dirty flag indicates that refences have been removed which require
+	// dirty flag indicates that references have been removed which require
 	// a garbage collection to ensure the database is clean. This tracks
 	// the number of dirty operations. This should be updated and read
 	// atomically if outside of wlock.Lock.
