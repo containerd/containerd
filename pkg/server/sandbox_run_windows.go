@@ -30,7 +30,6 @@ import (
 	customopts "github.com/containerd/cri/pkg/containerd/opts"
 )
 
-// TODO(windows): Configure windows sandbox shares
 func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
 	imageConfig *imagespec.ImageConfig, nsPath string, runtimePodAnnotations []string) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
@@ -54,6 +53,8 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		customopts.WithoutRoot,
 		customopts.WithWindowsNetworkNamespace(nsPath),
 	)
+
+	specOpts = append(specOpts, customopts.WithWindowsDefaultSandboxShares)
 
 	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
 		runtimePodAnnotations) {

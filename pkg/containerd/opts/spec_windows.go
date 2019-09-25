@@ -172,3 +172,19 @@ func WithWindowsResources(resources *runtime.WindowsContainerResources) oci.Spec
 		return nil
 	}
 }
+
+// WithWindowsDefaultSandboxShares sets the default sandbox CPU shares
+func WithWindowsDefaultSandboxShares(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+	if s.Windows == nil {
+		s.Windows = &runtimespec.Windows{}
+	}
+	if s.Windows.Resources == nil {
+		s.Windows.Resources = &runtimespec.WindowsResources{}
+	}
+	if s.Windows.Resources.CPU == nil {
+		s.Windows.Resources.CPU = &runtimespec.WindowsCPUResources{}
+	}
+	i := uint16(DefaultSandboxCPUshares)
+	s.Windows.Resources.CPU.Shares = &i
+	return nil
+}

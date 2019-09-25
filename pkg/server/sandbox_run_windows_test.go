@@ -27,6 +27,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	"github.com/containerd/cri/pkg/annotations"
+	"github.com/containerd/cri/pkg/containerd/opts"
 )
 
 func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
@@ -54,6 +55,7 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 		assert.Contains(t, spec.Process.Env, "a=b", "c=d")
 		assert.Equal(t, []string{"/pause", "forever"}, spec.Process.Args)
 		assert.Equal(t, "/workspace", spec.Process.Cwd)
+		assert.EqualValues(t, *spec.Windows.Resources.CPU.Shares, opts.DefaultSandboxCPUshares)
 
 		t.Logf("Check PodSandbox annotations")
 		assert.Contains(t, spec.Annotations, annotations.SandboxID)

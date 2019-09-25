@@ -31,6 +31,10 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
+// DefaultSandboxCPUshares is default cpu shares for sandbox container.
+// TODO(windows): Revisit cpu shares for windows (https://github.com/containerd/cri/issues/1297)
+const DefaultSandboxCPUshares = 2
+
 // WithRelativeRoot sets the root for the container
 func WithRelativeRoot(root string) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
