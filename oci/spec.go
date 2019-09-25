@@ -78,7 +78,7 @@ func generateDefaultSpecWithPlatform(ctx context.Context, platform, id string, s
 	return err
 }
 
-// ApplyOpts applys the options to the given spec, injecting data from the
+// ApplyOpts applies the options to the given spec, injecting data from the
 // context, client and container instance.
 func ApplyOpts(ctx context.Context, client Client, c *containers.Container, s *Spec, opts ...SpecOpts) error {
 	for _, o := range opts {

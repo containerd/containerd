@@ -174,7 +174,7 @@ func TestShimInCgroup(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(processes) == 0 {
-		t.Errorf("created cgroup should have atleast one process inside: %d", len(processes))
+		t.Errorf("created cgroup should have at least one process inside: %d", len(processes))
 	}
 	if err := task.Kill(ctx, unix.SIGKILL); err != nil {
 		t.Fatal(err)
