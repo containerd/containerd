@@ -25,7 +25,7 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/containerd/cgroups"
+	v1 "github.com/containerd/cgroups/stats/v1"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/typeurl"
 	"github.com/urfave/cli"
@@ -77,7 +77,7 @@ var metricsCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		data, ok := anydata.(*cgroups.Metrics)
+		data, ok := anydata.(*v1.Metrics)
 		if !ok {
 			return errors.New("cannot convert metric data to cgroups.Metrics")
 		}
