@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/testutil"
@@ -62,11 +63,26 @@ func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshots.Snap
 			loop.Close()
 			return nil, nil, errors.Wrapf(err, "failed to make btrfs filesystem (out: %q)", out)
 		}
-		if out, err := exec.Command("mount", loop.Device, root).CombinedOutput(); err != nil {
-			loop.Close()
-			return nil, nil, errors.Wrapf(err, "failed to mount device %s (out: %q)", loop.Device, out)
-		}
+		// sync after a mkfs on the loopback before trying to mount the device
+		unix.Sync()
 
+		for i := 0; i < 5; i++ {
+			if out, err := exec.Command("mount", loop.Device, root).CombinedOutput(); err != nil {
+				loop.Close()
+				return nil, nil, errors.Wrapf(err, "failed to mount device %s (out: %q)", loop.Device, out)
+			}
+			var stat unix.Statfs_t
+			if err := unix.Statfs(root, &stat); err != nil {
+				unix.Unmount(root, 0)
+				return nil, nil, errors.Wrapf(err, "unable to statfs btrfs mount %s", root)
+			}
+			if stat.Type == unix.BTRFS_SUPER_MAGIC {
+				break
+			}
+			// unmount and try again
+			unix.Unmount(root, 0)
+			time.Sleep(100 * time.Millisecond)
+		}
 		snapshotter, err := NewSnapshotter(root)
 		if err != nil {
 			loop.Close()
