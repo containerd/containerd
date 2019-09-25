@@ -87,6 +87,7 @@ This version of containerd is validated against v1.15, but it is also compatible
 
 ### Other
 * **Support additional garbage collection labels.** Allows more advanced resource management use cases on the client
+* **Fix garbage collection scheduling on reference removal.** Ensures removal of leases or containers triggers the next scheduled garbage collection
 
 
 And many more improvements and bug fixes in the complete changelog"""
