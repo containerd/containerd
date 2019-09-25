@@ -61,7 +61,7 @@ func NewExitStatus(code uint32, t time.Time, err error) *ExitStatus {
 	}
 }
 
-// ExitStatus encapsulates a process' exit status.
+// ExitStatus encapsulates a process's exit status.
 // It is used by `Wait()` to return either a process exit code or an error
 type ExitStatus struct {
 	code     uint32
