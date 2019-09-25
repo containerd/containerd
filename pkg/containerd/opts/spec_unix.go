@@ -43,13 +43,6 @@ import (
 	"github.com/containerd/cri/pkg/util"
 )
 
-const (
-	// DefaultSandboxCPUshares is default cpu shares for sandbox container.
-	// TODO(windows): Evaluate whether this can be used for windows sandbox
-	// container cpu shares.
-	DefaultSandboxCPUshares = 2
-)
-
 // WithAdditionalGIDs adds any additional groups listed for a particular user in the
 // /etc/groups file of the image's root filesystem to the OCI spec's additionalGids array.
 func WithAdditionalGIDs(userstr string) oci.SpecOpts {
