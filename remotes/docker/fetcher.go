@@ -136,7 +136,7 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 }
 
 func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string, offset int64) (io.ReadCloser, error) {
-	req.header.Set("Accept", strings.Join([]string{mediatype, `*`}, ", "))
+	req.header.Set("Accept", strings.Join([]string{mediatype, `*/*`}, ", "))
 
 	if offset > 0 {
 		// Note: "Accept-Ranges: bytes" cannot be trusted as some endpoints
