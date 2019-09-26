@@ -169,7 +169,7 @@ func (m *DB) Init(ctx context.Context) error {
 			}
 		}
 
-		// Previous version fo database found
+		// Previous version of database found
 		if schema != "v0" {
 			updates := migrations[i:]
 
