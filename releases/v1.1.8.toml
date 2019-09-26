@@ -11,7 +11,7 @@ previous = "v1.1.7"
 pre_release = false
 
 preface = """\
-This is the eight patch release for the `containerd` 1.1 release. This is the
+This is the eighth patch release for the `containerd` 1.1 release. This is the
 first 1.1 release during the extended security release period. Included is
 a runc fix for [CVE-2019-16884](https://nvd.nist.gov/vuln/detail/CVE-2019-16884)
 as well as fixes to close inherited sockets and cleanup on context cancellation
