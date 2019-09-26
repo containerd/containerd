@@ -83,6 +83,7 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 			Namespace: "test-sandbox-ns",
 			Attempt:   2,
 		},
+		Hostname:    "test-hostname",
 		Annotations: map[string]string{"c": "d"},
 	}
 	imageConfig := &imagespec.ImageConfig{
@@ -93,6 +94,7 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 	}
 	specCheck := func(t *testing.T, id string, sandboxID string, sandboxPid uint32, spec *runtimespec.Spec) {
 		assert.Nil(t, spec.Root)
+		assert.Equal(t, "test-hostname", spec.Hostname)
 		assert.Equal(t, []string{"test", "command", "test", "args"}, spec.Process.Args)
 		assert.Equal(t, "test-cwd", spec.Process.Cwd)
 		assert.Contains(t, spec.Process.Env, "k1=v1", "k2=v2", "k3=v3=v3bis", "ik4=iv4=iv4bis=boop")
