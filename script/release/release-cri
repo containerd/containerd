@@ -31,8 +31,8 @@ go get -d github.com/containerd/cri/...
 cd $GOPATH/src/github.com/containerd/cri
 git checkout $CRI_COMMIT
 make clean
-make release TARBALL_PREFIX=cri-containerd LOCAL_RELEASE=true VERSION=${VERSION}
-make release TARBALL_PREFIX=cri-containerd-cni LOCAL_RELEASE=true INCLUDE_CNI=true VERSION=${VERSION}
+make release TARBALL_PREFIX=cri-containerd LOCAL_RELEASE=true VERSION=${VERSION} VENDOR=${ROOT}/vendor.conf
+make release TARBALL_PREFIX=cri-containerd-cni LOCAL_RELEASE=true INCLUDE_CNI=true VERSION=${VERSION} VENDOR=${ROOT}/vendor.conf
 
 mkdir -p ${ROOT}/releases/cri
 cp _output/*.tar.gz ${ROOT}/releases/cri
