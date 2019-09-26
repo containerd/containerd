@@ -155,7 +155,7 @@ func NewResolver(options ResolverOptions) remotes.Resolver {
 			images.MediaTypeDockerSchema2Manifest,
 			images.MediaTypeDockerSchema2ManifestList,
 			ocispec.MediaTypeImageManifest,
-			ocispec.MediaTypeImageIndex, "*"}, ", "))
+			ocispec.MediaTypeImageIndex, "*/*"}, ", "))
 	} else {
 		resolveHeader["Accept"] = options.Headers["Accept"]
 		delete(options.Headers, "Accept")
