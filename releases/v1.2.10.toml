@@ -1,0 +1,31 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.2.9"
+
+pre_release = false
+
+preface = """\
+The tenth patch release for `containerd` 1.2 includes only one main bug fix in the
+CRI plugin, but includes updated vendors/build runtimes that fix 2 reported CVEs in
+runc and the Golang 1.12 runtime respectively.
+
+### Notable Updates
+* Update the runc vendor to capture the fix for [CVE-2019-16884](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-16884). Fixed by [PR #3685](https://github.com/containerd/containerd/pull/3685)
+  - More details on the runc CVE in [opencontainers/runc#2128](https://github.com/opencontainers/runc/issues/2128), fixed by [opencontainers/runc#2129](https://github.com/opencontainers/runc/pull/2129)
+* Update Golang runtime to 1.12.10 to handle CVE-2019-16276. More detail on the Golang CVE available in [golang/go#34540](https://github.com/golang/go/issues/34540)
+
+* CRI fixes:
+  - Fix a bug that the default UNIX path is not in the default OCI config via the CRI plugin. Reported in [containerd/cri#1279](https://github.com/containerd/cri/issues/1279) and fixed by [containerd/cri#1283](https://github.com/containerd/cri/pull/1283)
+
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
