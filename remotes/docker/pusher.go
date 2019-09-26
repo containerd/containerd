@@ -80,7 +80,7 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 	}
 
 	req := p.request(host, http.MethodHead, existCheck...)
-	req.header.Set("Accept", strings.Join([]string{desc.MediaType, `*`}, ", "))
+	req.header.Set("Accept", strings.Join([]string{desc.MediaType, `*/*`}, ", "))
 
 	log.G(ctx).WithField("url", req.String()).Debugf("checking and pushing to")
 
