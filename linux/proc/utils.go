@@ -19,10 +19,12 @@
 package proc
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
@@ -103,4 +105,22 @@ func checkKillError(err error) error {
 
 func hasNoIO(r *CreateConfig) bool {
 	return r.Stdin == "" && r.Stdout == "" && r.Stderr == ""
+}
+
+// waitTimeout handles waiting on a waitgroup with a specified timeout.
+// this is commonly used for waiting on IO to finish after a process has exited
+func waitTimeout(ctx context.Context, wg *sync.WaitGroup, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	done := make(chan struct{}, 1)
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
