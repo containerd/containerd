@@ -8,10 +8,10 @@ match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
 # previous release
 previous = "v1.2.0"
 
-pre_release = true
+pre_release = false
 
 preface = """\
-The fourth major release of containerd comes over 9 months after the previous
+The fourth major release of containerd comes 11 months after the previous
 major release and covers a period of both significant project growth and
 further stabilization. Similar to previous releases, the number of API changes
 are small and, as always, backwards compatible. The growing ecosystem of plugins
@@ -24,6 +24,7 @@ implemented in the client libraries without requiring daemon upgrade.
 * **New Windows V2 runtime using shim API.** Adds support for the Windows runtime shims in containerd. *NOTE: while containerd's runtime is stable in this release, running Windows containers are not yet fully supported until the [runhcs shim](https://github.com/microsoft/hcsshim/tree/master/cmd/containerd-shim-runhcs-v1) is fully supported.*
 * **Improvements to ttrpc.** For better daemon to shim communication (https://github.com/containerd/containerd/pull/3341)
 * **Removed experimental Windows V1 runtime**
+* **Update runc dependency** Updated runc for CVE-2019-16884
 
 ### Snapshots
 * **New Devmapper snapshotter** (https://github.com/containerd/containerd/pull/3022)
@@ -47,7 +48,7 @@ implemented in the client libraries without requiring daemon upgrade.
 * **Add payload parameter to apply in diff service API**
 
 ### CRI
-This version of containerd is validated against v1.15, but it is also compatible with Kubernetes v1.12+. (See [more details](https://github.com/containerd/cri#support-metrics) about support metrics)
+This version of containerd is validated against v1.16, but it is also compatible with Kubernetes v1.12+. (See [more details](https://github.com/containerd/cri#support-metrics) about support metrics)
 
 #### Features
 * **Supported per-pod containerd shim.** The `io.containerd.runc.v2` runtime is fully validated and ready to be used in production. This helps minimizing per-pod resource overhead. Note that `io.containerd.runtime.v1.linux` is still the default runtime. (https://github.com/containerd/cri/issues/1075)
