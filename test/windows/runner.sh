@@ -49,7 +49,7 @@ function retry_anyway() {
 }
 
 function retry_on_permission_error() {
-  retry_on_error 12 5 "Permission denied" "$@"
+  retry_on_error 36 5 "Permission denied" "$@"
 }
 
 function retry_on_error() {
