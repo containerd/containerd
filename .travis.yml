@@ -106,7 +106,7 @@ after_success:
   - bash <(curl -s https://codecov.io/bash) -F linux
 
 before_deploy:
-  - make release
+  - sudo PATH=$PATH GOPATH=$GOPATH script/release/release-containerd.sh
   - if [ "$TRAVIS_GOOS" = "linux" ]; then make cri-release; fi
 
 deploy:
