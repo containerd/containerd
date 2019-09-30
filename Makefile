@@ -203,12 +203,18 @@ install-man:
 	@echo "$(WHALE) $@"
 	$(foreach manpage,$(addprefix man/,$(MANPAGES)), $(call installmanpage,$(manpage),$(subst .,,$(suffix $(manpage))),$(notdir $(manpage))))
 
-release: $(BINARIES)
+releases/$(RELEASE).tar.gz: $(BINARIES)
 	@echo "$(WHALE) $@"
 	@rm -rf releases/$(RELEASE) releases/$(RELEASE).tar.gz
 	@install -d releases/$(RELEASE)/bin
 	@install $(BINARIES) releases/$(RELEASE)/bin
 	@cd releases/$(RELEASE) && tar -czf ../$(RELEASE).tar.gz *
+
+release: $(BINARIES) releases/$(RELEASE).tar.gz
+
+cri-release: $(BINARIES) releases/$(RELEASE).tar.gz
+	@echo "$(WHALE) $@"
+	@VERSION=$(VERSION:v%=%) script/release/release-cri
 
 clean: ## clean up binaries
 	@echo "$(WHALE) $@"
