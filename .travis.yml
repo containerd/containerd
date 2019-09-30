@@ -14,7 +14,7 @@ go:
 
 env:
   - TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runc.v1 TRAVIS_CGO_ENABLED=1 TRAVIS_DISTRO=bionic
-  - TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runc.v2 TRAVIS_CGO_ENABLED=1 TRAVIS_DISTRO=bionic
+  - TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runc.v2 TRAVIS_CGO_ENABLED=1 TRAVIS_DISTRO=bionic TRAVIS_RELEASE=yes
   - TRAVIS_GOOS=linux TEST_RUNTIME=io.containerd.runtime.v1.linux TRAVIS_CGO_ENABLED=1 TRAVIS_DISTRO=bionic
   - TRAVIS_GOOS=darwin TRAVIS_CGO_ENABLED=0
 
@@ -106,8 +106,7 @@ after_success:
   - bash <(curl -s https://codecov.io/bash) -F linux
 
 before_deploy:
-  - make release
-  - if [ "$TRAVIS_GOOS" = "linux" ]; then make cri-release; fi
+  - if [ "$TRAVIS_RELEASE" = "yes" ]; then make release cri-release; fi
 
 deploy:
   - provider: releases
