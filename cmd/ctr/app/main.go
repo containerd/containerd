@@ -71,6 +71,7 @@ stable from release to release of the containerd project.`
 
 containerd CLI
 `
+	app.EnableBashCompletion = true
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
 			Name:  "debug",
