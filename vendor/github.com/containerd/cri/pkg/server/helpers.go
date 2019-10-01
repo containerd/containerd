@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/plugin"
@@ -33,7 +33,6 @@ import (
 	"github.com/containerd/typeurl"
 	"github.com/docker/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
-	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -51,6 +50,7 @@ const (
 	errorStartReason = "StartError"
 	// errorStartExitCode is the exit code when fails to start container.
 	// 128 is the same with Docker's behavior.
+	// TODO(windows): Figure out what should be used for windows.
 	errorStartExitCode = 128
 	// completeExitReason is the exit reason when container exits with code 0.
 	completeExitReason = "Completed"
@@ -58,39 +58,16 @@ const (
 	errorExitReason = "Error"
 	// oomExitReason is the exit reason when process in container is oom killed.
 	oomExitReason = "OOMKilled"
-)
 
-const (
-	// defaultSandboxOOMAdj is default omm adj for sandbox container. (kubernetes#47938).
-	defaultSandboxOOMAdj = -998
-	// defaultShmSize is the default size of the sandbox shm.
-	defaultShmSize = int64(1024 * 1024 * 64)
-	// relativeRootfsPath is the rootfs path relative to bundle path.
-	relativeRootfsPath = "rootfs"
 	// sandboxesDir contains all sandbox root. A sandbox root is the running
 	// directory of the sandbox, all files created for the sandbox will be
 	// placed under this directory.
 	sandboxesDir = "sandboxes"
 	// containersDir contains all container root.
 	containersDir = "containers"
-	// According to http://man7.org/linux/man-pages/man5/resolv.conf.5.html:
-	// "The search list is currently limited to six domains with a total of 256 characters."
-	maxDNSSearches = 6
 	// Delimiter used to construct container/sandbox names.
 	nameDelimiter = "_"
-	// devShm is the default path of /dev/shm.
-	devShm = "/dev/shm"
-	// etcHosts is the default path of /etc/hosts file.
-	etcHosts = "/etc/hosts"
-	// etcHostname is the default path of /etc/hostname file.
-	etcHostname = "/etc/hostname"
-	// resolvConfPath is the abs path of resolv.conf on host or container.
-	resolvConfPath = "/etc/resolv.conf"
-	// hostnameEnv is the key for HOSTNAME env.
-	hostnameEnv = "HOSTNAME"
-)
 
-const (
 	// criContainerdPrefix is common prefix for cri-containerd
 	criContainerdPrefix = "io.cri-containerd"
 	// containerKindLabel is a label key indicating container is sandbox container or application container
@@ -107,14 +84,12 @@ const (
 	sandboxMetadataExtension = criContainerdPrefix + ".sandbox.metadata"
 	// containerMetadataExtension is an extension name that identify metadata of container in CreateContainerRequest
 	containerMetadataExtension = criContainerdPrefix + ".container.metadata"
-)
 
-const (
 	// defaultIfName is the default network interface for the pods
 	defaultIfName = "eth0"
-	// networkAttachCount is the minimum number of networks the PodSandbox
-	// attaches to
-	networkAttachCount = 2
+
+	// runtimeRunhcsV1 is the runtime type for runhcs.
+	runtimeRunhcsV1 = "io.containerd.runhcs.v1"
 )
 
 // makeSandboxName generates sandbox name from sandbox metadata. The name
@@ -141,17 +116,6 @@ func makeContainerName(c *runtime.ContainerMetadata, s *runtime.PodSandboxMetada
 	}, nameDelimiter)
 }
 
-// getCgroupsPath generates container cgroups path.
-func getCgroupsPath(cgroupsParent, id string) string {
-	base := path.Base(cgroupsParent)
-	if strings.HasSuffix(base, ".slice") {
-		// For a.slice/b.slice/c.slice, base is c.slice.
-		// runc systemd cgroup path format is "slice:prefix:name".
-		return strings.Join([]string{base, "cri-containerd", id}, ":")
-	}
-	return filepath.Join(cgroupsParent, id)
-}
-
 // getSandboxRootDir returns the root directory for managing sandbox files,
 // e.g. hosts files.
 func (c *criService) getSandboxRootDir(id string) string {
@@ -174,26 +138,6 @@ func (c *criService) getContainerRootDir(id string) string {
 // e.g. named pipes.
 func (c *criService) getVolatileContainerRootDir(id string) string {
 	return filepath.Join(c.config.StateDir, containersDir, id)
-}
-
-// getSandboxHostname returns the hostname file path inside the sandbox root directory.
-func (c *criService) getSandboxHostname(id string) string {
-	return filepath.Join(c.getSandboxRootDir(id), "hostname")
-}
-
-// getSandboxHosts returns the hosts file path inside the sandbox root directory.
-func (c *criService) getSandboxHosts(id string) string {
-	return filepath.Join(c.getSandboxRootDir(id), "hosts")
-}
-
-// getResolvPath returns resolv.conf filepath for specified sandbox.
-func (c *criService) getResolvPath(id string) string {
-	return filepath.Join(c.getSandboxRootDir(id), "resolv.conf")
-}
-
-// getSandboxDevShm returns the shm file path inside the sandbox root directory.
-func (c *criService) getSandboxDevShm(id string) string {
-	return filepath.Join(c.getVolatileSandboxRootDir(id), "shm")
 }
 
 // criContainerStateToString formats CRI container state to string.
@@ -298,49 +242,6 @@ func (c *criService) ensureImageExists(ctx context.Context, ref string, config *
 	return &newImage, nil
 }
 
-func initSelinuxOpts(selinuxOpt *runtime.SELinuxOption) (string, string, error) {
-	if selinuxOpt == nil {
-		return "", "", nil
-	}
-
-	// Should ignored selinuxOpts if they are incomplete.
-	if selinuxOpt.GetUser() == "" ||
-		selinuxOpt.GetRole() == "" ||
-		selinuxOpt.GetType() == "" {
-		return "", "", nil
-	}
-
-	// make sure the format of "level" is correct.
-	ok, err := checkSelinuxLevel(selinuxOpt.GetLevel())
-	if err != nil || !ok {
-		return "", "", err
-	}
-
-	labelOpts := fmt.Sprintf("%s:%s:%s:%s",
-		selinuxOpt.GetUser(),
-		selinuxOpt.GetRole(),
-		selinuxOpt.GetType(),
-		selinuxOpt.GetLevel())
-
-	options, err := label.DupSecOpt(labelOpts)
-	if err != nil {
-		return "", "", err
-	}
-	return label.InitLabels(options)
-}
-
-func checkSelinuxLevel(level string) (bool, error) {
-	if len(level) == 0 {
-		return true, nil
-	}
-
-	matched, err := regexp.MatchString(`^s\d(-s\d)??(:c\d{1,4}((.c\d{1,4})?,c\d{1,4})*(.c\d{1,4})?(,c\d{1,4}(.c\d{1,4})?)*)?$`, level)
-	if err != nil || !matched {
-		return false, errors.Wrapf(err, "the format of 'level' %q is not correct", level)
-	}
-	return true, nil
-}
-
 // isInCRIMounts checks whether a destination is in CRI mount list.
 func isInCRIMounts(dst string, mounts []*runtime.Mount) bool {
 	for _, m := range mounts {
@@ -365,15 +266,6 @@ func buildLabels(configLabels map[string]string, containerType string) map[strin
 	}
 	labels[containerKindLabel] = containerType
 	return labels
-}
-
-func getPodCNILabels(id string, config *runtime.PodSandboxConfig) map[string]string {
-	return map[string]string{
-		"K8S_POD_NAMESPACE":          config.GetMetadata().GetNamespace(),
-		"K8S_POD_NAME":               config.GetMetadata().GetName(),
-		"K8S_POD_INFRA_CONTAINER_ID": id,
-		"IgnoreUnknown":              "1",
-	}
 }
 
 // toRuntimeAuthConfig converts cri plugin auth config to runtime auth config.
@@ -433,6 +325,8 @@ func getRuntimeOptionsType(t string) interface{} {
 		return &runcoptions.Options{}
 	case plugin.RuntimeLinuxV1:
 		return &runctypes.RuncOptions{}
+	case runtimeRunhcsV1:
+		return &runhcsoptions.Options{}
 	default:
 		return &runtimeoptions.Options{}
 	}

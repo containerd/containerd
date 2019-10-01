@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -407,7 +408,8 @@ func (c *criService) loadSandbox(ctx context.Context, cntr containerd.Container)
 	sandbox.Container = cntr
 
 	// Load network namespace.
-	if meta.Config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE {
+	if goruntime.GOOS != "windows" &&
+		meta.Config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE {
 		// Don't need to load netns for host network sandbox.
 		return sandbox, nil
 	}
