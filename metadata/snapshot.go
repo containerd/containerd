@@ -530,7 +530,7 @@ type infoPair struct {
 	info snapshots.Info
 }
 
-func (s *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshots.Info) error) error {
+func (s *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshots.Info) error, filters ...string) error {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return err

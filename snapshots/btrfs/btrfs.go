@@ -186,7 +186,7 @@ func (b *snapshotter) usage(ctx context.Context, key string) (snapshots.Usage, e
 }
 
 // Walk the committed snapshots.
-func (b *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshots.Info) error) error {
+func (b *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshots.Info) error, filters ...string) error {
 	ctx, t, err := b.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return err

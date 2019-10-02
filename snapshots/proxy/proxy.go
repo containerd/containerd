@@ -153,7 +153,7 @@ func (p *proxySnapshotter) Remove(ctx context.Context, key string) error {
 	return errdefs.FromGRPC(err)
 }
 
-func (p *proxySnapshotter) Walk(ctx context.Context, fn func(context.Context, snapshots.Info) error) error {
+func (p *proxySnapshotter) Walk(ctx context.Context, fn func(context.Context, snapshots.Info) error, filters ...string) error {
 	sc, err := p.client.List(ctx, &snapshotsapi.ListSnapshotsRequest{
 		Snapshotter: p.snapshotterName,
 	})
