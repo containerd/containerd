@@ -315,8 +315,11 @@ type Snapshotter interface {
 	Remove(ctx context.Context, key string) error
 
 	// Walk all snapshots in the snapshotter. For each snapshot in the
-	// snapshotter, the function will be called.
-	Walk(ctx context.Context, fn func(context.Context, Info) error) error
+	// snapshotter, the function will be called, unless filters were used.
+	// Zero or more filters may be provided as strings. Only events that match
+	// *any* of the provided filters will be sent on the channel. The filters use
+	// the standard containerd filters package syntax.
+	Walk(ctx context.Context, fn func(context.Context, Info) error, filters ...string) error
 
 	// Close releases the internal resources.
 	//

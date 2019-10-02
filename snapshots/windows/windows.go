@@ -238,7 +238,7 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 }
 
 // Walk the committed snapshots.
-func (s *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshots.Info) error) error {
+func (s *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshots.Info) error, filters ...string) error {
 	ctx, t, err := s.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return err
