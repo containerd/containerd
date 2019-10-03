@@ -25,6 +25,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
@@ -49,6 +50,20 @@ func (s *safePid) set(pid int) {
 	s.Lock()
 	s.pid = pid
 	s.Unlock()
+}
+
+type atomicBool int32
+
+func (ab *atomicBool) set(b bool) {
+	if b {
+		atomic.StoreInt32((*int32)(ab), 1)
+	} else {
+		atomic.StoreInt32((*int32)(ab), 0)
+	}
+}
+
+func (ab *atomicBool) get() bool {
+	return atomic.LoadInt32((*int32)(ab)) == 1
 }
 
 // TODO(mlaventure): move to runc package?
