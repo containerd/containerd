@@ -233,12 +233,12 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 			return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "unable to resolve rootfs mounts without snapshotter on container")
 		}
 
-		// get the rootfs from the snapshotter and add it to the request
-		s, err := c.client.getSnapshotter(ctx, r.Snapshotter)
+		// get the rootfs from the mount provider and add it to the request
+		p, err := c.client.getMountProvider(ctx, r.Snapshotter)
 		if err != nil {
 			return nil, err
 		}
-		mounts, err := s.Mounts(ctx, r.SnapshotKey)
+		mounts, err := p.Mounts(ctx, r.SnapshotKey)
 		if err != nil {
 			return nil, err
 		}

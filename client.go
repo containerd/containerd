@@ -48,6 +48,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/leases"
 	leasesproxy "github.com/containerd/containerd/leases/proxy"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/platforms"
@@ -590,6 +591,10 @@ func (c *Client) SnapshotService(snapshotterName string) snapshots.Snapshotter {
 	return snproxy.NewSnapshotter(snapshotsapi.NewSnapshotsClient(c.conn), snapshotterName)
 }
 
+func (c *Client) MountProvider(name string) mount.MountProvider {
+	return c.SnapshotService(name)
+}
+
 // TaskService returns the underlying TasksClient
 func (c *Client) TaskService() tasks.TasksClient {
 	if c.taskService != nil {
@@ -744,6 +749,10 @@ func (c *Client) getSnapshotter(ctx context.Context, name string) (snapshots.Sna
 	}
 
 	return s, nil
+}
+
+func (c *Client) getMountProvider(ctx context.Context, name string) (mount.MountProvider, error) {
+	return c.getSnapshotter(ctx, name)
 }
 
 // CheckRuntime returns true if the current runtime matches the expected

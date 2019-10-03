@@ -557,8 +557,8 @@ func WithUser(userstr string) SpecOpts {
 			if c.SnapshotKey == "" {
 				return errors.New("rootfs snapshot not created for container")
 			}
-			snapshotter := client.SnapshotService(c.Snapshotter)
-			mounts, err := snapshotter.Mounts(ctx, c.SnapshotKey)
+			p := client.MountProvider(c.Snapshotter)
+			mounts, err := p.Mounts(ctx, c.SnapshotKey)
 			if err != nil {
 				return err
 			}
@@ -610,8 +610,8 @@ func WithUserID(uid uint32) SpecOpts {
 		if c.SnapshotKey == "" {
 			return errors.Errorf("rootfs snapshot not created for container")
 		}
-		snapshotter := client.SnapshotService(c.Snapshotter)
-		mounts, err := snapshotter.Mounts(ctx, c.SnapshotKey)
+		p := client.MountProvider(c.Snapshotter)
+		mounts, err := p.Mounts(ctx, c.SnapshotKey)
 		if err != nil {
 			return err
 		}
@@ -743,8 +743,8 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 		if c.SnapshotKey == "" {
 			return errors.Errorf("rootfs snapshot not created for container")
 		}
-		snapshotter := client.SnapshotService(c.Snapshotter)
-		mounts, err := snapshotter.Mounts(ctx, c.SnapshotKey)
+		p := client.MountProvider(c.Snapshotter)
+		mounts, err := p.Mounts(ctx, c.SnapshotKey)
 		if err != nil {
 			return err
 		}
