@@ -18,7 +18,7 @@ You can find official releases of `runc` on the [release](https://github.com/ope
 
 ## Security
 
-Reporting process and disclosure communications are outlined in [/org/security](https://github.com/opencontainers/org/blob/master/security/)
+The reporting process and disclosure communications are outlined in [/org/security](https://github.com/opencontainers/org/blob/master/security/).
 
 ## Building
 
