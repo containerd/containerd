@@ -108,7 +108,14 @@ func ApplyLayerWithOpts(ctx context.Context, layer Layer, chain []digest.Digest,
 		}
 	}
 	return applied, nil
+}
 
+// ApplyLayerToMountWithOpts applies a single layer on top of the given mounts.
+func ApplyLayerToMountWithOpts(ctx context.Context, layer Layer, mounts []mount.Mount, a diff.Applier, applyOpts []diff.ApplyOpt) (bool, error) {
+	if err := applyLayerToMount(ctx, layer, mounts, a, applyOpts); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn snapshots.Snapshotter, a diff.Applier, opts []snapshots.Opt, applyOpts []diff.ApplyOpt) error {
@@ -175,6 +182,19 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 		return err
 	}
 
+	return nil
+}
+
+func applyLayerToMount(ctx context.Context, layer Layer, mounts []mount.Mount, a diff.Applier, applyOpts []diff.ApplyOpt) error {
+	diff, err := a.Apply(ctx, layer.Blob, mounts, applyOpts...)
+	if err != nil {
+		err = errors.Wrapf(err, "failed to extract layer %s", layer.Diff.Digest)
+		return err
+	}
+	if diff.Digest != layer.Diff.Digest {
+		err = errors.Errorf("wrong diff id calculated on extraction %q", diff.Digest)
+		return err
+	}
 	return nil
 }
 
