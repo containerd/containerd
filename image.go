@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/snapshots"
@@ -46,6 +47,8 @@ type Image interface {
 	Labels() map[string]string
 	// Unpack unpacks the image's content into a snapshot
 	Unpack(context.Context, string, ...UnpackOpt) error
+	// UnpackTo unpacks the image's content into the provided options
+	UnpackTo(context.Context, ...UnpackOpt) error
 	// RootFS returns the unpacked diffids that make up images rootfs.
 	RootFS(ctx context.Context) ([]digest.Digest, error)
 	// Size returns the total size of the image's packed resources.
@@ -273,12 +276,32 @@ type UnpackConfig struct {
 	ApplyOpts []diff.ApplyOpt
 	// SnapshotOpts for configuring a snapshotter
 	SnapshotOpts []snapshots.Opt
+	// SnapshotterName to apply diff to
+	SnapshotterName string
+	// Mounts to apply diff to
+	Mounts []mount.Mount
 }
 
 // UnpackOpt provides configuration for unpack
 type UnpackOpt func(context.Context, *UnpackConfig) error
 
-func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...UnpackOpt) error {
+// WithUnpackSnapshotter sets the snapshotter name in the UnpackConfig
+func WithUnpackSnapshotter(name string) UnpackOpt {
+	return func(_ context.Context, c *UnpackConfig) error {
+		c.SnapshotterName = name
+		return nil
+	}
+}
+
+// WithUnpackMounts sets the mounts in the UnpackConfig
+func WithUnpackMounts(mounts []mount.Mount) UnpackOpt {
+	return func(_ context.Context, c *UnpackConfig) error {
+		c.Mounts = mounts
+		return nil
+	}
+}
+
+func (i *image) UnpackTo(ctx context.Context, opts ...UnpackOpt) error {
 	ctx, done, err := i.client.WithLease(ctx)
 	if err != nil {
 		return err
@@ -301,23 +324,34 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 		a  = i.client.DiffService()
 		cs = i.client.ContentStore()
 
-		chain    []digest.Digest
-		unpacked bool
+		chain   []digest.Digest
+		applyFn func(rootfs.Layer, []digest.Digest) (bool, error)
 	)
-	snapshotterName, err = i.client.resolveSnapshotterName(ctx, snapshotterName)
-	if err != nil {
-		return err
+	if config.SnapshotterName == "" && len(config.Mounts) == 0 {
+		return errors.New("snapshotter name and mounts are both empty for unpack")
 	}
-	sn, err := i.client.getSnapshotter(ctx, snapshotterName)
-	if err != nil {
-		return err
-	}
-	for _, layer := range layers {
-		unpacked, err = rootfs.ApplyLayerWithOpts(ctx, layer, chain, sn, a, config.SnapshotOpts, config.ApplyOpts)
+	if config.SnapshotterName != "" {
+		config.SnapshotterName, err = i.client.resolveSnapshotterName(ctx, config.SnapshotterName)
 		if err != nil {
 			return err
 		}
-
+		sn, err := i.client.getSnapshotter(ctx, config.SnapshotterName)
+		if err != nil {
+			return err
+		}
+		applyFn = func(layer rootfs.Layer, cchain []digest.Digest) (bool, error) {
+			return rootfs.ApplyLayerWithOpts(ctx, layer, cchain, sn, a, config.SnapshotOpts, config.ApplyOpts)
+		}
+	} else {
+		applyFn = func(layer rootfs.Layer, chain []digest.Digest) (bool, error) {
+			return rootfs.ApplyLayerToMountWithOpts(ctx, layer, config.Mounts, a, config.ApplyOpts)
+		}
+	}
+	for _, layer := range layers {
+		unpacked, err := applyFn(layer, chain)
+		if err != nil {
+			return err
+		}
 		if unpacked {
 			// Set the uncompressed label after the uncompressed
 			// digest has been verified through apply.
@@ -335,22 +369,29 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 		chain = append(chain, layer.Diff.Digest)
 	}
 
-	desc, err := i.i.Config(ctx, cs, i.platform)
-	if err != nil {
+	if config.SnapshotterName != "" {
+		desc, err := i.i.Config(ctx, cs, i.platform)
+		if err != nil {
+			return err
+		}
+
+		rootfs := identity.ChainID(chain).String()
+
+		cinfo := content.Info{
+			Digest: desc.Digest,
+			Labels: map[string]string{
+				fmt.Sprintf("containerd.io/gc.ref.snapshot.%s", config.SnapshotterName): rootfs,
+			},
+		}
+
+		_, err = cs.Update(ctx, cinfo, fmt.Sprintf("labels.containerd.io/gc.ref.snapshot.%s", config.SnapshotterName))
 		return err
 	}
+	return nil
+}
 
-	rootfs := identity.ChainID(chain).String()
-
-	cinfo := content.Info{
-		Digest: desc.Digest,
-		Labels: map[string]string{
-			fmt.Sprintf("containerd.io/gc.ref.snapshot.%s", snapshotterName): rootfs,
-		},
-	}
-
-	_, err = cs.Update(ctx, cinfo, fmt.Sprintf("labels.containerd.io/gc.ref.snapshot.%s", snapshotterName))
-	return err
+func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...UnpackOpt) error {
+	return i.UnpackTo(ctx, append(opts, WithUnpackSnapshotter(snapshotterName))...)
 }
 
 func (i *image) getLayers(ctx context.Context, platform platforms.MatchComparer) ([]rootfs.Layer, error) {
