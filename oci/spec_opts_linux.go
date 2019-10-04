@@ -37,9 +37,7 @@ func WithHostDevices(_ context.Context, _ Client, _ *containers.Container, s *Sp
 	if err != nil {
 		return err
 	}
-	for _, d := range devs {
-		s.Linux.Devices = append(s.Linux.Devices, d)
-	}
+	s.Linux.Devices = append(s.Linux.Devices, devs...)
 	return nil
 }
 

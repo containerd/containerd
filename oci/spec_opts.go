@@ -1115,7 +1115,6 @@ func WithDefaultUnixDevices(_ context.Context, _ Client, _ *containers.Container
 }
 
 // WithPrivileged sets up options for a privileged container
-// TODO(justincormack) device handling
 var WithPrivileged = Compose(
 	WithAllCapabilities,
 	WithMaskedPaths(nil),
