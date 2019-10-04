@@ -20,8 +20,8 @@ import (
 	"context"
 )
 
-// MountProvider for mounts via various sources.
-type MountProvider interface {
+// Provider for mounts via various sources.
+type Provider interface {
 	// Mounts returns the mounts for the provided key.
 	Mounts(ctx context.Context, key string) ([]Mount, error)
 }

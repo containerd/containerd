@@ -80,7 +80,9 @@ func init() {
 // New returns a new containerd client that is connected to the containerd
 // instance provided by address
 func New(address string, opts ...ClientOpt) (*Client, error) {
-	var copts clientOpts
+	copts := clientOpts{
+		mountProviders: make(map[string]mount.Provider),
+	}
 	for _, o := range opts {
 		if err := o(&copts); err != nil {
 			return nil, err
@@ -91,7 +93,8 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 	}
 
 	c := &Client{
-		defaultns: copts.defaultns,
+		defaultns:      copts.defaultns,
+		mountProviders: copts.mountProviders,
 	}
 
 	if copts.defaultRuntime != "" {
@@ -196,12 +199,13 @@ func NewWithConn(conn *grpc.ClientConn, opts ...ClientOpt) (*Client, error) {
 // using a uniform interface
 type Client struct {
 	services
-	connMu    sync.Mutex
-	conn      *grpc.ClientConn
-	runtime   string
-	defaultns string
-	platform  platforms.MatchComparer
-	connector func() (*grpc.ClientConn, error)
+	connMu         sync.Mutex
+	conn           *grpc.ClientConn
+	runtime        string
+	defaultns      string
+	platform       platforms.MatchComparer
+	connector      func() (*grpc.ClientConn, error)
+	mountProviders map[string]mount.Provider
 }
 
 // Reconnect re-establishes the GRPC connection to the containerd daemon
@@ -591,8 +595,12 @@ func (c *Client) SnapshotService(snapshotterName string) snapshots.Snapshotter {
 	return snproxy.NewSnapshotter(snapshotsapi.NewSnapshotsClient(c.conn), snapshotterName)
 }
 
-func (c *Client) MountProvider(name string) mount.MountProvider {
-	return c.SnapshotService(name)
+func (c *Client) MountProvider(name string) mount.Provider {
+	p, ok := c.mountProviders[name]
+	if !ok {
+		return c.SnapshotService(name)
+	}
+	return p
 }
 
 // TaskService returns the underlying TasksClient
@@ -751,8 +759,12 @@ func (c *Client) getSnapshotter(ctx context.Context, name string) (snapshots.Sna
 	return s, nil
 }
 
-func (c *Client) getMountProvider(ctx context.Context, name string) (mount.MountProvider, error) {
-	return c.getSnapshotter(ctx, name)
+func (c *Client) getMountProvider(ctx context.Context, name string) (mount.Provider, error) {
+	p, ok := c.mountProviders[name]
+	if !ok {
+		return c.getSnapshotter(ctx, name)
+	}
+	return p, nil
 }
 
 // CheckRuntime returns true if the current runtime matches the expected

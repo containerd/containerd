@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
 	"google.golang.org/grpc"
@@ -32,6 +33,7 @@ type clientOpts struct {
 	services        *services
 	dialOptions     []grpc.DialOption
 	timeout         time.Duration
+	mountProviders  map[string]mount.Provider
 }
 
 // ClientOpt allows callers to set options on the containerd client
@@ -87,6 +89,14 @@ func WithServices(opts ...ServicesOpt) ClientOpt {
 func WithTimeout(d time.Duration) ClientOpt {
 	return func(c *clientOpts) error {
 		c.timeout = d
+		return nil
+	}
+}
+
+// WithMountProvider sets the provider by name to the client
+func WithMountProvider(name string, p mount.Provider) ClientOpt {
+	return func(c *clientOpts) error {
+		c.mountProviders[name] = p
 		return nil
 	}
 }

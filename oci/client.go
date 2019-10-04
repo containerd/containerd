@@ -28,7 +28,7 @@ import (
 // Client interface used by SpecOpt
 type Client interface {
 	SnapshotService(snapshotterName string) snapshots.Snapshotter
-	MountProvider(name string) mount.MountProvider
+	MountProvider(name string) mount.Provider
 }
 
 // Image interface used by some SpecOpt to query image configuration

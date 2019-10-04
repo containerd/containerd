@@ -327,10 +327,7 @@ func (i *image) UnpackTo(ctx context.Context, opts ...UnpackOpt) error {
 		chain   []digest.Digest
 		applyFn func(rootfs.Layer, []digest.Digest) (bool, error)
 	)
-	if config.SnapshotterName == "" && len(config.Mounts) == 0 {
-		return errors.New("snapshotter name and mounts are both empty for unpack")
-	}
-	if config.SnapshotterName != "" {
+	if len(config.Mounts) == 0 {
 		config.SnapshotterName, err = i.client.resolveSnapshotterName(ctx, config.SnapshotterName)
 		if err != nil {
 			return err
