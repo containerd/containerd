@@ -64,7 +64,7 @@ func Namespace(ctx context.Context) (string, bool) {
 	return namespace, ok
 }
 
-// NamespaceRequired returns the valid namepace from the context or an error.
+// NamespaceRequired returns the valid namespace from the context or an error.
 func NamespaceRequired(ctx context.Context) (string, error) {
 	namespace, ok := Namespace(ctx)
 	if !ok || namespace == "" {

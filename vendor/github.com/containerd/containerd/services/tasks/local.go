@@ -51,7 +51,6 @@ import (
 	ptypes "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
-	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -101,14 +100,14 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 		monitor = runtime.NewNoopMonitor()
 	}
 
-	cs := m.(*metadata.DB).ContentStore()
+	db := m.(*metadata.DB)
 	l := &local{
-		runtimes:  runtimes,
-		db:        m.(*metadata.DB),
-		store:     cs,
-		publisher: ic.Events,
-		monitor:   monitor.(runtime.TaskMonitor),
-		v2Runtime: v2r.(*v2.TaskManager),
+		runtimes:   runtimes,
+		containers: metadata.NewContainerStore(db),
+		store:      db.ContentStore(),
+		publisher:  ic.Events,
+		monitor:    monitor.(runtime.TaskMonitor),
+		v2Runtime:  v2r.(*v2.TaskManager),
 	}
 	for _, r := range runtimes {
 		tasks, err := r.Tasks(ic.Context, true)
@@ -123,10 +122,10 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 }
 
 type local struct {
-	runtimes  map[string]runtime.PlatformRuntime
-	db        *metadata.DB
-	store     content.Store
-	publisher events.Publisher
+	runtimes   map[string]runtime.PlatformRuntime
+	containers containers.Store
+	store      content.Store
+	publisher  events.Publisher
 
 	monitor   runtime.TaskMonitor
 	v2Runtime *v2.TaskManager
@@ -242,7 +241,7 @@ func (l *local) Delete(ctx context.Context, r *api.DeleteTaskRequest, _ ...grpc.
 	}
 	exit, err := t.Delete(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	return &api.DeleteResponse{
 		ExitStatus: exit.Status,
@@ -258,7 +257,7 @@ func (l *local) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest, 
 	}
 	process, err := t.Process(ctx, r.ExecID)
 	if err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	exit, err := process.Delete(ctx)
 	if err != nil {
@@ -647,12 +646,8 @@ func (l *local) writeContent(ctx context.Context, mediaType, ref string, r io.Re
 
 func (l *local) getContainer(ctx context.Context, id string) (*containers.Container, error) {
 	var container containers.Container
-	if err := l.db.View(func(tx *bolt.Tx) error {
-		store := metadata.NewContainerStore(tx)
-		var err error
-		container, err = store.Get(ctx, id)
-		return err
-	}); err != nil {
+	container, err := l.containers.Get(ctx, id)
+	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 	return &container, nil
