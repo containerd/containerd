@@ -57,6 +57,10 @@ command. As part of this process, we do the following:
 			Name:  "all-metadata",
 			Usage: "Pull metadata for all platforms",
 		},
+		cli.BoolFlag{
+			Name:  "skip-download",
+			Usage: "Skip downloading layers which can be provided by snapshotter without pulling it",
+		},
 	),
 	Action: func(context *cli.Context) error {
 		var (

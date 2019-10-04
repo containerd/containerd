@@ -219,3 +219,12 @@ func WithAllMetadata() RemoteOpt {
 		return nil
 	}
 }
+
+// WithSkipPullingBySnapshotter skips pulling layers which can be provided by
+// snapshotter without pulling the actual contents.
+func WithSkipPullingBySnapshotter() RemoteOpt {
+	return func(_ *Client, c *RemoteContext) error {
+		c.SkipPullingBySnapshotter = true
+		return nil
+	}
+}

@@ -108,6 +108,11 @@ type FetchConfig struct {
 	Platforms []string
 	// Whether or not download all metadata
 	AllMetadata bool
+	// Snapshotter
+	Snapshotter string
+	// Whether or not skip downloading layers which can be provided by snapshotter
+	// without pulling it.
+	SkipPullingBySnapshotter bool
 }
 
 // NewFetchConfig returns the default FetchConfig from cli flags
@@ -137,6 +142,10 @@ func NewFetchConfig(ctx context.Context, clicontext *cli.Context) (*FetchConfig,
 		config.PlatformMatcher = platforms.Any()
 	} else if clicontext.Bool("all-metadata") {
 		config.AllMetadata = true
+	}
+	if clicontext.Bool("skip-download") {
+		config.SkipPullingBySnapshotter = true
+		config.Snapshotter = clicontext.String("snapshotter")
 	}
 
 	return config, nil
@@ -175,6 +184,13 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 
 	if config.AllMetadata {
 		opts = append(opts, containerd.WithAllMetadata())
+	}
+
+	if config.SkipPullingBySnapshotter {
+		opts = append(opts,
+			containerd.WithSkipPullingBySnapshotter(),
+			containerd.WithPullSnapshotter(config.Snapshotter),
+		)
 	}
 
 	if config.PlatformMatcher != nil {

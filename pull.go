@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/schema1"
+	snhandler "github.com/containerd/containerd/snapshots/handler"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/semaphore"
@@ -153,6 +154,11 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 			// Filter children by platforms if specified.
 			childrenHandler = images.FilterPlatforms(childrenHandler, rCtx.PlatformMatcher)
 		}
+		// Skip downloading layers which can be provided by snapshotter without pulling it.
+		if rCtx.SkipPullingBySnapshotter {
+			childrenHandler = snhandler.FilterLayerBySnapshotter(childrenHandler, c.SnapshotService(rCtx.Snapshotter), store, fetcher, ref)
+		}
+
 		// Sort and limit manifests if a finite number is needed
 		if limit > 0 {
 			childrenHandler = images.LimitManifests(childrenHandler, rCtx.PlatformMatcher, limit)
