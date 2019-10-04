@@ -1006,6 +1006,21 @@ func WithParentCgroupDevices(_ context.Context, _ Client, _ *containers.Containe
 	return nil
 }
 
+// WithAllDevicesAllowed permits READ WRITE MKNOD on all devices nodes for the container
+func WithAllDevicesAllowed(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+	setLinux(s)
+	if s.Linux.Resources == nil {
+		s.Linux.Resources = &specs.LinuxResources{}
+	}
+	s.Linux.Resources.Devices = []specs.LinuxDeviceCgroup{
+		{
+			Allow:  true,
+			Access: rwm,
+		},
+	}
+	return nil
+}
+
 // WithDefaultUnixDevices adds the default devices for unix such as /dev/null, /dev/random to
 // the container's resource cgroup spec
 func WithDefaultUnixDevices(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
