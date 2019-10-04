@@ -26,4 +26,7 @@ var (
 	// Revision is filled with the VCS (e.g. git) revision being used to build
 	// the program at linking time.
 	Revision = ""
+
+	// GoVersion is filled at linking time
+	GoVersion = ""
 )
