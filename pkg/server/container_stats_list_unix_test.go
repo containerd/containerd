@@ -21,30 +21,30 @@ package server
 import (
 	"testing"
 
-	"github.com/containerd/cgroups"
+	v1 "github.com/containerd/cgroups/stats/v1"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetWorkingSet(t *testing.T) {
 	for desc, test := range map[string]struct {
-		memory   *cgroups.MemoryStat
+		memory   *v1.MemoryStat
 		expected uint64
 	}{
 		"nil memory usage": {
-			memory:   &cgroups.MemoryStat{},
+			memory:   &v1.MemoryStat{},
 			expected: 0,
 		},
 		"memory usage higher than inactive_total_file": {
-			memory: &cgroups.MemoryStat{
+			memory: &v1.MemoryStat{
 				TotalInactiveFile: 1000,
-				Usage:             &cgroups.MemoryEntry{Usage: 2000},
+				Usage:             &v1.MemoryEntry{Usage: 2000},
 			},
 			expected: 1000,
 		},
 		"memory usage lower than inactive_total_file": {
-			memory: &cgroups.MemoryStat{
+			memory: &v1.MemoryStat{
 				TotalInactiveFile: 2000,
-				Usage:             &cgroups.MemoryEntry{Usage: 1000},
+				Usage:             &v1.MemoryEntry{Usage: 1000},
 			},
 			expected: 0,
 		},
