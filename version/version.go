@@ -16,6 +16,8 @@
 
 package version
 
+import "runtime"
+
 var (
 	// Package is filled at linking time
 	Package = "github.com/containerd/containerd"
@@ -27,6 +29,6 @@ var (
 	// the program at linking time.
 	Revision = ""
 
-	// GoVersion is filled at linking time
-	GoVersion = ""
+	// GoVersion is Go tree's version.
+	GoVersion = runtime.Version()
 )
