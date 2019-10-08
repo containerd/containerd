@@ -217,7 +217,7 @@ func (s *Service) Delete(ctx context.Context, r *ptypes.Empty) (*shimapi.DeleteR
 		return nil, err
 	}
 	if err := p.Delete(ctx); err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	s.mu.Lock()
 	delete(s.processes, s.id)
@@ -240,7 +240,7 @@ func (s *Service) DeleteProcess(ctx context.Context, r *shimapi.DeleteProcessReq
 		return nil, err
 	}
 	if err := p.Delete(ctx); err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	s.mu.Lock()
 	delete(s.processes, r.ID)
