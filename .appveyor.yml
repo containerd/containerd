@@ -22,7 +22,7 @@ install:
   - ps: $psversiontable
 
 build_script:
-  - bash.exe -elc "mingw32-make"
+  - bash.exe -elc "mingw32-make.exe"
 
 test_script:
-  - bash.exe -elc "mingw32-make test"
+  - bash.exe -elc "mingw32-make.exe test"
