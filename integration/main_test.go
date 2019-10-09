@@ -22,6 +22,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -63,11 +64,12 @@ var criRoot = flag.String("cri-root", "/var/lib/containerd/io.containerd.grpc.v1
 var runtimeHandler = flag.String("runtime-handler", "", "The runtime handler to use in the test.")
 var containerdBin = flag.String("containerd-bin", "containerd", "The containerd binary name. The name is used to restart containerd during test.")
 
-func init() {
+func TestMain(m *testing.M) {
 	flag.Parse()
 	if err := ConnectDaemons(); err != nil {
 		logrus.WithError(err).Fatalf("Failed to connect daemons")
 	}
+	os.Exit(m.Run())
 }
 
 // ConnectDaemons connect cri plugin and containerd, and initialize the clients.
