@@ -147,11 +147,14 @@ func (s *shim) Close() error {
 }
 
 func (s *shim) Delete(ctx context.Context) (*runtime.Exit, error) {
-	response, err := s.task.Delete(ctx, &task.DeleteRequest{
+	response, shimErr := s.task.Delete(ctx, &task.DeleteRequest{
 		ID: s.ID(),
 	})
-	if err != nil && !errdefs.IsNotFound(err) {
-		return nil, errdefs.FromGRPC(err)
+	if shimErr != nil {
+		shimErr = errdefs.FromGRPC(shimErr)
+		if !errdefs.IsNotFound(shimErr) {
+			return nil, shimErr
+		}
 	}
 	if err := s.waitShutdown(ctx); err != nil {
 		return nil, err
@@ -162,6 +165,11 @@ func (s *shim) Delete(ctx context.Context) (*runtime.Exit, error) {
 	// remove self from the runtime task list
 	// this seems dirty but it cleans up the API across runtimes, tasks, and the service
 	s.rtTasks.Delete(ctx, s.ID())
+
+	if shimErr != nil {
+		return nil, shimErr
+	}
+
 	s.events.Publish(ctx, runtime.TaskDeleteEventTopic, &eventstypes.TaskDelete{
 		ContainerID: s.ID(),
 		ExitStatus:  response.ExitStatus,

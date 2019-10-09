@@ -86,9 +86,12 @@ func (t *Task) Namespace() string {
 
 // Delete the task and return the exit status
 func (t *Task) Delete(ctx context.Context) (*runtime.Exit, error) {
-	rsp, err := t.shim.Delete(ctx, empty)
-	if err != nil && !errdefs.IsNotFound(err) {
-		return nil, errdefs.FromGRPC(err)
+	rsp, shimErr := t.shim.Delete(ctx, empty)
+	if shimErr != nil {
+		shimErr = errdefs.FromGRPC(shimErr)
+		if !errdefs.IsNotFound(shimErr) {
+			return nil, shimErr
+		}
 	}
 	t.tasks.Delete(ctx, t.id)
 	if err := t.shim.KillShim(ctx); err != nil {
@@ -96,6 +99,9 @@ func (t *Task) Delete(ctx context.Context) (*runtime.Exit, error) {
 	}
 	if err := t.bundle.Delete(); err != nil {
 		log.G(ctx).WithError(err).Error("failed to delete bundle")
+	}
+	if shimErr != nil {
+		return nil, shimErr
 	}
 	t.events.Publish(ctx, runtime.TaskDeleteEventTopic, &eventstypes.TaskDelete{
 		ContainerID: t.id,
