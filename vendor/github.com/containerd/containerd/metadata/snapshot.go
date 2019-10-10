@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
@@ -517,9 +518,8 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 		}
 
 		// Mark snapshotter as dirty for triggering garbage collection
-		s.db.dirtyL.Lock()
+		atomic.AddUint32(&s.db.dirty, 1)
 		s.db.dirtySS[s.name] = struct{}{}
-		s.db.dirtyL.Unlock()
 
 		return nil
 	})

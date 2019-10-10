@@ -29,7 +29,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
-	"github.com/docker/distribution/registry/api/errcode"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
@@ -136,7 +135,7 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 }
 
 func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string, offset int64) (io.ReadCloser, error) {
-	req.header.Set("Accept", strings.Join([]string{mediatype, `*`}, ", "))
+	req.header.Set("Accept", strings.Join([]string{mediatype, `*/*`}, ", "))
 
 	if offset > 0 {
 		// Note: "Accept-Ranges: bytes" cannot be trusted as some endpoints
@@ -160,7 +159,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		if resp.StatusCode == http.StatusNotFound {
 			return nil, errors.Wrapf(errdefs.ErrNotFound, "content at %v not found", req.String())
 		}
-		var registryErr errcode.Errors
+		var registryErr Errors
 		if err := json.NewDecoder(resp.Body).Decode(&registryErr); err != nil || registryErr.Len() < 1 {
 			return nil, errors.Errorf("unexpected status code %v: %v", req.String(), resp.Status)
 		}

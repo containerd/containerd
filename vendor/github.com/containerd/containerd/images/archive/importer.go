@@ -124,7 +124,7 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opt
 	}
 
 	// If OCI layout was given, interpret the tar as an OCI layout.
-	// When not provided, the layout of the tar will be interpretted
+	// When not provided, the layout of the tar will be interpreted
 	// as Docker v1.1 or v1.2.
 	if ociLayout.Version != "" {
 		if ociLayout.Version != ocispec.ImageLayoutVersion {
