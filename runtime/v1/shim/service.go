@@ -55,7 +55,7 @@ var (
 	empty   = &ptypes.Empty{}
 	bufPool = sync.Pool{
 		New: func() interface{} {
-			buffer := make([]byte, 32<<10)
+			buffer := make([]byte, 4096)
 			return &buffer
 		},
 	}
