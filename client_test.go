@@ -54,7 +54,6 @@ func init() {
 	flag.StringVar(&address, "address", defaultAddress, "The address to the containerd socket for use in the tests")
 	flag.BoolVar(&noDaemon, "no-daemon", false, "Do not start a dedicated daemon for the tests")
 	flag.BoolVar(&noCriu, "no-criu", false, "Do not run the checkpoint tests")
-	flag.Parse()
 }
 
 func testContext(t testing.TB) (context.Context, context.CancelFunc) {
@@ -67,6 +66,7 @@ func testContext(t testing.TB) (context.Context, context.CancelFunc) {
 }
 
 func TestMain(m *testing.M) {
+	flag.Parse()
 	if testing.Short() {
 		os.Exit(m.Run())
 	}
