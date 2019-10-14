@@ -339,9 +339,9 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 	}
 
 	// 201 is specified return status, some registries return
-	// 200 or 204.
+	// 200, 202 or 204.
 	switch resp.StatusCode {
-	case http.StatusOK, http.StatusCreated, http.StatusNoContent:
+	case http.StatusOK, http.StatusCreated, http.StatusNoContent, http.StatusAccepted:
 	default:
 		return errors.Errorf("unexpected status: %s", resp.Status)
 	}
