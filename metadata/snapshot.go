@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata/boltutil"
@@ -530,7 +531,7 @@ type infoPair struct {
 	info snapshots.Info
 }
 
-func (s *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshots.Info) error, filters ...string) error {
+func (s *snapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...string) error {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return err
@@ -541,6 +542,11 @@ func (s *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 		pairs     = []infoPair{}
 		lastKey   string
 	)
+
+	filter, err := filters.ParseAll(fs...)
+	if err != nil {
+		return err
+	}
 
 	for {
 		if err := view(ctx, s.db, func(tx *bolt.Tx) error {
@@ -604,8 +610,11 @@ func (s *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 				return err
 			}
 
-			if err := fn(ctx, overlayInfo(info, pair.info)); err != nil {
-				return err
+			info = overlayInfo(info, pair.info)
+			if filter.Match(adaptSnapshot(info)) {
+				if err := fn(ctx, info); err != nil {
+					return err
+				}
 			}
 		}
 

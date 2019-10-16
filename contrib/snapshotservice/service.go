@@ -136,7 +136,7 @@ func (s service) List(sr *snapshotsapi.ListSnapshotsRequest, ss snapshotsapi.Sna
 		}
 
 		return nil
-	})
+	}, sr.Filters...)
 	if err != nil {
 		return err
 	}
