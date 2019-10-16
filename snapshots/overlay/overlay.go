@@ -282,14 +282,14 @@ func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 	return t.Commit()
 }
 
-// Walk the committed snapshots.
-func (o *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshots.Info) error, filters ...string) error {
+// Walk the snapshots.
+func (o *snapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...string) error {
 	ctx, t, err := o.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return err
 	}
 	defer t.Rollback()
-	return storage.WalkInfo(ctx, fn)
+	return storage.WalkInfo(ctx, fn, fs...)
 }
 
 // Cleanup cleans up disk resources from removed or abandoned snapshots
