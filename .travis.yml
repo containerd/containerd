@@ -64,7 +64,7 @@ addons:
       - unzip
 
 before_install:
-  - uname -r
+  - sudo script/sysinfo
 
 install:
   - sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-protobuf
@@ -125,6 +125,9 @@ script:
 
 after_success:
   - bash <(curl -s https://codecov.io/bash) -F linux
+
+after_failure:
+  - dmesg
 
 before_deploy:
   - if [ "$TRAVIS_RELEASE" = "yes" ]; then make release cri-release; fi
