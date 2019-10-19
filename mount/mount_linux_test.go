@@ -19,8 +19,15 @@
 package mount
 
 import (
+	"fmt"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/containerd/continuity/testutil"
 )
 
 func TestLongestCommonPrefix(t *testing.T) {
@@ -90,5 +97,43 @@ func TestCompactLowerdirOption(t *testing.T) {
 		if !reflect.DeepEqual(opts, tc.newopts) {
 			t.Fatalf("[%d case] expected options (%v), but got (%v)", i+1, tc.newopts, opts)
 		}
+	}
+}
+
+func TestFUSEHelper(t *testing.T) {
+	testutil.RequiresRoot(t)
+	const fuseoverlayfsBinary = "fuse-overlayfs"
+	_, err := exec.LookPath(fuseoverlayfsBinary)
+	if err != nil {
+		t.Skip("fuse-overlayfs not installed")
+	}
+	td, err := ioutil.TempDir("", "fuse")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.RemoveAll(td); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	for _, dir := range []string{"lower1", "lower2", "upper", "work", "merged"} {
+		if err := os.Mkdir(filepath.Join(td, dir), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	opts := fmt.Sprintf("lowerdir=%s:%s,upperdir=%s,workdir=%s", filepath.Join(td, "lower2"), filepath.Join(td, "lower1"), filepath.Join(td, "upper"), filepath.Join(td, "work"))
+	m := Mount{
+		Type:    "fuse3." + fuseoverlayfsBinary,
+		Source:  "overlay",
+		Options: []string{opts},
+	}
+	dest := filepath.Join(td, "merged")
+	if err := m.Mount(dest); err != nil {
+		t.Fatal(err)
+	}
+	if err := UnmountAll(dest, 0); err != nil {
+		t.Fatal(err)
 	}
 }
