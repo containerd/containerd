@@ -72,7 +72,8 @@ script:
   - export CGO_ENABLED=$TRAVIS_CGO_ENABLED
   - DCO_VERBOSITY=-q ../project/script/validate/dco
   - ../project/script/validate/fileheader ../project/
-  - travis_wait ../project/script/validate/vendor
+  - travis_wait 20 bash -c '../project/script/validate/vendor > /tmp/vendor-validate.log 2>&1 || (cat /tmp/vendor-validate.log; exit 1)';
+  - cat /tmp/vendor-validate.log
   - GOOS=linux script/setup/install-dev-tools
   - go build -i .
   - make check
