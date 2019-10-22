@@ -30,7 +30,11 @@ gcloud auth activate-service-account --key-file "${GOOGLE_APPLICATION_CREDENTIAL
 
 # Install dependent libraries.
 apt-get update
-apt-get install -y btrfs-tools
+if apt-cache show libbtrfs-dev > /dev/null; then
+  apt-get install -y libbtrfs-dev
+else
+  apt-get install -y btrfs-tools
+fi
 
 # Kubernetes test infra uses jessie and stretch.
 if cat /etc/os-release | grep jessie; then
