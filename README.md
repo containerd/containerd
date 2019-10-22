@@ -220,23 +220,23 @@ architectures, such as [Canonical's Ubuntu packaging](https://launchpad.net/ubun
 
 #### Enabling command auto-completion
 
-Starting with containerd 1.4, the urfave client feature for auto-creation of bash
-autocompletion data is enabled. To use the autocomplete feature in your shell, source
-the autocomplete/bash_autocomplete file in your .bashrc file while setting the `PROG`
-variable to `ctr`:
+Starting with containerd 1.4, the urfave client feature for auto-creation of bash and zsh
+autocompletion data is enabled. To use the autocomplete feature in a bash shell for example, source
+the autocomplete/ctr file in your `.bashrc`, or manually like:
 
 ```
-$ PROG=ctr source vendor/github.com/urfave/cli/autocomplete/bash_autocomplete
+$ source ./contrib/autocomplete/ctr
 ```
 
-#### Distribution of `ctr` autocomplete for bash
+#### Distribution of `ctr` autocomplete for bash and zsh
 
-Copy `vendor/github.com/urfave/cli/autocomplete/bash_autocomplete` into
-`/etc/bash_completion.d/` and rename it to `ctr`.
+For bash, copy the `contrib/autocomplete/ctr` script into
+`/etc/bash_completion.d/` and rename it to `ctr`. The `zsh_autocomplete`
+file is also available and can be used similarly for zsh users.
 
 Provide documentation to users to `source` this file into their shell if
 you don't place the autocomplete file in a location where it is automatically
-loaded for user's bash shell environment.
+loaded for the user's shell environment.
 
 ### Communication
 
