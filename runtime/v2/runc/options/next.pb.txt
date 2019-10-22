@@ -81,6 +81,13 @@ file {
       type: TYPE_STRING
       json_name: "criuWorkPath"
     }
+    field {
+      name: "load_cgroupstats"
+      number: 12
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "loadCgroupstats"
+    }
   }
   message_type {
     name: "CheckpointOptions"

@@ -29,6 +29,8 @@ message Options {
 	string criu_image_path = 10;
 	// criu work path
 	string criu_work_path = 11;
+	// enable to load cgroupstats into metrics
+	bool load_cgroupstats = 12;
 }
 
 message CheckpointOptions {

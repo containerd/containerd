@@ -119,6 +119,10 @@ var Command = cli.Command{
 			Name:  "platform",
 			Usage: "run image for specific platform",
 		},
+		cli.BoolFlag{
+			Name:  "load-cgroupstats",
+			Usage: "load cgroupstats when call metrics",
+		},
 	}, append(platformRunFlags, append(commands.SnapshotterFlags, commands.ContainerFlags...)...)...),
 	Action: func(context *cli.Context) error {
 		var (

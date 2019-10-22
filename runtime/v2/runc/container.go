@@ -127,6 +127,7 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 	container := &Container{
 		ID:              r.ID,
 		Bundle:          r.Bundle,
+		LoadCgroupstats: opts.LoadCgroupstats,
 		process:         p,
 		processes:       make(map[string]process.Process),
 		reservedProcess: make(map[string]struct{}),
@@ -189,6 +190,8 @@ type Container struct {
 	ID string
 	// Bundle path
 	Bundle string
+	// LoadCgroupstats loads cgropstats
+	LoadCgroupstats bool
 
 	cgroup          cgroups.Cgroup
 	process         process.Process

@@ -181,10 +181,15 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 }
 
 func getNewTaskOpts(context *cli.Context) []containerd.NewTaskOpts {
+	opts := []containerd.NewTaskOpts{}
+
 	if context.Bool("no-pivot") {
-		return []containerd.NewTaskOpts{containerd.WithNoPivotRoot}
+		opts = append(opts, containerd.WithNoPivotRoot)
 	}
-	return nil
+	if context.Bool("load-cgroupstats") {
+		opts = append(opts, containerd.WithLoadCgroupstats(true))
+	}
+	return opts
 }
 
 func validNamespace(ns string) bool {

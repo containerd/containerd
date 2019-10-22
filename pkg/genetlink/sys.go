@@ -16,33 +16,34 @@
    limitations under the License.
 */
 
-package v1
+package genetlink
 
 import (
-	v1 "github.com/containerd/cgroups/stats/v1"
+	"encoding/binary"
+	"os"
+	"sync"
+	"unsafe"
 )
 
-type (
-	// Metrics alias
-	Metrics = v1.Metrics
-	// BlkIOEntry alias
-	BlkIOEntry = v1.BlkIOEntry
-	// MemoryStat alias
-	MemoryStat = v1.MemoryStat
-	// CPUStat alias
-	CPUStat = v1.CPUStat
-	// CPUUsage alias
-	CPUUsage = v1.CPUUsage
-	// BlkIOStat alias
-	BlkIOStat = v1.BlkIOStat
-	// PidsStat alias
-	PidsStat = v1.PidsStat
-	// RdmaStat alias
-	RdmaStat = v1.RdmaStat
-	// RdmaEntry alias
-	RdmaEntry = v1.RdmaEntry
-	// HugetlbStat alias
-	HugetlbStat = v1.HugetlbStat
-	// CgroupStats alias
-	CgroupStats = v1.CgroupStats
+var (
+	sysEndian binary.ByteOrder
+	sysOnce   sync.Once
+
+	sysPageSize = os.Getpagesize()
 )
+
+// getSysEndian returns byte order in current host.
+func getSysEndian() binary.ByteOrder {
+	sysOnce.Do(func() {
+		buf := [2]byte{}
+		*(*uint16)(unsafe.Pointer(&buf[0])) = uint16(0x1234)
+
+		switch buf[0] {
+		case 0x34:
+			sysEndian = binary.LittleEndian
+		default:
+			sysEndian = binary.BigEndian
+		}
+	})
+	return sysEndian
+}

@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/runtime/linux/runctypes"
+	"github.com/containerd/containerd/runtime/v2/runc/options"
 )
 
 func TestWithNoNewKeyringAddsNoNewKeyringToOptions(t *testing.T) {
@@ -59,5 +60,68 @@ func TestWithNoNewKeyringDoesNotOverwriteOtherOptions(t *testing.T) {
 
 	if !opts.NoPivotRoot {
 		t.Fatal("WithNoNewKeyring overwrote other options")
+	}
+}
+
+func TestWithLoadCgroupstats(t *testing.T) {
+	testCases := []struct {
+		taskInfo TaskInfo
+		input    bool
+		hasErr   bool
+		enabled  bool
+	}{
+		{
+			taskInfo: TaskInfo{
+				runtime: "io.containerd.runc.v1",
+			},
+			input:   true,
+			hasErr:  false,
+			enabled: true,
+		},
+		{
+			taskInfo: TaskInfo{
+				runtime: "io.containerd.runc.v2",
+			},
+			input:   false,
+			hasErr:  false,
+			enabled: false,
+		},
+		{
+			taskInfo: TaskInfo{
+				runtime: "io.containerd.runc.v2",
+				Options: &runctypes.CreateOptions{},
+			},
+			input:   true,
+			hasErr:  true,
+			enabled: false,
+		},
+		{
+			taskInfo: TaskInfo{
+				runtime: "io.containerd.runtime.v1.linux",
+			},
+			input:   true,
+			hasErr:  true,
+			enabled: false,
+		},
+	}
+
+	var (
+		ctx    context.Context
+		client Client
+	)
+
+	for idx, tc := range testCases {
+		err := WithLoadCgroupstats(tc.input)(ctx, &client, &tc.taskInfo)
+		if tc.hasErr != (err != nil) {
+			t.Fatalf("[idx=%d] expected hasErr=%v, but got error=%v", idx, tc.hasErr, err)
+		}
+
+		if err == nil {
+			opts := tc.taskInfo.Options.(*options.Options)
+			if got := opts.LoadCgroupstats; got != tc.enabled {
+				t.Fatalf("[idx=%d] expected loadCgroupstats=%v, but got %v", idx, tc.enabled, got)
+
+			}
+		}
 	}
 }

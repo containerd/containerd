@@ -34,8 +34,10 @@ import (
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
+	metricv1 "github.com/containerd/containerd/metrics/types/v1"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/genetlink"
 	"github.com/containerd/containerd/pkg/oom"
 	"github.com/containerd/containerd/pkg/process"
 	"github.com/containerd/containerd/pkg/stdio"
@@ -98,6 +100,7 @@ type service struct {
 
 	id        string
 	container *runc.Container
+	genl      *genetlink.TaskstatsClient
 
 	cancel func()
 }
@@ -234,6 +237,11 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 	container, err := runc.NewContainer(ctx, s.platform, r)
 	if err != nil {
 		return nil, err
+	}
+	if container.LoadCgroupstats {
+		if err := s.initGenl(); err != nil {
+			return nil, err
+		}
 	}
 
 	s.container = container
@@ -553,6 +561,13 @@ func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.
 	if err != nil {
 		return nil, err
 	}
+	if s.container.LoadCgroupstats {
+		stats.CgroupStats, err = s.fetchCgroupstats(ctx, cg, s.container.Pid())
+		if err != nil && !os.IsNotExist(err) {
+			log.G(ctx).WithError(err).Warnf("failed to fetch cgroupstats")
+		}
+	}
+
 	data, err := typeurl.MarshalAny(stats)
 	if err != nil {
 		return nil, err
@@ -696,4 +711,61 @@ func (s *service) initPlatform() error {
 	}
 	s.platform = p
 	return nil
+}
+
+// initGenl initializes genetlink client for service if one container
+// requests to load cgroupstats for metrics.
+func (s *service) initGenl() error {
+	if s.genl != nil {
+		return nil
+	}
+
+	genl, err := genetlink.NewTaskstatsClient()
+	if err != nil {
+		return errors.Wrapf(err, "unable to init genetlink for cgroupstats")
+	}
+
+	// NOTE: set timeout as 30 seconds here.
+	if err := genl.SetTimeout(30 * time.Second); err != nil {
+		return errors.Wrapf(err, "unable to set timeout for genetlink")
+	}
+	s.genl = genl
+	return nil
+}
+
+func (s *service) fetchCgroupstats(ctx context.Context, cg cgroups.Cgroup, pid int) (*metricv1.CgroupStats, error) {
+	var target cgroups.Subsystem
+	for _, sub := range cg.Subsystems() {
+		if sub.Name() == cgroups.Cpu {
+			target = sub
+			break
+		}
+	}
+	if target == nil {
+		return nil, nil
+	}
+
+	sp, err := cgroups.PidPath(pid)(target.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	pather, ok := target.(interface {
+		Path(string) string
+	})
+	if !ok {
+		return nil, nil
+	}
+
+	cgstats, err := s.genl.GetCgroupStats(ctx, pather.Path(sp))
+	if err != nil {
+		return nil, err
+	}
+	return &metricv1.CgroupStats{
+		NrSleeping:        cgstats.NrSleeping,
+		NrRunning:         cgstats.NrRunning,
+		NrStopped:         cgstats.NrStopped,
+		NrUninterruptible: cgstats.NrUninterruptible,
+		NrIoWait:          cgstats.NrIoWait,
+	}, nil
 }
