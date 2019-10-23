@@ -15,6 +15,7 @@ import (
 	"github.com/Microsoft/hcsshim/internal/log"
 	"github.com/Microsoft/hcsshim/internal/oc"
 	"github.com/Microsoft/hcsshim/internal/schema1"
+	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
 	"github.com/Microsoft/hcsshim/internal/timeout"
 	"github.com/Microsoft/hcsshim/internal/vmcompute"
 	"go.opencensus.io/trace"
@@ -345,6 +346,7 @@ func (computeSystem *System) ExitError() error {
 	}
 }
 
+// Properties returns the requested container properties targeting a V1 schema container.
 func (computeSystem *System) Properties(ctx context.Context, types ...schema1.PropertyType) (*schema1.ContainerProperties, error) {
 	computeSystem.handleLock.RLock()
 	defer computeSystem.handleLock.RUnlock()
@@ -366,6 +368,35 @@ func (computeSystem *System) Properties(ctx context.Context, types ...schema1.Pr
 		return nil, ErrUnexpectedValue
 	}
 	properties := &schema1.ContainerProperties{}
+	if err := json.Unmarshal([]byte(propertiesJSON), properties); err != nil {
+		return nil, makeSystemError(computeSystem, operation, "", err, nil)
+	}
+
+	return properties, nil
+}
+
+// PropertiesV2 returns the requested container properties targeting a V2 schema container.
+func (computeSystem *System) PropertiesV2(ctx context.Context, types ...hcsschema.PropertyType) (*hcsschema.Properties, error) {
+	computeSystem.handleLock.RLock()
+	defer computeSystem.handleLock.RUnlock()
+
+	operation := "hcsshim::System::PropertiesV2"
+
+	queryBytes, err := json.Marshal(hcsschema.PropertyQuery{PropertyTypes: types})
+	if err != nil {
+		return nil, makeSystemError(computeSystem, operation, "", err, nil)
+	}
+
+	propertiesJSON, resultJSON, err := vmcompute.HcsGetComputeSystemProperties(ctx, computeSystem.handle, string(queryBytes))
+	events := processHcsResult(ctx, resultJSON)
+	if err != nil {
+		return nil, makeSystemError(computeSystem, operation, "", err, events)
+	}
+
+	if propertiesJSON == "" {
+		return nil, ErrUnexpectedValue
+	}
+	properties := &hcsschema.Properties{}
 	if err := json.Unmarshal([]byte(propertiesJSON), properties); err != nil {
 		return nil, makeSystemError(computeSystem, operation, "", err, nil)
 	}

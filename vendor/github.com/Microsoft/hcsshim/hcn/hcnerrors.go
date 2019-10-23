@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Microsoft/hcsshim/internal/hcs"
 	"github.com/Microsoft/hcsshim/internal/hcserror"
 	"github.com/Microsoft/hcsshim/internal/interop"
 	"github.com/sirupsen/logrus"
@@ -89,7 +90,7 @@ func (e LoadBalancerNotFoundError) Error() string {
 // IsNotFoundError returns a boolean indicating whether the error was caused by
 // a resource not being found.
 func IsNotFoundError(err error) bool {
-	switch err.(type) {
+	switch pe := err.(type) {
 	case NetworkNotFoundError:
 		return true
 	case EndpointNotFoundError:
@@ -98,6 +99,8 @@ func IsNotFoundError(err error) bool {
 		return true
 	case LoadBalancerNotFoundError:
 		return true
+	case *hcserror.HcsError:
+		return pe.Err == hcs.ErrElementNotFound
 	}
 	return false
 }
