@@ -116,6 +116,12 @@ retry_on_permission_error "${scp[@]}" "${node_name}":"C:/test.log" "${ARTIFACTS}
 retry_on_permission_error "${scp[@]}" --recurse "${node_name}":"C:/_artifacts/*" "${ARTIFACTS}"
 
 log "Test output:"
+
+# Make sure stdout is not in O_NONBLOCK mode.
+# See https://github.com/kubernetes/test-infra/issues/14938 for more details.
+python -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); print(flags&os.O_NONBLOCK);'
+python -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); fcntl.fcntl(sys.stdout, fcntl.F_SETFL, flags&~os.O_NONBLOCK);'
+
 cat "${ARTIFACTS}/test.log"
 
 exit_code="$(cat "${ARTIFACTS}/exitcode")"
