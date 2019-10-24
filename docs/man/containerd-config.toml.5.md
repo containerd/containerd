@@ -39,6 +39,8 @@ separately (for example vendors may keep a custom runtime configuration in a
 separate file without modifying the main `config.toml`).
 Imported files will overwrite simple fields like `int` or
 `string` (if not empty) and will append `array` and `map` fields.
+Imported files are also versioned, and the version can't be higher than
+the main config.
 
 **[grpc]**
 : Section for gRPC socket listener settings. Contains three properties:
