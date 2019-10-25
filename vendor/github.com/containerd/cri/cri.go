@@ -172,7 +172,7 @@ func setGLogLevel() error {
 		return err
 	}
 	switch l {
-	case log.TraceLevel:
+	case logrus.TraceLevel:
 		return fs.Set("v", "5")
 	case logrus.DebugLevel:
 		return fs.Set("v", "4")
