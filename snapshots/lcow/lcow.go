@@ -241,7 +241,7 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 }
 
 // Walk the committed snapshots.
-func (s *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshots.Info) error) error {
+func (s *snapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...string) error {
 	log.G(ctx).Debug("Starting Walk")
 	ctx, t, err := s.ms.TransactionContext(ctx, false)
 	if err != nil {
@@ -249,7 +249,7 @@ func (s *snapshotter) Walk(ctx context.Context, fn func(context.Context, snapsho
 	}
 	defer t.Rollback()
 
-	return storage.WalkInfo(ctx, fn)
+	return storage.WalkInfo(ctx, fn, fs...)
 }
 
 // Close closes the snapshotter

@@ -312,10 +312,10 @@ func (s *Snapshotter) removeDevice(ctx context.Context, key string) error {
 }
 
 // Walk iterates through all metadata Info for the stored snapshots and calls the provided function for each.
-func (s *Snapshotter) Walk(ctx context.Context, fn func(context.Context, snapshots.Info) error) error {
+func (s *Snapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...string) error {
 	log.G(ctx).Debug("walk")
 	return s.withTransaction(ctx, false, func(ctx context.Context) error {
-		return storage.WalkInfo(ctx, fn)
+		return storage.WalkInfo(ctx, fn, fs...)
 	})
 }
 

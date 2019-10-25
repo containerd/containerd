@@ -3390,6 +3390,13 @@ file {
       type: TYPE_STRING
       json_name: "snapshotter"
     }
+    field {
+      name: "filters"
+      number: 2
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "filters"
+    }
   }
   message_type {
     name: "ListSnapshotsResponse"
