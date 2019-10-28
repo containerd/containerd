@@ -236,3 +236,55 @@ func TestRegistryEndpoints(t *testing.T) {
 		assert.Equal(t, test.expected, got)
 	}
 }
+
+func TestDefaultScheme(t *testing.T) {
+	for desc, test := range map[string]struct {
+		host     string
+		expected string
+	}{
+		"should use http by default for localhost": {
+			host:     "localhost",
+			expected: "http",
+		},
+		"should use http by default for localhost with port": {
+			host:     "localhost:8080",
+			expected: "http",
+		},
+		"should use http by default for 127.0.0.1": {
+			host:     "127.0.0.1",
+			expected: "http",
+		},
+		"should use http by default for 127.0.0.1 with port": {
+			host:     "127.0.0.1:8080",
+			expected: "http",
+		},
+		"should use http by default for ::1": {
+			host:     "::1",
+			expected: "http",
+		},
+		"should use http by default for ::1 with port": {
+			host:     "[::1]:8080",
+			expected: "http",
+		},
+		"should use https by default for remote host": {
+			host:     "remote",
+			expected: "https",
+		},
+		"should use https by default for remote host with port": {
+			host:     "remote:8080",
+			expected: "https",
+		},
+		"should use https by default for remote ip": {
+			host:     "8.8.8.8",
+			expected: "https",
+		},
+		"should use https by default for remote ip with port": {
+			host:     "8.8.8.8:8080",
+			expected: "https",
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		got := defaultScheme(test.host)
+		assert.Equal(t, test.expected, got)
+	}
+}

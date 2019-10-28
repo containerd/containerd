@@ -310,6 +310,10 @@ func (c *criService) registryHosts(auth *runtime.AuthConfig) docker.RegistryHost
 				config    = c.config.Registry.Configs[u.Host]
 			)
 
+			if u.Scheme == "" {
+				u.Scheme = defaultScheme(u.Host)
+			}
+
 			if u.Scheme != "https" && config.TLS != nil {
 				return nil, errors.Errorf("tls provided for http endpoint %q", e)
 			}
@@ -344,6 +348,18 @@ func (c *criService) registryHosts(auth *runtime.AuthConfig) docker.RegistryHost
 		}
 		return registries, nil
 	}
+}
+
+// defaultScheme returns the default scheme for a registry host.
+func defaultScheme(host string) string {
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	if host == "localhost" || host == "127.0.0.1" ||
+		host == "::1" {
+		return "http"
+	}
+	return "https"
 }
 
 // registryEndpoints returns endpoints for a given host.
