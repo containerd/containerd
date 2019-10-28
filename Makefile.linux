@@ -20,7 +20,9 @@ COMMANDS += containerd-shim containerd-shim-runc-v1 containerd-shim-runc-v2
 
 # check GOOS for cross compile builds
 ifeq ($(GOOS),linux)
+  ifneq ($(GOARCH),ppc64)
 	GO_GCFLAGS += -buildmode=pie
+  endif
 endif
 
 # amd64 supports go test -race
