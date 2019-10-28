@@ -21,11 +21,12 @@ import (
 	"io"
 	"os"
 	"path"
+	"unsafe"
 
+	"github.com/containerd/ttrpc/codes"
+	"github.com/containerd/ttrpc/status"
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type Method func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error)
@@ -95,6 +96,10 @@ func (s *serviceSet) dispatch(ctx context.Context, serviceName, methodName strin
 		return nil, err
 	}
 
+	if isNil(resp) {
+		return nil, errors.New("ttrpc: marshal called with nil")
+	}
+
 	switch v := resp.(type) {
 	case proto.Message:
 		r, err := proto.Marshal(v)
@@ -153,4 +158,8 @@ func convertCode(err error) codes.Code {
 
 func fullPath(service, method string) string {
 	return "/" + path.Join(service, method)
+}
+
+func isNil(resp interface{}) bool {
+	return (*[2]uintptr)(unsafe.Pointer(&resp))[1] == 0
 }

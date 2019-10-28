@@ -26,11 +26,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containerd/ttrpc/codes"
+	"github.com/containerd/ttrpc/status"
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // ErrClosed is returned by client methods when the underlying connection is
@@ -338,9 +338,12 @@ func filterCloseErr(err error) error {
 	case strings.Contains(err.Error(), "use of closed network connection"):
 		return ErrClosed
 	default:
-		// if we have an epipe on a write, we cast to errclosed
-		if oerr, ok := err.(*net.OpError); ok && oerr.Op == "write" {
-			if serr, ok := oerr.Err.(*os.SyscallError); ok && serr.Err == syscall.EPIPE {
+		// if we have an epipe on a write or econnreset on a read , we cast to errclosed
+		if oerr, ok := err.(*net.OpError); ok && (oerr.Op == "write" || oerr.Op == "read") {
+			serr, sok := oerr.Err.(*os.SyscallError)
+			if sok && ((serr.Err == syscall.EPIPE && oerr.Op == "write") ||
+				(serr.Err == syscall.ECONNRESET && oerr.Op == "read")) {
+
 				return ErrClosed
 			}
 		}
