@@ -165,9 +165,8 @@ func (o *snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, e
 		return snapshots.Usage{}, err
 	}
 
-	upperPath := o.upperPath(id)
-
 	if info.Kind == snapshots.KindActive {
+		upperPath := o.upperPath(id)
 		du, err := fs.DiskUsage(ctx, upperPath)
 		if err != nil {
 			// TODO(stevvooe): Consider not reporting an error in this case.

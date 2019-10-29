@@ -125,17 +125,20 @@ func (s *snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, e
 	if err != nil {
 		return snapshots.Usage{}, err
 	}
-	defer t.Rollback()
+	id, info, usage, err := storage.GetInfo(ctx, key)
+	t.Rollback() // transaction no longer needed at this point.
 
-	_, info, usage, err := storage.GetInfo(ctx, key)
 	if err != nil {
 		return snapshots.Usage{}, err
 	}
 
 	if info.Kind == snapshots.KindActive {
-		du := fs.Usage{
-			Size: 0,
+		path := s.getSnapshotDir(id)
+		du, err := fs.DiskUsage(ctx, path)
+		if err != nil {
+			return snapshots.Usage{}, err
 		}
+
 		usage = snapshots.Usage(du)
 	}
 
@@ -173,20 +176,30 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	if err != nil {
 		return err
 	}
-	defer t.Rollback()
 
-	usage := fs.Usage{
-		Size: 0,
+	defer func() {
+		if err != nil {
+			if rerr := t.Rollback(); rerr != nil {
+				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
+			}
+		}
+	}()
+
+	// grab the existing id
+	id, _, _, err := storage.GetInfo(ctx, key)
+	if err != nil {
+		return err
+	}
+
+	usage, err := fs.DiskUsage(ctx, s.getSnapshotDir(id))
+	if err != nil {
+		return err
 	}
 
 	if _, err = storage.CommitActive(ctx, key, name, snapshots.Usage(usage), opts...); err != nil {
 		return errors.Wrap(err, "failed to commit snapshot")
 	}
-
-	if err := t.Commit(); err != nil {
-		return err
-	}
-	return nil
+	return t.Commit()
 }
 
 // Remove abandons the transaction identified by key. All resources
