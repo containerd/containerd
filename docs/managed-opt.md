@@ -91,3 +91,15 @@ ctr: OCI runtime create failed: unable to retrieve OCI runtime error (open /run/
 1:M 01 Aug 15:59:53.484 * DB saved on disk
 1:M 01 Aug 15:59:53.484 # Redis is now ready to exit, bye bye...
 ```
+For Windows:
+
+```Dockerfile
+FROM mcr.microsoft.com/windows/nanoserver:1809
+ADD runhcs.exe /bin/runhcs.exe
+```
+
+```powershell
+> ctr content fetch docker.io/ameyagawde/runhcs:1809 #An example image, not supported by containerd
+> ctr install docker.io/ameyagawde/runhcs:1809
+```
+The Windows equivalent for `/opt/containerd` will be `$env:ProgramData\containerd\root\opt`
