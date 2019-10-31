@@ -29,6 +29,7 @@ import (
 	"sync"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/oci"
@@ -209,6 +210,9 @@ func TestCheckpointRestore(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Wait to check proper restore
+	time.Sleep(7 * time.Second)
+
 	checkpoint, err := container.Checkpoint(ctx, testCheckpointName+"restore", []CheckpointOpts{
 		WithCheckpointRuntime,
 		WithCheckpointRW,
@@ -248,10 +252,19 @@ func TestCheckpointRestore(t *testing.T) {
 	if err := task.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
+	defer task.Kill(ctx, syscall.SIGKILL)
+
+	select {
+	case <-statusC:
+		// `sleep 10` exited in time
+	case <-time.After(5 * time.Second):
+		t.Fatal("Task was not restored properly")
+	}
 
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
 		t.Fatal(err)
 	}
+
 	<-statusC
 }
 
