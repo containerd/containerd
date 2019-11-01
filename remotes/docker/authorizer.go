@@ -324,6 +324,7 @@ type tokenOptions struct {
 
 type postTokenResponse struct {
 	AccessToken  string    `json:"access_token"`
+	LegacyToken  string    `json:"token"`
 	RefreshToken string    `json:"refresh_token"`
 	ExpiresIn    int       `json:"expires_in"`
 	IssuedAt     time.Time `json:"issued_at"`
@@ -383,6 +384,10 @@ func (ah *authHandler) fetchTokenWithOAuth(ctx context.Context, to tokenOptions)
 	var tr postTokenResponse
 	if err = decoder.Decode(&tr); err != nil {
 		return "", fmt.Errorf("unable to decode token response: %s", err)
+	}
+
+	if tr.AccessToken == "" && tr.LegacyToken != "" {
+		tr.AccessToken = tr.LegacyToken
 	}
 
 	return tr.AccessToken, nil
