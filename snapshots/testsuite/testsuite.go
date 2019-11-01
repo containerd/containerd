@@ -1061,7 +1061,7 @@ func checkWalk(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshot
 		},
 		{
 			matches: []string{"a", "v", "a-wl", "v-wl"},
-			filters: []string{"parent,labels.\"containerd.io/gc.root\"==check-walk"},
+			filters: []string{"parent!=\"\",labels.\"containerd.io/gc.root\"==check-walk"},
 		},
 		{
 			matches: []string{"p-wl", "a-wl", "v-wl", "a-np-wl"},
