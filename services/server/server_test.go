@@ -32,3 +32,23 @@ func TestCreateTopLevelDirectoriesErrorsWithSamePathForRootAndState(t *testing.T
 	})
 	assert.Check(t, is.Error(err, "root and state must be different paths"))
 }
+
+func TestCreateTopLevelDirectoriesWithEmptyStatePath(t *testing.T) {
+	statePath := ""
+	rootPath := "/tmp/path/for/testing"
+	err := CreateTopLevelDirectories(&srvconfig.Config{
+		Root:  rootPath,
+		State: statePath,
+	})
+	assert.Check(t, is.Error(err, "state must be specified"))
+}
+
+func TestCreateTopLevelDirectoriesWithEmptyRootPath(t *testing.T) {
+	statePath := "/tmp/path/for/testing"
+	rootPath := ""
+	err := CreateTopLevelDirectories(&srvconfig.Config{
+		Root:  rootPath,
+		State: statePath,
+	})
+	assert.Check(t, is.Error(err, "root must be specified"))
+}
