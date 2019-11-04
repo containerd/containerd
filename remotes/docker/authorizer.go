@@ -323,8 +323,8 @@ type tokenOptions struct {
 }
 
 type postTokenResponse struct {
+	Token        string    `json:"token"`
 	AccessToken  string    `json:"access_token"`
-	LegacyToken  string    `json:"token"`
 	RefreshToken string    `json:"refresh_token"`
 	ExpiresIn    int       `json:"expires_in"`
 	IssuedAt     time.Time `json:"issued_at"`
@@ -389,11 +389,18 @@ func (ah *authHandler) fetchTokenWithOAuth(ctx context.Context, to tokenOptions)
 		return "", fmt.Errorf("unable to decode token response: %s", err)
 	}
 
-	if tr.AccessToken == "" && tr.LegacyToken != "" {
-		tr.AccessToken = tr.LegacyToken
+	// `access_token` is equivalent to `token` and if both are specified
+	// the choice is undefined.  Canonicalize `access_token` by sticking
+	// things in `token`.
+	if tr.AccessToken != "" {
+		tr.Token = tr.AccessToken
 	}
 
-	return tr.AccessToken, nil
+	if tr.Token == "" {
+		return "", ErrNoToken
+	}
+
+	return tr.Token, nil
 }
 
 type getTokenResponse struct {
