@@ -348,11 +348,11 @@ func (ah *authHandler) fetchTokenWithOAuth(ctx context.Context, to tokenOptions)
 	}
 
 	req, err := http.NewRequest("POST", to.realm, strings.NewReader(form.Encode()))
-	if to.username != "" {
-		req.SetBasicAuth(to.username, to.secret)
-	}
 	if err != nil {
 		return "", err
+	}
+	if to.username != "" {
+		req.SetBasicAuth(to.username, to.secret)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
 	if ah.header != nil {
