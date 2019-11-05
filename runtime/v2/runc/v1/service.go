@@ -271,8 +271,12 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 		s.eventSendMu.Unlock()
 		return nil, errdefs.ToGRPC(err)
 	}
-	if err := s.ep.Add(container.ID, container.Cgroup()); err != nil {
-		logrus.WithError(err).Error("add cg to OOM monitor")
+	if cg, ok := container.Cgroup().(cgroups.Cgroup); ok {
+		if err := s.ep.Add(container.ID, cg); err != nil {
+			logrus.WithError(err).Error("add cg to OOM monitor")
+		}
+	} else {
+		logrus.WithError(errdefs.ErrNotImplemented).Error("add cg to OOM monitor")
 	}
 	switch r.ExecID {
 	case "":
@@ -545,7 +549,14 @@ func (s *service) Shutdown(ctx context.Context, r *taskAPI.ShutdownRequest) (*pt
 }
 
 func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.StatsResponse, error) {
-	cg := s.container.Cgroup()
+	cgx := s.container.Cgroup()
+	if cgx == nil {
+		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "cgroup does not exist")
+	}
+	cg, ok := cgx.(cgroups.Cgroup)
+	if !ok {
+		return nil, errdefs.ToGRPCf(errdefs.ErrNotImplemented, "cgroup v2 not implemented for Stats")
+	}
 	if cg == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "cgroup does not exist")
 	}

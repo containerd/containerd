@@ -27,6 +27,7 @@ import (
 
 	wstats "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
 	v1 "github.com/containerd/cgroups/stats/v1"
+	v2 "github.com/containerd/cgroups/v2/stats"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/typeurl"
 	"github.com/urfave/cli"
@@ -80,11 +81,14 @@ var metricsCommand = cli.Command{
 		}
 		var (
 			data         *v1.Metrics
+			data2        *v2.Metrics
 			windowsStats *wstats.Statistics
 		)
 		switch v := anydata.(type) {
 		case *v1.Metrics:
 			data = v
+		case *v2.Metrics:
+			data2 = v
 		case *wstats.Statistics:
 			windowsStats = v
 		default:
@@ -98,6 +102,8 @@ var metricsCommand = cli.Command{
 			fmt.Fprintf(w, "%s\t%s\t\n\n", metric.ID, metric.Timestamp)
 			if data != nil {
 				printCgroupMetricsTable(w, data)
+			} else if data2 != nil {
+				printCgroup2MetricsTable(w, data2)
 			} else {
 				if windowsStats.GetLinux() != nil {
 					printCgroupMetricsTable(w, windowsStats.GetLinux())
@@ -111,7 +117,7 @@ var metricsCommand = cli.Command{
 			}
 			return w.Flush()
 		case formatJSON:
-			marshaledJSON, err := json.MarshalIndent(data, "", "  ")
+			marshaledJSON, err := json.MarshalIndent(anydata, "", "  ")
 			if err != nil {
 				return err
 			}
@@ -134,6 +140,14 @@ func printCgroupMetricsTable(w *tabwriter.Writer, data *v1.Metrics) {
 		fmt.Fprintf(w, "cpuacct.usage\t%d\t\n", data.CPU.Usage.Total)
 		fmt.Fprintf(w, "cpuacct.usage_percpu\t%v\t\n", data.CPU.Usage.PerCPU)
 	}
+	if data.Pids != nil {
+		fmt.Fprintf(w, "pids.current\t%v\t\n", data.Pids.Current)
+		fmt.Fprintf(w, "pids.limit\t%v\t\n", data.Pids.Limit)
+	}
+}
+
+func printCgroup2MetricsTable(w *tabwriter.Writer, data *v2.Metrics) {
+	fmt.Fprintf(w, "METRIC\tVALUE\t\n")
 	if data.Pids != nil {
 		fmt.Fprintf(w, "pids.current\t%v\t\n", data.Pids.Current)
 		fmt.Fprintf(w, "pids.limit\t%v\t\n", data.Pids.Limit)

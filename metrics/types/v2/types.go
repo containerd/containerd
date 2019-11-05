@@ -1,3 +1,5 @@
+// +build linux
+
 /*
    Copyright The containerd Authors.
 
@@ -14,16 +16,19 @@
    limitations under the License.
 */
 
-package main
+package v2
 
 import (
-	_ "github.com/containerd/aufs"
-	_ "github.com/containerd/containerd/metrics/cgroups"
-	_ "github.com/containerd/containerd/metrics/cgroups/v2"
-	_ "github.com/containerd/containerd/runtime/v1/linux"
-	_ "github.com/containerd/containerd/runtime/v2"
-	_ "github.com/containerd/containerd/runtime/v2/runc/options"
-	_ "github.com/containerd/containerd/snapshots/native"
-	_ "github.com/containerd/containerd/snapshots/overlay"
-	_ "github.com/containerd/zfs"
+	v2 "github.com/containerd/cgroups/v2/stats"
+)
+
+type (
+	// Metrics alias
+	Metrics = v2.Metrics
+	// MemoryStat alias
+	MemoryStat = v2.MemoryStat
+	// CPUStat alias
+	CPUStat = v2.CPUStat
+	// PidsStat alias
+	PidsStat = v2.PidsStat
 )
