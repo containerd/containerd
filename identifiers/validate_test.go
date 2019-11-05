@@ -34,6 +34,7 @@ func TestValidIdentifiers(t *testing.T) {
 		"swarmkit.docker.io",
 		"0912341234",
 		"task.0.0123456789",
+		"container.system-75-f19a.00",
 		"underscores_are_allowed",
 		strings.Repeat("a", maxLength),
 	} {
