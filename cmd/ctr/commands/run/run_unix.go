@@ -29,12 +29,18 @@ import (
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
-var platformRunFlags []cli.Flag
+var platformRunFlags = []cli.Flag{
+	cli.StringFlag{
+		Name:  "runc-binary",
+		Usage: "specify runc-compatible binary",
+	},
+}
 
 // NewContainer creates a new container
 func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli.Context) (containerd.Container, error) {
@@ -167,7 +173,15 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		}
 	}
 
-	cOpts = append(cOpts, containerd.WithRuntime(context.String("runtime"), nil))
+	runtimeOpts := &options.Options{}
+	if runcBinary := context.String("runc-binary"); runcBinary != "" {
+		if context.String("runtime") == "io.containerd.runc.v2" {
+			runtimeOpts.BinaryName = runcBinary
+		} else {
+			return nil, errors.New("specifying runc-binary is only supported for \"io.containerd.runc.v2\" runtime")
+		}
+	}
+	cOpts = append(cOpts, containerd.WithRuntime(context.String("runtime"), runtimeOpts))
 
 	opts = append(opts, oci.WithAnnotations(commands.LabelArgs(context.StringSlice("label"))))
 	var s specs.Spec
