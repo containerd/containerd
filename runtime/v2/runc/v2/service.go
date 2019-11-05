@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/containerd/cgroups"
+	cgroupsv2 "github.com/containerd/cgroups/v2"
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
@@ -222,14 +223,27 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 			}
 			if opts, ok := v.(*options.Options); ok {
 				if opts.ShimCgroup != "" {
-					cg, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(opts.ShimCgroup))
-					if err != nil {
-						return "", errors.Wrapf(err, "failed to load cgroup %s", opts.ShimCgroup)
-					}
-					if err := cg.Add(cgroups.Process{
-						Pid: cmd.Process.Pid,
-					}); err != nil {
-						return "", errors.Wrapf(err, "failed to join cgroup %s", opts.ShimCgroup)
+					if cgroups.Mode() == cgroups.Unified {
+						if err := cgroupsv2.VerifyGroupPath(opts.ShimCgroup); err != nil {
+							return "", errors.Wrapf(err, "failed to verify cgroup path %q", opts.ShimCgroup)
+						}
+						cg, err := cgroupsv2.LoadManager("/sys/fs/cgroup", opts.ShimCgroup)
+						if err != nil {
+							return "", errors.Wrapf(err, "failed to load cgroup %s", opts.ShimCgroup)
+						}
+						if err := cg.AddProc(uint64(cmd.Process.Pid)); err != nil {
+							return "", errors.Wrapf(err, "failed to join cgroup %s", opts.ShimCgroup)
+						}
+					} else {
+						cg, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(opts.ShimCgroup))
+						if err != nil {
+							return "", errors.Wrapf(err, "failed to load cgroup %s", opts.ShimCgroup)
+						}
+						if err := cg.Add(cgroups.Process{
+							Pid: cmd.Process.Pid,
+						}); err != nil {
+							return "", errors.Wrapf(err, "failed to join cgroup %s", opts.ShimCgroup)
+						}
 					}
 				}
 			}
@@ -316,9 +330,18 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 		s.eventSendMu.Unlock()
 		return nil, errdefs.ToGRPC(err)
 	}
-	if err := s.ep.Add(container.ID, container.Cgroup()); err != nil {
-		logrus.WithError(err).Error("add cg to OOM monitor")
+	switch cg := container.Cgroup().(type) {
+	case cgroups.Cgroup:
+		if err := s.ep.Add(container.ID, cg); err != nil {
+			logrus.WithError(err).Error("add cg to OOM monitor")
+		}
+	case *cgroupsv2.Manager:
+		// TODO: enable controllers for statting
+
+		// OOM monitor is not implemented yet
+		logrus.WithError(errdefs.ErrNotImplemented).Warn("add cg to OOM monitor")
 	}
+
 	switch r.ExecID {
 	case "":
 		s.send(&eventstypes.TaskStart{
@@ -608,15 +631,28 @@ func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.
 	if err != nil {
 		return nil, err
 	}
-	cg := container.Cgroup()
-	if cg == nil {
+	cgx := container.Cgroup()
+	if cgx == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "cgroup does not exist")
 	}
-	stats, err := cg.Stat(cgroups.IgnoreNotExist)
-	if err != nil {
-		return nil, err
+	var statsx interface{}
+	switch cg := cgx.(type) {
+	case cgroups.Cgroup:
+		stats, err := cg.Stat(cgroups.IgnoreNotExist)
+		if err != nil {
+			return nil, err
+		}
+		statsx = stats
+	case *cgroupsv2.Manager:
+		stats, err := cg.Stat()
+		if err != nil {
+			return nil, err
+		}
+		statsx = stats
+	default:
+		return nil, errdefs.ToGRPCf(errdefs.ErrNotImplemented, "unsupported cgroup type %T", cg)
 	}
-	data, err := typeurl.MarshalAny(stats)
+	data, err := typeurl.MarshalAny(statsx)
 	if err != nil {
 		return nil, err
 	}

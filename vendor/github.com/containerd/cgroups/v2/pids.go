@@ -14,16 +14,24 @@
    limitations under the License.
 */
 
-package main
+package v2
 
-import (
-	_ "github.com/containerd/aufs"
-	_ "github.com/containerd/containerd/metrics/cgroups"
-	_ "github.com/containerd/containerd/metrics/cgroups/v2"
-	_ "github.com/containerd/containerd/runtime/v1/linux"
-	_ "github.com/containerd/containerd/runtime/v2"
-	_ "github.com/containerd/containerd/runtime/v2/runc/options"
-	_ "github.com/containerd/containerd/snapshots/native"
-	_ "github.com/containerd/containerd/snapshots/overlay"
-	_ "github.com/containerd/zfs"
-)
+import "strconv"
+
+type Pids struct {
+	Max int64
+}
+
+func (r *Pids) Values() (o []Value) {
+	if r.Max != 0 {
+		limit := "max"
+		if r.Max > 0 {
+			limit = strconv.FormatInt(r.Max, 10)
+		}
+		o = append(o, Value{
+			filename: "pids.max",
+			value:    limit,
+		})
+	}
+	return o
+}

@@ -14,16 +14,39 @@
    limitations under the License.
 */
 
-package main
+package v2
 
-import (
-	_ "github.com/containerd/aufs"
-	_ "github.com/containerd/containerd/metrics/cgroups"
-	_ "github.com/containerd/containerd/metrics/cgroups/v2"
-	_ "github.com/containerd/containerd/runtime/v1/linux"
-	_ "github.com/containerd/containerd/runtime/v2"
-	_ "github.com/containerd/containerd/runtime/v2/runc/options"
-	_ "github.com/containerd/containerd/snapshots/native"
-	_ "github.com/containerd/containerd/snapshots/overlay"
-	_ "github.com/containerd/zfs"
-)
+type Memory struct {
+	Swap *int64
+	Max  *int64
+	Low  *int64
+	High *int64
+}
+
+func (r *Memory) Values() (o []Value) {
+	if r.Swap != nil {
+		o = append(o, Value{
+			filename: "memory.swap.max",
+			value:    *r.Swap,
+		})
+	}
+	if r.Max != nil {
+		o = append(o, Value{
+			filename: "memory.max",
+			value:    *r.Max,
+		})
+	}
+	if r.Low != nil {
+		o = append(o, Value{
+			filename: "memory.low",
+			value:    *r.Low,
+		})
+	}
+	if r.High != nil {
+		o = append(o, Value{
+			filename: "memory.high",
+			value:    *r.High,
+		})
+	}
+	return o
+}
