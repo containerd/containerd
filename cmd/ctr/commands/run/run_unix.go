@@ -40,6 +40,10 @@ var platformRunFlags = []cli.Flag{
 		Name:  "runc-binary",
 		Usage: "specify runc-compatible binary",
 	},
+	cli.BoolFlag{
+		Name:  "runc-systemd-cgroup",
+		Usage: "start runc with systemd cgroup manager",
+	},
 }
 
 // NewContainer creates a new container
@@ -179,6 +183,17 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			runtimeOpts.BinaryName = runcBinary
 		} else {
 			return nil, errors.New("specifying runc-binary is only supported for \"io.containerd.runc.v2\" runtime")
+		}
+	}
+	if context.Bool("runc-systemd-cgroup") {
+		if context.String("runtime") == "io.containerd.runc.v2" {
+			if context.String("cgroup") == "" {
+				// runc maps "machine.slice:foo:deadbeef" to "/machine.slice/foo-deadbeef.scope"
+				return nil, errors.New("option --runc-systemd-cgroup requires --cgroup to be set, e.g. \"machine.slice:foo:deadbeef\"")
+			}
+			runtimeOpts.SystemdCgroup = true
+		} else {
+			return nil, errors.New("specifying runc-systemd-cgroup is only supported for \"io.containerd.runc.v2\" runtime")
 		}
 	}
 	cOpts = append(cOpts, containerd.WithRuntime(context.String("runtime"), runtimeOpts))
