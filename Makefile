@@ -106,10 +106,10 @@ GO_GCFLAGS=$(shell				\
 	echo "-gcflags=-trimpath=$${1}/src";	\
 	)
 
+BINARIES=$(addprefix bin/,$(COMMANDS))
+
 #include platform specific makefile
 -include Makefile.$(GOOS)
-
-BINARIES=$(addprefix bin/,$(COMMANDS))
 
 # Flags passed to `go test`
 TESTFLAGS ?= $(TESTFLAGS_RACE)
@@ -178,10 +178,14 @@ benchmark: ## run benchmarks tests
 
 FORCE:
 
+define BUILD_BINARY =
+@echo "$(WHALE) $@"
+@go build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o $@ ${GO_LDFLAGS} ${GO_TAGS}  ./$<
+endef
+
 # Build a binary from a cmd.
 bin/%: cmd/% FORCE
-	@echo "$(WHALE) $@${BINARY_SUFFIX}"
-	@go build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o $@${BINARY_SUFFIX} ${GO_LDFLAGS} ${GO_TAGS}  ./$<
+	$(BUILD_BINARY)
 
 bin/containerd-shim: cmd/containerd-shim FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
 	@echo "$(WHALE) bin/containerd-shim"
