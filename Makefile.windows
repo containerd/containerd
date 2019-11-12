@@ -18,8 +18,6 @@ WHALE = "+"
 ONI = "-"
 COMMANDS += containerd-shim-runhcs-v1
 
-BINARY_SUFFIX=".exe"
-
 # amd64 supports go test -race
 ifeq ($(GOARCH),amd64)
 	TESTFLAGS_RACE= -race
@@ -31,3 +29,8 @@ endif
 ifeq (${BUILD_WINDOWS_V2},1)
 	BUILDTAGS += windows_v2
 endif
+
+BINARIES:=$(addsuffix .exe,$(BINARIES))
+
+bin/%.exe: cmd/% FORCE
+	$(BUILD_BINARY)
