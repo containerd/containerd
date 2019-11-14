@@ -1,0 +1,45 @@
+name: Nightly
+on:
+  schedule:
+    - cron: '0 0 * * *' # Every day at midnight
+
+jobs:
+  binaries:
+    name: Binaries
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.12
+
+      - name: Checkout
+        uses: actions/checkout@v1
+        env:
+          GOPATH: ${{ runner.workspace }}
+          GO111MODULE: off
+        with:
+          path: ./src/github.com/containerd/containerd
+
+      - name: Ubuntu dependencies
+        if: contains(matrix.os, 'ubuntu')
+        run: |
+          sudo apt-get install -y \
+            btrfs-tools \
+            libseccomp-dev
+
+      - name: Make
+        run: |
+          make binaries
+        env:
+          GOPATH: ${{ runner.workspace }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v1
+        with:
+          name: ${{ matrix.os }}
+          path: bin
