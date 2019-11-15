@@ -39,8 +39,9 @@ SOURCES := $(shell find cmd/ pkg/ vendor/ -name '*.go')
 PLUGIN_SOURCES := $(shell ls *.go)
 INTEGRATION_SOURCES := $(shell find integration/ -name '*.go')
 
+CONTAINERD_BIN := containerd
 ifeq ($(GOOS),windows)
-	BIN_EXT := .exe
+	CONTAINERD_BIN := $(CONTAINERD_BIN).exe
 endif
 
 all: binaries
@@ -82,9 +83,9 @@ sync-vendor:
 update-vendor: sync-vendor sort-vendor ## Syncs containerd/vendor.conf -> vendor.conf and sorts vendor.conf
 	@echo "$(WHALE) $@"
 
-$(BUILD_DIR)/containerd: $(SOURCES) $(PLUGIN_SOURCES)
+$(BUILD_DIR)/$(CONTAINERD_BIN): $(SOURCES) $(PLUGIN_SOURCES)
 	@echo "$(WHALE) $@"
-	$(GO) build -o $@$(BIN_EXT) \
+	$(GO) build -o $@ \
 		-tags '$(BUILD_TAGS)' \
 		-ldflags '$(GO_LDFLAGS)' \
 		-gcflags '$(GO_GCFLAGS)' \
@@ -117,29 +118,34 @@ clean: ## cleanup binaries
 	@echo "$(WHALE) $@"
 	@rm -rf $(BUILD_DIR)/*
 
-binaries: $(BUILD_DIR)/containerd ## build a customized containerd (same result as make containerd)
+binaries: $(BUILD_DIR)/$(CONTAINERD_BIN) ## build a customized containerd (same result as make containerd)
 	@echo "$(WHALE) $@"
 
 static-binaries: GO_LDFLAGS += -extldflags "-fno-PIC -static"
-static-binaries: $(BUILD_DIR)/containerd ## build static containerd
+static-binaries: $(BUILD_DIR)/$(CONTAINERD_BIN) ## build static containerd
 	@echo "$(WHALE) $@"
 
-containerd: $(BUILD_DIR)/containerd ## build a customized containerd with CRI plugin for testing
+containerd: $(BUILD_DIR)/$(CONTAINERD_BIN) ## build a customized containerd with CRI plugin for testing
 	@echo "$(WHALE) $@"
 
 install-containerd: containerd ## installs customized containerd to system location
 	@echo "$(WHALE) $@"
-	@install -D -m 755 $(BUILD_DIR)/containerd "$(BINDIR)/containerd"
+	@install -D -m 755 $(BUILD_DIR)/$(CONTAINERD_BIN) "$(BINDIR)/$(CONTAINERD_BIN)"
 
 install: install-containerd ## installs customized containerd to system location
 	@echo "$(WHALE) $@"
 
 uninstall: ## remove containerd from system location
 	@echo "$(WHALE) $@"
-	@rm -f "$(BINDIR)/containerd"
+	@rm -f "$(BINDIR)/$(CONTAINERD_BIN)"
 
+ifeq ($(GOOS),windows)
+$(BUILD_DIR)/$(TARBALL): static-binaries vendor.conf
+	@BUILD_DIR=$(BUILD_DIR) TARBALL=$(TARBALL) VERSION=$(VERSION) ./hack/release-windows.sh
+else
 $(BUILD_DIR)/$(TARBALL): static-binaries vendor.conf
 	@BUILD_DIR=$(BUILD_DIR) TARBALL=$(TARBALL) VERSION=$(VERSION) ./hack/release.sh
+endif
 
 release: $(BUILD_DIR)/$(TARBALL) ## build release tarball
 

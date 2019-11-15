@@ -26,6 +26,10 @@ umask 0022
 # BUILD_DIR is the directory to generate release tar.
 # TARBALL is the name of the release tar.
 BUILD_DIR=${BUILD_DIR:-"_output"}
+# Convert to absolute path if it's relative.
+if [[ ${BUILD_DIR} != /* ]]; then
+  BUILD_DIR=${ROOT}/${BUILD_DIR}
+fi
 TARBALL=${TARBALL:-"cri-containerd.tar.gz"}
 # INCLUDE_CNI indicates whether to install CNI. By default don't
 # include CNI in release tarball.

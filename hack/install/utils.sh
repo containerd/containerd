@@ -16,11 +16,12 @@
 
 source $(dirname "${BASH_SOURCE[0]}")/../utils.sh
 
-# DESTDIR is the dest path to install dependencies.
+# DESTDIR is the absolute dest path to install dependencies.
 DESTDIR=${DESTDIR:-"/"}
-# Convert to absolute path if it's relative.
+# Make sure that DESTDIR is an absolute path.
 if [[ ${DESTDIR} != /* ]]; then
-  DESTDIR=${ROOT}/${DESTDIR}
+  echo "DESTDIR is not an absolute path"
+  exit 1
 fi
 
 # NOSUDO indicates not to use sudo during installation.

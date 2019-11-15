@@ -22,7 +22,7 @@ source $(dirname "${BASH_SOURCE[0]}")/../utils.sh
 # WINCNI_BIN_DIR is the cni plugin directory
 WINCNI_BIN_DIR="${WINCNI_BIN_DIR:-"C:\\Program Files\\containerd\\cni\\bin"}"
 WINCNI_PKG=github.com/Microsoft/windows-container-networking
-WINCNI_VERSION=33bc4764ea3ad7c6ec58c5716370d329f5eb1266
+WINCNI_VERSION=aa10a0b31e9f72937063436454def1760b858ee2
 
 # Create a temporary GOPATH for cni installation.
 GOPATH="$(mktemp -d /tmp/cri-install-cni.XXXX)"
@@ -30,8 +30,10 @@ GOPATH="$(mktemp -d /tmp/cri-install-cni.XXXX)"
 # Install cni
 checkout_repo "${WINCNI_PKG}" "${WINCNI_VERSION}" "${WINCNI_PKG}"
 cd "${GOPATH}/src/${WINCNI_PKG}"
-go build "${WINCNI_PKG}/plugins/nat"
-install -D -m 755 "nat.exe" "${WINCNI_BIN_DIR}/nat.exe"
+make all
+install -D -m 755 "out/nat.exe" "${WINCNI_BIN_DIR}/nat.exe"
+install -D -m 755 "out/sdnbridge.exe" "${WINCNI_BIN_DIR}/sdnbridge.exe"
+install -D -m 755 "out/sdnoverlay.exe" "${WINCNI_BIN_DIR}/sdnoverlay.exe"
 
 # Clean the tmp GOPATH dir.
 rm -rf "${GOPATH}"
