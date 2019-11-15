@@ -140,3 +140,22 @@ func TestContainerWindowsNetworkNamespace(t *testing.T) {
 	assert.NotNil(t, spec.Windows.Network)
 	assert.Equal(t, nsPath, spec.Windows.Network.NetworkNamespace)
 }
+
+func TestMountCleanPath(t *testing.T) {
+	testID := "test-id"
+	testSandboxID := "sandbox-id"
+	testPid := uint32(1234)
+	nsPath := "test-cni"
+	c := newTestCRIService()
+
+	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	containerConfig.Mounts = append(containerConfig.Mounts, &runtime.Mount{
+		ContainerPath: "c:/test/container-path",
+		HostPath:      "c:/test/host-path",
+	})
+	spec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
+	assert.NoError(t, err)
+	assert.NotNil(t, spec)
+	specCheck(t, testID, testSandboxID, testPid, spec)
+	checkMount(t, spec.Mounts, "c:\\test\\host-path", "c:\\test\\container-path", "", []string{"rw"}, nil)
+}

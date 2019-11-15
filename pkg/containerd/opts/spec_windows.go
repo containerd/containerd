@@ -77,8 +77,7 @@ func WithWindowsMounts(osi osinterface.OS, config *runtime.ContainerConfig, extr
 		sort.Sort(orderedMounts(mounts))
 
 		// Copy all mounts from default mounts, except for
-		// - mounts overridden by supplied mount;
-		// - all mounts under /dev if a supplied /dev is present.
+		// mounts overridden by supplied mount;
 		mountSet := make(map[string]struct{})
 		for _, m := range mounts {
 			mountSet[filepath.Clean(m.ContainerPath)] = struct{}{}
@@ -123,8 +122,9 @@ func WithWindowsMounts(osi osinterface.OS, config *runtime.ContainerConfig, extr
 				options = append(options, "rw")
 			}
 			s.Mounts = append(s.Mounts, runtimespec.Mount{
-				Source:      src,
-				Destination: dst,
+				// hcsshim requires clean path, especially '/' -> '\'.
+				Source:      filepath.Clean(src),
+				Destination: filepath.Clean(dst),
 				Options:     options,
 			})
 		}
