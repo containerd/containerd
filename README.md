@@ -3,6 +3,7 @@
 [![GoDoc](https://godoc.org/github.com/containerd/containerd?status.svg)](https://godoc.org/github.com/containerd/containerd)
 [![Build Status](https://travis-ci.org/containerd/containerd.svg?branch=master)](https://travis-ci.org/containerd/containerd)
 [![Windows Build Status](https://ci.appveyor.com/api/projects/status/github/containerd/containerd?branch=master&svg=true)](https://ci.appveyor.com/project/mlaventure/containerd-3g73f?branch=master)
+![](https://github.com/containerd/containerd/workflows/Nightly/badge.svg)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bhttps%3A%2F%2Fgithub.com%2Fcontainerd%2Fcontainerd.svg?type=shield)](https://app.fossa.io/projects/git%2Bhttps%3A%2F%2Fgithub.com%2Fcontainerd%2Fcontainerd?ref=badge_shield)
 [![Go Report Card](https://goreportcard.com/badge/github.com/containerd/containerd)](https://goreportcard.com/report/github.com/containerd/containerd)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1271/badge)](https://bestpractices.coreinfrastructure.org/projects/1271)
@@ -24,6 +25,12 @@ See how to build containerd from source at [BUILDING](BUILDING.md).
 
 If you are interested in trying out containerd see our example at [Getting Started](docs/getting-started.md).
 
+## Nightly builds
+
+There are nightly builds available for download [here](https://github.com/containerd/containerd/actions?query=workflow%3ANightly).
+Binaries are generated from `master` branch every night for `Linux` and `Windows`.
+
+Please be aware: nightly builds might have critical bugs, it's not recommended for use in prodution and no support provided.
 
 ## Runtime Requirements
 

@@ -4,12 +4,9 @@ on:
     - cron: '0 0 * * *' # Every day at midnight
 
 jobs:
-  binaries:
-    name: Binaries
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
+  linux:
+    name: Linux
+    runs-on: ubuntu-latest
 
     steps:
       - name: Set up Go
@@ -25,21 +22,127 @@ jobs:
         with:
           path: ./src/github.com/containerd/containerd
 
-      - name: Ubuntu dependencies
-        if: contains(matrix.os, 'ubuntu')
-        run: |
-          sudo apt-get install -y \
-            btrfs-tools \
-            libseccomp-dev
+      #
+      # Build
+      #
 
-      - name: Make
+      - name: Install dependencies
         run: |
-          make binaries
+          sudo add-apt-repository "deb [arch=arm64,s390x,ppc64el] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -sc) main" || true
+          sudo add-apt-repository "deb [arch=arm64,s390x,ppc64el] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -sc)-updates main" || true
+
+          sudo dpkg --add-architecture arm64
+          sudo dpkg --add-architecture s390x
+          sudo dpkg --add-architecture ppc64el
+
+          sudo apt-get update || true
+
+          sudo apt-get install -y \
+            crossbuild-essential-arm64 \
+            crossbuild-essential-s390x \
+            crossbuild-essential-ppc64el \
+            libseccomp-dev:amd64 \
+            libseccomp-dev:arm64 \
+            libseccomp-dev:s390x \
+            libseccomp-dev:ppc64el
+
+      - name: Build amd64
         env:
           GOPATH: ${{ runner.workspace }}
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          make binaries
+          mv bin bin_amd64
 
-      - name: Upload artifacts
+      - name: Build arm64
+        env:
+          GOPATH: ${{ runner.workspace }}
+          GOOS: linux
+          GOARCH: arm64
+          CC: aarch64-linux-gnu-gcc
+          CGO_ENABLED: 1
+        run: |
+          make binaries
+          mv bin bin_arm64
+
+      - name: Build s390x
+        env:
+          GOPATH: ${{ runner.workspace }}
+          GOOS: linux
+          GOARCH: s390x
+          CGO_ENABLED: 1
+          CC: s390x-linux-gnu-gcc
+        run: |
+          make binaries
+          mv bin bin_s390x
+
+      - name: Build ppc64le
+        env:
+          GOPATH: ${{ runner.workspace }}
+          GOOS: linux
+          GOARCH: ppc64le
+          CGO_ENABLED: 1
+          CC: powerpc64le-linux-gnu-gcc
+        run: |
+          make binaries
+          mv bin bin_ppc64le
+
+      #
+      # Upload
+      #
+
+      - name: Upload artifacts (linux_amd64)
         uses: actions/upload-artifact@v1
         with:
-          name: ${{ matrix.os }}
+          name: linux_amd64
+          path: bin_amd64
+
+      - name: Upload artifacts (linux_arm64)
+        uses: actions/upload-artifact@v1
+        with:
+          name: linux_arm64
+          path: bin_arm64
+
+      - name: Upload artifacts (linux_s390x)
+        uses: actions/upload-artifact@v1
+        with:
+          name: linux_s390x
+          path: bin_s390x
+
+      - name: Upload artifacts (linux_ppc64le)
+        uses: actions/upload-artifact@v1
+        with:
+          name: linux_ppc64le
+          path: bin_ppc64le
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.12
+
+      - name: Checkout
+        uses: actions/checkout@v1
+        env:
+          GOPATH: ${{ runner.workspace }}
+          GO111MODULE: off
+        with:
+          path: ./src/github.com/containerd/containerd
+
+      - name: Build amd64
+        env:
+          GOPATH: ${{ runner.workspace }}
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          make binaries
+
+      - name: Upload artifacts (windows_amd64)
+        uses: actions/upload-artifact@v1
+        with:
+          name: windows_amd64
           path: bin
