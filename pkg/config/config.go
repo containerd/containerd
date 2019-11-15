@@ -153,6 +153,11 @@ type RegistryConfig struct {
 	TLS *TLSConfig `toml:"tls" json:"tls"`
 }
 
+type EncryptedImagesConfig struct {
+	// KeyModel specifies the model of where keys should reside
+	KeyModel string `toml:"key_model" json:"keyModel"`
+}
+
 // PluginConfig contains toml config related to CRI plugin,
 // it is a subset of Config.
 type PluginConfig struct {
@@ -162,6 +167,8 @@ type PluginConfig struct {
 	CniConfig `toml:"cni" json:"cni"`
 	// Registry contains config related to the registry
 	Registry Registry `toml:"registry" json:"registry"`
+	// EncryptedImagesConfig contains config related to handling of encrypted images
+	EncryptedImagesConfig `toml:"image_encryption" json:"imageEncryption"`
 	// DisableTCPService disables serving CRI on the TCP server.
 	DisableTCPService bool `toml:"disable_tcp_service" json:"disableTCPService"`
 	// StreamServerAddress is the ip address streaming server is listening on.
@@ -236,6 +243,12 @@ const (
 	RuntimeUntrusted = "untrusted"
 	// RuntimeDefault is the implicit runtime defined for ContainerdConfig.DefaultRuntime
 	RuntimeDefault = "default"
+	// EncryptionKeyModelMultitenant is the key model where keys are obtained from
+	// kubernetes ImageDecryptSecrets
+	EncryptionKeyModelMultitenant = "multitenant"
+	// EncryptionKeyModelNode is the key model where key for encrypted images reside
+	// on the worker nodes
+	EncryptionKeyModelNode = "node"
 )
 
 // ValidatePluginConfig validates the given plugin configuration.

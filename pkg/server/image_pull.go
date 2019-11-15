@@ -32,6 +32,8 @@ import (
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/remotes/docker"
+	"github.com/containerd/imgcrypt"
+	"github.com/containerd/imgcrypt/images/encryption"
 	distribution "github.com/docker/distribution/reference"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -106,7 +108,8 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 			return nil, nil
 		}
 	)
-	image, err := c.client.Pull(ctx, ref,
+
+	pullOpts := []containerd.RemoteOpt{
 		containerd.WithSchema1Conversion,
 		containerd.WithResolver(resolver),
 		containerd.WithPullSnapshotter(c.config.ContainerdConfig.Snapshotter),
@@ -114,7 +117,15 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		containerd.WithPullLabel(imageLabelKey, imageLabelValue),
 		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
 		containerd.WithImageHandler(imageHandler),
-	)
+	}
+
+	if c.config.EncryptedImagesConfig.KeyModel == criconfig.EncryptionKeyModelNode {
+		ltdd := imgcrypt.Payload{}
+		decUnpackOpt := encryption.WithUnpackConfigApplyOpts(encryption.WithDecryptedUnpack(&ltdd))
+		pullOpts = append(pullOpts, encryption.WithUnpackOpts([]containerd.UnpackOpt{decUnpackOpt}))
+	}
+
+	image, err := c.client.Pull(ctx, ref, pullOpts...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to pull and unpack image %q", ref)
 	}

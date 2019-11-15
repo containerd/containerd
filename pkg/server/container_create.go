@@ -165,6 +165,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		// rootfs readonly (requested by spec.Root.Readonly).
 		customopts.WithNewSnapshot(id, containerdImage),
 	}
+
 	if len(volumeMounts) > 0 {
 		mountMap := make(map[string]string)
 		for _, v := range volumeMounts {
