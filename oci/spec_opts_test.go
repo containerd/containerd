@@ -36,7 +36,7 @@ import (
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/namespaces"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 type blob []byte
@@ -157,6 +157,67 @@ func TestReplaceOrAppendEnvValues(t *testing.T) {
 	if err := assertEqualsStringArrays(results, expected); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestWithDefaultSpecForPlatform(t *testing.T) {
+	t.Parallel()
+	var (
+		s   Spec
+		c   = containers.Container{ID: "TestWithDefaultSpecForPlatform"}
+		ctx = namespaces.WithNamespace(context.Background(), "test")
+	)
+
+	platforms := []string{"linux/amd64", "windows/amd64"}
+	for _, p := range platforms {
+		if err := ApplyOpts(ctx, nil, &c, &s, WithDefaultSpecForPlatform(p)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+}
+
+func Contains(a []string, x string) bool {
+	for _, n := range a {
+		if x == n {
+			return true
+		}
+	}
+	return false
+}
+
+func TestWithDefaultPathEnv(t *testing.T) {
+	t.Parallel()
+	s := Spec{}
+	s.Process = &specs.Process{
+		Env: []string{},
+	}
+	var (
+		defaultUnixEnv = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+		ctx            = namespaces.WithNamespace(context.Background(), "test")
+	)
+	WithDefaultPathEnv(ctx, nil, nil, &s)
+	if !Contains(s.Process.Env, defaultUnixEnv) {
+		t.Fatal("default Unix Env not found")
+	}
+}
+
+func TestWithProcessCwd(t *testing.T) {
+	t.Parallel()
+	s := Spec{}
+	opts := []SpecOpts{
+		WithProcessCwd("testCwd"),
+	}
+	var expectedCwd = "testCwd"
+
+	for _, opt := range opts {
+		if err := opt(nil, nil, nil, &s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if s.Process.Cwd != expectedCwd {
+		t.Fatal("Process has a wrong current working directory")
+	}
+
 }
 
 func TestWithEnv(t *testing.T) {
@@ -381,6 +442,49 @@ func assertEqualsStringArrays(values, expected []string) error {
 	return nil
 }
 
+func TestWithTTYSize(t *testing.T) {
+	t.Parallel()
+	s := Spec{}
+	opts := []SpecOpts{
+		WithTTYSize(10, 20),
+	}
+	var (
+		expectedWidth  = uint(10)
+		expectedHeight = uint(20)
+	)
+
+	for _, opt := range opts {
+		if err := opt(nil, nil, nil, &s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if s.Process.ConsoleSize.Height != expectedWidth && s.Process.ConsoleSize.Height != expectedHeight {
+		t.Fatal("Process Console has invalid size")
+	}
+
+}
+
+func TestWithUserNamespace(t *testing.T) {
+	t.Parallel()
+	s := Spec{}
+	opts := []SpecOpts{
+		WithUserNamespace(1, 2, 20000),
+	}
+	for _, opt := range opts {
+		if err := opt(nil, nil, nil, &s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	testMapping := specs.LinuxIDMapping{
+		ContainerID: 1,
+		HostID:      2,
+		Size:        20000,
+	}
+	if !(len(s.Linux.UIDMappings) == 1 && s.Linux.UIDMappings[0] == testMapping) || !(len(s.Linux.GIDMappings) == 1 && s.Linux.GIDMappings[0] == testMapping) {
+		t.Fatal("WithUserNamespace Cannot set the uid/gid  mappings for the task")
+	}
+
+}
 func TestWithImageConfigArgs(t *testing.T) {
 	t.Parallel()
 
