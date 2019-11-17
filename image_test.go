@@ -45,7 +45,8 @@ func TestImageIsUnpacked(t *testing.T) {
 	defer client.Close()
 
 	// Cleanup
-	err = client.ImageService().Delete(ctx, imageName)
+	opts := []images.DeleteOpt{images.SynchronousDelete()}
+	err = client.ImageService().Delete(ctx, imageName, opts...)
 	if err != nil && !errdefs.IsNotFound(err) {
 		t.Fatal(err)
 	}
