@@ -15,7 +15,7 @@ Here's minimal sample entry that can be made in the configuration file:
   ...
   [plugins.devmapper]
     pool_name = "containerd-pool"
-    base_image_size = "128MB"
+    base_image_size = "8192MB"
   ...
 ```
 
