@@ -227,7 +227,7 @@ func (s *service) List(sr *snapshotsapi.ListSnapshotsRequest, ss snapshotsapi.Sn
 		}
 
 		return nil
-	})
+	}, sr.Filters...)
 	if err != nil {
 		return err
 	}
