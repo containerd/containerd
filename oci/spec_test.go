@@ -223,6 +223,32 @@ func TestWithCapabilitiesNil(t *testing.T) {
 	}
 }
 
+func TestPopulateDefaultWindowsSpec(t *testing.T) {
+	var (
+		c   = containers.Container{ID: "TestWithDefaultSpec"}
+		ctx = namespaces.WithNamespace(context.Background(), "test")
+	)
+	var expected Spec
+
+	populateDefaultWindowsSpec(ctx, &expected, c.ID)
+	if expected.Windows == nil {
+		t.Error("Cannot populate windows Spec")
+	}
+}
+
+func TestPopulateDefaultUnixSpec(t *testing.T) {
+	var (
+		c   = containers.Container{ID: "TestWithDefaultSpec"}
+		ctx = namespaces.WithNamespace(context.Background(), "test")
+	)
+	var expected Spec
+
+	populateDefaultUnixSpec(ctx, &expected, c.ID)
+	if expected.Linux == nil {
+		t.Error("Cannot populate Unix Spec")
+	}
+}
+
 func TestWithPrivileged(t *testing.T) {
 	t.Parallel()
 
