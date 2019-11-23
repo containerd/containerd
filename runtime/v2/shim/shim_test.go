@@ -18,8 +18,29 @@ package shim
 
 import (
 	"context"
+	"os"
+	"runtime"
 	"testing"
 )
+
+func TestRuntimeWithEmptyMaxEnvProcs(t *testing.T) {
+
+	os.Setenv("GOMAXPROCS", "")
+	setRuntime()
+	var oldGoMaxProcs = runtime.GOMAXPROCS(0)
+	if oldGoMaxProcs != 2 {
+		t.Fatal("the max number of procs should be 2")
+	}
+}
+
+func TestRuntimeWithNonEmptyMaxEnvProcs(t *testing.T) {
+	os.Setenv("GOMAXPROCS", "not_empty")
+	setRuntime()
+	var oldGoMaxProcs2 = runtime.GOMAXPROCS(0)
+	if oldGoMaxProcs2 != runtime.NumCPU() {
+		t.Fatal("the max number CPU should be equal to available CPUs")
+	}
+}
 
 func TestShimOptWithValue(t *testing.T) {
 	ctx := context.TODO()
