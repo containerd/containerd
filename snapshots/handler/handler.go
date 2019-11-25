@@ -143,12 +143,12 @@ func firstFalseIdx(layers []ocispec.Descriptor, chain []digest.Digest, f func(oc
 }
 
 func exclude(a []ocispec.Descriptor, b []ocispec.Descriptor) (res []ocispec.Descriptor) {
-	bmap := make(map[string]ocispec.Descriptor)
+	bmap := make(map[string]bool)
 	for _, vb := range b {
-		bmap[vb.Digest.String()] = vb
+		bmap[vb.Digest.String()] = true
 	}
 	for _, va := range a {
-		if _, ok := bmap[va.Digest.String()]; !ok {
+		if ok := bmap[va.Digest.String()]; !ok {
 			res = append(res, va)
 		}
 	}
