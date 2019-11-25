@@ -105,7 +105,7 @@ func isPullSkippable(ctx context.Context, sn snapshots.Snapshotter, ref string) 
 			if _, err := sn.Stat(ctx, pKey); err == nil {
 
 				// We got ErrAlreadyExist and the ActiveSnapshot already exists. This
-				// doesn't indicade pull-skippable snapshot existence but key confliction.
+				// doesn't indicate pull-skippable snapshot existence but key confliction.
 				// Try again with another key.
 				continue
 			}

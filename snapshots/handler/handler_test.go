@@ -96,7 +96,7 @@ func TestSkippableCheck(t *testing.T) {
 				return
 			}
 			if len(sn.active) != 0 {
-				t.Errorf("remaining garbedge active snapshot. must bo clean")
+				t.Errorf("remaining garbage active snapshot. must be clean")
 				return
 			}
 			if len(sn.committed) != wantI {
