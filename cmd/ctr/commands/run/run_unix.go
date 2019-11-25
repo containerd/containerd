@@ -20,7 +20,9 @@ package run
 
 import (
 	gocontext "context"
+	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/containerd/containerd"
@@ -43,6 +45,14 @@ var platformRunFlags = []cli.Flag{
 	cli.BoolFlag{
 		Name:  "runc-systemd-cgroup",
 		Usage: "start runc with systemd cgroup manager",
+	},
+	cli.StringFlag{
+		Name:  "uidmap",
+		Usage: "run inside a user namespace with the specified UID mapping range; specified with the format `container-uid:host-uid:length`",
+	},
+	cli.StringFlag{
+		Name:  "gidmap",
+		Usage: "run inside a user namespace with the specified GID mapping range; specified with the format `container-gid:host-gid:length`",
 	},
 }
 
@@ -115,12 +125,30 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			opts = append(opts, oci.WithImageConfig(image))
 			cOpts = append(cOpts,
 				containerd.WithImage(image),
-				containerd.WithSnapshotter(snapshotter),
+				containerd.WithSnapshotter(snapshotter))
+			if uidmap, gidmap := context.String("uidmap"), context.String("gidmap"); uidmap != "" && gidmap != "" {
+				uidMap, err := parseIDMapping(uidmap)
+				if err != nil {
+					return nil, err
+				}
+				gidMap, err := parseIDMapping(gidmap)
+				if err != nil {
+					return nil, err
+				}
+				opts = append(opts,
+					oci.WithUserNamespace([]specs.LinuxIDMapping{uidMap}, []specs.LinuxIDMapping{gidMap}))
+				if context.Bool("read-only") {
+					cOpts = append(cOpts, containerd.WithRemappedSnapshotView(id, image, uidMap.HostID, gidMap.HostID))
+				} else {
+					cOpts = append(cOpts, containerd.WithRemappedSnapshot(id, image, uidMap.HostID, gidMap.HostID))
+				}
+			} else {
 				// Even when "read-only" is set, we don't use KindView snapshot here. (#1495)
 				// We pass writable snapshot to the OCI runtime, and the runtime remounts it as read-only,
 				// after creating some mount points on demand.
-				containerd.WithNewSnapshot(id, image),
-				containerd.WithImageStopSignal(image, "SIGTERM"))
+				cOpts = append(cOpts, containerd.WithNewSnapshot(id, image))
+			}
+			cOpts = append(cOpts, containerd.WithImageStopSignal(image, "SIGTERM"))
 		}
 		if context.Bool("read-only") {
 			opts = append(opts, oci.WithRootFSReadonly())
@@ -210,10 +238,51 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 }
 
 func getNewTaskOpts(context *cli.Context) []containerd.NewTaskOpts {
+	var (
+		tOpts []containerd.NewTaskOpts
+	)
 	if context.Bool("no-pivot") {
-		return []containerd.NewTaskOpts{containerd.WithNoPivotRoot}
+		tOpts = append(tOpts, containerd.WithNoPivotRoot)
 	}
-	return nil
+	if uidmap := context.String("uidmap"); uidmap != "" {
+		uidMap, err := parseIDMapping(uidmap)
+		if err != nil {
+			fmt.Printf("warning: expected to parse uidmap: %s\n", err.Error())
+		}
+		tOpts = append(tOpts, containerd.WithUIDOwner(uidMap.HostID))
+	}
+	if gidmap := context.String("gidmap"); gidmap != "" {
+		gidMap, err := parseIDMapping(gidmap)
+		if err != nil {
+			fmt.Printf("warning: expected to parse uidmap: %s\n", err.Error())
+		}
+		tOpts = append(tOpts, containerd.WithGIDOwner(gidMap.HostID))
+	}
+	return tOpts
+}
+
+func parseIDMapping(mapping string) (specs.LinuxIDMapping, error) {
+	parts := strings.Split(mapping, ":")
+	if len(parts) != 3 {
+		return specs.LinuxIDMapping{}, errors.New("user namespace mappings require the format `container-id:host-id:size`")
+	}
+	cID, err := strconv.ParseUint(parts[0], 0, 16)
+	if err != nil {
+		return specs.LinuxIDMapping{}, errors.Wrapf(err, "invalid container id for user namespace remapping")
+	}
+	hID, err := strconv.ParseUint(parts[1], 0, 16)
+	if err != nil {
+		return specs.LinuxIDMapping{}, errors.Wrapf(err, "invalid host id for user namespace remapping")
+	}
+	size, err := strconv.ParseUint(parts[2], 0, 16)
+	if err != nil {
+		return specs.LinuxIDMapping{}, errors.Wrapf(err, "invalid size for user namespace remapping")
+	}
+	return specs.LinuxIDMapping{
+		ContainerID: uint32(cID),
+		HostID:      uint32(hID),
+		Size:        uint32(size),
+	}, nil
 }
 
 func validNamespace(ns string) bool {
