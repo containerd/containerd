@@ -35,9 +35,23 @@ import (
 )
 
 const (
+	// TargetSnapshotLabel is a label to tell the backend snapshotter the
+	// chainID of this snapshot. The backend snapshotter can use this
+	// information to search for the contents of the snapshot and to commit
+	// it. The client can use the committed snapshot with the chainID later.
 	TargetSnapshotLabel = "containerd.io/snapshot.ref"
-	TargetRefLabel      = "containerd.io/snapshot/target.reference"
-	TargetDigestLabel   = "containerd.io/snapshot/target.digest"
+
+	// TargetRefLabel is a label to tell the backend snapshotter the basic
+	// information(image reference) of the image layer. The backend
+	// snapshotter can use this information to search for the contents of
+	// the snapshot.
+	TargetRefLabel = "containerd.io/snapshot/target.reference"
+
+	// TargetDigestLabel is a label to tell the backend snapshotter the
+	// basic information(layer digest) of the image layer. The backend
+	// snapshotter can use this information to search for the contents of
+	// the snapshot.
+	TargetDigestLabel = "containerd.io/snapshot/target.digest"
 )
 
 // FilterLayerBySnapshotter filters out layers from download candidates if the
