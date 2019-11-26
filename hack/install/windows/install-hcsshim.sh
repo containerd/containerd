@@ -30,7 +30,7 @@ from-vendor HCSSHIM "${HCSSHIM_PKG}"
 checkout_repo "${HCSSHIM_PKG}" "${HCSSHIM_VERSION}" "${HCSSHIM_REPO}"
 cd "${GOPATH}/src/${HCSSHIM_PKG}"
 go build "${HCSSHIM_PKG}/cmd/containerd-shim-runhcs-v1"
-install -D -m 755 containerd-shim-runhcs-v1 "${HCSSHIM_DIR}"/containerd-shim-runhcs-v1
+install -D -m 755 containerd-shim-runhcs-v1.exe "${HCSSHIM_DIR}"/containerd-shim-runhcs-v1.exe
 
 # Clean the tmp GOPATH dir. Use sudo because runc build generates
 # some privileged files.

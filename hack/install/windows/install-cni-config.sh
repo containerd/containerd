@@ -74,7 +74,7 @@ bash -c 'cat >"'"${CNI_CONFIG_DIR}"'"/0-containerd-nat.conf <<EOF
         "subnet": "'$subnet'",
         "routes": [
             {
-                "gateway": "'$gateway'"
+                "GW": "'$gateway'"
             }
         ]
     },
