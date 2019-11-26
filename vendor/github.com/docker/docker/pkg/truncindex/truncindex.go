@@ -1,7 +1,7 @@
 // Package truncindex provides a general 'index tree', used by Docker
 // in order to be able to reference containers by only a few unambiguous
 // characters of their id.
-package truncindex
+package truncindex // import "github.com/docker/docker/pkg/truncindex"
 
 import (
 	"errors"
@@ -108,7 +108,7 @@ func (idx *TruncIndex) Get(s string) (string, error) {
 		if id != "" {
 			// we haven't found the ID if there are two or more IDs
 			id = ""
-			return ErrAmbiguousPrefix{prefix: string(prefix)}
+			return ErrAmbiguousPrefix{prefix: s}
 		}
 		id = string(prefix)
 		return nil
