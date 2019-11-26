@@ -1,12 +1,10 @@
-package system
+package system // import "github.com/docker/docker/pkg/system"
 
 import (
 	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
-
-	"github.com/containerd/continuity/pathdriver"
 )
 
 const defaultUnixPathEnv = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -27,6 +25,12 @@ func DefaultPathEnv(os string) string {
 
 }
 
+// PathVerifier defines the subset of a PathDriver that CheckSystemDriveAndRemoveDriveLetter
+// actually uses in order to avoid system depending on containerd/continuity.
+type PathVerifier interface {
+	IsAbs(string) bool
+}
+
 // CheckSystemDriveAndRemoveDriveLetter verifies that a path, if it includes a drive letter,
 // is the system drive.
 // On Linux: this is a no-op.
@@ -35,14 +39,14 @@ func DefaultPathEnv(os string) string {
 // This is used, for example, when validating a user provided path in docker cp.
 // If a drive letter is supplied, it must be the system drive. The drive letter
 // is always removed. Also, it translates it to OS semantics (IOW / to \). We
-// need the path in this syntax so that it can ultimately be contatenated with
+// need the path in this syntax so that it can ultimately be concatenated with
 // a Windows long-path which doesn't support drive-letters. Examples:
 // C:			--> Fail
 // C:\			--> \
 // a			--> a
 // /a			--> \a
 // d:\			--> Fail
-func CheckSystemDriveAndRemoveDriveLetter(path string, driver pathdriver.PathDriver) (string, error) {
+func CheckSystemDriveAndRemoveDriveLetter(path string, driver PathVerifier) (string, error) {
 	if runtime.GOOS != "windows" || LCOWSupported() {
 		return path, nil
 	}
