@@ -159,9 +159,7 @@ func adaptSnapshot(info snapshots.Info) filters.Adaptor {
 		case "name":
 			return info.Name, true
 		case "parent":
-			if info.Parent != "" {
-				return info.Parent, true
-			}
+			return info.Parent, true
 		case "labels":
 			return checkMap(fieldpath[1:], info.Labels)
 		}

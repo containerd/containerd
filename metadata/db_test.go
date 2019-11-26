@@ -48,9 +48,31 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-func testDB(t *testing.T) (context.Context, *DB, func()) {
+type testOptions struct {
+	extraSnapshots map[string]func(string) (snapshots.Snapshotter, error)
+}
+
+type testOpt func(*testOptions)
+
+func withSnapshotter(name string, fn func(string) (snapshots.Snapshotter, error)) testOpt {
+	return func(to *testOptions) {
+		if to.extraSnapshots == nil {
+			to.extraSnapshots = map[string]func(string) (snapshots.Snapshotter, error){}
+		}
+		to.extraSnapshots[name] = fn
+	}
+}
+
+func testDB(t *testing.T, opt ...testOpt) (context.Context, *DB, func()) {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = namespaces.WithNamespace(ctx, "testing")
+	ctx = logtest.WithT(ctx, t)
+
+	var topts testOptions
+
+	for _, o := range opt {
+		o(&topts)
+	}
 
 	dirname, err := ioutil.TempDir("", strings.Replace(t.Name(), "/", "_", -1)+"-")
 	if err != nil {
@@ -60,6 +82,18 @@ func testDB(t *testing.T) (context.Context, *DB, func()) {
 	snapshotter, err := native.NewSnapshotter(filepath.Join(dirname, "native"))
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	snapshotters := map[string]snapshots.Snapshotter{
+		"native": snapshotter,
+	}
+
+	for name, fn := range topts.extraSnapshots {
+		snapshotter, err := fn(filepath.Join(dirname, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		snapshotters[name] = snapshotter
 	}
 
 	cs, err := local.NewStore(filepath.Join(dirname, "content"))
@@ -72,7 +106,7 @@ func testDB(t *testing.T) (context.Context, *DB, func()) {
 		t.Fatal(err)
 	}
 
-	db := NewDB(bdb, cs, map[string]snapshots.Snapshotter{"native": snapshotter})
+	db := NewDB(bdb, cs, snapshotters)
 	if err := db.Init(ctx); err != nil {
 		t.Fatal(err)
 	}
