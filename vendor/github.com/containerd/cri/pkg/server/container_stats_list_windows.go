@@ -19,7 +19,10 @@ limitations under the License.
 package server
 
 import (
+	wstats "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/typeurl"
+	"github.com/pkg/errors"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	containerstore "github.com/containerd/cri/pkg/store/container"
@@ -53,8 +56,29 @@ func (c *criService) containerMetrics(
 		Annotations: meta.Config.GetAnnotations(),
 	}
 
-	// TODO(windows): hcsshim Stats is not implemented, add windows support after
-	// that is implemented.
-
+	if stats != nil {
+		s, err := typeurl.UnmarshalAny(stats.Data)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to extract container metrics")
+		}
+		wstats := s.(*wstats.Statistics).GetWindows()
+		if wstats == nil {
+			return nil, errors.New("windows stats is empty")
+		}
+		if wstats.Processor != nil {
+			cs.Cpu = &runtime.CpuUsage{
+				Timestamp:            wstats.Timestamp.UnixNano(),
+				UsageCoreNanoSeconds: &runtime.UInt64Value{Value: wstats.Processor.TotalRuntimeNS},
+			}
+		}
+		if wstats.Memory != nil {
+			cs.Memory = &runtime.MemoryUsage{
+				Timestamp: wstats.Timestamp.UnixNano(),
+				WorkingSetBytes: &runtime.UInt64Value{
+					Value: wstats.Memory.MemoryUsagePrivateWorkingSetBytes,
+				},
+			}
+		}
+	}
 	return &cs, nil
 }
