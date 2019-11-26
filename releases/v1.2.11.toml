@@ -1,0 +1,32 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.2.10"
+
+pre_release = false
+
+preface = """\
+The eleventh patch release for `containerd` 1.2 includes an updated runc with
+an additional fix for CVE-2019-16884 and a Golang update.
+
+### Notable Updates
+
+* Update the runc vendor to v1.0.0-rc9 which includes an additional mitigation for [CVE-2019-16884](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-16884).
+    - More details on the runc CVE in [opencontainers/runc#2128](https://github.com/opencontainers/runc/issues/2128), and the additional mitigations in [opencontainers/runc#2130](https://github.com/opencontainers/runc/pull/2130).
+* Add local-fs.target to service file to fix corrupt image after unexpected host reboot. Reported in [containerd/containerd#3671](https://github.com/containerd/containerd/issues/3671), and fixed by [containerd/containerd#3746](https://github.com/containerd/containerd/pull/3746).
+* Update Golang runtime to 1.12.13, which includes security fixes to the `crypto/dsa` package made in Go 1.12.11 ([CVE-2019-17596](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-17596)), and fixes to the go command, `runtime`, `syscall` and `net` packages (Go 1.12.12).
+
+* CRI fixes:
+    - Fix shim delete error code to avoid unnecessary retries in the CRI plugin. Discovered in [containerd/cri#1309](https://github.com/containerd/cri/issues/1309), and fixed by [containerd/containerd#3732](https://github.com/containerd/containerd/pull/3732) and [containerd/containerd#3739](https://github.com/containerd/containerd/pull/3739).
+
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
