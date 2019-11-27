@@ -57,7 +57,7 @@ func newContentStore(ctx context.Context, root string) (context.Context, content
 				return err
 			}
 			for _, st := range statuses {
-				if err := cs.Abort(ctx, st.Ref); err != nil {
+				if err := cs.Abort(ctx, st.Ref); err != nil && !errdefs.IsNotFound(err) {
 					return errors.Wrapf(err, "failed to abort %s", st.Ref)
 				}
 			}
