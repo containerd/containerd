@@ -38,7 +38,7 @@ After modify this config, you need restart the `containerd` service.
 
 To configure the TLS settings for a specific registry, create/modify the `/etc/containerd/config.toml` as follows:
 ```toml
-# The registry host has to be an domain name or IP. Port number is also
+# The registry host has to be a domain name or IP. Port number is also
 # needed if the default HTTPS or HTTP port is not used.
 [plugins.cri.registry.configs."my.custom.registry".tls]
     ca_file   = "ca.pem"
@@ -69,7 +69,7 @@ To skip the registry certificate verification:
 To configure a credential for a specific registry, create/modify the
 `/etc/containerd/config.toml` as follows:
 ```toml
-# The registry host has to be an domain name or IP. Port number is also
+# The registry host has to be a domain name or IP. Port number is also
 # needed if the default HTTPS or HTTP port is not used.
 [plugins.cri.registry.configs."gcr.io".auth]
   username = ""
