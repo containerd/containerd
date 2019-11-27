@@ -69,7 +69,7 @@ type Init struct {
 	pausing      *atomicBool
 	status       int
 	exited       time.Time
-	pid          safePid
+	pid          int
 	closers      []io.Closer
 	stdin        io.Closer
 	stdio        proc.Stdio
@@ -116,8 +116,6 @@ func (p *Init) Create(ctx context.Context, r *CreateConfig) error {
 		err    error
 		socket *runc.Socket
 	)
-	p.pid.Lock()
-	defer p.pid.Unlock()
 
 	if r.Terminal {
 		if socket, err = runc.NewTempConsoleSocket(); err != nil {
@@ -197,7 +195,7 @@ func (p *Init) Create(ctx context.Context, r *CreateConfig) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to retrieve OCI runtime container pid")
 	}
-	p.pid.pid = pid
+	p.pid = pid
 	return nil
 }
 
@@ -213,7 +211,7 @@ func (p *Init) ID() string {
 
 // Pid of the process
 func (p *Init) Pid() int {
-	return p.pid.get()
+	return p.pid
 }
 
 // ExitStatus of the process
@@ -269,7 +267,6 @@ func (p *Init) setExited(status int) {
 	p.exited = time.Now()
 	p.status = status
 	p.Platform.ShutdownConsole(context.Background(), p.console)
-	p.pid.set(StoppedPID)
 	close(p.waitBlock)
 }
 
