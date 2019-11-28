@@ -19,11 +19,13 @@
 package proc
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
@@ -42,6 +44,26 @@ func (s *safePid) get() int {
 	s.Lock()
 	defer s.Unlock()
 	return s.pid
+}
+
+func (s *safePid) set(pid int) {
+	s.Lock()
+	s.pid = pid
+	s.Unlock()
+}
+
+type atomicBool int32
+
+func (ab *atomicBool) set(b bool) {
+	if b {
+		atomic.StoreInt32((*int32)(ab), 1)
+	} else {
+		atomic.StoreInt32((*int32)(ab), 0)
+	}
+}
+
+func (ab *atomicBool) get() bool {
+	return atomic.LoadInt32((*int32)(ab)) == 1
 }
 
 // TODO(mlaventure): move to runc package?
@@ -116,4 +138,22 @@ func checkKillError(err error) error {
 
 func hasNoIO(r *CreateConfig) bool {
 	return r.Stdin == "" && r.Stdout == "" && r.Stderr == ""
+}
+
+// waitTimeout handles waiting on a waitgroup with a specified timeout.
+// this is commonly used for waiting on IO to finish after a process has exited
+func waitTimeout(ctx context.Context, wg *sync.WaitGroup, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	done := make(chan struct{}, 1)
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

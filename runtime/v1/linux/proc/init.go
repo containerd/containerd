@@ -59,15 +59,17 @@ type Init struct {
 
 	WorkDir string
 
-	id           string
-	Bundle       string
-	console      console.Console
-	Platform     proc.Platform
-	io           runc.IO
-	runtime      *runc.Runc
+	id       string
+	Bundle   string
+	console  console.Console
+	Platform proc.Platform
+	io       runc.IO
+	runtime  *runc.Runc
+	// pausing preserves the pausing state.
+	pausing      *atomicBool
 	status       int
 	exited       time.Time
-	pid          int
+	pid          safePid
 	closers      []io.Closer
 	stdin        io.Closer
 	stdio        proc.Stdio
@@ -99,6 +101,7 @@ func New(id string, runtime *runc.Runc, stdio proc.Stdio) *Init {
 	p := &Init{
 		id:        id,
 		runtime:   runtime,
+		pausing:   new(atomicBool),
 		stdio:     stdio,
 		status:    0,
 		waitBlock: make(chan struct{}),
@@ -113,6 +116,9 @@ func (p *Init) Create(ctx context.Context, r *CreateConfig) error {
 		err    error
 		socket *runc.Socket
 	)
+	p.pid.Lock()
+	defer p.pid.Unlock()
+
 	if r.Terminal {
 		if socket, err = runc.NewTempConsoleSocket(); err != nil {
 			return errors.Wrap(err, "failed to create OCI runtime console socket")
@@ -191,7 +197,7 @@ func (p *Init) Create(ctx context.Context, r *CreateConfig) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to retrieve OCI runtime container pid")
 	}
-	p.pid = pid
+	p.pid.pid = pid
 	return nil
 }
 
@@ -207,7 +213,7 @@ func (p *Init) ID() string {
 
 // Pid of the process
 func (p *Init) Pid() int {
-	return p.pid
+	return p.pid.get()
 }
 
 // ExitStatus of the process
@@ -228,17 +234,14 @@ func (p *Init) ExitedAt() time.Time {
 
 // Status of the process
 func (p *Init) Status(ctx context.Context) (string, error) {
+	if p.pausing.get() {
+		return "pausing", nil
+	}
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	c, err := p.runtime.State(ctx, p.id)
-	if err != nil {
-		if strings.Contains(err.Error(), "does not exist") {
-			return "stopped", nil
-		}
-		return "", p.runtimeError(err, "OCI runtime state failed")
-	}
-	return c.Status, nil
+	return p.initState.Status(ctx)
 }
 
 // Start the init process
@@ -266,6 +269,7 @@ func (p *Init) setExited(status int) {
 	p.exited = time.Now()
 	p.status = status
 	p.Platform.ShutdownConsole(context.Background(), p.console)
+	p.pid.set(StoppedPID)
 	close(p.waitBlock)
 }
 
@@ -278,7 +282,7 @@ func (p *Init) Delete(ctx context.Context) error {
 }
 
 func (p *Init) delete(ctx context.Context) error {
-	p.wg.Wait()
+	waitTimeout(ctx, &p.wg, 2*time.Second)
 	err := p.runtime.Delete(ctx, p.id, nil)
 	// ignore errors if a runtime has already deleted the process
 	// but we still hold metadata and pipes
@@ -408,7 +412,6 @@ func (p *Init) exec(ctx context.Context, path string, r *ExecConfig) (proc.Proce
 			Terminal: r.Terminal,
 		},
 		waitBlock: make(chan struct{}),
-		pid:       &safePid{},
 	}
 	e.execState = &execCreatedState{p: e}
 	return e, nil
