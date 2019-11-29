@@ -51,6 +51,10 @@ var startCommand = cli.Command{
 			Name:  "detach,d",
 			Usage: "detach from the task after it has started execution",
 		},
+		cli.BoolFlag{
+			Name:  "live",
+			Usage: "restore runtime and memory data from a checkpoint in the image",
+		},
 	},
 	Action: func(context *cli.Context) error {
 		var (
@@ -80,6 +84,13 @@ var startCommand = cli.Command{
 			opts   = getNewTaskOpts(context)
 			ioOpts = []cio.Opt{cio.WithFIFODir(context.String("fifo-dir"))}
 		)
+		if context.Bool("live") {
+			img, err := container.Image(ctx)
+			if err != nil {
+				return err
+			}
+			opts = append(opts, containerd.WithTaskCheckpoint(img))
+		}
 		var con console.Console
 		if tty {
 			con = console.Current()

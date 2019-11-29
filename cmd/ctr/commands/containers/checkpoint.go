@@ -60,6 +60,7 @@ var checkpointCommand = cli.Command{
 		defer cancel()
 		opts := []containerd.CheckpointOpts{
 			containerd.WithCheckpointRuntime,
+			containerd.WithCheckpointSpec,
 		}
 
 		if context.Bool("image") {

@@ -95,6 +95,25 @@ func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Conta
 	return nil
 }
 
+// WithCheckpointSpec includes the container spec
+func WithCheckpointSpec(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
+	data, err := c.Spec.Marshal()
+	if err != nil {
+		return err
+	}
+	spec := bytes.NewReader(data)
+	desc, err := writeContent(ctx, client.ContentStore(), images.MediaTypeContainerd1CheckpointSpec, c.ID+"-spec", spec)
+	if err != nil {
+		return err
+	}
+	desc.Platform = &imagespec.Platform{
+		OS:           runtime.GOOS,
+		Architecture: runtime.GOARCH,
+	}
+	index.Manifests = append(index.Manifests, desc)
+	return nil
+}
+
 // WithCheckpointRuntime includes the container runtime info
 func WithCheckpointRuntime(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
 	if c.Runtime.Options != nil {
@@ -152,5 +171,5 @@ func GetIndexByMediaType(index *imagespec.Index, mt string) (*imagespec.Descript
 			return &d, nil
 		}
 	}
-	return nil, ErrMediaTypeNotFound
+	return nil, errors.Wrap(ErrMediaTypeNotFound, mt)
 }

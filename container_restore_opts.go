@@ -87,7 +87,7 @@ func WithRestoreRuntime(ctx context.Context, id string, client *Client, checkpoi
 				return err
 			}
 		}
-		var options *ptypes.Any
+		options := &ptypes.Any{}
 		if m != nil {
 			store := client.ContentStore()
 			data, err := content.ReadBlob(ctx, store, *m)
@@ -110,7 +110,7 @@ func WithRestoreRuntime(ctx context.Context, id string, client *Client, checkpoi
 // WithRestoreSpec restores the spec from the checkpoint for the container
 func WithRestoreSpec(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		m, err := GetIndexByMediaType(index, images.MediaTypeContainerd1CheckpointConfig)
+		m, err := GetIndexByMediaType(index, images.MediaTypeContainerd1CheckpointSpec)
 		if err != nil {
 			return err
 		}

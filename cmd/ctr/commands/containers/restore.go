@@ -18,7 +18,6 @@ package containers
 
 import (
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/pkg/errors"
@@ -33,10 +32,6 @@ var restoreCommand = cli.Command{
 		cli.BoolFlag{
 			Name:  "rw",
 			Usage: "restore the rw layer from the checkpoint",
-		},
-		cli.BoolFlag{
-			Name:  "live",
-			Usage: "restore the runtime and memory data from the checkpoint",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -76,21 +71,10 @@ var restoreCommand = cli.Command{
 			opts = append(opts, containerd.WithRestoreRW)
 		}
 
-		ctr, err := client.Restore(ctx, id, checkpoint, opts...)
-		if err != nil {
+		if _, err := client.Restore(ctx, id, checkpoint, opts...); err != nil {
 			return err
 		}
 
-		topts := []containerd.NewTaskOpts{}
-		if context.Bool("live") {
-			topts = append(topts, containerd.WithTaskCheckpoint(checkpoint))
-		}
-
-		task, err := ctr.NewTask(ctx, cio.NewCreator(cio.WithStdio), topts...)
-		if err != nil {
-			return err
-		}
-
-		return task.Start(ctx)
+		return nil
 	},
 }
