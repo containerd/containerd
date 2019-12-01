@@ -284,7 +284,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 			resp, err := req.doWithRetries(ctx, nil)
 			if err != nil {
 				if errors.Cause(err) == ErrInvalidAuthorization {
-					err = errors.Wrapf(err, "pull access denied, repository does not exist or may require authorization")
+					log.G(ctx).Info("pull access denied, repository does not exist or may require authorization, trying next host")
 				}
 				// Store the error for referencing later
 				if lastErr == nil {
@@ -295,11 +295,10 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 			resp.Body.Close() // don't care about body contents.
 
 			if resp.StatusCode > 299 {
-				if resp.StatusCode == http.StatusNotFound {
-					continue
-				}
-				return "", ocispec.Descriptor{}, errors.Errorf("unexpected status code %v: %v", u, resp.Status)
+				log.G(ctx).Info("trying next host")
+				continue
 			}
+
 			size := resp.ContentLength
 			contentType := getManifestMediaType(resp)
 
@@ -377,7 +376,6 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 	if lastErr == nil {
 		lastErr = errors.Wrap(errdefs.ErrNotFound, ref)
 	}
-
 	return "", ocispec.Descriptor{}, lastErr
 }
 
