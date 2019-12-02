@@ -1675,6 +1675,55 @@ func TestContainerExecLargeOutputWithTTY(t *testing.T) {
 	<-finishedC
 }
 
+func TestShortRunningTaskPid(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("true")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	finishedC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	int32PID := int32(task.Pid())
+	if int32PID <= 0 {
+		t.Errorf("Unexpected task pid %d", int32PID)
+	}
+	<-finishedC
+}
+
 func withProcessTTY() cio.Opt {
 	return func(opt *cio.Streams) {
 		cio.WithTerminal(opt)
