@@ -108,6 +108,13 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 			Type:        "bind",
 			Options:     []string{"rbind", "ro"},
 		},
+		// Add resolv.conf for katacontainers to setup the DNS of pod VM properly.
+		{
+			Source:      c.getResolvPath(id),
+			Destination: resolvConfPath,
+			Type:        "bind",
+			Options:     []string{"rbind", "ro"},
+		},
 	}))
 
 	selinuxOpt := securityContext.GetSelinuxOptions()
