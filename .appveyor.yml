@@ -7,6 +7,7 @@ clone_folder: c:\gopath\src\github.com\containerd\containerd
 branches:
   only:
     - master
+    - /release\/.*/
 
 environment:
   GOPATH: C:\gopath
