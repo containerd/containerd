@@ -174,7 +174,7 @@ We can build an image from this `Dockerfile`:
 FROM golang
 
 RUN apt-get update && \
-    apt-get install -y btrfs-tools libseccomp-dev
+    apt-get install -y libbtrfs-dev libseccomp-dev
 
 ```
 
