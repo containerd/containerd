@@ -36,6 +36,12 @@ func TestContainerState(t *testing.T) {
 		state  runtime.ContainerState
 	}{
 		"unknown state": {
+			status: Status{
+				Unknown: true,
+			},
+			state: runtime.ContainerState_CONTAINER_UNKNOWN,
+		},
+		"unknown state because there is no timestamp set": {
 			status: Status{},
 			state:  runtime.ContainerState_CONTAINER_UNKNOWN,
 		},
@@ -76,6 +82,7 @@ func TestStatusEncodeDecode(t *testing.T) {
 		Message:    "test-message",
 		Removing:   true,
 		Starting:   true,
+		Unknown:    true,
 	}
 	assert := assertlib.New(t)
 	data, err := s.encode()
@@ -84,6 +91,7 @@ func TestStatusEncodeDecode(t *testing.T) {
 	assert.NoError(newS.decode(data))
 	s.Removing = false // Removing should not be encoded.
 	s.Starting = false // Starting should not be encoded.
+	s.Unknown = false  // Unknown should not be encoded.
 	assert.Equal(s, newS)
 
 	unsupported, err := json.Marshal(&versionedStatus{
