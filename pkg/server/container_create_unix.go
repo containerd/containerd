@@ -170,7 +170,7 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 		}
 		specOpts = append(specOpts, oci.WithPrivileged)
 		if !ociRuntime.PrivilegedWithoutHostDevices {
-			specOpts = append(specOpts, customopts.WithPrivilegedDevices)
+			specOpts = append(specOpts, oci.WithHostDevices)
 		}
 	} else { // not privileged
 		specOpts = append(specOpts, customopts.WithDevices(c.os, config), customopts.WithCapabilities(securityContext))
