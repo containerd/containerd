@@ -336,7 +336,14 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 			logrus.WithError(err).Error("add cg to OOM monitor")
 		}
 	case *cgroupsv2.Manager:
-		// TODO: enable controllers for statting
+		allControllers, err := cg.RootControllers()
+		if err != nil {
+			logrus.WithError(err).Error("failed to get root controllers")
+		} else {
+			if err := cg.ToggleControllers(allControllers, cgroupsv2.Enable); err != nil {
+				logrus.WithError(err).Errorf("failed to enable controllers (%v)", allControllers)
+			}
+		}
 
 		// OOM monitor is not implemented yet
 		logrus.WithError(errdefs.ErrNotImplemented).Warn("add cg to OOM monitor")
