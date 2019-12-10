@@ -8,8 +8,9 @@ environment:
   GOPATH: C:\gopath
   PATH: C:\go\bin;C:\tools\mingw64\bin;$(PATH)
   CGO_ENABLED: 1
+  GO111MODULE: off
   matrix:
-    - GO_VERSION: 1.12.9
+    - GO_VERSION: 1.13.4
 
 install:
   # Install Mingw
