@@ -160,7 +160,7 @@ You are now ready to [build](#build-containerd):
 ```
 
 ## Build containerd and runc
-To have complete core container runtime, you will both `containerd` and `runc`. It is possible to build both of these via Docker container.
+To have complete core container runtime, you will need both `containerd` and `runc`. It is possible to build both of these via Docker container.
 
 You can use `go` to checkout `runc` in your `GOPATH`:
 
