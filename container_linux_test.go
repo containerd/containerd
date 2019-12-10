@@ -1362,12 +1362,24 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 
 	opts := []NewContainerOpts{WithNewSpec(oci.WithImageConfig(image),
 		withExitStatus(7),
-		oci.WithUserNamespace(0, 1000, 10000),
+		oci.WithUserNamespace([]specs.LinuxIDMapping{
+			{
+				ContainerID: 0,
+				HostID:      1000,
+				Size:        10000,
+			},
+		}, []specs.LinuxIDMapping{
+			{
+				ContainerID: 0,
+				HostID:      2000,
+				Size:        10000,
+			},
+		}),
 	)}
 	if readonlyRootFS {
-		opts = append([]NewContainerOpts{WithRemappedSnapshotView(id, image, 1000, 1000)}, opts...)
+		opts = append([]NewContainerOpts{WithRemappedSnapshotView(id, image, 1000, 2000)}, opts...)
 	} else {
-		opts = append([]NewContainerOpts{WithRemappedSnapshot(id, image, 1000, 1000)}, opts...)
+		opts = append([]NewContainerOpts{WithRemappedSnapshot(id, image, 1000, 2000)}, opts...)
 	}
 
 	container, err := client.NewContainer(ctx, id, opts...)
@@ -1380,12 +1392,12 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 	if CheckRuntime(client.runtime, "io.containerd.runc") {
 		copts = &options.Options{
 			IoUid: 1000,
-			IoGid: 1000,
+			IoGid: 2000,
 		}
 	} else {
 		copts = &runctypes.CreateOptions{
 			IoUid: 1000,
-			IoGid: 1000,
+			IoGid: 2000,
 		}
 	}
 
