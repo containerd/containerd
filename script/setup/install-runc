@@ -14,16 +14,33 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-
 #
 # Builds and installs runc to /usr/local/go/bin based off
 # the commit defined in vendor.conf
 #
 set -eu -o pipefail
 
-RUNC_COMMIT=$(grep opencontainers/runc "$GOPATH"/src/github.com/containerd/containerd/vendor.conf | awk '{print $2}')
+function install_runc() {
+	RUNC_COMMIT=$(grep opencontainers/runc "$GOPATH"/src/github.com/containerd/containerd/vendor.conf | awk '{print $2}')
 
-go get -d github.com/opencontainers/runc
-cd "$GOPATH"/src/github.com/opencontainers/runc
-git checkout $RUNC_COMMIT
-make BUILDTAGS='apparmor seccomp' runc install
+	go get -d github.com/opencontainers/runc
+	cd "$GOPATH"/src/github.com/opencontainers/runc
+	git checkout $RUNC_COMMIT
+	make BUILDTAGS='apparmor seccomp' runc install
+}
+
+function install_crun() {
+	CRUN_VERSION=0.11
+	curl -o /usr/local/sbin/runc -L https://github.com/containers/crun/releases/download/${CRUN_VERSION}/crun-${CRUN_VERSION}-static-$(uname -m)
+	chmod +x /usr/local/sbin/runc
+}
+
+: ${RUNC_FLAVOR=runc}
+case ${RUNC_FLAVOR} in
+runc) install_runc ;;
+crun) install_crun ;;
+*)
+	echo >&2 "unknown runc flavor: ${RUNC_FLAVOR}"
+	exit 1
+	;;
+esac
