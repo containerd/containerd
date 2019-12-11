@@ -467,21 +467,42 @@ func TestWithTTYSize(t *testing.T) {
 func TestWithUserNamespace(t *testing.T) {
 	t.Parallel()
 	s := Spec{}
+
 	opts := []SpecOpts{
-		WithUserNamespace(1, 2, 20000),
+		WithUserNamespace([]specs.LinuxIDMapping{
+			{
+				ContainerID: 1,
+				HostID:      2,
+				Size:        10000,
+			},
+		}, []specs.LinuxIDMapping{
+			{
+				ContainerID: 2,
+				HostID:      3,
+				Size:        20000,
+			},
+		}),
 	}
+
 	for _, opt := range opts {
 		if err := opt(nil, nil, nil, &s); err != nil {
 			t.Fatal(err)
 		}
 	}
-	testMapping := specs.LinuxIDMapping{
+
+	expectedUIDMapping := specs.LinuxIDMapping{
 		ContainerID: 1,
 		HostID:      2,
+		Size:        10000,
+	}
+	expectedGIDMapping := specs.LinuxIDMapping{
+		ContainerID: 2,
+		HostID:      3,
 		Size:        20000,
 	}
-	if !(len(s.Linux.UIDMappings) == 1 && s.Linux.UIDMappings[0] == testMapping) || !(len(s.Linux.GIDMappings) == 1 && s.Linux.GIDMappings[0] == testMapping) {
-		t.Fatal("WithUserNamespace Cannot set the uid/gid  mappings for the task")
+
+	if !(len(s.Linux.UIDMappings) == 1 && s.Linux.UIDMappings[0] == expectedUIDMapping) || !(len(s.Linux.GIDMappings) == 1 && s.Linux.GIDMappings[0] == expectedGIDMapping) {
+		t.Fatal("WithUserNamespace Cannot set the uid/gid mappings for the task")
 	}
 
 }
