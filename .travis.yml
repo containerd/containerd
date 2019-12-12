@@ -3,7 +3,7 @@ git:
 
 language: go
 go:
-  - 1.12.x
+  - 1.13.4
   - tip
 
 
@@ -12,6 +12,9 @@ matrix:
     - go: tip
 
 sudo: required
+
+env:
+  - GO111MODULE=off
 
 services:
   - docker
