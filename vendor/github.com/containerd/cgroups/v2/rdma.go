@@ -14,16 +14,33 @@
    limitations under the License.
 */
 
-package main
+package v2
 
 import (
-	_ "github.com/containerd/aufs"
-	_ "github.com/containerd/containerd/metrics/cgroups"
-	_ "github.com/containerd/containerd/metrics/cgroups/v2"
-	_ "github.com/containerd/containerd/runtime/v1/linux"
-	_ "github.com/containerd/containerd/runtime/v2"
-	_ "github.com/containerd/containerd/runtime/v2/runc/options"
-	_ "github.com/containerd/containerd/snapshots/native"
-	_ "github.com/containerd/containerd/snapshots/overlay"
-	_ "github.com/containerd/zfs"
+	"fmt"
 )
+
+type RDMA struct {
+	Limit []RDMAEntry
+}
+
+type RDMAEntry struct {
+	Device     string
+	HcaHandles uint32
+	HcaObjects uint32
+}
+
+func (r RDMAEntry) String() string {
+	return fmt.Sprintf("%s hca_handle=%d hca_object=%d", r.Device, r.HcaHandles, r.HcaObjects)
+}
+
+func (r *RDMA) Values() (o []Value) {
+	for _, e := range r.Limit {
+		o = append(o, Value{
+			filename: "rdma.max",
+			value:    e.String(),
+		})
+	}
+
+	return o
+}

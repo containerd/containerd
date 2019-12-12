@@ -14,16 +14,39 @@
    limitations under the License.
 */
 
-package main
+package v2
 
-import (
-	_ "github.com/containerd/aufs"
-	_ "github.com/containerd/containerd/metrics/cgroups"
-	_ "github.com/containerd/containerd/metrics/cgroups/v2"
-	_ "github.com/containerd/containerd/runtime/v1/linux"
-	_ "github.com/containerd/containerd/runtime/v2"
-	_ "github.com/containerd/containerd/runtime/v2/runc/options"
-	_ "github.com/containerd/containerd/snapshots/native"
-	_ "github.com/containerd/containerd/snapshots/overlay"
-	_ "github.com/containerd/zfs"
-)
+type CPU struct {
+	Weight *uint64
+	Max    *uint64
+	Cpus   string
+	Mems   string
+}
+
+func (r *CPU) Values() (o []Value) {
+	if r.Weight != nil {
+		o = append(o, Value{
+			filename: "cpu.weight",
+			value:    *r.Weight,
+		})
+	}
+	if r.Max != nil {
+		o = append(o, Value{
+			filename: "cpu.max",
+			value:    *r.Max,
+		})
+	}
+	if r.Cpus != "" {
+		o = append(o, Value{
+			filename: "cpuset.cpus",
+			value:    r.Cpus,
+		})
+	}
+	if r.Mems != "" {
+		o = append(o, Value{
+			filename: "cpuset.mems",
+			value:    r.Mems,
+		})
+	}
+	return o
+}
