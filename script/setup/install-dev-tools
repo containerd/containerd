@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
 #   Copyright The containerd Authors.
 
@@ -18,14 +18,14 @@
 #
 # Install developer tools to $GOBIN (or $GOPATH/bin if unset)
 #
-set -eu -o pipefail
+set -eu
 
 go get -u github.com/stevvooe/protobuild
 go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
 go get -u github.com/cpuguy83/go-md2man
 
 (
-	cd $GOPATH/src/github.com/golangci/golangci-lint/cmd/golangci-lint
+	cd "$GOPATH"/src/github.com/golangci/golangci-lint/cmd/golangci-lint
 	git checkout v1.18.0
 	go build -v && go install
 )

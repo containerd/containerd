@@ -21,18 +21,18 @@
 #
 set -eu -o pipefail
 
-CNI_COMMIT=$(grep containernetworking/plugins ${GOPATH}/src/github.com/containerd/containerd/vendor.conf | awk '{print $2}')
+CNI_COMMIT=$(grep containernetworking/plugins "$GOPATH"/src/github.com/containerd/containerd/vendor.conf | awk '{print $2}')
 CNI_DIR=/opt/cni
 CNI_CONFIG_DIR=/etc/cni/net.d
 
 go get -d github.com/containernetworking/plugins/...
-cd $GOPATH/src/github.com/containernetworking/plugins
+cd "$GOPATH"/src/github.com/containernetworking/plugins
 git checkout $CNI_COMMIT
 FASTBUILD=true ./build.sh
 mkdir -p $CNI_DIR
 cp -r ./bin $CNI_DIR
 mkdir -p $CNI_CONFIG_DIR
-bash -c 'cat >'$CNI_CONFIG_DIR'/10-containerd-net.conflist <<EOF
+cat > $CNI_CONFIG_DIR/10-containerd-net.conflist <<EOF
 {
   "cniVersion": "0.3.1",
   "name": "containerd-net",
@@ -57,4 +57,4 @@ bash -c 'cat >'$CNI_CONFIG_DIR'/10-containerd-net.conflist <<EOF
     }
   ]
 }
-EOF'
+EOF
