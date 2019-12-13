@@ -16,7 +16,7 @@
    limitations under the License.
 */
 
-package cgroups
+package v1
 
 import (
 	v1 "github.com/containerd/containerd/metrics/types/v1"

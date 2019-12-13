@@ -16,23 +16,33 @@
    limitations under the License.
 */
 
-package v2
+package v1
 
 import (
 	"context"
 
+	"github.com/containerd/cgroups"
+	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/v1/linux"
 	metrics "github.com/docker/go-metrics"
+	"github.com/sirupsen/logrus"
 )
 
 // NewTaskMonitor returns a new cgroups monitor
 func NewTaskMonitor(ctx context.Context, publisher events.Publisher, ns *metrics.Namespace) (runtime.TaskMonitor, error) {
 	collector := newCollector(ns)
+	oom, err := newOOMCollector(ns)
+	if err != nil {
+		return nil, err
+	}
 	return &cgroupsMonitor{
 		collector: collector,
+		oom:       oom,
 		context:   ctx,
 		publisher: publisher,
 	}, nil
@@ -40,6 +50,7 @@ func NewTaskMonitor(ctx context.Context, publisher events.Publisher, ns *metrics
 
 type cgroupsMonitor struct {
 	collector *collector
+	oom       *oomCollector
 	context   context.Context
 	publisher events.Publisher
 }
@@ -59,12 +70,24 @@ func (m *cgroupsMonitor) Monitor(c runtime.Task) error {
 		}
 		return err
 	}
-	// OOM handler is not implemented yet
-	_ = cg
-	return nil
+	err = m.oom.Add(c.ID(), c.Namespace(), cg, m.trigger)
+	if err == cgroups.ErrMemoryNotSupported {
+		logrus.WithError(err).Warn("OOM monitoring failed")
+		return nil
+	}
+	return err
 }
 
 func (m *cgroupsMonitor) Stop(c runtime.Task) error {
 	m.collector.Remove(c)
 	return nil
+}
+
+func (m *cgroupsMonitor) trigger(id, namespace string, cg cgroups.Cgroup) {
+	ctx := namespaces.WithNamespace(m.context, namespace)
+	if err := m.publisher.Publish(ctx, runtime.TaskOOMEventTopic, &eventstypes.TaskOOM{
+		ContainerID: id,
+	}); err != nil {
+		log.G(m.context).WithError(err).Error("post OOM event")
+	}
 }
