@@ -22,9 +22,11 @@ import (
 	"context"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/snapshots/devmapper/dmsetup"
@@ -360,7 +362,30 @@ func (p *PoolDevice) DeactivateDevice(ctx context.Context, deviceName string, de
 	}
 
 	if err := p.transition(ctx, deviceName, Deactivating, Deactivated, func() error {
-		return dmsetup.RemoveDevice(deviceName, opts...)
+		var (
+			maxRetries = 100
+			retryDelay = 100 * time.Millisecond
+			retryErr   error
+		)
+
+		for attempt := 1; attempt <= maxRetries; attempt++ {
+			retryErr = dmsetup.RemoveDevice(deviceName, opts...)
+			if retryErr == nil {
+				return nil
+			} else if retryErr != unix.EBUSY {
+				return retryErr
+			}
+
+			// Don't spam logs
+			if attempt%10 == 0 {
+				log.G(ctx).WithError(retryErr).Warnf("failed to deactivate device, retrying... (%d of %d)", attempt, maxRetries)
+			}
+
+			// Devmapper device is busy, give it a bit of time and retry removal
+			time.Sleep(retryDelay)
+		}
+
+		return retryErr
 	}); err != nil {
 		return errors.Wrapf(err, "failed to deactivate device %q", deviceName)
 	}
