@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 #   Copyright The containerd Authors.
 
@@ -18,7 +18,7 @@
 # Builds and installs critools including critest and crictl
 # to /usr/local/bin.
 #
-set -eu
+set -eu -o pipefail
 
 go get -u github.com/onsi/ginkgo/ginkgo
 CRITEST_COMMIT=v1.16.1
