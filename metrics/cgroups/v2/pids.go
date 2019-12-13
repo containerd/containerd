@@ -26,8 +26,8 @@ import (
 
 var pidMetrics = []*metric{
 	{
-		name: "pids_v2",
-		help: "The limit to the number of pids allowed",
+		name: "pids",
+		help: "The limit to the number of pids allowed (cgroup v2)",
 		unit: metrics.Unit("limit"),
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *v2.Metrics) []value {
@@ -42,8 +42,8 @@ var pidMetrics = []*metric{
 		},
 	},
 	{
-		name: "pids_v2",
-		help: "The current number of pids",
+		name: "pids",
+		help: "The current number of pids (cgroup v2)",
 		unit: metrics.Unit("current"),
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *v2.Metrics) []value {
