@@ -104,8 +104,10 @@ version = 2
     # of runtime configurations, to the matching configurations.
     # In this example, 'runc' is the RuntimeHandler string to match.
     [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
-      # runtime_type is the runtime type to use in containerd e.g. io.containerd.runtime.v1.linux
-      runtime_type = "io.containerd.runc.v1"
+      # runtime_type is the runtime type to use in containerd.
+      # The default value is "io.containerd.runc.v2" since containerd 1.4.
+      # The default value was "io.containerd.runc.v1" in containerd 1.3, "io.containerd.runtime.v1.linux" in prior releases.
+      runtime_type = "io.containerd.runc.v2"
 
       # pod_annotations is a list of pod annotations passed to both pod
       # sandbox as well as container OCI annotations. Pod_annotations also
@@ -129,8 +131,8 @@ version = 2
       privileged_without_host_devices = false
 
       # 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options' is options specific to
-      # "io.containerd.runc.v1". Its corresponding options type is:
-      #   https://github.com/containerd/containerd/blob/v1.2.0-rc.1/runtime/v2/runc/options/oci.pb.go#L39.
+      # "io.containerd.runc.v1" and "io.containerd.runc.v2". Its corresponding options type is:
+      #   https://github.com/containerd/containerd/blob/v1.3.2/runtime/v2/runc/options/oci.pb.go#L26 .
       [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
         # NoPivotRoot disables pivot root when creating a container.
         NoPivotRoot = false
@@ -158,6 +160,12 @@ version = 2
 
         # SystemdCgroup enables systemd cgroups.
         SystemdCgroup = false
+
+        # CriuImagePath is the criu image path
+        CriuImagePath = ""
+
+        # CriuWorkPath is the criu work path.
+        CriuWorkPath = ""
 
   # 'plugins."io.containerd.grpc.v1.cri".cni' contains config related to cni
   [plugins."io.containerd.grpc.v1.cri".cni]

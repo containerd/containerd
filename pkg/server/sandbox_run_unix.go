@@ -298,7 +298,7 @@ func (c *criService) cleanupSandboxFiles(id string, config *runtime.PodSandboxCo
 func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {
 	// TODO(random-liu): Remove this after shim v1 is deprecated.
 	var taskOpts []containerd.NewTaskOpts
-	if c.config.NoPivot && runtimeType == plugin.RuntimeRuncV1 {
+	if c.config.NoPivot && (runtimeType == plugin.RuntimeRuncV1 || runtimeType == plugin.RuntimeRuncV2) {
 		taskOpts = append(taskOpts, containerd.WithNoPivotRoot)
 	}
 	return taskOpts
