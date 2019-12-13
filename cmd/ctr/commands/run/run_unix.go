@@ -20,7 +20,6 @@ package run
 
 import (
 	gocontext "context"
-	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -34,6 +33,7 @@ import (
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -247,14 +247,14 @@ func getNewTaskOpts(context *cli.Context) []containerd.NewTaskOpts {
 	if uidmap := context.String("uidmap"); uidmap != "" {
 		uidMap, err := parseIDMapping(uidmap)
 		if err != nil {
-			fmt.Printf("warning: expected to parse uidmap: %s\n", err.Error())
+			logrus.WithError(err).Warn("unable to parse uidmap; defaulting to uid 0 IO ownership")
 		}
 		tOpts = append(tOpts, containerd.WithUIDOwner(uidMap.HostID))
 	}
 	if gidmap := context.String("gidmap"); gidmap != "" {
 		gidMap, err := parseIDMapping(gidmap)
 		if err != nil {
-			fmt.Printf("warning: expected to parse uidmap: %s\n", err.Error())
+			logrus.WithError(err).Warn("unable to parse gidmap; defaulting to gid 0 IO ownership")
 		}
 		tOpts = append(tOpts, containerd.WithGIDOwner(gidMap.HostID))
 	}
