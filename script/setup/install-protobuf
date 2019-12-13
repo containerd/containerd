@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 #   Copyright The containerd Authors.
 
@@ -18,7 +18,7 @@
 #
 # Downloads and installs protobuf
 #
-set -eu
+set -eu -o pipefail
 
 PROTOBUF_VERSION=3.7.0
 GOARCH=$(go env GOARCH)
