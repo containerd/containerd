@@ -28,7 +28,7 @@ var cpuMetrics = []*metric{
 	{
 		name: "cpu_usage",
 		help: "Total cpu usage (cgroup v2)",
-		unit: metrics.Nanoseconds,
+		unit: metrics.Unit("microseconds"),
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *v2.Metrics) []value {
 			if stats.CPU == nil {
@@ -44,7 +44,7 @@ var cpuMetrics = []*metric{
 	{
 		name: "cpu_user_usage",
 		help: "Current cpu usage in user space (cgroup v2)",
-		unit: metrics.Nanoseconds,
+		unit: metrics.Unit("microseconds"),
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *v2.Metrics) []value {
 			if stats.CPU == nil {
@@ -60,7 +60,7 @@ var cpuMetrics = []*metric{
 	{
 		name: "cpu_kernel_usage",
 		help: "Current cpu usage in kernel space (cgroup v2)",
-		unit: metrics.Nanoseconds,
+		unit: metrics.Unit("microseconds"),
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *v2.Metrics) []value {
 			if stats.CPU == nil {
@@ -108,7 +108,7 @@ var cpuMetrics = []*metric{
 	{
 		name: "cpu_throttled_usec",
 		help: "Total time duration for which tasks have been throttled. (only if controller is enabled)",
-		unit: metrics.Nanoseconds,
+		unit: metrics.Unit("microseconds"),
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *v2.Metrics) []value {
 			if stats.CPU == nil {
