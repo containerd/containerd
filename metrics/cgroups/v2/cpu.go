@@ -26,9 +26,9 @@ import (
 
 var cpuMetrics = []*metric{
 	{
-		name: "cpu",
-		help: "Current cpu usage_usec (cgroup v2)",
-		unit: metrics.Unit("usage_usec"),
+		name: "cpu_usage",
+		help: "Total cpu usage (cgroup v2)",
+		unit: metrics.Nanoseconds,
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *v2.Metrics) []value {
 			if stats.CPU == nil {
@@ -42,9 +42,9 @@ var cpuMetrics = []*metric{
 		},
 	},
 	{
-		name: "cpu",
-		help: "Current cpu user_usec (cgroup v2)",
-		unit: metrics.Unit("user_usec"),
+		name: "cpu_user_usage",
+		help: "Current cpu usage in user space (cgroup v2)",
+		unit: metrics.Nanoseconds,
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *v2.Metrics) []value {
 			if stats.CPU == nil {
@@ -58,9 +58,9 @@ var cpuMetrics = []*metric{
 		},
 	},
 	{
-		name: "cpu",
-		help: "Current cpu system_usec (cgroup v2)",
-		unit: metrics.Unit("system_usec"),
+		name: "cpu_kernel_usage",
+		help: "Current cpu usage in kernel space (cgroup v2)",
+		unit: metrics.Nanoseconds,
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *v2.Metrics) []value {
 			if stats.CPU == nil {
@@ -74,9 +74,9 @@ var cpuMetrics = []*metric{
 		},
 	},
 	{
-		name: "cpu",
-		help: "Current cpu nr_periods (only if controller is enabled)",
-		unit: metrics.Unit("nr_periods"),
+		name: "cpu_nr_periods",
+		help: "Current cpu number of periods (only if controller is enabled)",
+		unit: metrics.Total,
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *v2.Metrics) []value {
 			if stats.CPU == nil {
@@ -90,9 +90,9 @@ var cpuMetrics = []*metric{
 		},
 	},
 	{
-		name: "cpu",
-		help: "Current cpu nr_throttled (only if controller is enabled)",
-		unit: metrics.Unit("nr_throttled"),
+		name: "cpu_nr_throttled",
+		help: "Total number of times tasks have been throttled (only if controller is enabled)",
+		unit: metrics.Total,
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *v2.Metrics) []value {
 			if stats.CPU == nil {
@@ -106,9 +106,9 @@ var cpuMetrics = []*metric{
 		},
 	},
 	{
-		name: "cpu",
-		help: "Current cpu throttled_usec (only if controller is enabled)",
-		unit: metrics.Unit("throttled_usec"),
+		name: "cpu_throttled_usec",
+		help: "Total time duration for which tasks have been throttled. (only if controller is enabled)",
+		unit: metrics.Nanoseconds,
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *v2.Metrics) []value {
 			if stats.CPU == nil {
