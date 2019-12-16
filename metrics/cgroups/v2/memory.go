@@ -91,8 +91,8 @@ var memoryMetrics = []*metric{
 	},
 
 	{
-		name: "memory_mapped_file",
-		help: "The mapped_file amount used",
+		name: "memory_file_mapped",
+		help: "The file_mapped amount",
 		unit: metrics.Bytes,
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *v2.Metrics) []value {
@@ -107,8 +107,8 @@ var memoryMetrics = []*metric{
 		},
 	},
 	{
-		name: "memory_dirty_file",
-		help: "The dirty file amount",
+		name: "memory_file_dirty",
+		help: "The file_dirty amount",
 		unit: metrics.Bytes,
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *v2.Metrics) []value {
