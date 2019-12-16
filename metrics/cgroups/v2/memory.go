@@ -26,9 +26,9 @@ import (
 
 var memoryMetrics = []*metric{
 	{
-		name: "memory",
+		name: "memory_usage",
 		help: "Current memory usage (cgroup v2)",
-		unit: metrics.Unit("usage"),
+		unit: metrics.Bytes,
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *v2.Metrics) []value {
 			if stats.Memory == nil {
@@ -42,9 +42,9 @@ var memoryMetrics = []*metric{
 		},
 	},
 	{
-		name: "memory",
+		name: "memory_limit",
 		help: "Current memory usage limit (cgroup v2)",
-		unit: metrics.Unit("limit"),
+		unit: metrics.Bytes,
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *v2.Metrics) []value {
 			if stats.Memory == nil {
@@ -58,9 +58,9 @@ var memoryMetrics = []*metric{
 		},
 	},
 	{
-		name: "memory",
+		name: "memory_swap_usage",
 		help: "Current swap usage (cgroup v2)",
-		unit: metrics.Unit("swap"),
+		unit: metrics.Bytes,
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *v2.Metrics) []value {
 			if stats.Memory == nil {
@@ -74,9 +74,9 @@ var memoryMetrics = []*metric{
 		},
 	},
 	{
-		name: "memory",
+		name: "memory_swap_Limit",
 		help: "Current swap usage limit (cgroup v2)",
-		unit: metrics.Unit("swap_limit"),
+		unit: metrics.Bytes,
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *v2.Metrics) []value {
 			if stats.Memory == nil {
@@ -85,6 +85,503 @@ var memoryMetrics = []*metric{
 			return []value{
 				{
 					v: float64(stats.Memory.SwapLimit),
+				},
+			}
+		},
+	},
+
+	{
+		name: "memory_mapped_file",
+		help: "The mapped_file amount used",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.FileMapped),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_dirty_file",
+		help: "The dirty file amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.FileDirty),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_file_writeback",
+		help: "The file_writeback amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.FileWriteback),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_pgactive",
+		help: "The pgactive amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.Pgactivate),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_pgdeactivate",
+		help: "The pgdeactivate amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.Pgdeactivate),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_pgfault",
+		help: "The pgfault amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.Pgfault),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_pgmajfault",
+		help: "The pgmajfault amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.Pgmajfault),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_pglazyfree",
+		help: "The pglazyfree amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.Pglazyfree),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_pgrefill",
+		help: "The pgrefill amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.Pgrefill),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_pglazyfreed",
+		help: "The pglazyfreed amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.Pglazyfreed),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_pgscan",
+		help: "The pgscan amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.Pgscan),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_pgsteal",
+		help: "The pgsteal amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.Pgsteal),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_inactive_anon",
+		help: "The inactive_anon amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.InactiveAnon),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_active_anon",
+		help: "The active_anon amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.ActiveAnon),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_inactive_file",
+		help: "The inactive_file amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.InactiveFile),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_active_file",
+		help: "The active_file amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.ActiveFile),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_unevictable",
+		help: "The unevictable amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.Unevictable),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_anon",
+		help: "The anon amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.Anon),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_file",
+		help: "The file amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.File),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_kernel_stack",
+		help: "The kernel_stack amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.KernelStack),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_slab",
+		help: "The slab amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.Slab),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_sock",
+		help: "The sock amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.Sock),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_shmem",
+		help: "The shmem amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.Shmem),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_anon_thp",
+		help: "The anon_thp amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.AnonThp),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_slab_reclaimable",
+		help: "The slab_reclaimable amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.SlabReclaimable),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_slab_unreclaimable",
+		help: "The slab_unreclaimable amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.SlabUnreclaimable),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_workingset_refault",
+		help: "The workingset_refault amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.WorkingsetRefault),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_workingset_activate",
+		help: "The workingset_activate amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.WorkingsetActivate),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_workingset_nodereclaim",
+		help: "The workingset_nodereclaim amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.WorkingsetNodereclaim),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_thp_fault_alloc",
+		help: "The thp_fault_alloc amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.ThpFaultAlloc),
+				},
+			}
+		},
+	},
+	{
+		name: "memory_thp_collapse_alloc",
+		help: "The thp_collapse_alloc amount",
+		unit: metrics.Bytes,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.Memory == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.Memory.ThpCollapseAlloc),
 				},
 			}
 		},
