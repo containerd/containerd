@@ -139,8 +139,8 @@ var memoryMetrics = []*metric{
 		},
 	},
 	{
-		name: "memory_pgactive",
-		help: "The pgactive amount",
+		name: "memory_pgactivate",
+		help: "The pgactivate amount",
 		unit: metrics.Bytes,
 		vt:   prometheus.GaugeValue,
 		getValues: func(stats *v2.Metrics) []value {
