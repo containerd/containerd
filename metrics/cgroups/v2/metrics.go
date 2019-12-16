@@ -43,6 +43,8 @@ func newCollector(ns *metrics.Namespace) *collector {
 		tasks: make(map[string]runtime.Task),
 	}
 	c.metrics = append(c.metrics, pidMetrics...)
+	c.metrics = append(c.metrics, cpuMetrics...)
+	c.metrics = append(c.metrics, memoryMetrics...)
 	c.storedMetrics = make(chan prometheus.Metric, 100*len(c.metrics))
 	ns.Add(c)
 	return c
