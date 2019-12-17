@@ -58,7 +58,7 @@ var cpuMetrics = []*metric{
 		},
 	},
 	{
-		name: "cpu_kernel_usage",
+		name: "cpu_system_usage",
 		help: "Current cpu usage in kernel space (cgroup v2)",
 		unit: metrics.Unit("microseconds"),
 		vt:   prometheus.GaugeValue,
