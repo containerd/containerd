@@ -42,7 +42,7 @@ var memoryMetrics = []*metric{
 		},
 	},
 	{
-		name: "memory_limit",
+		name: "memory_usage_limit",
 		help: "Current memory usage limit (cgroup v2)",
 		unit: metrics.Bytes,
 		vt:   prometheus.GaugeValue,
