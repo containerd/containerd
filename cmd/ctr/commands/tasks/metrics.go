@@ -163,7 +163,7 @@ func printCgroup2MetricsTable(w *tabwriter.Writer, data *v2.Metrics) {
 	if data.Memory != nil {
 		fmt.Fprintf(w, "memory.usage\t%v\t\n", data.Memory.Usage)
 		fmt.Fprintf(w, "memory.usage_limit\t%v\t\n", data.Memory.UsageLimit)
-		fmt.Fprintf(w, "memory.swap\t%v\t\n", data.Memory.SwapUsage)
+		fmt.Fprintf(w, "memory.swap_usage\t%v\t\n", data.Memory.SwapUsage)
 		fmt.Fprintf(w, "memory.swap_limit\t%v\t\n", data.Memory.SwapLimit)
 	}
 }
