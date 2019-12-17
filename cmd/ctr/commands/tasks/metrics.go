@@ -155,9 +155,9 @@ func printCgroup2MetricsTable(w *tabwriter.Writer, data *v2.Metrics) {
 	if data.CPU != nil {
 		fmt.Fprintf(w, "cpu.usage_usec\t%v\t\n", data.CPU.UsageUsec)
 		fmt.Fprintf(w, "cpu.user_usec\t%v\t\n", data.CPU.UserUsec)
-		fmt.Fprintf(w, "cpu.sys_usec\t%v\t\n", data.CPU.SystemUsec)
-		fmt.Fprintf(w, "cpu.number_of_periods\t%v\t\n", data.CPU.NrPeriods)
-		fmt.Fprintf(w, "cpu.number_of_throttled\t%v\t\n", data.CPU.NrThrottled)
+		fmt.Fprintf(w, "cpu.system_usec\t%v\t\n", data.CPU.SystemUsec)
+		fmt.Fprintf(w, "cpu.nr_periods\t%v\t\n", data.CPU.NrPeriods)
+		fmt.Fprintf(w, "cpu.nr_throttled\t%v\t\n", data.CPU.NrThrottled)
 		fmt.Fprintf(w, "cpu.throttled_usec\t%v\t\n", data.CPU.ThrottledUsec)
 	}
 	if data.Memory != nil {
