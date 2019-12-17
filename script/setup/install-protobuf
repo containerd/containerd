@@ -33,9 +33,9 @@ arm64)
 	;;
 
 amd64|386)
-	if [ $GOOS == "windows" ]; then
+	if [ "$GOOS" = windows ]; then
 		wget -O $PROTOBUF_DIR/protobuf "https://github.com/google/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-win32.zip"
-	elif [ $GOOS == "linux" ]; then
+	elif [ "$GOOS" = linux ]; then
 		wget -O $PROTOBUF_DIR/protobuf "https://github.com/google/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-linux-x86_64.zip"
 	fi
 	unzip $PROTOBUF_DIR/protobuf -d /usr/local
