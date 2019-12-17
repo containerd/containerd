@@ -26,7 +26,7 @@ import (
 
 var cpuMetrics = []*metric{
 	{
-		name: "cpu_usage",
+		name: "cpu_usage_usec",
 		help: "Total cpu usage (cgroup v2)",
 		unit: metrics.Unit("microseconds"),
 		vt:   prometheus.GaugeValue,
@@ -42,7 +42,7 @@ var cpuMetrics = []*metric{
 		},
 	},
 	{
-		name: "cpu_user_usage",
+		name: "cpu_user_usec",
 		help: "Current cpu usage in user space (cgroup v2)",
 		unit: metrics.Unit("microseconds"),
 		vt:   prometheus.GaugeValue,
@@ -58,7 +58,7 @@ var cpuMetrics = []*metric{
 		},
 	},
 	{
-		name: "cpu_system_usage",
+		name: "cpu_system_usec",
 		help: "Current cpu usage in kernel space (cgroup v2)",
 		unit: metrics.Unit("microseconds"),
 		vt:   prometheus.GaugeValue,
