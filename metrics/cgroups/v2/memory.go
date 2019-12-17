@@ -74,7 +74,7 @@ var memoryMetrics = []*metric{
 		},
 	},
 	{
-		name: "memory_swap_Limit",
+		name: "memory_swap_limit",
 		help: "Current swap usage limit (cgroup v2)",
 		unit: metrics.Bytes,
 		vt:   prometheus.GaugeValue,
