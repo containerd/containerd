@@ -2,7 +2,7 @@
 
 module k8s.io/apiserver
 
-go 1.12
+go 1.13
 
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
@@ -38,16 +38,17 @@ require (
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
 	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
+	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	google.golang.org/genproto v0.0.0-20190502173448-54afdca5d873 // indirect
 	google.golang.org/grpc v1.23.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 v2.2.2
 	gopkg.in/yaml.v2 v2.2.4
 	gotest.tools v2.2.0+incompatible // indirect
-	k8s.io/api v0.17.1
-	k8s.io/apimachinery v0.17.1
-	k8s.io/client-go v0.17.1
-	k8s.io/component-base v0.17.1
+	k8s.io/api v0.18.0-alpha.1
+	k8s.io/apimachinery v0.18.0-alpha.1
+	k8s.io/client-go v0.18.0-alpha.1
+	k8s.io/component-base v0.18.0-alpha.1
 	k8s.io/klog v1.0.0
 	k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a
 	k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
@@ -58,8 +59,8 @@ require (
 replace (
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // pinned to release-branch.go1.13
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7 // pinned to release-branch.go1.13
-	k8s.io/api => k8s.io/api v0.17.1
-	k8s.io/apimachinery => k8s.io/apimachinery v0.17.1
-	k8s.io/client-go => k8s.io/client-go v0.17.1
-	k8s.io/component-base => k8s.io/component-base v0.17.1
+	k8s.io/api => k8s.io/api v0.18.0-alpha.1
+	k8s.io/apimachinery => k8s.io/apimachinery v0.18.0-alpha.1
+	k8s.io/client-go => k8s.io/client-go v0.18.0-alpha.1
+	k8s.io/component-base => k8s.io/component-base v0.18.0-alpha.1
 )
