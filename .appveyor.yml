@@ -16,6 +16,7 @@ environment:
 
 before_build:
   - choco install -y mingw --version 5.3.0
+
   # Install Go
   - rd C:\Go /s /q
   - appveyor DownloadFile https://storage.googleapis.com/golang/go%GO_VERSION%.windows-amd64.zip
