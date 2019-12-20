@@ -54,6 +54,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
+	"github.com/containerd/containerd/services/introspection"
 	"github.com/containerd/containerd/snapshots"
 	snproxy "github.com/containerd/containerd/snapshots/proxy"
 	"github.com/containerd/typeurl"
@@ -621,10 +622,13 @@ func (c *Client) DiffService() DiffService {
 }
 
 // IntrospectionService returns the underlying Introspection Client
-func (c *Client) IntrospectionService() introspectionapi.IntrospectionClient {
+func (c *Client) IntrospectionService() introspection.Service {
+	if c.introspectionService != nil {
+		return c.introspectionService
+	}
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
-	return introspectionapi.NewIntrospectionClient(c.conn)
+	return introspection.NewIntrospectionServiceFromClient(introspectionapi.NewIntrospectionClient(c.conn))
 }
 
 // LeasesService returns the underlying Leases Client

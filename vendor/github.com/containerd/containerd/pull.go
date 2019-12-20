@@ -70,11 +70,6 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		}
 		unpackWrapper, eg := u.handlerWrapper(ctx, &unpacks)
 		defer func() {
-			if retErr != nil {
-				// Forcibly stop the unpacker if there is
-				// an error.
-				eg.Cancel()
-			}
 			if err := eg.Wait(); err != nil {
 				if retErr == nil {
 					retErr = errors.Wrap(err, "unpack")
@@ -86,7 +81,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 			if wrapper == nil {
 				return unpackWrapper(h)
 			}
-			return wrapper(unpackWrapper(h))
+			return unpackWrapper(wrapper(h))
 		}
 	}
 
