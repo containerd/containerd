@@ -283,7 +283,6 @@ func checkImages(t *testing.T, target digest.Digest, actual []images.Image, name
 			t.Fatalf("image(%d) unexpected media type: %s", i, actual[i].Target.MediaType)
 		}
 	}
-
 }
 
 func createContent(size int64, seed int64) ([]byte, digest.Digest) {
