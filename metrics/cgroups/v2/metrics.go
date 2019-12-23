@@ -45,6 +45,7 @@ func newCollector(ns *metrics.Namespace) *collector {
 	c.metrics = append(c.metrics, pidMetrics...)
 	c.metrics = append(c.metrics, cpuMetrics...)
 	c.metrics = append(c.metrics, memoryMetrics...)
+	c.metrics = append(c.metrics, ioMetrics...)
 	c.storedMetrics = make(chan prometheus.Metric, 100*len(c.metrics))
 	ns.Add(c)
 	return c
