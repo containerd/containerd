@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -39,6 +40,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
+)
+
+const (
+	inheritedLabelsPrefix = "containerd.io/snapshot/"
+	labelSnapshotRef      = "containerd.io/snapshot.ref"
 )
 
 type unpacker struct {
@@ -113,9 +119,16 @@ EachLayer:
 			return errors.Wrapf(err, "failed to stat snapshot %s", chainID)
 		}
 
-		labelOpt := snapshots.WithLabels(map[string]string{
-			"containerd.io/snapshot.ref": chainID,
-		})
+		// filters the provided annotations by removing any key which isn't a snapshot
+		// label. Snapshot labels have a prefix of "containerd.io/snapshot/".
+		labels := make(map[string]string)
+		for k, v := range desc.Annotations {
+			if strings.HasPrefix(k, inheritedLabelsPrefix) {
+				labels[k] = v
+			}
+		}
+		labels[labelSnapshotRef] = chainID
+		labelOpt := snapshots.WithLabels(labels)
 
 		var (
 			key    string
