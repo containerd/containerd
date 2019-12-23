@@ -104,9 +104,8 @@ var pushCommand = cli.Command{
 				}
 
 				cs := client.ContentStore()
-				manifests, err := images.Children(ctx, cs, desc)
 				matcher := platforms.NewMatcher(p)
-				if len(manifests) > 0 {
+				if manifests, err := images.Children(ctx, cs, desc); err == nil && len(manifests) > 0 {
 					for _, manifest := range manifests {
 						if manifest.Platform != nil && matcher.Match(*manifest.Platform) {
 							if _, err := images.Children(ctx, cs, manifest); err != nil {
