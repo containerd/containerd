@@ -81,7 +81,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 			if wrapper == nil {
 				return unpackWrapper(h)
 			}
-			return wrapper(unpackWrapper(h))
+			return unpackWrapper(wrapper(h))
 		}
 	}
 
