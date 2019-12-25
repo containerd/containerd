@@ -219,7 +219,7 @@ func (s *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 
 		inner := snapshots.Info{
 			Name:   bkey,
-			Labels: filterInheritedLabels(local.Labels),
+			Labels: snapshots.FilterInheritedLabels(local.Labels),
 		}
 
 		// NOTE: Perform this inside the transaction to reduce the
@@ -306,7 +306,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 		bparent string
 		bkey    string
 		bopts   = []snapshots.Opt{
-			snapshots.WithLabels(filterInheritedLabels(base.Labels)),
+			snapshots.WithLabels(snapshots.FilterInheritedLabels(base.Labels)),
 		}
 	)
 
@@ -586,7 +586,7 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 			return err
 		}
 
-		inheritedOpt := snapshots.WithLabels(filterInheritedLabels(base.Labels))
+		inheritedOpt := snapshots.WithLabels(snapshots.FilterInheritedLabels(base.Labels))
 
 		// NOTE: Backend snapshotters should commit fast and reliably to
 		// prevent metadata store locking and minimizing rollbacks.
@@ -938,21 +938,4 @@ func (s *snapshotter) pruneBranch(ctx context.Context, node *treeNode) error {
 // Close closes s.Snapshotter but not db
 func (s *snapshotter) Close() error {
 	return s.Snapshotter.Close()
-}
-
-// filterInheritedLabels filters the provided labels by removing any key which
-// isn't a snapshot label. Snapshot labels have a prefix of "containerd.io/snapshot/"
-// or are the "containerd.io/snapshot.ref" label.
-func filterInheritedLabels(labels map[string]string) map[string]string {
-	if labels == nil {
-		return nil
-	}
-
-	filtered := make(map[string]string)
-	for k, v := range labels {
-		if k == labelSnapshotRef || strings.HasPrefix(k, inheritedLabelsPrefix) {
-			filtered[k] = v
-		}
-	}
-	return filtered
 }

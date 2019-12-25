@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -43,8 +42,7 @@ import (
 )
 
 const (
-	inheritedLabelsPrefix = "containerd.io/snapshot/"
-	labelSnapshotRef      = "containerd.io/snapshot.ref"
+	labelSnapshotRef = "containerd.io/snapshot.ref"
 )
 
 type unpacker struct {
@@ -119,13 +117,10 @@ EachLayer:
 			return errors.Wrapf(err, "failed to stat snapshot %s", chainID)
 		}
 
-		// filters the provided annotations by removing any key which isn't a snapshot
-		// label. Snapshot labels have a prefix of "containerd.io/snapshot/".
-		labels := make(map[string]string)
-		for k, v := range desc.Annotations {
-			if strings.HasPrefix(k, inheritedLabelsPrefix) {
-				labels[k] = v
-			}
+		// inherits annotations which are provided as snapshot labels.
+		labels := snapshots.FilterInheritedLabels(desc.Annotations)
+		if labels == nil {
+			labels = make(map[string]string)
 		}
 		labels[labelSnapshotRef] = chainID
 		labelOpt := snapshots.WithLabels(labels)
