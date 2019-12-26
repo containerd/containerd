@@ -41,6 +41,10 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
+const (
+	labelSnapshotRef = "containerd.io/snapshot.ref"
+)
+
 type unpacker struct {
 	updateCh    chan ocispec.Descriptor
 	snapshotter string
@@ -113,9 +117,13 @@ EachLayer:
 			return errors.Wrapf(err, "failed to stat snapshot %s", chainID)
 		}
 
-		labelOpt := snapshots.WithLabels(map[string]string{
-			"containerd.io/snapshot.ref": chainID,
-		})
+		// inherits annotations which are provided as snapshot labels.
+		labels := snapshots.FilterInheritedLabels(desc.Annotations)
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+		labels[labelSnapshotRef] = chainID
+		labelOpt := snapshots.WithLabels(labels)
 
 		var (
 			key    string

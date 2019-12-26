@@ -25,6 +25,11 @@ import (
 	"github.com/containerd/containerd/mount"
 )
 
+const (
+	inheritedLabelsPrefix = "containerd.io/snapshot/"
+	labelSnapshotRef      = "containerd.io/snapshot.ref"
+)
+
 // Kind identifies the kind of snapshot.
 type Kind uint8
 
@@ -345,4 +350,21 @@ func WithLabels(labels map[string]string) Opt {
 		info.Labels = labels
 		return nil
 	}
+}
+
+// FilterInheritedLabels filters the provided labels by removing any key which
+// isn't a snapshot label. Snapshot labels have a prefix of "containerd.io/snapshot/"
+// or are the "containerd.io/snapshot.ref" label.
+func FilterInheritedLabels(labels map[string]string) map[string]string {
+	if labels == nil {
+		return nil
+	}
+
+	filtered := make(map[string]string)
+	for k, v := range labels {
+		if k == labelSnapshotRef || strings.HasPrefix(k, inheritedLabelsPrefix) {
+			filtered[k] = v
+		}
+	}
+	return filtered
 }

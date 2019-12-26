@@ -227,7 +227,7 @@ func TestFilterInheritedLabels(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		if actual := filterInheritedLabels(test.labels); !reflect.DeepEqual(actual, test.expected) {
+		if actual := snapshots.FilterInheritedLabels(test.labels); !reflect.DeepEqual(actual, test.expected) {
 			t.Fatalf("expected %v but got %v", test.expected, actual)
 		}
 	}
