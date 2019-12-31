@@ -12,7 +12,7 @@ var _ = (trace.Exporter)(&LogrusExporter{})
 type LogrusExporter struct {
 }
 
-// ExportSpan exports `s` based on the the following rules:
+// ExportSpan exports `s` based on the following rules:
 //
 // 1. All output will contain `s.Attributes`, `s.TraceID`, `s.SpanID`,
 // `s.ParentSpanID` for correlation
