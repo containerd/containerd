@@ -21,6 +21,7 @@ service Snapshots {
 	rpc Update(UpdateSnapshotRequest) returns (UpdateSnapshotResponse);
 	rpc List(ListSnapshotsRequest) returns (stream ListSnapshotsResponse);
 	rpc Usage(UsageRequest) returns (UsageResponse);
+	rpc Cleanup(CleanupRequest) returns (google.protobuf.Empty);
 }
 
 message PrepareSnapshotRequest {
@@ -159,4 +160,8 @@ message UsageRequest {
 message UsageResponse {
 	int64 size = 1;
 	int64 inodes = 2;
+}
+
+message CleanupRequest {
+	string snapshotter = 1;
 }
