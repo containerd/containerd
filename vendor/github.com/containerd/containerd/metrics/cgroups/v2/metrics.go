@@ -16,16 +16,15 @@
    limitations under the License.
 */
 
-package cgroups
+package v2
 
 import (
 	"context"
 	"fmt"
 	"sync"
 
-	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd/log"
-	v1 "github.com/containerd/containerd/metrics/types/v1"
+	v2 "github.com/containerd/containerd/metrics/types/v2"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/typeurl"
@@ -33,17 +32,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// Trigger will be called when an event happens and provides the cgroup
-// where the event originated from
-type Trigger func(string, string, cgroups.Cgroup)
-
 // newCollector registers the collector with the provided namespace and returns it so
 // that cgroups can be added for collection
 func newCollector(ns *metrics.Namespace) *collector {
 	if ns == nil {
 		return &collector{}
 	}
-	// add machine cpus and memory info
 	c := &collector{
 		ns:    ns,
 		tasks: make(map[string]runtime.Task),
@@ -51,8 +45,6 @@ func newCollector(ns *metrics.Namespace) *collector {
 	c.metrics = append(c.metrics, pidMetrics...)
 	c.metrics = append(c.metrics, cpuMetrics...)
 	c.metrics = append(c.metrics, memoryMetrics...)
-	c.metrics = append(c.metrics, hugetlbMetrics...)
-	c.metrics = append(c.metrics, blkioMetrics...)
 	c.storedMetrics = make(chan prometheus.Metric, 100*len(c.metrics))
 	ns.Add(c)
 	return c
@@ -115,7 +107,7 @@ func (c *collector) collect(t runtime.Task, ch chan<- prometheus.Metric, block b
 		log.L.WithError(err).Errorf("unmarshal stats for %s", t.ID())
 		return
 	}
-	s, ok := data.(*v1.Metrics)
+	s, ok := data.(*v2.Metrics)
 	if !ok {
 		log.L.WithError(err).Errorf("invalid metric type for %s", t.ID())
 		return
