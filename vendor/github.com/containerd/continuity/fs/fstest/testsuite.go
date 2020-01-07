@@ -90,7 +90,7 @@ var (
 		Symlink("libnothing.so", "/usr/local/lib/libnothing.so.2"),
 		CreateDir("/home", 0755),
 		CreateDir("/home/derek", 0700),
-		CreateDir("/var/run/socket", 0700),
+		// TODO: CreateSocket: how should Sockets be handled in continuity?
 	)
 
 	// basicTest covers basic operations
