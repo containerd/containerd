@@ -78,9 +78,10 @@ containerd CLI
 			Usage: "enable debug output in logs",
 		},
 		cli.StringFlag{
-			Name:  "address, a",
-			Usage: "address for containerd's GRPC server",
-			Value: defaults.DefaultAddress,
+			Name:   "address, a",
+			Usage:  "address for containerd's GRPC server",
+			Value:  defaults.DefaultAddress,
+			EnvVar: "CONTAINERD_ADDRESS",
 		},
 		cli.DurationFlag{
 			Name:  "timeout",

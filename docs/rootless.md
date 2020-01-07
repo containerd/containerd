@@ -33,9 +33,10 @@ state = "/run/user/1001/containerd"
 A client program such as `ctr` also needs to be executed inside the daemon namespaces.
 ```console
 $ nsenter -U --preserve-credentials -m -n -t $(cat /run/user/1001/rootlesskit-containerd/child_pid)
+$ export CONTAINERD_ADDRESS=/run/user/1001/containerd/containerd.sock
 $ export CONTAINERD_SNAPSHOTTER=native
-$ ctr -a /run/user/1001/containerd/containerd.sock pull docker.io/library/ubuntu:latest
-$ ctr -a /run/user/1001/containerd/containerd.sock run -t --rm --fifo-dir /tmp/foo-fifo --cgroup "" docker.io/library/ubuntu:latest foo
+$ ctr images pull docker.io/library/ubuntu:latest
+$ ctr run -t --rm --fifo-dir /tmp/foo-fifo --cgroup "" docker.io/library/ubuntu:latest foo
 ```
 
 * `overlayfs` snapshotter does not work inside user namespaces, except on Ubuntu kernel
