@@ -38,8 +38,11 @@ import (
 	is "gotest.tools/assert/cmp"
 )
 
+// SnapshotterFunc is used in SnapshotterSuite
+type SnapshotterFunc func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error)
+
 // SnapshotterSuite runs a test suite on the snapshotter given a factory function.
-func SnapshotterSuite(t *testing.T, name string, snapshotterFn func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error)) {
+func SnapshotterSuite(t *testing.T, name string, snapshotterFn SnapshotterFunc) {
 	restoreMask := clearMask()
 	defer restoreMask()
 
