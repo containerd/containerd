@@ -26,6 +26,7 @@ import (
 
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/runtime"
 	client "github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/containerd/runtime/v2/task"
@@ -74,7 +75,9 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 	if err != nil {
 		return nil, err
 	}
-	f, err := openShimLog(context.Background(), b.bundle, client.AnonDialer)
+	// Windows needs a namespace when openShimLog
+	ns, _ := namespaces.Namespace(ctx)
+	f, err := openShimLog(namespaces.WithNamespace(context.Background(), ns), b.bundle, client.AnonDialer)
 	if err != nil {
 		return nil, errors.Wrap(err, "open shim log pipe")
 	}
