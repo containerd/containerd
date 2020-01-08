@@ -31,6 +31,7 @@ import (
 	// so we use continuity/testutil instead.
 	"github.com/containerd/continuity/testutil"
 	"github.com/containerd/continuity/testutil/loopback"
+	"github.com/opencontainers/runc/libcontainer/system"
 	"gotest.tools/assert"
 )
 
@@ -52,6 +53,9 @@ func testLookup(t *testing.T, fsType string) {
 
 	loop, err := loopback.New(100 << 20) // 100 MB
 	if err != nil {
+		if system.RunningInUserNS() {
+			t.Skipf("Skipping test in user namespace: %v", err)
+		}
 		t.Fatal(err)
 	}
 	if out, err := exec.Command("mkfs", "-t", fsType, loop.Device).CombinedOutput(); err != nil {
