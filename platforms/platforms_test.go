@@ -26,9 +26,14 @@ import (
 
 func TestParseSelector(t *testing.T) {
 	var (
-		defaultOS   = runtime.GOOS
-		defaultArch = runtime.GOARCH
+		defaultOS      = runtime.GOOS
+		defaultArch    = runtime.GOARCH
+		defaultVariant = ""
 	)
+
+	if defaultArch == "arm" && cpuVariant != "v7" {
+		defaultVariant = cpuVariant
+	}
 
 	for _, testcase := range []struct {
 		skip      bool
@@ -255,8 +260,9 @@ func TestParseSelector(t *testing.T) {
 			expected: specs.Platform{
 				OS:           "linux",
 				Architecture: defaultArch,
+				Variant:      defaultVariant,
 			},
-			formatted: joinNotEmpty("linux", defaultArch),
+			formatted: joinNotEmpty("linux", defaultArch, defaultVariant),
 		},
 		{
 			input: "s390x",
@@ -279,8 +285,9 @@ func TestParseSelector(t *testing.T) {
 			expected: specs.Platform{
 				OS:           "darwin",
 				Architecture: defaultArch,
+				Variant:      defaultVariant,
 			},
-			formatted: joinNotEmpty("darwin", defaultArch),
+			formatted: joinNotEmpty("darwin", defaultArch, defaultVariant),
 		},
 	} {
 		t.Run(testcase.input, func(t *testing.T) {
