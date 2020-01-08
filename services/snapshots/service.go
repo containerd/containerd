@@ -255,6 +255,25 @@ func (s *service) Usage(ctx context.Context, ur *snapshotsapi.UsageRequest) (*sn
 	return fromUsage(usage), nil
 }
 
+func (s *service) Cleanup(ctx context.Context, cr *snapshotsapi.CleanupRequest) (*ptypes.Empty, error) {
+	sn, err := s.getSnapshotter(cr.Snapshotter)
+	if err != nil {
+		return nil, err
+	}
+
+	c, ok := sn.(snapshots.Cleaner)
+	if !ok {
+		return nil, errdefs.ToGRPCf(errdefs.ErrNotImplemented, "snapshotter does not implement Cleanup method")
+	}
+
+	err = c.Cleanup(ctx)
+	if err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+
+	return empty, nil
+}
+
 func fromKind(kind snapshots.Kind) snapshotsapi.Kind {
 	if kind == snapshots.KindActive {
 		return snapshotsapi.KindActive
