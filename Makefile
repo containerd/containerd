@@ -81,6 +81,11 @@ TEST_REQUIRES_ROOT_PACKAGES=$(filter \
 	done | sort -u) \
     )
 
+ifdef SKIPTESTS
+    PACKAGES:=$(filter-out ${SKIPTESTS},${PACKAGES})
+    TEST_REQUIRES_ROOT_PACKAGES:=$(filter-out ${SKIPTESTS},${TEST_REQUIRES_ROOT_PACKAGES})
+endif
+
 # Project binaries.
 COMMANDS=ctr containerd containerd-stress
 MANPAGES=ctr.1 containerd.1 containerd-config.1 containerd-config.toml.5
