@@ -119,11 +119,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		containerd.WithImageHandler(imageHandler),
 	}
 
-	if c.config.EncryptedImagesConfig.KeyModel == criconfig.EncryptionKeyModelNode {
-		ltdd := imgcrypt.Payload{}
-		decUnpackOpt := encryption.WithUnpackConfigApplyOpts(encryption.WithDecryptedUnpack(&ltdd))
-		pullOpts = append(pullOpts, encryption.WithUnpackOpts([]containerd.UnpackOpt{decUnpackOpt}))
-	}
+	pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
 
 	image, err := c.client.Pull(ctx, ref, pullOpts...)
 	if err != nil {
@@ -413,4 +409,16 @@ func newTransport() *http.Transport {
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 5 * time.Second,
 	}
+}
+
+// addEncryptedImagesPullOpts adds the necessary pull options to a list of
+// pull options if enabled.
+func (c *criService) encryptedImagesPullOpts() []containerd.RemoteOpt {
+	if c.config.EncryptedImagesConfig.KeyModel == criconfig.EncryptionKeyModelNode {
+		ltdd := imgcrypt.Payload{}
+		decUnpackOpt := encryption.WithUnpackConfigApplyOpts(encryption.WithDecryptedUnpack(&ltdd))
+		opt := containerd.WithUnpackOpts([]containerd.UnpackOpt{decUnpackOpt})
+		return []containerd.RemoteOpt{opt}
+	}
+	return nil
 }
