@@ -243,9 +243,6 @@ const (
 	RuntimeUntrusted = "untrusted"
 	// RuntimeDefault is the implicit runtime defined for ContainerdConfig.DefaultRuntime
 	RuntimeDefault = "default"
-	// EncryptionKeyModelMultitenant is the key model where keys are obtained from
-	// kubernetes ImageDecryptSecrets
-	EncryptionKeyModelMultitenant = "multitenant"
 	// EncryptionKeyModelNode is the key model where key for encrypted images reside
 	// on the worker nodes
 	EncryptionKeyModelNode = "node"
