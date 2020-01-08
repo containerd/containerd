@@ -98,7 +98,6 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 // Should be used for parent resolution, existence checks and to discern
 // the kind of snapshot.
 func (s *snapshotter) Stat(ctx context.Context, key string) (snapshots.Info, error) {
-	log.G(ctx).Debug("Starting Stat")
 	ctx, t, err := s.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return snapshots.Info{}, err
@@ -110,7 +109,6 @@ func (s *snapshotter) Stat(ctx context.Context, key string) (snapshots.Info, err
 }
 
 func (s *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
-	log.G(ctx).Debug("Starting Update")
 	ctx, t, err := s.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return snapshots.Info{}, err
@@ -130,21 +128,21 @@ func (s *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 }
 
 func (s *snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
-	log.G(ctx).Debug("Starting Usage")
 	ctx, t, err := s.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return snapshots.Usage{}, err
 	}
-	defer t.Rollback()
+	id, info, usage, err := storage.GetInfo(ctx, key)
+	t.Rollback() // transaction no longer needed at this point.
 
-	_, info, usage, err := storage.GetInfo(ctx, key)
 	if err != nil {
 		return snapshots.Usage{}, err
 	}
 
 	if info.Kind == snapshots.KindActive {
-		du := fs.Usage{
-			Size: 0,
+		du, err := fs.DiskUsage(ctx, s.getSnapshotDir(id))
+		if err != nil {
+			return snapshots.Usage{}, err
 		}
 		usage = snapshots.Usage(du)
 	}
@@ -153,12 +151,10 @@ func (s *snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, e
 }
 
 func (s *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
-	log.G(ctx).Debug("Starting Prepare")
 	return s.createSnapshot(ctx, snapshots.KindActive, key, parent, opts)
 }
 
 func (s *snapshotter) View(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
-	log.G(ctx).Debug("Starting View")
 	return s.createSnapshot(ctx, snapshots.KindView, key, parent, opts)
 }
 
@@ -167,7 +163,6 @@ func (s *snapshotter) View(ctx context.Context, key, parent string, opts ...snap
 //
 // This can be used to recover mounts after calling View or Prepare.
 func (s *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
-	log.G(ctx).Debug("Starting Mounts")
 	ctx, t, err := s.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return nil, err
@@ -182,31 +177,39 @@ func (s *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 }
 
 func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
-	log.G(ctx).Debug("Starting Commit")
 	ctx, t, err := s.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return err
 	}
-	defer t.Rollback()
+	defer func() {
+		if err != nil {
+			if rerr := t.Rollback(); rerr != nil {
+				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
+			}
+		}
+	}()
 
-	usage := fs.Usage{
-		Size: 0,
+	// grab the existing id
+	id, _, _, err := storage.GetInfo(ctx, key)
+	if err != nil {
+		return err
+	}
+
+	usage, err := fs.DiskUsage(ctx, s.getSnapshotDir(id))
+	if err != nil {
+		return err
 	}
 
 	if _, err = storage.CommitActive(ctx, key, name, snapshots.Usage(usage), opts...); err != nil {
 		return errors.Wrap(err, "failed to commit snapshot")
 	}
 
-	if err := t.Commit(); err != nil {
-		return err
-	}
-	return nil
+	return t.Commit()
 }
 
 // Remove abandons the transaction identified by key. All resources
 // associated with the key will be removed.
 func (s *snapshotter) Remove(ctx context.Context, key string) error {
-	log.G(ctx).Debug("Starting Remove")
 	ctx, t, err := s.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return err
@@ -242,7 +245,6 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 
 // Walk the committed snapshots.
 func (s *snapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...string) error {
-	log.G(ctx).Debug("Starting Walk")
 	ctx, t, err := s.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return err
