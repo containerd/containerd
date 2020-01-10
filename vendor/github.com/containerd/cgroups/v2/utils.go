@@ -23,9 +23,12 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/godbus/dbus/v5"
 
 	"github.com/containerd/cgroups/v2/stats"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -176,7 +179,7 @@ func ToResources(spec *specs.LinuxResources) *Resources {
 			resources.CPU.Weight = &convertedWeight
 		}
 		if period := cpu.Period; period != nil {
-			resources.CPU.Max = period
+			resources.CPU.Max = NewCPUMax(cpu.Quota, period)
 		}
 	}
 	if mem := spec.Memory; mem != nil {
@@ -237,7 +240,6 @@ func ToResources(spec *specs.LinuxResources) *Resources {
 func getStatFileContentUint64(filePath string) uint64 {
 	contents, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		logrus.Error(err)
 		return 0
 	}
 	trimmed := strings.TrimSpace(string(contents))
@@ -253,6 +255,64 @@ func getStatFileContentUint64(filePath string) uint64 {
 
 	return res
 }
+
+func readIoStats(path string) []*stats.IOEntry {
+	// more details on the io.stat file format: https://www.kernel.org/doc/Documentation/cgroup-v2.txt
+	var usage []*stats.IOEntry
+	fpath := filepath.Join(path, "io.stat")
+	currentData, err := ioutil.ReadFile(fpath)
+	if err != nil {
+		return usage
+	}
+	entries := strings.Split(string(currentData), "\n")
+
+	for _, entry := range entries {
+		parts := strings.Split(entry, " ")
+		if len(parts) < 2 {
+			continue
+		}
+		majmin := strings.Split(parts[0], ":")
+		if len(majmin) != 2 {
+			continue
+		}
+		major, err := strconv.ParseUint(majmin[0], 10, 0)
+		if err != nil {
+			return usage
+		}
+		minor, err := strconv.ParseUint(majmin[1], 10, 0)
+		if err != nil {
+			return usage
+		}
+		parts = parts[1:]
+		ioEntry := stats.IOEntry{
+			Major: major,
+			Minor: minor,
+		}
+		for _, stats := range parts {
+			keyPairValue := strings.Split(stats, "=")
+			if len(keyPairValue) != 2 {
+				continue
+			}
+			v, err := strconv.ParseUint(keyPairValue[1], 10, 0)
+			if err != nil {
+				continue
+			}
+			switch keyPairValue[0] {
+			case "rbytes":
+				ioEntry.Rbytes = v
+			case "wbytes":
+				ioEntry.Wbytes = v
+			case "rios":
+				ioEntry.Rios = v
+			case "wios":
+				ioEntry.Wios = v
+			}
+		}
+		usage = append(usage, &ioEntry)
+	}
+	return usage
+}
+
 func rdmaStats(filepath string) []*stats.RdmaEntry {
 	currentData, err := ioutil.ReadFile(filepath)
 	if err != nil {
@@ -301,4 +361,19 @@ func toRdmaEntry(strEntries []string) []*stats.RdmaEntry {
 		}
 	}
 	return rdmaEntries
+}
+
+// isUnitExists returns true if the error is that a systemd unit already exists.
+func isUnitExists(err error) bool {
+	if err != nil {
+		if dbusError, ok := err.(dbus.Error); ok {
+			return strings.Contains(dbusError.Name, "org.freedesktop.systemd1.UnitExists")
+		}
+	}
+	return false
+}
+
+func systemdUnitFromPath(path string) string {
+	_, unit := filepath.Split(path)
+	return unit
 }
