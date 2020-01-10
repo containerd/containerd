@@ -341,6 +341,17 @@ type Snapshotter interface {
 	Close() error
 }
 
+// Cleaner defines a type capable of performing asynchronous resource cleanup.
+// The Cleaner interface should be used by snapshotters which implement fast
+// removal and deferred resource cleanup. This prevents snapshots from needing
+// to perform lengthy resource cleanup before acknowledging a snapshot key
+// has been removed and available for re-use. This is also useful when
+// performing multi-key removal with the intent of cleaning up all the
+// resources after each snapshot key has been removed.
+type Cleaner interface {
+	Cleanup(ctx context.Context) error
+}
+
 // Opt allows setting mutable snapshot properties on creation
 type Opt func(info *Info) error
 
