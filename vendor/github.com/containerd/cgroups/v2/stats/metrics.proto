@@ -9,6 +9,7 @@ message Metrics {
 	CPUStat cpu = 2 [(gogoproto.customname) = "CPU"];
 	MemoryStat memory = 4;
 	RdmaStat rdma = 5;
+	IOStat io = 6;
 }
 
 message PidsStat {
@@ -74,5 +75,15 @@ message RdmaEntry {
 	uint32 hca_objects = 3;
 }
 
-// iostat
-// fmt: 230:0 rbytes=394211328 wbytes=65044480 rios=16313 wios=2006 dbytes=0 dios=0
+message IOStat {
+	repeated IOEntry usage = 1;
+}
+
+message IOEntry {
+	uint64 major = 1;
+	uint64 minor = 2;
+	uint64 rbytes = 3;
+	uint64 wbytes = 4;
+	uint64 rios = 5;
+	uint64 wios = 6;
+}
