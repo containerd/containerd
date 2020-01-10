@@ -791,18 +791,17 @@ func validateSnapshot(info *snapshots.Info) error {
 	return nil
 }
 
-type cleaner interface {
-	Cleanup(ctx context.Context) error
-}
-
 func (s *snapshotter) garbageCollect(ctx context.Context) (d time.Duration, err error) {
 	s.l.Lock()
 	t1 := time.Now()
 	defer func() {
 		s.l.Unlock()
 		if err == nil {
-			if c, ok := s.Snapshotter.(cleaner); ok {
+			if c, ok := s.Snapshotter.(snapshots.Cleaner); ok {
 				err = c.Cleanup(ctx)
+				if errdefs.IsNotImplemented(err) {
+					err = nil
+				}
 			}
 		}
 		if err == nil {

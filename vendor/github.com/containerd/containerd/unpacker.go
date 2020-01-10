@@ -191,7 +191,7 @@ EachLayer:
 		case <-fetchC[i-fetchOffset]:
 		}
 
-		diff, err := a.Apply(ctx, desc, mounts)
+		diff, err := a.Apply(ctx, desc, mounts, u.config.ApplyOpts...)
 		if err != nil {
 			abort()
 			return errors.Wrapf(err, "failed to extract layer %s", diffIDs[i])
