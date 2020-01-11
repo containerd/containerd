@@ -161,6 +161,33 @@ func DSRSupported() error {
 	return platformDoesNotSupportError("Direct Server Return (DSR)")
 }
 
+// Slash32EndpointPrefixesSupported returns an error if the HCN version does not support configuring endpoints with /32 prefixes.
+func Slash32EndpointPrefixesSupported() error {
+	supported := GetSupportedFeatures()
+	if supported.Slash32EndpointPrefixes {
+		return nil
+	}
+	return platformDoesNotSupportError("Slash 32 Endpoint prefixes")
+}
+
+// AclSupportForProtocol252Supported returns an error if the HCN version does not support HNS ACL Policies to support protocol 252 for VXLAN.
+func AclSupportForProtocol252Supported() error {
+	supported := GetSupportedFeatures()
+	if supported.AclSupportForProtocol252 {
+		return nil
+	}
+	return platformDoesNotSupportError("HNS ACL Policies to support protocol 252 for VXLAN")
+}
+
+// SessionAffinitySupported returns an error if the HCN version does not support Session Affinity.
+func SessionAffinitySupported() error {
+	supported := GetSupportedFeatures()
+	if supported.SessionAffinity {
+		return nil
+	}
+	return platformDoesNotSupportError("Session Affinity")
+}
+
 // RequestType are the different operations performed to settings.
 // Used to update the settings of Endpoint/Namespace objects.
 type RequestType string
