@@ -330,27 +330,28 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 		s.eventSendMu.Unlock()
 		return nil, errdefs.ToGRPC(err)
 	}
-	switch cg := container.Cgroup().(type) {
-	case cgroups.Cgroup:
-		if err := s.ep.Add(container.ID, cg); err != nil {
-			logrus.WithError(err).Error("add cg to OOM monitor")
-		}
-	case *cgroupsv2.Manager:
-		allControllers, err := cg.RootControllers()
-		if err != nil {
-			logrus.WithError(err).Error("failed to get root controllers")
-		} else {
-			if err := cg.ToggleControllers(allControllers, cgroupsv2.Enable); err != nil {
-				logrus.WithError(err).Errorf("failed to enable controllers (%v)", allControllers)
-			}
-		}
-
-		// OOM monitor is not implemented yet
-		logrus.WithError(errdefs.ErrNotImplemented).Warn("add cg to OOM monitor")
-	}
 
 	switch r.ExecID {
 	case "":
+		switch cg := container.Cgroup().(type) {
+		case cgroups.Cgroup:
+			if err := s.ep.Add(container.ID, cg); err != nil {
+				logrus.WithError(err).Error("add cg to OOM monitor")
+			}
+		case *cgroupsv2.Manager:
+			allControllers, err := cg.RootControllers()
+			if err != nil {
+				logrus.WithError(err).Error("failed to get root controllers")
+			} else {
+				if err := cg.ToggleControllers(allControllers, cgroupsv2.Enable); err != nil {
+					logrus.WithError(err).Errorf("failed to enable controllers (%v)", allControllers)
+				}
+			}
+
+			// OOM monitor is not implemented yet
+			logrus.WithError(errdefs.ErrNotImplemented).Warn("add cg to OOM monitor")
+		}
+
 		s.send(&eventstypes.TaskStart{
 			ContainerID: container.ID,
 			Pid:         uint32(p.Pid()),
