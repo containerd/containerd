@@ -23,6 +23,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/containerd/console"
 )
@@ -105,7 +106,7 @@ func countLines(output string) int {
 	strlines := strings.Split(output, "\n")
 	lines := -1
 	for _, line := range strlines {
-		lines += (len(stripLine(line))-1)/width + 1
+		lines += (utf8.RuneCountInString(stripLine(line))-1)/width + 1
 	}
 	return lines
 }
