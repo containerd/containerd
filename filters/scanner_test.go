@@ -25,9 +25,13 @@ type tokenResult struct {
 	pos   int
 	token token
 	text  string
+	err   string
 }
 
 func (tr tokenResult) String() string {
+	if tr.err != "" {
+		return fmt.Sprintf("{pos: %v, token: %v, text: %q, err: %q}", tr.pos, tr.token, tr.text, tr.err)
+	}
 	return fmt.Sprintf("{pos: %v, token: %v, text: %q}", tr.pos, tr.token, tr.text)
 }
 
@@ -171,7 +175,7 @@ func TestScanner(t *testing.T) {
 			input: "foo\x00bar",
 			expected: []tokenResult{
 				{pos: 0, token: tokenField, text: "foo"},
-				{pos: 3, token: tokenIllegal},
+				{pos: 3, token: tokenIllegal, err: "unexpected null"},
 				{pos: 4, token: tokenField, text: "bar"},
 				{pos: 7, token: tokenEOF},
 			},
@@ -271,6 +275,51 @@ func TestScanner(t *testing.T) {
 				{pos: 23, token: tokenEOF},
 			},
 		},
+		{
+			name:  "IllegalQuoted",
+			input: "labels.containerd.io/key==value",
+			expected: []tokenResult{
+				{pos: 0, token: tokenField, text: "labels"},
+				{pos: 6, token: tokenSeparator, text: "."},
+				{pos: 7, token: tokenField, text: "containerd"},
+				{pos: 17, token: tokenSeparator, text: "."},
+				{pos: 18, token: tokenField, text: "io"},
+				{pos: 20, token: tokenIllegal, text: "/key==value", err: "quoted literal not terminated"},
+				{pos: 31, token: tokenEOF},
+			},
+		},
+		{
+			name:  "IllegalQuotedWithNewLine",
+			input: "labels.\"containerd.io\nkey\"==value",
+			expected: []tokenResult{
+				{pos: 0, token: tokenField, text: "labels"},
+				{pos: 6, token: tokenSeparator, text: "."},
+				{pos: 7, token: tokenIllegal, text: "\"containerd.io\n", err: "quoted literal not terminated"},
+				{pos: 22, token: tokenField, text: "key"},
+				{pos: 25, token: tokenIllegal, text: "\"==value", err: "quoted literal not terminated"},
+				{pos: 33, token: tokenEOF},
+			},
+		},
+		{
+			name:  "IllegalEscapeSequence",
+			input: `labels."\g"`,
+			expected: []tokenResult{
+				{pos: 0, token: tokenField, text: "labels"},
+				{pos: 6, token: tokenSeparator, text: "."},
+				{pos: 7, token: tokenIllegal, text: `"\g"`, err: "illegal escape sequence"},
+				{pos: 11, token: tokenEOF},
+			},
+		},
+		{
+			name:  "IllegalNumericEscapeSequence",
+			input: `labels."\xaz"`,
+			expected: []tokenResult{
+				{pos: 0, token: tokenField, text: "labels"},
+				{pos: 6, token: tokenSeparator, text: "."},
+				{pos: 7, token: tokenIllegal, text: `"\xaz"`, err: "illegal numeric escape sequence"},
+				{pos: 13, token: tokenEOF},
+			},
+		},
 	} {
 		t.Run(testcase.name, func(t *testing.T) {
 			var sc scanner
@@ -296,6 +345,9 @@ func TestScanner(t *testing.T) {
 					if i >= len(testcase.expected) {
 						t.Fatalf("too many tokens parsed")
 					}
+					if tok == tokenIllegal {
+						tokv.err = sc.err
+					}
 
 					if tokv != testcase.expected[i] {
 						t.Fatalf("token unexpected: %v != %v", tokv, testcase.expected[i])
@@ -305,6 +357,7 @@ func TestScanner(t *testing.T) {
 				if tok == tokenEOF {
 					break
 				}
+
 			}
 
 			// make sure we've eof'd
