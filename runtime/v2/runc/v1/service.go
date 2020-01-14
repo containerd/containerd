@@ -271,15 +271,15 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 		s.eventSendMu.Unlock()
 		return nil, errdefs.ToGRPC(err)
 	}
-	if cg, ok := container.Cgroup().(cgroups.Cgroup); ok {
-		if err := s.ep.Add(container.ID, cg); err != nil {
-			logrus.WithError(err).Error("add cg to OOM monitor")
-		}
-	} else {
-		logrus.WithError(errdefs.ErrNotImplemented).Error("add cg to OOM monitor")
-	}
 	switch r.ExecID {
 	case "":
+		if cg, ok := container.Cgroup().(cgroups.Cgroup); ok {
+			if err := s.ep.Add(container.ID, cg); err != nil {
+				logrus.WithError(err).Error("add cg to OOM monitor")
+			}
+		} else {
+			logrus.WithError(errdefs.ErrNotImplemented).Error("add cg to OOM monitor")
+		}
 		s.send(&eventstypes.TaskStart{
 			ContainerID: container.ID,
 			Pid:         uint32(p.Pid()),
