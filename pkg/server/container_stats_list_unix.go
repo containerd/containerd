@@ -19,8 +19,11 @@ limitations under the License.
 package server
 
 import (
+	"fmt"
+
 	"github.com/containerd/containerd/api/types"
 	v1 "github.com/containerd/containerd/metrics/types/v1"
+	v2 "github.com/containerd/containerd/metrics/types/v2"
 	"github.com/containerd/typeurl"
 	"github.com/pkg/errors"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -61,20 +64,39 @@ func (c *criService) containerMetrics(
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to extract container metrics")
 		}
-		metrics := s.(*v1.Metrics)
-		if metrics.CPU != nil && metrics.CPU.Usage != nil {
-			cs.Cpu = &runtime.CpuUsage{
-				Timestamp:            stats.Timestamp.UnixNano(),
-				UsageCoreNanoSeconds: &runtime.UInt64Value{Value: metrics.CPU.Usage.Total},
+		switch metrics := s.(type) {
+		case *v1.Metrics:
+			if metrics.CPU != nil && metrics.CPU.Usage != nil {
+				cs.Cpu = &runtime.CpuUsage{
+					Timestamp:            stats.Timestamp.UnixNano(),
+					UsageCoreNanoSeconds: &runtime.UInt64Value{Value: metrics.CPU.Usage.Total},
+				}
 			}
-		}
-		if metrics.Memory != nil && metrics.Memory.Usage != nil {
-			cs.Memory = &runtime.MemoryUsage{
-				Timestamp: stats.Timestamp.UnixNano(),
-				WorkingSetBytes: &runtime.UInt64Value{
-					Value: getWorkingSet(metrics.Memory),
-				},
+			if metrics.Memory != nil && metrics.Memory.Usage != nil {
+				cs.Memory = &runtime.MemoryUsage{
+					Timestamp: stats.Timestamp.UnixNano(),
+					WorkingSetBytes: &runtime.UInt64Value{
+						Value: getWorkingSet(metrics.Memory),
+					},
+				}
 			}
+		case *v2.Metrics:
+			if metrics.CPU != nil {
+				cs.Cpu = &runtime.CpuUsage{
+					Timestamp:            stats.Timestamp.UnixNano(),
+					UsageCoreNanoSeconds: &runtime.UInt64Value{Value: metrics.CPU.UsageUsec * 1000},
+				}
+			}
+			if metrics.Memory != nil {
+				cs.Memory = &runtime.MemoryUsage{
+					Timestamp: stats.Timestamp.UnixNano(),
+					WorkingSetBytes: &runtime.UInt64Value{
+						Value: getWorkingSetV2(metrics.Memory),
+					},
+				}
+			}
+		default:
+			return &cs, errors.New(fmt.Sprintf("unxpected metrics type: %v", metrics))
 		}
 	}
 
@@ -91,6 +113,17 @@ func getWorkingSet(memory *v1.MemoryStat) uint64 {
 	var workingSet uint64
 	if memory.TotalInactiveFile < memory.Usage.Usage {
 		workingSet = memory.Usage.Usage - memory.TotalInactiveFile
+	}
+	return workingSet
+}
+
+// getWorkingSetV2 calculates workingset memory from cgroupv2 memory stats.
+// The caller should make sure memory is not nil.
+// workingset = usage - inactive_file
+func getWorkingSetV2(memory *v2.MemoryStat) uint64 {
+	var workingSet uint64
+	if memory.InactiveFile < memory.Usage {
+		workingSet = memory.Usage - memory.InactiveFile
 	}
 	return workingSet
 }
