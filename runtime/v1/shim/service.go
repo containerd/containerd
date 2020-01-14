@@ -511,33 +511,35 @@ func (s *Service) allProcesses() []rproc.Process {
 }
 
 func (s *Service) checkProcesses(e runc.Exit) {
-	shouldKillAll, err := shouldKillAllOnExit(s.bundle)
-	if err != nil {
-		log.G(s.context).WithError(err).Error("failed to check shouldKillAll")
-	}
-
 	for _, p := range s.allProcesses() {
-		if p.Pid() == e.Pid {
+		if p.Pid() != e.Pid {
+			continue
+		}
 
+		if ip, ok := p.(*proc.Init); ok {
+			shouldKillAll, err := shouldKillAllOnExit(s.bundle)
+			if err != nil {
+				log.G(s.context).WithError(err).Error("failed to check shouldKillAll")
+			}
+
+			// Ensure all children are killed
 			if shouldKillAll {
-				if ip, ok := p.(*proc.Init); ok {
-					// Ensure all children are killed
-					if err := ip.KillAll(s.context); err != nil {
-						log.G(s.context).WithError(err).WithField("id", ip.ID()).
-							Error("failed to kill init's children")
-					}
+				if err := ip.KillAll(s.context); err != nil {
+					log.G(s.context).WithError(err).WithField("id", ip.ID()).
+						Error("failed to kill init's children")
 				}
 			}
-			p.SetExited(e.Status)
-			s.events <- &eventstypes.TaskExit{
-				ContainerID: s.id,
-				ID:          p.ID(),
-				Pid:         uint32(e.Pid),
-				ExitStatus:  uint32(e.Status),
-				ExitedAt:    p.ExitedAt(),
-			}
-			return
 		}
+
+		p.SetExited(e.Status)
+		s.events <- &eventstypes.TaskExit{
+			ContainerID: s.id,
+			ID:          p.ID(),
+			Pid:         uint32(e.Pid),
+			ExitStatus:  uint32(e.Status),
+			ExitedAt:    p.ExitedAt(),
+		}
+		return
 	}
 }
 
