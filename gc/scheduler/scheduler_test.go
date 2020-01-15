@@ -98,7 +98,7 @@ func TestDeletionThreshold(t *testing.T) {
 
 	select {
 	case <-gcWait:
-	case <-time.After(time.Millisecond * 10):
+	case <-time.After(time.Millisecond * 30):
 		t.Fatal("GC wait timed out")
 	}
 
@@ -162,7 +162,7 @@ func TestStartupDelay(t *testing.T) {
 	defer cancel()
 	go scheduler.run(ctx)
 
-	time.Sleep(time.Millisecond * 5)
+	time.Sleep(time.Millisecond * 30)
 
 	if c := tc.runCount(); c != 1 {
 		t.Fatalf("unexpected gc run count %d, expected 1", c)
