@@ -261,7 +261,7 @@ var cmpSnapshotInfo = cmp.FilterPath(
 		// actual value should be within a few seconds of now
 		now := time.Now()
 		delta := now.Sub(actual)
-		threshold := 10 * time.Second
+		threshold := 30 * time.Second
 		return delta > -threshold && delta < threshold
 	}))
 
