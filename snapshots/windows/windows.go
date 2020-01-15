@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	winfs "github.com/Microsoft/go-winio/pkg/fs"
@@ -47,6 +48,10 @@ func init() {
 		},
 	})
 }
+
+const (
+	rootfsSizeLabel = "containerd.io/snapshot/io.microsoft.container.storage.rootfs.size-gb"
+)
 
 type snapshotter struct {
 	root string
@@ -332,7 +337,26 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			return nil, errors.Wrap(err, "failed to create sandbox layer")
 		}
 
-		// TODO(darrenstahlmsft): Allow changing sandbox size
+		var snapshotInfo snapshots.Info
+		for _, o := range opts {
+			o(&snapshotInfo)
+		}
+
+		var sizeGB int
+		if sizeGBstr, ok := snapshotInfo.Labels[rootfsSizeLabel]; ok {
+			i32, err := strconv.ParseInt(sizeGBstr, 10, 32)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to parse annotation %q=%q", rootfsSizeLabel, sizeGBstr)
+			}
+			sizeGB = int(i32)
+		}
+
+		if sizeGB > 0 {
+			const gbToByte = 1024 * 1024 * 1024
+			if err := hcsshim.ExpandSandboxSize(s.info, newSnapshot.ID, uint64(gbToByte*sizeGB)); err != nil {
+				return nil, errors.Wrapf(err, "failed to expand scratch size to %d GB", sizeGB)
+			}
+		}
 	}
 
 	if err := t.Commit(); err != nil {
