@@ -72,6 +72,8 @@ func adjustOom(adjustment int) (int, error) {
 		return 0, err
 	}
 
+	defer cmd.Process.Kill()
+
 	pid, err := waitForPid(cmd.Process)
 	if err != nil {
 		return 0, err
