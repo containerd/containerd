@@ -273,7 +273,7 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 	}
 	switch r.ExecID {
 	case "":
-		if err := s.ep.Add(container.ID, cg); err != nil {
+		if err := s.ep.Add(container.ID, container.Cgroup()); err != nil {
 			logrus.WithError(err).Error("add cg to OOM monitor")
 		}
 		s.send(&eventstypes.TaskStart{
