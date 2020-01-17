@@ -14,24 +14,7 @@
    limitations under the License.
 */
 
-/*
-  Copyright The containerd Authors
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-*/
 package btrfs
-
-import "sort"
 
 /*
 #include <stddef.h>
@@ -47,11 +30,16 @@ import "C"
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"syscall"
 	"unsafe"
 
 	"github.com/pkg/errors"
 )
+
+// maxByteSliceSize is the smallest size that Go supports on various platforms.
+// On mipsle, 1<<31-1 overflows the address space.
+const maxByteSliceSize = 1 << 30
 
 // IsSubvolume returns nil if the path is a valid subvolume. An error is
 // returned if the path does not exist or the path is not a valid subvolume.
@@ -146,7 +134,7 @@ func subvolMap(path string) (map[uint64]*Info, error) {
 		var (
 			sh     C.struct_btrfs_ioctl_search_header
 			shSize = unsafe.Sizeof(sh)
-			buf    = (*[1<<31 - 1]byte)(unsafe.Pointer(&args.buf[0]))[:C.BTRFS_SEARCH_ARGS_BUFSIZE]
+			buf    = (*[maxByteSliceSize]byte)(unsafe.Pointer(&args.buf[0]))[:C.BTRFS_SEARCH_ARGS_BUFSIZE]
 		)
 
 		for i := 0; i < int(args.key.nr_items); i++ {
@@ -287,7 +275,7 @@ func SubvolCreate(path string) error {
 	if len(name) > C.BTRFS_PATH_NAME_MAX {
 		return errors.Errorf("%q too long for subvolume", name)
 	}
-	nameptr := (*[1<<31 - 1]byte)(unsafe.Pointer(&args.name[0]))
+	nameptr := (*[maxByteSliceSize]byte)(unsafe.Pointer(&args.name[0]))
 	copy(nameptr[:C.BTRFS_PATH_NAME_MAX], []byte(name))
 
 	if err := ioctl(fp.Fd(), C.BTRFS_IOC_SUBVOL_CREATE, uintptr(unsafe.Pointer(&args))); err != nil {
@@ -304,7 +292,7 @@ func SubvolSnapshot(dst, src string, readonly bool) error {
 
 	dstfp, err := openSubvolDir(dstdir)
 	if err != nil {
-		return errors.Wrapf(err, "opening snapshot desination subvolume failed")
+		return errors.Wrapf(err, "opening snapshot destination subvolume failed")
 	}
 	defer dstfp.Close()
 
@@ -323,7 +311,7 @@ func SubvolSnapshot(dst, src string, readonly bool) error {
 		return errors.Errorf("%q too long for subvolume", dstname)
 	}
 
-	nameptr := (*[1<<31 - 1]byte)(unsafe.Pointer(name))
+	nameptr := (*[maxByteSliceSize]byte)(unsafe.Pointer(name))
 	copy(nameptr[:C.BTRFS_SUBVOL_NAME_MAX], []byte(dstname))
 
 	if readonly {
@@ -382,7 +370,7 @@ func SubvolDelete(path string) error {
 		return errors.Errorf("%q too long for subvolume", name)
 	}
 
-	nameptr := (*[1<<31 - 1]byte)(unsafe.Pointer(&args.name[0]))
+	nameptr := (*[maxByteSliceSize]byte)(unsafe.Pointer(&args.name[0]))
 	copy(nameptr[:C.BTRFS_SUBVOL_NAME_MAX], []byte(name))
 
 	if err := ioctl(fp.Fd(), C.BTRFS_IOC_SNAP_DESTROY, uintptr(unsafe.Pointer(&args))); err != nil {
