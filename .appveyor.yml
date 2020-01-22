@@ -61,4 +61,4 @@ test_script:
   # - bash.exe -elc "export CGO_ENABLED=1 PATH=/c/tools/mingw64/bin:/c/gopath/src/github.com/containerd/containerd/bin:$PATH; TESTFLAGS_PARALLEL=1 mingw32-make.exe integration"
 
 on_success:
-  codecov --flag windows -f coverage.txt
+  - codecov --flag windows -f coverage.txt
