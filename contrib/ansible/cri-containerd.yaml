@@ -31,17 +31,30 @@
         name: net.ipv4.ip_forward
         value: 1
 
-    - name: "Check kubelet args in kubelet config"
+    - name: "Check kubelet args in kubelet config (Ubuntu)"
       shell: grep "^Environment=\"KUBELET_EXTRA_ARGS=" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf || true
       register: check_args
+      when: ansible_distribution == "Ubuntu"
 
-    - name: "Add runtime args in kubelet conf"
+    - name: "Add runtime args in kubelet conf (Ubuntu)"
       lineinfile:
         dest: "/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
         line: "Environment=\"KUBELET_EXTRA_ARGS= --runtime-cgroups=/system.slice/containerd.service --container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=unix:///run/containerd/containerd.sock\""
         insertafter: '\[Service\]'
-      when: check_args.stdout == ""
-    
+      when: ansible_distribution == "Ubuntu" and check_args.stdout == ""
+
+    - name: "Check kubelet args in kubelet config (CentOS)"
+      shell: grep "^Environment=\"KUBELET_EXTRA_ARGS=" /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf || true
+      register: check_args
+      when: ansible_distribution == "CentOS"
+
+    - name: "Add runtime args in kubelet conf (CentOS)"
+      lineinfile:
+        dest: "/usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf"
+        line: "Environment=\"KUBELET_EXTRA_ARGS= --runtime-cgroups=/system.slice/containerd.service --container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=unix:///run/containerd/containerd.sock\""
+        insertafter: '\[Service\]'
+      when: ansible_distribution == "CentOS" and check_args.stdout == ""
+
     - name: "Start Kubelet"
       systemd: name=kubelet daemon_reload=yes state=started enabled=yes
     
