@@ -153,7 +153,7 @@ type RegistryConfig struct {
 	TLS *TLSConfig `toml:"tls" json:"tls"`
 }
 
-type EncryptedImagesConfig struct {
+type ImageEncryption struct {
 	// KeyModel specifies the model of where keys should reside
 	KeyModel string `toml:"key_model" json:"keyModel"`
 }
@@ -167,8 +167,8 @@ type PluginConfig struct {
 	CniConfig `toml:"cni" json:"cni"`
 	// Registry contains config related to the registry
 	Registry Registry `toml:"registry" json:"registry"`
-	// EncryptedImagesConfig contains config related to handling of encrypted images
-	EncryptedImagesConfig `toml:"image_encryption" json:"imageEncryption"`
+	// ImageEncryption contains config related to handling of encrypted images
+	ImageEncryption `toml:"image_encryption" json:"imageEncryption"`
 	// DisableTCPService disables serving CRI on the TCP server.
 	DisableTCPService bool `toml:"disable_tcp_service" json:"disableTCPService"`
 	// StreamServerAddress is the ip address streaming server is listening on.
