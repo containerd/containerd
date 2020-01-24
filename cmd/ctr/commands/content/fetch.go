@@ -110,6 +110,8 @@ type FetchConfig struct {
 	AllMetadata bool
 	// RemoteOpts to be appended
 	RemoteOpts []containerd.RemoteOpt
+	// UsePull uses client.Pull, not client.Fetch
+	UsePull bool
 }
 
 // NewFetchConfig returns the default FetchConfig from cli flags
@@ -188,13 +190,26 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 		}
 	}
 
-	img, err := client.Fetch(pctx, ref, opts...)
+	var (
+		img     images.Image
+		imgPull containerd.Image
+		err     error
+	)
+
+	if config.UsePull {
+		imgPull, err = client.Pull(pctx, ref, opts...)
+	} else {
+		img, err = client.Fetch(pctx, ref, opts...)
+	}
 	stopProgress()
 	if err != nil {
 		return images.Image{}, err
 	}
 
 	<-progress
+	if config.UsePull {
+		return imgPull.Metadata(), nil
+	}
 	return img, nil
 }
 
