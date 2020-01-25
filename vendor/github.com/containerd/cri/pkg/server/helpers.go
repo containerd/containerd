@@ -359,6 +359,7 @@ func unknownContainerStatus() containerstore.Status {
 		FinishedAt: 0,
 		ExitCode:   unknownExitCode,
 		Reason:     unknownExitReason,
+		Unknown:    true,
 	}
 }
 

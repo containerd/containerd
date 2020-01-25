@@ -277,42 +277,6 @@ func ensureSharedOrSlave(path string, lookupMount func(string) (mount.Info, erro
 	return errors.Errorf("path %q is mounted on %q but it is not a shared or slave mount", path, mountInfo.Mountpoint)
 }
 
-// WithPrivilegedDevices allows all host devices inside the container
-func WithPrivilegedDevices(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
-	if s.Linux == nil {
-		s.Linux = &runtimespec.Linux{}
-	}
-	if s.Linux.Resources == nil {
-		s.Linux.Resources = &runtimespec.LinuxResources{}
-	}
-	hostDevices, err := devices.HostDevices()
-	if err != nil {
-		return err
-	}
-	for _, hostDevice := range hostDevices {
-		rd := runtimespec.LinuxDevice{
-			Path:  hostDevice.Path,
-			Type:  string(hostDevice.Type),
-			Major: hostDevice.Major,
-			Minor: hostDevice.Minor,
-			UID:   &hostDevice.Uid,
-			GID:   &hostDevice.Gid,
-		}
-		if hostDevice.Major == 0 && hostDevice.Minor == 0 {
-			// Invalid device, most likely a symbolic link, skip it.
-			continue
-		}
-		addDevice(s, rd)
-	}
-	s.Linux.Resources.Devices = []runtimespec.LinuxDeviceCgroup{
-		{
-			Allow:  true,
-			Access: "rwm",
-		},
-	}
-	return nil
-}
-
 func addDevice(s *runtimespec.Spec, rd runtimespec.LinuxDevice) {
 	for i, dev := range s.Linux.Devices {
 		if dev.Path == rd.Path {
