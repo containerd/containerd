@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/api/services/diff/v1"
 	"github.com/containerd/containerd/api/services/images/v1"
+	introspectionapi "github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/containerd/containerd/api/services/namespaces/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/content"
@@ -64,6 +65,10 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	ic.Meta.Exports = map[string]string{"CRIVersion": constants.CRIVersion}
 	ctx := ic.Context
 	pluginConfig := ic.Config.(*criconfig.PluginConfig)
+	if err := criconfig.ValidatePluginConfig(ctx, pluginConfig); err != nil {
+		return nil, errors.Wrap(err, "invalid plugin config")
+	}
+
 	c := criconfig.Config{
 		PluginConfig:       *pluginConfig,
 		ContainerdRootDir:  filepath.Dir(ic.Root),
@@ -72,10 +77,6 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		StateDir:           ic.State,
 	}
 	log.G(ctx).Infof("Start cri plugin with config %+v", c)
-
-	if err := criconfig.ValidatePluginConfig(ctx, pluginConfig); err != nil {
-		return nil, errors.Wrap(err, "invalid plugin config")
-	}
 
 	if err := setGLogLevel(); err != nil {
 		return nil, errors.Wrap(err, "failed to set glog level")
@@ -145,6 +146,9 @@ func getServicesOpts(ic *plugin.InitContext) ([]containerd.ServicesOpt, error) {
 		},
 		services.LeasesService: func(s interface{}) containerd.ServicesOpt {
 			return containerd.WithLeasesService(s.(leases.Manager))
+		},
+		services.IntrospectionService: func(s interface{}) containerd.ServicesOpt {
+			return containerd.WithIntrospectionService(s.(introspectionapi.IntrospectionClient))
 		},
 	} {
 		p := plugins[s]

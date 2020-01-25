@@ -38,7 +38,7 @@ func DefaultConfig() PluginConfig {
 			NoPivot:            false,
 			Runtimes: map[string]Runtime{
 				"runc": {
-					Type: "io.containerd.runc.v1",
+					Type: "io.containerd.runc.v2",
 				},
 			},
 		},

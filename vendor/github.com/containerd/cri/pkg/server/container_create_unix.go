@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/oci"
@@ -170,7 +171,7 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 		}
 		specOpts = append(specOpts, oci.WithPrivileged)
 		if !ociRuntime.PrivilegedWithoutHostDevices {
-			specOpts = append(specOpts, customopts.WithPrivilegedDevices)
+			specOpts = append(specOpts, oci.WithHostDevices, oci.WithAllDevicesAllowed)
 		}
 	} else { // not privileged
 		specOpts = append(specOpts, customopts.WithDevices(c.os, config), customopts.WithCapabilities(securityContext))
@@ -223,7 +224,15 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 		customopts.WithAnnotation(annotations.ContainerType, annotations.ContainerTypeContainer),
 		customopts.WithAnnotation(annotations.SandboxID, sandboxID),
 	)
-
+	// cgroupns is used for hiding /sys/fs/cgroup from containers.
+	// For compatibility, cgroupns is not used when running in cgroup v1 mode.
+	// https://github.com/containers/libpod/issues/4363
+	if cgroups.Mode() == cgroups.Unified {
+		specOpts = append(specOpts, oci.WithLinuxNamespace(
+			runtimespec.LinuxNamespace{
+				Type: runtimespec.CgroupNamespace,
+			}))
+	}
 	return runtimeSpec(id, specOpts...)
 }
 

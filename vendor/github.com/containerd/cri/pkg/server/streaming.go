@@ -67,7 +67,7 @@ func getStreamListenerMode(c *criService) (streamListenerMode, error) {
 
 func newStreamServer(c *criService, addr, port, streamIdleTimeout string) (streaming.Server, error) {
 	if addr == "" {
-		a, err := k8snet.ChooseBindAddress(nil)
+		a, err := k8snet.ResolveBindAddress(nil)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get stream server address")
 		}
