@@ -2,9 +2,9 @@
 
 Go clients for talking to a [kubernetes](http://kubernetes.io/) cluster.
 
-We currently recommend using the v12.0.0 tag. See [INSTALL.md](/INSTALL.md) for
-detailed installation instructions. `go get k8s.io/client-go/...` works, but
-will build `master`, which doesn't handle the dependencies well.
+We recommend using the `kubernetes-1.x.y` tag matching the current Kubernetes release (`kubernetes-1.15.3` at the time this was written).
+See [INSTALL.md](/INSTALL.md) for detailed installation instructions.
+`go get k8s.io/client-go@master` works, but will fetch `master`, which may be less stable than a tagged release.
 
 [![BuildStatus Widget]][BuildStatus Result]
 [![GoReport Widget]][GoReport Status]
@@ -164,8 +164,8 @@ This repository is still a mirror of
 the code development is still done in the staging area. Since Kubernetes 1.8
 release, when syncing the code from the staging area, we also sync the Kubernetes
 version tags to client-go, prefixed with "kubernetes-". For example, if you check
-out the `kubernetes-v1.8.0` tag in client-go, the code you get is exactly the
-same as if you check out the `v1.8.0` tag in kubernetes, and change directory to
+out the `kubernetes-1.15.3` tag in client-go, the code you get is exactly the
+same as if you check out the `v1.15.3` tag in Kubernetes, and change directory to
 `staging/src/k8s.io/client-go`. The purpose is to let users quickly find matching
 commits among published repos, like
 [sample-apiserver](https://github.com/kubernetes/sample-apiserver),
@@ -176,10 +176,13 @@ you care about backwards compatibility.
 
 ### How to get it
 
-You can use `go get k8s.io/client-go/...` to get client-go, but **you will get
-the unstable master branch** and `client-go`'s vendored dependencies will not be
-added to your `$GOPATH`. So we think most users will want to use a dependency
-management system. See [INSTALL.md](/INSTALL.md) for detailed instructions.
+Use go1.11+ and fetch the desired version using the `go get` command. For example:
+
+```
+go get k8s.io/client-go@kubernetes-1.15.3
+```
+
+See [INSTALL.md](/INSTALL.md) for detailed instructions.
 
 ### How to use it
 
