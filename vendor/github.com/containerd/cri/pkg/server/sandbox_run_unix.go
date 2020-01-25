@@ -108,6 +108,13 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 			Type:        "bind",
 			Options:     []string{"rbind", "ro"},
 		},
+		// Add resolv.conf for katacontainers to setup the DNS of pod VM properly.
+		{
+			Source:      c.getResolvPath(id),
+			Destination: resolvConfPath,
+			Type:        "bind",
+			Options:     []string{"rbind", "ro"},
+		},
 	}))
 
 	selinuxOpt := securityContext.GetSelinuxOptions()
@@ -291,7 +298,7 @@ func (c *criService) cleanupSandboxFiles(id string, config *runtime.PodSandboxCo
 func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {
 	// TODO(random-liu): Remove this after shim v1 is deprecated.
 	var taskOpts []containerd.NewTaskOpts
-	if c.config.NoPivot && runtimeType == plugin.RuntimeRuncV1 {
+	if c.config.NoPivot && (runtimeType == plugin.RuntimeRuncV1 || runtimeType == plugin.RuntimeRuncV2) {
 		taskOpts = append(taskOpts, containerd.WithNoPivotRoot)
 	}
 	return taskOpts
