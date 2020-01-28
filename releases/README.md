@@ -7,7 +7,7 @@
       by containerd's release tool but refer to previous release files for style
       and format help. Name the file using the version, for rc add an `-rc` suffix.
       When moving from rc to final, the rc file may just be renamed and updated.
-      See [release-tool](https://github.com/containerd/project/tree/master/cmd/release-tool)
+      See [release-tool](https://github.com/containerd/release-tool)
 
    2. Update the version file at `https://github.com/containerd/containerd/blob/master/version/version.go`
 
