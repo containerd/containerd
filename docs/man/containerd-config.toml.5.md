@@ -128,7 +128,7 @@ imports = ["/etc/containerd/runtime_*.toml", "./debug.toml"]
     deletion_threshold = 0
     mutation_threshold = 100
     schedule_delay = 0
-    startup_delay = 100000000
+    startup_delay = "100ms"
 ```
 
 ## BUGS
