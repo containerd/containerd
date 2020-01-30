@@ -18,6 +18,8 @@ package client
 
 import (
 	"context"
+	"net"
+	"time"
 
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -36,7 +38,14 @@ func NewCRIPluginClient(ctx context.Context, endpoint string) (api.CRIPluginServ
 	conn, err := grpc.DialContext(ctx, addr,
 		grpc.WithBlock(),
 		grpc.WithInsecure(),
-		grpc.WithDialer(dialer),
+		grpc.WithContextDialer(
+			func(ctx context.Context, addr string) (net.Conn, error) {
+				if deadline, ok := ctx.Deadline(); ok {
+					return dialer(addr, time.Until(deadline))
+				}
+				return dialer(addr, 0)
+			},
+		),
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to dial")
