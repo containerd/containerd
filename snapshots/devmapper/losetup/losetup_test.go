@@ -23,10 +23,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/docker/go-units"
+	"golang.org/x/sys/unix"
 	"gotest.tools/assert"
 	is "gotest.tools/assert/cmp"
+
+	"github.com/containerd/containerd/pkg/testutil"
 )
 
 func TestLosetup(t *testing.T) {
@@ -97,6 +99,11 @@ func TestLosetup(t *testing.T) {
 	t.Run("RemoveLoopDevicesAssociatedWithInvalidImage", func(t *testing.T) {
 		err := RemoveLoopDevicesAssociatedWithImage("")
 		assert.NilError(t, err)
+	})
+
+	t.Run("DetachInvalidDevice", func(t *testing.T) {
+		err := DetachLoopDevice("/dev/loop_invalid_idx")
+		assert.Equal(t, unix.ENOENT, err)
 	})
 }
 
