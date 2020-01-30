@@ -390,7 +390,11 @@ func (c *Client) Fetch(ctx context.Context, ref string, opts ...RemoteOpt) (imag
 	}
 	defer done(ctx)
 
-	return c.fetch(ctx, fetchCtx, ref, 0)
+	img, err := c.fetch(ctx, fetchCtx, ref, 0)
+	if err != nil {
+		return images.Image{}, err
+	}
+	return c.createNewImage(ctx, img)
 }
 
 // Push uploads the provided content to a remote resource
