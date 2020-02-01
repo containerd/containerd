@@ -271,7 +271,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	var taskOpts []containerd.NewTaskOpts
 	// TODO(random-liu): Remove this after shim v1 is deprecated.
-	if c.config.NoPivot && ociRuntime.Type == plugin.RuntimeRuncV1 {
+	if c.config.NoPivot && (ociRuntime.Type == plugin.RuntimeRuncV1 || ociRuntime.Type == plugin.RuntimeRuncV2) {
 		taskOpts = append(taskOpts, containerd.WithNoPivotRoot)
 	}
 	// We don't need stdio for sandbox container.
