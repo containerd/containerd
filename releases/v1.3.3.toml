@@ -1,0 +1,38 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.3.2"
+
+pre_release = false
+
+preface = """\
+The third patch release for `containerd` 1.3 includes a few runtime fixes and
+important dependency updates.
+
+### Runtime
+
+* Close platform in runc's shim Shutdown method [containerd/containerd#3907](https://github.com/containerd/containerd/pull/3907)
+* Fix eventfd leak [containerd/containerd#3961](https://github.com/containerd/containerd/pull/3961)
+
+### API
+
+* Fix API filters to properly handle and return parse errors [containerd/containerd#3950](https://github.com/containerd/containerd/pull/3950)
+
+### Other Updates
+
+* Update the runc vendor to v1.0.0-rc10 which includes a mitigation for [CVE-2019-19921](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-19921).
+* Update the opencontainers/selinux which includes a mitigation for [CVE-2019-16884](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-16884).
+* Update Golang runtime to 1.12.16, mitigating the [CVE-2020-0601](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2020-0601) certificate verification bypass on Windows, and [CVE-2020-7919](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2020-7919), which only affects 32-bit architectures.
+* Update Golang runtime to 1.12.15, which includes a fix to the runtime (Go 1.12.14, Go 1.12.15) and and the `net/http` package (Go 1.12.15)
+* Update the `gopkg.in/yaml.v2` vendor to v2.2.8 with a mitigation for [CVE-2019-11253](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-11253)
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
