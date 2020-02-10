@@ -29,6 +29,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/remotes"
 	digest "github.com/opencontainers/go-digest"
@@ -190,6 +191,93 @@ func TestBadTokenResolver(t *testing.T) {
 	if errors.Cause(err) != ErrInvalidAuthorization {
 		t.Fatal(err)
 	}
+}
+
+func TestHostFailureFallbackResolver(t *testing.T) {
+	sf := func(h http.Handler) (string, ResolverOptions, func()) {
+		s := httptest.NewServer(h)
+		base := s.URL[7:] // strip "http://"
+
+		options := ResolverOptions{}
+		createHost := func(host string) RegistryHost {
+			return RegistryHost{
+				Client: &http.Client{
+					// Set the timeout so we timeout waiting for the non-responsive HTTP server
+					Timeout: 500 * time.Millisecond,
+				},
+				Host:         host,
+				Scheme:       "http",
+				Path:         "/v2",
+				Capabilities: HostCapabilityPull | HostCapabilityResolve | HostCapabilityPush,
+			}
+		}
+
+		// Create an unstarted HTTP server. We use this to generate a random port.
+		notRunning := httptest.NewUnstartedServer(nil)
+		notRunningBase := notRunning.Listener.Addr().String()
+
+		// Override hosts with two hosts
+		options.Hosts = func(host string) ([]RegistryHost, error) {
+			return []RegistryHost{
+				createHost(notRunningBase), // This host IS running, but with a non-responsive HTTP server
+				createHost(base),           // This host IS running
+			}, nil
+		}
+
+		return base, options, s.Close
+	}
+
+	runBasicTest(t, "testname", sf)
+}
+
+func TestHostTLSFailureFallbackResolver(t *testing.T) {
+	sf := func(h http.Handler) (string, ResolverOptions, func()) {
+		// Start up two servers
+		server := httptest.NewServer(h)
+		httpBase := server.URL[7:] // strip "http://"
+
+		tlsServer := httptest.NewUnstartedServer(h)
+		tlsServer.StartTLS()
+		httpsBase := tlsServer.URL[8:] // strip "https://"
+
+		capool := x509.NewCertPool()
+		cert, _ := x509.ParseCertificate(tlsServer.TLS.Certificates[0].Certificate[0])
+		capool.AddCert(cert)
+
+		client := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					RootCAs: capool,
+				},
+			},
+		}
+
+		options := ResolverOptions{}
+		createHost := func(host string) RegistryHost {
+			return RegistryHost{
+				Client:       client,
+				Host:         host,
+				Scheme:       "https",
+				Path:         "/v2",
+				Capabilities: HostCapabilityPull | HostCapabilityResolve | HostCapabilityPush,
+			}
+		}
+
+		// Override hosts with two hosts
+		options.Hosts = func(host string) ([]RegistryHost, error) {
+			return []RegistryHost{
+				createHost(httpBase),  // This host is serving plain HTTP
+				createHost(httpsBase), // This host is serving TLS
+			}, nil
+		}
+
+		return httpBase, options, func() {
+			server.Close()
+			tlsServer.Close()
+		}
+	}
+
+	runBasicTest(t, "testname", sf)
 }
 
 func withTokenServer(th http.Handler, creds func(string) (string, string, error)) func(h http.Handler) (string, ResolverOptions, func()) {
