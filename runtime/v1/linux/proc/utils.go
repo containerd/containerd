@@ -46,12 +46,6 @@ func (s *safePid) get() int {
 	return s.pid
 }
 
-func (s *safePid) set(pid int) {
-	s.Lock()
-	s.pid = pid
-	s.Unlock()
-}
-
 type atomicBool int32
 
 func (ab *atomicBool) set(b bool) {
