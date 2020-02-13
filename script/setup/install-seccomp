@@ -16,8 +16,7 @@
 
 
 #
-# Builds and installs runc to /usr/local/go/bin based off
-# the commit defined in vendor.conf
+# Builds a specific version of libseccomp and installs in /usr/local
 #
 set -eu -o pipefail
 
