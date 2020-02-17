@@ -22,8 +22,8 @@ set -eu -o pipefail
 
 go get -u github.com/onsi/ginkgo/ginkgo
 CRITEST_COMMIT=v1.16.1
-go get -d github.com/kubernetes-incubator/cri-tools/...
-cd "$GOPATH"/src/github.com/kubernetes-incubator/cri-tools
+go get -d github.com/kubernetes-sigs/cri-tools/...
+cd "$GOPATH"/src/github.com/kubernetes-sigs/cri-tools
 git checkout $CRITEST_COMMIT
 make
 make install
