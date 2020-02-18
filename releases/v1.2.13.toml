@@ -1,0 +1,31 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.2.12"
+
+pre_release = false
+
+preface = """\
+The thirteenth patch release for `containerd` 1.2 fixes a regression introduced
+in v1.2.12 that caused container/shim to hang on single core machines, fixes an
+issue with blkio, and updates the Golang runtime to 1.12.17.
+
+### Notable Updates
+
+* Fix container pid race condition [containerd#4025](https://github.com/containerd/containerd/pull/4025)
+* Update containerd/cgroups dependency to address blkio issue [containerd#4001](https://github.com/containerd/containerd/pull/4001)
+* Set octet-stream content-type on PUT request [containerd#4028](https://github.com/containerd/containerd/pull/4028)
+* Pin to libseccomp 2.3.3 to preserve compatibility with hosts that do not have libseccomp 2.4 or higher installed [containerd#4015](https://github.com/containerd/containerd/pull/4015)
+* Update Golang runtime to 1.12.17, which includes a fix to the runtime [containerd#4031](https://github.com/containerd/containerd/pull/4031)
+
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
