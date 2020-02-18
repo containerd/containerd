@@ -317,3 +317,20 @@ func TestFilters(t *testing.T) {
 		})
 	}
 }
+
+func TestOperatorStrings(t *testing.T) {
+	for _, testcase := range []struct {
+		op       operator
+		expected string
+	}{
+		{operatorPresent, "?"},
+		{operatorEqual, "=="},
+		{operatorNotEqual, "!="},
+		{operatorMatches, "~="},
+		{10, "unknown"},
+	} {
+		if !reflect.DeepEqual(testcase.op.String(), testcase.expected) {
+			t.Fatalf("return value unexpected: %v != %v", testcase.op.String(), testcase.expected)
+		}
+	}
+}
