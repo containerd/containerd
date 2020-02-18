@@ -421,6 +421,7 @@ func (ah *authHandler) fetchToken(ctx context.Context, to tokenOptions) (string,
 
 	if to.secret != "" {
 		req.SetBasicAuth(to.username, to.secret)
+		reqParams.Add("account", to.username)
 	}
 
 	req.URL.RawQuery = reqParams.Encode()
