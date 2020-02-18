@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/snapshots"
 	ptypes "github.com/gogo/protobuf/types"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
@@ -272,6 +273,33 @@ func (s *service) Cleanup(ctx context.Context, cr *snapshotsapi.CleanupRequest) 
 	}
 
 	return empty, nil
+}
+
+func (s *service) Annotate(ctx context.Context, ar *snapshotsapi.AnnotateRequest) (*snapshotsapi.AnnotateResponse, error) {
+	sn, err := s.getSnapshotter(ar.Snapshotter)
+	if err != nil {
+		return nil, err
+	}
+
+	a, ok := sn.(snapshots.Annotator)
+	if !ok {
+		return nil, errdefs.ToGRPCf(errdefs.ErrNotImplemented, "snapshotter does not implement Annotate method")
+	}
+	annotations, err := a.Annotate(ctx, toDescriptor(ar.Desc))
+	if err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+
+	return &snapshotsapi.AnnotateResponse{Annotations: annotations}, nil
+}
+
+func toDescriptor(d *types.Descriptor) ocispec.Descriptor {
+	return ocispec.Descriptor{
+		MediaType:   d.MediaType,
+		Digest:      d.Digest,
+		Size:        d.Size_,
+		Annotations: d.Annotations,
+	}
 }
 
 func fromKind(kind snapshots.Kind) snapshotsapi.Kind {

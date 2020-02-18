@@ -20,12 +20,15 @@ import (
 	"context"
 
 	eventstypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/snapshots"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 )
 
 // snapshotter wraps snapshots.Snapshotter with proper events published.
@@ -95,4 +98,16 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 	return s.publisher.Publish(ctx, "/snapshot/remove", &eventstypes.SnapshotRemove{
 		Key: key,
 	})
+}
+
+func (s *snapshotter) Annotate(ctx context.Context, desc ocispec.Descriptor) (map[string]string, error) {
+	a, ok := s.Snapshotter.(snapshots.Annotator)
+	if !ok {
+		return nil, errors.Wrapf(errdefs.ErrNotImplemented, "snapshotter does not implement Annotate method")
+	}
+	annotations, err := a.Annotate(ctx, desc)
+	if err != nil {
+		return nil, err
+	}
+	return annotations, err
 }

@@ -72,7 +72,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		if err != nil {
 			return nil, errors.Wrap(err, "create unpacker")
 		}
-		unpackWrapper, unpackEg = u.handlerWrapper(ctx, pullCtx, &unpacks)
+		unpackWrapper, unpackEg = u.handlerWrapper(ctx, pullCtx, &unpacks, ref)
 		defer func() {
 			if err := unpackEg.Wait(); err != nil {
 				if retErr == nil {

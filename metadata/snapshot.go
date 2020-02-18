@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/snapshots"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
 )
@@ -271,6 +272,18 @@ func (s *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 		return nil, err
 	}
 	return s.Snapshotter.Mounts(ctx, bkey)
+}
+
+func (s *snapshotter) Annotate(ctx context.Context, desc ocispec.Descriptor) (map[string]string, error) {
+	a, ok := s.Snapshotter.(snapshots.Annotator)
+	if !ok {
+		return nil, errors.Wrapf(errdefs.ErrNotImplemented, "snapshotter does not implement Annotate method")
+	}
+	annotations, err := a.Annotate(ctx, desc)
+	if err != nil {
+		return nil, err
+	}
+	return annotations, err
 }
 
 func (s *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {

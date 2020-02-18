@@ -3007,6 +3007,7 @@ file {
   dependency: "google/protobuf/field_mask.proto"
   dependency: "google/protobuf/timestamp.proto"
   dependency: "github.com/containerd/containerd/api/types/mount.proto"
+  dependency: "github.com/containerd/containerd/api/types/descriptor.proto"
   message_type {
     name: "PrepareSnapshotRequest"
     field {
@@ -3456,6 +3457,55 @@ file {
       json_name: "snapshotter"
     }
   }
+  message_type {
+    name: "AnnotateRequest"
+    field {
+      name: "snapshotter"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "snapshotter"
+    }
+    field {
+      name: "desc"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Descriptor"
+      json_name: "desc"
+    }
+  }
+  message_type {
+    name: "AnnotateResponse"
+    field {
+      name: "annotations"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.snapshots.v1.AnnotateResponse.AnnotationsEntry"
+      json_name: "annotations"
+    }
+    nested_type {
+      name: "AnnotationsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
+  }
   enum_type {
     name: "Kind"
     value {
@@ -3543,6 +3593,11 @@ file {
       name: "Cleanup"
       input_type: ".containerd.services.snapshots.v1.CleanupRequest"
       output_type: ".google.protobuf.Empty"
+    }
+    method {
+      name: "Annotate"
+      input_type: ".containerd.services.snapshots.v1.AnnotateRequest"
+      output_type: ".containerd.services.snapshots.v1.AnnotateResponse"
     }
   }
   options {

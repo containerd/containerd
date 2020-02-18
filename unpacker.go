@@ -42,7 +42,8 @@ import (
 )
 
 const (
-	labelSnapshotRef = "containerd.io/snapshot.ref"
+	labelSnapshotRef  = "containerd.io/snapshot.ref"
+	annotationRefName = "containerd.io/unpacker/ref.name"
 )
 
 type unpacker struct {
@@ -281,6 +282,7 @@ func (u *unpacker) handlerWrapper(
 	uctx context.Context,
 	rCtx *RemoteContext,
 	unpacks *int32,
+	ref string,
 ) (func(images.Handler) images.Handler, *errgroup.Group) {
 	eg, uctx := errgroup.WithContext(uctx)
 	return func(f images.Handler) images.Handler {
@@ -298,11 +300,27 @@ func (u *unpacker) handlerWrapper(
 			case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
 				var nonLayers []ocispec.Descriptor
 				var manifestLayers []ocispec.Descriptor
+				sn := u.c.SnapshotService(u.snapshotter)
 
 				// Split layers from non-layers, layers will be handled after
 				// the config
 				for _, child := range children {
 					if images.IsLayerType(child.MediaType) {
+
+						// Annotate this layer if necessary
+						if a, ok := sn.(snapshots.Annotator); ok {
+							if child.Annotations == nil {
+								child.Annotations = make(map[string]string)
+							}
+							child.Annotations[annotationRefName] = ref
+							annotations, err := a.Annotate(uctx, child)
+							if err != nil && !errdefs.IsNotImplemented(err) {
+								return nil, err
+							}
+							for k, v := range snapshots.FilterInheritedLabels(annotations) {
+								child.Annotations[k] = v
+							}
+						}
 						manifestLayers = append(manifestLayers, child)
 					} else {
 						nonLayers = append(nonLayers, child)

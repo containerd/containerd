@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/mount"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 const (
@@ -339,6 +340,19 @@ type Snapshotter interface {
 	//
 	// Close returns nil when it is already closed.
 	Close() error
+}
+
+// Annotator defines a type capable of annotating layer descriptors. The
+// Annotator interface should be used by snapshotters which requires
+// snapshotter-specific additional information for snapshots preparation.
+// The string map returned by the `Annotation()` method will be treated as
+// additional annotations for each layer descriptor and will be passed again
+// to the snapshotter as labels on `Prepare()`. This is useful for snapshotters
+// which require information in addition to what is passed on `Prepare()` (i.e.
+// key, parent and chainID, etc.). The additional information includes manifest
+// digest, image reference, content digest and size, etc.
+type Annotator interface {
+	Annotate(ctx context.Context, desc ocispec.Descriptor) (map[string]string, error)
 }
 
 // Cleaner defines a type capable of performing asynchronous resource cleanup.

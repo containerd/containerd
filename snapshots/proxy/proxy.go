@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
 	protobuftypes "github.com/gogo/protobuf/types"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // NewSnapshotter returns a new Snapshotter which communicates over a GRPC
@@ -191,6 +192,17 @@ func (p *proxySnapshotter) Cleanup(ctx context.Context) error {
 	return errdefs.FromGRPC(err)
 }
 
+func (p *proxySnapshotter) Annotate(ctx context.Context, desc ocispec.Descriptor) (map[string]string, error) {
+	resp, err := p.client.Annotate(ctx, &snapshotsapi.AnnotateRequest{
+		Snapshotter: p.snapshotterName,
+		Desc:        fromDescriptor(desc),
+	})
+	if err != nil {
+		return nil, errdefs.FromGRPC(err)
+	}
+	return resp.Annotations, nil
+}
+
 func toKind(kind snapshotsapi.Kind) snapshots.Kind {
 	if kind == snapshotsapi.KindActive {
 		return snapshots.KindActive
@@ -229,6 +241,15 @@ func toMounts(mm []*types.Mount) []mount.Mount {
 		}
 	}
 	return mounts
+}
+
+func fromDescriptor(d ocispec.Descriptor) *types.Descriptor {
+	return &types.Descriptor{
+		MediaType:   d.MediaType,
+		Digest:      d.Digest,
+		Size_:       d.Size,
+		Annotations: d.Annotations,
+	}
 }
 
 func fromKind(kind snapshots.Kind) snapshotsapi.Kind {

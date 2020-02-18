@@ -7,6 +7,7 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "github.com/containerd/containerd/api/types/mount.proto";
+import "github.com/containerd/containerd/api/types/descriptor.proto";
 
 option go_package = "github.com/containerd/containerd/api/services/snapshots/v1;snapshots";
 
@@ -22,6 +23,7 @@ service Snapshots {
 	rpc List(ListSnapshotsRequest) returns (stream ListSnapshotsResponse);
 	rpc Usage(UsageRequest) returns (UsageResponse);
 	rpc Cleanup(CleanupRequest) returns (google.protobuf.Empty);
+	rpc Annotate(AnnotateRequest) returns (AnnotateResponse);
 }
 
 message PrepareSnapshotRequest {
@@ -164,4 +166,13 @@ message UsageResponse {
 
 message CleanupRequest {
 	string snapshotter = 1;
+}
+
+message AnnotateRequest {
+	string snapshotter = 1;
+	containerd.types.Descriptor desc = 2;
+}
+
+message AnnotateResponse {
+	map<string, string> annotations = 1;
 }
