@@ -1,3 +1,4 @@
+// +build linux windows
 // +build !no_cri
 
 /*
