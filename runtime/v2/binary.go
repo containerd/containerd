@@ -77,7 +77,13 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 	}
 	// Windows needs a namespace when openShimLog
 	ns, _ := namespaces.Namespace(ctx)
-	f, err := openShimLog(namespaces.WithNamespace(context.Background(), ns), b.bundle, client.AnonDialer)
+	shimCtx, cancelShimLog := context.WithCancel(namespaces.WithNamespace(context.Background(), ns))
+	defer func() {
+		if err != nil {
+			cancelShimLog()
+		}
+	}()
+	f, err := openShimLog(shimCtx, b.bundle, client.AnonDialer)
 	if err != nil {
 		return nil, errors.Wrap(err, "open shim log pipe")
 	}
@@ -106,7 +112,11 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 	if err != nil {
 		return nil, err
 	}
-	client := ttrpc.NewClient(conn, ttrpc.WithOnClose(onClose))
+	onCloseWithShimLog := func() {
+		onClose()
+		cancelShimLog()
+	}
+	client := ttrpc.NewClient(conn, ttrpc.WithOnClose(onCloseWithShimLog))
 	return &shim{
 		bundle:  b.bundle,
 		client:  client,
