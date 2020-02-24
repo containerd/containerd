@@ -122,6 +122,14 @@ func (m *PoolMetadata) AddDevice(ctx context.Context, info *DeviceInfo) error {
 	return nil
 }
 
+// ChangeDeviceState changes the device state given the device name in devices bucket.
+func (m *PoolMetadata) ChangeDeviceState(ctx context.Context, name string, state DeviceState) error {
+	return m.UpdateDevice(ctx, name, func(deviceInfo *DeviceInfo) error {
+		deviceInfo.State = state
+		return nil
+	})
+}
+
 // MarkFaulty marks the given device and corresponding devmapper device ID as faulty.
 // The snapshotter might attempt to recreate a device in 'Faulty' state with another devmapper ID in
 // subsequent calls, and in case of success it's status will be changed to 'Created' or 'Activated'.

@@ -25,6 +25,7 @@ The following configuration flags are supported:
 * `pool_name` - a name to use for the devicemapper thin pool. Pool name
   should be the same as in `/dev/mapper/` directory
 * `base_image_size` - defines how much space to allocate when creating the base device
+* `async_remove` - flag to async remove device using snapshot GC's cleanup callback
 
 Pool name and base image size are required snapshotter parameters.
 
