@@ -295,17 +295,17 @@ func TestEncryptedImagePullOpts(t *testing.T) {
 		expectedOpts int
 	}{
 		"node key model should return one unpack opt": {
-			keyModel:     criconfig.EncryptionKeyModelNode,
+			keyModel:     criconfig.KeyModelNode,
 			expectedOpts: 1,
 		},
 		"no key model selected should default to node key model": {
 			keyModel:     "",
-			expectedOpts: 1,
+			expectedOpts: 0,
 		},
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIService()
-		c.config.ImageEncryption.KeyModel = test.keyModel
+		c.config.ImageDecryption.KeyModel = test.keyModel
 		got := len(c.encryptedImagesPullOpts())
 		assert.Equal(t, test.expectedOpts, got)
 	}

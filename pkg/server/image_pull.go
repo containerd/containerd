@@ -411,11 +411,10 @@ func newTransport() *http.Transport {
 	}
 }
 
-// addEncryptedImagesPullOpts adds the necessary pull options to a list of
-// pull options if enabled.
+// encryptedImagesPullOpts returns the necessary list of pull options required
+// for decryption of encrypted images based on the cri decryption configuration.
 func (c *criService) encryptedImagesPullOpts() []containerd.RemoteOpt {
-	if c.config.ImageEncryption.KeyModel == criconfig.EncryptionKeyModelNode ||
-		c.config.ImageEncryption.KeyModel == "" {
+	if c.config.ImageDecryption.KeyModel == criconfig.KeyModelNode {
 		ltdd := imgcrypt.Payload{}
 		decUnpackOpt := encryption.WithUnpackConfigApplyOpts(encryption.WithDecryptedUnpack(&ltdd))
 		opt := containerd.WithUnpackOpts([]containerd.UnpackOpt{decUnpackOpt})

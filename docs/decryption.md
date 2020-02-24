@@ -19,10 +19,16 @@ The default configuration does not handle decrypting encrypted container images.
 
 An example for configuring the "node" key model for container image decryption:
 
+Configure `cri` to enable decryption with "node" key model
 ```toml
 [plugins.cri.image_decryption]
   key_model = "node"
 
+```
+
+Configure `containerd` daemon [`stream_processors`](https://github.com/containerd/containerd/blob/master/docs/stream_processors.md) to handle the
+encrypted mediatypes.
+```toml
 [stream_processors]
   [stream_processors."io.containerd.ocicrypt.decoder.v1.tar.gzip"]
     accepts = ["application/vnd.oci.image.layer.v1.tar+gzip+encrypted"]
@@ -36,6 +42,6 @@ An example for configuring the "node" key model for container image decryption:
     args = ["--decryption-keys-path", "/keys"]
 ```
 
-In this example, container image decryption is set to use the "node" key model. In addition, the decryption `stream_processors` are configured as specified in [containerd/imgcrypt project](https://github.com/containerd/imgcrypt), with the additional field `--decryption-keys-path` configured to specify where decryption keys are located locally in the node.
+In this example, container image decryption is set to use the "node" key model. In addition, the decryption [`stream_processors`](https://github.com/containerd/containerd/blob/master/docs/stream_processors.md) are configured as specified in [containerd/imgcrypt project](https://github.com/containerd/imgcrypt), with the additional field `--decryption-keys-path` configured to specify where decryption keys are located locally in the node.
 
 After modify this config, you need restart the `containerd` service.
