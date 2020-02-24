@@ -201,6 +201,14 @@ version = 2
     [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
       [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
         endpoint = ["https://registry-1.docker.io", ]
+
+  # 'plugins."io.containerd.grpc.v1.cri".image_decryption' contains config related
+  # to the handling decryption of encrypted container images.
+  [plugins."io.containerd.grpc.v1.cri".image_decryption]
+    # key_model sets how the trust model of where keys should reside for the
+    # decryption of encrypted container images. The default is "node".
+    # The docs/encryption.md file provides further information of key models.
+    key_model = "node"
 ```
 
 ## Untrusted Workload
