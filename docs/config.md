@@ -203,11 +203,20 @@ version = 2
         endpoint = ["https://registry-1.docker.io", ]
 
   # 'plugins."io.containerd.grpc.v1.cri".image_decryption' contains config related
-  # to the handling decryption of encrypted container images.
+  # to handling decryption of encrypted container images.
   [plugins."io.containerd.grpc.v1.cri".image_decryption]
-    # key_model sets how the trust model of where keys should reside for the
-    # decryption of encrypted container images. The default is "node".
-    # The docs/encryption.md file provides further information of key models.
+    # key_model defines the name of the key model used for how the cri obtains
+    # keys used for decryption of encrypted container images.
+    # Set of available string options: {"node"}
+    #
+    # In order to use the decryption feature, additional configurations must be made.
+    # The [decryption document](https://github.com/containerd/cri/blob/master/docs/decryption.md)
+    # provides information of key models and how to set them up with stream processors and the
+    # containerd imgcrypt decoder.
+    #
+    # Additional information on stream processors and imgcrypt:
+    # * Stream processors: https://github.com/containerd/containerd/blob/master/docs/stream_processors.md
+    # * Containerd imgcrypt : https://github.com/containerd/imgcrypt
     key_model = "node"
 ```
 

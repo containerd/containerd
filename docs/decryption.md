@@ -1,5 +1,5 @@
-# Configure Image Encryption
-This document describes the method to configure image encryption for `containerd` for use with the `cri` plugin.
+# Configure Image Decryption
+This document describes the method to configure encrypted container image decryption for `containerd` for use with the `cri` plugin.
 
 ## Encrypted Container Images
 
@@ -17,7 +17,7 @@ In this model encryption is tied to worker nodes. The usecase here revolves arou
 
 The default configuration does not handle decrypting encrypted container images.
 
-An example for configuring the "node" key model for container image decryption is as follows:
+An example for configuring the "node" key model for container image decryption:
 
 ```toml
 [plugins.cri.image_decryption]
@@ -35,8 +35,6 @@ An example for configuring the "node" key model for container image decryption i
     path = "/usr/local/bin/ctd-decoder"
     args = ["--decryption-keys-path", "/keys"]
 ```
-
-
 
 In this example, container image decryption is set to use the "node" key model. In addition, the decryption `stream_processors` are configured as specified in [containerd/imgcrypt project](https://github.com/containerd/imgcrypt), with the additional field `--decryption-keys-path` configured to specify where decryption keys are located locally in the node.
 
