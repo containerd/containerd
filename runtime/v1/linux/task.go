@@ -21,6 +21,7 @@ package linux
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/containerd/cgroups"
 	eventstypes "github.com/containerd/containerd/api/events"
@@ -99,7 +100,9 @@ func (t *Task) Delete(ctx context.Context) (*runtime.Exit, error) {
 		}
 	}
 	t.tasks.Delete(ctx, t.id)
-	if err := t.shim.KillShim(ctx); err != nil {
+	deferCtx, deferCancel := context.WithTimeout(context.TODO(), 1 * time.Minute)
+	defer deferCancel()
+	if err := t.shim.KillShim(deferCtx); err != nil {
 		log.G(ctx).WithError(err).Error("failed to kill shim")
 	}
 	if err := t.bundle.Delete(); err != nil {
