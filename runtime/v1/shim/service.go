@@ -114,7 +114,7 @@ type Service struct {
 }
 
 // Create a new initial process and container with the underlying OCI runtime
-func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (_ *shimapi.CreateTaskResponse, err error) {
+func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (_ *shimapi.CreateTaskResponse, retErr error) {
 	var mounts []process.Mount
 	for _, m := range r.Rootfs {
 		mounts = append(mounts, process.Mount{
@@ -128,8 +128,8 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (_ *
 	rootfs := ""
 	if len(mounts) > 0 {
 		rootfs = filepath.Join(r.Bundle, "rootfs")
-		if err := os.Mkdir(rootfs, 0711); err != nil && !os.IsExist(err) {
-			return nil, err
+		if retErr = os.Mkdir(rootfs, 0711); retErr != nil && !os.IsExist(retErr) {
+			return nil, retErr
 		}
 	}
 
@@ -147,7 +147,7 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (_ *
 		Options:          r.Options,
 	}
 	defer func() {
-		if err != nil {
+		if retErr != nil {
 			if err2 := mount.UnmountAll(rootfs, 0); err2 != nil {
 				log.G(ctx).WithError(err2).Warn("Failed to cleanup rootfs mount")
 			}
