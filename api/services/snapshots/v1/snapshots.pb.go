@@ -12,8 +12,11 @@ import (
 	github_com_gogo_protobuf_types "github.com/gogo/protobuf/types"
 	types1 "github.com/gogo/protobuf/types"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	io "io"
 	math "math"
+	math_bits "math/bits"
 	reflect "reflect"
 	strings "strings"
 	time "time"
@@ -29,7 +32,7 @@ var _ = time.Kitchen
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 type Kind int32
 
@@ -88,7 +91,7 @@ func (m *PrepareSnapshotRequest) XXX_Marshal(b []byte, deterministic bool) ([]by
 		return xxx_messageInfo_PrepareSnapshotRequest.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -127,7 +130,7 @@ func (m *PrepareSnapshotResponse) XXX_Marshal(b []byte, deterministic bool) ([]b
 		return xxx_messageInfo_PrepareSnapshotResponse.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -172,7 +175,7 @@ func (m *ViewSnapshotRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte,
 		return xxx_messageInfo_ViewSnapshotRequest.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -211,7 +214,7 @@ func (m *ViewSnapshotResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte
 		return xxx_messageInfo_ViewSnapshotResponse.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -251,7 +254,7 @@ func (m *MountsRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error
 		return xxx_messageInfo_MountsRequest.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -290,7 +293,7 @@ func (m *MountsResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, erro
 		return xxx_messageInfo_MountsResponse.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -330,7 +333,7 @@ func (m *RemoveSnapshotRequest) XXX_Marshal(b []byte, deterministic bool) ([]byt
 		return xxx_messageInfo_RemoveSnapshotRequest.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -375,7 +378,7 @@ func (m *CommitSnapshotRequest) XXX_Marshal(b []byte, deterministic bool) ([]byt
 		return xxx_messageInfo_CommitSnapshotRequest.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -415,7 +418,7 @@ func (m *StatSnapshotRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte,
 		return xxx_messageInfo_StatSnapshotRequest.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -464,7 +467,7 @@ func (m *Info) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return xxx_messageInfo_Info.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -503,7 +506,7 @@ func (m *StatSnapshotResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte
 		return xxx_messageInfo_StatSnapshotResponse.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -550,7 +553,7 @@ func (m *UpdateSnapshotRequest) XXX_Marshal(b []byte, deterministic bool) ([]byt
 		return xxx_messageInfo_UpdateSnapshotRequest.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -589,7 +592,7 @@ func (m *UpdateSnapshotResponse) XXX_Marshal(b []byte, deterministic bool) ([]by
 		return xxx_messageInfo_UpdateSnapshotResponse.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -639,7 +642,7 @@ func (m *ListSnapshotsRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte
 		return xxx_messageInfo_ListSnapshotsRequest.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -678,7 +681,7 @@ func (m *ListSnapshotsResponse) XXX_Marshal(b []byte, deterministic bool) ([]byt
 		return xxx_messageInfo_ListSnapshotsResponse.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -718,7 +721,7 @@ func (m *UsageRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
 		return xxx_messageInfo_UsageRequest.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -758,7 +761,7 @@ func (m *UsageResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error
 		return xxx_messageInfo_UsageResponse.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -797,7 +800,7 @@ func (m *CleanupRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, erro
 		return xxx_messageInfo_CleanupRequest.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -1075,6 +1078,41 @@ type SnapshotsServer interface {
 	Cleanup(context.Context, *CleanupRequest) (*types1.Empty, error)
 }
 
+// UnimplementedSnapshotsServer can be embedded to have forward compatible implementations.
+type UnimplementedSnapshotsServer struct {
+}
+
+func (*UnimplementedSnapshotsServer) Prepare(ctx context.Context, req *PrepareSnapshotRequest) (*PrepareSnapshotResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Prepare not implemented")
+}
+func (*UnimplementedSnapshotsServer) View(ctx context.Context, req *ViewSnapshotRequest) (*ViewSnapshotResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method View not implemented")
+}
+func (*UnimplementedSnapshotsServer) Mounts(ctx context.Context, req *MountsRequest) (*MountsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Mounts not implemented")
+}
+func (*UnimplementedSnapshotsServer) Commit(ctx context.Context, req *CommitSnapshotRequest) (*types1.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Commit not implemented")
+}
+func (*UnimplementedSnapshotsServer) Remove(ctx context.Context, req *RemoveSnapshotRequest) (*types1.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Remove not implemented")
+}
+func (*UnimplementedSnapshotsServer) Stat(ctx context.Context, req *StatSnapshotRequest) (*StatSnapshotResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Stat not implemented")
+}
+func (*UnimplementedSnapshotsServer) Update(ctx context.Context, req *UpdateSnapshotRequest) (*UpdateSnapshotResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Update not implemented")
+}
+func (*UnimplementedSnapshotsServer) List(req *ListSnapshotsRequest, srv Snapshots_ListServer) error {
+	return status.Errorf(codes.Unimplemented, "method List not implemented")
+}
+func (*UnimplementedSnapshotsServer) Usage(ctx context.Context, req *UsageRequest) (*UsageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Usage not implemented")
+}
+func (*UnimplementedSnapshotsServer) Cleanup(ctx context.Context, req *CleanupRequest) (*types1.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Cleanup not implemented")
+}
+
 func RegisterSnapshotsServer(s *grpc.Server, srv SnapshotsServer) {
 	s.RegisterService(&_Snapshots_serviceDesc, srv)
 }
@@ -1316,7 +1354,7 @@ var _Snapshots_serviceDesc = grpc.ServiceDesc{
 func (m *PrepareSnapshotRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -1324,55 +1362,66 @@ func (m *PrepareSnapshotRequest) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *PrepareSnapshotRequest) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PrepareSnapshotRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if len(m.Snapshotter) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Snapshotter)))
-		i += copy(dAtA[i:], m.Snapshotter)
-	}
-	if len(m.Key) > 0 {
-		dAtA[i] = 0x12
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Key)))
-		i += copy(dAtA[i:], m.Key)
-	}
-	if len(m.Parent) > 0 {
-		dAtA[i] = 0x1a
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Parent)))
-		i += copy(dAtA[i:], m.Parent)
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	if len(m.Labels) > 0 {
-		for k, _ := range m.Labels {
-			dAtA[i] = 0x22
-			i++
+		for k := range m.Labels {
 			v := m.Labels[k]
-			mapSize := 1 + len(k) + sovSnapshots(uint64(len(k))) + 1 + len(v) + sovSnapshots(uint64(len(v)))
-			i = encodeVarintSnapshots(dAtA, i, uint64(mapSize))
-			dAtA[i] = 0xa
-			i++
-			i = encodeVarintSnapshots(dAtA, i, uint64(len(k)))
-			i += copy(dAtA[i:], k)
-			dAtA[i] = 0x12
-			i++
+			baseI := i
+			i -= len(v)
+			copy(dAtA[i:], v)
 			i = encodeVarintSnapshots(dAtA, i, uint64(len(v)))
-			i += copy(dAtA[i:], v)
+			i--
+			dAtA[i] = 0x12
+			i -= len(k)
+			copy(dAtA[i:], k)
+			i = encodeVarintSnapshots(dAtA, i, uint64(len(k)))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintSnapshots(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x22
 		}
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	if len(m.Parent) > 0 {
+		i -= len(m.Parent)
+		copy(dAtA[i:], m.Parent)
+		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Parent)))
+		i--
+		dAtA[i] = 0x1a
 	}
-	return i, nil
+	if len(m.Key) > 0 {
+		i -= len(m.Key)
+		copy(dAtA[i:], m.Key)
+		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Key)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.Snapshotter) > 0 {
+		i -= len(m.Snapshotter)
+		copy(dAtA[i:], m.Snapshotter)
+		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Snapshotter)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
 }
 
 func (m *PrepareSnapshotResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -1380,32 +1429,40 @@ func (m *PrepareSnapshotResponse) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *PrepareSnapshotResponse) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PrepareSnapshotResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
 	if len(m.Mounts) > 0 {
-		for _, msg := range m.Mounts {
-			dAtA[i] = 0xa
-			i++
-			i = encodeVarintSnapshots(dAtA, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(dAtA[i:])
-			if err != nil {
-				return 0, err
+		for iNdEx := len(m.Mounts) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Mounts[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintSnapshots(dAtA, i, uint64(size))
 			}
-			i += n
+			i--
+			dAtA[i] = 0xa
 		}
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
-	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 
 func (m *ViewSnapshotRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -1413,55 +1470,66 @@ func (m *ViewSnapshotRequest) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *ViewSnapshotRequest) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ViewSnapshotRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if len(m.Snapshotter) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Snapshotter)))
-		i += copy(dAtA[i:], m.Snapshotter)
-	}
-	if len(m.Key) > 0 {
-		dAtA[i] = 0x12
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Key)))
-		i += copy(dAtA[i:], m.Key)
-	}
-	if len(m.Parent) > 0 {
-		dAtA[i] = 0x1a
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Parent)))
-		i += copy(dAtA[i:], m.Parent)
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	if len(m.Labels) > 0 {
-		for k, _ := range m.Labels {
-			dAtA[i] = 0x22
-			i++
+		for k := range m.Labels {
 			v := m.Labels[k]
-			mapSize := 1 + len(k) + sovSnapshots(uint64(len(k))) + 1 + len(v) + sovSnapshots(uint64(len(v)))
-			i = encodeVarintSnapshots(dAtA, i, uint64(mapSize))
-			dAtA[i] = 0xa
-			i++
-			i = encodeVarintSnapshots(dAtA, i, uint64(len(k)))
-			i += copy(dAtA[i:], k)
-			dAtA[i] = 0x12
-			i++
+			baseI := i
+			i -= len(v)
+			copy(dAtA[i:], v)
 			i = encodeVarintSnapshots(dAtA, i, uint64(len(v)))
-			i += copy(dAtA[i:], v)
+			i--
+			dAtA[i] = 0x12
+			i -= len(k)
+			copy(dAtA[i:], k)
+			i = encodeVarintSnapshots(dAtA, i, uint64(len(k)))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintSnapshots(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x22
 		}
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	if len(m.Parent) > 0 {
+		i -= len(m.Parent)
+		copy(dAtA[i:], m.Parent)
+		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Parent)))
+		i--
+		dAtA[i] = 0x1a
 	}
-	return i, nil
+	if len(m.Key) > 0 {
+		i -= len(m.Key)
+		copy(dAtA[i:], m.Key)
+		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Key)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.Snapshotter) > 0 {
+		i -= len(m.Snapshotter)
+		copy(dAtA[i:], m.Snapshotter)
+		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Snapshotter)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
 }
 
 func (m *ViewSnapshotResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -1469,32 +1537,40 @@ func (m *ViewSnapshotResponse) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *ViewSnapshotResponse) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ViewSnapshotResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
 	if len(m.Mounts) > 0 {
-		for _, msg := range m.Mounts {
-			dAtA[i] = 0xa
-			i++
-			i = encodeVarintSnapshots(dAtA, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(dAtA[i:])
-			if err != nil {
-				return 0, err
+		for iNdEx := len(m.Mounts) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Mounts[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintSnapshots(dAtA, i, uint64(size))
 			}
-			i += n
+			i--
+			dAtA[i] = 0xa
 		}
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
-	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 
 func (m *MountsRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -1502,32 +1578,40 @@ func (m *MountsRequest) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *MountsRequest) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MountsRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if len(m.Snapshotter) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Snapshotter)))
-		i += copy(dAtA[i:], m.Snapshotter)
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	if len(m.Key) > 0 {
-		dAtA[i] = 0x12
-		i++
+		i -= len(m.Key)
+		copy(dAtA[i:], m.Key)
 		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Key)))
-		i += copy(dAtA[i:], m.Key)
+		i--
+		dAtA[i] = 0x12
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	if len(m.Snapshotter) > 0 {
+		i -= len(m.Snapshotter)
+		copy(dAtA[i:], m.Snapshotter)
+		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Snapshotter)))
+		i--
+		dAtA[i] = 0xa
 	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 
 func (m *MountsResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -1535,32 +1619,40 @@ func (m *MountsResponse) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *MountsResponse) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MountsResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
 	if len(m.Mounts) > 0 {
-		for _, msg := range m.Mounts {
-			dAtA[i] = 0xa
-			i++
-			i = encodeVarintSnapshots(dAtA, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(dAtA[i:])
-			if err != nil {
-				return 0, err
+		for iNdEx := len(m.Mounts) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Mounts[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintSnapshots(dAtA, i, uint64(size))
 			}
-			i += n
+			i--
+			dAtA[i] = 0xa
 		}
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
-	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 
 func (m *RemoveSnapshotRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -1568,32 +1660,40 @@ func (m *RemoveSnapshotRequest) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *RemoveSnapshotRequest) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *RemoveSnapshotRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if len(m.Snapshotter) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Snapshotter)))
-		i += copy(dAtA[i:], m.Snapshotter)
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	if len(m.Key) > 0 {
-		dAtA[i] = 0x12
-		i++
+		i -= len(m.Key)
+		copy(dAtA[i:], m.Key)
 		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Key)))
-		i += copy(dAtA[i:], m.Key)
+		i--
+		dAtA[i] = 0x12
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	if len(m.Snapshotter) > 0 {
+		i -= len(m.Snapshotter)
+		copy(dAtA[i:], m.Snapshotter)
+		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Snapshotter)))
+		i--
+		dAtA[i] = 0xa
 	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 
 func (m *CommitSnapshotRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -1601,55 +1701,66 @@ func (m *CommitSnapshotRequest) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *CommitSnapshotRequest) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *CommitSnapshotRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if len(m.Snapshotter) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Snapshotter)))
-		i += copy(dAtA[i:], m.Snapshotter)
-	}
-	if len(m.Name) > 0 {
-		dAtA[i] = 0x12
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Name)))
-		i += copy(dAtA[i:], m.Name)
-	}
-	if len(m.Key) > 0 {
-		dAtA[i] = 0x1a
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Key)))
-		i += copy(dAtA[i:], m.Key)
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	if len(m.Labels) > 0 {
-		for k, _ := range m.Labels {
-			dAtA[i] = 0x22
-			i++
+		for k := range m.Labels {
 			v := m.Labels[k]
-			mapSize := 1 + len(k) + sovSnapshots(uint64(len(k))) + 1 + len(v) + sovSnapshots(uint64(len(v)))
-			i = encodeVarintSnapshots(dAtA, i, uint64(mapSize))
-			dAtA[i] = 0xa
-			i++
-			i = encodeVarintSnapshots(dAtA, i, uint64(len(k)))
-			i += copy(dAtA[i:], k)
-			dAtA[i] = 0x12
-			i++
+			baseI := i
+			i -= len(v)
+			copy(dAtA[i:], v)
 			i = encodeVarintSnapshots(dAtA, i, uint64(len(v)))
-			i += copy(dAtA[i:], v)
+			i--
+			dAtA[i] = 0x12
+			i -= len(k)
+			copy(dAtA[i:], k)
+			i = encodeVarintSnapshots(dAtA, i, uint64(len(k)))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintSnapshots(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x22
 		}
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	if len(m.Key) > 0 {
+		i -= len(m.Key)
+		copy(dAtA[i:], m.Key)
+		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Key)))
+		i--
+		dAtA[i] = 0x1a
 	}
-	return i, nil
+	if len(m.Name) > 0 {
+		i -= len(m.Name)
+		copy(dAtA[i:], m.Name)
+		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Name)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.Snapshotter) > 0 {
+		i -= len(m.Snapshotter)
+		copy(dAtA[i:], m.Snapshotter)
+		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Snapshotter)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
 }
 
 func (m *StatSnapshotRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -1657,32 +1768,40 @@ func (m *StatSnapshotRequest) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *StatSnapshotRequest) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *StatSnapshotRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if len(m.Snapshotter) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Snapshotter)))
-		i += copy(dAtA[i:], m.Snapshotter)
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	if len(m.Key) > 0 {
-		dAtA[i] = 0x12
-		i++
+		i -= len(m.Key)
+		copy(dAtA[i:], m.Key)
 		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Key)))
-		i += copy(dAtA[i:], m.Key)
+		i--
+		dAtA[i] = 0x12
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	if len(m.Snapshotter) > 0 {
+		i -= len(m.Snapshotter)
+		copy(dAtA[i:], m.Snapshotter)
+		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Snapshotter)))
+		i--
+		dAtA[i] = 0xa
 	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 
 func (m *Info) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -1690,70 +1809,80 @@ func (m *Info) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *Info) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *Info) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if len(m.Name) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Name)))
-		i += copy(dAtA[i:], m.Name)
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
-	if len(m.Parent) > 0 {
-		dAtA[i] = 0x12
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Parent)))
-		i += copy(dAtA[i:], m.Parent)
-	}
-	if m.Kind != 0 {
-		dAtA[i] = 0x18
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(m.Kind))
-	}
-	dAtA[i] = 0x22
-	i++
-	i = encodeVarintSnapshots(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.CreatedAt)))
-	n1, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.CreatedAt, dAtA[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n1
-	dAtA[i] = 0x2a
-	i++
-	i = encodeVarintSnapshots(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.UpdatedAt)))
-	n2, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.UpdatedAt, dAtA[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n2
 	if len(m.Labels) > 0 {
-		for k, _ := range m.Labels {
-			dAtA[i] = 0x32
-			i++
+		for k := range m.Labels {
 			v := m.Labels[k]
-			mapSize := 1 + len(k) + sovSnapshots(uint64(len(k))) + 1 + len(v) + sovSnapshots(uint64(len(v)))
-			i = encodeVarintSnapshots(dAtA, i, uint64(mapSize))
-			dAtA[i] = 0xa
-			i++
-			i = encodeVarintSnapshots(dAtA, i, uint64(len(k)))
-			i += copy(dAtA[i:], k)
-			dAtA[i] = 0x12
-			i++
+			baseI := i
+			i -= len(v)
+			copy(dAtA[i:], v)
 			i = encodeVarintSnapshots(dAtA, i, uint64(len(v)))
-			i += copy(dAtA[i:], v)
+			i--
+			dAtA[i] = 0x12
+			i -= len(k)
+			copy(dAtA[i:], k)
+			i = encodeVarintSnapshots(dAtA, i, uint64(len(k)))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintSnapshots(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x32
 		}
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	n1, err1 := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.UpdatedAt, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdTime(m.UpdatedAt):])
+	if err1 != nil {
+		return 0, err1
 	}
-	return i, nil
+	i -= n1
+	i = encodeVarintSnapshots(dAtA, i, uint64(n1))
+	i--
+	dAtA[i] = 0x2a
+	n2, err2 := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.CreatedAt, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdTime(m.CreatedAt):])
+	if err2 != nil {
+		return 0, err2
+	}
+	i -= n2
+	i = encodeVarintSnapshots(dAtA, i, uint64(n2))
+	i--
+	dAtA[i] = 0x22
+	if m.Kind != 0 {
+		i = encodeVarintSnapshots(dAtA, i, uint64(m.Kind))
+		i--
+		dAtA[i] = 0x18
+	}
+	if len(m.Parent) > 0 {
+		i -= len(m.Parent)
+		copy(dAtA[i:], m.Parent)
+		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Parent)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.Name) > 0 {
+		i -= len(m.Name)
+		copy(dAtA[i:], m.Name)
+		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Name)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
 }
 
 func (m *StatSnapshotResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -1761,28 +1890,36 @@ func (m *StatSnapshotResponse) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *StatSnapshotResponse) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *StatSnapshotResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	dAtA[i] = 0xa
-	i++
-	i = encodeVarintSnapshots(dAtA, i, uint64(m.Info.Size()))
-	n3, err := m.Info.MarshalTo(dAtA[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n3
 	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
-	return i, nil
+	{
+		size, err := m.Info.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintSnapshots(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
 }
 
 func (m *UpdateSnapshotRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -1790,44 +1927,55 @@ func (m *UpdateSnapshotRequest) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *UpdateSnapshotRequest) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *UpdateSnapshotRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if len(m.Snapshotter) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Snapshotter)))
-		i += copy(dAtA[i:], m.Snapshotter)
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
-	dAtA[i] = 0x12
-	i++
-	i = encodeVarintSnapshots(dAtA, i, uint64(m.Info.Size()))
-	n4, err := m.Info.MarshalTo(dAtA[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n4
 	if m.UpdateMask != nil {
+		{
+			size, err := m.UpdateMask.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintSnapshots(dAtA, i, uint64(size))
+		}
+		i--
 		dAtA[i] = 0x1a
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(m.UpdateMask.Size()))
-		n5, err := m.UpdateMask.MarshalTo(dAtA[i:])
+	}
+	{
+		size, err := m.Info.MarshalToSizedBuffer(dAtA[:i])
 		if err != nil {
 			return 0, err
 		}
-		i += n5
+		i -= size
+		i = encodeVarintSnapshots(dAtA, i, uint64(size))
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	i--
+	dAtA[i] = 0x12
+	if len(m.Snapshotter) > 0 {
+		i -= len(m.Snapshotter)
+		copy(dAtA[i:], m.Snapshotter)
+		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Snapshotter)))
+		i--
+		dAtA[i] = 0xa
 	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 
 func (m *UpdateSnapshotResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -1835,28 +1983,36 @@ func (m *UpdateSnapshotResponse) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *UpdateSnapshotResponse) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *UpdateSnapshotResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	dAtA[i] = 0xa
-	i++
-	i = encodeVarintSnapshots(dAtA, i, uint64(m.Info.Size()))
-	n6, err := m.Info.MarshalTo(dAtA[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n6
 	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
-	return i, nil
+	{
+		size, err := m.Info.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintSnapshots(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
 }
 
 func (m *ListSnapshotsRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -1864,41 +2020,42 @@ func (m *ListSnapshotsRequest) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *ListSnapshotsRequest) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ListSnapshotsRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if len(m.Snapshotter) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Snapshotter)))
-		i += copy(dAtA[i:], m.Snapshotter)
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	if len(m.Filters) > 0 {
-		for _, s := range m.Filters {
+		for iNdEx := len(m.Filters) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.Filters[iNdEx])
+			copy(dAtA[i:], m.Filters[iNdEx])
+			i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Filters[iNdEx])))
+			i--
 			dAtA[i] = 0x12
-			i++
-			l = len(s)
-			for l >= 1<<7 {
-				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
-				l >>= 7
-				i++
-			}
-			dAtA[i] = uint8(l)
-			i++
-			i += copy(dAtA[i:], s)
 		}
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	if len(m.Snapshotter) > 0 {
+		i -= len(m.Snapshotter)
+		copy(dAtA[i:], m.Snapshotter)
+		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Snapshotter)))
+		i--
+		dAtA[i] = 0xa
 	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 
 func (m *ListSnapshotsResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -1906,32 +2063,40 @@ func (m *ListSnapshotsResponse) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *ListSnapshotsResponse) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ListSnapshotsResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
 	if len(m.Info) > 0 {
-		for _, msg := range m.Info {
-			dAtA[i] = 0xa
-			i++
-			i = encodeVarintSnapshots(dAtA, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(dAtA[i:])
-			if err != nil {
-				return 0, err
+		for iNdEx := len(m.Info) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Info[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintSnapshots(dAtA, i, uint64(size))
 			}
-			i += n
+			i--
+			dAtA[i] = 0xa
 		}
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
-	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 
 func (m *UsageRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -1939,32 +2104,40 @@ func (m *UsageRequest) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *UsageRequest) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *UsageRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if len(m.Snapshotter) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Snapshotter)))
-		i += copy(dAtA[i:], m.Snapshotter)
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	if len(m.Key) > 0 {
-		dAtA[i] = 0x12
-		i++
+		i -= len(m.Key)
+		copy(dAtA[i:], m.Key)
 		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Key)))
-		i += copy(dAtA[i:], m.Key)
+		i--
+		dAtA[i] = 0x12
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	if len(m.Snapshotter) > 0 {
+		i -= len(m.Snapshotter)
+		copy(dAtA[i:], m.Snapshotter)
+		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Snapshotter)))
+		i--
+		dAtA[i] = 0xa
 	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 
 func (m *UsageResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -1972,30 +2145,36 @@ func (m *UsageResponse) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *UsageResponse) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *UsageResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if m.Size_ != 0 {
-		dAtA[i] = 0x8
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(m.Size_))
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	if m.Inodes != 0 {
-		dAtA[i] = 0x10
-		i++
 		i = encodeVarintSnapshots(dAtA, i, uint64(m.Inodes))
+		i--
+		dAtA[i] = 0x10
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	if m.Size_ != 0 {
+		i = encodeVarintSnapshots(dAtA, i, uint64(m.Size_))
+		i--
+		dAtA[i] = 0x8
 	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 
 func (m *CleanupRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -2003,30 +2182,39 @@ func (m *CleanupRequest) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *CleanupRequest) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *CleanupRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if len(m.Snapshotter) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Snapshotter)))
-		i += copy(dAtA[i:], m.Snapshotter)
-	}
 	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
-	return i, nil
+	if len(m.Snapshotter) > 0 {
+		i -= len(m.Snapshotter)
+		copy(dAtA[i:], m.Snapshotter)
+		i = encodeVarintSnapshots(dAtA, i, uint64(len(m.Snapshotter)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
 }
 
 func encodeVarintSnapshots(dAtA []byte, offset int, v uint64) int {
+	offset -= sovSnapshots(v)
+	base := offset
 	for v >= 1<<7 {
 		dAtA[offset] = uint8(v&0x7f | 0x80)
 		v >>= 7
 		offset++
 	}
 	dAtA[offset] = uint8(v)
-	return offset + 1
+	return base
 }
 func (m *PrepareSnapshotRequest) Size() (n int) {
 	if m == nil {
@@ -2418,14 +2606,7 @@ func (m *CleanupRequest) Size() (n int) {
 }
 
 func sovSnapshots(x uint64) (n int) {
-	for {
-		n++
-		x >>= 7
-		if x == 0 {
-			break
-		}
-	}
-	return n
+	return (math_bits.Len64(x|1) + 6) / 7
 }
 func sozSnapshots(x uint64) (n int) {
 	return sovSnapshots(uint64((x << 1) ^ uint64((int64(x) >> 63))))
@@ -2458,8 +2639,13 @@ func (this *PrepareSnapshotResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
+	repeatedStringForMounts := "[]*Mount{"
+	for _, f := range this.Mounts {
+		repeatedStringForMounts += strings.Replace(fmt.Sprintf("%v", f), "Mount", "types.Mount", 1) + ","
+	}
+	repeatedStringForMounts += "}"
 	s := strings.Join([]string{`&PrepareSnapshotResponse{`,
-		`Mounts:` + strings.Replace(fmt.Sprintf("%v", this.Mounts), "Mount", "types.Mount", 1) + `,`,
+		`Mounts:` + repeatedStringForMounts + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -2493,8 +2679,13 @@ func (this *ViewSnapshotResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
+	repeatedStringForMounts := "[]*Mount{"
+	for _, f := range this.Mounts {
+		repeatedStringForMounts += strings.Replace(fmt.Sprintf("%v", f), "Mount", "types.Mount", 1) + ","
+	}
+	repeatedStringForMounts += "}"
 	s := strings.Join([]string{`&ViewSnapshotResponse{`,
-		`Mounts:` + strings.Replace(fmt.Sprintf("%v", this.Mounts), "Mount", "types.Mount", 1) + `,`,
+		`Mounts:` + repeatedStringForMounts + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -2516,8 +2707,13 @@ func (this *MountsResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
+	repeatedStringForMounts := "[]*Mount{"
+	for _, f := range this.Mounts {
+		repeatedStringForMounts += strings.Replace(fmt.Sprintf("%v", f), "Mount", "types.Mount", 1) + ","
+	}
+	repeatedStringForMounts += "}"
 	s := strings.Join([]string{`&MountsResponse{`,
-		`Mounts:` + strings.Replace(fmt.Sprintf("%v", this.Mounts), "Mount", "types.Mount", 1) + `,`,
+		`Mounts:` + repeatedStringForMounts + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -2589,8 +2785,8 @@ func (this *Info) String() string {
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`Parent:` + fmt.Sprintf("%v", this.Parent) + `,`,
 		`Kind:` + fmt.Sprintf("%v", this.Kind) + `,`,
-		`CreatedAt:` + strings.Replace(strings.Replace(this.CreatedAt.String(), "Timestamp", "types1.Timestamp", 1), `&`, ``, 1) + `,`,
-		`UpdatedAt:` + strings.Replace(strings.Replace(this.UpdatedAt.String(), "Timestamp", "types1.Timestamp", 1), `&`, ``, 1) + `,`,
+		`CreatedAt:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.CreatedAt), "Timestamp", "types1.Timestamp", 1), `&`, ``, 1) + `,`,
+		`UpdatedAt:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.UpdatedAt), "Timestamp", "types1.Timestamp", 1), `&`, ``, 1) + `,`,
 		`Labels:` + mapStringForLabels + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
@@ -2648,8 +2844,13 @@ func (this *ListSnapshotsResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
+	repeatedStringForInfo := "[]Info{"
+	for _, f := range this.Info {
+		repeatedStringForInfo += strings.Replace(strings.Replace(f.String(), "Info", "Info", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForInfo += "}"
 	s := strings.Join([]string{`&ListSnapshotsResponse{`,
-		`Info:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Info), "Info", "Info", 1), `&`, ``, 1) + `,`,
+		`Info:` + repeatedStringForInfo + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -5311,6 +5512,7 @@ func (m *CleanupRequest) Unmarshal(dAtA []byte) error {
 func skipSnapshots(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0
+	depth := 0
 	for iNdEx < l {
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
@@ -5342,10 +5544,8 @@ func skipSnapshots(dAtA []byte) (n int, err error) {
 					break
 				}
 			}
-			return iNdEx, nil
 		case 1:
 			iNdEx += 8
-			return iNdEx, nil
 		case 2:
 			var length int
 			for shift := uint(0); ; shift += 7 {
@@ -5366,55 +5566,30 @@ func skipSnapshots(dAtA []byte) (n int, err error) {
 				return 0, ErrInvalidLengthSnapshots
 			}
 			iNdEx += length
-			if iNdEx < 0 {
-				return 0, ErrInvalidLengthSnapshots
-			}
-			return iNdEx, nil
 		case 3:
-			for {
-				var innerWire uint64
-				var start int = iNdEx
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return 0, ErrIntOverflowSnapshots
-					}
-					if iNdEx >= l {
-						return 0, io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					innerWire |= (uint64(b) & 0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				innerWireType := int(innerWire & 0x7)
-				if innerWireType == 4 {
-					break
-				}
-				next, err := skipSnapshots(dAtA[start:])
-				if err != nil {
-					return 0, err
-				}
-				iNdEx = start + next
-				if iNdEx < 0 {
-					return 0, ErrInvalidLengthSnapshots
-				}
-			}
-			return iNdEx, nil
+			depth++
 		case 4:
-			return iNdEx, nil
+			if depth == 0 {
+				return 0, ErrUnexpectedEndOfGroupSnapshots
+			}
+			depth--
 		case 5:
 			iNdEx += 4
-			return iNdEx, nil
 		default:
 			return 0, fmt.Errorf("proto: illegal wireType %d", wireType)
 		}
+		if iNdEx < 0 {
+			return 0, ErrInvalidLengthSnapshots
+		}
+		if depth == 0 {
+			return iNdEx, nil
+		}
 	}
-	panic("unreachable")
+	return 0, io.ErrUnexpectedEOF
 }
 
 var (
-	ErrInvalidLengthSnapshots = fmt.Errorf("proto: negative length found during unmarshaling")
-	ErrIntOverflowSnapshots   = fmt.Errorf("proto: integer overflow")
+	ErrInvalidLengthSnapshots        = fmt.Errorf("proto: negative length found during unmarshaling")
+	ErrIntOverflowSnapshots          = fmt.Errorf("proto: integer overflow")
+	ErrUnexpectedEndOfGroupSnapshots = fmt.Errorf("proto: unexpected end of group")
 )
