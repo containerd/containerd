@@ -31,11 +31,11 @@ At this point you can use `go` to checkout `containerd` in your `GOPATH`:
 go get github.com/containerd/containerd
 ```
 
-For proper results, install the `protoc` release into `/usr/local` on your build system. For example, the following commands will download and install the 3.5.0 release for a 64-bit Linux host:
+For proper results, install the `protoc` release into `/usr/local` on your build system. For example, the following commands will download and install the 3.11.4 release for a 64-bit Linux host:
 
 ```
-$ wget -c https://github.com/google/protobuf/releases/download/v3.5.0/protoc-3.5.0-linux-x86_64.zip
-$ sudo unzip protoc-3.5.0-linux-x86_64.zip -d /usr/local
+$ wget -c https://github.com/google/protobuf/releases/download/v3.11.4/protoc-3.11.4-linux-x86_64.zip
+$ sudo unzip protoc-3.11.4-linux-x86_64.zip -d /usr/local
 ```
 
 `containerd` uses [Btrfs](https://en.wikipedia.org/wiki/Btrfs) it means that you
