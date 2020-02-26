@@ -34,7 +34,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	protobuf "github.com/gogo/protobuf/types"
 	"github.com/opencontainers/image-spec/identity"
-	"github.com/opencontainers/image-spec/specs-go/v1"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
 

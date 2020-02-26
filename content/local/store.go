@@ -546,11 +546,11 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 			return nil, err
 		}
 
-		if writeTimestampFile(filepath.Join(path, "startedat"), startedAt); err != nil {
+		if err := writeTimestampFile(filepath.Join(path, "startedat"), startedAt); err != nil {
 			return nil, err
 		}
 
-		if writeTimestampFile(filepath.Join(path, "updatedat"), startedAt); err != nil {
+		if err := writeTimestampFile(filepath.Join(path, "updatedat"), startedAt); err != nil {
 			return nil, err
 		}
 

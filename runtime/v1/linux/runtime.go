@@ -41,7 +41,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
-	"github.com/containerd/containerd/runtime/v1"
+	v1 "github.com/containerd/containerd/runtime/v1"
 	"github.com/containerd/containerd/runtime/v1/linux/proc"
 	shim "github.com/containerd/containerd/runtime/v1/shim/v1"
 	runc "github.com/containerd/go-runc"
