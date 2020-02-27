@@ -16,13 +16,13 @@ environment:
     - GO_VERSION: 1.13.8
 
 before_build:
-  - choco install -y mingw --version 5.3.0
+  - choco install --no-progress -y mingw --version 5.3.0
   # Install Go
   - rd C:\Go /s /q
   - appveyor DownloadFile https://storage.googleapis.com/golang/go%GO_VERSION%.windows-amd64.zip
   - 7z x go%GO_VERSION%.windows-amd64.zip -oC:\ >nul
   - go version
-  - choco install codecov
+  - choco install --no-progress codecov
   # Clone hcsshim at the vendored version
   - bash.exe -elc "export PATH=/c/tools/mingw64/bin:$PATH;
        rm -rf /c/gopath/src/github.com/Microsoft/hcsshim;
