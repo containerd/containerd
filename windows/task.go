@@ -283,7 +283,7 @@ func (t *task) Update(ctx context.Context, resources *types.Any) error {
 
 func (t *task) Process(ctx context.Context, id string) (p runtime.Process, err error) {
 	p = t.getProcess(id)
-	if p == nil {
+	if p == nil { // nolint: govet
 		err = errors.Wrapf(errdefs.ErrNotFound, "no such process %s", id)
 	}
 

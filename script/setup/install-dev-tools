@@ -21,6 +21,11 @@
 set -eu -o pipefail
 
 go get -u github.com/stevvooe/protobuild
-go get -u github.com/alecthomas/gometalinter
-gometalinter --install >/dev/null
+go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
 go get -u github.com/cpuguy83/go-md2man
+
+(
+	cd $GOPATH/src/github.com/golangci/golangci-lint/cmd/golangci-lint
+	git checkout v1.18.0
+	go build -v && go install
+)
