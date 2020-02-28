@@ -201,6 +201,28 @@ version = 2
     [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
       [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
         endpoint = ["https://registry-1.docker.io", ]
+
+  # 'plugins."io.containerd.grpc.v1.cri".image_decryption' contains config related
+  # to handling decryption of encrypted container images.
+  [plugins."io.containerd.grpc.v1.cri".image_decryption]
+    # key_model defines the name of the key model used for how the cri obtains
+    # keys used for decryption of encrypted container images.
+    # The [decryption document](https://github.com/containerd/cri/blob/master/docs/decryption.md)
+    # contains additional information about the key models available. 
+    #
+    # Set of available string options: {"", "node"}
+    # Omission of this field defaults to the empty string "", which indicates no key model, 
+    # disabling image decryption.
+    #
+    # In order to use the decryption feature, additional configurations must be made.
+    # The [decryption document](https://github.com/containerd/cri/blob/master/docs/decryption.md)
+    # provides information of how to set up stream processors and the containerd imgcrypt decoder
+    # with the appropriate key models.
+    #
+    # Additional information:
+    # * Stream processors: https://github.com/containerd/containerd/blob/master/docs/stream_processors.md
+    # * Containerd imgcrypt: https://github.com/containerd/imgcrypt
+    key_model = "node"
 ```
 
 ## Untrusted Workload
