@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 
@@ -155,7 +154,7 @@ func (p *PoolDevice) transition(ctx context.Context, deviceName string, tryingSt
 		} else {
 			deviceInfo.Error = err.Error()
 		}
-		return nil
+		return err
 	})
 
 	if uerr != nil {
