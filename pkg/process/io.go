@@ -183,10 +183,10 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 			fr io.Closer
 		)
 		if ok {
-			if fw, err = fifo.OpenFifo(ctx, i.name, syscall.O_WRONLY, 0); err != nil {
+			if fw, err = fifo.OpenFifo(context.Background(), i.name, syscall.O_WRONLY|syscall.O_NONBLOCK, 0); err != nil {
 				return errors.Wrapf(err, "containerd-shim: opening w/o fifo %q failed", i.name)
 			}
-			if fr, err = fifo.OpenFifo(ctx, i.name, syscall.O_RDONLY, 0); err != nil {
+			if fr, err = fifo.OpenFifo(context.Background(), i.name, syscall.O_RDONLY|syscall.O_NONBLOCK, 0); err != nil {
 				return errors.Wrapf(err, "containerd-shim: opening r/o fifo %q failed", i.name)
 			}
 		} else {
