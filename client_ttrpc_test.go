@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd/pkg/ttrpcutil"
 	"github.com/containerd/ttrpc"
 	"github.com/gogo/protobuf/types"
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 )
 
 func TestClientTTRPC_New(t *testing.T) {
