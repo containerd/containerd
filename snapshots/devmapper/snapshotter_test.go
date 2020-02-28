@@ -30,7 +30,7 @@ import (
 	"github.com/containerd/continuity/fs/fstest"
 	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
