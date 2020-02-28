@@ -25,8 +25,8 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/hashicorp/go-multierror"
-	"gotest.tools/assert"
-	is "gotest.tools/assert/cmp"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
 )
 
 func TestLoadConfig(t *testing.T) {

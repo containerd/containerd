@@ -25,8 +25,8 @@ import (
 
 	"github.com/docker/go-units"
 	"golang.org/x/sys/unix"
-	"gotest.tools/assert"
-	is "gotest.tools/assert/cmp"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
 
 	"github.com/containerd/containerd/pkg/testutil"
 )
