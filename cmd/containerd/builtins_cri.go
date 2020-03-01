@@ -1,4 +1,4 @@
-// +build !no_cri
+// +build linux,!no_cri windows,!no_cri
 
 /*
    Copyright The containerd Authors.
