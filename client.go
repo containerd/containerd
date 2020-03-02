@@ -319,6 +319,9 @@ type RemoteContext struct {
 	// Snapshotter used for unpacking
 	Snapshotter string
 
+	// SnapshotterOpts are additional options to be passed to a snapshotter during pull
+	SnapshotterOpts []snapshots.Opt
+
 	// Labels to be applied to the created image
 	Labels map[string]string
 
