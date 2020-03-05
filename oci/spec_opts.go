@@ -91,6 +91,21 @@ func setResources(s *Spec) {
 	}
 }
 
+// nolint
+func setCPU(s *Spec) {
+	setResources(s)
+	if s.Linux != nil {
+		if s.Linux.Resources.CPU == nil {
+			s.Linux.Resources.CPU = &specs.LinuxCPU{}
+		}
+	}
+	if s.Windows != nil {
+		if s.Windows.Resources.CPU == nil {
+			s.Windows.Resources.CPU = &specs.WindowsCPUResources{}
+		}
+	}
+}
+
 // setCapabilities sets Linux Capabilities to empty if unset
 func setCapabilities(s *Spec) {
 	setProcess(s)
