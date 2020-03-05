@@ -3,7 +3,7 @@ git:
 
 language: go
 go:
-  - 1.13.4
+  - 1.13.8
   - tip
 
 
