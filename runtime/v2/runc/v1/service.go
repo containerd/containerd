@@ -595,7 +595,7 @@ func (s *service) checkProcesses(e runcC.Exit) {
 		return
 	}
 
-	shouldKillAll, err := shouldKillAllOnExit(container.Bundle)
+	shouldKillAll, err := shouldKillAllOnExit(s.context, container.Bundle)
 	if err != nil {
 		log.G(s.context).WithError(err).Error("failed to check shouldKillAll")
 	}
@@ -624,13 +624,17 @@ func (s *service) checkProcesses(e runcC.Exit) {
 	}
 }
 
-func shouldKillAllOnExit(bundlePath string) (bool, error) {
+func shouldKillAllOnExit(ctx context.Context, bundlePath string) (bool, error) {
 	var bundleSpec specs.Spec
 	bundleConfigContents, err := ioutil.ReadFile(filepath.Join(bundlePath, "config.json"))
 	if err != nil {
-		return false, err
+		log.G(ctx).WithError(err).Error("failed to check shouldKillAllOnExit")
+		return true, nil
 	}
-	json.Unmarshal(bundleConfigContents, &bundleSpec)
+	if err := json.Unmarshal(bundleConfigContents, &bundleSpec); err != nil {
+		log.G(ctx).WithError(err).Error("failed to check shouldKillAllOnExit")
+		return true, nil
+	}
 
 	if bundleSpec.Linux != nil {
 		for _, ns := range bundleSpec.Linux.Namespaces {
