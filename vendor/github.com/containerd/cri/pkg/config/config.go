@@ -153,6 +153,18 @@ type RegistryConfig struct {
 	TLS *TLSConfig `toml:"tls" json:"tls"`
 }
 
+// ImageDecryption contains configuration to handling decryption of encrypted container images.
+type ImageDecryption struct {
+	// KeyModel specifies the trust model of where keys should reside.
+	//
+	// Details of field usage can be found in:
+	// https://github.com/containerd/cri/tree/master/docs/config.md
+	//
+	// Details of key models can be found in:
+	// https://github.com/containerd/cri/tree/master/docs/decryption.md
+	KeyModel string `toml:"key_model" json:"keyModel"`
+}
+
 // PluginConfig contains toml config related to CRI plugin,
 // it is a subset of Config.
 type PluginConfig struct {
@@ -162,6 +174,8 @@ type PluginConfig struct {
 	CniConfig `toml:"cni" json:"cni"`
 	// Registry contains config related to the registry
 	Registry Registry `toml:"registry" json:"registry"`
+	// ImageDecryption contains config related to handling decryption of encrypted container images
+	ImageDecryption `toml:"image_decryption" json:"imageDecryption"`
 	// DisableTCPService disables serving CRI on the TCP server.
 	DisableTCPService bool `toml:"disable_tcp_service" json:"disableTCPService"`
 	// StreamServerAddress is the ip address streaming server is listening on.
@@ -236,6 +250,9 @@ const (
 	RuntimeUntrusted = "untrusted"
 	// RuntimeDefault is the implicit runtime defined for ContainerdConfig.DefaultRuntime
 	RuntimeDefault = "default"
+	// KeyModelNode is the key model where key for encrypted images reside
+	// on the worker nodes
+	KeyModelNode = "node"
 )
 
 // ValidatePluginConfig validates the given plugin configuration.
