@@ -31,4 +31,6 @@ type (
 	CPUStat = v2.CPUStat
 	// PidsStat alias
 	PidsStat = v2.PidsStat
+	// IOStat alias
+	IOStat = v2.IOStat
 )
