@@ -16,12 +16,18 @@ limitations under the License.
 
 package store
 
-import "errors"
+import "github.com/containerd/containerd/errdefs"
 
 var (
 	// ErrAlreadyExist is the error returned when data added in the store
 	// already exists.
-	ErrAlreadyExist = errors.New("already exists")
+	//
+	// This error has been DEPRECATED and will be removed in 1.5. Please switch
+	// usage directly to `errdefs.ErrAlreadyExists`.
+	ErrAlreadyExist = errdefs.ErrAlreadyExists
 	// ErrNotExist is the error returned when data is not in the store.
-	ErrNotExist = errors.New("does not exist")
+	//
+	// This error has been DEPRECATED and will be removed in 1.5. Please switch
+	// usage directly to `errdefs.ErrNotFound`.
+	ErrNotExist = errdefs.ErrNotFound
 )
