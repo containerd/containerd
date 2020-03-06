@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"net"
 	"os"
 	"os/exec"
 	"strconv"
@@ -353,13 +352,7 @@ func RawRuntimeClient() (runtime.RuntimeServiceClient, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithContextDialer(
-		func(ctx context.Context, addr string) (net.Conn, error) {
-			if deadline, ok := ctx.Deadline(); ok {
-				return dialer(addr, time.Until(deadline))
-			}
-			return dialer(addr, 0)
-		}))
+	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithContextDialer(dialer))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect cri endpoint")
 	}
