@@ -583,9 +583,10 @@ type StorageMedium string
 
 // These are the valid value for StorageMedium
 const (
-	StorageMediumDefault   StorageMedium = ""          // use whatever the default is for the node
-	StorageMediumMemory    StorageMedium = "Memory"    // use memory (tmpfs)
-	StorageMediumHugePages StorageMedium = "HugePages" // use hugepages
+	StorageMediumDefault         StorageMedium = ""           // use whatever the default is for the node
+	StorageMediumMemory          StorageMedium = "Memory"     // use memory (tmpfs)
+	StorageMediumHugePages       StorageMedium = "HugePages"  // use hugepages
+	StorageMediumHugePagesPrefix StorageMedium = "HugePages-" // prefix for full medium notation HugePages-<size>
 )
 
 // Protocol defines network protocols supported for things like container ports.
@@ -2765,8 +2766,7 @@ type PodSpec struct {
 	EnableServiceLinks *bool
 	// TopologySpreadConstraints describes how a group of pods ought to spread across topology
 	// domains. Scheduler will schedule pods in a way which abides by the constraints.
-	// This field is alpha-level and is only honored by clusters that enables the EvenPodsSpread
-	// feature.
+	// This field is only honored by clusters that enable the EvenPodsSpread feature.
 	// All topologySpreadConstraints are ANDed.
 	// +optional
 	TopologySpreadConstraints []TopologySpreadConstraint
@@ -3533,6 +3533,16 @@ type ServicePort struct {
 	// The IP protocol for this port.  Supports "TCP", "UDP", and "SCTP".
 	Protocol Protocol
 
+	// The application protocol for this port.
+	// This field follows standard Kubernetes label syntax.
+	// Un-prefixed names are reserved for IANA standard service names (as per
+	// RFC-6335 and http://www.iana.org/assignments/service-names).
+	// Non-standard protocols should use prefixed names such as
+	// mycompany.com/my-custom-protocol.
+	// Field can be enabled with ServiceAppProtocol feature gate.
+	// +optional
+	AppProtocol *string
+
 	// The port that will be exposed on the service.
 	Port int32
 
@@ -3673,6 +3683,16 @@ type EndpointPort struct {
 
 	// The IP protocol for this port.
 	Protocol Protocol
+
+	// The application protocol for this port.
+	// This field follows standard Kubernetes label syntax.
+	// Un-prefixed names are reserved for IANA standard service names (as per
+	// RFC-6335 and http://www.iana.org/assignments/service-names).
+	// Non-standard protocols should use prefixed names such as
+	// mycompany.com/my-custom-protocol.
+	// Field can be enabled with ServiceAppProtocol feature gate.
+	// +optional
+	AppProtocol *string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -4735,6 +4755,12 @@ type Secret struct {
 	// +optional
 	metav1.ObjectMeta
 
+	// Immutable field, if set, ensures that data stored in the Secret cannot
+	// be updated (only object metadata can be modified).
+	// This is an alpha field enabled by ImmutableEphemeralVolumes feature gate.
+	// +optional
+	Immutable *bool
+
 	// Data contains the secret data. Each key must consist of alphanumeric
 	// characters, '-', '_' or '.'. The serialized form of the secret data is a
 	// base64 encoded string, representing the arbitrary (possibly non-string)
@@ -4856,6 +4882,12 @@ type ConfigMap struct {
 	metav1.TypeMeta
 	// +optional
 	metav1.ObjectMeta
+
+	// Immutable field, if set, ensures that data stored in the ConfigMap cannot
+	// be updated (only object metadata can be modified).
+	// This is an alpha field enabled by ImmutableEphemeralVolumes feature gate.
+	// +optional
+	Immutable *bool
 
 	// Data contains the configuration data.
 	// Each key must consist of alphanumeric characters, '-', '_' or '.'.
@@ -5079,7 +5111,6 @@ type WindowsSecurityContextOptions struct {
 	// Defaults to the user specified in image metadata if unspecified.
 	// May also be set in PodSecurityContext. If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
-	// This field is beta-level and may be disabled with the WindowsRunAsUserName feature flag.
 	// +optional
 	RunAsUserName *string
 }
