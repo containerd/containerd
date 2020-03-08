@@ -43,6 +43,8 @@ need to satisfy this dependencies in your system:
 
 * CentOS/Fedora: `yum install btrfs-progs-devel`
 * Debian/Ubuntu: `apt-get install btrfs-tools`
+	* Debian Buster/Ubuntu 19.10:
+	    `apt-get install btrfs-progs libbtrfs-dev`
 
 If you're building with seccomp, you'll need to install it with the following:
 
