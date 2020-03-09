@@ -103,3 +103,9 @@ func Unmount(mount string, flags int) error {
 func UnmountAll(mount string, flags int) error {
 	return Unmount(mount, flags)
 }
+
+// UnmountRecursive unmounts the target and all mounts underneath, starting with
+// the deepest mount first.
+func UnmountRecursive(target string) (warnings []error, err error) {
+	return nil, Unmount(mount, 0)
+}

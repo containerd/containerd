@@ -39,3 +39,8 @@ func Unmount(mount string, flags int) error {
 func UnmountAll(mount string, flags int) error {
 	return ErrNotImplementOnUnix
 }
+
+// UnmountRecursive is not implemented on this platform
+func UnmountRecursive(mount string, flags int) (warnings []error, err error) {
+	return nil, ErrNotImplementOnUnix
+}

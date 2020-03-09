@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"sort"
 	"strings"
 	"time"
 
@@ -171,6 +172,36 @@ func UnmountAll(mount string, flags int) error {
 			return err
 		}
 	}
+}
+
+// UnmountRecursive unmounts the target and all mounts underneath, starting with
+// the deepest mount first.
+func UnmountRecursive(target string, flags int) (warnings []error, err error) {
+	mounts, err := Self()
+	if err != nil {
+		return nil, err
+	}
+
+	var toUnmount []string
+	for _, m := range mounts {
+		if strings.HasPrefix(m.Mountpoint, target) {
+			toUnmount = append(toUnmount, m.Mountpoint)
+		}
+	}
+
+	sort.Sort(sort.Reverse(sort.StringSlice(toUnmount)))
+	for i, mountPath := range toUnmount {
+		err := UnmountAll(mountPath, flags)
+		if err != nil {
+			if i == len(toUnmount)-1 { // last mount
+				return nil, err
+			} else {
+				// This is some submount, we can ignore this error for now, the final unmount will fail if this is a real problem
+				warnings = append(warnings, errors.Wrapf(err, "failed to unmount submount %s", mountPath))
+			}
+		}
+	}
+	return warnings, nil
 }
 
 // parseMountOptions takes fstab style mount options and parses them for
