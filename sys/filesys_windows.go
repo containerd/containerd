@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 	"unsafe"
 
 	"github.com/Microsoft/hcsshim"
@@ -49,7 +50,7 @@ func MkdirAll(path string, _ os.FileMode) error {
 // mkdirall is a custom version of os.MkdirAll modified for use on Windows
 // so that it is both volume path aware, and can create a directory with
 // a DACL.
-func mkdirall(path string, applyACL bool) error {
+func mkdirall(path string, adminAndLocalSystem bool) error {
 	if re := regexp.MustCompile(`^\\\\\?\\Volume{[a-z0-9-]+}$`); re.MatchString(path) {
 		return nil
 	}
@@ -66,7 +67,7 @@ func mkdirall(path string, applyACL bool) error {
 		return &os.PathError{
 			Op:   "mkdir",
 			Path: path,
-			Err:  windows.ERROR_PATH_NOT_FOUND,
+			Err:  syscall.ENOTDIR,
 		}
 	}
 
@@ -83,14 +84,14 @@ func mkdirall(path string, applyACL bool) error {
 
 	if j > 1 {
 		// Create parent
-		err = mkdirall(path[0:j-1], false)
+		err = mkdirall(path[0:j-1], adminAndLocalSystem)
 		if err != nil {
 			return err
 		}
 	}
 
 	// Parent now exists; invoke os.Mkdir or mkdirWithACL and use its result.
-	if applyACL {
+	if adminAndLocalSystem {
 		err = mkdirWithACL(path)
 	} else {
 		err = os.Mkdir(path, 0)
@@ -183,7 +184,7 @@ func OpenSequential(name string) (*os.File, error) {
 // If there is an error, it will be of type *PathError.
 func OpenFileSequential(name string, flag int, _ os.FileMode) (*os.File, error) {
 	if name == "" {
-		return nil, &os.PathError{Op: "open", Path: name, Err: windows.ERROR_FILE_NOT_FOUND}
+		return nil, &os.PathError{Op: "open", Path: name, Err: syscall.ENOENT}
 	}
 	r, errf := windowsOpenFileSequential(name, flag, 0)
 	if errf == nil {
