@@ -58,7 +58,6 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	snproxy "github.com/containerd/containerd/snapshots/proxy"
 	"github.com/containerd/typeurl"
-	"github.com/gogo/protobuf/types"
 	ptypes "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -723,7 +722,7 @@ func (c *Client) Server(ctx context.Context) (ServerInfo, error) {
 	}
 	c.connMu.Unlock()
 
-	response, err := c.IntrospectionService().Server(ctx, &types.Empty{})
+	response, err := c.IntrospectionService().Server(ctx, &ptypes.Empty{})
 	if err != nil {
 		return ServerInfo{}, err
 	}
