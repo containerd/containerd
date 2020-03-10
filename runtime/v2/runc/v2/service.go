@@ -48,7 +48,6 @@ import (
 	runcC "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/proto"
-	"github.com/gogo/protobuf/types"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -211,7 +210,7 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 	}
 	if data, err := ioutil.ReadAll(os.Stdin); err == nil {
 		if len(data) > 0 {
-			var any types.Any
+			var any ptypes.Any
 			if err := proto.Unmarshal(data, &any); err != nil {
 				return "", err
 			}
