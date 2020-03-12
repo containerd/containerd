@@ -44,8 +44,11 @@ func TestClientTTRPC_Reconnect(t *testing.T) {
 	err = client.Reconnect()
 	assert.NilError(t, err)
 
+	service, err := client.EventsService()
+	assert.NilError(t, err)
+
 	// Send test request to make sure its alive after reconnect
-	_, err = client.EventsService().Forward(context.Background(), &v1.ForwardRequest{
+	_, err = service.Forward(context.Background(), &v1.ForwardRequest{
 		Envelope: &v1.Envelope{
 			Timestamp: time.Now(),
 			Namespace: namespaces.Default,
@@ -63,10 +66,13 @@ func TestClientTTRPC_Close(t *testing.T) {
 	client, err := ttrpcutil.NewClient(address + ".ttrpc")
 	assert.NilError(t, err)
 
+	service, err := client.EventsService()
+	assert.NilError(t, err)
+
 	err = client.Close()
 	assert.NilError(t, err)
 
-	_, err = client.EventsService().Forward(context.Background(), &v1.ForwardRequest{Envelope: &v1.Envelope{}})
+	_, err = service.Forward(context.Background(), &v1.ForwardRequest{Envelope: &v1.Envelope{}})
 	assert.Equal(t, err, ttrpc.ErrClosed)
 
 	err = client.Close()
