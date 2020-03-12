@@ -1238,10 +1238,10 @@ func WithEnvFile(path string) SpecOpts {
 
 		sc := bufio.NewScanner(f)
 		for sc.Scan() {
-			if sc.Err() != nil {
-				return sc.Err()
-			}
 			vars = append(vars, sc.Text())
+		}
+		if err = sc.Err(); err != nil {
+			return err
 		}
 		return WithEnv(vars)(nil, nil, nil, s)
 	}
