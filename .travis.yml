@@ -4,12 +4,10 @@ git:
 language: go
 go:
   - 1.13.8
-  - tip
-
+  - 1.14
 
 matrix:
-  allow_failures:
-    - go: tip
+  - go: 1.14
 
 sudo: required
 
