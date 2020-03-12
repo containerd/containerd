@@ -173,35 +173,6 @@ func ConfigureDefaultRegistries(ropts ...RegistryOpt) RegistryHosts {
 		opt(&opts)
 	}
 
-	if opts.Client == nil && opts.certRootDir != "" {
-		fs, err := ioutil.ReadDir(opts.certRootDir)
-		if err != nil && !os.IsNotExist(err) {
-			return func(_ string) ([]RegistryHost, error) {
-				return nil, err
-			}
-		}
-		for _, f := range fs {
-			hostDir := filepath.Join(opts.certRootDir, f.Name())
-			caCertGlob := filepath.Join(hostDir, "*.crt")
-			keyGlob := filepath.Join(hostDir, "*.key")
-			//TODO: not find not meaning failed?
-			_, err := certutil.LoadCACerts(tlsconf, caCertGlob)
-			if err != nil {
-				continue
-			}
-			certutil.LoadKeyPairs(tlsconf, keyGlob, certutil.DockerKeyPairCertLocator)
-		}
-		tlsconf.InsecureSkipVerify = opts.skipVerify
-		opts.Client = &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: tlsconf,
-			},
-		}
-	}
-	if opts.client == nil {
-		opts.client = http.DefaultClient
-	}
-
 	return func(host string) ([]RegistryHost, error) {
 		config := RegistryHost{
 			Client:       opts.client,
@@ -210,6 +181,34 @@ func ConfigureDefaultRegistries(ropts ...RegistryOpt) RegistryHosts {
 			Scheme:       "https",
 			Path:         "/v2",
 			Capabilities: HostCapabilityPull | HostCapabilityResolve | HostCapabilityPush,
+		}
+
+		if opts.client == nil && opts.certRootDir != "" {
+			fs, err := ioutil.ReadDir(filepath.Join(opts.certRootDir,host))
+			if err != nil && !os.IsNotExist(err) {
+				return nil, err
+			}
+			for _, f := range fs {
+				hostDir := filepath.Join(opts.certRootDir, f.Name())
+				caCertGlob := filepath.Join(hostDir, "*.crt")
+				keyGlob := filepath.Join(hostDir, "*.key")
+				//TODO: not find continue?
+				_, err := certutil.LoadCACerts(tlsconf, caCertGlob)
+				if err != nil {
+					continue
+				}
+				certutil.LoadKeyPairs(tlsconf, keyGlob, certutil.DockerKeyPairCertLocator)
+			}
+			tlsconf.InsecureSkipVerify = opts.skipVerify
+			opts.client = &http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: tlsconf,
+				},
+			}
+		}
+
+		if opts.client == nil {
+			opts.client = http.DefaultClient
 		}
 
 		if opts.plainHTTP != nil {
