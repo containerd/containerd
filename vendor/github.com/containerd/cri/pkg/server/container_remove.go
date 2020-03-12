@@ -20,7 +20,6 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-	"github.com/docker/docker/pkg/system"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -76,12 +75,12 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	}
 
 	containerRootDir := c.getContainerRootDir(id)
-	if err := system.EnsureRemoveAll(containerRootDir); err != nil {
+	if err := ensureRemoveAll(ctx, containerRootDir); err != nil {
 		return nil, errors.Wrapf(err, "failed to remove container root directory %q",
 			containerRootDir)
 	}
 	volatileContainerRootDir := c.getVolatileContainerRootDir(id)
-	if err := system.EnsureRemoveAll(volatileContainerRootDir); err != nil {
+	if err := ensureRemoveAll(ctx, volatileContainerRootDir); err != nil {
 		return nil, errors.Wrapf(err, "failed to remove volatile container root directory %q",
 			volatileContainerRootDir)
 	}

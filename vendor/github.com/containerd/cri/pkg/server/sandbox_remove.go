@@ -20,7 +20,6 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-	"github.com/docker/docker/pkg/system"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -80,12 +79,12 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 
 	// Cleanup the sandbox root directories.
 	sandboxRootDir := c.getSandboxRootDir(id)
-	if err := system.EnsureRemoveAll(sandboxRootDir); err != nil {
+	if err := ensureRemoveAll(ctx, sandboxRootDir); err != nil {
 		return nil, errors.Wrapf(err, "failed to remove sandbox root directory %q",
 			sandboxRootDir)
 	}
 	volatileSandboxRootDir := c.getVolatileSandboxRootDir(id)
-	if err := system.EnsureRemoveAll(volatileSandboxRootDir); err != nil {
+	if err := ensureRemoveAll(ctx, volatileSandboxRootDir); err != nil {
 		return nil, errors.Wrapf(err, "failed to remove volatile sandbox root directory %q",
 			volatileSandboxRootDir)
 	}

@@ -225,9 +225,10 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 		customopts.WithAnnotation(annotations.SandboxID, sandboxID),
 	)
 	// cgroupns is used for hiding /sys/fs/cgroup from containers.
-	// For compatibility, cgroupns is not used when running in cgroup v1 mode.
+	// For compatibility, cgroupns is not used when running in cgroup v1 mode or in privileged.
 	// https://github.com/containers/libpod/issues/4363
-	if cgroups.Mode() == cgroups.Unified {
+	// https://github.com/kubernetes/enhancements/blob/0e409b47497e398b369c281074485c8de129694f/keps/sig-node/20191118-cgroups-v2.md#cgroup-namespace
+	if cgroups.Mode() == cgroups.Unified && !securityContext.GetPrivileged() {
 		specOpts = append(specOpts, oci.WithLinuxNamespace(
 			runtimespec.LinuxNamespace{
 				Type: runtimespec.CgroupNamespace,

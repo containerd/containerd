@@ -30,7 +30,6 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/typeurl"
-	"github.com/docker/docker/pkg/system"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -474,7 +473,7 @@ func cleanupOrphanedIDDirs(ctx context.Context, cntrs []containerd.Container, ba
 			continue
 		}
 		dir := filepath.Join(base, d.Name())
-		if err := system.EnsureRemoveAll(dir); err != nil {
+		if err := ensureRemoveAll(ctx, dir); err != nil {
 			log.G(ctx).WithError(err).Warnf("Failed to remove id directory %q", dir)
 		} else {
 			log.G(ctx).Debugf("Cleanup orphaned id directory %q", dir)
