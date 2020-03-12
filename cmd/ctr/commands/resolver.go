@@ -19,18 +19,13 @@ package commands
 import (
 	"bufio"
 	gocontext "context"
-	"crypto/tls"
 	"fmt"
-	"net"
-	"net/http"
-	"strings"
-	"time"
-
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
+	"strings"
 )
 
 // PushTracker returns a new InMemoryTracker which tracks the ref status
@@ -53,16 +48,16 @@ func passwordPrompt() (string, error) {
 
 // GetResolver prepares the resolver from the environment and options
 func GetResolver(ctx gocontext.Context, clicontext *cli.Context) (remotes.Resolver, error) {
+	var (
+		secret string
+		opts   []docker.RegistryOpt
+	)
 	username := clicontext.String("user")
-	var secret string
 	if i := strings.IndexByte(username, ':'); i > 0 {
 		secret = username[i+1:]
 		username = username[0:i]
 	}
-	options := docker.ResolverOptions{
-		PlainHTTP: clicontext.Bool("plain-http"),
-		Tracker:   PushTracker,
-	}
+
 	if username != "" {
 		if secret == "" {
 			fmt.Printf("Password: ")
@@ -79,32 +74,27 @@ func GetResolver(ctx gocontext.Context, clicontext *cli.Context) (remotes.Resolv
 		secret = rt
 	}
 
-	tr := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-			DualStack: true,
-		}).DialContext,
-		MaxIdleConns:        10,
-		IdleConnTimeout:     30 * time.Second,
-		TLSHandshakeTimeout: 10 * time.Second,
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: clicontext.Bool("skip-verify"),
-		},
-		ExpectContinueTimeout: 5 * time.Second,
-	}
-
-	options.Client = &http.Client{
-		Transport: tr,
-	}
-
 	credentials := func(host string) (string, string, error) {
 		// Only one host
 		return username, secret, nil
 	}
-	authOpts := []docker.AuthorizerOpt{docker.WithAuthClient(options.Client), docker.WithAuthCreds(credentials)}
-	options.Authorizer = docker.NewDockerAuthorizer(authOpts...)
+
+	if clicontext.Bool("plain-http") {
+		opts = append(opts, docker.WithPlainHTTP(docker.MatchAllHosts))
+	}
+
+	opts = append(opts,
+		docker.WithSkipVerify(clicontext.Bool("skip-verify")),
+		docker.WithCertRootDir(clicontext.String("cert-dir")),
+	)
+
+	authOpts := []docker.AuthorizerOpt{docker.WithAuthCreds(credentials)}
+
+	opts = append(opts, docker.WithAuthorizer(docker.NewDockerAuthorizer(authOpts...)))
+	options := docker.ResolverOptions{
+		Hosts:   docker.ConfigureDefaultRegistries(opts...),
+		Tracker: PushTracker,
+	}
 
 	return docker.NewResolver(options), nil
 }
