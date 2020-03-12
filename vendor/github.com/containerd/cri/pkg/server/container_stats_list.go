@@ -17,9 +17,9 @@ limitations under the License.
 package server
 
 import (
-	"github.com/containerd/cgroups"
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
+	v1 "github.com/containerd/containerd/metrics/types/v1"
 	"github.com/containerd/typeurl"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -100,7 +100,7 @@ func (c *criService) getContainerMetrics(
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to extract container metrics")
 		}
-		metrics := s.(*cgroups.Metrics)
+		metrics := s.(*v1.Metrics)
 		if metrics.CPU != nil && metrics.CPU.Usage != nil {
 			cs.Cpu = &runtime.CpuUsage{
 				Timestamp:            stats.Timestamp.UnixNano(),
@@ -173,7 +173,7 @@ func matchLabelSelector(selector, labels map[string]string) bool {
 // getWorkingSet calculates workingset memory from cgroup memory stats.
 // The caller should make sure memory is not nil.
 // workingset = usage - total_inactive_file
-func getWorkingSet(memory *cgroups.MemoryStat) uint64 {
+func getWorkingSet(memory *v1.MemoryStat) uint64 {
 	if memory.Usage == nil {
 		return 0
 	}
