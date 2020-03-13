@@ -206,7 +206,7 @@ func ConfigureDefaultRegistries(ropts ...RegistryOpt) RegistryHosts {
 				},
 			}
 		}
-		
+
 		if opts.client == nil {
 			opts.client = http.DefaultClient
 		}
