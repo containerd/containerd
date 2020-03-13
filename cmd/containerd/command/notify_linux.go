@@ -22,19 +22,29 @@ import (
 	"context"
 	"os"
 
-	sd "github.com/coreos/go-systemd/v22/daemon"
+	sd "github.com/coreos/go-systemd/daemon"
 
 	"github.com/containerd/containerd/log"
 )
 
+const (
+	// SdNotifyReady tells the service manager that service startup is finished
+	// or the service finished loading its configuration.
+	SdNotifyReady = "READY=1"
+
+	// SdNotifyStopping tells the service manager that the service is beginning
+	// its shutdown.
+	SdNotifyStopping = "STOPPING=1"
+)
+
 // notifyReady notifies systemd that the daemon is ready to serve requests
 func notifyReady(ctx context.Context) error {
-	return sdNotify(ctx, sd.SdNotifyReady)
+	return sdNotify(ctx, SdNotifyReady)
 }
 
 // notifyStopping notifies systemd that the daemon is about to be stopped
 func notifyStopping(ctx context.Context) error {
-	return sdNotify(ctx, sd.SdNotifyStopping)
+	return sdNotify(ctx, SdNotifyStopping)
 }
 
 func sdNotify(ctx context.Context, state string) error {
