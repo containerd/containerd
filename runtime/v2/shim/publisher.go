@@ -128,9 +128,12 @@ func (l *RemoteEventsPublisher) Publish(ctx context.Context, topic string, event
 }
 
 func (l *RemoteEventsPublisher) forwardRequest(ctx context.Context, req *v1.ForwardRequest) error {
-	_, err := l.client.EventsService().Forward(ctx, req)
+	service, err := l.client.EventsService()
 	if err == nil {
-		return nil
+		_, err = service.Forward(ctx, req)
+		if err == nil {
+			return nil
+		}
 	}
 
 	if err != ttrpc.ErrClosed {
@@ -138,11 +141,15 @@ func (l *RemoteEventsPublisher) forwardRequest(ctx context.Context, req *v1.Forw
 	}
 
 	// Reconnect and retry request
-	if err := l.client.Reconnect(); err != nil {
+	if err = l.client.Reconnect(); err != nil {
 		return err
 	}
 
-	if _, err := l.client.EventsService().Forward(ctx, req); err != nil {
+	service, err = l.client.EventsService()
+	if err != nil {
+		return err
+	}
+	if _, err = service.Forward(ctx, req); err != nil {
 		return err
 	}
 
