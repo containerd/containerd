@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"io/ioutil"
 	"testing"
 
 	"github.com/BurntSushi/toml"
@@ -465,5 +466,33 @@ func TestPassThroughAnnotationsFilter(t *testing.T) {
 			passthroughAnnotations := getPassthroughAnnotations(test.podAnnotations, test.runtimePodAnnotations)
 			assert.Equal(t, test.passthroughAnnotations, passthroughAnnotations)
 		})
+	}
+}
+
+func TestEnsureRemoveAllNotExist(t *testing.T) {
+	// should never return an error for a non-existent path
+	if err := ensureRemoveAll(context.Background(), "/non/existent/path"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEnsureRemoveAllWithDir(t *testing.T) {
+	dir, err := ioutil.TempDir("", "test-ensure-removeall-with-dir")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureRemoveAll(context.Background(), dir); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEnsureRemoveAllWithFile(t *testing.T) {
+	tmp, err := ioutil.TempFile("", "test-ensure-removeall-with-dir")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmp.Close()
+	if err := ensureRemoveAll(context.Background(), tmp.Name()); err != nil {
+		t.Fatal(err)
 	}
 }

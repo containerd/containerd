@@ -423,10 +423,11 @@ func WithResources(resources *runtime.LinuxContainerResources) oci.SpecOpts {
 			s.Linux.Resources.Memory = &runtimespec.LinuxMemory{}
 		}
 		var (
-			p      = uint64(resources.GetCpuPeriod())
-			q      = resources.GetCpuQuota()
-			shares = uint64(resources.GetCpuShares())
-			limit  = resources.GetMemoryLimitInBytes()
+			p         = uint64(resources.GetCpuPeriod())
+			q         = resources.GetCpuQuota()
+			shares    = uint64(resources.GetCpuShares())
+			limit     = resources.GetMemoryLimitInBytes()
+			hugepages = resources.GetHugepageLimits()
 		)
 
 		if p != 0 {
@@ -446,6 +447,12 @@ func WithResources(resources *runtime.LinuxContainerResources) oci.SpecOpts {
 		}
 		if limit != 0 {
 			s.Linux.Resources.Memory.Limit = &limit
+		}
+		for _, limit := range hugepages {
+			s.Linux.Resources.HugepageLimits = append(s.Linux.Resources.HugepageLimits, runtimespec.LinuxHugepageLimit{
+				Pagesize: limit.PageSize,
+				Limit:    limit.Limit,
+			})
 		}
 		return nil
 	}
