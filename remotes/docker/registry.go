@@ -17,7 +17,14 @@
 package docker
 
 import (
+	"crypto/tls"
+
+	"io/ioutil"
 	"net/http"
+	"os"
+	"path/filepath"
+
+	"github.com/containerd/containerd/remotes/certutil"
 )
 
 // HostCapabilities represent the capabilities of the registry
@@ -98,10 +105,12 @@ func Registries(registries ...RegistryHosts) RegistryHosts {
 }
 
 type registryOpts struct {
-	authorizer Authorizer
-	plainHTTP  func(string) (bool, error)
-	host       func(string) (string, error)
-	client     *http.Client
+	authorizer  Authorizer
+	plainHTTP   func(string) (bool, error)
+	host        func(string) (string, error)
+	client      *http.Client
+	certRootDir string
+	skipVerify  bool
 }
 
 // RegistryOpt defines a registry default option
@@ -112,6 +121,21 @@ type RegistryOpt func(*registryOpts)
 func WithPlainHTTP(f func(string) (bool, error)) RegistryOpt {
 	return func(opts *registryOpts) {
 		opts.plainHTTP = f
+	}
+}
+
+// WithSkipVerify skip verify server
+func WithSkipVerify(skipVerify bool) RegistryOpt {
+	return func(opts *registryOpts) {
+		opts.skipVerify = skipVerify
+	}
+}
+
+// WithCertRootDir configures certdir
+// if client not set, will try find ca,cert,key file
+func WithCertRootDir(dir string) RegistryOpt {
+	return func(opts *registryOpts) {
+		opts.certRootDir = dir
 	}
 }
 
@@ -141,9 +165,16 @@ func WithClient(c *http.Client) RegistryOpt {
 // the RegistryHosts interface should be used directly.
 // NOTE: This function will always return a non-empty value or error
 func ConfigureDefaultRegistries(ropts ...RegistryOpt) RegistryHosts {
-	var opts registryOpts
+	var (
+		opts    registryOpts
+		tlsconf = new(tls.Config)
+	)
 	for _, opt := range ropts {
 		opt(&opts)
+	}
+
+	if opts.client == nil {
+		opts.client = http.DefaultClient
 	}
 
 	return func(host string) ([]RegistryHost, error) {
@@ -156,8 +187,28 @@ func ConfigureDefaultRegistries(ropts ...RegistryOpt) RegistryHosts {
 			Capabilities: HostCapabilityPull | HostCapabilityResolve | HostCapabilityPush,
 		}
 
-		if config.Client == nil {
-			config.Client = http.DefaultClient
+		if opts.certRootDir != "" {
+			fs, err := ioutil.ReadDir(filepath.Join(opts.certRootDir, host))
+			if err != nil && !os.IsNotExist(err) {
+				return nil, err
+			}
+			for _, f := range fs {
+				hostDir := filepath.Join(opts.certRootDir, f.Name())
+				caCertGlob := filepath.Join(hostDir, "*.crt")
+				keyGlob := filepath.Join(hostDir, "*.key")
+				//TODO: not find continue?
+				_, err := certutil.LoadCACerts(tlsconf, caCertGlob)
+				if err != nil {
+					continue
+				}
+				certutil.LoadKeyPairs(tlsconf, keyGlob, certutil.DockerKeyPairCertLocator)
+			}
+			tlsconf.InsecureSkipVerify = opts.skipVerify
+			opts.client = &http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: tlsconf,
+				},
+			}
 		}
 
 		if opts.plainHTTP != nil {
