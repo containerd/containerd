@@ -208,9 +208,6 @@ func (m *DB) Init(ctx context.Context) error {
 // ContentStore returns a namespaced content store
 // proxied to a content store.
 func (m *DB) ContentStore() content.Store {
-	if m.cs == nil {
-		return nil
-	}
 	return m.cs
 }
 
