@@ -20,22 +20,13 @@ import (
 	"bufio"
 	gocontext "context"
 	"fmt"
-	"io/ioutil"
-	"net"
-	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/remotes"
-	"github.com/containerd/containerd/remotes/certutil"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	"strings"
 )
 
 // PushTracker returns a new InMemoryTracker which tracks the ref status
@@ -88,7 +79,6 @@ func GetResolver(ctx gocontext.Context, clicontext *cli.Context) (remotes.Resolv
 		// Only one host
 		return username, secret, nil
 	}
-	loadCertsDir(tr.TLSClientConfig, clicontext.String("certs-dir"))
 
 	if clicontext.Bool("plain-http") {
 		opts = append(opts, docker.WithPlainHTTP(docker.MatchAllHosts))
@@ -96,7 +86,7 @@ func GetResolver(ctx gocontext.Context, clicontext *cli.Context) (remotes.Resolv
 
 	opts = append(opts,
 		docker.WithSkipVerify(clicontext.Bool("skip-verify")),
-		docker.WithCertRootDir(clicontext.String("cert-dir")),
+		docker.WithCertRootDir(clicontext.String("certs-dir")),
 	)
 
 	authOpts := []docker.AuthorizerOpt{docker.WithAuthCreds(credentials)}
@@ -108,31 +98,4 @@ func GetResolver(ctx gocontext.Context, clicontext *cli.Context) (remotes.Resolv
 	}
 
 	return docker.NewResolver(options), nil
-}
-
-// loadCertsDir loads certs from certsDir like "/etc/docker/certs.d" .
-func loadCertsDir(config *tls.Config, certsDir string) {
-	if certsDir == "" {
-		return
-	}
-	fs, err := ioutil.ReadDir(certsDir)
-	if err != nil && !os.IsNotExist(err) {
-		logrus.WithError(err).Errorf("cannot read certs directory %q", certsDir)
-		return
-	}
-	for _, f := range fs {
-		if !f.IsDir() {
-			continue
-		}
-		// TODO: skip loading if f.Name() is not valid FQDN/IP
-		hostDir := filepath.Join(certsDir, f.Name())
-		caCertGlob := filepath.Join(hostDir, "*.crt")
-		if _, err = certutil.LoadCACerts(config, caCertGlob); err != nil {
-			logrus.WithError(err).Errorf("cannot load certs from %q", caCertGlob)
-		}
-		keyGlob := filepath.Join(hostDir, "*.key")
-		if _, _, err = certutil.LoadKeyPairs(config, keyGlob, certutil.DockerKeyPairCertLocator); err != nil {
-			logrus.WithError(err).Errorf("cannot load key pairs from %q", keyGlob)
-		}
-	}
 }
