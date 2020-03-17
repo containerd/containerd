@@ -31,7 +31,6 @@ func TestParseSignal(t *testing.T) {
 		{"1", syscall.Signal(1), false},
 		{"SIGKILL", syscall.SIGKILL, false},
 		{"NONEXIST", 0, true},
-		{"65536", 0, true},
 	}
 	for _, ts := range testSignals {
 		t.Run(fmt.Sprintf("%s/%d/%t", ts.raw, ts.want, ts.err), func(t *testing.T) {
