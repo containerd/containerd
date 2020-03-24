@@ -205,24 +205,9 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		}
 	}
 
-	runtimeOpts := &options.Options{}
-	if runcBinary := context.String("runc-binary"); runcBinary != "" {
-		if context.String("runtime") == "io.containerd.runc.v2" {
-			runtimeOpts.BinaryName = runcBinary
-		} else {
-			return nil, errors.New("specifying runc-binary is only supported for \"io.containerd.runc.v2\" runtime")
-		}
-	}
-	if context.Bool("runc-systemd-cgroup") {
-		if context.String("runtime") == "io.containerd.runc.v2" {
-			if context.String("cgroup") == "" {
-				// runc maps "machine.slice:foo:deadbeef" to "/machine.slice/foo-deadbeef.scope"
-				return nil, errors.New("option --runc-systemd-cgroup requires --cgroup to be set, e.g. \"machine.slice:foo:deadbeef\"")
-			}
-			runtimeOpts.SystemdCgroup = true
-		} else {
-			return nil, errors.New("specifying runc-systemd-cgroup is only supported for \"io.containerd.runc.v2\" runtime")
-		}
+	runtimeOpts, err := getRuntimeOptions(context)
+	if err != nil {
+		return nil, err
 	}
 	cOpts = append(cOpts, containerd.WithRuntime(context.String("runtime"), runtimeOpts))
 
@@ -235,6 +220,36 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	// oci.WithImageConfig (WithUsername, WithUserID) depends on access to rootfs for resolving via
 	// the /etc/{passwd,group} files. So cOpts needs to have precedence over opts.
 	return client.NewContainer(ctx, id, cOpts...)
+}
+
+func getRuncOptions(context *cli.Context) (*options.Options, error) {
+	runtimeOpts := &options.Options{}
+	if runcBinary := context.String("runc-binary"); runcBinary != "" {
+		runtimeOpts.BinaryName = runcBinary
+	}
+	if context.Bool("runc-systemd-cgroup") {
+		if context.String("cgroup") == "" {
+			// runc maps "machine.slice:foo:deadbeef" to "/machine.slice/foo-deadbeef.scope"
+			return nil, errors.New("option --runc-systemd-cgroup requires --cgroup to be set, e.g. \"machine.slice:foo:deadbeef\"")
+		}
+		runtimeOpts.SystemdCgroup = true
+	}
+
+	return runtimeOpts, nil
+}
+
+func getRuntimeOptions(context *cli.Context) (interface{}, error) {
+	// validate first
+	if (context.String("runc-binary") != "" || context.Bool("runc-systemd-cgroup")) &&
+		context.String("runtime") != "io.containerd.runc.v2" {
+		return nil, errors.New("specifying runc-binary and runc-systemd-cgroup is only supported for \"io.containerd.runc.v2\" runtime")
+	}
+
+	if context.String("runtime") == "io.containerd.runc.v2" {
+		return getRuncOptions(context)
+	}
+
+	return nil, nil
 }
 
 func getNewTaskOpts(context *cli.Context) []containerd.NewTaskOpts {
