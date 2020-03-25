@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/stdio"
+	"github.com/containerd/containerd/sys"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	"github.com/pkg/errors"
@@ -174,7 +175,7 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 			},
 		},
 	} {
-		ok, err := isFifo(i.name)
+		ok, err := sys.IsFifo(i.name)
 		if err != nil {
 			return err
 		}
@@ -238,22 +239,6 @@ func (c *countingWriteCloser) Close() error {
 		return nil
 	}
 	return c.WriteCloser.Close()
-}
-
-// isFifo checks if a file is a fifo
-// if the file does not exist then it returns false
-func isFifo(path string) (bool, error) {
-	stat, err := os.Stat(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	if stat.Mode()&os.ModeNamedPipe == os.ModeNamedPipe {
-		return true, nil
-	}
-	return false, nil
 }
 
 // NewBinaryIO runs a custom binary process for pluggable shim logging
