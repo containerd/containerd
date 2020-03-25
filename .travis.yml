@@ -3,13 +3,8 @@ git:
 
 language: go
 go:
-  - 1.13.8
-  - 1.14
-
-matrix:
-  - go: 1.14
-
-sudo: required
+  - 1.13.9
+  - 1.14.1
 
 env:
   - GO111MODULE=off
