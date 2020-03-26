@@ -24,6 +24,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// IDName is the name that is used to identify the id being collected in the metric
+var IDName = "container_id"
+
 type value struct {
 	v float64
 	l []string
@@ -41,7 +44,7 @@ type metric struct {
 
 func (m *metric) desc(ns *metrics.Namespace) *prometheus.Desc {
 	// the namespace label is for containerd namespaces
-	return ns.NewDesc(m.name, m.help, m.unit, append([]string{"container_id", "namespace"}, m.labels...)...)
+	return ns.NewDesc(m.name, m.help, m.unit, append([]string{IDName, "namespace"}, m.labels...)...)
 }
 
 func (m *metric) collect(id, namespace string, stats *v2.Metrics, ns *metrics.Namespace, ch chan<- prometheus.Metric, block bool) {
