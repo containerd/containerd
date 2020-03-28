@@ -44,6 +44,8 @@ func (c *criService) Attach(ctx context.Context, r *runtime.AttachRequest) (*run
 
 func (c *criService) attachContainer(ctx context.Context, id string, stdin io.Reader, stdout, stderr io.WriteCloser,
 	tty bool, resize <-chan remotecommand.TerminalSize) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	// Get container from our container store.
 	cntr, err := c.containerStore.Get(id)
 	if err != nil {
@@ -60,7 +62,7 @@ func (c *criService) attachContainer(ctx context.Context, id string, stdin io.Re
 	if err != nil {
 		return errors.Wrap(err, "failed to load task")
 	}
-	handleResizing(resize, func(size remotecommand.TerminalSize) {
+	handleResizing(ctx, resize, func(size remotecommand.TerminalSize) {
 		if err := task.Resize(ctx, uint32(size.Width), uint32(size.Height)); err != nil {
 			log.G(ctx).WithError(err).Errorf("Failed to resize task %q console", id)
 		}
