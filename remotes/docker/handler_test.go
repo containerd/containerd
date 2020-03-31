@@ -65,3 +65,10 @@ func TestAppendDistributionLabel(t *testing.T) {
 		}
 	}
 }
+
+func TestDistributionSourceLabelKey(t *testing.T) {
+	expected := "containerd.io/distribution.source.testsource"
+	if got := distributionSourceLabelKey("testsource"); !reflect.DeepEqual(got, expected) {
+		t.Fatalf("expected %v, but got %v", expected, got)
+	}
+}
