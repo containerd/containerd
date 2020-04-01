@@ -72,3 +72,31 @@ func TestDistributionSourceLabelKey(t *testing.T) {
 		t.Fatalf("expected %v, but got %v", expected, got)
 	}
 }
+
+func TestCommonPrefixComponents(t *testing.T) {
+	for _, tc := range []struct {
+		components []string
+		target     string
+		expected   int
+	}{
+		{
+			components: []string{"foo"},
+			target:     "foo/bar",
+			expected:   1,
+		},
+		{
+			components: []string{"bar"},
+			target:     "foo/bar",
+			expected:   0,
+		},
+		{
+			components: []string{"foo", "bar"},
+			target:     "foo/bar",
+			expected:   2,
+		},
+	} {
+		if got := commonPrefixComponents(tc.components, tc.target); !reflect.DeepEqual(got, tc.expected) {
+			t.Fatalf("expected %v, but got %v", tc.expected, got)
+		}
+	}
+}
