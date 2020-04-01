@@ -62,9 +62,9 @@ var (
 			Usage: "refresh token for authorization server",
 		},
 		cli.StringFlag{
-			Name: "certs-dir",
+			Name: "hosts-dir",
 			// compatible with "/etc/docker/certs.d"
-			Usage: "custom certificates directory that contains \"<hostname>/{ca.crt, client.cert, client.key}\"",
+			Usage: "Custom hosts configuration directory",
 		},
 	}
 

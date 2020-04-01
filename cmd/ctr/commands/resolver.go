@@ -21,20 +21,13 @@ import (
 	gocontext "context"
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
-	"net"
-	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/remotes"
-	"github.com/containerd/containerd/remotes/certutil"
 	"github.com/containerd/containerd/remotes/docker"
+	"github.com/containerd/containerd/remotes/docker/config"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -65,8 +58,7 @@ func GetResolver(ctx gocontext.Context, clicontext *cli.Context) (remotes.Resolv
 		username = username[0:i]
 	}
 	options := docker.ResolverOptions{
-		PlainHTTP: clicontext.Bool("plain-http"),
-		Tracker:   PushTracker,
+		Tracker: PushTracker,
 	}
 	if username != "" {
 		if secret == "" {
@@ -84,60 +76,26 @@ func GetResolver(ctx gocontext.Context, clicontext *cli.Context) (remotes.Resolv
 		secret = rt
 	}
 
-	tr := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-			DualStack: true,
-		}).DialContext,
-		MaxIdleConns:        10,
-		IdleConnTimeout:     30 * time.Second,
-		TLSHandshakeTimeout: 10 * time.Second,
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: clicontext.Bool("skip-verify"),
-		},
-		ExpectContinueTimeout: 5 * time.Second,
-	}
-	loadCertsDir(tr.TLSClientConfig, clicontext.String("certs-dir"))
-
-	options.Client = &http.Client{
-		Transport: tr,
-	}
-
-	credentials := func(host string) (string, string, error) {
+	hostOptions := config.HostOptions{}
+	hostOptions.Credentials = func(host string) (string, string, error) {
+		// If host doesn't match...
 		// Only one host
 		return username, secret, nil
 	}
-	authOpts := []docker.AuthorizerOpt{docker.WithAuthClient(options.Client), docker.WithAuthCreds(credentials)}
-	options.Authorizer = docker.NewDockerAuthorizer(authOpts...)
+	if clicontext.Bool("plain-http") {
+		hostOptions.DefaultScheme = "http"
+	}
+
+	if clicontext.Bool("skip-verify") {
+		hostOptions.DefaultTLS = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+	}
+	if hostDir := clicontext.String("hosts-dir"); hostDir != "" {
+		hostOptions.HostDir = config.HostDirFromRoot(hostDir)
+	}
+
+	options.Hosts = config.ConfigureHosts(ctx, hostOptions)
 
 	return docker.NewResolver(options), nil
-}
-
-// loadCertsDir loads certs from certsDir like "/etc/docker/certs.d" .
-func loadCertsDir(config *tls.Config, certsDir string) {
-	if certsDir == "" {
-		return
-	}
-	fs, err := ioutil.ReadDir(certsDir)
-	if err != nil && !os.IsNotExist(err) {
-		logrus.WithError(err).Errorf("cannot read certs directory %q", certsDir)
-		return
-	}
-	for _, f := range fs {
-		if !f.IsDir() {
-			continue
-		}
-		// TODO: skip loading if f.Name() is not valid FQDN/IP
-		hostDir := filepath.Join(certsDir, f.Name())
-		caCertGlob := filepath.Join(hostDir, "*.crt")
-		if _, err = certutil.LoadCACerts(config, caCertGlob); err != nil {
-			logrus.WithError(err).Errorf("cannot load certs from %q", caCertGlob)
-		}
-		keyGlob := filepath.Join(hostDir, "*.key")
-		if _, _, err = certutil.LoadKeyPairs(config, keyGlob, certutil.DockerKeyPairCertLocator); err != nil {
-			logrus.WithError(err).Errorf("cannot load key pairs from %q", keyGlob)
-		}
-	}
 }
