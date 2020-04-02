@@ -140,4 +140,4 @@ Phil Estes <estesp@gmail.com>
 
 ## SEE ALSO
 
-ctr(1), containerd-config(1), containerd(1)
+ctr(1), containerd-config(1), containerd(8)
