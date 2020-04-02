@@ -1,4 +1,4 @@
-# containerd-config 1 01/30/2018
+# containerd-config 8 01/30/2018
 
 ## NAME
 
@@ -38,4 +38,4 @@ Phil Estes <estesp@gmail.com>
 
 ## SEE ALSO
 
-ctr(1), containerd(8), containerd-config.toml(5)
+ctr(8), containerd(8), containerd-config.toml(5)
