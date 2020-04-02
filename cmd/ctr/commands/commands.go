@@ -61,6 +61,11 @@ var (
 			Name:  "refresh",
 			Usage: "refresh token for authorization server",
 		},
+		cli.StringFlag{
+			Name: "hosts-dir",
+			// compatible with "/etc/docker/certs.d"
+			Usage: "Custom hosts configuration directory",
+		},
 	}
 
 	// ContainerFlags are cli flags specifying container options
