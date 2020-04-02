@@ -88,7 +88,7 @@ endif
 
 # Project binaries.
 COMMANDS=ctr containerd containerd-stress
-MANPAGES=ctr.1 containerd.1 containerd-config.1 containerd-config.toml.5
+MANPAGES=ctr.1 containerd.8 containerd-config.1 containerd-config.toml.5
 
 ifdef BUILDTAGS
     GO_BUILDTAGS = ${BUILDTAGS}
@@ -214,9 +214,9 @@ mandir:
 	@mkdir -p man
 
 # Kept for backwards compatability
-genman: man/containerd.1 man/ctr.1
+genman: man/containerd.8 man/ctr.1
 
-man/containerd.1: FORCE
+man/containerd.8: FORCE
 	@echo "$(WHALE) $@"
 	go run cmd/gen-manpages/main.go containerd man/
 

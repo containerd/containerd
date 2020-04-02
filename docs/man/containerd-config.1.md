@@ -38,4 +38,4 @@ Phil Estes <estesp@gmail.com>
 
 ## SEE ALSO
 
-ctr(1), containerd(1), containerd-config.toml(5)
+ctr(1), containerd(8), containerd-config.toml(5)
