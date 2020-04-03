@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/containerd/containerd/cmd/containerd/command"
 	"github.com/containerd/containerd/cmd/ctr/app"
@@ -41,22 +42,28 @@ func run() error {
 		"containerd": command.App(),
 		"ctr":        app.New(),
 	}
-	name := flag.Arg(0)
 	dir := flag.Arg(1)
-	app, ok := apps[name]
-	if !ok {
-		return fmt.Errorf("Invalid application '%s'", name)
+
+	parts := strings.SplitN(flag.Arg(0), ".", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid name '%s': name does not contain man page section", flag.Arg(0))
 	}
+	name, section := parts[0], parts[1]
+
+	appName, ok := apps[name]
+	if !ok {
+		return fmt.Errorf("invalid application '%s'", name)
+	}
+
 	// clear out the usage as we use banners that do not display in man pages
-	app.Usage = ""
-	data, err := app.ToMan()
+	appName.Usage = ""
+	appName.ToMan()
+	data, err := appName.ToMan()
 	if err != nil {
 		return err
 	}
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		os.Mkdir(dir, os.ModePerm)
-	}
-	if err := ioutil.WriteFile(filepath.Join(dir, fmt.Sprintf("%s.1", name)), []byte(data), 0644); err != nil {
+	_ = os.MkdirAll(dir, os.ModePerm)
+	if err := ioutil.WriteFile(filepath.Join(dir, fmt.Sprintf("%s.%s", name, section)), []byte(data), 0644); err != nil {
 		return err
 	}
 	return nil
