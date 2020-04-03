@@ -2,6 +2,7 @@ package ebpf
 
 import (
 	"github.com/cilium/ebpf/asm"
+	"github.com/cilium/ebpf/internal/btf"
 	"github.com/pkg/errors"
 )
 
@@ -55,17 +56,61 @@ func NewCollection(spec *CollectionSpec) (*Collection, error) {
 // NewCollectionWithOptions creates a Collection from a specification.
 //
 // Only maps referenced by at least one of the programs are initialized.
-func NewCollectionWithOptions(spec *CollectionSpec, opts CollectionOptions) (*Collection, error) {
-	maps := make(map[string]*Map)
+func NewCollectionWithOptions(spec *CollectionSpec, opts CollectionOptions) (coll *Collection, err error) {
+	var (
+		maps  = make(map[string]*Map)
+		progs = make(map[string]*Program)
+		btfs  = make(map[*btf.Spec]*btf.Handle)
+	)
+
+	defer func() {
+		for _, btf := range btfs {
+			btf.Close()
+		}
+
+		if err == nil {
+			return
+		}
+
+		for _, m := range maps {
+			m.Close()
+		}
+
+		for _, p := range progs {
+			p.Close()
+		}
+	}()
+
+	loadBTF := func(spec *btf.Spec) (*btf.Handle, error) {
+		if btfs[spec] != nil {
+			return btfs[spec], nil
+		}
+
+		handle, err := btf.NewHandle(spec)
+		if err != nil {
+			return nil, err
+		}
+
+		btfs[spec] = handle
+		return handle, nil
+	}
+
 	for mapName, mapSpec := range spec.Maps {
-		m, err := NewMap(mapSpec)
+		var handle *btf.Handle
+		if mapSpec.BTF != nil {
+			handle, err = loadBTF(btf.MapSpec(mapSpec.BTF))
+			if err != nil && !btf.IsNotSupported(err) {
+				return nil, err
+			}
+		}
+
+		m, err := newMapWithBTF(mapSpec, handle)
 		if err != nil {
 			return nil, errors.Wrapf(err, "map %s", mapName)
 		}
 		maps[mapName] = m
 	}
 
-	progs := make(map[string]*Program)
 	for progName, origProgSpec := range spec.Programs {
 		progSpec := origProgSpec.Copy()
 
@@ -91,7 +136,15 @@ func NewCollectionWithOptions(spec *CollectionSpec, opts CollectionOptions) (*Co
 			}
 		}
 
-		prog, err := NewProgramWithOptions(progSpec, opts.Programs)
+		var handle *btf.Handle
+		if progSpec.BTF != nil {
+			handle, err = loadBTF(btf.ProgramSpec(progSpec.BTF))
+			if err != nil && !btf.IsNotSupported(err) {
+				return nil, err
+			}
+		}
+
+		prog, err := newProgramWithBTF(progSpec, handle, opts.Programs)
 		if err != nil {
 			return nil, errors.Wrapf(err, "program %s", progName)
 		}
