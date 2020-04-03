@@ -236,15 +236,15 @@ func (m *memoryController) parseStats(r io.Reader, stat *v1.MemoryStat) error {
 		line int
 	)
 	for sc.Scan() {
-		if err := sc.Err(); err != nil {
-			return err
-		}
 		key, v, err := parseKV(sc.Text())
 		if err != nil {
 			return fmt.Errorf("%d: %v", line, err)
 		}
 		raw[key] = v
 		line++
+	}
+	if err := sc.Err(); err != nil {
+		return err
 	}
 	stat.Cache = raw["cache"]
 	stat.RSS = raw["rss"]

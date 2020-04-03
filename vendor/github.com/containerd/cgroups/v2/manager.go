@@ -66,11 +66,12 @@ type Event struct {
 
 // Resources for a cgroups v2 unified hierarchy
 type Resources struct {
-	CPU    *CPU
-	Memory *Memory
-	Pids   *Pids
-	IO     *IO
-	RDMA   *RDMA
+	CPU     *CPU
+	Memory  *Memory
+	Pids    *Pids
+	IO      *IO
+	RDMA    *RDMA
+	HugeTlb *HugeTlb
 	// When len(Devices) is zero, devices are not controlled
 	Devices []specs.LinuxDeviceCgroup
 }
@@ -93,6 +94,9 @@ func (r *Resources) Values() (o []Value) {
 	if r.RDMA != nil {
 		o = append(o, r.RDMA.Values()...)
 	}
+	if r.HugeTlb != nil {
+		o = append(o, r.HugeTlb.Values()...)
+	}
 	return o
 }
 
@@ -113,6 +117,9 @@ func (r *Resources) EnabledControllers() (c []string) {
 	}
 	if r.RDMA != nil {
 		c = append(c, "rdma")
+	}
+	if r.HugeTlb != nil {
+		c = append(c, "hugetlb")
 	}
 	return
 }
@@ -422,11 +429,11 @@ func (c *Manager) Stat() (*stats.Metrics, error) {
 	}
 
 	metrics.Io = &stats.IOStat{Usage: readIoStats(c.path)}
-
 	metrics.Rdma = &stats.RdmaStat{
 		Current: rdmaStats(filepath.Join(c.path, "rdma.current")),
 		Limit:   rdmaStats(filepath.Join(c.path, "rdma.max")),
 	}
+	metrics.Hugetlb = readHugeTlbStats(c.path)
 
 	return &metrics, nil
 }
@@ -489,16 +496,13 @@ func readKVStatsFile(path string, file string, out map[string]interface{}) error
 
 	s := bufio.NewScanner(f)
 	for s.Scan() {
-		if err := s.Err(); err != nil {
-			return err
-		}
 		name, value, err := parseKV(s.Text())
 		if err != nil {
 			return errors.Wrapf(err, "error while parsing %s (line=%q)", filepath.Join(path, file), s.Text())
 		}
 		out[name] = value
 	}
-	return nil
+	return s.Err()
 }
 
 func (c *Manager) Freeze() error {
@@ -526,20 +530,20 @@ func (c *Manager) freeze(path string, state State) error {
 	}
 }
 
-func (c *Manager) MemoryEventFD() (uintptr, error) {
+// MemoryEventFD returns inotify file descriptor and 'memory.events' inotify watch descriptor
+func (c *Manager) MemoryEventFD() (int, uint32, error) {
 	fpath := filepath.Join(c.path, "memory.events")
 	fd, err := syscall.InotifyInit()
 	if err != nil {
-		return 0, errors.Errorf("Failed to create inotify fd")
+		return 0, 0, errors.Errorf("Failed to create inotify fd")
 	}
-	defer syscall.Close(fd)
 	wd, err := syscall.InotifyAddWatch(fd, fpath, unix.IN_MODIFY)
 	if wd < 0 {
-		return 0, errors.Errorf("Failed to add inotify watch for %q", fpath)
+		syscall.Close(fd)
+		return 0, 0, errors.Errorf("Failed to add inotify watch for %q", fpath)
 	}
-	defer syscall.InotifyRmWatch(fd, uint32(wd))
 
-	return uintptr(fd), nil
+	return fd, uint32(wd), nil
 }
 
 func (c *Manager) EventChan() (<-chan Event, <-chan error) {
@@ -551,15 +555,22 @@ func (c *Manager) EventChan() (<-chan Event, <-chan error) {
 }
 
 func (c *Manager) waitForEvents(ec chan<- Event, errCh chan<- error) {
-	fd, err := c.MemoryEventFD()
+	fd, wd, err := c.MemoryEventFD()
+
+	defer syscall.InotifyRmWatch(fd, wd)
+	defer syscall.Close(fd)
+
 	if err != nil {
-		errCh <- errors.Errorf("Failed to create memory event fd")
+		errCh <- err
+		return
 	}
+
 	for {
 		buffer := make([]byte, syscall.SizeofInotifyEvent*10)
-		bytesRead, err := syscall.Read(int(fd), buffer)
+		bytesRead, err := syscall.Read(fd, buffer)
 		if err != nil {
 			errCh <- err
+			return
 		}
 		var out map[string]interface{}
 		if bytesRead >= syscall.SizeofInotifyEvent {
@@ -572,6 +583,9 @@ func (c *Manager) waitForEvents(ec chan<- Event, errCh chan<- error) {
 					OOMKill: out["oom_kill"].(uint64),
 				}
 				ec <- e
+			} else {
+				errCh <- err
+				return
 			}
 		}
 	}
