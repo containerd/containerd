@@ -21,7 +21,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v1
         with:
-          go-version: '1.13.8'
+          go-version: '1.13.9'
 
       - name: Set env
         shell: bash
@@ -60,7 +60,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v1
         with:
-          go-version: '1.13.8'
+          go-version: '1.13.9'
 
       - name: Set env
         shell: bash
@@ -131,7 +131,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v1
         with:
-          go-version: '1.13.8'
+          go-version: '1.13.9'
 
       - name: Checkout
         uses: actions/checkout@v1
