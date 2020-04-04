@@ -88,21 +88,20 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 		if hosts == nil {
 			hosts = make([]hostConfig, 1)
 		}
-		if len(hosts) > 1 {
-			if hosts[len(hosts)-1].host == "" {
-				if host == "docker.io" {
-					hosts[len(hosts)-1].scheme = "https"
-					hosts[len(hosts)-1].host = "https://registry-1.docker.io"
+		if len(hosts) >= 1 && hosts[len(hosts)-1].host == "" {
+			if host == "docker.io" {
+				hosts[len(hosts)-1].scheme = "https"
+				hosts[len(hosts)-1].host = "registry-1.docker.io"
+			} else {
+				hosts[len(hosts)-1].host = host
+				if options.DefaultScheme != "" {
+					hosts[len(hosts)-1].scheme = options.DefaultScheme
 				} else {
-					hosts[len(hosts)-1].host = host
-					if options.DefaultScheme != "" {
-						hosts[len(hosts)-1].scheme = options.DefaultScheme
-					} else {
-						hosts[len(hosts)-1].scheme = "https"
-					}
+					hosts[len(hosts)-1].scheme = "https"
 				}
-				hosts[len(hosts)-1].path = "/v2"
 			}
+			hosts[len(hosts)-1].path = "/v2"
+			hosts[len(hosts)-1].capabilities = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush
 		}
 
 		defaultTransport := &http.Transport{
