@@ -1,0 +1,70 @@
+name: Tests
+on:
+  push:
+    branches:
+      - master
+      - 'release/**'
+  pull_request:
+    branches:
+      - master
+      - 'release/**'
+
+jobs:
+  integration:
+    name: Integration
+    runs-on: ubuntu-18.04
+    timeout-minutes: 10
+
+    strategy:
+      matrix:
+        runtime: [v1, v2]
+        runc: [runc, crun]
+        exclude:
+          - runtime: v1
+            runc: crun
+
+    steps:
+      - name: Set env
+        shell: bash
+        run: |
+          echo "::set-env name=GOPATH::${{ github.workspace }}"
+          echo "::add-path::${{ github.workspace }}/bin"
+
+      - name: Checkout containerd
+        uses: actions/checkout@v2
+        with:
+          path: src/github.com/containerd/containerd
+
+      - name: Install dependencies
+        env:
+          RUNC_FLAVOR: ${{ matrix.runc }}
+        run: |
+          sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-seccomp
+          sudo PATH=$PATH GOPATH=$GOPATH RUNC_FLAVOR=$RUNC_FLAVOR script/setup/install-runc
+          sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-cni
+        working-directory: src/github.com/containerd/containerd
+
+      - name: Install binaries
+        env:
+          CGO_ENABLED: 1
+        run: |
+          make binaries
+          sudo make install
+        working-directory: src/github.com/containerd/containerd
+
+      - name: Integration 1
+        env:
+          GOPROXY: direct
+          TEST_RUNTIME: io.containerd.runc.${{ matrix.runtime }}
+        run: |
+          sudo GOPATH=$GOPATH GOPROXY=$GOPROXY TEST_RUNTIME=$TEST_RUNTIME make integration EXTRA_TESTFLAGS=-no-criu TESTFLAGS_RACE=-race
+        working-directory: src/github.com/containerd/containerd
+
+      # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
+      - name: Integration 2
+        env:
+          GOPROXY: direct
+          TEST_RUNTIME: io.containerd.runc.${{ matrix.runtime }}
+        run: |
+          sudo GOPATH=$GOPATH GOPROXY=$GOPROXY TEST_RUNTIME=$TEST_RUNTIME TESTFLAGS_PARALLEL=1 make integration EXTRA_TESTFLAGS=-no-criu
+        working-directory: src/github.com/containerd/containerd
