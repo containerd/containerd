@@ -30,6 +30,7 @@ jobs:
         run: |
           echo "::set-env name=GOPATH::${{ github.workspace }}"
           echo "::add-path::${{ github.workspace }}/bin"
+
       - name: Checkout
         uses: actions/checkout@v2
         with:
@@ -39,6 +40,7 @@ jobs:
         if: startsWith(matrix.os, 'ubuntu')
         run: |
           sudo apt-get install -y btrfs-tools libseccomp-dev
+
       - name: Make
         run: |
           make build
@@ -61,6 +63,7 @@ jobs:
         run: |
           echo "::set-env name=GOPATH::${{ github.workspace }}"
           echo "::add-path::${{ github.workspace }}/bin"
+
       - name: Checkout
         uses: actions/checkout@v2
         with:
