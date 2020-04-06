@@ -74,6 +74,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 				return nil, err
 			}
 			if dir != "" {
+				log.G(ctx).WithField("dir", dir).Debug("loading host directory")
 				hosts, err = loadHostDir(ctx, dir)
 				if err != nil {
 					return nil, err
@@ -88,7 +89,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 		if hosts == nil {
 			hosts = make([]hostConfig, 1)
 		}
-		if len(hosts) >= 1 && hosts[len(hosts)-1].host == "" {
+		if len(hosts) > 0 && hosts[len(hosts)-1].host == "" {
 			if host == "docker.io" {
 				hosts[len(hosts)-1].scheme = "https"
 				hosts[len(hosts)-1].host = "registry-1.docker.io"

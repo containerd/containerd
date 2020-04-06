@@ -23,11 +23,55 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/remotes/docker"
 )
 
+const allCaps = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush
+
+func TestDefaultHosts(t *testing.T) {
+	ctx := logtest.WithT(context.Background(), t)
+	resolve := ConfigureHosts(ctx, HostOptions{})
+
+	for _, tc := range []struct {
+		host     string
+		expected []docker.RegistryHost
+	}{
+		{
+			host: "docker.io",
+			expected: []docker.RegistryHost{
+				{
+					Scheme:       "https",
+					Host:         "registry-1.docker.io",
+					Path:         "/v2",
+					Capabilities: allCaps,
+				},
+			},
+		},
+	} {
+		hosts, err := resolve(tc.host)
+		if err != nil {
+			t.Errorf("[%s] resolve failed: %v", tc.host, err)
+			continue
+		}
+		if len(hosts) != len(tc.expected) {
+			t.Errorf("[%s] unexpected number of hosts %d, expected %d", tc.host, len(hosts), len(tc.expected))
+			continue
+		}
+		for j := range hosts {
+			if !compareRegistryHost(hosts[j], tc.expected[j]) {
+
+				t.Errorf("[%s] [%d] unexpected host %v, expected %v", tc.host, j, hosts[j], tc.expected[j])
+				break
+			}
+
+		}
+
+	}
+}
+
 func TestParseHostFile(t *testing.T) {
-	ctx := context.Background()
+	ctx := logtest.WithT(context.Background(), t)
 
 	const testtoml = `
 server = "https://test-default.registry"
@@ -56,7 +100,6 @@ ca = "/etc/path/default"
   client = ["/etc/certs/client-1.pem", "/etc/certs/client-2.pem"]
 `
 	var tb, fb = true, false
-	var allCaps = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush
 	expected := []hostConfig{
 		{
 			scheme:       "https",
@@ -140,6 +183,23 @@ ca = "/etc/path/default"
 			t.Fatalf("Mismatch at host %d", i)
 		}
 	}
+}
+
+func compareRegistryHost(j, k docker.RegistryHost) bool {
+	if j.Scheme != k.Scheme {
+		return false
+	}
+	if j.Host != k.Host {
+		return false
+	}
+	if j.Path != k.Path {
+		return false
+	}
+	if j.Capabilities != k.Capabilities {
+		return false
+	}
+	// Not comparing TLS configs or authorizations
+	return true
 }
 
 func compareHostConfig(j, k hostConfig) bool {
