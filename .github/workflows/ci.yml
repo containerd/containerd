@@ -55,7 +55,7 @@ jobs:
   # Project checks
   #
   project:
-    name: Project
+    name: Project Checks
     runs-on: ubuntu-18.04
     timeout-minutes: 5
 
@@ -140,18 +140,21 @@ jobs:
         with:
           go-version: '1.13.9'
 
+      - name: Set env
+        shell: bash
+        run: |
+          echo "::set-env name=GOPATH::${{ github.workspace }}"
+          echo "::add-path::${{ github.workspace }}/bin"
+
       - name: Checkout
-        uses: actions/checkout@v1
-        env:
-          GOPATH: ${{ runner.workspace }}
-          GO111MODULE: off
+        uses: actions/checkout@v2
         with:
-          path: ./src/github.com/containerd/containerd
+          path: src/github.com/containerd/containerd
 
       - name: Install protobuf
         env:
-          GOPATH: ${{ runner.workspace }}
           GO111MODULE: off
+        working-directory: src/github.com/containerd/containerd
         run: |
           sudo env PATH=$PATH GOPATH=$GOPATH script/setup/install-protobuf
           sudo chmod +x /usr/local/bin/protoc
@@ -161,27 +164,26 @@ jobs:
 
       - name: Go get gogo
         env:
-          GOPATH: ${{ runner.workspace }}
           GO111MODULE: off
         # Get proto files, ignore "package github.com/gogo/googleapis: no Go files in ~/go/src/github.com/gogo/googleapis"
         run: go get -u github.com/gogo/googleapis || true
 
       - name: Install dev tools
         env:
-          GOPATH: ${{ runner.workspace }}
           GO111MODULE: off
         run: script/setup/install-dev-tools
+        working-directory: src/github.com/containerd/containerd
 
       - name: Make
         env:
-          GOPATH: ${{ runner.workspace }}
           GO111MODULE: off
+        working-directory: src/github.com/containerd/containerd
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
           make check-protos check-api-descriptors
 
   man:
-    name: Mans
+    name: Manpages
     runs-on: ubuntu-18.04
     timeout-minutes: 5
 
@@ -256,7 +258,7 @@ jobs:
   integration:
     name: Integration
     runs-on: ubuntu-18.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     needs: [project, linters, protos, man]
 
     strategy:
