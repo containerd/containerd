@@ -42,6 +42,8 @@ type LoggerFunc func(context.Context, *Config, func() error) error
 // Run the logging driver
 func Run(fn LoggerFunc) {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	config := &Config{
 		ID:        os.Getenv("CONTAINER_ID"),
 		Namespace: os.Getenv("CONTAINER_NAMESPACE"),
@@ -56,10 +58,7 @@ func Run(fn LoggerFunc) {
 	signal.Notify(s, unix.SIGTERM)
 
 	go func() {
-		if err := fn(ctx, config, wait.Close); err != nil {
-			errCh <- err
-		}
-		errCh <- nil
+		errCh <- fn(ctx, config, wait.Close)
 	}()
 
 	for {
