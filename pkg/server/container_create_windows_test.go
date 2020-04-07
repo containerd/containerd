@@ -127,12 +127,13 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 func TestContainerWindowsNetworkNamespace(t *testing.T) {
 	testID := "test-id"
 	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
 	testPid := uint32(1234)
 	nsPath := "test-cni"
 	c := newTestCRIService()
 
 	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
+	spec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, testContainerName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
 	assert.NoError(t, err)
 	assert.NotNil(t, spec)
 	specCheck(t, testID, testSandboxID, testPid, spec)
@@ -144,6 +145,7 @@ func TestContainerWindowsNetworkNamespace(t *testing.T) {
 func TestMountCleanPath(t *testing.T) {
 	testID := "test-id"
 	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
 	testPid := uint32(1234)
 	nsPath := "test-cni"
 	c := newTestCRIService()
@@ -153,7 +155,7 @@ func TestMountCleanPath(t *testing.T) {
 		ContainerPath: "c:/test/container-path",
 		HostPath:      "c:/test/host-path",
 	})
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
+	spec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, testContainerName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
 	assert.NoError(t, err)
 	assert.NotNil(t, spec)
 	specCheck(t, testID, testSandboxID, testPid, spec)
