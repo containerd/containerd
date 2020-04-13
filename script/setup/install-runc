@@ -26,7 +26,7 @@ function install_runc() {
 	go get -d github.com/opencontainers/runc
 	cd "$GOPATH"/src/github.com/opencontainers/runc
 	git checkout $RUNC_COMMIT
-	make BUILDTAGS='apparmor seccomp' runc install
+	make BUILDTAGS='seccomp apparmor selinux' runc install
 }
 
 function install_crun() {
