@@ -105,8 +105,8 @@ func TestInitSelinuxOpts(t *testing.T) {
 
 func TestCheckSelinuxLevel(t *testing.T) {
 	for desc, test := range map[string]struct {
-		level     string
-		expectErr bool
+		level         string
+		expectNoMatch bool
 	}{
 		"s0": {
 			level: "s0",
@@ -136,30 +136,30 @@ func TestCheckSelinuxLevel(t *testing.T) {
 			level: "s0-s0:c0,c3.c6",
 		},
 		"s0,c0,c3": {
-			level:     "s0,c0,c3",
-			expectErr: true,
+			level:         "s0,c0,c3",
+			expectNoMatch: true,
 		},
 		"s0:c0.c3.c6": {
-			level:     "s0:c0.c3.c6",
-			expectErr: true,
+			level:         "s0:c0.c3.c6",
+			expectNoMatch: true,
 		},
 		"s0-s0,c0,c3": {
-			level:     "s0-s0,c0,c3",
-			expectErr: true,
+			level:         "s0-s0,c0,c3",
+			expectNoMatch: true,
 		},
 		"s0-s0:c0.c3.c6": {
-			level:     "s0-s0:c0.c3.c6",
-			expectErr: true,
+			level:         "s0-s0:c0.c3.c6",
+			expectNoMatch: true,
 		},
 		"s0-s0:c0,c3.c6.c8": {
-			level:     "s0-s0:c0,c3.c6.c8",
-			expectErr: true,
+			level:         "s0-s0:c0,c3.c6.c8",
+			expectNoMatch: true,
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			ok, err := checkSelinuxLevel(test.level)
-			if test.expectErr {
-				assert.Error(t, err)
+			if test.expectNoMatch {
+				assert.NoError(t, err)
 				assert.False(t, ok)
 			} else {
 				assert.NoError(t, err)
