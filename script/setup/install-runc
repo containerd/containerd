@@ -26,13 +26,14 @@ function install_runc() {
 	go get -d github.com/opencontainers/runc
 	cd "$GOPATH"/src/github.com/opencontainers/runc
 	git checkout $RUNC_COMMIT
-	make BUILDTAGS='seccomp apparmor selinux' runc install
+	make BUILDTAGS='apparmor seccomp selinux' runc
+	sudo make install
 }
 
 function install_crun() {
 	CRUN_VERSION=0.11
-	curl -o /usr/local/sbin/runc -L https://github.com/containers/crun/releases/download/${CRUN_VERSION}/crun-${CRUN_VERSION}-static-$(uname -m)
-	chmod +x /usr/local/sbin/runc
+	sudo curl -o /usr/local/sbin/runc -L https://github.com/containers/crun/releases/download/${CRUN_VERSION}/crun-${CRUN_VERSION}-static-$(uname -m)
+	sudo chmod +x /usr/local/sbin/runc
 }
 
 : ${RUNC_FLAVOR=runc}
