@@ -264,6 +264,11 @@ jobs:
             runc: crun
 
     steps:
+      - name: Install Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: '1.13.10'
+
       - name: Set env
         shell: bash
         run: |
@@ -279,19 +284,10 @@ jobs:
         env:
           RUNC_FLAVOR: ${{ matrix.runc }}
         run: |
-          sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-seccomp
-          sudo PATH=$PATH GOPATH=$GOPATH RUNC_FLAVOR=$RUNC_FLAVOR script/setup/install-runc
-          sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-cni
-          sudo PATH=$PATH GOPATH=$GOPATH script/setup/install-critools
-        working-directory: src/github.com/containerd/containerd
-
-      - name: Install protobuf
-        run: |
-          sudo env PATH=$PATH GOPATH=$GOPATH script/setup/install-protobuf
-          sudo chmod +x /usr/local/bin/protoc
-          sudo chmod og+rx /usr/local/include/google /usr/local/include/google/protobuf /usr/local/include/google/protobuf/compiler
-          sudo chmod -R og+r /usr/local/include/google/protobuf/
-          protoc --version
+          sudo PATH=$PATH script/setup/install-seccomp
+          script/setup/install-runc
+          script/setup/install-cni
+          script/setup/install-critools
         working-directory: src/github.com/containerd/containerd
 
       - name: Install criu
