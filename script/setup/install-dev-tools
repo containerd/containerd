@@ -20,7 +20,16 @@
 #
 set -eu -o pipefail
 
-go get -u github.com/stevvooe/protobuild
+# install the `protobuild` binary in $GOPATH/bin; requires module-aware install
+# to pin dependencies
+GO111MODULE=on go get github.com/stevvooe/protobuild
+
+# the following packages need to exist in $GOPATH so we can't use
+# go modules-aware mode of `go get` for these includes used during
+# proto building
+GO111MODULE=off go get -d github.com/gogo/googleapis || true
+GO111MODULE=off go get -d github.com/gogo/protobuf || true
+
 go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
 go get -u github.com/cpuguy83/go-md2man
 
