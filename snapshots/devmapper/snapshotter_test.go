@@ -37,7 +37,6 @@ import (
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/devmapper/dmsetup"
-	"github.com/containerd/containerd/snapshots/devmapper/losetup"
 	"github.com/containerd/containerd/snapshots/testsuite"
 )
 
@@ -70,7 +69,7 @@ func TestSnapshotterSuite(t *testing.T) {
 		removePool := func() error {
 			result := multierror.Append(
 				snap.pool.RemovePool(ctx),
-				losetup.DetachLoopDevice(loopDataDevice, loopMetaDevice))
+				mount.DetachLoopDevice(loopDataDevice, loopMetaDevice))
 
 			return result.ErrorOrNil()
 		}
