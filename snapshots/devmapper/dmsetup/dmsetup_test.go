@@ -29,8 +29,8 @@ import (
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/testutil"
-	"github.com/containerd/containerd/snapshots/devmapper/losetup"
 )
 
 const (
@@ -55,16 +55,13 @@ func TestDMSetup(t *testing.T) {
 	metaImage, loopMetaDevice := createLoopbackDevice(t, tempDir)
 
 	defer func() {
-		err = losetup.RemoveLoopDevicesAssociatedWithImage(dataImage)
-		assert.NilError(t, err, "failed to detach loop devices for data image: %s", dataImage)
-
-		err = losetup.RemoveLoopDevicesAssociatedWithImage(metaImage)
-		assert.NilError(t, err, "failed to detach loop devices for meta image: %s", metaImage)
+		err = mount.DetachLoopDevice(loopDataDevice, loopMetaDevice)
+		assert.NilError(t, err, "failed to detach loop devices for data image: %s and meta image: %s", dataImage, metaImage)
 	}()
 
 	t.Run("CreatePool", func(t *testing.T) {
 		err := CreatePool(testPoolName, loopDataDevice, loopMetaDevice, 128)
-		assert.NilError(t, err, "failed to create thin-pool")
+		assert.NilError(t, err, "failed to create thin-pool with %s %s", loopDataDevice, loopMetaDevice)
 
 		table, err := Table(testPoolName)
 		t.Logf("table: %s", table)
@@ -201,7 +198,7 @@ func createLoopbackDevice(t *testing.T, dir string) (string, string) {
 
 	imagePath := file.Name()
 
-	loopDevice, err := losetup.AttachLoopDevice(imagePath)
+	loopDevice, err := mount.AttachLoopDevice(imagePath)
 	assert.NilError(t, err)
 
 	return imagePath, loopDevice
