@@ -19,15 +19,9 @@ set -o nounset
 set -o pipefail
 
 export PATH="/c/Program Files/Containerd:$PATH"
-REPO_TAR="${REPO_TAR:-"/c/cri.tar.gz"}"
 FOCUS="${FOCUS:-"Conformance"}"
 SKIP="${SKIP:-""}"
 REPORT_DIR="${REPORT_DIR:-"/c/_artifacts"}"
-
-repo="$GOPATH/src/github.com/containerd/cri"
-mkdir -p "${repo}"
-cd "${repo}"
-tar -xzf "${REPO_TAR}"
 
 make install.deps
 make install -e BINDIR="/c/Program Files/Containerd"

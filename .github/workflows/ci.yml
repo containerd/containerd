@@ -1,0 +1,36 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  build-windows:
+    name: Build Windows amd64
+    runs-on: windows-latest
+    steps:
+      - name: Set up Go 1.13.10
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.13.10
+
+      - name: Checkout cri repo
+        uses: actions/checkout@v2
+        with:
+          path: ${{github.workspace}}\\src\\github.com\\containerd\\cri
+
+      - name: Clone containerd repo
+        run: |
+          bash.exe -c "GO111MODULE=off go get github.com/containerd/containerd"
+
+      - name: Configure Windows environment variables
+        run: |
+          echo "::set-env name=GOPATH::$env:GITHUB_WORKSPACE"
+
+      - name: Build
+        run: |
+          bash.exe -c "pwd && ./test/windows/test.sh"
+        working-directory: ${{github.workspace}}\\src\\github.com\\containerd\\cri
+
+      - name: Upload containerd log file
+        uses: actions/upload-artifact@v1
+        with:
+          name: cadvisor.log
+          path: c:\\_artifacts\\containerd.log
