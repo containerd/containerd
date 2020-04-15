@@ -32,7 +32,7 @@ if ${NOSUDO}; then
 fi
 
 # BUILDTAGS are bulid tags for runc and containerd.
-BUILDTAGS=${BUILDTAGS:-seccomp apparmor}
+BUILDTAGS=${BUILDTAGS:-seccomp apparmor selinux}
 
 # checkout_repo checks out specified repository
 # and switch to specified  version.
