@@ -29,7 +29,7 @@ CHECKOUT_CONTAINERD=${CHECKOUT_CONTAINERD:-true}
 
 if ${CHECKOUT_CONTAINERD}; then
   # Create a temporary GOPATH for containerd installation.
-  GOPATH=$(mktemp -d /tmp/cri-install-containerd.XXXX)
+  export GOPATH=$(mktemp -d /tmp/cri-install-containerd.XXXX)
   from-vendor CONTAINERD github.com/containerd/containerd
   checkout_repo ${CONTAINERD_PKG} ${CONTAINERD_VERSION} ${CONTAINERD_REPO}
 fi
