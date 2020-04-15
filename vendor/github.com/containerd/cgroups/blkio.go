@@ -74,54 +74,47 @@ func (b *blkioController) Update(path string, resources *specs.LinuxResources) e
 
 func (b *blkioController) Stat(path string, stats *Metrics) error {
 	stats.Blkio = &BlkIOStat{}
-	settings := []blkioStatSettings{
-		{
-			name:  "throttle.io_serviced",
-			entry: &stats.Blkio.IoServicedRecursive,
-		},
-		{
-			name:  "throttle.io_service_bytes",
-			entry: &stats.Blkio.IoServiceBytesRecursive,
-		},
-	}
+
+	var settings []blkioStatSettings
+
 	// Try to read CFQ stats available on all CFQ enabled kernels first
 	if _, err := os.Lstat(filepath.Join(b.Path(path), fmt.Sprintf("blkio.io_serviced_recursive"))); err == nil {
-		settings = []blkioStatSettings{}
-		settings = append(settings,
-			blkioStatSettings{
+		settings = []blkioStatSettings{
+			{
 				name:  "sectors_recursive",
 				entry: &stats.Blkio.SectorsRecursive,
 			},
-			blkioStatSettings{
+			{
 				name:  "io_service_bytes_recursive",
 				entry: &stats.Blkio.IoServiceBytesRecursive,
 			},
-			blkioStatSettings{
+			{
 				name:  "io_serviced_recursive",
 				entry: &stats.Blkio.IoServicedRecursive,
 			},
-			blkioStatSettings{
+			{
 				name:  "io_queued_recursive",
 				entry: &stats.Blkio.IoQueuedRecursive,
 			},
-			blkioStatSettings{
+			{
 				name:  "io_service_time_recursive",
 				entry: &stats.Blkio.IoServiceTimeRecursive,
 			},
-			blkioStatSettings{
+			{
 				name:  "io_wait_time_recursive",
 				entry: &stats.Blkio.IoWaitTimeRecursive,
 			},
-			blkioStatSettings{
+			{
 				name:  "io_merged_recursive",
 				entry: &stats.Blkio.IoMergedRecursive,
 			},
-			blkioStatSettings{
+			{
 				name:  "time_recursive",
 				entry: &stats.Blkio.IoTimeRecursive,
 			},
-		)
+		}
 	}
+
 	f, err := os.Open("/proc/diskstats")
 	if err != nil {
 		return err
@@ -133,6 +126,29 @@ func (b *blkioController) Stat(path string, stats *Metrics) error {
 		return err
 	}
 
+	var size int
+	for _, t := range settings {
+		if err := b.readEntry(devices, path, t.name, t.entry); err != nil {
+			return err
+		}
+		size += len(*t.entry)
+	}
+	if size > 0 {
+		return nil
+	}
+
+	// Even the kernel is compiled with the CFQ scheduler, the cgroup may not use
+	// block devices with the CFQ scheduler. If so, we should fallback to throttle.* files.
+	settings = []blkioStatSettings{
+		{
+			name:  "throttle.io_serviced",
+			entry: &stats.Blkio.IoServicedRecursive,
+		},
+		{
+			name:  "throttle.io_service_bytes",
+			entry: &stats.Blkio.IoServiceBytesRecursive,
+		},
+	}
 	for _, t := range settings {
 		if err := b.readEntry(devices, path, t.name, t.entry); err != nil {
 			return err
