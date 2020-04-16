@@ -18,12 +18,12 @@ jobs:
           go-version: '1.13.10'
 
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
         env:
           GOPATH: ${{ runner.workspace }}
           GO111MODULE: off
         with:
-          path: ./src/github.com/containerd/containerd
+          path: src/github.com/containerd/containerd
 
       #
       # Build
@@ -129,12 +129,12 @@ jobs:
           go-version: '1.13.10'
 
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
         env:
           GOPATH: ${{ runner.workspace }}
           GO111MODULE: off
         with:
-          path: ./src/github.com/containerd/containerd
+          path: src/github.com/containerd/containerd
 
       - name: Build amd64
         env:
