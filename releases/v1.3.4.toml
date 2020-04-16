@@ -1,0 +1,32 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.3.3"
+
+pre_release = false
+
+preface = """\
+The fourth patch release for `containerd` 1.3 adds `NOTIFY_SOCKET` support, improves shim loggers shutdown
+behavior and includes a few bug fixes related to incorrect FIFO clean up and dangling shims.
+
+### Notable Updates
+
+* Improve host fallback behaviour in docker remote [containerd/containerd#4007](https://github.com/containerd/containerd/pull/4007)
+* Cleanup dangling shim by brand new context [containerd/containerd#4054](https://github.com/containerd/containerd/pull/4054)
+* Support notify socket [containerd/containerd#4104](https://github.com/containerd/containerd/pull/4104)
+* Correct logic of FIFO cleanup [containerd/containerd#4150](https://github.com/containerd/containerd/pull/4150)
+* Rework shim logger shutdown process [containerd/containerd#4166](https://github.com/containerd/containerd/pull/4166)
+* Man page fixes [containerd/containerd#4144](https://github.com/containerd/containerd/pull/4144)
+* Bump Golang 1.13.10 [containerd/containerd#4170](https://github.com/containerd/containerd/pull/4170)
+* sys/mount_linux: use pipe for communicating mount result [containerd/containerd#4171](https://github.com/containerd/containerd/pull/4171)
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
