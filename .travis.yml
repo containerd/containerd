@@ -1,5 +1,10 @@
 dist: bionic
 sudo: required
+
+branches:
+  except:
+    - master
+
 # setup travis so that we can run containers for integration tests
 services:
   - docker
