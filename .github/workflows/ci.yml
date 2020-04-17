@@ -3,11 +3,13 @@ on: [push, pull_request]
 
 jobs:
   #
-  # validate, unit, integration, and CRI tests
+  # Project checks
   #
-  test-linux:
-    name: linux validate build and unit integration and CRI
+  project:
+    name: Project Checks (DCO, Vendor)
     runs-on: ubuntu-18.04
+    timeout-minutes: 5
+
     steps:
       - name: Install Go
         uses: actions/setup-go@v1
@@ -25,18 +27,6 @@ jobs:
         with:
           path: ${{github.workspace}}/src/github.com/containerd/cri
           fetch-depth: 150
-
-      - name: Before install
-        run: |
-          sudo sysctl net.ipv6.conf.all.disable_ipv6=0
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get install -y \
-            btrfs-tools \
-            libseccomp2 \
-            libseccomp-dev \
-            socat
 
       - name: Checkout project repo
         uses: actions/checkout@v2
@@ -71,34 +61,84 @@ jobs:
           DCO_RANGE=$(curl ${GITHUB_COMMIT_URL} | jq -r '.[0].parents[0].sha +".."+ .[-1].sha')
           fi
           ../project/script/validate/dco
+
       - name: Vendor
         run: ../project/script/validate/vendor
         working-directory: src/github.com/containerd/cri
 
-      - name: Build and Test
+  #
+  # build, unit, integration, and CRI tests
+  #
+  linux-build-and-test:
+    name: Build, Unit, Integration, and CRI (linux amd64)
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: '1.13.10'
+
+      - name: Set env
+        shell: bash
         run: |
+          echo "::set-env name=GOPATH::${{ github.workspace }}"
+          echo "::add-path::${{ github.workspace }}/bin"
+
+      - name: Checkout cri repo
+        uses: actions/checkout@v2
+        with:
+          path: ${{github.workspace}}/src/github.com/containerd/cri
+          fetch-depth: 150
+
+      - name: Before install
+        run: |
+          sudo sysctl net.ipv6.conf.all.disable_ipv6=0
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y \
+            btrfs-tools \
+            libseccomp2 \
+            libseccomp-dev \
+            socat
           make install.deps
+        working-directory: ${{github.workspace}}/src/github.com/containerd/cri
+
+      - name: Install containerd
+        run: |
           make containerd
           sudo PATH=$PATH GOPATH=$GOPATH make install-containerd
+        working-directory: ${{github.workspace}}/src/github.com/containerd/cri
+
+      - name: Unit Test
+        run: |
           make test
+        working-directory: ${{github.workspace}}/src/github.com/containerd/cri
+
+      - name: Integration Test
+        run: |
           make test-integration
+        working-directory: ${{github.workspace}}/src/github.com/containerd/cri
+
+      - name: Upload Integration Log File
+        uses: actions/upload-artifact@v1
+        with:
+          name: integration-test.log
+          path: /tmp/test-integration/containerd.log
+
+      - name: CRI Test
+        run: |
           make test-cri
         working-directory: ${{github.workspace}}/src/github.com/containerd/cri
 
-      - name: Upload containerd log file
+      - name: Upload CRI Test log file
         uses: actions/upload-artifact@v1
         with:
-          name: integration.log
-          path: /tmp/test-integration/containerd.log
-
-      - name: Upload cri log file
-        uses: actions/upload-artifact@v1
-        with:
-          name: cri.log
+          name: cri-test.log
           path: /tmp/test-cri/containerd.log
 
   test-windows:
-    name: Build and CRI Test Windows amd64
+    name: Build and CRI Test (Windows amd64)
     runs-on: windows-latest
     steps:
       - name: Set up Go 1.13.10
