@@ -227,6 +227,23 @@ func TestRegistryEndpoints(t *testing.T) {
 				"https://registry-3.io/path",
 			},
 		},
+		"miss scheme endpoint in list with path": {
+			mirrors: map[string]criconfig.Mirror{
+				"registry-3.io": {
+					Endpoints: []string{
+						"https://registry-3.io",
+						"registry-1.io",
+						"127.0.0.1:1234",
+					},
+				},
+			},
+			host: "registry-3.io",
+			expected: []string{
+				"https://registry-3.io",
+				"https://registry-1.io",
+				"http://127.0.0.1:1234",
+			},
+		},
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIService()
