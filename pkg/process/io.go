@@ -34,7 +34,6 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/stdio"
-	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
@@ -42,9 +41,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	shimLoggerTermTimeout = "io.containerd.timeout.shim.logger.shutdown"
-)
+const binaryIOProcTermTimeout = 12 * time.Second // Give logger process solid 10 seconds for cleanup
 
 var bufPool = sync.Pool{
 	New: func() interface{} {
@@ -373,12 +370,10 @@ func (b *binaryIO) cancel() error {
 		done <- err
 	}()
 
-	termTimeout := timeout.Get(shimLoggerTermTimeout)
-
 	select {
 	case err := <-done:
 		return err
-	case <-time.After(termTimeout):
+	case <-time.After(binaryIOProcTermTimeout):
 		log.L.Warn("failed to wait for shim logger process to exit, killing")
 
 		err := b.cmd.Process.Kill()
