@@ -383,11 +383,7 @@ func (b *binaryIO) cancel() error {
 
 	done := make(chan error)
 	go func() {
-		err := b.cmd.Wait()
-		if err != nil {
-			err = errors.Wrap(err, "failed to wait for shim logger process after SIGTERM")
-		}
-		done <- err
+		done <- b.cmd.Wait()
 	}()
 
 	select {
