@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"crypto/tls"
 	"io"
 	"math"
@@ -160,9 +161,8 @@ func (s *streamRuntime) PortForward(podSandboxID string, port int32, stream io.R
 }
 
 // handleResizing spawns a goroutine that processes the resize channel, calling resizeFunc for each
-// remotecommand.TerminalSize received from the channel. The resize channel must be closed elsewhere to stop the
-// goroutine.
-func handleResizing(resize <-chan remotecommand.TerminalSize, resizeFunc func(size remotecommand.TerminalSize)) {
+// remotecommand.TerminalSize received from the channel.
+func handleResizing(ctx context.Context, resize <-chan remotecommand.TerminalSize, resizeFunc func(size remotecommand.TerminalSize)) {
 	if resize == nil {
 		return
 	}
@@ -171,14 +171,18 @@ func handleResizing(resize <-chan remotecommand.TerminalSize, resizeFunc func(si
 		defer runtime.HandleCrash()
 
 		for {
-			size, ok := <-resize
-			if !ok {
+			select {
+			case <-ctx.Done():
 				return
+			case size, ok := <-resize:
+				if !ok {
+					return
+				}
+				if size.Height < 1 || size.Width < 1 {
+					continue
+				}
+				resizeFunc(size)
 			}
-			if size.Height < 1 || size.Width < 1 {
-				continue
-			}
-			resizeFunc(size)
 		}
 	}()
 }

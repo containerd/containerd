@@ -60,11 +60,6 @@ func (c *criService) initPlatform() error {
 		return errors.Wrap(err, "failed to initialize cni")
 	}
 
-	// Try to load the config if it exists. Just log the error if load fails
-	// This is not disruptive for containerd to panic
-	if err := c.netPlugin.Load(c.cniLoadOptions()...); err != nil {
-		logrus.WithError(err).Error("Failed to load cni during init, please check CRI plugin status before setting up network for pods")
-	}
 	return nil
 }
 

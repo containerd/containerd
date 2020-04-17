@@ -17,7 +17,7 @@ limitations under the License.
 package util
 
 import (
-	"github.com/docker/distribution/reference"
+	"github.com/containerd/containerd/reference/docker"
 )
 
 // NormalizeImageRef normalizes the image reference following the docker convention. This is added
@@ -27,7 +27,7 @@ import (
 // sha256:7cc4b5aefd1d0cadf8d97d4350462ba51c694ebca145b08d7d41b41acc8db5aa will be returned as
 // docker.io/library/busybox@sha256:7cc4b5aefd1d0cadf8d97d4350462ba51c694ebca145b08d7d41b41acc8db5aa.
 //
-// Deprecated: use github.com/docker/reference.ParseDockerRef() instead
-func NormalizeImageRef(ref string) (reference.Named, error) {
-	return reference.ParseDockerRef(ref)
+// Deprecated: use github.com/containerd/containerd/reference/docker.ParseDockerRef() instead
+func NormalizeImageRef(ref string) (docker.Named, error) {
+	return docker.ParseDockerRef(ref)
 }

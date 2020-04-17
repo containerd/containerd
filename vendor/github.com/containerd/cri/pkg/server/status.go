@@ -41,10 +41,6 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 		Type:   runtime.NetworkReady,
 		Status: true,
 	}
-	// Load the latest cni configuration to be in sync with the latest network configuration
-	if err := c.netPlugin.Load(c.cniLoadOptions()...); err != nil {
-		log.G(ctx).WithError(err).Errorf("Failed to load cni configuration")
-	}
 	// Check the status of the cni initialization
 	if err := c.netPlugin.Status(); err != nil {
 		networkCondition.Status = false
@@ -76,6 +72,12 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 			log.G(ctx).WithError(err).Errorf("Failed to marshal CNI config %v", err)
 		}
 		resp.Info["cniconfig"] = string(cniConfig)
+
+		lastCNILoadStatus := "OK"
+		if lerr := c.cniNetConfMonitor.lastStatus(); lerr != nil {
+			lastCNILoadStatus = lerr.Error()
+		}
+		resp.Info["lastCNILoadStatus"] = lastCNILoadStatus
 	}
 	return resp, nil
 }

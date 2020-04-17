@@ -132,7 +132,7 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 		return nil, errors.Wrapf(err, "failed to start exec %q", execID)
 	}
 
-	handleResizing(opts.resize, func(size remotecommand.TerminalSize) {
+	handleResizing(ctx, opts.resize, func(size remotecommand.TerminalSize) {
 		if err := process.Resize(ctx, uint32(size.Width), uint32(size.Height)); err != nil {
 			log.G(ctx).WithError(err).Errorf("Failed to resize process %q console for container %q", execID, id)
 		}

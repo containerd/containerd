@@ -91,6 +91,9 @@ type criService struct {
 	// initialized indicates whether the server is initialized. All GRPC services
 	// should return error before the server is initialized.
 	initialized atomic.Bool
+	// cniNetConfMonitor is used to reload cni network conf if there is
+	// any valid fs change events from cni network conf dir.
+	cniNetConfMonitor *cniNetConfSyncer
 }
 
 // NewCRIService returns a new instance of CRIService
@@ -127,6 +130,11 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 	}
 
 	c.eventMonitor = newEventMonitor(c)
+
+	c.cniNetConfMonitor, err = newCNINetConfSyncer(c.config.NetworkPluginConfDir, c.netPlugin, c.cniLoadOptions())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create cni conf monitor")
+	}
 
 	return c, nil
 }
@@ -169,6 +177,14 @@ func (c *criService) Run() error {
 	)
 	snapshotsSyncer.start()
 
+	// Start CNI network conf syncer
+	logrus.Info("Start cni network conf syncer")
+	cniNetConfMonitorErrCh := make(chan error, 1)
+	go func() {
+		defer close(cniNetConfMonitorErrCh)
+		cniNetConfMonitorErrCh <- c.cniNetConfMonitor.syncLoop()
+	}()
+
 	// Start streaming server.
 	logrus.Info("Start streaming server")
 	streamServerErrCh := make(chan error)
@@ -183,11 +199,12 @@ func (c *criService) Run() error {
 	// Set the server as initialized. GRPC services could start serving traffic.
 	c.initialized.Set()
 
-	var eventMonitorErr, streamServerErr error
+	var eventMonitorErr, streamServerErr, cniNetConfMonitorErr error
 	// Stop the whole CRI service if any of the critical service exits.
 	select {
 	case eventMonitorErr = <-eventMonitorErrCh:
 	case streamServerErr = <-streamServerErrCh:
+	case cniNetConfMonitorErr = <-cniNetConfMonitorErrCh:
 	}
 	if err := c.Close(); err != nil {
 		return errors.Wrap(err, "failed to stop cri service")
@@ -222,6 +239,9 @@ func (c *criService) Run() error {
 	if streamServerErr != nil {
 		return errors.Wrap(streamServerErr, "stream server error")
 	}
+	if cniNetConfMonitorErr != nil {
+		return errors.Wrap(cniNetConfMonitorErr, "cni network conf monitor error")
+	}
 	return nil
 }
 
@@ -229,6 +249,9 @@ func (c *criService) Run() error {
 // TODO(random-liu): Make close synchronous.
 func (c *criService) Close() error {
 	logrus.Info("Stop CRI service")
+	if err := c.cniNetConfMonitor.stop(); err != nil {
+		logrus.WithError(err).Error("failed to stop cni network conf monitor")
+	}
 	c.eventMonitor.stop()
 	if err := c.streamServer.Stop(); err != nil {
 		return errors.Wrap(err, "failed to stop stream server")

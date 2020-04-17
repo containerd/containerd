@@ -78,7 +78,7 @@ specifications as appropriate.
 backport version of `libseccomp-dev` is required. See [travis.yml](.travis.yml) for an example on trusty.
 * **btrfs development library.** Required by containerd btrfs support. `btrfs-tools`(Ubuntu, Debian) / `btrfs-progs-devel`(Fedora, CentOS, RHEL)
 2. Install **`socat`** (required by portforward).
-2. Install and setup a go 1.13.8 development environment. (Note: You can check the travis logs for a recent pull request to confirm the version(s) of golang currently being used to build and test master.)
+2. Install and setup a go 1.13.9 development environment. (Note: You can check the travis logs for a recent pull request to confirm the version(s) of golang currently being used to build and test master.)
 3. Make a local clone of this repository.
 4. Install binary dependencies by running the following command from your cloned `cri/` project directory:
 ```bash
@@ -102,7 +102,7 @@ testing purposes. The version tag carries the suffix "-TEST".*
 To add build tags to the make option the `BUILD_TAGS` variable must be set.
 
 ```bash
-make BUILD_TAGS='seccomp apparmor'
+make BUILD_TAGS='seccomp apparmor selinux'
 ```
 
 | Build Tag | Feature                            | Dependency                      |
