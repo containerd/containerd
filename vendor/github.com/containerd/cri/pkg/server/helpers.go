@@ -28,10 +28,10 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl"
-	"github.com/docker/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -146,12 +146,12 @@ func criContainerStateToString(state runtime.ContainerState) string {
 }
 
 // getRepoDigestAngTag returns image repoDigest and repoTag of the named image reference.
-func getRepoDigestAndTag(namedRef reference.Named, digest imagedigest.Digest, schema1 bool) (string, string) {
+func getRepoDigestAndTag(namedRef docker.Named, digest imagedigest.Digest, schema1 bool) (string, string) {
 	var repoTag, repoDigest string
-	if _, ok := namedRef.(reference.NamedTagged); ok {
+	if _, ok := namedRef.(docker.NamedTagged); ok {
 		repoTag = namedRef.String()
 	}
-	if _, ok := namedRef.(reference.Canonical); ok {
+	if _, ok := namedRef.(docker.Canonical); ok {
 		repoDigest = namedRef.String()
 	} else if !schema1 {
 		// digest is not actual repo digest for schema1 image.
@@ -170,7 +170,7 @@ func (c *criService) localResolve(refOrID string) (imagestore.Image, error) {
 		return func(ref string) string {
 			// ref is not image id, try to resolve it locally.
 			// TODO(random-liu): Handle this error better for debugging.
-			normalized, err := reference.ParseDockerRef(ref)
+			normalized, err := docker.ParseDockerRef(ref)
 			if err != nil {
 				return ""
 			}
@@ -283,13 +283,13 @@ func toRuntimeAuthConfig(a criconfig.AuthConfig) *runtime.AuthConfig {
 func parseImageReferences(refs []string) ([]string, []string) {
 	var tags, digests []string
 	for _, ref := range refs {
-		parsed, err := reference.ParseAnyReference(ref)
+		parsed, err := docker.ParseAnyReference(ref)
 		if err != nil {
 			continue
 		}
-		if _, ok := parsed.(reference.Canonical); ok {
+		if _, ok := parsed.(docker.Canonical); ok {
 			digests = append(digests, parsed.String())
-		} else if _, ok := parsed.(reference.Tagged); ok {
+		} else if _, ok := parsed.(docker.Tagged); ok {
 			tags = append(tags, parsed.String())
 		}
 	}
