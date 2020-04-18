@@ -19,7 +19,6 @@ The daemon also uses a configuration file located in `/etc/containerd/config.tom
 A sample configuration file looks like this:
 
 ```toml
-subreaper = true
 oom_score = -999
 
 [debug]
