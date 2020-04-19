@@ -57,7 +57,8 @@ func TestGeneralContainerSpec(t *testing.T) {
 	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
 	testSandboxID := "sandbox-id"
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, "", containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+	testContainerName := "container-name"
+	spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 	require.NoError(t, err)
 	specCheck(t, testID, testSandboxID, testPid, spec)
 }
@@ -65,6 +66,7 @@ func TestGeneralContainerSpec(t *testing.T) {
 func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 	testID := "test-id"
 	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
 	testPid := uint32(1234)
 
 	for desc, test := range map[string]struct {
@@ -120,7 +122,7 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 			ociRuntime := config.Runtime{
 				PodAnnotations: test.podAnnotations,
 			}
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "",
+			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName,
 				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
@@ -268,6 +270,7 @@ func TestVolumeMounts(t *testing.T) {
 func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 	testID := "test-id"
 	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
 	testPid := uint32(1234)
 
 	for desc, test := range map[string]struct {
@@ -367,7 +370,7 @@ func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 				PodAnnotations:       test.podAnnotations,
 				ContainerAnnotations: test.containerAnnotations,
 			}
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "",
+			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName,
 				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
