@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/containerd/cgroups"
+
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
 
@@ -110,7 +112,7 @@ func defaultUnixCaps() []string {
 }
 
 func defaultUnixNamespaces() []specs.LinuxNamespace {
-	return []specs.LinuxNamespace{
+	specNs := []specs.LinuxNamespace{
 		{
 			Type: specs.PIDNamespace,
 		},
@@ -127,6 +129,12 @@ func defaultUnixNamespaces() []specs.LinuxNamespace {
 			Type: specs.NetworkNamespace,
 		},
 	}
+	if cgroups.Mode() == cgroups.Unified {
+		specNs = append(specNs, specs.LinuxNamespace{
+			Type: specs.CgroupNamespace,
+		})
+	}
+	return specNs
 }
 
 func populateDefaultUnixSpec(ctx context.Context, s *Spec, id string) error {
