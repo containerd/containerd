@@ -21,7 +21,7 @@ ifeq ($(GOOS),windows)
 	WHALE = "+"
 	ONI = "-"
 endif
-EPOCH_TEST_COMMIT := f9e02affccd51702191e5312665a16045ffef8ab
+EPOCH_TEST_COMMIT := 67de3e4ccf2b2a69b8398798af7cfca01abf7a7e
 PROJECT := github.com/containerd/cri
 BINDIR := ${DESTDIR}/usr/local/bin
 BUILD_DIR := _output
@@ -175,15 +175,12 @@ endif
 	@./hack/install/windows/install-deps.sh
 
 .PHONY: .gitvalidation
-# When this is running in travis, it will only check the travis commit range.
-# When running outside travis, it will check from $(EPOCH_TEST_COMMIT)..HEAD.
+# make .gitvalidation is only used localy for manual testing
+# requires a clone of github.com/containerd/project
+# containerd/project DCO validation runs automatically with github actions in ci.yml for each pull
 .gitvalidation:
 	@echo "$(WHALE) $@"
-ifeq ($(TRAVIS),true)
-	git-validation -q -run DCO,short-subject
-else
-	git-validation -v -run DCO,short-subject -range $(EPOCH_TEST_COMMIT)..HEAD
-endif
+	DCO_VERBOSITY=-v DCO_RANGE=$(EPOCH_TEST_COMMIT)..HEAD ../project/script/validate/dco
 
 .PHONY: install.tools .install.gitvalidation .install.golangci-lint .install.vndr
 
