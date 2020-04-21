@@ -71,7 +71,7 @@ To configure a credential for a specific registry, create/modify the
 ```toml
 # The registry host has to be a domain name or IP. Port number is also
 # needed if the default HTTPS or HTTP port is not used.
-[plugins.cri.registry.configs."gcr.io".auth]
+[plugins.cri.registry.configs.auths."https://gcr.io"]
   username = ""
   password = ""
   auth = ""
