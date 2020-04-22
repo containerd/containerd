@@ -24,11 +24,14 @@ import (
 )
 
 func TestRuntimeWithEmptyMaxEnvProcs(t *testing.T) {
+	var oldGoMaxProcs = runtime.GOMAXPROCS(0)
+	defer runtime.GOMAXPROCS(oldGoMaxProcs)
 
 	os.Setenv("GOMAXPROCS", "")
 	setRuntime()
-	var oldGoMaxProcs = runtime.GOMAXPROCS(0)
-	if oldGoMaxProcs != 2 {
+
+	var currentGoMaxProcs = runtime.GOMAXPROCS(0)
+	if currentGoMaxProcs != 2 {
 		t.Fatal("the max number of procs should be 2")
 	}
 }
