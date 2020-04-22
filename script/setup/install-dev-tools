@@ -30,11 +30,5 @@ GO111MODULE=on go get github.com/stevvooe/protobuild
 GO111MODULE=off go get -d github.com/gogo/googleapis || true
 GO111MODULE=off go get -d github.com/gogo/protobuf || true
 
-go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
 go get -u github.com/cpuguy83/go-md2man
-
-(
-	cd "$GOPATH"/src/github.com/golangci/golangci-lint/cmd/golangci-lint
-	git checkout v1.23.8
-	go build -v && go install
-)
+GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.23.8
