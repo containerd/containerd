@@ -78,9 +78,10 @@ specifications as appropriate.
 backport version of `libseccomp-dev` is required. See [travis.yml](.travis.yml) for an example on trusty.
 * **btrfs development library.** Required by containerd btrfs support. `btrfs-tools`(Ubuntu, Debian) / `btrfs-progs-devel`(Fedora, CentOS, RHEL)
 2. Install **`socat`** (required by portforward).
-2. Install and setup a go 1.13.9 development environment. (Note: You can check the travis logs for a recent pull request to confirm the version(s) of golang currently being used to build and test master.)
-3. Make a local clone of this repository.
-4. Install binary dependencies by running the following command from your cloned `cri/` project directory:
+3. Install **`pkg-config`** (required for linking with `libseccomp`).
+4. Install and setup a Go 1.13.10 development environment.
+5. Make a local clone of this repository.
+6. Install binary dependencies by running the following command from your cloned `cri/` project directory:
 ```bash
 # Note: install.deps installs the above mentioned runc, containerd, and CNI
 # binary dependencies. install.deps is only provided for general use and ease of
@@ -114,7 +115,7 @@ make BUILD_TAGS='seccomp apparmor selinux'
 A Kubernetes incubator project called [cri-tools](https://github.com/kubernetes-sigs/cri-tools)
 includes programs for exercising CRI implementations such as the `cri` plugin.
 More importantly, cri-tools includes the program `critest` which is used for running
-[CRI Validation Testing](https://github.com/kubernetes/community/blob/master/contributors/devel/cri-validation.md).
+[CRI Validation Testing](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-validation.md).
 
 Run the CRI Validation test to validate your installation of `containerd` with `cri` built in:
 ```bash
@@ -140,7 +141,7 @@ See [here](./docs/crictl.md) for information about using `crictl` to debug
 pods, containers, and images.
 ## Configurations
 See [here](./docs/config.md) for information about how to configure cri plugins
-and [here](https://github.com/containerd/containerd/blob/master/docs/man/containerd-config.1.md)
+and [here](https://github.com/containerd/containerd/blob/master/docs/man/containerd-config.8.md)
 for information about how to configure containerd
 ## Documentation
 See [here](./docs) for additional documentation.
