@@ -38,6 +38,21 @@ $ crictl inspecti busybox
   ... displays information about the image.
 ```
 
+***Note:*** If you get an error similar to the following when running a `crictl`
+command (and your containerd instance is already running):
+```console
+crictl info
+FATA[0000] getting status of runtime failed: rpc error: code = Unimplemented desc = unknown service runtime.v1alpha2.RuntimeService
+```
+This could be that you are using an incorrect containerd configuration (maybe
+from a Docker install). You will need to update your containerd configuration
+to the containerd instance that you are running. One way of doing this is as
+follows:
+```console
+$ mv /etc/containerd/config.toml /etc/containerd/config.bak
+$ containerd config default > /etc/containerd/config.toml
+```
+
 ## Directly Load a Container Image
 Another way to load an image into the container runtime is with the load
 command. With the load command you inject a container image into the container

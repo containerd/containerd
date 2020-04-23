@@ -9,6 +9,7 @@ Code verification includes lint, code formatting, boilerplate check etc.
 ```bash
 make install.tools
 ```
+***Note:*** Some make actions (like `install.tools`) use the user's `GOPATH` and will otherwise not work when it is not set. Other make actions override it by setting it to a temporary directory for release build and testing purposes.
 * Run code verification:
 ```bash
 make verify
