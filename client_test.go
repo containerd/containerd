@@ -108,7 +108,7 @@ func TestMain(m *testing.M) {
 		}
 	}
 
-	waitCtx, waitCancel := context.WithTimeout(ctx, 2*time.Second)
+	waitCtx, waitCancel := context.WithTimeout(ctx, 4*time.Second)
 	client, err := ctrd.waitForStart(waitCtx)
 	waitCancel()
 	if err != nil {
