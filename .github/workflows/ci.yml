@@ -6,7 +6,7 @@ jobs:
   # Project checks
   #
   project:
-    name: Project Checks (DCO, Vendor)
+    name: Project Checks (DCO, Headers, Vendor)
     runs-on: ubuntu-18.04
     timeout-minutes: 5
 
@@ -42,10 +42,11 @@ jobs:
           GO111MODULE: off
         run: |
           go get -u github.com/vbatts/git-validation
+          go get -u github.com/kunalkushwaha/ltag
           go get -u github.com/LK4D4/vndr
 
       #
-      # DCO / Vendor directory validation
+      # DCO / File headers / Vendor directory validation
       #
       - name: DCO
         env:
@@ -62,9 +63,16 @@ jobs:
           fi
           ../project/script/validate/dco
 
-      - name: Vendor
-        run: ../project/script/validate/vendor
+      # TODO: (mikebrow) removed test/ due to ltag not working with test/e3e symlink
+      # TODO: (mikebrow) removed hack/ due to prior boilerplate tests
+      - name: Headers
         working-directory: src/github.com/containerd/cri
+        run:  |
+          ltag -t "../project/script/validate/template" --excludes "vendor test hack" --check -v
+
+      - name: Vendor
+        working-directory: src/github.com/containerd/cri
+        run: ../project/script/validate/vendor
 
   #
   # build, unit, integration, and CRI tests
