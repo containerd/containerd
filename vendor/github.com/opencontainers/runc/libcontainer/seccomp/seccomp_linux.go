@@ -19,7 +19,6 @@ var (
 	actTrap  = libseccomp.ActTrap
 	actKill  = libseccomp.ActKill
 	actTrace = libseccomp.ActTrace.SetReturnCode(int16(unix.EPERM))
-	actLog   = libseccomp.ActLog
 	actErrno = libseccomp.ActErrno.SetReturnCode(int16(unix.EPERM))
 )
 
@@ -113,8 +112,6 @@ func getAction(act configs.Action) (libseccomp.ScmpAction, error) {
 		return actAllow, nil
 	case configs.Trace:
 		return actTrace, nil
-	case configs.Log:
-		return actLog, nil
 	default:
 		return libseccomp.ActInvalid, fmt.Errorf("invalid action, cannot use in rule")
 	}

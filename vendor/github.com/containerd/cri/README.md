@@ -78,9 +78,10 @@ specifications as appropriate.
 backport version of `libseccomp-dev` is required. See [travis.yml](.travis.yml) for an example on trusty.
 * **btrfs development library.** Required by containerd btrfs support. `btrfs-tools`(Ubuntu, Debian) / `btrfs-progs-devel`(Fedora, CentOS, RHEL)
 2. Install **`socat`** (required by portforward).
-2. Install and setup a go 1.13.9 development environment. (Note: You can check the travis logs for a recent pull request to confirm the version(s) of golang currently being used to build and test master.)
-3. Make a local clone of this repository.
-4. Install binary dependencies by running the following command from your cloned `cri/` project directory:
+3. Install **`pkg-config`** (required for linking with `libseccomp`).
+4. Install and setup a Go 1.13.10 development environment.
+5. Make a local clone of this repository.
+6. Install binary dependencies by running the following command from your cloned `cri/` project directory:
 ```bash
 # Note: install.deps installs the above mentioned runc, containerd, and CNI
 # binary dependencies. install.deps is only provided for general use and ease of
@@ -114,7 +115,7 @@ make BUILD_TAGS='seccomp apparmor selinux'
 A Kubernetes incubator project called [cri-tools](https://github.com/kubernetes-sigs/cri-tools)
 includes programs for exercising CRI implementations such as the `cri` plugin.
 More importantly, cri-tools includes the program `critest` which is used for running
-[CRI Validation Testing](https://github.com/kubernetes/community/blob/master/contributors/devel/cri-validation.md).
+[CRI Validation Testing](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-validation.md).
 
 Run the CRI Validation test to validate your installation of `containerd` with `cri` built in:
 ```bash
@@ -140,18 +141,11 @@ See [here](./docs/crictl.md) for information about using `crictl` to debug
 pods, containers, and images.
 ## Configurations
 See [here](./docs/config.md) for information about how to configure cri plugins
-and [here](https://github.com/containerd/containerd/blob/master/docs/man/containerd-config.1.md)
+and [here](https://github.com/containerd/containerd/blob/master/docs/man/containerd-config.8.md)
 for information about how to configure containerd
 ## Documentation
 See [here](./docs) for additional documentation.
-## Contributing
-Interested in contributing? Check out the [documentation](./CONTRIBUTING.md).
-
 ## Communication
-This project was originally established in April of 2017 in the Kubernetes
-Incubator program. After reaching the Beta stage, In January of 2018, the
-project was merged into [containerd](https://github.com/containerd/containerd).
-
 For async communication and long running discussions please use issues and pull
 requests on this github repo. This will be the best place to discuss design and
 implementation.
@@ -183,5 +177,13 @@ Creative Commons Attribution 4.0 International License under the terms and
 conditions set forth in the file "[LICENSE.docs](https://github.com/containerd/containerd/blob/master/LICENSE.docs)". You may obtain a duplicate
 copy of the same license, titled CC-BY-4.0, at http://creativecommons.org/licenses/by/4.0/.
 
-## Code of Conduct
-This project follows the [CNCF Code of Conduct](https://github.com/cncf/foundation/blob/master/code-of-conduct.md).
+## Project details
+cri is a containerd sub-project. This project was originally established in
+April of 2017 in the Kubernetes Incubator program. After reaching the Beta
+stage, In January of 2018, the project was merged into [containerd](https://github.com/containerd/containerd).
+As a containerd sub-project, you will find the:
+* [Project governance](https://github.com/containerd/project/blob/master/GOVERNANCE.md),
+* [Maintainers](https://github.com/containerd/project/blob/master/MAINTAINERS),
+* and [Contributing guidelines](https://github.com/containerd/project/blob/master/CONTRIBUTING.md)
+
+information in our [`containerd/project`](https://github.com/containerd/project) repository.

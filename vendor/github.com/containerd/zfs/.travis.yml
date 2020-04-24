@@ -1,0 +1,30 @@
+dist: xenial
+sudo: required
+language: go
+go:
+  - "1.12.x"
+
+go_import_path: github.com/containerd/zfs
+
+install:
+  - sudo apt-get install -y zfsutils-linux && sudo modprobe zfs
+# currently we don't pin containerd version.
+  - mkdir -p $GOPATH/src/github.com/containerd && cd $GOPATH/src/github.com/containerd && git clone https://github.com/containerd/containerd.git
+# mistifyio/go-zfs (Apr 14, 2019)
+  - mkdir -p $GOPATH/src/github.com/mistifyio && cd $GOPATH/src/github.com/mistifyio && git clone https://github.com/mistifyio/go-zfs.git && cd go-zfs && git checkout f784269be439d704d3dfa1906f45dd848fed2beb
+  - cd $GOPATH/src/github.com/containerd/zfs
+  - go get -t ./...
+  - go get -u github.com/vbatts/git-validation
+  - go get -u github.com/kunalkushwaha/ltag
+
+before_script:
+  - pushd ..; git clone https://github.com/containerd/project; popd
+
+script:
+  - DCO_VERBOSITY=-q ../project/script/validate/dco
+  - ../project/script/validate/fileheader ../project/
+  - go test -race -covermode=atomic -c .
+  - sudo ./zfs.test -test.root -test.v -test.coverprofile=coverage.txt
+
+after_success:
+    - bash <(curl -s https://codecov.io/bash)
