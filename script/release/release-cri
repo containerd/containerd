@@ -25,14 +25,14 @@ if [[ -z "${VERSION:-}" ]]; then
 fi
 
 ROOT=${GOPATH}/src/github.com/containerd/containerd
-CRI_COMMIT=$(grep github.com/containerd/cri ${ROOT}/vendor.conf | awk '{print $2}')
+CRI_COMMIT=$(grep github.com/containerd/cri ${ROOT}/go.mod | awk '{print $2}')
 
 go get -d github.com/containerd/cri/...
 cd $GOPATH/src/github.com/containerd/cri
 git checkout $CRI_COMMIT
 make clean
-make release TARBALL_PREFIX=cri-containerd LOCAL_RELEASE=true VERSION=${VERSION} VENDOR=${ROOT}/vendor.conf
-make release TARBALL_PREFIX=cri-containerd-cni LOCAL_RELEASE=true INCLUDE_CNI=true VERSION=${VERSION} VENDOR=${ROOT}/vendor.conf
+make release TARBALL_PREFIX=cri-containerd LOCAL_RELEASE=true VERSION=${VERSION} VENDOR=${ROOT}/go.mod
+make release TARBALL_PREFIX=cri-containerd-cni LOCAL_RELEASE=true INCLUDE_CNI=true VERSION=${VERSION} VENDOR=${ROOT}/go.mod
 
 mkdir -p ${ROOT}/releases/cri
 cp _output/*.tar.gz ${ROOT}/releases/cri

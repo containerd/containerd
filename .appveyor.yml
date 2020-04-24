@@ -27,7 +27,7 @@ before_build:
   - bash.exe -elc "export PATH=/c/tools/mingw64/bin:$PATH;
        rm -rf /c/gopath/src/github.com/Microsoft/hcsshim;
        git clone -q https://github.com/Microsoft/hcsshim.git /c/gopath/src/github.com/Microsoft/hcsshim;
-       export HCSSHIM_VERSION=`grep Microsoft/hcsshim vendor.conf | awk '{print $2}'`;
+       export HCSSHIM_VERSION=`grep Microsoft/hcsshim go.mod | awk '{print $2}'`;
        echo Using Microsoft/hcsshim $HCSSHIM_VERSION;
        pushd /c/gopath/src/github.com/Microsoft/hcsshim;
        git checkout $HCSSHIM_VERSION;
