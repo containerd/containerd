@@ -1,16 +1,3 @@
-package images
-
-import (
-	"fmt"
-
-	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/leases"
-	"github.com/containerd/containerd/mount"
-	"github.com/pkg/errors"
-	"github.com/urfave/cli"
-)
-
 /*
    Copyright The containerd Authors.
 
@@ -26,6 +13,19 @@ import (
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+
+package images
+
+import (
+	"fmt"
+
+	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/leases"
+	"github.com/containerd/containerd/mount"
+	"github.com/pkg/errors"
+	"github.com/urfave/cli"
+)
 
 var unmountCommand = cli.Command{
 	Name:        "unmount",
