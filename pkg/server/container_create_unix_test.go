@@ -882,14 +882,15 @@ func TestGenerateApparmorSpecOpts(t *testing.T) {
 			profile:    runtimeDefault,
 			privileged: true,
 		},
-		"should set specified profile when local profile is specified": {
-			profile:  profileNamePrefix + "test-profile",
-			specOpts: apparmor.WithProfile("test-profile"),
+		// TODO (mikebrow) add success with exising defined profile tests
+		"should return error when undefined local profile is specified": {
+			profile:   profileNamePrefix + "test-profile",
+			expectErr: true,
 		},
-		"should set apparmor when local profile is specified and privileged is true": {
+		"should return error when undefined local profile is specified and privileged is true": {
 			profile:    profileNamePrefix + "test-profile",
 			privileged: true,
-			specOpts:   apparmor.WithProfile("test-profile"),
+			expectErr:  true,
 		},
 		"should return error if specified profile is invalid": {
 			profile:   "test-profile",
