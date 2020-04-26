@@ -30,6 +30,7 @@ FROM golang-base AS runc
 RUN apt-get update && apt-get install -y \
     curl \
     libseccomp-dev \
+    sudo \
   --no-install-recommends
 
 COPY vendor.conf vendor.conf
