@@ -329,8 +329,9 @@ jobs:
         env:
           GOPROXY: direct
           TEST_RUNTIME: io.containerd.runc.${{ matrix.runtime }}
+          RUNC_FLAVOR: ${{ matrix.runc }}
         run: |
-          sudo GOPATH=$GOPATH GOPROXY=$GOPROXY TEST_RUNTIME=$TEST_RUNTIME make integration EXTRA_TESTFLAGS=-no-criu TESTFLAGS_RACE=-race
+          sudo GOPATH=$GOPATH GOPROXY=$GOPROXY TEST_RUNTIME=$TEST_RUNTIME RUNC_FLAVOR=$RUNC_FLAVOR make integration EXTRA_TESTFLAGS=-no-criu TESTFLAGS_RACE=-race
         working-directory: src/github.com/containerd/containerd
 
       # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
@@ -338,8 +339,9 @@ jobs:
         env:
           GOPROXY: direct
           TEST_RUNTIME: io.containerd.runc.${{ matrix.runtime }}
+          RUNC_FLAVOR: ${{ matrix.runc }}
         run: |
-          sudo GOPATH=$GOPATH GOPROXY=$GOPROXY TEST_RUNTIME=$TEST_RUNTIME TESTFLAGS_PARALLEL=1 make integration EXTRA_TESTFLAGS=-no-criu
+          sudo GOPATH=$GOPATH GOPROXY=$GOPROXY TEST_RUNTIME=$TEST_RUNTIME RUNC_FLAVOR=$RUNC_FLAVOR TESTFLAGS_PARALLEL=1 make integration EXTRA_TESTFLAGS=-no-criu
         working-directory: src/github.com/containerd/containerd
 
       - name: CRI test
