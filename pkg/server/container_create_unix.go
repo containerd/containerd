@@ -19,6 +19,9 @@
 package server
 
 import (
+	"bufio"
+	"io"
+	"os"
 	"strconv"
 	"strings"
 
@@ -353,7 +356,41 @@ func generateApparmorSpecOpts(apparmorProf string, privileged, apparmorEnabled b
 		if !strings.HasPrefix(apparmorProf, profileNamePrefix) {
 			return nil, errors.Errorf("invalid apparmor profile %q", apparmorProf)
 		}
-		return apparmor.WithProfile(strings.TrimPrefix(apparmorProf, profileNamePrefix)), nil
+		appArmorProfile := strings.TrimPrefix(apparmorProf, profileNamePrefix)
+		if profileExists, err := appArmorProfileExists(appArmorProfile); !profileExists {
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to generate apparmor spec opts")
+			}
+			return nil, errors.Errorf("apparmor profile not found %s", appArmorProfile)
+		}
+		return apparmor.WithProfile(appArmorProfile), nil
+	}
+}
+
+// appArmorProfileExists scans apparmor/profiles for the requested profile
+func appArmorProfileExists(profile string) (bool, error) {
+	if profile == "" {
+		return false, errors.New("nil apparmor profile is not supported")
+	}
+	profiles, err := os.Open("/sys/kernel/security/apparmor/profiles")
+	if err != nil {
+		return false, err
+	}
+	defer profiles.Close()
+
+	rbuff := bufio.NewReader(profiles)
+	for {
+		line, err := rbuff.ReadString('\n')
+		switch err {
+		case nil:
+			if strings.HasPrefix(line, profile+" (") {
+				return true, nil
+			}
+		case io.EOF:
+			return false, nil
+		default:
+			return false, err
+		}
 	}
 }
 
