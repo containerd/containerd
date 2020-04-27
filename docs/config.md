@@ -10,6 +10,7 @@ The explanation and default value of each configuration item are as follows:
 ```toml
 # Use config version 2 to enable new configuration fields.
 # Config file is parsed as version 1 by default.
+# Version 2 uses long plugin names, i.e. "io.containerd.grpc.v1.cri" vs "cri".
 version = 2
 
 # The 'plugins."io.containerd.grpc.v1.cri"' table contains all of the server options.
