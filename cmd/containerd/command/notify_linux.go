@@ -20,7 +20,6 @@ package command
 
 import (
 	"context"
-	"os"
 
 	sd "github.com/coreos/go-systemd/v22/daemon"
 
@@ -38,15 +37,11 @@ func notifyStopping(ctx context.Context) error {
 }
 
 func sdNotify(ctx context.Context, state string) error {
-	if os.Getenv("NOTIFY_SOCKET") != "" {
-		notified, err := sd.SdNotify(false, state)
-		log.G(ctx).
-			WithError(err).
-			WithField("notified", notified).
-			WithField("state", state).
-			Debug("sd notification")
-		return err
-	}
-
-	return nil
+	notified, err := sd.SdNotify(false, state)
+	log.G(ctx).
+		WithError(err).
+		WithField("notified", notified).
+		WithField("state", state).
+		Debug("sd notification")
+	return err
 }
