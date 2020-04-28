@@ -455,6 +455,10 @@ const (
 	// targetDigestLabel is a label which contains layer digest and will be passed
 	// to snapshotters.
 	targetDigestLabel = "containerd.io/snapshot/cri.layer-digest"
+	// targetImageLayersLabel is a label which contains layer digests contained in
+	// the target image and will be passed to snapshotters for preparing layers in
+	// parallel.
+	targetImageLayersLabel = "containerd.io/snapshot/cri.image-layers"
 )
 
 // appendInfoHandlerWrapper makes a handler which appends some basic information
@@ -471,6 +475,15 @@ func appendInfoHandlerWrapper(ref string) func(f containerdimages.Handler) conta
 			}
 			switch desc.MediaType {
 			case imagespec.MediaTypeImageManifest, containerdimages.MediaTypeDockerSchema2Manifest:
+				var layers string
+				for _, c := range children {
+					if containerdimages.IsLayerType(c.MediaType) {
+						layers += fmt.Sprintf("%s,", c.Digest.String())
+					}
+				}
+				if len(layers) >= 1 {
+					layers = layers[:len(layers)-1]
+				}
 				for i := range children {
 					c := &children[i]
 					if containerdimages.IsLayerType(c.MediaType) {
@@ -479,6 +492,7 @@ func appendInfoHandlerWrapper(ref string) func(f containerdimages.Handler) conta
 						}
 						c.Annotations[targetRefLabel] = ref
 						c.Annotations[targetDigestLabel] = c.Digest.String()
+						c.Annotations[targetImageLayersLabel] = layers
 					}
 				}
 			}
