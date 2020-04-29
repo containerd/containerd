@@ -18,6 +18,7 @@ package images
 
 import (
 	gocontext "context"
+	"fmt"
 	"os"
 	"sync"
 	"text/tabwriter"
@@ -57,8 +58,7 @@ var pushCommand = cli.Command{
 		Usage: "digest of manifest",
 	}, cli.StringFlag{
 		Name:  "manifest-type",
-		Usage: "media type of manifest digest",
-		Value: ocispec.MediaTypeImageManifest,
+		Usage: fmt.Sprintf("media type of manifest digest, example: %s", ocispec.MediaTypeImageManifest),
 	}, cli.StringSliceFlag{
 		Name:  "platform",
 		Usage: "push content from a specific platform",
@@ -86,7 +86,6 @@ var pushCommand = cli.Command{
 			if err != nil {
 				return errors.Wrap(err, "invalid manifest digest")
 			}
-			desc.MediaType = context.String("manifest-type")
 		} else {
 			if local == "" {
 				local = ref
@@ -117,6 +116,9 @@ var pushCommand = cli.Command{
 					}
 				}
 			}
+		}
+		if manifestType := context.String("manifest-type"); manifestType != "" {
+			desc.MediaType = manifestType
 		}
 
 		resolver, err := commands.GetResolver(ctx, context)
