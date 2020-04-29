@@ -1,24 +1,27 @@
 // +build !windows
 
 /*
-Copyright The containerd Authors.
+   Copyright The containerd Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 package server
 
 import (
+	"bufio"
+	"io"
+	"os"
 	"strconv"
 	"strings"
 
@@ -104,7 +107,7 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 	return mounts
 }
 
-func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint32, netNSPath string,
+func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint32, netNSPath string, containerName string,
 	config *runtime.ContainerConfig, sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig,
 	extraMounts []*runtime.Mount, ociRuntime config.Runtime) (*runtimespec.Spec, error) {
 
@@ -172,6 +175,9 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 		specOpts = append(specOpts, oci.WithPrivileged)
 		if !ociRuntime.PrivilegedWithoutHostDevices {
 			specOpts = append(specOpts, oci.WithHostDevices, oci.WithAllDevicesAllowed)
+		} else {
+			// add requested devices by the config as host devices are not automatically added
+			specOpts = append(specOpts, customopts.WithDevices(c.os, config), customopts.WithCapabilities(securityContext))
 		}
 	} else { // not privileged
 		specOpts = append(specOpts, customopts.WithDevices(c.os, config), customopts.WithCapabilities(securityContext))
@@ -223,6 +229,7 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 		customopts.WithSupplementalGroups(supplementalGroups),
 		customopts.WithAnnotation(annotations.ContainerType, annotations.ContainerTypeContainer),
 		customopts.WithAnnotation(annotations.SandboxID, sandboxID),
+		customopts.WithAnnotation(annotations.ContainerName, containerName),
 	)
 	// cgroupns is used for hiding /sys/fs/cgroup from containers.
 	// For compatibility, cgroupns is not used when running in cgroup v1 mode or in privileged.
@@ -352,7 +359,41 @@ func generateApparmorSpecOpts(apparmorProf string, privileged, apparmorEnabled b
 		if !strings.HasPrefix(apparmorProf, profileNamePrefix) {
 			return nil, errors.Errorf("invalid apparmor profile %q", apparmorProf)
 		}
-		return apparmor.WithProfile(strings.TrimPrefix(apparmorProf, profileNamePrefix)), nil
+		appArmorProfile := strings.TrimPrefix(apparmorProf, profileNamePrefix)
+		if profileExists, err := appArmorProfileExists(appArmorProfile); !profileExists {
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to generate apparmor spec opts")
+			}
+			return nil, errors.Errorf("apparmor profile not found %s", appArmorProfile)
+		}
+		return apparmor.WithProfile(appArmorProfile), nil
+	}
+}
+
+// appArmorProfileExists scans apparmor/profiles for the requested profile
+func appArmorProfileExists(profile string) (bool, error) {
+	if profile == "" {
+		return false, errors.New("nil apparmor profile is not supported")
+	}
+	profiles, err := os.Open("/sys/kernel/security/apparmor/profiles")
+	if err != nil {
+		return false, err
+	}
+	defer profiles.Close()
+
+	rbuff := bufio.NewReader(profiles)
+	for {
+		line, err := rbuff.ReadString('\n')
+		switch err {
+		case nil:
+			if strings.HasPrefix(line, profile+" (") {
+				return true, nil
+			}
+		case io.EOF:
+			return false, nil
+		default:
+			return false, err
+		}
 	}
 }
 
