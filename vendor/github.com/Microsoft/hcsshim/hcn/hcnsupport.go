@@ -14,6 +14,7 @@ type SupportedFeatures struct {
 	Slash32EndpointPrefixes  bool        `json:"Slash32EndpointPrefixes"`
 	AclSupportForProtocol252 bool        `json:"AclSupportForProtocol252"`
 	SessionAffinity          bool        `json:"SessionAffinity"`
+	IPv6DualStack            bool        `json:"IPv6DualStack"`
 }
 
 // AclFeatures are the supported ACL possibilities.
@@ -59,6 +60,7 @@ func GetSupportedFeatures() SupportedFeatures {
 	features.Slash32EndpointPrefixes = isFeatureSupported(globals.Version, Slash32EndpointPrefixesVersion)
 	features.AclSupportForProtocol252 = isFeatureSupported(globals.Version, AclSupportForProtocol252Version)
 	features.SessionAffinity = isFeatureSupported(globals.Version, SessionAffinityVersion)
+	features.IPv6DualStack = isFeatureSupported(globals.Version, IPv6DualStackVersion)
 
 	return features
 }

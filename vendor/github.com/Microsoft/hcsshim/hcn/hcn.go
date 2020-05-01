@@ -55,6 +55,15 @@ import (
 //sys hcnDeleteLoadBalancer(id *_guid, result **uint16) (hr error) = computenetwork.HcnDeleteLoadBalancer?
 //sys hcnCloseLoadBalancer(loadBalancer hcnLoadBalancer) (hr error) = computenetwork.HcnCloseLoadBalancer?
 
+// SDN Routes
+//sys hcnEnumerateRoutes(query string, routes **uint16, result **uint16) (hr error) = computenetwork.HcnEnumerateSdnRoutes?
+//sys hcnCreateRoute(id *_guid, settings string, route *hcnRoute, result **uint16) (hr error) = computenetwork.HcnCreateSdnRoute?
+//sys hcnOpenRoute(id *_guid, route *hcnRoute, result **uint16) (hr error) = computenetwork.HcnOpenSdnRoute?
+//sys hcnModifyRoute(route hcnRoute, settings string, result **uint16) (hr error) = computenetwork.HcnModifySdnRoute?
+//sys hcnQueryRouteProperties(route hcnRoute, query string, properties **uint16, result **uint16) (hr error) = computenetwork.HcnQuerySdnRouteProperties?
+//sys hcnDeleteRoute(id *_guid, result **uint16) (hr error) = computenetwork.HcnDeleteSdnRoute?
+//sys hcnCloseRoute(route hcnRoute) (hr error) = computenetwork.HcnCloseSdnRoute?
+
 // Service
 //sys hcnOpenService(service *hcnService, result **uint16) (hr error) = computenetwork.HcnOpenService?
 //sys hcnRegisterServiceCallback(service hcnService, callback int32, context int32, callbackHandle *hcnCallbackHandle) (hr error) = computenetwork.HcnRegisterServiceCallback?
@@ -67,6 +76,7 @@ type hcnNetwork syscall.Handle
 type hcnEndpoint syscall.Handle
 type hcnNamespace syscall.Handle
 type hcnLoadBalancer syscall.Handle
+type hcnRoute syscall.Handle
 type hcnService syscall.Handle
 type hcnCallbackHandle syscall.Handle
 
@@ -186,6 +196,15 @@ func SessionAffinitySupported() error {
 		return nil
 	}
 	return platformDoesNotSupportError("Session Affinity")
+}
+
+// IPv6DualStackSupported returns an error if the HCN version does not support IPv6DualStack.
+func IPv6DualStackSupported() error {
+	supported := GetSupportedFeatures()
+	if supported.IPv6DualStack {
+		return nil
+	}
+	return platformDoesNotSupportError("IPv6 DualStack")
 }
 
 // RequestType are the different operations performed to settings.
