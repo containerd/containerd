@@ -198,6 +198,11 @@ func (a *dockerAuthorizer) generateTokenOptions(ctx context.Context, host string
 	scope, ok := c.parameters["scope"]
 	if ok {
 		to.scopes = append(to.scopes, scope)
+	}
+	// fallback to request scope if there's no scope in the challenge
+	if v := ctx.Value(tokenScopesKey{}); !ok && v != nil {
+		scopes := v.([]string)
+		to.scopes = append(to.scopes, scopes...)
 	} else {
 		log.G(ctx).WithField("host", host).Debug("no scope specified for token auth challenge")
 	}
