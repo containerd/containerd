@@ -17,6 +17,7 @@ var (
 	errInvalidEndpointID     = errors.New("invalid endpoint ID")
 	errInvalidNamespaceID    = errors.New("invalid namespace ID")
 	errInvalidLoadBalancerID = errors.New("invalid load balancer ID")
+	errInvalidRouteID        = errors.New("invalid route ID")
 )
 
 func checkForErrors(methodName string, hr error, resultBuffer *uint16) error {
@@ -133,6 +134,15 @@ func (e LoadBalancerNotFoundError) Error() string {
 	return fmt.Sprintf("LoadBalancer %q not found", e.LoadBalancerId)
 }
 
+// RouteNotFoundError results from a failed seach for a route by Id
+type RouteNotFoundError struct {
+	RouteId string
+}
+
+func (e RouteNotFoundError) Error() string {
+	return fmt.Sprintf("SDN Route %q not found", e.RouteId)
+}
+
 // IsNotFoundError returns a boolean indicating whether the error was caused by
 // a resource not being found.
 func IsNotFoundError(err error) bool {
@@ -144,6 +154,8 @@ func IsNotFoundError(err error) bool {
 	case NamespaceNotFoundError:
 		return true
 	case LoadBalancerNotFoundError:
+		return true
+	case RouteNotFoundError:
 		return true
 	case *hcserror.HcsError:
 		return pe.Err == hcs.ErrElementNotFound
