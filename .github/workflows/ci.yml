@@ -269,6 +269,16 @@ jobs:
         with:
           go-version: '1.13.10'
 
+      - name: Setup gosu
+        shell: bash
+        run: |
+          GOSU=/usr/local/bin/gosu
+          arch="$(dpkg --print-architecture | awk -F- '{ print $NF }')"
+          sudo wget -O ${GOSU} "https://github.com/tianon/gosu/releases/download/1.12/gosu-$arch"
+          sudo chmod +x ${GOSU}
+          sudo chown root ${GOSU}
+          sudo chmod +s ${GOSU}
+
       - name: Set env
         shell: bash
         run: |
@@ -285,7 +295,7 @@ jobs:
           RUNC_FLAVOR: ${{ matrix.runc }}
         run: |
           sudo PATH=$PATH script/setup/install-seccomp
-          script/setup/install-runc
+          gosu root script/setup/install-runc
           script/setup/install-cni
           script/setup/install-critools
         working-directory: src/github.com/containerd/containerd
