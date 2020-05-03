@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package sys
+package reaper
 
 import (
 	"unsafe"
