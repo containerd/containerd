@@ -25,9 +25,9 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/containerd/containerd/sys"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/continuity/sysx"
-	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
@@ -90,7 +90,7 @@ var (
 )
 
 func setInUserNS() {
-	inUserNS = system.RunningInUserNS()
+	inUserNS = sys.RunningInUserNS()
 }
 
 func skipFile(hdr *tar.Header) bool {
