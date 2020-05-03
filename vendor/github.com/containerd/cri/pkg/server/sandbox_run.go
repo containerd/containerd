@@ -123,12 +123,18 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		sandbox.NetNSPath = sandbox.NetNS.GetPath()
 		defer func() {
 			if retErr != nil {
+				// Teardown network if an error is returned.
+				if err := c.teardownPodNetwork(ctx, sandbox); err != nil {
+					log.G(ctx).WithError(err).Errorf("Failed to destroy network for sandbox %q", id)
+				}
+
 				if err := sandbox.NetNS.Remove(); err != nil {
 					log.G(ctx).WithError(err).Errorf("Failed to remove network namespace %s for sandbox %q", sandbox.NetNSPath, id)
 				}
 				sandbox.NetNSPath = ""
 			}
 		}()
+
 		// Setup network for sandbox.
 		// Certain VM based solutions like clear containers (Issue containerd/cri-containerd#524)
 		// rely on the assumption that CRI shim will not be querying the network namespace to check the
@@ -140,14 +146,6 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		if err := c.setupPodNetwork(ctx, &sandbox); err != nil {
 			return nil, errors.Wrapf(err, "failed to setup network for sandbox %q", id)
 		}
-		defer func() {
-			if retErr != nil {
-				// Teardown network if an error is returned.
-				if err := c.teardownPodNetwork(ctx, sandbox); err != nil {
-					log.G(ctx).WithError(err).Errorf("Failed to destroy network for sandbox %q", id)
-				}
-			}
-		}()
 	}
 
 	// Create sandbox container.
@@ -327,10 +325,6 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		sandbox.IP, sandbox.AdditionalIPs = selectPodIPs(configs.IPConfigs)
 		sandbox.CNIResult = result
 		return nil
-	}
-	// If it comes here then the result was invalid so destroy the pod network and return error
-	if err := c.teardownPodNetwork(ctx, *sandbox); err != nil {
-		log.G(ctx).WithError(err).Errorf("Failed to destroy network for sandbox %q", id)
 	}
 	return errors.Errorf("failed to find network info for sandbox %q", id)
 }
