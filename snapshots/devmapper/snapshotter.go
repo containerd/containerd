@@ -277,14 +277,26 @@ func (s *Snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 			return err
 		}
 
-		// The thin snapshot is not used for IO after committed, so
-		// suspend to flush the IO and deactivate the device.
+		// After committed, the snapshot device will not be directly
+		// used anymore. We'd better deativate it to make it *invisible*
+		// in userspace, so that tools like LVM2 and fdisk cannot touch it,
+		// and avoid useless IOs on it.
+		//
+		// Before deactivation, we need to flush the outstanding IO by suspend.
+		// Afterward, we resume it again to prevent a race window which may cause
+		// a process IO hang. See the issue below for details:
+		//   (https://github.com/containerd/containerd/issues/4234)
 		err = s.pool.SuspendDevice(ctx, deviceName)
 		if err != nil {
 			return err
 		}
 
-		return s.pool.DeactivateDevice(ctx, deviceName, true, false)
+		err = s.pool.ResumeDevice(ctx, deviceName)
+		if err != nil {
+			return err
+		}
+
+		return s.pool.DeactivateDevice(ctx, deviceName, false, false)
 	})
 }
 
