@@ -141,7 +141,7 @@ func TestImagesList(t *testing.T) {
 		}
 
 		// try it again, get NotFound
-		if err := store.Delete(ctx, id); errors.Cause(err) != errdefs.ErrNotFound {
+		if err := store.Delete(ctx, id); !errdefs.IsNotFound(err) {
 			t.Fatalf("unexpected error %v", err)
 		}
 	}
@@ -496,7 +496,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 			// Create
 			now := time.Now()
 			created, err := store.Create(ctx, testcase.original)
-			if errors.Cause(err) != testcase.createerr {
+			if !errors.Is(err, testcase.createerr) {
 				if testcase.createerr == nil {
 					t.Fatalf("unexpected error: %v", err)
 				} else {
@@ -518,7 +518,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 			// Update
 			now = time.Now()
 			updated, err := store.Update(ctx, testcase.input, testcase.fieldpaths...)
-			if errors.Cause(err) != testcase.cause {
+			if !errors.Is(err, testcase.cause) {
 				if testcase.cause == nil {
 					t.Fatalf("unexpected error: %v", err)
 				} else {

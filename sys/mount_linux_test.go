@@ -125,8 +125,8 @@ func testFMountatWithFileFd(t *testing.T, root string) {
 	defer f.Close()
 
 	err = FMountat(f.Fd(), filepath.Join(root, "empty"), filepath.Join(root, "work"), "", 0, "")
-	if got := errors.Cause(err); got != expectedErr {
-		t.Fatalf("expected error %v, but got %v", expectedErr, got)
+	if !errors.Is(err, expectedErr) {
+		t.Fatalf("expected error %v, but got %v", expectedErr, errors.Cause(err))
 	}
 }
 
@@ -146,8 +146,8 @@ func testFMountatWithInvalidSource(t *testing.T, root string) {
 	defer f.Close()
 
 	err = FMountat(f.Fd(), filepath.Join(root, "oops"), "at", "bind", unix.MS_BIND, "")
-	if got := errors.Cause(err); got != expectedErr {
-		t.Fatalf("expected error %v, but got %v", expectedErr, got)
+	if !errors.Is(err, expectedErr) {
+		t.Fatalf("expected error %v, but got %v", expectedErr, err)
 	}
 }
 

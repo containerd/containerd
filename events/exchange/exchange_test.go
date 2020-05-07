@@ -300,7 +300,7 @@ func TestExchangeValidateTopic(t *testing.T) {
 	} {
 		t.Run(testcase.input, func(t *testing.T) {
 			event := &eventstypes.ContainerCreate{ID: t.Name()}
-			if err := exchange.Publish(ctx, testcase.input, event); errors.Cause(err) != testcase.err {
+			if err := exchange.Publish(ctx, testcase.input, event); !errors.Is(err, testcase.err) {
 				if err == nil {
 					t.Fatalf("expected error %v, received nil", testcase.err)
 				} else {
@@ -321,7 +321,7 @@ func TestExchangeValidateTopic(t *testing.T) {
 			}
 
 			// make sure we get same errors with forward.
-			if err := exchange.Forward(ctx, &envelope); errors.Cause(err) != testcase.err {
+			if err := exchange.Forward(ctx, &envelope); !errors.Is(err, testcase.err) {
 				if err == nil {
 					t.Fatalf("expected error %v, received nil", testcase.err)
 				} else {
