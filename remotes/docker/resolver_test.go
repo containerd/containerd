@@ -188,7 +188,7 @@ func TestBadTokenResolver(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected error getting token with inssufficient scope")
 	}
-	if errors.Cause(err) != ErrInvalidAuthorization {
+	if !errors.Is(err, ErrInvalidAuthorization) {
 		t.Fatal(err)
 	}
 }

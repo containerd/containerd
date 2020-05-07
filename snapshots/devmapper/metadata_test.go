@@ -80,7 +80,7 @@ func TestPoolMetadata_AddDeviceDuplicate(t *testing.T) {
 	assert.NilError(t, err)
 
 	err = store.AddDevice(testCtx, &DeviceInfo{Name: "test"})
-	assert.Equal(t, ErrAlreadyExists, errors.Cause(err))
+	assert.Assert(t, errors.Is(err, ErrAlreadyExists))
 }
 
 func TestPoolMetadata_ReuseDeviceID(t *testing.T) {
