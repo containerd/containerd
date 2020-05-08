@@ -88,6 +88,9 @@ func TestGRPCRoundTrip(t *testing.T) {
 			if errors.Cause(ferr) != testcase.cause {
 				t.Fatalf("unexpected cause: %v != %v", errors.Cause(ferr), testcase.cause)
 			}
+			if !errors.Is(ferr, testcase.cause) {
+				t.Fatalf("unexpected cause: !errors.Is(%v, %v)", ferr, testcase.cause)
+			}
 
 			expected := testcase.str
 			if expected == "" {

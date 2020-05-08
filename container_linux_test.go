@@ -44,7 +44,6 @@ import (
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/sys"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -1539,7 +1538,7 @@ func TestContainerNoImage(t *testing.T) {
 	if err == nil {
 		t.Fatal("error should not be nil when container is created without an image")
 	}
-	if errors.Cause(err) != errdefs.ErrNotFound {
+	if !errdefs.IsNotFound(err) {
 		t.Fatalf("expected error to be %s but received %s", errdefs.ErrNotFound, err)
 	}
 }

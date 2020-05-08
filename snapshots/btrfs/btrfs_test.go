@@ -81,7 +81,7 @@ func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshots.Snap
 			snapshotter, err = NewSnapshotter(root)
 			if err == nil {
 				break
-			} else if errors.Cause(err) != plugin.ErrSkipPlugin {
+			} else if !errors.Is(err, plugin.ErrSkipPlugin) {
 				return nil, nil, err
 			}
 
