@@ -286,7 +286,7 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 		specOpts = append(specOpts, apparmorSpecOpts)
 	}
 
-	seccompSpecOpts, err := generateSeccompSpecOpts(
+	seccompSpecOpts, err := c.generateSeccompSpecOpts(
 		securityContext.GetSeccompProfilePath(),
 		securityContext.GetPrivileged(),
 		c.seccompEnabled())
@@ -300,10 +300,13 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 }
 
 // generateSeccompSpecOpts generates containerd SpecOpts for seccomp.
-func generateSeccompSpecOpts(seccompProf string, privileged, seccompEnabled bool) (oci.SpecOpts, error) {
+func (c *criService) generateSeccompSpecOpts(seccompProf string, privileged, seccompEnabled bool) (oci.SpecOpts, error) {
 	if privileged {
 		// Do not set seccomp profile when container is privileged
 		return nil, nil
+	}
+	if seccompProf == "" {
+		seccompProf = c.config.DefaultSeccompProfile
 	}
 	// Set seccomp profile
 	if seccompProf == runtimeDefault || seccompProf == dockerDefault {

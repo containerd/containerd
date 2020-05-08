@@ -225,6 +225,8 @@ type PluginConfig struct {
 	// DisableProcMount disables Kubernetes ProcMount support. This MUST be set to `true`
 	// when using containerd with Kubernetes <=1.11.
 	DisableProcMount bool `toml:"disable_proc_mount" json:"disableProcMount"`
+	// DefaultSeccompProfile is a seccomp profile to use if not provided by k8s.
+	DefaultSeccompProfile string `toml:"default_seccomp_profile" json:"defaultSeccompProfile"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
