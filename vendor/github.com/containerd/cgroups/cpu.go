@@ -110,9 +110,6 @@ func (c *cpuController) Stat(path string, stats *v1.Metrics) error {
 	// get or create the cpu field because cpuacct can also set values on this struct
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
-		if err := sc.Err(); err != nil {
-			return err
-		}
 		key, v, err := parseKV(sc.Text())
 		if err != nil {
 			return err
@@ -126,5 +123,5 @@ func (c *cpuController) Stat(path string, stats *v1.Metrics) error {
 			stats.CPU.Throttling.ThrottledTime = v
 		}
 	}
-	return nil
+	return sc.Err()
 }
