@@ -1,3 +1,5 @@
+// +build !linux
+
 /*
    Copyright The containerd Authors.
 
@@ -14,17 +16,10 @@
    limitations under the License.
 */
 
-package shim
+package sys
 
-import (
-	"github.com/containerd/containerd/sys/reaper"
-	"github.com/containerd/ttrpc"
-)
-
-func newServer() (*ttrpc.Server, error) {
-	return ttrpc.NewServer(ttrpc.WithServerHandshaker(ttrpc.UnixSocketRequireSameUser()))
-}
-
-func subreaper() error {
-	return reaper.SetSubreaper(1)
+// RunningInUserNS is a stub for non-Linux systems
+// Always returns false
+func RunningInUserNS() bool {
+	return false
 }

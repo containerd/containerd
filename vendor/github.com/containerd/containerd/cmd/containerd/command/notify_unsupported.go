@@ -1,3 +1,5 @@
+// +build !linux
+
 /*
    Copyright The containerd Authors.
 
@@ -14,17 +16,16 @@
    limitations under the License.
 */
 
-package shim
+package command
 
 import (
-	"github.com/containerd/containerd/sys/reaper"
-	"github.com/containerd/ttrpc"
+	"context"
 )
 
-func newServer() (*ttrpc.Server, error) {
-	return ttrpc.NewServer(ttrpc.WithServerHandshaker(ttrpc.UnixSocketRequireSameUser()))
+func notifyReady(ctx context.Context) error {
+	return nil
 }
 
-func subreaper() error {
-	return reaper.SetSubreaper(1)
+func notifyStopping(ctx context.Context) error {
+	return nil
 }

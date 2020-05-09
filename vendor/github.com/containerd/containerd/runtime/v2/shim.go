@@ -226,9 +226,12 @@ func (s *shim) Delete(ctx context.Context) (*runtime.Exit, error) {
 		ID: s.ID(),
 	})
 	if shimErr != nil {
-		shimErr = errdefs.FromGRPC(shimErr)
-		if !errdefs.IsNotFound(shimErr) {
-			return nil, shimErr
+		log.G(ctx).WithField("id", s.ID()).WithError(shimErr).Debug("failed to delete task")
+		if errors.Cause(shimErr) != ttrpc.ErrClosed {
+			shimErr = errdefs.FromGRPC(shimErr)
+			if !errdefs.IsNotFound(shimErr) {
+				return nil, shimErr
+			}
 		}
 	}
 	// remove self from the runtime task list

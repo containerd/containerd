@@ -30,7 +30,7 @@ import (
 
 // NewTaskMonitor returns a new cgroups monitor
 func NewTaskMonitor(ctx context.Context, publisher events.Publisher, ns *metrics.Namespace) (runtime.TaskMonitor, error) {
-	collector := newCollector(ns)
+	collector := NewCollector(ns)
 	return &cgroupsMonitor{
 		collector: collector,
 		context:   ctx,
@@ -39,7 +39,7 @@ func NewTaskMonitor(ctx context.Context, publisher events.Publisher, ns *metrics
 }
 
 type cgroupsMonitor struct {
-	collector *collector
+	collector *Collector
 	context   context.Context
 	publisher events.Publisher
 }
