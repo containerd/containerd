@@ -324,10 +324,6 @@ func (c *criService) registryHosts(auth *runtime.AuthConfig) docker.RegistryHost
 				config    = c.config.Registry.Configs[u.Host]
 			)
 
-			if u.Scheme != "https" && config.TLS != nil {
-				return nil, errors.Errorf("tls provided for http endpoint %q", e)
-			}
-
 			if config.TLS != nil {
 				transport.TLSClientConfig, err = c.getTLSConfig(*config.TLS)
 				if err != nil {
