@@ -85,6 +85,9 @@ func parseCgroupProcsFile(path string) ([]uint64, error) {
 			out = append(out, pid)
 		}
 	}
+	if err := s.Err(); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -144,9 +147,6 @@ func parseCgroupFromReader(r io.Reader) (string, error) {
 		s = bufio.NewScanner(r)
 	)
 	for s.Scan() {
-		if err := s.Err(); err != nil {
-			return "", err
-		}
 		var (
 			text  = s.Text()
 			parts = strings.SplitN(text, ":", 3)
@@ -158,6 +158,9 @@ func parseCgroupFromReader(r io.Reader) (string, error) {
 		if parts[0] == "0" && parts[1] == "" {
 			return parts[2], nil
 		}
+	}
+	if err := s.Err(); err != nil {
+		return "", err
 	}
 	return "", fmt.Errorf("cgroup path not found")
 }
@@ -194,6 +197,16 @@ func ToResources(spec *specs.LinuxResources) *Resources {
 			resources.Memory.Low = l
 		}
 	}
+	if hugetlbs := spec.HugepageLimits; hugetlbs != nil {
+		hugeTlbUsage := HugeTlb{}
+		for _, hugetlb := range hugetlbs {
+			hugeTlbUsage = append(hugeTlbUsage, HugeTlbEntry{
+				HugePageSize: hugetlb.Pagesize,
+				Limit:        hugetlb.Limit,
+			})
+		}
+		resources.HugeTlb = &hugeTlbUsage
+	}
 	if pids := spec.Pids; pids != nil {
 		resources.Pids = &Pids{
 			Max: pids.Limit,
@@ -202,7 +215,7 @@ func ToResources(spec *specs.LinuxResources) *Resources {
 	if i := spec.BlockIO; i != nil {
 		resources.IO = &IO{}
 		if i.Weight != nil {
-			resources.IO.BFQ.Weight = *i.Weight
+			resources.IO.BFQ.Weight = 1 + (*i.Weight-10)*9999/990
 		}
 		for t, devices := range map[IOType][]specs.LinuxThrottleDevice{
 			ReadBPS:   i.ThrottleReadBpsDevice,
@@ -376,4 +389,57 @@ func isUnitExists(err error) bool {
 func systemdUnitFromPath(path string) string {
 	_, unit := filepath.Split(path)
 	return unit
+}
+
+func readHugeTlbStats(path string) []*stats.HugeTlbStat {
+	var usage = []*stats.HugeTlbStat{}
+	var keyUsage = make(map[string]*stats.HugeTlbStat)
+	f, err := os.Open(path)
+	if err != nil {
+		return usage
+	}
+	files, err := f.Readdir(-1)
+	f.Close()
+	if err != nil {
+		return usage
+	}
+
+	for _, file := range files {
+		if strings.Contains(file.Name(), "hugetlb") &&
+			(strings.HasSuffix(file.Name(), "max") || strings.HasSuffix(file.Name(), "current")) {
+			var hugeTlb *stats.HugeTlbStat
+			var ok bool
+			fileName := strings.Split(file.Name(), ".")
+			pageSize := fileName[1]
+			if hugeTlb, ok = keyUsage[pageSize]; !ok {
+				hugeTlb = &stats.HugeTlbStat{}
+			}
+			hugeTlb.Pagesize = pageSize
+			out, err := ioutil.ReadFile(filepath.Join(path, file.Name()))
+			if err != nil {
+				continue
+			}
+			var value uint64
+			stringVal := strings.TrimSpace(string(out))
+			if stringVal == "max" {
+				value = math.MaxUint64
+			} else {
+				value, err = strconv.ParseUint(stringVal, 10, 64)
+			}
+			if err != nil {
+				continue
+			}
+			switch fileName[2] {
+			case "max":
+				hugeTlb.Max = value
+			case "current":
+				hugeTlb.Current = value
+			}
+			keyUsage[pageSize] = hugeTlb
+		}
+	}
+	for _, entry := range keyUsage {
+		usage = append(usage, entry)
+	}
+	return usage
 }

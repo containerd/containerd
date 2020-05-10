@@ -181,6 +181,10 @@ func readPids(path string, subsystem Name) ([]Process, error) {
 			})
 		}
 	}
+	if err := s.Err(); err != nil {
+		// failed to read all pids?
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -207,6 +211,9 @@ func readTasksPids(path string, subsystem Name) ([]Task, error) {
 				Path:      path,
 			})
 		}
+	}
+	if err := s.Err(); err != nil {
+		return nil, err
 	}
 	return out, nil
 }
@@ -286,9 +293,6 @@ func parseCgroupFromReader(r io.Reader) (map[string]string, error) {
 		s       = bufio.NewScanner(r)
 	)
 	for s.Scan() {
-		if err := s.Err(); err != nil {
-			return nil, err
-		}
 		var (
 			text  = s.Text()
 			parts = strings.SplitN(text, ":", 3)
@@ -302,6 +306,9 @@ func parseCgroupFromReader(r io.Reader) (map[string]string, error) {
 			}
 		}
 	}
+	if err := s.Err(); err != nil {
+		return nil, err
+	}
 	return cgroups, nil
 }
 
@@ -313,15 +320,22 @@ func getCgroupDestination(subsystem string) (string, error) {
 	defer f.Close()
 	s := bufio.NewScanner(f)
 	for s.Scan() {
-		if err := s.Err(); err != nil {
-			return "", err
+		fields := strings.Split(s.Text(), " ")
+		if len(fields) < 10 {
+			// broken mountinfo?
+			continue
 		}
-		fields := strings.Fields(s.Text())
+		if fields[len(fields)-3] != "cgroup" {
+			continue
+		}
 		for _, opt := range strings.Split(fields[len(fields)-1], ",") {
 			if opt == subsystem {
 				return fields[3], nil
 			}
 		}
+	}
+	if err := s.Err(); err != nil {
+		return "", err
 	}
 	return "", ErrNoCgroupMountDestination
 }

@@ -10,6 +10,7 @@ message Metrics {
 	MemoryStat memory = 4;
 	RdmaStat rdma = 5;
 	IOStat io = 6;
+	repeated HugeTlbStat hugetlb = 7;
 }
 
 message PidsStat {
@@ -86,4 +87,10 @@ message IOEntry {
 	uint64 wbytes = 4;
 	uint64 rios = 5;
 	uint64 wios = 6;
+}
+
+message HugeTlbStat {
+	uint64 current = 1;
+	uint64 max = 2;
+	string pagesize = 3;
 }
