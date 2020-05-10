@@ -306,7 +306,7 @@ func (c *criService) generateSeccompSpecOpts(seccompProf string, privileged, sec
 		return nil, nil
 	}
 	if seccompProf == "" {
-		seccompProf = c.config.DefaultSeccompProfile
+		seccompProf = c.config.UnsetSeccompProfile
 	}
 	// Set seccomp profile
 	if seccompProf == runtimeDefault || seccompProf == dockerDefault {

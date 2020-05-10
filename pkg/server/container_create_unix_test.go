@@ -837,7 +837,7 @@ func TestGenerateSeccompSpecOpts(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("TestCase %q", desc), func(t *testing.T) {
 			cri := &criService{}
-			cri.config.DefaultSeccompProfile = test.defaultProfile
+			cri.config.UnsetSeccompProfile = test.defaultProfile
 			specOpts, err := cri.generateSeccompSpecOpts(test.profile, test.privileged, !test.disable)
 			assert.Equal(t,
 				reflect.ValueOf(test.specOpts).Pointer(),
