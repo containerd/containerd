@@ -324,10 +324,6 @@ func (c *criService) registryHosts(auth *runtime.AuthConfig) docker.RegistryHost
 				config    = c.config.Registry.Configs[u.Host]
 			)
 
-			if u.Scheme != "https" && config.TLS != nil {
-				return nil, errors.Errorf("tls provided for http endpoint %q", e)
-			}
-
 			if config.TLS != nil {
 				transport.TLSClientConfig, err = c.getTLSConfig(*config.TLS)
 				if err != nil {
@@ -425,9 +421,9 @@ func newTransport() *http.Transport {
 	return &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-			DualStack: true,
+			Timeout:       30 * time.Second,
+			KeepAlive:     30 * time.Second,
+			FallbackDelay: 300 * time.Millisecond,
 		}).DialContext,
 		MaxIdleConns:          10,
 		IdleConnTimeout:       30 * time.Second,
