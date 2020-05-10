@@ -46,7 +46,6 @@ addons:
       - libaio-dev
       - libprotobuf-c-dev
       - libprotobuf-dev
-      - socat
 
 before_install:
   - uname -r

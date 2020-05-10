@@ -161,7 +161,7 @@ func (c *criService) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 		securityContext = config.GetLinux().GetSecurityContext()
 		specOpts        []oci.SpecOpts
 	)
-	seccompSpecOpts, err := generateSeccompSpecOpts(
+	seccompSpecOpts, err := c.generateSeccompSpecOpts(
 		securityContext.GetSeccompProfilePath(),
 		securityContext.GetPrivileged(),
 		c.seccompEnabled())
