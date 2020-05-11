@@ -311,8 +311,7 @@ jobs:
             libnl-3-dev \
             libnet-dev \
             libcap-dev \
-            python-future \
-            socat
+            python-future
           wget https://github.com/checkpoint-restore/criu/archive/v3.13.tar.gz -O criu.tar.gz
           tar -zxf criu.tar.gz
           cd criu-3.13
