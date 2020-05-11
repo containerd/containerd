@@ -20,6 +20,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -779,11 +780,12 @@ func TestNoDefaultRunMount(t *testing.T) {
 
 func TestGenerateSeccompSpecOpts(t *testing.T) {
 	for desc, test := range map[string]struct {
-		profile    string
-		privileged bool
-		disable    bool
-		specOpts   oci.SpecOpts
-		expectErr  bool
+		profile        string
+		privileged     bool
+		disable        bool
+		specOpts       oci.SpecOpts
+		expectErr      bool
+		defaultProfile string
 	}{
 		"should return error if seccomp is specified when seccomp is not supported": {
 			profile:   runtimeDefault,
@@ -824,17 +826,28 @@ func TestGenerateSeccompSpecOpts(t *testing.T) {
 			profile:   "test-profile",
 			expectErr: true,
 		},
+		"should use default profile when seccomp is empty": {
+			defaultProfile: profileNamePrefix + "test-profile",
+			specOpts:       seccomp.WithProfile("test-profile"),
+		},
+		"should fallback to docker/default when seccomp is empty and default is runtime/default": {
+			defaultProfile: runtimeDefault,
+			specOpts:       seccomp.WithDefaultProfile(),
+		},
 	} {
-		t.Logf("TestCase %q", desc)
-		specOpts, err := generateSeccompSpecOpts(test.profile, test.privileged, !test.disable)
-		assert.Equal(t,
-			reflect.ValueOf(test.specOpts).Pointer(),
-			reflect.ValueOf(specOpts).Pointer())
-		if test.expectErr {
-			assert.Error(t, err)
-		} else {
-			assert.NoError(t, err)
-		}
+		t.Run(fmt.Sprintf("TestCase %q", desc), func(t *testing.T) {
+			cri := &criService{}
+			cri.config.UnsetSeccompProfile = test.defaultProfile
+			specOpts, err := cri.generateSeccompSpecOpts(test.profile, test.privileged, !test.disable)
+			assert.Equal(t,
+				reflect.ValueOf(test.specOpts).Pointer(),
+				reflect.ValueOf(specOpts).Pointer())
+			if test.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
 	}
 }
 

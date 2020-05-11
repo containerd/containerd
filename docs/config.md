@@ -78,6 +78,10 @@ version = 2
   # when using containerd with Kubernetes <=1.11.
   disable_proc_mount = false
 
+  # unsetSeccompProfile is the profile containerd/cri will use if the provided seccomp profile is
+  # unset (`""`) for a container (default is `unconfined`)
+  unset_seccomp_profile = ""
+
   # 'plugins."io.containerd.grpc.v1.cri".containerd' contains config related to containerd
   [plugins."io.containerd.grpc.v1.cri".containerd]
 
