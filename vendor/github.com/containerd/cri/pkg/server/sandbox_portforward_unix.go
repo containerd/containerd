@@ -100,9 +100,9 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 			return ctx.Err()
 		}
 		// give a chance to terminate gracefully or timeout
-		// 0.5s is the default timeout used in socat
+		// after 1s
 		// https://linux.die.net/man/1/socat
-		timeout := time.Duration(500) * time.Millisecond
+		const timeout = time.Second
 		select {
 		case e := <-errCh:
 			if errFwd == nil {
