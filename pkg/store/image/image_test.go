@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/distribution/digestset"
+	"github.com/opencontainers/go-digest/digestset"
 	assertlib "github.com/stretchr/testify/assert"
 
 	storeutil "github.com/containerd/cri/pkg/store"
