@@ -49,7 +49,7 @@ all: binaries
 help: ## this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9._-]+:.*?## / {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST) | sort
 
-verify: lint gofmt boiler check-vendor ## execute the source code verification tools
+verify: lint gofmt check-vendor ## execute the source code verification tools
 
 version: ## print current cri plugin release version
 	@echo $(VERSION)
@@ -61,10 +61,6 @@ lint:
 gofmt:
 	@echo "$(WHALE) $@"
 	@./hack/verify-gofmt.sh
-
-boiler:
-	@echo "$(WHALE) $@"
-	@./hack/verify-boilerplate.sh
 
 check-vendor:
 	@echo "$(WHALE) $@"
@@ -209,7 +205,6 @@ install.tools: .install.gitvalidation .install.golangci-lint .install.vndr ## in
 	install-containerd \
 	release \
 	push \
-	boiler \
 	clean \
 	default \
 	gofmt \

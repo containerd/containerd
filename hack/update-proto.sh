@@ -39,7 +39,6 @@ protoc \
   --gogo_out=plugins=grpc:${API_ROOT} ${API_ROOT}/api.proto
 
 # Update boilerplate for the generated file.
-echo "$(cat hack/boilerplate/boilerplate.go.txt ${API_ROOT}/api.pb.go)" > ${API_ROOT}/api.pb.go
-sed -i".bak" "s/Copyright AUTHORS/Copyright $(date '+%Y') The containerd Authors/g" ${API_ROOT}/api.pb.go
+echo "$(cat hack/boilerplate/boilerplate ${API_ROOT}/api.pb.go)" > ${API_ROOT}/api.pb.go
 
 gofmt -l -s -w ${API_ROOT}/api.pb.go
