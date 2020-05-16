@@ -623,32 +623,22 @@ func (r *Runc) Version(context context.Context) (Version, error) {
 func parseVersion(data []byte) (Version, error) {
 	var v Version
 	parts := strings.Split(strings.TrimSpace(string(data)), "\n")
-	if len(parts) != 3 {
-		return v, nil
-	}
-	for i, p := range []struct {
-		dest  *string
-		split string
-	}{
-		{
-			dest:  &v.Runc,
-			split: "version ",
-		},
-		{
-			dest:  &v.Commit,
-			split: ": ",
-		},
-		{
-			dest:  &v.Spec,
-			split: ": ",
-		},
-	} {
-		p2 := strings.Split(parts[i], p.split)
-		if len(p2) != 2 {
-			return v, fmt.Errorf("unable to parse version line %q", parts[i])
+
+	if len(parts) > 0 {
+		if !strings.HasPrefix(parts[0], "runc version ") {
+			return v, nil
 		}
-		*p.dest = p2[1]
+		v.Runc = parts[0][13:]
+
+		for _, part := range parts[1:] {
+			if strings.HasPrefix(part, "commit: ") {
+				v.Commit = part[8:]
+			} else if strings.HasPrefix(part, "spec: ") {
+				v.Spec = part[6:]
+			}
+		}
 	}
+
 	return v, nil
 }
 

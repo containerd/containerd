@@ -265,7 +265,7 @@ func (u *unpacker) fetch(ctx context.Context, h images.Handler, layers []ocispec
 			if u.limiter != nil {
 				u.limiter.Release(1)
 			}
-			if err != nil && errors.Cause(err) != images.ErrSkipDesc {
+			if err != nil && !errors.Is(err, images.ErrSkipDesc) {
 				return err
 			}
 			close(done[i])
