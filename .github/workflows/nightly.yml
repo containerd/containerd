@@ -51,7 +51,7 @@ jobs:
 
       - name: Build amd64
         env:
-          GOPATH: ${{ runner.workspace }}
+          GOPATH: ${{ runner.workspace }}/containerd
           GOOS: linux
           GOARCH: amd64
         run: |
