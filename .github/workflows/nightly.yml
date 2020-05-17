@@ -57,6 +57,7 @@ jobs:
         run: |
           make binaries
           mv bin bin_amd64
+        working-directory: src/github.com/containerd/containerd
 
       - name: Build arm64
         env:
@@ -68,6 +69,7 @@ jobs:
         run: |
           make binaries
           mv bin bin_arm64
+        working-directory: src/github.com/containerd/containerd
 
       - name: Build s390x
         env:
@@ -79,6 +81,7 @@ jobs:
         run: |
           make binaries
           mv bin bin_s390x
+        working-directory: src/github.com/containerd/containerd
 
       - name: Build ppc64le
         env:
@@ -90,6 +93,7 @@ jobs:
         run: |
           make binaries
           mv bin bin_ppc64le
+        working-directory: src/github.com/containerd/containerd
 
       #
       # Upload
@@ -143,6 +147,7 @@ jobs:
           GOARCH: amd64
         run: |
           make binaries
+        working-directory: src/github.com/containerd/containerd
 
       - name: Upload artifacts (windows_amd64)
         uses: actions/upload-artifact@v1
