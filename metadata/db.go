@@ -323,7 +323,6 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 	m.dirty = 0
 
 	if len(m.dirtySS) > 0 {
-		var sl sync.Mutex
 		stats.SnapshotD = map[string]time.Duration{}
 		wg.Add(len(m.dirtySS))
 		for snapshotterName := range m.dirtySS {
@@ -331,10 +330,9 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 			go func(snapshotterName string) {
 				st1 := time.Now()
 				m.cleanupSnapshotter(snapshotterName)
-
-				sl.Lock()
+				
+				// Don't need a lock here since every goroutine is updating a unique snapshot
 				stats.SnapshotD[snapshotterName] = time.Since(st1)
-				sl.Unlock()
 
 				wg.Done()
 			}(snapshotterName)
