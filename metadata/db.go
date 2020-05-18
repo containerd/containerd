@@ -330,7 +330,6 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 			go func(snapshotterName string) {
 				st1 := time.Now()
 				m.cleanupSnapshotter(snapshotterName)
-				
 				// Don't need a lock here since every goroutine is updating a unique snapshot
 				stats.SnapshotD[snapshotterName] = time.Since(st1)
 
