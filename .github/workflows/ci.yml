@@ -14,7 +14,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v1
         with:
-          go-version: '1.13.10'
+          go-version: '1.13.11'
 
       - name: Set env
         shell: bash
@@ -83,7 +83,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v1
         with:
-          go-version: '1.13.10'
+          go-version: '1.13.11'
 
       - name: Set env
         shell: bash
@@ -147,10 +147,10 @@ jobs:
     name: Build and CRI Test (Windows amd64)
     runs-on: windows-latest
     steps:
-      - name: Set up Go 1.13.10
+      - name: Set up Go 1.13.11
         uses: actions/setup-go@v1
         with:
-          go-version: 1.13.10
+          go-version: 1.13.11
 
       - name: Checkout cri repo
         uses: actions/checkout@v2
