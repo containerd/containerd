@@ -48,6 +48,8 @@ type hostConfig struct {
 	clientPairs [][2]string
 	skipVerify  *bool
 
+	header http.Header
+
 	// TODO: API ("docker" or "oci")
 	// TODO: API Version ("v1", "v2")
 	// TODO: Add credential configuration (domain alias, username)
@@ -143,6 +145,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			rhosts[i].Host = host.host
 			rhosts[i].Path = host.path
 			rhosts[i].Capabilities = host.capabilities
+			rhosts[i].Header = host.header
 
 			if host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil {
 				tr := defaultTransport.Clone()
@@ -203,7 +206,6 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 				rhosts[i].Client = client
 				rhosts[i].Authorizer = authorizer
 			}
-
 		}
 
 		return rhosts, nil
@@ -273,6 +275,8 @@ type hostFileConfig struct {
 	Client toml.Primitive `toml:"client"`
 
 	SkipVerify *bool `toml:"skip_verify"`
+
+	Header map[string]toml.Primitive `toml:"header"`
 
 	// API (default: "docker")
 	// API Version (default: "v2")
@@ -432,6 +436,31 @@ func parseHostsFile(ctx context.Context, baseDir string, b []byte) ([]hostConfig
 			default:
 				return nil, errors.Errorf("invalid type %v for \"client\"", t)
 			}
+		}
+
+		headerKey := append(baseKey, "header")
+		if md.IsDefined(headerKey...) {
+			header := http.Header{}
+			for key, prim := range hostConfig.Header {
+				switch t := md.Type(append(headerKey, key)...); t {
+				case "String":
+					var value string
+					if err := md.PrimitiveDecode(prim, &value); err != nil {
+						return nil, errors.Wrapf(err, "failed to decode header %q", key)
+					}
+					header[key] = []string{value}
+				case "Array":
+					var value []string
+					if err := md.PrimitiveDecode(prim, &value); err != nil {
+						return nil, errors.Wrapf(err, "failed to decode header %q", key)
+					}
+
+					header[key] = value
+				default:
+					return nil, errors.Errorf("invalid type %v for header %q", t, key)
+				}
+			}
+			hosts[i].header = header
 		}
 	}
 
