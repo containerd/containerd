@@ -176,7 +176,7 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 		q := req.URL.Query()
 		q.Add("digest", desc.Digest.String())
 		req.URL.RawQuery = q.Encode()
-
+		req.Header.Set("Content-Type", "application/octet-stream")
 	}
 	p.tracker.SetStatus(ref, Status{
 		Status: content.Status{
@@ -193,7 +193,6 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 	respC := make(chan *http.Response, 1)
 
 	req.Body = ioutil.NopCloser(pr)
-	req.Header.Set("Content-Type", "application/octet-stream")
 	req.ContentLength = desc.Size
 
 	go func() {
