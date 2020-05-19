@@ -393,7 +393,7 @@ func (m testManifest) OCIManifest() []byte {
 		Config: m.config.Descriptor(),
 		Layers: make([]ocispec.Descriptor, len(m.references)),
 	}
-	for i, c := range append(m.references) {
+	for i, c := range m.references {
 		manifest.Layers[i] = c.Descriptor()
 	}
 	b, _ := json.Marshal(manifest)
