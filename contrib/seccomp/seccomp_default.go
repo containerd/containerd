@@ -515,7 +515,6 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 					"delete_module",
 					"init_module",
 					"finit_module",
-					"query_module",
 				},
 				Action: specs.ActAllow,
 				Args:   []specs.LinuxSeccompArg{},
