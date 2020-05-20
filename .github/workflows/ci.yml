@@ -63,11 +63,10 @@ jobs:
           fi
           ../project/script/validate/dco
 
-      # TODO: (mikebrow) removed test/ due to ltag not working with test/e3e symlink
       - name: Headers
         working-directory: src/github.com/containerd/cri
         run:  |
-          ltag -t "../project/script/validate/template" --excludes "vendor test" --check -v
+          ltag -t "../project/script/validate/template" --check -v
 
       - name: Vendor
         working-directory: src/github.com/containerd/cri
