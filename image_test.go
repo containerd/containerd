@@ -180,6 +180,7 @@ func TestImageUsage(t *testing.T) {
 
 	// Pin image name to specific version for future fetches
 	imageName = imageName + "@" + image.Target().Digest.String()
+	defer client.ImageService().Delete(ctx, imageName, images.SynchronousDelete())
 
 	// Fetch single platforms, but all manifests pulled
 	if _, err := client.Fetch(ctx, imageName, WithPlatformMatcher(testPlatform), WithAllMetadata()); err != nil {
