@@ -105,6 +105,13 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			hosts[len(hosts)-1].capabilities = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush
 		}
 
+		var defaultTLSConfig *tls.Config
+		if options.DefaultTLS != nil {
+			defaultTLSConfig = options.DefaultTLS
+		} else {
+			defaultTLSConfig = &tls.Config{}
+		}
+
 		defaultTransport := &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			DialContext: (&net.Dialer{
@@ -115,7 +122,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			MaxIdleConns:          10,
 			IdleConnTimeout:       30 * time.Second,
 			TLSHandshakeTimeout:   10 * time.Second,
-			TLSClientConfig:       options.DefaultTLS,
+			TLSClientConfig:       defaultTLSConfig,
 			ExpectContinueTimeout: 5 * time.Second,
 		}
 
@@ -138,12 +145,8 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			rhosts[i].Capabilities = host.capabilities
 
 			if host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil {
-				var tlsConfig *tls.Config
-				if options.DefaultTLS != nil {
-					tlsConfig = options.DefaultTLS.Clone()
-				} else {
-					tlsConfig = &tls.Config{}
-				}
+				tr := defaultTransport.Clone()
+				tlsConfig := tr.TLSClientConfig
 				if host.skipVerify != nil {
 					tlsConfig.InsecureSkipVerify = *host.skipVerify
 				}
@@ -190,8 +193,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 						tlsConfig.Certificates = append(tlsConfig.Certificates, cert)
 					}
 				}
-				tr := defaultTransport.Clone()
-				tr.TLSClientConfig = tlsConfig
+
 				c := *client
 				c.Transport = tr
 
@@ -306,6 +308,9 @@ func parseHostsFile(ctx context.Context, baseDir string, b []byte) ([]hostConfig
 		}
 	}
 
+	if c.HostConfigs == nil {
+		c.HostConfigs = map[string]hostFileConfig{}
+	}
 	if c.Server != "" {
 		c.HostConfigs[c.Server] = c.hostFileConfig
 		orderedHosts = append(orderedHosts, c.Server)
