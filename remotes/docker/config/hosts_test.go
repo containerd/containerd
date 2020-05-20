@@ -80,6 +80,7 @@ ca = "/etc/path/default"
 [host."https://mirror.registry"]
   capabilities = ["pull"]
   ca = "/etc/certs/mirror.pem"
+  skip_verify = false
 
 [host."https://mirror-bak.registry/us"]
   capabilities = ["pull"]
@@ -132,7 +133,6 @@ ca = "/etc/path/default"
 				{filepath.FromSlash("/etc/certs/client.cert"), filepath.FromSlash("/etc/certs/client.key")},
 				{filepath.FromSlash("/etc/certs/client.pem"), ""},
 			},
-			skipVerify: &fb,
 		},
 		{
 			scheme:       "https",
@@ -142,7 +142,6 @@ ca = "/etc/path/default"
 			clientPairs: [][2]string{
 				{filepath.FromSlash("/etc/certs/client.pem")},
 			},
-			skipVerify: &fb,
 		},
 		{
 			scheme:       "https",
@@ -153,14 +152,13 @@ ca = "/etc/path/default"
 				{filepath.FromSlash("/etc/certs/client-1.pem")},
 				{filepath.FromSlash("/etc/certs/client-2.pem")},
 			},
-			skipVerify: &fb,
 		},
 		{
 			scheme:       "https",
 			host:         "test-default.registry",
 			path:         "/v2",
 			capabilities: allCaps,
-			skipVerify:   &fb,
+			caCerts:      []string{filepath.FromSlash("/etc/path/default")},
 		},
 	}
 	hosts, err := parseHostsFile(ctx, "", []byte(testtoml))
