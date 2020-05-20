@@ -16,7 +16,7 @@
    limitations under the License.
 */
 
-package oom
+package v1
 
 import (
 	"context"
@@ -24,28 +24,30 @@ import (
 
 	"github.com/containerd/cgroups"
 	eventstypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/containerd/pkg/oom"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/v2/shim"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
 // New returns an epoll implementation that listens to OOM events
 // from a container's cgroups.
-func New(publisher shim.Publisher) (*Epoller, error) {
+func New(publisher shim.Publisher) (oom.Watcher, error) {
 	fd, err := unix.EpollCreate1(unix.EPOLL_CLOEXEC)
 	if err != nil {
 		return nil, err
 	}
-	return &Epoller{
+	return &epoller{
 		fd:        fd,
 		publisher: publisher,
 		set:       make(map[uintptr]*item),
 	}, nil
 }
 
-// Epoller implementation for handling OOM events from a container's cgroup
-type Epoller struct {
+// epoller implementation for handling OOM events from a container's cgroup
+type epoller struct {
 	mu sync.Mutex
 
 	fd        int
@@ -59,12 +61,12 @@ type item struct {
 }
 
 // Close the epoll fd
-func (e *Epoller) Close() error {
+func (e *epoller) Close() error {
 	return unix.Close(e.fd)
 }
 
 // Run the epoll loop
-func (e *Epoller) Run(ctx context.Context) {
+func (e *epoller) Run(ctx context.Context) {
 	var events [128]unix.EpollEvent
 	for {
 		select {
@@ -86,8 +88,12 @@ func (e *Epoller) Run(ctx context.Context) {
 	}
 }
 
-// Add the cgroup to the epoll monitor
-func (e *Epoller) Add(id string, cg cgroups.Cgroup) error {
+// Add cgroups.Cgroup to the epoll monitor
+func (e *epoller) Add(id string, cgx interface{}) error {
+	cg, ok := cgx.(cgroups.Cgroup)
+	if !ok {
+		return errors.Errorf("expected cgroups.Cgroup, got: %T", cgx)
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	fd, err := cg.OOMEventFD()
@@ -105,7 +111,7 @@ func (e *Epoller) Add(id string, cg cgroups.Cgroup) error {
 	return unix.EpollCtl(e.fd, unix.EPOLL_CTL_ADD, int(fd), &event)
 }
 
-func (e *Epoller) process(ctx context.Context, fd uintptr) {
+func (e *epoller) process(ctx context.Context, fd uintptr) {
 	flush(fd)
 	e.mu.Lock()
 	i, ok := e.set[fd]
