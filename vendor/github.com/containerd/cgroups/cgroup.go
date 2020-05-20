@@ -458,7 +458,26 @@ func (c *cgroup) OOMEventFD() (uintptr, error) {
 	if err != nil {
 		return 0, err
 	}
-	return s.(*memoryController).OOMEventFD(sp)
+	return s.(*memoryController).memoryEvent(sp, OOMEvent())
+}
+
+// RegisterMemoryEvent allows the ability to register for all v1 memory cgroups
+// notifications.
+func (c *cgroup) RegisterMemoryEvent(event MemoryEvent) (uintptr, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.err != nil {
+		return 0, c.err
+	}
+	s := c.getSubsystem(Memory)
+	if s == nil {
+		return 0, ErrMemoryNotSupported
+	}
+	sp, err := c.path(Memory)
+	if err != nil {
+		return 0, err
+	}
+	return s.(*memoryController).memoryEvent(sp, event)
 }
 
 // State returns the state of the cgroup and its processes

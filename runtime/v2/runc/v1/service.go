@@ -35,6 +35,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/oom"
+	oomv1 "github.com/containerd/containerd/pkg/oom/v1"
 	"github.com/containerd/containerd/pkg/process"
 	"github.com/containerd/containerd/pkg/stdio"
 	"github.com/containerd/containerd/runtime/v2/runc"
@@ -58,7 +59,7 @@ var (
 
 // New returns a new shim service that can be used via GRPC
 func New(ctx context.Context, id string, publisher shim.Publisher, shutdown func()) (shim.Shim, error) {
-	ep, err := oom.New(publisher)
+	ep, err := oomv1.New(publisher)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +91,7 @@ type service struct {
 	events   chan interface{}
 	platform stdio.Platform
 	ec       chan runcC.Exit
-	ep       *oom.Epoller
+	ep       oom.Watcher
 
 	id        string
 	container *runc.Container

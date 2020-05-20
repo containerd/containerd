@@ -166,6 +166,9 @@ func writeValues(path string, values []Value) error {
 }
 
 func NewManager(mountpoint string, group string, resources *Resources) (*Manager, error) {
+	if resources == nil {
+		return nil, errors.New("resources reference is nil")
+	}
 	if err := VerifyGroupPath(group); err != nil {
 		return nil, err
 	}
@@ -376,6 +379,12 @@ func (c *Manager) Stat() (*stats.Metrics, error) {
 			return nil, err
 		}
 	}
+	memoryEvents := make(map[string]interface{})
+	if err := readKVStatsFile(c.path, "memory.events", memoryEvents); err != nil {
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+	}
 	var metrics stats.Metrics
 
 	metrics.Pids = &stats.PidsStat{
@@ -427,7 +436,15 @@ func (c *Manager) Stat() (*stats.Metrics, error) {
 		SwapUsage:             getStatFileContentUint64(filepath.Join(c.path, "memory.swap.current")),
 		SwapLimit:             getStatFileContentUint64(filepath.Join(c.path, "memory.swap.max")),
 	}
-
+	if len(memoryEvents) > 0 {
+		metrics.MemoryEvents = &stats.MemoryEvents{
+			Low:     getUint64Value("low", memoryEvents),
+			High:    getUint64Value("high", memoryEvents),
+			Max:     getUint64Value("max", memoryEvents),
+			Oom:     getUint64Value("oom", memoryEvents),
+			OomKill: getUint64Value("oom_kill", memoryEvents),
+		}
+	}
 	metrics.Io = &stats.IOStat{Usage: readIoStats(c.path)}
 	metrics.Rdma = &stats.RdmaStat{
 		Current: rdmaStats(filepath.Join(c.path, "rdma.current")),
@@ -572,15 +589,44 @@ func (c *Manager) waitForEvents(ec chan<- Event, errCh chan<- error) {
 			errCh <- err
 			return
 		}
-		var out map[string]interface{}
 		if bytesRead >= syscall.SizeofInotifyEvent {
-			if err := readKVStatsFile(c.path, "memory.events", out); err != nil {
-				e := Event{
-					High:    out["high"].(uint64),
-					Low:     out["low"].(uint64),
-					Max:     out["max"].(uint64),
-					OOM:     out["oom"].(uint64),
-					OOMKill: out["oom_kill"].(uint64),
+			out := make(map[string]interface{})
+			if err := readKVStatsFile(c.path, "memory.events", out); err == nil {
+				e := Event{}
+				if v, ok := out["high"]; ok {
+					e.High, ok = v.(uint64)
+					if !ok {
+						errCh <- errors.Errorf("cannot convert high to uint64: %+v", v)
+						return
+					}
+				}
+				if v, ok := out["low"]; ok {
+					e.Low, ok = v.(uint64)
+					if !ok {
+						errCh <- errors.Errorf("cannot convert low to uint64: %+v", v)
+						return
+					}
+				}
+				if v, ok := out["max"]; ok {
+					e.Max, ok = v.(uint64)
+					if !ok {
+						errCh <- errors.Errorf("cannot convert max to uint64: %+v", v)
+						return
+					}
+				}
+				if v, ok := out["oom"]; ok {
+					e.OOM, ok = v.(uint64)
+					if !ok {
+						errCh <- errors.Errorf("cannot convert oom to uint64: %+v", v)
+						return
+					}
+				}
+				if v, ok := out["oom_kill"]; ok {
+					e.OOMKill, ok = v.(uint64)
+					if !ok {
+						errCh <- errors.Errorf("cannot convert oom_kill to uint64: %+v", v)
+						return
+					}
 				}
 				ec <- e
 			} else {

@@ -10,7 +10,7 @@ require (
 	github.com/godbus/dbus/v5 v5.0.3
 	github.com/gogo/protobuf v1.3.1
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
-	github.com/opencontainers/runtime-spec v0.1.2-0.20190507144316-5b71a03e2700
+	github.com/opencontainers/runtime-spec v1.0.2
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.2.2

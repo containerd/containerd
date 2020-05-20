@@ -1,3 +1,5 @@
+// +build linux
+
 /*
    Copyright The containerd Authors.
 
@@ -14,7 +16,15 @@
    limitations under the License.
 */
 
-package cgroups
+package oom
 
-// Hierarchy enables both unified and split hierarchy for cgroups
-type Hierarchy func() ([]Subsystem, error)
+import (
+	"context"
+)
+
+// Watcher watches OOM events
+type Watcher interface {
+	Close() error
+	Run(ctx context.Context)
+	Add(id string, cg interface{}) error
+}
