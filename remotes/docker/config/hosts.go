@@ -272,7 +272,7 @@ type hostFileConfig struct {
 	// TODO: Make this an array (two key types, one for pairs (multiple files), one for single file?)
 	Client toml.Primitive `toml:"client"`
 
-	SkipVerify bool `toml:"skip_verify"`
+	SkipVerify *bool `toml:"skip_verify"`
 
 	// API (default: "docker")
 	// API Version (default: "v2")
@@ -322,33 +322,32 @@ func parseHostsFile(ctx context.Context, baseDir string, b []byte) ([]hostConfig
 	for i, server := range orderedHosts {
 		hostConfig := c.HostConfigs[server]
 
-		if !strings.HasPrefix(server, "http") {
-			server = "https://" + server
-		}
-		u, err := url.Parse(server)
-		if err != nil {
-			return nil, errors.Errorf("unable to parse server %v", server)
-		}
-		hosts[i].scheme = u.Scheme
-		hosts[i].host = u.Host
-
-		// TODO: Handle path based on registry protocol
-		// Define a registry protocol type
-		//   OCI v1    - Always use given path as is
-		//   Docker v2 - Always ensure ends with /v2/
-		if len(u.Path) > 0 {
-			u.Path = path.Clean(u.Path)
-			if !strings.HasSuffix(u.Path, "/v2") {
-				u.Path = u.Path + "/v2"
+		if server != "" {
+			if !strings.HasPrefix(server, "http") {
+				server = "https://" + server
 			}
-		} else {
-			u.Path = "/v2"
-		}
-		hosts[i].path = u.Path
+			u, err := url.Parse(server)
+			if err != nil {
+				return nil, errors.Errorf("unable to parse server %v", server)
+			}
+			hosts[i].scheme = u.Scheme
+			hosts[i].host = u.Host
 
-		if hosts[i].scheme == "https" {
-			hosts[i].skipVerify = &hostConfig.SkipVerify
+			// TODO: Handle path based on registry protocol
+			// Define a registry protocol type
+			//   OCI v1    - Always use given path as is
+			//   Docker v2 - Always ensure ends with /v2/
+			if len(u.Path) > 0 {
+				u.Path = path.Clean(u.Path)
+				if !strings.HasSuffix(u.Path, "/v2") {
+					u.Path = u.Path + "/v2"
+				}
+			} else {
+				u.Path = "/v2"
+			}
+			hosts[i].path = u.Path
 		}
+		hosts[i].skipVerify = hostConfig.SkipVerify
 
 		if len(hostConfig.Capabilities) > 0 {
 			for _, c := range hostConfig.Capabilities {
@@ -368,7 +367,7 @@ func parseHostsFile(ctx context.Context, baseDir string, b []byte) ([]hostConfig
 		}
 
 		baseKey := []string{}
-		if server != "" {
+		if server != "" && server != c.Server {
 			baseKey = append(baseKey, "host", server)
 		}
 		caKey := append(baseKey, "ca")
