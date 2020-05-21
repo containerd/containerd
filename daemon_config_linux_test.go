@@ -30,6 +30,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/plugin"
@@ -212,6 +213,9 @@ func getCgroupPath() (map[string]string, error) {
 
 // TestDaemonCustomCgroup ensures plugin.cgroup.path is not ignored
 func TestDaemonCustomCgroup(t *testing.T) {
+	if cgroups.Mode() == cgroups.Unified {
+		t.Skip("test requires cgroup1")
+	}
 	cgroupPath, err := getCgroupPath()
 	if err != nil {
 		t.Fatal(err)
