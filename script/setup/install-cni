@@ -29,10 +29,10 @@ go get -d github.com/containernetworking/plugins/...
 cd $GOPATH/src/github.com/containernetworking/plugins
 git checkout $CNI_COMMIT
 FASTBUILD=true ./build.sh
-mkdir -p $CNI_DIR
-cp -r ./bin $CNI_DIR
-mkdir -p $CNI_CONFIG_DIR
-bash -c 'cat >'$CNI_CONFIG_DIR'/10-containerd-net.conflist <<EOF
+sudo mkdir -p $CNI_DIR
+sudo cp -r ./bin $CNI_DIR
+sudo mkdir -p $CNI_CONFIG_DIR
+cat <<EOF | sudo tee $CNI_CONFIG_DIR/10-containerd-net.conflist
 {
   "cniVersion": "0.3.1",
   "name": "containerd-net",
@@ -57,4 +57,4 @@ bash -c 'cat >'$CNI_CONFIG_DIR'/10-containerd-net.conflist <<EOF
     }
   ]
 }
-EOF'
+EOF

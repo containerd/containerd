@@ -1,0 +1,355 @@
+name: CI
+on:
+  push:
+    branches:
+      - master
+      - 'release/**'
+  pull_request:
+    branches:
+      - master
+      - 'release/**'
+
+jobs:
+  #
+  # golangci-lint
+  #
+  linters:
+    name: Linters
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+
+    strategy:
+      matrix:
+        os: [ubuntu-18.04, macos-10.15] # TODO: pass linters on 'windows-2019'
+
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: '1.13.10'
+
+      - name: Set env
+        shell: bash
+        run: |
+          echo "::set-env name=GOPATH::${{ github.workspace }}"
+          echo "::add-path::${{ github.workspace }}/bin"
+
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          path: src/github.com/containerd/containerd
+
+      - name: Install dev tools
+        env:
+          GO111MODULE: off
+        shell: bash
+        run: script/setup/install-dev-tools
+        working-directory: src/github.com/containerd/containerd
+
+      - name: Make check
+        shell: bash
+        run: make check
+        working-directory: src/github.com/containerd/containerd
+
+  #
+  # Project checks
+  #
+  project:
+    name: Project Checks
+    runs-on: ubuntu-18.04
+    timeout-minutes: 5
+
+    steps:
+      #
+      # Install Go
+      #
+      - name: Install Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: '1.13.10'
+
+      - name: Set env
+        shell: bash
+        run: |
+          echo "::set-env name=GOPATH::${{ github.workspace }}"
+          echo "::add-path::${{ github.workspace }}/bin"
+
+      #
+      # Checkout repos
+      #
+      - name: Checkout this repo
+        uses: actions/checkout@v2
+        with:
+          path: src/github.com/containerd/containerd
+          fetch-depth: 25
+
+      - name: Checkout project repo
+        uses: actions/checkout@v2
+        with:
+          repository: containerd/project
+          path: src/github.com/containerd/project
+
+      #
+      # Go get dependencies
+      #
+      - name: Install dependencies
+        env:
+          GO111MODULE: off
+        run: |
+          go get -u github.com/vbatts/git-validation
+          go get -u github.com/kunalkushwaha/ltag
+          go get -u github.com/LK4D4/vndr
+
+      #
+      # DCO / File headers / Vendor directory validation
+      #
+      - name: DCO
+        env:
+          GITHUB_COMMIT_URL: ${{ github.event.pull_request.commits_url }}
+          DCO_VERBOSITY: "-q"
+          DCO_RANGE: ""
+        working-directory: src/github.com/containerd/containerd
+        run: |
+          set -x
+          if [ -z "${GITHUB_COMMIT_URL}" ]; then
+          DCO_RANGE=$(jq -r '.after + "..HEAD"' ${GITHUB_EVENT_PATH})
+          else
+          DCO_RANGE=$(curl ${GITHUB_COMMIT_URL} | jq -r '.[0].parents[0].sha +".."+ .[-1].sha')
+          fi
+          ../project/script/validate/dco
+
+      - name: Headers
+        run: ../project/script/validate/fileheader ../project/
+        working-directory: src/github.com/containerd/containerd
+
+      - name: Vendor
+        run: ../project/script/validate/vendor
+        working-directory: src/github.com/containerd/containerd
+
+  #
+  # Protobuf checks
+  #
+  protos:
+    name: Protobuf
+    runs-on: ubuntu-18.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: '1.13.10'
+
+      - name: Set env
+        shell: bash
+        run: |
+          echo "::set-env name=GOPATH::${{ github.workspace }}"
+          echo "::add-path::${{ github.workspace }}/bin"
+
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          path: src/github.com/containerd/containerd
+
+      - name: Install protobuf
+        env:
+          GO111MODULE: off
+        working-directory: src/github.com/containerd/containerd
+        run: |
+          sudo env PATH=$PATH GOPATH=$GOPATH script/setup/install-protobuf
+          sudo chmod +x /usr/local/bin/protoc
+          sudo chmod og+rx /usr/local/include/google /usr/local/include/google/protobuf /usr/local/include/google/protobuf/compiler
+          sudo chmod -R og+r /usr/local/include/google/protobuf/
+          protoc --version
+
+      - name: Install dev tools
+        env:
+          GO111MODULE: off
+        run: script/setup/install-dev-tools
+        working-directory: src/github.com/containerd/containerd
+
+      - name: Make
+        env:
+          GO111MODULE: off
+        working-directory: src/github.com/containerd/containerd
+        run: |
+          export PATH=$PATH:$(go env GOPATH)/bin
+          make check-protos check-api-descriptors
+
+  man:
+    name: Manpages
+    runs-on: ubuntu-18.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: '1.13.10'
+
+      - name: Set env
+        shell: bash
+        run: |
+          echo "::set-env name=GOPATH::${{ github.workspace }}"
+          echo "::add-path::${{ github.workspace }}/bin"
+
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          path: src/github.com/containerd/containerd
+
+      - name: Install dependencies
+        run: go get -u github.com/cpuguy83/go-md2man
+
+      - name: Make
+        run: make man
+        working-directory: src/github.com/containerd/containerd
+
+  #
+  # Build containerd binaries
+  #
+  binaries:
+    name: Binaries
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    needs: [project, linters, protos, man]
+
+    strategy:
+      matrix:
+        os: [ubuntu-18.04, macos-10.15, windows-2019]
+
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: '1.13.10'
+
+      - name: Set env
+        shell: bash
+        run: |
+          echo "::set-env name=GOPATH::${{ github.workspace }}"
+          echo "::add-path::${{ github.workspace }}/bin"
+
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          path: src/github.com/containerd/containerd
+
+      - name: Install Linux dependencies
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt-get install -y btrfs-tools libseccomp-dev
+
+      - name: Make
+        run: |
+          make build
+          make binaries
+        working-directory: src/github.com/containerd/containerd
+
+  #
+  # Integration and CRI tests
+  #
+  integration:
+    name: Integration
+    runs-on: ubuntu-18.04
+    timeout-minutes: 15
+    needs: [project, linters, protos, man]
+
+    strategy:
+      matrix:
+        runtime: [runc.v1, runc.v2, runtime.v1.linux]
+
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: '1.13.10'
+
+      - name: Setup gosu
+        shell: bash
+        run: |
+          GOSU=/usr/local/bin/gosu
+          arch="$(dpkg --print-architecture | awk -F- '{ print $NF }')"
+          sudo wget -O ${GOSU} "https://github.com/tianon/gosu/releases/download/1.12/gosu-$arch"
+          sudo chmod +x ${GOSU}
+          sudo chown root ${GOSU}
+          sudo chmod +s ${GOSU}
+
+      - name: Set env
+        shell: bash
+        run: |
+          echo "::set-env name=GOPATH::${{ github.workspace }}"
+          echo "::add-path::${{ github.workspace }}/bin"
+
+      - name: Checkout containerd
+        uses: actions/checkout@v2
+        with:
+          path: src/github.com/containerd/containerd
+
+      - name: Install containerd dependencies
+        run: |
+          sudo PATH=$PATH script/setup/install-seccomp
+          gosu root script/setup/install-runc
+          script/setup/install-cni
+          script/setup/install-critools
+        working-directory: src/github.com/containerd/containerd
+
+      - name: Install criu
+        run: |
+          sudo apt-get install -y \
+            libprotobuf-dev \
+            libprotobuf-c-dev \
+            protobuf-c-compiler \
+            protobuf-compiler \
+            python-protobuf \
+            libnl-3-dev \
+            libnet-dev \
+            libcap-dev \
+            python-future
+          wget https://github.com/checkpoint-restore/criu/archive/v3.13.tar.gz -O criu.tar.gz
+          tar -zxf criu.tar.gz
+          cd criu-3.13
+          sudo make install-criu
+
+      - name: Install containerd
+        env:
+          CGO_ENABLED: 1
+        run: |
+          make binaries
+          sudo make install
+        working-directory: src/github.com/containerd/containerd
+
+      - name: Integration 1
+        env:
+          GOPROXY: direct
+          TEST_RUNTIME: io.containerd.${{ matrix.runtime }}
+        run: |
+          sudo GOPATH=$GOPATH GOPROXY=$GOPROXY TEST_RUNTIME=$TEST_RUNTIME make integration EXTRA_TESTFLAGS=-no-criu TESTFLAGS_RACE=-race
+        working-directory: src/github.com/containerd/containerd
+
+      # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
+      - name: Integration 2
+        env:
+          GOPROXY: direct
+          TEST_RUNTIME: io.containerd.${{ matrix.runtime }}
+        run: |
+          sudo GOPATH=$GOPATH GOPROXY=$GOPROXY TEST_RUNTIME=$TEST_RUNTIME TESTFLAGS_PARALLEL=1 make integration EXTRA_TESTFLAGS=-no-criu
+        working-directory: src/github.com/containerd/containerd
+
+      - name: CRI test
+        env:
+          TEST_RUNTIME: io.containerd.${{ matrix.runtime }}
+        run: |
+          sudo mkdir -p /etc/containerd
+          sudo bash -c "cat > /etc/containerd/config.toml <<EOF
+            [plugins.cri.containerd.default_runtime]
+              runtime_type = \"${TEST_RUNTIME}\"
+          EOF"
+          sudo PATH=$PATH containerd -log-level debug &> /tmp/containerd-cri.log &
+          sudo ctr version
+          sudo PATH=$PATH GOPATH=$GOPATH critest --runtime-endpoint=/var/run/containerd/containerd.sock --parallel=8
+          TEST_RC=$?
+          test $TEST_RC -ne 0 && cat /tmp/containerd-cri.log
+          sudo pkill containerd
+          sudo rm -rf /etc/containerd
+          test $TEST_RC -eq 0 || /bin/false
