@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/containerd/cgroups"
+	cgroupsv2 "github.com/containerd/cgroups/v2"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
@@ -91,17 +92,39 @@ func TestTaskUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	var (
+		cgroup  cgroups.Cgroup
+		cgroup2 *cgroupsv2.Manager
+	)
 	// check that the task has a limit of 32mb
-	cgroup, err := cgroups.Load(cgroups.V1, cgroups.PidPath(int(task.Pid())))
-	if err != nil {
-		t.Fatal(err)
-	}
-	stat, err := cgroup.Stat(cgroups.IgnoreNotExist)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if int64(stat.Memory.Usage.Limit) != limit {
-		t.Fatalf("expected memory limit to be set to %d but received %d", limit, stat.Memory.Usage.Limit)
+	if cgroups.Mode() == cgroups.Unified {
+		groupPath, err := cgroupsv2.PidGroupPath(int(task.Pid()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		cgroup2, err = cgroupsv2.LoadManager("/sys/fs/cgroup", groupPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		stat, err := cgroup2.Stat()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if int64(stat.Memory.UsageLimit) != limit {
+			t.Fatalf("expected memory limit to be set to %d but received %d", limit, stat.Memory.UsageLimit)
+		}
+	} else {
+		cgroup, err = cgroups.Load(cgroups.V1, cgroups.PidPath(int(task.Pid())))
+		if err != nil {
+			t.Fatal(err)
+		}
+		stat, err := cgroup.Stat(cgroups.IgnoreNotExist)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if int64(stat.Memory.Usage.Limit) != limit {
+			t.Fatalf("expected memory limit to be set to %d but received %d", limit, stat.Memory.Usage.Limit)
+		}
 	}
 	limit = 64 * 1024 * 1024
 	if err := task.Update(ctx, WithResources(&specs.LinuxResources{
@@ -112,11 +135,22 @@ func TestTaskUpdate(t *testing.T) {
 		t.Error(err)
 	}
 	// check that the task has a limit of 64mb
-	if stat, err = cgroup.Stat(cgroups.IgnoreNotExist); err != nil {
-		t.Fatal(err)
-	}
-	if int64(stat.Memory.Usage.Limit) != limit {
-		t.Errorf("expected memory limit to be set to %d but received %d", limit, stat.Memory.Usage.Limit)
+	if cgroups.Mode() == cgroups.Unified {
+		stat, err := cgroup2.Stat()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if int64(stat.Memory.UsageLimit) != limit {
+			t.Errorf("expected memory limit to be set to %d but received %d", limit, stat.Memory.UsageLimit)
+		}
+	} else {
+		stat, err := cgroup.Stat(cgroups.IgnoreNotExist)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if int64(stat.Memory.Usage.Limit) != limit {
+			t.Errorf("expected memory limit to be set to %d but received %d", limit, stat.Memory.Usage.Limit)
+		}
 	}
 	if err := task.Kill(ctx, unix.SIGKILL); err != nil {
 		t.Fatal(err)
@@ -150,11 +184,23 @@ func TestShimInCgroup(t *testing.T) {
 	defer container.Delete(ctx, WithSnapshotCleanup)
 	// create a cgroup for the shim to use
 	path := "/containerd/shim"
-	cg, err := cgroups.New(cgroups.V1, cgroups.StaticPath(path), &specs.LinuxResources{})
-	if err != nil {
-		t.Fatal(err)
+	var (
+		cg  cgroups.Cgroup
+		cg2 *cgroupsv2.Manager
+	)
+	if cgroups.Mode() == cgroups.Unified {
+		cg2, err = cgroupsv2.NewManager("/sys/fs/cgroup", path, &cgroupsv2.Resources{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer cg2.Delete()
+	} else {
+		cg, err = cgroups.New(cgroups.V1, cgroups.StaticPath(path), &specs.LinuxResources{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer cg.Delete()
 	}
-	defer cg.Delete()
 
 	task, err := container.NewTask(ctx, empty(), WithShimCgroup(path))
 	if err != nil {
@@ -168,12 +214,22 @@ func TestShimInCgroup(t *testing.T) {
 	}
 
 	// check to see if the shim is inside the cgroup
-	processes, err := cg.Processes(cgroups.Devices, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(processes) == 0 {
-		t.Errorf("created cgroup should have at least one process inside: %d", len(processes))
+	if cgroups.Mode() == cgroups.Unified {
+		processes, err := cg2.Procs(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(processes) == 0 {
+			t.Errorf("created cgroup should have at least one process inside: %d", len(processes))
+		}
+	} else {
+		processes, err := cg.Processes(cgroups.Devices, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(processes) == 0 {
+			t.Errorf("created cgroup should have at least one process inside: %d", len(processes))
+		}
 	}
 	if err := task.Kill(ctx, unix.SIGKILL); err != nil {
 		t.Fatal(err)
@@ -1765,11 +1821,23 @@ func TestShimOOMScore(t *testing.T) {
 	defer cancel()
 
 	path := "/containerd/oomshim"
-	cg, err := cgroups.New(cgroups.V1, cgroups.StaticPath(path), &specs.LinuxResources{})
-	if err != nil {
-		t.Fatal(err)
+	var (
+		cg  cgroups.Cgroup
+		cg2 *cgroupsv2.Manager
+	)
+	if cgroups.Mode() == cgroups.Unified {
+		cg2, err = cgroupsv2.NewManager("/sys/fs/cgroup", path, &cgroupsv2.Resources{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer cg2.Delete()
+	} else {
+		cg, err = cgroups.New(cgroups.V1, cgroups.StaticPath(path), &specs.LinuxResources{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer cg.Delete()
 	}
-	defer cg.Delete()
 
 	image, err = client.GetImage(ctx, testImage)
 	if err != nil {
@@ -1793,19 +1861,35 @@ func TestShimOOMScore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	processes, err := cg.Processes(cgroups.Devices, false)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedScore := containerdScore + 1
 	// find the shim's pid
-	for _, p := range processes {
-		score, err := sys.GetOOMScoreAdj(p.Pid)
+	if cgroups.Mode() == cgroups.Unified {
+		processes, err := cg2.Procs(false)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if score != expectedScore {
-			t.Errorf("expected score %d but got %d for shim process", expectedScore, score)
+		for _, pid := range processes {
+			score, err := sys.GetOOMScoreAdj(int(pid))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if score != expectedScore {
+				t.Errorf("expected score %d but got %d for shim process", expectedScore, score)
+			}
+		}
+	} else {
+		processes, err := cg.Processes(cgroups.Devices, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range processes {
+			score, err := sys.GetOOMScoreAdj(p.Pid)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if score != expectedScore {
+				t.Errorf("expected score %d but got %d for shim process", expectedScore, score)
+			}
 		}
 	}
 

@@ -361,3 +361,20 @@ jobs:
           sudo pkill containerd
           sudo rm -rf /etc/containerd
           test $TEST_RC -eq 0 || /bin/false
+
+  cgroup2:
+    name: cgroup2
+    # nested virtualization is only available on macOS hosts
+    runs-on: macos-10.15
+    timeout-minutes: 40
+    needs: [project, linters, protos, man]
+
+    steps:
+      - name: Checkout containerd
+        uses: actions/checkout@v2
+
+      - name: Start vagrant
+        run: vagrant up
+
+      - name: Integration
+        run: vagrant ssh default -- sudo -i /integration.sh
