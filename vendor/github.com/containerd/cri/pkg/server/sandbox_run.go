@@ -42,6 +42,7 @@ import (
 	"github.com/containerd/cri/pkg/netns"
 	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
 	"github.com/containerd/cri/pkg/util"
+	selinux "github.com/opencontainers/selinux/go-selinux"
 )
 
 func init() {
@@ -157,6 +158,18 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, errors.Wrap(err, "failed to generate sandbox container spec")
 	}
 	log.G(ctx).Debugf("Sandbox container %q spec: %#+v", id, spew.NewFormatter(spec))
+	sandbox.ProcessLabel = spec.Process.SelinuxLabel
+	defer func() {
+		if retErr != nil {
+			selinux.ReleaseLabel(sandbox.ProcessLabel)
+		}
+	}()
+
+	if config.GetLinux().GetSecurityContext().GetPrivileged() {
+		// If privileged don't set selinux label, but we still record the MCS label so that
+		// the unused label can be freed later.
+		spec.Process.SelinuxLabel = ""
+	}
 
 	// Generate spec options that will be applied to the spec later.
 	specOpts, err := c.sandboxContainerSpecOpts(config, &image.ImageSpec.Config)
