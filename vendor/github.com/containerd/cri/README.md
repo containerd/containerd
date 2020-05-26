@@ -25,9 +25,9 @@ With it, you could run Kubernetes using containerd as the container runtime.
 `cri` is in GA:
 * It is feature complete.
 * It (the GA version) works with Kubernetes 1.10 and above.
-* It has passed all [CRI validation tests](https://github.com/kubernetes/community/blob/master/contributors/devel/cri-validation.md).
-* It has passed all [node e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-node-tests.md).
-* It has passed all [e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-tests.md).
+* It has passed all [CRI validation tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-validation.md).
+* It has passed all [node e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/e2e-node-tests.md).
+* It has passed all [e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/e2e-tests.md).
 
 See [test dashboard](https://k8s-testgrid.appspot.com/sig-node-containerd)
 ## Support Metrics
@@ -78,7 +78,7 @@ specifications as appropriate.
 backport version of `libseccomp-dev` is required. See [travis.yml](.travis.yml) for an example on trusty.
 * **btrfs development library.** Required by containerd btrfs support. `btrfs-tools`(Ubuntu, Debian) / `btrfs-progs-devel`(Fedora, CentOS, RHEL)
 2. Install **`pkg-config`** (required for linking with `libseccomp`).
-3. Install and setup a Go 1.13.10 development environment.
+3. Install and setup a Go 1.13.11 development environment.
 4. Make a local clone of this repository.
 5. Install binary dependencies by running the following command from your cloned `cri/` project directory:
 ```bash

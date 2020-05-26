@@ -25,6 +25,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/cri/pkg/store/label"
 	cni "github.com/containerd/go-cni"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -99,12 +100,13 @@ type criService struct {
 // NewCRIService returns a new instance of CRIService
 func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIService, error) {
 	var err error
+	labels := label.NewStore()
 	c := &criService{
 		config:             config,
 		client:             client,
 		os:                 osinterface.RealOS{},
-		sandboxStore:       sandboxstore.NewStore(),
-		containerStore:     containerstore.NewStore(),
+		sandboxStore:       sandboxstore.NewStore(labels),
+		containerStore:     containerstore.NewStore(labels),
 		imageStore:         imagestore.NewStore(client),
 		snapshotStore:      snapshotstore.NewStore(),
 		sandboxNameIndex:   registrar.NewRegistrar(),

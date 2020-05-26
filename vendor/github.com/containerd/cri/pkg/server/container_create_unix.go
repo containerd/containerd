@@ -31,6 +31,8 @@ import (
 	"github.com/containerd/containerd/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	selinux "github.com/opencontainers/selinux/go-selinux"
+	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
@@ -109,7 +111,7 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 
 func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint32, netNSPath string, containerName string,
 	config *runtime.ContainerConfig, sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig,
-	extraMounts []*runtime.Mount, ociRuntime config.Runtime) (*runtimespec.Spec, error) {
+	extraMounts []*runtime.Mount, ociRuntime config.Runtime) (_ *runtimespec.Spec, retErr error) {
 
 	specOpts := []oci.SpecOpts{
 		customopts.WithoutRunMount,
@@ -151,11 +153,30 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 	specOpts = append(specOpts, oci.WithEnv(env))
 
 	securityContext := config.GetLinux().GetSecurityContext()
-	selinuxOpt := securityContext.GetSelinuxOptions()
-	processLabel, mountLabel, err := initSelinuxOpts(selinuxOpt)
+	labelOptions, err := toLabel(securityContext.GetSelinuxOptions())
+	if err != nil {
+		return nil, err
+	}
+	if len(labelOptions) == 0 {
+		// Use pod level SELinux config
+		if sandbox, err := c.sandboxStore.Get(sandboxID); err == nil {
+			labelOptions, err = selinux.DupSecOpt(sandbox.ProcessLabel)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	processLabel, mountLabel, err := label.InitLabels(labelOptions)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to init selinux options %+v", securityContext.GetSelinuxOptions())
 	}
+	defer func() {
+		if retErr != nil {
+			_ = label.ReleaseLabel(processLabel)
+		}
+	}()
+
 	specOpts = append(specOpts, customopts.WithMounts(c.os, config, extraMounts, mountLabel))
 
 	if !c.config.DisableProcMount {
