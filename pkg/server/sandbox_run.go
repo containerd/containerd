@@ -29,7 +29,6 @@ import (
 	cni "github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -43,6 +42,7 @@ import (
 	"github.com/containerd/cri/pkg/netns"
 	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
 	"github.com/containerd/cri/pkg/util"
+	selinux "github.com/opencontainers/selinux/go-selinux"
 )
 
 func init() {
@@ -161,7 +161,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	sandbox.ProcessLabel = spec.Process.SelinuxLabel
 	defer func() {
 		if retErr != nil {
-			_ = label.ReleaseLabel(sandbox.ProcessLabel)
+			selinux.ReleaseLabel(sandbox.ProcessLabel)
 		}
 	}()
 

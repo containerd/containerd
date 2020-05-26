@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/opencontainers/selinux/go-selinux/label"
+	selinux "github.com/opencontainers/selinux/go-selinux"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -124,7 +124,7 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	}
 	defer func() {
 		if retErr != nil {
-			_ = label.ReleaseLabel(processLabel)
+			selinux.ReleaseLabel(processLabel)
 		}
 	}()
 

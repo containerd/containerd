@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	selinux "github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -159,7 +160,7 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 	if len(labelOptions) == 0 {
 		// Use pod level SELinux config
 		if sandbox, err := c.sandboxStore.Get(sandboxID); err == nil {
-			labelOptions, err = label.DupSecOpt(sandbox.ProcessLabel)
+			labelOptions, err = selinux.DupSecOpt(sandbox.ProcessLabel)
 			if err != nil {
 				return nil, err
 			}
