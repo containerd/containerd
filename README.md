@@ -25,9 +25,9 @@ With it, you could run Kubernetes using containerd as the container runtime.
 `cri` is in GA:
 * It is feature complete.
 * It (the GA version) works with Kubernetes 1.10 and above.
-* It has passed all [CRI validation tests](https://github.com/kubernetes/community/blob/master/contributors/devel/cri-validation.md).
-* It has passed all [node e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-node-tests.md).
-* It has passed all [e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-tests.md).
+* It has passed all [CRI validation tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-validation.md).
+* It has passed all [node e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/e2e-node-tests.md).
+* It has passed all [e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/e2e-tests.md).
 
 See [test dashboard](https://k8s-testgrid.appspot.com/sig-node-containerd)
 ## Support Metrics
