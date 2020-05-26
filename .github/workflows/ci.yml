@@ -249,8 +249,74 @@ jobs:
   #
   # Integration and CRI tests
   #
-  integration:
-    name: Integration
+  integration-windows:
+    name: Windows Integration
+    runs-on: windows-2019
+    timeout-minutes: 30
+    needs: [project, linters, protos, man]
+
+    strategy:
+      matrix:
+        runtime: [v1]
+
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: '1.13.11'
+
+      - name: Set env
+        shell: bash
+        run: |
+          echo "::set-env name=GOPATH::${{ github.workspace }}"
+          echo "::add-path::${{ github.workspace }}/src/github.com/containerd/containerd/bin"
+
+      - name: Checkout containerd
+        uses: actions/checkout@v2
+        with:
+          path: src/github.com/containerd/containerd
+      - name: Checkout Microsoft/hcsshim
+        uses: actions/checkout@v2
+        with:
+          repository: Microsoft/hcsshim
+          path: src/github.com/Microsoft/hcsshim
+
+      - name: Install Build Deps
+        shell: bash
+        run: |
+          cd src/github.com/containerd/containerd
+          script/setup/install-dev-tools
+      - name: Binaries
+        shell: bash
+        run: |
+          set -o xtrace
+          export CGO_ENABLED=1
+          cd src/github.com/containerd/containerd
+          mingw32-make.exe binaries
+          bindir="$(pwd)"
+          SHIM_COMMIT=$(grep Microsoft/hcsshim vendor.conf | awk '{print $2}')
+          cd ../../Microsoft/hcsshim
+          git fetch --tags origin "${SHIM_COMMIT}"
+          git checkout "${SHIM_COMMIT}"
+          GO111MODULE=on go build -mod=vendor -o "${bindir}/containerd-shim-runhcs-v1.exe" ./cmd/containerd-shim-runhcs-v1
+      - name: Integration 1
+        shell: bash
+        run: |
+          cp src/github.com/Microsoft/hcsshim/test/functional/manifest/rsrc_amd64.syso src/github.com/containerd/containerd/
+          cd src/github.com/containerd/containerd
+          export CGO_ENABLED=1
+          mingw32-make.exe integration
+      # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/175
+      - name: Integration 2
+        shell: bash
+        run: |
+          cd src/github.com/containerd/containerd
+          export TESTFLAGS_PARALLEL=1
+          export CGO_ENABLED=1
+          mingw32-make.exe integration
+
+  integration-linux:
+    name: Linux Integration
     runs-on: ubuntu-18.04
     timeout-minutes: 15
     needs: [project, linters, protos, man]
