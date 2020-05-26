@@ -66,6 +66,18 @@ var (
 			// compatible with "/etc/docker/certs.d"
 			Usage: "Custom hosts configuration directory",
 		},
+		cli.StringFlag{
+			Name:  "tlscacert",
+			Usage: "path to TLS root CA",
+		},
+		cli.StringFlag{
+			Name:  "tlscert",
+			Usage: "path to TLS client certificate",
+		},
+		cli.StringFlag{
+			Name:  "tlskey",
+			Usage: "path to TLS client key",
+		},
 	}
 
 	// ContainerFlags are cli flags specifying container options
