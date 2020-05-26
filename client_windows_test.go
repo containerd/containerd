@@ -17,16 +17,41 @@
 package containerd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/Microsoft/hcsshim/osversion"
 )
 
 const (
 	defaultAddress = `\\.\pipe\containerd-containerd-test`
-	testImage      = "mcr.microsoft.com/windows/nanoserver:sac2016"
 )
 
 var (
 	defaultRoot  = filepath.Join(os.Getenv("programfiles"), "containerd", "root-test")
 	defaultState = filepath.Join(os.Getenv("programfiles"), "containerd", "state-test")
+	testImage    string
+	shortCommand = withTrue()
+	longCommand  = withProcessArgs("ping", "-t", "localhost")
 )
+
+func init() {
+	b := osversion.Build()
+	switch b {
+	case osversion.RS1:
+		testImage = "mcr.microsoft.com/windows/nanoserver:sac2016"
+	case osversion.RS3:
+		testImage = "mcr.microsoft.com/windows/nanoserver:1709"
+	case osversion.RS4:
+		testImage = "mcr.microsoft.com/windows/nanoserver:1803"
+	case osversion.RS5:
+		testImage = "mcr.microsoft.com/windows/nanoserver:1809"
+	case osversion.V19H1:
+		testImage = "mcr.microsoft.com/windows/nanoserver:1903"
+	case 18363: // this isn't in osversion yet, but the image should be available
+		testImage = "mcr.microsoft.com/windows/nanoserver:1909"
+	}
+
+	fmt.Println("Windows test image:", testImage, ", Windows build version:", b)
+}
