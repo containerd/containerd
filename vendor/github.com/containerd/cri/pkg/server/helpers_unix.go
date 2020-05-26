@@ -93,47 +93,52 @@ func (c *criService) getSandboxDevShm(id string) string {
 	return filepath.Join(c.getVolatileSandboxRootDir(id), "shm")
 }
 
-func initSelinuxOpts(selinuxOpt *runtime.SELinuxOption) (string, string, error) {
-	if selinuxOpt == nil {
-		return "", "", nil
+func toLabel(selinuxOptions *runtime.SELinuxOption) ([]string, error) {
+	var labels []string
+
+	if selinuxOptions == nil {
+		return nil, nil
+	}
+	if err := checkSelinuxLevel(selinuxOptions.Level); err != nil {
+		return nil, err
+	}
+	if selinuxOptions.User != "" {
+		labels = append(labels, "user:"+selinuxOptions.User)
+	}
+	if selinuxOptions.Role != "" {
+		labels = append(labels, "role:"+selinuxOptions.Role)
+	}
+	if selinuxOptions.Type != "" {
+		labels = append(labels, "type:"+selinuxOptions.Type)
+	}
+	if selinuxOptions.Level != "" {
+		labels = append(labels, "level:"+selinuxOptions.Level)
 	}
 
-	// Should ignored selinuxOpts if they are incomplete.
-	if selinuxOpt.GetUser() == "" ||
-		selinuxOpt.GetRole() == "" ||
-		selinuxOpt.GetType() == "" {
-		return "", "", nil
-	}
+	return labels, nil
+}
 
-	// make sure the format of "level" is correct.
-	ok, err := checkSelinuxLevel(selinuxOpt.GetLevel())
-	if err != nil || !ok {
-		return "", "", err
-	}
-
-	labelOpts := fmt.Sprintf("%s:%s:%s:%s",
-		selinuxOpt.GetUser(),
-		selinuxOpt.GetRole(),
-		selinuxOpt.GetType(),
-		selinuxOpt.GetLevel())
-
-	options, err := label.DupSecOpt(labelOpts)
+func initLabelsFromOpt(selinuxOpts *runtime.SELinuxOption) (string, string, error) {
+	labels, err := toLabel(selinuxOpts)
 	if err != nil {
 		return "", "", err
 	}
-	return label.InitLabels(options)
+	return label.InitLabels(labels)
 }
 
-func checkSelinuxLevel(level string) (bool, error) {
+func checkSelinuxLevel(level string) error {
 	if len(level) == 0 {
-		return true, nil
+		return nil
 	}
 
-	matched, err := regexp.MatchString(`^s\d(-s\d)??(:c\d{1,4}((.c\d{1,4})?,c\d{1,4})*(.c\d{1,4})?(,c\d{1,4}(.c\d{1,4})?)*)?$`, level)
-	if err != nil || !matched {
-		return false, errors.Wrapf(err, "the format of 'level' %q is not correct", level)
+	matched, err := regexp.MatchString(`^s\d(-s\d)??(:c\d{1,4}(\.c\d{1,4})?(,c\d{1,4}(\.c\d{1,4})?)*)?$`, level)
+	if err != nil {
+		return errors.Wrapf(err, "the format of 'level' %q is not correct", level)
 	}
-	return true, nil
+	if !matched {
+		return fmt.Errorf("the format of 'level' %q is not correct", level)
+	}
+	return nil
 }
 
 func (c *criService) apparmorEnabled() bool {
