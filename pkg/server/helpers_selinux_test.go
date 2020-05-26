@@ -19,7 +19,6 @@
 package server
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/opencontainers/selinux/go-selinux"
@@ -35,23 +34,23 @@ func TestInitSelinuxOpts(t *testing.T) {
 	for desc, test := range map[string]struct {
 		selinuxOpt   *runtime.SELinuxOption
 		processLabel string
-		mountLabels  []string
+		mountLabel   string
 		expectErr    bool
 	}{
 		"Should return empty strings for processLabel and mountLabel when selinuxOpt is nil": {
 			selinuxOpt:   nil,
-			processLabel: "",
-			mountLabels:  []string{"", ""},
+			processLabel: ".*:c[0-9]{1,3},c[0-9]{1,3}",
+			mountLabel:   ".*:c[0-9]{1,3},c[0-9]{1,3}",
 		},
-		"Should return empty strings for processLabel and mountLabel when selinuxOpt has been initialized partially": {
+		"Should overlay fields on processLabel when selinuxOpt has been initialized partially": {
 			selinuxOpt: &runtime.SELinuxOption{
 				User:  "",
 				Role:  "user_r",
 				Type:  "",
 				Level: "s0:c1,c2",
 			},
-			processLabel: "",
-			mountLabels:  []string{"", ""},
+			processLabel: "system_u:user_r:(container_file_t|svirt_lxc_net_t):s0:c1,c2",
+			mountLabel:   "system_u:object_r:(container_file_t|svirt_sandbox_file_t):s0:c1,c2",
 		},
 		"Should be resolved correctly when selinuxOpt has been initialized completely": {
 			selinuxOpt: &runtime.SELinuxOption{
@@ -61,7 +60,7 @@ func TestInitSelinuxOpts(t *testing.T) {
 				Level: "s0:c1,c2",
 			},
 			processLabel: "user_u:user_r:user_t:s0:c1,c2",
-			mountLabels:  []string{"user_u:object_r:container_file_t:s0:c1,c2", "user_u:object_r:svirt_sandbox_file_t:s0:c1,c2"},
+			mountLabel:   "user_u:object_r:(container_file_t|svirt_sandbox_file_t):s0:c1,c2",
 		},
 		"Should be resolved correctly when selinuxOpt has been initialized with level=''": {
 			selinuxOpt: &runtime.SELinuxOption{
@@ -70,8 +69,8 @@ func TestInitSelinuxOpts(t *testing.T) {
 				Type:  "user_t",
 				Level: "",
 			},
-			processLabel: "user_u:user_r:user_t:s0",
-			mountLabels:  []string{"user_u:object_r:container_file_t:s0", "user_u:object_r:svirt_sandbox_file_t:s0"},
+			processLabel: "user_u:user_r:user_t:s0:c[0-9]{1,3},c[0-9]{1,3}",
+			mountLabel:   "user_u:object_r:(container_file_t|svirt_sandbox_file_t):s0",
 		},
 		"Should return error when the format of 'level' is not correct": {
 			selinuxOpt: &runtime.SELinuxOption{
@@ -84,20 +83,12 @@ func TestInitSelinuxOpts(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			processLabel, mountLabel, err := initSelinuxOpts(test.selinuxOpt)
+			processLabel, mountLabel, err := initLabelsFromOpt(test.selinuxOpt)
 			if test.expectErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
-				if test.selinuxOpt == nil || test.selinuxOpt.Level != "" {
-					assert.Equal(t, test.processLabel, processLabel)
-					assert.Contains(t, test.mountLabels, mountLabel)
-				} else {
-					assert.Equal(t, 0, strings.LastIndex(processLabel, test.processLabel))
-					contain := strings.LastIndex(mountLabel, test.mountLabels[0]) == 0 ||
-						strings.LastIndex(mountLabel, test.mountLabels[1]) == 0
-					assert.True(t, contain)
-				}
+				assert.Regexp(t, test.processLabel, processLabel)
+				assert.Regexp(t, test.mountLabel, mountLabel)
 			}
 		})
 	}
@@ -157,13 +148,11 @@ func TestCheckSelinuxLevel(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			ok, err := checkSelinuxLevel(test.level)
+			err := checkSelinuxLevel(test.level)
 			if test.expectNoMatch {
-				assert.NoError(t, err)
-				assert.False(t, ok)
+				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				assert.True(t, ok)
 			}
 		})
 	}

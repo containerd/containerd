@@ -28,6 +28,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	selinux "github.com/opencontainers/selinux/go-selinux"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -154,6 +155,18 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, errors.Wrapf(err, "failed to generate container %q spec", id)
 	}
 
+	meta.ProcessLabel = spec.Process.SelinuxLabel
+	if config.GetLinux().GetSecurityContext().GetPrivileged() {
+		// If privileged don't set the SELinux label but still record it on the container so
+		// the unused MCS label can be release later
+		spec.Process.SelinuxLabel = ""
+	}
+	defer func() {
+		if retErr != nil {
+			selinux.ReleaseLabel(spec.Process.SelinuxLabel)
+		}
+	}()
+
 	log.G(ctx).Debugf("Container %q spec: %#+v", id, spew.NewFormatter(spec))
 
 	// Set snapshotter before any other options.
@@ -275,10 +288,9 @@ func (c *criService) volumeMounts(containerRootDir string, criMounts []*runtime.
 		src := filepath.Join(containerRootDir, "volumes", volumeID)
 		// addOCIBindMounts will create these volumes.
 		mounts = append(mounts, &runtime.Mount{
-			ContainerPath: dst,
-			HostPath:      src,
-			// Use default mount propagation.
-			// TODO(random-liu): What about selinux relabel?
+			ContainerPath:  dst,
+			HostPath:       src,
+			SelinuxRelabel: true,
 		})
 	}
 	return mounts

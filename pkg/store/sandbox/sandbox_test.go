@@ -19,6 +19,7 @@ package sandbox
 import (
 	"testing"
 
+	"github.com/containerd/cri/pkg/store/label"
 	assertlib "github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
@@ -109,7 +110,7 @@ func TestSandboxStore(t *testing.T) {
 		Status{State: StateUnknown},
 	)
 	assert := assertlib.New(t)
-	s := NewStore()
+	s := NewStore(label.NewStore())
 
 	t.Logf("should be able to add sandbox")
 	for _, sb := range sandboxes {

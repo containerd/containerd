@@ -33,6 +33,7 @@ TARBALL := $(TARBALL_PREFIX)-$(VERSION).$(GOOS)-$(GOARCH).tar.gz
 ifneq ($(GOOS),windows)
 	BUILD_TAGS := seccomp apparmor selinux
 endif
+export BUILDTAGS := $(BUILD_TAGS)
 # Add `-TEST` suffix to indicate that all binaries built from this repo are for test.
 GO_LDFLAGS := -X $(PROJECT)/vendor/github.com/containerd/containerd/version.Version=$(VERSION)-TEST
 SOURCES := $(shell find cmd/ pkg/ vendor/ -name '*.go')
@@ -91,7 +92,7 @@ test: ## unit test
 	@echo "$(WHALE) $@"
 	$(GO) test -timeout=10m -race ./pkg/... \
 		-tags '$(BUILD_TAGS)' \
-	        -ldflags '$(GO_LDFLAGS)' \
+		-ldflags '$(GO_LDFLAGS)' \
 		-gcflags '$(GO_GCFLAGS)'
 
 $(BUILD_DIR)/integration.test: $(INTEGRATION_SOURCES)
@@ -162,7 +163,7 @@ else
 install.deps: .install.deps.linux ## install windows deps on linux
 endif
 
-.install.deps.linux: ## install dependencies of cri (default 'seccomp apparmor' BUILDTAGS for runc build)
+.install.deps.linux: ## install dependencies of cri
 	@echo "$(WHALE) $@"
 	@./hack/install/install-deps.sh
 

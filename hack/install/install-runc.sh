@@ -29,7 +29,7 @@ GOPATH=$(mktemp -d /tmp/cri-install-runc.XXXX)
 from-vendor RUNC github.com/opencontainers/runc
 checkout_repo ${RUNC_PKG} ${RUNC_VERSION} ${RUNC_REPO}
 cd ${GOPATH}/src/${RUNC_PKG}
-make static BUILDTAGS="$BUILDTAGS" VERSION=${RUNC_VERSION}
+make BUILDTAGS="$BUILDTAGS" VERSION=${RUNC_VERSION}
 ${SUDO} make install -e DESTDIR=${RUNC_DIR}
 
 # Clean the tmp GOPATH dir. Use sudo because runc build generates
