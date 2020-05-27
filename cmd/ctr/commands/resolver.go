@@ -20,7 +20,9 @@ import (
 	"bufio"
 	gocontext "context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io/ioutil"
 	"strings"
 
 	"github.com/containerd/console"
@@ -85,12 +87,11 @@ func GetResolver(ctx gocontext.Context, clicontext *cli.Context) (remotes.Resolv
 	if clicontext.Bool("plain-http") {
 		hostOptions.DefaultScheme = "http"
 	}
-
-	if clicontext.Bool("skip-verify") {
-		hostOptions.DefaultTLS = &tls.Config{
-			InsecureSkipVerify: true,
-		}
+	defaultTLS, err := resolverDefaultTLS(clicontext)
+	if err != nil {
+		return nil, err
 	}
+	hostOptions.DefaultTLS = defaultTLS
 	if hostDir := clicontext.String("hosts-dir"); hostDir != "" {
 		hostOptions.HostDir = config.HostDirFromRoot(hostDir)
 	}
@@ -98,4 +99,39 @@ func GetResolver(ctx gocontext.Context, clicontext *cli.Context) (remotes.Resolv
 	options.Hosts = config.ConfigureHosts(ctx, hostOptions)
 
 	return docker.NewResolver(options), nil
+}
+
+func resolverDefaultTLS(clicontext *cli.Context) (*tls.Config, error) {
+	config := &tls.Config{}
+
+	if clicontext.Bool("skip-verify") {
+		config.InsecureSkipVerify = true
+	}
+
+	if tlsRootPath := clicontext.String("tlscacert"); tlsRootPath != "" {
+		tlsRootData, err := ioutil.ReadFile(tlsRootPath)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to read %q", tlsRootPath)
+		}
+
+		config.RootCAs = x509.NewCertPool()
+		if !config.RootCAs.AppendCertsFromPEM(tlsRootData) {
+			return nil, fmt.Errorf("failed to load TLS CAs from %q: invalid data", tlsRootPath)
+		}
+	}
+
+	tlsCertPath := clicontext.String("tlscert")
+	tlsKeyPath := clicontext.String("tlskey")
+	if tlsCertPath != "" || tlsKeyPath != "" {
+		if tlsCertPath == "" || tlsKeyPath == "" {
+			return nil, errors.New("flags --tlscert and --tlskey must be set together")
+		}
+		keyPair, err := tls.LoadX509KeyPair(tlsCertPath, tlsKeyPath)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to load TLS client credentials (cert=%q, key=%q)", tlsCertPath, tlsKeyPath)
+		}
+		config.Certificates = []tls.Certificate{keyPair}
+	}
+
+	return config, nil
 }
