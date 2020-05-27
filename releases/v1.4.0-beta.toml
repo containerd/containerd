@@ -83,6 +83,7 @@ while driving toward ever increasing stability.
 * **Add support for 'container-name' OCI annotation** [cri#1436](https://github.com/containerd/cri/pull/1436)
 * **Remove socat for port forwarding** [cri#1470](https://github.com/containerd/cri/pull/1470)
 * **Add config flag to default empty seccomp profile** [cri#1472](https://github.com/containerd/cri/pull/1472)
+* **Add SELinux support** [cri#1487](https://github.com/containerd/cri/pull/1487)
 
 And many more improvements and bug fixes in the complete changelog"""
 
