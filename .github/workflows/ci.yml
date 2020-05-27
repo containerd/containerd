@@ -128,7 +128,7 @@ jobs:
       - name: Upload Integration Log File
         uses: actions/upload-artifact@v1
         with:
-          name: integration-test.log
+          name: integration-test-${{github.sha}}.log
           path: /tmp/test-integration/containerd.log
 
       - name: CRI Test
@@ -139,7 +139,7 @@ jobs:
       - name: Upload CRI Test log file
         uses: actions/upload-artifact@v1
         with:
-          name: cri-test.log
+          name: cri-test-${{github.sha}}.log
           path: /tmp/test-cri/containerd.log
 
   test-windows:
@@ -172,5 +172,5 @@ jobs:
       - name: Upload containerd log file
         uses: actions/upload-artifact@v1
         with:
-          name: cadvisor.log
+          name: cadvisor-${{github.sha}}.log
           path: c:\\_artifacts\\containerd.log
