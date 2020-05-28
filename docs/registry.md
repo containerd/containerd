@@ -86,3 +86,59 @@ The registry credential in this config will only be used when auth config is
 not specified by Kubernetes via CRI.
 
 After modify this config, you need restart the `containerd` service.
+
+### Configure Registry Credentials Example - GCR with _json_key Authentication
+
+Create a gcp account with gcr, do all the steps to enable receiving a
+pushed image for a gcr instance, including the generation and download of a
+new _json_key (for a new service account user.) To make sure your
+gcr registry is working with _json_key authentication let's login and
+push an image to your gcr instance: *This step is not necessary if you have
+already pushed an image to your gcr instance.*
+
+```bash
+$ docker login -u _json_key -p "$(cat key.json)" gcr.io
+$ docker push gcr.io/your-gcr-instance-id/busybox
+$ docker logout gcr.io
+```
+
+Generate a single line for the _json_key file that you downloaded:
+
+```bash
+jq -c . key.json
+```
+
+Edit the containerd config (default location is at /etc/containerd/config.toml)
+to add your _json_key authentication for gcr.io domain image pull
+requests:
+
+```
+[plugins."io.containerd.grpc.v1.cri".registry]
+  [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
+    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
+      endpoint = ["https://registry-1.docker.io"]
+    [plugins.cri.registry.mirrors."gcr.io"]
+      endpoint = ["https://gcr.io"]
+  [plugins."io.containerd.grpc.v1.cri".registry.configs]
+    [plugins."io.containerd.grpc.v1.cri".registry.configs."gcr.io".auth]
+      username = "_json_key"
+      password = 'paste output from jq'
+```
+
+Restart containerd
+
+```bash
+$ service containerd restart
+```
+
+Pull an image from your gcr instance with crictl:
+
+```bash
+$ sudo crictl pull gcr.io/your-gcr-instance-id/busybox
+DEBU[0000] get image connection
+DEBU[0000] connect using endpoint 'unix:///run/containerd/containerd.sock' with '3s' timeout
+DEBU[0000] connected successfully using endpoint: unix:///run/containerd/containerd.sock
+DEBU[0000] PullImageRequest: &PullImageRequest{Image:&ImageSpec{Image:gcr.io/your-gcr-instance-id/busybox,},Auth:nil,SandboxConfig:nil,}
+DEBU[0001] PullImageResponse: &PullImageResponse{ImageRef:sha256:78096d0a54788961ca68393e5f8038704b97d8af374249dc5c8faec1b8045e42,}
+Image is up to date for sha256:78096d0a54788961ca68393e5f8038704b97d8af374249dc5c8faec1b8045e42
+```
