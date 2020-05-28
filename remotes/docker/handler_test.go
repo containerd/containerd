@@ -19,6 +19,8 @@ package docker
 import (
 	"reflect"
 	"testing"
+
+	"github.com/containerd/containerd/reference"
 )
 
 func TestAppendDistributionLabel(t *testing.T) {
@@ -96,6 +98,34 @@ func TestCommonPrefixComponents(t *testing.T) {
 		},
 	} {
 		if got := commonPrefixComponents(tc.components, tc.target); !reflect.DeepEqual(got, tc.expected) {
+			t.Fatalf("expected %v, but got %v", tc.expected, got)
+		}
+	}
+}
+
+func TestSelectRepositoryMountCandidate(t *testing.T) {
+	for _, tc := range []struct {
+		refspec  reference.Spec
+		source   map[string]string
+		expected string
+	}{
+		{
+			refspec:  reference.Spec{},
+			source:   map[string]string{"": ""},
+			expected: "",
+		},
+		{
+			refspec:  reference.Spec{Locator: "user@host/path"},
+			source:   map[string]string{"containerd.io/distribution.source.host": "foo,path,bar"},
+			expected: "bar",
+		},
+		{
+			refspec:  reference.Spec{Locator: "user@host/path"},
+			source:   map[string]string{"containerd.io/distribution.source.host": "foo,bar,path"},
+			expected: "bar",
+		},
+	} {
+		if got := selectRepositoryMountCandidate(tc.refspec, tc.source); !reflect.DeepEqual(got, tc.expected) {
 			t.Fatalf("expected %v, but got %v", tc.expected, got)
 		}
 	}
