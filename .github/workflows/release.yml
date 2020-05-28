@@ -39,7 +39,7 @@ jobs:
         run: |
           RELEASEVER=${{ github.ref }}
           echo "::set-output name=stringver::${RELEASEVER#refs/tags/v}"
-          git tag -l ${RELEASEVER#refs/tags/} -n1000 | tail -n +3 | cut -c 5- >release-notes.md
+          git tag -l ${RELEASEVER#refs/tags/} -n20000 | tail -n +3 | cut -c 5- >release-notes.md
         working-directory: src/github.com/containerd/containerd
 
       - name: Save release notes
