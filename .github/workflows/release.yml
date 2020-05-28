@@ -79,12 +79,26 @@ jobs:
           repository: containerd/containerd
           ref: ${{ github.ref }}
           path: src/github.com/containerd/containerd
+      - name: Checkout Microsoft/hcsshim
+        if: startsWith(matrix.os, 'windows')
+        uses: actions/checkout@v2
+        with:
+          repository: Microsoft/hcsshim
+          path: src/github.com/Microsoft/hcsshim
 
       - name: Install Linux dependencies
         if: startsWith(matrix.os, 'ubuntu')
         run: |
           sudo apt-get install -y btrfs-tools libseccomp-dev
-
+      - name: Prepare hcsshim source
+        if: startsWith(matrix.os, 'windows')
+        shell: bash
+        working-directory: src/github.com/containerd/containerd
+        run: |
+          SHIM_COMMIT=$(grep Microsoft/hcsshim vendor.conf | awk '{print $2}')
+          cd ../../Microsoft/hcsshim
+          git fetch --tags origin "${SHIM_COMMIT}"
+          git checkout "${SHIM_COMMIT}"
       - name: Make
         shell: bash
         env:
@@ -95,6 +109,11 @@ jobs:
           make binaries
           [[ "${MOS}" =~ "windows" ]] && {
               OS=windows
+              (
+                bindir="$(pwd)/bin"
+                cd ../../Microsoft/hcsshim
+                GO111MODULE=on go build -mod=vendor -o "${bindir}/containerd-shim-runhcs-v1.exe" ./cmd/containerd-shim-runhcs-v1
+              )
           }
           TARFILE="containerd-${RELEASE_VER#v}-${OS}-amd64.tar.gz"
           tar czf ${TARFILE} bin/
