@@ -1203,3 +1203,45 @@ func TestPrivilegedDevices(t *testing.T) {
 		}
 	}
 }
+
+func TestBaseOCISpec(t *testing.T) {
+	c := newTestCRIService()
+	baseLimit := int64(100)
+	c.baseOCISpecs = map[string]*oci.Spec{
+		"/etc/containerd/cri-base.json": {
+			Process: &runtimespec.Process{
+				User: runtimespec.User{AdditionalGids: []uint32{9999}},
+				Capabilities: &runtimespec.LinuxCapabilities{
+					Permitted: []string{"CAP_SETUID"},
+				},
+			},
+			Linux: &runtimespec.Linux{
+				Resources: &runtimespec.LinuxResources{
+					Memory: &runtimespec.LinuxMemory{Limit: &baseLimit}, // Will be overwritten by `getCreateContainerTestData`
+				},
+			},
+		},
+	}
+
+	ociRuntime := config.Runtime{}
+	ociRuntime.BaseRuntimeSpec = "/etc/containerd/cri-base.json"
+
+	testID := "test-id"
+	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
+	testPid := uint32(1234)
+	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+
+	spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+	assert.NoError(t, err)
+
+	specCheck(t, testID, testSandboxID, testPid, spec)
+
+	assert.Contains(t, spec.Process.User.AdditionalGids, uint32(9999))
+	assert.Len(t, spec.Process.User.AdditionalGids, 3)
+
+	assert.Contains(t, spec.Process.Capabilities.Permitted, "CAP_SETUID")
+	assert.Len(t, spec.Process.Capabilities.Permitted, 1)
+
+	assert.Equal(t, *spec.Linux.Resources.Memory.Limit, containerConfig.Linux.Resources.MemoryLimitInBytes)
+}

@@ -297,12 +297,33 @@ func (c *criService) volumeMounts(containerRootDir string, criMounts []*runtime.
 }
 
 // runtimeSpec returns a default runtime spec used in cri-containerd.
-func runtimeSpec(id string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
+func (c *criService) runtimeSpec(id string, baseSpecFile string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
 	// GenerateSpec needs namespace.
 	ctx := ctrdutil.NamespacedContext()
-	spec, err := oci.GenerateSpec(ctx, nil, &containers.Container{ID: id}, opts...)
-	if err != nil {
-		return nil, err
+	container := &containers.Container{ID: id}
+
+	if baseSpecFile != "" {
+		baseSpec, ok := c.baseOCISpecs[baseSpecFile]
+		if !ok {
+			return nil, errors.Errorf("can't find base OCI spec %q", baseSpecFile)
+		}
+
+		spec := oci.Spec{}
+		if err := util.DeepCopy(&spec, &baseSpec); err != nil {
+			return nil, errors.Wrap(err, "failed to clone OCI spec")
+		}
+
+		if err := oci.ApplyOpts(ctx, nil, container, &spec, opts...); err != nil {
+			return nil, errors.Wrap(err, "failed to apply OCI options")
+		}
+
+		return &spec, nil
 	}
+
+	spec, err := oci.GenerateSpec(ctx, nil, container, opts...)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate spec")
+	}
+
 	return spec, nil
 }
