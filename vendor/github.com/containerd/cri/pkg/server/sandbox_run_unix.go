@@ -156,7 +156,7 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		customopts.WithAnnotation(annotations.SandboxLogDir, config.GetLogDirectory()),
 	)
 
-	return runtimeSpec(id, specOpts...)
+	return c.runtimeSpec(id, "", specOpts...)
 }
 
 // sandboxContainerSpecOpts generates OCI spec options for
