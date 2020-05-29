@@ -135,6 +135,13 @@ version = 2
       # i.e pass host devices through to privileged containers.
       privileged_without_host_devices = false
 
+      # base_runtime_spec is a file path to a JSON file with the OCI spec that will be used as the base spec that all
+      # container's are created from.
+      # Use containerd's `ctr oci spec > /etc/containerd/cri-base.json` to output initial spec file.
+      # Spec files are loaded at launch, so containerd daemon must be restared on any changes to refresh default specs.
+      # Still running containers and restarted containers will still be using the original spec from which that container was created.
+      base_runtime_spec = ""
+
       # 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options' is options specific to
       # "io.containerd.runc.v1" and "io.containerd.runc.v2". Its corresponding options type is:
       #   https://github.com/containerd/containerd/blob/v1.3.2/runtime/v2/runc/options/oci.pb.go#L26 .

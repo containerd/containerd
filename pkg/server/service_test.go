@@ -17,6 +17,15 @@
 package server
 
 import (
+	"encoding/json"
+	"io/ioutil"
+	"os"
+	"testing"
+
+	"github.com/containerd/containerd/oci"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	criconfig "github.com/containerd/cri/pkg/config"
 	ostesting "github.com/containerd/cri/pkg/os/testing"
 	"github.com/containerd/cri/pkg/registrar"
@@ -59,4 +68,35 @@ func newTestCRIService() *criService {
 		containerNameIndex: registrar.NewRegistrar(),
 		netPlugin:          servertesting.NewFakeCNIPlugin(),
 	}
+}
+
+func TestLoadBaseOCISpec(t *testing.T) {
+	spec := oci.Spec{Version: "1.0.2", Hostname: "default"}
+
+	file, err := ioutil.TempFile("", "spec-test-")
+	require.NoError(t, err)
+
+	defer func() {
+		assert.NoError(t, file.Close())
+		assert.NoError(t, os.RemoveAll(file.Name()))
+	}()
+
+	err = json.NewEncoder(file).Encode(&spec)
+	assert.NoError(t, err)
+
+	config := criconfig.Config{}
+	config.Runtimes = map[string]criconfig.Runtime{
+		"runc": {BaseRuntimeSpec: file.Name()},
+	}
+
+	specs, err := loadBaseOCISpecs(&config)
+	assert.NoError(t, err)
+
+	assert.Len(t, specs, 1)
+
+	out, ok := specs[file.Name()]
+	assert.True(t, ok, "expected spec with file name %q", file.Name())
+
+	assert.Equal(t, "1.0.2", out.Version)
+	assert.Equal(t, "default", out.Hostname)
 }

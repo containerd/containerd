@@ -52,6 +52,8 @@ type Runtime struct {
 	// PrivilegedWithoutHostDevices overloads the default behaviour for adding host devices to the
 	// runtime spec when the container is privileged. Defaults to false.
 	PrivilegedWithoutHostDevices bool `toml:"privileged_without_host_devices" json:"privileged_without_host_devices"`
+	// BaseRuntimeSpec is a json file with OCI spec to use as base spec that all container's will be created from.
+	BaseRuntimeSpec string `toml:"base_runtime_spec" json:"baseRuntimeSpec"`
 }
 
 // ContainerdConfig contains toml config related to containerd
