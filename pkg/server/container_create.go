@@ -313,7 +313,10 @@ func (c *criService) runtimeSpec(id string, baseSpecFile string, opts ...oci.Spe
 			return nil, errors.Wrap(err, "failed to clone OCI spec")
 		}
 
-		if err := oci.ApplyOpts(ctx, nil, container, &spec, opts...); err != nil {
+		// Fix up cgroups path
+		applyOpts := append([]oci.SpecOpts{oci.WithNamespacedCgroup()}, opts...)
+
+		if err := oci.ApplyOpts(ctx, nil, container, &spec, applyOpts...); err != nil {
 			return nil, errors.Wrap(err, "failed to apply OCI options")
 		}
 

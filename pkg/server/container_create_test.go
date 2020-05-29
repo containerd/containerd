@@ -29,6 +29,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	"github.com/containerd/cri/pkg/config"
+	"github.com/containerd/cri/pkg/constants"
 	"github.com/containerd/cri/pkg/containerd/opts"
 )
 
@@ -401,4 +402,6 @@ func TestBaseRuntimeSpec(t *testing.T) {
 	// Make sure original base spec not changed
 	assert.NotEqual(t, out, c.baseOCISpecs["/etc/containerd/cri-base.json"])
 	assert.Equal(t, c.baseOCISpecs["/etc/containerd/cri-base.json"].Hostname, "old")
+
+	assert.Equal(t, filepath.Join("/", constants.K8sContainerdNamespace, "id1"), out.Linux.CgroupsPath)
 }
