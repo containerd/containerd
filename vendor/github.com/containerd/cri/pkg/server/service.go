@@ -17,21 +17,25 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/cri/pkg/store/label"
 	cni "github.com/containerd/go-cni"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
+
+	"github.com/containerd/cri/pkg/store/label"
 
 	"github.com/containerd/cri/pkg/atomic"
 	criconfig "github.com/containerd/cri/pkg/config"
@@ -95,6 +99,8 @@ type criService struct {
 	// cniNetConfMonitor is used to reload cni network conf if there is
 	// any valid fs change events from cni network conf dir.
 	cniNetConfMonitor *cniNetConfSyncer
+	// baseOCISpecs contains cached OCI specs loaded via `Runtime.BaseRuntimeSpec`
+	baseOCISpecs map[string]*oci.Spec
 }
 
 // NewCRIService returns a new instance of CRIService
@@ -136,6 +142,12 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 	c.cniNetConfMonitor, err = newCNINetConfSyncer(c.config.NetworkPluginConfDir, c.netPlugin, c.cniLoadOptions())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create cni conf monitor")
+	}
+
+	// Preload base OCI specs
+	c.baseOCISpecs, err = loadBaseOCISpecs(&config)
+	if err != nil {
+		return nil, err
 	}
 
 	return c, nil
@@ -272,4 +284,42 @@ func (c *criService) register(s *grpc.Server) error {
 // Note that if containerd changes directory layout, we also needs to change this.
 func imageFSPath(rootDir, snapshotter string) string {
 	return filepath.Join(rootDir, fmt.Sprintf("%s.%s", plugin.SnapshotPlugin, snapshotter))
+}
+
+func loadOCISpec(filename string) (*oci.Spec, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to open base OCI spec: %s", filename)
+	}
+	defer file.Close()
+
+	spec := oci.Spec{}
+	if err := json.NewDecoder(file).Decode(&spec); err != nil {
+		return nil, errors.Wrap(err, "failed to parse base OCI spec file")
+	}
+
+	return &spec, nil
+}
+
+func loadBaseOCISpecs(config *criconfig.Config) (map[string]*oci.Spec, error) {
+	specs := map[string]*oci.Spec{}
+	for _, cfg := range config.Runtimes {
+		if cfg.BaseRuntimeSpec == "" {
+			continue
+		}
+
+		// Don't load same file twice
+		if _, ok := specs[cfg.BaseRuntimeSpec]; ok {
+			continue
+		}
+
+		spec, err := loadOCISpec(cfg.BaseRuntimeSpec)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to load base OCI spec from file: %s", cfg.BaseRuntimeSpec)
+		}
+
+		specs[cfg.BaseRuntimeSpec] = spec
+	}
+
+	return specs, nil
 }

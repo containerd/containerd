@@ -262,7 +262,7 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 				Type: runtimespec.CgroupNamespace,
 			}))
 	}
-	return runtimeSpec(id, specOpts...)
+	return c.runtimeSpec(id, ociRuntime.BaseRuntimeSpec, specOpts...)
 }
 
 func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {

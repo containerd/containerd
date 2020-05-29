@@ -67,7 +67,7 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		customopts.WithAnnotation(annotations.SandboxLogDir, config.GetLogDirectory()),
 	)
 
-	return runtimeSpec(id, specOpts...)
+	return c.runtimeSpec(id, "", specOpts...)
 }
 
 // No sandbox container spec options for windows yet.
