@@ -230,6 +230,10 @@ type PluginConfig struct {
 	// UnsetSeccompProfile is the profile containerd/cri will use If the provided seccomp profile is
 	// unset (`""`) for a container (default is `unconfined`)
 	UnsetSeccompProfile string `toml:"unset_seccomp_profile" json:"unsetSeccompProfile"`
+	// TolerateMissingHugePagesCgroupController if set to false will error out on create/update
+	// container requests with huge page limits if the cgroup controller for hugepages is not present.
+	// This helps with supporting Kubernetes <=1.18 out of the box. (default is `true`)
+	TolerateMissingHugePagesCgroupController bool `toml:"tolerate_missing_hugepages_controller" json:"tolerateMissingHugePagesCgroupController"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
