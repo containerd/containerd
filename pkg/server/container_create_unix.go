@@ -225,7 +225,7 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 	if c.config.DisableCgroup {
 		specOpts = append(specOpts, customopts.WithDisabledCgroups)
 	} else {
-		specOpts = append(specOpts, customopts.WithResources(config.GetLinux().GetResources()))
+		specOpts = append(specOpts, customopts.WithResources(config.GetLinux().GetResources(), c.config.TolerateMissingHugePagesCgroupController))
 		if sandboxConfig.GetLinux().GetCgroupParent() != "" {
 			cgroupsPath := getCgroupsPath(sandboxConfig.GetLinux().GetCgroupParent(), id)
 			specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
