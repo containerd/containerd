@@ -17,7 +17,7 @@
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
 
 # Not from vendor.conf.
-CRITOOL_VERSION=${CRITOOL_VERSION:-89384cc13a27bb9128553c9fe75a7cc07c6a95bb}
+CRITOOL_VERSION=${CRITOOL_VERSION:-75ef33dc2b4ecb08e0237d91de1b664909d262de}
 CRITOOL_PKG=github.com/kubernetes-sigs/cri-tools
 CRITOOL_REPO=github.com/kubernetes-sigs/cri-tools
 
