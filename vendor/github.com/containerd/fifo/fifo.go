@@ -41,6 +41,20 @@ type fifo struct {
 
 var leakCheckWg *sync.WaitGroup
 
+func OpenFifoWithDup2(ctx context.Context, fn string, flag int, perm os.FileMode, fd int) (io.ReadWriteCloser, error) {
+	f, err := openFifo(ctx, fn, flag, perm)
+
+	if err != nil {
+		return f, err
+	}
+
+	return f, syscall.Dup2(int(f.file.Fd()), fd)
+}
+
+func OpenFifo(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
+	return openFifo(ctx, fn, flag, perm)
+}
+
 // OpenFifo opens a fifo. Returns io.ReadWriteCloser.
 // Context can be used to cancel this function until open(2) has not returned.
 // Accepted flags:
@@ -51,7 +65,7 @@ var leakCheckWg *sync.WaitGroup
 // - syscall.O_NONBLOCK - return io.ReadWriteCloser even if other side of the
 //     fifo isn't open. read/write will be connected after the actual fifo is
 //     open or after fifo is closed.
-func OpenFifo(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
+func openFifo(ctx context.Context, fn string, flag int, perm os.FileMode) (*fifo, error) {
 	if _, err := os.Stat(fn); err != nil {
 		if os.IsNotExist(err) && flag&syscall.O_CREAT != 0 {
 			if err := mkfifo(fn, uint32(perm&os.ModePerm)); err != nil && !os.IsExist(err) {
