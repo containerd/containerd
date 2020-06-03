@@ -435,7 +435,7 @@ func loadFifos(response *tasks.GetResponse) *cio.FIFOSet {
 		)
 		for _, fifo := range fifos {
 			if isFifo, _ := sys.IsFifo(fifo); isFifo {
-				if rerr := os.Remove(fifo); err == nil {
+				if rerr := os.Remove(fifo); err == nil && !os.IsNotExist(rerr) {
 					err = rerr
 				}
 				dirs[filepath.Dir(fifo)] = struct{}{}
