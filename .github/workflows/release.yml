@@ -73,32 +73,29 @@ jobs:
           echo "::set-env name=GOPATH::${{ github.workspace }}"
           echo "::add-path::${{ github.workspace }}/bin"
 
-      - name: Checkout
+      - name: Checkout containerd
         uses: actions/checkout@v2
         with:
           repository: containerd/containerd
           ref: ${{ github.ref }}
           path: src/github.com/containerd/containerd
-      - name: Checkout Microsoft/hcsshim
-        if: startsWith(matrix.os, 'windows')
-        uses: actions/checkout@v2
-        with:
-          repository: Microsoft/hcsshim
-          path: src/github.com/Microsoft/hcsshim
-
       - name: Install Linux dependencies
         if: startsWith(matrix.os, 'ubuntu')
         run: |
           sudo apt-get install -y btrfs-tools libseccomp-dev
-      - name: Prepare hcsshim source
+      - name: HCS Shim commit
+        id: hcsshim_commit
         if: startsWith(matrix.os, 'windows')
         shell: bash
+        run: echo "::set-output name=sha::$(grep Microsoft/hcsshim vendor.conf | awk '{print $2}')"
         working-directory: src/github.com/containerd/containerd
-        run: |
-          SHIM_COMMIT=$(grep Microsoft/hcsshim vendor.conf | awk '{print $2}')
-          cd ../../Microsoft/hcsshim
-          git fetch --tags origin "${SHIM_COMMIT}"
-          git checkout "${SHIM_COMMIT}"
+      - name: Checkout hcsshim source
+        if: startsWith(matrix.os, 'windows')
+        uses: actions/checkout@v2
+        with:
+          repository: Microsoft/hcsshim
+          ref: ${{ steps.hcsshim_commit.outputs.sha }}
+          path: src/github.com/Microsoft/hcsshim
       - name: Make
         shell: bash
         env:
