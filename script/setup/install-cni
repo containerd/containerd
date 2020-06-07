@@ -28,13 +28,13 @@ CNI_CONFIG_DIR=${DESTDIR}/etc/cni/net.d
 go get -d github.com/containernetworking/plugins/...
 cd "$GOPATH"/src/github.com/containernetworking/plugins
 git checkout $CNI_COMMIT
-FASTBUILD=true ./build.sh
+./build_linux.sh
 sudo mkdir -p $CNI_DIR
 sudo cp -r ./bin $CNI_DIR
 sudo mkdir -p $CNI_CONFIG_DIR
 cat << EOF | sudo tee $CNI_CONFIG_DIR/10-containerd-net.conflist
 {
-  "cniVersion": "0.3.1",
+  "cniVersion": "0.4.0",
   "name": "containerd-net",
   "plugins": [
     {
@@ -50,7 +50,7 @@ cat << EOF | sudo tee $CNI_CONFIG_DIR/10-containerd-net.conflist
             "subnet": "10.88.0.0/16"
           }],
           [{
-            "subnet": "2001:4860:4860::8888/32"
+            "subnet": "2001:4860:4860::/64"
           }]
         ],
         "routes": [
