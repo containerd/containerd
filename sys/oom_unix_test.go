@@ -87,7 +87,7 @@ func adjustOom(adjustment int) (int, error) {
 }
 
 func waitForPid(process *os.Process) (int, error) {
-	c := make(chan int)
+	c := make(chan int, 1)
 	go func() {
 		for {
 			pid := process.Pid
