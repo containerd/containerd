@@ -70,6 +70,7 @@ type snapshotter struct {
 	root        string
 	ms          *storage.MetaStore
 	asyncRemove bool
+	indexOff    bool
 }
 
 // NewSnapshotter returns a Snapshotter which uses overlayfs. The overlayfs
@@ -102,10 +103,17 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		return nil, err
 	}
 
+	// figure out whether "index=off" option is recognized by the kernel
+	var indexOff bool
+	if _, err = os.Stat("/sys/module/overlay/parameters/index"); err == nil {
+		indexOff = true
+	}
+
 	return &snapshotter{
 		root:        root,
 		ms:          ms,
 		asyncRemove: config.asyncRemove,
+		indexOff:    indexOff,
 	}, nil
 }
 
@@ -464,6 +472,11 @@ func (o *snapshotter) mounts(s storage.Snapshot) []mount.Mount {
 		}
 	}
 	var options []string
+
+	// set index=off when mount overlayfs
+	if o.indexOff {
+		options = append(options, "index=off")
+	}
 
 	if s.Kind == snapshots.KindActive {
 		options = append(options,
