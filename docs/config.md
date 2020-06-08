@@ -45,6 +45,11 @@ version = 2
   # It generates a self-sign certificate unless the following x509_key_pair_streaming are both set.
   enable_tls_streaming = false
 
+  # ignore_image_defined_volumes ignores volumes defined by the image. Useful for better resource
+	# isolation, security and early detection of issues in the mount configuration when using
+	# ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
+  ignore_image_defined_volumes = false
+
   # 'plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming' contains a x509 valid key pair to stream with tls.
   [plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming]
     # tls_cert_file is the filepath to the certificate paired with the "tls_key_file"
