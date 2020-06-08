@@ -47,7 +47,7 @@ func arches() []specs.Arch {
 	}
 }
 
-// DefaultProfile defines the whitelist for the default seccomp profile.
+// DefaultProfile defines the allowed syscalls for the default seccomp profile.
 func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 	syscalls := []specs.LinuxSyscall{
 		{
