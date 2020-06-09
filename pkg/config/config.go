@@ -149,6 +149,8 @@ type Registry struct {
 	// be a valid url with host specified.
 	// DEPRECATED: Use Configs instead. Remove in containerd 1.4.
 	Auths map[string]AuthConfig `toml:"auths" json:"auths"`
+	// Headers adds additional HTTP headers that get sent to all registries
+	Headers map[string][]string `toml:"headers" json:"headers"`
 }
 
 // RegistryConfig contains configuration used to communicate with the registry.

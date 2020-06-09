@@ -209,6 +209,10 @@ version = 2
   # 'plugins."io.containerd.grpc.v1.cri".registry' contains config related to the registry
   [plugins."io.containerd.grpc.v1.cri".registry]
 
+    # 'plugins."io.containerd.grpc.v1.cri.registry.headers sets the http request headers to send for all registry requests
+    [plugins."io.containerd.grpc.v1.cri".registry.headers]
+        Foo = ["bar"]
+
     # 'plugins."io.containerd.grpc.v1.cri".registry.mirrors' are namespace to mirror mapping for all namespaces.
     [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
       [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
