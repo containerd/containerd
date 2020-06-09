@@ -195,3 +195,47 @@ func TestLogFileFailOnRelativePath(t *testing.T) {
 	_, err := LogFile("./file.txt")("!")
 	assert.Error(t, err, "absolute path needed")
 }
+
+func TestLogURIGenerator(t *testing.T) {
+	for _, tc := range []struct {
+		scheme   string
+		path     string
+		args     map[string]string
+		expected string
+		err      string
+	}{
+		{
+			scheme:   "fifo",
+			path:     "/full/path/pipe.fifo",
+			expected: "fifo:///full/path/pipe.fifo",
+		},
+		{
+			scheme: "file",
+			path:   "/full/path/file.txt",
+			args: map[string]string{
+				"maxSize": "100MB",
+			},
+			expected: "file:///full/path/file.txt?maxSize=100MB",
+		},
+		{
+			scheme: "binary",
+			path:   "/full/path/bin",
+			args: map[string]string{
+				"id": "testing",
+			},
+			expected: "binary:///full/path/bin?id=testing",
+		},
+		{
+			scheme: "unknown",
+			path:   "nowhere",
+			err:    "absolute path needed",
+		},
+	} {
+		uri, err := LogURIGenerator(tc.scheme, tc.path, tc.args)
+		if err != nil {
+			assert.Error(t, err, tc.err)
+			continue
+		}
+		assert.Equal(t, tc.expected, uri.String())
+	}
+}
