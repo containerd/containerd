@@ -21,7 +21,7 @@
 set -eu -o pipefail
 
 function install_runc() {
-	RUNC_COMMIT=$(grep opencontainers/runc "$GOPATH"/src/github.com/containerd/containerd/vendor.conf | awk '{print $2}')
+	RUNC_COMMIT="9748b48742fad065666bcded00f2db5ded7e44c1" # June 19, 2020
 
 	go get -d github.com/opencontainers/runc
 	cd "$GOPATH"/src/github.com/opencontainers/runc
