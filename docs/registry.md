@@ -31,7 +31,7 @@ As an example, for the image `gcr.io/library/busybox:latest`, the endpoints are:
 * `gcr.io` is configured: endpoints for `gcr.io` + default endpoint `https://gcr.io/v2`.
 * `*` is configured, and `gcr.io` is not: endpoints for `*` + default
   endpoint `https://gcr.io/v2`.
-* None of above is configured: default endpoint `https:/gcr.io/v2`.
+* None of above is configured: default endpoint `https://gcr.io/v2`.
 
 After modify this config, you need restart the `containerd` service.
 
