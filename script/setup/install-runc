@@ -26,5 +26,5 @@ RUNC_COMMIT=$(grep opencontainers/runc ${GOPATH}/src/github.com/containerd/conta
 go get -d github.com/opencontainers/runc
 cd $GOPATH/src/github.com/opencontainers/runc
 git checkout $RUNC_COMMIT
-make BUILDTAGS="apparmor seccomp" runc
+make BUILDTAGS="seccomp apparmor selinux" runc
 sudo make install
