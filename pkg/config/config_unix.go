@@ -66,5 +66,6 @@ func DefaultConfig() PluginConfig {
 		MaxConcurrentDownloads:                   3,
 		DisableProcMount:                         false,
 		TolerateMissingHugePagesCgroupController: true,
+		IgnoreImageDefinedVolumes:                false,
 	}
 }

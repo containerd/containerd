@@ -137,8 +137,13 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		}
 	}()
 
-	// Create container volumes mounts.
-	volumeMounts := c.volumeMounts(containerRootDir, config.GetMounts(), &image.ImageSpec.Config)
+	var volumeMounts []*runtime.Mount
+	if !c.config.IgnoreImageDefinedVolumes {
+		// Create container image volumes mounts.
+		volumeMounts = c.volumeMounts(containerRootDir, config.GetMounts(), &image.ImageSpec.Config)
+	} else if len(image.ImageSpec.Config.Volumes) != 0 {
+		log.G(ctx).Debugf("Ignoring volumes defined in image %v because IgnoreImageDefinedVolumes is set", image.ID)
+	}
 
 	// Generate container mounts.
 	mounts := c.containerMounts(sandboxID, config)
