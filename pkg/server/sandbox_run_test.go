@@ -175,6 +175,12 @@ func TestToCNIPortMappings(t *testing.T) {
 					HostPort:      8765,
 					HostIp:        "126.125.124.123",
 				},
+				{
+					Protocol:      runtime.Protocol_SCTP,
+					ContainerPort: 1234,
+					HostPort:      5678,
+					HostIp:        "123.124.125.126",
+				},
 			},
 			cniPortMappings: []cni.PortMapping{
 				{
@@ -188,6 +194,12 @@ func TestToCNIPortMappings(t *testing.T) {
 					ContainerPort: 4321,
 					Protocol:      "tcp",
 					HostIP:        "126.125.124.123",
+				},
+				{
+					HostPort:      5678,
+					ContainerPort: 1234,
+					Protocol:      "sctp",
+					HostIP:        "123.124.125.126",
 				},
 			},
 		},
@@ -216,12 +228,6 @@ func TestToCNIPortMappings(t *testing.T) {
 		},
 		"CRI port mapping with unsupported protocol should be skipped": {
 			criPortMappings: []*runtime.PortMapping{
-				{
-					Protocol:      runtime.Protocol_SCTP,
-					ContainerPort: 1234,
-					HostPort:      5678,
-					HostIp:        "123.124.125.126",
-				},
 				{
 					Protocol:      runtime.Protocol_TCP,
 					ContainerPort: 4321,
