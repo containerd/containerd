@@ -72,7 +72,8 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 				MemoryLimitInBytes: 400,
 			},
 			SecurityContext: &runtime.WindowsContainerSecurityContext{
-				RunAsUsername: "test-user",
+				RunAsUsername:  "test-user",
+				CredentialSpec: "{\"test\": \"spec\"}",
 			},
 		},
 	}
@@ -91,6 +92,7 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		Entrypoint: []string{"/entrypoint"},
 		Cmd:        []string{"cmd"},
 		WorkingDir: "/workspace",
+		User:       "ContainerUser",
 	}
 	specCheck := func(t *testing.T, id string, sandboxID string, sandboxPid uint32, spec *runtimespec.Spec) {
 		assert.Nil(t, spec.Root)
@@ -111,8 +113,12 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		assert.EqualValues(t, *spec.Windows.Resources.CPU.Maximum, 300)
 		assert.EqualValues(t, *spec.Windows.Resources.Memory.Limit, 400)
 
+		// Also checks if override of the image configs user is behaving.
 		t.Logf("Check username")
 		assert.Contains(t, spec.Process.User.Username, "test-user")
+
+		t.Logf("Check credential spec")
+		assert.Contains(t, spec.Windows.CredentialSpec, "{\"test\": \"spec\"}")
 
 		t.Logf("Check PodSandbox annotations")
 		assert.Contains(t, spec.Annotations, annotations.SandboxID)
