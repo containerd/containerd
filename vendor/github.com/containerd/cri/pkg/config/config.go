@@ -149,6 +149,8 @@ type Registry struct {
 	// be a valid url with host specified.
 	// DEPRECATED: Use Configs instead. Remove in containerd 1.4.
 	Auths map[string]AuthConfig `toml:"auths" json:"auths"`
+	// Headers adds additional HTTP headers that get sent to all registries
+	Headers map[string][]string `toml:"headers" json:"headers"`
 }
 
 // RegistryConfig contains configuration used to communicate with the registry.
@@ -234,6 +236,10 @@ type PluginConfig struct {
 	// container requests with huge page limits if the cgroup controller for hugepages is not present.
 	// This helps with supporting Kubernetes <=1.18 out of the box. (default is `true`)
 	TolerateMissingHugePagesCgroupController bool `toml:"tolerate_missing_hugepages_controller" json:"tolerateMissingHugePagesCgroupController"`
+	// IgnoreImageDefinedVolumes ignores volumes defined by the image. Useful for better resource
+	// isolation, security and early detection of issues in the mount configuration when using
+	// ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
+	IgnoreImageDefinedVolumes bool `toml:"ignore_image_defined_volumes" json:"ignoreImageDefinedVolumes"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
