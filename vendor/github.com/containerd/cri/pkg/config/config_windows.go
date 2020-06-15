@@ -64,7 +64,8 @@ func DefaultConfig() PluginConfig {
 				},
 			},
 		},
-		MaxConcurrentDownloads: 3,
+		MaxConcurrentDownloads:    3,
+		IgnoreImageDefinedVolumes: false,
 		// TODO(windows): Add platform specific config, so that most common defaults can be shared.
 	}
 }

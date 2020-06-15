@@ -414,9 +414,6 @@ func toCNIPortMappings(criPortMappings []*runtime.PortMapping) []cni.PortMapping
 		if mapping.HostPort <= 0 {
 			continue
 		}
-		if mapping.Protocol != runtime.Protocol_TCP && mapping.Protocol != runtime.Protocol_UDP {
-			continue
-		}
 		portMappings = append(portMappings, cni.PortMapping{
 			HostPort:      mapping.HostPort,
 			ContainerPort: mapping.ContainerPort,
