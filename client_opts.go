@@ -132,6 +132,14 @@ func WithPullUnpack(_ *Client, c *RemoteContext) error {
 	return nil
 }
 
+// WithDiscardContent is used to allow GC to clean layers up from
+// the content store after successfully unpacking these contents to
+// the snapshotter.
+func WithDiscardContent(_ *Client, c *RemoteContext) error {
+	c.DiscardContent = true
+	return nil
+}
+
 // WithUnpackOpts is used to add unpack options to the unpacker.
 func WithUnpackOpts(opts []UnpackOpt) RemoteOpt {
 	return func(_ *Client, c *RemoteContext) error {

@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -77,6 +78,7 @@ func (u *unpacker) unpack(
 	rCtx *RemoteContext,
 	h images.Handler,
 	config ocispec.Descriptor,
+	parentDesc ocispec.Descriptor,
 	layers []ocispec.Descriptor,
 ) error {
 	p, err := content.ReadBlob(ctx, u.c.ContentStore(), config)
@@ -245,6 +247,31 @@ EachLayer:
 		"chainID": chainID,
 	}).Debug("image unpacked")
 
+	if rCtx.DiscardContent {
+		// delete references to successfully unpacked layers
+		layersMap := map[string]struct{}{}
+		for _, desc := range layers {
+			layersMap[desc.Digest.String()] = struct{}{}
+		}
+		pinfo, err := cs.Info(ctx, parentDesc.Digest)
+		if err != nil {
+			return err
+		}
+		fields := []string{}
+		for k, v := range pinfo.Labels {
+			if strings.HasPrefix(k, "containerd.io/gc.ref.content.") {
+				if _, ok := layersMap[v]; ok {
+					// We've already unpacked this layer content
+					pinfo.Labels[k] = ""
+					fields = append(fields, "labels."+k)
+				}
+			}
+		}
+		if _, err := cs.Update(ctx, pinfo, fields...); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -287,6 +314,7 @@ func (u *unpacker) handlerWrapper(
 		var (
 			lock   sync.Mutex
 			layers = map[digest.Digest][]ocispec.Descriptor{}
+			parent = map[digest.Digest]ocispec.Descriptor{}
 		)
 		return images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 			children, err := f.Handle(ctx, desc)
@@ -312,6 +340,7 @@ func (u *unpacker) handlerWrapper(
 				lock.Lock()
 				for _, nl := range nonLayers {
 					layers[nl.Digest] = manifestLayers
+					parent[nl.Digest] = desc
 				}
 				lock.Unlock()
 
@@ -319,11 +348,12 @@ func (u *unpacker) handlerWrapper(
 			case images.MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig:
 				lock.Lock()
 				l := layers[desc.Digest]
+				p := parent[desc.Digest]
 				lock.Unlock()
 				if len(l) > 0 {
 					atomic.AddInt32(unpacks, 1)
 					eg.Go(func() error {
-						return u.unpack(uctx, rCtx, f, desc, l)
+						return u.unpack(uctx, rCtx, f, desc, p, l)
 					})
 				}
 			}

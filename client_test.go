@@ -29,13 +29,17 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/defaults"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/sys"
+	"github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/identity"
 	"github.com/sirupsen/logrus"
 )
 
@@ -212,6 +216,80 @@ func TestImagePull(t *testing.T) {
 	_, err = client.Pull(ctx, testImage, WithPlatformMatcher(platforms.Default()))
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestImagePullWithDiscardContent(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	ctx, cancel := testContext(t)
+	defer cancel()
+
+	ls := client.LeasesService()
+	l, err := ls.Create(ctx, leases.WithRandomID(), leases.WithExpiration(24*time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx = leases.WithLease(ctx, l.ID)
+	img, err := client.Pull(ctx, testImage,
+		WithPlatformMatcher(platforms.Default()),
+		WithPullUnpack,
+		WithDiscardContent,
+	)
+	// Synchronously garbage collect contents
+	if errL := ls.Delete(ctx, l, leases.SynchronousDelete); errL != nil {
+		t.Fatal(errL)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check if all layer contents have been unpacked and aren't preserved
+	var (
+		diffIDs []digest.Digest
+		layers  []digest.Digest
+	)
+	cs := client.ContentStore()
+	manifest, err := images.Manifest(ctx, cs, img.Target(), platforms.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(manifest.Layers) == 0 {
+		t.Fatalf("failed to get children from %v", img.Target())
+	}
+	for _, l := range manifest.Layers {
+		layers = append(layers, l.Digest)
+	}
+	config, err := images.Config(ctx, cs, img.Target(), platforms.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	diffIDs, err = images.RootFS(ctx, cs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(layers) != len(diffIDs) {
+		t.Fatalf("number of layers and diffIDs don't match: %d != %d", len(layers), len(diffIDs))
+	} else if len(layers) == 0 {
+		t.Fatalf("there is no layers in the target image(parent: %v)", img.Target())
+	}
+	var (
+		sn    = client.SnapshotService("")
+		chain []digest.Digest
+	)
+	for i, dgst := range layers {
+		chain = append(chain, diffIDs[i])
+		chainID := identity.ChainID(chain).String()
+		if _, err := sn.Stat(ctx, chainID); err != nil {
+			t.Errorf("snapshot %v must exist: %v", chainID, err)
+		}
+		if _, err := cs.Info(ctx, dgst); err == nil || !errdefs.IsNotFound(err) {
+			t.Errorf("content %v must be garbage collected: %v", dgst, err)
+		}
 	}
 }
 

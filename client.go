@@ -312,6 +312,11 @@ type RemoteContext struct {
 	// afterwards. Unpacking is required to run an image.
 	Unpack bool
 
+	// DiscardContent is a boolean flag to specify whether to allow GC to clean
+	// layers up from the content store after successfully unpacking these
+	// contents to the snapshotter.
+	DiscardContent bool
+
 	// UnpackOpts handles options to the unpack call.
 	UnpackOpts []UnpackOpt
 
