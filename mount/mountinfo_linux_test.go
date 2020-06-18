@@ -444,7 +444,9 @@ const (
 1046 30 253:1 /tmp/bar /tmp/"foo" rw,relatime shared:1 - ext4 /dev/mapper/ubuntu--vg-root rw,errors=remount-ro
 1060 30 253:1 /tmp/bar /tmp/\134"foo\134" rw,relatime shared:1 - ext4 /dev/mapper/ubuntu--vg-root rw,errors=remount-ro
 1060 30 253:1 /tmp/"what's\040up?" /tmp/foo rw,relatime shared:1 - ext4 /dev/mapper/ubuntu--vg-root rw,errors=remount-ro
-1100 1060 253:1 /tmp/'what's\040up?' /tmp/foo rw,relatime shared:1 - ext4 /dev/mapper/ubuntu--vg-root rw,errors=remount-ro`
+1100 1060 253:1 /tmp/'what's\040up?' /tmp/foo rw,relatime shared:1 - ext4 /dev/mapper/ubuntu--vg-root rw,errors=remount-ro` +
+		// Last must be appended because literal backticks are also valid.
+		"\n1047 30 253:1 /tmp/`foo` /tmp/bar rw,relatime shared:1 - ext4 /dev/mapper/ubuntu--vg-root rw,errors=remount-ro"
 )
 
 func TestParseFedoraMountinfo(t *testing.T) {
@@ -611,6 +613,19 @@ func TestParseMountinfoWithQuotes(t *testing.T) {
 			Minor:      1,
 			Root:       `/tmp/'what's up?'`,
 			Mountpoint: "/tmp/foo",
+			Options:    "rw,relatime",
+			Optional:   "shared:1",
+			FSType:     "ext4",
+			Source:     "/dev/mapper/ubuntu--vg-root",
+			VFSOptions: "rw,errors=remount-ro",
+		},
+		{
+			ID:         1047,
+			Parent:     30,
+			Major:      253,
+			Minor:      1,
+			Root:       "/tmp/`foo`",
+			Mountpoint: "/tmp/bar",
 			Options:    "rw,relatime",
 			Optional:   "shared:1",
 			FSType:     "ext4",
