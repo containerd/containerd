@@ -33,7 +33,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
+	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
 
 	"github.com/containerd/cri/pkg/store/label"
 
