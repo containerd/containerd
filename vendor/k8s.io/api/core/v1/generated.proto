@@ -459,7 +459,7 @@ message ConfigMap {
   // be updated (only object metadata can be modified).
   // If not set to true, the field can be modified at any time.
   // Defaulted to nil.
-  // This is an alpha field enabled by ImmutableEphemeralVolumes feature gate.
+  // This is a beta field enabled by ImmutableEphemeralVolumes feature gate.
   // +optional
   optional bool immutable = 4;
 
@@ -588,8 +588,10 @@ message ConfigMapVolumeSource {
   // +optional
   repeated KeyToPath items = 2;
 
-  // Optional: mode bits to use on created files by default. Must be a
-  // value between 0 and 0777. Defaults to 0644.
+  // Optional: mode bits used to set permissions on created files by default.
+  // Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+  // YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
+  // Defaults to 0644.
   // Directories within the path are not affected by this setting.
   // This might be in conflict with other options that affect the file
   // mode, like fsGroup, and the result can be other mode bits set.
@@ -957,8 +959,10 @@ message DownwardAPIVolumeFile {
   // +optional
   optional ResourceFieldSelector resourceFieldRef = 3;
 
-  // Optional: mode bits to use on this file, must be a value between 0
-  // and 0777. If not specified, the volume defaultMode will be used.
+  // Optional: mode bits used to set permissions on this file, must be an octal value
+  // between 0000 and 0777 or a decimal value between 0 and 511.
+  // YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
+  // If not specified, the volume defaultMode will be used.
   // This might be in conflict with other options that affect the file
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
@@ -973,7 +977,10 @@ message DownwardAPIVolumeSource {
   repeated DownwardAPIVolumeFile items = 1;
 
   // Optional: mode bits to use on created files by default. Must be a
-  // value between 0 and 0777. Defaults to 0644.
+  // Optional: mode bits used to set permissions on created files by default.
+  // Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+  // YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
+  // Defaults to 0644.
   // Directories within the path are not affected by this setting.
   // This might be in conflict with other options that affect the file
   // mode, like fsGroup, and the result can be other mode bits set.
@@ -1048,7 +1055,8 @@ message EndpointPort {
   // RFC-6335 and http://www.iana.org/assignments/service-names).
   // Non-standard protocols should use prefixed names such as
   // mycompany.com/my-custom-protocol.
-  // Field can be enabled with ServiceAppProtocol feature gate.
+  // This is a beta field that is guarded by the ServiceAppProtocol feature
+  // gate and enabled by default.
   // +optional
   optional string appProtocol = 4;
 }
@@ -1158,7 +1166,7 @@ message EnvVar {
 
 // EnvVarSource represents a source for the value of an EnvVar.
 message EnvVarSource {
-  // Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations,
+  // Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
   // spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
   // +optional
   optional ObjectFieldSelector fieldRef = 1;
@@ -1447,10 +1455,6 @@ message EventSeries {
 
   // Time of the last occurrence observed
   optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime lastObservedTime = 2;
-
-  // State of this Series: Ongoing or Finished
-  // Deprecated. Planned removal for 1.18
-  optional string state = 3;
 }
 
 // EventSource contains information for an event.
@@ -1880,8 +1884,10 @@ message KeyToPath {
   // May not start with the string '..'.
   optional string path = 2;
 
-  // Optional: mode bits to use on this file, must be a value between 0
-  // and 0777. If not specified, the volume defaultMode will be used.
+  // Optional: mode bits used to set permissions on this file.
+  // Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+  // YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
+  // If not specified, the volume defaultMode will be used.
   // This might be in conflict with other options that affect the file
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
@@ -2277,7 +2283,7 @@ message NodeProxyOptions {
 }
 
 // NodeResources is an object for conveying resource information about a node.
-// see http://releases.k8s.io/HEAD/docs/design/resources.md for more details.
+// see https://kubernetes.io/docs/concepts/architecture/nodes/#capacity for more details.
 message NodeResources {
   // Capacity represents the available resources of a node
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 1;
@@ -2431,7 +2437,7 @@ message NodeSystemInfo {
 
   // SystemUUID reported by the node. For unique machine identification
   // MachineID is preferred. This field is specific to Red Hat hosts
-  // https://access.redhat.com/documentation/en-US/Red_Hat_Subscription_Management/1/html/RHSM/getting-system-uuid.html
+  // https://access.redhat.com/documentation/en-us/red_hat_subscription_management/1/html/rhsm/uuid
   optional string systemUUID = 2;
 
   // Boot ID reported by the node.
@@ -3537,7 +3543,6 @@ message PodSpec {
 
   // TopologySpreadConstraints describes how a group of pods ought to spread across topology
   // domains. Scheduler will schedule pods in a way which abides by the constraints.
-  // This field is only honored by clusters that enable the EvenPodsSpread feature.
   // All topologySpreadConstraints are ANDed.
   // +optional
   // +patchMergeKey=topologyKey
@@ -3788,8 +3793,9 @@ message ProjectedVolumeSource {
   // list of volume projections
   repeated VolumeProjection sources = 1;
 
-  // Mode bits to use on created files by default. Must be a value between
-  // 0 and 0777.
+  // Mode bits used to set permissions on created files by default.
+  // Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+  // YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
   // Directories within the path are not affected by this setting.
   // This might be in conflict with other options that affect the file
   // mode, like fsGroup, and the result can be other mode bits set.
@@ -4299,7 +4305,7 @@ message Secret {
   // be updated (only object metadata can be modified).
   // If not set to true, the field can be modified at any time.
   // Defaulted to nil.
-  // This is an alpha field enabled by ImmutableEphemeralVolumes feature gate.
+  // This is a beta field enabled by ImmutableEphemeralVolumes feature gate.
   // +optional
   optional bool immutable = 5;
 
@@ -4419,8 +4425,10 @@ message SecretVolumeSource {
   // +optional
   repeated KeyToPath items = 2;
 
-  // Optional: mode bits to use on created files by default. Must be a
-  // value between 0 and 0777. Defaults to 0644.
+  // Optional: mode bits used to set permissions on created files by default.
+  // Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+  // YAML accepts both octal and decimal values, JSON requires decimal values
+  // for mode bits. Defaults to 0644.
   // Directories within the path are not affected by this setting.
   // This might be in conflict with other options that affect the file
   // mode, like fsGroup, and the result can be other mode bits set.
@@ -4634,7 +4642,8 @@ message ServicePort {
   // RFC-6335 and http://www.iana.org/assignments/service-names).
   // Non-standard protocols should use prefixed names such as
   // mycompany.com/my-custom-protocol.
-  // Field can be enabled with ServiceAppProtocol feature gate.
+  // This is a beta field that is guarded by the ServiceAppProtocol feature
+  // gate and enabled by default.
   // +optional
   optional string appProtocol = 6;
 
@@ -4994,8 +5003,8 @@ message TopologySelectorTerm {
 // TopologySpreadConstraint specifies how to spread matching pods among the given topology.
 message TopologySpreadConstraint {
   // MaxSkew describes the degree to which pods may be unevenly distributed.
-  // It's the maximum permitted difference between the number of matching pods in
-  // any two topology domains of a given topology type.
+  // When `whenUnsatisfiable=DoNotSchedule`, it is the maximum permitted difference
+  // between the number of matching pods in the target topology and the global minimum.
   // For example, in a 3-zone cluster, MaxSkew is set to 1, and pods with the same
   // labelSelector spread as 1/1/0:
   // +-------+-------+-------+
@@ -5007,6 +5016,8 @@ message TopologySpreadConstraint {
   // scheduling it onto zone1(zone2) would make the ActualSkew(2-0) on zone1(zone2)
   // violate MaxSkew(1).
   // - if MaxSkew is 2, incoming pod can be scheduled onto any zone.
+  // When `whenUnsatisfiable=ScheduleAnyway`, it is used to give higher precedence
+  // to topologies that satisfy it.
   // It's a required field. Default value is 1 and 0 is not allowed.
   optional int32 maxSkew = 1;
 
@@ -5019,10 +5030,13 @@ message TopologySpreadConstraint {
 
   // WhenUnsatisfiable indicates how to deal with a pod if it doesn't satisfy
   // the spread constraint.
-  // - DoNotSchedule (default) tells the scheduler not to schedule it
-  // - ScheduleAnyway tells the scheduler to still schedule it
-  // It's considered as "Unsatisfiable" if and only if placing incoming pod on any
-  // topology violates "MaxSkew".
+  // - DoNotSchedule (default) tells the scheduler not to schedule it.
+  // - ScheduleAnyway tells the scheduler to schedule the pod in any location,
+  //   but giving higher precedence to topologies that would help reduce the
+  //   skew.
+  // A constraint is considered "Unsatisfiable" for an incoming pod
+  // if and only if every possible node assigment for that pod would violate
+  // "MaxSkew" on some topology.
   // For example, in a 3-zone cluster, MaxSkew is set to 1, and pods with the same
   // labelSelector spread as 3/1/1:
   // +-------+-------+-------+
