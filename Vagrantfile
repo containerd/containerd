@@ -29,7 +29,7 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", inline: <<-SHELL
     set -eux -o pipefail
     # configuration
-    GO_VERSION="1.13.11"
+    GO_VERSION="1.13.12"
     RUNC_FLAVOR="crun"
 
     # install dnf deps
