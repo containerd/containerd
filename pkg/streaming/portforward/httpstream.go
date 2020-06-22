@@ -164,16 +164,6 @@ func (h *httpStreamHandler) monitorStreamPair(p *httpStreamPair, timeout <-chan 
 	h.removeStreamPair(p.requestID)
 }
 
-// hasStreamPair returns a bool indicating if a stream pair for requestID
-// exists.
-func (h *httpStreamHandler) hasStreamPair(requestID string) bool {
-	h.streamPairsLock.RLock()
-	defer h.streamPairsLock.RUnlock()
-
-	_, ok := h.streamPairs[requestID]
-	return ok
-}
-
 // removeStreamPair removes the stream pair identified by requestID from streamPairs.
 func (h *httpStreamHandler) removeStreamPair(requestID string) {
 	h.streamPairsLock.Lock()
