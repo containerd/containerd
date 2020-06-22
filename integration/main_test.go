@@ -36,9 +36,9 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/cri-api/pkg/apis"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 
+	"github.com/containerd/cri/integration/remote"
 	criconfig "github.com/containerd/cri/pkg/config"
 	"github.com/containerd/cri/pkg/constants"
 	"github.com/containerd/cri/pkg/server"
