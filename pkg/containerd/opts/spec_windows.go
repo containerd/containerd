@@ -22,6 +22,7 @@ import (
 	"context"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
@@ -47,6 +48,20 @@ func WithWindowsNetworkNamespace(path string) oci.SpecOpts {
 	}
 }
 
+// namedPipePath returns true if the given path is to a named pipe.
+func namedPipePath(p string) bool {
+	return strings.HasPrefix(p, `\\.\pipe\`)
+}
+
+// cleanMount returns a cleaned version of the mount path. The input is returned
+// as-is if it is a named pipe path.
+func cleanMount(p string) string {
+	if namedPipePath(p) {
+		return p
+	}
+	return filepath.Clean(p)
+}
+
 // WithWindowsMounts sorts and adds runtime and CRI mounts to the spec for
 // windows container.
 func WithWindowsMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount) oci.SpecOpts {
@@ -62,7 +77,7 @@ func WithWindowsMounts(osi osinterface.OS, config *runtime.ContainerConfig, extr
 		for _, e := range extra {
 			found := false
 			for _, c := range criMounts {
-				if filepath.Clean(e.ContainerPath) == filepath.Clean(c.ContainerPath) {
+				if cleanMount(e.ContainerPath) == cleanMount(c.ContainerPath) {
 					found = true
 					break
 				}
@@ -80,14 +95,14 @@ func WithWindowsMounts(osi osinterface.OS, config *runtime.ContainerConfig, extr
 		// mounts overridden by supplied mount;
 		mountSet := make(map[string]struct{})
 		for _, m := range mounts {
-			mountSet[filepath.Clean(m.ContainerPath)] = struct{}{}
+			mountSet[cleanMount(m.ContainerPath)] = struct{}{}
 		}
 
 		defaultMounts := s.Mounts
 		s.Mounts = nil
 
 		for _, m := range defaultMounts {
-			dst := filepath.Clean(m.Destination)
+			dst := cleanMount(m.Destination)
 			if _, ok := mountSet[dst]; ok {
 				// filter out mount overridden by a supplied mount
 				continue
@@ -100,17 +115,25 @@ func WithWindowsMounts(osi osinterface.OS, config *runtime.ContainerConfig, extr
 				dst = mount.GetContainerPath()
 				src = mount.GetHostPath()
 			)
-			// TODO(windows): Support special mount sources, e.g. named pipe.
-			// Create the host path if it doesn't exist.
-			if _, err := osi.Stat(src); err != nil {
-				// If the source doesn't exist, return an error instead
-				// of creating the source. This aligns with Docker's
-				// behavior on windows.
-				return errors.Wrapf(err, "failed to stat %q", src)
-			}
-			src, err := osi.ResolveSymbolicLink(src)
-			if err != nil {
-				return errors.Wrapf(err, "failed to resolve symlink %q", src)
+			// In the case of a named pipe mount on Windows, don't stat the file
+			// or do other operations that open it, as that could interfere with
+			// the listening process. filepath.Clean also breaks named pipe
+			// paths, so don't use it.
+			if !namedPipePath(src) {
+				if _, err := osi.Stat(src); err != nil {
+					// If the source doesn't exist, return an error instead
+					// of creating the source. This aligns with Docker's
+					// behavior on windows.
+					return errors.Wrapf(err, "failed to stat %q", src)
+				}
+				var err error
+				src, err = osi.ResolveSymbolicLink(src)
+				if err != nil {
+					return errors.Wrapf(err, "failed to resolve symlink %q", src)
+				}
+				// hcsshim requires clean path, especially '/' -> '\'.
+				src = filepath.Clean(src)
+				dst = filepath.Clean(dst)
 			}
 
 			var options []string
@@ -122,9 +145,8 @@ func WithWindowsMounts(osi osinterface.OS, config *runtime.ContainerConfig, extr
 				options = append(options, "rw")
 			}
 			s.Mounts = append(s.Mounts, runtimespec.Mount{
-				// hcsshim requires clean path, especially '/' -> '\'.
-				Source:      filepath.Clean(src),
-				Destination: filepath.Clean(dst),
+				Source:      src,
+				Destination: dst,
 				Options:     options,
 			})
 		}
