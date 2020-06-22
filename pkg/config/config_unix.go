@@ -20,7 +20,7 @@ package config
 
 import (
 	"github.com/containerd/containerd"
-	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
+	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
 )
 
 // DefaultConfig returns default configurations of cri plugin.
