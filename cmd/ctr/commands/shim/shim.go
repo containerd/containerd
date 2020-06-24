@@ -242,8 +242,8 @@ func getTaskService(context *cli.Context) (task.TaskService, error) {
 	ctx := namespaces.WithNamespace(gocontext.Background(), ns)
 	s2, _ := shim.SocketAddress(ctx, id)
 
-	for _, socket := range []string{s1, s2} {
-		conn, err := net.Dial("unix", "\x00"+socket)
+	for _, socket := range []string{"\x00" + s1, s2} {
+		conn, err := net.Dial("unix", socket)
 		if err == nil {
 			client := ttrpc.NewClient(conn)
 

@@ -37,6 +37,29 @@ import (
 
 var runtimePaths sync.Map
 
+const abstractSocketPrefix = "\x00"
+
+type socket string
+
+func (s socket) isAbstract() bool {
+	return !strings.HasPrefix(string(s), "unix://")
+}
+
+func (s socket) path() string {
+	path := strings.TrimPrefix(string(s), "unix://")
+	// if there was no trim performed, we assume an abstract socket
+	if len(path) == len(s) {
+		path = abstractSocketPrefix + path
+	}
+	return path
+}
+
+// IsAbstractSocket returns true if the address is pointing to an
+// abstract unix socket.
+func IsAbstractSocket(address string) bool {
+	return socket(address).isAbstract()
+}
+
 // Command returns the shim command with the provided args and configuration
 func Command(ctx context.Context, runtime, containerdAddress, containerdTTRPCAddress, path string, opts *types.Any, cmdArgs ...string) (*exec.Cmd, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
@@ -169,7 +192,7 @@ func WriteAddress(path, address string) error {
 // ErrNoAddress is returned when the address file has no content
 var ErrNoAddress = errors.New("no shim address")
 
-// ReadAddress returns the shim's abstract socket address from the path
+// ReadAddress returns the shim's socket address from the path
 func ReadAddress(path string) (string, error) {
 	path, err := filepath.Abs(path)
 	if err != nil {

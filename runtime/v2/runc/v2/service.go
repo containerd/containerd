@@ -189,6 +189,10 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 	}
 	socket, err := shim.NewSocket(address)
 	if err != nil {
+		// the only time where this would happen is if there is a bug and the socket
+		// was not cleaned up in the cleanup method of the shim or we are using the
+		// grouping functionality where the new process should be run with the same
+		// shim as an existing container
 		if strings.Contains(err.Error(), "address already in use") {
 			if err := shim.WriteAddress("address", address); err != nil {
 				return "", err
@@ -197,18 +201,24 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 		}
 		return "", err
 	}
-	defer socket.Close()
+	defer func() {
+		if retErr != nil {
+			socket.Close()
+			shim.RemoveSocket(address)
+		}
+	}()
 	f, err := socket.File()
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
 
 	cmd.ExtraFiles = append(cmd.ExtraFiles, f)
 
 	if err := cmd.Start(); err != nil {
+		f.Close()
 		return "", err
 	}
+	// f.Close()
 	defer func() {
 		if retErr != nil {
 			cmd.Process.Kill()
@@ -273,7 +283,9 @@ func (s *service) Cleanup(ctx context.Context) (*taskAPI.DeleteResponse, error) 
 	if err != nil {
 		return nil, err
 	}
-
+	if address, err := shim.ReadAddress("address"); err == nil {
+		shim.RemoveSocket(address)
+	}
 	runtime, err := runc.ReadRuntime(path)
 	if err != nil {
 		return nil, err
@@ -652,7 +664,9 @@ func (s *service) Shutdown(ctx context.Context, r *taskAPI.ShutdownRequest) (*pt
 	if s.platform != nil {
 		s.platform.Close()
 	}
-
+	if address, err := shim.ReadAddress("address"); err == nil {
+		shim.RemoveSocket(address)
+	}
 	return empty, nil
 }
 

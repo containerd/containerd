@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -137,14 +138,20 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 	}
 	socket, err := shim.NewSocket(address)
 	if err != nil {
-		return "", err
+		if !strings.Contains(err.Error(), "address already in use") {
+			return "", err
+		}
+		if err := shim.RemoveSocket(address); err != nil {
+			return "", errors.Wrap(err, "remove already used socket")
+		}
+		if socket, err = shim.NewSocket(address); err != nil {
+			return "", err
+		}
 	}
-	defer socket.Close()
 	f, err := socket.File()
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
 
 	cmd.ExtraFiles = append(cmd.ExtraFiles, f)
 
@@ -153,6 +160,7 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 	}
 	defer func() {
 		if err != nil {
+			shim.RemoveSocket(address)
 			cmd.Process.Kill()
 		}
 	}()
@@ -551,6 +559,9 @@ func (s *service) Connect(ctx context.Context, r *taskAPI.ConnectRequest) (*task
 func (s *service) Shutdown(ctx context.Context, r *taskAPI.ShutdownRequest) (*ptypes.Empty, error) {
 	s.cancel()
 	close(s.events)
+	if address, err := shim.ReadAddress("address"); err == nil {
+		shim.RemoveSocket(address)
+	}
 	return empty, nil
 }
 
