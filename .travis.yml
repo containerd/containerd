@@ -7,7 +7,7 @@ services:
 language: go
 
 go:
-  - "1.13.10"
+  - "1.13.12"
 os:
   - "linux"
   # TODO ppc64le is currently timing out on travis; see https://github.com/containerd/containerd/pull/2896
