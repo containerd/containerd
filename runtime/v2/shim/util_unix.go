@@ -25,7 +25,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
@@ -35,7 +34,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-const shimBinaryFormat = "containerd-shim-%s-%s"
+const (
+	shimBinaryFormat = "containerd-shim-%s-%s"
+	socketPathLimit  = 106
+)
 
 func getSysProcAttr() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{
@@ -63,20 +65,22 @@ func AdjustOOMScore(pid int) error {
 	return nil
 }
 
-// SocketAddress returns an abstract socket address
+// SocketAddress returns a socket address
 func SocketAddress(ctx context.Context, id string) (string, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return "", err
 	}
+	if err := os.MkdirAll("/run/containerd/s", 0660); err != nil {
+		return "", err
+	}
 	d := sha256.Sum256([]byte(filepath.Join(ns, id)))
-	return filepath.Join(string(filepath.Separator), "containerd-shim", fmt.Sprintf("%x.sock", d)), nil
+	return fmt.Sprintf("unix:///run/containerd/s/%x", d), nil
 }
 
-// AnonDialer returns a dialer for an abstract socket
+// AnonDialer returns a dialer for a socket
 func AnonDialer(address string, timeout time.Duration) (net.Conn, error) {
-	address = strings.TrimPrefix(address, "unix://")
-	return dialer.Dialer("\x00"+address, timeout)
+	return dialer.Dialer(socket(address).path(), timeout)
 }
 
 func AnonReconnectDialer(address string, timeout time.Duration) (net.Conn, error) {
@@ -85,12 +89,28 @@ func AnonReconnectDialer(address string, timeout time.Duration) (net.Conn, error
 
 // NewSocket returns a new socket
 func NewSocket(address string) (*net.UnixListener, error) {
-	if len(address) > 106 {
-		return nil, errors.Errorf("%q: unix socket path too long (> 106)", address)
+	var (
+		sock = socket(address)
+		path = sock.path()
+	)
+	if !sock.isAbstract() {
+		if err := os.MkdirAll(filepath.Dir(path), 0660); err != nil {
+			return nil, errors.Wrapf(err, "%s", path)
+		}
 	}
-	l, err := net.Listen("unix", "\x00"+address)
+	l, err := net.Listen("unix", path)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to listen to abstract unix socket %q", address)
+		return nil, err
 	}
 	return l.(*net.UnixListener), nil
+}
+
+// RemoveSocket removes the socket at the sepcified address if
+// it exists on the filesystem
+func RemoveSocket(address string) error {
+	sock := socket(address)
+	if !sock.isAbstract() {
+		return os.Remove(sock.path())
+	}
+	return nil
 }
