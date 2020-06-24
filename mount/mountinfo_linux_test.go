@@ -439,6 +439,14 @@ const (
 
 	mountInfoWithSpaces = `486 28 252:1 / /mnt/foo\040bar rw,relatime shared:243 - ext4 /dev/vda1 rw,data=ordered
 31 21 0:23 / /DATA/foo_bla_bla rw,relatime - cifs //foo/BLA\040BLA\040BLA/ rw,sec=ntlm,cache=loose,unc=\\foo\BLA BLA BLA,username=my_login,domain=mydomain.com,uid=12345678,forceuid,gid=12345678,forcegid,addr=10.1.30.10,file_mode=0755,dir_mode=0755,nounix,rsize=61440,wsize=65536,actimeo=1`
+
+	mountInfoWithQuotes = `1046 30 253:1 /tmp/bar /var/lib/kubelet/pods/98d150a4-d814-4d52-9068-b10f62d7a895/volumes/kubernetes.io~empty-dir/tmp-dir/"var rw,relatime shared:1 - ext4 /dev/mapper/ubuntu--vg-root rw,errors=remount-ro
+1046 30 253:1 /tmp/bar /tmp/"foo" rw,relatime shared:1 - ext4 /dev/mapper/ubuntu--vg-root rw,errors=remount-ro
+1060 30 253:1 /tmp/bar /tmp/\134"foo\134" rw,relatime shared:1 - ext4 /dev/mapper/ubuntu--vg-root rw,errors=remount-ro
+1060 30 253:1 /tmp/"what's\040up?" /tmp/foo rw,relatime shared:1 - ext4 /dev/mapper/ubuntu--vg-root rw,errors=remount-ro
+1100 1060 253:1 /tmp/'what's\040up?' /tmp/foo rw,relatime shared:1 - ext4 /dev/mapper/ubuntu--vg-root rw,errors=remount-ro` +
+		// Last must be appended because literal backticks are also valid.
+		"\n1047 30 253:1 /tmp/`foo` /tmp/bar rw,relatime shared:1 - ext4 /dev/mapper/ubuntu--vg-root rw,errors=remount-ro"
 )
 
 func TestParseFedoraMountinfo(t *testing.T) {
@@ -526,6 +534,103 @@ func TestParseMountinfoWithSpaces(t *testing.T) {
 			FSType:     "cifs",
 			Source:     `//foo/BLA\040BLA\040BLA/`,
 			VFSOptions: `rw,sec=ntlm,cache=loose,unc=\\foo\BLA`,
+		},
+	}
+
+	if len(infos) != len(expected) {
+		t.Fatalf("expected %d entries, got %d", len(expected), len(infos))
+	}
+	for i, mi := range expected {
+		if infos[i] != mi {
+			t.Fatalf("expected %#v, got %#v", mi, infos[i])
+		}
+	}
+}
+
+func TestParseMountinfoWithQuotes(t *testing.T) {
+	r := bytes.NewBuffer([]byte(mountInfoWithQuotes))
+	infos, err := parseInfoFile(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := []Info{
+		{
+			ID:         1046,
+			Parent:     30,
+			Major:      253,
+			Minor:      1,
+			Root:       "/tmp/bar",
+			Mountpoint: `/var/lib/kubelet/pods/98d150a4-d814-4d52-9068-b10f62d7a895/volumes/kubernetes.io~empty-dir/tmp-dir/"var`,
+			Options:    "rw,relatime",
+			Optional:   "shared:1",
+			FSType:     "ext4",
+			Source:     "/dev/mapper/ubuntu--vg-root",
+			VFSOptions: "rw,errors=remount-ro",
+		},
+		{
+			ID:         1046,
+			Parent:     30,
+			Major:      253,
+			Minor:      1,
+			Root:       "/tmp/bar",
+			Mountpoint: `/tmp/"foo"`,
+			Options:    "rw,relatime",
+			Optional:   "shared:1",
+			FSType:     "ext4",
+			Source:     "/dev/mapper/ubuntu--vg-root",
+			VFSOptions: "rw,errors=remount-ro",
+		},
+		{
+			ID:         1060,
+			Parent:     30,
+			Major:      253,
+			Minor:      1,
+			Root:       "/tmp/bar",
+			Mountpoint: `/tmp/\"foo\"`,
+			Options:    "rw,relatime",
+			Optional:   "shared:1",
+			FSType:     "ext4",
+			Source:     "/dev/mapper/ubuntu--vg-root",
+			VFSOptions: "rw,errors=remount-ro",
+		},
+		{
+			ID:         1060,
+			Parent:     30,
+			Major:      253,
+			Minor:      1,
+			Root:       `/tmp/"what's up?"`,
+			Mountpoint: "/tmp/foo",
+			Options:    "rw,relatime",
+			Optional:   "shared:1",
+			FSType:     "ext4",
+			Source:     "/dev/mapper/ubuntu--vg-root",
+			VFSOptions: "rw,errors=remount-ro",
+		},
+		{
+			ID:         1100,
+			Parent:     1060,
+			Major:      253,
+			Minor:      1,
+			Root:       `/tmp/'what's up?'`,
+			Mountpoint: "/tmp/foo",
+			Options:    "rw,relatime",
+			Optional:   "shared:1",
+			FSType:     "ext4",
+			Source:     "/dev/mapper/ubuntu--vg-root",
+			VFSOptions: "rw,errors=remount-ro",
+		},
+		{
+			ID:         1047,
+			Parent:     30,
+			Major:      253,
+			Minor:      1,
+			Root:       "/tmp/`foo`",
+			Mountpoint: "/tmp/bar",
+			Options:    "rw,relatime",
+			Optional:   "shared:1",
+			FSType:     "ext4",
+			Source:     "/dev/mapper/ubuntu--vg-root",
+			VFSOptions: "rw,errors=remount-ro",
 		},
 	}
 
