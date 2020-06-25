@@ -37,6 +37,7 @@ const (
 	MediaTypeDockerSchema2Config           = "application/vnd.docker.container.image.v1+json"
 	MediaTypeDockerSchema2Manifest         = "application/vnd.docker.distribution.manifest.v2+json"
 	MediaTypeDockerSchema2ManifestList     = "application/vnd.docker.distribution.manifest.list.v2+json"
+	MediaTypeDockerPluginConfig            = "application/vnd.docker.plugin.v1+json"
 	// Checkpoint/Restore Media Types
 	MediaTypeContainerd1Checkpoint               = "application/vnd.containerd.container.criu.checkpoint.criu.tar"
 	MediaTypeContainerd1CheckpointPreDump        = "application/vnd.containerd.container.criu.checkpoint.predump.tar"
@@ -119,7 +120,8 @@ func IsLayerType(mt string) bool {
 func IsKnownConfig(mt string) bool {
 	switch mt {
 	case MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig,
-		MediaTypeContainerd1Checkpoint, MediaTypeContainerd1CheckpointConfig:
+		MediaTypeContainerd1Checkpoint, MediaTypeContainerd1CheckpointConfig,
+		MediaTypeDockerPluginConfig:
 		return true
 	}
 	return false
