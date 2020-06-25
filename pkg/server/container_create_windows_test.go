@@ -167,3 +167,23 @@ func TestMountCleanPath(t *testing.T) {
 	specCheck(t, testID, testSandboxID, testPid, spec)
 	checkMount(t, spec.Mounts, "c:\\test\\host-path", "c:\\test\\container-path", "", []string{"rw"}, nil)
 }
+
+func TestMountNamedPipe(t *testing.T) {
+	testID := "test-id"
+	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
+	testPid := uint32(1234)
+	nsPath := "test-cni"
+	c := newTestCRIService()
+
+	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	containerConfig.Mounts = append(containerConfig.Mounts, &runtime.Mount{
+		ContainerPath: `\\.\pipe\foo`,
+		HostPath:      `\\.\pipe\foo`,
+	})
+	spec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, testContainerName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
+	assert.NoError(t, err)
+	assert.NotNil(t, spec)
+	specCheck(t, testID, testSandboxID, testPid, spec)
+	checkMount(t, spec.Mounts, `\\.\pipe\foo`, `\\.\pipe\foo`, "", []string{"rw"}, nil)
+}
