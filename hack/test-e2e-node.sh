@@ -62,12 +62,7 @@ fi
 GOPATH=${GOPATH%%:*}
 
 # Get kubernetes
-from-vendor KUBERNETES k8s.io/kubernetes
-# k8s.io is actually a redirect, but we do not handle the go-import
-# metadata which `go get` and `vndr` etc do. Handle it manually here.
-if [ x"$KUBERNETES_REPO" = "xk8s.io" ] ; then
-  KUBERNETES_REPO="https://github.com/kubernetes/kubernetes"
-fi
+KUBERNETES_REPO="https://github.com/kubernetes/kubernetes"
 KUBERNETES_PATH="${GOPATH}/src/k8s.io/kubernetes"
 if [ ! -d "${KUBERNETES_PATH}" ]; then
   mkdir -p ${KUBERNETES_PATH}
