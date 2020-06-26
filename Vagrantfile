@@ -33,16 +33,21 @@ Vagrant.configure("2") do |config|
     RUNC_FLAVOR="crun"
 
     # install dnf deps
-    dnf install -y gcc git libseccomp-devel lsof make
+    dnf install -y container-selinux gcc git iptables libseccomp-devel lsof make
 
     # install Go
     curl -fsSL "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar Cxz /usr/local
 
     # setup env vars
-    cat >> /etc/profile.d/sh.local <<EOF
+    cat >> /etc/environment <<EOF
 PATH=/usr/local/go/bin:$PATH
 GO111MODULE=off
-export PATH GO111MODULE
+EOF
+    source /etc/environment
+    cat >> /etc/profile.d/sh.local <<EOF
+GOPATH=\\$HOME/go
+PATH=\\$GOPATH/bin:\\$PATH
+export GOPATH PATH
 EOF
     source /etc/profile.d/sh.local
 
@@ -51,11 +56,27 @@ EOF
     ln -s /vagrant /root/go/src/github.com/containerd/containerd
     cd /root/go/src/github.com/containerd/containerd
 
-    # install runc (or crun)
+    # install runc (or crun) and other components
     RUNC_FLAVOR=$RUNC_FLAVOR ./script/setup/install-runc
+    ./script/setup/install-cni
+    ./script/setup/install-critools
 
     # install containerd
-    make BUILDTAGS="no_aufs no_btrfs no_devmapper no_zfs" binaries install
+    make BUILDTAGS="seccomp selinux no_aufs no_btrfs no_devmapper no_zfs" binaries install
+
+    # FIXME: enable SELinux
+    setenforce 0
+    umount /sys/fs/selinux
+
+    # create the daemon config
+    mkdir -p /etc/containerd
+    cat > /etc/containerd/config.toml <<EOF
+version = 2
+[plugins]
+  [plugins."io.containerd.grpc.v1.cri"]
+# FIXME: enable SELinux
+    enable_selinux = false
+EOF
 
     # create /integration.sh
     cat > /integration.sh <<EOF
@@ -65,5 +86,19 @@ cd /root/go/src/github.com/containerd/containerd
 make integration EXTRA_TESTFLAGS=-no-criu TEST_RUNTIME=io.containerd.runc.v2 RUNC_FLAVOR=$RUNC_FLAVOR
 EOF
     chmod +x /integration.sh
+
+    # create /critest.sh
+    cat > /critest.sh <<EOF
+#!/bin/bash
+set -eux -o pipefail
+containerd -log-level debug &> /tmp/containerd-cri.log &
+critest --runtime-endpoint=unix:///var/run/containerd/containerd.sock --parallel=2
+TEST_RC=\\$?
+test \\$TEST_RC -ne 0 && cat /tmp/containerd-cri.log
+pkill containerd
+rm -rf /etc/containerd
+exit \\$TEST_RC
+EOF
+    chmod +x /critest.sh
  SHELL
 end

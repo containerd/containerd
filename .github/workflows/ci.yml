@@ -442,3 +442,6 @@ jobs:
 
       - name: Integration
         run: vagrant ssh default -- sudo -i /integration.sh
+
+      - name: CRI test
+        run: vagrant ssh default -- sudo -i /critest.sh
