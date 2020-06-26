@@ -1,0 +1,28 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.3.4"
+
+pre_release = false
+
+preface = """\
+The fifth patch release for `containerd` 1.3 includes bug fixes related to clean-up of I/O and shim processes.
+
+### Notable Updates
+
+* Cleanup allocated resources in case of a binary I/O error [containerd/containerd#4278](https://github.com/containerd/containerd/pull/4278)
+* Fix image usage calculation error [containerd/containerd#4276](https://github.com/containerd/containerd/pull/4276)
+* Make killing shims more resilient [containerd/containerd#4307](https://github.com/containerd/containerd/pull/4307)
+* shim v2 runc: propagate options.Root to Cleanup [containerd/containerd#4329](https://github.com/containerd/containerd/pull/4329)
+* Bump Golang 1.13.12 [containerd/containerd#4337](https://github.com/containerd/containerd/pull/4337)
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
