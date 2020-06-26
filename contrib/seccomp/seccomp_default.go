@@ -255,6 +255,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"renameat2",
 				"restart_syscall",
 				"rmdir",
+				"rseq",
 				"rt_sigaction",
 				"rt_sigpending",
 				"rt_sigprocmask",
