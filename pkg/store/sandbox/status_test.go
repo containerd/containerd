@@ -18,6 +18,7 @@ package sandbox
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -58,4 +59,12 @@ func TestStatus(t *testing.T) {
 	})
 	assert.NoError(err)
 	assert.Equal(updateStatus, s.Get())
+}
+
+func TestStateStringConversion(t *testing.T) {
+	assert := assertlib.New(t)
+	assert.Equal("SANDBOX_READY", fmt.Sprintf("%s", StateReady))
+	assert.Equal("SANDBOX_NOTREADY", fmt.Sprintf("%s", StateNotReady))
+	assert.Equal("SANDBOX_UNKNOWN", fmt.Sprintf("%s", StateUnknown))
+	assert.Equal("invalid sandbox state value: 123", fmt.Sprintf("%s", State(123)))
 }
