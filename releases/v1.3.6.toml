@@ -1,0 +1,26 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.3.5"
+
+pre_release = false
+
+preface = """\
+The sixth patch release for `containerd` 1.3 includes a release process fix to not require the latest libseccomp. Prior
+releases in this series were pinned to libseccomp 2.3.3 and this update corrects the error in the v1.3.5 release which
+linked to the latest libseccomp.
+
+### Notable Updates
+
+* Pin libseccomp to 2.3.3 for the GH Actions-based release.yml [containerd/containerd#4352](https://github.com/containerd/containerd/pull/4352)
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
