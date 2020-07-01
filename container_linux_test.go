@@ -723,11 +723,15 @@ func (f *directIO) Cancel() {
 // Close closes all open fds
 func (f *directIO) Close() error {
 	err := f.Stdin.Close()
-	if err2 := f.Stdout.Close(); err == nil {
-		err = err2
+	if f.Stdout != nil {
+		if err2 := f.Stdout.Close(); err == nil {
+			err = err2
+		}
 	}
-	if err2 := f.Stderr.Close(); err == nil {
-		err = err2
+	if f.Stderr != nil {
+		if err2 := f.Stderr.Close(); err == nil {
+			err = err2
+		}
 	}
 	return err
 }
