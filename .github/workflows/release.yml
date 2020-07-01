@@ -82,6 +82,7 @@ jobs:
       - name: Install Linux dependencies
         if: startsWith(matrix.os, 'ubuntu')
         run: |
+          sudo apt-get update
           sudo apt-get install -y btrfs-tools
           sudo script/setup/install-seccomp
         working-directory: src/github.com/containerd/containerd
@@ -148,13 +149,13 @@ jobs:
           done
       - name: Create Release
         id: create_release
-        uses: jbolda/create-release@v1.1.0
+        uses: actions/create-release@v1.1.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.ref }}
           release_name: containerd ${{ needs.check.outputs.stringver }}
-          bodyFromFile: ./builds/containerd-release-notes/release-notes.md
+          body_path: ./builds/containerd-release-notes/release-notes.md
           draft: false
           prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
       - name: Upload Linux containerd tarball
