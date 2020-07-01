@@ -1,12 +1,13 @@
 package internal
 
 import (
+	"errors"
+	"fmt"
+	"os"
 	"runtime"
 	"strconv"
 
 	"github.com/cilium/ebpf/internal/unix"
-
-	"github.com/pkg/errors"
 )
 
 var ErrClosedFd = errors.New("use of closed file descriptor")
@@ -56,8 +57,13 @@ func (fd *FD) Dup() (*FD, error) {
 
 	dup, err := unix.FcntlInt(uintptr(fd.raw), unix.F_DUPFD_CLOEXEC, 0)
 	if err != nil {
-		return nil, errors.Wrap(err, "can't dup fd")
+		return nil, fmt.Errorf("can't dup fd: %v", err)
 	}
 
 	return NewFD(uint32(dup)), nil
+}
+
+func (fd *FD) File(name string) *os.File {
+	fd.Forget()
+	return os.NewFile(uintptr(fd.raw), name)
 }

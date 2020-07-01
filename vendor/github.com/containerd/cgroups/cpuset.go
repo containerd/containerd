@@ -26,7 +26,7 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
-func NewCputset(root string) *cpusetController {
+func NewCpuset(root string) *cpusetController {
 	return &cpusetController{
 		root: filepath.Join(root, string(Cpuset)),
 	}

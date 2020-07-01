@@ -1,9 +1,13 @@
 package ebpf
 
 import (
+	"errors"
+	"fmt"
+	"math"
+
 	"github.com/cilium/ebpf/asm"
+	"github.com/cilium/ebpf/internal"
 	"github.com/cilium/ebpf/internal/btf"
-	"github.com/pkg/errors"
 )
 
 // CollectionOptions control loading a collection into the kernel.
@@ -37,6 +41,89 @@ func (cs *CollectionSpec) Copy() *CollectionSpec {
 	}
 
 	return &cpy
+}
+
+// RewriteMaps replaces all references to specific maps.
+//
+// Use this function to use pre-existing maps instead of creating new ones
+// when calling NewCollection. Any named maps are removed from CollectionSpec.Maps.
+//
+// Returns an error if a named map isn't used in at least one program.
+func (cs *CollectionSpec) RewriteMaps(maps map[string]*Map) error {
+	for symbol, m := range maps {
+		// have we seen a program that uses this symbol / map
+		seen := false
+		fd := m.FD()
+		for progName, progSpec := range cs.Programs {
+			err := progSpec.Instructions.RewriteMapPtr(symbol, fd)
+
+			switch {
+			case err == nil:
+				seen = true
+
+			case asm.IsUnreferencedSymbol(err):
+				// Not all programs need to use the map
+
+			default:
+				return fmt.Errorf("program %s: %w", progName, err)
+			}
+		}
+
+		if !seen {
+			return fmt.Errorf("map %s not referenced by any programs", symbol)
+		}
+
+		// Prevent NewCollection from creating rewritten maps
+		delete(cs.Maps, symbol)
+	}
+
+	return nil
+}
+
+// RewriteConstants replaces the value of multiple constants.
+//
+// The constant must be defined like so in the C program:
+//
+//    static volatile const type foobar;
+//    static volatile const type foobar = default;
+//
+// Replacement values must be of the same length as the C sizeof(type).
+// If necessary, they are marshalled according to the same rules as
+// map values.
+//
+// From Linux 5.5 the verifier will use constants to eliminate dead code.
+//
+// Returns an error if a constant doesn't exist.
+func (cs *CollectionSpec) RewriteConstants(consts map[string]interface{}) error {
+	rodata := cs.Maps[".rodata"]
+	if rodata == nil {
+		return errors.New("missing .rodata section")
+	}
+
+	if rodata.BTF == nil {
+		return errors.New(".rodata section has no BTF")
+	}
+
+	if n := len(rodata.Contents); n != 1 {
+		return fmt.Errorf("expected one key in .rodata, found %d", n)
+	}
+
+	kv := rodata.Contents[0]
+	value, ok := kv.Value.([]byte)
+	if !ok {
+		return fmt.Errorf("first value in .rodata is %T not []byte", kv.Value)
+	}
+
+	buf := make([]byte, len(value))
+	copy(buf, value)
+
+	err := patchValue(buf, btf.MapValue(rodata.BTF), consts)
+	if err != nil {
+		return err
+	}
+
+	rodata.Contents[0] = MapKV{kv.Key, buf}
+	return nil
 }
 
 // Collection is a collection of Programs and Maps associated
@@ -99,14 +186,14 @@ func NewCollectionWithOptions(spec *CollectionSpec, opts CollectionOptions) (col
 		var handle *btf.Handle
 		if mapSpec.BTF != nil {
 			handle, err = loadBTF(btf.MapSpec(mapSpec.BTF))
-			if err != nil && !btf.IsNotSupported(err) {
+			if err != nil && !errors.Is(err, btf.ErrNotSupported) {
 				return nil, err
 			}
 		}
 
 		m, err := newMapWithBTF(mapSpec, handle)
 		if err != nil {
-			return nil, errors.Wrapf(err, "map %s", mapName)
+			return nil, fmt.Errorf("map %s: %w", mapName, err)
 		}
 		maps[mapName] = m
 	}
@@ -116,37 +203,43 @@ func NewCollectionWithOptions(spec *CollectionSpec, opts CollectionOptions) (col
 
 		// Rewrite any reference to a valid map.
 		for i := range progSpec.Instructions {
-			var (
-				ins = &progSpec.Instructions[i]
-				m   = maps[ins.Reference]
-			)
+			ins := &progSpec.Instructions[i]
 
-			if ins.Reference == "" || m == nil {
+			if ins.OpCode != asm.LoadImmOp(asm.DWord) || ins.Reference == "" {
 				continue
 			}
 
-			if ins.Src == asm.R1 {
+			if uint32(ins.Constant) != math.MaxUint32 {
 				// Don't overwrite maps already rewritten, users can
 				// rewrite programs in the spec themselves
 				continue
 			}
 
+			m := maps[ins.Reference]
+			if m == nil {
+				return nil, fmt.Errorf("program %s: missing map %s", progName, ins.Reference)
+			}
+
+			fd := m.FD()
+			if fd < 0 {
+				return nil, fmt.Errorf("map %s: %w", ins.Reference, internal.ErrClosedFd)
+			}
 			if err := ins.RewriteMapPtr(m.FD()); err != nil {
-				return nil, errors.Wrapf(err, "progam %s: map %s", progName, ins.Reference)
+				return nil, fmt.Errorf("progam %s: map %s: %w", progName, ins.Reference, err)
 			}
 		}
 
 		var handle *btf.Handle
 		if progSpec.BTF != nil {
 			handle, err = loadBTF(btf.ProgramSpec(progSpec.BTF))
-			if err != nil && !btf.IsNotSupported(err) {
+			if err != nil && !errors.Is(err, btf.ErrNotSupported) {
 				return nil, err
 			}
 		}
 
 		prog, err := newProgramWithBTF(progSpec, handle, opts.Programs)
 		if err != nil {
-			return nil, errors.Wrapf(err, "program %s", progName)
+			return nil, fmt.Errorf("program %s: %w", progName, err)
 		}
 		progs[progName] = prog
 	}

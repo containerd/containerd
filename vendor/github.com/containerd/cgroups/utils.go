@@ -121,7 +121,7 @@ func defaults(root string) ([]Subsystem, error) {
 		NewNetCls(root),
 		NewNetPrio(root),
 		NewPerfEvent(root),
-		NewCputset(root),
+		NewCpuset(root),
 		NewCpu(root),
 		NewCpuacct(root),
 		NewMemory(root),

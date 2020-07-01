@@ -31,9 +31,6 @@ const (
 	// Disabled constant to indicate SELinux is disabled
 	Disabled = -1
 
-	// DefaultCategoryRange is the upper bound on the category range
-	DefaultCategoryRange = uint32(1024)
-
 	contextFile      = "/usr/share/containers/selinux/contexts"
 	selinuxDir       = "/etc/selinux/"
 	selinuxConfig    = selinuxDir + "config"
@@ -59,9 +56,6 @@ var (
 	ErrEmptyPath = errors.New("empty path")
 	// InvalidLabel is returned when an invalid label is specified.
 	InvalidLabel = errors.New("Invalid Label")
-
-	// CategoryRange allows the upper bound on the category range to be adjusted
-	CategoryRange = DefaultCategoryRange
 
 	assignRegex = regexp.MustCompile(`^([^=]+)=(.*)$`)
 	roFileLabel string
@@ -796,7 +790,7 @@ func ContainerLabels() (processLabel string, fileLabel string) {
 func addMcs(processLabel, fileLabel string) (string, string) {
 	scon, _ := NewContext(processLabel)
 	if scon["level"] != "" {
-		mcs := uniqMcs(CategoryRange)
+		mcs := uniqMcs(1024)
 		scon["level"] = mcs
 		processLabel = scon.Get()
 		scon, _ = NewContext(fileLabel)

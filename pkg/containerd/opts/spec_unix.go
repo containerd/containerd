@@ -324,7 +324,7 @@ func WithDevices(osi osinterface.OS, config *runtime.ContainerConfig) oci.SpecOp
 				Type:   string(dev.Type),
 				Major:  &dev.Major,
 				Minor:  &dev.Minor,
-				Access: dev.Permissions,
+				Access: string(dev.Permissions),
 			})
 		}
 		return nil

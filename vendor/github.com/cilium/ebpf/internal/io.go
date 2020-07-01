@@ -1,6 +1,6 @@
 package internal
 
-import "github.com/pkg/errors"
+import "errors"
 
 // DiscardZeroes makes sure that all written bytes are zero
 // before discarding them.
