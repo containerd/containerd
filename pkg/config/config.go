@@ -235,7 +235,7 @@ type PluginConfig struct {
 	// TolerateMissingHugePagesCgroupController if set to false will error out on create/update
 	// container requests with huge page limits if the cgroup controller for hugepages is not present.
 	// This helps with supporting Kubernetes <=1.18 out of the box. (default is `true`)
-	TolerateMissingHugePagesCgroupController bool `toml:"tolerate_missing_hugepages_controller" json:"tolerateMissingHugePagesCgroupController"`
+	TolerateMissingHugePagesCgroupController bool `toml:"tolerate_missing_hugepages_cgroup_controller" json:"tolerateMissingHugePagesCgroupController"`
 	// IgnoreImageDefinedVolumes ignores volumes defined by the image. Useful for better resource
 	// isolation, security and early detection of issues in the mount configuration when using
 	// ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
