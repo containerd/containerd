@@ -232,10 +232,10 @@ type PluginConfig struct {
 	// UnsetSeccompProfile is the profile containerd/cri will use If the provided seccomp profile is
 	// unset (`""`) for a container (default is `unconfined`)
 	UnsetSeccompProfile string `toml:"unset_seccomp_profile" json:"unsetSeccompProfile"`
-	// TolerateMissingHugePagesCgroupController if set to false will error out on create/update
+	// TolerateMissingHugetlbController if set to false will error out on create/update
 	// container requests with huge page limits if the cgroup controller for hugepages is not present.
 	// This helps with supporting Kubernetes <=1.18 out of the box. (default is `true`)
-	TolerateMissingHugePagesCgroupController bool `toml:"tolerate_missing_hugepages_cgroup_controller" json:"tolerateMissingHugePagesCgroupController"`
+	TolerateMissingHugetlbController bool `toml:"tolerate_missing_hugetlb_controller" json:"tolerateMissingHugetlbController"`
 	// IgnoreImageDefinedVolumes ignores volumes defined by the image. Useful for better resource
 	// isolation, security and early detection of issues in the mount configuration when using
 	// ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
