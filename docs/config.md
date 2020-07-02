@@ -45,6 +45,11 @@ version = 2
   # It generates a self-sign certificate unless the following x509_key_pair_streaming are both set.
   enable_tls_streaming = false
 
+  # tolerate_missing_hugetlb_controller if set to false will error out on create/update
+  # container requests with huge page limits if the cgroup controller for hugepages is not present.
+  # This helps with supporting Kubernetes <=1.18 out of the box. (default is `true`)
+  tolerate_missing_hugetlb_controller = true
+
   # ignore_image_defined_volumes ignores volumes defined by the image. Useful for better resource
 	# isolation, security and early detection of issues in the mount configuration when using
 	# ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
