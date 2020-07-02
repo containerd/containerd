@@ -2,10 +2,10 @@ package btf
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
-
-	"github.com/pkg/errors"
 )
 
 type stringTable []byte
@@ -13,7 +13,7 @@ type stringTable []byte
 func readStringTable(r io.Reader) (stringTable, error) {
 	contents, err := ioutil.ReadAll(r)
 	if err != nil {
-		return nil, errors.Wrap(err, "can't read string table")
+		return nil, fmt.Errorf("can't read string table: %v", err)
 	}
 
 	if len(contents) < 1 {
@@ -33,22 +33,22 @@ func readStringTable(r io.Reader) (stringTable, error) {
 
 func (st stringTable) Lookup(offset uint32) (string, error) {
 	if int64(offset) > int64(^uint(0)>>1) {
-		return "", errors.Errorf("offset %d overflows int", offset)
+		return "", fmt.Errorf("offset %d overflows int", offset)
 	}
 
 	pos := int(offset)
 	if pos >= len(st) {
-		return "", errors.Errorf("offset %d is out of bounds", offset)
+		return "", fmt.Errorf("offset %d is out of bounds", offset)
 	}
 
 	if pos > 0 && st[pos-1] != '\x00' {
-		return "", errors.Errorf("offset %d isn't start of a string", offset)
+		return "", fmt.Errorf("offset %d isn't start of a string", offset)
 	}
 
 	str := st[pos:]
 	end := bytes.IndexByte(str, '\x00')
 	if end == -1 {
-		return "", errors.Errorf("offset %d isn't null terminated", offset)
+		return "", fmt.Errorf("offset %d isn't null terminated", offset)
 	}
 
 	return string(str[:end]), nil

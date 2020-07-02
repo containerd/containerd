@@ -15,6 +15,10 @@ func GenLabels(options string) (string, string, error) {
 	return "", "", nil
 }
 
+func FormatMountLabel(src string, mountLabel string) string {
+	return src
+}
+
 func SetFileLabel(path string, fileLabel string) error {
 	return nil
 }

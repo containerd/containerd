@@ -30,10 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/remotecommand"
 	k8scert "k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/utils/exec"
 
 	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
+	"github.com/containerd/cri/pkg/streaming"
 )
 
 type streamListenerMode int

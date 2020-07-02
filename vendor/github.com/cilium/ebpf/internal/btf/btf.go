@@ -4,19 +4,28 @@ import (
 	"bytes"
 	"debug/elf"
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"math"
+	"os"
 	"reflect"
+	"sync"
 	"unsafe"
 
 	"github.com/cilium/ebpf/internal"
 	"github.com/cilium/ebpf/internal/unix"
-
-	"github.com/pkg/errors"
 )
 
 const btfMagic = 0xeB9F
+
+// Errors returned by BTF functions.
+var (
+	ErrNotSupported   = internal.ErrNotSupported
+	ErrNotFound       = errors.New("not found")
+	ErrNoExtendedInfo = errors.New("no extended info")
+)
 
 // Spec represents decoded BTF.
 type Spec struct {
@@ -25,6 +34,7 @@ type Spec struct {
 	types     map[string][]Type
 	funcInfos map[string]extInfo
 	lineInfos map[string]extInfo
+	byteOrder binary.ByteOrder
 }
 
 type btfHeader struct {
@@ -52,6 +62,7 @@ func LoadSpecFromReader(rd io.ReaderAt) (*Spec, error) {
 	var (
 		btfSection    *elf.Section
 		btfExtSection *elf.Section
+		sectionSizes  = make(map[string]uint32)
 	)
 
 	for _, sec := range file.Sections {
@@ -60,6 +71,16 @@ func LoadSpecFromReader(rd io.ReaderAt) (*Spec, error) {
 			btfSection = sec
 		case ".BTF.ext":
 			btfExtSection = sec
+		default:
+			if sec.Type != elf.SHT_PROGBITS && sec.Type != elf.SHT_NOBITS {
+				break
+			}
+
+			if sec.Size > math.MaxUint32 {
+				return nil, fmt.Errorf("section %s exceeds maximum size", sec.Name)
+			}
+
+			sectionSizes[sec.Name] = uint32(sec.Size)
 		}
 	}
 
@@ -67,74 +88,59 @@ func LoadSpecFromReader(rd io.ReaderAt) (*Spec, error) {
 		return nil, nil
 	}
 
-	spec, err := parseBTF(btfSection.Open(), file.ByteOrder)
+	symbols, err := file.Symbols()
+	if err != nil {
+		return nil, fmt.Errorf("can't read symbols: %v", err)
+	}
+
+	variableOffsets := make(map[variable]uint32)
+	for _, symbol := range symbols {
+		if idx := symbol.Section; idx >= elf.SHN_LORESERVE && idx <= elf.SHN_HIRESERVE {
+			// Ignore things like SHN_ABS
+			continue
+		}
+
+		secName := file.Sections[symbol.Section].Name
+		if _, ok := sectionSizes[secName]; !ok {
+			continue
+		}
+
+		if symbol.Value > math.MaxUint32 {
+			return nil, fmt.Errorf("section %s: symbol %s: size exceeds maximum", secName, symbol.Name)
+		}
+
+		variableOffsets[variable{secName, symbol.Name}] = uint32(symbol.Value)
+	}
+
+	spec, err := loadNakedSpec(btfSection.Open(), file.ByteOrder, sectionSizes, variableOffsets)
 	if err != nil {
 		return nil, err
 	}
 
-	if btfExtSection != nil {
-		spec.funcInfos, spec.lineInfos, err = parseExtInfos(btfExtSection.Open(), file.ByteOrder, spec.strings)
-		if err != nil {
-			return nil, errors.Wrap(err, "can't read ext info")
-		}
+	if btfExtSection == nil {
+		return spec, nil
+	}
+
+	spec.funcInfos, spec.lineInfos, err = parseExtInfos(btfExtSection.Open(), file.ByteOrder, spec.strings)
+	if err != nil {
+		return nil, fmt.Errorf("can't read ext info: %w", err)
 	}
 
 	return spec, nil
 }
 
-func parseBTF(btf io.ReadSeeker, bo binary.ByteOrder) (*Spec, error) {
-	rawBTF, err := ioutil.ReadAll(btf)
+func loadNakedSpec(btf io.ReadSeeker, bo binary.ByteOrder, sectionSizes map[string]uint32, variableOffsets map[variable]uint32) (*Spec, error) {
+	rawTypes, rawStrings, err := parseBTF(btf, bo)
 	if err != nil {
-		return nil, errors.Wrap(err, "can't read BTF")
+		return nil, err
 	}
 
-	rd := bytes.NewReader(rawBTF)
-
-	var header btfHeader
-	if err := binary.Read(rd, bo, &header); err != nil {
-		return nil, errors.Wrap(err, "can't read header")
-	}
-
-	if header.Magic != btfMagic {
-		return nil, errors.Errorf("incorrect magic value %v", header.Magic)
-	}
-
-	if header.Version != 1 {
-		return nil, errors.Errorf("unexpected version %v", header.Version)
-	}
-
-	if header.Flags != 0 {
-		return nil, errors.Errorf("unsupported flags %v", header.Flags)
-	}
-
-	remainder := int64(header.HdrLen) - int64(binary.Size(&header))
-	if remainder < 0 {
-		return nil, errors.New("header is too short")
-	}
-
-	if _, err := io.CopyN(internal.DiscardZeroes{}, rd, remainder); err != nil {
-		return nil, errors.Wrap(err, "header padding")
-	}
-
-	if _, err := rd.Seek(int64(header.HdrLen+header.StringOff), io.SeekStart); err != nil {
-		return nil, errors.Wrap(err, "can't seek to start of string section")
-	}
-
-	strings, err := readStringTable(io.LimitReader(rd, int64(header.StringLen)))
+	err = fixupDatasec(rawTypes, rawStrings, sectionSizes, variableOffsets)
 	if err != nil {
-		return nil, errors.Wrap(err, "can't read type names")
+		return nil, err
 	}
 
-	if _, err := rd.Seek(int64(header.HdrLen+header.TypeOff), io.SeekStart); err != nil {
-		return nil, errors.Wrap(err, "can't seek to start of type section")
-	}
-
-	rawTypes, err := readTypes(io.LimitReader(rd, int64(header.TypeLen)), bo)
-	if err != nil {
-		return nil, errors.Wrap(err, "can't read types")
-	}
-
-	types, err := inflateRawTypes(rawTypes, strings)
+	types, err := inflateRawTypes(rawTypes, rawStrings)
 	if err != nil {
 		return nil, err
 	}
@@ -142,13 +148,158 @@ func parseBTF(btf io.ReadSeeker, bo binary.ByteOrder) (*Spec, error) {
 	return &Spec{
 		rawTypes:  rawTypes,
 		types:     types,
-		strings:   strings,
-		funcInfos: make(map[string]extInfo),
-		lineInfos: make(map[string]extInfo),
+		strings:   rawStrings,
+		byteOrder: bo,
 	}, nil
 }
 
-func (s *Spec) marshal(bo binary.ByteOrder) ([]byte, error) {
+var kernelBTF struct {
+	sync.Mutex
+	*Spec
+}
+
+// LoadKernelSpec returns the current kernel's BTF information.
+//
+// Requires a >= 5.5 kernel with CONFIG_DEBUG_INFO_BTF enabled. Returns
+// ErrNotSupported if BTF is not enabled.
+func LoadKernelSpec() (*Spec, error) {
+	kernelBTF.Lock()
+	defer kernelBTF.Unlock()
+
+	if kernelBTF.Spec != nil {
+		return kernelBTF.Spec, nil
+	}
+
+	var err error
+	kernelBTF.Spec, err = loadKernelSpec()
+	return kernelBTF.Spec, err
+}
+
+func loadKernelSpec() (*Spec, error) {
+	fh, err := os.Open("/sys/kernel/btf/vmlinux")
+	if os.IsNotExist(err) {
+		return nil, fmt.Errorf("can't open kernel BTF at /sys/kernel/btf/vmlinux: %w", ErrNotFound)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("can't read kernel BTF: %s", err)
+	}
+	defer fh.Close()
+
+	return loadNakedSpec(fh, internal.NativeEndian, nil, nil)
+}
+
+func parseBTF(btf io.ReadSeeker, bo binary.ByteOrder) ([]rawType, stringTable, error) {
+	rawBTF, err := ioutil.ReadAll(btf)
+	if err != nil {
+		return nil, nil, fmt.Errorf("can't read BTF: %v", err)
+	}
+
+	rd := bytes.NewReader(rawBTF)
+
+	var header btfHeader
+	if err := binary.Read(rd, bo, &header); err != nil {
+		return nil, nil, fmt.Errorf("can't read header: %v", err)
+	}
+
+	if header.Magic != btfMagic {
+		return nil, nil, fmt.Errorf("incorrect magic value %v", header.Magic)
+	}
+
+	if header.Version != 1 {
+		return nil, nil, fmt.Errorf("unexpected version %v", header.Version)
+	}
+
+	if header.Flags != 0 {
+		return nil, nil, fmt.Errorf("unsupported flags %v", header.Flags)
+	}
+
+	remainder := int64(header.HdrLen) - int64(binary.Size(&header))
+	if remainder < 0 {
+		return nil, nil, errors.New("header is too short")
+	}
+
+	if _, err := io.CopyN(internal.DiscardZeroes{}, rd, remainder); err != nil {
+		return nil, nil, fmt.Errorf("header padding: %v", err)
+	}
+
+	if _, err := rd.Seek(int64(header.HdrLen+header.StringOff), io.SeekStart); err != nil {
+		return nil, nil, fmt.Errorf("can't seek to start of string section: %v", err)
+	}
+
+	rawStrings, err := readStringTable(io.LimitReader(rd, int64(header.StringLen)))
+	if err != nil {
+		return nil, nil, fmt.Errorf("can't read type names: %w", err)
+	}
+
+	if _, err := rd.Seek(int64(header.HdrLen+header.TypeOff), io.SeekStart); err != nil {
+		return nil, nil, fmt.Errorf("can't seek to start of type section: %v", err)
+	}
+
+	rawTypes, err := readTypes(io.LimitReader(rd, int64(header.TypeLen)), bo)
+	if err != nil {
+		return nil, nil, fmt.Errorf("can't read types: %w", err)
+	}
+
+	return rawTypes, rawStrings, nil
+}
+
+type variable struct {
+	section string
+	name    string
+}
+
+func fixupDatasec(rawTypes []rawType, rawStrings stringTable, sectionSizes map[string]uint32, variableOffsets map[variable]uint32) error {
+	for i, rawType := range rawTypes {
+		if rawType.Kind() != kindDatasec {
+			continue
+		}
+
+		name, err := rawStrings.Lookup(rawType.NameOff)
+		if err != nil {
+			return err
+		}
+
+		if name == ".kconfig" || name == ".ksym" {
+			return fmt.Errorf("reference to %s: %w", name, ErrNotSupported)
+		}
+
+		size, ok := sectionSizes[name]
+		if !ok {
+			return fmt.Errorf("data section %s: missing size", name)
+		}
+
+		rawTypes[i].SizeType = size
+
+		secinfos := rawType.data.([]btfVarSecinfo)
+		for j, secInfo := range secinfos {
+			id := int(secInfo.Type - 1)
+			if id >= len(rawTypes) {
+				return fmt.Errorf("data section %s: invalid type id %d for variable %d", name, id, j)
+			}
+
+			varName, err := rawStrings.Lookup(rawTypes[id].NameOff)
+			if err != nil {
+				return fmt.Errorf("data section %s: can't get name for type %d: %w", name, id, err)
+			}
+
+			offset, ok := variableOffsets[variable{name, varName}]
+			if !ok {
+				return fmt.Errorf("data section %s: missing offset for variable %s", name, varName)
+			}
+
+			secinfos[j].Offset = offset
+		}
+	}
+
+	return nil
+}
+
+type marshalOpts struct {
+	ByteOrder        binary.ByteOrder
+	StripFuncLinkage bool
+}
+
+func (s *Spec) marshal(opts marshalOpts) ([]byte, error) {
 	var (
 		buf       bytes.Buffer
 		header    = new(btfHeader)
@@ -160,17 +311,14 @@ func (s *Spec) marshal(bo binary.ByteOrder) ([]byte, error) {
 	_, _ = buf.Write(make([]byte, headerLen))
 
 	// Write type section, just after the header.
-	for _, typ := range s.rawTypes {
-		if typ.Kind() == kindDatasec {
-			// Datasec requires patching with information from the ELF
-			// file. We don't support this at the moment, so patch
-			// out any Datasec by turning it into a void*.
-			typ = rawType{}
-			typ.SetKind(kindPointer)
+	for _, raw := range s.rawTypes {
+		switch {
+		case opts.StripFuncLinkage && raw.Kind() == kindFunc:
+			raw.SetLinkage(linkageStatic)
 		}
 
-		if err := typ.Marshal(&buf, bo); err != nil {
-			return nil, errors.Wrap(err, "can't marshal BTF")
+		if err := raw.Marshal(&buf, opts.ByteOrder); err != nil {
+			return nil, fmt.Errorf("can't marshal BTF: %w", err)
 		}
 	}
 
@@ -192,9 +340,9 @@ func (s *Spec) marshal(bo binary.ByteOrder) ([]byte, error) {
 	}
 
 	raw := buf.Bytes()
-	err := binary.Write(sliceWriter(raw[:headerLen]), bo, header)
+	err := binary.Write(sliceWriter(raw[:headerLen]), opts.ByteOrder, header)
 	if err != nil {
-		return nil, errors.Wrap(err, "can't write header")
+		return nil, fmt.Errorf("can't write header: %v", err)
 	}
 
 	return raw, nil
@@ -214,17 +362,22 @@ func (sw sliceWriter) Write(p []byte) (int, error) {
 //
 // Length is the number of bytes in the raw BPF instruction stream.
 //
-// Returns an error if there is no BTF.
+// Returns an error which may wrap ErrNoExtendedInfo if the Spec doesn't
+// contain extended BTF info.
 func (s *Spec) Program(name string, length uint64) (*Program, error) {
 	if length == 0 {
 		return nil, errors.New("length musn't be zero")
+	}
+
+	if s.funcInfos == nil && s.lineInfos == nil {
+		return nil, fmt.Errorf("BTF for section %s: %w", name, ErrNoExtendedInfo)
 	}
 
 	funcInfos, funcOK := s.funcInfos[name]
 	lineInfos, lineOK := s.lineInfos[name]
 
 	if !funcOK && !lineOK {
-		return nil, errors.Errorf("no BTF for program %s", name)
+		return nil, fmt.Errorf("no extended BTF info for section %s", name)
 	}
 
 	return &Program{s, length, funcInfos, lineInfos}, nil
@@ -233,15 +386,15 @@ func (s *Spec) Program(name string, length uint64) (*Program, error) {
 // Map finds the BTF for a map.
 //
 // Returns an error if there is no BTF for the given name.
-func (s *Spec) Map(name string) (*Map, error) {
+func (s *Spec) Map(name string) (*Map, []Member, error) {
 	var mapVar Var
 	if err := s.FindType(name, &mapVar); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	mapStruct, ok := mapVar.Type.(*Struct)
 	if !ok {
-		return nil, errors.Errorf("expected struct, have %s", mapVar.Type)
+		return nil, nil, fmt.Errorf("expected struct, have %s", mapVar.Type)
 	}
 
 	var key, value Type
@@ -256,23 +409,32 @@ func (s *Spec) Map(name string) (*Map, error) {
 	}
 
 	if key == nil {
-		return nil, errors.Errorf("map %s: missing 'key' in type", name)
+		key = (*Void)(nil)
 	}
 
 	if value == nil {
-		return nil, errors.Errorf("map %s: missing 'value' in type", name)
+		value = (*Void)(nil)
 	}
 
-	return &Map{mapStruct, s, key, value}, nil
+	return &Map{s, key, value}, mapStruct.Members, nil
 }
 
-var errNotFound = errors.New("not found")
+// Datasec returns the BTF required to create maps which represent data sections.
+func (s *Spec) Datasec(name string) (*Map, error) {
+	var datasec Datasec
+	if err := s.FindType(name, &datasec); err != nil {
+		return nil, fmt.Errorf("data section %s: can't get BTF: %w", name, err)
+	}
+
+	return &Map{s, &Void{}, &datasec}, nil
+}
 
 // FindType searches for a type with a specific name.
 //
 // hint determines the type of the returned Type.
 //
-// Returns an error if there is no or multiple matches.
+// Returns an error wrapping ErrNotFound if no matching
+// type exists in spec.
 func (s *Spec) FindType(name string, typ Type) error {
 	var (
 		wanted    = reflect.TypeOf(typ)
@@ -285,14 +447,14 @@ func (s *Spec) FindType(name string, typ Type) error {
 		}
 
 		if candidate != nil {
-			return errors.Errorf("type %s: multiple candidates for %T", name, typ)
+			return fmt.Errorf("type %s: multiple candidates for %T", name, typ)
 		}
 
 		candidate = typ
 	}
 
 	if candidate == nil {
-		return errors.WithMessagef(errNotFound, "type %s", name)
+		return fmt.Errorf("type %s: %w", name, ErrNotFound)
 	}
 
 	value := reflect.Indirect(reflect.ValueOf(copyType(candidate)))
@@ -307,16 +469,22 @@ type Handle struct {
 
 // NewHandle loads BTF into the kernel.
 //
-// Returns an error if BTF is not supported, which can
-// be checked by IsNotSupported.
+// Returns ErrNotSupported if BTF is not supported.
 func NewHandle(spec *Spec) (*Handle, error) {
 	if err := haveBTF(); err != nil {
 		return nil, err
 	}
 
-	btf, err := spec.marshal(internal.NativeEndian)
+	if spec.byteOrder != internal.NativeEndian {
+		return nil, fmt.Errorf("can't load %s BTF on %s", spec.byteOrder, internal.NativeEndian)
+	}
+
+	btf, err := spec.marshal(marshalOpts{
+		ByteOrder:        internal.NativeEndian,
+		StripFuncLinkage: haveFuncLinkage() != nil,
+	})
 	if err != nil {
-		return nil, errors.Wrap(err, "can't marshal BTF")
+		return nil, fmt.Errorf("can't marshal BTF: %w", err)
 	}
 
 	if uint64(len(btf)) > math.MaxUint32 {
@@ -360,7 +528,6 @@ func (h *Handle) FD() int {
 
 // Map is the BTF for a map.
 type Map struct {
-	definition *Struct
 	spec       *Spec
 	key, value Type
 }
@@ -369,12 +536,6 @@ type Map struct {
 // to hide it from users of the ebpf package.
 func MapSpec(m *Map) *Spec {
 	return m.spec
-}
-
-// MapType should be a method on Map, but is a free function
-// to hide it from users of the ebpf package.
-func MapType(m *Map) *Struct {
-	return m.definition
 }
 
 // MapKey should be a method on Map, but is a free function
@@ -411,12 +572,12 @@ func ProgramSpec(s *Program) *Spec {
 func ProgramAppend(s, other *Program) error {
 	funcInfos, err := s.funcInfos.append(other.funcInfos, s.length)
 	if err != nil {
-		return errors.Wrap(err, "func infos")
+		return fmt.Errorf("func infos: %w", err)
 	}
 
 	lineInfos, err := s.lineInfos.append(other.lineInfos, s.length)
 	if err != nil {
-		return errors.Wrap(err, "line infos")
+		return fmt.Errorf("line infos: %w", err)
 	}
 
 	s.length += other.length
@@ -451,13 +612,6 @@ func ProgramLineInfos(s *Program) (recordSize uint32, bytes []byte, err error) {
 	return s.lineInfos.recordSize, bytes, nil
 }
 
-// IsNotSupported returns true if the error indicates that the kernel
-// doesn't support BTF.
-func IsNotSupported(err error) bool {
-	ufe, ok := errors.Cause(err).(*internal.UnsupportedFeatureError)
-	return ok && ufe.Name == "BTF"
-}
-
 type bpfLoadBTFAttr struct {
 	btf         internal.Pointer
 	logBuf      internal.Pointer
@@ -477,26 +631,36 @@ func bpfLoadBTF(attr *bpfLoadBTFAttr) (*internal.FD, error) {
 	return internal.NewFD(uint32(fd)), nil
 }
 
-func minimalBTF(bo binary.ByteOrder) []byte {
+func marshalBTF(types interface{}, strings []byte, bo binary.ByteOrder) []byte {
 	const minHeaderLength = 24
 
+	typesLen := uint32(binary.Size(types))
+	header := btfHeader{
+		Magic:     btfMagic,
+		Version:   1,
+		HdrLen:    minHeaderLength,
+		TypeOff:   0,
+		TypeLen:   typesLen,
+		StringOff: typesLen,
+		StringLen: uint32(len(strings)),
+	}
+
+	buf := new(bytes.Buffer)
+	_ = binary.Write(buf, bo, &header)
+	_ = binary.Write(buf, bo, types)
+	buf.Write(strings)
+
+	return buf.Bytes()
+}
+
+var haveBTF = internal.FeatureTest("BTF", "5.1", func() (bool, error) {
 	var (
 		types struct {
 			Integer btfType
 			Var     btfType
 			btfVar  struct{ Linkage uint32 }
 		}
-		typLen  = uint32(binary.Size(&types))
 		strings = []byte{0, 'a', 0}
-		header  = btfHeader{
-			Magic:     btfMagic,
-			Version:   1,
-			HdrLen:    minHeaderLength,
-			TypeOff:   0,
-			TypeLen:   typLen,
-			StringOff: typLen,
-			StringLen: uint32(len(strings)),
-		}
 	)
 
 	// We use a BTF_KIND_VAR here, to make sure that
@@ -507,16 +671,8 @@ func minimalBTF(bo binary.ByteOrder) []byte {
 	types.Var.SetKind(kindVar)
 	types.Var.SizeType = 1
 
-	buf := new(bytes.Buffer)
-	_ = binary.Write(buf, bo, &header)
-	_ = binary.Write(buf, bo, &types)
-	buf.Write(strings)
+	btf := marshalBTF(&types, strings, internal.NativeEndian)
 
-	return buf.Bytes()
-}
-
-var haveBTF = internal.FeatureTest("BTF", "5.1", func() bool {
-	btf := minimalBTF(internal.NativeEndian)
 	fd, err := bpfLoadBTF(&bpfLoadBTFAttr{
 		btf:     internal.NewSlicePointer(btf),
 		btfSize: uint32(len(btf)),
@@ -526,5 +682,35 @@ var haveBTF = internal.FeatureTest("BTF", "5.1", func() bool {
 	}
 	// Check for EINVAL specifically, rather than err != nil since we
 	// otherwise misdetect due to insufficient permissions.
-	return errors.Cause(err) != unix.EINVAL
+	return !errors.Is(err, unix.EINVAL), nil
+})
+
+var haveFuncLinkage = internal.FeatureTest("BTF func linkage", "5.6", func() (bool, error) {
+	var (
+		types struct {
+			FuncProto btfType
+			Func      btfType
+		}
+		strings = []byte{0, 'a', 0}
+	)
+
+	types.FuncProto.SetKind(kindFuncProto)
+	types.Func.SetKind(kindFunc)
+	types.Func.SizeType = 1 // aka FuncProto
+	types.Func.NameOff = 1
+	types.Func.SetLinkage(linkageGlobal)
+
+	btf := marshalBTF(&types, strings, internal.NativeEndian)
+
+	fd, err := bpfLoadBTF(&bpfLoadBTFAttr{
+		btf:     internal.NewSlicePointer(btf),
+		btfSize: uint32(len(btf)),
+	})
+	if err == nil {
+		fd.Close()
+	}
+
+	// Check for EINVAL specifically, rather than err != nil since we
+	// otherwise misdetect due to insufficient permissions.
+	return !errors.Is(err, unix.EINVAL), nil
 })
