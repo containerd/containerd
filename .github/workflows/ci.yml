@@ -199,7 +199,7 @@ jobs:
           path: src/github.com/containerd/containerd
 
       - name: Install dependencies
-        run: go get -u github.com/cpuguy83/go-md2man
+        run: GO111MODULE=on go get github.com/cpuguy83/go-md2man/v2@v2.0.0
 
       - name: Make
         run: make man
