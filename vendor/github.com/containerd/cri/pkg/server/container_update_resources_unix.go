@@ -73,7 +73,7 @@ func (c *criService) updateContainerResources(ctx context.Context,
 		return errors.Wrap(err, "failed to get container spec")
 	}
 	newSpec, err := updateOCILinuxResource(ctx, oldSpec, resources,
-		c.config.TolerateMissingHugePagesCgroupController)
+		c.config.TolerateMissingHugetlbController)
 	if err != nil {
 		return errors.Wrap(err, "failed to update resource in spec")
 	}
@@ -134,7 +134,7 @@ func updateContainerSpec(ctx context.Context, cntr containerd.Container, spec *r
 
 // updateOCILinuxResource updates container resource limit.
 func updateOCILinuxResource(ctx context.Context, spec *runtimespec.Spec, new *runtime.LinuxContainerResources,
-	tolerateMissingHugePagesCgroupController bool) (*runtimespec.Spec, error) {
+	tolerateMissingHugetlbController bool) (*runtimespec.Spec, error) {
 	// Copy to make sure old spec is not changed.
 	var cloned runtimespec.Spec
 	if err := util.DeepCopy(&cloned, spec); err != nil {
@@ -143,7 +143,7 @@ func updateOCILinuxResource(ctx context.Context, spec *runtimespec.Spec, new *ru
 	if cloned.Linux == nil {
 		cloned.Linux = &runtimespec.Linux{}
 	}
-	if err := opts.WithResources(new, tolerateMissingHugePagesCgroupController)(ctx, nil, nil, &cloned); err != nil {
+	if err := opts.WithResources(new, tolerateMissingHugetlbController)(ctx, nil, nil, &cloned); err != nil {
 		return nil, errors.Wrap(err, "unable to set linux container resources")
 	}
 	return &cloned, nil

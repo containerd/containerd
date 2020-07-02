@@ -135,7 +135,7 @@ type ObjectMeta struct {
 	// +optional
 	GenerateName string `json:"generateName,omitempty" protobuf:"bytes,2,opt,name=generateName"`
 
-	// Namespace defines the space within each name must be unique. An empty namespace is
+	// Namespace defines the space within which each name must be unique. An empty namespace is
 	// equivalent to the "default" namespace, but "default" is the canonical representation.
 	// Not all objects are required to be scoped to a namespace - the value of this field for
 	// those objects will be empty.
@@ -1145,9 +1145,14 @@ const (
 // If a key maps to an empty Fields value, the field that key represents is part of the set.
 //
 // The exact format is defined in sigs.k8s.io/structured-merge-diff
+// +protobuf.options.(gogoproto.goproto_stringer)=false
 type FieldsV1 struct {
 	// Raw is the underlying serialization of this object.
 	Raw []byte `json:"-" protobuf:"bytes,1,opt,name=Raw"`
+}
+
+func (f FieldsV1) String() string {
+	return string(f.Raw)
 }
 
 // TODO: Table does not generate to protobuf because of the interface{} - fix protobuf

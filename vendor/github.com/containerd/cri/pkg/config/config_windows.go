@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 
 	"github.com/containerd/containerd"
-	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
+	"github.com/containerd/cri/pkg/streaming"
 )
 
 // DefaultConfig returns default configurations of cri plugin.

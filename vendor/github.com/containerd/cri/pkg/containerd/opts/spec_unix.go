@@ -324,7 +324,7 @@ func WithDevices(osi osinterface.OS, config *runtime.ContainerConfig) oci.SpecOp
 				Type:   string(dev.Type),
 				Major:  &dev.Major,
 				Minor:  &dev.Minor,
-				Access: dev.Permissions,
+				Access: string(dev.Permissions),
 			})
 		}
 		return nil
@@ -408,7 +408,7 @@ func WithSelinuxLabels(process, mount string) oci.SpecOpts {
 }
 
 // WithResources sets the provided resource restrictions
-func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHugePagesCgroupController bool) oci.SpecOpts {
+func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHugetlbController bool) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
 		if resources == nil {
 			return nil
@@ -451,7 +451,7 @@ func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHu
 		if limit != 0 {
 			s.Linux.Resources.Memory.Limit = &limit
 		}
-		if isHugePagesControllerPresent() {
+		if isHugetlbControllerPresent() {
 			for _, limit := range hugepages {
 				s.Linux.Resources.HugepageLimits = append(s.Linux.Resources.HugepageLimits, runtimespec.LinuxHugepageLimit{
 					Pagesize: limit.PageSize,
@@ -459,9 +459,9 @@ func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHu
 				})
 			}
 		} else {
-			if !tolerateMissingHugePagesCgroupController {
+			if !tolerateMissingHugetlbController {
 				return errors.Errorf("huge pages limits are specified but hugetlb cgroup controller is missing. " +
-					"Please set tolerate_missing_hugepages_controller to `true` to ignore this error")
+					"Please set tolerate_missing_hugetlb_controller to `true` to ignore this error")
 			}
 			logrus.Warn("hugetlb cgroup controller is absent. skipping huge pages limits")
 		}
@@ -474,7 +474,7 @@ var (
 	supportsHugetlb     bool
 )
 
-func isHugePagesControllerPresent() bool {
+func isHugetlbControllerPresent() bool {
 	supportsHugetlbOnce.Do(func() {
 		supportsHugetlb = false
 		if IsCgroup2UnifiedMode() {
