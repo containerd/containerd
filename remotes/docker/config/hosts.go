@@ -48,6 +48,8 @@ type hostConfig struct {
 	clientPairs [][2]string
 	skipVerify  *bool
 
+	header http.Header
+
 	// TODO: API ("docker" or "oci")
 	// TODO: API Version ("v1", "v2")
 	// TODO: Add credential configuration (domain alias, username)
@@ -105,6 +107,13 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			hosts[len(hosts)-1].capabilities = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush
 		}
 
+		var defaultTLSConfig *tls.Config
+		if options.DefaultTLS != nil {
+			defaultTLSConfig = options.DefaultTLS
+		} else {
+			defaultTLSConfig = &tls.Config{}
+		}
+
 		defaultTransport := &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			DialContext: (&net.Dialer{
@@ -115,7 +124,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			MaxIdleConns:          10,
 			IdleConnTimeout:       30 * time.Second,
 			TLSHandshakeTimeout:   10 * time.Second,
-			TLSClientConfig:       options.DefaultTLS,
+			TLSClientConfig:       defaultTLSConfig,
 			ExpectContinueTimeout: 5 * time.Second,
 		}
 
@@ -136,14 +145,11 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			rhosts[i].Host = host.host
 			rhosts[i].Path = host.path
 			rhosts[i].Capabilities = host.capabilities
+			rhosts[i].Header = host.header
 
 			if host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil {
-				var tlsConfig *tls.Config
-				if options.DefaultTLS != nil {
-					tlsConfig = options.DefaultTLS.Clone()
-				} else {
-					tlsConfig = &tls.Config{}
-				}
+				tr := defaultTransport.Clone()
+				tlsConfig := tr.TLSClientConfig
 				if host.skipVerify != nil {
 					tlsConfig.InsecureSkipVerify = *host.skipVerify
 				}
@@ -190,8 +196,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 						tlsConfig.Certificates = append(tlsConfig.Certificates, cert)
 					}
 				}
-				tr := defaultTransport.Clone()
-				tr.TLSClientConfig = tlsConfig
+
 				c := *client
 				c.Transport = tr
 
@@ -201,7 +206,6 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 				rhosts[i].Client = client
 				rhosts[i].Authorizer = authorizer
 			}
-
 		}
 
 		return rhosts, nil
@@ -270,7 +274,9 @@ type hostFileConfig struct {
 	// TODO: Make this an array (two key types, one for pairs (multiple files), one for single file?)
 	Client toml.Primitive `toml:"client"`
 
-	SkipVerify bool `toml:"skip_verify"`
+	SkipVerify *bool `toml:"skip_verify"`
+
+	Header map[string]toml.Primitive `toml:"header"`
 
 	// API (default: "docker")
 	// API Version (default: "v2")
@@ -306,6 +312,9 @@ func parseHostsFile(ctx context.Context, baseDir string, b []byte) ([]hostConfig
 		}
 	}
 
+	if c.HostConfigs == nil {
+		c.HostConfigs = map[string]hostFileConfig{}
+	}
 	if c.Server != "" {
 		c.HostConfigs[c.Server] = c.hostFileConfig
 		orderedHosts = append(orderedHosts, c.Server)
@@ -317,33 +326,32 @@ func parseHostsFile(ctx context.Context, baseDir string, b []byte) ([]hostConfig
 	for i, server := range orderedHosts {
 		hostConfig := c.HostConfigs[server]
 
-		if !strings.HasPrefix(server, "http") {
-			server = "https://" + server
-		}
-		u, err := url.Parse(server)
-		if err != nil {
-			return nil, errors.Errorf("unable to parse server %v", server)
-		}
-		hosts[i].scheme = u.Scheme
-		hosts[i].host = u.Host
-
-		// TODO: Handle path based on registry protocol
-		// Define a registry protocol type
-		//   OCI v1    - Always use given path as is
-		//   Docker v2 - Always ensure ends with /v2/
-		if len(u.Path) > 0 {
-			u.Path = path.Clean(u.Path)
-			if !strings.HasSuffix(u.Path, "/v2") {
-				u.Path = u.Path + "/v2"
+		if server != "" {
+			if !strings.HasPrefix(server, "http") {
+				server = "https://" + server
 			}
-		} else {
-			u.Path = "/v2"
-		}
-		hosts[i].path = u.Path
+			u, err := url.Parse(server)
+			if err != nil {
+				return nil, errors.Errorf("unable to parse server %v", server)
+			}
+			hosts[i].scheme = u.Scheme
+			hosts[i].host = u.Host
 
-		if hosts[i].scheme == "https" {
-			hosts[i].skipVerify = &hostConfig.SkipVerify
+			// TODO: Handle path based on registry protocol
+			// Define a registry protocol type
+			//   OCI v1    - Always use given path as is
+			//   Docker v2 - Always ensure ends with /v2/
+			if len(u.Path) > 0 {
+				u.Path = path.Clean(u.Path)
+				if !strings.HasSuffix(u.Path, "/v2") {
+					u.Path = u.Path + "/v2"
+				}
+			} else {
+				u.Path = "/v2"
+			}
+			hosts[i].path = u.Path
 		}
+		hosts[i].skipVerify = hostConfig.SkipVerify
 
 		if len(hostConfig.Capabilities) > 0 {
 			for _, c := range hostConfig.Capabilities {
@@ -363,7 +371,7 @@ func parseHostsFile(ctx context.Context, baseDir string, b []byte) ([]hostConfig
 		}
 
 		baseKey := []string{}
-		if server != "" {
+		if server != "" && server != c.Server {
 			baseKey = append(baseKey, "host", server)
 		}
 		caKey := append(baseKey, "ca")
@@ -428,6 +436,31 @@ func parseHostsFile(ctx context.Context, baseDir string, b []byte) ([]hostConfig
 			default:
 				return nil, errors.Errorf("invalid type %v for \"client\"", t)
 			}
+		}
+
+		headerKey := append(baseKey, "header")
+		if md.IsDefined(headerKey...) {
+			header := http.Header{}
+			for key, prim := range hostConfig.Header {
+				switch t := md.Type(append(headerKey, key)...); t {
+				case "String":
+					var value string
+					if err := md.PrimitiveDecode(prim, &value); err != nil {
+						return nil, errors.Wrapf(err, "failed to decode header %q", key)
+					}
+					header[key] = []string{value}
+				case "Array":
+					var value []string
+					if err := md.PrimitiveDecode(prim, &value); err != nil {
+						return nil, errors.Wrapf(err, "failed to decode header %q", key)
+					}
+
+					header[key] = value
+				default:
+					return nil, errors.Errorf("invalid type %v for header %q", t, key)
+				}
+			}
+			hosts[i].header = header
 		}
 	}
 

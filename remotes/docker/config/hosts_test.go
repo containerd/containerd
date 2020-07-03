@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
 	"path/filepath"
 	"testing"
 
@@ -76,10 +77,15 @@ func TestParseHostFile(t *testing.T) {
 	const testtoml = `
 server = "https://test-default.registry"
 ca = "/etc/path/default"
+[header]
+  x-custom-1 = "custom header"
 
 [host."https://mirror.registry"]
   capabilities = ["pull"]
   ca = "/etc/certs/mirror.pem"
+  skip_verify = false
+  [host."https://mirror.registry".header]
+    x-custom-2 = ["value1", "value2"]
 
 [host."https://mirror-bak.registry/us"]
   capabilities = ["pull"]
@@ -108,6 +114,7 @@ ca = "/etc/path/default"
 			capabilities: docker.HostCapabilityPull,
 			caCerts:      []string{filepath.FromSlash("/etc/certs/mirror.pem")},
 			skipVerify:   &fb,
+			header:       http.Header{"x-custom-2": {"value1", "value2"}},
 		},
 		{
 			scheme:       "https",
@@ -132,7 +139,6 @@ ca = "/etc/path/default"
 				{filepath.FromSlash("/etc/certs/client.cert"), filepath.FromSlash("/etc/certs/client.key")},
 				{filepath.FromSlash("/etc/certs/client.pem"), ""},
 			},
-			skipVerify: &fb,
 		},
 		{
 			scheme:       "https",
@@ -142,7 +148,6 @@ ca = "/etc/path/default"
 			clientPairs: [][2]string{
 				{filepath.FromSlash("/etc/certs/client.pem")},
 			},
-			skipVerify: &fb,
 		},
 		{
 			scheme:       "https",
@@ -153,14 +158,14 @@ ca = "/etc/path/default"
 				{filepath.FromSlash("/etc/certs/client-1.pem")},
 				{filepath.FromSlash("/etc/certs/client-2.pem")},
 			},
-			skipVerify: &fb,
 		},
 		{
 			scheme:       "https",
 			host:         "test-default.registry",
 			path:         "/v2",
 			capabilities: allCaps,
-			skipVerify:   &fb,
+			caCerts:      []string{filepath.FromSlash("/etc/path/default")},
+			header:       http.Header{"x-custom-1": {"custom header"}},
 		},
 	}
 	hosts, err := parseHostsFile(ctx, "", []byte(testtoml))
@@ -243,6 +248,20 @@ func compareHostConfig(j, k hostConfig) bool {
 		return false
 	}
 
+	if len(j.header) != len(k.header) {
+		return false
+	}
+	for key := range j.header {
+		if len(j.header[key]) != len(k.header[key]) {
+			return false
+		}
+		for i := range j.header[key] {
+			if j.header[key][i] != k.header[key][i] {
+				return false
+			}
+		}
+	}
+
 	return true
 }
 
@@ -260,6 +279,7 @@ func printHostConfig(hc []hostConfig) string {
 		} else {
 			fmt.Fprintf(b, "\t\tskip-verify: %t\n", *hc[i].skipVerify)
 		}
+		fmt.Fprintf(b, "\t\theader: %#v\n", hc[i].header)
 	}
 	return b.String()
 }
