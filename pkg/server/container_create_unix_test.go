@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/devices"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -1193,8 +1194,15 @@ func TestPrivilegedDevices(t *testing.T) {
 		spec, err := c.containerSpec(t.Name(), testSandboxID, testPid, "", testContainerName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 		assert.NoError(t, err)
 
-		hostDevices, err := devices.HostDevices()
+		hostDevicesRaw, err := devices.HostDevices()
 		assert.NoError(t, err)
+		var hostDevices []*libcontainerconfigs.Device
+		for _, dev := range hostDevicesRaw {
+			// https://github.com/containerd/cri/pull/1521#issuecomment-652807951
+			if dev.DeviceRule.Major != 0 {
+				hostDevices = append(hostDevices, dev)
+			}
+		}
 
 		if test.expectHostDevices {
 			assert.Len(t, spec.Linux.Devices, len(hostDevices))

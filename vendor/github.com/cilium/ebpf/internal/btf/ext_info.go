@@ -3,13 +3,13 @@ package btf
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 
 	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/internal"
-
-	"github.com/pkg/errors"
 )
 
 type btfExtHeader struct {
@@ -25,23 +25,21 @@ type btfExtHeader struct {
 }
 
 func parseExtInfos(r io.ReadSeeker, bo binary.ByteOrder, strings stringTable) (funcInfo, lineInfo map[string]extInfo, err error) {
-	const expectedMagic = 0xeB9F
-
 	var header btfExtHeader
 	if err := binary.Read(r, bo, &header); err != nil {
-		return nil, nil, errors.Wrap(err, "can't read header")
+		return nil, nil, fmt.Errorf("can't read header: %v", err)
 	}
 
-	if header.Magic != expectedMagic {
-		return nil, nil, errors.Errorf("incorrect magic value %v", header.Magic)
+	if header.Magic != btfMagic {
+		return nil, nil, fmt.Errorf("incorrect magic value %v", header.Magic)
 	}
 
 	if header.Version != 1 {
-		return nil, nil, errors.Errorf("unexpected version %v", header.Version)
+		return nil, nil, fmt.Errorf("unexpected version %v", header.Version)
 	}
 
 	if header.Flags != 0 {
-		return nil, nil, errors.Errorf("unsupported flags %v", header.Flags)
+		return nil, nil, fmt.Errorf("unsupported flags %v", header.Flags)
 	}
 
 	remainder := int64(header.HdrLen) - int64(binary.Size(&header))
@@ -53,25 +51,25 @@ func parseExtInfos(r io.ReadSeeker, bo binary.ByteOrder, strings stringTable) (f
 	// .BTF ext header. We need to ignore non-null values.
 	_, err = io.CopyN(ioutil.Discard, r, remainder)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "header padding")
+		return nil, nil, fmt.Errorf("header padding: %v", err)
 	}
 
 	if _, err := r.Seek(int64(header.HdrLen+header.FuncInfoOff), io.SeekStart); err != nil {
-		return nil, nil, errors.Wrap(err, "can't seek to function info section")
+		return nil, nil, fmt.Errorf("can't seek to function info section: %v", err)
 	}
 
 	funcInfo, err = parseExtInfo(io.LimitReader(r, int64(header.FuncInfoLen)), bo, strings)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "function info")
+		return nil, nil, fmt.Errorf("function info: %w", err)
 	}
 
 	if _, err := r.Seek(int64(header.HdrLen+header.LineInfoOff), io.SeekStart); err != nil {
-		return nil, nil, errors.Wrap(err, "can't seek to line info section")
+		return nil, nil, fmt.Errorf("can't seek to line info section: %v", err)
 	}
 
 	lineInfo, err = parseExtInfo(io.LimitReader(r, int64(header.LineInfoLen)), bo, strings)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "line info")
+		return nil, nil, fmt.Errorf("line info: %w", err)
 	}
 
 	return funcInfo, lineInfo, nil
@@ -94,7 +92,7 @@ type extInfo struct {
 
 func (ei extInfo) append(other extInfo, offset uint64) (extInfo, error) {
 	if other.recordSize != ei.recordSize {
-		return extInfo{}, errors.Errorf("ext_info record size mismatch, want %d (got %d)", ei.recordSize, other.recordSize)
+		return extInfo{}, fmt.Errorf("ext_info record size mismatch, want %d (got %d)", ei.recordSize, other.recordSize)
 	}
 
 	records := make([]extInfoRecord, 0, len(ei.records)+len(other.records))
@@ -119,7 +117,7 @@ func (ei extInfo) MarshalBinary() ([]byte, error) {
 		// while the ELF tracks it in bytes.
 		insnOff := uint32(info.InsnOff / asm.InstructionSize)
 		if err := binary.Write(buf, internal.NativeEndian, insnOff); err != nil {
-			return nil, errors.Wrap(err, "can't write instruction offset")
+			return nil, fmt.Errorf("can't write instruction offset: %v", err)
 		}
 
 		buf.Write(info.Opaque)
@@ -131,7 +129,7 @@ func (ei extInfo) MarshalBinary() ([]byte, error) {
 func parseExtInfo(r io.Reader, bo binary.ByteOrder, strings stringTable) (map[string]extInfo, error) {
 	var recordSize uint32
 	if err := binary.Read(r, bo, &recordSize); err != nil {
-		return nil, errors.Wrap(err, "can't read record size")
+		return nil, fmt.Errorf("can't read record size: %v", err)
 	}
 
 	if recordSize < 4 {
@@ -145,32 +143,32 @@ func parseExtInfo(r io.Reader, bo binary.ByteOrder, strings stringTable) (map[st
 		if err := binary.Read(r, bo, &infoHeader); err == io.EOF {
 			return result, nil
 		} else if err != nil {
-			return nil, errors.Wrap(err, "can't read ext info header")
+			return nil, fmt.Errorf("can't read ext info header: %v", err)
 		}
 
 		secName, err := strings.Lookup(infoHeader.SecNameOff)
 		if err != nil {
-			return nil, errors.Wrap(err, "can't get section name")
+			return nil, fmt.Errorf("can't get section name: %w", err)
 		}
 
 		if infoHeader.NumInfo == 0 {
-			return nil, errors.Errorf("section %s has invalid number of records", secName)
+			return nil, fmt.Errorf("section %s has invalid number of records", secName)
 		}
 
 		var records []extInfoRecord
 		for i := uint32(0); i < infoHeader.NumInfo; i++ {
 			var byteOff uint32
 			if err := binary.Read(r, bo, &byteOff); err != nil {
-				return nil, errors.Wrapf(err, "section %v: can't read extended info offset", secName)
+				return nil, fmt.Errorf("section %v: can't read extended info offset: %v", secName, err)
 			}
 
 			buf := make([]byte, int(recordSize-4))
 			if _, err := io.ReadFull(r, buf); err != nil {
-				return nil, errors.Wrapf(err, "section %v: can't read record", secName)
+				return nil, fmt.Errorf("section %v: can't read record: %v", secName, err)
 			}
 
 			if byteOff%asm.InstructionSize != 0 {
-				return nil, errors.Errorf("section %v: offset %v is not aligned with instruction size", secName, byteOff)
+				return nil, fmt.Errorf("section %v: offset %v is not aligned with instruction size", secName, byteOff)
 			}
 
 			records = append(records, extInfoRecord{uint64(byteOff), buf})

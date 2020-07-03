@@ -13,8 +13,6 @@ const (
 	Permissive = 0
 	// Disabled constant to indicate SELinux is disabled
 	Disabled = -1
-	// DefaultCategoryRange is the upper bound on the category range
-	DefaultCategoryRange = uint32(1024)
 )
 
 var (
@@ -22,8 +20,6 @@ var (
 	ErrMCSAlreadyExists = errors.New("MCS label already exists")
 	// ErrEmptyPath is returned when an empty path has been specified.
 	ErrEmptyPath = errors.New("empty path")
-	// CategoryRange allows the upper bound on the category range to be adjusted
-	CategoryRange = DefaultCategoryRange
 )
 
 // Context is a representation of the SELinux label broken into 4 parts
