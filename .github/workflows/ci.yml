@@ -51,7 +51,7 @@ jobs:
       - name: DCO
         env:
           GITHUB_COMMIT_URL: ${{ github.event.pull_request.commits_url }}
-          DCO_VERBOSITY: "-q"
+          DCO_VERBOSITY: "-v"
           DCO_RANGE: ""
         working-directory: src/github.com/containerd/cri
         run: |
