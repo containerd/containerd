@@ -2,11 +2,11 @@ package internal
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/cilium/ebpf/internal/unix"
-	"github.com/pkg/errors"
 )
 
 // ErrorWithLog returns an error that includes logs from the
@@ -16,28 +16,25 @@ import (
 // the log. It is used to check for truncation of the output.
 func ErrorWithLog(err error, log []byte, logErr error) error {
 	logStr := strings.Trim(CString(log), "\t\r\n ")
-	if errors.Cause(logErr) == unix.ENOSPC {
+	if errors.Is(logErr, unix.ENOSPC) {
 		logStr += " (truncated...)"
 	}
 
-	return &loadError{err, logStr}
+	return &VerifierError{err, logStr}
 }
 
-type loadError struct {
+// VerifierError includes information from the eBPF verifier.
+type VerifierError struct {
 	cause error
 	log   string
 }
 
-func (le *loadError) Error() string {
+func (le *VerifierError) Error() string {
 	if le.log == "" {
 		return le.cause.Error()
 	}
 
 	return fmt.Sprintf("%s: %s", le.cause, le.log)
-}
-
-func (le *loadError) Cause() error {
-	return le.cause
 }
 
 // CString turns a NUL / zero terminated byte buffer into a string.
