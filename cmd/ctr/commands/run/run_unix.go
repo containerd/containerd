@@ -54,6 +54,10 @@ var platformRunFlags = []cli.Flag{
 		Name:  "gidmap",
 		Usage: "run inside a user namespace with the specified GID mapping range; specified with the format `container-gid:host-gid:length`",
 	},
+	cli.BoolFlag{
+		Name:  "remap-labels",
+		Usage: "provide the user namespace ID remapping to the snapshotter via label options; requires snapshotter support",
+	},
 }
 
 // NewContainer creates a new container
@@ -137,8 +141,12 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 				}
 				opts = append(opts,
 					oci.WithUserNamespace([]specs.LinuxIDMapping{uidMap}, []specs.LinuxIDMapping{gidMap}))
-				if context.Bool("read-only") {
-					cOpts = append(cOpts, containerd.WithRemappedSnapshotView(id, image, uidMap.HostID, gidMap.HostID))
+				// use snapshotter opts or the remapped snapshot support to shift the filesystem
+				// currently the only snapshotter known to support the labels is fuse-overlayfs:
+				// https://github.com/AkihiroSuda/containerd-fuse-overlayfs
+				if context.Bool("remap-labels") {
+					cOpts = append(cOpts, containerd.WithNewSnapshot(id, image,
+						containerd.WithRemapperLabels(0, uidMap.HostID, 0, gidMap.HostID, uidMap.Size)))
 				} else {
 					cOpts = append(cOpts, containerd.WithRemappedSnapshot(id, image, uidMap.HostID, gidMap.HostID))
 				}
