@@ -20,6 +20,9 @@ package cio
 
 import (
 	"context"
+	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -53,5 +56,48 @@ func TestOpenFifos(t *testing.T) {
 	for _, scenario := range scenarios {
 		_, err := openFifos(context.Background(), scenario)
 		assert.Assert(t, err != nil, scenario)
+	}
+}
+
+// TestOpenFifosWithTerminal tests openFifos should not open stderr if terminal
+// is set.
+func TestOpenFifosWithTerminal(t *testing.T) {
+	var ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+
+	ioFifoDir, err := ioutil.TempDir("", fmt.Sprintf("cio-%s", t.Name()))
+	if err != nil {
+		t.Fatalf("unexpected error during creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(ioFifoDir)
+
+	cfg := Config{
+		Stdout: filepath.Join(ioFifoDir, "test-stdout"),
+		Stderr: filepath.Join(ioFifoDir, "test-stderr"),
+	}
+
+	// Without terminal, pipes.Stderr should not be nil
+	{
+		p, err := openFifos(ctx, NewFIFOSet(cfg, nil))
+		if err != nil {
+			t.Fatalf("unexpected error during openFifos: %v", err)
+		}
+
+		if p.Stderr == nil {
+			t.Fatalf("unexpected empty stderr pipe")
+		}
+	}
+
+	// With terminal, pipes.Stderr should be nil
+	{
+		cfg.Terminal = true
+		p, err := openFifos(ctx, NewFIFOSet(cfg, nil))
+		if err != nil {
+			t.Fatalf("unexpected error during openFifos: %v", err)
+		}
+
+		if p.Stderr != nil {
+			t.Fatalf("unexpected stderr pipe")
+		}
 	}
 }
