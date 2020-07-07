@@ -36,7 +36,9 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/plugin"
 	_ "github.com/containerd/containerd/runtime"
+	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -632,6 +634,15 @@ func TestContainerKill(t *testing.T) {
 	}
 }
 
+func getRuntimeVersion() string {
+	switch rt := os.Getenv("TEST_RUNTIME"); rt {
+	case plugin.RuntimeRuncV1, plugin.RuntimeRuncV2:
+		return "v2"
+	default:
+		return "v1"
+	}
+}
+
 func TestKillContainerDeletedByRunc(t *testing.T) {
 	t.Parallel()
 
@@ -659,10 +670,19 @@ func TestKillContainerDeletedByRunc(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	var opts interface{}
+	runtimeVersion := getRuntimeVersion()
+	switch runtimeVersion {
+	case "v1":
+		opts = &runctypes.RuncOptions{RuntimeRoot: runcRoot}
+	case "v2":
+		opts = &options.Options{Root: runcRoot}
+	}
 	container, err := client.NewContainer(ctx, id,
 		WithNewSnapshot(id, image),
 		WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "10")),
-		WithRuntime(client.runtime, &options.Options{Root: runcRoot}))
+		WithRuntime(client.runtime, opts))
 	if err != nil {
 		t.Fatal(err)
 	}
