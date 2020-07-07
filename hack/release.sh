@@ -42,6 +42,8 @@ OFFICIAL_RELEASE=${OFFICIAL_RELEASE:-false}
 # LOCAL_RELEASE indicates that containerd has been built and released
 # locally.
 LOCAL_RELEASE=${LOCAL_RELEASE:-false}
+GOOS=$(go env GOOS)
+GOARCH=$(go env GOARCH)
 
 
 destdir=${BUILD_DIR}/release-stage
@@ -66,7 +68,7 @@ download_containerd() {
 
 # copy_local_containerd copies local containerd release.
 copy_local_containerd() {
-  local -r tarball="${GOPATH}/src/github.com/containerd/containerd/releases/containerd-${VERSION}.linux-amd64.tar.gz"
+  local -r tarball="${GOPATH}/src/github.com/containerd/containerd/releases/containerd-${VERSION}.${GOOS}-${GOARCH}.tar.gz"
   if [[ ! -e "${tarball}" ]]; then
     echo "Containerd release is not built"
     exit 1
