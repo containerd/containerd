@@ -19,7 +19,6 @@ package exchange
 import (
 	"context"
 	"reflect"
-	"sync"
 	"testing"
 	"time"
 
@@ -221,11 +220,8 @@ func TestExchangeFilters(t *testing.T) {
 	}
 
 	t.Log("publish")
-	var wg sync.WaitGroup
-	wg.Add(1)
 	errChan := make(chan error)
 	go func() {
-		defer wg.Done()
 		defer close(errChan)
 		for _, es := range testEventSets {
 			for _, e := range es.events {
@@ -240,7 +236,6 @@ func TestExchangeFilters(t *testing.T) {
 	}()
 
 	t.Log("waiting")
-	wg.Wait()
 	if err := <-errChan; err != nil {
 		t.Fatal(err)
 	}
