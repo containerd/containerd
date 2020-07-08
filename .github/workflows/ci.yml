@@ -258,7 +258,7 @@ jobs:
 
     strategy:
       matrix:
-        runtime: [v1]
+        runtime: [io.containerd.runc.v1]
 
     steps:
       - name: Install Go
@@ -324,10 +324,10 @@ jobs:
 
     strategy:
       matrix:
-        runtime: [v1, v2]
+        runtime: [io.containerd.runc.v1, io.containerd.runc.v2]
         runc: [runc, crun]
         exclude:
-          - runtime: v1
+          - runtime: io.containerd.runc.v1
             runc: crun
 
     steps:
@@ -395,7 +395,7 @@ jobs:
       - name: Integration 1
         env:
           GOPROXY: direct
-          TEST_RUNTIME: io.containerd.runc.${{ matrix.runtime }}
+          TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
         run: |
           sudo GOPATH=$GOPATH GOPROXY=$GOPROXY TEST_RUNTIME=$TEST_RUNTIME RUNC_FLAVOR=$RUNC_FLAVOR make integration EXTRA_TESTFLAGS=-no-criu TESTFLAGS_RACE=-race
@@ -405,7 +405,7 @@ jobs:
       - name: Integration 2
         env:
           GOPROXY: direct
-          TEST_RUNTIME: io.containerd.runc.${{ matrix.runtime }}
+          TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
         run: |
           sudo GOPATH=$GOPATH GOPROXY=$GOPROXY TEST_RUNTIME=$TEST_RUNTIME RUNC_FLAVOR=$RUNC_FLAVOR TESTFLAGS_PARALLEL=1 make integration EXTRA_TESTFLAGS=-no-criu
@@ -413,7 +413,7 @@ jobs:
 
       - name: CRI test
         env:
-          TEST_RUNTIME: io.containerd.runc.${{ matrix.runtime }}
+          TEST_RUNTIME: ${{ matrix.runtime }}
         run: |
           sudo mkdir -p /etc/containerd
           sudo bash -c "cat > /etc/containerd/config.toml <<EOF
