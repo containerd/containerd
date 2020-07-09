@@ -153,7 +153,7 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		got, err := updateOCILinuxResource(context.Background(), test.spec, test.resources, false)
+		got, err := updateOCILinuxResource(context.Background(), test.spec, test.resources, false, false)
 		if test.expectErr {
 			assert.Error(t, err)
 		} else {
