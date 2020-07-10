@@ -430,7 +430,7 @@ jobs:
           test $TEST_RC -eq 0 || /bin/false
 
   cgroup2:
-    name: cgroup2
+    name: CGroups v2 Integration Test
     # nested virtualization is only available on macOS hosts
     runs-on: macos-10.15
     timeout-minutes: 40
