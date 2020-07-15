@@ -21,7 +21,7 @@
 set -eu -o pipefail
 
 go get -u github.com/onsi/ginkgo/ginkgo
-CRITEST_COMMIT=v1.16.1
+CRITEST_COMMIT=16911795a3c33833fa0ec83dac1ade3172f6989e
 go get -d github.com/kubernetes-sigs/cri-tools/...
 cd "$GOPATH"/src/github.com/kubernetes-sigs/cri-tools
 git checkout $CRITEST_COMMIT
