@@ -341,16 +341,17 @@ jobs:
         env:
           TEST_RUNTIME: io.containerd.${{ matrix.runtime }}
         run: |
-          sudo mkdir -p /etc/containerd
-          sudo bash -c "cat > /etc/containerd/config.toml <<EOF
+          BDIR="$(mktemp -d -p $PWD)"
+          mkdir -p ${BDIR}/{root,state}
+          cat > ${BDIR}/config.toml <<EOF
             [plugins.cri.containerd.default_runtime]
               runtime_type = \"${TEST_RUNTIME}\"
-          EOF"
-          sudo PATH=$PATH containerd -log-level debug &> /tmp/containerd-cri.log &
-          sudo ctr version
-          sudo PATH=$PATH GOPATH=$GOPATH critest --runtime-endpoint=/var/run/containerd/containerd.sock --parallel=8
+          EOF
+          sudo PATH=$PATH BDIR=$BDIR /usr/local/bin/containerd -a ${BDIR}/c.sock -root ${BDIR}/root -state ${BDIR}/state -log-level debug &> ${BDIR}/containerd-cri.log &
+          sudo BDIR=$BDIR /usr/local/bin/ctr -a ${BDIR}/c.sock version
+          sudo PATH=$PATH BDIR=$BDIR GOPATH=$GOPATH critest --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8
           TEST_RC=$?
-          test $TEST_RC -ne 0 && cat /tmp/containerd-cri.log
+          test $TEST_RC -ne 0 && cat ${BDIR}/containerd-cri.log
           sudo pkill containerd
-          sudo rm -rf /etc/containerd
+          sudo BDIR=$BDIR rm -rf ${BDIR}
           test $TEST_RC -eq 0 || /bin/false
