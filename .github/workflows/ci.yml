@@ -256,10 +256,6 @@ jobs:
     timeout-minutes: 30
     needs: [project, linters, protos, man]
 
-    strategy:
-      matrix:
-        runtime: [io.containerd.runc.v1]
-
     steps:
       - name: Install Go
         uses: actions/setup-go@v1
