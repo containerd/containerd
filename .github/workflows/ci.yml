@@ -324,10 +324,12 @@ jobs:
 
     strategy:
       matrix:
-        runtime: [io.containerd.runc.v1, io.containerd.runc.v2]
+        runtime: [io.containerd.runtime.v1.linux, io.containerd.runc.v1, io.containerd.runc.v2]
         runc: [runc, crun]
         exclude:
           - runtime: io.containerd.runc.v1
+            runc: crun
+          - runtime: io.containerd.runtime.v1.linux
             runc: crun
 
     steps:
