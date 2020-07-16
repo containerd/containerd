@@ -36,6 +36,10 @@ func (m *Mount) Mount(target string) error {
 		return errors.Errorf("invalid windows mount type: '%s'", m.Type)
 	}
 
+	if m.Source != target {
+		return errors.Wrapf(ErrNotImplementOnWindows, "layer %s must mount in-place, not at %s", m.Source, target)
+	}
+
 	home, layerID := filepath.Split(m.Source)
 
 	parentLayerPaths, err := m.GetParentPaths()
