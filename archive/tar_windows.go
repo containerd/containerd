@@ -131,6 +131,17 @@ func setxattr(path, key, value string) error {
 	return errors.New("xattrs not supported on Windows")
 }
 
+func copyDirInfo(fi os.FileInfo, path string) error {
+	if err := os.Chmod(path, fi.Mode()); err != nil {
+		return errors.Wrapf(err, "failed to chmod %s", path)
+	}
+	return nil
+}
+
+func copyUpXAttrs(dst, src string) error {
+	return nil
+}
+
 // applyWindowsLayer applies a tar stream of an OCI style diff tar of a Windows
 // layer using the hcsshim layer writer and backup streams.
 // See https://github.com/opencontainers/image-spec/blob/master/layer.md#applying-changesets
@@ -247,15 +258,4 @@ func tarToBackupStreamWithMutatedFiles(buf *bufio.Writer, w io.Writer, t *tar.Re
 	}()
 
 	return backuptar.WriteBackupStreamFromTarFile(buf, t, hdr)
-}
-
-func copyDirInfo(fi os.FileInfo, path string) error {
-	if err := os.Chmod(path, fi.Mode()); err != nil {
-		return errors.Wrapf(err, "failed to chmod %s", path)
-	}
-	return nil
-}
-
-func copyUpXAttrs(dst, src string) error {
-	return nil
 }
