@@ -158,7 +158,7 @@ func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 // Compare creates a diff between the given mounts and uploads the result
 // to the content store.
 func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
-	return emptyDesc, errdefs.ErrNotImplemented
+	return emptyDesc, errors.Wrap(errdefs.ErrNotImplemented, "windowsDiff does not implement Compare method")
 }
 
 type readCounter struct {
@@ -181,7 +181,7 @@ func mountsToLayerAndParents(mounts []mount.Mount) (string, []string, error) {
 		// This is a special case error. When this is received the diff service
 		// will attempt the next differ in the chain which for Windows is the
 		// lcow differ that we want.
-		return "", nil, errdefs.ErrNotImplemented
+		return "", nil, errors.Wrapf(errdefs.ErrNotImplemented, "windowsDiff does not support layer type %s", mnt.Type)
 	}
 
 	parentLayerPaths, err := mnt.GetParentPaths()

@@ -23,6 +23,7 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 )
 
 // mediatype definitions for image components handled in containerd.
@@ -81,7 +82,7 @@ func DiffCompression(ctx context.Context, mediaType string) (string, error) {
 		}
 		return "", nil
 	default:
-		return "", errdefs.ErrNotImplemented
+		return "", errors.Wrapf(errdefs.ErrNotImplemented, "unrecognised mediatype %s", mediaType)
 	}
 }
 
