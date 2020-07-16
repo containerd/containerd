@@ -40,6 +40,12 @@ func (m *Mount) Mount(target string) error {
 		return errors.Wrapf(ErrNotImplementOnWindows, "layer %s must mount in-place, not at %s", m.Source, target)
 	}
 
+	for _, opt := range m.Options {
+		if opt == "ro" {
+			return errors.Wrapf(ErrNotImplementOnWindows, "layer %s cannot be mounted read-only", m.Source)
+		}
+	}
+
 	home, layerID := filepath.Split(m.Source)
 
 	parentLayerPaths, err := m.GetParentPaths()
