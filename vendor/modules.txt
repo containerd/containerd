@@ -4,6 +4,7 @@ github.com/BurntSushi/toml
 # github.com/Microsoft/go-winio v0.4.15
 ## explicit
 github.com/Microsoft/go-winio
+github.com/Microsoft/go-winio/backuptar
 github.com/Microsoft/go-winio/pkg/etw
 github.com/Microsoft/go-winio/pkg/etwlogrus
 github.com/Microsoft/go-winio/pkg/fs

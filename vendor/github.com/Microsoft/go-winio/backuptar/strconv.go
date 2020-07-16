@@ -1,34 +1,16 @@
-// +build windows
-
-/*
-   Copyright The containerd Authors.
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-*/
-
-package archive
+package backuptar
 
 import (
+	"archive/tar"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
-
-	"archive/tar"
 )
 
-// Forked from https://github.com/golang/go/blob/master/src/archive/tar/strconv.go
-// as archive/tar doesn't support CreationTime, but does handle PAX time parsing,
-// and there's no need to re-invent the wheel.
+// Functions copied from https://github.com/golang/go/blob/master/src/archive/tar/strconv.go
+// as we need to manage the LIBARCHIVE.creationtime PAXRecord manually.
+// Idea taken from containerd which did the same thing.
 
 // parsePAXTime takes a string of the form %d.%d as described in the PAX
 // specification. Note that this implementation allows for negative timestamps,
@@ -62,7 +44,25 @@ func parsePAXTime(s string) (time.Time, error) {
 	}
 	nsecs, _ := strconv.ParseInt(sn, 10, 64) // Must succeed
 	if len(ss) > 0 && ss[0] == '-' {
-		return time.Unix(secs, -nsecs), nil // Negative correction
+		return time.Unix(secs, -1*nsecs), nil // Negative correction
 	}
 	return time.Unix(secs, nsecs), nil
+}
+
+// formatPAXTime converts ts into a time of the form %d.%d as described in the
+// PAX specification. This function is capable of negative timestamps.
+func formatPAXTime(ts time.Time) (s string) {
+	secs, nsecs := ts.Unix(), ts.Nanosecond()
+	if nsecs == 0 {
+		return strconv.FormatInt(secs, 10)
+	}
+
+	// If seconds is negative, then perform correction.
+	sign := ""
+	if secs < 0 {
+		sign = "-"             // Remember sign
+		secs = -(secs + 1)     // Add a second to secs
+		nsecs = -(nsecs - 1e9) // Take that second away from nsecs
+	}
+	return strings.TrimRight(fmt.Sprintf("%s%d.%09d", sign, secs, nsecs), "0")
 }
