@@ -68,6 +68,7 @@ func DefaultConfig() PluginConfig {
 		MaxConcurrentDownloads:           3,
 		DisableProcMount:                 false,
 		TolerateMissingHugetlbController: true,
+		DisableHugetlbController:         true,
 		IgnoreImageDefinedVolumes:        false,
 	}
 }
