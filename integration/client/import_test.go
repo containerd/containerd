@@ -25,7 +25,6 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"reflect"
-	"runtime"
 	"testing"
 
 	. "github.com/containerd/containerd"
@@ -41,8 +40,7 @@ import (
 // TestExportAndImport exports testImage as a tar stream,
 // and import the tar stream as a new image.
 func TestExportAndImport(t *testing.T) {
-	// TODO: support windows
-	if testing.Short() || runtime.GOOS == "windows" {
+	if testing.Short() {
 		t.Skip()
 	}
 	ctx, cancel := testContext(t)

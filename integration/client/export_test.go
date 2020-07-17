@@ -20,7 +20,6 @@ import (
 	"archive/tar"
 	"bytes"
 	"io"
-	"runtime"
 	"testing"
 
 	. "github.com/containerd/containerd"
@@ -30,8 +29,7 @@ import (
 
 // TestExport exports testImage as a tar stream
 func TestExport(t *testing.T) {
-	// TODO: support windows
-	if testing.Short() || runtime.GOOS == "windows" {
+	if testing.Short() {
 		t.Skip()
 	}
 	ctx, cancel := testContext(t)
