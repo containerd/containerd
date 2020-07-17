@@ -94,7 +94,7 @@ func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 				"digest": desc.Digest,
 				"size":   desc.Size,
 				"media":  desc.MediaType,
-			}).Debugf("diff applied")
+			}).Debug("diff applied")
 		}
 	}()
 
