@@ -289,15 +289,15 @@ func parseIDMapping(mapping string) (specs.LinuxIDMapping, error) {
 	if len(parts) != 3 {
 		return specs.LinuxIDMapping{}, errors.New("user namespace mappings require the format `container-id:host-id:size`")
 	}
-	cID, err := strconv.ParseUint(parts[0], 0, 16)
+	cID, err := strconv.ParseUint(parts[0], 0, 32)
 	if err != nil {
 		return specs.LinuxIDMapping{}, errors.Wrapf(err, "invalid container id for user namespace remapping")
 	}
-	hID, err := strconv.ParseUint(parts[1], 0, 16)
+	hID, err := strconv.ParseUint(parts[1], 0, 32)
 	if err != nil {
 		return specs.LinuxIDMapping{}, errors.Wrapf(err, "invalid host id for user namespace remapping")
 	}
-	size, err := strconv.ParseUint(parts[2], 0, 16)
+	size, err := strconv.ParseUint(parts[2], 0, 32)
 	if err != nil {
 		return specs.LinuxIDMapping{}, errors.Wrapf(err, "invalid size for user namespace remapping")
 	}
