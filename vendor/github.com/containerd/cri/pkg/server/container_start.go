@@ -24,6 +24,8 @@ import (
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/nri"
+	v1 "github.com/containerd/nri/types/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -97,19 +99,31 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		return nil, errors.Wrap(err, "failed to get container info")
 	}
 
+	nric, err := nri.New()
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to create nri client")
+	}
+
 	taskOpts := c.taskOpts(ctrInfo.Runtime.Name)
 	task, err := container.NewTask(ctx, ioCreation, taskOpts...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create containerd task")
 	}
+	nriSB := &nri.Sandbox{
+		ID: sandboxID,
+	}
 	defer func() {
 		if retErr != nil {
 			deferCtx, deferCancel := ctrdutil.DeferContext()
 			defer deferCancel()
+			if _, err := nric.InvokeWithSandbox(deferCtx, task, v1.Delete, nriSB); err != nil {
+				log.G(ctx).WithError(err).Errorf("Failed to delete nri for %q", id)
+			}
 			// It's possible that task is deleted by event monitor.
 			if _, err := task.Delete(deferCtx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
 				log.G(ctx).WithError(err).Errorf("Failed to delete containerd task %q", id)
 			}
+
 		}
 	}()
 
@@ -118,7 +132,9 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wait for containerd task")
 	}
-
+	if _, err := nric.InvokeWithSandbox(ctx, task, v1.Create, nriSB); err != nil {
+		return nil, errors.Wrap(err, "nri invoke")
+	}
 	// Start containerd task.
 	if err := task.Start(ctx); err != nil {
 		return nil, errors.Wrapf(err, "failed to start containerd task %q", id)

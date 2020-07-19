@@ -25,6 +25,8 @@ import (
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
+	"github.com/containerd/nri"
+	v1 "github.com/containerd/nri/types/v1"
 	"github.com/containerd/typeurl"
 	gogotypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
@@ -296,6 +298,14 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 
 // handleContainerExit handles TaskExit event for container.
 func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr containerstore.Container) error {
+	nric, err := nri.New()
+	if err != nil {
+		return errors.Wrap(err, "unable to create nri client")
+	}
+	nriSB := &nri.Sandbox{
+		ID: cntr.SandboxID,
+	}
+
 	// Attach container IO so that `Delete` could cleanup the stream properly.
 	task, err := cntr.Container.Task(ctx,
 		func(*containerdio.FIFOSet) (containerdio.IO, error) {
@@ -317,6 +327,9 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 		}
 	} else {
 		// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
+		if _, err := nric.InvokeWithSandbox(ctx, task, v1.Delete, nriSB); err != nil {
+			return errors.Wrap(err, "failed to delete nri resources")
+		}
 		if _, err = task.Delete(ctx, containerd.WithProcessKill); err != nil {
 			if !errdefs.IsNotFound(err) {
 				return errors.Wrap(err, "failed to stop container")
@@ -352,6 +365,14 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 // handleSandboxExit handles TaskExit event for sandbox.
 func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxstore.Sandbox) error {
 	// No stream attached to sandbox container.
+	nric, err := nri.New()
+	if err != nil {
+		return errors.Wrap(err, "unable to create nri client")
+	}
+	nriSB := &nri.Sandbox{
+		ID: sb.ID,
+	}
+
 	task, err := sb.Container.Task(ctx, nil)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
@@ -362,6 +383,9 @@ func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxst
 		if _, err = task.Delete(ctx, containerd.WithProcessKill); err != nil {
 			if !errdefs.IsNotFound(err) {
 				return errors.Wrap(err, "failed to stop sandbox")
+			}
+			if _, err := nric.InvokeWithSandbox(ctx, task, v1.Delete, nriSB); err != nil {
+				return errors.Wrap(err, "failed to delete nri resources")
 			}
 			// Move on to make sure container status is updated.
 		}

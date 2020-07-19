@@ -29,6 +29,8 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands/tasks"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/nri"
+	types "github.com/containerd/nri/types/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -121,6 +123,7 @@ var Command = cli.Command{
 		},
 	}, append(platformRunFlags, append(commands.SnapshotterFlags, commands.ContainerFlags...)...)...),
 	Action: func(context *cli.Context) error {
+
 		var (
 			err error
 			id  string
@@ -130,6 +133,10 @@ var Command = cli.Command{
 			detach = context.Bool("detach")
 			config = context.IsSet("config")
 		)
+		nric, err := nri.New()
+		if err != nil {
+			return errors.Wrap(err, "unable to create nri client")
+		}
 
 		if config {
 			id = context.Args().First()
@@ -185,6 +192,16 @@ var Command = cli.Command{
 				return err
 			}
 		}
+		if _, err := nric.Invoke(ctx, task, types.Create); err != nil {
+			task.Delete(ctx, containerd.WithProcessKill)
+			container.Delete(ctx, containerd.WithSnapshotCleanup)
+			return errors.Wrap(err, "nri invoke")
+		}
+		defer func() {
+			if _, err := nric.Invoke(ctx, task, types.Delete); err != nil {
+				fmt.Println(err)
+			}
+		}()
 		if err := task.Start(ctx); err != nil {
 			return err
 		}

@@ -27,6 +27,8 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	cni "github.com/containerd/go-cni"
+	"github.com/containerd/nri"
+	v1 "github.com/containerd/nri/types/v1"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
@@ -258,16 +260,27 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	log.G(ctx).Tracef("Create sandbox container (id=%q, name=%q).",
 		id, name)
 
+	nric, err := nri.New()
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to create nri client")
+	}
+
 	taskOpts := c.taskOpts(ociRuntime.Type)
 	// We don't need stdio for sandbox container.
 	task, err := container.NewTask(ctx, containerdio.NullIO, taskOpts...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create containerd task")
 	}
+	nriSB := &nri.Sandbox{
+		ID: id,
+	}
 	defer func() {
 		if retErr != nil {
 			deferCtx, deferCancel := ctrdutil.DeferContext()
 			defer deferCancel()
+			if _, err := nric.InvokeWithSandbox(deferCtx, task, v1.Delete, nriSB); err != nil {
+				log.G(ctx).WithError(err).Errorf("Failed to delete nri for %q", id)
+			}
 			// Cleanup the sandbox container if an error is returned.
 			if _, err := task.Delete(deferCtx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
 				log.G(ctx).WithError(err).Errorf("Failed to delete sandbox container %q", id)
@@ -280,7 +293,9 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wait for sandbox container task")
 	}
-
+	if _, err := nric.InvokeWithSandbox(ctx, task, v1.Create, nriSB); err != nil {
+		return nil, errors.Wrap(err, "nri invoke")
+	}
 	if err := task.Start(ctx); err != nil {
 		return nil, errors.Wrapf(err, "failed to start sandbox container task %q", id)
 	}
