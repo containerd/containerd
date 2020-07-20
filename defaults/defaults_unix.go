@@ -34,4 +34,6 @@ const (
 	DefaultFIFODir = "/run/containerd/fifo"
 	// DefaultRuntime is the default linux runtime
 	DefaultRuntime = "io.containerd.runc.v2"
+	// DefaultOOMScore is the default OOM score for the containerd daemon
+	DefaultOOMScore = -999
 )
