@@ -22,6 +22,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"path"
 	"strings"
 
@@ -276,6 +277,10 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 			ctx := log.WithLogger(ctx, log.G(ctx).WithField("host", host.Host))
 
 			req := base.request(host, http.MethodHead, u...)
+			if err := req.addNamespace(base.refspec.Hostname()); err != nil {
+				return "", ocispec.Descriptor{}, err
+			}
+
 			for key, value := range r.resolveHeader {
 				req.header[key] = append(req.header[key], value...)
 			}
@@ -322,6 +327,10 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				log.G(ctx).Debug("no Docker-Content-Digest header, fetching manifest instead")
 
 				req = base.request(host, http.MethodGet, u...)
+				if err := req.addNamespace(base.refspec.Hostname()); err != nil {
+					return "", ocispec.Descriptor{}, err
+				}
+
 				for key, value := range r.resolveHeader {
 					req.header[key] = append(req.header[key], value...)
 				}
@@ -414,10 +423,10 @@ func (r *dockerResolver) Pusher(ctx context.Context, ref string) (remotes.Pusher
 }
 
 type dockerBase struct {
-	refspec   reference.Spec
-	namespace string
-	hosts     []RegistryHost
-	header    http.Header
+	refspec    reference.Spec
+	repository string
+	hosts      []RegistryHost
+	header     http.Header
 }
 
 func (r *dockerResolver) base(refspec reference.Spec) (*dockerBase, error) {
@@ -427,10 +436,10 @@ func (r *dockerResolver) base(refspec reference.Spec) (*dockerBase, error) {
 		return nil, err
 	}
 	return &dockerBase{
-		refspec:   refspec,
-		namespace: strings.TrimPrefix(refspec.Locator, host+"/"),
-		hosts:     hosts,
-		header:    r.header,
+		refspec:    refspec,
+		repository: strings.TrimPrefix(refspec.Locator, host+"/"),
+		hosts:      hosts,
+		header:     r.header,
 	}, nil
 }
 
@@ -451,7 +460,7 @@ func (r *dockerBase) request(host RegistryHost, method string, ps ...string) *re
 	for key, value := range host.Header {
 		header[key] = append(header[key], value...)
 	}
-	parts := append([]string{"/", host.Path, r.namespace}, ps...)
+	parts := append([]string{"/", host.Path, r.repository}, ps...)
 	p := path.Join(parts...)
 	// Join strips trailing slash, re-add ending "/" if included
 	if len(parts) > 0 && strings.HasSuffix(parts[len(parts)-1], "/") {
@@ -474,6 +483,29 @@ func (r *request) authorize(ctx context.Context, req *http.Request) error {
 	}
 
 	return nil
+}
+
+func (r *request) addNamespace(ns string) (err error) {
+	if !r.host.isProxy(ns) {
+		return nil
+	}
+	var q url.Values
+	// Parse query
+	if i := strings.IndexByte(r.path, '?'); i > 0 {
+		r.path = r.path[:i+1]
+		q, err = url.ParseQuery(r.path[i+1:])
+		if err != nil {
+			return
+		}
+	} else {
+		r.path = r.path + "?"
+		q = url.Values{}
+	}
+	q.Add("ns", ns)
+
+	r.path = r.path + q.Encode()
+
+	return
 }
 
 type request struct {
