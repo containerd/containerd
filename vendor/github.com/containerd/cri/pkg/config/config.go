@@ -236,6 +236,10 @@ type PluginConfig struct {
 	// container requests with huge page limits if the cgroup controller for hugepages is not present.
 	// This helps with supporting Kubernetes <=1.18 out of the box. (default is `true`)
 	TolerateMissingHugetlbController bool `toml:"tolerate_missing_hugetlb_controller" json:"tolerateMissingHugetlbController"`
+	// DisableHugetlbController indicates to silently disable the hugetlb controller, even when it is
+	// present in /sys/fs/cgroup/cgroup.controllers.
+	// This helps with running rootless mode + cgroup v2 + systemd but without hugetlb delegation.
+	DisableHugetlbController bool `toml:"disable_hugetlb_controller" json:"disableHugetlbController"`
 	// IgnoreImageDefinedVolumes ignores volumes defined by the image. Useful for better resource
 	// isolation, security and early detection of issues in the mount configuration when using
 	// ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
