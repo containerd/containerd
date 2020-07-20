@@ -434,12 +434,16 @@ jobs:
     runs-on: macos-10.15
     timeout-minutes: 40
     needs: [project, linters, protos, man]
-
+    strategy:
+      matrix:
+        runc: [runc, crun]
     steps:
       - name: Checkout containerd
         uses: actions/checkout@v2
 
       - name: Start vagrant
+        env:
+          RUNC_FLAVOR: ${{ matrix.runc }}
         run: vagrant up
 
       - name: Integration
