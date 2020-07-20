@@ -35,6 +35,10 @@ version = 2
   # enable_selinux indicates to enable the selinux support.
   enable_selinux = false
 
+  # selinux_category_range allows the upper bound on the category range to be set.
+  # if not specified or set to 0, defaults to 1024 from the selinux package.
+  selinux_category_range = 1024
+
   # sandbox_image is the image used by sandbox container.
   sandbox_image = "k8s.gcr.io/pause:3.2"
 
