@@ -303,7 +303,7 @@ func longestCommonPrefix(strs []string) string {
 	}
 
 	// find out the common part between min and max
-	for i := 0; i < len(min) && i < len(max); i++ {
+	for i := 0; i < len(min); i++ {
 		if min[i] != max[i] {
 			return min[:i]
 		}
