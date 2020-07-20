@@ -738,9 +738,7 @@ func (s *service) forward(ctx context.Context, publisher shim.Publisher) {
 	ns, _ := namespaces.Namespace(ctx)
 	ctx = namespaces.WithNamespace(context.Background(), ns)
 	for e := range s.events {
-		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		err := publisher.Publish(ctx, runc.GetTopic(e), e)
-		cancel()
 		if err != nil {
 			logrus.WithError(err).Error("post event")
 		}
