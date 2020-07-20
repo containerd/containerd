@@ -26,11 +26,10 @@ Vagrant.configure("2") do |config|
     v.memory = 2048
     v.cpus = 2
   end
-  config.vm.provision "shell", inline: <<-SHELL
+  config.vm.provision "shell", env: {"RUNC_FLAVOR"=>ENV["RUNC_FLAVOR"]}, inline: <<-SHELL
     set -eux -o pipefail
     # configuration
     GO_VERSION="1.13.14"
-    RUNC_FLAVOR="crun"
 
     # install dnf deps
     dnf install -y container-selinux gcc git iptables libseccomp-devel lsof make
@@ -57,7 +56,7 @@ EOF
     cd /root/go/src/github.com/containerd/containerd
 
     # install runc (or crun) and other components
-    RUNC_FLAVOR=$RUNC_FLAVOR ./script/setup/install-runc
+    ./script/setup/install-runc
     ./script/setup/install-cni
     ./script/setup/install-critools
 
