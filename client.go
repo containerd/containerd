@@ -312,11 +312,6 @@ type RemoteContext struct {
 	// afterwards. Unpacking is required to run an image.
 	Unpack bool
 
-	// DiscardContent is a boolean flag to specify whether to allow GC to clean
-	// layers up from the content store after successfully unpacking these
-	// contents to the snapshotter.
-	DiscardContent bool
-
 	// UnpackOpts handles options to the unpack call.
 	UnpackOpts []UnpackOpt
 
@@ -356,6 +351,10 @@ type RemoteContext struct {
 
 	// AllMetadata downloads all manifests and known-configuration files
 	AllMetadata bool
+
+	// ChildLabelMap sets the labels used to reference child objects in the content
+	// store. By default, all GC reference labels will be set for all fetched content.
+	ChildLabelMap func(ocispec.Descriptor) []string
 }
 
 func defaultRemoteContext() *RemoteContext {
