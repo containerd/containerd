@@ -229,6 +229,11 @@ func TestImagePullWithDiscardContent(t *testing.T) {
 	ctx, cancel := testContext(t)
 	defer cancel()
 
+	err = client.ImageService().Delete(ctx, testImage, images.SynchronousDelete())
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	ls := client.LeasesService()
 	l, err := ls.Create(ctx, leases.WithRandomID(), leases.WithExpiration(24*time.Hour))
 	if err != nil {
@@ -238,7 +243,7 @@ func TestImagePullWithDiscardContent(t *testing.T) {
 	img, err := client.Pull(ctx, testImage,
 		WithPlatformMatcher(platforms.Default()),
 		WithPullUnpack,
-		WithDiscardContent,
+		WithChildLabelMap(images.ChildGCLabelsFilterLayers),
 	)
 	// Synchronously garbage collect contents
 	if errL := ls.Delete(ctx, l, leases.SynchronousDelete); errL != nil {

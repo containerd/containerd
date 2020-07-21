@@ -23,6 +23,7 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/snapshots"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"google.golang.org/grpc"
 )
@@ -132,14 +133,6 @@ func WithPullUnpack(_ *Client, c *RemoteContext) error {
 	return nil
 }
 
-// WithDiscardContent is used to allow GC to clean layers up from
-// the content store after successfully unpacking these contents to
-// the snapshotter.
-func WithDiscardContent(_ *Client, c *RemoteContext) error {
-	c.DiscardContent = true
-	return nil
-}
-
 // WithUnpackOpts is used to add unpack options to the unpacker.
 func WithUnpackOpts(opts []UnpackOpt) RemoteOpt {
 	return func(_ *Client, c *RemoteContext) error {
@@ -179,6 +172,18 @@ func WithPullLabels(labels map[string]string) RemoteOpt {
 		for k, v := range labels {
 			rc.Labels[k] = v
 		}
+		return nil
+	}
+}
+
+// WithChildLabelMap sets the map function used to define the labels set
+// on referenced child content in the content store. This can be used
+// to overwrite the default GC labels or filter which labels get set
+// for content.
+// The default is `images.ChildGCLabels`.
+func WithChildLabelMap(fn func(ocispec.Descriptor) []string) RemoteOpt {
+	return func(_ *Client, c *RemoteContext) error {
+		c.ChildLabelMap = fn
 		return nil
 	}
 }
