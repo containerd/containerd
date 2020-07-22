@@ -362,6 +362,16 @@ func (p *PoolDevice) SuspendDevice(ctx context.Context, deviceName string) error
 	return nil
 }
 
+func (p *PoolDevice) ResumeDevice(ctx context.Context, deviceName string) error {
+	if err := p.transition(ctx, deviceName, Resuming, Resumed, func() error {
+		return dmsetup.ResumeDevice(deviceName)
+	}); err != nil {
+		return errors.Wrapf(err, "failed to resume device %q", deviceName)
+	}
+
+	return nil
+}
+
 // DeactivateDevice deactivates thin device
 func (p *PoolDevice) DeactivateDevice(ctx context.Context, deviceName string, deferred, withForce bool) error {
 	if !p.IsLoaded(deviceName) {
