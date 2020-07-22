@@ -21,9 +21,8 @@ An example for configuring the "node" key model for container image decryption:
 
 Configure `cri` to enable decryption with "node" key model
 ```toml
-[plugins.cri.image_decryption]
+[plugins."io.containerd.grpc.v1.cri".image_decryption]
   key_model = "node"
-
 ```
 
 Configure `containerd` daemon [`stream_processors`](https://github.com/containerd/containerd/blob/master/docs/stream_processors.md) to handle the
