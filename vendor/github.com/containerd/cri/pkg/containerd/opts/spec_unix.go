@@ -408,7 +408,7 @@ func WithSelinuxLabels(process, mount string) oci.SpecOpts {
 }
 
 // WithResources sets the provided resource restrictions
-func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHugetlbController bool) oci.SpecOpts {
+func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHugetlbController, disableHugetlbController bool) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
 		if resources == nil {
 			return nil
@@ -451,19 +451,21 @@ func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHu
 		if limit != 0 {
 			s.Linux.Resources.Memory.Limit = &limit
 		}
-		if isHugetlbControllerPresent() {
-			for _, limit := range hugepages {
-				s.Linux.Resources.HugepageLimits = append(s.Linux.Resources.HugepageLimits, runtimespec.LinuxHugepageLimit{
-					Pagesize: limit.PageSize,
-					Limit:    limit.Limit,
-				})
+		if !disableHugetlbController {
+			if isHugetlbControllerPresent() {
+				for _, limit := range hugepages {
+					s.Linux.Resources.HugepageLimits = append(s.Linux.Resources.HugepageLimits, runtimespec.LinuxHugepageLimit{
+						Pagesize: limit.PageSize,
+						Limit:    limit.Limit,
+					})
+				}
+			} else {
+				if !tolerateMissingHugetlbController {
+					return errors.Errorf("huge pages limits are specified but hugetlb cgroup controller is missing. " +
+						"Please set tolerate_missing_hugetlb_controller to `true` to ignore this error")
+				}
+				logrus.Warn("hugetlb cgroup controller is absent. skipping huge pages limits")
 			}
-		} else {
-			if !tolerateMissingHugetlbController {
-				return errors.Errorf("huge pages limits are specified but hugetlb cgroup controller is missing. " +
-					"Please set tolerate_missing_hugetlb_controller to `true` to ignore this error")
-			}
-			logrus.Warn("hugetlb cgroup controller is absent. skipping huge pages limits")
 		}
 		return nil
 	}
