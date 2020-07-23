@@ -145,7 +145,7 @@ jobs:
 
   test-windows:
     name: Build and CRI Test (Windows amd64)
-    runs-on: windows-latest
+    runs-on: windows-2016
     steps:
       - name: Set up Go 1.13.12
         uses: actions/setup-go@v1
