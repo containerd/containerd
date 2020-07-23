@@ -419,8 +419,9 @@ jobs:
             [plugins.cri.containerd.default_runtime]
               runtime_type = \"${TEST_RUNTIME}\"
           EOF
+          ls /etc/cni/net.d
           sudo PATH=$PATH BDIR=$BDIR /usr/local/bin/containerd -a ${BDIR}/c.sock -root ${BDIR}/root -state ${BDIR}/state -log-level debug &> ${BDIR}/containerd-cri.log &
-          sudo BDIR=$BDIR /usr/local/bin/ctr -a ${BDIR}/c.sock version
+          sudo PATH=$PATH BDIR=$BDIR /usr/local/bin/ctr -a ${BDIR}/c.sock version
           sudo PATH=$PATH BDIR=$BDIR GOPATH=$GOPATH critest --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8
           TEST_RC=$?
           test $TEST_RC -ne 0 && cat ${BDIR}/containerd-cri.log
