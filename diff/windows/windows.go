@@ -177,16 +177,33 @@ func mountsToLayerAndParents(mounts []mount.Mount) (string, []string, error) {
 		return "", nil, errors.Wrap(errdefs.ErrInvalidArgument, "number of mounts should always be 1 for Windows layers")
 	}
 	mnt := mounts[0]
-	if mnt.Type != "windows-layer" {
+
+	if mnt.Type != "windows-layer" && mnt.Type != "bind" {
 		// This is a special case error. When this is received the diff service
 		// will attempt the next differ in the chain which for Windows is the
 		// lcow differ that we want.
+		// A new base layer being applied will be 'bind', because until this moment,
+		// we didn't know the mount was for being applied to.
+		// TODO: Is there any situation where we actually wanted a "bind" mount to
+		// fall through to the lcow differ?
 		return "", nil, errors.Wrapf(errdefs.ErrNotImplemented, "windowsDiff does not support layer type %s", mnt.Type)
 	}
 
 	parentLayerPaths, err := mnt.GetParentPaths()
 	if err != nil {
 		return "", nil, err
+	}
+
+	if mnt.Type == "windows-layer" {
+		for _, o := range mnt.Options {
+			if o == "ro" {
+				if len(parentLayerPaths) == 0 {
+					return "", nil, errors.New("unexpected windows-layer View with no parent")
+				}
+				// It's a View. Ignore the dummy sandbox.
+				return parentLayerPaths[0], parentLayerPaths[1:], nil
+			}
+		}
 	}
 
 	return mnt.Source, parentLayerPaths, nil

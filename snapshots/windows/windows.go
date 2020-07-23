@@ -273,23 +273,28 @@ func (s *snapshotter) Close() error {
 
 func (s *snapshotter) mounts(sn storage.Snapshot) []mount.Mount {
 	var (
-		roFlag           string
-		source           string
-		parentLayerPaths []string
+		roFlag string
 	)
 
-	if sn.Kind == snapshots.KindView {
-		roFlag = "ro"
-	} else {
+	if sn.Kind == snapshots.KindActive {
 		roFlag = "rw"
+	} else {
+		roFlag = "ro"
 	}
 
-	if len(sn.ParentIDs) == 0 || sn.Kind == snapshots.KindActive {
-		source = s.getSnapshotDir(sn.ID)
-		parentLayerPaths = s.parentIDsToParentPaths(sn.ParentIDs)
-	} else {
-		source = s.getSnapshotDir(sn.ParentIDs[0])
-		parentLayerPaths = s.parentIDsToParentPaths(sn.ParentIDs[1:])
+	source := s.getSnapshotDir(sn.ID)
+	parentLayerPaths := s.parentIDsToParentPaths(sn.ParentIDs)
+
+	mountType := "windows-layer"
+
+	if len(sn.ParentIDs) == 0 {
+		// If there are no parents, it's a bind-mount, since we cannot
+		// have a windows-layer mount with no parents.
+		// https://github.com/microsoft/hcsshim/issues/853
+		// The only time this is weird is if an Active snapshot has a
+		// diff applied to it, and is then mounted to a folder; in this
+		// case, the windows-layer data structures will be visible.
+		mountType = "bind"
 	}
 
 	// error is not checked here, as a string array will never fail to Marshal
@@ -299,7 +304,7 @@ func (s *snapshotter) mounts(sn storage.Snapshot) []mount.Mount {
 	var mounts []mount.Mount
 	mounts = append(mounts, mount.Mount{
 		Source: source,
-		Type:   "windows-layer",
+		Type:   mountType,
 		Options: []string{
 			roFlag,
 			parentLayersOption,
@@ -325,24 +330,24 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		return nil, errors.Wrap(err, "failed to create snapshot")
 	}
 
+	parentLayerPaths := s.parentIDsToParentPaths(newSnapshot.ParentIDs)
+
+	var parentPath string
+	if len(parentLayerPaths) != 0 {
+		parentPath = parentLayerPaths[0]
+	}
+
+	if err := hcsshim.CreateSandboxLayer(s.info, newSnapshot.ID, parentPath, parentLayerPaths); err != nil {
+		return nil, errors.Wrap(err, "failed to create sandbox layer")
+	}
+
+	var snapshotInfo snapshots.Info
+	for _, o := range opts {
+		o(&snapshotInfo)
+	}
+
+	var sizeGB int
 	if kind == snapshots.KindActive {
-		parentLayerPaths := s.parentIDsToParentPaths(newSnapshot.ParentIDs)
-
-		var parentPath string
-		if len(parentLayerPaths) != 0 {
-			parentPath = parentLayerPaths[0]
-		}
-
-		if err := hcsshim.CreateSandboxLayer(s.info, newSnapshot.ID, parentPath, parentLayerPaths); err != nil {
-			return nil, errors.Wrap(err, "failed to create sandbox layer")
-		}
-
-		var snapshotInfo snapshots.Info
-		for _, o := range opts {
-			o(&snapshotInfo)
-		}
-
-		var sizeGB int
 		if sizeGBstr, ok := snapshotInfo.Labels[rootfsSizeLabel]; ok {
 			i32, err := strconv.ParseInt(sizeGBstr, 10, 32)
 			if err != nil {
@@ -350,12 +355,16 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			}
 			sizeGB = int(i32)
 		}
+	} else {
+		// A view is just a read-write snapshot with a _really_ small sandbox, since we cannot actually
+		// make a read-only mount or junction point. https://superuser.com/q/881544/112473
+		sizeGB = 1
+	}
 
-		if sizeGB > 0 {
-			const gbToByte = 1024 * 1024 * 1024
-			if err := hcsshim.ExpandSandboxSize(s.info, newSnapshot.ID, uint64(gbToByte*sizeGB)); err != nil {
-				return nil, errors.Wrapf(err, "failed to expand scratch size to %d GB", sizeGB)
-			}
+	if sizeGB > 0 {
+		const gbToByte = 1024 * 1024 * 1024
+		if err := hcsshim.ExpandSandboxSize(s.info, newSnapshot.ID, uint64(gbToByte*sizeGB)); err != nil {
+			return nil, errors.Wrapf(err, "failed to expand scratch size to %d GB", sizeGB)
 		}
 	}
 
