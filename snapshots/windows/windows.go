@@ -188,7 +188,7 @@ func (s *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to get snapshot mount: %w", err)
 	}
-	return s.mounts(snapshot), nil
+	return s.mounts(snapshot, key), nil
 }
 
 func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) (retErr error) {
@@ -221,7 +221,11 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	// If (windowsDiff).Apply was used to populate this layer, then it's already in the 'committed' state.
 	// See createSnapshot below for more details
 	if !strings.Contains(key, snapshots.UnpackKeyPrefix) {
-		if err := s.convertScratchToReadOnlyLayer(ctx, snapshot, path); err != nil {
+		if len(snapshot.ParentIDs) == 0 {
+			if err = hcsshim.ConvertToBaseLayer(path); err != nil {
+				return err
+			}
+		} else if err := s.convertScratchToReadOnlyLayer(ctx, snapshot, path); err != nil {
 			return err
 		}
 	}
@@ -309,11 +313,9 @@ func (s *snapshotter) Close() error {
 	return s.ms.Close()
 }
 
-func (s *snapshotter) mounts(sn storage.Snapshot) []mount.Mount {
+func (s *snapshotter) mounts(sn storage.Snapshot, key string) []mount.Mount {
 	var (
-		roFlag           string
-		source           string
-		parentLayerPaths []string
+		roFlag string
 	)
 
 	if sn.Kind == snapshots.KindView {
@@ -322,12 +324,19 @@ func (s *snapshotter) mounts(sn storage.Snapshot) []mount.Mount {
 		roFlag = "rw"
 	}
 
-	if len(sn.ParentIDs) == 0 || sn.Kind == snapshots.KindActive {
-		source = s.getSnapshotDir(sn.ID)
-		parentLayerPaths = s.parentIDsToParentPaths(sn.ParentIDs)
-	} else {
-		source = s.getSnapshotDir(sn.ParentIDs[0])
-		parentLayerPaths = s.parentIDsToParentPaths(sn.ParentIDs[1:])
+	source := s.getSnapshotDir(sn.ID)
+	parentLayerPaths := s.parentIDsToParentPaths(sn.ParentIDs)
+
+	mountType := "windows-layer"
+
+	if len(sn.ParentIDs) == 0 {
+		// A mount of a parentless snapshot is a bind-mount.
+		mountType = "bind"
+		// If not being extracted into, then the bind-target is the
+		// "Files" subdirectory.
+		if !strings.Contains(key, snapshots.UnpackKeyPrefix) {
+			source = filepath.Join(source, "Files")
+		}
 	}
 
 	// error is not checked here, as a string array will never fail to Marshal
@@ -337,7 +346,7 @@ func (s *snapshotter) mounts(sn storage.Snapshot) []mount.Mount {
 	var mounts []mount.Mount
 	mounts = append(mounts, mount.Mount{
 		Source: source,
-		Type:   "windows-layer",
+		Type:   mountType,
 		Options: []string{
 			roFlag,
 			parentLayersOption,
@@ -363,29 +372,38 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		return nil, fmt.Errorf("failed to create snapshot: %w", err)
 	}
 
-	if kind == snapshots.KindActive {
-		log.G(ctx).Debug("createSnapshot active")
-		// Create the new snapshot dir
-		snDir := s.getSnapshotDir(newSnapshot.ID)
-		if err := os.MkdirAll(snDir, 0700); err != nil {
-			return nil, err
-		}
+	log.G(ctx).Debug("createSnapshot")
+	// Create the new snapshot dir
+	snDir := s.getSnapshotDir(newSnapshot.ID)
+	if err := os.MkdirAll(snDir, 0700); err != nil {
+		return nil, err
+	}
 
-		// IO/disk space optimization
+	if strings.Contains(key, snapshots.UnpackKeyPrefix) {
+		// IO/disk space optimization: Do nothing
 		//
 		// We only need one sandbox.vhdx for the container. Skip making one for this
 		// snapshot if this isn't the snapshot that just houses the final sandbox.vhd
 		// that will be mounted as the containers scratch. Currently the key for a snapshot
 		// where a layer will be extracted to will have the string `extract-` in it.
-		if !strings.Contains(key, snapshots.UnpackKeyPrefix) {
-			parentLayerPaths := s.parentIDsToParentPaths(newSnapshot.ParentIDs)
+	} else if len(newSnapshot.ParentIDs) == 0 {
+		// A parentless snapshot is just a bind-mount to a directory named
+		// "Files". When committed, there'll be some post-processing to fill in the rest
+		// of the metadata.
+		filesDir := filepath.Join(snDir, "Files")
+		if err := os.MkdirAll(filesDir, 0700); err != nil {
+			return nil, err
+		}
+	} else {
+		parentLayerPaths := s.parentIDsToParentPaths(newSnapshot.ParentIDs)
 
-			var snapshotInfo snapshots.Info
-			for _, o := range opts {
-				o(&snapshotInfo)
-			}
+		var snapshotInfo snapshots.Info
+		for _, o := range opts {
+			o(&snapshotInfo)
+		}
 
-			var sizeInBytes uint64
+		var sizeInBytes uint64
+		if kind == snapshots.KindActive {
 			if sizeGBstr, ok := snapshotInfo.Labels[rootfsSizeInGBLabel]; ok {
 				log.G(ctx).Warnf("%q label is deprecated, please use %q instead.", rootfsSizeInGBLabel, rootfsSizeInBytesLabel)
 
@@ -403,21 +421,25 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 					return nil, fmt.Errorf("failed to parse label %q=%q: %w", rootfsSizeInBytesLabel, sizeBytesStr, err)
 				}
 			}
+		} else {
+			// A view is just a read-write snapshot with a _really_ small sandbox, since we cannot actually
+			// make a read-only mount or junction point. https://superuser.com/q/881544/112473
+			sizeInBytes = 1024 * 1024 * 1024
+		}
 
-			var makeUVMScratch bool
-			if _, ok := snapshotInfo.Labels[uvmScratchLabel]; ok {
-				makeUVMScratch = true
-			}
+		var makeUVMScratch bool
+		if _, ok := snapshotInfo.Labels[uvmScratchLabel]; ok {
+			makeUVMScratch = true
+		}
 
-			// This has to be run first to avoid clashing with the containers sandbox.vhdx.
-			if makeUVMScratch {
-				if err := s.createUVMScratchLayer(ctx, snDir, parentLayerPaths); err != nil {
-					return nil, fmt.Errorf("failed to make UVM's scratch layer: %w", err)
-				}
+		// This has to be run first to avoid clashing with the containers sandbox.vhdx.
+		if makeUVMScratch {
+			if err := s.createUVMScratchLayer(ctx, snDir, parentLayerPaths); err != nil {
+				return nil, fmt.Errorf("failed to make UVM's scratch layer: %w", err)
 			}
-			if err := s.createScratchLayer(ctx, snDir, parentLayerPaths, sizeInBytes); err != nil {
-				return nil, fmt.Errorf("failed to create scratch layer: %w", err)
-			}
+		}
+		if err := s.createScratchLayer(ctx, snDir, parentLayerPaths, sizeInBytes); err != nil {
+			return nil, fmt.Errorf("failed to create scratch layer: %w", err)
 		}
 	}
 
@@ -425,7 +447,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		return nil, fmt.Errorf("commit failed: %w", err)
 	}
 
-	return s.mounts(newSnapshot), nil
+	return s.mounts(newSnapshot, key), nil
 }
 
 func (s *snapshotter) parentIDsToParentPaths(parentIDs []string) []string {
