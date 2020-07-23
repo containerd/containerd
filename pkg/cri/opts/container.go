@@ -21,8 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
-	goruntime "runtime"
 	"strings"
 
 	"github.com/containerd/containerd"
@@ -85,53 +83,34 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 		// https://github.com/containerd/containerd/pull/1785
 		defer os.Remove(root) // nolint: errcheck
 
-		unmounter := func(mountPath string) {
-			if uerr := mount.Unmount(mountPath, 0); uerr != nil {
+		if err := mount.All(mounts, root); err != nil {
+			return fmt.Errorf("failed to mount: %w", err)
+		}
+		defer func() {
+			if uerr := mount.Unmount(root, 0); uerr != nil {
 				log.G(ctx).WithError(uerr).Errorf("Failed to unmount snapshot %q", root)
 				if err == nil {
 					err = uerr
 				}
 			}
-		}
-
-		var mountPaths []string
-		if goruntime.GOOS == "windows" {
-			for _, m := range mounts {
-				// appending the layerID to the root.
-				mountPath := filepath.Join(root, filepath.Base(m.Source))
-				mountPaths = append(mountPaths, mountPath)
-				if err := m.Mount(mountPath); err != nil {
-					return err
-				}
-
-				defer unmounter(m.Source)
-			}
-		} else {
-			mountPaths = append(mountPaths, root)
-			if err := mount.All(mounts, root); err != nil {
-				return fmt.Errorf("failed to mount: %w", err)
-			}
-			defer unmounter(root)
-		}
+		}()
 
 		for host, volume := range volumeMounts {
 			// The volume may have been defined with a C: prefix, which we can't use here.
 			volume = strings.TrimPrefix(volume, "C:")
-			for _, mountPath := range mountPaths {
-				src, err := fs.RootPath(mountPath, volume)
-				if err != nil {
-					return fmt.Errorf("rootpath on mountPath %s, volume %s: %w", mountPath, volume, err)
+			src, err := fs.RootPath(root, volume)
+			if err != nil {
+				return fmt.Errorf("rootpath on mountPath %s, volume %s: %w", root, volume, err)
+			}
+			if _, err := os.Stat(src); err != nil {
+				if os.IsNotExist(err) {
+					// Skip copying directory if it does not exist.
+					continue
 				}
-				if _, err := os.Stat(src); err != nil {
-					if os.IsNotExist(err) {
-						// Skip copying directory if it does not exist.
-						continue
-					}
-					return fmt.Errorf("stat volume in rootfs: %w", err)
-				}
-				if err := copyExistingContents(src, host); err != nil {
-					return fmt.Errorf("taking runtime copy of volume: %w", err)
-				}
+				return fmt.Errorf("stat volume in rootfs: %w", err)
+			}
+			if err := copyExistingContents(src, host); err != nil {
+				return fmt.Errorf("taking runtime copy of volume: %w", err)
 			}
 		}
 		return nil
