@@ -198,6 +198,9 @@ type PluginConfig struct {
 	StreamIdleTimeout string `toml:"stream_idle_timeout" json:"streamIdleTimeout"`
 	// EnableSelinux indicates to enable the selinux support.
 	EnableSelinux bool `toml:"enable_selinux" json:"enableSelinux"`
+	// SelinuxCategoryRange allows the upper bound on the category range to be set.
+	// If not specified or set to 0, defaults to 1024 from the selinux package.
+	SelinuxCategoryRange int `toml:"selinux_category_range" json:"selinuxCategoryRange"`
 	// SandboxImage is the image used by sandbox container.
 	SandboxImage string `toml:"sandbox_image" json:"sandboxImage"`
 	// StatsCollectPeriod is the period (in seconds) of snapshots stats collection.

@@ -44,6 +44,9 @@ func (c *criService) initPlatform() error {
 		if !selinux.GetEnabled() {
 			logrus.Warn("Selinux is not supported")
 		}
+		if r := c.config.SelinuxCategoryRange; r > 0 {
+			selinux.CategoryRange = uint32(r)
+		}
 	} else {
 		selinux.SetDisabled()
 	}
