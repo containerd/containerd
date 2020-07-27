@@ -106,6 +106,10 @@ version = 2
     # This only works for runtime type "io.containerd.runtime.v1.linux".
     no_pivot = false
 
+    # discard_unpacked_layers allows GC to remove layers from the content store after
+    # successfully unpacking these layers to the snapshotter.
+    discard_unpacked_layers = false
+
     # default_runtime_name is the default runtime name to use.
     default_runtime_name = "runc"
 
