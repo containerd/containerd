@@ -58,6 +58,11 @@ var platformRunFlags = []cli.Flag{
 		Name:  "remap-labels",
 		Usage: "provide the user namespace ID remapping to the snapshotter via label options; requires snapshotter support",
 	},
+	cli.Float64Flag{
+		Name:  "cpus",
+		Usage: "set the CFS cpu qouta",
+		Value: 0.0,
+	},
 }
 
 // NewContainer creates a new container
@@ -178,6 +183,13 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		}
 		if context.Bool("seccomp") {
 			opts = append(opts, seccomp.WithDefaultProfile())
+		}
+		if cpus := context.Float64("cpus"); cpus > 0.0 {
+			var (
+				period = uint64(100000)
+				quota  = int64(cpus * 100000.0)
+			)
+			opts = append(opts, oci.WithCPUCFS(quota, period))
 		}
 
 		joinNs := context.StringSlice("with-ns")
