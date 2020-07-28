@@ -113,11 +113,13 @@ to add your _json_key authentication for gcr.io domain image pull
 requests:
 
 ```
+version = 2
+
 [plugins."io.containerd.grpc.v1.cri".registry]
   [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
     [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
       endpoint = ["https://registry-1.docker.io"]
-    [plugins.cri.registry.mirrors."gcr.io"]
+    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."gcr.io"]
       endpoint = ["https://gcr.io"]
   [plugins."io.containerd.grpc.v1.cri".registry.configs]
     [plugins."io.containerd.grpc.v1.cri".registry.configs."gcr.io".auth]
