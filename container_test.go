@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
 	"runtime"
 	"strings"
 	"syscall"
@@ -35,11 +36,15 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/plugin"
 	_ "github.com/containerd/containerd/runtime"
+	"github.com/containerd/containerd/runtime/linux/runctypes"
+	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/go-runc"
 	gogotypes "github.com/gogo/protobuf/types"
 )
 
@@ -626,6 +631,96 @@ func TestContainerKill(t *testing.T) {
 	}
 	if !errdefs.IsNotFound(err) {
 		t.Errorf("expected error %q but received %q", errdefs.ErrNotFound, err)
+	}
+}
+
+func getRuntimeVersion() string {
+	switch rt := os.Getenv("TEST_RUNTIME"); rt {
+	case plugin.RuntimeRuncV1, plugin.RuntimeRuncV2:
+		return "v2"
+	default:
+		return "v1"
+	}
+}
+
+func TestKillContainerDeletedByRunc(t *testing.T) {
+	t.Parallel()
+
+	// We skip this case when runtime is crun.
+	// More information in https://github.com/containerd/containerd/pull/4214#discussion_r422769497
+	if os.Getenv("RUNC_FLAVOR") == "crun" {
+		t.Skip("skip it when using crun")
+	}
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+		runcRoot    = "/tmp/runc-test"
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var opts interface{}
+	runtimeVersion := getRuntimeVersion()
+	switch runtimeVersion {
+	case "v1":
+		opts = &runctypes.RuncOptions{RuntimeRoot: runcRoot}
+	case "v2":
+		opts = &options.Options{Root: runcRoot}
+	}
+	container, err := client.NewContainer(ctx, id,
+		WithNewSnapshot(id, image),
+		WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "10")),
+		WithRuntime(client.runtime, opts))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	rcmd := &runc.Runc{
+		Root: path.Join(runcRoot, testNamespace),
+	}
+
+	if err := rcmd.Delete(ctx, id, &runc.DeleteOpts{Force: true}); err != nil {
+		t.Fatal(err)
+	}
+	err = task.Kill(ctx, syscall.SIGKILL)
+	if err == nil {
+		t.Fatal("kill should return NotFound error")
+	} else if !errdefs.IsNotFound(err) {
+		t.Errorf("expected error %q but received %q", errdefs.ErrNotFound, err)
+	}
+
+	select {
+	case <-statusC:
+	case <-time.After(2 * time.Second):
+		t.Errorf("unexpected timeout when try to get exited container's status")
 	}
 }
 

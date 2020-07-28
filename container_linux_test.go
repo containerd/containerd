@@ -451,15 +451,6 @@ func getLogDirPath(runtimeVersion, id string) string {
 	}
 }
 
-func getRuntimeVersion() string {
-	switch rt := os.Getenv("TEST_RUNTIME"); rt {
-	case plugin.RuntimeRuncV1, plugin.RuntimeRuncV2:
-		return "v2"
-	default:
-		return "v1"
-	}
-}
-
 func TestContainerPTY(t *testing.T) {
 	t.Parallel()
 
