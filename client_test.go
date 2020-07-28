@@ -169,8 +169,9 @@ func TestMain(m *testing.M) {
 			fmt.Fprintln(os.Stderr, "failed to remove test root dir", err)
 			os.Exit(1)
 		}
-		// only print containerd logs if the test failed
-		if status != 0 {
+
+		// only print containerd logs if the test failed or tests were run with -v
+		if status != 0 || testing.Verbose() {
 			fmt.Fprintln(os.Stderr, buf.String())
 		}
 	}
