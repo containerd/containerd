@@ -1903,3 +1903,73 @@ func TestShimOOMScore(t *testing.T) {
 
 	<-statusC
 }
+
+func TestTaskSpec(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), longCommand))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	spec, err := task.Spec(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec == nil {
+		t.Fatal("spec from task is nil")
+	}
+	direct, err := newDirectIO(ctx, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer direct.Delete()
+
+	lt, err := container.Task(ctx, direct.IOAttach)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	spec, err = lt.Spec(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec == nil {
+		t.Fatal("spec from loaded task is nil")
+	}
+
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	<-statusC
+}
