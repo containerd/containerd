@@ -299,7 +299,6 @@ jobs:
       - name: Integration 1
         shell: bash
         run: |
-          cp src/github.com/Microsoft/hcsshim/test/functional/manifest/rsrc_amd64.syso src/github.com/containerd/containerd/
           cd src/github.com/containerd/containerd
           export CGO_ENABLED=1
           mingw32-make.exe integration
