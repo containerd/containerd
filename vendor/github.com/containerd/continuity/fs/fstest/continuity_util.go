@@ -47,7 +47,7 @@ func (l resourceListDifference) HasDiff() bool {
 	}
 
 	for _, add := range l.Additions {
-		if ok, _ := metadataFiles[add.Path()]; !ok {
+		if ok := metadataFiles[add.Path()]; !ok {
 			return true
 		}
 	}
@@ -66,7 +66,7 @@ func (l resourceListDifference) String() string {
 	for _, upt := range l.Updates {
 		fmt.Fprintf(buf, "~ %s\n", upt.String())
 	}
-	return string(buf.Bytes())
+	return buf.String()
 }
 
 // diffManifest compares two resource lists and returns the list
