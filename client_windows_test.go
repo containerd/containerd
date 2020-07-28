@@ -51,6 +51,14 @@ func init() {
 		testImage = "mcr.microsoft.com/windows/nanoserver:1903"
 	case 18363: // this isn't in osversion yet, but the image should be available
 		testImage = "mcr.microsoft.com/windows/nanoserver:1909"
+	case 19041: // this isn't in osversion yet, but the image should be available
+		testImage = "mcr.microsoft.com/windows/nanoserver:2004"
+	case 9200: // Missing manifest, so it's running in compatibility mode
+		fmt.Println("You need to copy Microsoft/hcsshim/test/functional/manifest/rsrc_amd64.syso into the containerd checkout")
+		panic("Running in Windows 8/Windows Server 2012 compatibility mode, failed to detect Windows build version")
+	default:
+		fmt.Println("No test image defined for Windows build version:", b)
+		panic("No windows test image found for this Windows build")
 	}
 
 	fmt.Println("Windows test image:", testImage, ", Windows build version:", b)
