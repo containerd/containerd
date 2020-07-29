@@ -210,7 +210,7 @@ var (
 	}
 
 	// Hardlink name before with modification
-	// Tests link is created for unmodified files when new hardlinked file is seen first
+	// Tests link is created for unmodified files when a new hard linked file is seen first
 	hardlinkBeforeUnmodified = []Applier{
 		baseApplier,
 		Apply(
