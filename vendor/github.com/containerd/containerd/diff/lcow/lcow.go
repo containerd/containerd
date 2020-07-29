@@ -178,7 +178,7 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 // Compare creates a diff between the given mounts and uploads the result
 // to the content store.
 func (s windowsLcowDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
-	return emptyDesc, errdefs.ErrNotImplemented
+	return emptyDesc, errors.Wrap(errdefs.ErrNotImplemented, "windowsLcowDiff does not implement Compare method")
 }
 
 type readCounter struct {

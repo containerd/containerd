@@ -80,6 +80,11 @@ type ContainerdConfig struct {
 	// related information) to snapshotters. These annotations are required by
 	// stargz snapshotter (https://github.com/containerd/stargz-snapshotter).
 	DisableSnapshotAnnotations bool `toml:"disable_snapshot_annotations" json:"disableSnapshotAnnotations"`
+
+	// DiscardUnpackedLayers is a boolean flag to specify whether to allow GC to
+	// remove layers from the content store after successfully unpacking these
+	// layers to the snapshotter.
+	DiscardUnpackedLayers bool `toml:"discard_unpacked_layers" json:"discardUnpackedLayers"`
 }
 
 // CniConfig contains toml config related to cni
