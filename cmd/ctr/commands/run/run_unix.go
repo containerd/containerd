@@ -192,6 +192,15 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			opts = append(opts, oci.WithCPUCFS(quota, period))
 		}
 
+		quota := context.Int64("cpu-quota")
+		period := context.Uint64("cpu-period")
+		if quota != -1 || period != 0 {
+			if cpus := context.Float64("cpus"); cpus > 0.0 {
+				return nil, errors.New("cpus and quota/period should be used separately")
+			}
+			opts = append(opts, oci.WithCPUCFS(quota, period))
+		}
+
 		joinNs := context.StringSlice("with-ns")
 		for _, ns := range joinNs {
 			parts := strings.Split(ns, ":")
