@@ -32,8 +32,8 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/cri/pkg/seccomp"
 	runcapparmor "github.com/opencontainers/runc/libcontainer/apparmor"
-	runcseccomp "github.com/opencontainers/runc/libcontainer/seccomp"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
@@ -146,7 +146,7 @@ func (c *criService) apparmorEnabled() bool {
 }
 
 func (c *criService) seccompEnabled() bool {
-	return runcseccomp.IsEnabled()
+	return seccomp.IsEnabled()
 }
 
 // openLogFile opens/creates a container log file.
