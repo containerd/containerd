@@ -91,7 +91,7 @@ func TestGetTokenScopes(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		ctx := context.WithValue(context.TODO(), tokenScopesKey{}, tc.scopesInCtx)
-		actual := getTokenScopes(ctx, tc.commonScopes)
+		actual := GetTokenScopes(ctx, tc.commonScopes)
 		assert.DeepEqual(t, tc.expected, actual)
 	}
 }
@@ -101,7 +101,7 @@ func TestCustomScope(t *testing.T) {
 	ctx := WithScope(context.Background(), scope)
 	ctx = contextWithAppendPullRepositoryScope(ctx, "foo/bar")
 
-	scopes := getTokenScopes(ctx, []string{})
+	scopes := GetTokenScopes(ctx, []string{})
 	assert.Assert(t, cmp.Len(scopes, 2))
 	assert.Check(t, cmp.Equal(scopes[0], "repository:foo/bar:pull"))
 	assert.Check(t, cmp.Equal(scopes[1], scope))
