@@ -162,7 +162,22 @@ func (p *PoolDevice) transition(ctx context.Context, deviceName string, tryingSt
 		result = multierror.Append(result, uerr)
 	}
 
-	return result.ErrorOrNil()
+	return unwrapError(result)
+}
+
+// unwrapError converts multierror.Error to the original error when it is possible.
+// multierror 1.1.0 has the similar function named Unwrap, but it requires Go 1.14.
+func unwrapError(e *multierror.Error) error {
+	if e == nil {
+		return nil
+	}
+
+	// If the error can be expressed without multierror, return the original error.
+	if len(e.Errors) == 1 {
+		return e.Errors[0]
+	}
+
+	return e.ErrorOrNil()
 }
 
 // CreateThinDevice creates new devmapper thin-device with given name and size.
@@ -184,21 +199,7 @@ func (p *PoolDevice) CreateThinDevice(ctx context.Context, deviceName string, vi
 	defer func() {
 		// We've created a devmapper device, but failed to activate it, try rollback everything
 		if activeErr != nil {
-			// Delete the device first.
-			delErr := p.deleteDevice(ctx, info)
-			if delErr != nil {
-				// Failed to rollback, mark the device as faulty and keep metadata in order to
-				// preserve the faulty device ID
-				retErr = multierror.Append(retErr, delErr, p.metadata.MarkFaulty(ctx, info.Name))
-				return
-			}
-
-			// The devmapper device has been successfully deleted, deallocate device ID
-			if err := p.RemoveDevice(ctx, info.Name); err != nil {
-				retErr = multierror.Append(retErr, err)
-				return
-			}
-
+			retErr = p.rollbackActivate(ctx, info, activeErr)
 			return
 		}
 
@@ -228,6 +229,23 @@ func (p *PoolDevice) CreateThinDevice(ctx context.Context, deviceName string, vi
 	}
 
 	return nil
+}
+
+func (p *PoolDevice) rollbackActivate(ctx context.Context, info *DeviceInfo, activateErr error) error {
+	// Delete the device first.
+	delErr := p.deleteDevice(ctx, info)
+	if delErr != nil {
+		// Failed to rollback, mark the device as faulty and keep metadata in order to
+		// preserve the faulty device ID
+		return multierror.Append(activateErr, delErr, p.metadata.MarkFaulty(ctx, info.Name))
+	}
+
+	// The devmapper device has been successfully deleted, deallocate device ID
+	if err := p.RemoveDevice(ctx, info.Name); err != nil {
+		return multierror.Append(activateErr, err)
+	}
+
+	return activateErr
 }
 
 // createDevice creates thin device
@@ -275,21 +293,7 @@ func (p *PoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName string
 	defer func() {
 		// We've created a devmapper device, but failed to activate it, try rollback everything
 		if activeErr != nil {
-			// Delete the device first.
-			delErr := p.deleteDevice(ctx, snapInfo)
-			if delErr != nil {
-				// Failed to rollback, mark the device as faulty and keep metadata in order to
-				// preserve the faulty device ID
-				retErr = multierror.Append(retErr, delErr, p.metadata.MarkFaulty(ctx, snapInfo.Name))
-				return
-			}
-
-			// The devmapper device has been successfully deleted, deallocate device ID
-			if err := p.RemoveDevice(ctx, snapInfo.Name); err != nil {
-				retErr = multierror.Append(retErr, err)
-				return
-			}
-
+			retErr = p.rollbackActivate(ctx, snapInfo, activeErr)
 			return
 		}
 
@@ -490,7 +494,13 @@ func (p *PoolDevice) RemoveDevice(ctx context.Context, deviceName string) error 
 func (p *PoolDevice) deleteDevice(ctx context.Context, info *DeviceInfo) error {
 	if err := p.transition(ctx, info.Name, Removing, Removed, func() error {
 		// Send 'delete' message to thin-pool
-		return dmsetup.DeleteDevice(p.poolName, info.DeviceID)
+		e := dmsetup.DeleteDevice(p.poolName, info.DeviceID)
+
+		// Ignores the error if the device has been deleted already.
+		if e != nil && !errors.Is(e, unix.ENODATA) {
+			return e
+		}
+		return nil
 	}); err != nil {
 		return errors.Wrapf(err, "failed to delete device %q (dev id: %d)", info.Name, info.DeviceID)
 	}
