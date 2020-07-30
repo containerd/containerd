@@ -101,7 +101,7 @@ func (m *PoolMetadata) AddDevice(ctx context.Context, info *DeviceInfo) error {
 		// See https://github.com/containerd/containerd/pull/3436 for more context.
 		var existing DeviceInfo
 		if err := getObject(devicesBucket, info.Name, &existing); err == nil && existing.State != Faulty {
-			return ErrAlreadyExists
+			return errors.Wrapf(ErrAlreadyExists, "device %q is already there %+v", info.Name, existing)
 		}
 
 		// Find next available device ID
