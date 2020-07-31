@@ -235,12 +235,6 @@ jobs:
         with:
           path: src/github.com/containerd/containerd
 
-      - name: Install Linux dependencies
-        if: startsWith(matrix.os, 'ubuntu')
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y btrfs-tools libseccomp-dev
-
       - name: Make
         run: |
           make build
