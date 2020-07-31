@@ -69,13 +69,24 @@ func (c *criService) filterCRIContainers(containers []*runtime.Container, filter
 		return containers
 	}
 
+	// The containerd cri plugin supports short ids so long as there is only one
+	// match. So we do a lookup against the store here if a pod id has been
+	// included in the filter.
+	sb := filter.GetPodSandboxId()
+	if sb != "" {
+		sandbox, err := c.sandboxStore.Get(sb)
+		if err == nil {
+			sb = sandbox.ID
+		}
+	}
+
 	c.normalizeContainerFilter(filter)
 	filtered := []*runtime.Container{}
 	for _, cntr := range containers {
 		if filter.GetId() != "" && filter.GetId() != cntr.Id {
 			continue
 		}
-		if filter.GetPodSandboxId() != "" && filter.GetPodSandboxId() != cntr.PodSandboxId {
+		if sb != "" && sb != cntr.PodSandboxId {
 			continue
 		}
 		if filter.GetState() != nil && filter.GetState().GetState() != cntr.State {

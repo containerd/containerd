@@ -127,6 +127,12 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 			containerd.WithImageHandlerWrapper(appendInfoHandlerWrapper(ref)))
 	}
 
+	if c.config.ContainerdConfig.DiscardUnpackedLayers {
+		// Allows GC to clean layers up from the content store after unpacking
+		pullOpts = append(pullOpts,
+			containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
+	}
+
 	image, err := c.client.Pull(ctx, ref, pullOpts...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to pull and unpack image %q", ref)
