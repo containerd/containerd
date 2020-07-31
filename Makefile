@@ -93,8 +93,8 @@ MANPAGES=ctr.8 containerd.8 containerd-config.8 containerd-config.toml.5
 ifdef BUILDTAGS
     GO_BUILDTAGS = ${BUILDTAGS}
 endif
-# Build tags seccomp, apparmor and selinux are needed by CRI plugin.
-GO_BUILDTAGS ?= seccomp apparmor selinux
+# Build tags apparmor and selinux are needed by CRI plugin.
+GO_BUILDTAGS ?= apparmor selinux
 GO_BUILDTAGS += ${DEBUG_TAGS}
 GO_TAGS=$(if $(GO_BUILDTAGS),-tags "$(GO_BUILDTAGS)",)
 GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) $(EXTRA_LDFLAGS)'
