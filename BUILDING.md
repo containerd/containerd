@@ -17,7 +17,6 @@ To build the `containerd` daemon, and the `ctr` simple test client, the followin
 * Go 1.13.x or above except 1.14.x
 * Protoc 3.x compiler and headers (download at the [Google protobuf releases page](https://github.com/google/protobuf/releases))
 * Btrfs headers and libraries for your distribution. Note that building the btrfs driver can be disabled via the build tag `no_btrfs`, removing this dependency.
-* `libseccomp` is required if you're building with seccomp support
 
 ## Build the development environment
 
@@ -45,11 +44,6 @@ need to satisfy this dependencies in your system:
 * Debian/Ubuntu: `apt-get install btrfs-tools`
 	* Debian Buster/Ubuntu 19.10:
 	    `apt-get install btrfs-progs libbtrfs-dev`
-
-If you're building with seccomp, you'll need to install it with the following:
-
-* CentOS/Fedora: `yum install libseccomp-devel`
-* Debian/Ubuntu: `apt install libseccomp-dev`
 
 At this point you are ready to build `containerd` yourself!
 
@@ -107,7 +101,6 @@ make generate
 > * `no_cri`: A build tag disables building Kubernetes [CRI](http://blog.kubernetes.io/2016/12/container-runtime-interface-cri-in-kubernetes.html) support into containerd.
 > See [here](https://github.com/containerd/cri-containerd#build-tags) for build tags of CRI plugin.
 > * `no_devmapper`: A build tag disables building the device mapper snapshot driver.
-> * `seccomp`: Enables seccomp support in the cri plugin
 > * `apparmor`: Enables apparmor support in the cri plugin
 > * `selinux`: Enables selinux support in the cri plugin
 >
@@ -143,7 +136,7 @@ You can build an image from this `Dockerfile`:
 FROM golang
 
 RUN apt-get update && \
-    apt-get install -y libbtrfs-dev libseccomp-dev
+    apt-get install -y libbtrfs-dev
 ```
 
 Let's suppose that you built an image called `containerd/build`. From the
