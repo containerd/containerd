@@ -79,11 +79,6 @@ jobs:
           repository: containerd/containerd
           ref: ${{ github.ref }}
           path: src/github.com/containerd/containerd
-      - name: Install Linux dependencies
-        if: startsWith(matrix.os, 'ubuntu')
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y btrfs-tools libseccomp-dev
       - name: HCS Shim commit
         id: hcsshim_commit
         if: startsWith(matrix.os, 'windows')
