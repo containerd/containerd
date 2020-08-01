@@ -303,7 +303,6 @@ func longestCommonPrefix(strs []string) string {
 	}
 
 	// find out the common part between min and max
-	// find out the common part between min and max
 	// If two string x y, meet x > y (alphabetic order), have two possibility:
 	// x and y have common prefix,
 	// 1.1 if len(x) >= len(y), like x = ab** y =ab*, so  I < len(y) is safe
