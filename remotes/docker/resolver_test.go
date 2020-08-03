@@ -280,6 +280,151 @@ func TestHostTLSFailureFallbackResolver(t *testing.T) {
 	runBasicTest(t, "testname", sf)
 }
 
+func TestResolveProxy(t *testing.T) {
+	var (
+		ctx  = context.Background()
+		tag  = "latest"
+		r    = http.NewServeMux()
+		name = "testname"
+		ns   = "upstream.example.com"
+	)
+
+	m := newManifest(
+		newContent(ocispec.MediaTypeImageConfig, []byte("1")),
+		newContent(ocispec.MediaTypeImageLayerGzip, []byte("2")),
+	)
+	mc := newContent(ocispec.MediaTypeImageManifest, m.OCIManifest())
+	m.RegisterHandler(r, name)
+	r.Handle(fmt.Sprintf("/v2/%s/manifests/%s", name, tag), mc)
+	r.Handle(fmt.Sprintf("/v2/%s/manifests/%s", name, mc.Digest()), mc)
+
+	nr := namespaceRouter{
+		"upstream.example.com": r,
+	}
+
+	base, ro, close := tlsServer(logHandler{t, nr})
+	defer close()
+
+	ro.Hosts = func(host string) ([]RegistryHost, error) {
+		return []RegistryHost{{
+			Client:       ro.Client,
+			Host:         base,
+			Scheme:       "https",
+			Path:         "/v2",
+			Capabilities: HostCapabilityPull | HostCapabilityResolve,
+		}}, nil
+	}
+
+	resolver := NewResolver(ro)
+	image := fmt.Sprintf("%s/%s:%s", ns, name, tag)
+
+	_, d, err := resolver.Resolve(ctx, image)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := resolver.Fetcher(ctx, image)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refs, err := testocimanifest(ctx, f, d)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(refs) != 2 {
+		t.Fatalf("Unexpected number of references: %d, expected 2", len(refs))
+	}
+
+	for _, ref := range refs {
+		if err := testFetch(ctx, f, ref); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestResolveProxyFallback(t *testing.T) {
+	var (
+		ctx  = context.Background()
+		tag  = "latest"
+		r    = http.NewServeMux()
+		name = "testname"
+	)
+
+	m := newManifest(
+		newContent(ocispec.MediaTypeImageConfig, []byte("1")),
+		newContent(ocispec.MediaTypeImageLayerGzip, []byte("2")),
+	)
+	mc := newContent(ocispec.MediaTypeImageManifest, m.OCIManifest())
+	m.RegisterHandler(r, name)
+	r.Handle(fmt.Sprintf("/v2/%s/manifests/%s", name, tag), mc)
+	r.Handle(fmt.Sprintf("/v2/%s/manifests/%s", name, mc.Digest()), mc)
+
+	nr := namespaceRouter{
+		"": r,
+	}
+	s := httptest.NewServer(logHandler{t, nr})
+	defer s.Close()
+
+	base := s.URL[7:] // strip "http://"
+
+	ro := ResolverOptions{
+		Hosts: func(host string) ([]RegistryHost, error) {
+			return []RegistryHost{
+				{
+					Host:         flipLocalhost(host),
+					Scheme:       "http",
+					Path:         "/v2",
+					Capabilities: HostCapabilityPull | HostCapabilityResolve,
+				},
+				{
+					Host:         host,
+					Scheme:       "http",
+					Path:         "/v2",
+					Capabilities: HostCapabilityPull | HostCapabilityResolve | HostCapabilityPush,
+				},
+			}, nil
+		},
+	}
+
+	resolver := NewResolver(ro)
+	image := fmt.Sprintf("%s/%s:%s", base, name, tag)
+
+	_, d, err := resolver.Resolve(ctx, image)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := resolver.Fetcher(ctx, image)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refs, err := testocimanifest(ctx, f, d)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(refs) != 2 {
+		t.Fatalf("Unexpected number of references: %d, expected 2", len(refs))
+	}
+
+	for _, ref := range refs {
+		if err := testFetch(ctx, f, ref); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func flipLocalhost(host string) string {
+	if strings.HasPrefix(host, "127.0.0.1") {
+		return "localhost" + host[9:]
+
+	} else if strings.HasPrefix(host, "localhost") {
+		return "127.0.0.1" + host[9:]
+	}
+	return host
+}
+
 func withTokenServer(th http.Handler, creds func(string) (string, string, error)) func(h http.Handler) (string, ResolverOptions, func()) {
 	return func(h http.Handler) (string, ResolverOptions, func()) {
 		s := httptest.NewUnstartedServer(th)
@@ -350,6 +495,17 @@ type logHandler struct {
 
 func (h logHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	h.handler.ServeHTTP(rw, r)
+}
+
+type namespaceRouter map[string]http.Handler
+
+func (nr namespaceRouter) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+	h, ok := nr[r.URL.Query().Get("ns")]
+	if !ok {
+		rw.WriteHeader(http.StatusNotFound)
+		return
+	}
+	h.ServeHTTP(rw, r)
 }
 
 func runBasicTest(t *testing.T, name string, sf func(h http.Handler) (string, ResolverOptions, func())) {

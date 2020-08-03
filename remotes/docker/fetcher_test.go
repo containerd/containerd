@@ -52,7 +52,7 @@ func TestFetcherOpen(t *testing.T) {
 	}
 
 	f := dockerFetcher{&dockerBase{
-		namespace: "nonempty",
+		repository: "nonempty",
 	}}
 
 	host := RegistryHost{
@@ -182,7 +182,7 @@ func TestDockerFetcherOpen(t *testing.T) {
 			}
 
 			f := dockerFetcher{&dockerBase{
-				namespace: "ns",
+				repository: "ns",
 			}}
 
 			host := RegistryHost{
