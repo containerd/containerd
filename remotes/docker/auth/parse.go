@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package docker
+package auth
 
 import (
 	"net/http"
@@ -22,31 +22,35 @@ import (
 	"strings"
 )
 
-type authenticationScheme byte
+// AuthenticationScheme defines scheme of the authentication method
+type AuthenticationScheme byte
 
 const (
-	basicAuth  authenticationScheme = 1 << iota // Defined in RFC 7617
-	digestAuth                                  // Defined in RFC 7616
-	bearerAuth                                  // Defined in RFC 6750
+	// BasicAuth is scheme for Basic HTTP Authentication RFC 7617
+	BasicAuth AuthenticationScheme = 1 << iota
+	// DigestAuth is scheme for HTTP Digest Access Authentication RFC 7616
+	DigestAuth
+	// BearerAuth is scheme for OAuth 2.0 Bearer Tokens RFC 6750
+	BearerAuth
 )
 
-// challenge carries information from a WWW-Authenticate response header.
+// Challenge carries information from a WWW-Authenticate response header.
 // See RFC 2617.
-type challenge struct {
+type Challenge struct {
 	// scheme is the auth-scheme according to RFC 2617
-	scheme authenticationScheme
+	Scheme AuthenticationScheme
 
 	// parameters are the auth-params according to RFC 2617
-	parameters map[string]string
+	Parameters map[string]string
 }
 
-type byScheme []challenge
+type byScheme []Challenge
 
 func (bs byScheme) Len() int      { return len(bs) }
 func (bs byScheme) Swap(i, j int) { bs[i], bs[j] = bs[j], bs[i] }
 
 // Sort in priority order: token > digest > basic
-func (bs byScheme) Less(i, j int) bool { return bs[i].scheme > bs[j].scheme }
+func (bs byScheme) Less(i, j int) bool { return bs[i].Scheme > bs[j].Scheme }
 
 // Octet types from RFC 2616.
 type octetType byte
@@ -90,22 +94,23 @@ func init() {
 	}
 }
 
-func parseAuthHeader(header http.Header) []challenge {
-	challenges := []challenge{}
+// ParseAuthHeader parses challenges from WWW-Authenticate header
+func ParseAuthHeader(header http.Header) []Challenge {
+	challenges := []Challenge{}
 	for _, h := range header[http.CanonicalHeaderKey("WWW-Authenticate")] {
 		v, p := parseValueAndParams(h)
-		var s authenticationScheme
+		var s AuthenticationScheme
 		switch v {
 		case "basic":
-			s = basicAuth
+			s = BasicAuth
 		case "digest":
-			s = digestAuth
+			s = DigestAuth
 		case "bearer":
-			s = bearerAuth
+			s = BearerAuth
 		default:
 			continue
 		}
-		challenges = append(challenges, challenge{scheme: s, parameters: p})
+		challenges = append(challenges, Challenge{Scheme: s, Parameters: p})
 	}
 	sort.Stable(byScheme(challenges))
 	return challenges
