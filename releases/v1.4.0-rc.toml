@@ -27,6 +27,7 @@ while driving toward ever increasing stability.
 * **Support cgroups v2** [#3726](https://github.com/containerd/containerd/pull/3726)
 * **Improved SELinux support**
 * **Rework shim logger shutdown process** [#4162](https://github.com/containerd/containerd/pull/4162)
+* **Deprecate `io.containerd.runtime.v1.*` and `io.containerd.runc.v1`** [#4384](https://github.com/containerd/containerd/pull/4384)
 
 ### Snapshots
 * **Support target snapshot option on prepare to allow skipping prepare when snapshot reports target already exists** [#3793](https://github.com/containerd/containerd/pull/3793)
@@ -47,9 +48,10 @@ while driving toward ever increasing stability.
 * **Split UID and GID namespace mapping in spec generation** [#3881](https://github.com/containerd/containerd/pull/3881)
 * **Propagate snapshotter layer annotations on unpack** [#3911](https://github.com/containerd/containerd/pull/3911)
 * **Create image record after blob download to fix concurrent download issue** [#3972](https://github.com/containerd/containerd/pull/3972)
+* **Use spec's mountLabel when mounting container rootfs** [#4051](https://github.com/containerd/containerd/pull/4051)
 * **Add Linux resources to spec options** [#4083](https://github.com/containerd/containerd/pull/4083)
 * **New registry configuration tooling for improved mirror and endpoint options** [#4138](https://github.com/containerd/containerd/pull/4138)
-* **Use spec's mountLabel when mounting container rootfs** [#4051](https://github.com/containerd/containerd/pull/4051)
+* **Add namespace query parameter when using a registry proxy** [#4413](https://github.com/containerd/containerd/pull/4413)
 
 ### API
 * **Add filters to snapshot list** [#3709](https://github.com/containerd/containerd/pull/3709)
@@ -57,6 +59,7 @@ while driving toward ever increasing stability.
 
 ### Daemon
 * **Support NOTIFY_SOCKET for notifying the daemon's readiness to systemd** [#4088](https://github.com/containerd/containerd/pull/4088)
+* **Remove libseccomp requirement, seccomp support is now always built-in** [#4439](https://github.com/containerd/containerd/pull/4439)
 
 ### Windows
 * **Disk usage support in snapshotter** [#3785](https://github.com/containerd/containerd/pull/3785)
