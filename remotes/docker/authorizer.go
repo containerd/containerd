@@ -241,7 +241,7 @@ func (ah *authHandler) doBasicAuth(ctx context.Context) (string, error) {
 	return fmt.Sprintf("Basic %s", auth), nil
 }
 
-func (ah *authHandler) doBearerAuth(ctx context.Context) (string, error) {
+func (ah *authHandler) doBearerAuth(ctx context.Context) (token string, err error) {
 	// copy common tokenOptions
 	to := ah.common
 
@@ -263,15 +263,20 @@ func (ah *authHandler) doBearerAuth(ctx context.Context) (string, error) {
 	ah.scopedTokens[scoped] = r
 	ah.Unlock()
 
+	defer func() {
+		token = fmt.Sprintf("Bearer %s", token)
+		r.token, r.err = token, err
+		r.Done()
+	}()
+
 	// fetch token for the resource scope
-	var (
-		token string
-		err   error
-	)
 	if to.Secret != "" {
+		defer func() {
+			err = errors.Wrap(err, "failed to fetch oauth token")
+		}()
 		// credential information is provided, use oauth POST endpoint
 		// TODO: Allow setting client_id
-		token, err = auth.FetchTokenWithOAuth(ctx, ah.client, ah.header, "containerd-client", to)
+		resp, err := auth.FetchTokenWithOAuth(ctx, ah.client, ah.header, "containerd-client", to)
 		if err != nil {
 			var errStatus auth.ErrUnexpectedStatus
 			if errors.As(err, &errStatus) {
@@ -279,26 +284,27 @@ func (ah *authHandler) doBearerAuth(ctx context.Context) (string, error) {
 				// As of September 2017, GCR is known to return 404.
 				// As of February 2018, JFrog Artifactory is known to return 401.
 				if (errStatus.StatusCode == 405 && to.Username != "") || errStatus.StatusCode == 404 || errStatus.StatusCode == 401 {
-					token, err = auth.FetchToken(ctx, ah.client, ah.header, to)
-				} else {
-					log.G(ctx).WithFields(logrus.Fields{
-						"status": errStatus.Status,
-						"body":   string(errStatus.Body),
-					}).Debugf("token request failed")
+					resp, err := auth.FetchToken(ctx, ah.client, ah.header, to)
+					if err != nil {
+						return "", err
+					}
+					return resp.Token, nil
 				}
+				log.G(ctx).WithFields(logrus.Fields{
+					"status": errStatus.Status,
+					"body":   string(errStatus.Body),
+				}).Debugf("token request failed")
 			}
+			return "", err
 		}
-		err = errors.Wrap(err, "failed to fetch oauth token")
-	} else {
-		// do request anonymously
-		token, err = auth.FetchToken(ctx, ah.client, ah.header, to)
-		err = errors.Wrap(err, "failed to fetch anonymous token")
+		return resp.AccessToken, nil
 	}
-	token = fmt.Sprintf("Bearer %s", token)
-
-	r.token, r.err = token, err
-	r.Done()
-	return r.token, r.err
+	// do request anonymously
+	resp, err := auth.FetchToken(ctx, ah.client, ah.header, to)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to fetch anonymous token")
+	}
+	return resp.Token, nil
 }
 
 func invalidAuthorization(c auth.Challenge, responses []*http.Response) error {

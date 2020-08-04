@@ -57,6 +57,7 @@ func newUnexpectedStatusErr(resp *http.Response) error {
 	return ErrUnexpectedStatus{Status: resp.Status, StatusCode: resp.StatusCode, Body: b}
 }
 
+// GenerateTokenOptions generates options for fetching a token based on a challenge
 func GenerateTokenOptions(ctx context.Context, host, username, secret string, c Challenge) (TokenOptions, error) {
 	realm, ok := c.Parameters["realm"]
 	if !ok {
@@ -94,7 +95,8 @@ type TokenOptions struct {
 	Secret   string
 }
 
-type postTokenResponse struct {
+// OAuthTokenResponse is response from fetching token with a OAuth POST request
+type OAuthTokenResponse struct {
 	AccessToken  string    `json:"access_token"`
 	RefreshToken string    `json:"refresh_token"`
 	ExpiresIn    int       `json:"expires_in"`
@@ -102,7 +104,8 @@ type postTokenResponse struct {
 	Scope        string    `json:"scope"`
 }
 
-func FetchTokenWithOAuth(ctx context.Context, client *http.Client, headers http.Header, clientID string, to TokenOptions) (string, error) {
+// FetchTokenWithOAuth fetches a token using a POST request
+func FetchTokenWithOAuth(ctx context.Context, client *http.Client, headers http.Header, clientID string, to TokenOptions) (*OAuthTokenResponse, error) {
 	form := url.Values{}
 	if len(to.Scopes) > 0 {
 		form.Set("scope", strings.Join(to.Scopes, " "))
@@ -121,7 +124,7 @@ func FetchTokenWithOAuth(ctx context.Context, client *http.Client, headers http.
 
 	req, err := http.NewRequest("POST", to.Realm, strings.NewReader(form.Encode()))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
 	if headers != nil {
@@ -132,25 +135,30 @@ func FetchTokenWithOAuth(ctx context.Context, client *http.Client, headers http.
 
 	resp, err := ctxhttp.Do(ctx, client, req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		return "", errors.WithStack(newUnexpectedStatusErr(resp))
+		return nil, errors.WithStack(newUnexpectedStatusErr(resp))
 	}
 
 	decoder := json.NewDecoder(resp.Body)
 
-	var tr postTokenResponse
+	var tr OAuthTokenResponse
 	if err = decoder.Decode(&tr); err != nil {
-		return "", errors.Errorf("unable to decode token response: %s", err)
+		return nil, errors.Wrap(err, "unable to decode token response")
 	}
 
-	return tr.AccessToken, nil
+	if tr.AccessToken == "" {
+		return nil, errors.WithStack(ErrNoToken)
+	}
+
+	return &tr, nil
 }
 
-type getTokenResponse struct {
+// FetchTokenResponse is response from fetching token with GET request
+type FetchTokenResponse struct {
 	Token        string    `json:"token"`
 	AccessToken  string    `json:"access_token"`
 	ExpiresIn    int       `json:"expires_in"`
@@ -159,10 +167,10 @@ type getTokenResponse struct {
 }
 
 // FetchToken fetches a token using a GET request
-func FetchToken(ctx context.Context, client *http.Client, headers http.Header, to TokenOptions) (string, error) {
+func FetchToken(ctx context.Context, client *http.Client, headers http.Header, to TokenOptions) (*FetchTokenResponse, error) {
 	req, err := http.NewRequest("GET", to.Realm, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if headers != nil {
@@ -189,19 +197,19 @@ func FetchToken(ctx context.Context, client *http.Client, headers http.Header, t
 
 	resp, err := ctxhttp.Do(ctx, client, req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		return "", errors.WithStack(newUnexpectedStatusErr(resp))
+		return nil, errors.WithStack(newUnexpectedStatusErr(resp))
 	}
 
 	decoder := json.NewDecoder(resp.Body)
 
-	var tr getTokenResponse
+	var tr FetchTokenResponse
 	if err = decoder.Decode(&tr); err != nil {
-		return "", errors.Errorf("unable to decode token response: %s", err)
+		return nil, errors.Wrap(err, "unable to decode token response")
 	}
 
 	// `access_token` is equivalent to `token` and if both are specified
@@ -212,8 +220,8 @@ func FetchToken(ctx context.Context, client *http.Client, headers http.Header, t
 	}
 
 	if tr.Token == "" {
-		return "", ErrNoToken
+		return nil, errors.WithStack(ErrNoToken)
 	}
 
-	return tr.Token, nil
+	return &tr, nil
 }
