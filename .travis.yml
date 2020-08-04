@@ -109,6 +109,8 @@ deploy:
     file:
       - releases/*.tar.gz
       - releases/*.tar.gz.sha256sum
+      - releases/cri/*.tar.gz
+      - releases/cri/*.tar.gz.sha256sum
     skip_cleanup: true
     on:
       repo: containerd/containerd
