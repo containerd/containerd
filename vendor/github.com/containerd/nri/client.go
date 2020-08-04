@@ -46,6 +46,8 @@ type Client struct {
 type Sandbox struct {
 	// ID of the sandbox
 	ID string
+	// Labels of the sandbox
+	Labels map[string]string
 }
 
 // Invoke the ConfList of nri plugins
@@ -75,6 +77,7 @@ func (c *Client) InvokeWithSandbox(ctx context.Context, task containerd.Task, st
 	}
 	if sandbox != nil {
 		r.SandboxID = sandbox.ID
+		r.Labels = sandbox.Labels
 	}
 	for _, p := range c.conf.Plugins {
 		r.Conf = p.Conf

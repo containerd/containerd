@@ -75,6 +75,8 @@ type Request struct {
 	Pid int `json:"pid,omitempty"`
 	// Spec generated from the OCI runtime specification
 	Spec *Spec `json:"spec"`
+	// Labels of a sandbox
+	Labels map[string]string `json:"labels,omitempty"`
 	// Results from previous plugins in the chain
 	Results []*Result `json:"results,omitempty"`
 }
