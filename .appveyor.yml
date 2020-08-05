@@ -10,7 +10,7 @@ environment:
   CGO_ENABLED: 1
   GO111MODULE: off
   matrix:
-    - GO_VERSION: 1.13.12
+    - GO_VERSION: 1.13.14
 
 install:
   # Install Mingw
