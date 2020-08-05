@@ -1,3 +1,5 @@
+// +build go1.13
+
 /*
    Copyright The containerd Authors.
 
@@ -13,8 +15,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-
-// +build go1.13
 
 // Go 1.13 is the minimally supported version for Windows.
 // Earlier golang releases have bug in os.Readlink
