@@ -153,7 +153,7 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 		isConvertible = true
 
 		converterFunc = func(ctx context.Context, _ ocispec.Descriptor) (ocispec.Descriptor, error) {
-			return schema1Converter.Convert(ctx)
+			return schema1Converter.Convert(ctx, schema1.WithChildLabelMap(rCtx.ChildLabelMap))
 		}
 	} else {
 		// Get all the children for a descriptor

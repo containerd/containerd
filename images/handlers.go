@@ -180,9 +180,6 @@ func SetChildrenLabels(manager content.Manager, f HandlerFunc) HandlerFunc {
 // For returned labels, the index of the child will be appended to the end
 // except for the first index when the returned label does not end with '.'.
 func SetChildrenMappedLabels(manager content.Manager, f HandlerFunc, labelMap func(ocispec.Descriptor) []string) HandlerFunc {
-	if labelMap == nil {
-		labelMap = ChildGCLabels
-	}
 	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		children, err := f(ctx, desc)
 		if err != nil {
@@ -190,36 +187,48 @@ func SetChildrenMappedLabels(manager content.Manager, f HandlerFunc, labelMap fu
 		}
 
 		if len(children) > 0 {
-			var (
-				info = content.Info{
-					Digest: desc.Digest,
-					Labels: map[string]string{},
-				}
-				fields = []string{}
-				keys   = map[string]uint{}
-			)
-			for _, ch := range children {
-				labelKeys := labelMap(ch)
-				for _, key := range labelKeys {
-					idx := keys[key]
-					keys[key] = idx + 1
-					if idx > 0 || key[len(key)-1] == '.' {
-						key = fmt.Sprintf("%s%d", key, idx)
-					}
-
-					info.Labels[key] = ch.Digest.String()
-					fields = append(fields, "labels."+key)
-				}
-			}
-
-			_, err := manager.Update(ctx, info, fields...)
-			if err != nil {
+			if err := UpdateMappedLabels(ctx, manager, desc, children, labelMap); err != nil {
 				return nil, err
 			}
 		}
 
 		return children, err
 	}
+}
+
+// UpdateMappedLabels updates labels for the content on the children. The label
+// map allows the caller to control the labels per child descriptor.
+// For returned labels, the index of the child will be appended to the end
+// except for the first index when the returned label does not end with '.'.
+func UpdateMappedLabels(ctx context.Context, manager content.Manager, desc ocispec.Descriptor, children []ocispec.Descriptor, labelMap func(ocispec.Descriptor) []string) error {
+	if labelMap == nil {
+		labelMap = ChildGCLabels
+	}
+
+	var (
+		info = content.Info{
+			Digest: desc.Digest,
+			Labels: map[string]string{},
+		}
+		fields = []string{}
+		keys   = map[string]uint{}
+	)
+	for _, ch := range children {
+		labelKeys := labelMap(ch)
+		for _, key := range labelKeys {
+			idx := keys[key]
+			keys[key] = idx + 1
+			if idx > 0 || key[len(key)-1] == '.' {
+				key = fmt.Sprintf("%s%d", key, idx)
+			}
+
+			info.Labels[key] = ch.Digest.String()
+			fields = append(fields, "labels."+key)
+		}
+	}
+
+	_, err := manager.Update(ctx, info, fields...)
+	return err
 }
 
 // FilterPlatforms is a handler wrapper which limits the descriptors returned

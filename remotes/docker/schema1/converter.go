@@ -130,6 +130,10 @@ type ConvertOptions struct {
 	// ConfigMediaType specifies the media type of the manifest config OCI
 	// descriptor.
 	ConfigMediaType string
+
+	// ChildLabelMap sets the labels used to reference child objects in the content
+	// store. By default, all GC reference labels will be set.
+	ChildLabelMap func(ocispec.Descriptor) []string
 }
 
 // ConvertOpt allows configuring a convert operation.
@@ -141,6 +145,18 @@ func UseDockerSchema2() ConvertOpt {
 	return func(ctx context.Context, o *ConvertOptions) error {
 		o.ManifestMediaType = images.MediaTypeDockerSchema2Manifest
 		o.ConfigMediaType = images.MediaTypeDockerSchema2Config
+		return nil
+	}
+}
+
+// WithChildLabelMap sets the map function used to define the labels set
+// on referenced child content in the content store. This can be used
+// to overwrite the default GC labels or filter which labels get set
+// for content.
+// The default is `images.ChildGCLabels`.
+func WithChildLabelMap(fn func(ocispec.Descriptor) []string) ConvertOpt {
+	return func(ctx context.Context, o *ConvertOptions) error {
+		o.ChildLabelMap = fn
 		return nil
 	}
 }
@@ -208,15 +224,15 @@ func (c *Converter) Convert(ctx context.Context, opts ...ConvertOpt) (ocispec.De
 		Size:      int64(len(mb)),
 	}
 
-	labels := map[string]string{}
-	labels["containerd.io/gc.ref.content.0"] = manifest.Config.Digest.String()
-	for i, ch := range manifest.Layers {
-		labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i+1)] = ch.Digest.String()
+	ref := remotes.MakeRefKey(ctx, desc)
+	if err := content.WriteBlob(ctx, c.contentStore, ref, bytes.NewReader(mb), desc); err != nil {
+		return ocispec.Descriptor{}, errors.Wrap(err, "failed to write image manifest")
 	}
 
-	ref := remotes.MakeRefKey(ctx, desc)
-	if err := content.WriteBlob(ctx, c.contentStore, ref, bytes.NewReader(mb), desc, content.WithLabels(labels)); err != nil {
-		return ocispec.Descriptor{}, errors.Wrap(err, "failed to write image manifest")
+	// updates labels for the manifest on the children(layers and config), allowing the client to
+	// control the labels per descriptor.
+	if err := images.UpdateMappedLabels(ctx, c.contentStore, desc, append([]ocispec.Descriptor{manifest.Config}, manifest.Layers...), co.ChildLabelMap); err != nil {
+		return ocispec.Descriptor{}, errors.Wrap(err, "failed to update manifest labels")
 	}
 
 	ref = remotes.MakeRefKey(ctx, config)
