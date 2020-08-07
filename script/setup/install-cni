@@ -21,9 +21,9 @@
 #
 set -eu -o pipefail
 
-CNI_COMMIT=$(grep containernetworking/plugins ${GOPATH}/src/github.com/containerd/containerd/vendor.conf | awk '{print $2}')
-CNI_DIR=/opt/cni
-CNI_CONFIG_DIR=/etc/cni/net.d
+CNI_COMMIT=$(grep containernetworking/plugins "$GOPATH"/src/github.com/containerd/containerd/vendor.conf | awk '{print $2}')
+CNI_DIR=${DESTDIR:=''}/opt/cni
+CNI_CONFIG_DIR=${DESTDIR}/etc/cni/net.d
 
 go get -d github.com/containernetworking/plugins/...
 cd $GOPATH/src/github.com/containernetworking/plugins
@@ -32,7 +32,7 @@ FASTBUILD=true ./build.sh
 sudo mkdir -p $CNI_DIR
 sudo cp -r ./bin $CNI_DIR
 sudo mkdir -p $CNI_CONFIG_DIR
-cat <<EOF | sudo tee $CNI_CONFIG_DIR/10-containerd-net.conflist
+cat << EOF | sudo tee $CNI_CONFIG_DIR/10-containerd-net.conflist
 {
   "cniVersion": "0.3.1",
   "name": "containerd-net",
@@ -45,9 +45,17 @@ cat <<EOF | sudo tee $CNI_CONFIG_DIR/10-containerd-net.conflist
       "promiscMode": true,
       "ipam": {
         "type": "host-local",
-        "subnet": "10.88.0.0/16",
+        "ranges": [
+          [{
+            "subnet": "10.88.0.0/16"
+          }],
+          [{
+            "subnet": "2001:4860:4860::8888/32"
+          }]
+        ],
         "routes": [
-          { "dst": "0.0.0.0/0" }
+          { "dst": "0.0.0.0/0" },
+          { "dst": "::/0" }
         ]
       }
     },
