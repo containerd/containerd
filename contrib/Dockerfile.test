@@ -6,7 +6,7 @@
 # 3.) $ make binaries install test
 #
 
-ARG GOLANG_VERSION=1.13.14
+ARG GOLANG_VERSION=1.13.15
 
 FROM golang:${GOLANG_VERSION} AS golang-base
 RUN mkdir -p /go/src/github.com/containerd/containerd
