@@ -29,7 +29,7 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", env: {"RUNC_FLAVOR"=>ENV["RUNC_FLAVOR"]}, inline: <<-SHELL
     set -eux -o pipefail
     # configuration
-    GO_VERSION="1.13.14"
+    GO_VERSION="1.13.15"
 
     # install dnf deps
     dnf install -y container-selinux gcc git iptables libseccomp-devel lsof make
