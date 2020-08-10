@@ -1,20 +1,23 @@
 - hosts: all
   become: yes
   roles:
-    - role: config-golang
-      arch: arm64
+  - role: config-golang
+    go_version: '1.13.15'
+    arch: arm64
   tasks:
-    - name: Build containerd
-      shell:
-        cmd: |
-          set -xe
-          apt-get update
-          apt-get install -y btrfs-tools libseccomp-dev git pkg-config
+  - name: Build containerd
+    shell:
+      cmd: |
+        set -xe
+        set -o pipefail
+        apt-get update
+        apt-get install -y btrfs-tools libseccomp-dev git pkg-config
 
-          make | tee $LOGS_PATH/make.txt
-          make test | tee $LOGS_PATH/make_test.txt
+        go version
+        make | tee $LOGS_PATH/make.txt
+        make test | tee $LOGS_PATH/make_test.txt
 
-          cp -r ./bin $RESULTS_PATH
-        chdir: '{{ zuul.project.src_dir }}'
-        executable: /bin/bash
-      environment: '{{ global_env }}'
+        cp -r ./bin $RESULTS_PATH
+      chdir: '{{ zuul.project.src_dir }}'
+      executable: /bin/bash
+    environment: '{{ global_env }}'
