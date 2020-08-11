@@ -1,17 +1,8 @@
 [![Linux Build Status](https://travis-ci.org/containernetworking/cni.svg?branch=master)](https://travis-ci.org/containernetworking/cni)
 [![Windows Build Status](https://ci.appveyor.com/api/projects/status/wtrkou8oow7x533e/branch/master?svg=true)](https://ci.appveyor.com/project/cni-bot/cni/branch/master)
 [![Coverage Status](https://coveralls.io/repos/github/containernetworking/cni/badge.svg?branch=master)](https://coveralls.io/github/containernetworking/cni?branch=master)
-[![Slack Status](https://cryptic-tundra-43194.herokuapp.com/badge.svg)](https://cryptic-tundra-43194.herokuapp.com/)
 
 ![CNI Logo](logo.png)
-
----
-
-# Community Sync Meeting
-
-There is a community sync meeting for users and developers every 1-2 months. The next meeting will help on a Google Hangout and the link is in the [agenda](https://docs.google.com/document/d/10ECyT2mBGewsJUcmYmS8QNo1AcNgy2ZIe2xS7lShYhE/edit?usp=sharing) (Notes from previous meeting are also in this doc).
-
-The next meeting will be held on *Wednesday, January 30th, 2019* at *4:00pm UTC / 11:00am EDT / 8:00am PDT* [Add to Calendar](https://www.worldtimebuddy.com/?qm=1&lid=100,5,2643743,5391959&h=100&date=2019-01-30&sln=16-17).
 
 ---
 
@@ -27,6 +18,11 @@ As well as the [specification](SPEC.md), this repository contains the Go source 
 
 The template code makes it straight-forward to create a CNI plugin for an existing container networking project.
 CNI also makes a good framework for creating a new container networking project from scratch.
+
+Here are the recordings of two sessions that the CNI maintainers hosted at KubeCon/CloudNativeCon 2019:
+
+- [Introduction to CNI](https://youtu.be/YjjrQiJOyME)
+- [CNI deep dive](https://youtu.be/zChkx-AB5Xc)
 
 ## Why develop CNI?
 
@@ -68,6 +64,11 @@ To avoid duplication, we think it is prudent to define a common interface betwee
 - [DANM - a CNI-compliant networking solution for TelCo workloads running on Kubernetes](https://github.com/nokia/danm)
 - [VMware NSX – a CNI plugin that enables automated NSX L2/L3 networking and L4/L7 Load Balancing; network isolation at the pod, node, and cluster level; and zero-trust security policy for your Kubernetes cluster.](https://docs.vmware.com/en/VMware-NSX-T/2.2/com.vmware.nsxt.ncp_kubernetes.doc/GUID-6AFA724E-BB62-4693-B95C-321E8DDEA7E1.html)
 - [cni-route-override - a meta CNI plugin that override route information](https://github.com/redhat-nfvpe/cni-route-override)
+- [Terway - a collection of CNI Plugins based on alibaba cloud VPC/ECS network product](https://github.com/AliyunContainerService/terway)
+- [Cisco ACI CNI - for on-prem and cloud container networking with consistent policy and security model.](https://github.com/noironetworks/aci-containers)
+- [Kube-OVN - a CNI plugin that bases on OVN/OVS and provides advanced features like subnet, static ip, ACL, QoS, etc.](https://github.com/alauda/kube-ovn)
+- [Project Antrea - an Open vSwitch k8s CNI](https://github.com/vmware-tanzu/antrea)
+- [OVN4NFV-K8S-Plugin - a OVN based CNI controller plugin to provide cloud native based Service function chaining (SFC), Multiple OVN overlay networking](https://github.com/opnfv/ovn4nfv-k8s-plugin)
 
 The CNI team also maintains some [core plugins in a separate repository](https://github.com/containernetworking/plugins).
 
@@ -190,17 +191,26 @@ lo        Link encap:Local Loopback
 
 ## What might CNI do in the future?
 
-CNI currently covers a wide range of needs for network configuration due to it simple model and API.
+CNI currently covers a wide range of needs for network configuration due to its simple model and API.
 However, in the future CNI might want to branch out into other directions:
 
 - Dynamic updates to existing network configuration
 - Dynamic policies for network bandwidth and firewall rules
 
-If these topics of are interest, please contact the team via the mailing list or IRC and find some like-minded people in the community to put a proposal together.
+If these topics are of interest, please contact the team via the mailing list or IRC and find some like-minded people in the community to put a proposal together.
+
+## Where are the binaries?
+
+The plugins moved to a separate repo:
+https://github.com/containernetworking/plugins, and the releases there
+include binaries and checksums.
+
+Prior to release 0.7.0 the `cni` release also included a `cnitool`
+binary; as this is a developer tool we suggest you build it yourself.
 
 ## Contact
 
-For any questions about CNI, please reach out on the mailing list:
+For any questions about CNI, please reach out via:
 - Email: [cni-dev](https://groups.google.com/forum/#!forum/cni-dev)
-- IRC: #[containernetworking](irc://irc.freenode.org:6667/#containernetworking) channel on freenode.org
-- Slack: [containernetworking.slack.com](https://cryptic-tundra-43194.herokuapp.com)
+- IRC: #[containernetworking](irc://irc.freenode.net:6667/#containernetworking) channel on [freenode.net](https://freenode.net/)
+- Slack: #cni on the [CNCF slack](https://slack.cncf.io/).  NOTE: the previous CNI Slack (containernetworking.slack.com) has been sunsetted.
