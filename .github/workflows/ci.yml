@@ -81,7 +81,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           path: src/github.com/containerd/containerd
-          fetch-depth: 25
+          fetch-depth: 100
 
       - name: Checkout project repo
         uses: actions/checkout@v2
@@ -114,7 +114,7 @@ jobs:
           if [ -z "${GITHUB_COMMIT_URL}" ]; then
           DCO_RANGE=$(jq -r '.after + "..HEAD"' ${GITHUB_EVENT_PATH})
           else
-          DCO_RANGE=$(curl ${GITHUB_COMMIT_URL} | jq -r '.[0].parents[0].sha +".."+ .[-1].sha')
+          DCO_RANGE=$(curl ${GITHUB_COMMIT_URL} | jq -r '.[0].parents[0].sha + "..HEAD"')
           fi
           ../project/script/validate/dco
 
