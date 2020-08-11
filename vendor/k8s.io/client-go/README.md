@@ -82,12 +82,13 @@ We will backport bugfixes--but not new features--into older versions of
 
 #### Compatibility matrix
 
-|                               | Kubernetes 1.15 | Kubernetes 1.16 | Kubernetes 1.17 |
-|-------------------------------|-----------------|-----------------|-----------------|
-| `kubernetes-1.15.0`           | ✓               | +-              | +-              |
-| `kubernetes-1.16.0`           | +-              | ✓               | +-              |
-| `kubernetes-1.17.0`/`v0.17.0` | +-              | +-              | ✓               |
-| `HEAD`                        | +-              | +-              | +-              |
+|                               | Kubernetes 1.15 | Kubernetes 1.16 | Kubernetes 1.17 | Kubernetes 1.18 |
+|-------------------------------|-----------------|-----------------|-----------------|-----------------|
+| `kubernetes-1.15.0`           | ✓               | +-              | +-              | +-              |
+| `kubernetes-1.16.0`           | +-              | ✓               | +-              | +-              |
+| `kubernetes-1.17.0`/`v0.17.0` | +-              | +-              | ✓               | +-              |
+| `kubernetes-1.18.0`/`v0.18.0` | +-              | +-              | +-              | ✓               |
+| `HEAD`                        | +-              | +-              | +-              | +-              |
 
 Key:
 
@@ -119,10 +120,11 @@ between client-go versions.
 | `release-8.0`  | Kubernetes main repo, 1.11 branch    | =-                            |
 | `release-9.0`  | Kubernetes main repo, 1.12 branch    | =-                            |
 | `release-10.0` | Kubernetes main repo, 1.13 branch    | =-                            |
-| `release-11.0` | Kubernetes main repo, 1.14 branch    | ✓                             |
+| `release-11.0` | Kubernetes main repo, 1.14 branch    | =-                            |
 | `release-12.0` | Kubernetes main repo, 1.15 branch    | ✓                             |
 | `release-13.0` | Kubernetes main repo, 1.16 branch    | ✓                             |
 | `release-14.0` | Kubernetes main repo, 1.17 branch    | ✓                             |
+| `release-1.18` | Kubernetes main repo, 1.18 branch    | ✓                             |
 | client-go HEAD | Kubernetes main repo, master branch  | ✓                             |
 
 Key:
