@@ -36,7 +36,7 @@ function install_crun() {
 	chmod +x /usr/local/sbin/runc
 }
 
-: ${RUNC_FLAVOR=runc}
+: ${RUNC_FLAVOR:=runc}
 case ${RUNC_FLAVOR} in
 runc) install_runc ;;
 crun) install_crun ;;

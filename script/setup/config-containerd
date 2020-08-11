@@ -15,18 +15,22 @@
 #   limitations under the License.
 
 #
-# Builds and installs critools including critest and crictl
-# to /usr/local/bin.
+# establishes /etc/containerd/config.toml
+# parameterized by the current SELinux mode
 #
-set -eu -o pipefail
+set -eux -o pipefail
 
-go get -u github.com/onsi/ginkgo/ginkgo
-CRITEST_COMMIT=2bf7674922a424337d7580a08166d666c6802818 # v1.18.0-100-g2bf7674
-go get -d github.com/kubernetes-sigs/cri-tools/...
-cd "$GOPATH"/src/github.com/kubernetes-sigs/cri-tools
-git checkout $CRITEST_COMMIT
-make
-sudo make install
-cat << EOF | sudo tee /etc/crictl.yaml
-runtime-endpoint: unix:///run/containerd/containerd.sock
+enable_selinux=false
+
+if type -p getenforce &>/dev/null && [[ $(getenforce) != Disabled ]]; then
+  enable_selinux=true
+fi
+
+mkdir -p /etc/containerd
+
+cat << EOF | sudo tee /etc/containerd/config.toml
+version = 2
+[plugins]
+  [plugins."io.containerd.grpc.v1.cri"]
+    enable_selinux = ${enable_selinux}
 EOF
