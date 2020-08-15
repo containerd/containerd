@@ -430,7 +430,9 @@ jobs:
     needs: [project, linters, protos, man]
     strategy:
       matrix:
-        runc: [runc, crun]
+        # Currently crun is disabled to decrease CI flakiness.
+        # We can enable crun again when we get a better CI infra.
+        runc: [runc]
     steps:
       - name: Checkout containerd
         uses: actions/checkout@v2
