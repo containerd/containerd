@@ -224,6 +224,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"_newselect",
 				"open",
 				"openat",
+				"openat2",
 				"pause",
 				"pipe",
 				"pipe2",
