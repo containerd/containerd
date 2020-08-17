@@ -93,6 +93,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"exit",
 				"exit_group",
 				"faccessat",
+				"faccessat2",
 				"fadvise64",
 				"fadvise64_64",
 				"fallocate",
