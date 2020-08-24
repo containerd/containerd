@@ -191,6 +191,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"lstat",
 				"lstat64",
 				"madvise",
+				"membarrier",
 				"memfd_create",
 				"mincore",
 				"mkdir",
