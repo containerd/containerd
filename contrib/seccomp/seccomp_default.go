@@ -418,6 +418,28 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 			Args: []specs.LinuxSeccompArg{
 				{
 					Index: 0,
+					Value: 0x20000,
+					Op:    specs.OpEqualTo,
+				},
+			},
+		},
+		{
+			Names:  []string{"personality"},
+			Action: specs.ActAllow,
+			Args: []specs.LinuxSeccompArg{
+				{
+					Index: 0,
+					Value: 0x20008,
+					Op:    specs.OpEqualTo,
+				},
+			},
+		},
+		{
+			Names:  []string{"personality"},
+			Action: specs.ActAllow,
+			Args: []specs.LinuxSeccompArg{
+				{
+					Index: 0,
 					Value: 0xffffffff,
 					Op:    specs.OpEqualTo,
 				},
