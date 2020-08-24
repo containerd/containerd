@@ -55,6 +55,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"accept",
 				"accept4",
 				"access",
+				"adjtimex",
 				"alarm",
 				"bind",
 				"brk",
@@ -553,7 +554,6 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				Names: []string{
 					"settimeofday",
 					"stime",
-					"adjtimex",
 				},
 				Action: specs.ActAllow,
 				Args:   []specs.LinuxSeccompArg{},
