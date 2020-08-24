@@ -346,7 +346,6 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"sync_file_range",
 				"syncfs",
 				"sysinfo",
-				"syslog",
 				"tee",
 				"tgkill",
 				"time",
@@ -493,6 +492,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 					"setdomainname",
 					"sethostname",
 					"setns",
+					"syslog",
 					"umount",
 					"umount2",
 					"unshare",
@@ -561,6 +561,12 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 		case "CAP_SYS_TTY_CONFIG":
 			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
 				Names:  []string{"vhangup"},
+				Action: specs.ActAllow,
+				Args:   []specs.LinuxSeccompArg{},
+			})
+		case "CAP_SYSLOG":
+			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+				Names:  []string{"syslog"},
 				Action: specs.ActAllow,
 				Args:   []specs.LinuxSeccompArg{},
 			})
