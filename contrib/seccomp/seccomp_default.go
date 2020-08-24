@@ -524,6 +524,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 					"mount",
 					"name_to_handle_at",
 					"perf_event_open",
+					"quotactl",
 					"setdomainname",
 					"sethostname",
 					"setns",
