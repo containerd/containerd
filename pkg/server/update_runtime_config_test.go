@@ -51,7 +51,7 @@ func TestUpdateRuntimeConfig(t *testing.T) {
 	},
 	]
 }`
-		testCIDR = "10.0.0.0/24, 2001:4860:4860::8888/32"
+		testCIDR = "10.0.0.0/24, 2001:4860:4860::/64"
 		expected = `
 {
 	"name": "test-pod-network",
@@ -63,7 +63,7 @@ func TestUpdateRuntimeConfig(t *testing.T) {
 		"ipam": {
 			"type": "host-local",
 			"subnet": "10.0.0.0/24",
-			"ranges": [[{"subnet": "10.0.0.0/24"}], [{"subnet": "2001:4860:4860::8888/32"}]],
+			"ranges": [[{"subnet": "10.0.0.0/24"}], [{"subnet": "2001:4860:4860::/64"}]],
 			"routes": [{"dst": "0.0.0.0/0"}, {"dst": "::/0"}]
 		}
 	},

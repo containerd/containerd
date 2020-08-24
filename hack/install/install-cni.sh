@@ -29,7 +29,15 @@ GOPATH=$(mktemp -d /tmp/cri-install-cni.XXXX)
 from-vendor CNI github.com/containernetworking/plugins
 checkout_repo ${CNI_PKG} ${CNI_VERSION} ${CNI_REPO}
 cd ${GOPATH}/src/${CNI_PKG}
-FASTBUILD=true ./build.sh
+
+if [[ "$OSTYPE" == "linux-gnu"* ]] || [[ "$OSTYPE" == "darwin"* ]]; then
+   ./build_linux.sh
+elif [[ "$OSTYPE" == "win32" ]]; then
+   ./build_windows.sh
+else
+   exit 1
+fi
+
 ${SUDO} mkdir -p ${CNI_DIR}
 ${SUDO} cp -r ./bin ${CNI_DIR}
 
