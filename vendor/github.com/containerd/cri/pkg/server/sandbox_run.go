@@ -27,6 +27,8 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	cni "github.com/containerd/go-cni"
+	"github.com/containerd/nri"
+	v1 "github.com/containerd/nri/types/v1"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
@@ -269,7 +271,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			deferCtx, deferCancel := ctrdutil.DeferContext()
 			defer deferCancel()
 			// Cleanup the sandbox container if an error is returned.
-			if _, err := task.Delete(deferCtx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
+			if _, err := task.Delete(deferCtx, WithNRISandboxDelete(id), containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
 				log.G(ctx).WithError(err).Errorf("Failed to delete sandbox container %q", id)
 			}
 		}
@@ -279,6 +281,20 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	exitCh, err := task.Wait(ctrdutil.NamespacedContext())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wait for sandbox container task")
+	}
+
+	nric, err := nri.New()
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to create nri client")
+	}
+	if nric != nil {
+		nriSB := &nri.Sandbox{
+			ID:     id,
+			Labels: config.Labels,
+		}
+		if _, err := nric.InvokeWithSandbox(ctx, task, v1.Create, nriSB); err != nil {
+			return nil, errors.Wrap(err, "nri invoke")
+		}
 	}
 
 	if err := task.Start(ctx); err != nil {

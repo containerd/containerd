@@ -24,6 +24,8 @@ import (
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/nri"
+	v1 "github.com/containerd/nri/types/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -107,7 +109,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 			deferCtx, deferCancel := ctrdutil.DeferContext()
 			defer deferCancel()
 			// It's possible that task is deleted by event monitor.
-			if _, err := task.Delete(deferCtx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
+			if _, err := task.Delete(deferCtx, WithNRISandboxDelete(sandboxID), containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
 				log.G(ctx).WithError(err).Errorf("Failed to delete containerd task %q", id)
 			}
 		}
@@ -117,6 +119,18 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	exitCh, err := task.Wait(ctrdutil.NamespacedContext())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wait for containerd task")
+	}
+	nric, err := nri.New()
+	if err != nil {
+		log.G(ctx).WithError(err).Error("unable to create nri client")
+	}
+	if nric != nil {
+		nriSB := &nri.Sandbox{
+			ID: sandboxID,
+		}
+		if _, err := nric.InvokeWithSandbox(ctx, task, v1.Create, nriSB); err != nil {
+			return nil, errors.Wrap(err, "nri invoke")
+		}
 	}
 
 	// Start containerd task.
