@@ -452,11 +452,20 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 
 	// include by arch
 	switch runtime.GOARCH {
+	case "ppc64le":
+		s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			Names: []string{
+				"sync_file_range2",
+			},
+			Action: specs.ActAllow,
+			Args:   []specs.LinuxSeccompArg{},
+		})
 	case "arm", "arm64":
 		s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
 			Names: []string{
 				"arm_fadvise64_64",
 				"arm_sync_file_range",
+				"sync_file_range2",
 				"breakpoint",
 				"cacheflush",
 				"set_tls",
