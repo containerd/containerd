@@ -42,6 +42,10 @@ var platformRunFlags = []cli.Flag{
 		Name:  "runc-binary",
 		Usage: "specify runc-compatible binary",
 	},
+	cli.StringFlag{
+		Name:  "runc-root",
+		Usage: "specify runc-compatible root",
+	},
 	cli.BoolFlag{
 		Name:  "runc-systemd-cgroup",
 		Usage: "start runc with systemd cgroup manager",
@@ -262,6 +266,9 @@ func getRuncOptions(context *cli.Context) (*options.Options, error) {
 			return nil, errors.New("option --runc-systemd-cgroup requires --cgroup to be set, e.g. \"machine.slice:foo:deadbeef\"")
 		}
 		runtimeOpts.SystemdCgroup = true
+	}
+	if root := context.String("runc-root"); root != "" {
+		runtimeOpts.Root = root
 	}
 
 	return runtimeOpts, nil
