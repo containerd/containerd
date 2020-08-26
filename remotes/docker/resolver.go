@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/reference"
 	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/containerd/remotes/docker/auth"
 	"github.com/containerd/containerd/remotes/docker/schema1"
 	"github.com/containerd/containerd/version"
 	digest "github.com/opencontainers/go-digest"
@@ -41,6 +42,11 @@ import (
 )
 
 var (
+	// ErrNoToken is returned if a request is successful but the body does not
+	// contain an authorization token.
+	// Deprecated: use github.com/containerd/containerd/remotes/docker/auth.ErrNoToken
+	ErrNoToken = auth.ErrNoToken
+
 	// ErrInvalidAuthorization is used when credentials are passed to a server but
 	// those credentials are rejected.
 	ErrInvalidAuthorization = errors.New("authorization failed")
