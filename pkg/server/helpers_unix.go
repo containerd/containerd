@@ -33,7 +33,9 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/cri/pkg/seccomp"
+	"github.com/containerd/cri/pkg/seutil"
 	runcapparmor "github.com/opencontainers/runc/libcontainer/apparmor"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
@@ -255,4 +257,36 @@ func ensureRemoveAll(ctx context.Context, dir string) error {
 		exitOnErr[pe.Path]++
 		time.Sleep(100 * time.Millisecond)
 	}
+}
+
+var vmbasedRuntimes = []string{
+	"io.containerd.kata",
+}
+
+func isVMBasedRuntime(runtimeType string) bool {
+	for _, rt := range vmbasedRuntimes {
+		if strings.Contains(runtimeType, rt) {
+			return true
+		}
+	}
+	return false
+}
+
+func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
+	if !isVMBasedRuntime(runtimeType) {
+		return nil
+	}
+	l, err := getKVMLabel(spec.Process.SelinuxLabel)
+	if err != nil {
+		return errors.Wrap(err, "failed to get selinux kvm label")
+	}
+	spec.Process.SelinuxLabel = l
+	return nil
+}
+
+func getKVMLabel(l string) (string, error) {
+	if !seutil.HasType("container_kvm_t") {
+		return "", nil
+	}
+	return seutil.ChangeToKVM(l)
 }

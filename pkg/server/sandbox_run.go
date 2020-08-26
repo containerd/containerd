@@ -167,6 +167,11 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 	}()
 
+	// handle any KVM based runtime
+	if err := modifyProcessLabel(ociRuntime.Type, spec); err != nil {
+		return nil, err
+	}
+
 	if config.GetLinux().GetSecurityContext().GetPrivileged() {
 		// If privileged don't set selinux label, but we still record the MCS label so that
 		// the unused label can be freed later.
