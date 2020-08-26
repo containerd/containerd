@@ -18,26 +18,12 @@ package runtime
 
 import (
 	"net/url"
-	"os"
 	"os/exec"
 )
 
-type Pipe struct {
-	R *os.File
-	W *os.File
-}
-
-func NewPipe() (*Pipe, error) {
-	R, W, err := os.Pipe()
-	if err != nil {
-		return nil, err
-	}
-	return &Pipe{
-		R: R,
-		W: W,
-	}, nil
-}
-
+// NewBinaryCmd returns a Cmd to be used to start a logging binary.
+// The Cmd is generated from the provided uri, and the container ID and
+// namespace are appended to the Cmd environment.
 func NewBinaryCmd(binaryURI *url.URL, id, ns string) *exec.Cmd {
 	var args []string
 	for k, vs := range binaryURI.Query() {
