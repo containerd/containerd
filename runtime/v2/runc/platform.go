@@ -102,13 +102,13 @@ func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console
 		cmd := runtime.NewBinaryCmd(uri, id, ns)
 
 		// Create pipe to be used by logging binary for Stdout
-		out, err := runtime.NewPipe()
+		outR, outW, err := os.Pipe()
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create stdout pipes")
 		}
 
 		// Stderr is created for logging binary but unused when terminal is true
-		serr, err := runtime.NewPipe()
+		serrR, _, err := os.Pipe()
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create stderr pipes")
 		}
@@ -118,14 +118,14 @@ func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console
 			return nil, err
 		}
 
-		cmd.ExtraFiles = append(cmd.ExtraFiles, out.R, serr.R, w)
+		cmd.ExtraFiles = append(cmd.ExtraFiles, outR, serrR, w)
 
 		wg.Add(1)
 		cwg.Add(1)
 		go func() {
 			cwg.Done()
-			io.Copy(out.W, epollConsole)
-			out.W.Close()
+			io.Copy(outW, epollConsole)
+			outW.Close()
 			wg.Done()
 		}()
 
