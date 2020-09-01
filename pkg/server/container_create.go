@@ -161,6 +161,12 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 
 	meta.ProcessLabel = spec.Process.SelinuxLabel
+
+	// handle any KVM based runtime
+	if err := modifyProcessLabel(ociRuntime.Type, spec); err != nil {
+		return nil, err
+	}
+
 	if config.GetLinux().GetSecurityContext().GetPrivileged() {
 		// If privileged don't set the SELinux label but still record it on the container so
 		// the unused MCS label can be release later
