@@ -20,6 +20,7 @@ package run
 
 import (
 	gocontext "context"
+	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -185,9 +186,21 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		if context.Bool("net-host") {
 			opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace), oci.WithHostHostsFile, oci.WithHostResolvconf)
 		}
-		if context.Bool("seccomp") {
-			opts = append(opts, seccomp.WithDefaultProfile())
+
+		seccompProfile := context.String("seccomp-profile")
+
+		if !context.Bool("seccomp") && seccompProfile != "" {
+			return nil, fmt.Errorf("seccomp must be set to true, if using a custom seccomp-profile")
 		}
+
+		if context.Bool("seccomp") {
+			if seccompProfile != "" {
+				opts = append(opts, seccomp.WithProfile(seccompProfile))
+			} else {
+				opts = append(opts, seccomp.WithDefaultProfile())
+			}
+		}
+
 		if cpus := context.Float64("cpus"); cpus > 0.0 {
 			var (
 				period = uint64(100000)
