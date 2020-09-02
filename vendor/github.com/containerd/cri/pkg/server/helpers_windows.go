@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // openLogFile opens/creates a container log file.
@@ -216,4 +218,8 @@ func ensureRemoveAll(_ context.Context, dir string) error {
 		exitOnErr[pe.Path]++
 		time.Sleep(100 * time.Millisecond)
 	}
+}
+
+func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
+	return nil
 }
