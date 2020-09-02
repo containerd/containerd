@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/remotes/docker/auth"
+	remoteerrors "github.com/containerd/containerd/remotes/errors"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -278,7 +279,7 @@ func (ah *authHandler) doBearerAuth(ctx context.Context) (token string, err erro
 		// TODO: Allow setting client_id
 		resp, err := auth.FetchTokenWithOAuth(ctx, ah.client, ah.header, "containerd-client", to)
 		if err != nil {
-			var errStatus auth.ErrUnexpectedStatus
+			var errStatus remoteerrors.ErrUnexpectedStatus
 			if errors.As(err, &errStatus) {
 				// Registries without support for POST may return 404 for POST /v2/token.
 				// As of September 2017, GCR is known to return 404.
