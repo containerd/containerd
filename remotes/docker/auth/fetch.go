@@ -19,15 +19,13 @@ package auth
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/containerd/containerd/log"
+	remoteserrors "github.com/containerd/containerd/remotes/errors"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context/ctxhttp"
 )
@@ -37,25 +35,6 @@ var (
 	// contain an authorization token.
 	ErrNoToken = errors.New("authorization server did not include a token in the response")
 )
-
-// ErrUnexpectedStatus is returned if a token request returned with unexpected HTTP status
-type ErrUnexpectedStatus struct {
-	Status     string
-	StatusCode int
-	Body       []byte
-}
-
-func (e ErrUnexpectedStatus) Error() string {
-	return fmt.Sprintf("unexpected status: %s", e.Status)
-}
-
-func newUnexpectedStatusErr(resp *http.Response) error {
-	var b []byte
-	if resp.Body != nil {
-		b, _ = ioutil.ReadAll(io.LimitReader(resp.Body, 64000)) // 64KB
-	}
-	return ErrUnexpectedStatus{Status: resp.Status, StatusCode: resp.StatusCode, Body: b}
-}
 
 // GenerateTokenOptions generates options for fetching a token based on a challenge
 func GenerateTokenOptions(ctx context.Context, host, username, secret string, c Challenge) (TokenOptions, error) {
@@ -140,7 +119,7 @@ func FetchTokenWithOAuth(ctx context.Context, client *http.Client, headers http.
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		return nil, errors.WithStack(newUnexpectedStatusErr(resp))
+		return nil, errors.WithStack(remoteserrors.NewUnexpectedStatusErr(resp))
 	}
 
 	decoder := json.NewDecoder(resp.Body)
@@ -202,7 +181,7 @@ func FetchToken(ctx context.Context, client *http.Client, headers http.Header, t
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		return nil, errors.WithStack(newUnexpectedStatusErr(resp))
+		return nil, errors.WithStack(remoteserrors.NewUnexpectedStatusErr(resp))
 	}
 
 	decoder := json.NewDecoder(resp.Body)
