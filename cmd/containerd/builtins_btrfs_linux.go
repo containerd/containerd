@@ -18,4 +18,4 @@
 
 package main
 
-import _ "github.com/containerd/containerd/snapshots/btrfs"
+import _ "github.com/containerd/containerd/snapshots/btrfs/plugin"
