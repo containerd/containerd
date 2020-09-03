@@ -155,6 +155,10 @@ var (
 			Name:  "seccomp",
 			Usage: "enable the default seccomp profile",
 		},
+		cli.StringFlag{
+			Name:  "seccomp-profile",
+			Usage: "file path to custom seccomp profile. seccomp must be set to true, before using seccomp-profile",
+		},
 	}
 )
 
