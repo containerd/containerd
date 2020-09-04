@@ -37,6 +37,10 @@ func ForwardAllSignals(ctx gocontext.Context, task killer) chan os.Signal {
 	signal.Notify(sigc)
 	go func() {
 		for s := range sigc {
+			if canIgnoreSignal(s) {
+				logrus.Debugf("Ignoring signal %s", s)
+				continue
+			}
 			logrus.Debug("forwarding signal ", s)
 			if err := task.Kill(ctx, s.(syscall.Signal)); err != nil {
 				if errdefs.IsNotFound(err) {
