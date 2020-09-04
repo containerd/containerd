@@ -37,6 +37,14 @@ func platformVector(platform specs.Platform) []specs.Platform {
 	vector := []specs.Platform{platform}
 
 	switch platform.Architecture {
+	case "amd64":
+		vector = append(vector, specs.Platform{
+			Architecture: "386",
+			OS:           platform.OS,
+			OSVersion:    platform.OSVersion,
+			OSFeatures:   platform.OSFeatures,
+			Variant:      platform.Variant,
+		})
 	case "arm":
 		if armVersion, err := strconv.Atoi(strings.TrimPrefix(platform.Variant, "v")); err == nil && armVersion > 5 {
 			for armVersion--; armVersion >= 5; armVersion-- {
@@ -60,6 +68,7 @@ func platformVector(platform specs.Platform) []specs.Platform {
 // For arm/v8, will also match arm/v7, arm/v6 and arm/v5
 // For arm/v7, will also match arm/v6 and arm/v5
 // For arm/v6, will also match arm/v5
+// For amd64, will also match 386
 func Only(platform specs.Platform) MatchComparer {
 	return Ordered(platformVector(Normalize(platform))...)
 }
