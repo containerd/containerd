@@ -107,12 +107,7 @@ func getCPUVariant() string {
 
 	switch strings.ToLower(variant) {
 	case "8", "aarch64":
-		// special case: if running a 32-bit userspace on aarch64, the variant should be "v7"
-		if runtime.GOARCH == "arm" {
-			variant = "v7"
-		} else {
-			variant = "v8"
-		}
+		variant = "v8"
 	case "7", "7m", "?(12)", "?(13)", "?(14)", "?(15)", "?(16)", "?(17)":
 		variant = "v7"
 	case "6", "6tej":
