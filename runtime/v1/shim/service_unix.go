@@ -36,7 +36,7 @@ import (
 type unixPlatform struct {
 }
 
-func (p *unixPlatform) CopyConsole(ctx context.Context, console console.Console, id, stdin, stdout, stderr string, wg *sync.WaitGroup) (console.Console, error) {
+func (p *unixPlatform) CopyConsole(ctx context.Context, console console.Console, id, stdin, stdout, stderr string, wg *sync.WaitGroup) (cons console.Console, retErr error) {
 	var cwg sync.WaitGroup
 	if stdin != "" {
 		in, err := fifo.OpenFifo(ctx, stdin, syscall.O_RDONLY, 0)
@@ -66,22 +66,34 @@ func (p *unixPlatform) CopyConsole(ctx context.Context, console console.Console,
 
 		cmd := runtime.NewBinaryCmd(uri, id, ns)
 
+		// In case of unexpected errors during logging binary start, close open pipes
+		var filesToClose []*os.File
+
+		defer func() {
+			if retErr != nil {
+				runtime.CloseFiles(filesToClose...)
+			}
+		}()
+
 		// Create pipe to be used by logging binary for Stdout
 		outR, outW, err := os.Pipe()
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create stdout pipes")
 		}
+		filesToClose = append(filesToClose, outR)
 
 		// Stderr is created for logging binary but unused when terminal is true
 		serrR, _, err := os.Pipe()
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create stderr pipes")
 		}
+		filesToClose = append(filesToClose, serrR)
 
 		r, w, err := os.Pipe()
 		if err != nil {
 			return nil, err
 		}
+		filesToClose = append(filesToClose, r)
 
 		cmd.ExtraFiles = append(cmd.ExtraFiles, outR, serrR, w)
 
@@ -108,6 +120,7 @@ func (p *unixPlatform) CopyConsole(ctx context.Context, console console.Console,
 		if _, err := r.Read(b); err != nil && err != io.EOF {
 			return nil, errors.Wrap(err, "failed to read from logging binary")
 		}
+		cwg.Wait()
 
 	default:
 		outw, err := fifo.OpenFifo(ctx, stdout, syscall.O_WRONLY, 0)
