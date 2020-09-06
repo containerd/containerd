@@ -7,25 +7,10 @@ ZFS snapshotter plugin for containerd.
 
 This plugin is tested on Linux with Ubuntu.  It should be compatible with FreeBSD.
 
-
-## Compile
-
-To compile containerd with ZFS support, add the import into the `$GOPATH/src/github.com/containerd/containerd/cmd/containerd/builtins_zfs.go` file.
-
-```go
-// +build linux freebsd
-
-package main
-
-import (
-        _ "github.com/containerd/zfs"
-)
-```
-
-Please refer to [`.travis.yml`](.travis.yml) for the latest containerd version known to work with.
-
-
 ## Usage
+
+The plugin is built-in by default since containerd 1.1.
+No need to recompile containerd or execute a proxy snapshotter process.
 
 1. Set up a ZFS filesystem.
 The ZFS filesystem name is arbitrary but the mount point needs to be `/var/lib/containerd/io.containerd.snapshotter.v1.zfs`, when the containerd root is set to `/var/lib/containerd`.
