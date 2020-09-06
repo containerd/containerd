@@ -18,6 +18,7 @@ package runtime
 
 import (
 	"net/url"
+	"os"
 	"os/exec"
 )
 
@@ -41,4 +42,12 @@ func NewBinaryCmd(binaryURI *url.URL, id, ns string) *exec.Cmd {
 	)
 
 	return cmd
+}
+
+// CloseFiles closes any files passed in.
+// It it used for cleanup in the event of unexpected errors.
+func CloseFiles(files ...*os.File) {
+	for _, file := range files {
+		file.Close()
+	}
 }
