@@ -121,7 +121,7 @@ func loadShim(ctx context.Context, bundle *Bundle, events *exchange.Exchange, rt
 	return s, nil
 }
 
-func cleanupAfterDeadShim(ctx context.Context, id, ns string, events *exchange.Exchange, binaryCall *binary) {
+func cleanupAfterDeadShim(ctx context.Context, id, ns string, rt *runtime.TaskList, events *exchange.Exchange, binaryCall *binary) {
 	ctx = namespaces.WithNamespace(ctx, ns)
 	ctx, cancel := timeout.WithContext(ctx, cleanupTimeout)
 	defer cancel()
@@ -136,6 +136,12 @@ func cleanupAfterDeadShim(ctx context.Context, id, ns string, events *exchange.E
 			"id":        id,
 			"namespace": ns,
 		}).Warn("failed to clean up after shim disconnected")
+	}
+
+	if _, err := rt.Get(ctx, id); err != nil {
+		// Task was never started or was already successfully deleted
+		// No need to publish events
+		return
 	}
 
 	var (
@@ -234,13 +240,15 @@ func (s *shim) Delete(ctx context.Context) (*runtime.Exit, error) {
 			}
 		}
 	}
-	// remove self from the runtime task list
-	// this seems dirty but it cleans up the API across runtimes, tasks, and the service
-	s.rtTasks.Delete(ctx, s.ID())
 	if err := s.waitShutdown(ctx); err != nil {
 		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim")
 	}
 	s.Close()
+	s.client.UserOnCloseWait(ctx)
+
+	// remove self from the runtime task list
+	// this seems dirty but it cleans up the API across runtimes, tasks, and the service
+	s.rtTasks.Delete(ctx, s.ID())
 	if err := s.bundle.Delete(); err != nil {
 		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete bundle")
 	}
