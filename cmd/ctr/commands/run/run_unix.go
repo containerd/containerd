@@ -65,7 +65,7 @@ var platformRunFlags = []cli.Flag{
 	},
 	cli.Float64Flag{
 		Name:  "cpus",
-		Usage: "set the CFS cpu qouta",
+		Usage: "set the CFS cpu quota",
 		Value: 0.0,
 	},
 }
