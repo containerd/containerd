@@ -1,7 +1,7 @@
 # github.com/BurntSushi/toml v0.3.1
 ## explicit
 github.com/BurntSushi/toml
-# github.com/Microsoft/go-winio v0.4.15-0.20200908182639-5b44b70ab3ab
+# github.com/Microsoft/go-winio v0.4.15
 ## explicit
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/pkg/etw
