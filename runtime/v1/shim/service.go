@@ -503,37 +503,42 @@ func (s *Service) processExits() {
 	}
 }
 
-func (s *Service) checkProcesses(e runc.Exit) {
-	var p process.Process
+func (s *Service) allProcesses() []process.Process {
 	s.mu.Lock()
-	for _, proc := range s.processes {
-		if proc.Pid() == e.Pid {
-			p = proc
-			break
+	defer s.mu.Unlock()
+
+	res := make([]process.Process, 0, len(s.processes))
+	for _, p := range s.processes {
+		res = append(res, p)
+	}
+	return res
+}
+
+func (s *Service) checkProcesses(e runc.Exit) {
+	for _, p := range s.allProcesses() {
+		if p.Pid() != e.Pid {
+			continue
 		}
-	}
-	s.mu.Unlock()
-	if p == nil {
-		log.G(s.context).Debugf("process with id:%d wasn't found", e.Pid)
-		return
-	}
-	if ip, ok := p.(*process.Init); ok {
-		// Ensure all children are killed
-		if shouldKillAllOnExit(s.context, s.bundle) {
-			if err := ip.KillAll(s.context); err != nil {
-				log.G(s.context).WithError(err).WithField("id", ip.ID()).
-					Error("failed to kill init's children")
+
+		if ip, ok := p.(*process.Init); ok {
+			// Ensure all children are killed
+			if shouldKillAllOnExit(s.context, s.bundle) {
+				if err := ip.KillAll(s.context); err != nil {
+					log.G(s.context).WithError(err).WithField("id", ip.ID()).
+						Error("failed to kill init's children")
+				}
 			}
 		}
-	}
 
-	p.SetExited(e.Status)
-	s.events <- &eventstypes.TaskExit{
-		ContainerID: s.id,
-		ID:          p.ID(),
-		Pid:         uint32(e.Pid),
-		ExitStatus:  uint32(e.Status),
-		ExitedAt:    p.ExitedAt(),
+		p.SetExited(e.Status)
+		s.events <- &eventstypes.TaskExit{
+			ContainerID: s.id,
+			ID:          p.ID(),
+			Pid:         uint32(e.Pid),
+			ExitStatus:  uint32(e.Status),
+			ExitedAt:    p.ExitedAt(),
+		}
+		return
 	}
 }
 
