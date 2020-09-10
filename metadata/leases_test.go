@@ -17,6 +17,7 @@
 package metadata
 
 import (
+	_ "crypto/sha256"
 	"testing"
 
 	"github.com/containerd/containerd/errdefs"
