@@ -151,11 +151,10 @@ For async communication and long running discussions please use issues and pull
 requests on this github repo. This will be the best place to discuss design and
 implementation.
 
-For sync communication we have a community slack with a #containerd channel that
-everyone is welcome to join and chat about development.
-
-**Slack:** Catch us in the #containerd and #containerd-dev channels on dockercommunity.slack.com.
-[Click here for an invite to docker community slack.](https://dockr.ly/slack)
+For sync communication catch us in the `#containerd` and `#containerd-dev` slack
+channels on Cloud Native Computing Foundation's (CNCF) slack -
+`cloud-native.slack.com`. Everyone is welcome to join and chat.
+[Get Invite to CNCF slack.](https://slack.cncf.io)
 
 ## Other Communications
 As this project is tightly coupled to CRI and CRI-Tools and they are Kubernetes
