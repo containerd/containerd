@@ -19,6 +19,22 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+if [[ "$(python -V 2>&1)" =~ "Python 2" ]]; then
+  # found python2, just use that
+  PYTHON="python"
+elif [[ -f "/usr/bin/python2.7" ]]; then
+  # System python not defaulted to python 2 but using 2.7 during migration
+  PYTHON="/usr/bin/python2.7"
+else
+  # No python2 either by default, let's see if we can find python3
+  PYTHON="python3"
+  if ! command -v ${PYTHON} >/dev/null 2>&1; then
+    echo "ERROR Python not found. Aborting."
+    exit 2
+  fi
+fi
+echo "Version : " $(${PYTHON} -V 2>&1)
+
 # CONTAINERD_HOME is the directory for containerd.
 CONTAINERD_HOME="/home/containerd"
 cd "${CONTAINERD_HOME}"
@@ -53,9 +69,14 @@ fetch_env() {
     fi
     echo "${tmp_env_content}" > "${tmp_env_file}"
     # Convert the yaml format file into a shell-style file.
-    eval $(python -c '''
+    eval $(${PYTHON} -c '''
 import pipes,sys,yaml
-for k,v in yaml.load(sys.stdin).iteritems():
+# check version of python and call methods appropriate for that version
+if sys.version_info[0] < 3:
+    items = yaml.load(sys.stdin).iteritems()
+else:
+    items = yaml.load(sys.stdin, Loader=yaml.BaseLoader).items()
+for k,v in items:
   print("readonly {var}={value}".format(var = k, value = pipes.quote(str(v))))
 ''' < "${tmp_env_file}" > "${CONTAINERD_HOME}/${env_file_name}")
     rm -f "${tmp_env_file}"
