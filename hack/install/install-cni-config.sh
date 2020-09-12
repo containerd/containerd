@@ -23,7 +23,7 @@ CNI_CONFIG_DIR=${DESTDIR}/etc/cni/net.d
 ${SUDO} mkdir -p ${CNI_CONFIG_DIR}
 ${SUDO} bash -c 'cat >'${CNI_CONFIG_DIR}'/10-containerd-net.conflist <<EOF
 {
-  "cniVersion": "0.3.1",
+  "cniVersion": "0.4.0",
   "name": "containerd-net",
   "plugins": [
     {
