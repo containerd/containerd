@@ -3,5 +3,6 @@
 coverage.txt
 profile.out
 containerd.test
+.idea/
 _site/
 .vagrant/

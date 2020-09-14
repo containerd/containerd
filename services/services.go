@@ -35,4 +35,6 @@ const (
 	DiffService = "diff-service"
 	// IntrospectionService is the id of introspection service
 	IntrospectionService = "introspection-service"
+	// runtimeDependenciesService is the id of the runtime dependencies service
+	RuntimeDependenciesService = "runtime-dependencies"
 )

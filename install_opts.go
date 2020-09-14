@@ -22,11 +22,11 @@ type InstallOpts func(*InstallConfig)
 // InstallConfig sets the binary install configuration
 type InstallConfig struct {
 	// Libs installs libs from the image
-	Libs bool
+	Libs bool `toml:"libs"`
 	// Replace will overwrite existing binaries or libs in the opt directory
-	Replace bool
+	Replace bool `toml:"replace"`
 	// Path to install libs and binaries to
-	Path string
+	Path string `toml:"path"`
 }
 
 // WithInstallLibs installs libs from the image
