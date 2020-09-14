@@ -1,0 +1,30 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.4.0"
+
+pre_release = false
+
+preface = """\
+The first patch release for `containerd` 1.4 includes a fix for v1 shims hanging
+on exit and exec when the log pipe fills up along with other minor changes.
+
+### Notable Updates
+
+* Always consume shim logs to prevent logs in the shim from blocking [containerd/containerd#4546](https://github.com/containerd/containerd/pull/4546)
+* Fix error deleting v2 bundle directory when removing rootfs returns `ErrNotExist` [containerd/containerd#4472](https://github.com/containerd/containerd/pull/4472)
+* Fix metrics monitoring of v2 runtime tasks [containerd/containerd#4486](https://github.com/containerd/containerd/pull/4486)
+* Fix incorrect stat for Windows containers [containerd/containerd#4468](https://github.com/containerd/containerd/pull/4468)
+* Fix devmapper device deletion on rollback [containerd/containerd#4437](https://github.com/containerd/containerd/pull/4437)
+* Update seccomp default profile [containerd/containerd#4481](https://github.com/containerd/containerd/pull/4481) [#4491](https://github.com/containerd/containerd/pull/4491) [#4492](https://github.com/containerd/containerd/pull/4492) [#4493](https://github.com/containerd/containerd/pull/4493)
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
