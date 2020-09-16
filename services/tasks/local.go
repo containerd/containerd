@@ -148,7 +148,7 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 		return nil, err
 	}
 	// jump get checkpointPath from checkpoint image
-	if checkpointPath != "" && r.Checkpoint != nil {
+	if checkpointPath == "" && r.Checkpoint != nil {
 		checkpointPath, err = ioutil.TempDir(os.Getenv("XDG_RUNTIME_DIR"), "ctrd-checkpoint")
 		if err != nil {
 			return nil, err
