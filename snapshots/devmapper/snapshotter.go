@@ -30,8 +30,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/devmapper/dmsetup"
 	"github.com/containerd/containerd/snapshots/storage"
@@ -39,32 +37,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
-
-func init() {
-	plugin.Register(&plugin.Registration{
-		Type:   plugin.SnapshotPlugin,
-		ID:     "devmapper",
-		Config: &Config{},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
-
-			config, ok := ic.Config.(*Config)
-			if !ok {
-				return nil, errors.New("invalid devmapper configuration")
-			}
-
-			if config.PoolName == "" {
-				return nil, errors.New("devmapper not configured")
-			}
-
-			if config.RootPath == "" {
-				config.RootPath = ic.Root
-			}
-
-			return NewSnapshotter(ic.Context, config)
-		},
-	})
-}
 
 const (
 	metadataFileName = "metadata.db"
