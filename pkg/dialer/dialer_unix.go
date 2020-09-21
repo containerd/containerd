@@ -30,12 +30,6 @@ import (
 // DialAddress returns the address with unix:// prepended to the
 // provided address
 func DialAddress(address string) string {
-	m := strings.Index(address, ":")
-	// tcp address:port
-	if m > 0 {
-		return fmt.Sprintf("tcp://%s", address)
-	}
-	// unix socket path
 	return fmt.Sprintf("unix://%s", address)
 }
 
@@ -53,9 +47,6 @@ func isNoent(err error) bool {
 }
 
 func dialer(address string, timeout time.Duration) (net.Conn, error) {
-	data := strings.Split(address, "://")
-	if len(data) != 2 {
-		return nil, fmt.Errorf("invalid address: %s", address)
-	}
-	return net.DialTimeout(data[0], data[1], timeout)
+	address = strings.TrimPrefix(address, "unix://")
+	return net.DialTimeout("unix", address, timeout)
 }
