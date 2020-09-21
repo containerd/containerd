@@ -48,6 +48,11 @@ func (s *service) Register(server *grpc.Server) error {
 	return nil
 }
 
+func (s *service) RegisterTCP(server *grpc.Server) error {
+	api.RegisterVersionServer(server, s)
+	return nil
+}
+
 func (s *service) Version(ctx context.Context, _ *ptypes.Empty) (*api.VersionResponse, error) {
 	return &api.VersionResponse{
 		Version:  ctrdversion.Version,

@@ -76,6 +76,11 @@ func (s *server) Register(server *grpc.Server) error {
 	return nil
 }
 
+func (s *server) RegisterTCP(server *grpc.Server) error {
+	api.RegisterIntrospectionServer(server, s)
+	return nil
+}
+
 func (s *server) Plugins(ctx context.Context, req *api.PluginsRequest) (*api.PluginsResponse, error) {
 	return s.local.Plugins(ctx, req)
 }

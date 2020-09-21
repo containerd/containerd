@@ -56,6 +56,11 @@ func (s *service) Register(server *grpc.Server) error {
 	return nil
 }
 
+func (s *service) RegisterTCP(server *grpc.Server) error {
+	api.RegisterContentServer(server, s)
+	return nil
+}
+
 func (s *service) Info(ctx context.Context, req *api.InfoRequest) (*api.InfoResponse, error) {
 	if err := req.Digest.Validate(); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%q failed validation", req.Digest)

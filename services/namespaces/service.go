@@ -63,6 +63,11 @@ func (s *service) Register(server *grpc.Server) error {
 	return nil
 }
 
+func (s *service) RegisterTCP(server *grpc.Server) error {
+	api.RegisterNamespacesServer(server, s)
+	return nil
+}
+
 func (s *service) Get(ctx context.Context, req *api.GetNamespaceRequest) (*api.GetNamespaceResponse, error) {
 	return s.local.Get(ctx, req)
 }

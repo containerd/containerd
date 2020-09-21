@@ -61,6 +61,11 @@ func (s *service) Register(server *grpc.Server) error {
 	return nil
 }
 
+func (s *service) RegisterTCP(server *grpc.Server) error {
+	api.RegisterEventsServer(server, s)
+	return nil
+}
+
 func (s *service) RegisterTTRPC(server *ttrpc.Server) error {
 	apittrpc.RegisterEventsService(server, s.ttService)
 	return nil

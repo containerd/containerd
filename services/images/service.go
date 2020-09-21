@@ -63,6 +63,11 @@ func (s *service) Register(server *grpc.Server) error {
 	return nil
 }
 
+func (s *service) RegisterTCP(server *grpc.Server) error {
+	imagesapi.RegisterImagesServer(server, s)
+	return nil
+}
+
 func (s *service) Get(ctx context.Context, req *imagesapi.GetImageRequest) (*imagesapi.GetImageResponse, error) {
 	return s.local.Get(ctx, req)
 }

@@ -83,6 +83,11 @@ func (s *service) Register(gs *grpc.Server) error {
 	return nil
 }
 
+func (s *service) RegisterTCP(gs *grpc.Server) error {
+	snapshotsapi.RegisterSnapshotsServer(gs, s)
+	return nil
+}
+
 func (s *service) Prepare(ctx context.Context, pr *snapshotsapi.PrepareSnapshotRequest) (*snapshotsapi.PrepareSnapshotResponse, error) {
 	log.G(ctx).WithField("parent", pr.Parent).WithField("key", pr.Key).Debugf("prepare snapshot")
 	sn, err := s.getSnapshotter(pr.Snapshotter)

@@ -64,6 +64,11 @@ func (s *service) Register(server *grpc.Server) error {
 	return nil
 }
 
+func (s *service) RegisterTCP(server *grpc.Server) error {
+	api.RegisterLeasesServer(server, s)
+	return nil
+}
+
 func (s *service) Create(ctx context.Context, r *api.CreateRequest) (*api.CreateResponse, error) {
 	opts := []leases.Opt{
 		leases.WithLabels(r.Labels),

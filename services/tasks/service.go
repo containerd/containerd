@@ -65,6 +65,11 @@ func (s *service) Register(server *grpc.Server) error {
 	return nil
 }
 
+func (s *service) RegisterTCP(server *grpc.Server) error {
+	api.RegisterTasksServer(server, s)
+	return nil
+}
+
 func (s *service) Create(ctx context.Context, r *api.CreateTaskRequest) (*api.CreateTaskResponse, error) {
 	return s.local.Create(ctx, r)
 }

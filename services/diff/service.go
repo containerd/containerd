@@ -62,6 +62,11 @@ func (s *service) Register(gs *grpc.Server) error {
 	return nil
 }
 
+func (s *service) RegisterTCP(gs *grpc.Server) error {
+	diffapi.RegisterDiffServer(gs, s)
+	return nil
+}
+
 func (s *service) Apply(ctx context.Context, er *diffapi.ApplyRequest) (*diffapi.ApplyResponse, error) {
 	return s.local.Apply(ctx, er)
 }
