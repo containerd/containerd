@@ -26,12 +26,11 @@ import (
 )
 
 // Self retrieves a list of mounts for the current running process.
-func Self() ([]Info, error) {
-	m, err := mountinfo.GetMounts(nil)
-	return fromMountinfoSlice(m), err
+func Self() ([]*Info, error) {
+	return mountinfo.GetMounts(nil)
 }
 
 // PID collects the mounts for a specific process ID.
-func PID(pid int) ([]Info, error) {
+func PID(pid int) ([]*Info, error) {
 	return nil, fmt.Errorf("mountinfo.PID is not implemented on %s/%s", runtime.GOOS, runtime.GOARCH)
 }

@@ -21,11 +21,3 @@ import "github.com/moby/sys/mountinfo"
 // Info reveals information about a particular mounted filesystem. This
 // struct is populated from the content in the /proc/<pid>/mountinfo file.
 type Info = mountinfo.Info
-
-func fromMountinfoSlice(infos []*mountinfo.Info) []Info {
-	out := make([]Info, len(infos))
-	for i, v := range infos {
-		out[i] = *v
-	}
-	return out
-}
