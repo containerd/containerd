@@ -169,38 +169,38 @@ version = 2
       # "io.containerd.runc.v1" and "io.containerd.runc.v2". Its corresponding options type is:
       #   https://github.com/containerd/containerd/blob/v1.3.2/runtime/v2/runc/options/oci.pb.go#L26 .
       [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
-        # no_pivot_root disables pivot root when creating a container.
-        no_pivot_root = false
+        # NoPivotRoot disables pivot root when creating a container.
+        NoPivotRoot = false
 
-        # no_new_keyring disables new keyring for the container.
-        no_new_keyring = false
+        # NoNewKeyring disables new keyring for the container.
+        NoNewKeyring = false
 
-        # shim_cgroup places the shim in a cgroup.
-        shim_cgroup = ""
+        # ShimCgroup places the shim in a cgroup.
+        ShimCgroup = ""
 
-        # io_uid sets the I/O's pipes uid.
-        io_uid = 0
+        # IoUid sets the I/O's pipes uid.
+        IoUid = 0
 
-        # io_gid sets the I/O's pipes gid.
-        io_gid = 0
+        # IoGid sets the I/O's pipes gid.
+        IoGid = 0
 
-        # binary_name is the binary name of the runc binary.
-        binary_name = ""
+        # BinaryName is the binary name of the runc binary.
+        BinaryName = ""
 
-        # root is the runc root directory.
-        root = ""
+        # Root is the runc root directory.
+        Root = ""
 
-        # criu_path is the criu binary path.
-        criu_path = ""
+        # CriuPath is the criu binary path.
+        CriuPath = ""
 
-        # systemd_cgroup enables systemd cgroups.
-        systemd_cgroup = false
+        # SystemdCgroup enables systemd cgroups.
+        SystemdCgroup = false
 
-        # criu_image_path is the criu image path
-        criu_image_path = ""
+        # CriuImagePath is the criu image path
+        CriuImagePath = ""
 
-        # criu_work_path is the criu work path.
-        criu_work_path = ""
+        # CriuWorkPath is the criu work path.
+        CriuWorkPath = ""
 
   # 'plugins."io.containerd.grpc.v1.cri".cni' contains config related to cni
   [plugins."io.containerd.grpc.v1.cri".cni]
