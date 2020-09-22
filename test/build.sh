@@ -25,14 +25,26 @@ set -o pipefail
 source $(dirname "${BASH_SOURCE[0]}")/build-utils.sh
 cd "${ROOT}"
 
-# Make sure output directory is very clean.
+# Make sure output directory is clean.
 make clean
-make build
-make binaries
 
-# Build and push test tarball.
-# TODO: mikebrow need to build/push a release tar similarly to:
-# https://github.com/containerd/containerd/blob/master/.github/workflows/release.yml
-# old script:
-# PUSH_VERSION=true DEPLOY_DIR=${DEPLOY_DIR:-""} \
-#   make push TARBALL_PREFIX=cri-containerd-cni INCLUDE_CNI=true CUSTOM_CONTAINERD=true
+# Build CRI+CNI release
+make BUILDTAGS="seccomp selinux no_aufs no_btrfs no_devmapper no_zfs" cri-cni-release
+
+BUILDDIR=$(mktemp -d)
+cleanup() {
+  if [[ ${BUILDDIR} == /tmp/* ]]; then
+    echo "[-] REMOVING ${BUILDDIR}"
+    rm -rf ${BUILDDIR}
+  fi
+}
+trap cleanup EXIT
+
+set -x
+latest=$(readlink ./releases/cri-cni-containerd.tar.gz)
+cp releases/${latest} ${BUILDDIR}/cri-containerd.tar.gz
+cp releases/${latest}.sha256sum ${BUILDDIR}/cri-containerd.tar.gz.sha256
+
+# Push test tarball to Google cloud storage.
+VERSION=$(git describe --match 'v[0-9]*' --dirty='.m' --always)
+PUSH_VERSION=true VERSION=${VERSION} BUILD_DIR=${BUILDDIR} ${ROOT}/test/push.sh

@@ -298,15 +298,16 @@ endif
 
 cri-release: releases/$(CRIRELEASE).tar.gz
 	@echo "$(WHALE) $@"
-	@cd releases && sha256sum $(CRIRELEASE).tar.gz >$(CRIRELEASE).tar.gz.sha256sum
+	@cd releases && sha256sum $(CRIRELEASE).tar.gz >$(CRIRELEASE).tar.gz.sha256sum && ln -sf $(CRIRELEASE).tar.gz cri-containerd.tar.gz
 
 cri-cni-release: releases/$(CRICNIRELEASE).tar.gz
 	@echo "$(WHALE) $@"
-	@cd releases && sha256sum $(CRICNIRELEASE).tar.gz >$(CRICNIRELEASE).tar.gz.sha256sum
+	@cd releases && sha256sum $(CRICNIRELEASE).tar.gz >$(CRICNIRELEASE).tar.gz.sha256sum && ln -sf $(CRICNIRELEASE).tar.gz cri-cni-containerd.tar.gz
 
 clean: ## clean up binaries
 	@echo "$(WHALE) $@"
 	@rm -f $(BINARIES)
+	@rm -f releases/*.tar.gz*
 	@if [[ -d $(OUTPUTDIR) ]]; then sudo rm -rf $(OUTPUTDIR); fi
 
 clean-test: ## clean up debris from previously failed tests
