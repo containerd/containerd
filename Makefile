@@ -249,10 +249,6 @@ release: $(BINARIES) releases/$(RELEASE).tar.gz
 	@echo "$(WHALE) $@"
 	@cd releases && sha256sum $(RELEASE).tar.gz >$(RELEASE).tar.gz.sha256sum
 
-cri-release: $(BINARIES) releases/$(RELEASE).tar.gz
-	@echo "$(WHALE) $@"
-	@VERSION=$(VERSION:v%=%) script/release/release-cri
-
 clean: ## clean up binaries
 	@echo "$(WHALE) $@"
 	@rm -f $(BINARIES)
