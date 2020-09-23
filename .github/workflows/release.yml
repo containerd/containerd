@@ -126,46 +126,22 @@ jobs:
           name: containerd-binaries-${{ matrix.os }}
           path: src/github.com/containerd/containerd/*.tar.gz*
 
-      - name: Install cri-containerd dependencies
+      - name: Make cri-containerd tar
         shell: bash
         env:
           RUNC_FLAVOR: runc
-          DESTDIR: ${{ github.workspace }}/cri-release
         run: |
-          mkdir ${DESTDIR}
           if [[ "${OS}" == "linux" ]]; then
-            sudo install -d ${DESTDIR}/usr/local/bin
-            sudo install -D -m 755 bin/* ${DESTDIR}/usr/local/bin
-            sudo install -d ${DESTDIR}/opt/containerd/cluster
-            sudo cp -r contrib/gce ${DESTDIR}/opt/containerd/cluster/
-            sudo install -d ${DESTDIR}/etc/systemd/system
-            sudo install -m 644 containerd.service ${DESTDIR}/etc/systemd/system
-            echo "CONTAINERD_VERSION: '${RELEASE_VER#v}'" | sudo tee ${DESTDIR}/opt/containerd/cluster/version
-
             sudo PATH=$PATH script/setup/install-seccomp
-            USESUDO=true script/setup/install-runc
-            script/setup/install-cni
-            script/setup/install-critools
-          elif [[ "${OS}" == "windows" ]]; then
-            script/setup/install-cni-windows
-            cp bin/* ${DESTDIR}/
           fi
+          make cri-cni-release
         working-directory: src/github.com/containerd/containerd
-
-      - name: Make cri-containerd tar
-        shell: bash
-        run: |
-          TARFILE="cri-containerd-cni-${RELEASE_VER#v}-${OS}-amd64.tar.gz"
-          [[ "${OS}" == "linux" ]] && tar czf ${TARFILE} etc usr opt
-          [[ "${OS}" == "windows" ]] && tar czf ${TARFILE} *
-          sha256sum ${TARFILE} >${TARFILE}.sha256sum
-        working-directory: cri-release
 
       - name: Save cri-containerd binaries
         uses: actions/upload-artifact@v2
         with:
           name: cri-containerd-binaries-${{ matrix.os }}
-          path: cri-release/cri-containerd-cni-*.tar.gz*
+          path: src/github.com/containerd/containerd/releases/cri-containerd-cni-*.tar.gz*
 
   release:
     name: Create containerd Release

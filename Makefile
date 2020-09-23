@@ -65,6 +65,8 @@ WHALE = "🇩"
 ONI = "👹"
 
 RELEASE=containerd-$(VERSION:v%=%).${GOOS}-${GOARCH}
+CRIRELEASE=cri-containerd-$(VERSION:v%=%)-${GOOS}-${GOARCH}
+CRICNIRELEASE=cri-containerd-cni-$(VERSION:v%=%)-${GOOS}-${GOARCH}
 
 PKG=github.com/containerd/containerd
 
@@ -120,7 +122,10 @@ BINARIES=$(addprefix bin/,$(COMMANDS))
 TESTFLAGS ?= $(TESTFLAGS_RACE) $(EXTRA_TESTFLAGS)
 TESTFLAGS_PARALLEL ?= 8
 
-.PHONY: clean all AUTHORS build binaries test integration generate protos checkprotos coverage ci check help install uninstall vendor release mandir install-man genman
+OUTPUTDIR = $(join $(ROOTDIR), _output)
+CRIDIR=$(OUTPUTDIR)/cri
+
+.PHONY: clean all AUTHORS build binaries test integration generate protos checkprotos coverage ci check help install uninstall vendor release mandir install-man genman install-cri-deps cri-release cri-cni-release
 .DEFAULT: default
 
 all: binaries
@@ -245,13 +250,64 @@ releases/$(RELEASE).tar.gz: $(BINARIES)
 	@tar -czf releases/$(RELEASE).tar.gz -C releases/$(RELEASE) bin
 	@rm -rf releases/$(RELEASE)
 
-release: $(BINARIES) releases/$(RELEASE).tar.gz
+release: releases/$(RELEASE).tar.gz
 	@echo "$(WHALE) $@"
 	@cd releases && sha256sum $(RELEASE).tar.gz >$(RELEASE).tar.gz.sha256sum
+
+ifeq ($(GOOS),windows)
+install-cri-deps: $(BINARIES)
+	mkdir -p $(CRIDIR)
+	DESTDIR=$(CRIDIR) script/setup/install-cni-windows
+	cp bin/* $(CRIDIR)
+else
+install-cri-deps: $(BINARIES)
+	@sudo rm -rf ${CRIDIR}
+	@sudo install -d ${CRIDIR}/usr/local/bin
+	@sudo install -D -m 755 bin/* ${CRIDIR}/usr/local/bin
+	@sudo install -d ${CRIDIR}/opt/containerd/cluster
+	@sudo cp -r contrib/gce ${CRIDIR}/opt/containerd/cluster/
+	@sudo install -d ${CRIDIR}/etc/systemd/system
+	@sudo install -m 644 containerd.service ${CRIDIR}/etc/systemd/system
+	echo "CONTAINERD_VERSION: '$(VERSION:v%=%)'" | sudo tee ${CRIDIR}/opt/containerd/cluster/version
+
+	DESTDIR=$(CRIDIR) USESUDO=true script/setup/install-runc
+	DESTDIR=$(CRIDIR) script/setup/install-cni
+	DESTDIR=$(CRIDIR) script/setup/install-critools
+
+	@sudo install -d $(CRIDIR)/bin
+	@sudo install $(BINARIES) $(CRIDIR)/bin
+endif
+
+ifeq ($(GOOS),windows)
+releases/$(CRIRELEASE).tar.gz: install-cri-deps
+	@echo "$(WHALE) $@"
+	@cd $(CRIDIR) && tar -czf ../../releases/$(CRIRELEASE).tar.gz *
+
+releases/$(CRICNIRELEASE).tar.gz: install-cri-deps
+	@echo "$(WHALE) $@"
+	@cd $(CRIDIR) && tar -czf ../../releases/$(CRICNIRELEASE).tar.gz *
+else
+releases/$(CRIRELEASE).tar.gz: install-cri-deps
+	@echo "$(WHALE) $@"
+	@tar -czf releases/$(CRIRELEASE).tar.gz -C $(CRIDIR) etc/crictl.yaml etc/systemd usr opt/containerd
+
+releases/$(CRICNIRELEASE).tar.gz: install-cri-deps
+	@echo "$(WHALE) $@"
+	@tar -czf releases/$(CRICNIRELEASE).tar.gz -C $(CRIDIR) etc usr opt
+endif
+
+cri-release: releases/$(CRIRELEASE).tar.gz
+	@echo "$(WHALE) $@"
+	@cd releases && sha256sum $(CRIRELEASE).tar.gz >$(CRIRELEASE).tar.gz.sha256sum
+
+cri-cni-release: releases/$(CRICNIRELEASE).tar.gz
+	@echo "$(WHALE) $@"
+	@cd releases && sha256sum $(CRICNIRELEASE).tar.gz >$(CRICNIRELEASE).tar.gz.sha256sum
 
 clean: ## clean up binaries
 	@echo "$(WHALE) $@"
 	@rm -f $(BINARIES)
+	@if [[ -d $(OUTPUTDIR) ]]; then sudo rm -rf $(OUTPUTDIR); fi
 
 clean-test: ## clean up debris from previously failed tests
 	@echo "$(WHALE) $@"
