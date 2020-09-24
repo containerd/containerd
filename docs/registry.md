@@ -1,6 +1,10 @@
 # Configure Image Registry
 This document describes the method to configure the image registry for `containerd` for use with the `cri` plugin.
 
+NOTE: The configuration syntax used in this doc is in version 2 which is the
+recommended since `containerd` 1.3. If your configuration is still in version 1,
+you can replace `"io.containerd.grpc.v1.cri"` with `cri`.
+
 ## Configure Registry Endpoint
 With containerd, `docker.io` is the default image registry. You can also set up other image registries similar to docker.
 
@@ -8,15 +12,18 @@ To configure image registries create/modify the `/etc/containerd/config.toml` as
 ```toml
 # Config file is parsed as version 1 by default.
 # To use the long form of plugin names set "version = 2"
-[plugins.cri.registry.mirrors]
-  [plugins.cri.registry.mirrors."docker.io"]
+# explicitly use v2 config format
+version = 2
+
+[plugin."io.containerd.grpc.v1.cri".registry.mirrors]
+  [plugin."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
     endpoint = ["https://registry-1.docker.io"]
-  [plugins.cri.registry.mirrors."test.https-registry.io"]
+  [plugin."io.containerd.grpc.v1.cri".registry.mirrors."test.https-registry.io"]
     endpoint = ["https://HostIP1:Port1"]
-  [plugins.cri.registry.mirrors."test.http-registry.io"]
+  [plugin."io.containerd.grpc.v1.cri".registry.mirrors."test.http-registry.io"]
     endpoint = ["http://HostIP2:Port2"]
   # wildcard matching is supported but not required.
-  [plugins.cri.registry.mirrors."*"]
+  [plugin."io.containerd.grpc.v1.cri".registry.mirrors."*"]
     endpoint = ["https://HostIP3:Port3"]
 ```
 
@@ -40,9 +47,12 @@ After modify this config, you need restart the `containerd` service.
 
 To configure the TLS settings for a specific registry, create/modify the `/etc/containerd/config.toml` as follows:
 ```toml
+# explicitly use v2 config format
+version = 2
+
 # The registry host has to be a domain name or IP. Port number is also
 # needed if the default HTTPS or HTTP port is not used.
-[plugins.cri.registry.configs."my.custom.registry".tls]
+[plugin."io.containerd.grpc.v1.cri".registry.configs."my.custom.registry".tls]
     ca_file   = "ca.pem"
     cert_file = "cert.pem"
     key_file  = "key.pem"
@@ -54,13 +64,19 @@ In the config example shown above, TLS mutual authentication will be used for co
 `cert_file` and `key_file` are not needed when TLS mutual authentication is unused.
 
 ```toml
-[plugins.cri.registry.configs."my.custom.registry".tls]
+# explicitly use v2 config format
+version = 2
+
+[plugin."io.containerd.grpc.v1.cri".registry.configs."my.custom.registry".tls]
     ca_file   = "ca.pem"
 ```
 
 To skip the registry certificate verification:
-```
-[plugins.cri.registry.configs."my.custom.registry".tls]
+```toml
+# explicitly use v2 config format
+version = 2
+
+[plugin."io.containerd.grpc.v1.cri".registry.configs."my.custom.registry".tls]
   insecure_skip_verify = true
 ```
 
@@ -71,9 +87,12 @@ To skip the registry certificate verification:
 To configure a credential for a specific registry, create/modify the
 `/etc/containerd/config.toml` as follows:
 ```toml
+# explicitly use v2 config format
+version = 2
+
 # The registry host has to be a domain name or IP. Port number is also
 # needed if the default HTTPS or HTTP port is not used.
-[plugins.cri.registry.configs.auths."https://gcr.io"]
+[plugin."io.containerd.grpc.v1.cri".registry.configs."gcr.io".auth]
   username = ""
   password = ""
   auth = ""
