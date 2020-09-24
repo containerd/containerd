@@ -23,7 +23,12 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
+
+	"github.com/containerd/containerd/images"
+	digest "github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestFetcherOpen(t *testing.T) {
@@ -90,5 +95,137 @@ func TestFetcherOpen(t *testing.T) {
 	_, err := f.open(ctx, s.URL, "", 20)
 	if err == nil {
 		t.Fatal("expected error opening with invalid server response")
+	}
+}
+
+func TestFetcherFetch(t *testing.T) {
+	content := make([]byte, 128)
+	rand.New(rand.NewSource(1)).Read(content)
+	start := 0
+
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		t.Helper()
+
+		if r.RequestURI == "/404" {
+			// no authorization must be provided with the initial GET
+			if r.Header["Authorization"] != nil {
+				t.Errorf("no authorization can be used with manifest-specified URLs")
+				return
+			}
+
+			rw.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		if r.RequestURI == "/401" {
+			if r.Header["Authorization"] == nil {
+				rw.Header().Set("Docker-Distribution-Api-Version", "registry/2.0")
+				rw.Header().Set("WWW-Authenticate", "Basic realm=\"https://url\"")
+				rw.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			// no authorization must be provided for manifest-defined URLs
+			t.Errorf("no authorization can be used with manifest-specified URLs")
+			return
+		}
+
+		if r.Header["Authorization"] == nil {
+			rw.Header().Set("Docker-Distribution-Api-Version", "registry/2.0")
+			rw.Header().Set("WWW-Authenticate", "Basic realm=\"https://url\"")
+			rw.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		// authorizer must set Authorize header for the manifest URL
+		if start > 0 {
+			rw.Header().Set("content-range", fmt.Sprintf("bytes %d-127/128", start))
+		}
+		rw.Header().Set("content-length", fmt.Sprintf("%d", len(content[start:])))
+		rw.Write(content[start:])
+	}))
+	defer s.Close()
+
+	baseURL, _ := url.Parse(s.URL)
+	db := &dockerBase{
+		client: s.Client(),
+		base:   *baseURL,
+	}
+	db.auth = NewAuthorizer(db.client, func(a string) (string, string, error) {
+		return "Authorize", "Basic blah", nil
+	})
+
+	f := dockerFetcher{dockerBase: db}
+
+	ctx := context.Background()
+
+	desc := ocispec.Descriptor{
+		MediaType:   images.MediaTypeDockerSchema2Manifest,
+		Digest:      digest.FromBytes([]byte("digest")),
+		Size:        10,
+		URLs:        []string{fmt.Sprintf("%s/404", s.URL), fmt.Sprintf("%s/401", s.URL)},
+		Annotations: map[string]string{},
+	}
+
+	rc, err := f.Fetch(ctx, desc)
+	if err != nil {
+		t.Fatalf("failed to open: %+v", err)
+	}
+	b, err := ioutil.ReadAll(rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := content[0:]
+	if len(b) != len(expected) {
+		t.Errorf("unexpected length %d, expected %d", len(b), len(expected))
+		return
+	}
+	for i, c := range expected {
+		if b[i] != c {
+			t.Errorf("unexpected byte %x at %d, expected %x", b[i], i, c)
+			return
+		}
+	}
+}
+
+func TestFetcherGetV2URLPaths(t *testing.T) {
+	content := make([]byte, 128)
+	rand.New(rand.NewSource(1)).Read(content)
+	start := 0
+
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if start > 0 {
+			rw.Header().Set("content-range", fmt.Sprintf("bytes %d-127/128", start))
+		}
+		rw.Header().Set("content-length", fmt.Sprintf("%d", len(content[start:])))
+		rw.Write(content[start:])
+	}))
+	defer s.Close()
+
+	f := dockerFetcher{&dockerBase{
+		client: s.Client(),
+	}}
+	ctx := context.Background()
+
+	desc := ocispec.Descriptor{
+		MediaType:   images.MediaTypeDockerSchema2Manifest,
+		Digest:      "digest",
+		Size:        10,
+		URLs:        []string{"first", "second"},
+		Annotations: map[string]string{},
+	}
+
+	urls, err := f.getV2URLPaths(ctx, desc)
+
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+		return
+	}
+
+	// blobs and manifest/digest
+	// URLs from the descriptor should not be added to the list of alternative sources
+	if len(urls) != 2 {
+		t.Errorf("unexpected number of urls: %d, expected %d", len(urls), 2)
+		return
 	}
 }
