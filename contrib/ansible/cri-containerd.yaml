@@ -1,9 +1,9 @@
 ---
-- hosts: all 
+- hosts: all
   become: true
   tasks:
     - include_vars: vars/vars.yaml # Contains tasks variables for installer
-    - include_tasks: tasks/bootstrap_ubuntu.yaml # Contains tasks bootstrap components for ubuntu systems 
+    - include_tasks: tasks/bootstrap_ubuntu.yaml # Contains tasks bootstrap components for ubuntu systems
       when: ansible_distribution == "Ubuntu"
     - include_tasks: tasks/bootstrap_centos.yaml # Contains tasks bootstrap components for centos systems
       when: ansible_distribution == "CentOS"
@@ -21,33 +21,46 @@
         name: br_netfilter
         state: present
 
-    - name: "Set bridge-nf-call-iptables" 
+    - name: "Set bridge-nf-call-iptables"
       sysctl:
         name: net.bridge.bridge-nf-call-iptables
         value: 1
 
-    - name: "Set ip_forward" 
+    - name: "Set ip_forward"
       sysctl:
         name: net.ipv4.ip_forward
         value: 1
 
-    - name: "Check kubelet args in kubelet config"
+    - name: "Check kubelet args in kubelet config (Ubuntu)"
       shell: grep "^Environment=\"KUBELET_EXTRA_ARGS=" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf || true
       register: check_args
+      when: ansible_distribution == "Ubuntu"
 
-    - name: "Add runtime args in kubelet conf"
+    - name: "Add runtime args in kubelet conf (Ubuntu)"
       lineinfile:
         dest: "/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
         line: "Environment=\"KUBELET_EXTRA_ARGS= --runtime-cgroups=/system.slice/containerd.service --container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=unix:///run/containerd/containerd.sock\""
         insertafter: '\[Service\]'
-      when: check_args.stdout == ""
-    
+      when: ansible_distribution == "Ubuntu" and check_args.stdout == ""
+
+    - name: "Check kubelet args in kubelet config (CentOS)"
+      shell: grep "^Environment=\"KUBELET_EXTRA_ARGS=" /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf || true
+      register: check_args
+      when: ansible_distribution == "CentOS"
+
+    - name: "Add runtime args in kubelet conf (CentOS)"
+      lineinfile:
+        dest: "/usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf"
+        line: "Environment=\"KUBELET_EXTRA_ARGS= --runtime-cgroups=/system.slice/containerd.service --container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=unix:///run/containerd/containerd.sock\""
+        insertafter: '\[Service\]'
+      when: ansible_distribution == "CentOS" and check_args.stdout == ""
+
     - name: "Start Kubelet"
       systemd: name=kubelet daemon_reload=yes state=started enabled=yes
-    
+
     # TODO This needs to be removed once we have consistent concurrent pull results
     - name: "Pre-pull pause container image"
       shell: |
-        /usr/local/bin/ctr pull k8s.gcr.io/pause:3.1
+        /usr/local/bin/ctr pull k8s.gcr.io/pause:3.2
         /usr/local/bin/crictl --runtime-endpoint unix:///run/containerd/containerd.sock \
-        pull k8s.gcr.io/pause:3.1
+        pull k8s.gcr.io/pause:3.2

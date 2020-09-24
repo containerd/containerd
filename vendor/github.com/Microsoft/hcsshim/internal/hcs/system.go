@@ -4,12 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
-	"time"
 
 	"github.com/Microsoft/hcsshim/internal/cow"
 	"github.com/Microsoft/hcsshim/internal/log"
@@ -20,27 +17,6 @@ import (
 	"github.com/Microsoft/hcsshim/internal/vmcompute"
 	"go.opencensus.io/trace"
 )
-
-// currentContainerStarts is used to limit the number of concurrent container
-// starts.
-var currentContainerStarts containerStarts
-
-type containerStarts struct {
-	maxParallel int
-	inProgress  int
-	sync.Mutex
-}
-
-func init() {
-	mpsS := os.Getenv("HCSSHIM_MAX_PARALLEL_START")
-	if len(mpsS) > 0 {
-		mpsI, err := strconv.Atoi(mpsS)
-		if err != nil || mpsI < 0 {
-			return
-		}
-		currentContainerStarts.maxParallel = mpsI
-	}
-}
 
 type System struct {
 	handleLock     sync.RWMutex
@@ -213,32 +189,6 @@ func (computeSystem *System) Start(ctx context.Context) (err error) {
 
 	if computeSystem.handle == 0 {
 		return makeSystemError(computeSystem, operation, "", ErrAlreadyClosed, nil)
-	}
-
-	// This is a very simple backoff-retry loop to limit the number
-	// of parallel container starts if environment variable
-	// HCSSHIM_MAX_PARALLEL_START is set to a positive integer.
-	// It should generally only be used as a workaround to various
-	// platform issues that exist between RS1 and RS4 as of Aug 2018
-	if currentContainerStarts.maxParallel > 0 {
-		for {
-			currentContainerStarts.Lock()
-			if currentContainerStarts.inProgress < currentContainerStarts.maxParallel {
-				currentContainerStarts.inProgress++
-				currentContainerStarts.Unlock()
-				break
-			}
-			if currentContainerStarts.inProgress == currentContainerStarts.maxParallel {
-				currentContainerStarts.Unlock()
-				time.Sleep(100 * time.Millisecond)
-			}
-		}
-		// Make sure we decrement the count when we are done.
-		defer func() {
-			currentContainerStarts.Lock()
-			currentContainerStarts.inProgress--
-			currentContainerStarts.Unlock()
-		}()
 	}
 
 	resultJSON, err := vmcompute.HcsStartComputeSystem(ctx, computeSystem.handle, "")
@@ -482,38 +432,6 @@ func (computeSystem *System) createProcess(ctx context.Context, operation string
 	return newProcess(processHandle, int(processInfo.ProcessId), computeSystem), &processInfo, nil
 }
 
-// CreateProcessNoStdio launches a new process within the computeSystem. The
-// Stdio handles are not cached on the process struct.
-func (computeSystem *System) CreateProcessNoStdio(c interface{}) (_ cow.Process, err error) {
-	operation := "hcsshim::System::CreateProcessNoStdio"
-	ctx, span := trace.StartSpan(context.Background(), operation)
-	defer span.End()
-	defer func() { oc.SetSpanStatus(span, err) }()
-	span.AddAttributes(trace.StringAttribute("cid", computeSystem.id))
-
-	process, processInfo, err := computeSystem.createProcess(ctx, operation, c)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err != nil {
-			process.Close()
-		}
-	}()
-
-	// We don't do anything with these handles. Close them so they don't leak.
-	syscall.Close(processInfo.StdInput)
-	syscall.Close(processInfo.StdOutput)
-	syscall.Close(processInfo.StdError)
-
-	if err = process.registerCallback(ctx); err != nil {
-		return nil, makeSystemError(computeSystem, operation, "", err, nil)
-	}
-	go process.waitBackground()
-
-	return process, nil
-}
-
 // CreateProcess launches a new process within the computeSystem.
 func (computeSystem *System) CreateProcess(ctx context.Context, c interface{}) (cow.Process, error) {
 	operation := "hcsshim::System::CreateProcess"
@@ -534,6 +452,7 @@ func (computeSystem *System) CreateProcess(ctx context.Context, c interface{}) (
 	process.stdin = pipes[0]
 	process.stdout = pipes[1]
 	process.stderr = pipes[2]
+	process.hasCachedStdio = true
 
 	if err = process.registerCallback(ctx); err != nil {
 		return nil, makeSystemError(computeSystem, operation, "", err, nil)

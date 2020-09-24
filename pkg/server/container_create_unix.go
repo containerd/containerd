@@ -1,32 +1,38 @@
 // +build !windows
 
 /*
-Copyright The containerd Authors.
+   Copyright The containerd Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 package server
 
 import (
+	"bufio"
+	"io"
+	"os"
 	"strconv"
 	"strings"
 
+	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	selinux "github.com/opencontainers/selinux/go-selinux"
+	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
@@ -103,9 +109,9 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 	return mounts
 }
 
-func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint32, netNSPath string,
+func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint32, netNSPath string, containerName string,
 	config *runtime.ContainerConfig, sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig,
-	extraMounts []*runtime.Mount, ociRuntime config.Runtime) (*runtimespec.Spec, error) {
+	extraMounts []*runtime.Mount, ociRuntime config.Runtime) (_ *runtimespec.Spec, retErr error) {
 
 	specOpts := []oci.SpecOpts{
 		customopts.WithoutRunMount,
@@ -147,21 +153,44 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 	specOpts = append(specOpts, oci.WithEnv(env))
 
 	securityContext := config.GetLinux().GetSecurityContext()
-	selinuxOpt := securityContext.GetSelinuxOptions()
-	processLabel, mountLabel, err := initSelinuxOpts(selinuxOpt)
+	labelOptions, err := toLabel(securityContext.GetSelinuxOptions())
+	if err != nil {
+		return nil, err
+	}
+	if len(labelOptions) == 0 {
+		// Use pod level SELinux config
+		if sandbox, err := c.sandboxStore.Get(sandboxID); err == nil {
+			labelOptions, err = selinux.DupSecOpt(sandbox.ProcessLabel)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	processLabel, mountLabel, err := label.InitLabels(labelOptions)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to init selinux options %+v", securityContext.GetSelinuxOptions())
 	}
+	defer func() {
+		if retErr != nil {
+			_ = label.ReleaseLabel(processLabel)
+		}
+	}()
+
 	specOpts = append(specOpts, customopts.WithMounts(c.os, config, extraMounts, mountLabel))
 
 	if !c.config.DisableProcMount {
 		// Apply masked paths if specified.
 		// If the container is privileged, this will be cleared later on.
-		specOpts = append(specOpts, oci.WithMaskedPaths(securityContext.GetMaskedPaths()))
+		if maskedPaths := securityContext.GetMaskedPaths(); maskedPaths != nil {
+			specOpts = append(specOpts, oci.WithMaskedPaths(maskedPaths))
+		}
 
 		// Apply readonly paths if specified.
 		// If the container is privileged, this will be cleared later on.
-		specOpts = append(specOpts, oci.WithReadonlyPaths(securityContext.GetReadonlyPaths()))
+		if readonlyPaths := securityContext.GetReadonlyPaths(); readonlyPaths != nil {
+			specOpts = append(specOpts, oci.WithReadonlyPaths(readonlyPaths))
+		}
 	}
 
 	if securityContext.GetPrivileged() {
@@ -171,6 +200,9 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 		specOpts = append(specOpts, oci.WithPrivileged)
 		if !ociRuntime.PrivilegedWithoutHostDevices {
 			specOpts = append(specOpts, oci.WithHostDevices, oci.WithAllDevicesAllowed)
+		} else {
+			// add requested devices by the config as host devices are not automatically added
+			specOpts = append(specOpts, customopts.WithDevices(c.os, config), customopts.WithCapabilities(securityContext))
 		}
 	} else { // not privileged
 		specOpts = append(specOpts, customopts.WithDevices(c.os, config), customopts.WithCapabilities(securityContext))
@@ -197,7 +229,7 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 	if c.config.DisableCgroup {
 		specOpts = append(specOpts, customopts.WithDisabledCgroups)
 	} else {
-		specOpts = append(specOpts, customopts.WithResources(config.GetLinux().GetResources()))
+		specOpts = append(specOpts, customopts.WithResources(config.GetLinux().GetResources(), c.config.TolerateMissingHugetlbController, c.config.DisableHugetlbController))
 		if sandboxConfig.GetLinux().GetCgroupParent() != "" {
 			cgroupsPath := getCgroupsPath(sandboxConfig.GetLinux().GetCgroupParent(), id)
 			specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
@@ -222,9 +254,19 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 		customopts.WithSupplementalGroups(supplementalGroups),
 		customopts.WithAnnotation(annotations.ContainerType, annotations.ContainerTypeContainer),
 		customopts.WithAnnotation(annotations.SandboxID, sandboxID),
+		customopts.WithAnnotation(annotations.ContainerName, containerName),
 	)
-
-	return runtimeSpec(id, specOpts...)
+	// cgroupns is used for hiding /sys/fs/cgroup from containers.
+	// For compatibility, cgroupns is not used when running in cgroup v1 mode or in privileged.
+	// https://github.com/containers/libpod/issues/4363
+	// https://github.com/kubernetes/enhancements/blob/0e409b47497e398b369c281074485c8de129694f/keps/sig-node/20191118-cgroups-v2.md#cgroup-namespace
+	if cgroups.Mode() == cgroups.Unified && !securityContext.GetPrivileged() {
+		specOpts = append(specOpts, oci.WithLinuxNamespace(
+			runtimespec.LinuxNamespace{
+				Type: runtimespec.CgroupNamespace,
+			}))
+	}
+	return c.runtimeSpec(id, ociRuntime.BaseRuntimeSpec, specOpts...)
 }
 
 func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
@@ -269,7 +311,7 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 		specOpts = append(specOpts, apparmorSpecOpts)
 	}
 
-	seccompSpecOpts, err := generateSeccompSpecOpts(
+	seccompSpecOpts, err := c.generateSeccompSpecOpts(
 		securityContext.GetSeccompProfilePath(),
 		securityContext.GetPrivileged(),
 		c.seccompEnabled())
@@ -283,10 +325,13 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 }
 
 // generateSeccompSpecOpts generates containerd SpecOpts for seccomp.
-func generateSeccompSpecOpts(seccompProf string, privileged, seccompEnabled bool) (oci.SpecOpts, error) {
+func (c *criService) generateSeccompSpecOpts(seccompProf string, privileged, seccompEnabled bool) (oci.SpecOpts, error) {
 	if privileged {
 		// Do not set seccomp profile when container is privileged
 		return nil, nil
+	}
+	if seccompProf == "" {
+		seccompProf = c.config.UnsetSeccompProfile
 	}
 	// Set seccomp profile
 	if seccompProf == runtimeDefault || seccompProf == dockerDefault {
@@ -342,7 +387,41 @@ func generateApparmorSpecOpts(apparmorProf string, privileged, apparmorEnabled b
 		if !strings.HasPrefix(apparmorProf, profileNamePrefix) {
 			return nil, errors.Errorf("invalid apparmor profile %q", apparmorProf)
 		}
-		return apparmor.WithProfile(strings.TrimPrefix(apparmorProf, profileNamePrefix)), nil
+		appArmorProfile := strings.TrimPrefix(apparmorProf, profileNamePrefix)
+		if profileExists, err := appArmorProfileExists(appArmorProfile); !profileExists {
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to generate apparmor spec opts")
+			}
+			return nil, errors.Errorf("apparmor profile not found %s", appArmorProfile)
+		}
+		return apparmor.WithProfile(appArmorProfile), nil
+	}
+}
+
+// appArmorProfileExists scans apparmor/profiles for the requested profile
+func appArmorProfileExists(profile string) (bool, error) {
+	if profile == "" {
+		return false, errors.New("nil apparmor profile is not supported")
+	}
+	profiles, err := os.Open("/sys/kernel/security/apparmor/profiles")
+	if err != nil {
+		return false, err
+	}
+	defer profiles.Close()
+
+	rbuff := bufio.NewReader(profiles)
+	for {
+		line, err := rbuff.ReadString('\n')
+		switch err {
+		case nil:
+			if strings.HasPrefix(line, profile+" (") {
+				return true, nil
+			}
+		case io.EOF:
+			return false, nil
+		default:
+			return false, err
+		}
 	}
 }
 

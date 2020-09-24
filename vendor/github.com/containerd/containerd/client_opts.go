@@ -22,6 +22,9 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/containerd/snapshots"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"google.golang.org/grpc"
 )
 
@@ -138,10 +141,11 @@ func WithUnpackOpts(opts []UnpackOpt) RemoteOpt {
 	}
 }
 
-// WithPullSnapshotter specifies snapshotter name used for unpacking
-func WithPullSnapshotter(snapshotterName string) RemoteOpt {
+// WithPullSnapshotter specifies snapshotter name used for unpacking.
+func WithPullSnapshotter(snapshotterName string, opts ...snapshots.Opt) RemoteOpt {
 	return func(_ *Client, c *RemoteContext) error {
 		c.Snapshotter = snapshotterName
+		c.SnapshotterOpts = opts
 		return nil
 	}
 }
@@ -168,6 +172,18 @@ func WithPullLabels(labels map[string]string) RemoteOpt {
 		for k, v := range labels {
 			rc.Labels[k] = v
 		}
+		return nil
+	}
+}
+
+// WithChildLabelMap sets the map function used to define the labels set
+// on referenced child content in the content store. This can be used
+// to overwrite the default GC labels or filter which labels get set
+// for content.
+// The default is `images.ChildGCLabels`.
+func WithChildLabelMap(fn func(ocispec.Descriptor) []string) RemoteOpt {
+	return func(_ *Client, c *RemoteContext) error {
+		c.ChildLabelMap = fn
 		return nil
 	}
 }

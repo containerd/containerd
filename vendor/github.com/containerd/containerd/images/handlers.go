@@ -64,7 +64,7 @@ func Handlers(handlers ...Handler) HandlerFunc {
 		for _, handler := range handlers {
 			ch, err := handler.Handle(ctx, desc)
 			if err != nil {
-				if errors.Cause(err) == ErrStopHandler {
+				if errors.Is(err, ErrStopHandler) {
 					break
 				}
 				return nil, err
@@ -87,7 +87,7 @@ func Walk(ctx context.Context, handler Handler, descs ...ocispec.Descriptor) err
 
 		children, err := handler.Handle(ctx, desc)
 		if err != nil {
-			if errors.Cause(err) == ErrSkipDesc {
+			if errors.Is(err, ErrSkipDesc) {
 				continue // don't traverse the children.
 			}
 			return err
@@ -136,7 +136,7 @@ func Dispatch(ctx context.Context, handler Handler, limiter *semaphore.Weighted,
 				limiter.Release(1)
 			}
 			if err != nil {
-				if errors.Cause(err) == ErrSkipDesc {
+				if errors.Is(err, ErrSkipDesc) {
 					return nil // don't traverse the children.
 				}
 				return err
@@ -170,6 +170,19 @@ func ChildrenHandler(provider content.Provider) HandlerFunc {
 // the children returned by the handler and passes through the children.
 // Must follow a handler that returns the children to be labeled.
 func SetChildrenLabels(manager content.Manager, f HandlerFunc) HandlerFunc {
+	return SetChildrenMappedLabels(manager, f, nil)
+}
+
+// SetChildrenMappedLabels is a handler wrapper which sets labels for the content on
+// the children returned by the handler and passes through the children.
+// Must follow a handler that returns the children to be labeled.
+// The label map allows the caller to control the labels per child descriptor.
+// For returned labels, the index of the child will be appended to the end
+// except for the first index when the returned label does not end with '.'.
+func SetChildrenMappedLabels(manager content.Manager, f HandlerFunc, labelMap func(ocispec.Descriptor) []string) HandlerFunc {
+	if labelMap == nil {
+		labelMap = ChildGCLabels
+	}
 	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		children, err := f(ctx, desc)
 		if err != nil {
@@ -177,14 +190,26 @@ func SetChildrenLabels(manager content.Manager, f HandlerFunc) HandlerFunc {
 		}
 
 		if len(children) > 0 {
-			info := content.Info{
-				Digest: desc.Digest,
-				Labels: map[string]string{},
-			}
-			fields := []string{}
-			for i, ch := range children {
-				info.Labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i)] = ch.Digest.String()
-				fields = append(fields, fmt.Sprintf("labels.containerd.io/gc.ref.content.%d", i))
+			var (
+				info = content.Info{
+					Digest: desc.Digest,
+					Labels: map[string]string{},
+				}
+				fields = []string{}
+				keys   = map[string]uint{}
+			)
+			for _, ch := range children {
+				labelKeys := labelMap(ch)
+				for _, key := range labelKeys {
+					idx := keys[key]
+					keys[key] = idx + 1
+					if idx > 0 || key[len(key)-1] == '.' {
+						key = fmt.Sprintf("%s%d", key, idx)
+					}
+
+					info.Labels[key] = ch.Digest.String()
+					fields = append(fields, "labels."+key)
+				}
 			}
 
 			_, err := manager.Update(ctx, info, fields...)

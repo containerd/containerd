@@ -1,17 +1,17 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+   Copyright The containerd Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 package server
@@ -20,8 +20,8 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-	"github.com/docker/docker/pkg/system"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
@@ -30,7 +30,6 @@ import (
 )
 
 // RemoveContainer removes the container.
-// TODO(random-liu): Forcibly stop container if it's running.
 func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveContainerRequest) (_ *runtime.RemoveContainerResponse, retErr error) {
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
@@ -42,6 +41,17 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 		return &runtime.RemoveContainerResponse{}, nil
 	}
 	id := container.ID
+
+	// Forcibly stop the containers if they are in running or unknown state
+	state := container.Status.Get().State()
+	if state == runtime.ContainerState_CONTAINER_RUNNING ||
+		state == runtime.ContainerState_CONTAINER_UNKNOWN {
+		logrus.Infof("Forcibly stopping container %q", id)
+		if err := c.stopContainer(ctx, container, 0); err != nil {
+			return nil, errors.Wrapf(err, "failed to forcibly stop container %q", id)
+		}
+
+	}
 
 	// Set removing state to prevent other start/remove operations against this container
 	// while it's being removed.
@@ -76,12 +86,12 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	}
 
 	containerRootDir := c.getContainerRootDir(id)
-	if err := system.EnsureRemoveAll(containerRootDir); err != nil {
+	if err := ensureRemoveAll(ctx, containerRootDir); err != nil {
 		return nil, errors.Wrapf(err, "failed to remove container root directory %q",
 			containerRootDir)
 	}
 	volatileContainerRootDir := c.getVolatileContainerRootDir(id)
-	if err := system.EnsureRemoveAll(volatileContainerRootDir); err != nil {
+	if err := ensureRemoveAll(ctx, volatileContainerRootDir); err != nil {
 		return nil, errors.Wrapf(err, "failed to remove volatile container root directory %q",
 			volatileContainerRootDir)
 	}

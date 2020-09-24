@@ -1,17 +1,17 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+   Copyright The containerd Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 package server
@@ -28,10 +28,10 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl"
-	"github.com/docker/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -146,12 +146,12 @@ func criContainerStateToString(state runtime.ContainerState) string {
 }
 
 // getRepoDigestAngTag returns image repoDigest and repoTag of the named image reference.
-func getRepoDigestAndTag(namedRef reference.Named, digest imagedigest.Digest, schema1 bool) (string, string) {
+func getRepoDigestAndTag(namedRef docker.Named, digest imagedigest.Digest, schema1 bool) (string, string) {
 	var repoTag, repoDigest string
-	if _, ok := namedRef.(reference.NamedTagged); ok {
+	if _, ok := namedRef.(docker.NamedTagged); ok {
 		repoTag = namedRef.String()
 	}
-	if _, ok := namedRef.(reference.Canonical); ok {
+	if _, ok := namedRef.(docker.Canonical); ok {
 		repoDigest = namedRef.String()
 	} else if !schema1 {
 		// digest is not actual repo digest for schema1 image.
@@ -170,7 +170,7 @@ func (c *criService) localResolve(refOrID string) (imagestore.Image, error) {
 		return func(ref string) string {
 			// ref is not image id, try to resolve it locally.
 			// TODO(random-liu): Handle this error better for debugging.
-			normalized, err := reference.ParseDockerRef(ref)
+			normalized, err := docker.ParseDockerRef(ref)
 			if err != nil {
 				return ""
 			}
@@ -283,13 +283,13 @@ func toRuntimeAuthConfig(a criconfig.AuthConfig) *runtime.AuthConfig {
 func parseImageReferences(refs []string) ([]string, []string) {
 	var tags, digests []string
 	for _, ref := range refs {
-		parsed, err := reference.ParseAnyReference(ref)
+		parsed, err := docker.ParseAnyReference(ref)
 		if err != nil {
 			continue
 		}
-		if _, ok := parsed.(reference.Canonical); ok {
+		if _, ok := parsed.(docker.Canonical); ok {
 			digests = append(digests, parsed.String())
-		} else if _, ok := parsed.(reference.Tagged); ok {
+		} else if _, ok := parsed.(docker.Tagged); ok {
 			tags = append(tags, parsed.String())
 		}
 	}

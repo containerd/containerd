@@ -1,17 +1,17 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+   Copyright The containerd Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 package config
@@ -52,6 +52,8 @@ type Runtime struct {
 	// PrivilegedWithoutHostDevices overloads the default behaviour for adding host devices to the
 	// runtime spec when the container is privileged. Defaults to false.
 	PrivilegedWithoutHostDevices bool `toml:"privileged_without_host_devices" json:"privileged_without_host_devices"`
+	// BaseRuntimeSpec is a json file with OCI spec to use as base spec that all container's will be created from.
+	BaseRuntimeSpec string `toml:"base_runtime_spec" json:"baseRuntimeSpec"`
 }
 
 // ContainerdConfig contains toml config related to containerd
@@ -73,6 +75,16 @@ type ContainerdConfig struct {
 	// NoPivot disables pivot-root (linux only), required when running a container in a RamDisk with runc
 	// This only works for runtime type "io.containerd.runtime.v1.linux".
 	NoPivot bool `toml:"no_pivot" json:"noPivot"`
+
+	// DisableSnapshotAnnotations disables to pass additional annotations (image
+	// related information) to snapshotters. These annotations are required by
+	// stargz snapshotter (https://github.com/containerd/stargz-snapshotter).
+	DisableSnapshotAnnotations bool `toml:"disable_snapshot_annotations" json:"disableSnapshotAnnotations"`
+
+	// DiscardUnpackedLayers is a boolean flag to specify whether to allow GC to
+	// remove layers from the content store after successfully unpacking these
+	// layers to the snapshotter.
+	DiscardUnpackedLayers bool `toml:"discard_unpacked_layers" json:"discardUnpackedLayers"`
 }
 
 // CniConfig contains toml config related to cni
@@ -142,6 +154,8 @@ type Registry struct {
 	// be a valid url with host specified.
 	// DEPRECATED: Use Configs instead. Remove in containerd 1.4.
 	Auths map[string]AuthConfig `toml:"auths" json:"auths"`
+	// Headers adds additional HTTP headers that get sent to all registries
+	Headers map[string][]string `toml:"headers" json:"headers"`
 }
 
 // RegistryConfig contains configuration used to communicate with the registry.
@@ -153,6 +167,18 @@ type RegistryConfig struct {
 	TLS *TLSConfig `toml:"tls" json:"tls"`
 }
 
+// ImageDecryption contains configuration to handling decryption of encrypted container images.
+type ImageDecryption struct {
+	// KeyModel specifies the trust model of where keys should reside.
+	//
+	// Details of field usage can be found in:
+	// https://github.com/containerd/cri/tree/master/docs/config.md
+	//
+	// Details of key models can be found in:
+	// https://github.com/containerd/cri/tree/master/docs/decryption.md
+	KeyModel string `toml:"key_model" json:"keyModel"`
+}
+
 // PluginConfig contains toml config related to CRI plugin,
 // it is a subset of Config.
 type PluginConfig struct {
@@ -162,6 +188,8 @@ type PluginConfig struct {
 	CniConfig `toml:"cni" json:"cni"`
 	// Registry contains config related to the registry
 	Registry Registry `toml:"registry" json:"registry"`
+	// ImageDecryption contains config related to handling decryption of encrypted container images
+	ImageDecryption `toml:"image_decryption" json:"imageDecryption"`
 	// DisableTCPService disables serving CRI on the TCP server.
 	DisableTCPService bool `toml:"disable_tcp_service" json:"disableTCPService"`
 	// StreamServerAddress is the ip address streaming server is listening on.
@@ -175,6 +203,9 @@ type PluginConfig struct {
 	StreamIdleTimeout string `toml:"stream_idle_timeout" json:"streamIdleTimeout"`
 	// EnableSelinux indicates to enable the selinux support.
 	EnableSelinux bool `toml:"enable_selinux" json:"enableSelinux"`
+	// SelinuxCategoryRange allows the upper bound on the category range to be set.
+	// If not specified or set to 0, defaults to 1024 from the selinux package.
+	SelinuxCategoryRange int `toml:"selinux_category_range" json:"selinuxCategoryRange"`
 	// SandboxImage is the image used by sandbox container.
 	SandboxImage string `toml:"sandbox_image" json:"sandboxImage"`
 	// StatsCollectPeriod is the period (in seconds) of snapshots stats collection.
@@ -206,6 +237,21 @@ type PluginConfig struct {
 	// DisableProcMount disables Kubernetes ProcMount support. This MUST be set to `true`
 	// when using containerd with Kubernetes <=1.11.
 	DisableProcMount bool `toml:"disable_proc_mount" json:"disableProcMount"`
+	// UnsetSeccompProfile is the profile containerd/cri will use If the provided seccomp profile is
+	// unset (`""`) for a container (default is `unconfined`)
+	UnsetSeccompProfile string `toml:"unset_seccomp_profile" json:"unsetSeccompProfile"`
+	// TolerateMissingHugetlbController if set to false will error out on create/update
+	// container requests with huge page limits if the cgroup controller for hugepages is not present.
+	// This helps with supporting Kubernetes <=1.18 out of the box. (default is `true`)
+	TolerateMissingHugetlbController bool `toml:"tolerate_missing_hugetlb_controller" json:"tolerateMissingHugetlbController"`
+	// DisableHugetlbController indicates to silently disable the hugetlb controller, even when it is
+	// present in /sys/fs/cgroup/cgroup.controllers.
+	// This helps with running rootless mode + cgroup v2 + systemd but without hugetlb delegation.
+	DisableHugetlbController bool `toml:"disable_hugetlb_controller" json:"disableHugetlbController"`
+	// IgnoreImageDefinedVolumes ignores volumes defined by the image. Useful for better resource
+	// isolation, security and early detection of issues in the mount configuration when using
+	// ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
+	IgnoreImageDefinedVolumes bool `toml:"ignore_image_defined_volumes" json:"ignoreImageDefinedVolumes"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
@@ -236,6 +282,9 @@ const (
 	RuntimeUntrusted = "untrusted"
 	// RuntimeDefault is the implicit runtime defined for ContainerdConfig.DefaultRuntime
 	RuntimeDefault = "default"
+	// KeyModelNode is the key model where key for encrypted images reside
+	// on the worker nodes
+	KeyModelNode = "node"
 )
 
 // ValidatePluginConfig validates the given plugin configuration.

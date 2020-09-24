@@ -4,11 +4,12 @@ This document assumes you have already setup the development environment (go, gi
 
 Before sending pull requests you should at least make sure your changes have passed code verification, unit, integration and CRI validation tests.
 ## Code Verification
-Code verification includes lint, code formatting, boilerplate check etc.
+Code verification includes lint, and code formatting check etc.
 * Install tools used by code verification:
 ```bash
 make install.tools
 ```
+***Note:*** Some make actions (like `install.tools`) use the user's `GOPATH` and will otherwise not work when it is not set. Other make actions override it by setting it to a temporary directory for release build and testing purposes.
 * Run code verification:
 ```bash
 make verify

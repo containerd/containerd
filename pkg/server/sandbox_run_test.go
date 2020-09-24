@@ -1,17 +1,17 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+   Copyright The containerd Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 package server
@@ -175,6 +175,12 @@ func TestToCNIPortMappings(t *testing.T) {
 					HostPort:      8765,
 					HostIp:        "126.125.124.123",
 				},
+				{
+					Protocol:      runtime.Protocol_SCTP,
+					ContainerPort: 1234,
+					HostPort:      5678,
+					HostIp:        "123.124.125.126",
+				},
 			},
 			cniPortMappings: []cni.PortMapping{
 				{
@@ -188,6 +194,12 @@ func TestToCNIPortMappings(t *testing.T) {
 					ContainerPort: 4321,
 					Protocol:      "tcp",
 					HostIP:        "126.125.124.123",
+				},
+				{
+					HostPort:      5678,
+					ContainerPort: 1234,
+					Protocol:      "sctp",
+					HostIP:        "123.124.125.126",
 				},
 			},
 		},
@@ -216,12 +228,6 @@ func TestToCNIPortMappings(t *testing.T) {
 		},
 		"CRI port mapping with unsupported protocol should be skipped": {
 			criPortMappings: []*runtime.PortMapping{
-				{
-					Protocol:      runtime.Protocol_SCTP,
-					ContainerPort: 1234,
-					HostPort:      5678,
-					HostIp:        "123.124.125.126",
-				},
 				{
 					Protocol:      runtime.Protocol_TCP,
 					ContainerPort: 4321,

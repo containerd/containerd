@@ -1,31 +1,32 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+   Copyright The containerd Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 package server
 
 import (
 	"context"
+	"io/ioutil"
 	"testing"
 
 	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
-	"github.com/docker/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
@@ -106,7 +107,7 @@ func TestGetRepoDigestAndTag(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		named, err := reference.ParseDockerRef(test.ref)
+		named, err := docker.ParseDockerRef(test.ref)
 		assert.NoError(t, err)
 		repoDigest, repoTag := getRepoDigestAndTag(named, digest, test.schema1)
 		assert.Equal(t, test.expectedRepoDigest, repoDigest)
@@ -465,5 +466,33 @@ func TestPassThroughAnnotationsFilter(t *testing.T) {
 			passthroughAnnotations := getPassthroughAnnotations(test.podAnnotations, test.runtimePodAnnotations)
 			assert.Equal(t, test.passthroughAnnotations, passthroughAnnotations)
 		})
+	}
+}
+
+func TestEnsureRemoveAllNotExist(t *testing.T) {
+	// should never return an error for a non-existent path
+	if err := ensureRemoveAll(context.Background(), "/non/existent/path"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEnsureRemoveAllWithDir(t *testing.T) {
+	dir, err := ioutil.TempDir("", "test-ensure-removeall-with-dir")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureRemoveAll(context.Background(), dir); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEnsureRemoveAllWithFile(t *testing.T) {
+	tmp, err := ioutil.TempFile("", "test-ensure-removeall-with-dir")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmp.Close()
+	if err := ensureRemoveAll(context.Background(), tmp.Name()); err != nil {
+		t.Fatal(err)
 	}
 }

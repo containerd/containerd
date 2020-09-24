@@ -1,33 +1,27 @@
 #!/bin/bash
 
-# Copyright The containerd Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+#   Copyright The containerd Authors.
+
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+
+#       http://www.apache.org/licenses/LICENSE-2.0
+
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
 export PATH="/c/Program Files/Containerd:$PATH"
-REPO_TAR="${REPO_TAR:-"/c/cri.tar.gz"}"
 FOCUS="${FOCUS:-"Conformance"}"
 SKIP="${SKIP:-""}"
 REPORT_DIR="${REPORT_DIR:-"/c/_artifacts"}"
-
-repo="$GOPATH/src/github.com/containerd/cri"
-mkdir -p "${repo}"
-cd "${repo}"
-tar -xzf "${REPO_TAR}"
 
 make install.deps
 make install -e BINDIR="/c/Program Files/Containerd"

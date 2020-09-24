@@ -1,17 +1,17 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+   Copyright The containerd Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 package server
@@ -28,6 +28,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	selinux "github.com/opencontainers/selinux/go-selinux"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -68,6 +69,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if metadata == nil {
 		return nil, errors.New("container config must include metadata")
 	}
+	containerName := metadata.Name
 	name := makeContainerName(metadata, sandboxConfig.GetMetadata())
 	log.G(ctx).Debugf("Generated id %q for container %q", id, name)
 	if err = c.containerNameIndex.Reserve(name, id); err != nil {
@@ -135,8 +137,13 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		}
 	}()
 
-	// Create container volumes mounts.
-	volumeMounts := c.volumeMounts(containerRootDir, config.GetMounts(), &image.ImageSpec.Config)
+	var volumeMounts []*runtime.Mount
+	if !c.config.IgnoreImageDefinedVolumes {
+		// Create container image volumes mounts.
+		volumeMounts = c.volumeMounts(containerRootDir, config.GetMounts(), &image.ImageSpec.Config)
+	} else if len(image.ImageSpec.Config.Volumes) != 0 {
+		log.G(ctx).Debugf("Ignoring volumes defined in image %v because IgnoreImageDefinedVolumes is set", image.ID)
+	}
 
 	// Generate container mounts.
 	mounts := c.containerMounts(sandboxID, config)
@@ -147,11 +154,29 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 	log.G(ctx).Debugf("Use OCI runtime %+v for sandbox %q and container %q", ociRuntime, sandboxID, id)
 
-	spec, err := c.containerSpec(id, sandboxID, sandboxPid, sandbox.NetNSPath, config, sandboxConfig,
+	spec, err := c.containerSpec(id, sandboxID, sandboxPid, sandbox.NetNSPath, containerName, config, sandboxConfig,
 		&image.ImageSpec.Config, append(mounts, volumeMounts...), ociRuntime)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to generate container %q spec", id)
 	}
+
+	meta.ProcessLabel = spec.Process.SelinuxLabel
+
+	// handle any KVM based runtime
+	if err := modifyProcessLabel(ociRuntime.Type, spec); err != nil {
+		return nil, err
+	}
+
+	if config.GetLinux().GetSecurityContext().GetPrivileged() {
+		// If privileged don't set the SELinux label but still record it on the container so
+		// the unused MCS label can be release later
+		spec.Process.SelinuxLabel = ""
+	}
+	defer func() {
+		if retErr != nil {
+			selinux.ReleaseLabel(spec.Process.SelinuxLabel)
+		}
+	}()
 
 	log.G(ctx).Debugf("Container %q spec: %#+v", id, spew.NewFormatter(spec))
 
@@ -274,22 +299,45 @@ func (c *criService) volumeMounts(containerRootDir string, criMounts []*runtime.
 		src := filepath.Join(containerRootDir, "volumes", volumeID)
 		// addOCIBindMounts will create these volumes.
 		mounts = append(mounts, &runtime.Mount{
-			ContainerPath: dst,
-			HostPath:      src,
-			// Use default mount propagation.
-			// TODO(random-liu): What about selinux relabel?
+			ContainerPath:  dst,
+			HostPath:       src,
+			SelinuxRelabel: true,
 		})
 	}
 	return mounts
 }
 
 // runtimeSpec returns a default runtime spec used in cri-containerd.
-func runtimeSpec(id string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
+func (c *criService) runtimeSpec(id string, baseSpecFile string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
 	// GenerateSpec needs namespace.
 	ctx := ctrdutil.NamespacedContext()
-	spec, err := oci.GenerateSpec(ctx, nil, &containers.Container{ID: id}, opts...)
-	if err != nil {
-		return nil, err
+	container := &containers.Container{ID: id}
+
+	if baseSpecFile != "" {
+		baseSpec, ok := c.baseOCISpecs[baseSpecFile]
+		if !ok {
+			return nil, errors.Errorf("can't find base OCI spec %q", baseSpecFile)
+		}
+
+		spec := oci.Spec{}
+		if err := util.DeepCopy(&spec, &baseSpec); err != nil {
+			return nil, errors.Wrap(err, "failed to clone OCI spec")
+		}
+
+		// Fix up cgroups path
+		applyOpts := append([]oci.SpecOpts{oci.WithNamespacedCgroup()}, opts...)
+
+		if err := oci.ApplyOpts(ctx, nil, container, &spec, applyOpts...); err != nil {
+			return nil, errors.Wrap(err, "failed to apply OCI options")
+		}
+
+		return &spec, nil
 	}
+
+	spec, err := oci.GenerateSpec(ctx, nil, container, opts...)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate spec")
+	}
+
 	return spec, nil
 }

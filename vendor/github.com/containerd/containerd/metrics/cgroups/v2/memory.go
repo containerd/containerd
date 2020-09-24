@@ -586,4 +586,20 @@ var memoryMetrics = []*metric{
 			}
 		},
 	},
+	{
+		name: "memory_oom",
+		help: "The number of times a container has received an oom event",
+		unit: metrics.Total,
+		vt:   prometheus.GaugeValue,
+		getValues: func(stats *v2.Metrics) []value {
+			if stats.MemoryEvents == nil {
+				return nil
+			}
+			return []value{
+				{
+					v: float64(stats.MemoryEvents.Oom),
+				},
+			}
+		},
+	},
 }

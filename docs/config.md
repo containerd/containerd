@@ -10,6 +10,7 @@ The explanation and default value of each configuration item are as follows:
 ```toml
 # Use config version 2 to enable new configuration fields.
 # Config file is parsed as version 1 by default.
+# Version 2 uses long plugin names, i.e. "io.containerd.grpc.v1.cri" vs "cri".
 version = 2
 
 # The 'plugins."io.containerd.grpc.v1.cri"' table contains all of the server options.
@@ -34,8 +35,12 @@ version = 2
   # enable_selinux indicates to enable the selinux support.
   enable_selinux = false
 
+  # selinux_category_range allows the upper bound on the category range to be set.
+  # if not specified or set to 0, defaults to 1024 from the selinux package.
+  selinux_category_range = 1024
+
   # sandbox_image is the image used by sandbox container.
-  sandbox_image = "k8s.gcr.io/pause:3.1"
+  sandbox_image = "k8s.gcr.io/pause:3.2"
 
   # stats_collect_period is the period (in seconds) of snapshots stats collection.
   stats_collect_period = 10
@@ -43,6 +48,16 @@ version = 2
   # enable_tls_streaming enables the TLS streaming support.
   # It generates a self-sign certificate unless the following x509_key_pair_streaming are both set.
   enable_tls_streaming = false
+
+  # tolerate_missing_hugetlb_controller if set to false will error out on create/update
+  # container requests with huge page limits if the cgroup controller for hugepages is not present.
+  # This helps with supporting Kubernetes <=1.18 out of the box. (default is `true`)
+  tolerate_missing_hugetlb_controller = true
+
+  # ignore_image_defined_volumes ignores volumes defined by the image. Useful for better resource
+	# isolation, security and early detection of issues in the mount configuration when using
+	# ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
+  ignore_image_defined_volumes = false
 
   # 'plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming' contains a x509 valid key pair to stream with tls.
   [plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming]
@@ -77,6 +92,10 @@ version = 2
   # when using containerd with Kubernetes <=1.11.
   disable_proc_mount = false
 
+  # unsetSeccompProfile is the profile containerd/cri will use if the provided seccomp profile is
+  # unset (`""`) for a container (default is `unconfined`)
+  unset_seccomp_profile = ""
+
   # 'plugins."io.containerd.grpc.v1.cri".containerd' contains config related to containerd
   [plugins."io.containerd.grpc.v1.cri".containerd]
 
@@ -86,6 +105,15 @@ version = 2
     # no_pivot disables pivot-root (linux only), required when running a container in a RamDisk with runc.
     # This only works for runtime type "io.containerd.runtime.v1.linux".
     no_pivot = false
+
+    # disable_snapshot_annotations disables to pass additional annotations (image
+    # related information) to snapshotters. These annotations are required by
+    # stargz snapshotter (https://github.com/containerd/stargz-snapshotter)
+    disable_snapshot_annotations = false
+
+    # discard_unpacked_layers allows GC to remove layers from the content store after
+    # successfully unpacking these layers to the snapshotter.
+    discard_unpacked_layers = false
 
     # default_runtime_name is the default runtime name to use.
     default_runtime_name = "runc"
@@ -129,6 +157,13 @@ version = 2
       # not make sense to pass host devices to the container when privileged. Defaults to false -
       # i.e pass host devices through to privileged containers.
       privileged_without_host_devices = false
+
+      # base_runtime_spec is a file path to a JSON file with the OCI spec that will be used as the base spec that all
+      # container's are created from.
+      # Use containerd's `ctr oci spec > /etc/containerd/cri-base.json` to output initial spec file.
+      # Spec files are loaded at launch, so containerd daemon must be restared on any changes to refresh default specs.
+      # Still running containers and restarted containers will still be using the original spec from which that container was created.
+      base_runtime_spec = ""
 
       # 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options' is options specific to
       # "io.containerd.runc.v1" and "io.containerd.runc.v2". Its corresponding options type is:
@@ -197,10 +232,36 @@ version = 2
   # 'plugins."io.containerd.grpc.v1.cri".registry' contains config related to the registry
   [plugins."io.containerd.grpc.v1.cri".registry]
 
+    # 'plugins."io.containerd.grpc.v1.cri.registry.headers sets the http request headers to send for all registry requests
+    [plugins."io.containerd.grpc.v1.cri".registry.headers]
+        Foo = ["bar"]
+
     # 'plugins."io.containerd.grpc.v1.cri".registry.mirrors' are namespace to mirror mapping for all namespaces.
     [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
       [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
         endpoint = ["https://registry-1.docker.io", ]
+
+  # 'plugins."io.containerd.grpc.v1.cri".image_decryption' contains config related
+  # to handling decryption of encrypted container images.
+  [plugins."io.containerd.grpc.v1.cri".image_decryption]
+    # key_model defines the name of the key model used for how the cri obtains
+    # keys used for decryption of encrypted container images.
+    # The [decryption document](https://github.com/containerd/cri/blob/master/docs/decryption.md)
+    # contains additional information about the key models available. 
+    #
+    # Set of available string options: {"", "node"}
+    # Omission of this field defaults to the empty string "", which indicates no key model, 
+    # disabling image decryption.
+    #
+    # In order to use the decryption feature, additional configurations must be made.
+    # The [decryption document](https://github.com/containerd/cri/blob/master/docs/decryption.md)
+    # provides information of how to set up stream processors and the containerd imgcrypt decoder
+    # with the appropriate key models.
+    #
+    # Additional information:
+    # * Stream processors: https://github.com/containerd/containerd/blob/master/docs/stream_processors.md
+    # * Containerd imgcrypt: https://github.com/containerd/imgcrypt
+    key_model = "node"
 ```
 
 ## Untrusted Workload

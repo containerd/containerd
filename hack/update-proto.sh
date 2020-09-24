@@ -1,19 +1,18 @@
 #!/bin/bash
 
-# Copyright 2017 The Kubernetes Authors.
-# Copyright 2018 The Containerd Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+#   Copyright The containerd Authors.
+
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+
+#       http://www.apache.org/licenses/LICENSE-2.0
+
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
 
 set -o errexit
 set -o nounset
@@ -40,7 +39,6 @@ protoc \
   --gogo_out=plugins=grpc:${API_ROOT} ${API_ROOT}/api.proto
 
 # Update boilerplate for the generated file.
-echo "$(cat hack/boilerplate/boilerplate.go.txt ${API_ROOT}/api.pb.go)" > ${API_ROOT}/api.pb.go
-sed -i".bak" "s/Copyright AUTHORS/Copyright $(date '+%Y') The containerd Authors/g" ${API_ROOT}/api.pb.go
+echo "$(cat hack/boilerplate/boilerplate ${API_ROOT}/api.pb.go)" > ${API_ROOT}/api.pb.go
 
 gofmt -l -s -w ${API_ROOT}/api.pb.go

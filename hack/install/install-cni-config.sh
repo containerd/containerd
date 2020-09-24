@@ -1,18 +1,18 @@
 #!/bin/bash
 
-# Copyright 2018 The containerd Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+#   Copyright The containerd Authors.
+
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+
+#       http://www.apache.org/licenses/LICENSE-2.0
+
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
 
 set -o errexit
 set -o nounset
@@ -23,7 +23,7 @@ CNI_CONFIG_DIR=${DESTDIR}/etc/cni/net.d
 ${SUDO} mkdir -p ${CNI_CONFIG_DIR}
 ${SUDO} bash -c 'cat >'${CNI_CONFIG_DIR}'/10-containerd-net.conflist <<EOF
 {
-  "cniVersion": "0.3.1",
+  "cniVersion": "0.4.0",
   "name": "containerd-net",
   "plugins": [
     {
@@ -39,7 +39,7 @@ ${SUDO} bash -c 'cat >'${CNI_CONFIG_DIR}'/10-containerd-net.conflist <<EOF
             "subnet": "10.88.0.0/16"
           }],
           [{
-            "subnet": "2001:4860:4860::8888/32"
+            "subnet": "2001:4860:4860::/64"
           }]
         ],
         "routes": [

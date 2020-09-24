@@ -1,19 +1,19 @@
 // +build windows
 
 /*
-Copyright The containerd Authors.
+   Copyright The containerd Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 package server
@@ -34,7 +34,7 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 	return nil
 }
 
-func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint32, netNSPath string,
+func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint32, netNSPath string, containerName string,
 	config *runtime.ContainerConfig, sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig,
 	extraMounts []*runtime.Mount, ociRuntime config.Runtime) (*runtimespec.Spec, error) {
 	specOpts := []oci.SpecOpts{
@@ -68,13 +68,30 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 
 	specOpts = append(specOpts, customopts.WithWindowsMounts(c.os, config, extraMounts))
 
-	specOpts = append(specOpts, customopts.WithWindowsResources(config.GetWindows().GetResources()))
+	// Start with the image config user and override below if RunAsUsername is not "".
+	username := imageConfig.User
 
-	username := config.GetWindows().GetSecurityContext().GetRunAsUsername()
-	if username != "" {
-		specOpts = append(specOpts, oci.WithUser(username))
+	windowsConfig := config.GetWindows()
+	if windowsConfig != nil {
+		specOpts = append(specOpts, customopts.WithWindowsResources(windowsConfig.GetResources()))
+		securityCtx := windowsConfig.GetSecurityContext()
+		if securityCtx != nil {
+			runAsUser := securityCtx.GetRunAsUsername()
+			if runAsUser != "" {
+				username = runAsUser
+			}
+			cs := securityCtx.GetCredentialSpec()
+			if cs != "" {
+				specOpts = append(specOpts, customopts.WithWindowsCredentialSpec(cs))
+			}
+		}
 	}
-	// TODO(windows): Add CredentialSpec support.
+
+	// There really isn't a good Windows way to verify that the username is available in the
+	// image as early as here like there is for Linux. Later on in the stack hcsshim
+	// will handle the behavior of erroring out if the user isn't available in the image
+	// when trying to run the init process.
+	specOpts = append(specOpts, oci.WithUser(username))
 
 	for pKey, pValue := range getPassthroughAnnotations(sandboxConfig.Annotations,
 		ociRuntime.PodAnnotations) {
@@ -89,9 +106,9 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 	specOpts = append(specOpts,
 		customopts.WithAnnotation(annotations.ContainerType, annotations.ContainerTypeContainer),
 		customopts.WithAnnotation(annotations.SandboxID, sandboxID),
+		customopts.WithAnnotation(annotations.ContainerName, containerName),
 	)
-
-	return runtimeSpec(id, specOpts...)
+	return c.runtimeSpec(id, ociRuntime.BaseRuntimeSpec, specOpts...)
 }
 
 // No extra spec options needed for windows.

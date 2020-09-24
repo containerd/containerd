@@ -1,19 +1,19 @@
 // +build !windows
 
 /*
-Copyright The containerd Authors.
+   Copyright The containerd Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 package opts
@@ -27,6 +27,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"syscall"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/log"
@@ -36,6 +38,7 @@ import (
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
@@ -226,7 +229,7 @@ func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 			}
 
 			if mount.GetSelinuxRelabel() {
-				if err := label.Relabel(src, mountLabel, true); err != nil && err != unix.ENOTSUP {
+				if err := label.Relabel(src, mountLabel, false); err != nil && err != unix.ENOTSUP {
 					return errors.Wrapf(err, "relabel %q with %q failed", src, mountLabel)
 				}
 			}
@@ -321,7 +324,7 @@ func WithDevices(osi osinterface.OS, config *runtime.ContainerConfig) oci.SpecOp
 				Type:   string(dev.Type),
 				Major:  &dev.Major,
 				Minor:  &dev.Minor,
-				Access: dev.Permissions,
+				Access: string(dev.Permissions),
 			})
 		}
 		return nil
@@ -405,7 +408,7 @@ func WithSelinuxLabels(process, mount string) oci.SpecOpts {
 }
 
 // WithResources sets the provided resource restrictions
-func WithResources(resources *runtime.LinuxContainerResources) oci.SpecOpts {
+func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHugetlbController, disableHugetlbController bool) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
 		if resources == nil {
 			return nil
@@ -423,10 +426,11 @@ func WithResources(resources *runtime.LinuxContainerResources) oci.SpecOpts {
 			s.Linux.Resources.Memory = &runtimespec.LinuxMemory{}
 		}
 		var (
-			p      = uint64(resources.GetCpuPeriod())
-			q      = resources.GetCpuQuota()
-			shares = uint64(resources.GetCpuShares())
-			limit  = resources.GetMemoryLimitInBytes()
+			p         = uint64(resources.GetCpuPeriod())
+			q         = resources.GetCpuQuota()
+			shares    = uint64(resources.GetCpuShares())
+			limit     = resources.GetMemoryLimitInBytes()
+			hugepages = resources.GetHugepageLimits()
 		)
 
 		if p != 0 {
@@ -447,8 +451,93 @@ func WithResources(resources *runtime.LinuxContainerResources) oci.SpecOpts {
 		if limit != 0 {
 			s.Linux.Resources.Memory.Limit = &limit
 		}
+		if !disableHugetlbController {
+			if isHugetlbControllerPresent() {
+				for _, limit := range hugepages {
+					s.Linux.Resources.HugepageLimits = append(s.Linux.Resources.HugepageLimits, runtimespec.LinuxHugepageLimit{
+						Pagesize: limit.PageSize,
+						Limit:    limit.Limit,
+					})
+				}
+			} else {
+				if !tolerateMissingHugetlbController {
+					return errors.Errorf("huge pages limits are specified but hugetlb cgroup controller is missing. " +
+						"Please set tolerate_missing_hugetlb_controller to `true` to ignore this error")
+				}
+				logrus.Warn("hugetlb cgroup controller is absent. skipping huge pages limits")
+			}
+		}
 		return nil
 	}
+}
+
+var (
+	supportsHugetlbOnce sync.Once
+	supportsHugetlb     bool
+)
+
+func isHugetlbControllerPresent() bool {
+	supportsHugetlbOnce.Do(func() {
+		supportsHugetlb = false
+		if IsCgroup2UnifiedMode() {
+			supportsHugetlb, _ = cgroupv2HasHugetlb()
+		} else {
+			supportsHugetlb, _ = cgroupv1HasHugetlb()
+		}
+	})
+	return supportsHugetlb
+}
+
+var (
+	_cgroupv1HasHugetlbOnce sync.Once
+	_cgroupv1HasHugetlb     bool
+	_cgroupv1HasHugetlbErr  error
+	_cgroupv2HasHugetlbOnce sync.Once
+	_cgroupv2HasHugetlb     bool
+	_cgroupv2HasHugetlbErr  error
+	isUnifiedOnce           sync.Once
+	isUnified               bool
+)
+
+// cgroupv1HasHugetlb returns whether the hugetlb controller is present on
+// cgroup v1.
+func cgroupv1HasHugetlb() (bool, error) {
+	_cgroupv1HasHugetlbOnce.Do(func() {
+		if _, err := ioutil.ReadDir("/sys/fs/cgroup/hugetlb"); err != nil {
+			_cgroupv1HasHugetlbErr = errors.Wrap(err, "readdir /sys/fs/cgroup/hugetlb")
+			_cgroupv1HasHugetlb = false
+		} else {
+			_cgroupv1HasHugetlbErr = nil
+			_cgroupv1HasHugetlb = true
+		}
+	})
+	return _cgroupv1HasHugetlb, _cgroupv1HasHugetlbErr
+}
+
+// cgroupv2HasHugetlb returns whether the hugetlb controller is present on
+// cgroup v2.
+func cgroupv2HasHugetlb() (bool, error) {
+	_cgroupv2HasHugetlbOnce.Do(func() {
+		controllers, err := ioutil.ReadFile("/sys/fs/cgroup/cgroup.controllers")
+		if err != nil {
+			_cgroupv2HasHugetlbErr = errors.Wrap(err, "read /sys/fs/cgroup/cgroup.controllers")
+			return
+		}
+		_cgroupv2HasHugetlb = strings.Contains(string(controllers), "hugetlb")
+	})
+	return _cgroupv2HasHugetlb, _cgroupv2HasHugetlbErr
+}
+
+// IsCgroup2UnifiedMode returns whether we are running in cgroup v2 unified mode.
+func IsCgroup2UnifiedMode() bool {
+	isUnifiedOnce.Do(func() {
+		var st syscall.Statfs_t
+		if err := syscall.Statfs("/sys/fs/cgroup", &st); err != nil {
+			panic("cannot statfs cgroup root")
+		}
+		isUnified = st.Type == unix.CGROUP2_SUPER_MAGIC
+	})
+	return isUnified
 }
 
 // WithOOMScoreAdj sets the oom score

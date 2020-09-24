@@ -184,6 +184,13 @@ func (p *proxySnapshotter) Close() error {
 	return nil
 }
 
+func (p *proxySnapshotter) Cleanup(ctx context.Context) error {
+	_, err := p.client.Cleanup(ctx, &snapshotsapi.CleanupRequest{
+		Snapshotter: p.snapshotterName,
+	})
+	return errdefs.FromGRPC(err)
+}
+
 func toKind(kind snapshotsapi.Kind) snapshots.Kind {
 	if kind == snapshotsapi.KindActive {
 		return snapshots.KindActive

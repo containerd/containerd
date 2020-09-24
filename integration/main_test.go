@@ -1,17 +1,17 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+   Copyright The containerd Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 package integration
@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"net"
 	"os"
 	"os/exec"
 	"strconv"
@@ -37,9 +36,9 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/cri-api/pkg/apis"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/kubernetes/pkg/kubelet/remote"
-	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 
+	"github.com/containerd/cri/integration/remote"
+	dialer "github.com/containerd/cri/integration/util"
 	criconfig "github.com/containerd/cri/pkg/config"
 	"github.com/containerd/cri/pkg/constants"
 	"github.com/containerd/cri/pkg/server"
@@ -48,7 +47,7 @@ import (
 
 const (
 	timeout      = 1 * time.Minute
-	pauseImage   = "k8s.gcr.io/pause:3.1" // This is the same with default sandbox image.
+	pauseImage   = "k8s.gcr.io/pause:3.2" // This is the same with default sandbox image.
 	k8sNamespace = constants.K8sContainerdNamespace
 )
 
@@ -347,19 +346,13 @@ func PidOf(name string) (int, error) {
 
 // RawRuntimeClient returns a raw grpc runtime service client.
 func RawRuntimeClient() (runtime.RuntimeServiceClient, error) {
-	addr, dialer, err := kubeletutil.GetAddressAndDialer(*criEndpoint)
+	addr, dialer, err := dialer.GetAddressAndDialer(*criEndpoint)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get dialer")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithContextDialer(
-		func(ctx context.Context, addr string) (net.Conn, error) {
-			if deadline, ok := ctx.Deadline(); ok {
-				return dialer(addr, time.Until(deadline))
-			}
-			return dialer(addr, 0)
-		}))
+	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithContextDialer(dialer))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect cri endpoint")
 	}

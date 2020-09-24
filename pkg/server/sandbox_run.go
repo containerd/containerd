@@ -1,17 +1,17 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+   Copyright The containerd Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 package server
@@ -27,21 +27,24 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	cni "github.com/containerd/go-cni"
+	"github.com/containerd/nri"
+	v1 "github.com/containerd/nri/types/v1"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/kubernetes/pkg/util/bandwidth"
 
 	"github.com/containerd/cri/pkg/annotations"
 	criconfig "github.com/containerd/cri/pkg/config"
 	customopts "github.com/containerd/cri/pkg/containerd/opts"
 	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
 	"github.com/containerd/cri/pkg/netns"
+	"github.com/containerd/cri/pkg/server/bandwidth"
 	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
 	"github.com/containerd/cri/pkg/util"
+	selinux "github.com/opencontainers/selinux/go-selinux"
 )
 
 func init() {
@@ -123,12 +126,18 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		sandbox.NetNSPath = sandbox.NetNS.GetPath()
 		defer func() {
 			if retErr != nil {
+				// Teardown network if an error is returned.
+				if err := c.teardownPodNetwork(ctx, sandbox); err != nil {
+					log.G(ctx).WithError(err).Errorf("Failed to destroy network for sandbox %q", id)
+				}
+
 				if err := sandbox.NetNS.Remove(); err != nil {
 					log.G(ctx).WithError(err).Errorf("Failed to remove network namespace %s for sandbox %q", sandbox.NetNSPath, id)
 				}
 				sandbox.NetNSPath = ""
 			}
 		}()
+
 		// Setup network for sandbox.
 		// Certain VM based solutions like clear containers (Issue containerd/cri-containerd#524)
 		// rely on the assumption that CRI shim will not be querying the network namespace to check the
@@ -140,14 +149,6 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		if err := c.setupPodNetwork(ctx, &sandbox); err != nil {
 			return nil, errors.Wrapf(err, "failed to setup network for sandbox %q", id)
 		}
-		defer func() {
-			if retErr != nil {
-				// Teardown network if an error is returned.
-				if err := c.teardownPodNetwork(ctx, sandbox); err != nil {
-					log.G(ctx).WithError(err).Errorf("Failed to destroy network for sandbox %q", id)
-				}
-			}
-		}()
 	}
 
 	// Create sandbox container.
@@ -159,6 +160,23 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, errors.Wrap(err, "failed to generate sandbox container spec")
 	}
 	log.G(ctx).Debugf("Sandbox container %q spec: %#+v", id, spew.NewFormatter(spec))
+	sandbox.ProcessLabel = spec.Process.SelinuxLabel
+	defer func() {
+		if retErr != nil {
+			selinux.ReleaseLabel(sandbox.ProcessLabel)
+		}
+	}()
+
+	// handle any KVM based runtime
+	if err := modifyProcessLabel(ociRuntime.Type, spec); err != nil {
+		return nil, err
+	}
+
+	if config.GetLinux().GetSecurityContext().GetPrivileged() {
+		// If privileged don't set selinux label, but we still record the MCS label so that
+		// the unused label can be freed later.
+		spec.Process.SelinuxLabel = ""
+	}
 
 	// Generate spec options that will be applied to the spec later.
 	specOpts, err := c.sandboxContainerSpecOpts(config, &image.ImageSpec.Config)
@@ -258,7 +276,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			deferCtx, deferCancel := ctrdutil.DeferContext()
 			defer deferCancel()
 			// Cleanup the sandbox container if an error is returned.
-			if _, err := task.Delete(deferCtx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
+			if _, err := task.Delete(deferCtx, WithNRISandboxDelete(id), containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
 				log.G(ctx).WithError(err).Errorf("Failed to delete sandbox container %q", id)
 			}
 		}
@@ -268,6 +286,20 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	exitCh, err := task.Wait(ctrdutil.NamespacedContext())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wait for sandbox container task")
+	}
+
+	nric, err := nri.New()
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to create nri client")
+	}
+	if nric != nil {
+		nriSB := &nri.Sandbox{
+			ID:     id,
+			Labels: config.Labels,
+		}
+		if _, err := nric.InvokeWithSandbox(ctx, task, v1.Create, nriSB); err != nil {
+			return nil, errors.Wrap(err, "nri invoke")
+		}
 	}
 
 	if err := task.Start(ctx); err != nil {
@@ -327,10 +359,6 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		sandbox.IP, sandbox.AdditionalIPs = selectPodIPs(configs.IPConfigs)
 		sandbox.CNIResult = result
 		return nil
-	}
-	// If it comes here then the result was invalid so destroy the pod network and return error
-	if err := c.teardownPodNetwork(ctx, *sandbox); err != nil {
-		log.G(ctx).WithError(err).Errorf("Failed to destroy network for sandbox %q", id)
 	}
 	return errors.Errorf("failed to find network info for sandbox %q", id)
 }
@@ -405,9 +433,6 @@ func toCNIPortMappings(criPortMappings []*runtime.PortMapping) []cni.PortMapping
 	var portMappings []cni.PortMapping
 	for _, mapping := range criPortMappings {
 		if mapping.HostPort <= 0 {
-			continue
-		}
-		if mapping.Protocol != runtime.Protocol_TCP && mapping.Protocol != runtime.Protocol_UDP {
 			continue
 		}
 		portMappings = append(portMappings, cni.PortMapping{

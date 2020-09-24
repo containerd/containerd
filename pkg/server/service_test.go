@@ -1,28 +1,38 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+   Copyright The containerd Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 package server
 
 import (
+	"encoding/json"
+	"io/ioutil"
+	"os"
+	"testing"
+
+	"github.com/containerd/containerd/oci"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	criconfig "github.com/containerd/cri/pkg/config"
 	ostesting "github.com/containerd/cri/pkg/os/testing"
 	"github.com/containerd/cri/pkg/registrar"
 	servertesting "github.com/containerd/cri/pkg/server/testing"
 	containerstore "github.com/containerd/cri/pkg/store/container"
 	imagestore "github.com/containerd/cri/pkg/store/image"
+	"github.com/containerd/cri/pkg/store/label"
 	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
 	snapshotstore "github.com/containerd/cri/pkg/store/snapshot"
 )
@@ -39,6 +49,7 @@ const (
 
 // newTestCRIService creates a fake criService for test.
 func newTestCRIService() *criService {
+	labels := label.NewStore()
 	return &criService{
 		config: criconfig.Config{
 			RootDir:  testRootDir,
@@ -49,12 +60,43 @@ func newTestCRIService() *criService {
 		},
 		imageFSPath:        testImageFSPath,
 		os:                 ostesting.NewFakeOS(),
-		sandboxStore:       sandboxstore.NewStore(),
+		sandboxStore:       sandboxstore.NewStore(labels),
 		imageStore:         imagestore.NewStore(nil),
 		snapshotStore:      snapshotstore.NewStore(),
 		sandboxNameIndex:   registrar.NewRegistrar(),
-		containerStore:     containerstore.NewStore(),
+		containerStore:     containerstore.NewStore(labels),
 		containerNameIndex: registrar.NewRegistrar(),
 		netPlugin:          servertesting.NewFakeCNIPlugin(),
 	}
+}
+
+func TestLoadBaseOCISpec(t *testing.T) {
+	spec := oci.Spec{Version: "1.0.2", Hostname: "default"}
+
+	file, err := ioutil.TempFile("", "spec-test-")
+	require.NoError(t, err)
+
+	defer func() {
+		assert.NoError(t, file.Close())
+		assert.NoError(t, os.RemoveAll(file.Name()))
+	}()
+
+	err = json.NewEncoder(file).Encode(&spec)
+	assert.NoError(t, err)
+
+	config := criconfig.Config{}
+	config.Runtimes = map[string]criconfig.Runtime{
+		"runc": {BaseRuntimeSpec: file.Name()},
+	}
+
+	specs, err := loadBaseOCISpecs(&config)
+	assert.NoError(t, err)
+
+	assert.Len(t, specs, 1)
+
+	out, ok := specs[file.Name()]
+	assert.True(t, ok, "expected spec with file name %q", file.Name())
+
+	assert.Equal(t, "1.0.2", out.Version)
+	assert.Equal(t, "default", out.Hostname)
 }

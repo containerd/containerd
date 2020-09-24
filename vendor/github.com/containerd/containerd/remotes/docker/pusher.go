@@ -86,7 +86,7 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 
 	resp, err := req.doWithRetries(ctx, nil)
 	if err != nil {
-		if errors.Cause(err) != ErrInvalidAuthorization {
+		if !errors.Is(err, ErrInvalidAuthorization) {
 			return nil, err
 		}
 		log.G(ctx).WithError(err).Debugf("Unable to check existence, continuing with push")
@@ -204,6 +204,7 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 		q.Add("digest", desc.Digest.String())
 
 		req = p.request(lhost, http.MethodPut)
+		req.header.Set("Content-Type", "application/octet-stream")
 		req.path = lurl.Path + "?" + q.Encode()
 	}
 	p.tracker.SetStatus(ref, Status{
@@ -234,7 +235,7 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 
 	go func() {
 		defer close(respC)
-		resp, err = req.do(ctx)
+		resp, err := req.do(ctx)
 		if err != nil {
 			pr.CloseWithError(err)
 			return

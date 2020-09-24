@@ -9,6 +9,9 @@ message Metrics {
 	CPUStat cpu = 2 [(gogoproto.customname) = "CPU"];
 	MemoryStat memory = 4;
 	RdmaStat rdma = 5;
+	IOStat io = 6;
+	repeated HugeTlbStat hugetlb = 7;
+	MemoryEvents memory_events = 8;
 }
 
 message PidsStat {
@@ -63,6 +66,14 @@ message MemoryStat {
 	uint64 swap_limit = 35;
 }
 
+message MemoryEvents {
+	uint64 low = 1;
+	uint64 high = 2;
+	uint64 max = 3;
+	uint64 oom = 4;
+	uint64 oom_kill = 5;
+}
+
 message RdmaStat {
 	repeated RdmaEntry current = 1;
 	repeated RdmaEntry limit = 2;
@@ -74,5 +85,21 @@ message RdmaEntry {
 	uint32 hca_objects = 3;
 }
 
-// iostat
-// fmt: 230:0 rbytes=394211328 wbytes=65044480 rios=16313 wios=2006 dbytes=0 dios=0
+message IOStat {
+	repeated IOEntry usage = 1;
+}
+
+message IOEntry {
+	uint64 major = 1;
+	uint64 minor = 2;
+	uint64 rbytes = 3;
+	uint64 wbytes = 4;
+	uint64 rios = 5;
+	uint64 wios = 6;
+}
+
+message HugeTlbStat {
+	uint64 current = 1;
+	uint64 max = 2;
+	string pagesize = 3;
+}

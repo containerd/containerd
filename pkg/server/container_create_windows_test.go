@@ -1,19 +1,19 @@
 // +build windows
 
 /*
-Copyright The containerd Authors.
+   Copyright The containerd Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 package server
@@ -72,7 +72,8 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 				MemoryLimitInBytes: 400,
 			},
 			SecurityContext: &runtime.WindowsContainerSecurityContext{
-				RunAsUsername: "test-user",
+				RunAsUsername:  "test-user",
+				CredentialSpec: "{\"test\": \"spec\"}",
 			},
 		},
 	}
@@ -91,6 +92,7 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		Entrypoint: []string{"/entrypoint"},
 		Cmd:        []string{"cmd"},
 		WorkingDir: "/workspace",
+		User:       "ContainerUser",
 	}
 	specCheck := func(t *testing.T, id string, sandboxID string, sandboxPid uint32, spec *runtimespec.Spec) {
 		assert.Nil(t, spec.Root)
@@ -111,8 +113,12 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		assert.EqualValues(t, *spec.Windows.Resources.CPU.Maximum, 300)
 		assert.EqualValues(t, *spec.Windows.Resources.Memory.Limit, 400)
 
+		// Also checks if override of the image configs user is behaving.
 		t.Logf("Check username")
 		assert.Contains(t, spec.Process.User.Username, "test-user")
+
+		t.Logf("Check credential spec")
+		assert.Contains(t, spec.Windows.CredentialSpec, "{\"test\": \"spec\"}")
 
 		t.Logf("Check PodSandbox annotations")
 		assert.Contains(t, spec.Annotations, annotations.SandboxID)
@@ -127,12 +133,13 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 func TestContainerWindowsNetworkNamespace(t *testing.T) {
 	testID := "test-id"
 	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
 	testPid := uint32(1234)
 	nsPath := "test-cni"
 	c := newTestCRIService()
 
 	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
+	spec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, testContainerName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
 	assert.NoError(t, err)
 	assert.NotNil(t, spec)
 	specCheck(t, testID, testSandboxID, testPid, spec)
@@ -144,6 +151,7 @@ func TestContainerWindowsNetworkNamespace(t *testing.T) {
 func TestMountCleanPath(t *testing.T) {
 	testID := "test-id"
 	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
 	testPid := uint32(1234)
 	nsPath := "test-cni"
 	c := newTestCRIService()
@@ -153,9 +161,29 @@ func TestMountCleanPath(t *testing.T) {
 		ContainerPath: "c:/test/container-path",
 		HostPath:      "c:/test/host-path",
 	})
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
+	spec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, testContainerName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
 	assert.NoError(t, err)
 	assert.NotNil(t, spec)
 	specCheck(t, testID, testSandboxID, testPid, spec)
 	checkMount(t, spec.Mounts, "c:\\test\\host-path", "c:\\test\\container-path", "", []string{"rw"}, nil)
+}
+
+func TestMountNamedPipe(t *testing.T) {
+	testID := "test-id"
+	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
+	testPid := uint32(1234)
+	nsPath := "test-cni"
+	c := newTestCRIService()
+
+	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	containerConfig.Mounts = append(containerConfig.Mounts, &runtime.Mount{
+		ContainerPath: `\\.\pipe\foo`,
+		HostPath:      `\\.\pipe\foo`,
+	})
+	spec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, testContainerName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
+	assert.NoError(t, err)
+	assert.NotNil(t, spec)
+	specCheck(t, testID, testSandboxID, testPid, spec)
+	checkMount(t, spec.Mounts, `\\.\pipe\foo`, `\\.\pipe\foo`, "", []string{"rw"}, nil)
 }

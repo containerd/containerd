@@ -1,12 +1,28 @@
+// Copyright 2018 The Prometheus Authors
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package procfs
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"strings"
+
+	"github.com/prometheus/procfs/internal/fs"
+	"github.com/prometheus/procfs/internal/util"
 )
 
 // CPUStat shows how much time the cpu spend in various stages.
@@ -63,16 +79,6 @@ type Stat struct {
 	SoftIRQTotal uint64
 	// Detailed softirq statistics.
 	SoftIRQ SoftIRQStat
-}
-
-// NewStat returns kernel/system statistics read from /proc/stat.
-func NewStat() (Stat, error) {
-	fs, err := NewFS(DefaultMountPoint)
-	if err != nil {
-		return Stat{}, err
-	}
-
-	return fs.NewStat()
 }
 
 // Parse a cpu statistics line and returns the CPUStat struct plus the cpu id (or -1 for the overall sum).
@@ -136,19 +142,38 @@ func parseSoftIRQStat(line string) (SoftIRQStat, uint64, error) {
 	return softIRQStat, total, nil
 }
 
-// NewStat returns an information about current kernel/system statistics.
-func (fs FS) NewStat() (Stat, error) {
-	// See https://www.kernel.org/doc/Documentation/filesystems/proc.txt
-
-	f, err := os.Open(fs.Path("stat"))
+// NewStat returns information about current cpu/process statistics.
+// See https://www.kernel.org/doc/Documentation/filesystems/proc.txt
+//
+// Deprecated: use fs.Stat() instead
+func NewStat() (Stat, error) {
+	fs, err := NewFS(fs.DefaultProcMountPoint)
 	if err != nil {
 		return Stat{}, err
 	}
-	defer f.Close()
+	return fs.Stat()
+}
+
+// NewStat returns information about current cpu/process statistics.
+// See https://www.kernel.org/doc/Documentation/filesystems/proc.txt
+//
+// Deprecated: use fs.Stat() instead
+func (fs FS) NewStat() (Stat, error) {
+	return fs.Stat()
+}
+
+// Stat returns information about current cpu/process statistics.
+// See https://www.kernel.org/doc/Documentation/filesystems/proc.txt
+func (fs FS) Stat() (Stat, error) {
+	fileName := fs.proc.Path("stat")
+	data, err := util.ReadFileNoStat(fileName)
+	if err != nil {
+		return Stat{}, err
+	}
 
 	stat := Stat{}
 
-	scanner := bufio.NewScanner(f)
+	scanner := bufio.NewScanner(bytes.NewReader(data))
 	for scanner.Scan() {
 		line := scanner.Text()
 		parts := strings.Fields(scanner.Text())
@@ -212,7 +237,7 @@ func (fs FS) NewStat() (Stat, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return Stat{}, fmt.Errorf("couldn't parse %s: %s", f.Name(), err)
+		return Stat{}, fmt.Errorf("couldn't parse %s: %s", fileName, err)
 	}
 
 	return stat, nil

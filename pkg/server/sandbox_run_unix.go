@@ -1,19 +1,19 @@
 // +build !windows
 
 /*
-Copyright The containerd Authors.
+   Copyright The containerd Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 package server
@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	selinux "github.com/opencontainers/selinux/go-selinux"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -38,7 +39,7 @@ import (
 )
 
 func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig, nsPath string, runtimePodAnnotations []string) (*runtimespec.Spec, error) {
+	imageConfig *imagespec.ImageConfig, nsPath string, runtimePodAnnotations []string) (_ *runtimespec.Spec, retErr error) {
 	// Creates a spec Generator with the default spec.
 	// TODO(random-liu): [P1] Compare the default settings with docker and containerd default.
 	specOpts := []oci.SpecOpts{
@@ -117,11 +118,15 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		},
 	}))
 
-	selinuxOpt := securityContext.GetSelinuxOptions()
-	processLabel, mountLabel, err := initSelinuxOpts(selinuxOpt)
+	processLabel, mountLabel, err := initLabelsFromOpt(securityContext.GetSelinuxOptions())
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to init selinux options %+v", securityContext.GetSelinuxOptions())
 	}
+	defer func() {
+		if retErr != nil {
+			selinux.ReleaseLabel(processLabel)
+		}
+	}()
 
 	supplementalGroups := securityContext.GetSupplementalGroups()
 	specOpts = append(specOpts,
@@ -151,7 +156,7 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		customopts.WithAnnotation(annotations.SandboxLogDir, config.GetLogDirectory()),
 	)
 
-	return runtimeSpec(id, specOpts...)
+	return c.runtimeSpec(id, "", specOpts...)
 }
 
 // sandboxContainerSpecOpts generates OCI spec options for
@@ -161,7 +166,7 @@ func (c *criService) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 		securityContext = config.GetLinux().GetSecurityContext()
 		specOpts        []oci.SpecOpts
 	)
-	seccompSpecOpts, err := generateSeccompSpecOpts(
+	seccompSpecOpts, err := c.generateSeccompSpecOpts(
 		securityContext.GetSeccompProfilePath(),
 		securityContext.GetPrivileged(),
 		c.seccompEnabled())

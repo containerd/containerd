@@ -1,25 +1,30 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+   Copyright The containerd Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 package server
 
 import (
+	"context"
 	"encoding/base64"
+	"fmt"
+	"strings"
 	"testing"
 
+	digest "github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
@@ -227,6 +232,23 @@ func TestRegistryEndpoints(t *testing.T) {
 				"https://registry-3.io/path",
 			},
 		},
+		"miss scheme endpoint in list with path": {
+			mirrors: map[string]criconfig.Mirror{
+				"registry-3.io": {
+					Endpoints: []string{
+						"https://registry-3.io",
+						"registry-1.io",
+						"127.0.0.1:1234",
+					},
+				},
+			},
+			host: "registry-3.io",
+			expected: []string{
+				"https://registry-3.io",
+				"https://registry-1.io",
+				"http://127.0.0.1:1234",
+			},
+		},
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIService()
@@ -286,5 +308,72 @@ func TestDefaultScheme(t *testing.T) {
 		t.Logf("TestCase %q", desc)
 		got := defaultScheme(test.host)
 		assert.Equal(t, test.expected, got)
+	}
+}
+
+func TestEncryptedImagePullOpts(t *testing.T) {
+	for desc, test := range map[string]struct {
+		keyModel     string
+		expectedOpts int
+	}{
+		"node key model should return one unpack opt": {
+			keyModel:     criconfig.KeyModelNode,
+			expectedOpts: 1,
+		},
+		"no key model selected should default to node key model": {
+			keyModel:     "",
+			expectedOpts: 0,
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		c := newTestCRIService()
+		c.config.ImageDecryption.KeyModel = test.keyModel
+		got := len(c.encryptedImagesPullOpts())
+		assert.Equal(t, test.expectedOpts, got)
+	}
+}
+
+func TestImageLayersLabel(t *testing.T) {
+	sampleKey := "sampleKey"
+	sampleDigest, err := digest.Parse("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	assert.NoError(t, err)
+	sampleMaxSize := 300
+	sampleValidate := func(k, v string) error {
+		if (len(k) + len(v)) > sampleMaxSize {
+			return fmt.Errorf("invalid: %q: %q", k, v)
+		}
+		return nil
+	}
+
+	tests := []struct {
+		name      string
+		layersNum int
+		wantNum   int
+	}{
+		{
+			name:      "valid number of layers",
+			layersNum: 2,
+			wantNum:   2,
+		},
+		{
+			name:      "many layers",
+			layersNum: 5, // hits sampleMaxSize (300 chars).
+			wantNum:   4, // layers should be ommitted for avoiding invalid label.
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var sampleLayers []imagespec.Descriptor
+			for i := 0; i < tt.layersNum; i++ {
+				sampleLayers = append(sampleLayers, imagespec.Descriptor{
+					MediaType: imagespec.MediaTypeImageLayerGzip,
+					Digest:    sampleDigest,
+				})
+			}
+			gotS := getLayers(context.Background(), sampleKey, sampleLayers, sampleValidate)
+			got := len(strings.Split(gotS, ","))
+			assert.Equal(t, tt.wantNum, got)
+		})
 	}
 }

@@ -16,11 +16,42 @@
 
 package v2
 
+import (
+	"math"
+	"strconv"
+	"strings"
+)
+
+type CPUMax string
+
+func NewCPUMax(quota *int64, period *uint64) CPUMax {
+	max := "max"
+	if quota != nil {
+		max = strconv.FormatInt(*quota, 10)
+	}
+	return CPUMax(strings.Join([]string{max, strconv.FormatUint(*period, 10)}, " "))
+}
+
 type CPU struct {
 	Weight *uint64
-	Max    *uint64
+	Max    CPUMax
 	Cpus   string
 	Mems   string
+}
+
+func (c CPUMax) extractQuotaAndPeriod() (int64, uint64) {
+	var (
+		quota  int64
+		period uint64
+	)
+	values := strings.Split(string(c), " ")
+	if values[0] == "max" {
+		quota = math.MaxInt64
+	} else {
+		quota, _ = strconv.ParseInt(values[0], 10, 64)
+	}
+	period, _ = strconv.ParseUint(values[1], 10, 64)
+	return quota, period
 }
 
 func (r *CPU) Values() (o []Value) {
@@ -30,10 +61,10 @@ func (r *CPU) Values() (o []Value) {
 			value:    *r.Weight,
 		})
 	}
-	if r.Max != nil {
+	if r.Max != "" {
 		o = append(o, Value{
 			filename: "cpu.max",
-			value:    *r.Max,
+			value:    r.Max,
 		})
 	}
 	if r.Cpus != "" {

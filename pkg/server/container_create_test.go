@@ -1,17 +1,17 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+   Copyright The containerd Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 package server
@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/containerd/containerd/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
@@ -28,6 +29,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	"github.com/containerd/cri/pkg/config"
+	"github.com/containerd/cri/pkg/constants"
 	"github.com/containerd/cri/pkg/containerd/opts"
 )
 
@@ -57,7 +59,8 @@ func TestGeneralContainerSpec(t *testing.T) {
 	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
 	testSandboxID := "sandbox-id"
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, "", containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+	testContainerName := "container-name"
+	spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 	require.NoError(t, err)
 	specCheck(t, testID, testSandboxID, testPid, spec)
 }
@@ -65,6 +68,7 @@ func TestGeneralContainerSpec(t *testing.T) {
 func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 	testID := "test-id"
 	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
 	testPid := uint32(1234)
 
 	for desc, test := range map[string]struct {
@@ -120,7 +124,7 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 			ociRuntime := config.Runtime{
 				PodAnnotations: test.podAnnotations,
 			}
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "",
+			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName,
 				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
@@ -268,6 +272,7 @@ func TestVolumeMounts(t *testing.T) {
 func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 	testID := "test-id"
 	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
 	testPid := uint32(1234)
 
 	for desc, test := range map[string]struct {
@@ -367,7 +372,7 @@ func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 				PodAnnotations:       test.podAnnotations,
 				ContainerAnnotations: test.containerAnnotations,
 			}
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "",
+			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName,
 				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
@@ -377,4 +382,26 @@ func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBaseRuntimeSpec(t *testing.T) {
+	c := newTestCRIService()
+	c.baseOCISpecs = map[string]*oci.Spec{
+		"/etc/containerd/cri-base.json": {
+			Version:  "1.0.2",
+			Hostname: "old",
+		},
+	}
+
+	out, err := c.runtimeSpec("id1", "/etc/containerd/cri-base.json", oci.WithHostname("new"))
+	assert.NoError(t, err)
+
+	assert.Equal(t, "1.0.2", out.Version)
+	assert.Equal(t, "new", out.Hostname)
+
+	// Make sure original base spec not changed
+	assert.NotEqual(t, out, c.baseOCISpecs["/etc/containerd/cri-base.json"])
+	assert.Equal(t, c.baseOCISpecs["/etc/containerd/cri-base.json"].Hostname, "old")
+
+	assert.Equal(t, filepath.Join("/", constants.K8sContainerdNamespace, "id1"), out.Linux.CgroupsPath)
 }

@@ -1,26 +1,26 @@
 // +build !windows
 
 /*
-Copyright The containerd Authors.
+   Copyright The containerd Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 package server
 
 import (
+	"github.com/containerd/containerd/sys"
 	cni "github.com/containerd/go-cni"
-	runcsystem "github.com/opencontainers/runc/libcontainer/system"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -34,7 +34,7 @@ const networkAttachCount = 2
 func (c *criService) initPlatform() error {
 	var err error
 
-	if runcsystem.RunningInUserNS() {
+	if sys.RunningInUserNS() {
 		if !(c.config.DisableCgroup && !c.apparmorEnabled() && c.config.RestrictOOMScoreAdj) {
 			logrus.Warn("Running containerd in a user namespace typically requires disable_cgroup, disable_apparmor, restrict_oom_score_adj set to be true")
 		}
@@ -43,6 +43,9 @@ func (c *criService) initPlatform() error {
 	if c.config.EnableSelinux {
 		if !selinux.GetEnabled() {
 			logrus.Warn("Selinux is not supported")
+		}
+		if r := c.config.SelinuxCategoryRange; r > 0 {
+			selinux.CategoryRange = uint32(r)
 		}
 	} else {
 		selinux.SetDisabled()
@@ -60,11 +63,6 @@ func (c *criService) initPlatform() error {
 		return errors.Wrap(err, "failed to initialize cni")
 	}
 
-	// Try to load the config if it exists. Just log the error if load fails
-	// This is not disruptive for containerd to panic
-	if err := c.netPlugin.Load(c.cniLoadOptions()...); err != nil {
-		logrus.WithError(err).Error("Failed to load cni during init, please check CRI plugin status before setting up network for pods")
-	}
 	return nil
 }
 

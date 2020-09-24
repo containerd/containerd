@@ -1,9 +1,9 @@
 ![containerd banner](https://raw.githubusercontent.com/cncf/artwork/master/projects/containerd/horizontal/color/containerd-horizontal-color.png)
 
 [![GoDoc](https://godoc.org/github.com/containerd/containerd?status.svg)](https://godoc.org/github.com/containerd/containerd)
-[![Build Status](https://travis-ci.org/containerd/containerd.svg?branch=master)](https://travis-ci.org/containerd/containerd)
+[![Build Status](https://github.com/containerd/containerd/workflows/CI/badge.svg)](https://github.com/containerd/containerd/actions?query=workflow%3ACI)
 [![Windows Build Status](https://ci.appveyor.com/api/projects/status/github/containerd/containerd?branch=master&svg=true)](https://ci.appveyor.com/project/mlaventure/containerd-3g73f?branch=master)
-![](https://github.com/containerd/containerd/workflows/Nightly/badge.svg)
+[![Nightlies](https://github.com/containerd/containerd/workflows/Nightly/badge.svg)](https://github.com/containerd/containerd/actions?query=workflow%3ANightly)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bhttps%3A%2F%2Fgithub.com%2Fcontainerd%2Fcontainerd.svg?type=shield)](https://app.fossa.io/projects/git%2Bhttps%3A%2F%2Fgithub.com%2Fcontainerd%2Fcontainerd?ref=badge_shield)
 [![Go Report Card](https://goreportcard.com/badge/github.com/containerd/containerd)](https://goreportcard.com/report/github.com/containerd/containerd)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1271/badge)](https://bestpractices.coreinfrastructure.org/projects/1271)
@@ -154,7 +154,7 @@ Taking a container object and turning it into a runnable process on a system is 
 
 ```go
 // create a new task
-task, err := redis.NewTask(context, cio.Stdio)
+task, err := redis.NewTask(context, cio.NewCreator(cio.WithStdio))
 defer task.Delete(context)
 
 // the task is now running and has a pid that can be use to setup networking
@@ -184,7 +184,7 @@ checkpoint, err := client.Pull(context, "myregistry/checkpoints/redis:master")
 redis, err = client.NewContainer(context, "redis-master", containerd.WithNewSnapshot("redis-rootfs", checkpoint))
 defer container.Delete(context)
 
-task, err = redis.NewTask(context, cio.Stdio, containerd.WithTaskCheckpoint(checkpoint))
+task, err = redis.NewTask(context, cio.NewCreator(cio.WithStdio), containerd.WithTaskCheckpoint(checkpoint))
 defer task.Delete(context)
 
 err := task.Start(context)
@@ -265,7 +265,7 @@ __If you are reporting a security issue, please reach out discreetly at security
 
 ## Licenses
 
-The containerd codebase is released under the [Apache 2.0 license](LICENSE.code).
+The containerd codebase is released under the [Apache 2.0 license](LICENSE).
 The README.md file, and files in the "docs" folder are licensed under the
 Creative Commons Attribution 4.0 International License. You may obtain a
 copy of the license, titled CC-BY-4.0, at http://creativecommons.org/licenses/by/4.0/.

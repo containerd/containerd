@@ -1,19 +1,19 @@
 // +build !windows
 
 /*
-Copyright 2017 The Kubernetes Authors.
+   Copyright The containerd Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 package server
@@ -72,7 +72,8 @@ func (c *criService) updateContainerResources(ctx context.Context,
 	if err != nil {
 		return errors.Wrap(err, "failed to get container spec")
 	}
-	newSpec, err := updateOCILinuxResource(ctx, oldSpec, resources)
+	newSpec, err := updateOCILinuxResource(ctx, oldSpec, resources,
+		c.config.TolerateMissingHugetlbController, c.config.DisableHugetlbController)
 	if err != nil {
 		return errors.Wrap(err, "failed to update resource in spec")
 	}
@@ -132,7 +133,8 @@ func updateContainerSpec(ctx context.Context, cntr containerd.Container, spec *r
 }
 
 // updateOCILinuxResource updates container resource limit.
-func updateOCILinuxResource(ctx context.Context, spec *runtimespec.Spec, new *runtime.LinuxContainerResources) (*runtimespec.Spec, error) {
+func updateOCILinuxResource(ctx context.Context, spec *runtimespec.Spec, new *runtime.LinuxContainerResources,
+	tolerateMissingHugetlbController, disableHugetlbController bool) (*runtimespec.Spec, error) {
 	// Copy to make sure old spec is not changed.
 	var cloned runtimespec.Spec
 	if err := util.DeepCopy(&cloned, spec); err != nil {
@@ -141,7 +143,7 @@ func updateOCILinuxResource(ctx context.Context, spec *runtimespec.Spec, new *ru
 	if cloned.Linux == nil {
 		cloned.Linux = &runtimespec.Linux{}
 	}
-	if err := opts.WithResources(new)(ctx, nil, nil, &cloned); err != nil {
+	if err := opts.WithResources(new, tolerateMissingHugetlbController, disableHugetlbController)(ctx, nil, nil, &cloned); err != nil {
 		return nil, errors.Wrap(err, "unable to set linux container resources")
 	}
 	return &cloned, nil

@@ -1,18 +1,18 @@
 #!/bin/bash
 
-# Copyright 2017 The Kubernetes Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+#   Copyright The containerd Authors.
+
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+
+#       http://www.apache.org/licenses/LICENSE-2.0
+
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
 
 set -o nounset
 set -o pipefail
@@ -62,12 +62,7 @@ fi
 GOPATH=${GOPATH%%:*}
 
 # Get kubernetes
-from-vendor KUBERNETES k8s.io/kubernetes
-# k8s.io is actually a redirect, but we do not handle the go-import
-# metadata which `go get` and `vndr` etc do. Handle it manually here.
-if [ x"$KUBERNETES_REPO" = "xk8s.io" ] ; then
-  KUBERNETES_REPO="https://github.com/kubernetes/kubernetes"
-fi
+KUBERNETES_REPO="https://github.com/kubernetes/kubernetes"
 KUBERNETES_PATH="${GOPATH}/src/k8s.io/kubernetes"
 if [ ! -d "${KUBERNETES_PATH}" ]; then
   mkdir -p ${KUBERNETES_PATH}

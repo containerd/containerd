@@ -70,4 +70,4 @@ runcmd:
   - systemctl enable containerd.target
   - systemctl start containerd.target
   # Start docker after containerd is running. (for Docker 18.09+)
-  - systemctl is-enabled docker && (systemctl is-active docker || systemctl start docker)
+  - systemctl is-active docker || systemctl start docker

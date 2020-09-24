@@ -1,19 +1,19 @@
 // +build windows
 
 /*
-Copyright The containerd Authors.
+   Copyright The containerd Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 
 package config
@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 
 	"github.com/containerd/containerd"
-	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
+	"github.com/containerd/cri/pkg/streaming"
 )
 
 // DefaultConfig returns default configurations of cri plugin.
@@ -54,7 +54,7 @@ func DefaultConfig() PluginConfig {
 			TLSKeyFile:  "",
 			TLSCertFile: "",
 		},
-		SandboxImage:            "mcr.microsoft.com/k8s/core/pause:1.2.0",
+		SandboxImage:            "mcr.microsoft.com/oss/kubernetes/pause:1.4.0",
 		StatsCollectPeriod:      10,
 		MaxContainerLogLineSize: 16 * 1024,
 		Registry: Registry{
@@ -64,7 +64,8 @@ func DefaultConfig() PluginConfig {
 				},
 			},
 		},
-		MaxConcurrentDownloads: 3,
+		MaxConcurrentDownloads:    3,
+		IgnoreImageDefinedVolumes: false,
 		// TODO(windows): Add platform specific config, so that most common defaults can be shared.
 	}
 }

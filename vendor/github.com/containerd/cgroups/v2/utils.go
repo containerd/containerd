@@ -23,11 +23,13 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/containerd/cgroups/v2/stats"
+	"github.com/godbus/dbus/v5"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -82,6 +84,9 @@ func parseCgroupProcsFile(path string) ([]uint64, error) {
 			out = append(out, pid)
 		}
 	}
+	if err := s.Err(); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -98,14 +103,6 @@ func parseKV(raw string) (string, interface{}, error) {
 	default:
 		return "", 0, ErrInvalidFormat
 	}
-}
-
-func readUint(path string) (uint64, error) {
-	v, err := ioutil.ReadFile(path)
-	if err != nil {
-		return 0, err
-	}
-	return parseUint(strings.TrimSpace(string(v)), 10, 64)
 }
 
 func parseUint(s string, base, bitSize int) (uint64, error) {
@@ -141,9 +138,6 @@ func parseCgroupFromReader(r io.Reader) (string, error) {
 		s = bufio.NewScanner(r)
 	)
 	for s.Scan() {
-		if err := s.Err(); err != nil {
-			return "", err
-		}
 		var (
 			text  = s.Text()
 			parts = strings.SplitN(text, ":", 3)
@@ -155,6 +149,9 @@ func parseCgroupFromReader(r io.Reader) (string, error) {
 		if parts[0] == "0" && parts[1] == "" {
 			return parts[2], nil
 		}
+	}
+	if err := s.Err(); err != nil {
+		return "", err
 	}
 	return "", fmt.Errorf("cgroup path not found")
 }
@@ -172,11 +169,11 @@ func ToResources(spec *specs.LinuxResources) *Resources {
 			Mems: cpu.Mems,
 		}
 		if shares := cpu.Shares; shares != nil {
-			convertedWeight := (1 + ((*shares-2)*9999)/262142)
+			convertedWeight := 1 + ((*shares-2)*9999)/262142
 			resources.CPU.Weight = &convertedWeight
 		}
 		if period := cpu.Period; period != nil {
-			resources.CPU.Max = period
+			resources.CPU.Max = NewCPUMax(cpu.Quota, period)
 		}
 	}
 	if mem := spec.Memory; mem != nil {
@@ -191,6 +188,16 @@ func ToResources(spec *specs.LinuxResources) *Resources {
 			resources.Memory.Low = l
 		}
 	}
+	if hugetlbs := spec.HugepageLimits; hugetlbs != nil {
+		hugeTlbUsage := HugeTlb{}
+		for _, hugetlb := range hugetlbs {
+			hugeTlbUsage = append(hugeTlbUsage, HugeTlbEntry{
+				HugePageSize: hugetlb.Pagesize,
+				Limit:        hugetlb.Limit,
+			})
+		}
+		resources.HugeTlb = &hugeTlbUsage
+	}
 	if pids := spec.Pids; pids != nil {
 		resources.Pids = &Pids{
 			Max: pids.Limit,
@@ -199,7 +206,7 @@ func ToResources(spec *specs.LinuxResources) *Resources {
 	if i := spec.BlockIO; i != nil {
 		resources.IO = &IO{}
 		if i.Weight != nil {
-			resources.IO.BFQ.Weight = *i.Weight
+			resources.IO.BFQ.Weight = 1 + (*i.Weight-10)*9999/990
 		}
 		for t, devices := range map[IOType][]specs.LinuxThrottleDevice{
 			ReadBPS:   i.ThrottleReadBpsDevice,
@@ -237,7 +244,6 @@ func ToResources(spec *specs.LinuxResources) *Resources {
 func getStatFileContentUint64(filePath string) uint64 {
 	contents, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		logrus.Error(err)
 		return 0
 	}
 	trimmed := strings.TrimSpace(string(contents))
@@ -253,6 +259,64 @@ func getStatFileContentUint64(filePath string) uint64 {
 
 	return res
 }
+
+func readIoStats(path string) []*stats.IOEntry {
+	// more details on the io.stat file format: https://www.kernel.org/doc/Documentation/cgroup-v2.txt
+	var usage []*stats.IOEntry
+	fpath := filepath.Join(path, "io.stat")
+	currentData, err := ioutil.ReadFile(fpath)
+	if err != nil {
+		return usage
+	}
+	entries := strings.Split(string(currentData), "\n")
+
+	for _, entry := range entries {
+		parts := strings.Split(entry, " ")
+		if len(parts) < 2 {
+			continue
+		}
+		majmin := strings.Split(parts[0], ":")
+		if len(majmin) != 2 {
+			continue
+		}
+		major, err := strconv.ParseUint(majmin[0], 10, 0)
+		if err != nil {
+			return usage
+		}
+		minor, err := strconv.ParseUint(majmin[1], 10, 0)
+		if err != nil {
+			return usage
+		}
+		parts = parts[1:]
+		ioEntry := stats.IOEntry{
+			Major: major,
+			Minor: minor,
+		}
+		for _, s := range parts {
+			keyPairValue := strings.Split(s, "=")
+			if len(keyPairValue) != 2 {
+				continue
+			}
+			v, err := strconv.ParseUint(keyPairValue[1], 10, 0)
+			if err != nil {
+				continue
+			}
+			switch keyPairValue[0] {
+			case "rbytes":
+				ioEntry.Rbytes = v
+			case "wbytes":
+				ioEntry.Wbytes = v
+			case "rios":
+				ioEntry.Rios = v
+			case "wios":
+				ioEntry.Wios = v
+			}
+		}
+		usage = append(usage, &ioEntry)
+	}
+	return usage
+}
+
 func rdmaStats(filepath string) []*stats.RdmaEntry {
 	currentData, err := ioutil.ReadFile(filepath)
 	if err != nil {
@@ -301,4 +365,72 @@ func toRdmaEntry(strEntries []string) []*stats.RdmaEntry {
 		}
 	}
 	return rdmaEntries
+}
+
+// isUnitExists returns true if the error is that a systemd unit already exists.
+func isUnitExists(err error) bool {
+	if err != nil {
+		if dbusError, ok := err.(dbus.Error); ok {
+			return strings.Contains(dbusError.Name, "org.freedesktop.systemd1.UnitExists")
+		}
+	}
+	return false
+}
+
+func systemdUnitFromPath(path string) string {
+	_, unit := filepath.Split(path)
+	return unit
+}
+
+func readHugeTlbStats(path string) []*stats.HugeTlbStat {
+	var usage = []*stats.HugeTlbStat{}
+	var keyUsage = make(map[string]*stats.HugeTlbStat)
+	f, err := os.Open(path)
+	if err != nil {
+		return usage
+	}
+	files, err := f.Readdir(-1)
+	f.Close()
+	if err != nil {
+		return usage
+	}
+
+	for _, file := range files {
+		if strings.Contains(file.Name(), "hugetlb") &&
+			(strings.HasSuffix(file.Name(), "max") || strings.HasSuffix(file.Name(), "current")) {
+			var hugeTlb *stats.HugeTlbStat
+			var ok bool
+			fileName := strings.Split(file.Name(), ".")
+			pageSize := fileName[1]
+			if hugeTlb, ok = keyUsage[pageSize]; !ok {
+				hugeTlb = &stats.HugeTlbStat{}
+			}
+			hugeTlb.Pagesize = pageSize
+			out, err := ioutil.ReadFile(filepath.Join(path, file.Name()))
+			if err != nil {
+				continue
+			}
+			var value uint64
+			stringVal := strings.TrimSpace(string(out))
+			if stringVal == "max" {
+				value = math.MaxUint64
+			} else {
+				value, err = strconv.ParseUint(stringVal, 10, 64)
+			}
+			if err != nil {
+				continue
+			}
+			switch fileName[2] {
+			case "max":
+				hugeTlb.Max = value
+			case "current":
+				hugeTlb.Current = value
+			}
+			keyUsage[pageSize] = hugeTlb
+		}
+	}
+	for _, entry := range keyUsage {
+		usage = append(usage, entry)
+	}
+	return usage
 }
