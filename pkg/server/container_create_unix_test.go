@@ -959,12 +959,12 @@ func TestMaskedAndReadonlyPaths(t *testing.T) {
 			expectedReadonly: defaultSpec.Linux.ReadonlyPaths,
 			privileged:       false,
 		},
-		"should always apply CRI specified paths when disable_proc_mount = false": {
+		"should apply default if not specified when disable_proc_mount = false": {
 			disableProcMount: false,
 			masked:           nil,
 			readonly:         nil,
-			expectedMasked:   nil,
-			expectedReadonly: nil,
+			expectedMasked:   defaultSpec.Linux.MaskedPaths,
+			expectedReadonly: defaultSpec.Linux.ReadonlyPaths,
 			privileged:       false,
 		},
 		"should be able to specify empty paths": {
