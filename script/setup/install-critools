@@ -26,7 +26,7 @@ go get -d github.com/kubernetes-sigs/cri-tools/...
 cd "$GOPATH"/src/github.com/kubernetes-sigs/cri-tools
 git checkout $CRITEST_COMMIT
 make
-sudo make install -e BINDIR=${DESTDIR:=''}/usr/local/bin
-cat << EOF | sudo tee ${DESTDIR}/etc/crictl.yaml
+make install -e BINDIR=${DESTDIR:=''}/usr/local/bin
+cat << EOF | tee ${DESTDIR}/etc/crictl.yaml
 runtime-endpoint: unix:///run/containerd/containerd.sock
 EOF
