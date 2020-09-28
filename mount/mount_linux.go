@@ -106,20 +106,20 @@ func Unmount(target string, flags int) error {
 	return nil
 }
 
-func isFUSE(dir string) (bool, error) {
+func isFUSE(dir string) bool {
 	// fuseSuperMagic is defined in statfs(2)
 	const fuseSuperMagic = 0x65735546
 	var st unix.Statfs_t
 	if err := unix.Statfs(dir, &st); err != nil {
-		return false, err
+		return false
 	}
-	return st.Type == fuseSuperMagic, nil
+	return st.Type == fuseSuperMagic
 }
 
 func unmount(target string, flags int) error {
 	// For FUSE mounts, attempting to execute fusermount helper binary is preferred
 	// https://github.com/containerd/containerd/pull/3765#discussion_r342083514
-	if ok, err := isFUSE(target); err == nil && ok {
+	if isFUSE(target) {
 		for _, helperBinary := range []string{"fusermount3", "fusermount"} {
 			cmd := exec.Command(helperBinary, "-u", target)
 			if err := cmd.Run(); err == nil {
