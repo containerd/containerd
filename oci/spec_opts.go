@@ -106,6 +106,43 @@ func setCPU(s *Spec) {
 	}
 }
 
+// WithCPUShares sets the container's cpu shares
+func WithCPUShares(shares uint64) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		setCPU(s)
+		s.Linux.Resources.CPU.Shares = &shares
+		return nil
+	}
+}
+
+// WithCPUs sets the container's cpus/cores for use by the container
+func WithCPUs(cpus string) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		setCPU(s)
+		s.Linux.Resources.CPU.Cpus = cpus
+		return nil
+	}
+}
+
+// WithCPUsMems sets the container's cpu mems for use by the container
+func WithCPUsMems(mems string) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		setCPU(s)
+		s.Linux.Resources.CPU.Mems = mems
+		return nil
+	}
+}
+
+// WithCPUCFS sets the container's Completely fair scheduling (CFS) quota and period
+func WithCPUCFS(quota int64, period uint64) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		setCPU(s)
+		s.Linux.Resources.CPU.Quota = &quota
+		s.Linux.Resources.CPU.Period = &period
+		return nil
+	}
+}
+
 // setCapabilities sets Linux Capabilities to empty if unset
 func setCapabilities(s *Spec) {
 	setProcess(s)
