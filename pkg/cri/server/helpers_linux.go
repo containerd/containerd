@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/pkg/apparmor"
 	"github.com/containerd/containerd/pkg/seccomp"
 	"github.com/containerd/containerd/pkg/seutil"
+	"github.com/moby/sys/mountinfo"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
@@ -165,7 +166,7 @@ func openLogFile(path string) (*os.File, error) {
 // unmountRecursive unmounts the target and all mounts underneath, starting with
 // the deepest mount first.
 func unmountRecursive(ctx context.Context, target string) error {
-	mounts, err := mount.Self()
+	mounts, err := mountinfo.GetMounts(nil)
 	if err != nil {
 		return err
 	}
