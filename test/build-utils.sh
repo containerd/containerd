@@ -20,21 +20,13 @@ ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
 PROJECT=${PROJECT:-"k8s-cri-containerd"}
 
 # GOOGLE_APPLICATION_CREDENTIALS is the path of service account file.
-if [ -z ${GOOGLE_APPLICATION_CREDENTIALS} ]; then
+if [ -z ${GOOGLE_APPLICATION_CREDENTIALS:-""} ]; then
   echo "GOOGLE_APPLICATION_CREDENTIALS is not set"
   exit 1
 fi
 
 # Activate gcloud service account.
 gcloud auth activate-service-account --key-file "${GOOGLE_APPLICATION_CREDENTIALS}" --project="${PROJECT}"
-
-# Install dependent libraries.
-apt-get update
-if apt-cache show libbtrfs-dev > /dev/null; then
-  apt-get install -y libbtrfs-dev
-else
-  apt-get install -y btrfs-tools
-fi
 
 # Kubernetes test infra uses jessie and stretch.
 if cat /etc/os-release | grep jessie; then
@@ -43,6 +35,8 @@ if cat /etc/os-release | grep jessie; then
   apt-get install -y libseccomp2/jessie-backports
   apt-get install -y libseccomp-dev/jessie-backports
 else
+  cat /etc/os-release
+  apt-get update
   apt-get install -y libseccomp2
   apt-get install -y libseccomp-dev
 fi

@@ -261,21 +261,21 @@ install-cri-deps: $(BINARIES)
 	cp bin/* $(CRIDIR)
 else
 install-cri-deps: $(BINARIES)
-	@sudo rm -rf ${CRIDIR}
-	@sudo install -d ${CRIDIR}/usr/local/bin
-	@sudo install -D -m 755 bin/* ${CRIDIR}/usr/local/bin
-	@sudo install -d ${CRIDIR}/opt/containerd/cluster
-	@sudo cp -r contrib/gce ${CRIDIR}/opt/containerd/cluster/
-	@sudo install -d ${CRIDIR}/etc/systemd/system
-	@sudo install -m 644 containerd.service ${CRIDIR}/etc/systemd/system
-	echo "CONTAINERD_VERSION: '$(VERSION:v%=%)'" | sudo tee ${CRIDIR}/opt/containerd/cluster/version
+	@rm -rf ${CRIDIR}
+	@install -d ${CRIDIR}/usr/local/bin
+	@install -D -m 755 bin/* ${CRIDIR}/usr/local/bin
+	@install -d ${CRIDIR}/opt/containerd/cluster
+	@cp -r contrib/gce ${CRIDIR}/opt/containerd/cluster/
+	@install -d ${CRIDIR}/etc/systemd/system
+	@install -m 644 containerd.service ${CRIDIR}/etc/systemd/system
+	echo "CONTAINERD_VERSION: '$(VERSION:v%=%)'" | tee ${CRIDIR}/opt/containerd/cluster/version
 
-	DESTDIR=$(CRIDIR) USESUDO=true script/setup/install-runc
+	DESTDIR=$(CRIDIR) USESUDO=false script/setup/install-runc
 	DESTDIR=$(CRIDIR) script/setup/install-cni
 	DESTDIR=$(CRIDIR) script/setup/install-critools
 
-	@sudo install -d $(CRIDIR)/bin
-	@sudo install $(BINARIES) $(CRIDIR)/bin
+	@install -d $(CRIDIR)/bin
+	@install $(BINARIES) $(CRIDIR)/bin
 endif
 
 ifeq ($(GOOS),windows)
@@ -298,16 +298,17 @@ endif
 
 cri-release: releases/$(CRIRELEASE).tar.gz
 	@echo "$(WHALE) $@"
-	@cd releases && sha256sum $(CRIRELEASE).tar.gz >$(CRIRELEASE).tar.gz.sha256sum
+	@cd releases && sha256sum $(CRIRELEASE).tar.gz >$(CRIRELEASE).tar.gz.sha256sum && ln -sf $(CRIRELEASE).tar.gz cri-containerd.tar.gz
 
 cri-cni-release: releases/$(CRICNIRELEASE).tar.gz
 	@echo "$(WHALE) $@"
-	@cd releases && sha256sum $(CRICNIRELEASE).tar.gz >$(CRICNIRELEASE).tar.gz.sha256sum
+	@cd releases && sha256sum $(CRICNIRELEASE).tar.gz >$(CRICNIRELEASE).tar.gz.sha256sum && ln -sf $(CRICNIRELEASE).tar.gz cri-cni-containerd.tar.gz
 
 clean: ## clean up binaries
 	@echo "$(WHALE) $@"
 	@rm -f $(BINARIES)
-	@if [[ -d $(OUTPUTDIR) ]]; then sudo rm -rf $(OUTPUTDIR); fi
+	@rm -f releases/*.tar.gz*
+	@rm -rf $(OUTPUTDIR)
 
 clean-test: ## clean up debris from previously failed tests
 	@echo "$(WHALE) $@"
