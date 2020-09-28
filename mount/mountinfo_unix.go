@@ -1,4 +1,4 @@
-// +build linux
+// +build linux freebsd openbsd
 
 /*
    Copyright The containerd Authors.
@@ -25,11 +25,4 @@ import (
 // Self retrieves a list of mounts for the current running process.
 func Self() ([]*Info, error) {
 	return mountinfo.GetMounts(nil)
-}
-
-// PID collects the mounts for a specific process ID. If the process
-// ID is unknown, it is better to use `Self` which will inspect
-// "/proc/self/mountinfo" instead.
-func PID(pid int) ([]*Info, error) {
-	return mountinfo.PidMountInfo(pid)
 }
