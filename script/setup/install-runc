@@ -38,8 +38,8 @@ function install_runc() {
 }
 
 function install_crun() {
-	CRUN_VERSION=0.14
-	curl -o /usr/local/sbin/runc -L https://github.com/containers/crun/releases/download/${CRUN_VERSION}/crun-${CRUN_VERSION}-static-$(uname -m)
+	CRUN_VERSION=0.15
+	curl -o /usr/local/sbin/runc -L https://github.com/containers/crun/releases/download/${CRUN_VERSION}/crun-${CRUN_VERSION}-linux-$(go env GOARCH)
 	chmod +x /usr/local/sbin/runc
 }
 
