@@ -78,6 +78,7 @@ version = 2
 ```
 
 To skip the registry certificate verification:
+
 ```toml
 # explicitly use v2 config format
 version = 2
@@ -114,7 +115,7 @@ not specified by Kubernetes via CRI.
 
 After modifying this config, you need to restart the `containerd` service.
 
-### Configure Registry Credentials Example - GCR with service account key authentication
+### Configure Registry Credentials Example - GCR with Service Account Key Authentication
 
 If you don't already have Google Container Registry (GCR) set-up then you need to do the following steps:
 
@@ -126,7 +127,7 @@ If you don't already have Google Container Registry (GCR) set-up then you need t
 
 Refer to [Pushing and pulling images](https://cloud.google.com/container-registry/docs/pushing-and-pulling) for detailed information on the above steps.
 
-> Note: The JSON key file is a multi-line file and can be cumbersome to use its contents as a key outside of file. It is worthwhile generating a single line format output of the file. One way of doing this is using the `jq` tool as follows: `jq -c . key.json`
+> Note: The JSON key file is a multi-line file and it can be cumbersome to use the contents as a key outside of the file. It is worthwhile generating a single line format output of the file. One way of doing this is using the `jq` tool as follows: `jq -c . key.json`
 
 It is beneficial to first confirm that from your terminal you can authenticate with your GCR and have access to the storage before hooking it into containerd. This can be verified by performing a login to your GCR and
 pushing an image to it as follows:
