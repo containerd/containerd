@@ -26,4 +26,4 @@ cd "${ROOT}"
 
 make install.tools
 make verify
-GOOS=windows make verify
+#GOOS=windows make verify

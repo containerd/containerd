@@ -15,9 +15,6 @@ linters:
     - errcheck
 
 run:
-  deadline: 2m
+  timeout: 3m
   skip-dirs:
-    - integration
-    - pkg/api
-  skip-files:
-    - ".*_test.go"
+    - docs

@@ -17,9 +17,10 @@
 package integration
 
 import (
-	"golang.org/x/net/context"
 	"testing"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"

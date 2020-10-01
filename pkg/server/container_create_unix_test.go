@@ -903,7 +903,7 @@ func TestGenerateApparmorSpecOpts(t *testing.T) {
 			profile:    runtimeDefault,
 			privileged: true,
 		},
-		// TODO (mikebrow) add success with exising defined profile tests
+		// TODO (mikebrow) add success with existing defined profile tests
 		"should return error when undefined local profile is specified": {
 			profile:   profileNamePrefix + "test-profile",
 			expectErr: true,

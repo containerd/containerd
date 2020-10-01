@@ -35,13 +35,13 @@ func TestTruncIndex(t *testing.T) {
 	const appImage = "busybox"
 	imgID, err := imageService.PullImage(&runtimeapi.ImageSpec{Image: appImage}, nil, sbConfig)
 	require.NoError(t, err)
-	imgTruncId := genTruncIndex(imgID)
+	imgTruncID := genTruncIndex(imgID)
 	defer func() {
-		assert.NoError(t, imageService.RemoveImage(&runtimeapi.ImageSpec{Image: imgTruncId}))
+		assert.NoError(t, imageService.RemoveImage(&runtimeapi.ImageSpec{Image: imgTruncID}))
 	}()
 
-	t.Logf("Get image status by truncindex, truncId: %s", imgTruncId)
-	res, err := imageService.ImageStatus(&runtimeapi.ImageSpec{Image: imgTruncId})
+	t.Logf("Get image status by truncindex, truncID: %s", imgTruncID)
+	res, err := imageService.ImageStatus(&runtimeapi.ImageSpec{Image: imgTruncID})
 	require.NoError(t, err)
 	require.NotEqual(t, nil, res)
 	assert.Equal(t, imgID, res.Id)

@@ -34,7 +34,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
-	"k8s.io/cri-api/pkg/apis"
+	cri "k8s.io/cri-api/pkg/apis"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	"github.com/containerd/cri/integration/remote"
@@ -74,11 +74,11 @@ func TestMain(m *testing.M) {
 // ConnectDaemons connect cri plugin and containerd, and initialize the clients.
 func ConnectDaemons() error {
 	var err error
-	runtimeService, err = remote.NewRemoteRuntimeService(*criEndpoint, timeout)
+	runtimeService, err = remote.NewRuntimeService(*criEndpoint, timeout)
 	if err != nil {
 		return errors.Wrap(err, "failed to create runtime service")
 	}
-	imageService, err = remote.NewRemoteImageService(*criEndpoint, timeout)
+	imageService, err = remote.NewImageService(*criEndpoint, timeout)
 	if err != nil {
 		return errors.Wrap(err, "failed to create image service")
 	}

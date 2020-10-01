@@ -47,14 +47,14 @@ import (
 	"github.com/containerd/cri/integration/remote/util"
 )
 
-// RemoteImageService is a gRPC implementation of internalapi.ImageManagerService.
-type RemoteImageService struct {
+// ImageService is a gRPC implementation of internalapi.ImageManagerService.
+type ImageService struct {
 	timeout     time.Duration
 	imageClient runtimeapi.ImageServiceClient
 }
 
-// NewRemoteImageService creates a new internalapi.ImageManagerService.
-func NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (internalapi.ImageManagerService, error) {
+// NewImageService creates a new internalapi.ImageManagerService.
+func NewImageService(endpoint string, connectionTimeout time.Duration) (internalapi.ImageManagerService, error) {
 	klog.V(3).Infof("Connecting to image service %s", endpoint)
 	addr, dialer, err := util.GetAddressAndDialer(endpoint)
 	if err != nil {
@@ -70,14 +70,14 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (in
 		return nil, err
 	}
 
-	return &RemoteImageService{
+	return &ImageService{
 		timeout:     connectionTimeout,
 		imageClient: runtimeapi.NewImageServiceClient(conn),
 	}, nil
 }
 
 // ListImages lists available images.
-func (r *RemoteImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
+func (r *ImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -93,7 +93,7 @@ func (r *RemoteImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runt
 }
 
 // ImageStatus returns the status of the image.
-func (r *RemoteImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error) {
+func (r *ImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error) {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -117,7 +117,7 @@ func (r *RemoteImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimea
 }
 
 // PullImage pulls an image with authentication config.
-func (r *RemoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (r *ImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
@@ -141,7 +141,7 @@ func (r *RemoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtim
 }
 
 // RemoveImage removes the image.
-func (r *RemoteImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
+func (r *ImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -157,7 +157,7 @@ func (r *RemoteImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
 }
 
 // ImageFsInfo returns information of the filesystem that is used to store images.
-func (r *RemoteImageService) ImageFsInfo() ([]*runtimeapi.FilesystemUsage, error) {
+func (r *ImageService) ImageFsInfo() ([]*runtimeapi.FilesystemUsage, error) {
 	// Do not set timeout, because `ImageFsInfo` takes time.
 	// TODO(random-liu): Should we assume runtime should cache the result, and set timeout here?
 	ctx, cancel := getContextWithCancel()
