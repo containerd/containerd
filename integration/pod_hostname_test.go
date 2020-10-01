@@ -1,3 +1,5 @@
+// +build !windows
+
 /*
    Copyright The containerd Authors.
 
@@ -70,15 +72,14 @@ func TestPodHostname(t *testing.T) {
 					t.Fatalf("Unexpected RunPodSandbox error: %v", err)
 				}
 				return
-			} else {
-				// Make sure the sandbox is cleaned up.
-				defer func() {
-					assert.NoError(t, runtimeService.StopPodSandbox(sb))
-					assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-				}()
-				if test.expectErr {
-					t.Fatalf("Expected RunPodSandbox to return error")
-				}
+			}
+			// Make sure the sandbox is cleaned up.
+			defer func() {
+				assert.NoError(t, runtimeService.StopPodSandbox(sb))
+				assert.NoError(t, runtimeService.RemovePodSandbox(sb))
+			}()
+			if test.expectErr {
+				t.Fatalf("Expected RunPodSandbox to return error")
 			}
 
 			const (

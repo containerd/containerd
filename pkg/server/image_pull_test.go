@@ -358,7 +358,7 @@ func TestImageLayersLabel(t *testing.T) {
 		{
 			name:      "many layers",
 			layersNum: 5, // hits sampleMaxSize (300 chars).
-			wantNum:   4, // layers should be ommitted for avoiding invalid label.
+			wantNum:   4, // layers should be omitted for avoiding invalid label.
 		},
 	}
 
