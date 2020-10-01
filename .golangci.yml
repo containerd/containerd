@@ -18,3 +18,5 @@ run:
   timeout: 3m
   skip-dirs:
     - docs
+  skip-files:
+    - ".*\\.pb.go"
