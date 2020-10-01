@@ -17,6 +17,7 @@ To build the `containerd` daemon, and the `ctr` simple test client, the followin
 * Go 1.13.x or above except 1.14.x
 * Protoc 3.x compiler and headers (download at the [Google protobuf releases page](https://github.com/google/protobuf/releases))
 * Btrfs headers and libraries for your distribution. Note that building the btrfs driver can be disabled via the build tag `no_btrfs`, removing this dependency.
+* [Libseccomp](https://github.com/seccomp/libseccomp) headers and libraries.
 
 ## Build the development environment
 
@@ -37,13 +38,13 @@ $ wget -c https://github.com/google/protobuf/releases/download/v3.11.4/protoc-3.
 $ sudo unzip protoc-3.11.4-linux-x86_64.zip -d /usr/local
 ```
 
-`containerd` uses [Btrfs](https://en.wikipedia.org/wiki/Btrfs) it means that you
-need to satisfy this dependencies in your system:
+`containerd` uses [Btrfs](https://en.wikipedia.org/wiki/Btrfs) and [Libseccomp](https://github.com/seccomp/libseccomp) it means that you
+need to satisfy these dependencies in your system:
 
-* CentOS/Fedora: `yum install btrfs-progs-devel`
-* Debian/Ubuntu: `apt-get install btrfs-tools`
-	* Debian Buster/Ubuntu 19.10:
-	    `apt-get install btrfs-progs libbtrfs-dev`
+* CentOS/Fedora: `yum install btrfs-progs-devel libseccomp-devel`
+* Debian/Ubuntu: `apt-get install btrfs-tools libseccomp-dev`
+	* Debian Buster/Ubuntu 19.10/ Ubuntu 20.04:
+	    `apt-get install btrfs-progs libbtrfs-dev libseccomp-dev`
 
 At this point you are ready to build `containerd` yourself!
 
