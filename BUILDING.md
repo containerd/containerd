@@ -38,11 +38,11 @@ $ sudo unzip protoc-3.11.4-linux-x86_64.zip -d /usr/local
 ```
 
 `containerd` uses [Btrfs](https://en.wikipedia.org/wiki/Btrfs) it means that you
-need to satisfy this dependencies in your system:
+need to satisfy these dependencies in your system:
 
 * CentOS/Fedora: `yum install btrfs-progs-devel`
 * Debian/Ubuntu: `apt-get install btrfs-tools`
-	* Debian Buster/Ubuntu 19.10:
+	* Debian Buster/Ubuntu 19.10/ Ubuntu 20.04:
 	    `apt-get install btrfs-progs libbtrfs-dev`
 
 At this point you are ready to build `containerd` yourself!
@@ -54,6 +54,12 @@ run containerd. While it is okay to download a runc binary and install that on
 the system, sometimes it is necessary to build runc directly when working with
 container runtime development. You can skip this step if you already have the
 correct version of `runc` installed.
+
+`runc` requires `libseccomp`. You may need to install the missing dependencies:
+
+* CentOS/Fedora: `yum install libseccomp libseccomp-devel`
+* Debian/Ubuntu: `apt-get install libseccomp libseccomp-dev`
+
 
 For the quick and dirty installation, you can use the following:
 
