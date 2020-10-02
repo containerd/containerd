@@ -16,8 +16,8 @@
 
 set -eu -o pipefail
 
-destdir="${destdir:-"C:\\Program Files\\containerd"}"
-WINCNI_BIN_DIR="${destdir}/cni"
+DESTDIR="${DESTDIR:-"C:\\Program Files\\containerd"}"
+WINCNI_BIN_DIR="${DESTDIR}/cni"
 WINCNI_PKG=github.com/Microsoft/windows-container-networking
 WINCNI_VERSION=aa10a0b31e9f72937063436454def1760b858ee2
 
@@ -29,7 +29,7 @@ install -D -m 755 "out/nat.exe" "${WINCNI_BIN_DIR}/nat.exe"
 install -D -m 755 "out/sdnbridge.exe" "${WINCNI_BIN_DIR}/sdnbridge.exe"
 install -D -m 755 "out/sdnoverlay.exe" "${WINCNI_BIN_DIR}/sdnoverlay.exe"
 
-CNI_CONFIG_DIR="${destdir}/cni/conf"
+CNI_CONFIG_DIR="${DESTDIR}/cni/conf"
 mkdir -p "${CNI_CONFIG_DIR}"
 
 # split_ip splits ip into a 4-element array.
