@@ -126,7 +126,8 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	}
 	if nric != nil {
 		nriSB := &nri.Sandbox{
-			ID: sandboxID,
+			ID:     sandboxID,
+			Labels: sandbox.Config.Labels,
 		}
 		if _, err := nric.InvokeWithSandbox(ctx, task, v1.Create, nriSB); err != nil {
 			return nil, errors.Wrap(err, "nri invoke")
