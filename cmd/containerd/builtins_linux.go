@@ -1,5 +1,3 @@
-// +build !windows
-
 /*
    Copyright The containerd Authors.
 
@@ -16,16 +14,10 @@
    limitations under the License.
 */
 
-package os
+package main
 
 import (
-	"github.com/containerd/containerd/mount"
+	_ "github.com/containerd/containerd/metrics/cgroups"
+	_ "github.com/containerd/containerd/runtime/v1/linux"
+	_ "github.com/containerd/containerd/snapshots/overlay"
 )
-
-// UNIX collects unix system level operations that need to be
-// mocked out during tests.
-type UNIX interface {
-	Mount(source string, target string, fstype string, flags uintptr, data string) error
-	Unmount(target string) error
-	LookupMount(path string) (mount.Info, error)
-}

@@ -1,5 +1,3 @@
-// +build !windows
-
 /*
    Copyright The containerd Authors.
 
@@ -16,10 +14,24 @@
    limitations under the License.
 */
 
-package main
+package os
 
 import (
-	_ "github.com/containerd/containerd/metrics/cgroups"
-	_ "github.com/containerd/containerd/runtime/v1/linux"
-	_ "github.com/containerd/containerd/snapshots/overlay"
+	"github.com/containerd/containerd/mount"
+	"golang.org/x/sys/unix"
 )
+
+// Mount will call unix.Mount to mount the file.
+func (RealOS) Mount(source string, target string, fstype string, flags uintptr, data string) error {
+	return unix.Mount(source, target, fstype, flags, data)
+}
+
+// Unmount will call Unmount to unmount the file.
+func (RealOS) Unmount(target string) error {
+	return mount.Unmount(target, unix.MNT_DETACH)
+}
+
+// LookupMount gets mount info of a given path.
+func (RealOS) LookupMount(path string) (mount.Info, error) {
+	return mount.Lookup(path)
+}

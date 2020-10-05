@@ -1,4 +1,4 @@
-// +build !windows
+// +build !windows,!linux
 
 /*
    Copyright The containerd Authors.
@@ -16,16 +16,21 @@
    limitations under the License.
 */
 
-package os
+package server
 
 import (
-	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/pkg/errors"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+
+	containerstore "github.com/containerd/cri/pkg/store/container"
 )
 
-// UNIX collects unix system level operations that need to be
-// mocked out during tests.
-type UNIX interface {
-	Mount(source string, target string, fstype string, flags uintptr, data string) error
-	Unmount(target string) error
-	LookupMount(path string) (mount.Info, error)
+func (c *criService) containerMetrics(
+	meta containerstore.Metadata,
+	stats *types.Metric,
+) (*runtime.ContainerStats, error) {
+	var cs runtime.ContainerStats
+	return &cs, errors.Wrap(errdefs.ErrNotImplemented, "container metrics")
 }

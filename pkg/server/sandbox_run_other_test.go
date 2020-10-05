@@ -1,4 +1,4 @@
-// +build !windows
+// +build !windows,!linux
 
 /*
    Copyright The containerd Authors.
@@ -16,16 +16,20 @@
    limitations under the License.
 */
 
-package os
+package server
 
 import (
-	"github.com/containerd/containerd/mount"
+	"testing"
+
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
-// UNIX collects unix system level operations that need to be
-// mocked out during tests.
-type UNIX interface {
-	Mount(source string, target string, fstype string, flags uintptr, data string) error
-	Unmount(target string) error
-	LookupMount(path string) (mount.Info, error)
+func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
+	config := &runtime.PodSandboxConfig{}
+	imageConfig := &imagespec.ImageConfig{}
+	specCheck := func(t *testing.T, id string, spec *runtimespec.Spec) {
+	}
+	return config, imageConfig, specCheck
 }

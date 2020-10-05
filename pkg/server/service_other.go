@@ -1,4 +1,4 @@
-// +build !windows
+// +build !windows,!linux
 
 /*
    Copyright The containerd Authors.
@@ -16,16 +16,18 @@
    limitations under the License.
 */
 
-package os
+package server
 
 import (
-	"github.com/containerd/containerd/mount"
+	cni "github.com/containerd/go-cni"
 )
 
-// UNIX collects unix system level operations that need to be
-// mocked out during tests.
-type UNIX interface {
-	Mount(source string, target string, fstype string, flags uintptr, data string) error
-	Unmount(target string) error
-	LookupMount(path string) (mount.Info, error)
+// initPlatform handles linux specific initialization for the CRI service.
+func (c *criService) initPlatform() error {
+	return nil
+}
+
+// cniLoadOptions returns cni load options for the linux.
+func (c *criService) cniLoadOptions() []cni.CNIOpt {
+	return []cni.CNIOpt{}
 }

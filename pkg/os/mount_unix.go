@@ -1,4 +1,4 @@
-// +build !windows
+// +build !windows,!linux
 
 /*
    Copyright The containerd Authors.
@@ -22,10 +22,12 @@ import (
 	"github.com/containerd/containerd/mount"
 )
 
-// UNIX collects unix system level operations that need to be
-// mocked out during tests.
-type UNIX interface {
-	Mount(source string, target string, fstype string, flags uintptr, data string) error
-	Unmount(target string) error
-	LookupMount(path string) (mount.Info, error)
+// Mount will call unix.Mount to mount the file.
+func (RealOS) Mount(source string, target string, fstype string, flags uintptr, data string) error {
+	return mount.ErrNotImplementOnUnix
+}
+
+// Unmount will call Unmount to unmount the file.
+func (RealOS) Unmount(target string) error {
+	return mount.Unmount(target, 0)
 }
