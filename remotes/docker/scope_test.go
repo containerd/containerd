@@ -50,7 +50,7 @@ func TestRepositoryScope(t *testing.T) {
 	}
 	for _, x := range testCases {
 		t.Run(x.refspec.String(), func(t *testing.T) {
-			actual, err := repositoryScope(x.refspec, x.push)
+			actual, err := RepositoryScope(x.refspec, x.push)
 			assert.NilError(t, err)
 			assert.Equal(t, x.expected, actual)
 		})
@@ -99,7 +99,7 @@ func TestGetTokenScopes(t *testing.T) {
 func TestCustomScope(t *testing.T) {
 	scope := "whatever:foo/bar:pull"
 	ctx := WithScope(context.Background(), scope)
-	ctx = contextWithAppendPullRepositoryScope(ctx, "foo/bar")
+	ctx = ContextWithAppendPullRepositoryScope(ctx, "foo/bar")
 
 	scopes := GetTokenScopes(ctx, []string{})
 	assert.Assert(t, cmp.Len(scopes, 2))

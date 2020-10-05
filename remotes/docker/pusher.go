@@ -45,7 +45,7 @@ type dockerPusher struct {
 }
 
 func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (content.Writer, error) {
-	ctx, err := contextWithRepositoryScope(ctx, p.refspec, true)
+	ctx, err := ContextWithRepositoryScope(ctx, p.refspec, true)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 		var resp *http.Response
 		if fromRepo := selectRepositoryMountCandidate(p.refspec, desc.Annotations); fromRepo != "" {
 			preq := requestWithMountFrom(req, desc.Digest.String(), fromRepo)
-			pctx := contextWithAppendPullRepositoryScope(ctx, fromRepo)
+			pctx := ContextWithAppendPullRepositoryScope(ctx, fromRepo)
 
 			// NOTE: the fromRepo might be private repo and
 			// auth service still can grant token without error.
