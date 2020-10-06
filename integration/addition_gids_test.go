@@ -1,4 +1,4 @@
-// +build !windows
+// +build linux
 
 /*
    Copyright The containerd Authors.

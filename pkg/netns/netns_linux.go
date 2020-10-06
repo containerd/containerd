@@ -1,5 +1,3 @@
-// +build !windows
-
 /*
    Copyright The containerd Authors.
 
@@ -25,6 +23,7 @@
 //     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
+
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
@@ -40,12 +39,11 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/containerd/containerd/mount"
 	cnins "github.com/containernetworking/plugins/pkg/ns"
 	"github.com/docker/docker/pkg/symlink"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
-
-	osinterface "github.com/containerd/cri/pkg/os"
 )
 
 const nsRunDir = "/var/run/netns"
@@ -141,7 +139,7 @@ func unmountNS(path string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to follow symlink")
 	}
-	if err := osinterface.Unmount(path); err != nil && !os.IsNotExist(err) {
+	if err := mount.Unmount(path, unix.MNT_DETACH); err != nil && !os.IsNotExist(err) {
 		return errors.Wrap(err, "failed to umount netns")
 	}
 	if err := os.RemoveAll(path); err != nil {

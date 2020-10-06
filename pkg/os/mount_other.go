@@ -1,4 +1,4 @@
-// +build !windows
+// +build !windows,!linux
 
 /*
    Copyright The containerd Authors.
@@ -18,14 +18,9 @@
 
 package os
 
-import (
-	"github.com/containerd/containerd/mount"
-)
+import "github.com/containerd/containerd/mount"
 
-// UNIX collects unix system level operations that need to be
-// mocked out during tests.
-type UNIX interface {
-	Mount(source string, target string, fstype string, flags uintptr, data string) error
-	Unmount(target string) error
-	LookupMount(path string) (mount.Info, error)
+// LookupMount gets mount info of a given path.
+func (RealOS) LookupMount(path string) (mount.Info, error) {
+	return mount.Lookup(path)
 }

@@ -1,4 +1,4 @@
-// +build !windows
+// +build !windows,!linux
 
 /*
    Copyright The containerd Authors.
@@ -16,16 +16,18 @@
    limitations under the License.
 */
 
-package os
+package server
 
 import (
-	"github.com/containerd/containerd/mount"
+	"io"
+
+	"github.com/containerd/containerd/errdefs"
+	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
-// UNIX collects unix system level operations that need to be
-// mocked out during tests.
-type UNIX interface {
-	Mount(source string, target string, fstype string, flags uintptr, data string) error
-	Unmount(target string) error
-	LookupMount(path string) (mount.Info, error)
+// portForward uses netns to enter the sandbox namespace, and forwards a stream inside the
+// the namespace to a specific port. It keeps forwarding until it exits or client disconnect.
+func (c *criService) portForward(ctx context.Context, id string, port int32, stream io.ReadWriteCloser) error {
+	return errors.Wrap(errdefs.ErrNotImplemented, "port forward")
 }
