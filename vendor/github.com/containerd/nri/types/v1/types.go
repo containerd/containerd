@@ -81,6 +81,14 @@ type Request struct {
 	Results []*Result `json:"results,omitempty"`
 }
 
+// NewPluginError returns a plugin error
+func NewPluginError(name string, err error) error {
+	return &PluginError{
+		Plugin:  name,
+		Message: err.Error(),
+	}
+}
+
 // PluginError for specific plugin execution
 type PluginError struct {
 	// Plugin name
