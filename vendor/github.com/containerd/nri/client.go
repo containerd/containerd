@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sync"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
@@ -23,15 +24,22 @@ const (
 	Version = "0.1"
 )
 
+var appendPathOnce sync.Once
+
 // New nri client
 func New() (*Client, error) {
 	conf, err := loadConfig(DefaultConfPath)
 	if err != nil {
 		return nil, err
 	}
-	if err := os.Setenv("PATH", fmt.Sprintf("%s:%s", os.Getenv("PATH"), DefaultBinaryPath)); err != nil {
+
+	appendPathOnce.Do(func() {
+		err = os.Setenv("PATH", fmt.Sprintf("%s:%s", os.Getenv("PATH"), DefaultBinaryPath))
+	})
+	if err != nil {
 		return nil, err
 	}
+
 	return &Client{
 		conf: conf,
 	}, nil
