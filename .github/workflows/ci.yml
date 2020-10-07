@@ -20,7 +20,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-18.04, macos-10.15] # TODO: pass linters on 'windows-2019'
+        os: [ubuntu-18.04, macos-10.15, windows-2019]
 
     steps:
       - name: Install Go
