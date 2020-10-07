@@ -85,7 +85,7 @@ GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revi
 SHIM_GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) -extldflags "-static" $(EXTRA_LDFLAGS)'
 
 # Project packages.
-PACKAGES=$(shell go list ${GO_TAGS} ./... | grep -v /vendor/)
+PACKAGES=$(shell go list ${GO_TAGS} ./... | grep -v /vendor/ | grep -v /integration)
 INTEGRATION_PACKAGE=${PKG}
 TEST_REQUIRES_ROOT_PACKAGES=$(filter \
     ${PACKAGES}, \

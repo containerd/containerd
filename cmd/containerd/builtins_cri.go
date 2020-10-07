@@ -18,4 +18,4 @@
 
 package main
 
-import _ "github.com/containerd/cri"
+import _ "github.com/containerd/containerd/pkg/cri"
