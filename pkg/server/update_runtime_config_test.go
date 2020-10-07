@@ -28,8 +28,8 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	criconfig "github.com/containerd/cri/pkg/config"
-	servertesting "github.com/containerd/cri/pkg/server/testing"
+	criconfig "github.com/containerd/containerd/pkg/config"
+	servertesting "github.com/containerd/containerd/pkg/server/testing"
 )
 
 func TestUpdateRuntimeConfig(t *testing.T) {

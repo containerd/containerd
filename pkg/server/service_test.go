@@ -26,15 +26,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	criconfig "github.com/containerd/cri/pkg/config"
-	ostesting "github.com/containerd/cri/pkg/os/testing"
-	"github.com/containerd/cri/pkg/registrar"
-	servertesting "github.com/containerd/cri/pkg/server/testing"
-	containerstore "github.com/containerd/cri/pkg/store/container"
-	imagestore "github.com/containerd/cri/pkg/store/image"
-	"github.com/containerd/cri/pkg/store/label"
-	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
-	snapshotstore "github.com/containerd/cri/pkg/store/snapshot"
+	criconfig "github.com/containerd/containerd/pkg/config"
+	ostesting "github.com/containerd/containerd/pkg/os/testing"
+	"github.com/containerd/containerd/pkg/registrar"
+	servertesting "github.com/containerd/containerd/pkg/server/testing"
+	containerstore "github.com/containerd/containerd/pkg/store/container"
+	imagestore "github.com/containerd/containerd/pkg/store/image"
+	"github.com/containerd/containerd/pkg/store/label"
+	sandboxstore "github.com/containerd/containerd/pkg/store/sandbox"
+	snapshotstore "github.com/containerd/containerd/pkg/store/snapshot"
 )
 
 const (

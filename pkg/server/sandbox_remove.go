@@ -25,8 +25,8 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	"github.com/containerd/cri/pkg/store"
-	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
+	"github.com/containerd/containerd/pkg/store"
+	sandboxstore "github.com/containerd/containerd/pkg/store/sandbox"
 )
 
 // RemovePodSandbox removes the sandbox. If there are running containers in the

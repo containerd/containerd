@@ -32,11 +32,11 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/util/clock"
 
-	"github.com/containerd/cri/pkg/constants"
-	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
-	"github.com/containerd/cri/pkg/store"
-	containerstore "github.com/containerd/cri/pkg/store/container"
-	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
+	"github.com/containerd/containerd/pkg/constants"
+	ctrdutil "github.com/containerd/containerd/pkg/containerd/util"
+	"github.com/containerd/containerd/pkg/store"
+	containerstore "github.com/containerd/containerd/pkg/store/container"
+	sandboxstore "github.com/containerd/containerd/pkg/store/sandbox"
 )
 
 const (

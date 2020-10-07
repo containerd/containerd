@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/cri/pkg/streaming"
+	"github.com/containerd/containerd/pkg/streaming"
 )
 
 // DefaultConfig returns default configurations of cri plugin.

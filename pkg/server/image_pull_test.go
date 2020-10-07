@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	criconfig "github.com/containerd/cri/pkg/config"
+	criconfig "github.com/containerd/containerd/pkg/config"
 )
 
 func TestParseAuth(t *testing.T) {

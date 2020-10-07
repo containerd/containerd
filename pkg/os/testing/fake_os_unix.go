@@ -18,6 +18,6 @@
 
 package testing
 
-import osInterface "github.com/containerd/cri/pkg/os"
+import osInterface "github.com/containerd/containerd/pkg/os"
 
 var _ osInterface.UNIX = &FakeOS{}

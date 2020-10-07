@@ -32,9 +32,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	criconfig "github.com/containerd/cri/pkg/config"
-	"github.com/containerd/cri/pkg/store"
-	imagestore "github.com/containerd/cri/pkg/store/image"
+	criconfig "github.com/containerd/containerd/pkg/config"
+	"github.com/containerd/containerd/pkg/store"
+	imagestore "github.com/containerd/containerd/pkg/store/image"
 )
 
 // TestGetUserFromImage tests the logic of getting image uid or user name of image user.

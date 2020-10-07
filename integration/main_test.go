@@ -39,12 +39,12 @@ import (
 	cri "k8s.io/cri-api/pkg/apis"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	"github.com/containerd/cri/integration/remote"
-	dialer "github.com/containerd/cri/integration/util"
-	criconfig "github.com/containerd/cri/pkg/config"
-	"github.com/containerd/cri/pkg/constants"
-	"github.com/containerd/cri/pkg/server"
-	"github.com/containerd/cri/pkg/util"
+	"github.com/containerd/containerd/integration/remote"
+	dialer "github.com/containerd/containerd/integration/util"
+	criconfig "github.com/containerd/containerd/pkg/config"
+	"github.com/containerd/containerd/pkg/constants"
+	"github.com/containerd/containerd/pkg/server"
+	"github.com/containerd/containerd/pkg/util"
 )
 
 const (

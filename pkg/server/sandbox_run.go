@@ -36,20 +36,20 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	"github.com/containerd/cri/pkg/annotations"
-	criconfig "github.com/containerd/cri/pkg/config"
-	customopts "github.com/containerd/cri/pkg/containerd/opts"
-	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
-	"github.com/containerd/cri/pkg/netns"
-	"github.com/containerd/cri/pkg/server/bandwidth"
-	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
-	"github.com/containerd/cri/pkg/util"
+	"github.com/containerd/containerd/pkg/annotations"
+	criconfig "github.com/containerd/containerd/pkg/config"
+	customopts "github.com/containerd/containerd/pkg/containerd/opts"
+	ctrdutil "github.com/containerd/containerd/pkg/containerd/util"
+	"github.com/containerd/containerd/pkg/netns"
+	"github.com/containerd/containerd/pkg/server/bandwidth"
+	sandboxstore "github.com/containerd/containerd/pkg/store/sandbox"
+	"github.com/containerd/containerd/pkg/util"
 	selinux "github.com/opencontainers/selinux/go-selinux"
 )
 
 func init() {
 	typeurl.Register(&sandboxstore.Metadata{},
-		"github.com/containerd/cri/pkg/store/sandbox", "Metadata")
+		"github.com/containerd/containerd/pkg/store/sandbox", "Metadata")
 }
 
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure

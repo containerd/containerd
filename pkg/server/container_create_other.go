@@ -24,7 +24,7 @@ import (
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	"github.com/containerd/cri/pkg/config"
+	"github.com/containerd/containerd/pkg/config"
 )
 
 // containerMounts sets up necessary container system file mounts

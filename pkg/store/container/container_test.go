@@ -21,13 +21,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/cri/pkg/store/label"
+	"github.com/containerd/containerd/pkg/store/label"
 	"github.com/opencontainers/selinux/go-selinux"
 	assertlib "github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	cio "github.com/containerd/cri/pkg/server/io"
-	"github.com/containerd/cri/pkg/store"
+	cio "github.com/containerd/containerd/pkg/server/io"
+	"github.com/containerd/containerd/pkg/store"
 )
 
 func TestContainerStore(t *testing.T) {

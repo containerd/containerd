@@ -37,12 +37,12 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	runtimeoptions "github.com/containerd/cri/pkg/api/runtimeoptions/v1"
-	criconfig "github.com/containerd/cri/pkg/config"
-	"github.com/containerd/cri/pkg/store"
-	containerstore "github.com/containerd/cri/pkg/store/container"
-	imagestore "github.com/containerd/cri/pkg/store/image"
-	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
+	runtimeoptions "github.com/containerd/containerd/pkg/api/runtimeoptions/v1"
+	criconfig "github.com/containerd/containerd/pkg/config"
+	"github.com/containerd/containerd/pkg/store"
+	containerstore "github.com/containerd/containerd/pkg/store/container"
+	imagestore "github.com/containerd/containerd/pkg/store/image"
+	sandboxstore "github.com/containerd/containerd/pkg/store/sandbox"
 )
 
 const (

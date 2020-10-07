@@ -31,9 +31,9 @@ import (
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	"github.com/containerd/cri/pkg/annotations"
-	customopts "github.com/containerd/cri/pkg/containerd/opts"
-	osinterface "github.com/containerd/cri/pkg/os"
+	"github.com/containerd/containerd/pkg/annotations"
+	customopts "github.com/containerd/containerd/pkg/containerd/opts"
+	osinterface "github.com/containerd/containerd/pkg/os"
 )
 
 func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,

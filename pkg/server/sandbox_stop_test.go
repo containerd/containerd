@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 
-	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
+	sandboxstore "github.com/containerd/containerd/pkg/store/sandbox"
 )
 
 func TestWaitSandboxStop(t *testing.T) {

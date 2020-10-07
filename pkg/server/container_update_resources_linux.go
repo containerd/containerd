@@ -29,10 +29,10 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	"github.com/containerd/cri/pkg/containerd/opts"
-	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
-	containerstore "github.com/containerd/cri/pkg/store/container"
-	"github.com/containerd/cri/pkg/util"
+	"github.com/containerd/containerd/pkg/containerd/opts"
+	ctrdutil "github.com/containerd/containerd/pkg/containerd/util"
+	containerstore "github.com/containerd/containerd/pkg/store/container"
+	"github.com/containerd/containerd/pkg/util"
 )
 
 // UpdateContainerResources updates ContainerConfig of the container.

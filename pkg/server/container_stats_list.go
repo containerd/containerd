@@ -23,7 +23,7 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	containerstore "github.com/containerd/cri/pkg/store/container"
+	containerstore "github.com/containerd/containerd/pkg/store/container"
 )
 
 // ListContainerStats returns stats of all running containers.

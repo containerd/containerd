@@ -27,8 +27,8 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/utils/exec"
 
-	"github.com/containerd/cri/pkg/ioutil"
-	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
+	"github.com/containerd/containerd/pkg/ioutil"
+	sandboxstore "github.com/containerd/containerd/pkg/store/sandbox"
 )
 
 func (c *criService) portForward(ctx context.Context, id string, port int32, stream io.ReadWriter) error {

@@ -44,7 +44,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	"github.com/containerd/cri/integration/remote/util"
+	"github.com/containerd/containerd/integration/remote/util"
 )
 
 // ImageService is a gRPC implementation of internalapi.ImageManagerService.

@@ -27,7 +27,7 @@ import (
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	cioutil "github.com/containerd/cri/pkg/ioutil"
+	cioutil "github.com/containerd/containerd/pkg/ioutil"
 )
 
 const (

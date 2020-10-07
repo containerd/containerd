@@ -47,7 +47,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	utilexec "k8s.io/utils/exec"
 
-	"github.com/containerd/cri/integration/remote/util"
+	"github.com/containerd/containerd/integration/remote/util"
 )
 
 // RuntimeService is a gRPC implementation of internalapi.RuntimeService.

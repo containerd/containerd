@@ -27,25 +27,25 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/pkg/streaming"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/cri/pkg/streaming"
 	cni "github.com/containerd/go-cni"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	"github.com/containerd/cri/pkg/store/label"
+	"github.com/containerd/containerd/pkg/store/label"
 
-	"github.com/containerd/cri/pkg/atomic"
-	criconfig "github.com/containerd/cri/pkg/config"
-	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
-	osinterface "github.com/containerd/cri/pkg/os"
-	"github.com/containerd/cri/pkg/registrar"
-	containerstore "github.com/containerd/cri/pkg/store/container"
-	imagestore "github.com/containerd/cri/pkg/store/image"
-	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
-	snapshotstore "github.com/containerd/cri/pkg/store/snapshot"
+	"github.com/containerd/containerd/pkg/atomic"
+	criconfig "github.com/containerd/containerd/pkg/config"
+	ctrdutil "github.com/containerd/containerd/pkg/containerd/util"
+	osinterface "github.com/containerd/containerd/pkg/os"
+	"github.com/containerd/containerd/pkg/registrar"
+	containerstore "github.com/containerd/containerd/pkg/store/container"
+	imagestore "github.com/containerd/containerd/pkg/store/image"
+	sandboxstore "github.com/containerd/containerd/pkg/store/sandbox"
+	snapshotstore "github.com/containerd/containerd/pkg/store/snapshot"
 )
 
 // grpcServices are all the grpc services provided by cri containerd.

@@ -13,6 +13,9 @@ option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
 option (gogoproto.goproto_unrecognized_all) = false;
 
+
+option go_package = "github.com/containerd/containerd/pkg/api/runtimeoptions/v1;cri_runtimeoptions_v1";
+
 message Options {
 	// TypeUrl specifies the type of the content inside the config file.
 	string type_url = 1;

@@ -27,8 +27,8 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
-	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
+	ctrdutil "github.com/containerd/containerd/pkg/containerd/util"
+	sandboxstore "github.com/containerd/containerd/pkg/store/sandbox"
 )
 
 // StopPodSandbox stops the sandbox. If there are any running containers in the

@@ -33,16 +33,16 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	customopts "github.com/containerd/cri/pkg/containerd/opts"
-	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
-	cio "github.com/containerd/cri/pkg/server/io"
-	containerstore "github.com/containerd/cri/pkg/store/container"
-	"github.com/containerd/cri/pkg/util"
+	customopts "github.com/containerd/containerd/pkg/containerd/opts"
+	ctrdutil "github.com/containerd/containerd/pkg/containerd/util"
+	cio "github.com/containerd/containerd/pkg/server/io"
+	containerstore "github.com/containerd/containerd/pkg/store/container"
+	"github.com/containerd/containerd/pkg/util"
 )
 
 func init() {
 	typeurl.Register(&containerstore.Metadata{},
-		"github.com/containerd/cri/pkg/store/container", "Metadata")
+		"github.com/containerd/containerd/pkg/store/container", "Metadata")
 }
 
 // CreateContainer creates a new container in the given PodSandbox.

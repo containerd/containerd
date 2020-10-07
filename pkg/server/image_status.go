@@ -25,8 +25,8 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	"github.com/containerd/cri/pkg/store"
-	imagestore "github.com/containerd/cri/pkg/store/image"
+	"github.com/containerd/containerd/pkg/store"
+	imagestore "github.com/containerd/containerd/pkg/store/image"
 )
 
 // ImageStatus returns the status of the image, returns nil if the image isn't present.

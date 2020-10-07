@@ -30,8 +30,8 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/cri/pkg/seccomp"
-	"github.com/containerd/cri/pkg/seutil"
+	"github.com/containerd/containerd/pkg/seccomp"
+	"github.com/containerd/containerd/pkg/seutil"
 	runcapparmor "github.com/opencontainers/runc/libcontainer/apparmor"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux/label"

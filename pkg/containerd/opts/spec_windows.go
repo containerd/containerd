@@ -30,7 +30,7 @@ import (
 	"github.com/pkg/errors"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	osinterface "github.com/containerd/cri/pkg/os"
+	osinterface "github.com/containerd/containerd/pkg/os"
 )
 
 // WithWindowsNetworkNamespace sets windows network namespace for container.

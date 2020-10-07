@@ -25,8 +25,8 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	containerstore "github.com/containerd/cri/pkg/store/container"
-	sandboxstore "github.com/containerd/cri/pkg/store/sandbox"
+	containerstore "github.com/containerd/containerd/pkg/store/container"
+	sandboxstore "github.com/containerd/containerd/pkg/store/sandbox"
 )
 
 func TestToCRIContainer(t *testing.T) {

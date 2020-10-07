@@ -52,8 +52,8 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	"github.com/containerd/cri/pkg/streaming/portforward"
-	remotecommandserver "github.com/containerd/cri/pkg/streaming/remotecommand"
+	"github.com/containerd/containerd/pkg/streaming/portforward"
+	remotecommandserver "github.com/containerd/containerd/pkg/streaming/remotecommand"
 )
 
 // Server is the library interface to serve the stream requests.
