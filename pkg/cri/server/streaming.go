@@ -33,7 +33,7 @@ import (
 	"k8s.io/utils/exec"
 
 	ctrdutil "github.com/containerd/containerd/pkg/containerd/util"
-	"github.com/containerd/containerd/pkg/streaming"
+	"github.com/containerd/containerd/pkg/cri/streaming"
 )
 
 type streamListenerMode int

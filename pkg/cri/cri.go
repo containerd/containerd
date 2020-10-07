@@ -39,9 +39,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/klog/v2"
 
-	"github.com/containerd/containerd/pkg/constants"
 	criplatforms "github.com/containerd/containerd/pkg/containerd/platforms"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
+	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/pkg/cri/server"
 )
 
