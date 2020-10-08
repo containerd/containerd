@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	"github.com/containerd/containerd/pkg/annotations"
+	"github.com/containerd/containerd/pkg/cri/annotations"
 	"github.com/containerd/containerd/pkg/cri/config"
 )
 

@@ -41,8 +41,8 @@ import (
 
 	"github.com/containerd/containerd/integration/remote"
 	dialer "github.com/containerd/containerd/integration/util"
-	"github.com/containerd/containerd/pkg/constants"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
+	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/pkg/cri/server"
 	"github.com/containerd/containerd/pkg/util"
 )

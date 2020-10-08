@@ -36,9 +36,9 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	"github.com/containerd/containerd/pkg/annotations"
 	customopts "github.com/containerd/containerd/pkg/containerd/opts"
 	ctrdutil "github.com/containerd/containerd/pkg/containerd/util"
+	"github.com/containerd/containerd/pkg/cri/annotations"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/server/bandwidth"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"

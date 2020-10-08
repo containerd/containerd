@@ -27,7 +27,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/pkg/streaming"
+	"github.com/containerd/containerd/pkg/cri/streaming"
 	"github.com/containerd/containerd/plugin"
 	cni "github.com/containerd/go-cni"
 	"github.com/pkg/errors"

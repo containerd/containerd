@@ -22,7 +22,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"golang.org/x/net/context"
 
-	"github.com/containerd/containerd/pkg/constants"
+	"github.com/containerd/containerd/pkg/cri/constants"
 )
 
 // deferCleanupTimeout is the default timeout for containerd cleanup operations
