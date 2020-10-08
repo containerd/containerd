@@ -158,12 +158,16 @@ jobs:
         run: script/setup/install-dev-tools
         working-directory: src/github.com/containerd/containerd
 
-      - name: Make
+      - name: Check fmt
+        working-directory: src/github.com/containerd/containerd
+        run: |
+          make proto-fmt
+
+      - name: Check protos
         env:
           GO111MODULE: off
         working-directory: src/github.com/containerd/containerd
         run: |
-          export PATH=$PATH:$(go env GOPATH)/bin
           make check-protos check-api-descriptors
 
   man:
