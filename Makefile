@@ -105,11 +105,6 @@ TEST_REQUIRES_ROOT_PACKAGES=$(filter \
 	done | sort -u) \
     )
 
-ifdef SKIPTESTS
-    PACKAGES:=$(filter-out ${SKIPTESTS},${PACKAGES})
-    TEST_REQUIRES_ROOT_PACKAGES:=$(filter-out ${SKIPTESTS},${TEST_REQUIRES_ROOT_PACKAGES})
-endif
-
 #Replaces ":" (*nix), ";" (windows) with newline for easy parsing
 GOPATHS=$(shell echo ${GOPATH} | tr ":" "\n" | tr ";" "\n")
 
@@ -125,6 +120,12 @@ BINARIES=$(addprefix bin/,$(COMMANDS))
 
 #include platform specific makefile
 -include Makefile.$(GOOS)
+
+# SKIPTESTS can be defined in Makefile.$(GOOS)
+ifdef SKIPTESTS
+    PACKAGES:=$(filter-out ${SKIPTESTS},${PACKAGES})
+    TEST_REQUIRES_ROOT_PACKAGES:=$(filter-out ${SKIPTESTS},${TEST_REQUIRES_ROOT_PACKAGES})
+endif
 
 # Flags passed to `go test`
 TESTFLAGS ?= $(TESTFLAGS_RACE) $(EXTRA_TESTFLAGS)
