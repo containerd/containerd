@@ -31,7 +31,7 @@ import (
 	"github.com/pkg/errors"
 
 	storeutil "github.com/containerd/containerd/pkg/cri/store"
-	"github.com/containerd/containerd/pkg/util"
+	"github.com/containerd/containerd/pkg/cri/util"
 )
 
 // Image contains all resources associated with the image. All fields

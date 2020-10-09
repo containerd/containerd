@@ -44,7 +44,7 @@ import (
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/pkg/cri/server"
-	"github.com/containerd/containerd/pkg/util"
+	"github.com/containerd/containerd/pkg/cri/util"
 )
 
 const (

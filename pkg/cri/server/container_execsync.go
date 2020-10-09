@@ -32,10 +32,10 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	ctrdutil "github.com/containerd/containerd/pkg/containerd/util"
 	cio "github.com/containerd/containerd/pkg/cri/io"
+	"github.com/containerd/containerd/pkg/cri/util"
+	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	cioutil "github.com/containerd/containerd/pkg/ioutil"
-	"github.com/containerd/containerd/pkg/util"
 )
 
 // ExecSync executes a command in the container, and returns the stdout output.
