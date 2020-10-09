@@ -24,9 +24,9 @@ import (
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	customopts "github.com/containerd/containerd/pkg/containerd/opts"
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	"github.com/containerd/containerd/pkg/cri/config"
+	customopts "github.com/containerd/containerd/pkg/cri/opts"
 )
 
 // No container mounts for windows.

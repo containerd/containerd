@@ -38,12 +38,12 @@ import (
 	"github.com/containerd/containerd/pkg/cri/store/label"
 
 	"github.com/containerd/containerd/pkg/atomic"
-	ctrdutil "github.com/containerd/containerd/pkg/containerd/util"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
+	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	osinterface "github.com/containerd/containerd/pkg/os"
 	"github.com/containerd/containerd/pkg/registrar"
 )

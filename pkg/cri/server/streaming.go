@@ -32,8 +32,8 @@ import (
 	k8scert "k8s.io/client-go/util/cert"
 	"k8s.io/utils/exec"
 
-	ctrdutil "github.com/containerd/containerd/pkg/containerd/util"
 	"github.com/containerd/containerd/pkg/cri/streaming"
+	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 )
 
 type streamListenerMode int

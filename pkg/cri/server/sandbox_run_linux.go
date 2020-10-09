@@ -31,8 +31,8 @@ import (
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	customopts "github.com/containerd/containerd/pkg/containerd/opts"
 	"github.com/containerd/containerd/pkg/cri/annotations"
+	customopts "github.com/containerd/containerd/pkg/cri/opts"
 	osinterface "github.com/containerd/containerd/pkg/os"
 )
 

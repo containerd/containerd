@@ -33,11 +33,11 @@ import (
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	customopts "github.com/containerd/containerd/pkg/containerd/opts"
-	ctrdutil "github.com/containerd/containerd/pkg/containerd/util"
 	cio "github.com/containerd/containerd/pkg/cri/io"
+	customopts "github.com/containerd/containerd/pkg/cri/opts"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	"github.com/containerd/containerd/pkg/util"
+	"github.com/containerd/containerd/pkg/cri/util"
+	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 )
 
 func init() {
