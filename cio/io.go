@@ -272,11 +272,19 @@ func BinaryIO(binary string, args map[string]string) Creator {
 // It also sets the terminal option to true
 func TerminalBinaryIO(binary string, args map[string]string) Creator {
 	return func(_ string) (IO, error) {
-		uri, err := LogURIGenerator("binary", binary, args)
-		if err != nil {
-			return nil, err
+		binary = filepath.Clean(binary)
+		if !strings.HasPrefix(binary, "/") {
+			return nil, errors.New("absolute path needed")
 		}
-
+		uri := &url.URL{
+			Scheme: "binary",
+			Path:   binary,
+		}
+		q := uri.Query()
+		for k, v := range args {
+			q.Set(k, v)
+		}
+		uri.RawQuery = q.Encode()
 		res := uri.String()
 		return &logURI{
 			config: Config{
