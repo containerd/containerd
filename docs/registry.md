@@ -18,15 +18,15 @@ To configure image registries create/modify the `/etc/containerd/config.toml` as
 # explicitly use v2 config format
 version = 2
 
-[plugin."io.containerd.grpc.v1.cri".registry.mirrors]
-  [plugin."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
+[plugins."io.containerd.grpc.v1.cri".registry.mirrors]
+  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
     endpoint = ["https://registry-1.docker.io"]
-  [plugin."io.containerd.grpc.v1.cri".registry.mirrors."test.https-registry.io"]
+  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."test.https-registry.io"]
     endpoint = ["https://HostIP1:Port1"]
-  [plugin."io.containerd.grpc.v1.cri".registry.mirrors."test.http-registry.io"]
+  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."test.http-registry.io"]
     endpoint = ["http://HostIP2:Port2"]
   # wildcard matching is supported but not required.
-  [plugin."io.containerd.grpc.v1.cri".registry.mirrors."*"]
+  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."*"]
     endpoint = ["https://HostIP3:Port3"]
 ```
 
@@ -58,7 +58,7 @@ version = 2
 
 # The registry host has to be a domain name or IP. Port number is also
 # needed if the default HTTPS or HTTP port is not used.
-[plugin."io.containerd.grpc.v1.cri".registry.configs."my.custom.registry".tls]
+[plugins."io.containerd.grpc.v1.cri".registry.configs."my.custom.registry".tls]
     ca_file   = "ca.pem"
     cert_file = "cert.pem"
     key_file  = "key.pem"
@@ -73,7 +73,7 @@ In the config example shown above, TLS mutual authentication will be used for co
 # explicitly use v2 config format
 version = 2
 
-[plugin."io.containerd.grpc.v1.cri".registry.configs."my.custom.registry".tls]
+[plugins."io.containerd.grpc.v1.cri".registry.configs."my.custom.registry".tls]
     ca_file   = "ca.pem"
 ```
 
@@ -83,7 +83,7 @@ To skip the registry certificate verification:
 # explicitly use v2 config format
 version = 2
 
-[plugin."io.containerd.grpc.v1.cri".registry.configs."my.custom.registry".tls]
+[plugins."io.containerd.grpc.v1.cri".registry.configs."my.custom.registry".tls]
   insecure_skip_verify = true
 ```
 
@@ -100,7 +100,7 @@ version = 2
 
 # The registry host has to be a domain name or IP. Port number is also
 # needed if the default HTTPS or HTTP port is not used.
-[plugin."io.containerd.grpc.v1.cri".registry.configs."gcr.io".auth]
+[plugins."io.containerd.grpc.v1.cri".registry.configs."gcr.io".auth]
   username = ""
   password = ""
   auth = ""
