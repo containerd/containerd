@@ -42,9 +42,10 @@ trap cleanup EXIT
 
 set -x
 latest=$(readlink ./releases/cri-cni-containerd.tar.gz)
-cp releases/${latest} ${BUILDDIR}/cri-containerd.tar.gz
-cp releases/${latest}.sha256sum ${BUILDDIR}/cri-containerd.tar.gz.sha256
+tarball=$(echo ${latest} | sed -e 's/cri-containerd-cni/containerd-cni/g' | sed -e 's/-linux-amd64/.linux-amd64/g')
+cp releases/${latest} ${BUILDDIR}/${tarball}
+cp releases/${latest}.sha256sum ${BUILDDIR}/${tarball}.sha256
 
 # Push test tarball to Google cloud storage.
 VERSION=$(git describe --match 'v[0-9]*' --dirty='.m' --always)
-PUSH_VERSION=true VERSION=${VERSION} BUILD_DIR=${BUILDDIR} ${ROOT}/test/push.sh
+PUSH_VERSION=true DEPLOY_DIR='containerd' TARBALL=${tarball} VERSION=${VERSION} BUILD_DIR=${BUILDDIR} ${ROOT}/test/push.sh
