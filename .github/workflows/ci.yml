@@ -38,6 +38,7 @@ jobs:
         with:
           version: v1.29
           working-directory: src/github.com/containerd/containerd
+          args: --timeout=5m
 
   #
   # Project checks
@@ -104,9 +105,7 @@ jobs:
           else
           DCO_RANGE=$(curl ${GITHUB_COMMIT_URL} | jq -r '.[0].parents[0].sha + "..HEAD"')
           fi
-          # Add back after CRI merge complete and remove last call
-          # ../project/script/validate/dco
-          echo "skipping for CRI merge since older commits may not pass this check"
+          ../project/script/validate/dco
 
       - name: Headers
         run: ../project/script/validate/fileheader ../project/
