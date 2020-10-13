@@ -46,7 +46,7 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	// Use the full sandbox id.
 	id := sandbox.ID
 
-	// Return error if sandbox container is still running or unknown.
+	// If the sandbox is still running or in an unknown state, forcibly stop it.
 	state := sandbox.Status.Get().State
 	if state == sandboxstore.StateReady || state == sandboxstore.StateUnknown {
 		logrus.Infof("Forcibly stopping sandbox %q", id)
