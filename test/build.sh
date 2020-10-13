@@ -48,4 +48,11 @@ cp releases/${latest}.sha256sum ${BUILDDIR}/${tarball}.sha256
 
 # Push test tarball to Google cloud storage.
 VERSION=$(git describe --match 'v[0-9]*' --dirty='.m' --always)
-PUSH_VERSION=true DEPLOY_DIR='containerd' TARBALL=${tarball} VERSION=${VERSION} BUILD_DIR=${BUILDDIR} ${ROOT}/test/push.sh
+
+if [ -z "${DEPLOY_DIR}" ]; then
+  DEPLOY_DIR="containerd"
+else
+  DEPLOY_DIR="containerd/${DEPLOY_DIR}"
+fi
+
+PUSH_VERSION=true DEPLOY_DIR=${DEPLOY_DIR} TARBALL=${tarball} VERSION=${VERSION#v} BUILD_DIR=${BUILDDIR} ${ROOT}/test/push.sh
