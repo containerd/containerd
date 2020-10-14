@@ -27,14 +27,15 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/continuity/fs"
 	"github.com/pkg/errors"
 )
 
 // WithNewSnapshot wraps `containerd.WithNewSnapshot` so that if creating the
 // snapshot fails we make sure the image is actually unpacked and and retry.
-func WithNewSnapshot(id string, i containerd.Image) containerd.NewContainerOpts {
-	f := containerd.WithNewSnapshot(id, i)
+func WithNewSnapshot(id string, i containerd.Image, opts ...snapshots.Opt) containerd.NewContainerOpts {
+	f := containerd.WithNewSnapshot(id, i, opts...)
 	return func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
 		if err := f(ctx, client, c); err != nil {
 			if !errdefs.IsNotFound(err) {
