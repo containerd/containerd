@@ -346,7 +346,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		defer scratchSource.Close()
 
 		// TODO: JTERRY75 - This has to be called sandbox.vhdx for the time
-		// being but it really is the scratch.vhdx Using this naming convention
+		// being but it really is the scratch.vhdx. Using this naming convention
 		// for now but this is not the kubernetes sandbox.
 		//
 		// Create the sandbox.vhdx for this snapshot from the cache.
@@ -371,7 +371,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 }
 
 func (s *snapshotter) openOrCreateScratch(ctx context.Context, sizeGB int) (_ *os.File, err error) {
-	// Create the scratch.vhdx cache file if it doesn't already exit.
+	// Create the scratch.vhdx cache file if it doesn't already exist.
 	s.scratchLock.Lock()
 	defer s.scratchLock.Unlock()
 

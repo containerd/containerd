@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -180,6 +181,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	log.G(ctx).Debugf("Container %q spec: %#+v", id, spew.NewFormatter(spec))
 
+	snapshotterOpt := snapshots.WithLabels(config.Annotations)
 	// Set snapshotter before any other options.
 	opts := []containerd.NewContainerOpts{
 		containerd.WithSnapshotter(c.config.ContainerdConfig.Snapshotter),
@@ -188,7 +190,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		// the runtime (runc) a chance to modify (e.g. to create mount
 		// points corresponding to spec.Mounts) before making the
 		// rootfs readonly (requested by spec.Root.Readonly).
-		customopts.WithNewSnapshot(id, containerdImage),
+		customopts.WithNewSnapshot(id, containerdImage, snapshotterOpt),
 	}
 	if len(volumeMounts) > 0 {
 		mountMap := make(map[string]string)
