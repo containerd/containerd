@@ -58,7 +58,10 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 	return newHTTPReadSeeker(desc.Size, func(offset int64) (io.ReadCloser, error) {
 		if len(desc.URLs) > 0 {
 			db := *r.dockerBase
-			db.auth = nil // do not authenticate
+			// Remove authorizer to avoid authentication when
+			// connecting to manifest provided URLs.
+			// Prevents https://github.com/containerd/containerd/security/advisories/GHSA-742w-89gc-8m9c
+			db.auth = nil
 			nr := dockerFetcher{
 				dockerBase: &db,
 			}
