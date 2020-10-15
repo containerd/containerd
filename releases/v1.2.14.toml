@@ -1,0 +1,30 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.2.13"
+
+pre_release = false
+
+preface = """\
+The fourteenth patch release for `containerd` 1.2 is a security release to fix CVE-2020-15157.
+
+### Security Fixes
+
+* Fix bug which allowed manifests to coerce containerd clients into leaking registry credentials [GHSA-742w-89gc-8m9c](https://github.com/containerd/containerd/security/advisories/GHSA-742w-89gc-8m9c)
+
+### Included Changes
+
+* Fix regression pushing manifests as octet stream [#4268](https://github.com/containerd/containerd/pull/4268)
+* Update golang version
+
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]

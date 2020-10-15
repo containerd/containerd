@@ -56,6 +56,26 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 	}
 
 	return newHTTPReadSeeker(desc.Size, func(offset int64) (io.ReadCloser, error) {
+		if len(desc.URLs) > 0 {
+			db := *r.dockerBase
+			// Remove authorizer to avoid authentication when
+			// connecting to manifest provided URLs.
+			// Prevents https://github.com/containerd/containerd/security/advisories/GHSA-742w-89gc-8m9c
+			db.auth = nil
+			nr := dockerFetcher{
+				dockerBase: &db,
+			}
+			for _, u := range desc.URLs {
+				log.G(ctx).WithField("url", u).Debug("trying alternative url")
+				rc, err := nr.open(ctx, u, desc.MediaType, offset)
+				if err != nil {
+					log.G(ctx).WithField("error", err).Debug("error trying url")
+					continue // try one of the other urls.
+				}
+
+				return rc, nil
+			}
+		}
 		for _, u := range urls {
 			rc, err := r.open(ctx, u, desc.MediaType, offset)
 			if err != nil {
@@ -141,14 +161,6 @@ func (r dockerFetcher) open(ctx context.Context, u, mediatype string, offset int
 // most to least likely succeed.
 func (r *dockerFetcher) getV2URLPaths(ctx context.Context, desc ocispec.Descriptor) ([]string, error) {
 	var urls []string
-
-	if len(desc.URLs) > 0 {
-		// handle fetch via external urls.
-		for _, u := range desc.URLs {
-			log.G(ctx).WithField("url", u).Debug("adding alternative url")
-			urls = append(urls, u)
-		}
-	}
 
 	switch desc.MediaType {
 	case images.MediaTypeDockerSchema2Manifest, images.MediaTypeDockerSchema2ManifestList,
