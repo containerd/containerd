@@ -24,6 +24,7 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/platforms"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -48,10 +49,6 @@ func GetStopSignal(ctx context.Context, container Container, defaultSignal sysca
 
 // GetOCIStopSignal retrieves the stop signal specified in the OCI image config
 func GetOCIStopSignal(ctx context.Context, image Image, defaultSignal string) (string, error) {
-	_, err := ParseSignal(defaultSignal)
-	if err != nil {
-		return "", err
-	}
 	ic, err := image.Config(ctx)
 	if err != nil {
 		return "", err
@@ -59,6 +56,7 @@ func GetOCIStopSignal(ctx context.Context, image Image, defaultSignal string) (s
 	var (
 		ociimage v1.Image
 		config   v1.ImageConfig
+		platform string
 	)
 	switch ic.MediaType {
 	case v1.MediaTypeImageConfig, images.MediaTypeDockerSchema2Config:
@@ -71,8 +69,17 @@ func GetOCIStopSignal(ctx context.Context, image Image, defaultSignal string) (s
 			return "", err
 		}
 		config = ociimage.Config
+		platform = ociimage.OS
 	default:
 		return "", fmt.Errorf("unknown image config media type %s", ic.MediaType)
+	}
+
+	// verify that default signal is valid
+	if platform == "" {
+		platform = platforms.DefaultSpec().OS
+	}
+	if _, err := ParsePlatformSignal(defaultSignal, platform); err != nil {
+		return "", err
 	}
 
 	if config.StopSignal == "" {

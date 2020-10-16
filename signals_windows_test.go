@@ -1,3 +1,5 @@
+// +build windows
+
 /*
    Copyright The containerd Authors.
 
@@ -22,30 +24,7 @@ import (
 	"testing"
 )
 
-func TestParseSignal(t *testing.T) {
-	testSignals := []struct {
-		raw  string
-		want syscall.Signal
-		err  bool
-	}{
-		{"1", syscall.Signal(1), false},
-		{"SIGKILL", syscall.SIGKILL, false},
-		{"NONEXIST", 0, true},
-	}
-	for _, ts := range testSignals {
-		t.Run(fmt.Sprintf("%s/%d/%t", ts.raw, ts.want, ts.err), func(t *testing.T) {
-			got, err := ParseSignal(ts.raw)
-			if ts.err && err == nil {
-				t.Errorf("ParseSignal(%s) should return error", ts.raw)
-			}
-			if !ts.err && got != ts.want {
-				t.Errorf("ParseSignal(%s) return %d, want %d", ts.raw, got, ts.want)
-			}
-		})
-	}
-}
-
-func TestParsePlatformSignalGeneric(t *testing.T) {
+func TestParsePlatformSignalOnWindows(t *testing.T) {
 	testSignals := []struct {
 		raw      string
 		want     syscall.Signal
@@ -57,15 +36,25 @@ func TestParsePlatformSignalGeneric(t *testing.T) {
 		{"SIGKILL", syscall.SIGKILL, "linux", false},
 		{"NONEXIST", 0, "linux", true},
 		{"65536", syscall.Signal(65536), "linux", false},
+
+		// test signals for windows platform
+		{"1", syscall.Signal(1), "windows", false},
+		{"SIGKILL", syscall.SIGKILL, "windows", false},
+		{"NONEXIST", 0, "windows", true},
+		{"65536", 0, "windows", true},
+
+		// make sure signals from opposing platform do not resolve
+		{"SIGWINCH", 0, "windows", true},
+		{"SIGWINCH", syscall.Signal(0x1c), "linux", false},
 	}
 	for _, ts := range testSignals {
 		t.Run(fmt.Sprintf("%s/%d/%s/%t", ts.raw, ts.want, ts.platform, ts.err), func(t *testing.T) {
 			got, err := ParsePlatformSignal(ts.raw, ts.platform)
 			if ts.err && err == nil {
-				t.Errorf("ParseSignal(%s) should return error", ts.raw)
+				t.Errorf("ParsePlatformSignal(%s) should return error", ts.raw)
 			}
 			if !ts.err && got != ts.want {
-				t.Errorf("ParseSignal(%s) return %d, want %d", ts.raw, got, ts.want)
+				t.Errorf("ParsePlatformSignal(%s) return %d, want %d", ts.raw, got, ts.want)
 			}
 		})
 	}
