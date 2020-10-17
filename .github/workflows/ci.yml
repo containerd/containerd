@@ -368,7 +368,12 @@ jobs:
           sudo GOPATH=$GOPATH GOPROXY=$GOPROXY TEST_RUNTIME=$TEST_RUNTIME RUNC_FLAVOR=$RUNC_FLAVOR TESTFLAGS_PARALLEL=1 make integration EXTRA_TESTFLAGS=-no-criu
         working-directory: src/github.com/containerd/containerd
 
-      - name: CRI test
+      - name: CRI Integration Test
+        run: |
+          make cri-integration
+        working-directory: src/github.com/containerd/containerd
+
+      - name: cri-tools critest
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
         run: |

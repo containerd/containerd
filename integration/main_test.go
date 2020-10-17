@@ -335,7 +335,7 @@ func KillPid(pid int) error {
 
 // PidOf returns pid of a process by name.
 func PidOf(name string) (int, error) {
-	b, err := exec.Command("pidof", name).CombinedOutput()
+	b, err := exec.Command("pidof", "-s", name).CombinedOutput()
 	output := strings.TrimSpace(string(b))
 	if err != nil {
 		if len(output) != 0 {

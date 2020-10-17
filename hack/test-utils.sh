@@ -42,7 +42,7 @@ CONTAINERD_STATE=${CONTAINERD_STATE:-"/run/containerd${CONTAINERD_TEST_SUFFIX}"}
 # The containerd socket address.
 CONTAINERD_SOCK=${CONTAINERD_SOCK:-unix://${CONTAINERD_STATE}/containerd.sock}
 # The containerd binary name.
-CONTAINERD_BIN=${CONTAINERD_BIN:-"containerd${CONTAINERD_TEST_SUFFIX}"}
+CONTAINERD_BIN=${CONTAINERD_BIN:-"containerd"} # don't need a suffix now
 if [ -f "${CONTAINERD_CONFIG_FILE}" ]; then
   CONTAINERD_FLAGS+="--config ${CONTAINERD_CONFIG_FILE} "
 fi
@@ -56,34 +56,26 @@ containerd_groupid=
 test_setup() {
   local report_dir=$1
   # Start containerd
-  if [ ! -x "${ROOT}/_output/containerd" ]; then
+  if [ ! -x "bin/containerd" ]; then
     echo "containerd is not built"
     exit 1
   fi
-  # rename the test containerd binary, so that we can easily
-  # distinguish it.
-  cp ${ROOT}/_output/containerd ${ROOT}/_output/${CONTAINERD_BIN}
   set -m
   # Create containerd in a different process group
   # so that we can easily clean them up.
-  keepalive "sudo PATH=${PATH} ${ROOT}/_output/${CONTAINERD_BIN} ${CONTAINERD_FLAGS}" \
+  keepalive "sudo PATH=${PATH} bin/containerd ${CONTAINERD_FLAGS}" \
     ${RESTART_WAIT_PERIOD} &> ${report_dir}/containerd.log &
   pid=$!
   set +m
   containerd_groupid=$(ps -o pgid= -p ${pid})
   # Wait for containerd to be running by using the containerd client ctr to check the version
   # of the containerd server. Wait an increasing amount of time after each of five attempts
-  local -r ctr_path=$(which ctr)
-  if [ -z "${ctr_path}" ]; then
-    echo "ctr is not in PATH"
-    exit 1
-  fi
   local -r crictl_path=$(which crictl)
   if [ -z "${crictl_path}" ]; then
     echo "crictl is not in PATH"
     exit 1
   fi
-  readiness_check "sudo ${ctr_path} --address ${CONTAINERD_SOCK#"unix://"} version"
+  readiness_check "sudo bin/ctr --address ${CONTAINERD_SOCK#"unix://"} version"
   readiness_check "sudo ${crictl_path} --runtime-endpoint=${CONTAINERD_SOCK} info"
 }
 
