@@ -33,7 +33,7 @@ mkdir -p ${REPORT_DIR}
 test_setup ${REPORT_DIR}
 
 # Run integration test.
-sudo PATH=${PATH} ${ROOT}/_output/integration.test --test.run="${FOCUS}" --test.v \
+sudo PATH=${PATH} bin/cri-integration.test --test.run="${FOCUS}" --test.v \
   --cri-endpoint=${CONTAINERD_SOCK} \
   --cri-root=${CRI_ROOT} \
   --runtime-handler=${RUNTIME} \

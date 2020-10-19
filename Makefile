@@ -125,7 +125,7 @@ TESTFLAGS_PARALLEL ?= 8
 OUTPUTDIR = $(join $(ROOTDIR), _output)
 CRIDIR=$(OUTPUTDIR)/cri
 
-.PHONY: clean all AUTHORS build binaries test integration generate protos checkprotos coverage ci check help install uninstall vendor release mandir install-man genman install-cri-deps cri-release cri-cni-release
+.PHONY: clean all AUTHORS build binaries test integration generate protos checkprotos coverage ci check help install uninstall vendor release mandir install-man genman install-cri-deps cri-release cri-cni-release cri-integration bin/cri-integration.test
 .DEFAULT: default
 
 all: binaries
@@ -181,6 +181,16 @@ root-test: ## run tests, except integration tests
 integration: ## run integration tests
 	@echo "$(WHALE) $@"
 	@go test ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL}
+
+# TODO integrate cri integration bucket with coverage
+bin/cri-integration.test:
+	@echo "$(WHALE) $@"
+	@go test -c ./integration -o bin/cri-integration.test
+
+cri-integration: binaries bin/cri-integration.test ## run cri integration tests
+	@echo "$(WHALE) $@"
+	@./hack/test-cri-integration.sh
+	@rm -rf bin/cri-integration.test
 
 benchmark: ## run benchmarks tests
 	@echo "$(WHALE) $@"
@@ -309,6 +319,7 @@ clean: ## clean up binaries
 	@rm -f $(BINARIES)
 	@rm -f releases/*.tar.gz*
 	@rm -rf $(OUTPUTDIR)
+	@rm -rf bin/cri-integration.test
 
 clean-test: ## clean up debris from previously failed tests
 	@echo "$(WHALE) $@"
@@ -323,6 +334,7 @@ clean-test: ## clean up debris from previously failed tests
 	@rm -rf /run/containerd/runc/*
 	@rm -rf /run/containerd/fifo/*
 	@rm -rf /run/containerd-test/*
+	@rm -rf bin/cri-integration.test
 
 install: ## install binaries
 	@echo "$(WHALE) $@ $(BINARIES)"
