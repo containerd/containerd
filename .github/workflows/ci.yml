@@ -48,73 +48,15 @@ jobs:
     runs-on: ubuntu-18.04
     timeout-minutes: 5
 
-    defaults:
-      run:
-        working-directory: src/github.com/containerd/containerd
-
     steps:
-      #
-      # Install Go
-      #
-      - name: Install Go
-        uses: actions/setup-go@v1
-        with:
-          go-version: '1.15.2'
-
-      #
-      # Checkout repos
-      #
-      - name: Checkout this repo
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
         with:
           path: src/github.com/containerd/containerd
           fetch-depth: 100
 
-      - name: Checkout project repo
-        uses: actions/checkout@v2
+      - uses: containerd/project-checks@v1
         with:
-          repository: containerd/project
-          path: src/github.com/containerd/project
-
-      - name: Set env
-        shell: bash
-        run: |
-          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
-          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
-
-      #
-      # Go get dependencies
-      #
-      - name: Install dependencies
-        env:
-          GO111MODULE: off
-        run: |
-          go get -u github.com/vbatts/git-validation
-          go get -u github.com/kunalkushwaha/ltag
-          go get -u github.com/LK4D4/vndr
-
-      #
-      # DCO / File headers / Vendor directory validation
-      #
-      - name: DCO
-        env:
-          GITHUB_COMMIT_URL: ${{ github.event.pull_request.commits_url }}
-          DCO_VERBOSITY: "-q"
-          DCO_RANGE: ""
-        run: |
-          set -x
-          if [ -z "${GITHUB_COMMIT_URL}" ]; then
-          DCO_RANGE=$(jq -r '.after + "..HEAD"' ${GITHUB_EVENT_PATH})
-          else
-          DCO_RANGE=$(curl ${GITHUB_COMMIT_URL} | jq -r '.[0].parents[0].sha + "..HEAD"')
-          fi
-          ../project/script/validate/dco
-
-      - name: Headers
-        run: ../project/script/validate/fileheader ../project/
-
-      - name: Vendor
-        run: ../project/script/validate/vendor
+          working-directory: src/github.com/containerd/containerd
 
   #
   # Protobuf checks
