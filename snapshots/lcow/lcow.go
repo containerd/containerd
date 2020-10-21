@@ -329,37 +329,44 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		for _, o := range opts {
 			o(&snapshotInfo)
 		}
-
-		var sizeGB int
-		if sizeGBstr, ok := snapshotInfo.Labels[rootfsSizeLabel]; ok {
-			i32, err := strconv.ParseInt(sizeGBstr, 10, 32)
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to parse annotation %q=%q", rootfsSizeLabel, sizeGBstr)
-			}
-			sizeGB = int(i32)
-		}
-
-		scratchSource, err := s.openOrCreateScratch(ctx, sizeGB)
-		if err != nil {
-			return nil, err
-		}
-		defer scratchSource.Close()
-
-		// TODO: JTERRY75 - This has to be called sandbox.vhdx for the time
-		// being but it really is the scratch.vhdx. Using this naming convention
-		// for now but this is not the kubernetes sandbox.
+		// IO/disk space optimization
 		//
-		// Create the sandbox.vhdx for this snapshot from the cache.
-		destPath := filepath.Join(snDir, "sandbox.vhdx")
-		dest, err := os.OpenFile(destPath, os.O_RDWR|os.O_CREATE, 0700)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create sandbox.vhdx in snapshot")
-		}
-		defer dest.Close()
-		if _, err := io.Copy(dest, scratchSource); err != nil {
-			dest.Close()
-			os.Remove(destPath)
-			return nil, errors.Wrap(err, "failed to copy cached scratch.vhdx to sandbox.vhdx in snapshot")
+		// We only need one sandbox.vhd for the container. Skip making one for this
+		// snapshot if this isn't the snapshot that just houses the final sandbox.vhd
+		// that will be mounted as the containers scratch. Currently the key for a snapshot
+		// where a layer.vhd will be extracted to it will have the string `extract-` in it.
+		// If this is changed this will also need to be changed.
+		//
+		// We save about 17MB per layer (if the default scratch vhd size of 20GB is used) and of
+		// course the time to copy the vhd per snapshot.
+		if !strings.Contains(key, snapshots.UnpackKeyPrefix) {
+			var sizeGB int
+			if sizeGBstr, ok := snapshotInfo.Labels[rootfsSizeLabel]; ok {
+				i32, err := strconv.ParseInt(sizeGBstr, 10, 32)
+				if err != nil {
+					return nil, errors.Wrapf(err, "failed to parse label %q=%q", rootfsSizeLabel, sizeGBstr)
+				}
+				sizeGB = int(i32)
+			}
+
+			scratchSource, err := s.openOrCreateScratch(ctx, sizeGB)
+			if err != nil {
+				return nil, err
+			}
+			defer scratchSource.Close()
+
+			// Create the sandbox.vhdx for this snapshot from the cache.
+			destPath := filepath.Join(snDir, "sandbox.vhdx")
+			dest, err := os.OpenFile(destPath, os.O_RDWR|os.O_CREATE, 0700)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to create sandbox.vhdx in snapshot")
+			}
+			defer dest.Close()
+			if _, err := io.Copy(dest, scratchSource); err != nil {
+				dest.Close()
+				os.Remove(destPath)
+				return nil, errors.Wrap(err, "failed to copy cached scratch.vhdx to sandbox.vhdx in snapshot")
+			}
 		}
 	}
 
