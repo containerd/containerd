@@ -53,7 +53,7 @@ else
 endif
 
 ifndef GODEBUG
-	EXTRA_LDFLAGS += -s -w
+	EXTRA_LDFLAGS += -s -w -buildid=
 	DEBUG_GO_GCFLAGS :=
 	DEBUG_TAGS :=
 else
