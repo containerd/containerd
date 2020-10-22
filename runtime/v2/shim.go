@@ -420,10 +420,11 @@ func (s *shim) Checkpoint(ctx context.Context, path string, options *ptypes.Any)
 	return nil
 }
 
-func (s *shim) Update(ctx context.Context, resources *ptypes.Any) error {
+func (s *shim) Update(ctx context.Context, resources *ptypes.Any, annotations map[string]string) error {
 	if _, err := s.task.Update(ctx, &task.UpdateTaskRequest{
-		ID:        s.ID(),
-		Resources: resources,
+		ID:          s.ID(),
+		Resources:   resources,
+		Annotations: annotations,
 	}); err != nil {
 		return errdefs.FromGRPC(err)
 	}
