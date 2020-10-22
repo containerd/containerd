@@ -560,7 +560,7 @@ func (l *local) Update(ctx context.Context, r *api.UpdateTaskRequest, _ ...grpc.
 	if err != nil {
 		return nil, err
 	}
-	if err := t.Update(ctx, r.Resources); err != nil {
+	if err := t.Update(ctx, r.Resources, r.Annotations); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 	return empty, nil
