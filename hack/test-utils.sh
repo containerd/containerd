@@ -23,13 +23,24 @@ CONTAINERD_FLAGS="--log-level=debug "
 
 # Use a configuration file for containerd.
 CONTAINERD_CONFIG_FILE=${CONTAINERD_CONFIG_FILE:-""}
-if [ -z "${CONTAINERD_CONFIG_FILE}" ] && command -v sestatus >/dev/null 2>&1; then
-  selinux_config="/tmp/containerd-config-selinux.toml"
-  cat >${selinux_config} <<<'
+# The runtime to use (ignored when CONTAINERD_CONFIG_FILE is set)
+CONTAINERD_RUNTIME=${CONTAINERD_RUNTIME:-""}
+if [ -z "${CONTAINERD_CONFIG_FILE}" ]; then
+  config_file="/tmp/containerd-config-cri.toml"
+  truncate --size 0 "${config_file}"
+  if command -v sestatus >/dev/null 2>&1; then
+    cat >>${config_file} <<EOF
 [plugins.cri]
   enable_selinux = true
-'
-  CONTAINERD_CONFIG_FILE=${CONTAINERD_CONFIG_FILE:-"${selinux_config}"}
+EOF
+  fi
+  if [ -n "${CONTAINERD_RUNTIME}" ]; then
+    cat >>${config_file} <<EOF
+[plugins.cri.containerd.default_runtime]
+  runtime_type="${CONTAINERD_RUNTIME}"
+EOF
+  fi
+  CONTAINERD_CONFIG_FILE="${config_file}"
 fi
 
 # CONTAINERD_TEST_SUFFIX is the suffix appended to the root/state directory used
