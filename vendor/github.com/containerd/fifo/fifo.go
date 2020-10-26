@@ -25,6 +25,7 @@ import (
 	"syscall"
 
 	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 )
 
 type fifo struct {
@@ -48,7 +49,7 @@ func OpenFifoDup2(ctx context.Context, fn string, flag int, perm os.FileMode, fd
 		return nil, errors.Wrap(err, "fifo error")
 	}
 
-	if err := syscall.Dup2(int(f.file.Fd()), fd); err != nil {
+	if err := unix.Dup2(int(f.file.Fd()), fd); err != nil {
 		_ = f.Close()
 		return nil, errors.Wrap(err, "dup2 error")
 	}
