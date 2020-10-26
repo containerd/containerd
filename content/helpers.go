@@ -230,8 +230,31 @@ func seekReader(r io.Reader, offset, size int64) (io.Reader, error) {
 }
 
 func copyWithBuffer(dst io.Writer, src io.Reader) (written int64, err error) {
-	buf := bufPool.Get().(*[]byte)
-	written, err = io.CopyBuffer(dst, src, *buf)
-	bufPool.Put(buf)
+	bufRef := bufPool.Get().(*[]byte)
+	defer bufPool.Put(bufRef)
+	buf := *bufRef
+	for {
+		nr, er := io.ReadAtLeast(src, buf, len(buf))
+		if nr > 0 {
+			nw, ew := dst.Write(buf[0:nr])
+			if nw > 0 {
+				written += int64(nw)
+			}
+			if ew != nil {
+				err = ew
+				break
+			}
+			if nr != nw {
+				err = io.ErrShortWrite
+				break
+			}
+		}
+		if er != nil {
+			if er != io.EOF && er != io.ErrUnexpectedEOF {
+				err = er
+			}
+			break
+		}
+	}
 	return
 }
