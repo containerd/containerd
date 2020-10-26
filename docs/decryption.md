@@ -44,3 +44,9 @@ encrypted mediatypes.
 In this example, container image decryption is set to use the "node" key model. In addition, the decryption [`stream_processors`](https://github.com/containerd/containerd/blob/master/docs/stream_processors.md) are configured as specified in [containerd/imgcrypt project](https://github.com/containerd/imgcrypt), with the additional field `--decryption-keys-path` configured to specify where decryption keys are located locally in the node.
 
 After modify this config, you need restart the `containerd` service.
+
+## Question & Answer
+
+1. Containerd log `read configFd: bad file descriptor\n: unknown`
+
+   check your local images, if pulled encrypted image before add decryption config and restart `containerd` service. Need delete it and try deploy containers again.
