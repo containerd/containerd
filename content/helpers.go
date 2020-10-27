@@ -230,6 +230,15 @@ func seekReader(r io.Reader, offset, size int64) (io.Reader, error) {
 }
 
 func copyWithBuffer(dst io.Writer, src io.Reader) (written int64, err error) {
+	// If the reader has a WriteTo method, use it to do the copy.
+	// Avoids an allocation and a copy.
+	if wt, ok := src.(io.WriterTo); ok {
+		return wt.WriteTo(dst)
+	}
+	// Similarly, if the writer has a ReadFrom method, use it to do the copy.
+	if rt, ok := dst.(io.ReaderFrom); ok {
+		return rt.ReadFrom(src)
+	}
 	bufRef := bufPool.Get().(*[]byte)
 	defer bufPool.Put(bufRef)
 	buf := *bufRef
