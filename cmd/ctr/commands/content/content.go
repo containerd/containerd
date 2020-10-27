@@ -78,7 +78,9 @@ var (
 			}
 			defer ra.Close()
 
-			_, err = io.Copy(os.Stdout, content.NewReader(ra))
+			// use 1MB buffer like we do for ingesting
+			buf := make([]byte, 1<<20)
+			_, err = io.CopyBuffer(os.Stdout, content.NewReader(ra), buf)
 			return err
 		},
 	}
