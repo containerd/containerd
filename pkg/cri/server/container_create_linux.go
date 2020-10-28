@@ -319,6 +319,9 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 	if seccompSpecOpts != nil {
 		specOpts = append(specOpts, seccompSpecOpts)
 	}
+
+	// Add this at the end to make sure that capabilities and users have both been set.
+	specOpts = append(specOpts, customopts.WithCapDropForNonRootUser)
 	return specOpts, nil
 }
 

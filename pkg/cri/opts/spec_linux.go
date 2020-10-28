@@ -329,7 +329,7 @@ func WithDevices(osi osinterface.OS, config *runtime.ContainerConfig) oci.SpecOp
 	}
 }
 
-// WithCapabilities sets the provided capabilties from the security context
+// WithCapabilities sets the provided capabilities from the security context
 func WithCapabilities(sc *runtime.LinuxContainerSecurityContext) oci.SpecOpts {
 	capabilities := sc.GetCapabilities()
 	if capabilities == nil {
@@ -367,6 +367,19 @@ func WithCapabilities(sc *runtime.LinuxContainerSecurityContext) oci.SpecOpts {
 	}
 	opts = append(opts, oci.WithDroppedCapabilities(caps))
 	return oci.Compose(opts...)
+}
+
+// WithCapDropForNonRootUser drops effective and permitted capabilities
+// if the user is non-root.
+// See https://github.com/moby/moby/pull/36587.
+//
+// This option should be after options for setting users and capabilities.
+func WithCapDropForNonRootUser(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
+	if s.Process != nil && s.Process.User.UID != 0 && s.Process.Capabilities != nil {
+		s.Process.Capabilities.Effective = []string{}
+		s.Process.Capabilities.Permitted = []string{}
+	}
+	return nil
 }
 
 // WithoutAmbientCaps removes the ambient caps from the spec
