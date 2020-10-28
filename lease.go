@@ -38,7 +38,7 @@ func (c *Client) WithLease(ctx context.Context, opts ...leases.Opt) (context.Con
 		// Use default lease configuration if no options provided
 		opts = []leases.Opt{
 			leases.WithRandomID(),
-			leases.WithExpiration(24 * time.Hour),
+			leases.WithExpiration(2 * time.Hour),
 		}
 	}
 
