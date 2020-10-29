@@ -299,7 +299,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				if resp.StatusCode == http.StatusNotFound {
 					continue
 				}
-				return "", ocispec.Descriptor{}, errors.Errorf("unexpected status code %v: %v", u, resp.Status)
+				return "", ocispec.Descriptor{}, getResponseErr(ctx, req, resp)
 			}
 			size := resp.ContentLength
 			contentType := getManifestMediaType(resp)
