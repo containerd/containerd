@@ -257,8 +257,25 @@ func (errs *Errors) UnmarshalJSON(data []byte) error {
 		Errors []Error `json:"errors"`
 	}
 
-	if err := json.Unmarshal(data, &tmpErrs); err != nil {
-		return err
+	if err := json.Unmarshal(data, &tmpErrs); err != nil || len(tmpErrs.Errors) == 0 {
+		var e Error
+		// Maybe it's just a single error object
+		if err2 := json.Unmarshal(data, &e); err2 == nil && e.Code != 0 {
+			tmpErrs.Errors = append(tmpErrs.Errors, e)
+		} else {
+			// last try
+			// This is from https://github.com/docker/distribution/blob/749f6afb4572201e3c37325d0ffedb6f32be8950/registry/client/errors.go#L48-L52
+			var e2 struct {
+				Details string      `json:"details"`
+				Error   interface{} `json:"error"`
+			}
+			if err2 := json.Unmarshal(data, &e2); err2 != nil {
+				return err2
+			}
+			e.Message = e2.Details
+			e.Detail = e2.Error
+			tmpErrs.Errors = append(tmpErrs.Errors, e)
+		}
 	}
 
 	var newErrs Errors
