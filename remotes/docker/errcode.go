@@ -254,7 +254,7 @@ func (errs Errors) MarshalJSON() ([]byte, error) {
 // Error or ErrorCode
 func (errs *Errors) UnmarshalJSON(data []byte) error {
 	var tmpErrs struct {
-		Errors []Error
+		Errors []Error `json:"errors"`
 	}
 
 	if err := json.Unmarshal(data, &tmpErrs); err != nil {
