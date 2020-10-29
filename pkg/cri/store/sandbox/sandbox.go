@@ -21,7 +21,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/pkg/cri/store/label"
-	"github.com/docker/docker/pkg/truncindex"
+	"github.com/containerd/containerd/pkg/cri/store/truncindex"
 
 	"github.com/containerd/containerd/pkg/cri/store"
 	"github.com/containerd/containerd/pkg/netns"
