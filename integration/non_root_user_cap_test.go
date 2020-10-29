@@ -66,7 +66,7 @@ func TestNonRootUserCap(t *testing.T) {
 			cnConfig := ContainerConfig(
 				containerName,
 				testImage,
-				WithCommand("ls", "/"),
+				WithCommand("ls", "."),
 				WithLogPath(containerName),
 				WithRunAsUser(test.uid),
 			)
