@@ -123,6 +123,10 @@ var (
 			Usage: "runtime name",
 			Value: defaults.DefaultRuntime,
 		},
+		cli.StringFlag{
+			Name:  "runtime-config-path",
+			Usage: "optional runtime config path",
+		},
 		cli.BoolFlag{
 			Name:  "tty,t",
 			Usage: "allocate a TTY for the container",
