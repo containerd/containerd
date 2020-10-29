@@ -109,7 +109,8 @@ version = 2
     # disable_snapshot_annotations disables to pass additional annotations (image
     # related information) to snapshotters. These annotations are required by
     # stargz snapshotter (https://github.com/containerd/stargz-snapshotter)
-    disable_snapshot_annotations = false
+    # changed to default true with https://github.com/containerd/containerd/pull/4665 and subsequent service refreshes.
+    disable_snapshot_annotations = true
 
     # discard_unpacked_layers allows GC to remove layers from the content store after
     # successfully unpacking these layers to the snapshotter.
@@ -247,10 +248,10 @@ version = 2
     # key_model defines the name of the key model used for how the cri obtains
     # keys used for decryption of encrypted container images.
     # The [decryption document](https://github.com/containerd/cri/blob/master/docs/decryption.md)
-    # contains additional information about the key models available. 
+    # contains additional information about the key models available.
     #
     # Set of available string options: {"", "node"}
-    # Omission of this field defaults to the empty string "", which indicates no key model, 
+    # Omission of this field defaults to the empty string "", which indicates no key model,
     # disabling image decryption.
     #
     # In order to use the decryption feature, additional configurations must be made.
