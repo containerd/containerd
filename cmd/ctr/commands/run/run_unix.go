@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/contrib/nvidia"
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/oci"
+	crioptions "github.com/containerd/containerd/pkg/cri/runtimeoptions/v1"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -300,6 +301,12 @@ func getRuntimeOptions(context *cli.Context) (interface{}, error) {
 
 	if context.String("runtime") == "io.containerd.runc.v2" {
 		return getRuncOptions(context)
+	}
+
+	if configPath := context.String("runtime-config-path"); configPath != "" {
+		return &crioptions.Options{
+			ConfigPath: configPath,
+		}, nil
 	}
 
 	return nil, nil
