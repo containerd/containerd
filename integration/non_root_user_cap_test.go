@@ -20,6 +20,7 @@ package integration
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,16 +29,16 @@ import (
 
 func TestNonRootUserCap(t *testing.T) {
 	for name, test := range map[string]struct {
-		uid     int64
-		startOK bool
+		uid   int64
+		runOK bool
 	}{
 		"shouldn't be able to run test container, with a private workdir that is accessible to nobody, as non-root user": {
-			uid:     1234,
-			startOK: false,
+			uid:   1234,
+			runOK: false,
 		},
 		"should be able to run test container, with a private workdir that is accessible to nobody, as root user": {
-			uid:     0,
-			startOK: true,
+			uid:   0,
+			runOK: true,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -73,11 +74,35 @@ func TestNonRootUserCap(t *testing.T) {
 			cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
 			require.NoError(t, err)
 
+			// TODO: make this idiomatic versus the other integration tests
 			t.Log("Start the container")
-			if test.startOK {
-				require.NoError(t, runtimeService.StartContainer(cn))
+			err = runtimeService.StartContainer(cn)
+			if test.runOK && err != nil {
+				require.NoError(t, err)
+			}
+
+			t.Log("Wait for container exit")
+			require.NoError(t, Eventually(func() (bool, error) {
+				s, err := runtimeService.ContainerStatus(cn)
+				if err != nil {
+					return false, err
+				}
+				if s.GetState() == runtime.ContainerState_CONTAINER_EXITED {
+					return true, nil
+				}
+				return false, nil
+			}, time.Second, 30*time.Second))
+
+			s, err := runtimeService.ContainerStatus(cn)
+			require.NoError(t, err)
+			if test.runOK {
+				if s.ExitCode != 0 {
+					t.Fatal("Expected success but non zero exit")
+				}
 			} else {
-				require.Error(t, runtimeService.StartContainer(cn))
+				if s.ExitCode == 0 {
+					t.Fatal("Expected failure but exited zero")
+				}
 			}
 		})
 	}
