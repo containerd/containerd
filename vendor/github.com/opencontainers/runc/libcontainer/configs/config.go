@@ -92,6 +92,9 @@ type Config struct {
 	// Path to a directory containing the container's root filesystem.
 	Rootfs string `json:"rootfs"`
 
+	// Umask is the umask to use inside of the container.
+	Umask *uint32 `json:"umask"`
+
 	// Readonlyfs will remount the container's rootfs as readonly where only externally mounted
 	// bind mounts are writtable.
 	Readonlyfs bool `json:"readonlyfs"`

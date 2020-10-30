@@ -127,6 +127,9 @@ type Resources struct {
 	// CpuWeight sets a proportional bandwidth limit.
 	CpuWeight uint64 `json:"cpu_weight"`
 
+	// Unified is cgroupv2-only key-value map.
+	Unified map[string]string `json:"unified"`
+
 	// SkipDevices allows to skip configuring device permissions.
 	// Used by e.g. kubelet while creating a parent cgroup (kubepods)
 	// common for many containers.
