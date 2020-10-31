@@ -331,7 +331,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	//
 	// TaskOOM from containerd may come before sandbox is added to store,
 	// but we don't care about sandbox TaskOOM right now, so it is fine.
-	c.eventMonitor.startExitMonitor(context.Background(), id, task.Pid(), exitCh)
+	c.eventMonitor.startSandboxExitMonitor(context.Background(), id, task.Pid(), exitCh)
 
 	return &runtime.RunPodSandboxResponse{PodSandboxId: id}, nil
 }

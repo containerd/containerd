@@ -88,7 +88,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 		}
 
 		exitCtx, exitCancel := context.WithCancel(context.Background())
-		stopCh := c.eventMonitor.startExitMonitor(exitCtx, id, task.Pid(), exitCh)
+		stopCh := c.eventMonitor.startContainerExitMonitor(exitCtx, id, task.Pid(), exitCh)
 		defer func() {
 			exitCancel()
 			// This ensures that exit monitor is stopped before

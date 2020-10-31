@@ -50,17 +50,12 @@ const (
 	// Add a timeout for each event handling, events that timeout will be requeued and
 	// handled again in the future.
 	handleEventTimeout = 10 * time.Second
-
-	exitChannelSize = 1024
 )
 
 // eventMonitor monitors containerd event and updates internal state correspondingly.
-// TODO(random-liu): Handle event for each container in a separate goroutine.
 type eventMonitor struct {
-	c  *criService
-	ch <-chan *events.Envelope
-	// exitCh receives container/sandbox exit events from exit monitors.
-	exitCh  chan *eventtypes.TaskExit
+	c       *criService
+	ch      <-chan *events.Envelope
 	errCh   <-chan error
 	ctx     context.Context
 	cancel  context.CancelFunc
@@ -68,6 +63,9 @@ type eventMonitor struct {
 }
 
 type backOff struct {
+	// queuePoolMu is mutex used to protect the queuePool map
+	queuePoolMu sync.Mutex
+
 	queuePool map[string]*backOffQueue
 	// tickerMu is mutex used to protect the ticker.
 	tickerMu      sync.Mutex
@@ -93,7 +91,6 @@ func newEventMonitor(c *criService) *eventMonitor {
 		c:       c,
 		ctx:     ctx,
 		cancel:  cancel,
-		exitCh:  make(chan *eventtypes.TaskExit, exitChannelSize),
 		backOff: newBackOff(),
 	}
 }
@@ -109,8 +106,8 @@ func (em *eventMonitor) subscribe(subscriber events.Subscriber) {
 	em.ch, em.errCh = subscriber.Subscribe(em.ctx, filters...)
 }
 
-// startExitMonitor starts an exit monitor for a given container/sandbox.
-func (em *eventMonitor) startExitMonitor(ctx context.Context, id string, pid uint32, exitCh <-chan containerd.ExitStatus) <-chan struct{} {
+// startSandboxExitMonitor starts an exit monitor for a given sandbox.
+func (em *eventMonitor) startSandboxExitMonitor(ctx context.Context, id string, pid uint32, exitCh <-chan containerd.ExitStatus) <-chan struct{} {
 	stopCh := make(chan struct{})
 	go func() {
 		defer close(stopCh)
@@ -118,17 +115,93 @@ func (em *eventMonitor) startExitMonitor(ctx context.Context, id string, pid uin
 		case exitRes := <-exitCh:
 			exitStatus, exitedAt, err := exitRes.Result()
 			if err != nil {
-				logrus.WithError(err).Errorf("Failed to get task exit status for %q", id)
+				logrus.WithError(err).Errorf("failed to get task exit status for %q", id)
 				exitStatus = unknownExitCode
 				exitedAt = time.Now()
 			}
-			em.exitCh <- &eventtypes.TaskExit{
+
+			e := &eventtypes.TaskExit{
 				ContainerID: id,
 				ID:          id,
 				Pid:         pid,
 				ExitStatus:  exitStatus,
 				ExitedAt:    exitedAt,
 			}
+
+			logrus.Debugf("received exit event %+v", e)
+
+			err = func() error {
+				dctx := ctrdutil.NamespacedContext()
+				dctx, dcancel := context.WithTimeout(dctx, handleEventTimeout)
+				defer dcancel()
+
+				sb, err := em.c.sandboxStore.Get(e.ID)
+				if err == nil {
+					if err := handleSandboxExit(dctx, e, sb); err != nil {
+						return err
+					}
+					return nil
+				} else if err != store.ErrNotExist {
+					return errors.Wrapf(err, "failed to get sandbox %s", e.ID)
+				}
+				return nil
+			}()
+			if err != nil {
+				logrus.WithError(err).Errorf("failed to handle sandbox TaskExit event %+v", e)
+				em.backOff.enBackOff(id, e)
+			}
+			return
+		case <-ctx.Done():
+		}
+	}()
+	return stopCh
+}
+
+// startContainerExitMonitor starts an exit monitor for a given container.
+func (em *eventMonitor) startContainerExitMonitor(ctx context.Context, id string, pid uint32, exitCh <-chan containerd.ExitStatus) <-chan struct{} {
+	stopCh := make(chan struct{})
+	go func() {
+		defer close(stopCh)
+		select {
+		case exitRes := <-exitCh:
+			exitStatus, exitedAt, err := exitRes.Result()
+			if err != nil {
+				logrus.WithError(err).Errorf("failed to get task exit status for %q", id)
+				exitStatus = unknownExitCode
+				exitedAt = time.Now()
+			}
+
+			e := &eventtypes.TaskExit{
+				ContainerID: id,
+				ID:          id,
+				Pid:         pid,
+				ExitStatus:  exitStatus,
+				ExitedAt:    exitedAt,
+			}
+
+			logrus.Debugf("received exit event %+v", e)
+
+			err = func() error {
+				dctx := ctrdutil.NamespacedContext()
+				dctx, dcancel := context.WithTimeout(dctx, handleEventTimeout)
+				defer dcancel()
+
+				cntr, err := em.c.containerStore.Get(e.ID)
+				if err == nil {
+					if err := handleContainerExit(dctx, e, cntr); err != nil {
+						return err
+					}
+					return nil
+				} else if err != store.ErrNotExist {
+					return errors.Wrapf(err, "failed to get container %s", e.ID)
+				}
+				return nil
+			}()
+			if err != nil {
+				logrus.WithError(err).Errorf("failed to handle container TaskExit event %+v", e)
+				em.backOff.enBackOff(id, e)
+			}
+			return
 		case <-ctx.Done():
 		}
 	}()
@@ -157,9 +230,16 @@ func convertEvent(e *gogotypes.Any) (string, interface{}, error) {
 	return id, evt, nil
 }
 
-// start starts the event monitor which monitors and handles all subscribed events. It returns
-// an error channel for the caller to wait for stop errors from the event monitor.
-// start must be called after subscribe.
+// start starts the event monitor which monitors and handles all subscribed events.
+// It returns an error channel for the caller to wait for stop errors from the
+// event monitor.
+//
+// NOTE:
+// 1. start must be called after subscribe.
+// 2. The task exit event has been handled in individual startSandboxExitMonitor
+//    or startContainerExitMonitor goroutine at the first. If the goroutine fails,
+//    it puts the event into backoff retry queue and event monitor will handle
+//    it later.
 func (em *eventMonitor) start() <-chan error {
 	errCh := make(chan error)
 	if em.ch == nil || em.errCh == nil {
@@ -170,18 +250,6 @@ func (em *eventMonitor) start() <-chan error {
 		defer close(errCh)
 		for {
 			select {
-			case e := <-em.exitCh:
-				logrus.Debugf("Received exit event %+v", e)
-				id := e.ID
-				if em.backOff.isInBackOff(id) {
-					logrus.Infof("Events for %q is in backoff, enqueue event %+v", id, e)
-					em.backOff.enBackOff(id, e)
-					break
-				}
-				if err := em.handleEvent(e); err != nil {
-					logrus.WithError(err).Errorf("Failed to handle exit event %+v for %s", e, id)
-					em.backOff.enBackOff(id, e)
-				}
 			case e := <-em.ch:
 				logrus.Debugf("Received containerd event timestamp - %v, namespace - %q, topic - %q", e.Timestamp, e.Namespace, e.Topic)
 				if e.Namespace != constants.K8sContainerdNamespace {
@@ -388,6 +456,9 @@ func newBackOff() *backOff {
 }
 
 func (b *backOff) getExpiredIDs() []string {
+	b.queuePoolMu.Lock()
+	defer b.queuePoolMu.Unlock()
+
 	var ids []string
 	for id, q := range b.queuePool {
 		if q.isExpire() {
@@ -398,6 +469,9 @@ func (b *backOff) getExpiredIDs() []string {
 }
 
 func (b *backOff) isInBackOff(key string) bool {
+	b.queuePoolMu.Lock()
+	defer b.queuePoolMu.Unlock()
+
 	if _, ok := b.queuePool[key]; ok {
 		return true
 	}
@@ -406,6 +480,9 @@ func (b *backOff) isInBackOff(key string) bool {
 
 // enBackOff start to backOff and put event to the tail of queue
 func (b *backOff) enBackOff(key string, evt interface{}) {
+	b.queuePoolMu.Lock()
+	defer b.queuePoolMu.Unlock()
+
 	if queue, ok := b.queuePool[key]; ok {
 		queue.events = append(queue.events, evt)
 		return
@@ -415,6 +492,9 @@ func (b *backOff) enBackOff(key string, evt interface{}) {
 
 // enBackOff get out the whole queue
 func (b *backOff) deBackOff(key string) *backOffQueue {
+	b.queuePoolMu.Lock()
+	defer b.queuePoolMu.Unlock()
+
 	queue := b.queuePool[key]
 	delete(b.queuePool, key)
 	return queue
@@ -422,6 +502,9 @@ func (b *backOff) deBackOff(key string) *backOffQueue {
 
 // enBackOff start to backOff again and put events to the queue
 func (b *backOff) reBackOff(key string, events []interface{}, oldDuration time.Duration) {
+	b.queuePoolMu.Lock()
+	defer b.queuePoolMu.Unlock()
+
 	duration := 2 * oldDuration
 	if duration > b.maxDuration {
 		duration = b.maxDuration

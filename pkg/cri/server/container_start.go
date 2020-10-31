@@ -148,10 +148,8 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		return nil, errors.Wrapf(err, "failed to update container %q state", id)
 	}
 
-	// start the monitor after updating container state, this ensures that
-	// event monitor receives the TaskExit event and update container state
-	// after this.
-	c.eventMonitor.startExitMonitor(context.Background(), id, task.Pid(), exitCh)
+	// It handles the TaskExit event and update container state after this.
+	c.eventMonitor.startContainerExitMonitor(context.Background(), id, task.Pid(), exitCh)
 
 	return &runtime.StartContainerResponse{}, nil
 }
