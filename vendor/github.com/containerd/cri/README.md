@@ -1,16 +1,24 @@
+# Moved to [`github.com/containerd/containerd/pkg/cri`](https://github.com/containerd/containerd/tree/master/pkg/cri)
+
+On October 7, 2020, the contents of this repo were merged into [the `containerd/containerd` repo](https://github.com/containerd/cri).
+For example, the source code previously stored under [`containerd/cri/pkg`](https://github.com/containerd/cri/tree/release/1.4/pkg)
+was moved to [`containerd/containerd/pkg/cri` package](https://github.com/containerd/containerd/tree/master/pkg/cri).
+
+**Pull requests are no longer accepted in the master branch of this repo.**
+
+Bug-fix PRs for `release/1.3` and `release/1.4` branches are still accepted in this repo.
+However, the master branch for `containerd/cri` integration work is now located in the `containerd/containerd` repository,
+and as such new commits should be merged there.
+
+This repo will be archived after the EOL of containerd 1.4.
+
+- - -
+
 # cri
 <p align="center">
 <img src="https://kubernetes.io/images/favicon.png" width="50" height="50">
 <img src="https://containerd.io/img/logos/icon/black/containerd-icon-black.png" width="50" >
 </p>
-
-*Note: The standalone `cri-containerd` binary is end-of-life. `cri-containerd` is
-transitioning from a standalone binary that talks to containerd to a plugin within
-containerd. This github branch is for the `cri` plugin. See
-[standalone-cri-containerd branch](https://github.com/containerd/cri/tree/standalone-cri-containerd)
-for information about the standalone version of `cri-containerd`.*
-
-*Note: You need to [drain your node](https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/) before upgrading from standalone `cri-containerd` to containerd with `cri` plugin.*
 
 [![Build Status](https://api.travis-ci.org/containerd/cri.svg?style=flat-square)](https://travis-ci.org/containerd/cri)
 [![Go Report Card](https://goreportcard.com/badge/github.com/containerd/cri)](https://goreportcard.com/report/github.com/containerd/cri)
@@ -36,8 +44,9 @@ See [test dashboard](https://k8s-testgrid.appspot.com/sig-node-containerd)
 |     v1.0.0-alpha.x     |                    |      1.7, 1.8      |   v1alpha1  |
 |      v1.0.0-beta.x     |                    |        1.9         |   v1alpha1  |
 |       End-Of-Life      | v1.1 (End-Of-Life) |        1.10+       |   v1alpha2  |
-|                        |        v1.2        |        1.10+       |   v1alpha2  |
+|                        |  v1.2 (Extended)   |        1.10+       |   v1alpha2  |
 |                        |        v1.3        |        1.12+       |   v1alpha2  |
+|                        |        v1.4        |      1.19+ (rc)    |   v1alpha2  |
 
 **Note:** The support table above specifies the Kubernetes Version that was supported at time of release of the containerd - cri integration.
 
@@ -45,8 +54,9 @@ The following is the current support table for containerd CRI integration taking
 
 | Containerd Version | Kubernetes Version | CRI Version |
 |:------------------:|:------------------:|:-----------:|
-|        v1.2        |        1.14+       |   v1alpha2  |
-|        v1.3        |        1.14+       |   v1alpha2  |
+|        v1.2        |        1.15+       |   v1alpha2  |
+|        v1.3        |        1.15+       |   v1alpha2  |
+|        v1.4        |      1.19+ (rc)    |   v1alpha2  |
 
 ## Production Quality Cluster on GCE
 For a production quality cluster on GCE brought up with `kube-up.sh` refer [here](docs/kube-up.md).
