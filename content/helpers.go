@@ -229,6 +229,10 @@ func seekReader(r io.Reader, offset, size int64) (io.Reader, error) {
 	return r, nil
 }
 
+// copyWithBuffer is very similar to  io.CopyBuffer https://golang.org/pkg/io/#CopyBuffer
+// but instead of using Read to read from the src, we use ReadAtLeast to make sure we have
+// a full buffer before we do a write operation to dst to reduce overheads associated
+// with the write operations of small buffers.
 func copyWithBuffer(dst io.Writer, src io.Reader) (written int64, err error) {
 	// If the reader has a WriteTo method, use it to do the copy.
 	// Avoids an allocation and a copy.
@@ -259,6 +263,8 @@ func copyWithBuffer(dst io.Writer, src io.Reader) (written int64, err error) {
 			}
 		}
 		if er != nil {
+			// If an EOF happens after reading fewer than the requested bytes,
+			// ReadAtLeast returns ErrUnexpectedEOF.
 			if er != io.EOF && er != io.ErrUnexpectedEOF {
 				err = er
 			}
