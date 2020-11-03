@@ -182,11 +182,15 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 	if !c.config.DisableProcMount {
 		// Apply masked paths if specified.
 		// If the container is privileged, this will be cleared later on.
-		specOpts = append(specOpts, oci.WithMaskedPaths(securityContext.GetMaskedPaths()))
+		if maskedPaths := securityContext.GetMaskedPaths(); maskedPaths != nil {
+			specOpts = append(specOpts, oci.WithMaskedPaths(maskedPaths))
+		}
 
 		// Apply readonly paths if specified.
 		// If the container is privileged, this will be cleared later on.
-		specOpts = append(specOpts, oci.WithReadonlyPaths(securityContext.GetReadonlyPaths()))
+		if readonlyPaths := securityContext.GetReadonlyPaths(); readonlyPaths != nil {
+			specOpts = append(specOpts, oci.WithReadonlyPaths(readonlyPaths))
+		}
 	}
 
 	if securityContext.GetPrivileged() {
