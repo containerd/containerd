@@ -311,8 +311,10 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
       - name: CRI Integration Test
+        env:
+          TEST_RUNTIME: ${{ matrix.runtime }}
         run: |
-          make cri-integration
+          CONTAINERD_RUNTIME=$TEST_RUNTIME make cri-integration
         working-directory: src/github.com/containerd/containerd
 
       - name: cri-tools critest
