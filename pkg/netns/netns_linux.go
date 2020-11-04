@@ -40,8 +40,8 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/pkg/symlink"
 	cnins "github.com/containernetworking/plugins/pkg/ns"
+	"github.com/moby/sys/symlink"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
