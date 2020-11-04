@@ -325,10 +325,10 @@ jobs:
           mkdir -p ${BDIR}/{root,state}
           cat > ${BDIR}/config.toml <<EOF
             [plugins.cri.containerd.default_runtime]
-              runtime_type = \"${TEST_RUNTIME}\"
+              runtime_type = "${TEST_RUNTIME}"
           EOF
           ls /etc/cni/net.d
-          sudo PATH=$PATH BDIR=$BDIR /usr/local/bin/containerd -a ${BDIR}/c.sock -root ${BDIR}/root -state ${BDIR}/state -log-level debug &> ${BDIR}/containerd-cri.log &
+          sudo PATH=$PATH BDIR=$BDIR /usr/local/bin/containerd -a ${BDIR}/c.sock --config ${BDIR}/config.toml --root ${BDIR}/root --state ${BDIR}/state --log-level debug &> ${BDIR}/containerd-cri.log &
           sudo PATH=$PATH BDIR=$BDIR /usr/local/bin/ctr -a ${BDIR}/c.sock version
           sudo PATH=$PATH BDIR=$BDIR GOPATH=$GOPATH critest --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8
           TEST_RC=$?
