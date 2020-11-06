@@ -27,6 +27,7 @@ import (
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/snapshots"
 	cni "github.com/containerd/go-cni"
 	"github.com/containerd/nri"
 	v1 "github.com/containerd/nri/types/v1"
@@ -45,7 +46,6 @@ import (
 	"github.com/containerd/containerd/pkg/cri/util"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/pkg/netns"
-	"github.com/containerd/containerd/snapshots"
 	selinux "github.com/opencontainers/selinux/go-selinux"
 )
 
@@ -204,7 +204,6 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate runtime options")
 	}
-
 	snapshotterOpt := snapshots.WithLabels(snapshots.FilterInheritedLabels(config.Annotations))
 	opts := []containerd.NewContainerOpts{
 		containerd.WithSnapshotter(c.config.ContainerdConfig.Snapshotter),
@@ -349,14 +348,30 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	return &runtime.RunPodSandboxResponse{PodSandboxId: id}, nil
 }
 
+// getNetworkPlugin returns the network plugin to be used by the runtime class
+// defaults to the global CNI options in the CRI config
+func (c *criService) getNetworkPlugin(runtimeClass string) cni.CNI {
+	if c.netPlugin == nil {
+		return nil
+	}
+	i, ok := c.netPlugin[runtimeClass]
+	if !ok {
+		if i, ok = c.netPlugin[defaultNetworkPlugin]; !ok {
+			return nil
+		}
+	}
+	return i
+}
+
 // setupPodNetwork setups up the network for a pod
 func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.Sandbox) error {
 	var (
-		id     = sandbox.ID
-		config = sandbox.Config
-		path   = sandbox.NetNSPath
+		id        = sandbox.ID
+		config    = sandbox.Config
+		path      = sandbox.NetNSPath
+		netPlugin = c.getNetworkPlugin(sandbox.RuntimeHandler)
 	)
-	if c.netPlugin == nil {
+	if netPlugin == nil {
 		return errors.New("cni config not initialized")
 	}
 
@@ -365,7 +380,7 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		return errors.Wrap(err, "get cni namespace options")
 	}
 
-	result, err := c.netPlugin.Setup(ctx, id, path, opts...)
+	result, err := netPlugin.Setup(ctx, id, path, opts...)
 	if err != nil {
 		return err
 	}

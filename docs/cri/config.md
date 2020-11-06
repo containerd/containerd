@@ -175,6 +175,18 @@ version = 2
       # Still running containers and restarted containers will still be using the original spec from which that container was created.
       base_runtime_spec = ""
 
+      # conf_dir is the directory in which the admin places a CNI conf.
+      # this allows a different CNI conf for the network stack when a different runtime is being used.
+      cni_conf_dir = "/etc/cni/net.d"
+
+      # cni_max_conf_num specifies the maximum number of CNI plugin config files to
+      # load from the CNI config directory. By default, only 1 CNI plugin config
+      # file will be loaded. If you want to load multiple CNI plugin config files
+      # set max_conf_num to the number desired. Setting cni_max_config_num to 0 is
+      # interpreted as no limit is desired and will result in all CNI plugin
+      # config files being loaded from the CNI config directory.
+      cni_max_conf_num = 1
+
       # 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options' is options specific to
       # "io.containerd.runc.v1" and "io.containerd.runc.v2". Its corresponding options type is:
       #   https://github.com/containerd/containerd/blob/v1.3.2/runtime/v2/runc/options/oci.pb.go#L26 .
