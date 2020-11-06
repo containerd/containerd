@@ -787,7 +787,7 @@ func TestNoDefaultRunMount(t *testing.T) {
 	}
 }
 
-func TestGenerateSeccompSpecOpts(t *testing.T) {
+func TestGenerateSeccompSecurityProfileSpecOpts(t *testing.T) {
 	for desc, test := range map[string]struct {
 		profile        string
 		privileged     bool
@@ -795,6 +795,7 @@ func TestGenerateSeccompSpecOpts(t *testing.T) {
 		specOpts       oci.SpecOpts
 		expectErr      bool
 		defaultProfile string
+		sp             *runtime.SecurityProfile
 	}{
 		"should return error if seccomp is specified when seccomp is not supported": {
 			profile:   runtimeDefault,
@@ -843,11 +844,66 @@ func TestGenerateSeccompSpecOpts(t *testing.T) {
 			defaultProfile: runtimeDefault,
 			specOpts:       seccomp.WithDefaultProfile(),
 		},
+		//-----------------------------------------------
+		// now buckets for the SecurityProfile variants
+		//-----------------------------------------------
+		"sp should return error if seccomp is specified when seccomp is not supported": {
+			disable:   true,
+			expectErr: true,
+			sp: &runtime.SecurityProfile{
+				ProfileType: runtime.SecurityProfile_RuntimeDefault,
+			},
+		},
+		"sp should not return error if seccomp is unconfined when seccomp is not supported": {
+			disable: true,
+			sp: &runtime.SecurityProfile{
+				ProfileType: runtime.SecurityProfile_Unconfined,
+			},
+		},
+		"sp should not set seccomp when privileged is true": {
+			privileged: true,
+			sp: &runtime.SecurityProfile{
+				ProfileType: runtime.SecurityProfile_RuntimeDefault,
+			},
+		},
+		"sp should not set seccomp when seccomp is unconfined": {
+			sp: &runtime.SecurityProfile{
+				ProfileType: runtime.SecurityProfile_Unconfined,
+			},
+		},
+		"sp should not set seccomp when seccomp is not specified": {},
+		"sp should set default seccomp when seccomp is runtime/default": {
+			specOpts: seccomp.WithDefaultProfile(),
+			sp: &runtime.SecurityProfile{
+				ProfileType: runtime.SecurityProfile_RuntimeDefault,
+			},
+		},
+		"sp should set specified profile when local profile is specified": {
+			specOpts: seccomp.WithProfile("test-profile"),
+			sp: &runtime.SecurityProfile{
+				ProfileType:  runtime.SecurityProfile_Localhost,
+				LocalhostRef: profileNamePrefix + "test-profile",
+			},
+		},
+		"sp should set specified profile when local profile is specified even without prefix": {
+			specOpts: seccomp.WithProfile("test-profile"),
+			sp: &runtime.SecurityProfile{
+				ProfileType:  runtime.SecurityProfile_Localhost,
+				LocalhostRef: "test-profile",
+			},
+		},
+		"sp should return error if specified profile is invalid": {
+			expectErr: true,
+			sp: &runtime.SecurityProfile{
+				ProfileType:  runtime.SecurityProfile_RuntimeDefault,
+				LocalhostRef: "test-profile",
+			},
+		},
 	} {
 		t.Run(fmt.Sprintf("TestCase %q", desc), func(t *testing.T) {
 			cri := &criService{}
 			cri.config.UnsetSeccompProfile = test.defaultProfile
-			specOpts, err := cri.generateSeccompSpecOpts(test.profile, test.privileged, !test.disable)
+			specOpts, err := cri.generateSeccompSpecOpts(test.sp, test.profile, test.privileged, !test.disable)
 			assert.Equal(t,
 				reflect.ValueOf(test.specOpts).Pointer(),
 				reflect.ValueOf(specOpts).Pointer())
@@ -867,6 +923,7 @@ func TestGenerateApparmorSpecOpts(t *testing.T) {
 		disable    bool
 		specOpts   oci.SpecOpts
 		expectErr  bool
+		sp         *runtime.SecurityProfile
 	}{
 		"should return error if apparmor is specified when apparmor is not supported": {
 			profile:   runtimeDefault,
@@ -918,9 +975,71 @@ func TestGenerateApparmorSpecOpts(t *testing.T) {
 			profile:   "test-profile",
 			expectErr: true,
 		},
+		//--------------------------------------
+		// buckets for SecurityProfile struct
+		//--------------------------------------
+		"sp should return error if apparmor is specified when apparmor is not supported": {
+			disable:   true,
+			expectErr: true,
+			sp: &runtime.SecurityProfile{
+				ProfileType: runtime.SecurityProfile_RuntimeDefault,
+			},
+		},
+		"sp should not return error if apparmor is unconfined when apparmor is not supported": {
+			disable: true,
+			sp: &runtime.SecurityProfile{
+				ProfileType: runtime.SecurityProfile_Unconfined,
+			},
+		},
+		"sp should not apparmor when apparmor is unconfined": {
+			sp: &runtime.SecurityProfile{
+				ProfileType: runtime.SecurityProfile_Unconfined,
+			},
+		},
+		"sp should not apparmor when apparmor is unconfined and privileged is true": {
+			privileged: true,
+			sp: &runtime.SecurityProfile{
+				ProfileType: runtime.SecurityProfile_Unconfined,
+			},
+		},
+		"sp should set default apparmor when apparmor is runtime/default": {
+			specOpts: apparmor.WithDefaultProfile(appArmorDefaultProfileName),
+			sp: &runtime.SecurityProfile{
+				ProfileType: runtime.SecurityProfile_RuntimeDefault,
+			},
+		},
+		"sp should not apparmor when apparmor is default and privileged is true": {
+			privileged: true,
+			sp: &runtime.SecurityProfile{
+				ProfileType: runtime.SecurityProfile_RuntimeDefault,
+			},
+		},
+		"sp should return error when undefined local profile is specified": {
+			expectErr: true,
+			sp: &runtime.SecurityProfile{
+				ProfileType:  runtime.SecurityProfile_Localhost,
+				LocalhostRef: profileNamePrefix + "test-profile",
+			},
+		},
+		"sp should return error when undefined local profile is specified even without prefix": {
+			profile:   profileNamePrefix + "test-profile",
+			expectErr: true,
+			sp: &runtime.SecurityProfile{
+				ProfileType:  runtime.SecurityProfile_Localhost,
+				LocalhostRef: "test-profile",
+			},
+		},
+		"sp should return error when undefined local profile is specified and privileged is true": {
+			privileged: true,
+			expectErr:  true,
+			sp: &runtime.SecurityProfile{
+				ProfileType:  runtime.SecurityProfile_Localhost,
+				LocalhostRef: profileNamePrefix + "test-profile",
+			},
+		},
 	} {
 		t.Logf("TestCase %q", desc)
-		specOpts, err := generateApparmorSpecOpts(test.profile, test.privileged, !test.disable)
+		specOpts, err := generateApparmorSpecOpts(test.sp, test.profile, test.privileged, !test.disable)
 		assert.Equal(t,
 			reflect.ValueOf(test.specOpts).Pointer(),
 			reflect.ValueOf(specOpts).Pointer())

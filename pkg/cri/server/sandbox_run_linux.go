@@ -165,7 +165,8 @@ func (c *criService) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 		specOpts        []oci.SpecOpts
 	)
 	seccompSpecOpts, err := c.generateSeccompSpecOpts(
-		securityContext.GetSeccompProfilePath(),
+		securityContext.GetSeccomp(),
+		securityContext.GetSeccompProfilePath(), // nolint:staticcheck deprecated but we don't want to remove yet
 		securityContext.GetPrivileged(),
 		c.seccompEnabled())
 	if err != nil {
