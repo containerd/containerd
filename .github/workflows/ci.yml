@@ -347,15 +347,11 @@ jobs:
       - name: Integration
         env:
           RUNC_FLAVOR: ${{ matrix.runc }}
-          # SELinux: replace Permissive with Enforcing after https://github.com/containers/container-selinux/pull/98
-          # is merged and the package becomes generally available.
-          SELINUX: Permissive
+          SELINUX: Enforcing
         run: vagrant up --provision-with=selinux,install-runc,test-integration
 
       - name: CRI test
         env:
           RUNC_FLAVOR: ${{ matrix.runc }}
-          # SELinux: replace Permissive with Enforcing after https://github.com/containers/container-selinux/pull/98
-          # is merged and the package becomes generally available.
-          SELINUX: Permissive
+          SELINUX: Enforcing
         run: vagrant up --provision-with=selinux,install-runc,test-cri
