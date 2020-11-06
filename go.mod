@@ -61,7 +61,7 @@ require (
 	k8s.io/apiserver v0.19.4
 	k8s.io/client-go v0.19.4
 	k8s.io/component-base v0.19.4
-	k8s.io/cri-api v0.19.4
+	k8s.io/cri-api 3990421b69a024ba452db5f6e4ae7d45d93a019a
 	k8s.io/klog/v2 v2.2.0
 	k8s.io/utils v0.0.0-20200729134348-d5654de09c73
 )
