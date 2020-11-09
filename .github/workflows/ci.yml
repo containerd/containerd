@@ -322,6 +322,22 @@ jobs:
           sudo GOPATH=$GOPATH GOPROXY=$GOPROXY TEST_RUNTIME=$TEST_RUNTIME RUNC_FLAVOR=$RUNC_FLAVOR TESTFLAGS_PARALLEL=1 make integration EXTRA_TESTFLAGS=-no-criu
         working-directory: src/github.com/containerd/containerd
 
+      # CRIU wouldn't work with overlay snapshotter yet.
+      # See https://github.com/containerd/containerd/pull/4708#issuecomment-724322294.
+      - name: CRIU Integration
+        env:
+          GOPROXY: direct
+          TEST_RUNTIME: ${{ matrix.runtime }}
+          RUNC_FLAVOR: ${{ matrix.runc }}
+        # crun doesn't have "checkpoint" command.
+        if: ${{ matrix.runc == 'runc' }}
+        run: |
+          sudo GOPATH=$GOPATH GOPROXY=$GOPROXY \
+          TEST_RUNTIME=$TEST_RUNTIME RUNC_FLAVOR=$RUNC_FLAVOR TESTFLAGS_PARALLEL=1 \
+          TEST_SNAPSHOTTER=native \
+          make integration EXTRA_TESTFLAGS='-run TestCheckpoint'
+        working-directory: src/github.com/containerd/containerd
+
       - name: CRI Integration Test
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
