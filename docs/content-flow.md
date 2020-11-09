@@ -5,7 +5,7 @@ In order to execute on that flow, containerd requires content and to manage it.
 
 This document describes how content flows into containerd, how it is managed, and where it exists
 at each stage in the process. We use an example of going from a known image
-[docker.io/library/redis:5.0.9](https://hub.docker.com/layers/redis/library/redis/5.0.9/images/sha256-4ff8940144391ecd5e1632d0c427d95f4a8d2bb4a72b7e3898733352350d9ab3?context=explore) to explore the
+[docker.io/library/redis:5.0.9](https://hub.docker.com/layers/redis/library/redis/5.0.9/images/sha256-4b7860fcaea5b9bbd6249c10a3dc02a5b9fb339e8aef17a542d6126a6af84d96?context=explore) to explore the
 flow of content.
 
 ## Content Areas
