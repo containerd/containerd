@@ -220,7 +220,7 @@ jobs:
   integration-linux:
     name: Linux Integration
     runs-on: ubuntu-18.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     needs: [project, linters, protos, man]
 
     strategy:
