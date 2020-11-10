@@ -31,7 +31,6 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/devices"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -1346,11 +1345,11 @@ func TestPrivilegedDevices(t *testing.T) {
 
 		hostDevicesRaw, err := devices.HostDevices()
 		assert.NoError(t, err)
-		var hostDevices []*libcontainerconfigs.Device
+		var hostDevices = make([]string, 0)
 		for _, dev := range hostDevicesRaw {
 			// https://github.com/containerd/cri/pull/1521#issuecomment-652807951
 			if dev.DeviceRule.Major != 0 {
-				hostDevices = append(hostDevices, dev)
+				hostDevices = append(hostDevices, dev.Path)
 			}
 		}
 
