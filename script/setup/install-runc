@@ -27,14 +27,7 @@ function install_runc() {
 	cd "$GOPATH"/src/github.com/opencontainers/runc
 	git checkout $RUNC_COMMIT
 	make BUILDTAGS='apparmor seccomp selinux' runc
-
-	USESUDO=${USESUDO:-false}
-	if ${USESUDO}; then
-	  SUDO='sudo -E'
-	else
-	  SUDO=''
-	fi
-	${SUDO} make install
+	make install
 }
 
 function install_crun() {

@@ -280,7 +280,7 @@ install-cri-deps: $(BINARIES)
 	@install -m 644 containerd.service ${CRIDIR}/etc/systemd/system
 	echo "CONTAINERD_VERSION: '$(VERSION:v%=%)'" | tee ${CRIDIR}/opt/containerd/cluster/version
 
-	DESTDIR=$(CRIDIR) USESUDO=false script/setup/install-runc
+	DESTDIR=$(CRIDIR) script/setup/install-runc
 	DESTDIR=$(CRIDIR) script/setup/install-cni
 	DESTDIR=$(CRIDIR) script/setup/install-critools
 
