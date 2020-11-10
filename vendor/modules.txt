@@ -50,7 +50,7 @@ github.com/Microsoft/hcsshim/test/functional/manifest
 github.com/beorn7/perks/quantile
 # github.com/cespare/xxhash/v2 v2.1.1
 github.com/cespare/xxhash/v2
-# github.com/cilium/ebpf v0.0.0-20200702112145-1c8d4c9ef775
+# github.com/cilium/ebpf v0.2.0
 github.com/cilium/ebpf
 github.com/cilium/ebpf/asm
 github.com/cilium/ebpf/internal
@@ -264,12 +264,11 @@ github.com/opencontainers/go-digest/digestset
 github.com/opencontainers/image-spec/identity
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/opencontainers/runc v1.0.0-rc92
+# github.com/opencontainers/runc v1.0.0-rc93
 ## explicit
-github.com/opencontainers/runc/libcontainer/configs
 github.com/opencontainers/runc/libcontainer/devices
 github.com/opencontainers/runc/libcontainer/user
-# github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6
+# github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d
 ## explicit
 github.com/opencontainers/runtime-spec/specs-go
 # github.com/opencontainers/selinux v1.8.0
@@ -308,7 +307,7 @@ github.com/sirupsen/logrus
 ## explicit
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
-# github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
+# github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635
 ## explicit
 github.com/syndtr/gocapability/capability
 # github.com/tchap/go-patricia v2.2.6+incompatible
@@ -340,7 +339,7 @@ golang.org/x/crypto/openpgp/packet
 golang.org/x/crypto/openpgp/s2k
 golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
+# golang.org/x/net v0.0.0-20201224014010-6772e930b67b
 ## explicit
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
