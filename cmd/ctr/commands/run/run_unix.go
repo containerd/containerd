@@ -27,6 +27,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/nvidia"
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/oci"
@@ -203,6 +204,17 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			} else {
 				opts = append(opts, seccomp.WithDefaultProfile())
 			}
+		}
+
+		if s := context.String("apparmor-default-profile"); len(s) > 0 {
+			opts = append(opts, apparmor.WithDefaultProfile(s))
+		}
+
+		if s := context.String("apparmor-profile"); len(s) > 0 {
+			if len(context.String("apparmor-default-profile")) > 0 {
+				return nil, fmt.Errorf("apparmor-profile conflicts with apparmor-default-profile")
+			}
+			opts = append(opts, apparmor.WithProfile(s))
 		}
 
 		if cpus := context.Float64("cpus"); cpus > 0.0 {
