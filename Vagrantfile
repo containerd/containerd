@@ -214,9 +214,6 @@ EOF
   #
   config.vm.provision "test-cri", type: "shell", run: "never" do |sh|
     sh.upload_path = "/tmp/test-cri"
-    sh.env = {
-        'CRITEST_ARGS': ENV['CRITEST_ARGS'],
-    }
     sh.inline = <<~SHELL
         #!/usr/bin/env bash
         source /etc/environment
@@ -239,7 +236,7 @@ EOF
         fi
         trap cleanup EXIT
         ctr version
-        critest --parallel=$(nproc) ${CRITEST_ARGS}
+        critest --parallel=$(nproc) --ginkgo.skip='HostIpc is true'
     SHELL
   end
 
