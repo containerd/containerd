@@ -32,7 +32,6 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/seccomp"
 	"github.com/containerd/containerd/pkg/seutil"
-	runcapparmor "github.com/opencontainers/runc/libcontainer/apparmor"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
@@ -141,8 +140,13 @@ func checkSelinuxLevel(level string) error {
 	return nil
 }
 
+// apparmorEnabled returns true if apparmor is enabled, supported by the host,
+// if apparmor_parser is installed, and if we are not running docker-in-docker.
 func (c *criService) apparmorEnabled() bool {
-	return runcapparmor.IsEnabled() && !c.config.DisableApparmor
+	if c.config.DisableApparmor {
+		return false
+	}
+	return hostSupportsAppArmor()
 }
 
 func (c *criService) seccompEnabled() bool {
