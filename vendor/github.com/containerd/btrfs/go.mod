@@ -1,5 +1,5 @@
 module github.com/containerd/btrfs
 
-go 1.13
+go 1.15
 
 require github.com/pkg/errors v0.8.1

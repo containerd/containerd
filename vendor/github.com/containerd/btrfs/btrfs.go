@@ -275,7 +275,7 @@ func SubvolCreate(path string) error {
 	if len(name) > C.BTRFS_PATH_NAME_MAX {
 		return errors.Errorf("%q too long for subvolume", name)
 	}
-	nameptr := (*[maxByteSliceSize]byte)(unsafe.Pointer(&args.name[0]))
+	nameptr := (*[maxByteSliceSize]byte)(unsafe.Pointer(&args.name[0]))[:C.BTRFS_PATH_NAME_MAX:C.BTRFS_PATH_NAME_MAX]
 	copy(nameptr[:C.BTRFS_PATH_NAME_MAX], []byte(name))
 
 	if err := ioctl(fp.Fd(), C.BTRFS_IOC_SUBVOL_CREATE, uintptr(unsafe.Pointer(&args))); err != nil {
@@ -311,7 +311,7 @@ func SubvolSnapshot(dst, src string, readonly bool) error {
 		return errors.Errorf("%q too long for subvolume", dstname)
 	}
 
-	nameptr := (*[maxByteSliceSize]byte)(unsafe.Pointer(name))
+	nameptr := (*[maxByteSliceSize]byte)(unsafe.Pointer(name))[:C.BTRFS_SUBVOL_NAME_MAX:C.BTRFS_SUBVOL_NAME_MAX]
 	copy(nameptr[:C.BTRFS_SUBVOL_NAME_MAX], []byte(dstname))
 
 	if readonly {
@@ -370,7 +370,7 @@ func SubvolDelete(path string) error {
 		return errors.Errorf("%q too long for subvolume", name)
 	}
 
-	nameptr := (*[maxByteSliceSize]byte)(unsafe.Pointer(&args.name[0]))
+	nameptr := (*[maxByteSliceSize]byte)(unsafe.Pointer(&args.name[0]))[:C.BTRFS_SUBVOL_NAME_MAX:C.BTRFS_SUBVOL_NAME_MAX]
 	copy(nameptr[:C.BTRFS_SUBVOL_NAME_MAX], []byte(name))
 
 	if err := ioctl(fp.Fd(), C.BTRFS_IOC_SNAP_DESTROY, uintptr(unsafe.Pointer(&args))); err != nil {
