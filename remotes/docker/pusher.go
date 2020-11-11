@@ -222,7 +222,7 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 	// TODO: Support chunked upload
 
 	pr, pw := io.Pipe()
-	respC := make(chan *http.Response, 1)
+	respC := make(chan response, 1)
 	body := ioutil.NopCloser(pr)
 
 	req.body = func() (io.ReadCloser, error) {
@@ -240,6 +240,7 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 		defer close(respC)
 		resp, err := req.do(ctx)
 		if err != nil {
+			respC <- response{err: err}
 			pr.CloseWithError(err)
 			return
 		}
@@ -251,7 +252,7 @@ func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (conten
 			log.G(ctx).WithField("resp", resp).WithField("body", string(err.(remoteserrors.ErrUnexpectedStatus).Body)).Debug("unexpected response")
 			pr.CloseWithError(err)
 		}
-		respC <- resp
+		respC <- response{Response: resp}
 	}()
 
 	return &pushWriter{
@@ -284,12 +285,17 @@ func getManifestPath(object string, dgst digest.Digest) []string {
 	return []string{"manifests", object}
 }
 
+type response struct {
+	*http.Response
+	err error
+}
+
 type pushWriter struct {
 	base *dockerBase
 	ref  string
 
 	pipe       *io.PipeWriter
-	responseC  <-chan *http.Response
+	responseC  <-chan response
 	isManifest bool
 
 	expected digest.Digest
@@ -339,8 +345,8 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 
 	// TODO: timeout waiting for response
 	resp := <-pw.responseC
-	if resp == nil {
-		return errors.New("no response")
+	if resp.err != nil {
+		return resp.err
 	}
 
 	// 201 is specified return status, some registries return
