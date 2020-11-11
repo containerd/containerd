@@ -408,7 +408,7 @@ in turn, depends on the next layer down, so it is protected from collection, and
 ### Container
 
 With the above in place, we know how to create an active snapshot that is useful for the container. We simply
-need to [https://godoc.org/github.com/containerd/containerd/snapshots#Snapshotter](Prepare()) the active snapshot,
+need to [Prepare()](https://godoc.org/github.com/containerd/containerd/snapshots#Snapshotter) the active snapshot,
 passing it an ID and the parent, in this case the top layer of committed snapshots.
 
 Thus, the steps are:
