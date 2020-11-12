@@ -201,7 +201,7 @@ message Mount {
 }
 
 // A NamespaceMode describes the intended namespace configuration for each
-// of the namespaces (Network, PID, IPC) in NamespaceOption. Runtimes should
+// of the namespaces (Network, PID, IPC, User) in NamespaceOption. Runtimes should
 // map these modes as appropriate for the technology underlying the runtime.
 enum NamespaceMode {
     // A POD namespace is common to all containers in a pod.
@@ -244,6 +244,12 @@ message NamespaceOption {
     // previously created in the same pod. It is not possible to specify different targets
     // for each namespace.
     string target_id = 4;
+    // User namespace for this container/sandbox.
+    // Note: There is currently no way to set CONTAINER scoped user namespace in the Kubernetes API.
+    // Namespaces currently set by the kubelet: POD, NODE
+    NamespaceMode user = 5;
+    // IDs mappings to use if the user NamespaceMode is POD
+    LinuxUserNamespaceConfig mapping = 6;
 }
 
 // Int64Value is the wrapper of int64.
@@ -1188,6 +1194,25 @@ message StatusResponse {
     // debug, e.g. plugins used by the container runtime.
     // It should only be returned non-empty when Verbose is true.
     map<string, string> info = 2;
+}
+
+// LinuxIDMapping represents a single user namespace mapping in Linux.
+message LinuxIDMapping {
+   // container_id is the starting ID for the mapping inside the container.
+   uint32 container_id = 1;
+   // host_id is the starting ID for the mapping on the host.
+   uint32 host_id = 2;
+   // size is the number of elements in the mapping.
+   uint32 size = 3;
+}
+
+// LinuxUserNamespaceConfig represents runtime's user-namespace configuration on a
+// Linux host.
+message LinuxUserNamespaceConfig {
+   // uid_mappings is an array of user ID mappings.
+   repeated LinuxIDMapping uid_mappings = 1;
+   // gid_mappings is an array of group ID mappings.
+   repeated LinuxIDMapping gid_mappings = 2;
 }
 
 message ImageFsInfoRequest {}
