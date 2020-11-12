@@ -193,11 +193,15 @@ func (p *Init) createCheckpointedState(r *CreateConfig, pidFile *pidFile) error 
 			ParentPath: r.ParentCheckpoint,
 		},
 		PidFile:     pidFile.Path(),
-		IO:          p.io.IO(),
 		NoPivot:     p.NoPivotRoot,
 		Detach:      true,
 		NoSubreaper: true,
 	}
+
+	if p.io != nil {
+		opts.IO = p.io.IO()
+	}
+
 	p.initState = &createdCheckpointState{
 		p:    p,
 		opts: opts,
