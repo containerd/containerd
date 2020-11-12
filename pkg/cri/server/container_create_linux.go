@@ -265,6 +265,34 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 				Type: runtimespec.CgroupNamespace,
 			}))
 	}
+
+	switch securityContext.GetNamespaceOptions().GetUser() {
+	case runtime.NamespaceMode_NODE:
+		specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.UserNamespace))
+	case runtime.NamespaceMode_POD:
+		specOpts = append(specOpts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.UserNamespace, Path: customopts.GetUserNamespace(sandboxPid)}))
+		mappings := securityContext.GetNamespaceOptions().GetIdMappings()
+		if mappings == nil {
+			return nil, errors.New("missing user namespace mappings")
+		}
+		uidMaps := make([]runtimespec.LinuxIDMapping, len(mappings.UidMappings))
+		for i, mapping := range mappings.UidMappings {
+			uidMaps[i] = runtimespec.LinuxIDMapping{
+				ContainerID: mapping.GetContainerId(),
+				HostID: mapping.GetHostId(),
+				Size: mapping.GetSize_(),
+			}
+		}
+		gidMaps := make([]runtimespec.LinuxIDMapping, len(mappings.GidMappings))
+		for i, mapping := range mappings.GidMappings {
+			gidMaps[i] = runtimespec.LinuxIDMapping{
+				ContainerID: mapping.GetContainerId(),
+				HostID: mapping.GetHostId(),
+				Size: mapping.GetSize_(),
+			}
+		}
+		specOpts = append(specOpts, oci.WithUserNamespace(uidMaps, gidMaps))
+	}
 	return c.runtimeSpec(id, ociRuntime.BaseRuntimeSpec, specOpts...)
 }
 

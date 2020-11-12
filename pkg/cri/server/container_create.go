@@ -182,6 +182,49 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	log.G(ctx).Debugf("Container %q spec: %#+v", id, spew.NewFormatter(spec))
 
 	snapshotterOpt := snapshots.WithLabels(snapshots.FilterInheritedLabels(config.Annotations))
+	securityContext := config.GetLinux().GetSecurityContext()
+
+	var snapshotterOption containerd.NewContainerOpts
+	switch securityContext.GetNamespaceOptions().GetUser() {
+	case runtime.NamespaceMode_CONTAINER:
+		return nil, errors.New("unsupported user namespace mode: CONTAINER")
+	case runtime.NamespaceMode_NODE:
+		snapshotterOption = customopts.WithNewSnapshot(id, containerdImage, snapshotterOpt)
+	case runtime.NamespaceMode_POD:
+		mappings := securityContext.GetNamespaceOptions().GetIdMappings()
+		if mappings == nil {
+			return nil, errors.New("missing user namespace mappings")
+		}
+		var uidFound bool
+		var uid uint32
+
+		for _, mapping := range mappings.UidMappings {
+			if mapping.GetContainerId() == 0 {
+				uid = mapping.GetHostId()
+				uidFound = true
+				break
+			}
+		}
+
+		var gidFound bool
+		var gid uint32
+		for _, mapping := range mappings.GidMappings {
+			if mapping.GetContainerId() == 0 {
+				gid = mapping.GetHostId()
+				gidFound = true
+				break
+			}
+		}
+
+		if !uidFound || !gidFound {
+			return nil, errors.New("root inside container not mapped to host")
+		}
+
+		snapshotterOption = customopts.WithRemappedSnapshot(id, containerdImage, uint32(uid), uint32(gid))
+	default:
+		return nil, errors.Wrapf(err, "invalid user namespace option %d for sandbox %q", securityContext.GetNamespaceOptions().GetUser(), id)
+	}
+
 	// Set snapshotter before any other options.
 	opts := []containerd.NewContainerOpts{
 		containerd.WithSnapshotter(c.config.ContainerdConfig.Snapshotter),
@@ -190,7 +233,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		// the runtime (runc) a chance to modify (e.g. to create mount
 		// points corresponding to spec.Mounts) before making the
 		// rootfs readonly (requested by spec.Root.Readonly).
-		customopts.WithNewSnapshot(id, containerdImage, snapshotterOpt),
+		snapshotterOption,
 	}
 	if len(volumeMounts) > 0 {
 		mountMap := make(map[string]string)
