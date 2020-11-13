@@ -180,8 +180,13 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		if !uidFound || !gidFound {
 			return nil, errors.New("root inside container not mapped to host")
 		}
+		// Upstream approach: performs recursive chown in the container image
+		//snapshotterOption = customopts.WithRemappedSnapshot(id, containerdImage, uint32(uid), uint32(gid))
 
-		snapshotterOption = customopts.WithRemappedSnapshot(id, containerdImage, uid, gid)
+		// TODO: Get also length.
+		// Problem: WithRemapperLabels accepts the same length for both mappings
+		snapshotterOpt1 := containerd.WithRemapperLabels(0, uid, 0, gid, 65536)
+		snapshotterOption = customopts.WithNewSnapshot(id, containerdImage, snapshotterOpt1)
 	default:
 		return nil, errors.Wrapf(err, "invalid user namespace option %d for sandbox %q", securityContext.GetNamespaceOptions().GetUser(), id)
 	}
