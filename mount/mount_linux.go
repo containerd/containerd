@@ -62,7 +62,7 @@ func (m *Mount) Mount(target string) error {
 		chdir, options = compactLowerdirOption(options)
 	}
 
-	flags, data := parseMountOptions(options)
+	flags, data, mapuid, mapgid := parseMountOptions(options)
 	if len(data) > pagesize {
 		return errors.Errorf("mount options is too long")
 	}
@@ -93,7 +93,15 @@ func (m *Mount) Mount(target string) error {
 	const broflags = unix.MS_BIND | unix.MS_RDONLY
 	if oflags&broflags == broflags {
 		// Remount the bind to apply read only.
-		return unix.Mount("", target, "", uintptr(oflags|unix.MS_REMOUNT), "")
+		if err := unix.Mount("", target, "", uintptr(oflags|unix.MS_REMOUNT), ""); err != nil {
+			return err
+		}
+	}
+
+	// id map mount
+	// consider only both at the same time to simplify logic
+	if mapuid != "" && mapgid != "" {
+		map_mount(mapuid, mapgid, target)
 	}
 	return nil
 }
@@ -186,10 +194,13 @@ func UnmountAll(mount string, flags int) error {
 
 // parseMountOptions takes fstab style mount options and parses them for
 // use with a standard mount() syscall
-func parseMountOptions(options []string) (int, string) {
+// returns flags, options, mapuid, mapgid
+func parseMountOptions(options []string) (int, string, string, string) {
 	var (
 		flag int
 		data []string
+		mapuid string
+		mapgid string
 	)
 	flags := map[string]struct {
 		clear bool
@@ -231,11 +242,15 @@ func parseMountOptions(options []string) (int, string) {
 			} else {
 				flag |= f.flag
 			}
+		} else if strings.HasPrefix(o, "mapuid=") {
+			mapuid = strings.TrimPrefix(o, "mapuid=")
+		} else if strings.HasPrefix(o, "mapgid=") {
+			mapgid = strings.TrimPrefix(o, "mapgid=")
 		} else {
 			data = append(data, o)
 		}
 	}
-	return flag, strings.Join(data, ",")
+	return flag, strings.Join(data, ","), mapuid, mapgid
 }
 
 // compactLowerdirOption updates overlay lowdir option and returns the common
