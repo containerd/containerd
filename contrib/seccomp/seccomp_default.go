@@ -232,6 +232,8 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"openat",
 				"openat2",
 				"pause",
+				"pidfd_open",
+				"pidfd_send_signal",
 				"pipe",
 				"pipe2",
 				"poll",
