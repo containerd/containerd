@@ -107,8 +107,6 @@ documentation.
 **timeouts**
 : Timeouts specified as a duration
 
- - **[plugins.cgroup]** has one option __no_prometheus__ (Default: **false**)
-
 <!-- [timeouts]
   "io.containerd.timeout.shim.cleanup" = "5s"
   "io.containerd.timeout.shim.load" = "5s"
