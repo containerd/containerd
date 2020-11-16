@@ -44,7 +44,7 @@ If you are interested in trying out containerd see our example at [Getting Start
 There are nightly builds available for download [here](https://github.com/containerd/containerd/actions?query=workflow%3ANightly).
 Binaries are generated from `master` branch every night for `Linux` and `Windows`.
 
-Please be aware: nightly builds might have critical bugs, it's not recommended for use in prodution and no support provided.
+Please be aware: nightly builds might have critical bugs, it's not recommended for use in production and no support provided.
 
 ## Runtime Requirements
 
@@ -184,7 +184,7 @@ status, err := task.Wait(context)
 
 ### Checkpoint and Restore
 
-If you have [criu](https://criu.org/Main_Page) installed on your machine you can checkpoint and restore containers and their tasks.  This allow you to clone and/or live migrate containers to other machines.
+If you have [criu](https://criu.org/Main_Page) installed on your machine you can checkpoint and restore containers and their tasks.  This allows you to clone and/or live migrate containers to other machines.
 
 ```go
 // checkpoint the task then push it to a registry
