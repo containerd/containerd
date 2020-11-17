@@ -75,10 +75,10 @@ jobs:
           [[ "${MOS}" =~ "windows" ]] && {
             os=windows
           }
-          echo "::set-env name=RELEASE_VER::${releasever}"
-          echo "::set-env name=GOPATH::${{ github.workspace }}"
-          echo "::set-env name=OS::${os}"
-          echo "::add-path::${{ github.workspace }}/bin"
+          echo "RELEASE_VER=${releasever}" >> $GITHUB_ENV
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "OS=${os}" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - name: Checkout containerd
         uses: actions/checkout@v2
