@@ -23,7 +23,13 @@ jobs:
           GOPATH: ${{ runner.workspace }}
           GO111MODULE: off
         with:
-          path: ./src/github.com/containerd/containerd
+          path: src/github.com/containerd/containerd
+
+      - name: Set env
+        shell: bash
+        run: |
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       #
       # Build
@@ -134,7 +140,13 @@ jobs:
           GOPATH: ${{ runner.workspace }}
           GO111MODULE: off
         with:
-          path: ./src/github.com/containerd/containerd
+          path: src/github.com/containerd/containerd
+
+      - name: Set env
+        shell: bash
+        run: |
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - name: Build amd64
         env:
