@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"runtime"
 	"time"
 
 	"github.com/Microsoft/go-winio/pkg/security"
@@ -61,7 +62,7 @@ func init() {
 
 			ic.Meta.Platforms = append(ic.Meta.Platforms, ocispec.Platform{
 				OS:           "linux",
-				Architecture: "amd64",
+				Architecture: runtime.GOARCH,
 			})
 			return NewWindowsLcowDiff(md.(*metadata.DB).ContentStore())
 		},

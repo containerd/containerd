@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -50,7 +51,7 @@ func init() {
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			ic.Meta.Platforms = append(ic.Meta.Platforms, ocispec.Platform{
 				OS:           "linux",
-				Architecture: "amd64",
+				Architecture: runtime.GOARCH,
 			})
 			return NewSnapshotter(ic.Root)
 		},
