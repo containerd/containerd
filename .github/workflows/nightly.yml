@@ -27,8 +27,8 @@ jobs:
       - name: Set env
         shell: bash
         run: |
-          echo "::set-env name=GOPATH::${{ github.workspace }}"
-          echo "::add-path::${{ github.workspace }}/bin"
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       #
       # Build
@@ -140,8 +140,8 @@ jobs:
       - name: Set env
         shell: bash
         run: |
-          echo "::set-env name=GOPATH::${{ github.workspace }}"
-          echo "::add-path::${{ github.workspace }}/bin"
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - name: Build amd64
         env:
