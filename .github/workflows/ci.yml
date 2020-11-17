@@ -31,8 +31,8 @@ jobs:
       - name: Set env
         shell: bash
         run: |
-          echo "::set-env name=GOPATH::${{ github.workspace }}"
-          echo "::add-path::${{ github.workspace }}/bin"
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - name: Checkout
         uses: actions/checkout@v2
@@ -60,71 +60,14 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      #
-      # Install Go
-      #
-      - name: Install Go
-        uses: actions/setup-go@v1
-        with:
-          go-version: '1.15.5'
-
-      - name: Set env
-        shell: bash
-        run: |
-          echo "::set-env name=GOPATH::${{ github.workspace }}"
-          echo "::add-path::${{ github.workspace }}/bin"
-
-      #
-      # Checkout repos
-      #
-      - name: Checkout this repo
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
         with:
           path: src/github.com/containerd/containerd
           fetch-depth: 100
 
-      - name: Checkout project repo
-        uses: actions/checkout@v2
+      - uses: containerd/project-checks@v1
         with:
-          repository: containerd/project
-          path: src/github.com/containerd/project
-
-      #
-      # Go get dependencies
-      #
-      - name: Install dependencies
-        env:
-          GO111MODULE: off
-        run: |
-          go get -u github.com/vbatts/git-validation
-          go get -u github.com/kunalkushwaha/ltag
-          go get -u github.com/LK4D4/vndr
-
-      #
-      # DCO / File headers / Vendor directory validation
-      #
-      - name: DCO
-        env:
-          GITHUB_COMMIT_URL: ${{ github.event.pull_request.commits_url }}
-          DCO_VERBOSITY: "-q"
-          DCO_RANGE: ""
-        working-directory: src/github.com/containerd/containerd
-        run: |
-          set -x
-          if [ -z "${GITHUB_COMMIT_URL}" ]; then
-          DCO_RANGE=$(jq -r '.after + "..HEAD"' ${GITHUB_EVENT_PATH})
-          else
-          DCO_RANGE=$(curl ${GITHUB_COMMIT_URL} | jq -r '.[0].parents[0].sha + "..HEAD"')
-          fi
-          ../project/script/validate/dco
-
-      - name: Headers
-        run: ../project/script/validate/fileheader ../project/
-        working-directory: src/github.com/containerd/containerd
-
-      - name: Vendor
-        run: ../project/script/validate/vendor
-        working-directory: src/github.com/containerd/containerd
+          working-directory: src/github.com/containerd/containerd
 
   #
   # Protobuf checks
@@ -143,8 +86,8 @@ jobs:
       - name: Set env
         shell: bash
         run: |
-          echo "::set-env name=GOPATH::${{ github.workspace }}"
-          echo "::add-path::${{ github.workspace }}/bin"
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - name: Checkout
         uses: actions/checkout@v2
@@ -190,8 +133,8 @@ jobs:
       - name: Set env
         shell: bash
         run: |
-          echo "::set-env name=GOPATH::${{ github.workspace }}"
-          echo "::add-path::${{ github.workspace }}/bin"
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - name: Checkout
         uses: actions/checkout@v2
@@ -227,8 +170,8 @@ jobs:
       - name: Set env
         shell: bash
         run: |
-          echo "::set-env name=GOPATH::${{ github.workspace }}"
-          echo "::add-path::${{ github.workspace }}/bin"
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - name: Checkout
         uses: actions/checkout@v2
@@ -259,8 +202,8 @@ jobs:
       - name: Set env
         shell: bash
         run: |
-          echo "::set-env name=GOPATH::${{ github.workspace }}"
-          echo "::add-path::${{ github.workspace }}/src/github.com/containerd/containerd/bin"
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/src/github.com/containerd/containerd/bin" >> $GITHUB_PATH
 
       - name: Checkout containerd
         uses: actions/checkout@v2
@@ -330,8 +273,8 @@ jobs:
       - name: Set env
         shell: bash
         run: |
-          echo "::set-env name=GOPATH::${{ github.workspace }}"
-          echo "::add-path::${{ github.workspace }}/bin"
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - name: Checkout containerd
         uses: actions/checkout@v2
