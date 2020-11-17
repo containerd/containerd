@@ -98,7 +98,7 @@ jobs:
           GO111MODULE: off
         working-directory: src/github.com/containerd/containerd
         run: |
-          sudo env PATH=$PATH GOPATH=$GOPATH script/setup/install-protobuf
+          sudo -E PATH=$PATH script/setup/install-protobuf
           sudo chmod +x /usr/local/bin/protoc
           sudo chmod og+rx /usr/local/include/google /usr/local/include/google/protobuf /usr/local/include/google/protobuf/compiler
           sudo chmod -R og+r /usr/local/include/google/protobuf/
@@ -317,7 +317,7 @@ jobs:
           CGO_ENABLED: 1
         run: |
           make binaries
-          sudo make install
+          sudo -E PATH=$PATH make install
         working-directory: src/github.com/containerd/containerd
 
       - name: Tests
@@ -326,7 +326,7 @@ jobs:
           SKIPTESTS: github.com/containerd/containerd/snapshots/devmapper
         run: |
           make test
-          sudo -E PATH=$PATH GOPATH=$GOPATH GOPROXY=$GOPROXY make root-test
+          sudo -E PATH=$PATH make root-test
         working-directory: src/github.com/containerd/containerd
 
       - name: Integration 1
@@ -335,7 +335,7 @@ jobs:
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
         run: |
-          sudo GOPATH=$GOPATH GOPROXY=$GOPROXY TEST_RUNTIME=$TEST_RUNTIME RUNC_FLAVOR=$RUNC_FLAVOR make integration EXTRA_TESTFLAGS=-no-criu TESTFLAGS_RACE=-race
+          sudo -E PATH=$PATH make integration EXTRA_TESTFLAGS=-no-criu TESTFLAGS_RACE=-race
         working-directory: src/github.com/containerd/containerd
 
       # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
@@ -345,7 +345,7 @@ jobs:
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
         run: |
-          sudo GOPATH=$GOPATH GOPROXY=$GOPROXY TEST_RUNTIME=$TEST_RUNTIME RUNC_FLAVOR=$RUNC_FLAVOR TESTFLAGS_PARALLEL=1 make integration EXTRA_TESTFLAGS=-no-criu
+          sudo -E PATH=$PATH TESTFLAGS_PARALLEL=1 make integration EXTRA_TESTFLAGS=-no-criu
         working-directory: src/github.com/containerd/containerd
 
       - name: CRI test
@@ -359,13 +359,13 @@ jobs:
               runtime_type = "${TEST_RUNTIME}"
           EOF
           sudo ls /etc/cni/net.d
-          sudo PATH=$PATH BDIR=$BDIR /usr/local/bin/containerd -a ${BDIR}/c.sock --config ${BDIR}/config.toml --root ${BDIR}/root --state ${BDIR}/state --log-level debug &> ${BDIR}/containerd-cri.log &
-          sudo PATH=$PATH BDIR=$BDIR /usr/local/bin/ctr -a ${BDIR}/c.sock version
-          sudo PATH=$PATH BDIR=$BDIR GOPATH=$GOPATH critest --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8
+          sudo -E PATH=$PATH /usr/local/bin/containerd -a ${BDIR}/c.sock --config ${BDIR}/config.toml --root ${BDIR}/root --state ${BDIR}/state --log-level debug &> ${BDIR}/containerd-cri.log &
+          sudo -E PATH=$PATH /usr/local/bin/ctr -a ${BDIR}/c.sock version
+          sudo -E PATH=$PATH critest --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8
           TEST_RC=$?
           test $TEST_RC -ne 0 && cat ${BDIR}/containerd-cri.log
           sudo pkill containerd
-          sudo BDIR=$BDIR rm -rf ${BDIR}
+          sudo -E rm -rf ${BDIR}
           test $TEST_RC -eq 0 || /bin/false
 
   cgroup2:
