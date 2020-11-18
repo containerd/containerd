@@ -132,6 +132,7 @@ message CheckpointTaskRequest {
 message UpdateTaskRequest {
 	string id = 1;
 	google.protobuf.Any resources = 2;
+	map<string, string> annotations = 3;
 }
 
 message StartRequest {
