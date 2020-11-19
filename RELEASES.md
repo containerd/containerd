@@ -134,7 +134,7 @@ To cherry pick a straightforward commit from master, simply use the cherry pick
 process:
 
 1. Pick the branch to which you want backported, usually in the format
-   `release/<minor>.<major>`. The following will create a branch you can
+   `release/<major>.<minor>`. The following will create a branch you can
    use to open a PR:
 
 	```console
@@ -155,7 +155,12 @@ process:
 
    Make sure to replace `stevvooe` with whatever fork you are using to open
    the PR. When you open the PR, make sure to switch `master` with whatever
-   release branch you are targeting with the fix.
+   release branch you are targeting with the fix. Make sure the PR title has
+   `[<release branch>]` prefixed. e.g.:
+
+   ```
+   [release/1.4] Fix foo in bar
+   ```
 
 If there is no existing fix in master, you should first fix the bug in master,
 or ask us a maintainer or contributor to do it via an issue. Once that PR is
