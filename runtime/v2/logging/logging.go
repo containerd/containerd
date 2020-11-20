@@ -1,5 +1,3 @@
-// +build !windows
-
 /*
    Copyright The containerd Authors.
 
@@ -20,12 +18,7 @@ package logging
 
 import (
 	"context"
-	"fmt"
 	"io"
-	"os"
-	"os/signal"
-
-	"golang.org/x/sys/unix"
 )
 
 // Config of the container logs
@@ -38,39 +31,3 @@ type Config struct {
 
 // LoggerFunc is implemented by custom v2 logging binaries
 type LoggerFunc func(context.Context, *Config, func() error) error
-
-// Run the logging driver
-func Run(fn LoggerFunc) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	config := &Config{
-		ID:        os.Getenv("CONTAINER_ID"),
-		Namespace: os.Getenv("CONTAINER_NAMESPACE"),
-		Stdout:    os.NewFile(3, "CONTAINER_STDOUT"),
-		Stderr:    os.NewFile(4, "CONTAINER_STDERR"),
-	}
-	var (
-		s     = make(chan os.Signal, 32)
-		errCh = make(chan error, 1)
-		wait  = os.NewFile(5, "CONTAINER_WAIT")
-	)
-	signal.Notify(s, unix.SIGTERM)
-
-	go func() {
-		errCh <- fn(ctx, config, wait.Close)
-	}()
-
-	for {
-		select {
-		case <-s:
-			cancel()
-		case err := <-errCh:
-			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				os.Exit(1)
-			}
-			os.Exit(0)
-		}
-	}
-}
