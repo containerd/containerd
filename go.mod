@@ -65,3 +65,9 @@ require (
 	k8s.io/klog/v2 v2.2.0
 	k8s.io/utils v0.0.0-20200729134348-d5654de09c73
 )
+
+replace (
+	github.com/golang/protobuf => github.com/golang/protobuf v1.3.5
+	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200224152610-e50cd9704f63
+	google.golang.org/grpc => google.golang.org/grpc v1.27.1
+)
