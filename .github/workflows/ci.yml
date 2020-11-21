@@ -229,6 +229,7 @@ jobs:
     needs: [project, linters, protos, man]
 
     strategy:
+      fail-fast: false
       matrix:
         runtime: [io.containerd.runtime.v1.linux, io.containerd.runc.v1, io.containerd.runc.v2]
         runc: [runc, crun]
