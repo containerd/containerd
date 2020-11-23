@@ -1,4 +1,4 @@
-// To regenerate api.pb.go run `make proto`
+// To regenerate api.pb.go run `make protos`
 syntax = "proto3";
 
 package cri.runtimeoptions.v1;
@@ -14,7 +14,7 @@ option (gogoproto.unmarshaler_all) = true;
 option (gogoproto.goproto_unrecognized_all) = false;
 
 
-option go_package = "github.com/containerd/containerd/pkg/api/runtimeoptions/v1;cri_runtimeoptions_v1";
+option go_package = "github.com/containerd/containerd/pkg/cri/runtimeoptions/v1;cri_runtimeoptions_v1";
 
 message Options {
 	// TypeUrl specifies the type of the content inside the config file.
