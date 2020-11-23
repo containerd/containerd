@@ -174,6 +174,7 @@ func testOverlayOverlayMount(t *testing.T, newSnapshotter testsuite.SnapshotterF
 		lower = "lowerdir=" + getParents(ctx, o, root, "/tmp/layer2")[0]
 	)
 	for i, v := range []string{
+		"index=off",
 		work,
 		upper,
 		lower,
@@ -334,12 +335,12 @@ func testOverlayView(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	if m.Source != "overlay" {
 		t.Errorf("mount source should be overlay but received %q", m.Source)
 	}
-	if len(m.Options) != 1 {
-		t.Errorf("expected 1 mount option but got %d", len(m.Options))
+	if len(m.Options) != 2 {
+		t.Errorf("expected 1 additional mount option but got %d", len(m.Options))
 	}
 	lowers := getParents(ctx, o, root, "/tmp/view2")
 	expected = fmt.Sprintf("lowerdir=%s:%s", lowers[0], lowers[1])
-	if m.Options[0] != expected {
+	if m.Options[1] != expected {
 		t.Errorf("expected option %q but received %q", expected, m.Options[0])
 	}
 }

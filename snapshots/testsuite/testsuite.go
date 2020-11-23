@@ -18,6 +18,8 @@ package testsuite
 
 import (
 	"context"
+	//nolint:golint
+	_ "crypto/sha256"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
