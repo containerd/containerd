@@ -30,7 +30,7 @@ import (
 )
 
 func TestSetPositiveOomScoreAdjustment(t *testing.T) {
-	adjustment, err := adjustOom(123)
+	_, adjustment, err := adjustOom(123)
 	if err != nil {
 		t.Error(err)
 		return
@@ -44,7 +44,7 @@ func TestSetNegativeOomScoreAdjustmentWhenPrivileged(t *testing.T) {
 		return
 	}
 
-	adjustment, err := adjustOom(-123)
+	_, adjustment, err := adjustOom(-123)
 	if err != nil {
 		t.Error(err)
 		return
@@ -58,32 +58,37 @@ func TestSetNegativeOomScoreAdjustmentWhenUnprivilegedHasNoEffect(t *testing.T) 
 		return
 	}
 
-	adjustment, err := adjustOom(-123)
+	initial, adjustment, err := adjustOom(-123)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	assert.Check(t, is.Equal(adjustment, 0))
+	assert.Check(t, is.Equal(adjustment, initial))
 }
 
-func adjustOom(adjustment int) (int, error) {
+func adjustOom(adjustment int) (int, int, error) {
 	cmd := exec.Command("sleep", "100")
 	if err := cmd.Start(); err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 
 	defer cmd.Process.Kill()
 
 	pid, err := waitForPid(cmd.Process)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
+	}
+	initial, err := GetOOMScoreAdj(pid)
+	if err != nil {
+		return 0, 0, err
 	}
 
 	if err := SetOOMScore(pid, adjustment); err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 
-	return GetOOMScoreAdj(pid)
+	adj, err := GetOOMScoreAdj(pid)
+	return initial, adj, err
 }
 
 func waitForPid(process *os.Process) (int, error) {

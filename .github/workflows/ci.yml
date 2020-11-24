@@ -233,6 +233,15 @@ jobs:
           git fetch --tags origin "${SHIM_COMMIT}"
           git checkout "${SHIM_COMMIT}"
           GO111MODULE=on go build -mod=vendor -o "${bindir}/containerd-shim-runhcs-v1.exe" ./cmd/containerd-shim-runhcs-v1
+
+      - name: Tests
+        shell: bash
+        env:
+          CGO_ENABLED: 1
+        run: |
+          cd src/github.com/containerd/containerd
+          mingw32-make.exe test root-test
+
       - name: Integration 1
         shell: bash
         run: |
@@ -314,6 +323,15 @@ jobs:
         run: |
           make binaries
           sudo make install
+        working-directory: src/github.com/containerd/containerd
+
+      - name: Tests
+        env:
+          GOPROXY: direct
+          SKIPTESTS: github.com/containerd/containerd/snapshots/devmapper
+        run: |
+          make test
+          sudo -E PATH=$PATH GOPATH=$GOPATH GOPROXY=$GOPROXY make root-test
         working-directory: src/github.com/containerd/containerd
 
       - name: Integration 1
