@@ -19,6 +19,7 @@ package shim
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -125,4 +126,23 @@ func WriteAddress(path, address string) error {
 		return err
 	}
 	return os.Rename(tempPath, path)
+}
+
+// ErrNoAddress is returned when the address file has no content
+var ErrNoAddress = errors.New("no shim address")
+
+// ReadAddress returns the shim's socket address from the path
+func ReadAddress(path string) (string, error) {
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	if len(data) == 0 {
+		return "", ErrNoAddress
+	}
+	return string(data), nil
 }

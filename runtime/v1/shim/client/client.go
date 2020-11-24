@@ -20,10 +20,12 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -54,9 +56,17 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 	return func(ctx context.Context, config shim.Config) (_ shimapi.ShimService, _ io.Closer, err error) {
 		socket, err := newSocket(address)
 		if err != nil {
-			return nil, nil, err
+			if !eaddrinuse(err) {
+				return nil, nil, err
+			}
+			if err := RemoveSocket(address); err != nil {
+				return nil, nil, errors.Wrap(err, "remove already used socket")
+			}
+			if socket, err = newSocket(address); err != nil {
+				return nil, nil, err
+			}
 		}
-		defer socket.Close()
+
 		f, err := socket.File()
 		if err != nil {
 			return nil, nil, errors.Wrapf(err, "failed to get fd for socket %s", address)
@@ -101,12 +111,18 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 			if stderrLog != nil {
 				stderrLog.Close()
 			}
+			socket.Close()
+			RemoveSocket(address)
 		}()
 		log.G(ctx).WithFields(logrus.Fields{
 			"pid":     cmd.Process.Pid,
 			"address": address,
 			"debug":   debug,
 		}).Infof("shim %s started", binary)
+
+		if err := writeAddress(filepath.Join(config.Path, "address"), address); err != nil {
+			return nil, nil, err
+		}
 		// set shim in cgroup if it is provided
 		if cgroup != "" {
 			if err := setCgroup(cgroup, cmd); err != nil {
@@ -126,6 +142,26 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 		}
 		return c, clo, nil
 	}
+}
+
+func eaddrinuse(err error) bool {
+	cause := errors.Cause(err)
+	netErr, ok := cause.(*net.OpError)
+	if !ok {
+		return false
+	}
+	if netErr.Op != "listen" {
+		return false
+	}
+	syscallErr, ok := netErr.Err.(*os.SyscallError)
+	if !ok {
+		return false
+	}
+	errno, ok := syscallErr.Err.(syscall.Errno)
+	if !ok {
+		return false
+	}
+	return errno == syscall.EADDRINUSE
 }
 
 func newCommand(binary, daemonAddress string, debug bool, config shim.Config, socket *os.File, stdout, stderr io.Writer) (*exec.Cmd, error) {
@@ -166,31 +202,92 @@ func newCommand(binary, daemonAddress string, debug bool, config shim.Config, so
 	return cmd, nil
 }
 
-func newSocket(address string) (*net.UnixListener, error) {
-	if len(address) > 106 {
-		return nil, errors.Errorf("%q: unix socket path too long (> 106)", address)
-	}
-	l, err := net.Listen("unix", "\x00"+address)
+// writeAddress writes a address file atomically
+func writeAddress(path, address string) error {
+	path, err := filepath.Abs(path)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to listen to abstract unix socket %q", address)
+		return err
+	}
+	tempPath := filepath.Join(filepath.Dir(path), fmt.Sprintf(".%s", filepath.Base(path)))
+	f, err := os.OpenFile(tempPath, os.O_RDWR|os.O_CREATE|os.O_EXCL|os.O_SYNC, 0666)
+	if err != nil {
+		return err
+	}
+	_, err = f.WriteString(address)
+	f.Close()
+	if err != nil {
+		return err
+	}
+	return os.Rename(tempPath, path)
+}
+
+const (
+	abstractSocketPrefix = "\x00"
+	socketPathLimit      = 106
+)
+
+type socket string
+
+func (s socket) isAbstract() bool {
+	return !strings.HasPrefix(string(s), "unix://")
+}
+
+func (s socket) path() string {
+	path := strings.TrimPrefix(string(s), "unix://")
+	// if there was no trim performed, we assume an abstract socket
+	if len(path) == len(s) {
+		path = abstractSocketPrefix + path
+	}
+	return path
+}
+
+func newSocket(address string) (*net.UnixListener, error) {
+	if len(address) > socketPathLimit {
+		return nil, errors.Errorf("%q: unix socket path too long (> %d)", address, socketPathLimit)
+	}
+	var (
+		sock = socket(address)
+		path = sock.path()
+	)
+	if !sock.isAbstract() {
+		if err := os.MkdirAll(filepath.Dir(path), 0600); err != nil {
+			return nil, errors.Wrapf(err, "%s", path)
+		}
+	}
+	l, err := net.Listen("unix", path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to listen to unix socket %q (abstract: %t)", address, sock.isAbstract())
+	}
+	if err := os.Chmod(path, 0600); err != nil {
+		l.Close()
+		return nil, err
 	}
 
 	return l.(*net.UnixListener), nil
+}
+
+// RemoveSocket removes the socket at the specified address if
+// it exists on the filesystem
+func RemoveSocket(address string) error {
+	sock := socket(address)
+	if !sock.isAbstract() {
+		return os.Remove(sock.path())
+	}
+	return nil
 }
 
 func connect(address string, d func(string, time.Duration) (net.Conn, error)) (net.Conn, error) {
 	return d(address, 100*time.Second)
 }
 
-func annonDialer(address string, timeout time.Duration) (net.Conn, error) {
-	address = strings.TrimPrefix(address, "unix://")
-	return net.DialTimeout("unix", "\x00"+address, timeout)
+func anonDialer(address string, timeout time.Duration) (net.Conn, error) {
+	return net.DialTimeout("unix", socket(address).path(), timeout)
 }
 
 // WithConnect connects to an existing shim
 func WithConnect(address string, onClose func()) Opt {
 	return func(ctx context.Context, config shim.Config) (shimapi.ShimService, io.Closer, error) {
-		conn, err := connect(address, annonDialer)
+		conn, err := connect(address, anonDialer)
 		if err != nil {
 			return nil, nil, err
 		}

@@ -77,7 +77,7 @@ func parseFlags() {
 	flag.BoolVar(&debugFlag, "debug", false, "enable debug output in logs")
 	flag.StringVar(&namespaceFlag, "namespace", "", "namespace that owns the shim")
 	flag.StringVar(&idFlag, "id", "", "id of the task")
-	flag.StringVar(&socketFlag, "socket", "", "abstract socket path to serve")
+	flag.StringVar(&socketFlag, "socket", "", "socket path to serve")
 	flag.StringVar(&bundlePath, "bundle", "", "path to the bundle if not workdir")
 
 	flag.StringVar(&addressFlag, "address", "", "grpc address back to main containerd")
@@ -239,10 +239,13 @@ func serve(ctx context.Context, server *ttrpc.Server, path string) error {
 		return err
 	}
 	go func() {
-		defer l.Close()
 		if err := server.Serve(ctx, l); err != nil &&
 			!strings.Contains(err.Error(), "use of closed network connection") {
 			logrus.WithError(err).Fatal("containerd-shim: ttrpc server failure")
+		}
+		l.Close()
+		if address, err := ReadAddress("address"); err == nil {
+			_ = RemoveSocket(address)
 		}
 	}()
 	return nil

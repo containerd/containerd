@@ -88,3 +88,9 @@ func NewSocket(address string) (net.Listener, error) {
 	}
 	return l, nil
 }
+
+// RemoveSocket removes the socket at the specified address if
+// it exists on the filesystem
+func RemoveSocket(address string) error {
+	return nil
+}
