@@ -1,0 +1,35 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.4.1"
+
+pre_release = false
+
+preface = """\
+The second patch release for `containerd` 1.4 includes multiple minor fixes
+and updates.
+
+### Notable Updates
+
+* Fix bug limiting the number of layers by default [containerd/cri#1602](https://github.com/containerd/cri/pull/1602)
+* Fix selinux shared memory issue by relabeling /dev/shm [containerd/cri#1605](https://github.com/containerd/cri/pull/1605)
+* Fix unknown state preventing removal of containers [containerd/containerd#4656](https://github.com/containerd/containerd/pull/4656)
+* Fix nil pointer error when restoring checkpoint [containerd/containerd#4754](https://github.com/containerd/containerd/pull/4754)
+* Improve image pull performance when using HTTP 1.1 [containerd/containerd#4653](https://github.com/containerd/containerd/pull/4653)
+* Update default seccomp profile for pidfd [containerd/containerd#4730](https://github.com/containerd/containerd/pull/4730)
+* Update Go to 1.15
+
+### Windows
+* Fix integer overflow on Windows [containerd/containerd#4589](https://github.com/containerd/containerd/pull/4589)
+* Fix lcow snapshotter to read trailing tar data [containerd/containerd#4628](https://github.com/containerd/containerd/pull/4628)
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
