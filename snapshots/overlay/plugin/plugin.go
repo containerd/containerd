@@ -30,6 +30,7 @@ import (
 type Config struct {
 	// Root directory for the plugin
 	RootPath string `toml:"root_path"`
+	Volatile bool   `toml:"volatile"`
 }
 
 func init() {
@@ -51,7 +52,11 @@ func init() {
 			}
 
 			ic.Meta.Exports["root"] = root
-			return overlay.NewSnapshotter(root, overlay.AsynchronousRemove)
+			opts := []overlay.Opt{overlay.AsynchronousRemove}
+			if config.Volatile {
+				opts = append(opts, overlay.Volatile)
+			}
+			return overlay.NewSnapshotter(root, opts...)
 		},
 	})
 }
