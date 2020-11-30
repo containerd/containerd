@@ -231,7 +231,7 @@ func getTaskService(context *cli.Context) (task.TaskService, error) {
 		return nil, errors.New("socket path must be specified")
 	}
 
-	conn, err := net.Dial("unix", "\x00"+bindSocket)
+	conn, err := connectToAddress(bindSocket)
 	if err != nil {
 		return nil, err
 	}
@@ -242,4 +242,14 @@ func getTaskService(context *cli.Context) (task.TaskService, error) {
 	// before, so may not be a huge deal.
 
 	return task.NewTaskClient(client), nil
+}
+
+// as we changed the socket address from abstract, we need to have a backward
+// compatibility to handle the abstract sockets as well.
+func connectToAddress(address string) (net.Conn, error) {
+	conn, err := net.Dial("unix", address)
+	if err != nil {
+		return net.Dial("unix", "\x00"+address)
+	}
+	return conn, err
 }

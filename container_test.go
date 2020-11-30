@@ -32,7 +32,9 @@ import (
 	// Register the typeurl
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/platforms"
 	_ "github.com/containerd/containerd/runtime"
 	"github.com/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -1576,4 +1578,60 @@ func TestShortRunningTaskPid(t *testing.T) {
 		t.Errorf("Unexpected task pid %d", int32PID)
 	}
 	<-finishedC
+}
+
+func TestShimSockLength(t *testing.T) {
+	t.Parallel()
+
+	// Max length of namespace should be 76
+	namespace := strings.Repeat("n", 76)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ctx = namespaces.WithNamespace(ctx, namespace)
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	image, err := client.Pull(ctx, testImage,
+		WithPlatformMatcher(platforms.Default()),
+		WithPullUnpack,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	id := strings.Repeat("c", 64)
+
+	// We don't have limitation with length of container name,
+	// but 64 bytes of sha256 is the common case
+	container, err := client.NewContainer(ctx, id,
+		WithNewSnapshot(id, image),
+		WithNewSpec(oci.WithImageConfig(image), withExitStatus(0)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	<-statusC
 }
