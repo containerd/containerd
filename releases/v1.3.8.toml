@@ -1,0 +1,28 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.3.7"
+
+pre_release = false
+
+preface = """\
+The eighth patch release for `containerd` 1.3 includes several bug fixes and updates.
+
+### Notable Updates
+* Fix metrics monitoring of v2 runtime tasks [containerd/containerd#4486](https://github.com/containerd/containerd/pull/4486)
+* Fix nil pointer error when restoring checkpoint [containerd/containerd#4754](https://github.com/containerd/containerd/pull/4754)
+* Fix devmapper device deletion on rollback [containerd/containerd#4437](https://github.com/containerd/containerd/pull/4437)
+* Fix integer overflow on Windows [containerd/containerd#4589](https://github.com/containerd/containerd/pull/4589)
+* Update seccomp default profile [containerd/containerd#4481](https://github.com/containerd/containerd/pull/4481) [#4491](https://github.com/containerd/containerd/pull/4491) [#4492](https://github.com/containerd/containerd/pull/4492) [#4493](https://github.com/containerd/containerd/pull/4493)
+
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
