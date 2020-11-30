@@ -1,0 +1,21 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.3.8"
+
+pre_release = false
+
+preface = """\
+The ninth patch release for `containerd` 1.3 is a security release to address CVE-2020-15257.
+See [GHSA-36xw-fx78-c5r4](https://github.com/containerd/containerd/security/advisories/GHSA-35xw-fx78-c5r4) for more details.
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
