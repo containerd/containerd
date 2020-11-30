@@ -134,20 +134,26 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 	if err != nil {
 		return "", err
 	}
-	address, err := shim.SocketAddress(ctx, id)
+	address, err := shim.SocketAddress(ctx, containerdAddress, id)
 	if err != nil {
 		return "", err
 	}
 	socket, err := shim.NewSocket(address)
 	if err != nil {
-		return "", err
+		if !shim.SocketEaddrinuse(err) {
+			return "", err
+		}
+		if err := shim.RemoveSocket(address); err != nil {
+			return "", errors.Wrap(err, "remove already used socket")
+		}
+		if socket, err = shim.NewSocket(address); err != nil {
+			return "", err
+		}
 	}
-	defer socket.Close()
 	f, err := socket.File()
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
 
 	cmd.ExtraFiles = append(cmd.ExtraFiles, f)
 
@@ -156,6 +162,7 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 	}
 	defer func() {
 		if err != nil {
+			_ = shim.RemoveSocket(address)
 			cmd.Process.Kill()
 		}
 	}()
@@ -550,6 +557,9 @@ func (s *service) Connect(ctx context.Context, r *taskAPI.ConnectRequest) (*task
 func (s *service) Shutdown(ctx context.Context, r *taskAPI.ShutdownRequest) (*ptypes.Empty, error) {
 	s.cancel()
 	close(s.events)
+	if address, err := shim.ReadAddress("address"); err == nil {
+		_ = shim.RemoveSocket(address)
+	}
 	return empty, nil
 }
 
