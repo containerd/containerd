@@ -14,7 +14,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-source $(dirname "${BASH_SOURCE[0]}")/utils.sh
+ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
 
 # RESTART_WAIT_PERIOD is the period to wait before restarting containerd.
 RESTART_WAIT_PERIOD=${RESTART_WAIT_PERIOD:-10}
