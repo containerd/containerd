@@ -151,7 +151,6 @@ func TestReferenceParser(t *testing.T) {
 			},
 		},
 		{
-			Skip:     true, // TODO(stevvooe): Implement this case.
 			Name:     "SchemeDefined",
 			Input:    "http://xn--7o8h.com/myimage:xn--7o8h.com@sha512:fffffff",
 			Hostname: "xn--7o8h.com",
@@ -160,11 +159,6 @@ func TestReferenceParser(t *testing.T) {
 		},
 	} {
 		t.Run(testcase.Name, func(t *testing.T) {
-			if testcase.Skip {
-				t.Skip("testcase disabled")
-				return
-			}
-
 			ref, err := Parse(testcase.Input)
 			if err != testcase.Err {
 				if testcase.Err != nil {
