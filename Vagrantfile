@@ -85,7 +85,6 @@ Vagrant.configure("2") do |config|
         curl -fsSL "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar Cxz /usr/local
         cat >> /etc/environment <<EOF
 PATH=/usr/local/go/bin:$PATH
-GO111MODULE=off
 EOF
         source /etc/environment
         cat >> /etc/profile.d/sh.local <<EOF

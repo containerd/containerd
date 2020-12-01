@@ -12,6 +12,13 @@
 // is more important than obtaining a minimal Levenshtein distance.
 package diff
 
+import (
+	"math/rand"
+	"time"
+
+	"github.com/google/go-cmp/cmp/internal/flags"
+)
+
 // EditType represents a single operation within an edit-script.
 type EditType uint8
 
@@ -85,23 +92,34 @@ func (es EditScript) LenY() int { return len(es) - es.stats().NX }
 type EqualFunc func(ix int, iy int) Result
 
 // Result is the result of comparison.
-// NSame is the number of sub-elements that are equal.
-// NDiff is the number of sub-elements that are not equal.
-type Result struct{ NSame, NDiff int }
+// NumSame is the number of sub-elements that are equal.
+// NumDiff is the number of sub-elements that are not equal.
+type Result struct{ NumSame, NumDiff int }
+
+// BoolResult returns a Result that is either Equal or not Equal.
+func BoolResult(b bool) Result {
+	if b {
+		return Result{NumSame: 1} // Equal, Similar
+	} else {
+		return Result{NumDiff: 2} // Not Equal, not Similar
+	}
+}
 
 // Equal indicates whether the symbols are equal. Two symbols are equal
-// if and only if NDiff == 0. If Equal, then they are also Similar.
-func (r Result) Equal() bool { return r.NDiff == 0 }
+// if and only if NumDiff == 0. If Equal, then they are also Similar.
+func (r Result) Equal() bool { return r.NumDiff == 0 }
 
 // Similar indicates whether two symbols are similar and may be represented
 // by using the Modified type. As a special case, we consider binary comparisons
 // (i.e., those that return Result{1, 0} or Result{0, 1}) to be similar.
 //
-// The exact ratio of NSame to NDiff to determine similarity may change.
+// The exact ratio of NumSame to NumDiff to determine similarity may change.
 func (r Result) Similar() bool {
-	// Use NSame+1 to offset NSame so that binary comparisons are similar.
-	return r.NSame+1 >= r.NDiff
+	// Use NumSame+1 to offset NumSame so that binary comparisons are similar.
+	return r.NumSame+1 >= r.NumDiff
 }
+
+var randInt = rand.New(rand.NewSource(time.Now().Unix())).Intn(2)
 
 // Difference reports whether two lists of lengths nx and ny are equal
 // given the definition of equality provided as f.
@@ -150,6 +168,17 @@ func Difference(nx, ny int, f EqualFunc) (es EditScript) {
 	// A vertical edge is equivalent to inserting a symbol from list Y.
 	// A diagonal edge is equivalent to a matching symbol between both X and Y.
 
+	// To ensure flexibility in changing the algorithm in the future,
+	// introduce some degree of deliberate instability.
+	// This is achieved by fiddling the zigzag iterator to start searching
+	// the graph starting from the bottom-right versus than the top-left.
+	// The result may differ depending on the starting search location,
+	// but still produces a valid edit script.
+	zigzagInit := randInt // either 0 or 1
+	if flags.Deterministic {
+		zigzagInit = 0
+	}
+
 	// Invariants:
 	//	• 0 ≤ fwdPath.X ≤ (fwdFrontier.X, revFrontier.X) ≤ revPath.X ≤ nx
 	//	• 0 ≤ fwdPath.Y ≤ (fwdFrontier.Y, revFrontier.Y) ≤ revPath.Y ≤ ny
@@ -191,16 +220,16 @@ func Difference(nx, ny int, f EqualFunc) (es EditScript) {
 	// that two lists commonly differ because elements were added to the front
 	// or end of the other list.
 	//
-	// Running the tests with the "debug" build tag prints a visualization of
-	// the algorithm running in real-time. This is educational for understanding
-	// how the algorithm works. See debug_enable.go.
+	// Running the tests with the "cmp_debug" build tag prints a visualization
+	// of the algorithm running in real-time. This is educational for
+	// understanding how the algorithm works. See debug_enable.go.
 	f = debug.Begin(nx, ny, f, &fwdPath.es, &revPath.es)
 	for {
 		// Forward search from the beginning.
 		if fwdFrontier.X >= revFrontier.X || fwdFrontier.Y >= revFrontier.Y || searchBudget == 0 {
 			break
 		}
-		for stop1, stop2, i := false, false, 0; !(stop1 && stop2) && searchBudget > 0; i++ {
+		for stop1, stop2, i := false, false, zigzagInit; !(stop1 && stop2) && searchBudget > 0; i++ {
 			// Search in a diagonal pattern for a match.
 			z := zigzag(i)
 			p := point{fwdFrontier.X + z, fwdFrontier.Y - z}

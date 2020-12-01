@@ -1,0 +1,27 @@
+dist: xenial
+sudo: required
+language: go
+go:
+  - "1.12.x"
+  - "1.13.x"
+
+go_import_path: github.com/containerd/zfs
+
+install:
+  - sudo apt-get install -y zfsutils-linux && sudo modprobe zfs
+  - cd $GOPATH/src/github.com/containerd/zfs
+  - GO111MODULE="on" go mod vendor
+  - go get -u github.com/vbatts/git-validation
+  - go get -u github.com/kunalkushwaha/ltag
+
+before_script:
+  - pushd ..; git clone https://github.com/containerd/project; popd
+
+script:
+  - DCO_VERBOSITY=-q ../project/script/validate/dco
+  - ../project/script/validate/fileheader ../project/
+  - go test -race -covermode=atomic -c .
+  - sudo ./zfs.test -test.root -test.v -test.coverprofile=coverage.txt
+
+after_success:
+    - bash <(curl -s https://codecov.io/bash)

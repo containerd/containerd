@@ -91,7 +91,7 @@ jobs:
         id: hcsshim_commit
         if: startsWith(matrix.os, 'windows')
         shell: bash
-        run: echo "::set-output name=sha::$(grep Microsoft/hcsshim vendor.conf | awk '{print $2}')"
+        run: echo "::set-output name=sha::$(grep 'Microsoft/hcsshim ' go.mod | awk '{print $2}')"
         working-directory: src/github.com/containerd/containerd
 
       - name: Checkout hcsshim source

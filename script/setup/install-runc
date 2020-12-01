@@ -16,13 +16,14 @@
 
 #
 # Builds and installs runc to /usr/local/go/bin based off
-# the commit defined in vendor.conf
+# the commit defined in go.mod
 #
 set -eu -o pipefail
 
 function install_runc() {
-	RUNC_COMMIT=$(grep opencontainers/runc "$GOPATH"/src/github.com/containerd/containerd/vendor.conf | awk '{print $2}')
+	RUNC_COMMIT=$(grep opencontainers/runc "$GOPATH"/src/github.com/containerd/containerd/go.mod | awk '{print $2}')
 
+	cd "$GOPATH"
 	go get -d github.com/opencontainers/runc
 	cd "$GOPATH"/src/github.com/opencontainers/runc
 	git checkout $RUNC_COMMIT

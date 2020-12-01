@@ -20,6 +20,9 @@
 #
 set -eu -o pipefail
 
+# change to tmp dir, otherwise `go get` will change go.mod
+cd "$GOPATH"
+
 # install the `protobuild` binary in $GOPATH/bin; requires module-aware install
 # to pin dependencies
 GO111MODULE=on go get github.com/stevvooe/protobuild

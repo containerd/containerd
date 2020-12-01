@@ -199,7 +199,7 @@ jobs:
           set -o xtrace
           mingw32-make.exe binaries
           bindir="$(pwd)"
-          SHIM_COMMIT=$(grep Microsoft/hcsshim vendor.conf | awk '{print $2}')
+          SHIM_COMMIT=$(grep 'Microsoft/hcsshim ' go.mod | awk '{print $2}')
           cd ../../Microsoft/hcsshim
           git fetch --tags origin "${SHIM_COMMIT}"
           git checkout "${SHIM_COMMIT}"
@@ -229,6 +229,7 @@ jobs:
     needs: [project, linters, protos, man]
 
     strategy:
+      fail-fast: false
       matrix:
         runtime: [io.containerd.runtime.v1.linux, io.containerd.runc.v1, io.containerd.runc.v2]
         runc: [runc, crun]

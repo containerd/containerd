@@ -17,14 +17,15 @@
 #
 # Builds and installs cni plugins to /opt/cni/bin,
 # and create basic cni config in /etc/cni/net.d.
-# The commit defined in vendor.conf
+# The commit defined in go.mod
 #
 set -eu -o pipefail
 
-CNI_COMMIT=$(grep containernetworking/plugins "$GOPATH"/src/github.com/containerd/containerd/vendor.conf | awk '{print $2}')
+CNI_COMMIT=$(grep containernetworking/plugins "$GOPATH"/src/github.com/containerd/containerd/go.mod | awk '{print $2}')
 CNI_DIR=${DESTDIR:=''}/opt/cni
 CNI_CONFIG_DIR=${DESTDIR}/etc/cni/net.d
 
+cd "$GOPATH"
 go get -d github.com/containernetworking/plugins/...
 cd "$GOPATH"/src/github.com/containernetworking/plugins
 git checkout $CNI_COMMIT

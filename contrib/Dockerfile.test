@@ -32,10 +32,9 @@ RUN apt-get update && apt-get install -y \
     libseccomp-dev \
   --no-install-recommends
 
-COPY vendor.conf vendor.conf
+COPY go.mod go.mod
 COPY script/setup/install-runc install-runc
 ARG GOPROXY=direct
-ARG GO111MODULE=off
 RUN ./install-runc
 
 FROM golang-base AS dev
