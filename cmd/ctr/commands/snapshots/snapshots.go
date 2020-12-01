@@ -25,15 +25,20 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/progress"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/snapshots"
 	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -58,6 +63,7 @@ var Command = cli.Command{
 		unpackCommand,
 		usageCommand,
 		viewCommand,
+		createCommand,
 	},
 }
 
@@ -261,12 +267,131 @@ var removeCommand = cli.Command{
 		defer cancel()
 		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
 		for _, key := range context.Args() {
+			if err := client.LeasesService().Delete(ctx, leases.Lease{ID: key}); err != nil && !errdefs.IsNotFound(err) {
+				// remove lease if one exists for key, but don't prevent removal of snapshot on error
+				log.G(ctx).Warnf("error deleting lease: %v", err)
+			}
 			err = snapshotter.Remove(ctx, key)
 			if err != nil {
 				return errors.Wrapf(err, "failed to remove %q", key)
 			}
 		}
 
+		return nil
+	},
+}
+
+var createCommand = cli.Command{
+	Name:      "create",
+	Usage:     "create a new snapshot from an image",
+	ArgsUsage: "[flags] <key> <image name>",
+	Description: `Creates a new snapshot from a specified image.
+
+When you're done, use the remove command.
+`,
+	Flags: append(commands.SnapshotterFlags,
+		cli.BoolFlag{
+			Name:  "print-mounts",
+			Usage: "Print the snapshotter layer mounts",
+		},
+		cli.BoolFlag{
+			Name:  "print-chainid",
+			Usage: "Print the snapshot's chain ID",
+		},
+		cli.BoolFlag{
+			Name:  "read-only",
+			Usage: "create a read-only snapshot",
+		},
+		cli.StringFlag{
+			Name:  "platform",
+			Usage: "Create the snapshot for the specified platform",
+			Value: platforms.DefaultString(),
+		},
+	),
+	Action: func(context *cli.Context) (retErr error) {
+		imageName := context.Args().First()
+		if imageName == "" {
+			return fmt.Errorf("please provide an image to create a snapshot for")
+		}
+
+		key := context.Args().Get(1)
+		if key == "" {
+			return fmt.Errorf("please provide a key for the snapshot")
+		}
+
+		client, ctx, cancel, err := commands.NewClient(context)
+		if err != nil {
+			return err
+		}
+		defer cancel()
+
+		snapshotter := context.String("snapshotter")
+		if snapshotter == "" {
+			snapshotter = containerd.DefaultSnapshotter
+		}
+
+		ps := context.String("platform")
+		p, err := platforms.Parse(ps)
+		if err != nil {
+			return errors.Wrapf(err, "unable to parse platform %s", ps)
+		}
+
+		ctx, done, err := client.WithLease(ctx,
+			leases.WithID(imageName),
+			leases.WithExpiration(24*time.Hour),
+			leases.WithLabels(map[string]string{
+				"containerd.io/gc.ref.snapshot." + snapshotter: key,
+			}),
+		)
+		if err != nil && !errdefs.IsAlreadyExists(err) {
+			return err
+		}
+
+		defer func() {
+			if retErr != nil && done != nil {
+				done(ctx)
+			}
+		}()
+
+		img, err := client.ImageService().Get(ctx, imageName)
+		if err != nil {
+			return err
+		}
+
+		i := containerd.NewImageWithPlatform(client, img, platforms.Only(p))
+		if err := i.Unpack(ctx, snapshotter); err != nil {
+			return errors.Wrap(err, "error unpacking image")
+		}
+
+		diffIDs, err := i.RootFS(ctx)
+		if err != nil {
+			return err
+		}
+		chainID := identity.ChainID(diffIDs).String()
+		if context.Bool("print-chainid") {
+			fmt.Println(chainID)
+		}
+
+		s := client.SnapshotService(snapshotter)
+
+		var mounts []mount.Mount
+		if context.Bool("read-only") {
+			mounts, err = s.View(ctx, key, chainID)
+		} else {
+			mounts, err = s.Prepare(ctx, key, chainID)
+		}
+		if err != nil {
+			if errdefs.IsAlreadyExists(err) {
+				mounts, err = s.Mounts(ctx, key)
+			}
+			if err != nil {
+				return err
+			}
+		}
+
+		if context.Bool("print-mounts") {
+			commands.PrintAsJSON(mounts)
+		}
 		return nil
 	},
 }
