@@ -326,35 +326,50 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	}
 
 	if kind == snapshots.KindActive {
-		parentLayerPaths := s.parentIDsToParentPaths(newSnapshot.ParentIDs)
-
-		var parentPath string
-		if len(parentLayerPaths) != 0 {
-			parentPath = parentLayerPaths[0]
+		log.G(ctx).Debug("createSnapshot active")
+		// Create the new snapshot dir
+		snDir := s.getSnapshotDir(newSnapshot.ID)
+		if err := os.MkdirAll(snDir, 0700); err != nil {
+			return nil, err
 		}
 
-		if err := hcsshim.CreateSandboxLayer(s.info, newSnapshot.ID, parentPath, parentLayerPaths); err != nil {
-			return nil, errors.Wrap(err, "failed to create sandbox layer")
-		}
+		// IO/disk space optimization
+		//
+		// We only need one sandbox.vhdx for the container. Skip making one for this
+		// snapshot if this isn't the snapshot that just houses the final sandbox.vhd
+		// that will be mounted as the containers scratch. Currently the key for a snapshot
+		// where a layer will be extracted to will have the string `extract-` in it.
+		if !strings.Contains(key, snapshots.UnpackKeyPrefix) {
+			parentLayerPaths := s.parentIDsToParentPaths(newSnapshot.ParentIDs)
 
-		var snapshotInfo snapshots.Info
-		for _, o := range opts {
-			o(&snapshotInfo)
-		}
-
-		var sizeGB int
-		if sizeGBstr, ok := snapshotInfo.Labels[rootfsSizeLabel]; ok {
-			i32, err := strconv.ParseInt(sizeGBstr, 10, 32)
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to parse annotation %q=%q", rootfsSizeLabel, sizeGBstr)
+			var parentPath string
+			if len(parentLayerPaths) != 0 {
+				parentPath = parentLayerPaths[0]
 			}
-			sizeGB = int(i32)
-		}
 
-		if sizeGB > 0 {
-			const gbToByte = 1024 * 1024 * 1024
-			if err := hcsshim.ExpandSandboxSize(s.info, newSnapshot.ID, uint64(gbToByte*sizeGB)); err != nil {
-				return nil, errors.Wrapf(err, "failed to expand scratch size to %d GB", sizeGB)
+			if err := hcsshim.CreateSandboxLayer(s.info, newSnapshot.ID, parentPath, parentLayerPaths); err != nil {
+				return nil, errors.Wrap(err, "failed to create sandbox layer")
+			}
+
+			var snapshotInfo snapshots.Info
+			for _, o := range opts {
+				o(&snapshotInfo)
+			}
+
+			var sizeGB int
+			if sizeGBstr, ok := snapshotInfo.Labels[rootfsSizeLabel]; ok {
+				i32, err := strconv.ParseInt(sizeGBstr, 10, 32)
+				if err != nil {
+					return nil, errors.Wrapf(err, "failed to parse label %q=%q", rootfsSizeLabel, sizeGBstr)
+				}
+				sizeGB = int(i32)
+			}
+
+			if sizeGB > 0 {
+				const gbToByte = 1024 * 1024 * 1024
+				if err := hcsshim.ExpandSandboxSize(s.info, newSnapshot.ID, uint64(gbToByte*sizeGB)); err != nil {
+					return nil, errors.Wrapf(err, "failed to expand scratch size to %d GB", sizeGB)
+				}
 			}
 		}
 	}
