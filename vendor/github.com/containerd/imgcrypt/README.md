@@ -28,7 +28,7 @@ disable_plugins = ["cri"]
 root = "/tmp/var/lib/containerd"
 state = "/tmp/run/containerd"
 [grpc]
-  address = "/tmp/run/containerd/mycontainerd.sock"
+  address = "/tmp/run/containerd/containerd.sock"
   uid = 0
   gid = 0
 [stream_processors]

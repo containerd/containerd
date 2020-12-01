@@ -1,7 +1,7 @@
 # github.com/BurntSushi/toml v0.3.1
 ## explicit
 github.com/BurntSushi/toml
-# github.com/Microsoft/go-winio v0.4.15-0.20200908182639-5b44b70ab3ab
+# github.com/Microsoft/go-winio v0.4.15
 ## explicit
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/pkg/etw
@@ -41,27 +41,27 @@ github.com/Microsoft/hcsshim/internal/wclayer
 github.com/Microsoft/hcsshim/internal/winapi
 github.com/Microsoft/hcsshim/osversion
 github.com/Microsoft/hcsshim/pkg/go-runhcs
-# github.com/Microsoft/hcsshim/test v0.0.0-20201119174602-966bebae11b4
+# github.com/Microsoft/hcsshim/test v0.0.0-20201124231931-de74fe8b94ae
 ## explicit
 github.com/Microsoft/hcsshim/test/functional/manifest
 # github.com/beorn7/perks v1.0.1
 github.com/beorn7/perks/quantile
 # github.com/cespare/xxhash/v2 v2.1.1
 github.com/cespare/xxhash/v2
-# github.com/cilium/ebpf v0.0.0-20200702112145-1c8d4c9ef775
+# github.com/cilium/ebpf v0.2.0
 github.com/cilium/ebpf
 github.com/cilium/ebpf/asm
 github.com/cilium/ebpf/internal
 github.com/cilium/ebpf/internal/btf
 github.com/cilium/ebpf/internal/unix
-# github.com/containerd/aufs v0.0.0-20200908144142-dab0cbea06f4
+# github.com/containerd/aufs v0.0.0-20201003224125-76a6863f2989
 ## explicit
 github.com/containerd/aufs
 github.com/containerd/aufs/plugin
 # github.com/containerd/btrfs v0.0.0-20201111183144-404b9149801e
 ## explicit
 github.com/containerd/btrfs
-# github.com/containerd/cgroups v0.0.0-20200824123100-0b889c03f102
+# github.com/containerd/cgroups v0.0.0-20201119153540-4cbc285b3327
 ## explicit
 github.com/containerd/cgroups
 github.com/containerd/cgroups/stats/v1
@@ -70,7 +70,7 @@ github.com/containerd/cgroups/v2/stats
 # github.com/containerd/console v1.0.1
 ## explicit
 github.com/containerd/console
-# github.com/containerd/continuity v0.0.0-20200710164510-efbc4488d8fe
+# github.com/containerd/continuity v0.0.0-20201201154230-62ef0fffa6a1
 ## explicit
 github.com/containerd/continuity
 github.com/containerd/continuity/devices
@@ -88,10 +88,10 @@ github.com/containerd/fifo
 # github.com/containerd/go-cni v1.0.1
 ## explicit
 github.com/containerd/go-cni
-# github.com/containerd/go-runc v0.0.0-20200220073739-7016d3ce2328
+# github.com/containerd/go-runc v0.0.0-20201020171139-16b287bc67d0
 ## explicit
 github.com/containerd/go-runc
-# github.com/containerd/imgcrypt v1.0.1
+# github.com/containerd/imgcrypt v1.0.3
 ## explicit
 github.com/containerd/imgcrypt
 github.com/containerd/imgcrypt/images/encryption
@@ -118,10 +118,10 @@ github.com/containernetworking/cni/pkg/types/020
 github.com/containernetworking/cni/pkg/types/current
 github.com/containernetworking/cni/pkg/utils
 github.com/containernetworking/cni/pkg/version
-# github.com/containernetworking/plugins v0.8.6
+# github.com/containernetworking/plugins v0.8.7
 ## explicit
 github.com/containernetworking/plugins/pkg/ns
-# github.com/containers/ocicrypt v1.0.1
+# github.com/containers/ocicrypt v1.0.3
 github.com/containers/ocicrypt
 github.com/containers/ocicrypt/blockcipher
 github.com/containers/ocicrypt/config
@@ -152,15 +152,13 @@ github.com/docker/go-units
 # github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96
 github.com/docker/spdystream
 github.com/docker/spdystream/spdy
-# github.com/emicklei/go-restful v2.9.5+incompatible
+# github.com/emicklei/go-restful v2.15.0+incompatible
 ## explicit
 github.com/emicklei/go-restful
 github.com/emicklei/go-restful/log
 # github.com/fsnotify/fsnotify v1.4.9
 ## explicit
 github.com/fsnotify/fsnotify
-# github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
-github.com/fullsailor/pkcs7
 # github.com/go-logr/logr v0.2.0
 github.com/go-logr/logr
 # github.com/godbus/dbus/v5 v5.0.3
@@ -199,14 +197,14 @@ github.com/gogo/protobuf/vanity
 github.com/gogo/protobuf/vanity/command
 # github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7
 github.com/golang/groupcache/lru
-# github.com/golang/protobuf v1.4.2 => github.com/golang/protobuf v1.3.5
+# github.com/golang/protobuf v1.4.3 => github.com/golang/protobuf v1.3.5
 ## explicit
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
-# github.com/google/go-cmp v0.5.1
+# github.com/google/go-cmp v0.5.4
 ## explicit
 github.com/google/go-cmp/cmp
 github.com/google/go-cmp/cmp/cmpopts
@@ -216,7 +214,7 @@ github.com/google/go-cmp/cmp/internal/function
 github.com/google/go-cmp/cmp/internal/value
 # github.com/google/gofuzz v1.1.0
 github.com/google/gofuzz
-# github.com/google/uuid v1.1.1
+# github.com/google/uuid v1.1.2
 ## explicit
 github.com/google/uuid
 # github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
@@ -224,10 +222,10 @@ github.com/google/uuid
 github.com/grpc-ecosystem/go-grpc-prometheus
 # github.com/hashicorp/errwrap v1.0.0
 github.com/hashicorp/errwrap
-# github.com/hashicorp/go-multierror v1.0.0
+# github.com/hashicorp/go-multierror v1.1.0
 ## explicit
 github.com/hashicorp/go-multierror
-# github.com/imdario/mergo v0.3.10
+# github.com/imdario/mergo v0.3.11
 ## explicit
 github.com/imdario/mergo
 # github.com/json-iterator/go v1.1.10
@@ -270,18 +268,18 @@ github.com/opencontainers/selinux/pkg/pwalk
 github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
-# github.com/prometheus/client_golang v1.7.1
+# github.com/prometheus/client_golang v1.8.0
 ## explicit
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal
 github.com/prometheus/client_golang/prometheus/promhttp
 # github.com/prometheus/client_model v0.2.0
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.10.0
+# github.com/prometheus/common v0.14.0
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 github.com/prometheus/common/model
-# github.com/prometheus/procfs v0.1.3
+# github.com/prometheus/procfs v0.2.0
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
@@ -296,10 +294,10 @@ github.com/sirupsen/logrus
 ## explicit
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
-# github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
+# github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635
 ## explicit
 github.com/syndtr/gocapability/capability
-# github.com/tchap/go-patricia v2.2.6+incompatible
+# github.com/tchap/go-patricia v2.3.0+incompatible
 ## explicit
 github.com/tchap/go-patricia/patricia
 # github.com/urfave/cli v1.22.2 => github.com/urfave/cli v1.22.1
@@ -311,6 +309,8 @@ github.com/willf/bitset
 # go.etcd.io/bbolt v1.3.5
 ## explicit
 go.etcd.io/bbolt
+# go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1
+go.mozilla.org/pkcs7
 # go.opencensus.io v0.22.2
 go.opencensus.io
 go.opencensus.io/internal
@@ -329,7 +329,7 @@ golang.org/x/crypto/openpgp/packet
 golang.org/x/crypto/openpgp/s2k
 golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/net v0.0.0-20200707034311-ab3426394381
+# golang.org/x/net v0.0.0-20201201195509-5d6afe98e0b7
 ## explicit
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
@@ -343,11 +343,11 @@ golang.org/x/net/websocket
 # golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
+# golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 ## explicit
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.0.0-20201013081832-0aaa2718063a
+# golang.org/x/sys v0.0.0-20201201145000-ef89a241ccb3
 ## explicit
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
@@ -424,10 +424,11 @@ gopkg.in/square/go-jose.v2/cipher
 gopkg.in/square/go-jose.v2/json
 # gopkg.in/yaml.v2 v2.3.0
 gopkg.in/yaml.v2
-# gotest.tools/v3 v3.0.2
+# gotest.tools/v3 v3.0.3
 ## explicit
 gotest.tools/v3/assert
 gotest.tools/v3/assert/cmp
+gotest.tools/v3/internal/assert
 gotest.tools/v3/internal/difflib
 gotest.tools/v3/internal/format
 gotest.tools/v3/internal/source

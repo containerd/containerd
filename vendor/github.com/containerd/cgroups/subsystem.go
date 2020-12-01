@@ -59,7 +59,7 @@ func Subsystems() []Name {
 		Blkio,
 		Rdma,
 	}
-	if !isUserNS {
+	if !RunningInUserNS() {
 		n = append(n, Devices)
 	}
 	return n
