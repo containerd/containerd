@@ -17,40 +17,16 @@
 package local
 
 import (
-	"sync"
-	"time"
+	"testing"
 
-	"github.com/containerd/containerd/errdefs"
-	"github.com/pkg/errors"
+	"gotest.tools/v3/assert"
 )
 
-// Handles locking references
+func TestTryLock(t *testing.T) {
+	err := tryLock("testref")
+	assert.NilError(t, err)
+	defer unlock("testref")
 
-type lock struct {
-	since time.Time
-}
-
-var (
-	// locks lets us lock in process
-	locks   = make(map[string]*lock)
-	locksMu sync.Mutex
-)
-
-func tryLock(ref string) error {
-	locksMu.Lock()
-	defer locksMu.Unlock()
-
-	if v, ok := locks[ref]; ok {
-		return errors.Wrapf(errdefs.ErrUnavailable, "ref %s locked since %s", ref, v.since)
-	}
-
-	locks[ref] = &lock{time.Now()}
-	return nil
-}
-
-func unlock(ref string) {
-	locksMu.Lock()
-	defer locksMu.Unlock()
-
-	delete(locks, ref)
+	err = tryLock("testref")
+	assert.ErrorContains(t, err, "ref testref locked since ")
 }
