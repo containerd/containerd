@@ -25,6 +25,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
@@ -309,7 +310,15 @@ func dumpStacks(writeToFile bool) {
 		bufferLen *= 2
 	}
 	buf = buf[:stackSize]
-	logrus.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
+	stacks := strings.Split(string(buf), "\n\n")
+	logrus.WithField("stackCount", len(stacks)).Info("Begin goroutine stack dump")
+	for i, stack := range stacks {
+		logrus.WithFields(logrus.Fields{
+			"index": i,
+			"stack": stack,
+		}).Info("Dumping goroutine stack")
+	}
+	logrus.Info("End goroutine stack dump")
 
 	if writeToFile {
 		// Also write to file to aid gathering diagnostics
