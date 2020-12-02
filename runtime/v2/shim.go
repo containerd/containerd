@@ -240,6 +240,21 @@ func (s *shim) Delete(ctx context.Context) (*runtime.Exit, error) {
 			}
 		}
 	}
+
+	// NOTE: If the shim has been killed and ttrpc connection has been
+	// closed, the shimErr will not be nil. For this case, the event
+	// subscriber, like moby/moby, might have received the exit or delete
+	// events. Just in case, we should allow ttrpc-callback-on-close to
+	// send the exit and delete events again. And the exit status will
+	// depend on result of shimV2.Delete.
+	//
+	// If not, the shim has been delivered the exit and delete events.
+	// So we should remove the record and prevent duplicate events from
+	// ttrpc-callback-on-close.
+	if shimErr == nil {
+		s.rtTasks.Delete(ctx, s.ID())
+	}
+
 	if err := s.waitShutdown(ctx); err != nil {
 		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim")
 	}

@@ -30,7 +30,6 @@ import (
 	"testing"
 	"time"
 
-	// Register the typeurl
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/namespaces"
