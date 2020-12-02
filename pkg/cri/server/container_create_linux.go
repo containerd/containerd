@@ -114,13 +114,20 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 
 	specOpts := []oci.SpecOpts{
 		customopts.WithoutRunMount,
-		customopts.WithoutDefaultSecuritySettings,
+	}
+	// only clear the default security settings if the runtime does not have a custom
+	// base runtime spec spec.  Admins can use this functionality to define
+	// default ulimits, seccomp, or other default settings.
+	if ociRuntime.BaseRuntimeSpec == "" {
+		specOpts = append(specOpts, customopts.WithoutDefaultSecuritySettings)
+	}
+	specOpts = append(specOpts,
 		customopts.WithRelativeRoot(relativeRootfsPath),
 		customopts.WithProcessArgs(config, imageConfig),
 		oci.WithDefaultPathEnv,
 		// this will be set based on the security context below
 		oci.WithNewPrivileges,
-	}
+	)
 	if config.GetWorkingDir() != "" {
 		specOpts = append(specOpts, oci.WithProcessCwd(config.GetWorkingDir()))
 	} else if imageConfig.WorkingDir != "" {
