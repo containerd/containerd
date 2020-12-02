@@ -43,6 +43,7 @@ var (
 	unregisterServiceFlag bool
 	runServiceFlag        bool
 	logFileFlag           string
+	priorityClassName     string
 
 	kernel32     = windows.NewLazySystemDLL("kernel32.dll")
 	setStdHandle = kernel32.NewProc("SetStdHandle")
@@ -51,7 +52,10 @@ var (
 	panicFile    *os.File
 )
 
-const defaultServiceName = "containerd"
+const (
+	defaultServiceName       = "containerd"
+	defaultPriorityClassName = "NORMAL_PRIORITY_CLASS"
+)
 
 // serviceFlags returns an array of flags for configuring containerd to run
 // as a Windows service under control of SCM.
@@ -79,11 +83,15 @@ func serviceFlags() []cli.Flag {
 			Name:  "log-file",
 			Usage: "Path to the containerd log file",
 		},
+		cli.StringFlag{
+			Name:  "priority-class",
+			Usage: "Name of the windows priority class",
+		},
 	}
 }
 
 // applyPlatformFlags applies platform-specific flags.
-func applyPlatformFlags(context *cli.Context) {
+func applyPlatformFlags(context *cli.Context) error {
 	serviceNameFlag = context.GlobalString("service-name")
 	if serviceNameFlag == "" {
 		serviceNameFlag = defaultServiceName
@@ -108,6 +116,20 @@ func applyPlatformFlags(context *cli.Context) {
 		*v.d = context.GlobalBool(v.name)
 	}
 	logFileFlag = context.GlobalString("log-file")
+	priorityClassName = context.GlobalString("priority-class")
+	if priorityClassName == "" {
+		priorityClassName = defaultPriorityClassName
+	}
+	priority := getPriorityValue(priorityClassName)
+	if priority == 0 {
+		return fmt.Errorf("unknown priority class %s, valid ones are available at "+
+			"https://docs.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities",
+			priorityClassName)
+	}
+	if err := windows.SetPriorityClass(windows.CurrentProcess(), priority); err != nil {
+		return err
+	}
+	return nil
 }
 
 type handler struct {
@@ -122,6 +144,20 @@ func getServicePath() (string, error) {
 		return "", err
 	}
 	return filepath.Abs(p)
+}
+
+// getPriorityValue returns the value associated with a Windows process priorityClass
+// Ref: https://docs.microsoft.com/en-us/windows/win32/cimwin32prov/setpriority-method-in-class-win32-process
+func getPriorityValue(priorityClassName string) uint32 {
+	var priorityClassMap = map[string]uint32{
+		"IDLE_PRIORITY_CLASS":         uint32(windows.IDLE_PRIORITY_CLASS),
+		"BELOW_NORMAL_PRIORITY_CLASS": uint32(windows.BELOW_NORMAL_PRIORITY_CLASS),
+		"NORMAL_PRIORITY_CLASS":       uint32(windows.NORMAL_PRIORITY_CLASS),
+		"ABOVE_NORMAL_PRIORITY_CLASS": uint32(windows.ABOVE_NORMAL_PRIORITY_CLASS),
+		"HIGH_PRIORITY_CLASS":         uint32(windows.HIGH_PRIORITY_CLASS),
+		"REALTIME_PRIORITY_CLASS":     uint32(windows.REALTIME_PRIORITY_CLASS),
+	}
+	return priorityClassMap[priorityClassName]
 }
 
 func registerService() error {
@@ -142,11 +178,11 @@ func registerService() error {
 		DisplayName:  "Containerd",
 		Description:  "Container runtime",
 	}
-
+	
 	// Configure the service to launch with the arguments that were just passed.
 	args := []string{"--run-service"}
 	for _, a := range os.Args[1:] {
-		if a != "--register-service" && a != "--unregister-service" {
+		if a != "--register-service" && a != "--unregister-service" && a != "--priorityclass" {
 			args = append(args, a)
 		}
 	}

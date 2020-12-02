@@ -277,7 +277,9 @@ func applyFlags(context *cli.Context, config *srvconfig.Config) error {
 		}
 	}
 
-	applyPlatformFlags(context)
+	if err := applyPlatformFlags(context); err != nil {
+		return err
+	}
 
 	return nil
 }
