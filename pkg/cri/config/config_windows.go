@@ -44,6 +44,7 @@ func DefaultConfig() PluginConfig {
 					Type: "io.containerd.runhcs.v1",
 				},
 			},
+			DisableSnapshotAnnotations: true,
 		},
 		DisableTCPService:   true,
 		StreamServerAddress: "127.0.0.1",
@@ -65,7 +66,7 @@ func DefaultConfig() PluginConfig {
 			},
 		},
 		MaxConcurrentDownloads:    3,
-		IgnoreImageDefinedVolumes: false,
+		IgnoreImageDefinedVolumes: true,
 		// TODO(windows): Add platform specific config, so that most common defaults can be shared.
 	}
 }

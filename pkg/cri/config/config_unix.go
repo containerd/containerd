@@ -71,6 +71,6 @@ func DefaultConfig() PluginConfig {
 		DisableProcMount:                 false,
 		TolerateMissingHugetlbController: true,
 		DisableHugetlbController:         true,
-		IgnoreImageDefinedVolumes:        false,
+		IgnoreImageDefinedVolumes:        true,
 	}
 }
