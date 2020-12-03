@@ -163,10 +163,19 @@ func (c *criService) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 	var (
 		securityContext = config.GetLinux().GetSecurityContext()
 		specOpts        []oci.SpecOpts
+		err             error
 	)
+	ssp := securityContext.GetSeccomp()
+	if ssp == nil {
+		ssp, err = generateSeccompSecurityProfile(
+			securityContext.GetSeccompProfilePath(), // nolint:staticcheck deprecated but we don't want to remove yet
+			c.config.UnsetSeccompProfile)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to generate seccomp spec opts")
+		}
+	}
 	seccompSpecOpts, err := c.generateSeccompSpecOpts(
-		securityContext.GetSeccomp(),
-		securityContext.GetSeccompProfilePath(), // nolint:staticcheck deprecated but we don't want to remove yet
+		ssp,
 		securityContext.GetPrivileged(),
 		c.seccompEnabled())
 	if err != nil {

@@ -306,9 +306,15 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 	}
 	specOpts = append(specOpts, customopts.WithAdditionalGIDs(userstr))
 
+	asp := securityContext.GetApparmor()
+	if asp == nil {
+		asp, err = generateApparmorSecurityProfile(securityContext.GetApparmorProfile()) // nolint:staticcheck deprecated but we don't want to remove yet
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to generate apparmor spec opts")
+		}
+	}
 	apparmorSpecOpts, err := generateApparmorSpecOpts(
-		securityContext.GetApparmor(),
-		securityContext.GetApparmorProfile(), // nolint:staticcheck deprecated but we don't want to remove yet
+		asp,
 		securityContext.GetPrivileged(),
 		c.apparmorEnabled())
 	if err != nil {
@@ -318,9 +324,17 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 		specOpts = append(specOpts, apparmorSpecOpts)
 	}
 
+	ssp := securityContext.GetSeccomp()
+	if ssp == nil {
+		ssp, err = generateSeccompSecurityProfile(
+			securityContext.GetSeccompProfilePath(), // nolint:staticcheck deprecated but we don't want to remove yet
+			c.config.UnsetSeccompProfile)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to generate seccomp spec opts")
+		}
+	}
 	seccompSpecOpts, err := c.generateSeccompSpecOpts(
-		securityContext.GetSeccomp(),
-		securityContext.GetSeccompProfilePath(), // nolint:staticcheck deprecated but we don't want to remove yet
+		ssp,
 		securityContext.GetPrivileged(),
 		c.seccompEnabled())
 	if err != nil {
@@ -332,24 +346,51 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 	return specOpts, nil
 }
 
+func generateSeccompSecurityProfile(profilePath string, unsetProfilePath string) (*runtime.SecurityProfile, error) {
+	if profilePath != "" {
+		return generateSecurityProfile(profilePath)
+	}
+	if unsetProfilePath != "" {
+		return generateSecurityProfile(unsetProfilePath)
+	}
+	return nil, nil
+}
+func generateApparmorSecurityProfile(profilePath string) (*runtime.SecurityProfile, error) {
+	if profilePath != "" {
+		return generateSecurityProfile(profilePath)
+	}
+	return nil, nil
+}
+
+func generateSecurityProfile(profilePath string) (*runtime.SecurityProfile, error) {
+	switch profilePath {
+	case runtimeDefault, dockerDefault, "":
+		return &runtime.SecurityProfile{
+			ProfileType: runtime.SecurityProfile_RuntimeDefault,
+		}, nil
+	case unconfinedProfile:
+		return &runtime.SecurityProfile{
+			ProfileType: runtime.SecurityProfile_Unconfined,
+		}, nil
+	default:
+		// Require and Trim default profile name prefix
+		if !strings.HasPrefix(profilePath, profileNamePrefix) {
+			return nil, errors.Errorf("invalid profile %q", profilePath)
+		}
+		return &runtime.SecurityProfile{
+			ProfileType:  runtime.SecurityProfile_Localhost,
+			LocalhostRef: strings.TrimPrefix(profilePath, profileNamePrefix),
+		}, nil
+	}
+}
+
 // generateSeccompSpecOpts generates containerd SpecOpts for seccomp.
-func (c *criService) generateSeccompSpecOpts(sp *runtime.SecurityProfile, seccompProf string, privileged, seccompEnabled bool) (oci.SpecOpts, error) {
+func (c *criService) generateSeccompSpecOpts(sp *runtime.SecurityProfile, privileged, seccompEnabled bool) (oci.SpecOpts, error) {
 	if privileged {
 		// Do not set seccomp profile when container is privileged
 		return nil, nil
 	}
-	if seccompProf == "" && sp == nil {
-		seccompProf = c.config.UnsetSeccompProfile
-	}
-	// Set seccomp profile
-	if seccompProf == runtimeDefault || seccompProf == dockerDefault {
-		// use correct default profile (Eg. if not configured otherwise, the default is docker/default)
-		seccompProf = seccompDefaultProfile
-	}
 	if !seccompEnabled {
-		if seccompProf != "" && seccompProf != unconfinedProfile {
-			return nil, errors.New("seccomp is not supported")
-		}
 		if sp != nil {
 			if sp.ProfileType != runtime.SecurityProfile_Unconfined {
 				return nil, errors.New("seccomp is not supported")
@@ -358,49 +399,33 @@ func (c *criService) generateSeccompSpecOpts(sp *runtime.SecurityProfile, seccom
 		return nil, nil
 	}
 
-	if sp != nil {
-		if sp.ProfileType != runtime.SecurityProfile_Localhost && sp.LocalhostRef != "" {
-			return nil, errors.New("seccomp config invalid LocalhostRef must only be set if ProfileType is Localhost")
-		}
-		switch sp.ProfileType {
-		case runtime.SecurityProfile_Unconfined:
-			// Do not set seccomp profile.
-			return nil, nil
-		case runtime.SecurityProfile_RuntimeDefault:
-			return seccomp.WithDefaultProfile(), nil
-		case runtime.SecurityProfile_Localhost:
-			// trimming the localhost/ prefix just in case even through it should not
-			// be necessary with the new SecurityProfile struct
-			return seccomp.WithProfile(strings.TrimPrefix(sp.LocalhostRef, profileNamePrefix)), nil
-		default:
-			return nil, errors.New("seccomp unknown ProfileType")
-		}
+	if sp == nil {
+		return nil, nil
 	}
 
-	switch seccompProf {
-	case "", unconfinedProfile:
+	if sp.ProfileType != runtime.SecurityProfile_Localhost && sp.LocalhostRef != "" {
+		return nil, errors.New("seccomp config invalid LocalhostRef must only be set if ProfileType is Localhost")
+	}
+	switch sp.ProfileType {
+	case runtime.SecurityProfile_Unconfined:
 		// Do not set seccomp profile.
 		return nil, nil
-	case dockerDefault:
-		// Note: WithDefaultProfile specOpts must be added after capabilities
+	case runtime.SecurityProfile_RuntimeDefault:
 		return seccomp.WithDefaultProfile(), nil
+	case runtime.SecurityProfile_Localhost:
+		// trimming the localhost/ prefix just in case even though it should not
+		// be necessary with the new SecurityProfile struct
+		return seccomp.WithProfile(strings.TrimPrefix(sp.LocalhostRef, profileNamePrefix)), nil
 	default:
-		// Require and Trim default profile name prefix
-		if !strings.HasPrefix(seccompProf, profileNamePrefix) {
-			return nil, errors.Errorf("invalid seccomp profile %q", seccompProf)
-		}
-		return seccomp.WithProfile(strings.TrimPrefix(seccompProf, profileNamePrefix)), nil
+		return nil, errors.New("seccomp unknown ProfileType")
 	}
 }
 
 // generateApparmorSpecOpts generates containerd SpecOpts for apparmor.
-func generateApparmorSpecOpts(sp *runtime.SecurityProfile, apparmorProf string, privileged, apparmorEnabled bool) (oci.SpecOpts, error) {
+func generateApparmorSpecOpts(sp *runtime.SecurityProfile, privileged, apparmorEnabled bool) (oci.SpecOpts, error) {
 	if !apparmorEnabled {
 		// Should fail loudly if user try to specify apparmor profile
 		// but we don't support it.
-		if apparmorProf != "" && apparmorProf != unconfinedProfile {
-			return nil, errors.New("apparmor is not supported")
-		}
 		if sp != nil {
 			if sp.ProfileType != runtime.SecurityProfile_Unconfined {
 				return nil, errors.New("apparmor is not supported")
@@ -409,55 +434,31 @@ func generateApparmorSpecOpts(sp *runtime.SecurityProfile, apparmorProf string, 
 		return nil, nil
 	}
 
-	if sp != nil {
-		if sp.ProfileType != runtime.SecurityProfile_Localhost && sp.LocalhostRef != "" {
-			return nil, errors.New("apparmor config invalid LocalhostRef must only be set if ProfileType is Localhost")
-		}
-
-		switch sp.ProfileType {
-		case runtime.SecurityProfile_Unconfined:
-			// Do not set apparmor profile.
-			return nil, nil
-		case runtime.SecurityProfile_RuntimeDefault:
-			if privileged {
-				// Do not set apparmor profile when container is privileged
-				return nil, nil
-			}
-			return apparmor.WithDefaultProfile(appArmorDefaultProfileName), nil
-		case runtime.SecurityProfile_Localhost:
-			// trimming the localhost/ prefix just in case even through it should not
-			// be necessary with the new SecurityProfile struct
-			appArmorProfile := strings.TrimPrefix(sp.LocalhostRef, profileNamePrefix)
-			if profileExists, err := appArmorProfileExists(appArmorProfile); !profileExists {
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to generate apparmor spec opts")
-				}
-				return nil, errors.Errorf("apparmor profile not found %s", appArmorProfile)
-			}
-			return apparmor.WithProfile(appArmorProfile), nil
-		default:
-			return nil, errors.New("apparmor unknown ProfileType")
-		}
+	if sp == nil {
+		// Based on kubernetes#51746, default apparmor profile should be applied
+		// for when apparmor is not specified.
+		sp, _ = generateSecurityProfile("")
 	}
 
-	switch apparmorProf {
-	// Based on kubernetes#51746, default apparmor profile should be applied
-	// for when apparmor is not specified.
-	case runtimeDefault, "":
+	if sp.ProfileType != runtime.SecurityProfile_Localhost && sp.LocalhostRef != "" {
+		return nil, errors.New("apparmor config invalid LocalhostRef must only be set if ProfileType is Localhost")
+	}
+
+	switch sp.ProfileType {
+	case runtime.SecurityProfile_Unconfined:
+		// Do not set apparmor profile.
+		return nil, nil
+	case runtime.SecurityProfile_RuntimeDefault:
 		if privileged {
 			// Do not set apparmor profile when container is privileged
 			return nil, nil
 		}
 		// TODO (mikebrow): delete created apparmor default profile
 		return apparmor.WithDefaultProfile(appArmorDefaultProfileName), nil
-	case unconfinedProfile:
-		return nil, nil
-	default:
-		// Require and Trim default profile name prefix
-		if !strings.HasPrefix(apparmorProf, profileNamePrefix) {
-			return nil, errors.Errorf("invalid apparmor profile %q", apparmorProf)
-		}
-		appArmorProfile := strings.TrimPrefix(apparmorProf, profileNamePrefix)
+	case runtime.SecurityProfile_Localhost:
+		// trimming the localhost/ prefix just in case even through it should not
+		// be necessary with the new SecurityProfile struct
+		appArmorProfile := strings.TrimPrefix(sp.LocalhostRef, profileNamePrefix)
 		if profileExists, err := appArmorProfileExists(appArmorProfile); !profileExists {
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to generate apparmor spec opts")
@@ -465,6 +466,8 @@ func generateApparmorSpecOpts(sp *runtime.SecurityProfile, apparmorProf string, 
 			return nil, errors.Errorf("apparmor profile not found %s", appArmorProfile)
 		}
 		return apparmor.WithProfile(appArmorProfile), nil
+	default:
+		return nil, errors.New("apparmor unknown ProfileType")
 	}
 }
 

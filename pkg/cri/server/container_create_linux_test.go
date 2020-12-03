@@ -832,10 +832,6 @@ func TestGenerateSeccompSecurityProfileSpecOpts(t *testing.T) {
 			profile:  profileNamePrefix + "test-profile",
 			specOpts: seccomp.WithProfile("test-profile"),
 		},
-		"should return error if specified profile is invalid": {
-			profile:   "test-profile",
-			expectErr: true,
-		},
 		"should use default profile when seccomp is empty": {
 			defaultProfile: profileNamePrefix + "test-profile",
 			specOpts:       seccomp.WithProfile("test-profile"),
@@ -903,14 +899,29 @@ func TestGenerateSeccompSecurityProfileSpecOpts(t *testing.T) {
 		t.Run(fmt.Sprintf("TestCase %q", desc), func(t *testing.T) {
 			cri := &criService{}
 			cri.config.UnsetSeccompProfile = test.defaultProfile
-			specOpts, err := cri.generateSeccompSpecOpts(test.sp, test.profile, test.privileged, !test.disable)
-			assert.Equal(t,
-				reflect.ValueOf(test.specOpts).Pointer(),
-				reflect.ValueOf(specOpts).Pointer())
-			if test.expectErr {
-				assert.Error(t, err)
+			ssp := test.sp
+			csp, err := generateSeccompSecurityProfile(
+				test.profile,
+				test.defaultProfile)
+			if err != nil {
+				if test.expectErr {
+					assert.Error(t, err)
+				} else {
+					assert.NoError(t, err)
+				}
 			} else {
-				assert.NoError(t, err)
+				if ssp == nil {
+					ssp = csp
+				}
+				specOpts, err := cri.generateSeccompSpecOpts(ssp, test.privileged, !test.disable)
+				assert.Equal(t,
+					reflect.ValueOf(test.specOpts).Pointer(),
+					reflect.ValueOf(specOpts).Pointer())
+				if test.expectErr {
+					assert.Error(t, err)
+				} else {
+					assert.NoError(t, err)
+				}
 			}
 		})
 	}
@@ -1039,14 +1050,27 @@ func TestGenerateApparmorSpecOpts(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		specOpts, err := generateApparmorSpecOpts(test.sp, test.profile, test.privileged, !test.disable)
-		assert.Equal(t,
-			reflect.ValueOf(test.specOpts).Pointer(),
-			reflect.ValueOf(specOpts).Pointer())
-		if test.expectErr {
-			assert.Error(t, err)
+		asp := test.sp
+		csp, err := generateApparmorSecurityProfile(test.profile)
+		if err != nil {
+			if test.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 		} else {
-			assert.NoError(t, err)
+			if asp == nil {
+				asp = csp
+			}
+			specOpts, err := generateApparmorSpecOpts(asp, test.privileged, !test.disable)
+			assert.Equal(t,
+				reflect.ValueOf(test.specOpts).Pointer(),
+				reflect.ValueOf(specOpts).Pointer())
+			if test.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 		}
 	}
 }
