@@ -51,11 +51,6 @@ high performance container runtime
 `
 
 func init() {
-	logrus.SetFormatter(&logrus.TextFormatter{
-		TimestampFormat: log.RFC3339NanoFixed,
-		FullTimestamp:   true,
-	})
-
 	// Discard grpc logs so that they don't mess with our stdio
 	grpclog.SetLoggerV2(grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, ioutil.Discard))
 
@@ -252,7 +247,10 @@ func serve(ctx gocontext.Context, l net.Listener, serveFunc func(net.Listener) e
 func applyFlags(context *cli.Context, config *srvconfig.Config) error {
 	// the order for config vs flag values is that flags will always override
 	// the config values if they are set
-	if err := setLevel(context, config); err != nil {
+	if err := setLogLevel(context, config); err != nil {
+		return err
+	}
+	if err := setLogFormat(config); err != nil {
 		return err
 	}
 	for _, v := range []struct {
@@ -282,7 +280,7 @@ func applyFlags(context *cli.Context, config *srvconfig.Config) error {
 	return nil
 }
 
-func setLevel(context *cli.Context, config *srvconfig.Config) error {
+func setLogLevel(context *cli.Context, config *srvconfig.Config) error {
 	l := context.GlobalString("log-level")
 	if l == "" {
 		l = config.Debug.Level
@@ -294,6 +292,29 @@ func setLevel(context *cli.Context, config *srvconfig.Config) error {
 		}
 		logrus.SetLevel(lvl)
 	}
+	return nil
+}
+
+func setLogFormat(config *srvconfig.Config) error {
+	f := config.Debug.Format
+	if f == "" {
+		f = log.TextFormat
+	}
+
+	switch f {
+	case log.TextFormat:
+		logrus.SetFormatter(&logrus.TextFormatter{
+			TimestampFormat: log.RFC3339NanoFixed,
+			FullTimestamp:   true,
+		})
+	case log.JSONFormat:
+		logrus.SetFormatter(&logrus.JSONFormatter{
+			TimestampFormat: log.RFC3339NanoFixed,
+		})
+	default:
+		return errors.Errorf("unknown log format: %s", f)
+	}
+
 	return nil
 }
 
