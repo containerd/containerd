@@ -138,12 +138,6 @@ func cleanupAfterDeadShim(ctx context.Context, id, ns string, rt *runtime.TaskLi
 		}).Warn("failed to clean up after shim disconnected")
 	}
 
-	if _, err := rt.Get(ctx, id); err != nil {
-		// Task was never started or was already successfully deleted
-		// No need to publish events
-		return
-	}
-
 	var (
 		pid        uint32
 		exitStatus uint32

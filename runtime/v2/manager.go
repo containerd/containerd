@@ -139,6 +139,12 @@ func (m *TaskManager) Create(ctx context.Context, id string, opts runtime.Create
 	shim, err := b.Start(ctx, topts, func() {
 		log.G(ctx).WithField("id", id).Info("shim disconnected")
 
+		_, err := m.tasks.Get(ctx, id)
+		if err != nil {
+			// Task was never started or was already successfully deleted
+			return
+		}
+
 		cleanupAfterDeadShim(context.Background(), id, ns, m.tasks, m.events, b)
 		// Remove self from the runtime task list. Even though the cleanupAfterDeadShim()
 		// would publish taskExit event, but the shim.Delete() would always failed with ttrpc
@@ -262,6 +268,12 @@ func (m *TaskManager) loadTasks(ctx context.Context) error {
 		binaryCall := shimBinary(ctx, bundle, container.Runtime.Name, m.containerdAddress, m.containerdTTRPCAddress, m.events, m.tasks)
 		shim, err := loadShim(ctx, bundle, m.events, m.tasks, func() {
 			log.G(ctx).WithField("id", id).Info("shim disconnected")
+
+			_, err := m.tasks.Get(ctx, id)
+			if err != nil {
+				// Task was never started or was already successfully deleted
+				return
+			}
 
 			cleanupAfterDeadShim(context.Background(), id, ns, m.tasks, m.events, binaryCall)
 			// Remove self from the runtime task list.
