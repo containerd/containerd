@@ -11,7 +11,7 @@ require (
 	github.com/containerd/btrfs v0.0.0-20201111183144-404b9149801e
 	github.com/containerd/cgroups v0.0.0-20200824123100-0b889c03f102
 	github.com/containerd/console v1.0.1
-	github.com/containerd/continuity v0.0.0-20200710164510-efbc4488d8fe
+	github.com/containerd/continuity v0.0.0-20201204184040-1d9893e5674b
 	github.com/containerd/fifo v0.0.0-20201026212402-0724c46b320c
 	github.com/containerd/go-cni v1.0.1
 	github.com/containerd/go-runc v0.0.0-20200220073739-7016d3ce2328
@@ -30,7 +30,7 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/gogo/googleapis v1.4.0
 	github.com/gogo/protobuf v1.3.1
-	github.com/golang/protobuf v1.4.2
+	github.com/golang/protobuf v1.4.3
 	github.com/google/go-cmp v0.5.1
 	github.com/google/uuid v1.1.1
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
@@ -53,7 +53,7 @@ require (
 	go.etcd.io/bbolt v1.3.5
 	golang.org/x/net v0.0.0-20200707034311-ab3426394381
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
-	golang.org/x/sys v0.0.0-20201013081832-0aaa2718063a
+	golang.org/x/sys v0.0.0-20201202213521-69691e467435
 	google.golang.org/grpc v1.30.0
 	gotest.tools/v3 v3.0.2
 	k8s.io/api v0.19.4
