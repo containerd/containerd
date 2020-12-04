@@ -70,7 +70,7 @@ github.com/containerd/cgroups/v2/stats
 # github.com/containerd/console v1.0.1
 ## explicit
 github.com/containerd/console
-# github.com/containerd/continuity v0.0.0-20200710164510-efbc4488d8fe
+# github.com/containerd/continuity v0.0.0-20201204184040-1d9893e5674b
 ## explicit
 github.com/containerd/continuity
 github.com/containerd/continuity/devices
@@ -199,7 +199,7 @@ github.com/gogo/protobuf/vanity
 github.com/gogo/protobuf/vanity/command
 # github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7
 github.com/golang/groupcache/lru
-# github.com/golang/protobuf v1.4.2 => github.com/golang/protobuf v1.3.5
+# github.com/golang/protobuf v1.4.3 => github.com/golang/protobuf v1.3.5
 ## explicit
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes
@@ -347,7 +347,7 @@ golang.org/x/oauth2/internal
 ## explicit
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.0.0-20201013081832-0aaa2718063a
+# golang.org/x/sys v0.0.0-20201202213521-69691e467435
 ## explicit
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
