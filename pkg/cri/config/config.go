@@ -352,6 +352,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 			c.Registry.Configs = make(map[string]RegistryConfig)
 		}
 		for endpoint, auth := range c.Registry.Auths {
+			auth := auth
 			config := c.Registry.Configs[endpoint]
 			config.Auth = &auth
 			c.Registry.Configs[endpoint] = config
