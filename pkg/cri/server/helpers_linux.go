@@ -30,6 +30,7 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/pkg/apparmor"
 	"github.com/containerd/containerd/pkg/seccomp"
 	"github.com/containerd/containerd/pkg/seutil"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -146,7 +147,7 @@ func (c *criService) apparmorEnabled() bool {
 	if c.config.DisableApparmor {
 		return false
 	}
-	return hostSupportsAppArmor()
+	return apparmor.HostSupports()
 }
 
 func (c *criService) seccompEnabled() bool {

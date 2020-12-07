@@ -16,9 +16,9 @@
    limitations under the License.
 */
 
-package server
+package apparmor
 
 //nolint: deadcode, unused
-func hostSupportsAppArmor() bool {
+func HostSupports() bool {
 	return false
 }
