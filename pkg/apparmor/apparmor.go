@@ -16,7 +16,7 @@
    limitations under the License.
 */
 
-package server
+package apparmor
 
 import (
 	"io/ioutil"
@@ -29,12 +29,12 @@ var (
 	checkAppArmor     sync.Once
 )
 
-// hostSupportsAppArmor returns true if apparmor is enabled for the host, if
+// HostSupports returns true if apparmor is enabled for the host, if
 // apparmor_parser is enabled, and if we are not running docker-in-docker.
 //
 // It is a modified version of libcontainer/apparmor.IsEnabled(), which does not
 // check for apparmor_parser to be present, or if we're running docker-in-docker.
-func hostSupportsAppArmor() bool {
+func HostSupports() bool {
 	checkAppArmor.Do(func() {
 		// see https://github.com/docker/docker/commit/de191e86321f7d3136ff42ff75826b8107399497
 		if _, err := os.Stat("/sys/kernel/security/apparmor"); err == nil && os.Getenv("container") == "" {
