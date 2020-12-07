@@ -138,6 +138,8 @@ type Debug struct {
 	UID     int    `toml:"uid"`
 	GID     int    `toml:"gid"`
 	Level   string `toml:"level"`
+	// Format represents the logging format
+	Format string `toml:"format"`
 }
 
 // MetricsConfig provides metrics configuration
