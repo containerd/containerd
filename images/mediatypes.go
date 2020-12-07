@@ -78,6 +78,8 @@ func DiffCompression(ctx context.Context, mediaType string) (string, error) {
 			switch ext[len(ext)-1] {
 			case "gzip":
 				return "gzip", nil
+			case "zstd":
+				return "zstd", nil
 			}
 		}
 		return "", nil
