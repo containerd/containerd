@@ -29,7 +29,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/runtime"
 	client "github.com/containerd/containerd/runtime/v2/shim"
-	"github.com/containerd/containerd/runtime/v2/task"
+	shimapi "github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/ttrpc"
 	"github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
@@ -122,11 +122,12 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 	}
 	client := ttrpc.NewClient(conn, ttrpc.WithOnClose(onCloseWithShimLog))
 	return &shim{
-		bundle:  b.bundle,
-		client:  client,
-		task:    task.NewTaskClient(client),
-		events:  b.events,
-		rtTasks: b.rtTasks,
+		bundle:      b.bundle,
+		client:      client,
+		task:        shimapi.NewTaskClient(client),
+		portforward: shimapi.NewPortForwardClient(client),
+		events:      b.events,
+		rtTasks:     b.rtTasks,
 	}, nil
 }
 
@@ -169,7 +170,7 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 	if s != "" {
 		log.G(ctx).Warnf("cleanup warnings %s", s)
 	}
-	var response task.DeleteResponse
+	var response shimapi.DeleteResponse
 	if err := response.Unmarshal(out.Bytes()); err != nil {
 		return nil, err
 	}

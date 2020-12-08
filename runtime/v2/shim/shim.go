@@ -294,8 +294,14 @@ func (s *Client) Serve() error {
 		return errors.Wrap(err, "failed creating server")
 	}
 
-	logrus.Debug("registering ttrpc server")
+	logrus.Debug("registering task service")
 	shimapi.RegisterTaskService(server, s.service)
+
+	// Register the port forward service if it is implemented.
+	if pfsvc, ok := s.service.(shimapi.PortForwardService); ok {
+		logrus.Debug("registering portforward service")
+		shimapi.RegisterPortForwardService(server, pfsvc)
+	}
 
 	if err := serve(s.context, server, socketFlag); err != nil {
 		return err

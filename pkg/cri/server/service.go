@@ -46,6 +46,7 @@ import (
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	osinterface "github.com/containerd/containerd/pkg/os"
 	"github.com/containerd/containerd/pkg/registrar"
+	"github.com/containerd/containerd/runtime/v2/services/portforward"
 )
 
 // grpcServices are all the grpc services provided by cri containerd.
@@ -89,6 +90,8 @@ type criService struct {
 	netPlugin cni.CNI
 	// client is an instance of the containerd client
 	client *containerd.Client
+	// pfClient is a client used to initiate port forwarding with containers.
+	pfClient portforward.PortForward
 	// streamServer is the streaming server serves container streaming request.
 	streamServer streaming.Server
 	// eventMonitor is the monitor monitors containerd events.
@@ -107,7 +110,7 @@ type criService struct {
 }
 
 // NewCRIService returns a new instance of CRIService
-func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIService, error) {
+func NewCRIService(config criconfig.Config, client *containerd.Client, pf portforward.PortForward) (CRIService, error) {
 	var err error
 	labels := label.NewStore()
 	c := &criService{
@@ -121,6 +124,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerNameIndex: registrar.NewRegistrar(),
 		initialized:        atomic.NewBool(false),
+		pfClient:           pf,
 	}
 
 	if client.SnapshotService(c.config.ContainerdConfig.Snapshotter) == nil {
