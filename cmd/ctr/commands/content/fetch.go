@@ -108,6 +108,8 @@ type FetchConfig struct {
 	Platforms []string
 	// Whether or not download all metadata
 	AllMetadata bool
+	// RemoteOpts is not used by ctr, but can be used by other CLI tools
+	RemoteOpts []containerd.RemoteOpt
 }
 
 // NewFetchConfig returns the default FetchConfig from cli flags
@@ -172,6 +174,7 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 		containerd.WithImageHandler(h),
 		containerd.WithSchema1Conversion,
 	}
+	opts = append(opts, config.RemoteOpts...)
 
 	if config.AllMetadata {
 		opts = append(opts, containerd.WithAllMetadata())
