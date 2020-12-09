@@ -11,7 +11,7 @@ require (
 	github.com/containerd/btrfs v0.0.0-20201111183144-404b9149801e
 	github.com/containerd/cgroups v0.0.0-20200824123100-0b889c03f102
 	github.com/containerd/console v1.0.1
-	github.com/containerd/continuity v0.0.0-20201204184040-1d9893e5674b
+	github.com/containerd/continuity v0.0.0-20201208142359-180525291bb7
 	github.com/containerd/fifo v0.0.0-20201026212402-0724c46b320c
 	github.com/containerd/go-cni v1.0.1
 	github.com/containerd/go-runc v0.0.0-20200220073739-7016d3ce2328
