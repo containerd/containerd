@@ -320,7 +320,11 @@ jobs:
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
         run: |
+          set +e
           CONTAINERD_RUNTIME=$TEST_RUNTIME make cri-integration
+          TEST_RC=$?
+          test $TEST_RC -ne 0 && cat /tmp/test-integration/containerd.log
+          test $TEST_RC -eq 0 || /bin/false
         working-directory: src/github.com/containerd/containerd
 
       - name: cri-tools critest
