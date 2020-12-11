@@ -157,6 +157,13 @@ jobs:
           make binaries
         working-directory: src/github.com/containerd/containerd
 
+      - name: Cross-compile
+        if: startsWith(matrix.os, 'ubuntu')
+        run : |
+          GOOS=freebsd make build
+          GOOS=freebsd make binaries
+        working-directory: src/github.com/containerd/containerd
+
   #
   # Integration and CRI tests
   #
