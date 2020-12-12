@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Microsoft/hcsshim/ext4/internal/format"
+	"github.com/Microsoft/hcsshim/internal/memory"
 )
 
 // Writer writes a compact ext4 file system.
@@ -101,15 +102,15 @@ const (
 	maxInodesPerGroup       = BlockSize * 8 // Limited by the inode bitmap
 	inodesPerGroupIncrement = BlockSize / inodeSize
 
-	defaultMaxDiskSize = 16 * 1024 * 1024 * 1024        // 16GB
+	defaultMaxDiskSize = 16 * memory.GiB                // 16GB
 	maxMaxDiskSize     = 16 * 1024 * 1024 * 1024 * 1024 // 16TB
 
 	groupDescriptorSize      = 32 // Use the small group descriptor
 	groupsPerDescriptorBlock = BlockSize / groupDescriptorSize
 
-	maxFileSize             = 128 * 1024 * 1024 * 1024 // 128GB file size maximum for now
-	smallSymlinkSize        = 59                       // max symlink size that goes directly in the inode
-	maxBlocksPerExtent      = 0x8000                   // maximum number of blocks in an extent
+	maxFileSize             = 128 * memory.GiB // 128GB file size maximum for now
+	smallSymlinkSize        = 59               // max symlink size that goes directly in the inode
+	maxBlocksPerExtent      = 0x8000           // maximum number of blocks in an extent
 	inodeDataSize           = 60
 	inodeUsedSize           = 152 // fields through CrtimeExtra
 	inodeExtraSize          = inodeSize - inodeUsedSize
@@ -414,6 +415,15 @@ func (w *Writer) makeInode(f *File, node *inode) (*inode, error) {
 	node.Devmajor = f.Devmajor
 	node.Devminor = f.Devminor
 	node.Data = nil
+	if f.Xattrs == nil {
+		f.Xattrs = make(map[string][]byte)
+	}
+
+	// copy over existing xattrs first, we need to merge existing xattrs and the passed xattrs.
+	existingXattrs := make(map[string][]byte)
+	if len(node.XattrInline) > 0 {
+		getXattrs(node.XattrInline[4:], existingXattrs, 0)
+	}
 	node.XattrInline = nil
 
 	var xstate xattrState
@@ -450,6 +460,13 @@ func (w *Writer) makeInode(f *File, node *inode) (*inode, error) {
 	case format.S_IFDIR, format.S_IFIFO, format.S_IFSOCK, format.S_IFCHR, format.S_IFBLK:
 	default:
 		return nil, fmt.Errorf("invalid mode %o", mode)
+	}
+
+	// merge xattrs but prefer currently passed over existing
+	for name, data := range existingXattrs {
+		if _, ok := f.Xattrs[name]; !ok {
+			f.Xattrs[name] = data
+		}
 	}
 
 	// Accumulate the extended attributes.
@@ -514,15 +531,16 @@ func (w *Writer) lookup(name string, mustExist bool) (*inode, *inode, string, er
 	return dir, child, childname, nil
 }
 
-// CreateWithParents adds a file to the file system creating the parent directories in the path if
-// they don't exist (like `mkdir -p`). These non existing parent directories are created
+// MakeParents ensures that all the parent directories in the path specified by `name` exists. If
+// they don't exist it creates them (like `mkdir -p`). These non existing parent directories are created
 // with the same permissions as that of it's parent directory. It is expected that the a
 // call to make these parent directories will be made at a later point with the correct
 // permissions, at that time the permissions of these directories will be updated.
-func (w *Writer) CreateWithParents(name string, f *File) error {
+func (w *Writer) MakeParents(name string) error {
 	if err := w.finishInode(); err != nil {
 		return err
 	}
+
 	// go through the directories in the path one by one and create the
 	// parent directories if they don't exist.
 	cleanname := path.Clean("/" + name)[1:]
@@ -553,7 +571,7 @@ func (w *Writer) CreateWithParents(name string, f *File) error {
 		}
 		root = root.Children[dirname]
 	}
-	return w.Create(name, f)
+	return nil
 }
 
 // Create adds a file to the file system.
@@ -603,6 +621,8 @@ func (w *Writer) Create(name string, f *File) error {
 }
 
 // Link adds a hard link to the file system.
+// We support creating hardlinks to symlinks themselves instead of what
+// the symlinks link to, as this is what containerd does upstream.
 func (w *Writer) Link(oldname, newname string) error {
 	if err := w.finishInode(); err != nil {
 		return err
@@ -620,8 +640,8 @@ func (w *Writer) Link(oldname, newname string) error {
 		return err
 	}
 	switch oldfile.Mode & format.TypeMask {
-	case format.S_IFDIR, format.S_IFLNK:
-		return fmt.Errorf("%s: link target cannot be a directory or symlink: %s", newname, oldname)
+	case format.S_IFDIR:
+		return fmt.Errorf("%s: link target cannot be a directory: %s", newname, oldname)
 	}
 
 	if existing != oldfile && oldfile.LinkCount >= format.MaxLinks {

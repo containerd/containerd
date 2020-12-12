@@ -14,7 +14,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-: ${RUNHCS_VERSION:="$(grep 'Microsoft/hcsshim ' go.mod | awk '{print $2}')"}
+: ${RUNHCS_VERSION:="$(grep -m 1 'Microsoft/hcsshim ' go.mod | awk '{print $2}')"}
 : ${RUNHCS_REPO:="https://github.com/Microsoft/hcsshim.git"}
 : ${DESTDIR:=''}
 : ${GOOS:="windows"}
