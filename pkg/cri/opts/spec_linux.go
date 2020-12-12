@@ -375,10 +375,11 @@ func WithCapabilities(sc *runtime.LinuxContainerSecurityContext) oci.SpecOpts {
 //
 // This option should be after options for setting users and capabilities.
 func WithCapDropForNonRootUser(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
-	if s.Process != nil && s.Process.User.UID != 0 && s.Process.Capabilities != nil {
+	// TODO: TEMP FOR TESTING: don't actually do this, so we can verify that integration tests fail in CI environments
+	/*if s.Process != nil && s.Process.User.UID != 0 && s.Process.Capabilities != nil {
 		s.Process.Capabilities.Effective = []string{}
 		s.Process.Capabilities.Permitted = []string{}
-	}
+	}*/
 	return nil
 }
 
