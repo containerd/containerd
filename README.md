@@ -251,50 +251,37 @@ $ source ./contrib/autocomplete/ctr
 
 ### CRI
 
-`cri` is a [containerd](https://containerd.io/) plugin implementation of Kubernetes [container runtime interface (CRI)](https://github.com/kubernetes/cri-api/blob/master/pkg/apis/runtime/v1alpha2/api.proto).
+`cri` is a [containerd](https://containerd.io/) plugin implementation of the Kubernetes [container runtime interface (CRI)](https://github.com/kubernetes/cri-api/blob/master/pkg/apis/runtime/v1alpha2/api.proto). With it, you are able to use containerd as the container runtime for a Kubernetes cluster.
 
-With it, you could run Kubernetes using containerd as the container runtime.
 ![cri](./docs/cri.png)
 
-#### Current Status
+#### CRI Status
 
-`cri` is a native plugin of containerd 1.1 and above. It is built into containerd and enabled by default.
+`cri` is a native plugin of containerd. Since containerd 1.1, the cri plugin is built into the release binaries and enabled by default.
 
->  **Note:** `cri` as of containerd 1.5, the cri plugin is merged into the containerd/containerd repo. For example, the source code previously stored under [`containerd/cri/pkg`](https://github.com/containerd/cri/tree/release/1.4/pkg)
+> **Note:** As of containerd 1.5, the `cri` plugin is merged into the containerd/containerd repo. For example, the source code previously stored under [`containerd/cri/pkg`](https://github.com/containerd/cri/tree/release/1.4/pkg)
 was moved to [`containerd/containerd/pkg/cri` package](https://github.com/containerd/containerd/tree/master/pkg/cri).
 
-`cri` is in GA:
-* It is feature complete.
-* It (the GA version) works with Kubernetes 1.10 and above.
-* It has passed all [CRI validation tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-validation.md).
-* It has passed all [node e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/e2e-node-tests.md).
-* It has passed all [e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/e2e-tests.md).
+The `cri` plugin has reached GA status, representing that it is:
+* Feature complete
+* Works with Kubernetes 1.10 and above
+* Passes all [CRI validation tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-validation.md).
+* Passes all [node e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/e2e-node-tests.md).
+* Passes all [e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/e2e-tests.md).
 
-See [test dashboard](https://k8s-testgrid.appspot.com/sig-node-containerd)
+See results on the containerd k8s [test dashboard](https://k8s-testgrid.appspot.com/sig-node-containerd)
 
-#### Production Quality Cluster on GCE
-For a production quality cluster on GCE brought up with `kube-up.sh` refer [here](docs/cri/kube-up.md).
-#### Installing with Ansible and Kubeadm
-For a multi node cluster installer and bring up steps using ansible and kubeadm refer [here](contrib/ansible/README.md).
-#### Custom Installation
-For non ansible users, you can download the `cri-containerd` release tarball and deploy
-kubernetes cluster using kubeadm as described [here](docs/installation.md).
+#### Validating Your `cri` Setup
+A Kubernetes incubator project, [cri-tools](https://github.com/kubernetes-sigs/cri-tools), includes programs for exercising CRI implementations. More importantly, cri-tools includes the program `critest` which is used for running [CRI Validation Testing](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-validation.md).
 
-#### Validate Your `cri` Setup
-A Kubernetes incubator project called [cri-tools](https://github.com/kubernetes-sigs/cri-tools)
-includes programs for exercising CRI implementations such as the `cri` plugin.
-More importantly, cri-tools includes the program `critest` which is used for running
-[CRI Validation Testing](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-validation.md).
-
-#### CRI Plugin Testing Guide
-See [here](./docs/cri/testing.md) for information about CRI plugin testing.
-#### Using crictl
-See [here](./docs/cri/crictl.md) for information about using `crictl` to debug
-pods, containers, and images.
-#### Configurations
-See [here](./docs/cri/config.md) for information about how to configure cri plugins
-and [here](https://github.com/containerd/containerd/blob/master/docs/man/containerd-config.8.md)
-for information about how to configure containerd
+#### CRI Guides
+* [Bringing up a Production Quality Cluster on GCE](docs/cri/kube-up.md)
+* [Installing with Ansible and Kubeadm](contrib/ansible/README.md)
+* [For Non-Ansible Users, Preforming a Custom Installation Using the Release Tarball and Kubeadm](docs/installation.md)
+* [CRI Plugin Testing Guide](./docs/cri/testing.md)
+* [Debugging Pods, Containers, and Images with `crictl`](./docs/cri/crictl.md)
+* [Configuring `cri` Plugins](./docs/cri/config.md)
+* [Configuring containerd](https://github.com/containerd/containerd/blob/master/docs/man/containerd-config.8.md)
 
 #### Distribution of `ctr` autocomplete for bash and zsh
 
