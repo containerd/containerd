@@ -23,15 +23,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/Microsoft/go-winio"
 	winfs "github.com/Microsoft/go-winio/pkg/fs"
 	"github.com/Microsoft/go-winio/vhd"
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/computestorage"
+	"github.com/Microsoft/hcsshim/pkg/ociwclayer"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
@@ -185,14 +188,14 @@ func (s *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 	return s.mounts(snapshot), nil
 }
 
-func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
+func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) (retErr error) {
 	ctx, t, err := s.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return err
 	}
 
 	defer func() {
-		if err != nil {
+		if retErr != nil {
 			if rerr := t.Rollback(); rerr != nil {
 				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
 			}
@@ -202,15 +205,30 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	// grab the existing id
 	id, _, _, err := storage.GetInfo(ctx, key)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to get storage info for %s", key)
 	}
 
-	usage, err := fs.DiskUsage(ctx, s.getSnapshotDir(id))
+	snapshot, err := storage.GetSnapshot(ctx, key)
 	if err != nil {
 		return err
 	}
 
-	if _, err = storage.CommitActive(ctx, key, name, snapshots.Usage(usage), opts...); err != nil {
+	path := s.getSnapshotDir(id)
+
+	// If (windowsDiff).Apply was used to populate this layer, then it's already in the 'committed' state.
+	// See createSnapshot below for more details
+	if !strings.Contains(key, snapshots.UnpackKeyPrefix) {
+		if err := s.convertScratchToReadOnlyLayer(ctx, snapshot, path); err != nil {
+			return err
+		}
+	}
+
+	usage, err := fs.DiskUsage(ctx, path)
+	if err != nil {
+		return errors.Wrapf(err, "failed to collect disk usage of snapshot storage: %s", path)
+	}
+
+	if _, err := storage.CommitActive(ctx, key, name, snapshots.Usage(usage), opts...); err != nil {
 		return errors.Wrap(err, "failed to commit snapshot")
 	}
 	return t.Commit()
@@ -440,6 +458,43 @@ func (s *snapshotter) createScratchLayer(ctx context.Context, snDir string, pare
 			return errors.Wrapf(err, "failed to expand sandbox vhdx size to %d GB", sizeGB)
 		}
 	}
+	return nil
+}
+
+// convertScratchToReadOnlyLayer reimporst the layer over itself, to transfer the files from the sandbox.vhdx to the on-disk storage.
+func (s *snapshotter) convertScratchToReadOnlyLayer(ctx context.Context, snapshot storage.Snapshot, path string) (retErr error) {
+
+	// TODO darrenstahlmsft: When this is done isolated, we should disable these.
+	// it currently cannot be disabled, unless we add ref counting. Since this is
+	// temporary, leaving it enabled is OK for now.
+	// https://github.com/containerd/containerd/issues/1681
+	if err := winio.EnableProcessPrivileges([]string{winio.SeBackupPrivilege, winio.SeRestorePrivilege}); err != nil {
+		return errors.Wrap(err, "failed to enable necessary privileges")
+	}
+
+	parentLayerPaths := s.parentIDsToParentPaths(snapshot.ParentIDs)
+	reader, writer := io.Pipe()
+
+	go func() {
+		err := ociwclayer.ExportLayerToTar(ctx, writer, path, parentLayerPaths)
+		writer.CloseWithError(err)
+	}()
+
+	if _, err := ociwclayer.ImportLayerFromTar(ctx, reader, path, parentLayerPaths); err != nil {
+		return errors.Wrap(err, "failed to reimport snapshot")
+	}
+
+	if _, err := io.Copy(ioutil.Discard, reader); err != nil {
+		return errors.Wrap(err, "failed discarding extra data in import stream")
+	}
+
+	// NOTE: We do not delete the sandbox.vhdx here, as that will break later calls to
+	// ociwclayer.ExportLayerToTar for this snapshot.
+	// As a consequence, the data for this layer is held twice, once on-disk and once
+	// in the sandbox.vhdx.
+	// TODO: This is either a bug or misfeature in hcsshim, so will need to be resolved
+	// there first.
+
 	return nil
 }
 
