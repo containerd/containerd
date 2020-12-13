@@ -215,8 +215,9 @@ The linux runtime allows a few options to be set to configure the shim and the r
 
 ### Bolt Metadata Plugin
 
-The bolt metadata plugin allows configuration of the content sharing policy between namespaces.
+The bolt metadata plugin allows configuration of the content sharing policy between namespaces, as well as freelist synchronization.
 
+#### Content Sharing Policy
 The default mode "shared" will make blobs available in all namespaces once it is pulled into any namespace.
 The blob will be pulled into the namespace if a writer is opened with the "Expected" digest that is already present in the backend.
 
@@ -229,4 +230,16 @@ The default is "shared". While this is largely the most desired policy, one can 
 ```toml
 [plugins.bolt]
 	content_sharing_policy = "isolated"
+```
+
+#### Freelist Synchronization
+By setting to true, bolt db recovery will perform a full database re-sync.
+
+This can be useful if you are attempting to recover from a corrupted bolt db and should probably be reset to false once the db has been recovered.
+
+The default is `false`.
+
+```toml
+[pugins.bolt]
+  no_freelist_sync = true
 ```

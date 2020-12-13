@@ -178,6 +178,11 @@ type BoltConfig struct {
 	// bandwidth across namespaces, at the cost of allowing access to any blob
 	// just by knowing its digest.
 	ContentSharingPolicy string `toml:"content_sharing_policy"`
+	// When true, skips syncing freelist to disk. This improves the database
+	// write performance under normal operation, but requires a full database
+	// re-sync during recovery.  Can be useful for recovering from corruption.
+	// Defaults to false
+	NoFreelistSync bool `toml:"no_freelist_sync"`
 }
 
 const (
