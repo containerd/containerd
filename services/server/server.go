@@ -383,7 +383,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 				if cfg.NoFreelistSync == true {
 					options.NoFreelistSync = true
 
-					log.L.WithField("freelist_sync", cfg.NoFreelistSync).Info("no_freelist_sync set to true")
+					log.L.WithField("no_freelist_sync", cfg.NoFreelistSync).Info("no_freelist_sync set")
 				}
 			}
 
