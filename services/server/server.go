@@ -363,7 +363,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 			var options = &bolt.Options{
 				Timeout:      0,
 				NoGrowSync:   false,
-				FreelistType: FreelistArrayType,
+				FreelistType: bolt.FreelistArrayType,
 				NoFreelistSync: false,
 			}
 			ic.Meta.Exports["policy"] = srvconfig.SharingPolicyShared
