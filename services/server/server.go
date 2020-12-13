@@ -330,7 +330,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 		},
 		Config: &srvconfig.BoltConfig{
 			ContentSharingPolicy: srvconfig.SharingPolicyShared,
-			NoFreelistSync: srvconfig.NoFreelistSync,
+			NoFreelistSync: false,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			if err := os.MkdirAll(ic.Root, 0711); err != nil {
