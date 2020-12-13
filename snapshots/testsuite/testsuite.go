@@ -162,6 +162,7 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	}
 
 	if err := initialApplier.Apply(preparing); err != nil {
+		testutil.Unmount(t, preparing)
 		t.Fatalf("failure reason: %+v", err)
 	}
 	// unmount before commit
@@ -199,10 +200,12 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	}
 
 	if err := fstest.CheckDirectoryEqualWithApplier(next, initialApplier); err != nil {
+		testutil.Unmount(t, next)
 		t.Fatalf("failure reason: %+v", err)
 	}
 
 	if err := diffApplier.Apply(next); err != nil {
+		testutil.Unmount(t, next)
 		t.Fatalf("failure reason: %+v", err)
 	}
 	// unmount before commit
@@ -386,11 +389,12 @@ func checkSnapshotterTransitivity(ctx context.Context, t *testing.T, snapshotter
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer testutil.Unmount(t, preparing)
 
 	if err = os.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0777); err != nil {
+		testutil.Unmount(t, preparing)
 		t.Fatal(err)
 	}
+	testutil.Unmount(t, preparing)
 
 	snapA := filepath.Join(work, "snapA")
 	if err = snapshotter.Commit(ctx, snapA, preparing, opt); err != nil {
@@ -401,11 +405,12 @@ func checkSnapshotterTransitivity(ctx context.Context, t *testing.T, snapshotter
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer testutil.Unmount(t, next)
 
 	if err = os.WriteFile(filepath.Join(next, "foo"), []byte("foo bar\n"), 0777); err != nil {
+		testutil.Unmount(t, next)
 		t.Fatal(err)
 	}
+	testutil.Unmount(t, next)
 
 	snapB := filepath.Join(work, "snapB")
 	if err = snapshotter.Commit(ctx, snapB, next, opt); err != nil {
@@ -440,7 +445,7 @@ func checkSnapshotterPrepareView(ctx context.Context, t *testing.T, snapshotter 
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer testutil.Unmount(t, preparing)
+	testutil.Unmount(t, preparing)
 
 	snapA := filepath.Join(work, "snapA")
 	if err = snapshotter.Commit(ctx, snapA, preparing, opt); err != nil {
@@ -517,6 +522,7 @@ func checkRemoveIntermediateSnapshot(ctx context.Context, t *testing.T, snapshot
 	if err != nil {
 		t.Fatal(err)
 	}
+	testutil.Unmount(t, base)
 
 	committedBase := filepath.Join(work, "committed-base")
 	if err = snapshotter.Commit(ctx, committedBase, base, opt); err != nil {
@@ -555,7 +561,6 @@ func checkRemoveIntermediateSnapshot(ctx context.Context, t *testing.T, snapshot
 	if err != nil {
 		t.Fatal(err)
 	}
-	testutil.Unmount(t, base)
 	err = snapshotter.Remove(ctx, committedBase)
 	if err != nil {
 		t.Fatal(err)
@@ -817,6 +822,7 @@ func checkSnapshotterViewReadonly(ctx context.Context, t *testing.T, snapshotter
 	if err := os.WriteFile(testfile, []byte("testcontent"), 0777); err != nil {
 		t.Logf("write to %q failed with %v (EROFS is expected but can be other error code)", testfile, err)
 	} else {
+		testutil.Unmount(t, viewMountPoint)
 		t.Fatalf("write to %q should fail (EROFS) but did not fail", testfile)
 	}
 	testutil.Unmount(t, viewMountPoint)
