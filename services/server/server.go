@@ -360,7 +360,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 			}
 
 			shared := true
-			var options = nil
+			var options = *bolt.Options
 			ic.Meta.Exports["policy"] = srvconfig.SharingPolicyShared
 			if cfg, ok := ic.Config.(*srvconfig.BoltConfig); ok {
 				if cfg.ContentSharingPolicy != "" {
