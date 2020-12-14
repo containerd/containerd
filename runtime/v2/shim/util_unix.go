@@ -60,6 +60,10 @@ func AdjustOOMScore(pid int) error {
 		return errors.Wrap(err, "get parent OOM score")
 	}
 	shimScore := score + 1
+	// if parent is already at OOMscore max, we can't increment
+	if shimScore > 1000 {
+		shimScore = 1000
+	}
 	if err := sys.SetOOMScore(pid, shimScore); err != nil {
 		return errors.Wrap(err, "set shim OOM score")
 	}
