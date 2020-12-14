@@ -298,7 +298,6 @@ jobs:
       - name: Tests
         env:
           GOPROXY: direct
-          SKIPTESTS: github.com/containerd/containerd/snapshots/devmapper
         run: |
           make test
           sudo -E PATH=$PATH GOPATH=$GOPATH GOPROXY=$GOPROXY make root-test

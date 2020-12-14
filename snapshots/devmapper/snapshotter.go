@@ -265,7 +265,7 @@ func (s *Snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 			return err
 		}
 
-		return s.pool.DeactivateDevice(ctx, deviceName, false, false)
+		return s.pool.DeactivateDevice(ctx, deviceName, true, false)
 	})
 }
 

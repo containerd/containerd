@@ -75,6 +75,33 @@ func NewPoolDevice(ctx context.Context, config *Config) (*PoolDevice, error) {
 	return poolDevice, nil
 }
 
+func retry(ctx context.Context, f func() error) error {
+	var (
+		maxRetries = 100
+		retryDelay = 100 * time.Millisecond
+		retryErr   error
+	)
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		retryErr = f()
+		if retryErr == nil {
+			return nil
+		} else if retryErr != unix.EBUSY {
+			return retryErr
+		}
+
+		// Don't spam logs
+		if attempt%10 == 0 {
+			log.G(ctx).WithError(retryErr).Warnf("retrying... (%d of %d)", attempt, maxRetries)
+		}
+
+		// Devmapper device is busy, give it a bit of time and retry removal
+		time.Sleep(retryDelay)
+	}
+
+	return retryErr
+}
+
 // ensureDeviceStates updates devices to their real state:
 //   - marks devices with incomplete states (after crash) as 'Faulty'
 //   - activates devices if they are marked as 'Activated' but the dm
@@ -393,30 +420,13 @@ func (p *PoolDevice) DeactivateDevice(ctx context.Context, deviceName string, de
 	}
 
 	if err := p.transition(ctx, deviceName, Deactivating, Deactivated, func() error {
-		var (
-			maxRetries = 100
-			retryDelay = 100 * time.Millisecond
-			retryErr   error
-		)
-
-		for attempt := 1; attempt <= maxRetries; attempt++ {
-			retryErr = dmsetup.RemoveDevice(deviceName, opts...)
-			if retryErr == nil {
-				return nil
-			} else if retryErr != unix.EBUSY {
-				return retryErr
+		return retry(ctx, func() error {
+			if err := dmsetup.RemoveDevice(deviceName, opts...); err != nil {
+				return errors.Wrap(err, "failed to deactivate device")
 			}
 
-			// Don't spam logs
-			if attempt%10 == 0 {
-				log.G(ctx).WithError(retryErr).Warnf("failed to deactivate device, retrying... (%d of %d)", attempt, maxRetries)
-			}
-
-			// Devmapper device is busy, give it a bit of time and retry removal
-			time.Sleep(retryDelay)
-		}
-
-		return retryErr
+			return nil
+		})
 	}); err != nil {
 		return errors.Wrapf(err, "failed to deactivate device %q", deviceName)
 	}
@@ -493,14 +503,15 @@ func (p *PoolDevice) RemoveDevice(ctx context.Context, deviceName string) error 
 
 func (p *PoolDevice) deleteDevice(ctx context.Context, info *DeviceInfo) error {
 	if err := p.transition(ctx, info.Name, Removing, Removed, func() error {
-		// Send 'delete' message to thin-pool
-		e := dmsetup.DeleteDevice(p.poolName, info.DeviceID)
-
-		// Ignores the error if the device has been deleted already.
-		if e != nil && !errors.Is(e, unix.ENODATA) {
-			return e
-		}
-		return nil
+		return retry(ctx, func() error {
+			// Send 'delete' message to thin-pool
+			e := dmsetup.DeleteDevice(p.poolName, info.DeviceID)
+			// Ignores the error if the device has been deleted already.
+			if e != nil && !errors.Is(e, unix.ENODATA) {
+				return e
+			}
+			return nil
+		})
 	}); err != nil {
 		return errors.Wrapf(err, "failed to delete device %q (dev id: %d)", info.Name, info.DeviceID)
 	}
