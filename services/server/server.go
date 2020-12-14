@@ -360,12 +360,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 			}
 
 			shared := true
-			var options = &bolt.Options{
-				Timeout:      0,
-				NoGrowSync:   false,
-				FreelistType: bolt.FreelistArrayType,
-				NoFreelistSync: false,
-			}
+			var options = nil
 			ic.Meta.Exports["policy"] = srvconfig.SharingPolicyShared
 			if cfg, ok := ic.Config.(*srvconfig.BoltConfig); ok {
 				if cfg.ContentSharingPolicy != "" {
@@ -380,8 +375,13 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 					log.L.WithField("policy", cfg.ContentSharingPolicy).Info("metadata content store policy set")
 				}
 
-				if cfg.NoFreelistSync == true {
-					options.NoFreelistSync = true
+				if cfg.NoFreelistSync {
+					options = &bolt.Options{
+						Timeout:      0,
+						NoGrowSync:   false,
+						FreelistType: bolt.FreelistArrayType,
+						NoFreelistSync: true,
+					}
 
 					log.L.WithField("no_freelist_sync", cfg.NoFreelistSync).Info("no_freelist_sync set")
 				}
