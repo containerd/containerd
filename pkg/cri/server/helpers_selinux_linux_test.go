@@ -1,5 +1,3 @@
-// +build selinux
-
 /*
    Copyright The containerd Authors.
 

@@ -268,7 +268,7 @@ github.com/opencontainers/runc/libcontainer/user
 # github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6
 ## explicit
 github.com/opencontainers/runtime-spec/specs-go
-# github.com/opencontainers/selinux v1.6.0
+# github.com/opencontainers/selinux v1.8.0
 ## explicit
 github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
@@ -314,7 +314,6 @@ github.com/tchap/go-patricia/patricia
 ## explicit
 github.com/urfave/cli
 # github.com/willf/bitset v1.1.11
-## explicit
 github.com/willf/bitset
 # go.etcd.io/bbolt v1.3.5
 ## explicit
