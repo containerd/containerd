@@ -149,7 +149,7 @@ var (
 		},
 		cli.StringSliceFlag{
 			Name:  "device",
-			Usage: "add a device to a container",
+			Usage: "file path to a device to add to the container; or a path to a directory tree of devices to add to the container",
 		},
 		cli.BoolFlag{
 			Name:  "seccomp",
