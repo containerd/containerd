@@ -53,12 +53,12 @@ Information about the binaries in the release tarball:
 
 |           Binary Name          |      Support       |   OS  | Architecture |
 |:------------------------------:|:------------------:|:-----:|:------------:|
-|            containerd          | seccomp, apparmor, <br/> overlay, btrfs | linux |     amd64    |
+|            containerd          | seccomp, apparmor, selinux<br/> overlay, btrfs | linux |     amd64    |
 |          containerd-shim       |   overlay, btrfs   | linux |     amd64    |
-|               runc             | seccomp, apparmor  | linux |     amd64    |
+|               runc             | seccomp, apparmor, selinux  | linux |     amd64    |
 
 
-If you have other requirements for the binaries, e.g. selinux support, another architecture support etc., you need to build the binaries yourself following [the instructions](../BUILDING.md).
+If you have other requirements for the binaries, e.g. another architecture support etc., you need to build the binaries yourself following [the instructions](../BUILDING.md).
 
 ### Download
 
@@ -95,7 +95,7 @@ Follow [the instructions](https://kubernetes.io/docs/setup/independent/install-k
 ## Step 4: Create Systemd Drop-In for Containerd
 Create the systemd drop-in file `/etc/systemd/system/kubelet.service.d/0-containerd.conf`:
 ```
-[Service]                                                 
+[Service]
 Environment="KUBELET_EXTRA_ARGS=--container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=unix:///run/containerd/containerd.sock"
 ```
 And reload systemd configuration:
