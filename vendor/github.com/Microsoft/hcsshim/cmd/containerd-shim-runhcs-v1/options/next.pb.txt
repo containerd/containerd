@@ -108,6 +108,13 @@ file {
       type: TYPE_STRING
       json_name: "GPUVHDPath"
     }
+    field {
+      name: "scale_cpu_limits_to_sandbox"
+      number: 11
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "scaleCpuLimitsToSandbox"
+    }
     enum_type {
       name: "DebugType"
       value {
