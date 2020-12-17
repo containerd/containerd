@@ -249,6 +249,40 @@ the autocomplete/ctr file in your `.bashrc`, or manually like:
 $ source ./contrib/autocomplete/ctr
 ```
 
+### CRI
+
+`cri` is a [containerd](https://containerd.io/) plugin implementation of the Kubernetes [container runtime interface (CRI)](https://github.com/kubernetes/cri-api/blob/master/pkg/apis/runtime/v1alpha2/api.proto). With it, you are able to use containerd as the container runtime for a Kubernetes cluster.
+
+![cri](./docs/cri.png)
+
+#### CRI Status
+
+`cri` is a native plugin of containerd. Since containerd 1.1, the cri plugin is built into the release binaries and enabled by default.
+
+> **Note:** As of containerd 1.5, the `cri` plugin is merged into the containerd/containerd repo. For example, the source code previously stored under [`containerd/cri/pkg`](https://github.com/containerd/cri/tree/release/1.4/pkg)
+was moved to [`containerd/containerd/pkg/cri` package](https://github.com/containerd/containerd/tree/master/pkg/cri).
+
+The `cri` plugin has reached GA status, representing that it is:
+* Feature complete
+* Works with Kubernetes 1.10 and above
+* Passes all [CRI validation tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-validation.md).
+* Passes all [node e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/e2e-node-tests.md).
+* Passes all [e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/e2e-tests.md).
+
+See results on the containerd k8s [test dashboard](https://k8s-testgrid.appspot.com/sig-node-containerd)
+
+#### Validating Your `cri` Setup
+A Kubernetes incubator project, [cri-tools](https://github.com/kubernetes-sigs/cri-tools), includes programs for exercising CRI implementations. More importantly, cri-tools includes the program `critest` which is used for running [CRI Validation Testing](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-validation.md).
+
+#### CRI Guides
+* [Bringing up a Production Quality Cluster on GCE](docs/cri/kube-up.md)
+* [Installing with Ansible and Kubeadm](contrib/ansible/README.md)
+* [For Non-Ansible Users, Preforming a Custom Installation Using the Release Tarball and Kubeadm](docs/installation.md)
+* [CRI Plugin Testing Guide](./docs/cri/testing.md)
+* [Debugging Pods, Containers, and Images with `crictl`](./docs/cri/crictl.md)
+* [Configuring `cri` Plugins](./docs/cri/config.md)
+* [Configuring containerd](https://github.com/containerd/containerd/blob/master/docs/man/containerd-config.8.md)
+
 #### Distribution of `ctr` autocomplete for bash and zsh
 
 For bash, copy the `contrib/autocomplete/ctr` script into
