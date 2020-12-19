@@ -903,19 +903,19 @@ func check128LayersMount(name string) func(ctx context.Context, t *testing.T, sn
 		lowestApply := fstest.Apply(
 			fstest.CreateFile("/bottom", []byte("way at the bottom\n"), 0777),
 			fstest.CreateFile("/overwriteme", []byte("FIRST!\n"), 0777),
-			fstest.CreateDir("/ADDHERE", 0755),
-			fstest.CreateDir("/ONLYME", 0755),
-			fstest.CreateFile("/ONLYME/bottom", []byte("bye!\n"), 0777),
+			fstest.CreateDir("/addhere", 0755),
+			fstest.CreateDir("/onlyme", 0755),
+			fstest.CreateFile("/onlyme/bottom", []byte("bye!\n"), 0777),
 		)
 
 		appliers := []fstest.Applier{lowestApply}
 		for i := 1; i <= 127; i++ {
 			appliers = append(appliers, fstest.Apply(
 				fstest.CreateFile("/overwriteme", []byte(fmt.Sprintf("%d WAS HERE!\n", i)), 0777),
-				fstest.CreateFile(fmt.Sprintf("/ADDHERE/file-%d", i), []byte("same\n"), 0755),
-				fstest.RemoveAll("/ONLYME"),
-				fstest.CreateDir("/ONLYME", 0755),
-				fstest.CreateFile(fmt.Sprintf("/ONLYME/file-%d", i), []byte("only me!\n"), 0777),
+				fstest.CreateFile(fmt.Sprintf("/addhere/file-%d", i), []byte("same\n"), 0755),
+				fstest.RemoveAll("/onlyme"),
+				fstest.CreateDir("/onlyme", 0755),
+				fstest.CreateFile(fmt.Sprintf("/onlyme/file-%d", i), []byte("only me!\n"), 0777),
 			))
 		}
 
