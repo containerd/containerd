@@ -124,7 +124,7 @@ func TestRegressionIssue4769(t *testing.T) {
 	select {
 	case et := <-eventStream:
 		if et.Event == nil {
-			t.Fatal(errors.Errorf("unexpect empty event: %+v", et))
+			t.Fatal(errors.Errorf("unexpected empty event: %+v", et))
 		}
 
 		v, err := typeurl.UnmarshalAny(et.Event)
@@ -133,7 +133,7 @@ func TestRegressionIssue4769(t *testing.T) {
 		}
 
 		if e, ok := v.(*apievents.TaskExit); !ok {
-			t.Fatal(errors.Errorf("unexpect event type: %+v", v))
+			t.Fatal(errors.Errorf("unexpected event type: %+v", v))
 		} else if e.ExitStatus != 0 {
 			t.Fatal(errors.Errorf("expect zero exit status, but got %v", e.ExitStatus))
 		}

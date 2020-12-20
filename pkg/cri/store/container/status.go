@@ -156,7 +156,7 @@ type StatusStorage interface {
 	// Delete the container status.
 	// Note:
 	// * Delete should be idempotent.
-	// * The status must be deleted in one trasaction.
+	// * The status must be deleted in one transaction.
 	Delete() error
 }
 

@@ -247,7 +247,7 @@ func (s *Snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		}
 
 		// After committed, the snapshot device will not be directly
-		// used anymore. We'd better deativate it to make it *invisible*
+		// used anymore. We'd better deactivate it to make it *invisible*
 		// in userspace, so that tools like LVM2 and fdisk cannot touch it,
 		// and avoid useless IOs on it.
 		//

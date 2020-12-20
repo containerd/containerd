@@ -92,7 +92,7 @@ func (c *criService) containerMetrics(
 				}
 			}
 		default:
-			return &cs, errors.Errorf("unxpected metrics type: %v", metrics)
+			return &cs, errors.Errorf("unexpected metrics type: %v", metrics)
 		}
 	}
 

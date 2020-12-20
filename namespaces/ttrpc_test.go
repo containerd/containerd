@@ -42,7 +42,7 @@ func TestCopyTTRPCMetadata(t *testing.T) {
 
 func TestTTRPCNamespaceHeader(t *testing.T) {
 	ctx := context.Background()
-	namespace := "test-namepace"
+	namespace := "test-namespace"
 	ctx = withTTRPCNamespaceHeader(ctx, namespace)
 
 	header, ok := fromTTRPCHeader(ctx)

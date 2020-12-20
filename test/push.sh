@@ -24,7 +24,7 @@ source $(dirname "${BASH_SOURCE[0]}")/utils.sh
 DEPLOY_BUCKET=${DEPLOY_BUCKET:-"cri-containerd-staging"}
 # DEPLOY_DIR is the directory in the gcs bucket to store the tarball.
 DEPLOY_DIR=${DEPLOY_DIR:-""}
-# BUILD_DIR is the directory of the bulid out.
+# BUILD_DIR is the directory of the build out.
 BUILD_DIR=${BUILD_DIR:-"_output"}
 # TARBALL is the tarball name.
 TARBALL=${TARBALL:-"cri-containerd.tar.gz"}

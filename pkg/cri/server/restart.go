@@ -47,7 +47,7 @@ import (
 // 2) Containerd containers may be deleted, but SHOULD NOT be added. Or else, recovery logic
 // for the newly added container/sandbox will return error, because there is no corresponding root
 // directory created.
-// 3) Containerd container tasks may exit or be stoppped, deleted. Even though current logic could
+// 3) Containerd container tasks may exit or be stopped, deleted. Even though current logic could
 // tolerant tasks being created or started, we prefer that not to happen.
 
 // recover recovers system state from containerd and status checkpoint.
@@ -264,7 +264,7 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 					return errors.Errorf("unexpected container state for created task: %q", status.State())
 				}
 			case containerd.Running:
-				// Task is running. Container must be in `RUNNING` state, based on our assuption that
+				// Task is running. Container must be in `RUNNING` state, based on our assumption that
 				// "task should not be started when containerd is down".
 				switch status.State() {
 				case runtime.ContainerState_CONTAINER_EXITED:

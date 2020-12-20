@@ -39,7 +39,7 @@ func LoadNetNS(path string) *NetNS {
 	return &NetNS{path: path}
 }
 
-// Remove removes network namepace. Remove is idempotent, meaning it might
+// Remove removes network namespace. Remove is idempotent, meaning it might
 // be invoked multiple times and provides consistent result.
 func (n *NetNS) Remove() error {
 	return errNotImplementedOnUnix
