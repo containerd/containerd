@@ -248,6 +248,16 @@ the autocomplete/ctr file in your `.bashrc`, or manually like:
 $ source ./contrib/autocomplete/ctr
 ```
 
+#### Distribution of `ctr` autocomplete for bash and zsh
+
+For bash, copy the `contrib/autocomplete/ctr` script into
+`/etc/bash_completion.d/` and rename it to `ctr`. The `zsh_autocomplete`
+file is also available and can be used similarly for zsh users.
+
+Provide documentation to users to `source` this file into their shell if
+you don't place the autocomplete file in a location where it is automatically
+loaded for the user's shell environment.
+
 ### CRI
 
 `cri` is a [containerd](https://containerd.io/) plugin implementation of the Kubernetes [container runtime interface (CRI)](https://github.com/kubernetes/cri-api/blob/master/pkg/apis/runtime/v1alpha2/api.proto). With it, you are able to use containerd as the container runtime for a Kubernetes cluster.
@@ -281,16 +291,6 @@ A Kubernetes incubator project, [cri-tools](https://github.com/kubernetes-sigs/c
 * [Debugging Pods, Containers, and Images with `crictl`](./docs/cri/crictl.md)
 * [Configuring `cri` Plugins](./docs/cri/config.md)
 * [Configuring containerd](https://github.com/containerd/containerd/blob/master/docs/man/containerd-config.8.md)
-
-#### Distribution of `ctr` autocomplete for bash and zsh
-
-For bash, copy the `contrib/autocomplete/ctr` script into
-`/etc/bash_completion.d/` and rename it to `ctr`. The `zsh_autocomplete`
-file is also available and can be used similarly for zsh users.
-
-Provide documentation to users to `source` this file into their shell if
-you don't place the autocomplete file in a location where it is automatically
-loaded for the user's shell environment.
 
 ### Communication
 
