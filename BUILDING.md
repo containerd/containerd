@@ -41,9 +41,8 @@ $ sudo unzip protoc-3.11.4-linux-x86_64.zip -d /usr/local
 need to satisfy these dependencies in your system:
 
 * CentOS/Fedora: `yum install btrfs-progs-devel`
-* Debian/Ubuntu: `apt-get install btrfs-tools`
-	* Debian Buster/Ubuntu 19.10/ Ubuntu 20.04:
-	    `apt-get install btrfs-progs libbtrfs-dev`
+* Debian/Ubuntu: `apt-get install btrfs-progs libbtrfs-dev`
+  * Debian(before Buster)/Ubuntu(before 19.10): `apt-get install btrfs-tools`
 
 At this point you are ready to build `containerd` yourself!
 
