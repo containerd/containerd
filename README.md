@@ -2,7 +2,6 @@
 
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/containerd/containerd)](https://pkg.go.dev/github.com/containerd/containerd)
 [![Build Status](https://github.com/containerd/containerd/workflows/CI/badge.svg)](https://github.com/containerd/containerd/actions?query=workflow%3ACI)
-[![Windows Build Status](https://ci.appveyor.com/api/projects/status/github/containerd/containerd?branch=master&svg=true)](https://ci.appveyor.com/project/mlaventure/containerd-3g73f?branch=master)
 [![Nightlies](https://github.com/containerd/containerd/workflows/Nightly/badge.svg)](https://github.com/containerd/containerd/actions?query=workflow%3ANightly)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bhttps%3A%2F%2Fgithub.com%2Fcontainerd%2Fcontainerd.svg?type=shield)](https://app.fossa.io/projects/git%2Bhttps%3A%2F%2Fgithub.com%2Fcontainerd%2Fcontainerd?ref=badge_shield)
 [![Go Report Card](https://goreportcard.com/badge/github.com/containerd/containerd)](https://goreportcard.com/report/github.com/containerd/containerd)
