@@ -312,11 +312,11 @@ func (s *gcScheduler) run(ctx context.Context) {
 		if err != nil {
 			log.G(ctx).WithError(err).Error("garbage collection failed")
 
-			// Reschedule garbage collection for same duration + 1 second
-			schedC, nextCollection = schedule(nextCollection.Sub(*lastCollection) + time.Second)
-
 			// Update last collection time even though failure occurred
 			lastCollection = &last
+			
+			// Reschedule garbage collection for same duration + 1 second
+			schedC, nextCollection = schedule(nextCollection.Sub(*lastCollection) + time.Second)
 
 			for _, w := range s.waiters {
 				close(w)
