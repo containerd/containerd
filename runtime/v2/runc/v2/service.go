@@ -483,7 +483,7 @@ func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.
 	}
 	p, err := container.Process(r.ExecID)
 	if err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 	st, err := p.Status(ctx)
 	if err != nil {

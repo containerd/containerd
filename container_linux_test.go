@@ -1068,6 +1068,10 @@ func TestContainerLoadUnexistingProcess(t *testing.T) {
 		t.Fatal("an error should have occurred when loading a process that does not exist")
 	}
 
+	if !errdefs.IsNotFound(err) {
+		t.Fatalf("an error of type NotFound should have been returned when loading a process that does not exist, got %#v instead ", err)
+	}
+
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
 		t.Error(err)
 	}
