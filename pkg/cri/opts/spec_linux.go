@@ -329,7 +329,7 @@ func WithDevices(osi osinterface.OS, config *runtime.ContainerConfig) oci.SpecOp
 	}
 }
 
-// WithCapabilities sets the provided capabilties from the security context
+// WithCapabilities sets the provided capabilities from the security context
 func WithCapabilities(sc *runtime.LinuxContainerSecurityContext) oci.SpecOpts {
 	capabilities := sc.GetCapabilities()
 	if capabilities == nil {

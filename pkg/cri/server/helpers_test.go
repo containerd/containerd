@@ -56,7 +56,7 @@ func TestGetUserFromImage(t *testing.T) {
 		"empty user": {
 			user: "",
 		},
-		"multiple spearators": {
+		"multiple separators": {
 			user: "1:2:3",
 			uid:  newI64(1),
 		},
@@ -99,7 +99,7 @@ func TestGetRepoDigestAndTag(t *testing.T) {
 			expectedRepoDigest: "",
 			expectedRepoTag:    "gcr.io/library/busybox:latest",
 		},
-		"repo digest should not be empty if orignal ref is schema1 but has digest": {
+		"repo digest should not be empty if original ref is schema1 but has digest": {
 			ref:                "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59594",
 			schema1:            true,
 			expectedRepoDigest: "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59594",

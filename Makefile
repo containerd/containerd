@@ -227,7 +227,7 @@ man: mandir $(addprefix man/,$(MANPAGES))
 mandir:
 	@mkdir -p man
 
-# Kept for backwards compatability
+# Kept for backwards compatibility
 genman: man/containerd.8 man/ctr.8
 
 man/containerd.8: FORCE
