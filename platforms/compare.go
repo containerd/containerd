@@ -16,7 +16,12 @@
 
 package platforms
 
-import specs "github.com/opencontainers/image-spec/specs-go/v1"
+import (
+	"strconv"
+	"strings"
+
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
+)
 
 // MatchComparer is able to match and compare platforms to
 // filter and sort platforms.
@@ -26,103 +31,37 @@ type MatchComparer interface {
 	Less(specs.Platform, specs.Platform) bool
 }
 
-// Only returns a match comparer for a single platform
-// using default resolution logic for the platform.
-//
-// For ARMv8, will also match ARMv7, ARMv6 and ARMv5 (for 32bit runtimes)
-// For ARMv7, will also match ARMv6 and ARMv5
-// For ARMv6, will also match ARMv5
-func Only(platform specs.Platform) MatchComparer {
-	platform = Normalize(platform)
-	if platform.Architecture == "arm" {
-		if platform.Variant == "v8" {
-			return orderedPlatformComparer{
-				matchers: []Matcher{
-					&matcher{
-						Platform: platform,
-					},
-					&matcher{
-						Platform: specs.Platform{
-							Architecture: platform.Architecture,
-							OS:           platform.OS,
-							OSVersion:    platform.OSVersion,
-							OSFeatures:   platform.OSFeatures,
-							Variant:      "v7",
-						},
-					},
-					&matcher{
-						Platform: specs.Platform{
-							Architecture: platform.Architecture,
-							OS:           platform.OS,
-							OSVersion:    platform.OSVersion,
-							OSFeatures:   platform.OSFeatures,
-							Variant:      "v6",
-						},
-					},
-					&matcher{
-						Platform: specs.Platform{
-							Architecture: platform.Architecture,
-							OS:           platform.OS,
-							OSVersion:    platform.OSVersion,
-							OSFeatures:   platform.OSFeatures,
-							Variant:      "v5",
-						},
-					},
-				},
-			}
-		}
-		if platform.Variant == "v7" {
-			return orderedPlatformComparer{
-				matchers: []Matcher{
-					&matcher{
-						Platform: platform,
-					},
-					&matcher{
-						Platform: specs.Platform{
-							Architecture: platform.Architecture,
-							OS:           platform.OS,
-							OSVersion:    platform.OSVersion,
-							OSFeatures:   platform.OSFeatures,
-							Variant:      "v6",
-						},
-					},
-					&matcher{
-						Platform: specs.Platform{
-							Architecture: platform.Architecture,
-							OS:           platform.OS,
-							OSVersion:    platform.OSVersion,
-							OSFeatures:   platform.OSFeatures,
-							Variant:      "v5",
-						},
-					},
-				},
-			}
-		}
-		if platform.Variant == "v6" {
-			return orderedPlatformComparer{
-				matchers: []Matcher{
-					&matcher{
-						Platform: platform,
-					},
-					&matcher{
-						Platform: specs.Platform{
-							Architecture: platform.Architecture,
-							OS:           platform.OS,
-							OSVersion:    platform.OSVersion,
-							OSFeatures:   platform.OSFeatures,
-							Variant:      "v5",
-						},
-					},
-				},
+// platformVector returns an (ordered) vector of appropriate specs.Platform
+// objects to try matching for the given platform object (see platforms.Only).
+func platformVector(platform specs.Platform) []specs.Platform {
+	vector := []specs.Platform{platform}
+
+	switch platform.Architecture {
+	case "arm":
+		if armVersion, err := strconv.Atoi(strings.TrimPrefix(platform.Variant, "v")); err == nil && armVersion > 5 {
+			for armVersion--; armVersion >= 5; armVersion-- {
+				vector = append(vector, specs.Platform{
+					Architecture: platform.Architecture,
+					OS:           platform.OS,
+					OSVersion:    platform.OSVersion,
+					OSFeatures:   platform.OSFeatures,
+					Variant:      "v" + strconv.Itoa(armVersion),
+				})
 			}
 		}
 	}
 
-	return singlePlatformComparer{
-		Matcher: &matcher{
-			Platform: platform,
-		},
-	}
+	return vector
+}
+
+// Only returns a match comparer for a single platform
+// using default resolution logic for the platform.
+//
+// For arm/v8, will also match arm/v7, arm/v6 and arm/v5
+// For arm/v7, will also match arm/v6 and arm/v5
+// For arm/v6, will also match arm/v5
+func Only(platform specs.Platform) MatchComparer {
+	return Ordered(platformVector(Normalize(platform))...)
 }
 
 // Ordered returns a platform MatchComparer which matches any of the platforms
@@ -152,14 +91,6 @@ func Any(platforms ...specs.Platform) MatchComparer {
 // All is a platform MatchComparer which matches all platforms
 // with preference for ordering.
 var All MatchComparer = allPlatformComparer{}
-
-type singlePlatformComparer struct {
-	Matcher
-}
-
-func (c singlePlatformComparer) Less(p1, p2 specs.Platform) bool {
-	return c.Match(p1) && !c.Match(p2)
-}
 
 type orderedPlatformComparer struct {
 	matchers []Matcher
