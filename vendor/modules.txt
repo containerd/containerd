@@ -1,7 +1,7 @@
 # github.com/BurntSushi/toml v0.3.1
 ## explicit
 github.com/BurntSushi/toml
-# github.com/Microsoft/go-winio v0.4.15
+# github.com/Microsoft/go-winio v0.4.16
 ## explicit
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/backuptar
@@ -11,11 +11,12 @@ github.com/Microsoft/go-winio/pkg/fs
 github.com/Microsoft/go-winio/pkg/guid
 github.com/Microsoft/go-winio/pkg/security
 github.com/Microsoft/go-winio/vhd
-# github.com/Microsoft/hcsshim v0.8.10
+# github.com/Microsoft/hcsshim v0.8.14
 ## explicit
 github.com/Microsoft/hcsshim
 github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options
 github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats
+github.com/Microsoft/hcsshim/computestorage
 github.com/Microsoft/hcsshim/ext4/internal/compactext4
 github.com/Microsoft/hcsshim/ext4/internal/format
 github.com/Microsoft/hcsshim/ext4/tar2ext4
@@ -42,7 +43,7 @@ github.com/Microsoft/hcsshim/internal/wclayer
 github.com/Microsoft/hcsshim/internal/winapi
 github.com/Microsoft/hcsshim/osversion
 github.com/Microsoft/hcsshim/pkg/go-runhcs
-# github.com/Microsoft/hcsshim/test v0.0.0-20201119174602-966bebae11b4
+# github.com/Microsoft/hcsshim/test v0.0.0-20201218223536-d3e5debf77da
 ## explicit
 github.com/Microsoft/hcsshim/test/functional/manifest
 # github.com/beorn7/perks v1.0.1

@@ -4,9 +4,9 @@ go 1.15
 
 require (
 	github.com/BurntSushi/toml v0.3.1
-	github.com/Microsoft/go-winio v0.4.15
-	github.com/Microsoft/hcsshim v0.8.10
-	github.com/Microsoft/hcsshim/test v0.0.0-20201119174602-966bebae11b4
+	github.com/Microsoft/go-winio v0.4.16
+	github.com/Microsoft/hcsshim v0.8.14
+	github.com/Microsoft/hcsshim/test v0.0.0-20201218223536-d3e5debf77da
 	github.com/containerd/aufs v0.0.0-20200908144142-dab0cbea06f4
 	github.com/containerd/btrfs v0.0.0-20201111183144-404b9149801e
 	github.com/containerd/cgroups v0.0.0-20200824123100-0b889c03f102

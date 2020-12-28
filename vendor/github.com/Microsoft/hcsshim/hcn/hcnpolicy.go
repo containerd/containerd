@@ -154,9 +154,10 @@ type FiveTuple struct {
 
 // L4WfpProxyPolicySetting sets Layer-4 Proxy on an endpoint.
 type L4WfpProxyPolicySetting struct {
-	Port        string    `json:",omitempty"`
-	FilterTuple FiveTuple `json:",omitempty"`
-	UserSID     string    `json:",omitempty"`
+	InboundProxyPort  string    `json:",omitempty"`
+	OutboundProxyPort string    `json:",omitempty"`
+	FilterTuple       FiveTuple `json:",omitempty"`
+	UserSID           string    `json:",omitempty"`
 }
 
 // PortnameEndpointPolicySetting sets the port name for an endpoint.
