@@ -113,7 +113,7 @@ func TestImagePullWithDistSourceLabel(t *testing.T) {
 	key := fmt.Sprintf("containerd.io/distribution.source.%s", source)
 
 	// only check the target platform
-	childrenHandler := images.FilterPlatforms(images.ChildrenHandler(cs), pMatcher)
+	childrenHandler := images.LimitManifests(images.ChildrenHandler(cs), pMatcher, 1)
 
 	checkLabelHandler := func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		children, err := childrenHandler(ctx, desc)
