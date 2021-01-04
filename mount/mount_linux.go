@@ -85,9 +85,8 @@ func (m *Mount) Mount(target string) (err error) {
 			if err != nil {
 				return err
 			}
-			defer devFile.Close()
 			// Mount the loop device instead
-			source = devFile.Name()
+			source = devFile
 		}
 		if err := mountAt(chdir, source, target, m.Type, uintptr(oflags), data); err != nil {
 			return err

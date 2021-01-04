@@ -53,11 +53,11 @@ func TestSetupLoop(t *testing.T) {
 	}()
 
 	/* RO loop */
-	f, err = setupLoop(backingFile, LoopParams{Readonly: true, Autoclear: true})
+	path, err := setupLoop(backingFile, LoopParams{Readonly: true, Autoclear: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	ff, err := os.OpenFile(f.Name(), os.O_RDWR, 0)
+	ff, err := os.OpenFile(path, os.O_RDWR, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,16 +67,13 @@ func TestSetupLoop(t *testing.T) {
 	if err = ff.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if err = f.Close(); err != nil {
-		t.Fatal(err)
-	}
 
 	/* RW loop */
-	f, err = setupLoop(backingFile, LoopParams{Autoclear: true})
+	path, err = setupLoop(backingFile, LoopParams{Autoclear: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	ff, err = os.OpenFile(f.Name(), os.O_RDWR, 0)
+	ff, err = os.OpenFile(path, os.O_RDWR, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,9 +81,6 @@ func TestSetupLoop(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err = ff.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err = f.Close(); err != nil {
 		t.Fatal(err)
 	}
 }
