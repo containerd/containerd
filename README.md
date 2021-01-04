@@ -231,8 +231,7 @@ Please see [RELEASES.md](RELEASES.md) for details on versioning and stability
 of containerd components.
 
 Downloadable 64-bit Intel/AMD binaries of all official releases are available on
-our [releases page](https://github.com/containerd/containerd/releases), as well as
-auto-published to the [cri-containerd-release storage bucket](https://console.cloud.google.com/storage/browser/cri-containerd-release?pli=1).
+our [releases page](https://github.com/containerd/containerd/releases).
 
 For other architectures and distribution support, you will find that many
 Linux distributions package their own containerd and provide it across several
@@ -262,7 +261,7 @@ loaded for the user's shell environment.
 
 `cri` is a [containerd](https://containerd.io/) plugin implementation of the Kubernetes [container runtime interface (CRI)](https://github.com/kubernetes/cri-api/blob/master/pkg/apis/runtime/v1alpha2/api.proto). With it, you are able to use containerd as the container runtime for a Kubernetes cluster.
 
-![cri](./docs/cri.png)
+![cri](./docs/cri/cri.png)
 
 #### CRI Status
 
@@ -286,7 +285,7 @@ A Kubernetes incubator project, [cri-tools](https://github.com/kubernetes-sigs/c
 #### CRI Guides
 * [Bringing up a Production Quality Cluster on GCE](docs/cri/kube-up.md)
 * [Installing with Ansible and Kubeadm](contrib/ansible/README.md)
-* [For Non-Ansible Users, Preforming a Custom Installation Using the Release Tarball and Kubeadm](docs/installation.md)
+* [For Non-Ansible Users, Preforming a Custom Installation Using the Release Tarball and Kubeadm](docs/cri/installation.md)
 * [CRI Plugin Testing Guide](./docs/cri/testing.md)
 * [Debugging Pods, Containers, and Images with `crictl`](./docs/cri/crictl.md)
 * [Configuring `cri` Plugins](./docs/cri/config.md)

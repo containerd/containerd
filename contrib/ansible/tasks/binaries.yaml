@@ -1,7 +1,7 @@
 ---
 - name: "Get Containerd"
   unarchive:
-    src: "https://storage.googleapis.com/cri-containerd-release/cri-containerd-{{ containerd_release_version }}.linux-amd64.tar.gz"
+    src: "https://github.com/containerd/containerd/releases/download/v{{ containerd_release_version }}/cri-containerd-cni-{{ containerd_release_version }}-linux-amd64.tar.gz"
     dest: "/"
     remote_src: yes
 
