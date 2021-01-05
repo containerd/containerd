@@ -26,85 +26,89 @@ import (
 	"github.com/containerd/continuity/testutil"
 )
 
-func TestSetupLoop(t *testing.T) {
-	testutil.RequiresRoot(t)
-	const randomdata = "randomdata"
+var randomData = []byte("randomdata")
 
-	/* Non-existing loop */
-	backingFile := "setup-loop-test-no-such-file"
-	_, err := setupLoop(backingFile, LoopParams{})
-	if err == nil {
-		t.Fatalf("setupLoop with non-existing file should fail")
-	}
+func createTempFile(t *testing.T) string {
+	t.Helper()
 
 	f, err := ioutil.TempFile("", "losetup")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer f.Close()
+
 	if err = f.Truncate(512); err != nil {
 		t.Fatal(err)
 	}
-	backingFile = f.Name()
-	f.Close()
+
+	return f.Name()
+}
+
+func TestNonExistingLoop(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	backingFile := "setup-loop-test-no-such-file"
+	_, err := setupLoop(backingFile, LoopParams{})
+	if err == nil {
+		t.Fatalf("setupLoop with non-existing file should fail")
+	}
+}
+
+func TestRoLoop(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	backingFile := createTempFile(t)
 	defer func() {
 		if err := os.Remove(backingFile); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
-	/* RO loop */
 	path, err := setupLoop(backingFile, LoopParams{Readonly: true, Autoclear: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	ff, err := os.OpenFile(path, os.O_RDWR, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = ff.Write([]byte(randomdata)); err == nil {
+
+	if err := ioutil.WriteFile(path, randomData, os.ModePerm); err == nil {
 		t.Fatalf("writing to readonly loop device should fail")
 	}
-	if err = ff.Close(); err != nil {
+}
+
+func TestRwLoop(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	backingFile := createTempFile(t)
+	defer func() {
+		if err := os.Remove(backingFile); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	path, err := setupLoop(backingFile, LoopParams{Autoclear: true})
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	/* RW loop */
-	path, err = setupLoop(backingFile, LoopParams{Autoclear: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	ff, err = os.OpenFile(path, os.O_RDWR, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = ff.Write([]byte(randomdata)); err != nil {
-		t.Fatal(err)
-	}
-	if err = ff.Close(); err != nil {
+	if err := ioutil.WriteFile(path, randomData, os.ModePerm); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestAttachDetachLoopDevice(t *testing.T) {
 	testutil.RequiresRoot(t)
-	f, err := ioutil.TempFile("", "losetup")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = f.Truncate(512); err != nil {
-		t.Fatal(err)
-	}
-	f.Close()
+
+	path := createTempFile(t)
 	defer func() {
-		if err := os.Remove(f.Name()); err != nil {
+		if err := os.Remove(path); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
-	dev, err := AttachLoopDevice(f.Name())
+	dev, err := AttachLoopDevice(path)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if err = DetachLoopDevice(dev); err != nil {
 		t.Fatal(err)
 	}

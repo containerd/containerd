@@ -143,7 +143,7 @@ func setupLoopDev(backingFile, loopDev string, param LoopParams) error {
 //
 // Upon success, the file handle to the loop device is returned.
 func setupLoop(backingFile string, param LoopParams) (string, error) {
-	for retry := 1; retry < 200; retry++ {
+	for retry := 1; retry < 100; retry++ {
 		num, err := getFreeLoopDev()
 		if err != nil {
 			return "", err
