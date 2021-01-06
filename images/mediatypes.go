@@ -108,7 +108,7 @@ func IsNonDistributable(mt string) bool {
 		strings.HasPrefix(mt, "application/vnd.docker.image.rootfs.foreign.")
 }
 
-// IsLayerTypes returns true if the media type is a layer
+// IsLayerType returns true if the media type is a layer
 func IsLayerType(mt string) bool {
 	if strings.HasPrefix(mt, "application/vnd.oci.image.layer.") {
 		return true
