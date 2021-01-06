@@ -114,7 +114,7 @@ func (c *ContainerIO) Pipe() {
 			c.stdout.Close()
 			c.stdoutGroup.Close()
 			wg.Done()
-			logrus.Infof("Finish piping stdout of container %q", c.id)
+			logrus.Debugf("Finish piping stdout of container %q", c.id)
 		}()
 	}
 
@@ -127,7 +127,7 @@ func (c *ContainerIO) Pipe() {
 			c.stderr.Close()
 			c.stderrGroup.Close()
 			wg.Done()
-			logrus.Infof("Finish piping stderr of container %q", c.id)
+			logrus.Debugf("Finish piping stderr of container %q", c.id)
 		}()
 	}
 }

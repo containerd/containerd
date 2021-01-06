@@ -99,7 +99,7 @@ func (e *ExecIO) Attach(opts AttachOptions) <-chan struct{} {
 		}
 		e.closer.wg.Done()
 		wg.Done()
-		logrus.Infof("Finish piping %q of container exec %q", t, e.id)
+		logrus.Debugf("Finish piping %q of container exec %q", t, e.id)
 	}
 
 	if opts.Stdout != nil {
