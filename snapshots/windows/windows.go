@@ -21,6 +21,8 @@ package windows
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -29,6 +31,7 @@ import (
 	winfs "github.com/Microsoft/go-winio/pkg/fs"
 	"github.com/Microsoft/go-winio/vhd"
 	"github.com/Microsoft/hcsshim"
+	"github.com/Microsoft/hcsshim/computestorage"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
@@ -53,6 +56,9 @@ func init() {
 }
 
 const (
+	// Label to specify that we should make a scratch space for a UtilityVM.
+	uvmScratchLabel = "containerd.io/snapshot/io.microsoft.vm.storage.scratch"
+	// Label to control a containers scratch space size (sandbox.vhdx).
 	rootfsSizeLabel = "containerd.io/snapshot/io.microsoft.container.storage.rootfs.size-gb"
 )
 
@@ -345,15 +351,6 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		if !strings.Contains(key, snapshots.UnpackKeyPrefix) {
 			parentLayerPaths := s.parentIDsToParentPaths(newSnapshot.ParentIDs)
 
-			var parentPath string
-			if len(parentLayerPaths) != 0 {
-				parentPath = parentLayerPaths[0]
-			}
-
-			if err := hcsshim.CreateSandboxLayer(s.info, newSnapshot.ID, parentPath, parentLayerPaths); err != nil {
-				return nil, errors.Wrap(err, "failed to create sandbox layer")
-			}
-
 			var snapshotInfo snapshots.Info
 			for _, o := range opts {
 				o(&snapshotInfo)
@@ -368,11 +365,19 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 				sizeGB = int(i32)
 			}
 
-			if sizeGB > 0 {
-				const gbToByte = 1024 * 1024 * 1024
-				if err := hcsshim.ExpandSandboxSize(s.info, newSnapshot.ID, uint64(gbToByte*sizeGB)); err != nil {
-					return nil, errors.Wrapf(err, "failed to expand scratch size to %d GB", sizeGB)
+			var makeUVMScratch bool
+			if _, ok := snapshotInfo.Labels[uvmScratchLabel]; ok {
+				makeUVMScratch = true
+			}
+
+			// This has to be run first to avoid clashing with the containers sandbox.vhdx.
+			if makeUVMScratch {
+				if err := s.createUVMScratchLayer(ctx, snDir, parentLayerPaths); err != nil {
+					return nil, errors.Wrap(err, "failed to make UVM's scratch layer")
 				}
+			}
+			if err := s.createScratchLayer(ctx, snDir, parentLayerPaths, sizeGB); err != nil {
+				return nil, errors.Wrap(err, "failed to create scratch layer")
 			}
 		}
 	}
@@ -390,4 +395,101 @@ func (s *snapshotter) parentIDsToParentPaths(parentIDs []string) []string {
 		parentLayerPaths = append(parentLayerPaths, s.getSnapshotDir(ID))
 	}
 	return parentLayerPaths
+}
+
+// This is essentially a recreation of what HCS' CreateSandboxLayer does with some extra bells and
+// whistles like expanding the volume if a size is specified. This will create a 1GB scratch
+// vhdx to be used if a different sized scratch that is not equal to the default of 20 is requested.
+func (s *snapshotter) createScratchLayer(ctx context.Context, snDir string, parentLayers []string, sizeGB int) error {
+	parentLen := len(parentLayers)
+	if parentLen == 0 {
+		return errors.New("no parent layers present")
+	}
+	baseLayer := parentLayers[parentLen-1]
+
+	var (
+		templateBase     = filepath.Join(baseLayer, "blank-base.vhdx")
+		templateDiffDisk = filepath.Join(baseLayer, "blank.vhdx")
+		newDisks         = sizeGB > 0 && sizeGB < 20
+		expand           = sizeGB > 0 && sizeGB != 20
+	)
+
+	// If a size greater than 0 and less than 20 (the default size produced by hcs)
+	// was specified we make a new set of disks to be used. We make it a 1GB disk and just
+	// expand it to the size specified so for future container runs we don't need to remake a disk.
+	if newDisks {
+		templateBase = filepath.Join(baseLayer, "scratch.vhdx")
+		templateDiffDisk = filepath.Join(baseLayer, "scratch-diff.vhdx")
+	}
+
+	if _, err := os.Stat(templateDiffDisk); os.IsNotExist(err) {
+		// Scratch disk not present so lets make it.
+		if err := computestorage.SetupContainerBaseLayer(ctx, baseLayer, templateBase, templateDiffDisk, 1); err != nil {
+			return errors.Wrapf(err, "failed to create scratch vhdx at %q", baseLayer)
+		}
+	}
+
+	dest := filepath.Join(snDir, "sandbox.vhdx")
+	if err := copyScratchDisk(templateDiffDisk, dest); err != nil {
+		return err
+	}
+
+	if expand {
+		gbToByte := 1024 * 1024 * 1024
+		if err := hcsshim.ExpandSandboxSize(s.info, filepath.Base(snDir), uint64(gbToByte*sizeGB)); err != nil {
+			return errors.Wrapf(err, "failed to expand sandbox vhdx size to %d GB", sizeGB)
+		}
+	}
+	return nil
+}
+
+// This handles creating the UVMs scratch layer.
+func (s *snapshotter) createUVMScratchLayer(ctx context.Context, snDir string, parentLayers []string) error {
+	parentLen := len(parentLayers)
+	if parentLen == 0 {
+		return errors.New("no parent layers present")
+	}
+	baseLayer := parentLayers[parentLen-1]
+
+	// Make sure base layer has a UtilityVM folder.
+	uvmPath := filepath.Join(baseLayer, "UtilityVM")
+	if _, err := os.Stat(uvmPath); os.IsNotExist(err) {
+		return errors.Wrapf(err, "failed to find UtilityVM directory in base layer %q", baseLayer)
+	}
+
+	templateDiffDisk := filepath.Join(uvmPath, "SystemTemplate.vhdx")
+
+	// Check if SystemTemplate disk doesn't exist for some reason (this should be made during the unpacking
+	// of the base layer).
+	if _, err := os.Stat(templateDiffDisk); os.IsNotExist(err) {
+		return fmt.Errorf("%q does not exist in Utility VM image", templateDiffDisk)
+	}
+
+	// Move the sandbox.vhdx into a nested vm folder to avoid clashing with a containers sandbox.vhdx.
+	vmScratchDir := filepath.Join(snDir, "vm")
+	if err := os.MkdirAll(vmScratchDir, 0777); err != nil {
+		return errors.Wrap(err, "failed to make `vm` directory for vm's scratch space")
+	}
+
+	return copyScratchDisk(templateDiffDisk, filepath.Join(vmScratchDir, "sandbox.vhdx"))
+}
+
+func copyScratchDisk(source, dest string) error {
+	scratchSource, err := os.OpenFile(source, os.O_RDWR, 0700)
+	if err != nil {
+		return errors.Wrapf(err, "failed to open %s", source)
+	}
+	defer scratchSource.Close()
+
+	f, err := os.OpenFile(dest, os.O_RDWR|os.O_CREATE, 0700)
+	if err != nil {
+		return errors.Wrap(err, "failed to create sandbox.vhdx in snapshot")
+	}
+	defer f.Close()
+
+	if _, err := io.Copy(f, scratchSource); err != nil {
+		os.Remove(dest)
+		return errors.Wrapf(err, "failed to copy cached %q to %q in snapshot", source, dest)
+	}
+	return nil
 }
