@@ -53,7 +53,8 @@ const nsRunDir = "/var/run/netns"
 
 // newNS creates a new persistent (bind-mounted) network namespace and returns the
 // path to the network namespace.
-func newNS() (nsPath string, err error) {
+// If pid is non-zero, reuses the netns from this pid
+func newNS(pid uint32) (nsPath string, err error) {
 	b := make([]byte, 16)
 	if _, err := rand.Reader.Read(b); err != nil {
 		return "", errors.Wrap(err, "failed to generate random netns name")
@@ -94,26 +95,33 @@ func newNS() (nsPath string, err error) {
 		// Don't unlock. By not unlocking, golang will kill the OS thread when the
 		// goroutine is done (for go1.10+)
 
-		var origNS cnins.NetNS
-		origNS, err = cnins.GetNS(getCurrentThreadNetNSPath())
-		if err != nil {
-			return
-		}
-		defer origNS.Close()
+		var procNsPath string
+		if pid == 0 {
+			var origNS cnins.NetNS
+			origNS, err = cnins.GetNS(getCurrentThreadNetNSPath())
+			if err != nil {
+				return
+			}
+			defer origNS.Close()
 
-		// create a new netns on the current thread
-		err = unix.Unshare(unix.CLONE_NEWNET)
-		if err != nil {
-			return
-		}
+			// create a new netns on the current thread
+			err = unix.Unshare(unix.CLONE_NEWNET)
+			if err != nil {
+				return
+			}
 
-		// Put this thread back to the orig ns, since it might get reused (pre go1.10)
-		defer origNS.Set() // nolint: errcheck
+			// Put this thread back to the orig ns, since it might get reused (pre go1.10)
+			defer origNS.Set() // nolint: errcheck
+
+			procNsPath = getCurrentThreadNetNSPath()
+		} else {
+			procNsPath = getNetNSPathFromPID(pid)
+		}
 
 		// bind mount the netns from the current thread (from /proc) onto the
 		// mount point. This causes the namespace to persist, even when there
 		// are no threads in the ns.
-		err = unix.Mount(getCurrentThreadNetNSPath(), nsPath, "none", unix.MS_BIND, "")
+		err = unix.Mount(procNsPath, nsPath, "none", unix.MS_BIND, "")
 		if err != nil {
 			err = errors.Wrapf(err, "failed to bind mount ns at %s", nsPath)
 		}
@@ -156,6 +164,10 @@ func getCurrentThreadNetNSPath() string {
 	return fmt.Sprintf("/proc/%d/task/%d/ns/net", os.Getpid(), unix.Gettid())
 }
 
+func getNetNSPathFromPID(pid uint32) string {
+	return fmt.Sprintf("/proc/%d/ns/net", pid)
+}
+
 // NetNS holds network namespace.
 type NetNS struct {
 	path string
@@ -163,7 +175,14 @@ type NetNS struct {
 
 // NewNetNS creates a network namespace.
 func NewNetNS() (*NetNS, error) {
-	path, err := newNS()
+	return NetNSFromPID(0)
+}
+
+// NetNSFromPID reuses the existing network namespace from a process and bind
+// mount it in the same way as NewNetNS() so we can run Do() in the same way
+// regardless of the lifecycle of the pid.
+func NetNSFromPID(pid uint32) (*NetNS, error) {
+	path, err := newNS(pid)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to setup netns")
 	}

@@ -88,6 +88,7 @@ import (
 
 // PullImage pulls an image with authentication config.
 func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (*runtime.PullImageResponse, error) {
+	log.G(ctx).Infof("Pulling image  with SandboxConfig %v", r.SandboxConfig)
 	imageRef := r.GetImage().GetImage()
 	namedRef, err := distribution.ParseDockerRef(imageRef)
 	if err != nil {
