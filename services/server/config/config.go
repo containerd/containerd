@@ -80,6 +80,8 @@ type StreamProcessor struct {
 	Path string `toml:"path"`
 	// Args to the binary
 	Args []string `toml:"args"`
+	// Environment variables for the binary
+	Env []string `toml:"env"`
 }
 
 // GetVersion returns the config file's version
