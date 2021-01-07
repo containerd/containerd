@@ -247,12 +247,12 @@ func (in *instrumentedService) ExecSync(ctx context.Context, r *runtime.ExecSync
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	log.G(ctx).Infof("ExecSync for %q with command %+v and timeout %d (s)", r.GetContainerId(), r.GetCmd(), r.GetTimeout())
+	log.G(ctx).Debugf("ExecSync for %q with command %+v and timeout %d (s)", r.GetContainerId(), r.GetCmd(), r.GetTimeout())
 	defer func() {
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("ExecSync for %q failed", r.GetContainerId())
 		} else {
-			log.G(ctx).Infof("ExecSync for %q returns with exit code %d", r.GetContainerId(), res.GetExitCode())
+			log.G(ctx).Debugf("ExecSync for %q returns with exit code %d", r.GetContainerId(), res.GetExitCode())
 			log.G(ctx).Debugf("ExecSync for %q outputs - stdout: %q, stderr: %q", r.GetContainerId(),
 				res.GetStdout(), res.GetStderr())
 		}
@@ -265,13 +265,13 @@ func (in *instrumentedService) Exec(ctx context.Context, r *runtime.ExecRequest)
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	log.G(ctx).Infof("Exec for %q with command %+v, tty %v and stdin %v",
+	log.G(ctx).Debugf("Exec for %q with command %+v, tty %v and stdin %v",
 		r.GetContainerId(), r.GetCmd(), r.GetTty(), r.GetStdin())
 	defer func() {
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("Exec for %q failed", r.GetContainerId())
 		} else {
-			log.G(ctx).Infof("Exec for %q returns URL %q", r.GetContainerId(), res.GetUrl())
+			log.G(ctx).Debugf("Exec for %q returns URL %q", r.GetContainerId(), res.GetUrl())
 		}
 	}()
 	res, err = in.c.Exec(ctrdutil.WithNamespace(ctx), r)
@@ -282,12 +282,12 @@ func (in *instrumentedService) Attach(ctx context.Context, r *runtime.AttachRequ
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	log.G(ctx).Infof("Attach for %q with tty %v and stdin %v", r.GetContainerId(), r.GetTty(), r.GetStdin())
+	log.G(ctx).Debugf("Attach for %q with tty %v and stdin %v", r.GetContainerId(), r.GetTty(), r.GetStdin())
 	defer func() {
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("Attach for %q failed", r.GetContainerId())
 		} else {
-			log.G(ctx).Infof("Attach for %q returns URL %q", r.GetContainerId(), res.Url)
+			log.G(ctx).Debugf("Attach for %q returns URL %q", r.GetContainerId(), res.Url)
 		}
 	}()
 	res, err = in.c.Attach(ctrdutil.WithNamespace(ctx), r)
