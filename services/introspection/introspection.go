@@ -41,7 +41,7 @@ func NewIntrospectionServiceFromClient(c api.IntrospectionClient) Service {
 }
 
 func (i *introspectionRemote) Plugins(ctx context.Context, filters []string) (*api.PluginsResponse, error) {
-	log.G(ctx).WithField("filters", filters).Info("remote introspection plugin filters")
+	log.G(ctx).WithField("filters", filters).Debug("remote introspection plugin filters")
 	resp, err := i.client.Plugins(ctx, &api.PluginsRequest{
 		Filters: filters,
 	})
