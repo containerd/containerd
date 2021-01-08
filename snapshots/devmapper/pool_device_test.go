@@ -31,7 +31,6 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/snapshots/devmapper/dmsetup"
-	"github.com/containerd/containerd/snapshots/devmapper/losetup"
 	"github.com/docker/go-units"
 	"github.com/sirupsen/logrus"
 	"gotest.tools/v3/assert"
@@ -74,7 +73,7 @@ func TestPoolDevice(t *testing.T) {
 
 	defer func() {
 		// Detach loop devices and remove images
-		err := losetup.DetachLoopDevice(loopDataDevice, loopMetaDevice)
+		err := mount.DetachLoopDevice(loopDataDevice, loopMetaDevice)
 		assert.NilError(t, err)
 
 		err = os.RemoveAll(tempDir)
@@ -306,7 +305,7 @@ func createLoopbackDevice(t *testing.T, dir string) (string, string) {
 
 	imagePath := file.Name()
 
-	loopDevice, err := losetup.AttachLoopDevice(imagePath)
+	loopDevice, err := mount.AttachLoopDevice(imagePath)
 	assert.NilError(t, err)
 
 	return imagePath, loopDevice
