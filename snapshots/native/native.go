@@ -327,12 +327,9 @@ func (o *snapshotter) mounts(s storage.Snapshot) []mount.Mount {
 
 	return []mount.Mount{
 		{
-			Source: source,
-			Type:   "bind",
-			Options: []string{
-				roFlag,
-				"rbind",
-			},
+			Source:  source,
+			Type:    mountType,
+			Options: append(defaultMountOptions, roFlag),
 		},
 	}
 }
