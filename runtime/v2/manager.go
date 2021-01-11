@@ -155,7 +155,7 @@ func (m *TaskManager) Create(ctx context.Context, id string, opts runtime.Create
 			defer cancel()
 			_, errShim := shim.Delete(dctx)
 			if errShim != nil {
-				shim.Shutdown(ctx)
+				shim.Shutdown(dctx)
 				shim.Close()
 			}
 		}
