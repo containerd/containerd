@@ -45,12 +45,17 @@ func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *se
 			case s := <-serverC:
 				server = s
 			case s := <-signals:
+
+				// Do not print message when deailing with SIGPIPE, which may cause
+				// nested signals and consume lots of cpu bandwidth.
+				if s == unix.SIGPIPE {
+					continue
+				}
+
 				log.G(ctx).WithField("signal", s).Debug("received signal")
 				switch s {
 				case unix.SIGUSR1:
 					dumpStacks(true)
-				case unix.SIGPIPE:
-					continue
 				default:
 					if err := notifyStopping(ctx); err != nil {
 						log.G(ctx).WithError(err).Error("notify stopping failed")
