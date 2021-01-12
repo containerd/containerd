@@ -30,9 +30,9 @@ func TestOnly(t *testing.T) {
 			matches: map[bool][]string{
 				true: {
 					"linux/amd64",
+					"linux/386",
 				},
 				false: {
-					"linux/386",
 					"linux/arm/v7",
 					"linux/arm64",
 					"windows/amd64",
