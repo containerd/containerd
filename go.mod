@@ -31,8 +31,8 @@ require (
 	github.com/gogo/googleapis v1.4.0
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.4.3
-	github.com/google/go-cmp v0.5.1
-	github.com/google/uuid v1.1.1
+	github.com/google/go-cmp v0.5.2
+	github.com/google/uuid v1.1.2
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/imdario/mergo v0.3.10
@@ -47,24 +47,24 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
 	github.com/sirupsen/logrus v1.7.0
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.6.1
 	github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
 	github.com/tchap/go-patricia v2.2.6+incompatible
 	github.com/urfave/cli v1.22.2
 	go.etcd.io/bbolt v1.3.5
-	golang.org/x/net v0.0.0-20200707034311-ab3426394381
+	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
 	golang.org/x/sys v0.0.0-20201202213521-69691e467435
 	google.golang.org/grpc v1.30.0
 	gotest.tools/v3 v3.0.2
-	k8s.io/api v0.19.4
-	k8s.io/apimachinery v0.19.4
-	k8s.io/apiserver v0.19.4
-	k8s.io/client-go v0.19.4
-	k8s.io/component-base v0.19.4
-	k8s.io/cri-api v0.20.0-beta.1.0.20201105173512-3990421b69a0
-	k8s.io/klog/v2 v2.2.0
-	k8s.io/utils v0.0.0-20200729134348-d5654de09c73
+	k8s.io/api v0.20.1
+	k8s.io/apimachinery v0.20.1
+	k8s.io/apiserver v0.20.1
+	k8s.io/client-go v0.20.1
+	k8s.io/component-base v0.20.1
+	k8s.io/cri-api v0.20.1
+	k8s.io/klog/v2 v2.4.0
+	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 )
 
 replace (
