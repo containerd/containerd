@@ -951,6 +951,8 @@ func check128LayersMount(name string) func(ctx context.Context, t *testing.T, sn
 				t.Fatalf("[layer %d] failed to mount on the target(%s): %+v", i, preparing, err)
 			}
 
+			t.Log("mount", preparing)
+
 			preparingWorkDir := filepath.Join(preparing, "wcow_workaround")
 			if err := os.MkdirAll(preparingWorkDir, 0777); err != nil {
 				testutil.Unmount(t, preparing)
