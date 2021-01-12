@@ -17,7 +17,7 @@
 set -o nounset
 set -o pipefail
 
-source $(dirname "${BASH_SOURCE[0]}")/test-utils.sh
+source $(dirname "${BASH_SOURCE[0]}")/utils.sh
 cd ${ROOT}
 
 # FOCUS focuses the test to run.

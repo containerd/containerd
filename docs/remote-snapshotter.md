@@ -12,7 +12,7 @@ This enables containerd to lazily pull images from standard-compliant registries
 ## The containerd client API
 
 The containerd client's `Pull` API with unpacking-mode allows the underlying snapshotter to query for remote snapshots before fetching content.
-Remote snapshotter needs to be plugged into containerd in [the same ways as normal snapshotters](/PLUGINS.md).
+Remote snapshotter needs to be plugged into containerd in [the same ways as normal snapshotters](/docs/PLUGINS.md).
 
 ```go
 image, err := client.Pull(ctx, ref,
