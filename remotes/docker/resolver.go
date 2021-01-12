@@ -446,6 +446,9 @@ func (r *dockerBase) filterHosts(caps HostCapabilities) (hosts []RegistryHost) {
 
 func (r *dockerBase) request(host RegistryHost, method string, ps ...string) *request {
 	header := r.header.Clone()
+	if header == nil {
+		header = http.Header{}
+	}
 
 	for key, value := range host.Header {
 		header[key] = append(header[key], value...)
