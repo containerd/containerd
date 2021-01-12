@@ -944,6 +944,8 @@ func check128LayersMount(name string) func(ctx context.Context, t *testing.T, sn
 				t.Fatalf("[layer %d] failed to mount on the target(%s): %+v", i, preparing, err)
 			}
 
+			t.Log("mount", preparing)
+
 			if err := fstest.CheckDirectoryEqual(preparing, flat); err != nil {
 				testutil.Unmount(t, preparing)
 				t.Fatalf("[layer %d] preparing doesn't equal to flat before apply: %+v", i, err)
