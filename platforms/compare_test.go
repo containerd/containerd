@@ -166,17 +166,17 @@ func TestOnly(t *testing.T) {
 			platform: "linux/arm64",
 			matches: map[bool][]string{
 				true: {
+					"linux/arm",
+					"linux/arm/v5",
+					"linux/arm/v6",
+					"linux/arm/v7",
+					"linux/arm/v8",
 					"linux/arm64",
 					"linux/arm64/v8",
 				},
 				false: {
 					"linux/amd64",
-					"linux/arm",
 					"linux/arm/v4",
-					"linux/arm/v5",
-					"linux/arm/v6",
-					"linux/arm/v7",
-					"linux/arm/v8",
 					"linux/arm/v9",
 					"linux/arm64/v9",
 					"windows/amd64",

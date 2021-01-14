@@ -57,6 +57,18 @@ func platformVector(platform specs.Platform) []specs.Platform {
 				})
 			}
 		}
+	case "arm64":
+		variant := platform.Variant
+		if variant == "" {
+			variant = "v8"
+		}
+		vector = append(vector, platformVector(specs.Platform{
+			Architecture: "arm",
+			OS:           platform.OS,
+			OSVersion:    platform.OSVersion,
+			OSFeatures:   platform.OSFeatures,
+			Variant:      variant,
+		})...)
 	}
 
 	return vector
