@@ -36,3 +36,8 @@ func DefaultSpec() specs.Platform {
 		Variant: cpuVariant,
 	}
 }
+
+// DefaultStrict returns strict form of Default.
+func DefaultStrict() MatchComparer {
+	return OnlyStrict(DefaultSpec())
+}

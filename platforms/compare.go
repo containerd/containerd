@@ -85,6 +85,18 @@ func Only(platform specs.Platform) MatchComparer {
 	return Ordered(platformVector(Normalize(platform))...)
 }
 
+// OnlyStrict returns a match comparer for a single platform.
+//
+// Unlike Only, OnlyStrict does not match sub platforms.
+// So, "arm/vN" will not match "arm/vM" where M < N,
+// and "amd64" will not also match "386".
+//
+// OnlyStrict matches non-canonical forms.
+// So, "arm64" matches "arm/64/v8".
+func OnlyStrict(platform specs.Platform) MatchComparer {
+	return Ordered(Normalize(platform))
+}
+
 // Ordered returns a platform MatchComparer which matches any of the platforms
 // but orders them in order they are provided.
 func Ordered(platforms ...specs.Platform) MatchComparer {
