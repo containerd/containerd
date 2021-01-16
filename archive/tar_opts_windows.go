@@ -18,6 +18,19 @@
 
 package archive
 
+import (
+	"context"
+	"io"
+
+	"github.com/Microsoft/hcsshim/pkg/ociwclayer"
+)
+
+// applyWindowsLayer applies a tar stream of an OCI style diff tar of a Windows layer
+// See https://github.com/opencontainers/image-spec/blob/master/layer.md#applying-changesets
+func applyWindowsLayer(ctx context.Context, root string, r io.Reader, options ApplyOptions) (size int64, err error) {
+	return ociwclayer.ImportLayerFromTar(ctx, r, root, options.Parents)
+}
+
 // AsWindowsContainerLayer indicates that the tar stream to apply is that of
 // a Windows Container Layer. The caller must be holding SeBackupPrivilege and
 // SeRestorePrivilege.
