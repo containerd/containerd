@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	winfs "github.com/Microsoft/go-winio/pkg/fs"
 	"github.com/Microsoft/go-winio/vhd"
@@ -60,12 +61,17 @@ const (
 	uvmScratchLabel = "containerd.io/snapshot/io.microsoft.vm.storage.scratch"
 	// Label to control a containers scratch space size (sandbox.vhdx).
 	rootfsSizeLabel = "containerd.io/snapshot/io.microsoft.container.storage.rootfs.size-gb"
+	// Label to control a UVMs scratch space size.
+	uvmRootfsSizeLabel = "containerd.io/snapshot/io.microsoft.vm.storage.rootfs.size-gb"
+	// Path to the BCD file in a Utility VM image
+	uvmBCDPath = "Files\\EFI\\Microsoft\\Boot\\BCD"
 )
 
 type snapshotter struct {
-	root string
-	info hcsshim.DriverInfo
-	ms   *storage.MetaStore
+	root        string
+	info        hcsshim.DriverInfo
+	ms          *storage.MetaStore
+	scratchLock sync.Mutex
 }
 
 // NewSnapshotter returns a new windows snapshotter
@@ -365,6 +371,15 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 				sizeGB = int(i32)
 			}
 
+			var UVMsizeGB int
+			if sizeGBstr, ok := snapshotInfo.Labels[uvmRootfsSizeLabel]; ok {
+				i32, err := strconv.ParseInt(sizeGBstr, 10, 32)
+				if err != nil {
+					return nil, errors.Wrapf(err, "failed to parse label %q=%q", uvmRootfsSizeLabel, sizeGBstr)
+				}
+				UVMsizeGB = int(i32)
+			}
+
 			var makeUVMScratch bool
 			if _, ok := snapshotInfo.Labels[uvmScratchLabel]; ok {
 				makeUVMScratch = true
@@ -372,7 +387,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 
 			// This has to be run first to avoid clashing with the containers sandbox.vhdx.
 			if makeUVMScratch {
-				if err := s.createUVMScratchLayer(ctx, snDir, parentLayerPaths); err != nil {
+				if err := s.createUVMScratchLayer(ctx, snDir, parentLayerPaths, UVMsizeGB); err != nil {
 					return nil, errors.Wrap(err, "failed to make UVM's scratch layer")
 				}
 			}
@@ -401,6 +416,9 @@ func (s *snapshotter) parentIDsToParentPaths(parentIDs []string) []string {
 // whistles like expanding the volume if a size is specified. This will create a 1GB scratch
 // vhdx to be used if a different sized scratch that is not equal to the default of 20 is requested.
 func (s *snapshotter) createScratchLayer(ctx context.Context, snDir string, parentLayers []string, sizeGB int) error {
+	s.scratchLock.Lock()
+	defer s.scratchLock.Unlock()
+
 	parentLen := len(parentLayers)
 	if parentLen == 0 {
 		return errors.New("no parent layers present")
@@ -430,7 +448,7 @@ func (s *snapshotter) createScratchLayer(ctx context.Context, snDir string, pare
 	}
 
 	dest := filepath.Join(snDir, "sandbox.vhdx")
-	if err := copyScratchDisk(templateDiffDisk, dest); err != nil {
+	if err := copyFile(templateDiffDisk, dest); err != nil {
 		return err
 	}
 
@@ -443,8 +461,21 @@ func (s *snapshotter) createScratchLayer(ctx context.Context, snDir string, pare
 	return nil
 }
 
-// This handles creating the UVMs scratch layer.
-func (s *snapshotter) createUVMScratchLayer(ctx context.Context, snDir string, parentLayers []string) error {
+// This handles creating the UVMs scratch layer. This is a bit different from the containers scratch layer in
+// that expanding the volume doesn't work, so a new set of disks will have to be made. Processing the UVM layer also
+// renders any previously made disks unusable as the bcd store gets updated to point to the partition ID of the newly created
+// disk. To work around this, we keep a cache of the bcd stores and disks so we can swap out with the correct bcd <--> disk
+// mapping.
+func (s *snapshotter) createUVMScratchLayer(ctx context.Context, snDir string, parentLayers []string, sizeGB int) error {
+	s.scratchLock.Lock()
+	defer s.scratchLock.Unlock()
+
+	// Hardcoded size of the UVMs scratch in the original HCS storage calls. If no size is specified
+	// just keep using this default.
+	if sizeGB == 0 {
+		sizeGB = 10
+	}
+
 	parentLen := len(parentLayers)
 	if parentLen == 0 {
 		return errors.New("no parent layers present")
@@ -457,12 +488,47 @@ func (s *snapshotter) createUVMScratchLayer(ctx context.Context, snDir string, p
 		return errors.Wrapf(err, "failed to find UtilityVM directory in base layer %q", baseLayer)
 	}
 
-	templateDiffDisk := filepath.Join(uvmPath, "SystemTemplate.vhdx")
+	var (
+		newDisks         = sizeGB > 0 && sizeGB != 10
+		templateBase     = filepath.Join(uvmPath, "SystemTemplateBase.vhdx")
+		templateDiffDisk = filepath.Join(uvmPath, "SystemTemplate.vhdx")
+		bcdName          = fmt.Sprintf("BCD_%d", sizeGB)
+		bcdCache         = filepath.Join(uvmPath, "bcdcache")
+		bcdDestination   = filepath.Join(bcdCache, bcdName)
+		bcdSource        = filepath.Join(uvmPath, uvmBCDPath)
+	)
 
-	// Check if SystemTemplate disk doesn't exist for some reason (this should be made during the unpacking
-	// of the base layer).
-	if _, err := os.Stat(templateDiffDisk); os.IsNotExist(err) {
-		return fmt.Errorf("%q does not exist in Utility VM image", templateDiffDisk)
+	// If the cache doesn't exist this is the first time this image is being used to
+	// create a vm isolated container. Cache the original BCD entry.
+	if _, err := os.Stat(bcdCache); os.IsNotExist(err) {
+		if err := os.MkdirAll(bcdCache, 0777); err != nil {
+			return errors.Wrap(err, "failed to make BCD cache")
+		}
+		if err := copyFile(bcdSource, filepath.Join(bcdCache, fmt.Sprintf("BCD_%d", 10))); err != nil {
+			return errors.Wrap(err, "failed to copy bcd entry")
+		}
+	}
+
+	if newDisks {
+		templateBase = filepath.Join(uvmPath, fmt.Sprintf("SystemTemplateBase_%d.vhdx", sizeGB))
+		templateDiffDisk = filepath.Join(uvmPath, fmt.Sprintf("SystemTemplate_%d.vhdx", sizeGB))
+	}
+
+	if _, err := os.Stat(templateDiffDisk); os.IsNotExist(err) && newDisks {
+		if err := computestorage.SetupUtilityVMBaseLayer(ctx, uvmPath, templateBase, templateDiffDisk, uint64(sizeGB)); err != nil {
+			return errors.Wrap(err, "failed to create UVM scratch vhdx")
+		}
+		if err := copyFile(bcdSource, bcdDestination); err != nil {
+			return err
+		}
+	} else {
+		// Disk exists. Make sure bcd entry also does.
+		if _, err := os.Stat(bcdDestination); os.IsNotExist(err) {
+			return errors.Wrap(err, "failed to find bcd entry for UVM image")
+		}
+		if err := copyFile(bcdDestination, bcdSource); err != nil {
+			return err
+		}
 	}
 
 	// Move the sandbox.vhdx into a nested vm folder to avoid clashing with a containers sandbox.vhdx.
@@ -471,10 +537,10 @@ func (s *snapshotter) createUVMScratchLayer(ctx context.Context, snDir string, p
 		return errors.Wrap(err, "failed to make `vm` directory for vm's scratch space")
 	}
 
-	return copyScratchDisk(templateDiffDisk, filepath.Join(vmScratchDir, "sandbox.vhdx"))
+	return copyFile(templateDiffDisk, filepath.Join(vmScratchDir, "sandbox.vhdx"))
 }
 
-func copyScratchDisk(source, dest string) error {
+func copyFile(source, dest string) error {
 	scratchSource, err := os.OpenFile(source, os.O_RDWR, 0700)
 	if err != nil {
 		return errors.Wrapf(err, "failed to open %s", source)
@@ -491,5 +557,6 @@ func copyScratchDisk(source, dest string) error {
 		os.Remove(dest)
 		return errors.Wrapf(err, "failed to copy cached %q to %q in snapshot", source, dest)
 	}
+
 	return nil
 }
