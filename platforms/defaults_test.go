@@ -28,7 +28,7 @@ func TestDefault(t *testing.T) {
 	expected := specs.Platform{
 		OS:           runtime.GOOS,
 		Architecture: runtime.GOARCH,
-		Variant:      cpuVariant,
+		Variant:      cpuVariant(),
 	}
 	p := DefaultSpec()
 	if !reflect.DeepEqual(p, expected) {

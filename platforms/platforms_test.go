@@ -31,8 +31,8 @@ func TestParseSelector(t *testing.T) {
 		defaultVariant = ""
 	)
 
-	if defaultArch == "arm" && cpuVariant != "v7" {
-		defaultVariant = cpuVariant
+	if defaultArch == "arm" && cpuVariant() != "v7" {
+		defaultVariant = cpuVariant()
 	}
 
 	for _, testcase := range []struct {
