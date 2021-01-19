@@ -21,6 +21,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
@@ -28,14 +29,18 @@ import (
 )
 
 // Present the ARM instruction set architecture, eg: v7, v8
-var cpuVariant string
+// Don't use this value directly; call cpuVariant() instead.
+var cpuVariantValue string
 
-func init() {
-	if isArmArch(runtime.GOARCH) {
-		cpuVariant = getCPUVariant()
-	} else {
-		cpuVariant = ""
-	}
+var cpuVariantOnce sync.Once
+
+func cpuVariant() string {
+	cpuVariantOnce.Do(func() {
+		if isArmArch(runtime.GOARCH) {
+			cpuVariantValue = getCPUVariant()
+		}
+	})
+	return cpuVariantValue
 }
 
 // For Linux, the kernel has already detected the ABI, ISA and Features.
