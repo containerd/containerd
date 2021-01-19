@@ -183,7 +183,7 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 		}
 	}()
 
-	specOpts = append(specOpts, customopts.WithMounts(c.os, config, extraMounts, mountLabel))
+	specOpts = append(specOpts, customopts.WithMounts(c.os, config, extraMounts, mountLabel), customopts.WithRelabeledContainerMounts(mountLabel))
 
 	if !c.config.DisableProcMount {
 		// Apply masked paths if specified.
