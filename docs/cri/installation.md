@@ -129,4 +129,4 @@ systemctl daemon-reload
 ## Bring Up the Cluster
 Now you should have properly installed all required binaries and dependencies on each of your node.
 
-The next step is to use kubeadm to bring up the Kubernetes cluster. It is the same with [the ansible installer](../contrib/ansible). Please follow the steps 2-4 [here](../contrib/ansible/README.md#step-2).
+The next step is to use kubeadm to bring up the Kubernetes cluster. It is the same with [the ansible installer](../../contrib/ansible). Please follow the steps 2-4 [here](../../contrib/ansible/README.md#step-2).
