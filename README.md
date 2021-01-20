@@ -283,7 +283,6 @@ See results on the containerd k8s [test dashboard](https://k8s-testgrid.appspot.
 A Kubernetes incubator project, [cri-tools](https://github.com/kubernetes-sigs/cri-tools), includes programs for exercising CRI implementations. More importantly, cri-tools includes the program `critest` which is used for running [CRI Validation Testing](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-validation.md).
 
 #### CRI Guides
-* [Bringing up a Production Quality Cluster on GCE](docs/cri/kube-up.md)
 * [Installing with Ansible and Kubeadm](contrib/ansible/README.md)
 * [For Non-Ansible Users, Preforming a Custom Installation Using the Release Tarball and Kubeadm](docs/cri/installation.md)
 * [CRI Plugin Testing Guide](./docs/cri/testing.md)
