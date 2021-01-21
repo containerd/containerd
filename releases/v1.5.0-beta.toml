@@ -1,0 +1,55 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.4.0"
+
+pre_release = true
+
+preface = """\
+The sixth major release of containerd includes many stability improvements
+and code organization changes to make contribution easier and make future
+features cleaner to develop. This includes bringing CRI development into the
+main containerd repository and switching to Go modules. This release also
+brings support for the Node Resource Interface (NRI).
+
+## Project Organization
+* **Merge containerd/cri codebased into containerd/containerd** [#4593](https://github.com/containerd/containerd/pull/4593)
+* **Move to Go modules** [#4760](https://github.com/containerd/containerd/pull/4760)
+* **Remove `selinux` build tag** [#4849](https://github.com/containerd/containerd/pull/4849)
+* **Add json log format output option for daemon log** [#4803](https://github.com/containerd/containerd/pull/4803)
+
+## Snapshots
+* **Add configurable overlayfs path** [#4505](https://github.com/containerd/containerd/pull/4505)
+* **Separate overlay implementation from plugin** [#4506](https://github.com/containerd/containerd/pull/4506)
+* **Native snapshotter configuration and plugin separation** [#4517](https://github.com/containerd/containerd/pull/4517)
+* **Devmapper snapshotter configuration and plugin separation** [#4573](https://github.com/containerd/containerd/pull/4573)
+* **AUFS snapshotter configuration and plugin separation** [#4533](https://github.com/containerd/containerd/pull/4533)
+* **ZFS snapshotter configuration and plugin separation** [#4534](https://github.com/containerd/containerd/pull/4534)
+* **Pass custom snapshot labels when creating snapshot** [#4630](https://github.com/containerd/containerd/pull/4630) [#4635](https://github.com/containerd/containerd/pull/4635)
+* **Add platform check for snapshotter support when unpacking** [#3927](https://github.com/containerd/containerd/pull/3927)
+* **Handle loopback mounts** [#4902](https://github.com/containerd/containerd/pull/4902)
+
+## Distribution
+* **Improve registry response errors** [#4523](https://github.com/containerd/containerd/pull/4523)
+* **Improve image pull performance over HTTP 1.1** [#4653](https://github.com/containerd/containerd/pull/4653)
+* **Registry configuration package** [#4138](https://github.com/containerd/containerd/pull/4138)
+* **Add support for layers compressed with zstd** [#4809](https://github.com/containerd/containerd/pull/4809)
+
+## Runtime
+* **Add annotations to containerd task update API** [#4647](https://github.com/containerd/containerd/pull/4647)
+* **Add logging binary support when terminal is true** [#4502](https://github.com/containerd/containerd/pull/4502)
+
+## Windows
+* **Optimize LCOW snapshotter use of scratch layers** [#4643](https://github.com/containerd/containerd/pull/4643)
+
+And many more improvements and bug fixes in the complete changelog"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
