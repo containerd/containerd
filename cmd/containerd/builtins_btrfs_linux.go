@@ -1,4 +1,4 @@
-// +build !no_btrfs
+// +build !no_btrfs,cgo
 
 /*
    Copyright The containerd Authors.
