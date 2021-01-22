@@ -38,11 +38,11 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	runtimeoptions "github.com/containerd/containerd/pkg/cri/runtimeoptions/v1"
 	"github.com/containerd/containerd/pkg/cri/store"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	runtimeoptions "github.com/containerd/containerd/pkg/runtimeoptions/v1"
 )
 
 const (
