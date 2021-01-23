@@ -53,6 +53,7 @@ var (
 			listCommand,
 			pushObjectCommand,
 			setLabelsCommand,
+			pruneCommand,
 		},
 	}
 
