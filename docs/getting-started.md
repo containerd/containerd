@@ -6,7 +6,7 @@ However, if you want to integrate containerd into your project we have an easy t
 
 In this guide we will pull and run a redis server with containerd using the client package.
 We will assume that you are running a modern linux host for this example with a compatible build of `runc`.
-Please refer to [RUNC.md](/RUNC.md) for the currently supported version of `runc`.
+Please refer to [RUNC.md](/docs/RUNC.md) for the currently supported version of `runc`.
 This project requires Go 1.9.x or above.
 If you need to install Go or update your currently installed one, please refer to Go install page at https://golang.org/doc/install.
 

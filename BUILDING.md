@@ -69,7 +69,7 @@ make
 sudo make install
 ```
 
-Make sure to follow the guidelines for versioning in [RUNC.md](RUNC.md) for the
+Make sure to follow the guidelines for versioning in [RUNC.md](/docs/RUNC.md) for the
 best results.
 
 ## Build containerd
