@@ -134,7 +134,7 @@ func (c *criService) stopSandboxContainer(ctx context.Context, sandbox sandboxst
 		}
 
 		exitCtx, exitCancel := context.WithCancel(context.Background())
-		stopCh := c.eventMonitor.startExitMonitor(exitCtx, id, task.Pid(), exitCh)
+		stopCh := c.eventMonitor.startSandboxExitMonitor(exitCtx, id, task.Pid(), exitCh)
 		defer func() {
 			exitCancel()
 			// This ensures that exit monitor is stopped before
