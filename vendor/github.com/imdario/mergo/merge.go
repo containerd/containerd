@@ -271,11 +271,6 @@ func deepMerge(dst, src reflect.Value, visited map[uintptr]*visit, depth int, co
 		}
 	default:
 		mustSet := (isEmptyValue(dst) || overwrite) && (!isEmptyValue(src) || overwriteWithEmptySrc)
-		v := fmt.Sprintf("%v", src)
-		if v == "TestIssue106" {
-			fmt.Println(mustSet)
-			fmt.Println(dst.CanSet())
-		}
 		if mustSet {
 			if dst.CanSet() {
 				dst.Set(src)

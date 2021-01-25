@@ -2,7 +2,7 @@ package v1
 
 import (
 	"encoding/json"
-	"fmt"
+	"github.com/pkg/errors"
 )
 
 // Plugin type and configuration
@@ -81,27 +81,6 @@ type Request struct {
 	Results []*Result `json:"results,omitempty"`
 }
 
-// NewPluginError returns a plugin error
-func NewPluginError(name string, err error) error {
-	return &PluginError{
-		Plugin:  name,
-		Message: err.Error(),
-	}
-}
-
-// PluginError for specific plugin execution
-type PluginError struct {
-	// Plugin name
-	Plugin string `json:"plugin"`
-	// Message for the error
-	Message string `json:"message"`
-}
-
-// Error as a string
-func (p *PluginError) Error() string {
-	return fmt.Sprintf("%s: %s", p.Plugin, p.Message)
-}
-
 // IsSandbox returns true if the request is for a sandbox
 func (r *Request) IsSandbox() bool {
 	return r.ID == r.SandboxID
@@ -122,6 +101,16 @@ type Result struct {
 	Plugin string `json:"plugin"`
 	// Version of the plugin
 	Version string `json:"version"`
+	// Error message in case of failures
+	Error string `json:"error"`
 	// Metadata specific to actions taken by the plugin
 	Metadata map[string]string `json:"metadata,omitempty"`
+}
+
+// Err creates an Error object if ErrorMessage is populated
+func (r *Result) Err() error {
+	if r.Error != "" {
+		return errors.New(r.Error)
+	}
+	return nil
 }
