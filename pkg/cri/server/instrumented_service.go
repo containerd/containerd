@@ -253,8 +253,6 @@ func (in *instrumentedService) ExecSync(ctx context.Context, r *runtime.ExecSync
 			log.G(ctx).WithError(err).Errorf("ExecSync for %q failed", r.GetContainerId())
 		} else {
 			log.G(ctx).Debugf("ExecSync for %q returns with exit code %d", r.GetContainerId(), res.GetExitCode())
-			log.G(ctx).Debugf("ExecSync for %q outputs - stdout: %q, stderr: %q", r.GetContainerId(),
-				res.GetStdout(), res.GetStderr())
 		}
 	}()
 	res, err = in.c.ExecSync(ctrdutil.WithNamespace(ctx), r)
