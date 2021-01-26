@@ -174,6 +174,12 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 
 		assert.Contains(t, spec.Annotations, annotations.ContainerType)
 		assert.EqualValues(t, spec.Annotations[annotations.ContainerType], annotations.ContainerTypeContainer)
+
+		assert.Contains(t, spec.Annotations, annotations.SandboxNamespace)
+		assert.EqualValues(t, spec.Annotations[annotations.SandboxNamespace], "test-sandbox-ns")
+
+		assert.Contains(t, spec.Annotations, annotations.SandboxName)
+		assert.EqualValues(t, spec.Annotations[annotations.SandboxName], "test-sandbox-name")
 	}
 	return config, sandboxConfig, imageConfig, specCheck
 }

@@ -73,6 +73,12 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 		assert.Contains(t, spec.Annotations, annotations.ContainerType)
 		assert.EqualValues(t, spec.Annotations[annotations.ContainerType], annotations.ContainerTypeSandbox)
 
+		assert.Contains(t, spec.Annotations, annotations.SandboxNamespace)
+		assert.EqualValues(t, spec.Annotations[annotations.SandboxNamespace], "test-ns")
+
+		assert.Contains(t, spec.Annotations, annotations.SandboxName)
+		assert.EqualValues(t, spec.Annotations[annotations.SandboxName], "test-name")
+
 		assert.Contains(t, spec.Annotations, annotations.SandboxLogDir)
 		assert.EqualValues(t, spec.Annotations[annotations.SandboxLogDir], "test-log-directory")
 

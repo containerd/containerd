@@ -45,6 +45,12 @@ const (
 	// workload can only run on dedicated runtime for untrusted workload.
 	UntrustedWorkload = "io.kubernetes.cri.untrusted-workload"
 
-	// containerName is the name of the container in the pod
+	// SandboxNamespace is the name of the namespace of the sandbox (pod)
+	SandboxNamespace = "io.kubernetes.cri.sandbox-namespace"
+
+	// SandboxName is the name of the sandbox (pod)
+	SandboxName = "io.kubernetes.cri.sandbox-name"
+
+	// ContainerName is the name of the container in the pod
 	ContainerName = "io.kubernetes.cri.container-name"
 )
