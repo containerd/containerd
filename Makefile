@@ -376,6 +376,7 @@ root-coverage: ## generate coverage profiles for unit tests that require root
 
 vendor:
 	@echo "$(WHALE) $@"
+	@go mod tidy
 	@go mod vendor
 
 help: ## this help
