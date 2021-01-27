@@ -26,7 +26,7 @@ type NetNS struct {
 }
 
 // NewNetNS creates a network namespace for the sandbox
-func NewNetNS() (*NetNS, error) {
+func NewNetNS(baseDir string) (*NetNS, error) {
 	temp := hcn.HostComputeNamespace{}
 	hcnNamespace, err := temp.Create()
 	if err != nil {

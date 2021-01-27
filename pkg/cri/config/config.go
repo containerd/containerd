@@ -253,6 +253,10 @@ type PluginConfig struct {
 	// isolation, security and early detection of issues in the mount configuration when using
 	// ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
 	IgnoreImageDefinedVolumes bool `toml:"ignore_image_defined_volumes" json:"ignoreImageDefinedVolumes"`
+	// NetNSMountsUnderStateDir places all mounts for network namespaces under StateDir/netns instead
+	// of being placed under the hardcoded directory /var/run/netns. Changing this setting requires
+	// that all containers are deleted.
+	NetNSMountsUnderStateDir bool `toml:"netns_mounts_under_state_dir" json:"netnsMountsUnderStateDir"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming

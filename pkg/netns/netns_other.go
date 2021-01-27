@@ -30,7 +30,7 @@ type NetNS struct {
 }
 
 // NewNetNS creates a network namespace.
-func NewNetNS() (*NetNS, error) {
+func NewNetNS(baseDir string) (*NetNS, error) {
 	return nil, errNotImplementedOnUnix
 }
 

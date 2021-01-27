@@ -46,14 +46,12 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const nsRunDir = "/var/run/netns"
-
 // Some of the following functions are migrated from
 // https://github.com/containernetworking/plugins/blob/master/pkg/testutils/netns_linux.go
 
 // newNS creates a new persistent (bind-mounted) network namespace and returns the
 // path to the network namespace.
-func newNS() (nsPath string, err error) {
+func newNS(baseDir string) (nsPath string, err error) {
 	b := make([]byte, 16)
 	if _, err := rand.Reader.Read(b); err != nil {
 		return "", errors.Wrap(err, "failed to generate random netns name")
@@ -62,13 +60,13 @@ func newNS() (nsPath string, err error) {
 	// Create the directory for mounting network namespaces
 	// This needs to be a shared mountpoint in case it is mounted in to
 	// other namespaces (containers)
-	if err := os.MkdirAll(nsRunDir, 0755); err != nil {
+	if err := os.MkdirAll(baseDir, 0755); err != nil {
 		return "", err
 	}
 
 	// create an empty file at the mount point
 	nsName := fmt.Sprintf("cni-%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
-	nsPath = path.Join(nsRunDir, nsName)
+	nsPath = path.Join(baseDir, nsName)
 	mountPointFd, err := os.Create(nsPath)
 	if err != nil {
 		return "", err
@@ -162,8 +160,8 @@ type NetNS struct {
 }
 
 // NewNetNS creates a network namespace.
-func NewNetNS() (*NetNS, error) {
-	path, err := newNS()
+func NewNetNS(baseDir string) (*NetNS, error) {
+	path, err := newNS(baseDir)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to setup netns")
 	}
