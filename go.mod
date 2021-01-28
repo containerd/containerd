@@ -29,7 +29,7 @@ require (
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/gogo/googleapis v1.4.0
-	github.com/gogo/protobuf v1.3.1
+	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.4.3
 	github.com/google/go-cmp v0.5.2
 	github.com/google/uuid v1.1.2
@@ -53,7 +53,7 @@ require (
 	github.com/urfave/cli v1.22.2
 	go.etcd.io/bbolt v1.3.5
 	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
-	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
+	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	golang.org/x/sys v0.0.0-20201202213521-69691e467435
 	google.golang.org/grpc v1.30.0
 	gotest.tools/v3 v3.0.2
