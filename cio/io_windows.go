@@ -43,19 +43,11 @@ func NewFIFOSetInDir(_, id string, terminal bool) (*FIFOSet, error) {
 }
 
 func copyIO(fifos *FIFOSet, ioset *Streams) (_ *cio, retErr error) {
-	var (
-		set []io.Closer
-	)
+	cios := &cio{config: fifos.Config}
 
 	defer func() {
-		if retErr == nil {
-			return
-		}
-		for _, closer := range set {
-			if closer == nil {
-				continue
-			}
-			_ = closer.Close()
+		if retErr != nil {
+			_ = cios.Close()
 		}
 	}()
 
@@ -64,7 +56,7 @@ func copyIO(fifos *FIFOSet, ioset *Streams) (_ *cio, retErr error) {
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create stdin pipe %s", fifos.Stdin)
 		}
-		set = append(set, l)
+		cios.closers = append(cios.closers, l)
 
 		go func() {
 			c, err := l.Accept()
@@ -87,7 +79,7 @@ func copyIO(fifos *FIFOSet, ioset *Streams) (_ *cio, retErr error) {
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create stdout pipe %s", fifos.Stdout)
 		}
-		set = append(set, l)
+		cios.closers = append(cios.closers, l)
 
 		go func() {
 			c, err := l.Accept()
@@ -110,7 +102,7 @@ func copyIO(fifos *FIFOSet, ioset *Streams) (_ *cio, retErr error) {
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create stderr pipe %s", fifos.Stderr)
 		}
-		set = append(set, l)
+		cios.closers = append(cios.closers, l)
 
 		go func() {
 			c, err := l.Accept()
@@ -128,7 +120,7 @@ func copyIO(fifos *FIFOSet, ioset *Streams) (_ *cio, retErr error) {
 		}()
 	}
 
-	return &cio{config: fifos.Config, closers: set}, nil
+	return cios, nil
 }
 
 // NewDirectIO returns an IO implementation that exposes the IO streams as io.ReadCloser
