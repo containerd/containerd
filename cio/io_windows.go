@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net"
 
 	winio "github.com/Microsoft/go-winio"
 	"github.com/containerd/containerd/log"
@@ -43,21 +42,28 @@ func NewFIFOSetInDir(_, id string, terminal bool) (*FIFOSet, error) {
 	}, nil), nil
 }
 
-func copyIO(fifos *FIFOSet, ioset *Streams) (*cio, error) {
+func copyIO(fifos *FIFOSet, ioset *Streams) (_ *cio, retErr error) {
 	var (
 		set []io.Closer
 	)
+
+	defer func() {
+		if retErr == nil {
+			return
+		}
+		for _, closer := range set {
+			if closer == nil {
+				continue
+			}
+			_ = closer.Close()
+		}
+	}()
 
 	if fifos.Stdin != "" {
 		l, err := winio.ListenPipe(fifos.Stdin, nil)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create stdin pipe %s", fifos.Stdin)
 		}
-		defer func(l net.Listener) {
-			if err != nil {
-				l.Close()
-			}
-		}(l)
 		set = append(set, l)
 
 		go func() {
@@ -81,11 +87,6 @@ func copyIO(fifos *FIFOSet, ioset *Streams) (*cio, error) {
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create stdout pipe %s", fifos.Stdout)
 		}
-		defer func(l net.Listener) {
-			if err != nil {
-				l.Close()
-			}
-		}(l)
 		set = append(set, l)
 
 		go func() {
@@ -109,11 +110,6 @@ func copyIO(fifos *FIFOSet, ioset *Streams) (*cio, error) {
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create stderr pipe %s", fifos.Stderr)
 		}
-		defer func(l net.Listener) {
-			if err != nil {
-				l.Close()
-			}
-		}(l)
 		set = append(set, l)
 
 		go func() {
