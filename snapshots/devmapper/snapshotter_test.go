@@ -136,6 +136,8 @@ func testUsage(t *testing.T, snapshotter snapshots.Snapshotter) {
 	assert.NilError(t, err)
 
 	// Should be at least 1 MB + fs metadata
-	assert.Assert(t, layer2Usage.Size > sizeBytes)
-	assert.Assert(t, layer2Usage.Size < sizeBytes+256*dmsetup.SectorSize)
+	assert.Check(t, layer2Usage.Size > sizeBytes,
+		"%d > %d", layer2Usage.Size > sizeBytes)
+	assert.Check(t, layer2Usage.Size < sizeBytes+256*dmsetup.SectorSize,
+		"%d < %d", layer2Usage.Size < sizeBytes+256*dmsetup.SectorSize)
 }
