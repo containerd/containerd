@@ -64,12 +64,13 @@ func TestRoLoop(t *testing.T) {
 		}
 	}()
 
-	path, err := setupLoop(backingFile, LoopParams{Readonly: true, Autoclear: true})
+	file, err := setupLoop(backingFile, LoopParams{Readonly: true, Autoclear: true})
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer file.Close()
 
-	if err := ioutil.WriteFile(path, randomData, os.ModePerm); err == nil {
+	if _, err := file.Write(randomData); err == nil {
 		t.Fatalf("writing to readonly loop device should fail")
 	}
 }
@@ -84,12 +85,13 @@ func TestRwLoop(t *testing.T) {
 		}
 	}()
 
-	path, err := setupLoop(backingFile, LoopParams{Autoclear: true})
+	file, err := setupLoop(backingFile, LoopParams{Autoclear: false})
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer file.Close()
 
-	if err := ioutil.WriteFile(path, randomData, os.ModePerm); err != nil {
+	if _, err := file.Write(randomData); err != nil {
 		t.Fatal(err)
 	}
 }
