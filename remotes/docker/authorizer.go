@@ -284,7 +284,14 @@ func (ah *authHandler) doBearerAuth(ctx context.Context) (token string, err erro
 				// Registries without support for POST may return 404 for POST /v2/token.
 				// As of September 2017, GCR is known to return 404.
 				// As of February 2018, JFrog Artifactory is known to return 401.
-				if (errStatus.StatusCode == 405 && to.Username != "") || errStatus.StatusCode == 404 || errStatus.StatusCode == 401 {
+				// As of December 2019, Harbor is known to return 403, and it's fixed soon
+				// in https://github.com/goharbor/harbor/pull/10362
+				// As of January 2021, Docker community's registry implementation (https://github.com/distribution/distribution)
+				// is known to return 403, too.
+				// See https://github.com/containerd/containerd/issues/4982 for details.
+				if (errStatus.StatusCode == http.StatusMethodNotAllowed && to.Username != "") ||
+					errStatus.StatusCode == http.StatusNotFound || errStatus.StatusCode == http.StatusUnauthorized ||
+					errStatus.StatusCode == http.StatusForbidden {
 					resp, err := auth.FetchToken(ctx, ah.client, ah.header, to)
 					if err != nil {
 						return "", err
