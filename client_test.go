@@ -139,9 +139,9 @@ func TestMain(m *testing.M) {
 	// pull a seed image
 	log.G(ctx).WithField("image", testImage).Info("start to pull seed image")
 	if _, err = client.Pull(ctx, testImage, WithPullUnpack); err != nil {
-		fmt.Fprintf(os.Stderr, "%s: %s\n", err, buf.String())
 		ctrd.Kill()
 		ctrd.Wait()
+		fmt.Fprintf(os.Stderr, "%s: %s\n", err, buf.String())
 		os.Exit(1)
 	}
 
