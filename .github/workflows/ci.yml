@@ -363,7 +363,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - run: vagrant up
+      - run: |
+          # Retry if it fails (download.fedoraproject.org returns 404 sometimes)
+          vagrant up || vagrant up
 
       - name: Integration
         env:
