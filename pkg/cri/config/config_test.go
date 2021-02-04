@@ -294,7 +294,7 @@ func TestValidateConfig(t *testing.T) {
 				},
 				Registry: Registry{
 					Configs: map[string]RegistryConfig{
-						"https://gcr.io": {
+						"gcr.io": {
 							Auth: &AuthConfig{
 								Username: "test",
 							},
