@@ -108,10 +108,19 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 	return mounts
 }
 
-func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint32, netNSPath string, containerName string,
-	config *runtime.ContainerConfig, sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig,
-	extraMounts []*runtime.Mount, ociRuntime config.Runtime) (_ *runtimespec.Spec, retErr error) {
-
+func (c *criService) containerSpec(
+	id string,
+	sandboxID string,
+	sandboxPid uint32,
+	netNSPath string,
+	containerName string,
+	imageName string,
+	config *runtime.ContainerConfig,
+	sandboxConfig *runtime.PodSandboxConfig,
+	imageConfig *imagespec.ImageConfig,
+	extraMounts []*runtime.Mount,
+	ociRuntime config.Runtime,
+) (_ *runtimespec.Spec, retErr error) {
 	specOpts := []oci.SpecOpts{
 		customopts.WithoutRunMount,
 	}
@@ -263,6 +272,7 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 		customopts.WithAnnotation(annotations.SandboxNamespace, sandboxConfig.GetMetadata().GetNamespace()),
 		customopts.WithAnnotation(annotations.SandboxName, sandboxConfig.GetMetadata().GetName()),
 		customopts.WithAnnotation(annotations.ContainerName, containerName),
+		customopts.WithAnnotation(annotations.ImageName, imageName),
 	)
 	// cgroupns is used for hiding /sys/fs/cgroup from containers.
 	// For compatibility, cgroupns is not used when running in cgroup v1 mode or in privileged.

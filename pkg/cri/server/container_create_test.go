@@ -52,6 +52,8 @@ func checkMount(t *testing.T, mounts []runtimespec.Mount, src, dest, typ string,
 	assert.True(t, found, "mount from %q to %q not found", src, dest)
 }
 
+const testImageName = "container-image-name"
+
 func TestGeneralContainerSpec(t *testing.T) {
 	testID := "test-id"
 	testPid := uint32(1234)
@@ -60,7 +62,7 @@ func TestGeneralContainerSpec(t *testing.T) {
 	c := newTestCRIService()
 	testSandboxID := "sandbox-id"
 	testContainerName := "container-name"
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+	spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 	require.NoError(t, err)
 	specCheck(t, testID, testSandboxID, testPid, spec)
 }
@@ -124,7 +126,7 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 			ociRuntime := config.Runtime{
 				PodAnnotations: test.podAnnotations,
 			}
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName,
+			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName,
 				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
@@ -372,7 +374,7 @@ func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 				PodAnnotations:       test.podAnnotations,
 				ContainerAnnotations: test.containerAnnotations,
 			}
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName,
+			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName,
 				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
