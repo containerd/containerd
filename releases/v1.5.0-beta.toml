@@ -39,6 +39,7 @@ brings support for the Node Resource Interface (NRI).
 * **Improve image pull performance over HTTP 1.1** [#4653](https://github.com/containerd/containerd/pull/4653)
 * **Registry configuration package** [#4138](https://github.com/containerd/containerd/pull/4138)
 * **Add support for layers compressed with zstd** [#4809](https://github.com/containerd/containerd/pull/4809)
+* **Allow arm64 to fallback to arm (v8, v7, v6, v5)** [4932](https://github.com/containerd/containerd/pull/4932)
 
 ## Runtime
 * **Add annotations to containerd task update API** [#4647](https://github.com/containerd/containerd/pull/4647)
