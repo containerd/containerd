@@ -23,9 +23,10 @@ set -eu -o pipefail
 function install_runc() {
 	RUNC_COMMIT=$(grep opencontainers/runc "$GOPATH"/src/github.com/containerd/containerd/vendor.conf | awk '{print $2}')
 
-	go get -d github.com/opencontainers/runc
-	cd "$GOPATH"/src/github.com/opencontainers/runc
-	git checkout $RUNC_COMMIT
+	TMPROOT=$(mktemp -d)
+	git clone https://github.com/opencontainers/runc.git "${TMPROOT}"/runc
+	pushd "${TMPROOT}"/runc
+	git checkout "${RUNC_COMMIT}"
 	make BUILDTAGS='apparmor seccomp selinux' runc
 
 	USESUDO=${USESUDO:-false}
@@ -35,6 +36,8 @@ function install_runc() {
 	  SUDO=''
 	fi
 	${SUDO} make install
+	popd
+	rm -fR "${TMPROOT}"
 }
 
 function install_crun() {
@@ -43,7 +46,7 @@ function install_crun() {
 	chmod +x /usr/local/sbin/runc
 }
 
-: ${RUNC_FLAVOR:=runc}
+: "${RUNC_FLAVOR:=runc}"
 case ${RUNC_FLAVOR} in
 runc) install_runc ;;
 crun) install_crun ;;

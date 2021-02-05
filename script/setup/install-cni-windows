@@ -21,7 +21,7 @@ WINCNI_BIN_DIR="${DESTDIR}/cni"
 WINCNI_PKG=github.com/Microsoft/windows-container-networking
 WINCNI_VERSION=aa10a0b31e9f72937063436454def1760b858ee2
 
-go get -d "${WINCNI_PKG}/..."
+git clone "https://${WINCNI_PKG}.git" "${GOPATH}/src/${WINCNI_PKG}"
 cd "${GOPATH}/src/${WINCNI_PKG}"
 git checkout "${WINCNI_VERSION}"
 make all
