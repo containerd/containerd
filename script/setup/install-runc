@@ -23,21 +23,23 @@ set -eu -o pipefail
 function install_runc() {
 	RUNC_COMMIT=$(grep opencontainers/runc "$GOPATH"/src/github.com/containerd/containerd/go.mod | awk '{print $2}')
 
-	cd "$GOPATH"
-	go get -d github.com/opencontainers/runc
-	cd "$GOPATH"/src/github.com/opencontainers/runc
-	git checkout $RUNC_COMMIT
+	TMPROOT=$(mktemp -d)
+	git clone https://github.com/opencontainers/runc.git "${TMPROOT}"/runc
+	pushd "${TMPROOT}"/runc
+	git checkout "${RUNC_COMMIT}"
 	make BUILDTAGS='apparmor seccomp selinux' runc
 	make install
+	popd
+	rm -fR "${TMPROOT}"
 }
 
 function install_crun() {
 	CRUN_VERSION=0.17
-	curl -o /usr/local/sbin/runc -L https://github.com/containers/crun/releases/download/${CRUN_VERSION}/crun-${CRUN_VERSION}-linux-$(go env GOARCH)
+	curl -o /usr/local/sbin/runc -L https://github.com/containers/crun/releases/download/"${CRUN_VERSION}"/crun-"${CRUN_VERSION}"-linux-"$(go env GOARCH)"
 	chmod +x /usr/local/sbin/runc
 }
 
-: ${RUNC_FLAVOR:=runc}
+: "${RUNC_FLAVOR:=runc}"
 case ${RUNC_FLAVOR} in
 runc) install_runc ;;
 crun) install_crun ;;

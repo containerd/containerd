@@ -23,9 +23,10 @@ set -eu -o pipefail
 cd "$GOPATH"
 go get -u github.com/onsi/ginkgo/ginkgo
 CRITEST_COMMIT=0f5f734a7e1da0979915c6e7d5b6641bd9dc2627
-go get -d github.com/kubernetes-sigs/cri-tools/...
+
+git clone https://github.com/kubernetes-sigs/cri-tools.git "$GOPATH"/src/github.com/kubernetes-sigs/cri-tools
 cd "$GOPATH"/src/github.com/kubernetes-sigs/cri-tools
-git checkout $CRITEST_COMMIT
+git checkout "$CRITEST_COMMIT"
 make
 make install -e BINDIR=${DESTDIR:=''}/usr/local/bin
 cat << EOF | tee ${DESTDIR}/etc/crictl.yaml

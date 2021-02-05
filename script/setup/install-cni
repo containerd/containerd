@@ -25,8 +25,7 @@ CNI_COMMIT=$(grep containernetworking/plugins "$GOPATH"/src/github.com/container
 CNI_DIR=${DESTDIR:=''}/opt/cni
 CNI_CONFIG_DIR=${DESTDIR}/etc/cni/net.d
 
-cd "$GOPATH"
-go get -d github.com/containernetworking/plugins/...
+git clone https://github.com/containernetworking/plugins.git "$GOPATH"/src/github.com/containernetworking/plugins
 cd "$GOPATH"/src/github.com/containernetworking/plugins
 git checkout $CNI_COMMIT
 ./build_linux.sh
