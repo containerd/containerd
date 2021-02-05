@@ -53,4 +53,6 @@ const (
 
 	// ContainerName is the name of the container in the pod
 	ContainerName = "io.kubernetes.cri.container-name"
+	// ImageName is the name of the image used to create the container
+	ImageName = "io.kubernetes.cri.image-name"
 )

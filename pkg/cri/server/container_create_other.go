@@ -33,9 +33,19 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 	return []*runtime.Mount{}
 }
 
-func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint32, netNSPath string, containerName string,
-	config *runtime.ContainerConfig, sandboxConfig *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig,
-	extraMounts []*runtime.Mount, ociRuntime config.Runtime) (_ *runtimespec.Spec, retErr error) {
+func (c *criService) containerSpec(
+	id string,
+	sandboxID string,
+	sandboxPid uint32,
+	netNSPath string,
+	containerName string,
+	imageName string,
+	config *runtime.ContainerConfig,
+	sandboxConfig *runtime.PodSandboxConfig,
+	imageConfig *imagespec.ImageConfig,
+	extraMounts []*runtime.Mount,
+	ociRuntime config.Runtime,
+) (_ *runtimespec.Spec, retErr error) {
 	return c.runtimeSpec(id, ociRuntime.BaseRuntimeSpec)
 }
 
