@@ -310,7 +310,7 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 
 	asp := securityContext.GetApparmor()
 	if asp == nil {
-		asp, err = generateApparmorSecurityProfile(securityContext.GetApparmorProfile()) // nolint:staticcheck deprecated but we don't want to remove yet
+		asp, err = generateApparmorSecurityProfile(securityContext.GetApparmorProfile()) //nolint:staticcheck // Deprecated but we don't want to remove yet
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to generate apparmor spec opts")
 		}
@@ -329,7 +329,7 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 	ssp := securityContext.GetSeccomp()
 	if ssp == nil {
 		ssp, err = generateSeccompSecurityProfile(
-			securityContext.GetSeccompProfilePath(), // nolint:staticcheck deprecated but we don't want to remove yet
+			securityContext.GetSeccompProfilePath(), //nolint:staticcheck // Deprecated but we don't want to remove yet
 			c.config.UnsetSeccompProfile)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to generate seccomp spec opts")
