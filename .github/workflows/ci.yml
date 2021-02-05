@@ -24,7 +24,7 @@ jobs:
 
     steps:
       - name: Install Go
-        uses: actions/setup-go@v1
+        uses: actions/setup-go@v2
         with:
           go-version: '1.15.11'
 
@@ -78,8 +78,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - name: Set up Go
-        uses: actions/setup-go@v1
+      - uses: actions/setup-go@v2
         with:
           go-version: '1.15.11'
 
@@ -125,8 +124,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - name: Install Go
-        uses: actions/setup-go@v1
+      - uses: actions/setup-go@v2
         with:
           go-version: '1.15.11'
 
@@ -162,8 +160,7 @@ jobs:
         os: [ubuntu-18.04, macos-10.15, windows-2019]
 
     steps:
-      - name: Install Go
-        uses: actions/setup-go@v1
+      - uses: actions/setup-go@v2
         with:
           go-version: '1.15.11'
 
@@ -194,8 +191,7 @@ jobs:
     needs: [project, linters, protos, man]
 
     steps:
-      - name: Install Go
-        uses: actions/setup-go@v1
+      - uses: actions/setup-go@v2
         with:
           go-version: '1.15.11'
 
@@ -274,8 +270,7 @@ jobs:
             runc: crun
 
     steps:
-      - name: Install Go
-        uses: actions/setup-go@v1
+      - uses: actions/setup-go@v2
         with:
           go-version: '1.15.11'
 
