@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/pkg/cap"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
 )
@@ -179,4 +180,20 @@ func WithCPUCFS(quota int64, period uint64) SpecOpts {
 		s.Linux.Resources.CPU.Period = &period
 		return nil
 	}
+}
+
+// WithAllCurrentCapabilities propagates the effective capabilities of the caller process to the container process.
+// The capability set may differ from WithAllKnownCapabilities when running in a container.
+var WithAllCurrentCapabilities = func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
+	caps, err := cap.Current()
+	if err != nil {
+		return err
+	}
+	return WithCapabilities(caps)(ctx, client, c, s)
+}
+
+// WithAllKnownCapabilities sets all the the known linux capabilities for the container process
+var WithAllKnownCapabilities = func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
+	caps := cap.Known()
+	return WithCapabilities(caps)(ctx, client, c, s)
 }

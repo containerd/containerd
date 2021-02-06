@@ -23,6 +23,7 @@ import (
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/testutil"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -251,6 +252,10 @@ func TestPopulateDefaultUnixSpec(t *testing.T) {
 
 func TestWithPrivileged(t *testing.T) {
 	t.Parallel()
+	if runtime.GOOS == "linux" {
+		// because WithPrivileged depends on CapEff in /proc/self/status
+		testutil.RequiresRoot(t)
+	}
 
 	ctx := namespaces.WithNamespace(context.Background(), "testing")
 
@@ -270,6 +275,10 @@ func TestWithPrivileged(t *testing.T) {
 	}
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if runtime.GOOS != "linux" {
+		return
 	}
 
 	if len(s.Process.Capabilities.Bounding) == 0 {

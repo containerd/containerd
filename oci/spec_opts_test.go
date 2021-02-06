@@ -574,7 +574,7 @@ func TestDropCaps(t *testing.T) {
 
 	var s specs.Spec
 
-	if err := WithAllCapabilities(context.Background(), nil, nil, &s); err != nil {
+	if err := WithAllKnownCapabilities(context.Background(), nil, nil, &s); err != nil {
 		t.Fatal(err)
 	}
 	if err := WithDroppedCapabilities([]string{"CAP_CHOWN"})(context.Background(), nil, nil, &s); err != nil {
@@ -593,7 +593,7 @@ func TestDropCaps(t *testing.T) {
 	}
 
 	// Add all capabilities back and drop a different cap.
-	if err := WithAllCapabilities(context.Background(), nil, nil, &s); err != nil {
+	if err := WithAllKnownCapabilities(context.Background(), nil, nil, &s); err != nil {
 		t.Fatal(err)
 	}
 	if err := WithDroppedCapabilities([]string{"CAP_FOWNER"})(context.Background(), nil, nil, &s); err != nil {

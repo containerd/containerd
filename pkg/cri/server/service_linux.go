@@ -17,6 +17,7 @@
 package server
 
 import (
+	"github.com/containerd/containerd/pkg/cap"
 	"github.com/containerd/containerd/sys"
 	cni "github.com/containerd/go-cni"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -59,6 +60,13 @@ func (c *criService) initPlatform() error {
 		cni.WithPluginDir([]string{c.config.NetworkPluginBinDir}))
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize cni")
+	}
+
+	if c.allCaps == nil {
+		c.allCaps, err = cap.Current()
+		if err != nil {
+			return errors.Wrap(err, "failed to get caps")
+		}
 	}
 
 	return nil

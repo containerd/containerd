@@ -38,7 +38,6 @@ import (
 	"github.com/opencontainers/runc/libcontainer/user"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
-	"github.com/syndtr/gocapability/capability"
 )
 
 // SpecOpts sets spec specific information to a newly generated OCI spec
@@ -776,29 +775,6 @@ func WithCapabilities(caps []string) SpecOpts {
 	}
 }
 
-// WithAllCapabilities sets all linux capabilities for the process
-var WithAllCapabilities = func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
-	return WithCapabilities(GetAllCapabilities())(ctx, client, c, s)
-}
-
-// GetAllCapabilities returns all caps up to CAP_LAST_CAP
-// or CAP_BLOCK_SUSPEND on RHEL6
-func GetAllCapabilities() []string {
-	last := capability.CAP_LAST_CAP
-	// hack for RHEL6 which has no /proc/sys/kernel/cap_last_cap
-	if last == capability.Cap(63) {
-		last = capability.CAP_BLOCK_SUSPEND
-	}
-	var caps []string
-	for _, cap := range capability.List() {
-		if cap > last {
-			continue
-		}
-		caps = append(caps, "CAP_"+strings.ToUpper(cap.String()))
-	}
-	return caps
-}
-
 func capsContain(caps []string, s string) bool {
 	for _, c := range caps {
 		if c == s {
@@ -1132,7 +1108,7 @@ func WithDefaultUnixDevices(_ context.Context, _ Client, _ *containers.Container
 
 // WithPrivileged sets up options for a privileged container
 var WithPrivileged = Compose(
-	WithAllCapabilities,
+	WithAllCurrentCapabilities,
 	WithMaskedPaths(nil),
 	WithReadonlyPaths(nil),
 	WithWriteableSysfs,
