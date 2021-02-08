@@ -17,6 +17,7 @@
 package server
 
 import (
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -129,9 +130,22 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 		if err != nil {
 			return errors.Wrapf(err, "failed to parse stop signal %q", stopSignal)
 		}
-		log.G(ctx).Infof("Stop container %q with signal %v", id, sig)
-		if err = task.Kill(ctx, sig); err != nil && !errdefs.IsNotFound(err) {
-			return errors.Wrapf(err, "failed to stop container %q", id)
+
+		var sswt bool
+		if container.IsStopSignaledWithTimeout == nil {
+			log.G(ctx).Infof("unable to ensure stop signal %v was not sent twice to container %v", sig, id)
+			sswt = true
+		} else {
+			sswt = atomic.CompareAndSwapUint32(container.IsStopSignaledWithTimeout, 0, 1)
+		}
+
+		if sswt {
+			log.G(ctx).Infof("Stop container %q with signal %v", id, sig)
+			if err = task.Kill(ctx, sig); err != nil && !errdefs.IsNotFound(err) {
+				return errors.Wrapf(err, "failed to stop container %q", id)
+			}
+		} else {
+			log.G(ctx).Infof("Skipping the sending of signal %v to container %q because a prior stop with timeout>0 request already sent the signal", sig, id)
 		}
 
 		sigTermCtx, sigTermCtxCancel := context.WithTimeout(ctx, timeout)
