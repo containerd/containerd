@@ -42,6 +42,9 @@ type Container struct {
 	IO *cio.ContainerIO
 	// StopCh is used to propagate the stop information of the container.
 	*store.StopCh
+	// IsStopSignaledWithTimeout the default is 0, and it is set to 1 after sending
+	// the signal once to avoid repeated sending of the signal.
+	IsStopSignaledWithTimeout *uint32
 }
 
 // Opts sets specific information to newly created Container.
@@ -81,8 +84,9 @@ func WithStatus(status Status, root string) Opts {
 // NewContainer creates an internally used container type.
 func NewContainer(metadata Metadata, opts ...Opts) (Container, error) {
 	c := Container{
-		Metadata: metadata,
-		StopCh:   store.NewStopCh(),
+		Metadata:                  metadata,
+		StopCh:                    store.NewStopCh(),
+		IsStopSignaledWithTimeout: new(uint32),
 	}
 	for _, o := range opts {
 		if err := o(&c); err != nil {
