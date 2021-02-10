@@ -114,8 +114,14 @@ can be used and modified as necessary as a custom configuration.`
 			config  = defaultConfig()
 		)
 
-		if err := srvconfig.LoadConfig(context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
-			return err
+		// Only try to load the config if it either exists, or the user explicitly
+		// told us to load this path.
+		configPath := context.GlobalString("config")
+		_, err := os.Stat(configPath)
+		if !os.IsNotExist(err) || context.GlobalIsSet("config") {
+			if err := srvconfig.LoadConfig(configPath, config); err != nil {
+				return err
+			}
 		}
 
 		// Apply flags to the config
