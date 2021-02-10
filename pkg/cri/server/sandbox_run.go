@@ -370,6 +370,7 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 func cniNamespaceOpts(id string, config *runtime.PodSandboxConfig) ([]cni.NamespaceOpts, error) {
 	opts := []cni.NamespaceOpts{
 		cni.WithLabels(toCNILabels(id, config)),
+		cni.WithCapability(annotations.PodAnnotations, config.Annotations),
 	}
 
 	portMappings := toCNIPortMappings(config.GetPortMappings())
