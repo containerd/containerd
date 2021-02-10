@@ -19,6 +19,7 @@ package server
 import (
 	"encoding/json"
 	"math"
+	"path/filepath"
 	goruntime "runtime"
 	"strings"
 
@@ -120,7 +121,11 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// handle. NetNSPath in sandbox metadata and NetNS is non empty only for non host network
 		// namespaces. If the pod is in host network namespace then both are empty and should not
 		// be used.
-		sandbox.NetNS, err = netns.NewNetNS()
+		var netnsMountDir string = "/var/run/netns"
+		if c.config.NetNSMountsUnderStateDir {
+			netnsMountDir = filepath.Join(c.config.StateDir, "netns")
+		}
+		sandbox.NetNS, err = netns.NewNetNS(netnsMountDir)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create network namespace for sandbox %q", id)
 		}

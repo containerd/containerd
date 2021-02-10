@@ -59,6 +59,11 @@ version = 2
 	# ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
   ignore_image_defined_volumes = false
 
+  # netns_mounts_under_state_dir places all mounts for network namespaces under StateDir/netns
+  # instead of being placed under the hardcoded directory /var/run/netns. Changing this setting
+  # requires that all containers are deleted.
+  netns_mounts_under_state_dir = false
+
   # 'plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming' contains a x509 valid key pair to stream with tls.
   [plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming]
     # tls_cert_file is the filepath to the certificate paired with the "tls_key_file"
