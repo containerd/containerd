@@ -27,10 +27,17 @@ import (
 )
 
 func TestRuntimeHandler(t *testing.T) {
+
+	// Make sure the test runs with a sufficent flag
+	localHandler := "foo"
+	if *runtimeHandler != "" {
+		localHandler = *runtimeHandler
+	}
+
 	t.Logf("Create a sandbox")
 	sbConfig := PodSandboxConfig("sandbox", "test-runtime-handler")
-	t.Logf("the --runtime-handler flag value is: %s", *runtimeHandler)
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
+	t.Logf("the --runtime-handler flag value is: %s", localHandler)
+	sb, err := runtimeService.RunPodSandbox(sbConfig, localHandler)
 	require.NoError(t, err)
 	defer func() {
 		// Make sure the sandbox is cleaned up in any case.
@@ -42,11 +49,11 @@ func TestRuntimeHandler(t *testing.T) {
 	sbStatus, err := runtimeService.PodSandboxStatus(sb)
 	require.NoError(t, err)
 	t.Logf("runtimeService.PodSandboxStatus sets RuntimeHandler to %s", sbStatus.RuntimeHandler)
-	assert.Equal(t, *runtimeHandler, sbStatus.RuntimeHandler)
+	assert.Equal(t, localHandler, sbStatus.RuntimeHandler)
 
 	t.Logf("Verify runtimeService.ListPodSandbox sets RuntimeHandler")
 	sandboxes, err := runtimeService.ListPodSandbox(&runtime.PodSandboxFilter{})
 	require.NoError(t, err)
 	t.Logf("runtimeService.ListPodSandbox sets RuntimeHandler to %s", sbStatus.RuntimeHandler)
-	assert.Equal(t, *runtimeHandler, sandboxes[0].RuntimeHandler)
+	assert.Equal(t, localHandler, sandboxes[0].RuntimeHandler)
 }
