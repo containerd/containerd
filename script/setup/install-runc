@@ -21,13 +21,14 @@
 set -eu -o pipefail
 
 function install_runc() {
-	RUNC_COMMIT=$(grep opencontainers/runc "$GOPATH"/src/github.com/containerd/containerd/vendor.conf | awk '{print $2}')
+	# When updating RUNC_VERSION, consider updating the runc module in go.mod as well
+	: "${RUNC_VERSION:=v1.0.0-rc93}"
 
 	TMPROOT=$(mktemp -d)
 	git clone https://github.com/opencontainers/runc.git "${TMPROOT}"/runc
 	pushd "${TMPROOT}"/runc
-	git checkout "${RUNC_COMMIT}"
-	make runc
+	git checkout "${RUNC_VERSION}"
+	make
 
 	USESUDO=${USESUDO:-false}
 	if ${USESUDO}; then
