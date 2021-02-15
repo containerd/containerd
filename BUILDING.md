@@ -205,8 +205,11 @@ Next, let's build `runc`:
 
 ```sh
 cd /go/src/github.com/opencontainers/runc
-make BUILDTAGS='seccomp apparmor selinux' && make install
+make && make install
 ```
+
+For further details about building runc, refer to [RUNC.md](docs/RUNC.md) in the
+docs directory.
 
 When working with `ctr`, the simple test client we just built, don't forget to start the daemon!
 
