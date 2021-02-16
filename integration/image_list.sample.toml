@@ -1,0 +1,5 @@
+alpine = "docker.io/library/alpine:latest"
+busybox = "docker.io/library/busybox:latest"
+pause = "k8s.gcr.io/pause:3.5"
+VolumeCopyUp = "gcr.io/k8s-cri-containerd/volume-copy-up:2.0"
+VolumeOwnership = "gcr.io/k8s-cri-containerd/volume-ownership:2.0"

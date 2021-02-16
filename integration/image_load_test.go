@@ -32,8 +32,8 @@ import (
 
 // Test to load an image from tarball.
 func TestImageLoad(t *testing.T) {
-	testImage := "busybox:latest"
-	loadedImage := "docker.io/library/" + testImage
+	testImage := GetImage(BusyBox)
+	loadedImage := testImage
 	_, err := exec.LookPath("docker")
 	if err != nil {
 		t.Skipf("Docker is not available: %v", err)

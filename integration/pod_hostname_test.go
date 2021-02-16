@@ -82,8 +82,8 @@ func TestPodHostname(t *testing.T) {
 				t.Fatalf("Expected RunPodSandbox to return error")
 			}
 
-			const (
-				testImage     = "busybox"
+			var (
+				testImage     = GetImage(BusyBox)
 				containerName = "test-container"
 			)
 			t.Logf("Pull test image %q", testImage)
