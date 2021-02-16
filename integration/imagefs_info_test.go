@@ -1,5 +1,3 @@
-// +build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -61,7 +59,6 @@ func TestImageFSInfo(t *testing.T) {
 		info = stats[0]
 		if info.GetTimestamp() != 0 &&
 			info.GetUsedBytes().GetValue() != 0 &&
-			info.GetInodesUsed().GetValue() != 0 &&
 			info.GetFsId().GetMountpoint() != "" {
 			return true, nil
 		}

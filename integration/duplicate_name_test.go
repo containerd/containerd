@@ -1,5 +1,3 @@
-// +build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -38,6 +36,8 @@ func TestDuplicateName(t *testing.T) {
 	t.Logf("Create the sandbox again should fail")
 	_, err = runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.Error(t, err)
+
+	EnsureImageExists(t, pauseImage)
 
 	t.Logf("Create a container")
 	cnConfig := ContainerConfig(

@@ -1,5 +1,3 @@
-// +build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -97,6 +95,7 @@ func ConnectDaemons() error {
 	}
 	// containerdEndpoint is the same with criEndpoint now
 	containerdEndpoint = strings.TrimPrefix(*criEndpoint, "unix://")
+	containerdEndpoint = strings.TrimPrefix(containerdEndpoint, "npipe:")
 	containerdClient, err = containerd.New(containerdEndpoint, containerd.WithDefaultNamespace(k8sNamespace))
 	if err != nil {
 		return errors.Wrap(err, "failed to connect containerd")
@@ -198,7 +197,7 @@ func WithTestAnnotations() ContainerOpts {
 }
 
 // Add container resource limits.
-func WithResources(r *runtime.LinuxContainerResources) ContainerOpts {
+func WithResources(r *runtime.LinuxContainerResources) ContainerOpts { //nolint:unused
 	return func(c *runtime.ContainerConfig) {
 		if c.Linux == nil {
 			c.Linux = &runtime.LinuxContainerConfig{}
@@ -240,7 +239,7 @@ func WithLogPath(path string) ContainerOpts {
 }
 
 // WithSupplementalGroups adds supplemental groups.
-func WithSupplementalGroups(gids []int64) ContainerOpts {
+func WithSupplementalGroups(gids []int64) ContainerOpts { //nolint:unused
 	return func(c *runtime.ContainerConfig) {
 		if c.Linux == nil {
 			c.Linux = &runtime.LinuxContainerConfig{}
@@ -325,7 +324,7 @@ func KillProcess(name string) error {
 }
 
 // KillPid kills the process by pid. kill is used.
-func KillPid(pid int) error {
+func KillPid(pid int) error { //nolint:unused
 	output, err := exec.Command("kill", strconv.Itoa(pid)).CombinedOutput()
 	if err != nil {
 		return errors.Errorf("failed to kill %d - error: %v, output: %q", pid, err, output)
@@ -379,7 +378,7 @@ func CRIConfig() (*criconfig.Config, error) {
 }
 
 // SandboxInfo gets sandbox info.
-func SandboxInfo(id string) (*runtime.PodSandboxStatus, *server.SandboxInfo, error) {
+func SandboxInfo(id string) (*runtime.PodSandboxStatus, *server.SandboxInfo, error) { //nolint:unused
 	client, err := RawRuntimeClient()
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to get raw runtime client")

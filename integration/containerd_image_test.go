@@ -1,5 +1,3 @@
-// +build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -135,7 +133,7 @@ func TestContainerdImage(t *testing.T) {
 	cnConfig := ContainerConfig(
 		"test-container",
 		id,
-		WithCommand("top"),
+		WithCommand("sleep", "300"),
 	)
 	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
 	require.NoError(t, err)

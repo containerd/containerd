@@ -1,5 +1,3 @@
-// +build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -35,6 +33,9 @@ func TestContainerRestart(t *testing.T) {
 		assert.NoError(t, runtimeService.StopPodSandbox(sb))
 		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
 	}()
+
+	EnsureImageExists(t, pauseImage)
+
 	t.Logf("Create a container config and run container in a pod")
 	containerConfig := ContainerConfig(
 		"container1",
