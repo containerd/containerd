@@ -72,7 +72,7 @@ func getFreeLoopDev() (uint32, error) {
 // setupLoopDev attaches the backing file to the loop device and returns
 // the file handle for the loop device. The caller is responsible for
 // closing the file handle.
-func setupLoopDev(backingFile, loopDev string, param LoopParams) (*os.File, error) {
+func setupLoopDev(backingFile, loopDev string, param LoopParams) (_ *os.File, retErr error) {
 	// 1. Open backing file and loop device
 	flags := os.O_RDWR
 	if param.Readonly {
@@ -85,12 +85,15 @@ func setupLoopDev(backingFile, loopDev string, param LoopParams) (*os.File, erro
 	}
 	defer back.Close()
 
-	// To make Autoclear (LO_FLAGS_AUTOCLEAR) work, this function intentionally
-	// doesn't close this file handle on defer.
 	loop, err := os.OpenFile(loopDev, flags, 0)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not open loop device: %s", loopDev)
 	}
+	defer func() {
+		if retErr != nil {
+			loop.Close()
+		}
+	}()
 
 	// 2. Set FD
 	if _, _, err = ioctl(loop.Fd(), unix.LOOP_SET_FD, back.Fd()); err != nil {
@@ -127,10 +130,6 @@ func setupLoopDev(backingFile, loopDev string, param LoopParams) (*os.File, erro
 		}
 	}
 
-	// Cleanup loop fd and return error.
-	// If this function doesn't return this file handle, it must close the handle to
-	// prevent file descriptor leaks.
-	loop.Close()
 	_, _, _ = ioctl(loop.Fd(), unix.LOOP_CLR_FD, 0)
 	return nil, errors.Errorf("failed to set loop device info: %v", err)
 }
