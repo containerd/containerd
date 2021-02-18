@@ -227,7 +227,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	specOpts, err := c.containerSpecOpts(config, &image.ImageSpec.Config)
 	if err != nil {
-		return nil, errors.Wrap(err, "")
+		return nil, errors.Wrap(err, "failed to get container spec opts")
 	}
 
 	containerLabels := buildLabels(config.Labels, containerKindContainer)
