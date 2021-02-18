@@ -126,7 +126,7 @@ func newCommand(ctx context.Context, id, containerdBinary, containerdAddress, co
 	return cmd, nil
 }
 
-func (s *service) StartShim(ctx context.Context, id, containerdBinary, containerdAddress, containerdTTRPCAddress string) (string, error) {
+func (s *service) StartShim(ctx context.Context, id, containerdBinary, containerdAddress, containerdTTRPCAddress string) (_ string, retErr error) {
 	cmd, err := newCommand(ctx, id, containerdBinary, containerdAddress, containerdTTRPCAddress)
 	if err != nil {
 		return "", err
@@ -147,6 +147,12 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 			return "", err
 		}
 	}
+	defer func() {
+		if retErr != nil {
+			socket.Close()
+			_ = shim.RemoveSocket(address)
+		}
+	}()
 	f, err := socket.File()
 	if err != nil {
 		return "", err
@@ -155,11 +161,11 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 	cmd.ExtraFiles = append(cmd.ExtraFiles, f)
 
 	if err := cmd.Start(); err != nil {
+		f.Close()
 		return "", err
 	}
 	defer func() {
-		if err != nil {
-			_ = shim.RemoveSocket(address)
+		if retErr != nil {
 			cmd.Process.Kill()
 		}
 	}()
