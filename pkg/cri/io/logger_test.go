@@ -18,6 +18,8 @@ package io
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -34,16 +36,20 @@ func TestRedirectLogs(t *testing.T) {
 	// defaultBufSize is even number
 	const maxLen = defaultBufSize * 4
 	for desc, test := range map[string]struct {
-		input   string
-		stream  StreamType
-		maxLen  int
-		tag     []runtime.LogTag
-		content []string
+		input    string
+		stream   StreamType
+		maxLen   int
+		logLimit int
+		logBurst int
+		tag      []runtime.LogTag
+		content  []string
 	}{
 		"stdout log": {
-			input:  "test stdout log 1\ntest stdout log 2\n",
-			stream: Stdout,
-			maxLen: maxLen,
+			input:    "test stdout log 1\ntest stdout log 2\n",
+			stream:   Stdout,
+			maxLen:   maxLen,
+			logLimit: 0,
+			logBurst: 0,
 			tag: []runtime.LogTag{
 				runtime.LogTagFull,
 				runtime.LogTagFull,
@@ -54,9 +60,11 @@ func TestRedirectLogs(t *testing.T) {
 			},
 		},
 		"stderr log": {
-			input:  "test stderr log 1\ntest stderr log 2\n",
-			stream: Stderr,
-			maxLen: maxLen,
+			input:    "test stderr log 1\ntest stderr log 2\n",
+			stream:   Stderr,
+			maxLen:   maxLen,
+			logLimit: 0,
+			logBurst: 0,
 			tag: []runtime.LogTag{
 				runtime.LogTagFull,
 				runtime.LogTagFull,
@@ -67,9 +75,11 @@ func TestRedirectLogs(t *testing.T) {
 			},
 		},
 		"log ends without newline": {
-			input:  "test stderr log 1\ntest stderr log 2",
-			stream: Stderr,
-			maxLen: maxLen,
+			input:    "test stderr log 1\ntest stderr log 2",
+			stream:   Stderr,
+			maxLen:   maxLen,
+			logLimit: 0,
+			logBurst: 0,
 			tag: []runtime.LogTag{
 				runtime.LogTagFull,
 				runtime.LogTagPartial,
@@ -80,9 +90,11 @@ func TestRedirectLogs(t *testing.T) {
 			},
 		},
 		"log length equal to buffer size": {
-			input:  strings.Repeat("a", defaultBufSize) + "\n" + strings.Repeat("a", defaultBufSize) + "\n",
-			stream: Stdout,
-			maxLen: maxLen,
+			input:    strings.Repeat("a", defaultBufSize) + "\n" + strings.Repeat("a", defaultBufSize) + "\n",
+			stream:   Stdout,
+			maxLen:   maxLen,
+			logLimit: 0,
+			logBurst: 0,
 			tag: []runtime.LogTag{
 				runtime.LogTagFull,
 				runtime.LogTagFull,
@@ -93,9 +105,11 @@ func TestRedirectLogs(t *testing.T) {
 			},
 		},
 		"log length longer than buffer size": {
-			input:  strings.Repeat("a", defaultBufSize*2+10) + "\n" + strings.Repeat("a", defaultBufSize*2+20) + "\n",
-			stream: Stdout,
-			maxLen: maxLen,
+			input:    strings.Repeat("a", defaultBufSize*2+10) + "\n" + strings.Repeat("a", defaultBufSize*2+20) + "\n",
+			stream:   Stdout,
+			maxLen:   maxLen,
+			logLimit: 0,
+			logBurst: 0,
 			tag: []runtime.LogTag{
 				runtime.LogTagFull,
 				runtime.LogTagFull,
@@ -106,9 +120,11 @@ func TestRedirectLogs(t *testing.T) {
 			},
 		},
 		"log length equal to max length": {
-			input:  strings.Repeat("a", maxLen) + "\n" + strings.Repeat("a", maxLen) + "\n",
-			stream: Stdout,
-			maxLen: maxLen,
+			input:    strings.Repeat("a", maxLen) + "\n" + strings.Repeat("a", maxLen) + "\n",
+			stream:   Stdout,
+			maxLen:   maxLen,
+			logLimit: 0,
+			logBurst: 0,
 			tag: []runtime.LogTag{
 				runtime.LogTagFull,
 				runtime.LogTagFull,
@@ -119,9 +135,11 @@ func TestRedirectLogs(t *testing.T) {
 			},
 		},
 		"log length exceed max length by 1": {
-			input:  strings.Repeat("a", maxLen+1) + "\n" + strings.Repeat("a", maxLen+1) + "\n",
-			stream: Stdout,
-			maxLen: maxLen,
+			input:    strings.Repeat("a", maxLen+1) + "\n" + strings.Repeat("a", maxLen+1) + "\n",
+			stream:   Stdout,
+			maxLen:   maxLen,
+			logLimit: 0,
+			logBurst: 0,
 			tag: []runtime.LogTag{
 				runtime.LogTagPartial,
 				runtime.LogTagFull,
@@ -136,9 +154,11 @@ func TestRedirectLogs(t *testing.T) {
 			},
 		},
 		"log length longer than max length": {
-			input:  strings.Repeat("a", maxLen*2) + "\n" + strings.Repeat("a", maxLen*2+1) + "\n",
-			stream: Stdout,
-			maxLen: maxLen,
+			input:    strings.Repeat("a", maxLen*2) + "\n" + strings.Repeat("a", maxLen*2+1) + "\n",
+			stream:   Stdout,
+			maxLen:   maxLen,
+			logLimit: 0,
+			logBurst: 0,
 			tag: []runtime.LogTag{
 				runtime.LogTagPartial,
 				runtime.LogTagFull,
@@ -155,9 +175,11 @@ func TestRedirectLogs(t *testing.T) {
 			},
 		},
 		"max length shorter than buffer size": {
-			input:  strings.Repeat("a", defaultBufSize*3/2+10) + "\n" + strings.Repeat("a", defaultBufSize*3/2+20) + "\n",
-			stream: Stdout,
-			maxLen: defaultBufSize / 2,
+			input:    strings.Repeat("a", defaultBufSize*3/2+10) + "\n" + strings.Repeat("a", defaultBufSize*3/2+20) + "\n",
+			stream:   Stdout,
+			maxLen:   defaultBufSize / 2,
+			logLimit: 0,
+			logBurst: 0,
 			tag: []runtime.LogTag{
 				runtime.LogTagPartial,
 				runtime.LogTagPartial,
@@ -180,9 +202,11 @@ func TestRedirectLogs(t *testing.T) {
 			},
 		},
 		"log length longer than max length, and (maxLen % defaultBufSize != 0)": {
-			input:  strings.Repeat("a", defaultBufSize*2+10) + "\n" + strings.Repeat("a", defaultBufSize*2+20) + "\n",
-			stream: Stdout,
-			maxLen: defaultBufSize * 3 / 2,
+			input:    strings.Repeat("a", defaultBufSize*2+10) + "\n" + strings.Repeat("a", defaultBufSize*2+20) + "\n",
+			stream:   Stdout,
+			maxLen:   defaultBufSize * 3 / 2,
+			logLimit: 0,
+			logBurst: 0,
 			tag: []runtime.LogTag{
 				runtime.LogTagPartial,
 				runtime.LogTagFull,
@@ -197,9 +221,11 @@ func TestRedirectLogs(t *testing.T) {
 			},
 		},
 		"no limit if max length is 0": {
-			input:  strings.Repeat("a", defaultBufSize*10+10) + "\n" + strings.Repeat("a", defaultBufSize*10+20) + "\n",
-			stream: Stdout,
-			maxLen: 0,
+			input:    strings.Repeat("a", defaultBufSize*10+10) + "\n" + strings.Repeat("a", defaultBufSize*10+20) + "\n",
+			stream:   Stdout,
+			maxLen:   0,
+			logLimit: 0,
+			logBurst: 0,
 			tag: []runtime.LogTag{
 				runtime.LogTagFull,
 				runtime.LogTagFull,
@@ -210,9 +236,11 @@ func TestRedirectLogs(t *testing.T) {
 			},
 		},
 		"no limit if max length is negative": {
-			input:  strings.Repeat("a", defaultBufSize*10+10) + "\n" + strings.Repeat("a", defaultBufSize*10+20) + "\n",
-			stream: Stdout,
-			maxLen: -1,
+			input:    strings.Repeat("a", defaultBufSize*10+10) + "\n" + strings.Repeat("a", defaultBufSize*10+20) + "\n",
+			stream:   Stdout,
+			maxLen:   -1,
+			logLimit: 0,
+			logBurst: 0,
 			tag: []runtime.LogTag{
 				runtime.LogTagFull,
 				runtime.LogTagFull,
@@ -223,9 +251,11 @@ func TestRedirectLogs(t *testing.T) {
 			},
 		},
 		"log length longer than buffer size with tailing \\r\\n": {
-			input:  strings.Repeat("a", defaultBufSize-1) + "\r\n" + strings.Repeat("a", defaultBufSize-1) + "\r\n",
-			stream: Stdout,
-			maxLen: -1,
+			input:    strings.Repeat("a", defaultBufSize-1) + "\r\n" + strings.Repeat("a", defaultBufSize-1) + "\r\n",
+			stream:   Stdout,
+			maxLen:   -1,
+			logLimit: 0,
+			logBurst: 0,
 			tag: []runtime.LogTag{
 				runtime.LogTagFull,
 				runtime.LogTagFull,
@@ -240,7 +270,7 @@ func TestRedirectLogs(t *testing.T) {
 		rc := ioutil.NopCloser(strings.NewReader(test.input))
 		buf := bytes.NewBuffer(nil)
 		wc := cioutil.NewNopWriteCloser(buf)
-		redirectLogs("test-path", rc, wc, test.stream, test.maxLen)
+		redirectLogs("test-path", rc, wc, test.stream, test.maxLen, test.logLimit, test.logBurst)
 		output := buf.String()
 		lines := strings.Split(output, "\n")
 		lines = lines[:len(lines)-1] // Discard empty string after last \n
@@ -255,4 +285,57 @@ func TestRedirectLogs(t *testing.T) {
 			assert.Equal(t, test.content[i], fields[3])
 		}
 	}
+
+	prc, pwc := io.Pipe()
+	go writeLogs(t, pwc)
+	for desc, test := range map[string]struct {
+		stream   StreamType
+		maxLen   int
+		logLimit int
+		logBurst int
+		content  []string
+	}{
+		"limit the log writing speed if log limit > 0 and log burst > 0": {
+			stream:   Stdout,
+			maxLen:   maxLen,
+			logLimit: 1,
+			logBurst: 2,
+			content: []string{
+				"test log 0",
+				"test log 1",
+				"Limited 2 log messages",
+				"test log 4",
+				"Limited 2 log messages",
+				"test log 7",
+				"Limited 2 log messages",
+			},
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		buf := bytes.NewBuffer(nil)
+		wc := cioutil.NewNopWriteCloser(buf)
+		redirectLogs("test-path", prc, wc, test.stream, test.maxLen, test.logLimit, test.logBurst)
+		output := buf.String()
+		lines := strings.Split(output, "\n")
+		lines = lines[:len(lines)-1]
+		assert.Len(t, lines, len(test.content))
+		for i := range lines {
+			fields := strings.SplitN(lines[i], string([]byte{delimiter}), 4)
+			require.Len(t, fields, 4)
+			_, err := time.Parse(timestampFormat, fields[0])
+			assert.NoError(t, err)
+			assert.EqualValues(t, test.stream, fields[1])
+			assert.Equal(t, test.content[i], fields[3])
+		}
+	}
+}
+
+// write 1 log message per 0.3s
+func writeLogs(t *testing.T, w io.WriteCloser) {
+	for i := 0; i < 10; i++ {
+		logMessage := fmt.Sprintf("test log %d\n", i)
+		w.Write([]byte(logMessage))
+		time.Sleep(300 * time.Millisecond)
+	}
+	w.Close()
 }

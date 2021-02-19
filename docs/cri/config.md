@@ -77,6 +77,16 @@ version = 2
   # limit.
   max_container_log_line_size = 16384
 
+  # container_log_limit is the maximum number of log lines allowed to write to disk per second.
+  # If more lines than specified in container_log_limit= are logged by a container in 1 second,
+  # all further log lines within this second are dropped until this second is over.
+  # Non-positive value means no limit.
+  container_log_limit = 0
+
+  # container_log_burst is the burst number of log lines allowed to write to disk per second.
+  # This works together with container_log_limit and is usually greater than or equal to it.
+  container_log_burst = 0
+
   # disable_cgroup indicates to disable the cgroup support.
   # This is useful when the daemon does not have permission to access cgroup.
   disable_cgroup = false

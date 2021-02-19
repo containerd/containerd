@@ -60,6 +60,8 @@ func DefaultConfig() PluginConfig {
 		StatsCollectPeriod:      10,
 		SystemdCgroup:           false,
 		MaxContainerLogLineSize: 16 * 1024,
+		ContainerLogLimit:       0,
+		ContainerLogBurst:       0,
 		Registry: Registry{
 			Mirrors: map[string]Mirror{
 				"docker.io": {

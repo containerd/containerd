@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	cioutil "github.com/containerd/containerd/pkg/ioutil"
@@ -50,13 +51,17 @@ func NewDiscardLogger() io.WriteCloser {
 // log file, and decorate the log line into CRI defined format. It also
 // returns a channel which indicates whether the logger is stopped.
 // maxLen is the max length limit of a line. A line longer than the
-// limit will be cut into multiple lines.
-func NewCRILogger(path string, w io.Writer, stream StreamType, maxLen int) (io.WriteCloser, <-chan struct{}) {
+// limit will be cut into multiple lines. logLimit is the maximum number of
+// log lines allowed to write to disk per second. If more lines than specified
+// by logLimit are logged by a container in 1 second, all further log lines will
+// be dropped until this second is over. logBurst is the burst number
+// of log lines allowed to write to disk per second.
+func NewCRILogger(path string, w io.Writer, stream StreamType, maxLen int, logLimit int, logBurst int) (io.WriteCloser, <-chan struct{}) {
 	logrus.Debugf("Start writing stream %q to log file %q", stream, path)
 	prc, pwc := io.Pipe()
 	stop := make(chan struct{})
 	go func() {
-		redirectLogs(path, prc, w, stream, maxLen)
+		redirectLogs(path, prc, w, stream, maxLen, logLimit, logBurst)
 		close(stop)
 	}()
 	return pwc, stop
@@ -112,17 +117,24 @@ func readLine(b *bufio.Reader) (line []byte, isPrefix bool, err error) {
 	return
 }
 
-func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxLen int) {
+func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxLen int, logLimit int, logBurst int) {
 	defer rc.Close()
 	var (
-		stream    = []byte(s)
-		delimiter = []byte{delimiter}
-		partial   = []byte(runtime.LogTagPartial)
-		full      = []byte(runtime.LogTagFull)
-		buf       [][]byte
-		length    int
-		bufSize   = defaultBufSize
+		stream      = []byte(s)
+		delimiter   = []byte{delimiter}
+		partial     = []byte(runtime.LogTagPartial)
+		full        = []byte(runtime.LogTagFull)
+		buf         [][]byte
+		length      int
+		bufSize     = defaultBufSize
+		rateLimiter *rate.Limiter
+		limitedNum  int
+		writeLog    func(tag, line []byte)
 	)
+	if logBurst > 0 && logLimit > 0 {
+		rateLimiter = rate.NewLimiter(rate.Limit(logLimit), logBurst)
+	}
+
 	// Make sure bufSize <= maxLen
 	if maxLen > 0 && maxLen < bufSize {
 		bufSize = maxLen
@@ -137,6 +149,32 @@ func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxL
 			// Continue on write error to drain the container output.
 		}
 	}
+
+	writeLineWithLimiter := func(tag, line []byte) {
+		if !rateLimiter.Allow() {
+			limitedNum++
+			return
+		}
+		if limitedNum > 0 {
+			limitMessage := fmt.Sprintf("Limited %d log messages", limitedNum)
+			writeLine(full, []byte(limitMessage))
+			limitedNum = 0
+		}
+		writeLine(tag, line)
+	}
+	if rateLimiter != nil {
+		writeLog = writeLineWithLimiter
+		defer func() {
+			if limitedNum > 0 {
+				limitMessage := fmt.Sprintf("Limited %d log messages", limitedNum)
+				writeLine(full, []byte(limitMessage))
+				limitedNum = 0
+			}
+		}()
+	} else {
+		writeLog = writeLine
+	}
+
 	for {
 		var stop bool
 		newLine, isPrefix, err := readLine(r)
@@ -171,7 +209,7 @@ func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxL
 				panic("exceed length should <= last buffer size")
 			}
 			buf[len(buf)-1] = last[:len(last)-exceedLen]
-			writeLine(partial, bytes.Join(buf, nil))
+			writeLog(partial, bytes.Join(buf, nil))
 			buf = [][]byte{last[len(last)-exceedLen:]}
 			length = exceedLen
 		}
@@ -182,9 +220,9 @@ func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxL
 			// readLine only returns error when the message doesn't
 			// end with a newline, in that case it should be treated
 			// as a partial line.
-			writeLine(partial, bytes.Join(buf, nil))
+			writeLog(partial, bytes.Join(buf, nil))
 		} else {
-			writeLine(full, bytes.Join(buf, nil))
+			writeLog(full, bytes.Join(buf, nil))
 		}
 		buf = nil
 		length = 0

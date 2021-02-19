@@ -231,6 +231,14 @@ type PluginConfig struct {
 	// Log line longer than the limit will be split into multiple lines. Non-positive
 	// value means no limit.
 	MaxContainerLogLineSize int `toml:"max_container_log_line_size" json:"maxContainerLogSize"`
+	// ContainerLogLimit is the maximum number of log lines allowed to write to disk per second.
+	// If more lines than specified in ContainerLogLimit= are logged by a container in 1 second,
+	// all further log lines within this second will be dropped until this second is over.
+	// Non-positive value means no limit.
+	ContainerLogLimit int `toml:"container_log_limit" json:"containerLogLimit"`
+	// ContainerLogBurst is the burst number of log lines allowed to write to disk per second.
+	// This works together with ContainerLogLimit and is usually greater than or equal to it.
+	ContainerLogBurst int `toml:"container_log_burst" json:"containerLogBurst"`
 	// DisableCgroup indicates to disable the cgroup support.
 	// This is useful when the containerd does not have permission to access cgroup.
 	DisableCgroup bool `toml:"disable_cgroup" json:"disableCgroup"`
