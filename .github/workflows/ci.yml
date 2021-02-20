@@ -232,7 +232,7 @@ jobs:
   integration-linux:
     name: Linux Integration
     runs-on: ubuntu-18.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     needs: [project, linters, protos, man]
 
     strategy:
@@ -353,7 +353,7 @@ jobs:
     name: CGroupsV2 and SELinux Integration
     # nested virtualization is only available on macOS hosts
     runs-on: macos-10.15
-    timeout-minutes: 40
+    timeout-minutes: 45
     needs: [project, linters, protos, man]
     strategy:
       matrix:
