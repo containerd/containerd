@@ -264,7 +264,19 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			opts = append(opts, oci.WithMemoryLimit(limit))
 		}
 		for _, dev := range context.StringSlice("device") {
-			opts = append(opts, oci.WithDevices(dev, "", "rwm"))
+			parts := strings.Split(dev, ":")
+			if len(parts) > 3 {
+				return nil, errors.New("--device requires the format 'hostpath:containerpath:permission', while containerpath and permission are optional")
+			}
+			var partsArr [3]string
+			copy(partsArr[:], parts)
+			if partsArr[1] == "" {
+				partsArr[1] = partsArr[0]
+			}
+			if partsArr[2] == "" {
+				partsArr[2] = "rwm"
+			}
+			opts = append(opts, oci.WithDevices(partsArr[0], partsArr[1], partsArr[2]))
 		}
 	}
 

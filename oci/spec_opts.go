@@ -1163,40 +1163,6 @@ func WithAnnotations(annotations map[string]string) SpecOpts {
 	}
 }
 
-// WithLinuxDevices adds the provided linux devices to the spec
-func WithLinuxDevices(devices []specs.LinuxDevice) SpecOpts {
-	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
-		setLinux(s)
-		s.Linux.Devices = append(s.Linux.Devices, devices...)
-		return nil
-	}
-}
-
-// WithLinuxDevice adds the device specified by path to the spec
-func WithLinuxDevice(path, permissions string) SpecOpts {
-	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
-		setLinux(s)
-		setResources(s)
-
-		dev, err := deviceFromPath(path)
-		if err != nil {
-			return err
-		}
-
-		s.Linux.Devices = append(s.Linux.Devices, *dev)
-
-		s.Linux.Resources.Devices = append(s.Linux.Resources.Devices, specs.LinuxDeviceCgroup{
-			Type:   dev.Type,
-			Allow:  true,
-			Major:  &dev.Major,
-			Minor:  &dev.Minor,
-			Access: permissions,
-		})
-
-		return nil
-	}
-}
-
 // WithEnvFile adds environment variables from a file to the container's spec
 func WithEnvFile(path string) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {

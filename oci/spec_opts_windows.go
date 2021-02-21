@@ -73,7 +73,3 @@ func WithWindowNetworksAllowUnqualifiedDNSQuery() SpecOpts {
 func WithHostDevices(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 	return nil
 }
-
-func deviceFromPath(path string) (*specs.LinuxDevice, error) {
-	return nil, errors.New("device from path not supported on Windows")
-}
