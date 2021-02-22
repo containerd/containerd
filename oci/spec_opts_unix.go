@@ -107,7 +107,7 @@ func deviceFromPath(path, permissions string) (*specs.LinuxDevice, error) {
 	case mode&unix.S_IFCHR == unix.S_IFCHR:
 		devType = "c"
 	}
-	fm := os.FileMode(mode)
+	fm := os.FileMode(mode &^ unix.S_IFMT)
 	return &specs.LinuxDevice{
 		Type:     devType,
 		Path:     path,
