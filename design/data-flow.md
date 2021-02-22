@@ -12,7 +12,7 @@ With containerd, we redefine the "pull" to comprise the same set of steps
 encompassed in prior container engines. In this model, an image defines a
 collection of resources that can be used to create a _bundle_. There is no
 specific format or object called an image. The goal of the pull is to produce a
-set of steps is to resolve the resources that comprise an image, with the
+set of steps to resolve the resources that comprise an image, with the
 separation providing lifecycle points in the process. 
 
 A reference implementation of the complete "pull", performed client-side, will
@@ -47,7 +47,7 @@ containerd will setup the runtime container's filesystem.
 
 While containerd doesn't have the concept of an image, we can effectively build
 this structure from an image, as projected into containerd. Given this, we can
-say that are requirements for running a container are to do the following:
+say that the requirements for running a container are to do the following:
 
 1. Convert the configuration from the container image into the target format
    for the containerd runtime.
@@ -82,7 +82,7 @@ Broken down into steps, the process looks as follows:
 
 From this, we can understand the required resources to _pull_ an image:
 
-1. An entry in the metadata store a name pointing at a particular digest.
+1. An entry in the metadata store: a name pointing at a particular digest.
 2. The manifest must be available in the content store.
 3. The result of successively applied layers must be available as a snapshot.
 
