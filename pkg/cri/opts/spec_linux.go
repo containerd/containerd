@@ -393,6 +393,20 @@ func WithCapabilities(sc *runtime.LinuxContainerSecurityContext) oci.SpecOpts {
 	return oci.Compose(opts...)
 }
 
+// WithCapDropForNonRootUser drops effective and permitted capabilities
+// if the user is non-root.
+// See https://github.com/moby/moby/pull/36587.
+//
+// This option should be after options for setting users and capabilities.
+func WithCapDropForNonRootUser(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
+	// TODO: TEMP FOR TESTING: don't actually do this, so we can verify that integration tests fail in CI environments
+	/*if s.Process != nil && s.Process.User.UID != 0 && s.Process.Capabilities != nil {
+		s.Process.Capabilities.Effective = []string{}
+		s.Process.Capabilities.Permitted = []string{}
+	}*/
+	return nil
+}
+
 // WithoutAmbientCaps removes the ambient caps from the spec
 func WithoutAmbientCaps(_ context.Context, _ oci.Client, c *containers.Container, s *runtimespec.Spec) error {
 	if s.Process == nil {

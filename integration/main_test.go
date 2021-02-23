@@ -252,6 +252,19 @@ func WithSupplementalGroups(gids []int64) ContainerOpts {
 	}
 }
 
+// WithRunAsUser adds RunAsUser uid.
+func WithRunAsUser(uid int64) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		if c.Linux == nil {
+			c.Linux = &runtime.LinuxContainerConfig{}
+		}
+		if c.Linux.SecurityContext == nil {
+			c.Linux.SecurityContext = &runtime.LinuxContainerSecurityContext{}
+		}
+		c.Linux.SecurityContext.RunAsUser = &runtime.Int64Value{Value: uid}
+	}
+}
+
 // ContainerConfig creates a container config given a name and image name
 // and additional container config options
 func ContainerConfig(name, image string, opts ...ContainerOpts) *runtime.ContainerConfig {
