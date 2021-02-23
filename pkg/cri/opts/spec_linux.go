@@ -354,7 +354,7 @@ func WithDevices(osi osinterface.OS, config *runtime.ContainerConfig) oci.SpecOp
 }
 
 // WithCapabilities sets the provided capabilities from the security context
-func WithCapabilities(sc *runtime.LinuxContainerSecurityContext) oci.SpecOpts {
+func WithCapabilities(sc *runtime.LinuxContainerSecurityContext, allCaps []string) oci.SpecOpts {
 	capabilities := sc.GetCapabilities()
 	if capabilities == nil {
 		return nullOpt
@@ -366,7 +366,7 @@ func WithCapabilities(sc *runtime.LinuxContainerSecurityContext) oci.SpecOpts {
 	// AddCapabilities: []string{"ALL"}, DropCapabilities: []string{"CHOWN"}
 	// will be all capabilities without `CAP_CHOWN`.
 	if util.InStringSlice(capabilities.GetAddCapabilities(), "ALL") {
-		opts = append(opts, oci.WithAllCapabilities)
+		opts = append(opts, oci.WithCapabilities(allCaps))
 	}
 	if util.InStringSlice(capabilities.GetDropCapabilities(), "ALL") {
 		opts = append(opts, oci.WithCapabilities(nil))
