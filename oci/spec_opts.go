@@ -294,10 +294,7 @@ func WithLinuxNamespace(ns specs.LinuxNamespace) SpecOpts {
 		setLinux(s)
 		for i, n := range s.Linux.Namespaces {
 			if n.Type == ns.Type {
-				before := s.Linux.Namespaces[:i]
-				after := s.Linux.Namespaces[i+1:]
-				s.Linux.Namespaces = append(before, ns)
-				s.Linux.Namespaces = append(s.Linux.Namespaces, after...)
+				s.Linux.Namespaces[i] = ns
 				return nil
 			}
 		}
@@ -930,16 +927,13 @@ func WithReadonlyPaths(paths []string) SpecOpts {
 
 // WithWriteableSysfs makes any sysfs mounts writeable
 func WithWriteableSysfs(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
-	for i, m := range s.Mounts {
+	for _, m := range s.Mounts {
 		if m.Type == "sysfs" {
-			var options []string
-			for _, o := range m.Options {
+			for i, o := range m.Options {
 				if o == "ro" {
-					o = "rw"
+					m.Options[i] = "rw"
 				}
-				options = append(options, o)
 			}
-			s.Mounts[i].Options = options
 		}
 	}
 	return nil
@@ -947,16 +941,13 @@ func WithWriteableSysfs(_ context.Context, _ Client, _ *containers.Container, s 
 
 // WithWriteableCgroupfs makes any cgroup mounts writeable
 func WithWriteableCgroupfs(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
-	for i, m := range s.Mounts {
+	for _, m := range s.Mounts {
 		if m.Type == "cgroup" {
-			var options []string
-			for _, o := range m.Options {
+			for i, o := range m.Options {
 				if o == "ro" {
-					o = "rw"
+					m.Options[i] = "rw"
 				}
-				options = append(options, o)
 			}
-			s.Mounts[i].Options = options
 		}
 	}
 	return nil
