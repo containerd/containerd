@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/syndtr/gocapability/capability"
 )
 
 func TestCapsList(t *testing.T) {
@@ -30,7 +29,16 @@ func TestCapsList(t *testing.T) {
 	assert.Len(t, caps59, 41)
 }
 
-func TestFromUint64(t *testing.T) {
+func TestFromNumber(t *testing.T) {
+	assert.Equal(t, "CAP_CHOWN", FromNumber(0))
+	assert.Equal(t, "CAP_SYS_ADMIN", FromNumber(21))
+	assert.Equal(t, "CAP_CHECKPOINT_RESTORE", FromNumber(40))
+	assert.Equal(t, "", FromNumber(-1))
+	assert.Equal(t, "", FromNumber(63))
+	assert.Equal(t, "", FromNumber(255))
+}
+
+func TestFromBitmap(t *testing.T) {
 	type testCase struct {
 		comment    string
 		v          uint64
@@ -72,7 +80,7 @@ func TestFromUint64(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		knownNames, unknown := FromUint64(tc.v)
+		knownNames, unknown := FromBitmap(tc.v)
 		t.Logf("[%s] v=0x%x, got=%+v (%d entries), unknown=%v",
 			tc.comment, tc.v, knownNames, len(knownNames), unknown)
 		assert.Equal(t, tc.knownNames, knownNames)
@@ -139,12 +147,12 @@ nonvoluntary_ctxt_switches:     0
 `
 	res, err := ParseProcPIDStatus(strings.NewReader(procPIDStatus))
 	assert.NoError(t, err)
-	expected := map[capability.CapType]uint64{
-		capability.INHERITABLE: 0,
-		capability.PERMITTED:   0xffffffffff,
-		capability.EFFECTIVE:   0xffffffffff,
-		capability.BOUNDING:    0xffffffffff,
-		capability.AMBIENT:     0,
+	expected := map[Type]uint64{
+		Inheritable: 0,
+		Permitted:   0xffffffffff,
+		Effective:   0xffffffffff,
+		Bounding:    0xffffffffff,
+		Ambient:     0,
 	}
 	assert.EqualValues(t, expected, res)
 }

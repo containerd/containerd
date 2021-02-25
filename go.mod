@@ -48,7 +48,6 @@ require (
 	github.com/prometheus/client_golang v1.7.1
 	github.com/sirupsen/logrus v1.7.0
 	github.com/stretchr/testify v1.6.1
-	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635
 	github.com/tchap/go-patricia v2.2.6+incompatible
 	github.com/urfave/cli v1.22.2
 	go.etcd.io/bbolt v1.3.5

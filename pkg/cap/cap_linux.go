@@ -25,29 +25,31 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/syndtr/gocapability/capability"
 )
 
-// FromUint64 parses an integer into string slice like
+// FromNumber returns a cap string like "CAP_SYS_ADMIN"
+// that corresponds to the given number like 21.
+//
+// FromNumber returns an empty string for unknown cap number.
+func FromNumber(num int) string {
+	if num < 0 || num > len(capsLatest)-1 {
+		return ""
+	}
+	return capsLatest[num]
+}
+
+// FromBitmap parses an uint64 bitmap into string slice like
 // []{"CAP_SYS_ADMIN", ...}.
 //
 // Unknown cap numbers are returned as []int.
-func FromUint64(v uint64) ([]string, []int) {
+func FromBitmap(v uint64) ([]string, []int) {
 	var (
 		res     []string
 		unknown []int
 	)
-	knownList := capability.List()
-	known := make(map[string]struct{}, len(knownList))
-	for _, f := range knownList {
-		known[f.String()] = struct{}{}
-	}
 	for i := 0; i <= 63; i++ {
 		if b := (v >> i) & 0x1; b == 0x1 {
-			c := capability.Cap(i)
-			sRaw := c.String()
-			if _, ok := known[sRaw]; ok {
-				s := "CAP_" + strings.ToUpper(sRaw)
+			if s := FromNumber(i); s != "" {
 				res = append(res, s)
 			} else {
 				unknown = append(unknown, i)
@@ -57,9 +59,25 @@ func FromUint64(v uint64) ([]string, []int) {
 	return res, unknown
 }
 
-// ParseProcPIDStatus returns uint64 value from /proc/<PID>/status file
-func ParseProcPIDStatus(r io.Reader) (map[capability.CapType]uint64, error) {
-	res := make(map[capability.CapType]uint64)
+// Type is the type of capability
+type Type int
+
+const (
+	// Effective is CapEff
+	Effective Type = 1 << iota
+	// Effective is CapPrm
+	Permitted
+	// Inheritable is CapInh
+	Inheritable
+	// Bounding is CapBnd
+	Bounding
+	// Ambient is CapAmb
+	Ambient
+)
+
+// ParseProcPIDStatus returns uint64 bitmap value from /proc/<PID>/status file
+func ParseProcPIDStatus(r io.Reader) (map[Type]uint64, error) {
+	res := make(map[Type]uint64)
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -77,15 +95,15 @@ func ParseProcPIDStatus(r io.Reader) (map[capability.CapType]uint64, error) {
 			}
 			switch k {
 			case "CapInh":
-				res[capability.INHERITABLE] = ui64
+				res[Inheritable] = ui64
 			case "CapPrm":
-				res[capability.PERMITTED] = ui64
+				res[Permitted] = ui64
 			case "CapEff":
-				res[capability.EFFECTIVE] = ui64
+				res[Effective] = ui64
 			case "CapBnd":
-				res[capability.BOUNDING] = ui64
+				res[Bounding] = ui64
 			case "CapAmb":
-				res[capability.AMBIENT] = ui64
+				res[Ambient] = ui64
 			}
 		}
 	}
@@ -112,8 +130,8 @@ func Current() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	capEff := caps[capability.EFFECTIVE]
-	names, _ := FromUint64(capEff)
+	capEff := caps[Effective]
+	names, _ := FromBitmap(capEff)
 	return names, nil
 }
 
@@ -163,10 +181,12 @@ var (
 	// caps58 is the caps of kernel 5.8 (40 entries)
 	caps58 = append(caps316, []string{"CAP_PERFMON", "CAP_BPF"}...)
 	// caps59 is the caps of kernel 5.9 (41 entries)
-	caps59 = append(caps58, "CAP_CHECKPOINT_RESTORE")
+	caps59     = append(caps58, "CAP_CHECKPOINT_RESTORE")
+	capsLatest = caps59
 )
 
-// Known returns the known cap strings as of kernel 5.9
+// Known returns the known cap strings of the latest kernel.
+// The current latest kernel is 5.9.
 func Known() []string {
-	return caps59
+	return capsLatest
 }
