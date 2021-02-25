@@ -5,7 +5,7 @@ This document assumes you have already setup the development environment (go, gi
 Before sending pull requests you should at least make sure your changes have passed code verification, unit, integration and CRI validation tests.
 
 ## Build
-Follow the [building](../BUILDING.md) instructions.
+Follow the [building](../../BUILDING.md) instructions.
 
 ## CRI Integration Test
 * Run CRI integration test:

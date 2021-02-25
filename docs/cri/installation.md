@@ -82,7 +82,7 @@ Information about the binaries in the release tarball:
 |               runc             | seccomp, apparmor, selinux  | linux |     amd64    |
 
 
-If you have other requirements for the binaries, e.g. another architecture support etc., you need to build the binaries yourself following [the instructions](../BUILDING.md).
+If you have other requirements for the binaries, e.g. another architecture support etc., you need to build the binaries yourself following [the instructions](../../BUILDING.md).
 
 ### Download
 
