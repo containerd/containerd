@@ -21,13 +21,21 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/syndtr/gocapability/capability"
 )
 
 func TestCapsList(t *testing.T) {
 	assert.Len(t, caps316, 38)
 	assert.Len(t, caps58, 40)
 	assert.Len(t, caps59, 41)
+}
+
+func TestFromNumber(t *testing.T) {
+	assert.Equal(t, "CAP_CHOWN", FromNumber(0))
+	assert.Equal(t, "CAP_SYS_ADMIN", FromNumber(21))
+	assert.Equal(t, "CAP_CHECKPOINT_RESTORE", FromNumber(40))
+	assert.Equal(t, "", FromNumber(-1))
+	assert.Equal(t, "", FromNumber(63))
+	assert.Equal(t, "", FromNumber(255))
 }
 
 func TestFromBitmap(t *testing.T) {
@@ -139,12 +147,12 @@ nonvoluntary_ctxt_switches:     0
 `
 	res, err := ParseProcPIDStatus(strings.NewReader(procPIDStatus))
 	assert.NoError(t, err)
-	expected := map[capability.CapType]uint64{
-		capability.INHERITABLE: 0,
-		capability.PERMITTED:   0xffffffffff,
-		capability.EFFECTIVE:   0xffffffffff,
-		capability.BOUNDING:    0xffffffffff,
-		capability.AMBIENT:     0,
+	expected := map[Type]uint64{
+		Inheritable: 0,
+		Permitted:   0xffffffffff,
+		Effective:   0xffffffffff,
+		Bounding:    0xffffffffff,
+		Ambient:     0,
 	}
 	assert.EqualValues(t, expected, res)
 }
