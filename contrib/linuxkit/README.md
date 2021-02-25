@@ -1,5 +1,8 @@
 # LinuxKit Kubernetes project
 
-The LinuxKit [`projects/kubernetes`](https://github.com/linuxkit/linuxkit/tree/master/projects/kubernetes) subdirectory contains a project to build master and worker node virtual machines. When built with `KUBE_RUNTIME=cri-containerd` then these images will use `cri-containerd` as their execution backend.
+The [LinuxKit](https://github.com/linuxkit/kubernetes) is a project for building os images for kubernetes master and worker node virtual machines.
 
-See the [project README](https://github.com/linuxkit/linuxkit/blob/master/projects/kubernetes/README.md).
+When the images are built with cri-containerd as the `KUBE_RUNTIME` option they will use `cri-containerd` as their execution backend.
+```
+make all KUBE_RUNTIME=cri-containerd
+```
