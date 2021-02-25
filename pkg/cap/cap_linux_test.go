@@ -30,7 +30,7 @@ func TestCapsList(t *testing.T) {
 	assert.Len(t, caps59, 41)
 }
 
-func TestFromUint64(t *testing.T) {
+func TestFromBitmap(t *testing.T) {
 	type testCase struct {
 		comment    string
 		v          uint64
@@ -72,7 +72,7 @@ func TestFromUint64(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		knownNames, unknown := FromUint64(tc.v)
+		knownNames, unknown := FromBitmap(tc.v)
 		t.Logf("[%s] v=0x%x, got=%+v (%d entries), unknown=%v",
 			tc.comment, tc.v, knownNames, len(knownNames), unknown)
 		assert.Equal(t, tc.knownNames, knownNames)

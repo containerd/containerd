@@ -28,11 +28,11 @@ import (
 	"github.com/syndtr/gocapability/capability"
 )
 
-// FromUint64 parses an integer into string slice like
+// FromBitmap parses an uint64 bitmap into string slice like
 // []{"CAP_SYS_ADMIN", ...}.
 //
 // Unknown cap numbers are returned as []int.
-func FromUint64(v uint64) ([]string, []int) {
+func FromBitmap(v uint64) ([]string, []int) {
 	var (
 		res     []string
 		unknown []int
@@ -57,7 +57,7 @@ func FromUint64(v uint64) ([]string, []int) {
 	return res, unknown
 }
 
-// ParseProcPIDStatus returns uint64 value from /proc/<PID>/status file
+// ParseProcPIDStatus returns uint64 bitmap value from /proc/<PID>/status file
 func ParseProcPIDStatus(r io.Reader) (map[capability.CapType]uint64, error) {
 	res := make(map[capability.CapType]uint64)
 	scanner := bufio.NewScanner(r)
@@ -113,7 +113,7 @@ func Current() ([]string, error) {
 		return nil, err
 	}
 	capEff := caps[capability.EFFECTIVE]
-	names, _ := FromUint64(capEff)
+	names, _ := FromBitmap(capEff)
 	return names, nil
 }
 
