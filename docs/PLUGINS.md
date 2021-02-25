@@ -32,7 +32,7 @@ These binaries are used to start the shim process for containerd and allows
 containerd to manage those containers using the runtime shim api returned by
 the binary.
 
-See [runtime v2 documentation](/runtime/v2/README.md)
+See [runtime v2 documentation](../runtime/v2/README.md)
 
 ### Proxy Plugins
 
