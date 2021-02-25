@@ -21,7 +21,7 @@ External plugins allow extending containerd's functionality using an officially
 released version of containerd without needing to recompile the daemon to add a
 plugin.
 
-containerd allows extensions through two method:
+containerd allows extensions through two methods:
  - via a binary available in containerd's PATH
  - by configuring containerd to proxy to another gRPC service
 
