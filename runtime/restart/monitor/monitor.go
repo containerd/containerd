@@ -153,10 +153,10 @@ func (m *monitor) run(interval time.Duration) {
 		interval = 10 * time.Second
 	}
 	for {
-		time.Sleep(interval)
 		if err := m.reconcile(context.Background()); err != nil {
 			logrus.WithError(err).Error("reconcile")
 		}
+		time.Sleep(interval)
 	}
 }
 
