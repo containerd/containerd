@@ -48,6 +48,10 @@ brings support for the Node Resource Interface (NRI).
 ## Windows
 * **Optimize LCOW snapshotter use of scratch layers** [#4643](https://github.com/containerd/containerd/pull/4643)
 
+## CRI
+* **Update privileged containers to use current capabilities instead of known capabilities** [#5017](https://github.com/containerd/containerd/pull/5017)
+* **Add pod annotations to CNI call** [#5026](https://github.com/containerd/containerd/pull/5026)
+
 And many more improvements and bug fixes in the complete changelog"""
 
 # notable prs to include in the release notes, 1234 is the pr number
