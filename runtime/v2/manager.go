@@ -33,6 +33,9 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
+	"github.com/containerd/containerd/runtime/v2/runc/options"
+	"github.com/containerd/typeurl"
+	ptypes "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -40,6 +43,10 @@ import (
 type Config struct {
 	// Supported platforms
 	Platforms []string `toml:"platforms"`
+	// RuncRoot specifies the default root directory for runc when using the
+	// io.containerd.runc.v2 runtime.  When not set, the shim uses its own
+	// default value (which is specified in utils.RuncRoot).
+	RuncRoot string `toml:"runc_root"`
 }
 
 func init() {
@@ -53,7 +60,8 @@ func init() {
 			Platforms: defaultPlatforms(),
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			supportedPlatforms, err := parsePlatforms(ic.Config.(*Config).Platforms)
+			cfg := ic.Config.(*Config)
+			supportedPlatforms, err := parsePlatforms(cfg.Platforms)
 			if err != nil {
 				return nil, err
 			}
@@ -71,13 +79,13 @@ func init() {
 			}
 			cs := metadata.NewContainerStore(m.(*metadata.DB))
 
-			return New(ic.Context, ic.Root, ic.State, ic.Address, ic.TTRPCAddress, ic.Events, cs)
+			return New(ic.Context, ic.Root, ic.State, ic.Address, ic.TTRPCAddress, cfg.RuncRoot, ic.Events, cs)
 		},
 	})
 }
 
 // New task manager for v2 shims
-func New(ctx context.Context, root, state, containerdAddress, containerdTTRPCAddress string, events *exchange.Exchange, cs containers.Store) (*TaskManager, error) {
+func New(ctx context.Context, root, state, containerdAddress, containerdTTRPCAddress, runcRoot string, events *exchange.Exchange, cs containers.Store) (*TaskManager, error) {
 	for _, d := range []string{root, state} {
 		if err := os.MkdirAll(d, 0711); err != nil {
 			return nil, err
@@ -88,6 +96,7 @@ func New(ctx context.Context, root, state, containerdAddress, containerdTTRPCAdd
 		state:                  state,
 		containerdAddress:      containerdAddress,
 		containerdTTRPCAddress: containerdTTRPCAddress,
+		runcRoot:               runcRoot,
 		tasks:                  runtime.NewTaskList(),
 		events:                 events,
 		containers:             cs,
@@ -104,6 +113,7 @@ type TaskManager struct {
 	state                  string
 	containerdAddress      string
 	containerdTTRPCAddress string
+	runcRoot               string
 
 	tasks      *runtime.TaskList
 	events     *exchange.Exchange
@@ -130,6 +140,10 @@ func (m *TaskManager) Create(ctx context.Context, id string, opts runtime.Create
 			bundle.Delete()
 		}
 	}()
+	opts.RuntimeOptions, err = m.setDefaultRuntimeOptions(opts.Runtime, opts.RuntimeOptions)
+	if err != nil {
+		log.G(ctx).WithError(err).Warn("failed to set default runtime options")
+	}
 	topts := opts.TaskOptions
 	if topts == nil {
 		topts = opts.RuntimeOptions
@@ -166,6 +180,36 @@ func (m *TaskManager) Create(ctx context.Context, id string, opts runtime.Create
 	}
 	m.tasks.Add(ctx, t)
 	return t, nil
+}
+
+// setDefaultRuntimeOptions sets the default values for runtime options defined
+// the plugin's config.  If the runtime options passed in already have values
+// defined, they are left alone.
+// The only current value adjusted is the runc root directory for the
+// io.containerd.runc.v2 runtime.
+func (m *TaskManager) setDefaultRuntimeOptions(name string, anyOpts *ptypes.Any) (*ptypes.Any, error) {
+	if anyOpts == nil {
+		return nil, nil
+	}
+	if m.runcRoot == "" {
+		return anyOpts, nil
+	}
+	if name != "" && name != plugin.RuntimeRuncV2 {
+		return anyOpts, nil
+	}
+	opts, err := typeurl.UnmarshalAny(anyOpts)
+	if err != nil {
+		return nil, err
+	}
+	runtimeOpts, ok := opts.(*options.Options)
+	if !ok {
+		return anyOpts, nil
+	}
+	if runtimeOpts.Root != "" {
+		return anyOpts, nil
+	}
+	runtimeOpts.Root = m.runcRoot
+	return typeurl.MarshalAny(runtimeOpts)
 }
 
 // Get a specific task
