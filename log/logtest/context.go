@@ -18,7 +18,10 @@ package logtest
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/containerd/containerd/log"
@@ -35,6 +38,7 @@ func WithT(ctx context.Context, t testing.TB) context.Context {
 	// Increase debug level for tests
 	l.SetLevel(logrus.DebugLevel)
 	l.SetOutput(ioutil.Discard)
+	l.SetReportCaller(true)
 
 	// Add testing hook
 	l.AddHook(&testHook{
@@ -42,6 +46,9 @@ func WithT(ctx context.Context, t testing.TB) context.Context {
 		fmt: &logrus.TextFormatter{
 			DisableColors:   true,
 			TimestampFormat: log.RFC3339NanoFixed,
+			CallerPrettyfier: func(frame *runtime.Frame) (string, string) {
+				return filepath.Base(frame.Function), fmt.Sprintf("%s:%d", frame.File, frame.Line)
+			},
 		},
 	})
 
