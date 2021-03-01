@@ -1,7 +1,7 @@
 # github.com/BurntSushi/toml v0.3.1
 ## explicit
 github.com/BurntSushi/toml
-# github.com/Microsoft/go-winio v0.4.16
+# github.com/Microsoft/go-winio v0.4.17-0.20210211115548-6eac466e5fa3
 ## explicit
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/backuptar
@@ -43,7 +43,7 @@ github.com/Microsoft/hcsshim/internal/wclayer
 github.com/Microsoft/hcsshim/internal/winapi
 github.com/Microsoft/hcsshim/osversion
 github.com/Microsoft/hcsshim/pkg/go-runhcs
-# github.com/Microsoft/hcsshim/test v0.0.0-20201218223536-d3e5debf77da
+# github.com/Microsoft/hcsshim/test v0.0.0-20210227013316-43a75bb4edd3
 ## explicit
 github.com/Microsoft/hcsshim/test/functional/manifest
 # github.com/beorn7/perks v1.0.1
@@ -56,7 +56,7 @@ github.com/cilium/ebpf/asm
 github.com/cilium/ebpf/internal
 github.com/cilium/ebpf/internal/btf
 github.com/cilium/ebpf/internal/unix
-# github.com/containerd/aufs v0.0.0-20200908144142-dab0cbea06f4
+# github.com/containerd/aufs v0.0.0-20201003224125-76a6863f2989
 ## explicit
 github.com/containerd/aufs
 github.com/containerd/aufs/plugin
@@ -72,7 +72,7 @@ github.com/containerd/cgroups/v2/stats
 # github.com/containerd/console v1.0.1
 ## explicit
 github.com/containerd/console
-# github.com/containerd/continuity v0.0.0-20201208142359-180525291bb7
+# github.com/containerd/continuity v0.0.0-20210208174643-50096c924a4e
 ## explicit
 github.com/containerd/continuity
 github.com/containerd/continuity/devices
@@ -93,7 +93,7 @@ github.com/containerd/go-cni
 # github.com/containerd/go-runc v0.0.0-20200220073739-7016d3ce2328
 ## explicit
 github.com/containerd/go-runc
-# github.com/containerd/imgcrypt v1.0.1
+# github.com/containerd/imgcrypt v1.0.4-0.20210301171431-0ae5c75f59ba
 ## explicit
 github.com/containerd/imgcrypt
 github.com/containerd/imgcrypt/images/encryption
@@ -108,7 +108,7 @@ github.com/containerd/ttrpc/plugin
 # github.com/containerd/typeurl v1.0.1
 ## explicit
 github.com/containerd/typeurl
-# github.com/containerd/zfs v0.0.0-20200918131355-0a33824f23a2
+# github.com/containerd/zfs v0.0.0-20210301145711-11e8f1707f62
 ## explicit
 github.com/containerd/zfs
 github.com/containerd/zfs/plugin
@@ -123,16 +123,21 @@ github.com/containernetworking/cni/pkg/version
 # github.com/containernetworking/plugins v0.8.6
 ## explicit
 github.com/containernetworking/plugins/pkg/ns
-# github.com/containers/ocicrypt v1.0.1
+# github.com/containers/ocicrypt v1.1.0
 github.com/containers/ocicrypt
 github.com/containers/ocicrypt/blockcipher
 github.com/containers/ocicrypt/config
+github.com/containers/ocicrypt/config/keyprovider-config
+github.com/containers/ocicrypt/crypto/pkcs11
 github.com/containers/ocicrypt/keywrap
 github.com/containers/ocicrypt/keywrap/jwe
+github.com/containers/ocicrypt/keywrap/keyprovider
 github.com/containers/ocicrypt/keywrap/pgp
+github.com/containers/ocicrypt/keywrap/pkcs11
 github.com/containers/ocicrypt/keywrap/pkcs7
 github.com/containers/ocicrypt/spec
 github.com/containers/ocicrypt/utils
+github.com/containers/ocicrypt/utils/keyprovider
 # github.com/coreos/go-systemd/v22 v22.1.0
 ## explicit
 github.com/coreos/go-systemd/v22/daemon
@@ -161,8 +166,6 @@ github.com/emicklei/go-restful/log
 # github.com/fsnotify/fsnotify v1.4.9
 ## explicit
 github.com/fsnotify/fsnotify
-# github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
-github.com/fullsailor/pkcs7
 # github.com/go-logr/logr v0.2.0
 github.com/go-logr/logr
 # github.com/godbus/dbus/v5 v5.0.3
@@ -208,7 +211,7 @@ github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
-# github.com/google/go-cmp v0.5.2
+# github.com/google/go-cmp v0.5.4
 ## explicit
 github.com/google/go-cmp/cmp
 github.com/google/go-cmp/cmp/cmpopts
@@ -229,7 +232,7 @@ github.com/hashicorp/errwrap
 # github.com/hashicorp/go-multierror v1.0.0
 ## explicit
 github.com/hashicorp/go-multierror
-# github.com/imdario/mergo v0.3.10
+# github.com/imdario/mergo v0.3.11
 ## explicit
 github.com/imdario/mergo
 # github.com/json-iterator/go v1.1.10
@@ -243,6 +246,8 @@ github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
 # github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369
 github.com/matttproud/golang_protobuf_extensions/pbutil
+# github.com/miekg/pkcs11 v1.0.3
+github.com/miekg/pkcs11
 # github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible
 github.com/mistifyio/go-zfs
 # github.com/moby/sys/mountinfo v0.4.0
@@ -292,7 +297,7 @@ github.com/prometheus/client_model/go
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 github.com/prometheus/common/model
-# github.com/prometheus/procfs v0.2.0
+# github.com/prometheus/procfs v0.6.0
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
@@ -303,6 +308,8 @@ github.com/shurcooL/sanitized_anchor_name
 # github.com/sirupsen/logrus v1.7.0
 ## explicit
 github.com/sirupsen/logrus
+# github.com/stefanberger/go-pkcs11uri v0.0.0-20201008174630-78d3cae3a980
+github.com/stefanberger/go-pkcs11uri
 # github.com/stretchr/testify v1.6.1
 ## explicit
 github.com/stretchr/testify/assert
@@ -318,6 +325,8 @@ github.com/willf/bitset
 # go.etcd.io/bbolt v1.3.5
 ## explicit
 go.etcd.io/bbolt
+# go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1
+go.mozilla.org/pkcs7
 # go.opencensus.io v0.22.3
 go.opencensus.io
 go.opencensus.io/internal
@@ -350,11 +359,11 @@ golang.org/x/net/websocket
 # golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
+# golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
 ## explicit
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.0.0-20201202213521-69691e467435
+# golang.org/x/sys v0.0.0-20210124154548-22da62e12c0c
 ## explicit
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
@@ -383,7 +392,7 @@ google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/urlfetch
 # google.golang.org/genproto v0.0.0-20201110150050-8816d57aaa9a => google.golang.org/genproto v0.0.0-20200224152610-e50cd9704f63
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.30.0 => google.golang.org/grpc v1.27.1
+# google.golang.org/grpc v1.33.2 => google.golang.org/grpc v1.27.1
 ## explicit
 google.golang.org/grpc
 google.golang.org/grpc/attributes
@@ -425,18 +434,19 @@ google.golang.org/grpc/status
 google.golang.org/grpc/tap
 # gopkg.in/inf.v0 v0.9.1
 gopkg.in/inf.v0
-# gopkg.in/square/go-jose.v2 v2.3.1
+# gopkg.in/square/go-jose.v2 v2.5.1
 gopkg.in/square/go-jose.v2
 gopkg.in/square/go-jose.v2/cipher
 gopkg.in/square/go-jose.v2/json
-# gopkg.in/yaml.v2 v2.3.0
+# gopkg.in/yaml.v2 v2.4.0
 gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
 gopkg.in/yaml.v3
-# gotest.tools/v3 v3.0.2
+# gotest.tools/v3 v3.0.3
 ## explicit
 gotest.tools/v3/assert
 gotest.tools/v3/assert/cmp
+gotest.tools/v3/internal/assert
 gotest.tools/v3/internal/difflib
 gotest.tools/v3/internal/format
 gotest.tools/v3/internal/source
