@@ -337,6 +337,9 @@ func (c *criService) registryHosts(auth *runtime.AuthConfig) docker.RegistryHost
 				if err != nil {
 					return nil, errors.Wrapf(err, "get TLSConfig for registry %q", e)
 				}
+			} else if isLocalHost(host) && u.Scheme == "http" {
+				// Skipping TLS verification for localhost
+				transport.TLSClientConfig.InsecureSkipVerify = true
 			}
 
 			if auth == nil && config.Auth != nil {
@@ -366,13 +369,24 @@ func (c *criService) registryHosts(auth *runtime.AuthConfig) docker.RegistryHost
 
 // defaultScheme returns the default scheme for a registry host.
 func defaultScheme(host string) string {
-	if h, _, err := net.SplitHostPort(host); err == nil {
-		host = h
-	}
-	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+	if isLocalHost(host) {
 		return "http"
 	}
 	return "https"
+}
+
+// isLocalHost checks if the registry host is local.
+func isLocalHost(host string) bool {
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+
+	if host == "localhost" {
+		return true
+	}
+
+	ip := net.ParseIP(host)
+	return ip.IsLoopback()
 }
 
 // addDefaultScheme returns the endpoint with default scheme
