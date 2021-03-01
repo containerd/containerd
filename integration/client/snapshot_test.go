@@ -21,6 +21,7 @@ import (
 	"runtime"
 	"testing"
 
+	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/testsuite"
 )

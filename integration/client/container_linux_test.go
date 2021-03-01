@@ -34,6 +34,7 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/containerd/containerd"
 	"github.com/containerd/cgroups"
 	cgroupsv2 "github.com/containerd/cgroups/v2"
 	apievents "github.com/containerd/containerd/api/events"
@@ -85,7 +86,7 @@ func TestRegressionIssue4769(t *testing.T) {
 	container, err := client.NewContainer(ctx, id,
 		WithNewSnapshot(id, image),
 		WithNewSpec(oci.WithImageConfig(image), withTrue()),
-		WithRuntime(client.runtime, nil),
+		WithRuntime(client.Runtime(), nil),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1629,7 +1630,7 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
 	var copts interface{}
-	if CheckRuntime(client.runtime, "io.containerd.runc") {
+	if CheckRuntime(client.Runtime(), "io.containerd.runc") {
 		copts = &options.Options{
 			IoUid: 1000,
 			IoGid: 2000,

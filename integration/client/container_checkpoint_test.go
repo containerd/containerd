@@ -30,6 +30,7 @@ import (
 	"syscall"
 	"testing"
 
+	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/plugin"
@@ -48,7 +49,7 @@ func TestCheckpointRestorePTY(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	if client.runtime == plugin.RuntimeLinuxV1 {
+	if client.Runtime() == plugin.RuntimeLinuxV1 {
 		t.Skip()
 	}
 
@@ -174,7 +175,7 @@ func TestCheckpointRestore(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	if client.runtime == plugin.RuntimeLinuxV1 {
+	if client.Runtime() == plugin.RuntimeLinuxV1 {
 		t.Skip()
 	}
 
@@ -264,7 +265,7 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	if client.runtime == plugin.RuntimeLinuxV1 {
+	if client.Runtime() == plugin.RuntimeLinuxV1 {
 		t.Skip()
 	}
 
@@ -354,7 +355,7 @@ func TestCheckpointLeaveRunning(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	if client.runtime == plugin.RuntimeLinuxV1 {
+	if client.Runtime() == plugin.RuntimeLinuxV1 {
 		t.Skip()
 	}
 

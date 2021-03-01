@@ -30,6 +30,7 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/namespaces"
@@ -661,7 +662,7 @@ func TestKillContainerDeletedByRunc(t *testing.T) {
 	}
 	defer client.Close()
 
-	if client.runtime == plugin.RuntimeLinuxV1 {
+	if client.Runtime() == plugin.RuntimeLinuxV1 {
 		t.Skip("test relies on runtime v2")
 	}
 
@@ -680,7 +681,7 @@ func TestKillContainerDeletedByRunc(t *testing.T) {
 	container, err := client.NewContainer(ctx, id,
 		WithNewSnapshot(id, image),
 		WithNewSpec(oci.WithImageConfig(image), longCommand),
-		WithRuntime(client.runtime, &options.Options{Root: runcRoot}))
+		WithRuntime(client.Runtime(), &options.Options{Root: runcRoot}))
 	if err != nil {
 		t.Fatal(err)
 	}
