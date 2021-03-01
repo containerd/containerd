@@ -3,8 +3,6 @@ package fs
 import (
 	"errors"
 	"path/filepath"
-	"syscall"
-	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
@@ -16,32 +14,18 @@ var (
 
 // GetFileSystemType obtains the type of a file system through GetVolumeInformation.
 // https://msdn.microsoft.com/en-us/library/windows/desktop/aa364993(v=vs.85).aspx
-func GetFileSystemType(path string) (fsType string, hr error) {
+func GetFileSystemType(path string) (fsType string, err error) {
 	drive := filepath.VolumeName(path)
 	if len(drive) != 2 {
 		return "", ErrInvalidPath
 	}
 
 	var (
-		modkernel32              = windows.NewLazySystemDLL("kernel32.dll")
-		procGetVolumeInformation = modkernel32.NewProc("GetVolumeInformationW")
-		buf                      = make([]uint16, 255)
-		size                     = windows.MAX_PATH + 1
+		buf  = make([]uint16, 255)
+		size = uint32(windows.MAX_PATH + 1)
 	)
 	drive += `\`
-	n := uintptr(unsafe.Pointer(nil))
-	r0, _, _ := syscall.Syscall9(procGetVolumeInformation.Addr(), 8, uintptr(unsafe.Pointer(windows.StringToUTF16Ptr(drive))), n, n, n, n, n, uintptr(unsafe.Pointer(&buf[0])), uintptr(size), 0)
-	if int32(r0) < 0 {
-		hr = syscall.Errno(win32FromHresult(r0))
-	}
+	err = windows.GetVolumeInformation(windows.StringToUTF16Ptr(drive), nil, 0, nil, nil, nil, &buf[0], size)
 	fsType = windows.UTF16ToString(buf)
 	return
-}
-
-// win32FromHresult is a helper function to get the win32 error code from an HRESULT.
-func win32FromHresult(hr uintptr) uintptr {
-	if hr&0x1fff0000 == 0x00070000 {
-		return hr & 0xffff
-	}
-	return hr
 }

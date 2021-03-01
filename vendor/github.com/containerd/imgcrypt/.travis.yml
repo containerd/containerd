@@ -1,4 +1,4 @@
-dist: xenial
+dist: bionic
 language: go
 
 go:
@@ -7,12 +7,14 @@ go:
 env:
   global:
     - RUNC_VERSION=v1.0.0-rc9
-    - GOLANGCI_LINT_VERSION=v1.22.2
+    - GOLANGCI_LINT_VERSION=v1.32.2
 
 addons:
   apt:
     packages:
       - libseccomp-dev
+      - gnutls-bin
+      - softhsm2
 
 before_install:
   - uname -r
@@ -25,6 +27,11 @@ before_install:
     make -j$(nproc)
     sudo make install
     sudo rm -f $(type -P ctr)
+    popd
+    git clone https://github.com/lumjjb/simple-ocicrypt-keyprovider
+    pushd simple-ocicrypt-keyprovider
+     make
+     sudo cp simple_crypt /usr/local/bin
     popd
     popd
 
@@ -42,4 +49,4 @@ script:
   - make check
   - make test
   - make
-  - CONTAINERD=$(type -P containerd) ./script/tests/test_encryption.sh
+  - CONTAINERD=$(type -P containerd) KEYPROVIDER=/usr/local/bin/simple_crypt ./script/tests/test_encryption.sh

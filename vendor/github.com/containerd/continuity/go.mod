@@ -9,7 +9,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/pkg/errors v0.9.1
-	github.com/sirupsen/logrus v1.6.0
+	github.com/sirupsen/logrus v1.7.0
 	github.com/spf13/cobra v0.0.2-0.20171109065643-2da4a54c5cee
 	github.com/spf13/pflag v1.0.1-0.20171106142849-4c012f6dcd95 // indirect
 	github.com/stretchr/testify v1.4.0 // indirect
