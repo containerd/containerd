@@ -363,6 +363,12 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: "Cache ~/.vagrant.d/boxes"
+        uses: actions/cache@v2
+        with:
+          path: ~/.vagrant.d/boxes
+          key: vagrant-${{ hashFiles('Vagrantfile*') }}
+
       - run: |
           # Retry if it fails (download.fedoraproject.org returns 404 sometimes)
           vagrant up || vagrant up
