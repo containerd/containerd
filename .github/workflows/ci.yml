@@ -388,6 +388,12 @@ jobs:
       - name: Checkout containerd
         uses: actions/checkout@v2
 
+      - name: "Cache ~/.vagrant.d/boxes"
+        uses: actions/cache@v2
+        with:
+          path: ~/.vagrant.d/boxes
+          key: vagrant-${{ hashFiles('Vagrantfile*') }}
+
       - name: Start vagrant
         run: vagrant up
 
