@@ -311,28 +311,6 @@ func TestDefaultScheme(t *testing.T) {
 	}
 }
 
-func TestEncryptedImagePullOpts(t *testing.T) {
-	for desc, test := range map[string]struct {
-		keyModel     string
-		expectedOpts int
-	}{
-		"node key model should return one unpack opt": {
-			keyModel:     criconfig.KeyModelNode,
-			expectedOpts: 1,
-		},
-		"no key model selected should default to node key model": {
-			keyModel:     "",
-			expectedOpts: 0,
-		},
-	} {
-		t.Logf("TestCase %q", desc)
-		c := newTestCRIService()
-		c.config.ImageDecryption.KeyModel = test.keyModel
-		got := len(c.encryptedImagesPullOpts())
-		assert.Equal(t, test.expectedOpts, got)
-	}
-}
-
 func TestImageLayersLabel(t *testing.T) {
 	sampleKey := "sampleKey"
 	sampleDigest, err := digest.Parse("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")

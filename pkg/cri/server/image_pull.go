@@ -35,8 +35,6 @@ import (
 	"github.com/containerd/containerd/log"
 	distribution "github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/remotes/docker"
-	"github.com/containerd/imgcrypt"
-	"github.com/containerd/imgcrypt/images/encryption"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -438,18 +436,6 @@ func newTransport() *http.Transport {
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 5 * time.Second,
 	}
-}
-
-// encryptedImagesPullOpts returns the necessary list of pull options required
-// for decryption of encrypted images based on the cri decryption configuration.
-func (c *criService) encryptedImagesPullOpts() []containerd.RemoteOpt {
-	if c.config.ImageDecryption.KeyModel == criconfig.KeyModelNode {
-		ltdd := imgcrypt.Payload{}
-		decUnpackOpt := encryption.WithUnpackConfigApplyOpts(encryption.WithDecryptedUnpack(&ltdd))
-		opt := containerd.WithUnpackOpts([]containerd.UnpackOpt{decUnpackOpt})
-		return []containerd.RemoteOpt{opt}
-	}
-	return nil
 }
 
 const (
