@@ -19,6 +19,7 @@ package images
 import (
 	"fmt"
 	"net/http/httptrace"
+	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
@@ -124,6 +125,7 @@ command. As part of this process, we do the following:
 			p = append(p, platforms.DefaultSpec())
 		}
 
+		start := time.Now()
 		for _, platform := range p {
 			fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
 			i := containerd.NewImageWithPlatform(client, img, platforms.Only(platform))
@@ -140,8 +142,7 @@ command. As part of this process, we do the following:
 				fmt.Printf("image chain ID: %s\n", chainID)
 			}
 		}
-
-		fmt.Println("done")
+		fmt.Printf("done: %s\t\n", time.Since(start))
 		return nil
 	},
 }
