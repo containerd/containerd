@@ -111,7 +111,7 @@ to use `go mod` command to modify the dependencies. After modifition, you should
 and `go mod vendor` to ensure the `go.mod`, `go.sum` files and `vendor` directory are up to date.
 Changes to these files should become a single commit for a PR which relies on vendored updates.
 
-Please refer to [RUNC.md](/RUNC.md) for the currently supported version of `runc` that is used by containerd.
+Please refer to [RUNC.md](/docs/RUNC.md) for the currently supported version of `runc` that is used by containerd.
 
 ### Static binaries
 
@@ -180,7 +180,7 @@ RUN apt-get update && \
 
 ```
 
-In our Docker container we will use a specific `runc` build which includes [seccomp](https://en.wikipedia.org/wiki/seccomp) and [apparmor](https://en.wikipedia.org/wiki/AppArmor) support. Hence why our Dockerfile includes `libseccomp-dev` as a dependency (apparmor support doesn't require external libraries). Please refer to [RUNC.md](/RUNC.md) for the currently supported version of `runc` that is used by containerd.
+In our Docker container we will use a specific `runc` build which includes [seccomp](https://en.wikipedia.org/wiki/seccomp) and [apparmor](https://en.wikipedia.org/wiki/AppArmor) support. Hence why our Dockerfile includes `libseccomp-dev` as a dependency (apparmor support doesn't require external libraries). Please refer to [RUNC.md](/docs/RUNC.md) for the currently supported version of `runc` that is used by containerd.
 
 Let's suppose you build an image called `containerd/build` from the above Dockerfile. You can run the following command:
 
