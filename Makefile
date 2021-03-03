@@ -264,7 +264,7 @@ release: releases/$(RELEASE).tar.gz
 	@cd releases && sha256sum $(RELEASE).tar.gz >$(RELEASE).tar.gz.sha256sum
 
 ifeq ($(GOOS),windows)
-install-cri-deps: $(BINARIES)
+install-cri-deps: $(BINARIES) ## install cri dependendencies
 	mkdir -p $(CRIDIR)
 	DESTDIR=$(CRIDIR) script/setup/install-cni-windows
 	cp bin/* $(CRIDIR)
