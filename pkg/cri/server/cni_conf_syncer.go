@@ -73,7 +73,11 @@ func newCNINetConfSyncer(confDir string, netPlugin cni.CNI, loadOpts []cni.CNIOp
 func (syncer *cniNetConfSyncer) syncLoop() error {
 	for {
 		select {
-		case event := <-syncer.watcher.Events:
+		case event, ok := <-syncer.watcher.Events:
+			if !ok {
+				logrus.Debugf("cni watcher channel is closed")
+				return nil
+			}
 			// Only reload config when receiving write/rename/remove
 			// events
 			//
