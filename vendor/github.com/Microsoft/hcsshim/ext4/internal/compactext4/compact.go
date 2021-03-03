@@ -924,7 +924,13 @@ func (w *Writer) writeDirectory(dir, parent *inode) error {
 		children = append(children, name)
 	}
 	sort.Slice(children, func(i, j int) bool {
-		return dir.Children[children[i]].Number < dir.Children[children[j]].Number
+		left_num := dir.Children[children[i]].Number
+		right_num := dir.Children[children[j]].Number
+
+		if left_num == right_num {
+			return children[i] < children[j]
+		}
+		return left_num < right_num
 	})
 
 	for _, name := range children {
@@ -945,7 +951,24 @@ func (w *Writer) writeDirectoryRecursive(dir, parent *inode) error {
 	if err := w.writeDirectory(dir, parent); err != nil {
 		return err
 	}
-	for _, child := range dir.Children {
+
+	// Follow e2fsck's convention and sort the children by inode number.
+	var children []string
+	for name := range dir.Children {
+		children = append(children, name)
+	}
+	sort.Slice(children, func(i, j int) bool {
+		left_num := dir.Children[children[i]].Number
+		right_num := dir.Children[children[j]].Number
+
+		if left_num == right_num {
+			return children[i] < children[j]
+		}
+		return left_num < right_num
+	})
+
+	for _, name := range children {
+		child := dir.Children[name]
 		if child.IsDir() {
 			if err := w.writeDirectoryRecursive(child, dir); err != nil {
 				return err
