@@ -17,13 +17,15 @@ features cleaner to develop. This includes bringing CRI development into the
 main containerd repository and switching to Go modules. This release also
 brings support for the Node Resource Interface (NRI).
 
-## Project Organization
+### Highlights
+
+#### Project Organization
 * **Merge containerd/cri codebased into containerd/containerd** [#4593](https://github.com/containerd/containerd/pull/4593)
 * **Move to Go modules** [#4760](https://github.com/containerd/containerd/pull/4760)
 * **Remove `selinux` build tag** [#4849](https://github.com/containerd/containerd/pull/4849)
 * **Add json log format output option for daemon log** [#4803](https://github.com/containerd/containerd/pull/4803)
 
-## Snapshots
+#### Snapshots
 * **Add configurable overlayfs path** [#4505](https://github.com/containerd/containerd/pull/4505)
 * **Separate overlay implementation from plugin** [#4506](https://github.com/containerd/containerd/pull/4506)
 * **Native snapshotter configuration and plugin separation** [#4517](https://github.com/containerd/containerd/pull/4517)
@@ -34,27 +36,53 @@ brings support for the Node Resource Interface (NRI).
 * **Add platform check for snapshotter support when unpacking** [#3927](https://github.com/containerd/containerd/pull/3927)
 * **Handle loopback mounts** [#4902](https://github.com/containerd/containerd/pull/4902)
 
-## Distribution
+#### Distribution
 * **Improve registry response errors** [#4523](https://github.com/containerd/containerd/pull/4523)
 * **Improve image pull performance over HTTP 1.1** [#4653](https://github.com/containerd/containerd/pull/4653)
 * **Registry configuration package** [#4138](https://github.com/containerd/containerd/pull/4138)
 * **Add support for layers compressed with zstd** [#4809](https://github.com/containerd/containerd/pull/4809)
 * **Allow arm64 to fallback to arm (v8, v7, v6, v5)** [4932](https://github.com/containerd/containerd/pull/4932)
 
-## Runtime
+#### Runtime
 * **Add annotations to containerd task update API** [#4647](https://github.com/containerd/containerd/pull/4647)
 * **Add logging binary support when terminal is true** [#4502](https://github.com/containerd/containerd/pull/4502)
 
-## Windows
+#### Windows
 * **Optimize LCOW snapshotter use of scratch layers** [#4643](https://github.com/containerd/containerd/pull/4643)
 
-## CRI
+#### CRI
 * **Update privileged containers to use current capabilities instead of known capabilities** [#5017](https://github.com/containerd/containerd/pull/5017)
 * **Add pod annotations to CNI call** [#5026](https://github.com/containerd/containerd/pull/5026)
 
-And many more improvements and bug fixes in the complete changelog"""
+### Impactful Client Updates
 
-# notable prs to include in the release notes, 1234 is the pr number
-[notes]
+This release has changes which may affect projects which import containerd.
 
-[breaking]
+#### Switch to Go modules
+
+containerd and all containerd sub-repositories are now using Go modules. This
+should help make importing easier for handling transitive dependencies. As of
+this release, containerd still does not guarantee client library compatibility
+for 1.x versions, although best effort is made to minimize impact from changes
+to exported Go packages.
+
+#### CRI plugin moved to main repository
+
+With the CRI plugin moving into the main repository, imports under `github.com/containerd/cri/`
+can now be found `github.com/containerd/containerd/pkg/cri/`.
+There are no changes required for end users of CRI.
+
+#### Library changes
+
+##### `oci`
+
+The `WithAllCapabilities` has been removed and replaced with `WithAllCurrentCapabilities`
+and `WithAllKnownCapabilities`. `WithAllKnownCapabilities` has similar
+functionality to the previous `WithAllCapabilities` with added support for newer
+capabilities. `WithAllCurrentCapabilities` can be used to give privileged
+containers the same set of permissions as the calling process, preventing errors
+when privileged containers attempt to get more permissions than given to the
+caller.
+
+
+See the changelog for complete list of changes"""
