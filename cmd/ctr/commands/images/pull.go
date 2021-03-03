@@ -18,6 +18,7 @@ package images
 
 import (
 	"fmt"
+	"net/http/httptrace"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
@@ -55,6 +56,10 @@ command. As part of this process, we do the following:
 			Usage: "pull content and metadata from all platforms",
 		},
 		cli.BoolFlag{
+			Name:  "trace",
+			Usage: "enable HTTP tracing for registry interactions",
+		},
+		cli.BoolFlag{
 			Name:  "all-metadata",
 			Usage: "Pull metadata for all platforms",
 		},
@@ -88,6 +93,9 @@ command. As part of this process, we do the following:
 			return err
 		}
 
+		if context.Bool("trace") {
+			ctx = httptrace.WithClientTrace(ctx, NewDebugClientTrace(ctx))
+		}
 		img, err := content.Fetch(ctx, client, ref, config)
 		if err != nil {
 			return err
