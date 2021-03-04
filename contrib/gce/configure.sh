@@ -121,7 +121,7 @@ else
   pull_refs=$(fetch_metadata "${PULL_REFS_METADATA}")
   if [ ! -z "${pull_refs}" ]; then
     deploy_dir=$(echo "${pull_refs}" | sha1sum | awk '{print $1}')
-    deploy_path="${deploy_path}/${deploy_dir}"
+    deploy_path="${deploy_path}/containerd/${deploy_dir}"
   fi
 
   # TODO(random-liu): Put version into the metadata instead of
@@ -134,7 +134,7 @@ TARBALL_GCS_NAME="${pkg_prefix}-${version}.linux-amd64.tar.gz"
 # TARBALL_GCS_PATH is the path to download cri-containerd tarball for node e2e.
 TARBALL_GCS_PATH="https://storage.googleapis.com/${deploy_path}/${TARBALL_GCS_NAME}"
 # TARBALL is the name of the tarball after being downloaded.
-TARBALL="cri-containerd.tar.gz"
+TARBALL="containerd.tar.gz"
 # CONTAINERD_TAR_SHA1 is the sha1sum of containerd tarball.
 tar_sha1="${CONTAINERD_TAR_SHA1:-""}"
 
