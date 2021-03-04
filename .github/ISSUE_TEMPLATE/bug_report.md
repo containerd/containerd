@@ -30,10 +30,44 @@ Briefly describe the problem you are having in a few paragraphs.
 **Describe the results you expected:**
 
 
-**Output of `containerd --version`:**
+**What version of containerd are you using:**
 
 ```
-(paste your output here)
+$ containerd --version
+
 ```
 
-**Any other relevant information:**
+**Any other relevant information (runC version, CRI configuration, OS/Kernel version, etc.):**
+
+<!--
+Tips:
+
+* If containerd gets stuck on something and enables debug socket, `ctr pprof goroutines`
+  dumps the golang stack of containerd, which is helpful! If containerd runs
+  without debug socket, `kill -SIGUSR1 $(pidof containerd)` also dumps the stack
+  as well.
+
+* If there is something about running containerd, like consuming more CPU resources,
+  `ctr pprof` subcommands will help you to get some useful profiles. Enable debug
+  socket makes life easier.
+-->
+
+<details><summary><code>runc --version</code></summary><br><pre>
+$ runc --version
+
+</pre></details>
+
+<!--
+Show related configuration if it is related to CRI plugin.
+-->
+
+<details><summary><code>crictl info</code></summary><br><pre>
+$ crictl info
+
+</pre></details>
+
+
+<details><summary><code>uname -a</code></summary><br><pre>
+$ uname -a
+
+</pre></details>
