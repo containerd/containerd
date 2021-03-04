@@ -47,7 +47,6 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 	}
 
 	createdAt := time.Now().UnixNano()
-	startedAt := time.Now().UnixNano()
 
 	metadata := &containerstore.Metadata{
 		ID:        testID,
@@ -60,7 +59,6 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 	status := &containerstore.Status{
 		Pid:       1234,
 		CreatedAt: createdAt,
-		StartedAt: startedAt,
 	}
 	image := &imagestore.Image{
 		ID: imageID,
@@ -72,9 +70,8 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 	expected := &runtime.ContainerStatus{
 		Id:          testID,
 		Metadata:    config.GetMetadata(),
-		State:       runtime.ContainerState_CONTAINER_RUNNING,
+		State:       runtime.ContainerState_CONTAINER_CREATED,
 		CreatedAt:   createdAt,
-		StartedAt:   startedAt,
 		Image:       &runtime.ImageSpec{Image: "gcr.io/library/busybox:latest"},
 		ImageRef:    "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
 		Reason:      completeExitReason,
@@ -89,6 +86,7 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 
 func TestToCRIContainerStatus(t *testing.T) {
 	for desc, test := range map[string]struct {
+		startedAt      int64
 		finishedAt     int64
 		exitCode       int32
 		reason         string
@@ -96,10 +94,15 @@ func TestToCRIContainerStatus(t *testing.T) {
 		expectedState  runtime.ContainerState
 		expectedReason string
 	}{
+		"container created": {
+			expectedState: runtime.ContainerState_CONTAINER_CREATED,
+		},
 		"container running": {
+			startedAt:     time.Now().UnixNano(),
 			expectedState: runtime.ContainerState_CONTAINER_RUNNING,
 		},
 		"container exited with reason": {
+			startedAt:      time.Now().UnixNano(),
 			finishedAt:     time.Now().UnixNano(),
 			exitCode:       1,
 			reason:         "test-reason",
@@ -108,6 +111,7 @@ func TestToCRIContainerStatus(t *testing.T) {
 			expectedReason: "test-reason",
 		},
 		"container exited with exit code 0 without reason": {
+			startedAt:      time.Now().UnixNano(),
 			finishedAt:     time.Now().UnixNano(),
 			exitCode:       0,
 			message:        "test-message",
@@ -115,6 +119,7 @@ func TestToCRIContainerStatus(t *testing.T) {
 			expectedReason: completeExitReason,
 		},
 		"container exited with non-zero exit code without reason": {
+			startedAt:      time.Now().UnixNano(),
 			finishedAt:     time.Now().UnixNano(),
 			exitCode:       1,
 			message:        "test-message",
@@ -124,6 +129,7 @@ func TestToCRIContainerStatus(t *testing.T) {
 	} {
 		metadata, status, _, expected := getContainerStatusTestData()
 		// Update status with test case.
+		status.StartedAt = test.startedAt
 		status.FinishedAt = test.finishedAt
 		status.ExitCode = test.exitCode
 		status.Reason = test.reason
@@ -134,11 +140,12 @@ func TestToCRIContainerStatus(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		// Set expectation based on test case.
-		expected.State = test.expectedState
 		expected.Reason = test.expectedReason
+		expected.StartedAt = test.startedAt
 		expected.FinishedAt = test.finishedAt
 		expected.ExitCode = test.exitCode
 		expected.Message = test.message
+		patchExceptedWithState(expected, test.expectedState)
 		containerStatus := toCRIContainerStatus(container,
 			expected.Image,
 			expected.ImageRef)
@@ -166,19 +173,27 @@ func TestContainerStatus(t *testing.T) {
 	for desc, test := range map[string]struct {
 		exist         bool
 		imageExist    bool
+		startedAt     int64
 		finishedAt    int64
 		reason        string
 		expectedState runtime.ContainerState
 		expectErr     bool
 	}{
+		"container created": {
+			exist:         true,
+			imageExist:    true,
+			expectedState: runtime.ContainerState_CONTAINER_CREATED,
+		},
 		"container running": {
 			exist:         true,
 			imageExist:    true,
+			startedAt:     time.Now().UnixNano(),
 			expectedState: runtime.ContainerState_CONTAINER_RUNNING,
 		},
 		"container exited": {
 			exist:         true,
 			imageExist:    true,
+			startedAt:     time.Now().UnixNano(),
 			finishedAt:    time.Now().UnixNano(),
 			reason:        "test-reason",
 			expectedState: runtime.ContainerState_CONTAINER_EXITED,
@@ -198,6 +213,7 @@ func TestContainerStatus(t *testing.T) {
 		c := newTestCRIService()
 		metadata, status, image, expected := getContainerStatusTestData()
 		// Update status with test case.
+		status.StartedAt = test.startedAt
 		status.FinishedAt = test.finishedAt
 		status.Reason = test.reason
 		container, err := containerstore.NewContainer(
@@ -219,9 +235,20 @@ func TestContainerStatus(t *testing.T) {
 			continue
 		}
 		// Set expectation based on test case.
+		expected.StartedAt = test.startedAt
 		expected.FinishedAt = test.finishedAt
 		expected.Reason = test.reason
-		expected.State = test.expectedState
+		patchExceptedWithState(expected, test.expectedState)
 		assert.Equal(t, expected, resp.GetStatus())
+	}
+}
+
+func patchExceptedWithState(expected *runtime.ContainerStatus, state runtime.ContainerState) {
+	expected.State = state
+	switch state {
+	case runtime.ContainerState_CONTAINER_CREATED:
+		expected.StartedAt, expected.FinishedAt = 0, 0
+	case runtime.ContainerState_CONTAINER_RUNNING:
+		expected.FinishedAt = 0
 	}
 }
