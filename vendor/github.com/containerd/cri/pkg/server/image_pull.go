@@ -271,7 +271,7 @@ func (c *criService) getTLSConfig(registryTLSConfig criconfig.TLSConfig) (*tls.C
 		if len(cert.Certificate) != 0 {
 			tlsConfig.Certificates = []tls.Certificate{cert}
 		}
-		tlsConfig.BuildNameToCertificate()
+		tlsConfig.BuildNameToCertificate() // nolint:staticcheck
 	}
 
 	if registryTLSConfig.CAFile != "" {
