@@ -1,0 +1,32 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.3.9"
+
+pre_release = false
+
+preface = """\
+The tenth patch release for `containerd` 1.3 contains a fix for CVE-2021-21334
+along with various other minor issues. This is the final release for
+`containerd` 1.3.
+
+See [GHSA-36xw-fx78-c5r4](https://github.com/containerd/containerd/security/advisories/GHSA-36xw-fx78-c5r4)
+for more details related to CVE-2021-21334.
+
+### Notable Updates
+* **Fix container create in CRI to prevent possible environment variable leak between containers** [#1629](https://github.com/containerd/cri/pull/1629)
+* **Add bounds on max `oom_score_adj` value for shim's AdjustOOMScore** [#4875](https://github.com/containerd/containerd/pull/4875)
+* **Update task manager to use fresh context when calling shim shutdown** [#4930](https://github.com/containerd/containerd/pull/4930)
+* **Fix incorrect usage calculation** [#5126](https://github.com/containerd/containerd/pull/5126)
+
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
