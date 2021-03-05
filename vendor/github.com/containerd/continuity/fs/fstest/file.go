@@ -20,9 +20,9 @@ import (
 	"bytes"
 	"io"
 	"math/rand"
-	"net"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 )
 
@@ -158,11 +158,15 @@ func Link(oldname, newname string) Applier {
 func CreateSocket(name string, perm os.FileMode) Applier {
 	return applyFn(func(root string) error {
 		fullPath := filepath.Join(root, name)
-		ln, err := net.Listen("unix", fullPath)
+		fd, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
 		if err != nil {
 			return err
 		}
-		defer ln.Close()
+		defer syscall.Close(fd)
+		sa := &syscall.SockaddrUnix{Name: fullPath}
+		if err := syscall.Bind(fd, sa); err != nil {
+			return err
+		}
 		return os.Chmod(fullPath, perm)
 	})
 }

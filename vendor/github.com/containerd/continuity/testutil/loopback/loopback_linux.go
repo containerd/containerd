@@ -22,8 +22,8 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"syscall"
 	"strings"
+	"syscall"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -70,9 +70,9 @@ func New(size int64) (*Loopback, error) {
 	}
 
 	l := Loopback{
-		File: file.Name(),
+		File:   file.Name(),
 		Device: deviceName,
-		close: cleanup,
+		close:  cleanup,
 	}
 	return &l, nil
 }
@@ -83,7 +83,7 @@ type Loopback struct {
 	File string
 	// Device is /dev/loopX
 	Device string
-	close func() error
+	close  func() error
 }
 
 // SoftSize returns st_size
