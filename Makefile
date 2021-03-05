@@ -124,7 +124,7 @@ TESTFLAGS_PARALLEL ?= 8
 OUTPUTDIR = $(join $(ROOTDIR), _output)
 CRIDIR=$(OUTPUTDIR)/cri
 
-.PHONY: clean all AUTHORS build binaries test integration generate protos checkprotos coverage ci check help install uninstall vendor release mandir install-man genman install-cri-deps cri-release cri-cni-release cri-integration bin/cri-integration.test
+.PHONY: clean all AUTHORS build binaries test integration generate protos checkprotos coverage ci check help install uninstall vendor release mandir install-man genman install-cri-deps cri-release cri-cni-release cri-integration install-deps bin/cri-integration.test
 .DEFAULT: default
 
 all: binaries
@@ -263,6 +263,7 @@ release: releases/$(RELEASE).tar.gz
 	@echo "$(WHALE) $@"
 	@cd releases && sha256sum $(RELEASE).tar.gz >$(RELEASE).tar.gz.sha256sum
 
+# install of cri deps into release output directory
 ifeq ($(GOOS),windows)
 install-cri-deps: $(BINARIES)
 	mkdir -p $(CRIDIR)
@@ -344,6 +345,19 @@ uninstall:
 	@echo "$(WHALE) $@"
 	@rm -f $(addprefix $(DESTDIR)/bin/,$(notdir $(BINARIES)))
 
+#TODO(mikebrow): refactor install-critools and install-cni to work for local host and for release
+ifeq ($(GOOS),windows)
+install-deps:
+	script/setup/install-runc
+	#script/setup/install-critools
+	#script/setup/install-cni-windows
+else
+install-deps: ## install cri dependencies
+	script/setup/install-seccomp
+	script/setup/install-runc
+	#script/setup/install-critools
+	#script/setup/install-cni
+endif
 
 coverage: ## generate coverprofiles from the unit tests, except tests that require root
 	@echo "$(WHALE) $@"
@@ -374,7 +388,7 @@ root-coverage: ## generate coverage profiles for unit tests that require root
 		fi; \
 	done )
 
-vendor:
+vendor: ## vendor
 	@echo "$(WHALE) $@"
 	@go mod tidy
 	@go mod vendor
