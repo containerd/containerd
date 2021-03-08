@@ -54,7 +54,7 @@ func DefaultConfig() PluginConfig {
 			TLSKeyFile:  "",
 			TLSCertFile: "",
 		},
-		SandboxImage:            "mcr.microsoft.com/oss/kubernetes/pause:1.4.1",
+		SandboxImage:            "k8s.gcr.io/pause:3.4.1",
 		StatsCollectPeriod:      10,
 		MaxContainerLogLineSize: 16 * 1024,
 		Registry: Registry{
