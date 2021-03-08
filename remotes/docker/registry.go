@@ -56,6 +56,7 @@ const (
 	// Reserved for future capabilities (i.e. search, catalog, remove)
 )
 
+// Has checks whether the capabilities list has the provide capability
 func (c HostCapabilities) Has(t HostCapabilities) bool {
 	return c&t == t
 }

@@ -395,6 +395,7 @@ func (p *PoolDevice) SuspendDevice(ctx context.Context, deviceName string) error
 	return nil
 }
 
+// ResumeDevice resumes IO for the given device
 func (p *PoolDevice) ResumeDevice(ctx context.Context, deviceName string) error {
 	if err := p.transition(ctx, deviceName, Resuming, Resumed, func() error {
 		return dmsetup.ResumeDevice(deviceName)

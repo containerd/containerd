@@ -551,6 +551,7 @@ func (r *RuntimeService) ContainerStats(containerID string) (*runtimeapi.Contain
 	return resp.GetStats(), nil
 }
 
+// ListContainerStats lists all container stats given the provided filter
 func (r *RuntimeService) ListContainerStats(filter *runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error) {
 	klog.V(10).Infof("[RuntimeService] ListContainerStats (filter=%v)", filter)
 	// Do not set timeout, because writable layer stats collection takes time.
@@ -570,6 +571,7 @@ func (r *RuntimeService) ListContainerStats(filter *runtimeapi.ContainerStatsFil
 	return resp.GetStats(), nil
 }
 
+// ReopenContainerLog reopens the container log for the given container ID
 func (r *RuntimeService) ReopenContainerLog(containerID string) error {
 	klog.V(10).Infof("[RuntimeService] ReopenContainerLog (containerID=%v, timeout=%v)", containerID, r.timeout)
 	ctx, cancel := getContextWithTimeout(r.timeout)

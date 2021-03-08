@@ -65,7 +65,7 @@ type Type int
 const (
 	// Effective is CapEff
 	Effective Type = 1 << iota
-	// Effective is CapPrm
+	// Permitted is CapPrm
 	Permitted
 	// Inheritable is CapInh
 	Inheritable

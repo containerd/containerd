@@ -720,10 +720,12 @@ func (c *Client) Version(ctx context.Context) (Version, error) {
 	}, nil
 }
 
+// ServerInfo represents the introspected server information
 type ServerInfo struct {
 	UUID string
 }
 
+// Server returns server information from the introspection service
 func (c *Client) Server(ctx context.Context) (ServerInfo, error) {
 	c.connMu.Lock()
 	if c.conn == nil {
@@ -789,6 +791,8 @@ func CheckRuntime(current, expected string) bool {
 	return true
 }
 
+// GetSnapshotterSupportedPlatforms returns a platform matchers which represents the
+// supported platforms for the given snapshotters
 func (c *Client) GetSnapshotterSupportedPlatforms(ctx context.Context, snapshotterName string) (platforms.MatchComparer, error) {
 	filters := []string{fmt.Sprintf("type==%s, id==%s", plugin.SnapshotPlugin, snapshotterName)}
 	in := c.IntrospectionService()

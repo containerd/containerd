@@ -26,6 +26,7 @@ import (
 
 	"github.com/containerd/containerd/containers"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -40,6 +41,8 @@ func WithHostDevices(_ context.Context, _ Client, _ *containers.Container, s *Sp
 	s.Linux.Devices = append(s.Linux.Devices, devs...)
 	return nil
 }
+
+var errNotADevice = errors.New("not a device node")
 
 func getDevices(path string) ([]specs.LinuxDevice, error) {
 	files, err := ioutil.ReadDir(path)
@@ -69,7 +72,7 @@ func getDevices(path string) ([]specs.LinuxDevice, error) {
 		}
 		device, err := deviceFromPath(filepath.Join(path, f.Name()), "rwm")
 		if err != nil {
-			if err == ErrNotADevice {
+			if err == errNotADevice {
 				continue
 			}
 			if os.IsNotExist(err) {
@@ -94,7 +97,7 @@ func deviceFromPath(path, permissions string) (*specs.LinuxDevice, error) {
 		minor     = unix.Minor(devNumber)
 	)
 	if major == 0 {
-		return nil, ErrNotADevice
+		return nil, errNotADevice
 	}
 
 	var (

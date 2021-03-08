@@ -186,7 +186,7 @@ func removeLoop(loopdev string) error {
 	return err
 }
 
-// Attach a specified backing file to a loop device
+// AttachLoopDevice attaches a specified backing file to a loop device
 func AttachLoopDevice(backingFile string) (string, error) {
 	file, err := setupLoop(backingFile, LoopParams{})
 	if err != nil {
@@ -196,7 +196,7 @@ func AttachLoopDevice(backingFile string) (string, error) {
 	return file.Name(), nil
 }
 
-// Detach a loop device
+// DetachLoopDevice detaches the provided loop devices
 func DetachLoopDevice(devices ...string) error {
 	for _, dev := range devices {
 		if err := removeLoop(dev); err != nil {

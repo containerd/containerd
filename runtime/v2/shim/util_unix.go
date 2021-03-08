@@ -87,6 +87,7 @@ func AnonDialer(address string, timeout time.Duration) (net.Conn, error) {
 	return dialer.Dialer(socket(address).path(), timeout)
 }
 
+// AnonReconnectDialer returns a dialer for an existing socket on reconnection
 func AnonReconnectDialer(address string, timeout time.Duration) (net.Conn, error) {
 	return AnonDialer(address, timeout)
 }
