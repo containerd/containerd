@@ -22,6 +22,7 @@ import (
 	"os"
 
 	"github.com/BurntSushi/toml"
+	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/services/server"
 	srvconfig "github.com/containerd/containerd/services/server/config"
@@ -112,4 +113,19 @@ var configCommand = cli.Command{
 			},
 		},
 	},
+}
+
+func platformAgnosticDefaultConfig() *srvconfig.Config {
+	return &srvconfig.Config{
+		Version: 1,
+		Root:    defaults.DefaultRootDir,
+		State:   defaults.DefaultStateDir,
+		GRPC: srvconfig.GRPCConfig{
+			Address:        defaults.DefaultAddress,
+			MaxRecvMsgSize: defaults.DefaultMaxRecvMsgSize,
+			MaxSendMsgSize: defaults.DefaultMaxSendMsgSize,
+		},
+		DisabledPlugins: []string{},
+		RequiredPlugins: []string{},
+	}
 }
