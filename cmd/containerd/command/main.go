@@ -27,6 +27,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
@@ -80,7 +81,7 @@ can be used and modified as necessary as a custom configuration.`
 		cli.StringFlag{
 			Name:  "config,c",
 			Usage: "path to the configuration file",
-			Value: defaultConfigPath,
+			Value: filepath.Join(defaults.DefaultConfigDir, "config.toml"),
 		},
 		cli.StringFlag{
 			Name:  "log-level,l",
