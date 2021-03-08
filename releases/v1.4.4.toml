@@ -13,7 +13,7 @@ pre_release = false
 preface = """\
 The fourth patch release for `containerd` 1.4 contains a fix for CVE-2021-21334
 along with various other minor issues.
-See [GHSA-36xw-fx78-c5r4](https://github.com/containerd/containerd/security/advisories/GHSA-36xw-fx78-c5r4)
+See [GHSA-6g2q-w5j3-fwh4](https://github.com/containerd/containerd/security/advisories/GHSA-6g2q-w5j3-fwh4)
 for more details related to CVE-2021-21334.
 
 ### Notable Updates
