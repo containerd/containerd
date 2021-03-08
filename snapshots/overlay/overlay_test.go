@@ -173,12 +173,13 @@ func testOverlayOverlayMount(t *testing.T, newSnapshotter testsuite.SnapshotterF
 		upper = "upperdir=" + filepath.Join(bp, "fs")
 		lower = "lowerdir=" + getParents(ctx, o, root, "/tmp/layer2")[0]
 	)
-	for i, v := range []string{
-		"index=off",
-		work,
-		upper,
-		lower,
-	} {
+	var slice []string
+	if getIndexOff() {
+		slice = []string{"index=off", work, upper, lower}
+	} else {
+		slice = []string{work, upper, lower}
+	}
+	for i, v := range slice {
 		if m.Options[i] != v {
 			t.Errorf("expected %q but received %q", v, m.Options[i])
 		}
@@ -335,12 +336,30 @@ func testOverlayView(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	if m.Source != "overlay" {
 		t.Errorf("mount source should be overlay but received %q", m.Source)
 	}
-	if len(m.Options) != 2 {
-		t.Errorf("expected 1 additional mount option but got %d", len(m.Options))
+	if getIndexOff() {
+		if len(m.Options) != 2 {
+			t.Errorf("expected 1 additional mount option but got %d", len(m.Options))
+		}
+		lowers := getParents(ctx, o, root, "/tmp/view2")
+		expected = fmt.Sprintf("lowerdir=%s:%s", lowers[0], lowers[1])
+		if m.Options[1] != expected {
+			t.Errorf("expected option %q but received %q", expected, m.Options[0])
+		}
+	} else {
+		if len(m.Options) != 1 {
+			t.Errorf("expected 1 additional mount option but got %d", len(m.Options))
+		}
+		lowers := getParents(ctx, o, root, "/tmp/view2")
+		expected = fmt.Sprintf("lowerdir=%s:%s", lowers[0], lowers[1])
+		if m.Options[0] != expected {
+			t.Errorf("expected option %q but received %q", expected, m.Options[0])
+		}
 	}
-	lowers := getParents(ctx, o, root, "/tmp/view2")
-	expected = fmt.Sprintf("lowerdir=%s:%s", lowers[0], lowers[1])
-	if m.Options[1] != expected {
-		t.Errorf("expected option %q but received %q", expected, m.Options[0])
+}
+func getIndexOff() bool {
+	var indexOff bool
+	if _, err := os.Stat("/sys/module/overlay/parameters/index"); err == nil {
+		indexOff = true
 	}
+	return indexOff
 }
