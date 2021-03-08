@@ -19,6 +19,7 @@
 package apparmor
 
 import (
+	"bytes"
 	"context"
 	"io/ioutil"
 	"os"
@@ -78,4 +79,18 @@ func LoadDefaultProfile(name string) error {
 		return errors.Wrapf(err, "load apparmor profile %s", path)
 	}
 	return nil
+}
+
+// DumpDefaultProfiles dumps the default profile with the given name.
+func DumpDefaultProfile(name string) (string, error) {
+	p, err := loadData(name)
+	if err != nil {
+		return "", err
+	}
+
+	var buf bytes.Buffer
+	if err := generate(p, &buf); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }

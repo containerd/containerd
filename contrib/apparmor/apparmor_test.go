@@ -104,3 +104,16 @@ Copyright 2009-2018 Canonical Ltd.
 		}
 	}
 }
+
+func TestDumpDefaultProfile(t *testing.T) {
+	if _, err := getVersion(); err != nil {
+		t.Skipf("AppArmor not available: %+v", err)
+	}
+	name := "test-dump-default-profile"
+	prof, err := DumpDefaultProfile(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Generated profile %q", name)
+	t.Log(prof)
+}
