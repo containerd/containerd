@@ -258,6 +258,9 @@ type PluginConfig struct {
 	// present in /sys/fs/cgroup/cgroup.controllers.
 	// This helps with running rootless mode + cgroup v2 + systemd but without hugetlb delegation.
 	DisableHugetlbController bool `toml:"disable_hugetlb_controller" json:"disableHugetlbController"`
+	// DeviceOwnershipFromSecurityContext changes the default behavior of setting container devices uid/gid
+	// from CRI's SecurityContext (RunAsUser/RunAsGroup) instead of taking host's uid/gid. Defaults to false.
+	DeviceOwnershipFromSecurityContext bool `toml:"device_ownership_from_security_context" json:"device_ownership_from_security_context"`
 	// IgnoreImageDefinedVolumes ignores volumes defined by the image. Useful for better resource
 	// isolation, security and early detection of issues in the mount configuration when using
 	// ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
