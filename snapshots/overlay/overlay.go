@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/continuity/fs"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // SnapshotterConfig is used to configure the overlay snapshotter instance
@@ -57,6 +58,7 @@ type snapshotter struct {
 	ms          *storage.MetaStore
 	asyncRemove bool
 	indexOff    bool
+	userxattr   bool // whether to enable "userxattr" mount option
 }
 
 // NewSnapshotter returns a Snapshotter which uses overlayfs. The overlayfs
@@ -95,11 +97,18 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		indexOff = true
 	}
 
+	// figure out whether "userxattr" option is recognized by the kernel && needed
+	userxattr, err := NeedsUserXAttr(root)
+	if err != nil {
+		logrus.WithError(err).Warnf("cannot detect whether \"userxattr\" option needs to be used, assuming to be %v", userxattr)
+	}
+
 	return &snapshotter{
 		root:        root,
 		ms:          ms,
 		asyncRemove: config.asyncRemove,
 		indexOff:    indexOff,
+		userxattr:   userxattr,
 	}, nil
 }
 
@@ -462,6 +471,10 @@ func (o *snapshotter) mounts(s storage.Snapshot) []mount.Mount {
 	// set index=off when mount overlayfs
 	if o.indexOff {
 		options = append(options, "index=off")
+	}
+
+	if o.userxattr {
+		options = append(options, "userxattr")
 	}
 
 	if s.Kind == snapshots.KindActive {
