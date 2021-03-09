@@ -345,18 +345,17 @@ uninstall:
 	@echo "$(WHALE) $@"
 	@rm -f $(addprefix $(DESTDIR)/bin/,$(notdir $(BINARIES)))
 
-#TODO(mikebrow): refactor install-critools and install-cni to work for local host and for release
 ifeq ($(GOOS),windows)
 install-deps:
 	script/setup/install-runc
-	#script/setup/install-critools
-	#script/setup/install-cni-windows
+	script/setup/install-critools
+	script/setup/install-cni-windows
 else
 install-deps: ## install cri dependencies
 	script/setup/install-seccomp
 	script/setup/install-runc
-	#script/setup/install-critools
-	#script/setup/install-cni
+	script/setup/install-critools
+	script/setup/install-cni
 endif
 
 coverage: ## generate coverprofiles from the unit tests, except tests that require root

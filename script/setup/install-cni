@@ -25,8 +25,9 @@ CNI_COMMIT=$(grep containernetworking/plugins "$GOPATH"/src/github.com/container
 CNI_DIR=${DESTDIR:=''}/opt/cni
 CNI_CONFIG_DIR=${DESTDIR}/etc/cni/net.d
 
-git clone https://github.com/containernetworking/plugins.git "$GOPATH"/src/github.com/containernetworking/plugins
-cd "$GOPATH"/src/github.com/containernetworking/plugins
+TMPROOT=$(mktemp -d)
+git clone https://github.com/containernetworking/plugins.git "${TMPROOT}"/plugins
+pushd "${TMPROOT}"/plugins
 git checkout $CNI_COMMIT
 ./build_linux.sh
 mkdir -p $CNI_DIR
@@ -66,3 +67,6 @@ cat << EOF | tee $CNI_CONFIG_DIR/10-containerd-net.conflist
   ]
 }
 EOF
+
+popd
+rm -fR "${TMPROOT}"
