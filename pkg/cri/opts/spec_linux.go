@@ -39,6 +39,7 @@ import (
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
+	ann "github.com/containerd/containerd/pkg/cri/annotations"
 	"github.com/containerd/containerd/pkg/cri/util"
 	osinterface "github.com/containerd/containerd/pkg/os"
 )
@@ -285,6 +286,44 @@ func ensureSharedOrSlave(path string, lookupMount func(string) (mount.Info, erro
 	return errors.Errorf("path %q is mounted on %q but it is not a shared or slave mount", path, mountInfo.Mountpoint)
 }
 
+func disableDeviceOwnershipFromSecurityContext(annotations map[string]string) bool {
+	if v, ok := annotations[ann.DisableDeviceOwnershipFromSecurityContext]; ok {
+		if v == "true" {
+			return true
+		}
+	}
+	return false
+}
+
+// getDeviceUID() and getDeviceGID() are used to find the right
+// uid/gid values for the device node created in the container
+// namespace. The runtime executes mknod() and chmod()s the created
+// device with the values returned here.
+//
+// On Linux, uid and gid are sufficient and the user/groupname do not
+// need to be resolved.
+//
+// TODO(mythi): In case of user namespaces, the runtime simply bind
+// mounts the the devices from the host. Additional logic is needed
+// to check that the runtimes effective UID/GID on the host has the
+// permissions to access the device node and/or the right user namespace
+// mappings are created.
+//
+// Ref: https://github.com/kubernetes/kubernetes/issues/92211
+func getDeviceUID(config *runtime.ContainerConfig) int64 {
+	if userval := config.GetLinux().GetSecurityContext().GetRunAsUser(); userval != nil {
+		return userval.GetValue()
+	}
+	return 0
+}
+
+func getDeviceGID(config *runtime.ContainerConfig) int64 {
+	if groupval := config.GetLinux().GetSecurityContext().GetRunAsGroup(); groupval != nil {
+		return groupval.GetValue()
+	}
+	return 0
+}
+
 // WithDevices sets the provided devices onto the container spec
 func WithDevices(osi osinterface.OS, config *runtime.ContainerConfig) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
@@ -295,13 +334,22 @@ func WithDevices(osi osinterface.OS, config *runtime.ContainerConfig) oci.SpecOp
 			s.Linux.Resources = &runtimespec.LinuxResources{}
 		}
 
+		deviceOwnership := ""
+		if !disableDeviceOwnershipFromSecurityContext(config.GetAnnotations()) {
+			UID := getDeviceUID(config)
+			GID := getDeviceGID(config)
+			if UID > 0 && GID > 0 {
+				deviceOwnership = fmt.Sprintf("%d:%d", UID, GID)
+			}
+		}
+
 		for _, device := range config.GetDevices() {
 			path, err := osi.ResolveSymbolicLink(device.HostPath)
 			if err != nil {
 				return err
 			}
 
-			o := oci.WithDevices(path, device.ContainerPath, device.Permissions)
+			o := oci.WithDevices(path, device.ContainerPath, device.Permissions, deviceOwnership)
 			if err := o(ctx, client, c, s); err != nil {
 				return err
 			}
