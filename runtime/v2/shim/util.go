@@ -70,7 +70,7 @@ func Command(ctx context.Context, runtime, containerdAddress, containerdTTRPCAdd
 		}
 
 		if cmdPath == "" {
-			if cmdPath, lerr = exec.LookPath(name); err != nil {
+			if cmdPath, lerr = exec.LookPath(name); lerr != nil {
 				if eerr, ok := lerr.(*exec.Error); ok {
 					if eerr.Err == exec.ErrNotFound {
 						// LookPath only finds current directory matches based on
