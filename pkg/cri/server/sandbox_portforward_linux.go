@@ -62,12 +62,24 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 	log.G(ctx).Infof("Executing port forwarding in network namespace %q", netNSPath)
 	err = netNSDo(func(_ ns.NetNS) error {
 		defer stream.Close()
-		// TODO: hardcoded to tcp4 because localhost resolves to ::1 by default if the system has IPv6 enabled.
-		// Theoretically happy eyeballs will try IPv6 first and fallback to IPv4
-		// but resolving localhost doesn't seem to return and IPv4 address, thus failing the connection.
+		// localhost can resolve to both IPv4 and IPv6 addresses in dual-stack systems
+		// but the application can be listening in one of the IP families only.
+		// golang has enabled RFC 6555 Fast Fallback (aka HappyEyeballs) by default in 1.12
+		// It means that if a host resolves to both IPv6 and IPv4, it will try to connect to any
+		// of those addresses and use the working connection.
+		// However, the implementation uses go routines to start both connections in parallel,
+		// and this cases that the connection is done outside the namespace, so we try to connect
+		// serially.
+		// We try IPv4 first to keep current behavior and we fallback to IPv6 if the connection fails.
+		// xref https://github.com/golang/go/issues/44922
+		var conn net.Conn
 		conn, err := net.Dial("tcp4", fmt.Sprintf("localhost:%d", port))
 		if err != nil {
-			return errors.Wrapf(err, "failed to dial %d", port)
+			var errV6 error
+			conn, errV6 = net.Dial("tcp6", fmt.Sprintf("localhost:%d", port))
+			if errV6 != nil {
+				return fmt.Errorf("failed to connect to localhost:%d inside namespace %q, IPv4: %v IPv6 %v ", port, id, err, errV6)
+			}
 		}
 		defer conn.Close()
 
