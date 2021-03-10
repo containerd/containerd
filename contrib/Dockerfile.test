@@ -36,7 +36,7 @@ RUN apt-get update && apt-get install -y \
     libseccomp-dev \
   --no-install-recommends
 
-COPY script/setup/install-runc install-runc
+COPY script/setup/runc-version script/setup/install-runc ./
 # Allow overriding the version of runc to install through build-args
 ARG RUNC_VERSION
 ARG GOPROXY=direct
