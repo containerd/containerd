@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
@@ -155,6 +156,10 @@ func (m *TaskManager) Create(ctx context.Context, id string, opts runtime.Create
 			defer cancel()
 			_, errShim := shim.Delete(dctx)
 			if errShim != nil {
+				if errdefs.IsDeadlineExceeded(errShim) {
+					dctx, cancel = timeout.WithContext(context.Background(), cleanupTimeout)
+					defer cancel()
+				}
 				shim.Shutdown(dctx)
 				shim.Close()
 			}
