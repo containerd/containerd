@@ -115,6 +115,12 @@ func fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc
 		return err
 	}
 
+	if desc.Size == 0 {
+		// most likely a poorly configured registry/web front end which responded with no
+		// Content-Length header; unable (not to mention useless) to commit a 0-length entry
+		// into the content store. Error out here otherwise the error sent back is confusing
+		return errors.Wrapf(errdefs.ErrInvalidArgument, "unable to fetch descriptor (%s) which reports content size of zero", desc.Digest)
+	}
 	if ws.Offset == desc.Size {
 		// If writer is already complete, commit and return
 		err := cw.Commit(ctx, desc.Size, desc.Digest)
