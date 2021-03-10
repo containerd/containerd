@@ -45,7 +45,7 @@ func LoadBundle(ctx context.Context, root, id string) (*Bundle, error) {
 }
 
 // NewBundle returns a new bundle on disk
-func NewBundle(ctx context.Context, root, state, id string, spec []byte) (b *Bundle, err error) {
+func NewBundle(ctx context.Context, root, state, id string, spec []byte) (b *Bundle, retErr error) {
 	if err := identifiers.Validate(id); err != nil {
 		return nil, errors.Wrapf(err, "invalid task id %s", id)
 	}
@@ -62,7 +62,7 @@ func NewBundle(ctx context.Context, root, state, id string, spec []byte) (b *Bun
 	}
 	var paths []string
 	defer func() {
-		if err != nil {
+		if retErr != nil {
 			for _, d := range paths {
 				os.RemoveAll(d)
 			}
