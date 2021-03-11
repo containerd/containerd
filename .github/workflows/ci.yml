@@ -369,7 +369,8 @@ jobs:
           path: ~/.vagrant.d/boxes
           key: vagrant-${{ hashFiles('Vagrantfile*') }}
 
-      - run: |
+      - name: Vagrant start
+        run: |
           # Retry if it fails (download.fedoraproject.org returns 404 sometimes)
           vagrant up || vagrant up
 
