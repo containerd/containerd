@@ -82,15 +82,19 @@ version = 2
 	deadline := begin.Add(interval).Add(epsilon)
 	for time.Now().Before(deadline) {
 		status, err := task.Status(ctx)
+		now := time.Now()
 		if err != nil {
-			t.Fatal(err)
-		}
-		t.Logf("%v: status=%q", time.Now(), status)
+			// ErrNotFound is expected here, because the restart monitor
+			// temporarily removes the task before restarting.
+			t.Logf("%v: err=%v", now, err)
+		} else {
+			t.Logf("%v: status=%q", now, status)
 
-		if status.Status == Running {
-			elapsed := time.Since(begin)
-			t.Logf("the task was restarted after %s", elapsed.String())
-			return
+			if status.Status == Running {
+				elapsed := time.Since(begin)
+				t.Logf("the task was restarted within %s", elapsed.String())
+				return
+			}
 		}
 		time.Sleep(epsilon)
 	}
