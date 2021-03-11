@@ -27,10 +27,10 @@ function install_runc() {
 	: "${RUNC_VERSION:=$(cat "${script_dir}/runc-version")}"
 
 	TMPROOT=$(mktemp -d)
-	git clone https://github.com/opencontainers/runc.git "${TMPROOT}"/runc
-	pushd "${TMPROOT}"/runc
+	git clone https://github.com/opencontainers/runc.git "${TMPROOT}"/src/github.com/opencontainers/runc
+	pushd "${TMPROOT}"/src/github.com/opencontainers/runc
 	git checkout "${RUNC_VERSION}"
-	make BUILDTAGS='seccomp' runc
+	GOPATH="${TMPROOT}" GO111MODULE=off make BUILDTAGS='seccomp' runc
 
 	USESUDO=${USESUDO:-false}
 	if ${USESUDO}; then
