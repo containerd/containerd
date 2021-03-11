@@ -347,7 +347,7 @@ uninstall:
 
 ifeq ($(GOOS),windows)
 install-deps:
-	script/setup/install-runc
+	# TODO: need a script for hcshim something like containerd/cri/hack/install/windows/install-hcsshim.sh
 	script/setup/install-critools
 	script/setup/install-cni-windows
 else
