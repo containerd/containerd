@@ -270,9 +270,24 @@ func (c *criService) containerSpec(
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
 	}
 
+	// Default target PID namespace is the sandbox PID.
+	targetPid := sandboxPid
+	// If the container targets another container's PID namespace,
+	// set targetPid to the PID of that container.
+	nsOpts := securityContext.GetNamespaceOptions()
+	if nsOpts.GetPid() == runtime.NamespaceMode_TARGET {
+		targetContainer, err := c.validateTargetContainer(sandboxID, nsOpts.TargetId)
+		if err != nil {
+			return nil, errors.Wrapf(err, "invalid target container")
+		}
+
+		status := targetContainer.Status.Get()
+		targetPid = status.Pid
+	}
+
 	specOpts = append(specOpts,
 		customopts.WithOOMScoreAdj(config, c.config.RestrictOOMScoreAdj),
-		customopts.WithPodNamespaces(securityContext, sandboxPid),
+		customopts.WithPodNamespaces(securityContext, sandboxPid, targetPid),
 		customopts.WithSupplementalGroups(supplementalGroups),
 		customopts.WithAnnotation(annotations.ContainerType, annotations.ContainerTypeContainer),
 		customopts.WithAnnotation(annotations.SandboxID, sandboxID),
