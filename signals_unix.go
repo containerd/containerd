@@ -31,6 +31,14 @@ import (
 // the rawSignal can be a string with "SIG" prefix,
 // or a signal number in string format.
 func ParseSignal(rawSignal string) (syscall.Signal, error) {
+	return parseSignalUnix(rawSignal)
+}
+
+func ParsePlatformSignal(rawSignal string, _ string) (syscall.Signal, error) {
+	return parseSignalUnix(rawSignal)
+}
+
+func parseSignalUnix(rawSignal string) (syscall.Signal, error) {
 	s, err := strconv.Atoi(rawSignal)
 	if err == nil {
 		return syscall.Signal(s), nil
