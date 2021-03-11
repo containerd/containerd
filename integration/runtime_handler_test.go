@@ -19,6 +19,7 @@
 package integration
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,31 +27,32 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
-// TODO(chrisfegly): add/update test(s) to allow testing of multiple runtimes at the same time
-func TestRuntimeHandler(t *testing.T) {
-	t.Logf("Create a sandbox")
-	sbConfig := PodSandboxConfig("sandbox", "test-runtime-handler")
+func TestRuntimes(t *testing.T) {
+	runtimes := []string{*runtimeHandler, "runc"}
+	for idx, rt := range runtimes {
+		t.Logf("Create a sandbox")
+		sbConfig := PodSandboxConfig(fmt.Sprintf("sandbox-%d", idx), fmt.Sprintf("test-runtime-handler-%d", idx))
+		if rt == "" {
+			t.Logf("The --runtime-handler flag value is empty which results internally to setting the default runtime")
+		} else {
+			t.Logf("The --runtime-handler flag value is %s", rt)
+		}
+		sb, err := runtimeService.RunPodSandbox(sbConfig, rt)
+		require.NoError(t, err)
+		defer func() {
+			// Make sure the sandbox is cleaned up in any case.
+			runtimeService.StopPodSandbox(sb)
+			runtimeService.RemovePodSandbox(sb)
+		}()
 
-	if *runtimeHandler == "" {
-		t.Logf("The --runtime-handler flag value is empty which results internally to setting the default runtime")
-	} else {
-		t.Logf("The --runtime-handler flag value is %s", *runtimeHandler)
+		t.Logf("Verify runtimeService.PodSandboxStatus() returns previously set runtimeHandler")
+		sbStatus, err := runtimeService.PodSandboxStatus(sb)
+		require.NoError(t, err)
+		assert.Equal(t, rt, sbStatus.RuntimeHandler)
+
+		t.Logf("Verify runtimeService.ListPodSandbox() returns previously set runtimeHandler")
+		sandboxes, err := runtimeService.ListPodSandbox(&runtime.PodSandboxFilter{})
+		require.NoError(t, err)
+		assert.Equal(t, rt, sandboxes[idx].RuntimeHandler)
 	}
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		// Make sure the sandbox is cleaned up in any case.
-		runtimeService.StopPodSandbox(sb)
-		runtimeService.RemovePodSandbox(sb)
-	}()
-
-	t.Logf("Verify runtimeService.PodSandboxStatus() returns previously set runtimeHandler")
-	sbStatus, err := runtimeService.PodSandboxStatus(sb)
-	require.NoError(t, err)
-	assert.Equal(t, *runtimeHandler, sbStatus.RuntimeHandler)
-
-	t.Logf("Verify runtimeService.ListPodSandbox() returns previously set runtimeHandler")
-	sandboxes, err := runtimeService.ListPodSandbox(&runtime.PodSandboxFilter{})
-	require.NoError(t, err)
-	assert.Equal(t, *runtimeHandler, sandboxes[0].RuntimeHandler)
 }
