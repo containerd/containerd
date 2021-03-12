@@ -331,12 +331,6 @@ func (p *PoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName string
 		}
 	}()
 
-	// Save snapshot metadata and allocate new device ID
-	metaErr = p.metadata.AddDevice(ctx, snapInfo)
-	if metaErr != nil {
-		return metaErr
-	}
-
 	// The base device must be suspend before taking a snapshot to
 	// avoid corruption.
 	// https://github.com/torvalds/linux/blob/v5.7/Documentation/admin-guide/device-mapper/thin-provisioning.rst#internal-snapshots
@@ -352,6 +346,12 @@ func (p *PoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName string
 				log.G(ctx).WithError(err).Errorf("failed to resume base device %q after taking its snapshot", baseInfo.Name)
 			}
 		}()
+	}
+
+	// Save snapshot metadata and allocate new device ID
+	metaErr = p.metadata.AddDevice(ctx, snapInfo)
+	if metaErr != nil {
+		return metaErr
 	}
 
 	// Create thin device snapshot

@@ -21,13 +21,16 @@
 set -eu -o pipefail
 
 function install_runc() {
-	RUNC_COMMIT=$(grep opencontainers/runc "$GOPATH"/src/github.com/containerd/containerd/go.mod | awk '{print $2}')
+	script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
+
+	# When updating runc-version, consider updating the runc module in go.mod as well
+	: "${RUNC_VERSION:=$(cat "${script_dir}/runc-version")}"
 
 	TMPROOT=$(mktemp -d)
 	git clone https://github.com/opencontainers/runc.git "${TMPROOT}"/runc
 	pushd "${TMPROOT}"/runc
-	git checkout "${RUNC_COMMIT}"
-	make BUILDTAGS='apparmor seccomp selinux' runc
+	git checkout "${RUNC_VERSION}"
+	make
 	make install
 	popd
 	rm -fR "${TMPROOT}"

@@ -357,7 +357,7 @@ func TestImagePullSomePlatforms(t *testing.T) {
 		opts = append(opts, WithPlatform(platform))
 	}
 
-	img, err := client.Fetch(ctx, "k8s.gcr.io/pause:3.1", opts...)
+	img, err := client.Fetch(ctx, "k8s.gcr.io/pause:3.4.1", opts...)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -131,25 +131,13 @@ func (s *store) ReaderAt(ctx context.Context, desc ocispec.Descriptor) (content.
 	if err != nil {
 		return nil, errors.Wrapf(err, "calculating blob path for ReaderAt")
 	}
-	fi, err := os.Stat(p)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return nil, err
-		}
 
-		return nil, errors.Wrapf(errdefs.ErrNotFound, "blob %s expected at %s", desc.Digest, p)
+	reader, err := OpenReader(p)
+	if err != nil {
+		return nil, errors.Wrapf(err, "blob %s expected at %s", desc.Digest, p)
 	}
 
-	fp, err := os.Open(p)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return nil, err
-		}
-
-		return nil, errors.Wrapf(errdefs.ErrNotFound, "blob %s expected at %s", desc.Digest, p)
-	}
-
-	return sizeReaderAt{size: fi.Size(), fp: fp}, nil
+	return reader, nil
 }
 
 // Delete removes a blob by its digest.

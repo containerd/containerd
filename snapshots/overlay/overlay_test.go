@@ -2,13 +2,10 @@
 
 /*
    Copyright The containerd Authors.
-
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
-
        http://www.apache.org/licenses/LICENSE-2.0
-
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -32,6 +29,11 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/containerd/snapshots/testsuite"
+)
+
+var (
+	indexOff     bool
+	indexOffOnce sync.Once
 )
 
 func newSnapshotterWithOpts(opts ...Opt) testsuite.SnapshotterFunc {
@@ -174,7 +176,8 @@ func testOverlayOverlayMount(t *testing.T, newSnapshotter testsuite.SnapshotterF
 		lower = "lowerdir=" + getParents(ctx, o, root, "/tmp/layer2")[0]
 	)
 	var slice []string
-	if getIndexOff() {
+	indexOffOnce.Do(getIndexOff)
+	if indexOff {
 		slice = []string{"index=off", work, upper, lower}
 	} else {
 		slice = []string{work, upper, lower}
@@ -336,7 +339,8 @@ func testOverlayView(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	if m.Source != "overlay" {
 		t.Errorf("mount source should be overlay but received %q", m.Source)
 	}
-	if getIndexOff() {
+	indexOffOnce.Do(getIndexOff)
+	if indexOff {
 		if len(m.Options) != 2 {
 			t.Errorf("expected 1 additional mount option but got %d", len(m.Options))
 		}
@@ -356,10 +360,8 @@ func testOverlayView(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 		}
 	}
 }
-func getIndexOff() bool {
-	var indexOff bool
+func getIndexOff() {
 	if _, err := os.Stat("/sys/module/overlay/parameters/index"); err == nil {
 		indexOff = true
 	}
-	return indexOff
 }

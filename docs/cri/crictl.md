@@ -59,29 +59,28 @@ command. With the load command you inject a container image into the container
 runtime from a file. First you need to create a container image tarball. For
 example to create an image tarball for a pause container using Docker:
 ```console
-$ docker pull k8s.gcr.io/pause-amd64:3.2
-  3.2: Pulling from pause-amd64
+$ docker pull k8s.gcr.io/pause:3.4.1
+  3.4.1: Pulling from pause
   67ddbfb20a22: Pull complete
-  Digest: sha256:59eec8837a4d942cc19a52b8c09ea75121acc38114a2c68b98983ce9356b8610
-  Status: Downloaded newer image for k8s.gcr.io/pause-amd64:3.2
-$ docker save k8s.gcr.io/pause-amd64:3.2 -o pause.tar
+  Digest: sha256:6c3835cab3980f11b83277305d0d736051c32b17606f5ec59f1dda67c9ba3810
+  Status: Downloaded newer image for k8s.gcr.io/pause:3.4.1
+$ docker save k8s.gcr.io/pause:3.4.1 -o pause.tar
 ```
-Then use [`ctr`](https://github.com/containerd/containerd/blob/master/docs/man/ctr.1.md)
-to load the container image into the container runtime:
+Then use `ctr` to load the container image into the container runtime:
 ```console
 # The cri plugin uses the "k8s.io" containerd namespace.
 $ sudo ctr -n=k8s.io images import pause.tar
-  Loaded image: k8s.gcr.io/pause-amd64:3.2
+  Loaded image: k8s.gcr.io/pause:3.4.1
 ```
 List images and inspect the pause image:
 ```console
 $ sudo crictl images
 IMAGE                       TAG                 IMAGE ID            SIZE
 docker.io/library/busybox   latest              f6e427c148a76       728kB
-k8s.gcr.io/pause-amd64      3.2                 da86e6ba6ca19       746kB
-$ sudo crictl inspecti da86e6ba6ca19
+k8s.gcr.io/pause            3.4.1               0f8457a4c2eca       686kB
+$ sudo crictl inspecti 0f8457a4c2eca
   ... displays information about the pause image.
-$ sudo crictl inspecti k8s.gcr.io/pause-amd64:3.2
+$ sudo crictl inspecti k8s.gcr.io/pause:3.4.1
   ... displays information about the pause image.
 ```
 
@@ -201,7 +200,7 @@ $ crictl info
       }
     },
     "streamServerPort": "10010",
-    "sandboxImage": "k8s.gcr.io/pause:3.2",
+    "sandboxImage": "k8s.gcr.io/pause:3.4.1",
     "statsCollectPeriod": 10,
     "containerdRootDir": "/var/lib/containerd",
     "containerdEndpoint": "unix:///run/containerd/containerd.sock",
