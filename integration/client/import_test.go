@@ -28,6 +28,7 @@ import (
 	"runtime"
 	"testing"
 
+	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/archive/tartest"
 	"github.com/containerd/containerd/images"

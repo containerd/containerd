@@ -23,6 +23,7 @@ import (
 	"sync"
 	"syscall"
 
+	. "github.com/containerd/containerd"
 	"github.com/pkg/errors"
 )
 

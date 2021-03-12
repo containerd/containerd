@@ -85,7 +85,6 @@ SHIM_GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version
 
 # Project packages.
 PACKAGES=$(shell go list ${GO_TAGS} ./... | grep -v /vendor/ | grep -v /integration)
-INTEGRATION_PACKAGE=${PKG}
 TEST_REQUIRES_ROOT_PACKAGES=$(filter \
     ${PACKAGES}, \
     $(shell \
@@ -171,15 +170,15 @@ build: ## build the go packages
 
 test: ## run tests, except integration tests and tests that require root
 	@echo "$(WHALE) $@"
-	@go test ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES})
+	@go test ${TESTFLAGS} ${PACKAGES}
 
 root-test: ## run tests, except integration tests
 	@echo "$(WHALE) $@"
-	@go test ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES}) -test.root
+	@go test ${TESTFLAGS} ${TEST_REQUIRES_ROOT_PACKAGES} -test.root
 
 integration: ## run integration tests
 	@echo "$(WHALE) $@"
-	@go test ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL}
+	@cd "${ROOTDIR}/integration/client" && go mod download && go test -v ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL} .
 
 # TODO integrate cri integration bucket with coverage
 bin/cri-integration.test:
@@ -348,8 +347,8 @@ uninstall:
 coverage: ## generate coverprofiles from the unit tests, except tests that require root
 	@echo "$(WHALE) $@"
 	@rm -f coverage.txt
-	@go test -i ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES}) 2> /dev/null
-	@( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES}); do \
+	@go test -i ${TESTFLAGS} ${PACKAGES} 2> /dev/null
+	@( for pkg in ${PACKAGES}; do \
 		go test ${TESTFLAGS} \
 			-cover \
 			-coverprofile=profile.out \
@@ -362,8 +361,8 @@ coverage: ## generate coverprofiles from the unit tests, except tests that requi
 
 root-coverage: ## generate coverage profiles for unit tests that require root
 	@echo "$(WHALE) $@"
-	@go test -i ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES}) 2> /dev/null
-	@( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES}); do \
+	@go test -i ${TESTFLAGS} ${TEST_REQUIRES_ROOT_PACKAGES} 2> /dev/null
+	@( for pkg in ${TEST_REQUIRES_ROOT_PACKAGES}; do \
 		go test ${TESTFLAGS} \
 			-cover \
 			-coverprofile=profile.out \

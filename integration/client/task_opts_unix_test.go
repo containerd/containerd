@@ -22,6 +22,7 @@ import (
 	"context"
 	"testing"
 
+	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 )
 

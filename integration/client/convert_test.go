@@ -19,6 +19,7 @@ package containerd
 import (
 	"testing"
 
+	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/images/converter"
 	"github.com/containerd/containerd/images/converter/uncompress"

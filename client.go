@@ -226,6 +226,10 @@ func (c *Client) Reconnect() error {
 	return nil
 }
 
+func (c *Client) Runtime() string {
+	return c.runtime
+}
+
 // IsServing returns true if the client can successfully connect to the
 // containerd daemon and the healthcheck service returns the SERVING
 // response.

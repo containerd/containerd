@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
 )

@@ -22,6 +22,7 @@ import (
 	"runtime"
 	"testing"
 
+	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/platforms"
 )
 

@@ -28,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
@@ -514,7 +515,7 @@ func TestDefaultRuntimeWithNamespaceLabels(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer testClient.Close()
-	if testClient.runtime != testRuntime {
+	if testClient.Runtime() != testRuntime {
 		t.Error("failed to set default runtime from namespace labels")
 	}
 }

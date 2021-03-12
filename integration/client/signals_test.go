@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"syscall"
 	"testing"
+
+	. "github.com/containerd/containerd"
 )
 
 func TestParseSignal(t *testing.T) {
