@@ -20,6 +20,7 @@ package v2
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/containerd/fifo"
@@ -41,6 +42,9 @@ func TestCheckCopyShimLogError(t *testing.T) {
 		t.Fatalf("should return nil when error is ErrReadClosed after context is done, but %v", err)
 	}
 	if err := checkCopyShimLogError(ctx, nil); err != nil {
+		t.Fatalf("should return the actual error after context is done, but %v", err)
+	}
+	if err := checkCopyShimLogError(ctx, os.ErrClosed); err != nil {
 		t.Fatalf("should return the actual error after context is done, but %v", err)
 	}
 	if err := checkCopyShimLogError(ctx, fifo.ErrRdFrmWRONLY); err != fifo.ErrRdFrmWRONLY {

@@ -84,7 +84,7 @@ func loadShim(ctx context.Context, bundle *Bundle, events *exchange.Exchange, rt
 	}()
 	f, err := openShimLog(shimCtx, bundle, client.AnonReconnectDialer)
 	if err != nil {
-		return nil, errors.Wrap(err, "open shim log pipe")
+		return nil, errors.Wrap(err, "open shim log pipe when reload")
 	}
 	defer func() {
 		if err != nil {
@@ -96,13 +96,10 @@ func loadShim(ctx context.Context, bundle *Bundle, events *exchange.Exchange, rt
 	// copy the shim's logs to containerd's output
 	go func() {
 		defer f.Close()
-		if _, err := io.Copy(os.Stderr, f); err != nil {
-			// When using a multi-container shim the 2nd to Nth container in the
-			// shim will not have a separate log pipe. Ignore the failure log
-			// message here when the shim connect times out.
-			if !errors.Is(err, os.ErrNotExist) {
-				log.G(ctx).WithError(err).Error("copy shim log")
-			}
+		_, err := io.Copy(os.Stderr, f)
+		err = checkCopyShimLogError(ctx, err)
+		if err != nil {
+			log.G(ctx).WithError(err).Error("copy shim log after reload")
 		}
 	}()
 	onCloseWithShimLog := func() {
