@@ -226,6 +226,7 @@ func (c *Client) Reconnect() error {
 	return nil
 }
 
+// Runtime returns the name of the runtime being used
 func (c *Client) Runtime() string {
 	return c.runtime
 }
