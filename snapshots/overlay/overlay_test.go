@@ -2,13 +2,10 @@
 
 /*
    Copyright The containerd Authors.
-
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
-
        http://www.apache.org/licenses/LICENSE-2.0
-
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"testing"
 
@@ -32,6 +30,11 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/containerd/snapshots/testsuite"
+)
+
+var (
+	indexOff     bool
+	indexOffOnce sync.Once
 )
 
 func newSnapshotterWithOpts(opts ...Opt) testsuite.SnapshotterFunc {
@@ -173,12 +176,28 @@ func testOverlayOverlayMount(t *testing.T, newSnapshotter testsuite.SnapshotterF
 		upper = "upperdir=" + filepath.Join(bp, "fs")
 		lower = "lowerdir=" + getParents(ctx, o, root, "/tmp/layer2")[0]
 	)
-	for i, v := range []string{
-		"index=off",
+
+	expected := []string{}
+	indexOffOnce.Do(getIndexOff)
+	if indexOff {
+		expected = []string{
+			"index=off",
+		}
+	}
+	if userxattr, err := NeedsUserXAttr(root); err != nil {
+		t.Fatal(err)
+	} else if userxattr {
+		t.Log(userxattr)
+		expected = append(expected, "userxattr")
+		t.Log(expected)
+		t.Log("***********")
+	}
+	expected = append(expected, []string{
 		work,
 		upper,
 		lower,
-	} {
+	}...)
+	for i, v := range expected {
 		if m.Options[i] != v {
 			t.Errorf("expected %q but received %q", v, m.Options[i])
 		}
@@ -335,12 +354,55 @@ func testOverlayView(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	if m.Source != "overlay" {
 		t.Errorf("mount source should be overlay but received %q", m.Source)
 	}
-	if len(m.Options) != 2 {
-		t.Errorf("expected 1 additional mount option but got %d", len(m.Options))
-	}
-	lowers := getParents(ctx, o, root, "/tmp/view2")
-	expected = fmt.Sprintf("lowerdir=%s:%s", lowers[0], lowers[1])
-	if m.Options[1] != expected {
-		t.Errorf("expected option %q but received %q", expected, m.Options[0])
+	indexOffOnce.Do(getIndexOff)
+	if indexOff {
+		expectedOptions := 2
+		userxattr, err := NeedsUserXAttr(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if userxattr {
+			expectedOptions++
+		}
+		if len(m.Options) != expectedOptions {
+			t.Errorf("expected %d additional mount option but got %d", expectedOptions, len(m.Options))
+		}
+		lowers := getParents(ctx, o, root, "/tmp/view2")
+		expected = fmt.Sprintf("lowerdir=%s:%s", lowers[0], lowers[1])
+		optIdx := 1
+		if userxattr {
+			optIdx++
+		}
+		if m.Options[optIdx] != expected {
+			t.Errorf("expected option %q but received %q", expected, m.Options[optIdx])
+		}
+	} else {
+		expectedOptions := 1
+		userxattr, err := NeedsUserXAttr(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if userxattr {
+			expectedOptions++
+		}
+		if len(m.Options) != expectedOptions {
+			t.Errorf("expected %d additional mount option but got %d", expectedOptions, len(m.Options))
+		}
+		lowers := getParents(ctx, o, root, "/tmp/view2")
+		expected = fmt.Sprintf("lowerdir=%s:%s", lowers[0], lowers[1])
+		optIdx := 0
+		if userxattr {
+			optIdx++
+		}
+		if m.Options[optIdx] != expected {
+			t.Errorf("expected option %q but received %q", expected, m.Options[optIdx])
+		}
 	}
 }
+
+func getIndexOff() {
+	if _, err := os.Stat("/sys/module/overlay/parameters/index"); err == nil {
+		indexOff = true
+	}
+}
+
