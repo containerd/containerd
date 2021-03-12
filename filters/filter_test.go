@@ -78,6 +78,12 @@ func TestFilters(t *testing.T) {
 				"foo": "omg_asdf.asdf-qwer",
 			},
 		},
+		{
+			Name: "number",
+			Labels: map[string]string{
+				"size": "100",
+			},
+		},
 	}
 
 	var corpus []interface{}
@@ -175,6 +181,7 @@ func TestFilters(t *testing.T) {
 				corpus[6],
 				corpus[7],
 				corpus[8],
+				corpus[9],
 			},
 		},
 		{
@@ -250,6 +257,13 @@ func TestFilters(t *testing.T) {
 			input: `labels."more complex label with \\ and \"".post==present`,
 			expected: []interface{}{
 				corpus[5],
+			},
+		},
+		{
+			name:  "Number",
+			input: `labels.size > 10`,
+			expected: []interface{}{
+				corpus[9],
 			},
 		},
 		{

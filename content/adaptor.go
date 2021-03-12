@@ -17,6 +17,7 @@
 package content
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/containerd/containerd/filters"
@@ -33,7 +34,7 @@ func AdaptInfo(info Info) filters.Adaptor {
 		case "digest":
 			return info.Digest.String(), true
 		case "size":
-			// TODO: support size based filtering
+			return strconv.FormatInt(info.Size, 10), true
 		case "labels":
 			return checkMap(fieldpath[1:], info.Labels)
 		}

@@ -320,6 +320,16 @@ func TestScanner(t *testing.T) {
 				{pos: 13, token: tokenEOF},
 			},
 		},
+		{
+			name:  "NumberComparisonOperator",
+			input: `size < 10`,
+			expected: []tokenResult{
+				{pos: 0, token: tokenField, text: "size"},
+				{pos: 5, token: tokenOperator, text: "<"},
+				{pos: 7, token: tokenValue, text: "10"},
+				{pos: 9, token: tokenEOF},
+			},
+		},
 	} {
 		t.Run(testcase.name, func(t *testing.T) {
 			var sc scanner
