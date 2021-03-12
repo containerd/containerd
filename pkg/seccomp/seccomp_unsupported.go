@@ -18,6 +18,6 @@
 
 package seccomp
 
-func IsEnabled() bool {
+func isEnabled() bool {
 	return false
 }
