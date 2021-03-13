@@ -6,7 +6,7 @@ require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/Microsoft/go-winio v0.4.17-0.20210211115548-6eac466e5fa3
 	github.com/Microsoft/hcsshim v0.8.15
-	github.com/containerd/aufs v0.0.0-20201003224125-76a6863f2989
+	github.com/containerd/aufs v0.0.0-20210313051948-ffdde1490233
 	github.com/containerd/btrfs v0.0.0-20201111183144-404b9149801e
 	github.com/containerd/cgroups v0.0.0-20210114181951-8a68de567b68
 	github.com/containerd/console v1.0.1
