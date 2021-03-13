@@ -20,13 +20,14 @@ package zfs
 
 import (
 	"context"
+	"path/filepath"
+
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/storage"
 	zfs "github.com/mistifyio/go-zfs"
 	"github.com/pkg/errors"
-	"path/filepath"
 )
 
 const (
@@ -35,7 +36,6 @@ const (
 	//      committed := active + "@" + snapshotSuffix
 	snapshotSuffix = "snapshot"
 )
-
 
 type snapshotter struct {
 	dataset *zfs.Dataset
@@ -105,7 +105,7 @@ func (z *snapshotter) Stat(ctx context.Context, key string) (snapshots.Info, err
 	if err != nil {
 		return snapshots.Info{}, err
 	}
-	defer t.Rollback()
+	defer t.Rollback() //nolint:errcheck
 	_, info, _, err := storage.GetInfo(ctx, key)
 	if err != nil {
 		return snapshots.Info{}, err
@@ -125,7 +125,7 @@ func (z *snapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, filters .
 	if err != nil {
 		return err
 	}
-	defer t.Rollback()
+	defer t.Rollback() //nolint:errcheck
 	return storage.WalkInfo(ctx, fn, filters...)
 }
 
@@ -249,7 +249,7 @@ func (z *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 		return nil, err
 	}
 	s, err := storage.GetSnapshot(ctx, key)
-	t.Rollback()
+	t.Rollback() //nolint:errcheck
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get active snapshot")
 	}
@@ -313,7 +313,7 @@ func (o *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 
 	info, err = storage.UpdateInfo(ctx, info, fieldpaths...)
 	if err != nil {
-		t.Rollback()
+		t.Rollback() //nolint:errcheck
 		return snapshots.Info{}, err
 	}
 
