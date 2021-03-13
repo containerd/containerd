@@ -35,7 +35,7 @@ func TestImageIsUnpacked(t *testing.T) {
 		t.Skip()
 	}
 
-	const imageName = "docker.io/library/busybox:latest"
+	const imageName = "k8s.gcr.io/pause:3.4.1"
 	ctx, cancel := testContext(t)
 	defer cancel()
 
@@ -86,9 +86,9 @@ func TestImagePullWithDistSourceLabel(t *testing.T) {
 		t.Skip()
 	}
 	var (
-		source   = "docker.io"
-		repoName = "library/busybox"
-		tag      = "latest"
+		source   = "k8s.gcr.io"
+		repoName = "pause"
+		tag      = "3.4.1"
 	)
 
 	ctx, cancel := testContext(t)
@@ -144,7 +144,7 @@ func TestImageUsage(t *testing.T) {
 		t.Skip()
 	}
 
-	imageName := "docker.io/library/busybox:latest"
+	imageName := "k8s.gcr.io/pause:3.4.1"
 	ctx, cancel := testContext(t)
 	defer cancel()
 
@@ -241,7 +241,7 @@ func TestImageUsage(t *testing.T) {
 func TestImageSupportedBySnapshotter_Error(t *testing.T) {
 	var unsupportedImage string
 	if runtime.GOOS == "windows" {
-		unsupportedImage = "docker.io/library/busybox:latest"
+		unsupportedImage = "k8s.gcr.io/pause-amd64:3.2"
 	} else {
 		unsupportedImage = "mcr.microsoft.com/windows/nanoserver:1809"
 	}

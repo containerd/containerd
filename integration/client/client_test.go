@@ -310,7 +310,7 @@ func TestImagePullAllPlatforms(t *testing.T) {
 	defer cancel()
 
 	cs := client.ContentStore()
-	img, err := client.Fetch(ctx, "docker.io/library/busybox:latest")
+	img, err := client.Fetch(ctx, "k8s.gcr.io/pause:3.4.1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -358,7 +358,9 @@ func TestImagePullSomePlatforms(t *testing.T) {
 		opts = append(opts, WithPlatform(platform))
 	}
 
-	img, err := client.Fetch(ctx, "k8s.gcr.io/pause:3.4.1", opts...)
+	// Note: Must be different to the image used in TestImagePullAllPlatforms
+	// or it will see the content pulled by that, and fail.
+	img, err := client.Fetch(ctx, "k8s.gcr.io/pause:3.2", opts...)
 	if err != nil {
 		t.Fatal(err)
 	}

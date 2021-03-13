@@ -55,7 +55,7 @@ func TestLeaseResources(t *testing.T) {
 	defer ls.Delete(ctx, l, leases.SynchronousDelete)
 
 	// step 1: download image
-	imageName := "docker.io/library/busybox:1.25"
+	imageName := "k8s.gcr.io/pause:3.4.1"
 
 	image, err := client.Pull(ctx, imageName, WithPullUnpack, WithPullSnapshotter("native"))
 	if err != nil {
