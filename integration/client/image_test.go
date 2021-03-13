@@ -31,10 +31,6 @@ import (
 )
 
 func TestImageIsUnpacked(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip()
-	}
-
 	const imageName = "k8s.gcr.io/pause:3.4.1"
 	ctx, cancel := testContext(t)
 	defer cancel()
@@ -53,7 +49,7 @@ func TestImageIsUnpacked(t *testing.T) {
 	}
 
 	// By default pull does not unpack an image
-	image, err := client.Pull(ctx, imageName, WithPlatform("linux/amd64"))
+	image, err := client.Pull(ctx, imageName, WithPlatformMatcher(platforms.Default()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,9 +78,6 @@ func TestImageIsUnpacked(t *testing.T) {
 }
 
 func TestImagePullWithDistSourceLabel(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip()
-	}
 	var (
 		source   = "k8s.gcr.io"
 		repoName = "pause"
@@ -140,7 +133,7 @@ func TestImagePullWithDistSourceLabel(t *testing.T) {
 }
 
 func TestImageUsage(t *testing.T) {
-	if testing.Short() || runtime.GOOS == "windows" {
+	if testing.Short() {
 		t.Skip()
 	}
 
@@ -160,13 +153,10 @@ func TestImageUsage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testPlatform := platforms.Only(ocispec.Platform{
-		OS:           "linux",
-		Architecture: "amd64",
-	})
+	pMatcher := platforms.Default()
 
 	// Pull single platform, do not unpack
-	image, err := client.Pull(ctx, imageName, WithPlatformMatcher(testPlatform))
+	image, err := client.Pull(ctx, imageName, WithPlatformMatcher(pMatcher))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +177,7 @@ func TestImageUsage(t *testing.T) {
 	defer client.ImageService().Delete(ctx, imageName, images.SynchronousDelete())
 
 	// Fetch single platforms, but all manifests pulled
-	if _, err := client.Fetch(ctx, imageName, WithPlatformMatcher(testPlatform), WithAllMetadata()); err != nil {
+	if _, err := client.Fetch(ctx, imageName, WithPlatformMatcher(pMatcher), WithAllMetadata()); err != nil {
 		t.Fatal(err)
 	}
 
