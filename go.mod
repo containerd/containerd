@@ -13,7 +13,7 @@ require (
 	github.com/containerd/continuity v0.0.0-20210208174643-50096c924a4e
 	github.com/containerd/fifo v0.0.0-20201026212402-0724c46b320c
 	github.com/containerd/go-cni v1.0.1
-	github.com/containerd/go-runc v0.0.0-20200220073739-7016d3ce2328
+	github.com/containerd/go-runc v0.0.0-20201020171139-16b287bc67d0
 	github.com/containerd/imgcrypt v1.1.1-0.20210312161619-7ed62a527887
 	github.com/containerd/nri v0.0.0-20201007170849-eb1350a75164
 	github.com/containerd/ttrpc v1.0.2
