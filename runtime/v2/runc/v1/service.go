@@ -153,6 +153,11 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 			_ = shim.RemoveSocket(address)
 		}
 	}()
+	// make sure that reexec shim-v2 binary use the value if need
+	if err := shim.WriteAddress("address", address); err != nil {
+		return "", err
+	}
+
 	f, err := socket.File()
 	if err != nil {
 		return "", err
@@ -172,9 +177,6 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 	// make sure to wait after start
 	go cmd.Wait()
 	if err := shim.WritePidFile("shim.pid", cmd.Process.Pid); err != nil {
-		return "", err
-	}
-	if err := shim.WriteAddress("address", address); err != nil {
 		return "", err
 	}
 	if data, err := ioutil.ReadAll(os.Stdin); err == nil {
@@ -209,6 +211,12 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 }
 
 func (s *service) Cleanup(ctx context.Context) (*taskAPI.DeleteResponse, error) {
+	if address, err := shim.ReadAddress("address"); err == nil {
+		if err = shim.RemoveSocket(address); err != nil {
+			return nil, err
+		}
+	}
+
 	path, err := os.Getwd()
 	if err != nil {
 		return nil, err
@@ -562,11 +570,10 @@ func (s *service) Connect(ctx context.Context, r *taskAPI.ConnectRequest) (*task
 }
 
 func (s *service) Shutdown(ctx context.Context, r *taskAPI.ShutdownRequest) (*ptypes.Empty, error) {
+	// please make sure that temporary resource has been cleanup
+	// before shutdown service.
 	s.cancel()
 	close(s.events)
-	if address, err := shim.ReadAddress("address"); err == nil {
-		_ = shim.RemoveSocket(address)
-	}
 	return empty, nil
 }
 
