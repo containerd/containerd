@@ -1,5 +1,3 @@
-// +build !linux
-
 /*
    Copyright The containerd Authors.
 
@@ -16,8 +14,12 @@
    limitations under the License.
 */
 
-package apparmor
+package seccomp
 
-func hostSupports() bool {
-	return false
+// IsEnabled returns whether seccomp support is enabled
+// On Linux returns if the kernel has been configured to support seccomp.
+//  From https://github.com/opencontainers/runc/blob/v1.0.0-rc91/libcontainer/seccomp/seccomp_linux.go#L86-L102
+// On non-Linux returns false
+func IsEnabled() bool {
+	return isEnabled()
 }

@@ -81,7 +81,7 @@ func LoadDefaultProfile(name string) error {
 	return nil
 }
 
-// DumpDefaultProfiles dumps the default profile with the given name.
+// DumpDefaultProfile dumps the default profile with the given name.
 func DumpDefaultProfile(name string) (string, error) {
 	p, err := loadData(name)
 	if err != nil {

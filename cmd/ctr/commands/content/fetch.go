@@ -198,6 +198,8 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 	return img, nil
 }
 
+// ShowProgress continuously updates the output with job progress
+// by checking status in the content store.
 func ShowProgress(ctx context.Context, ongoing *Jobs, cs content.Store, out io.Writer) {
 	var (
 		ticker   = time.NewTicker(100 * time.Millisecond)
@@ -328,6 +330,7 @@ type Jobs struct {
 	resolved bool
 }
 
+// NewJobs creates a new instance of the job status tracker
 func NewJobs(name string) *Jobs {
 	return &Jobs{
 		name:  name,
@@ -335,6 +338,7 @@ func NewJobs(name string) *Jobs {
 	}
 }
 
+// Add adds a descriptor to be tracked
 func (j *Jobs) Add(desc ocispec.Descriptor) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
@@ -347,6 +351,7 @@ func (j *Jobs) Add(desc ocispec.Descriptor) {
 	j.added[desc.Digest] = struct{}{}
 }
 
+// Jobs returns a list of all tracked descriptors
 func (j *Jobs) Jobs() []ocispec.Descriptor {
 	j.mu.Lock()
 	defer j.mu.Unlock()
@@ -355,6 +360,7 @@ func (j *Jobs) Jobs() []ocispec.Descriptor {
 	return append(descs, j.descs...)
 }
 
+// IsResolved checks whether a descriptor has been resolved
 func (j *Jobs) IsResolved() bool {
 	j.mu.Lock()
 	defer j.mu.Unlock()

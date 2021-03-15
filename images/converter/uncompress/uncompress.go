@@ -91,6 +91,8 @@ func LayerConvertFunc(ctx context.Context, cs content.Store, desc ocispec.Descri
 	return &newDesc, nil
 }
 
+// IsUncompressedType returns whether the provided media type is considered
+// an uncompressed layer type
 func IsUncompressedType(mt string) bool {
 	switch mt {
 	case

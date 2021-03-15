@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-// config package containers utilities for helping configure the Docker resolver
+// Package config contains utilities for helping configure the Docker resolver
 package config
 
 import (

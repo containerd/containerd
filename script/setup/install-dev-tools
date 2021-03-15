@@ -34,4 +34,4 @@ GO111MODULE=off go get -d github.com/gogo/googleapis || true
 GO111MODULE=off go get -d github.com/gogo/protobuf || true
 
 GO111MODULE=on go get github.com/cpuguy83/go-md2man/v2@v2.0.0
-GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.23.8
+GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.38.0

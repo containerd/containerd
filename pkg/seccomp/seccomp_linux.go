@@ -40,9 +40,9 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// IsEnabled returns if the kernel has been configured to support seccomp.
+// isEnabled returns if the kernel has been configured to support seccomp.
 // From https://github.com/opencontainers/runc/blob/v1.0.0-rc91/libcontainer/seccomp/seccomp_linux.go#L86-L102
-func IsEnabled() bool {
+func isEnabled() bool {
 	// Try to read from /proc/self/status for kernels > 3.8
 	s, err := parseStatusFile("/proc/self/status")
 	if err != nil {

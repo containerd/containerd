@@ -348,6 +348,7 @@ func clearDockerV1DummyID(cfg DualConfig) (bool, error) {
 	return modified, nil
 }
 
+// ObjectWithMediaType represents an object with a MediaType field
 type ObjectWithMediaType struct {
 	// MediaType appears on Docker manifests and manifest lists.
 	// MediaType does not appear on OCI manifests and index

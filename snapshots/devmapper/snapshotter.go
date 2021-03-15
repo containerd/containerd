@@ -482,6 +482,7 @@ func (s *Snapshotter) withTransaction(ctx context.Context, writable bool, fn fun
 	return nil
 }
 
+// Cleanup cleans up all removed and unused resources
 func (s *Snapshotter) Cleanup(ctx context.Context) error {
 	var removedDevices []*DeviceInfo
 
