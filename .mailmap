@@ -5,6 +5,7 @@ Akihiro Suda <akihiro.suda.cz@hco.ntt.co.jp> <suda.akihiro@lab.ntt.co.jp>
 Akihiro Suda <akihiro.suda.cz@hco.ntt.co.jp> <suda.kyoto@gmail.com>
 Allen Sun <shlallen1990@gmail.com> <allensun@AllenSundeMacBook-Pro.local>
 Alexander Morozov <lk4d4math@gmail.com> <lk4d4@docker.com>
+Antonio Ojea <antonio.ojea.garcia@gmail.com> <aojea@redhat.com>
 Amit Krishnan <krish.amit@gmail.com> <amit.krishnan@oracle.com>
 Andrei Vagin <avagin@virtuozzo.com> <avagin@openvz.org>
 Andrey Kolomentsev <andrey.kolomentsev@gmail.com>
@@ -36,6 +37,7 @@ Haiyan Meng <haiyanmeng@google.com>
 Harry Zhang <harryz@hyper.sh> <harryzhang@zju.edu.cn>
 Hu Shuai <hus.fnst@cn.fujitsu.com>
 Hu Shuai <hus.fnst@cn.fujitsu.com> <hushuaiia@qq.com>
+Iceber Gu <wei.cai-nat@daocloud.io>
 Jaana Burcu Dogan <burcujdogan@gmail.com> <jbd@golang.org>
 Jess Valarezo <valarezo.jessica@gmail.com>
 Jess Valarezo <valarezo.jessica@gmail.com> <jessica.valarezo@docker.com>
@@ -47,6 +49,7 @@ John Howard <github@lowenna.com>
 John Howard <github@lowenna.com> <john.howard@microsoft.com>
 John Howard <github@lowenna.com> <jhoward@microsoft.com>
 John Howard <github@lowenna.com> <jhowardmsft@users.noreply.github.com>
+Lorenz Brun <lorenz@brun.one> <lorenz@nexantic.com>
 Luc Perkins <lucperkins@gmail.com>
 Julien Balestra <julien.balestra@datadoghq.com>
 Jun Lin Chen <webmaster@mc256.com> <1913688+mc256@users.noreply.github.com>
@@ -63,7 +66,8 @@ Lantao Liu <lantaol@google.com> <taotaotheripper@gmail.com>
 Li Yuxuan <liyuxuan04@baidu.com> <darfux@163.com>
 Lifubang <lifubang@aliyun.com> <lifubang@acmcoder.com>
 Lu Jingxiao <lujingxiao@huawei.com>
-Maksym Pavlenko <makpav@amazon.com> <pavlenko.maksym@gmail.com>
+Maksym Pavlenko <pavlenko.maksym@gmail.com> <makpav@amazon.com>
+Maksym Pavlenko <pavlenko.maksym@gmail.com> <mxpv@apple.com>
 Mario Hros <spam@k3a.me>
 Mario Hros <spam@k3a.me> <root@k3a.me>
 Mario Macias <mariomac@gmail.com> <mmacias@newrelic.com>
@@ -84,9 +88,12 @@ Rui Cao <ruicao@alauda.io> <ruicao@alauda.io>
 Sakeven Jiang <jc5930@sina.cn>
 Samuel Karp <me@samuelkarp.com> <skarp@amazon.com>
 Seth Pellegrino <spellegrino@newrelic.com> <30441101+sethp-nr@users.noreply.github.com>
+Shaobao Feng <shaobao.feng@huawei.com>
 Shengbo Song <thomassong@tencent.com>
 Shengjing Zhu <i@zhsj.me> <zhsj@debian.org>
+Siddharth Yadav <sedflix@gmail.com>
 SiYu Zhao <d.chaser.zsy@gmail.com>
+Stefan Berger <stefanb@us.ibm.com> <stefanb@linux.ibm.com>
 Stefan Berger <stefanb@us.ibm.com> <stefanb@linux.vnet.ibm.com>
 Stephen J Day <stevvooe@gmail.com> <stephen.day@getcruise.com>
 Stephen J Day <stevvooe@gmail.com> <stevvooe@users.noreply.github.com>
@@ -97,7 +104,9 @@ Su Xiaolin <linxxnil@126.com>
 Ted Yu <yuzhihong@gmail.com>
 Tõnis Tiigi <tonistiigi@gmail.com>
 Wade Lee <weidonglee27@gmail.com>
+Wade Lee <weidonglee27@gmail.com> <weidonglee29@gmail.com>
 Wade Lee <weidonglee27@gmail.com> <21621232@zju.edu.cn>
+Wei Fu <fuweid89@gmail.com>
 Wei Fu <fuweid89@gmail.com> <fhfuwei@163.com>
 Xiaodong Zhang <a4012017@sina.com>
 Xuean Yan <yan.xuean@zte.com.cn>
