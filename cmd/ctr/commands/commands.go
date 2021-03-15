@@ -92,19 +92,19 @@ var (
 		},
 		cli.StringSliceFlag{
 			Name:  "env",
-			Usage: "specify additional container environment variables (i.e. FOO=bar)",
+			Usage: "specify additional container environment variables (e.g. FOO=bar)",
 		},
 		cli.StringFlag{
 			Name:  "env-file",
-			Usage: "specify additional container environment variables in a file(i.e. FOO=bar, one per line)",
+			Usage: "specify additional container environment variables in a file(e.g. FOO=bar, one per line)",
 		},
 		cli.StringSliceFlag{
 			Name:  "label",
-			Usage: "specify additional labels (i.e. foo=bar)",
+			Usage: "specify additional labels (e.g. foo=bar)",
 		},
 		cli.StringSliceFlag{
 			Name:  "mount",
-			Usage: "specify additional container mount (ex: type=bind,src=/tmp,dst=/host,options=rbind:ro)",
+			Usage: "specify additional container mount (e.g. type=bind,src=/tmp,dst=/host,options=rbind:ro)",
 		},
 		cli.BoolFlag{
 			Name:  "net-host",
