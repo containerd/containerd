@@ -16,7 +16,7 @@
    limitations under the License.
 */
 
-package overlay
+package overlayutils
 
 import (
 	"fmt"
@@ -31,14 +31,14 @@ import (
 	"github.com/pkg/errors"
 )
 
-// supportsMultipleLowerDir checks if the system supports multiple lowerdirs,
+// SupportsMultipleLowerDir checks if the system supports multiple lowerdirs,
 // which is required for the overlay snapshotter. On 4.x kernels, multiple lowerdirs
 // are always available (so this check isn't needed), and backported to RHEL and
 // CentOS 3.x kernels (3.10.0-693.el7.x86_64 and up). This function is to detect
 // support on those kernels, without doing a kernel version compare.
 //
 // Ported from moby overlay2.
-func supportsMultipleLowerDir(d string) error {
+func SupportsMultipleLowerDir(d string) error {
 	td, err := ioutil.TempDir(d, "multiple-lowerdir-check")
 	if err != nil {
 		return err
@@ -85,7 +85,7 @@ func Supported(root string) error {
 	if !supportsDType {
 		return fmt.Errorf("%s does not support d_type. If the backing filesystem is xfs, please reformat with ftype=1 to enable d_type support", root)
 	}
-	return supportsMultipleLowerDir(root)
+	return SupportsMultipleLowerDir(root)
 }
 
 // NeedsUserXAttr returns whether overlayfs should be mounted with the "userxattr" mount option.

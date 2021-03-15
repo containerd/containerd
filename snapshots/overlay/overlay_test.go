@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/snapshots/overlay/overlayutils"
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/containerd/snapshots/testsuite"
 )
@@ -177,7 +178,7 @@ func testOverlayOverlayMount(t *testing.T, newSnapshotter testsuite.SnapshotterF
 	expected := []string{
 		"index=off",
 	}
-	if userxattr, err := NeedsUserXAttr(root); err != nil {
+	if userxattr, err := overlayutils.NeedsUserXAttr(root); err != nil {
 		t.Fatal(err)
 	} else if userxattr {
 		expected = append(expected, "userxattr")
@@ -346,7 +347,7 @@ func testOverlayView(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	}
 
 	expectedOptions := 2
-	userxattr, err := NeedsUserXAttr(root)
+	userxattr, err := overlayutils.NeedsUserXAttr(root)
 	if err != nil {
 		t.Fatal(err)
 	}

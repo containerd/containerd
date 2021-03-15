@@ -16,7 +16,7 @@
    limitations under the License.
 */
 
-package overlay
+package overlayutils
 
 import (
 	"io/ioutil"
