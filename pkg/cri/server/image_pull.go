@@ -25,6 +25,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -35,6 +36,7 @@ import (
 	"github.com/containerd/containerd/log"
 	distribution "github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/remotes/docker"
+	"github.com/containerd/containerd/remotes/docker/config"
 	"github.com/containerd/imgcrypt"
 	"github.com/containerd/imgcrypt/images/encryption"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -100,7 +102,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	var (
 		resolver = docker.NewResolver(docker.ResolverOptions{
 			Headers: c.config.Registry.Headers,
-			Hosts:   c.registryHosts(r.GetAuth()),
+			Hosts:   c.registryHosts(ctx, r.GetAuth()),
 		})
 		isSchema1    bool
 		imageHandler containerdimages.HandlerFunc = func(_ context.Context,
@@ -311,8 +313,42 @@ func (c *criService) getTLSConfig(registryTLSConfig criconfig.TLSConfig) (*tls.C
 	return tlsConfig, nil
 }
 
+func hostDirFromRoots(roots []string) func(string) (string, error) {
+	rootfn := make([]func(string) (string, error), len(roots))
+	for i := range roots {
+		rootfn[i] = config.HostDirFromRoot(roots[i])
+	}
+	return func(host string) (dir string, err error) {
+		for _, fn := range rootfn {
+			dir, err = fn(host)
+			if (err != nil && !errdefs.IsNotFound(err)) || (dir != "") {
+				break
+			}
+		}
+		return
+	}
+}
+
 // registryHosts is the registry hosts to be used by the resolver.
-func (c *criService) registryHosts(auth *runtime.AuthConfig) docker.RegistryHosts {
+func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig) docker.RegistryHosts {
+	paths := filepath.SplitList(c.config.Registry.ConfigPath)
+	if len(paths) > 0 {
+		hostOptions := config.HostOptions{}
+		hostOptions.Credentials = func(host string) (string, string, error) {
+			hostauth := auth
+			if hostauth == nil {
+				config := c.config.Registry.Configs[host]
+				if config.Auth != nil {
+					hostauth = toRuntimeAuthConfig(*config.Auth)
+				}
+			}
+			return ParseAuth(hostauth, host)
+		}
+		hostOptions.HostDir = hostDirFromRoots(paths)
+
+		return config.ConfigureHosts(ctx, hostOptions)
+	}
+
 	return func(host string) ([]docker.RegistryHost, error) {
 		var registries []docker.RegistryHost
 
