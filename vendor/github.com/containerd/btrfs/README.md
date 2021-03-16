@@ -1,6 +1,8 @@
 # go-btrfs
-[![GoDoc](https://godoc.org/github.com/containerd/btrfs?status.svg)](https://godoc.org/github.com/containerd/btrfs)
-[![Build Status](https://travis-ci.org/containerd/btrfs.svg?branch=master)](https://travis-ci.org/containerd/btrfs)
+
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/containerd/btrfs)](https://pkg.go.dev/github.com/containerd/btrfs)
+[![Build Status](https://github.com/containerd/btrfs/workflows/CI/badge.svg)](https://github.com/containerd/btrfs/actions?query=workflow%3ACI)
+[![Go Report Card](https://goreportcard.com/badge/github.com/containerd/btrfs)](https://goreportcard.com/report/github.com/containerd/btrfs)
 
 Native Go bindings for btrfs.
 
