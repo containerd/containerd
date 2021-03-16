@@ -9,7 +9,7 @@ require (
 	github.com/containerd/btrfs v0.0.0-20210316141732-918d888fb676
 	github.com/containerd/cgroups v0.0.0-20210114181951-8a68de567b68
 	github.com/containerd/console v1.0.2
-	github.com/containerd/continuity v0.0.0-20210208174643-50096c924a4e
+	github.com/containerd/continuity v0.0.0-20210315143101-93e15499afd5
 	github.com/containerd/fifo v0.0.0-20210316144830-115abcc95a1d
 	github.com/containerd/go-cni v1.0.1
 	github.com/containerd/go-runc v0.0.0-20201020171139-16b287bc67d0

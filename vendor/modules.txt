@@ -67,7 +67,7 @@ github.com/containerd/cgroups/v2/stats
 # github.com/containerd/console v1.0.2
 ## explicit
 github.com/containerd/console
-# github.com/containerd/continuity v0.0.0-20210208174643-50096c924a4e
+# github.com/containerd/continuity v0.0.0-20210315143101-93e15499afd5
 ## explicit
 github.com/containerd/continuity
 github.com/containerd/continuity/devices
