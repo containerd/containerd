@@ -81,7 +81,7 @@ github.com/containerd/continuity/proto
 github.com/containerd/continuity/sysx
 github.com/containerd/continuity/testutil
 github.com/containerd/continuity/testutil/loopback
-# github.com/containerd/fifo v0.0.0-20201026212402-0724c46b320c
+# github.com/containerd/fifo v0.0.0-20210316144830-115abcc95a1d
 ## explicit
 github.com/containerd/fifo
 # github.com/containerd/go-cni v1.0.1

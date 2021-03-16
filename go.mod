@@ -11,7 +11,7 @@ require (
 	github.com/containerd/cgroups v0.0.0-20210114181951-8a68de567b68
 	github.com/containerd/console v1.0.1
 	github.com/containerd/continuity v0.0.0-20210208174643-50096c924a4e
-	github.com/containerd/fifo v0.0.0-20201026212402-0724c46b320c
+	github.com/containerd/fifo v0.0.0-20210316144830-115abcc95a1d
 	github.com/containerd/go-cni v1.0.1
 	github.com/containerd/go-runc v0.0.0-20201020171139-16b287bc67d0
 	github.com/containerd/imgcrypt v1.1.1-0.20210312161619-7ed62a527887
