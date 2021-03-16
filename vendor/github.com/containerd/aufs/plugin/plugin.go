@@ -23,7 +23,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-
 // Config represents configuration for the zfs plugin
 type Config struct {
 	// Root directory for the plugin

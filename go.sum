@@ -92,8 +92,8 @@ github.com/cilium/ebpf v0.2.0/go.mod h1:To2CFviqOWL/M0gIMsvSMlqe7em/l1ALkX1PyjrX
 github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa/go.mod h1:zn76sxSg3SzpJ0PPJaLDCu+Bu0Lg3sKTORVIj19EIF8=
 github.com/containerd/aufs v0.0.0-20200908144142-dab0cbea06f4/go.mod h1:nukgQABAEopAHvB6j7cnP5zJ+/3aVcE7hCYqvIwAHyE=
 github.com/containerd/aufs v0.0.0-20201003224125-76a6863f2989/go.mod h1:AkGGQs9NM2vtYHaUen+NljV0/baGCAPELGm2q9ZXpWU=
-github.com/containerd/aufs v0.0.0-20210313051948-ffdde1490233 h1:WG1C8QfdnqC5+CM2FLg4WoVQdNMfMXMnXWc2tHzGZnY=
-github.com/containerd/aufs v0.0.0-20210313051948-ffdde1490233/go.mod h1:kL5kd6KM5TzQjR79jljyi4olc1Vrx6XBlcyj3gNv2PU=
+github.com/containerd/aufs v0.0.0-20210316121734-20793ff83c97 h1:eDnTE2gn5fNykNuQdUIhr5XHqLJR52FXCGxhWNHG4FM=
+github.com/containerd/aufs v0.0.0-20210316121734-20793ff83c97/go.mod h1:kL5kd6KM5TzQjR79jljyi4olc1Vrx6XBlcyj3gNv2PU=
 github.com/containerd/btrfs v0.0.0-20201111183144-404b9149801e/go.mod h1:jg2QkJcsabfHugurUvvPhS3E08Oxiuh5W/g1ybB4e0E=
 github.com/containerd/btrfs v0.0.0-20210316141732-918d888fb676 h1:jNaRXAhCLuQ2x3k4nZNxaZN27/BCMhLfVkCEokYPI5Q=
 github.com/containerd/btrfs v0.0.0-20210316141732-918d888fb676/go.mod h1:zMcX3qkXTAi9GI50+0HOeuV8LU2ryCE/V2vG/ZBiTss=

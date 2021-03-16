@@ -1,7 +1,9 @@
 # aufs snapshotter
 
-[![Build Status](https://travis-ci.org/containerd/aufs.svg?branch=master)](https://travis-ci.org/containerd/aufs)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/containerd/aufs)](https://pkg.go.dev/github.com/containerd/aufs)
+[![Build Status](https://github.com/containerd/aufs/workflows/CI/badge.svg)](https://github.com/containerd/aufs/actions?query=workflow%3ACI)
 [![codecov](https://codecov.io/gh/containerd/aufs/branch/master/graph/badge.svg)](https://codecov.io/gh/containerd/aufs)
+[![Go Report Card](https://goreportcard.com/badge/github.com/containerd/aufs)](https://goreportcard.com/report/github.com/containerd/aufs)
 
 
 AUFS implementation of the snapshot interface for containerd.

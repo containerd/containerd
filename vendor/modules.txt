@@ -53,7 +53,7 @@ github.com/cilium/ebpf/asm
 github.com/cilium/ebpf/internal
 github.com/cilium/ebpf/internal/btf
 github.com/cilium/ebpf/internal/unix
-# github.com/containerd/aufs v0.0.0-20210313051948-ffdde1490233
+# github.com/containerd/aufs v0.0.0-20210316121734-20793ff83c97
 ## explicit
 github.com/containerd/aufs
 github.com/containerd/aufs/plugin
