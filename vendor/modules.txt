@@ -94,7 +94,7 @@ github.com/containerd/go-runc
 ## explicit
 github.com/containerd/imgcrypt
 github.com/containerd/imgcrypt/images/encryption
-# github.com/containerd/nri v0.0.0-20201007170849-eb1350a75164
+# github.com/containerd/nri v0.0.0-20210316161719-dbaa18c31c14
 ## explicit
 github.com/containerd/nri
 github.com/containerd/nri/types/v1
