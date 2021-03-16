@@ -38,7 +38,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-
 var (
 	dirperm        sync.Once
 	dirpermEnabled bool

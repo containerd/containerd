@@ -1,3 +1,19 @@
+/*
+   Copyright The containerd Authors.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 package nri
 
 import (
@@ -63,7 +79,7 @@ func (c *Client) Invoke(ctx context.Context, task containerd.Task, state types.S
 	return c.InvokeWithSandbox(ctx, task, state, nil)
 }
 
-// Invoke the ConfList of nri plugins
+// InvokeWithSandbox invokes the ConfList of nri plugins
 func (c *Client) InvokeWithSandbox(ctx context.Context, task containerd.Task, state types.State, sandbox *Sandbox) ([]*types.Result, error) {
 	if len(c.conf.Plugins) == 0 {
 		return nil, nil
@@ -108,20 +124,27 @@ func (c *Client) invokePlugin(ctx context.Context, name string, r *types.Request
 	cmd.Stderr = os.Stderr
 
 	out, err := cmd.Output()
+	msg := "output:"
+	if len(out) > 0 {
+		msg = fmt.Sprintf("%s %q", msg, out)
+	} else {
+		msg = fmt.Sprintf("%s <empty>", msg)
+	}
 	if err != nil {
-		// ExitError is returned when there is a non-zero exit status
-		if _, ok := err.(*exec.ExitError); ok {
-			var pe types.PluginError
-			if err := json.Unmarshal(out, &pe); err != nil {
-				return nil, errors.Wrapf(err, "%s: %s", name, out)
-			}
-			return nil, &pe
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			// ExitError is returned when there is a non-zero exit status
+			msg = fmt.Sprintf("%s exit code: %d", msg, exitErr.ExitCode())
+		} else {
+			// plugin did not get a chance to run, return exec err
+			return nil, err
 		}
-		return nil, errors.Wrapf(err, "%s: %s", name, out)
 	}
 	var result types.Result
 	if err := json.Unmarshal(out, &result); err != nil {
-		return nil, err
+		return nil, errors.Errorf("failed to unmarshal plugin output: %s: %s", err.Error(), msg)
+	}
+	if result.Err() != nil {
+		return nil, result.Err()
 	}
 	return &result, nil
 }

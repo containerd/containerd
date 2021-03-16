@@ -53,11 +53,11 @@ github.com/cilium/ebpf/asm
 github.com/cilium/ebpf/internal
 github.com/cilium/ebpf/internal/btf
 github.com/cilium/ebpf/internal/unix
-# github.com/containerd/aufs v0.0.0-20210313051948-ffdde1490233
+# github.com/containerd/aufs v0.0.0-20210316121734-20793ff83c97
 ## explicit
 github.com/containerd/aufs
 github.com/containerd/aufs/plugin
-# github.com/containerd/btrfs v0.0.0-20201111183144-404b9149801e
+# github.com/containerd/btrfs v0.0.0-20210316141732-918d888fb676
 ## explicit
 github.com/containerd/btrfs
 # github.com/containerd/cgroups v0.0.0-20210114181951-8a68de567b68
@@ -81,7 +81,7 @@ github.com/containerd/continuity/proto
 github.com/containerd/continuity/sysx
 github.com/containerd/continuity/testutil
 github.com/containerd/continuity/testutil/loopback
-# github.com/containerd/fifo v0.0.0-20201026212402-0724c46b320c
+# github.com/containerd/fifo v0.0.0-20210316144830-115abcc95a1d
 ## explicit
 github.com/containerd/fifo
 # github.com/containerd/go-cni v1.0.1
@@ -94,7 +94,7 @@ github.com/containerd/go-runc
 ## explicit
 github.com/containerd/imgcrypt
 github.com/containerd/imgcrypt/images/encryption
-# github.com/containerd/nri v0.0.0-20201007170849-eb1350a75164
+# github.com/containerd/nri v0.0.0-20210316161719-dbaa18c31c14
 ## explicit
 github.com/containerd/nri
 github.com/containerd/nri/types/v1
@@ -105,7 +105,7 @@ github.com/containerd/ttrpc/plugin
 # github.com/containerd/typeurl v1.0.1
 ## explicit
 github.com/containerd/typeurl
-# github.com/containerd/zfs v0.0.0-20210313052028-2233970b74b1
+# github.com/containerd/zfs v0.0.0-20210315114300-dde8f0fda960
 ## explicit
 github.com/containerd/zfs
 github.com/containerd/zfs/plugin

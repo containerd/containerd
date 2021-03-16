@@ -6,19 +6,19 @@ require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/Microsoft/go-winio v0.4.17-0.20210211115548-6eac466e5fa3
 	github.com/Microsoft/hcsshim v0.8.15
-	github.com/containerd/aufs v0.0.0-20210313051948-ffdde1490233
-	github.com/containerd/btrfs v0.0.0-20201111183144-404b9149801e
+	github.com/containerd/aufs v0.0.0-20210316121734-20793ff83c97
+	github.com/containerd/btrfs v0.0.0-20210316141732-918d888fb676
 	github.com/containerd/cgroups v0.0.0-20210114181951-8a68de567b68
 	github.com/containerd/console v1.0.1
 	github.com/containerd/continuity v0.0.0-20210208174643-50096c924a4e
-	github.com/containerd/fifo v0.0.0-20201026212402-0724c46b320c
+	github.com/containerd/fifo v0.0.0-20210316144830-115abcc95a1d
 	github.com/containerd/go-cni v1.0.1
 	github.com/containerd/go-runc v0.0.0-20201020171139-16b287bc67d0
 	github.com/containerd/imgcrypt v1.1.1-0.20210312161619-7ed62a527887
-	github.com/containerd/nri v0.0.0-20201007170849-eb1350a75164
+	github.com/containerd/nri v0.0.0-20210316161719-dbaa18c31c14
 	github.com/containerd/ttrpc v1.0.2
 	github.com/containerd/typeurl v1.0.1
-	github.com/containerd/zfs v0.0.0-20210313052028-2233970b74b1
+	github.com/containerd/zfs v0.0.0-20210315114300-dde8f0fda960
 	github.com/containernetworking/plugins v0.8.6
 	github.com/coreos/go-systemd/v22 v22.1.0
 	github.com/davecgh/go-spew v1.1.1
