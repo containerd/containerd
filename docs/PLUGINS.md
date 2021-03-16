@@ -244,7 +244,7 @@ example configuration
     stream_server_address = ""
     stream_server_port = "10010"
     enable_selinux = false
-    sandbox_image = "k8s.gcr.io/pause:3.4.1"
+    sandbox_image = "k8s.gcr.io/pause:3.5"
     stats_collect_period = 10
     systemd_cgroup = false
     [plugins.cri.containerd]
