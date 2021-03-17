@@ -21,12 +21,16 @@
 set -eu -o pipefail
 
 function install_runc() {
-	RUNC_COMMIT=$(grep opencontainers/runc "$GOPATH"/src/github.com/containerd/containerd/vendor.conf | awk '{print $2}')
+	script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
 
-	go get -d github.com/opencontainers/runc
-	cd "$GOPATH"/src/github.com/opencontainers/runc
-	git checkout $RUNC_COMMIT
-	make BUILDTAGS='apparmor seccomp selinux' runc
+	# When updating runc-version, consider updating the runc module in go.mod as well
+	: "${RUNC_VERSION:=$(cat "${script_dir}/runc-version")}"
+
+	TMPROOT=$(mktemp -d)
+	git clone https://github.com/opencontainers/runc.git "${TMPROOT}"/src/github.com/opencontainers/runc
+	pushd "${TMPROOT}"/src/github.com/opencontainers/runc
+	git checkout "${RUNC_VERSION}"
+	GOPATH="${TMPROOT}" GO111MODULE=off make BUILDTAGS='seccomp' runc
 
 	USESUDO=${USESUDO:-false}
 	if ${USESUDO}; then
@@ -35,6 +39,8 @@ function install_runc() {
 	  SUDO=''
 	fi
 	${SUDO} make install
+	popd
+	rm -fR "${TMPROOT}"
 }
 
 function install_crun() {
@@ -43,7 +49,7 @@ function install_crun() {
 	chmod +x /usr/local/sbin/runc
 }
 
-: ${RUNC_FLAVOR:=runc}
+: "${RUNC_FLAVOR:=runc}"
 case ${RUNC_FLAVOR} in
 runc) install_runc ;;
 crun) install_crun ;;
