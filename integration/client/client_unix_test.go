@@ -19,7 +19,6 @@
 package containerd
 
 import (
-	"runtime"
 	"testing"
 
 	. "github.com/containerd/containerd"
@@ -33,27 +32,10 @@ const (
 )
 
 var (
-	testImage    string
+	testImage    = "mirror.gcr.io/library/busybox:latest"
 	shortCommand = withProcessArgs("true")
 	longCommand  = withProcessArgs("/bin/sh", "-c", "while true; do sleep 1; done")
 )
-
-func init() {
-	switch runtime.GOARCH {
-	case "386":
-		testImage = "docker.io/i386/alpine:latest"
-	case "arm":
-		testImage = "docker.io/arm32v6/alpine:latest"
-	case "arm64":
-		testImage = "docker.io/arm64v8/alpine:latest"
-	case "ppc64le":
-		testImage = "docker.io/ppc64le/alpine:latest"
-	case "s390x":
-		testImage = "docker.io/s390x/alpine:latest"
-	default:
-		testImage = "docker.io/library/alpine:latest"
-	}
-}
 
 func TestImagePullSchema1WithEmptyLayers(t *testing.T) {
 	client, err := newClient(t, address)
