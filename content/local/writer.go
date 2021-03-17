@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/containerd/containerd/content"
@@ -39,6 +40,7 @@ type writer struct {
 	ref       string   // ref key
 	offset    int64
 	total     int64
+	mu        sync.Mutex
 	digester  digest.Digester
 	startedAt time.Time
 	updatedAt time.Time
@@ -58,6 +60,8 @@ func (w *writer) Status() (content.Status, error) {
 //
 // Cannot be called concurrently with `Write`.
 func (w *writer) Digest() digest.Digest {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	return w.digester.Digest()
 }
 
@@ -66,6 +70,8 @@ func (w *writer) Digest() digest.Digest {
 // Note that writes are unbuffered to the backing file. When writing, it is
 // recommended to wrap in a bufio.Writer or, preferably, use io.CopyBuffer.
 func (w *writer) Write(p []byte) (n int, err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	n, err = w.fp.Write(p)
 	w.digester.Hash().Write(p[:n])
 	w.offset += int64(len(p))
