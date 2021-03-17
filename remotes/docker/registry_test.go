@@ -52,14 +52,19 @@ func TestMatchLocalhost(t *testing.T) {
 		match bool
 	}{
 		{"", false},
-		{"127.1.1.1", false},
+		{"127.1.1.1", true},
 		{"127.0.0.1", true},
+		{"127.256.0.1", false}, // test MatchLocalhost does not panic on invalid ip
+		{"127.23.34.52", true},
 		{"127.0.0.1:5000", true},
 		{"registry.org", false},
+		{"126.example.com", false},
 		{"localhost", true},
 		{"localhost:5000", true},
 		{"[127:0:0:1]", false},
 		{"[::1]", true},
+		{"[::1]:", false},     // invalid ip
+		{"127.0.1.1:", false}, // invalid ip
 		{"[::1]:5000", true},
 		{"::1", true},
 	} {
