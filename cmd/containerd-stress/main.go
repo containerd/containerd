@@ -147,7 +147,7 @@ func main() {
 		cli.StringFlag{
 			Name:  "runtime",
 			Usage: "set the runtime to stress test",
-			Value: plugin.RuntimeLinuxV1,
+			Value: plugin.RuntimeRuncV2,
 		},
 	}
 	app.Before = func(context *cli.Context) error {
