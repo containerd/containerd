@@ -55,12 +55,12 @@ require (
 	golang.org/x/sys v0.0.0-20210124154548-22da62e12c0c
 	google.golang.org/grpc v1.33.2
 	gotest.tools/v3 v3.0.3
-	k8s.io/api v0.20.1
-	k8s.io/apimachinery v0.20.1
-	k8s.io/apiserver v0.20.1
-	k8s.io/client-go v0.20.1
-	k8s.io/component-base v0.20.1
-	k8s.io/cri-api v0.20.1
+	k8s.io/api v0.20.4
+	k8s.io/apimachinery v0.20.4
+	k8s.io/apiserver v0.20.4
+	k8s.io/client-go v0.20.4
+	k8s.io/component-base v0.20.4
+	k8s.io/cri-api v0.20.4
 	k8s.io/klog/v2 v2.4.0
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 )
