@@ -126,7 +126,7 @@ func newCommand(ctx context.Context, id, containerdBinary, containerdAddress, co
 	return cmd, nil
 }
 
-func (s *service) StartShim(ctx context.Context, id, containerdBinary, containerdAddress, containerdTTRPCAddress string) (string, error) {
+func (s *service) StartShim(ctx context.Context, id, containerdBinary, containerdAddress, containerdTTRPCAddress string) (_ string, retErr error) {
 	cmd, err := newCommand(ctx, id, containerdBinary, containerdAddress, containerdTTRPCAddress)
 	if err != nil {
 		return "", err
@@ -147,6 +147,17 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 			return "", err
 		}
 	}
+	defer func() {
+		if retErr != nil {
+			socket.Close()
+			_ = shim.RemoveSocket(address)
+		}
+	}()
+	// make sure that reexec shim-v2 binary use the value if need
+	if err := shim.WriteAddress("address", address); err != nil {
+		return "", err
+	}
+
 	f, err := socket.File()
 	if err != nil {
 		return "", err
@@ -155,20 +166,17 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 	cmd.ExtraFiles = append(cmd.ExtraFiles, f)
 
 	if err := cmd.Start(); err != nil {
+		f.Close()
 		return "", err
 	}
 	defer func() {
-		if err != nil {
-			_ = shim.RemoveSocket(address)
+		if retErr != nil {
 			cmd.Process.Kill()
 		}
 	}()
 	// make sure to wait after start
 	go cmd.Wait()
 	if err := shim.WritePidFile("shim.pid", cmd.Process.Pid); err != nil {
-		return "", err
-	}
-	if err := shim.WriteAddress("address", address); err != nil {
 		return "", err
 	}
 	if data, err := ioutil.ReadAll(os.Stdin); err == nil {
@@ -203,6 +211,12 @@ func (s *service) StartShim(ctx context.Context, id, containerdBinary, container
 }
 
 func (s *service) Cleanup(ctx context.Context) (*taskAPI.DeleteResponse, error) {
+	if address, err := shim.ReadAddress("address"); err == nil {
+		if err = shim.RemoveSocket(address); err != nil {
+			return nil, err
+		}
+	}
+
 	path, err := os.Getwd()
 	if err != nil {
 		return nil, err
@@ -556,11 +570,10 @@ func (s *service) Connect(ctx context.Context, r *taskAPI.ConnectRequest) (*task
 }
 
 func (s *service) Shutdown(ctx context.Context, r *taskAPI.ShutdownRequest) (*ptypes.Empty, error) {
+	// please make sure that temporary resource has been cleanup
+	// before shutdown service.
 	s.cancel()
 	close(s.events)
-	if address, err := shim.ReadAddress("address"); err == nil {
-		_ = shim.RemoveSocket(address)
-	}
 	return empty, nil
 }
 
