@@ -59,28 +59,29 @@ command. With the load command you inject a container image into the container
 runtime from a file. First you need to create a container image tarball. For
 example to create an image tarball for a pause container using Docker:
 ```console
-$ docker pull k8s.gcr.io/pause:3.4.1
-  3.4.1: Pulling from pause
-  67ddbfb20a22: Pull complete
-  Digest: sha256:6c3835cab3980f11b83277305d0d736051c32b17606f5ec59f1dda67c9ba3810
-  Status: Downloaded newer image for k8s.gcr.io/pause:3.4.1
-$ docker save k8s.gcr.io/pause:3.4.1 -o pause.tar
+$ docker pull k8s.gcr.io/pause:3.5
+  3.5: Pulling from pause
+  019d8da33d91: Pull complete
+  Digest: sha256:1ff6c18fbef2045af6b9c16bf034cc421a29027b800e4f9b68ae9b1cb3e9ae07
+  Status: Downloaded newer image for k8s.gcr.io/pause:3.5
+  k8s.gcr.io/pause:3.5
+$ docker save k8s.gcr.io/pause:3.5 -o pause.tar
 ```
 Then use `ctr` to load the container image into the container runtime:
 ```console
 # The cri plugin uses the "k8s.io" containerd namespace.
 $ sudo ctr -n=k8s.io images import pause.tar
-  Loaded image: k8s.gcr.io/pause:3.4.1
+  Loaded image: k8s.gcr.io/pause:3.5
 ```
 List images and inspect the pause image:
 ```console
 $ sudo crictl images
 IMAGE                       TAG                 IMAGE ID            SIZE
 docker.io/library/busybox   latest              f6e427c148a76       728kB
-k8s.gcr.io/pause            3.4.1               0f8457a4c2eca       686kB
-$ sudo crictl inspecti 0f8457a4c2eca
+k8s.gcr.io/pause            3.5                 ed210e3e4a5ba       683kB
+$ sudo crictl inspecti ed210e3e4a5ba
   ... displays information about the pause image.
-$ sudo crictl inspecti k8s.gcr.io/pause:3.4.1
+$ sudo crictl inspecti k8s.gcr.io/pause:3.5
   ... displays information about the pause image.
 ```
 
@@ -200,7 +201,7 @@ $ crictl info
       }
     },
     "streamServerPort": "10010",
-    "sandboxImage": "k8s.gcr.io/pause:3.4.1",
+    "sandboxImage": "k8s.gcr.io/pause:3.5",
     "statsCollectPeriod": 10,
     "containerdRootDir": "/var/lib/containerd",
     "containerdEndpoint": "unix:///run/containerd/containerd.sock",

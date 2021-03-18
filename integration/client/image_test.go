@@ -31,7 +31,7 @@ import (
 )
 
 func TestImageIsUnpacked(t *testing.T) {
-	const imageName = "k8s.gcr.io/pause:3.4.1"
+	const imageName = "k8s.gcr.io/pause:3.5"
 	ctx, cancel := testContext(t)
 	defer cancel()
 
@@ -81,7 +81,7 @@ func TestImagePullWithDistSourceLabel(t *testing.T) {
 	var (
 		source   = "k8s.gcr.io"
 		repoName = "pause"
-		tag      = "3.4.1"
+		tag      = "3.5"
 	)
 
 	ctx, cancel := testContext(t)
@@ -137,7 +137,7 @@ func TestImageUsage(t *testing.T) {
 		t.Skip()
 	}
 
-	imageName := "k8s.gcr.io/pause:3.4.1"
+	imageName := "k8s.gcr.io/pause:3.5"
 	ctx, cancel := testContext(t)
 	defer cancel()
 
