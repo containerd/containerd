@@ -349,6 +349,16 @@ jobs:
           sudo BDIR=$BDIR rm -rf ${BDIR}
           test $TEST_RC -eq 0 || /bin/false
 
+      # Log the status of this VM to investigate issues like
+      # https://github.com/containerd/containerd/issues/4969
+      - name: Host Status
+        if: always()
+        run: |
+          set -x
+          mount
+          df
+          losetup -l
+
   cgroup2:
     name: CGroupsV2 and SELinux Integration
     # nested virtualization is only available on macOS hosts
