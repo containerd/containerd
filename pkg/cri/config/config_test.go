@@ -295,7 +295,7 @@ func TestValidateConfig(t *testing.T) {
 				Registry: Registry{
 					Configs: map[string]RegistryConfig{
 						"gcr.io": {
-							Auth: &AuthConfig{
+							Auth: AuthConfig{
 								Username: "test",
 							},
 						},
@@ -353,7 +353,7 @@ func TestValidateConfig(t *testing.T) {
 					ConfigPath: "/etc/containerd/conf.d",
 					Configs: map[string]RegistryConfig{
 						"something.io": {
-							TLS: &TLSConfig{},
+							TLS: TLSConfig{},
 						},
 					},
 				},

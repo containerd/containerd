@@ -339,7 +339,7 @@ func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig
 			if hostauth == nil {
 				config := c.config.Registry.Configs[host]
 				if config.Auth != nil {
-					hostauth = toRuntimeAuthConfig(*config.Auth)
+					hostauth = toRuntimeAuthConfig(config.Auth)
 				}
 			}
 			return ParseAuth(hostauth, host)
@@ -376,7 +376,7 @@ func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig
 			}
 
 			if auth == nil && config.Auth != nil {
-				auth = toRuntimeAuthConfig(*config.Auth)
+				auth = toRuntimeAuthConfig(config.Auth)
 			}
 
 			if u.Path == "" {

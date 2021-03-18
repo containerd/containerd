@@ -168,12 +168,12 @@ type Registry struct {
 // RegistryConfig contains configuration used to communicate with the registry.
 type RegistryConfig struct {
 	// Auth contains information to authenticate to the registry.
-	Auth *AuthConfig `toml:"auth" json:"auth"`
+	Auth AuthConfig `toml:"auth" json:"auth"`
 	// TLS is a pair of CA/Cert/Key which then are used when creating the transport
 	// that communicates with the registry.
 	// This field will not be used when ConfigPath is provided.
 	// DEPRECATED: Use ConfigPath instead. Remove in containerd 1.7.
-	TLS *TLSConfig `toml:"tls" json:"tls"`
+	TLS TLSConfig `toml:"tls" json:"tls"`
 }
 
 // ImageDecryption contains configuration to handling decryption of encrypted container images.
@@ -396,7 +396,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 				endpoint = u.Host
 			}
 			config := c.Registry.Configs[endpoint]
-			config.Auth = &auth
+			config.Auth = auth
 			c.Registry.Configs[endpoint] = config
 		}
 		log.G(ctx).Warning("`auths` is deprecated, please use `configs` instead")
