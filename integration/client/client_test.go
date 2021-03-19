@@ -50,6 +50,7 @@ var (
 	noCriu            bool
 	supportsCriu      bool
 	testNamespace     = "testing"
+	testSnapshotter   = DefaultSnapshotter
 	ctrdStdioFilePath string
 
 	ctrd = &daemon{}
@@ -132,10 +133,29 @@ func TestMain(m *testing.M) {
 
 	// allow comparison with containerd under test
 	log.G(ctx).WithFields(logrus.Fields{
-		"version":  version.Version,
-		"revision": version.Revision,
-		"runtime":  os.Getenv("TEST_RUNTIME"),
+		"version":     version.Version,
+		"revision":    version.Revision,
+		"runtime":     os.Getenv("TEST_RUNTIME"),
+		"snapshotter": os.Getenv("TEST_SNAPSHOTTER"),
 	}).Info("running tests against containerd")
+
+	snapshotter := DefaultSnapshotter
+	if ss := os.Getenv("TEST_SNAPSHOTTER"); ss != "" {
+		snapshotter = ss
+	}
+
+	ns, ok := namespaces.Namespace(ctx)
+	if !ok {
+		fmt.Fprintln(os.Stderr, "error getting namespace")
+		os.Exit(1)
+	}
+	err = client.NamespaceService().SetLabel(ctx, ns, defaults.DefaultSnapshotterNSLabel, snapshotter)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error setting %s's default snapshotter as %s: %s\n", ns, snapshotter, err)
+		os.Exit(1)
+	}
+
+	testSnapshotter = snapshotter
 
 	// pull a seed image
 	log.G(ctx).WithField("image", testImage).Info("start to pull seed image")
@@ -285,7 +305,7 @@ func TestImagePullWithDiscardContent(t *testing.T) {
 		t.Fatalf("there is no layers in the target image(parent: %v)", img.Target())
 	}
 	var (
-		sn    = client.SnapshotService("")
+		sn    = client.SnapshotService(testSnapshotter)
 		chain []digest.Digest
 	)
 	for i, dgst := range layers {

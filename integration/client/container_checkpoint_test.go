@@ -414,7 +414,7 @@ func TestCheckpointLeaveRunning(t *testing.T) {
 	<-statusC
 }
 
-func TestCRWithImagePath(t *testing.T) {
+func TestCheckpointRestoreWithImagePath(t *testing.T) {
 	if !supportsCriu {
 		t.Skip("system does not have criu installed")
 	}
