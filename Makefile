@@ -196,14 +196,14 @@ benchmark: ## run benchmarks tests
 
 FORCE:
 
-define BUILD_BINARY =
+define BUILD_BINARY
 @echo "$(WHALE) $@"
 @go build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o $@ ${GO_LDFLAGS} ${GO_TAGS}  ./$<
 endef
 
 # Build a binary from a cmd.
 bin/%: cmd/% FORCE
-	$(BUILD_BINARY)
+	$(call BUILD_BINARY)
 
 bin/containerd-shim: cmd/containerd-shim FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
 	@echo "$(WHALE) bin/containerd-shim"
