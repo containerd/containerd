@@ -55,6 +55,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const testUserNSImage = "mirror.gcr.io/library/alpine:latest"
+
 // TestRegressionIssue4769 verifies the number of task exit events.
 //
 // Issue: https://github.com/containerd/containerd/issues/4769.
@@ -1596,7 +1598,7 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 	)
 	defer cancel()
 
-	image, err = client.GetImage(ctx, testImage)
+	image, err = client.Pull(ctx, testUserNSImage, WithPullUnpack)
 	if err != nil {
 		t.Fatal(err)
 	}
