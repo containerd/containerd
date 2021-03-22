@@ -43,4 +43,7 @@ test_exit_code=$?
 
 test_teardown
 
+test $test_exit_code -ne 0 && \
+  cat "$REPORT_DIR/containerd.log"
+
 exit ${test_exit_code}
