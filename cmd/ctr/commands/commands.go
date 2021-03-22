@@ -78,6 +78,14 @@ var (
 			Name:  "tlskey",
 			Usage: "path to TLS client key",
 		},
+		cli.BoolFlag{
+			Name:  "http-dump",
+			Usage: "dump all HTTP request/responses when interacting with container registry",
+		},
+		cli.BoolFlag{
+			Name:  "http-trace",
+			Usage: "enable HTTP tracing for registry interactions",
+		},
 	}
 
 	// ContainerFlags are cli flags specifying container options
