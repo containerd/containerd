@@ -158,8 +158,8 @@ github.com/containerd/typeurl v1.0.1 h1:PvuK4E3D5S5q6IqsPDCy928FhP0LUIGcmZ/Yhgp5
 github.com/containerd/typeurl v1.0.1/go.mod h1:TB1hUtrpaiO88KEK56ijojHS1+NeF0izUACaJW2mdXg=
 github.com/containerd/zfs v0.0.0-20200918131355-0a33824f23a2/go.mod h1:8IgZOBdv8fAgXddBT4dBXJPtxyRsejFIpXoklgxgEjw=
 github.com/containerd/zfs v0.0.0-20210301145711-11e8f1707f62/go.mod h1:A9zfAbMlQwE+/is6hi0Xw8ktpL+6glmqZYtevJgaB8Y=
-github.com/containerd/zfs v0.0.0-20210315114300-dde8f0fda960 h1:HXgv62Qod4KvnxeNWszVQ4ZR+NrVY9ODFxlaqKzDQMs=
-github.com/containerd/zfs v0.0.0-20210315114300-dde8f0fda960/go.mod h1:m+m51S1DvAP6r3FcmYCp54bQ34pyOwTieQDNRIRHsFY=
+github.com/containerd/zfs v0.0.0-20210322090317-0e92c2247fb7 h1:8vskJ2uVsiu9pjODDUnyj6gKZ6mNPMlqPgfqV6gnuRc=
+github.com/containerd/zfs v0.0.0-20210322090317-0e92c2247fb7/go.mod h1:m+m51S1DvAP6r3FcmYCp54bQ34pyOwTieQDNRIRHsFY=
 github.com/containernetworking/cni v0.7.1/go.mod h1:LGwApLUm2FpoOfxTDEeq8T9ipbpZ61X79hmU3w8FmsY=
 github.com/containernetworking/cni v0.8.0 h1:BT9lpgGoH4jw3lFC7Odz2prU5ruiYKcgAjMCbgybcKI=
 github.com/containernetworking/cni v0.8.0/go.mod h1:LGwApLUm2FpoOfxTDEeq8T9ipbpZ61X79hmU3w8FmsY=

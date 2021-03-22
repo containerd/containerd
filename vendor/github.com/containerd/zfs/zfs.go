@@ -20,6 +20,7 @@ package zfs
 
 import (
 	"context"
+	"math"
 	"path/filepath"
 
 	"github.com/containerd/containerd/log"
@@ -116,7 +117,40 @@ func (z *snapshotter) Stat(ctx context.Context, key string) (snapshots.Info, err
 
 // Usage retrieves the disk usage of the top-level snapshot.
 func (z *snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
-	return snapshots.Usage{}, errors.New("zfs does not implement Usage() yet")
+	return z.usage(ctx, key)
+}
+
+func (z *snapshotter) usage(ctx context.Context, key string) (snapshots.Usage, error) {
+	ctx, t, err := z.ms.TransactionContext(ctx, false)
+	if err != nil {
+		return snapshots.Usage{}, err
+	}
+	id, info, usage, err := storage.GetInfo(ctx, key)
+	t.Rollback() //nolint:errcheck
+
+	if err != nil {
+		return snapshots.Usage{}, err
+	}
+
+	if info.Kind == snapshots.KindActive {
+		activeName := filepath.Join(z.dataset.Name, id)
+		sDataset, err := zfs.GetDataset(activeName)
+
+		if err != nil {
+			return snapshots.Usage{}, err
+		}
+
+		if sDataset.Used > math.MaxInt64 {
+			return snapshots.Usage{}, errors.Errorf("Dataset size exceeds maximum snapshot size of %v bytes", math.MaxInt64)
+		}
+
+		usage = snapshots.Usage{
+			Size:   int64(sDataset.Used),
+			Inodes: -1,
+		}
+	}
+
+	return usage, nil
 }
 
 // Walk the committed snapshots.
@@ -201,6 +235,11 @@ func (z *snapshotter) mounts(dataset *zfs.Dataset, readonly bool) ([]mount.Mount
 }
 
 func (z *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) (err error) {
+	usage, err := z.usage(ctx, key)
+	if err != nil {
+		return errors.Wrap(err, "failed to compute usage")
+	}
+
 	ctx, t, err := z.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return err
@@ -213,7 +252,7 @@ func (z *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		}
 	}()
 
-	id, err := storage.CommitActive(ctx, key, name, snapshots.Usage{}, opts...)
+	id, err := storage.CommitActive(ctx, key, name, usage, opts...)
 	if err != nil {
 		return errors.Wrap(err, "failed to commit")
 	}
