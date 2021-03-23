@@ -24,6 +24,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/containerd/containerd/pkg/userns"
 )
 
 const (
@@ -42,7 +44,7 @@ func SetOOMScore(pid, score int) error {
 	}
 	defer f.Close()
 	if _, err = f.WriteString(strconv.Itoa(score)); err != nil {
-		if os.IsPermission(err) && (RunningInUserNS() || RunningUnprivileged()) {
+		if os.IsPermission(err) && (userns.RunningInUserNS() || RunningUnprivileged()) {
 			return nil
 		}
 		return err
