@@ -61,10 +61,7 @@ func AdjustOOMScore(pid int) error {
 		return errors.Wrap(err, "get parent OOM score")
 	}
 	shimScore := score + 1
-	if shimScore > sys.OOMScoreAdjMax {
-		shimScore = sys.OOMScoreAdjMax
-	}
-	if err := sys.SetOOMScore(pid, shimScore); err != nil {
+	if err := sys.AdjustOOMScore(pid, shimScore); err != nil {
 		return errors.Wrap(err, "set shim OOM score")
 	}
 	return nil

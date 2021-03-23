@@ -36,6 +36,17 @@ const (
 	OOMScoreAdjMax = 1000
 )
 
+// AdjustOOMScore sets the oom score for the provided pid. If the provided score
+// is out of range (-1000 - 1000), it is clipped to the min/max value.
+func AdjustOOMScore(pid, score int) error {
+	if score > OOMScoreAdjMax {
+		score = OOMScoreAdjMax
+	} else if score < OOMScoreAdjMin {
+		score = OOMScoreAdjMin
+	}
+	return SetOOMScore(pid, score)
+}
+
 // SetOOMScore sets the oom score for the provided pid
 func SetOOMScore(pid, score int) error {
 	if score > OOMScoreAdjMax || score < OOMScoreAdjMin {
