@@ -18,6 +18,7 @@ package sys
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"testing"
@@ -55,6 +56,28 @@ func TestSetNegativeOomScoreAdjustmentWhenUnprivilegedHasNoEffect(t *testing.T) 
 	initial, adjustment, err := adjustOom(-123)
 	assert.NilError(t, err)
 	assert.Check(t, is.Equal(adjustment, initial))
+}
+
+func TestSetOOMScoreBoundaries(t *testing.T) {
+	err := SetOOMScore(0, OOMScoreAdjMax+1)
+	assert.ErrorContains(t, err, fmt.Sprintf("value out of range (%d): OOM score must be between", OOMScoreAdjMax+1))
+
+	err = SetOOMScore(0, OOMScoreAdjMin-1)
+	assert.ErrorContains(t, err, fmt.Sprintf("value out of range (%d): OOM score must be between", OOMScoreAdjMin-1))
+
+	_, adjustment, err := adjustOom(OOMScoreAdjMax)
+	assert.NilError(t, err)
+	assert.Check(t, is.Equal(adjustment, OOMScoreAdjMax))
+
+	score, err := GetOOMScoreAdj(os.Getpid())
+	assert.NilError(t, err)
+	if score == 0 || score == OOMScoreAdjMin {
+		// we won't be able to set the score lower than the parent process,
+		// so only test if parent process does not have a oom-score-adj
+		_, adjustment, err = adjustOom(OOMScoreAdjMin)
+		assert.NilError(t, err)
+		assert.Check(t, is.Equal(adjustment, OOMScoreAdjMin))
+	}
 }
 
 func adjustOom(adjustment int) (int, int, error) {

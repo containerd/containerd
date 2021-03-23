@@ -30,12 +30,17 @@ import (
 const (
 	// OOMScoreMaxKillable is the maximum score keeping the process killable by the oom killer
 	OOMScoreMaxKillable = -999
-	// OOMScoreAdjMax is from OOM_SCORE_ADJ_MAX https://github.com/torvalds/linux/blob/master/include/uapi/linux/oom.h
+	// OOMScoreAdjMin is from OOM_SCORE_ADJ_MIN https://github.com/torvalds/linux/blob/v5.10/include/uapi/linux/oom.h#L9
+	OOMScoreAdjMin = -1000
+	// OOMScoreAdjMax is from OOM_SCORE_ADJ_MAX https://github.com/torvalds/linux/blob/v5.10/include/uapi/linux/oom.h#L10
 	OOMScoreAdjMax = 1000
 )
 
 // SetOOMScore sets the oom score for the provided pid
 func SetOOMScore(pid, score int) error {
+	if score > OOMScoreAdjMax || score < OOMScoreAdjMin {
+		return fmt.Errorf("value out of range (%d): OOM score must be between %d and %d", score, OOMScoreAdjMin, OOMScoreAdjMax)
+	}
 	path := fmt.Sprintf("/proc/%d/oom_score_adj", pid)
 	f, err := os.OpenFile(path, os.O_WRONLY, 0)
 	if err != nil {
