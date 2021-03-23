@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/pkg/userns"
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -42,7 +43,7 @@ func SetOOMScore(pid, score int) error {
 	}
 	defer f.Close()
 	if _, err = f.WriteString(strconv.Itoa(score)); err != nil {
-		if os.IsPermission(err) && (userns.RunningInUserNS() || RunningUnprivileged()) {
+		if os.IsPermission(err) && (!runningPrivileged() || userns.RunningInUserNS()) {
 			return nil
 		}
 		return err
@@ -58,4 +59,10 @@ func GetOOMScoreAdj(pid int) (int, error) {
 		return 0, err
 	}
 	return strconv.Atoi(strings.TrimSpace(string(data)))
+}
+
+// runningPrivileged returns true if the effective user ID of the
+// calling process is 0
+func runningPrivileged() bool {
+	return unix.Geteuid() == 0
 }

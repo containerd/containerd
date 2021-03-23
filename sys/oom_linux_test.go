@@ -37,7 +37,7 @@ func TestSetPositiveOomScoreAdjustment(t *testing.T) {
 }
 
 func TestSetNegativeOomScoreAdjustmentWhenPrivileged(t *testing.T) {
-	if RunningUnprivileged() {
+	if !runningPrivileged() {
 		t.Skip("Needs to be run as root")
 		return
 	}
@@ -51,7 +51,7 @@ func TestSetNegativeOomScoreAdjustmentWhenPrivileged(t *testing.T) {
 }
 
 func TestSetNegativeOomScoreAdjustmentWhenUnprivilegedHasNoEffect(t *testing.T) {
-	if RunningPrivileged() {
+	if runningPrivileged() {
 		t.Skip("Needs to be run as non-root")
 		return
 	}
