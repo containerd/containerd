@@ -1,3 +1,5 @@
+// +build !linux
+
 /*
    Copyright The containerd Authors.
 
@@ -17,7 +19,9 @@
 package sys
 
 const (
-	// OOMScoreAdjMax is not implemented on Windows
+	// OOMScoreMaxKillable is not implemented on non Linux
+	OOMScoreMaxKillable = 0
+	// OOMScoreAdjMax is not implemented on non Linux
 	OOMScoreAdjMax = 0
 )
 
