@@ -210,8 +210,8 @@ func (s *store) add(img Image) error {
 		s.images[img.ID] = img
 		return nil
 	}
-	// Or else, merge the references.
-	i.References = util.MergeStringSlices(i.References, img.References)
+	// Or else, merge and sort the references.
+	i.References = sortReferences(util.MergeStringSlices(i.References, img.References))
 	s.images[img.ID] = i
 	return nil
 }

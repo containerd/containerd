@@ -32,24 +32,24 @@ func TestInternalStore(t *testing.T) {
 		{
 			ID:         "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			ChainID:    "test-chain-id-1",
-			References: []string{"ref-1"},
+			References: []string{"containerd.io/ref-1"},
 			Size:       10,
 		},
 		{
 			ID:         "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			ChainID:    "test-chain-id-2abcd",
-			References: []string{"ref-2abcd"},
+			References: []string{"containerd.io/ref-2abcd"},
 			Size:       20,
 		},
 		{
 			ID:         "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-			References: []string{"ref-4a333"},
+			References: []string{"containerd.io/ref-4a333"},
 			ChainID:    "test-chain-id-4a333",
 			Size:       30,
 		},
 		{
 			ID:         "sha256:4123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-			References: []string{"ref-4abcd"},
+			References: []string{"containerd.io/ref-4abcd"},
 			ChainID:    "test-chain-id-4abcd",
 			Size:       40,
 		},
@@ -143,7 +143,7 @@ func TestImageStore(t *testing.T) {
 	image := Image{
 		ID:         id,
 		ChainID:    "test-chain-id-1",
-		References: []string{"ref-1"},
+		References: []string{"containerd.io/ref-1"},
 		Size:       10,
 	}
 	assert := assertlib.New(t)
@@ -159,33 +159,33 @@ func TestImageStore(t *testing.T) {
 		expected []Image
 	}{
 		"nothing should happen if a non-exist ref disappear": {
-			ref:      "ref-2",
+			ref:      "containerd.io/ref-2",
 			image:    nil,
 			expected: []Image{image},
 		},
 		"new ref for an existing image": {
-			ref: "ref-2",
+			ref: "containerd.io/ref-2",
 			image: &Image{
 				ID:         id,
 				ChainID:    "test-chain-id-1",
-				References: []string{"ref-2"},
+				References: []string{"containerd.io/ref-2"},
 				Size:       10,
 			},
 			expected: []Image{
 				{
 					ID:         id,
 					ChainID:    "test-chain-id-1",
-					References: []string{"ref-1", "ref-2"},
+					References: []string{"containerd.io/ref-1", "containerd.io/ref-2"},
 					Size:       10,
 				},
 			},
 		},
 		"new ref for a new image": {
-			ref: "ref-2",
+			ref: "containerd.io/ref-2",
 			image: &Image{
 				ID:         newID,
 				ChainID:    "test-chain-id-2",
-				References: []string{"ref-2"},
+				References: []string{"containerd.io/ref-2"},
 				Size:       20,
 			},
 			expected: []Image{
@@ -193,30 +193,30 @@ func TestImageStore(t *testing.T) {
 				{
 					ID:         newID,
 					ChainID:    "test-chain-id-2",
-					References: []string{"ref-2"},
+					References: []string{"containerd.io/ref-2"},
 					Size:       20,
 				},
 			},
 		},
 		"existing ref point to a new image": {
-			ref: "ref-1",
+			ref: "containerd.io/ref-1",
 			image: &Image{
 				ID:         newID,
 				ChainID:    "test-chain-id-2",
-				References: []string{"ref-1"},
+				References: []string{"containerd.io/ref-1"},
 				Size:       20,
 			},
 			expected: []Image{
 				{
 					ID:         newID,
 					ChainID:    "test-chain-id-2",
-					References: []string{"ref-1"},
+					References: []string{"containerd.io/ref-1"},
 					Size:       20,
 				},
 			},
 		},
 		"existing ref disappear": {
-			ref:      "ref-1",
+			ref:      "containerd.io/ref-1",
 			image:    nil,
 			expected: []Image{},
 		},
