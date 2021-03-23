@@ -1,5 +1,3 @@
-// +build !linux
-
 /*
    Copyright The containerd Authors.
 
@@ -18,8 +16,8 @@
 
 package sys
 
-// RunningInUserNS is a stub for non-Linux systems
-// Always returns false
-func RunningInUserNS() bool {
-	return false
-}
+import "github.com/containerd/containerd/pkg/userns"
+
+// RunningInUserNS detects whether we are currently running in a user namespace.
+// Deprecated: use github.com/containerd/containerd/pkg/userns.RunningInUserNS instead.
+var RunningInUserNS = userns.RunningInUserNS

@@ -18,7 +18,7 @@ package server
 
 import (
 	"github.com/containerd/containerd/pkg/cap"
-	"github.com/containerd/containerd/sys"
+	"github.com/containerd/containerd/pkg/userns"
 	cni "github.com/containerd/go-cni"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/pkg/errors"
@@ -33,7 +33,7 @@ const networkAttachCount = 2
 func (c *criService) initPlatform() error {
 	var err error
 
-	if sys.RunningInUserNS() {
+	if userns.RunningInUserNS() {
 		if !(c.config.DisableCgroup && !c.apparmorEnabled() && c.config.RestrictOOMScoreAdj) {
 			logrus.Warn("Running containerd in a user namespace typically requires disable_cgroup, disable_apparmor, restrict_oom_score_adj set to be true")
 		}
