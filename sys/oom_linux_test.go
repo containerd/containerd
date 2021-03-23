@@ -23,11 +23,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/pkg/userns"
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 )
 
 func TestSetPositiveOomScoreAdjustment(t *testing.T) {
+	// Setting a *positive* OOM score adjust does not require privileged
 	_, adjustment, err := adjustOom(123)
 	if err != nil {
 		t.Error(err)
@@ -37,8 +39,8 @@ func TestSetPositiveOomScoreAdjustment(t *testing.T) {
 }
 
 func TestSetNegativeOomScoreAdjustmentWhenPrivileged(t *testing.T) {
-	if !runningPrivileged() {
-		t.Skip("Needs to be run as root")
+	if !runningPrivileged() || userns.RunningInUserNS() {
+		t.Skip("requires root and not running in user namespace")
 		return
 	}
 
@@ -51,8 +53,8 @@ func TestSetNegativeOomScoreAdjustmentWhenPrivileged(t *testing.T) {
 }
 
 func TestSetNegativeOomScoreAdjustmentWhenUnprivilegedHasNoEffect(t *testing.T) {
-	if runningPrivileged() {
-		t.Skip("Needs to be run as non-root")
+	if runningPrivileged() && !userns.RunningInUserNS() {
+		t.Skip("needs to be run as non-root or in user namespace")
 		return
 	}
 
