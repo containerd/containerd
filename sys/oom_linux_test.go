@@ -31,10 +31,7 @@ import (
 func TestSetPositiveOomScoreAdjustment(t *testing.T) {
 	// Setting a *positive* OOM score adjust does not require privileged
 	_, adjustment, err := adjustOom(123)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.NilError(t, err)
 	assert.Check(t, is.Equal(adjustment, 123))
 }
 
@@ -45,10 +42,7 @@ func TestSetNegativeOomScoreAdjustmentWhenPrivileged(t *testing.T) {
 	}
 
 	_, adjustment, err := adjustOom(-123)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.NilError(t, err)
 	assert.Check(t, is.Equal(adjustment, -123))
 }
 
@@ -59,10 +53,7 @@ func TestSetNegativeOomScoreAdjustmentWhenUnprivilegedHasNoEffect(t *testing.T) 
 	}
 
 	initial, adjustment, err := adjustOom(-123)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.NilError(t, err)
 	assert.Check(t, is.Equal(adjustment, initial))
 }
 
