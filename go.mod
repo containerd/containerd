@@ -18,7 +18,7 @@ require (
 	github.com/containerd/nri v0.0.0-20210316161719-dbaa18c31c14
 	github.com/containerd/ttrpc v1.0.2
 	github.com/containerd/typeurl v1.0.1
-	github.com/containerd/zfs v0.0.0-20210322090317-0e92c2247fb7
+	github.com/containerd/zfs v0.0.0-20210324211415-d5c4544f0433
 	github.com/containernetworking/plugins v0.8.6
 	github.com/coreos/go-systemd/v22 v22.1.0
 	github.com/davecgh/go-spew v1.1.1

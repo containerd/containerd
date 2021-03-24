@@ -36,6 +36,9 @@ const (
 	//	active := filepath.Join(dataset.Name, id)
 	//      committed := active + "@" + snapshotSuffix
 	snapshotSuffix = "snapshot"
+
+	// Using this typed MaxInt64 to prevent integer overlow on 32bit
+	maxSnapshotSize int64 = math.MaxInt64
 )
 
 type snapshotter struct {
@@ -140,8 +143,8 @@ func (z *snapshotter) usage(ctx context.Context, key string) (snapshots.Usage, e
 			return snapshots.Usage{}, err
 		}
 
-		if sDataset.Used > math.MaxInt64 {
-			return snapshots.Usage{}, errors.Errorf("Dataset size exceeds maximum snapshot size of %v bytes", math.MaxInt64)
+		if int64(sDataset.Used) > maxSnapshotSize {
+			return snapshots.Usage{}, errors.Errorf("Dataset size exceeds maximum snapshot size of %d bytes", maxSnapshotSize)
 		}
 
 		usage = snapshots.Usage{
