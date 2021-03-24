@@ -134,6 +134,7 @@ github.com/containerd/nri/pkg/api
 github.com/containerd/nri/pkg/log
 github.com/containerd/nri/pkg/net
 github.com/containerd/nri/pkg/net/multiplex
+github.com/containerd/nri/pkg/runtime-tools/generate
 github.com/containerd/nri/types/v1
 # github.com/containerd/ttrpc v1.1.1-0.20220420014843-944ef4a40df3
 ## explicit; go 1.13

@@ -33,6 +33,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 )
 
@@ -42,6 +43,24 @@ func (c *criService) UpdateContainerResources(ctx context.Context, r *runtime.Up
 	if err != nil {
 		return nil, fmt.Errorf("failed to find container: %w", err)
 	}
+
+	var sandbox sandboxstore.Sandbox
+	if c.nri.isEnabled() {
+		sandbox, err = c.sandboxStore.Get(container.SandboxID)
+		if err != nil {
+			return nil, err
+		}
+
+		resources := r.GetLinux()
+		updated, err := c.nri.updateContainer(ctx, &sandbox, &container, resources)
+		if err != nil {
+			return nil, fmt.Errorf("NRI container update failed: %w", err)
+		}
+		if updated != nil {
+			*resources = *updated
+		}
+	}
+
 	// Update resources in status update transaction, so that:
 	// 1) There won't be race condition with container start.
 	// 2) There won't be concurrent resource update to the same container.
@@ -50,6 +69,14 @@ func (c *criService) UpdateContainerResources(ctx context.Context, r *runtime.Up
 	}); err != nil {
 		return nil, fmt.Errorf("failed to update resources: %w", err)
 	}
+
+	if c.nri.isEnabled() {
+		err = c.nri.postUpdateContainer(ctx, &sandbox, &container)
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("NRI post-update notification failed")
+		}
+	}
+
 	return &runtime.UpdateContainerResourcesResponse{}, nil
 }
 

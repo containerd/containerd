@@ -50,6 +50,9 @@ require (
 	github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b
 	github.com/opencontainers/runc v1.1.4
 	github.com/opencontainers/runtime-spec v1.0.3-0.20220825212826-86290f6a00fb
+	// ATM the runtime-tools commit we need are beyond the latest tag.
+	// We use a replace to handle that until a new version is tagged.
+	github.com/opencontainers/runtime-tools v0.9.0
 	github.com/opencontainers/selinux v1.10.2
 	github.com/pelletier/go-toml v1.9.3
 	github.com/prometheus/client_golang v1.12.1
@@ -107,9 +110,6 @@ require (
 	github.com/moby/spdystream v0.2.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	// ATM the runtime-tools commit we need are beyond the latest tag.
-	// We use a replace to handle that until a new version is tagged.
-	github.com/opencontainers/runtime-tools v0.9.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect

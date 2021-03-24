@@ -1,5 +1,5 @@
-//go:build gofuzz
-// +build gofuzz
+//go:build !linux
+// +build !linux
 
 /*
    Copyright The containerd Authors.
@@ -17,31 +17,8 @@
    limitations under the License.
 */
 
-package fuzz
+package generate
 
-import (
-	fuzz "github.com/AdaLogics/go-fuzz-headers"
-
-	"github.com/containerd/containerd"
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	"github.com/containerd/containerd/pkg/cri/server"
-)
-
-func FuzzCRIServer(data []byte) int {
-	initDaemon.Do(startDaemon)
-
-	f := fuzz.NewConsumer(data)
-
-	client, err := containerd.New(defaultAddress)
-	if err != nil {
-		return 0
-	}
-	defer client.Close()
-
-	c, err := server.NewCRIService(criconfig.Config{}, client, nil)
-	if err != nil {
-		panic(err)
-	}
-
-	return fuzzCRI(f, c)
+func ensurePropagation(path string, accepted ...string) error {
+	return nil
 }

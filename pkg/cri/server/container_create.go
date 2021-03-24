@@ -246,6 +246,19 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		containerd.WithRuntime(sandboxInfo.Runtime.Name, runtimeOptions),
 		containerd.WithContainerLabels(containerLabels),
 		containerd.WithContainerExtension(containerMetadataExtension, &meta))
+
+	if c.nri.isEnabled() {
+		opts = append(opts, c.nri.WithContainerAdjustment())
+
+		defer func() {
+			if retErr != nil {
+				deferCtx, deferCancel := ctrdutil.DeferContext()
+				defer deferCancel()
+				c.nri.undoCreateContainer(deferCtx, &sandbox, id, spec)
+			}
+		}()
+	}
+
 	var cntr containerd.Container
 	if cntr, err = c.client.NewContainer(ctx, id, opts...); err != nil {
 		return nil, fmt.Errorf("failed to create containerd container: %w", err)
@@ -282,6 +295,13 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	// Add container into container store.
 	if err := c.containerStore.Add(container); err != nil {
 		return nil, fmt.Errorf("failed to add container %q into store: %w", id, err)
+	}
+
+	if c.nri.isEnabled() {
+		err = c.nri.postCreateContainer(ctx, &sandbox, &container)
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("NRI post-create notification failed")
+		}
 	}
 
 	containerCreateTimer.WithValues(ociRuntime.Type).UpdateSince(start)

@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/cri/sbserver"
+	"github.com/containerd/containerd/pkg/nri"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -46,6 +47,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.EventPlugin,
 			plugin.ServicePlugin,
+			plugin.NRIApiPlugin,
 		},
 		InitFn: initCRIService,
 	})
@@ -85,12 +87,19 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	}
 
 	var s server.CRIService
+	var nrip nri.API
 	if os.Getenv("ENABLE_CRI_SANDBOXES") != "" {
 		log.G(ctx).Info("using experimental CRI Sandbox server - unset ENABLE_CRI_SANDBOXES to disable")
 		s, err = sbserver.NewCRIService(c, client)
 	} else {
 		log.G(ctx).Info("using legacy CRI server")
-		s, err = server.NewCRIService(c, client)
+
+		nrip, err = getNRIPlugin(ic)
+		if err != nil {
+			log.G(ctx).Info("NRI service not found, disabling NRI support")
+		}
+
+		s, err = server.NewCRIService(c, client, nrip)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRI service: %w", err)
@@ -102,6 +111,14 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		}
 		// TODO(random-liu): Whether and how we can stop containerd.
 	}()
+
+	if nrip != nil {
+		log.G(ctx).Info("using experimental NRI integration - disable nri plugin to prevent this")
+		if err = nrip.Start(); err != nil {
+			log.G(ctx).WithError(err).Fatal("Failed to start NRI service")
+		}
+	}
+
 	return s, nil
 }
 
@@ -127,4 +144,25 @@ func setGLogLevel() error {
 	case logrus.PanicLevel:
 	}
 	return nil
+}
+
+// Get the NRI plugin and verify its type.
+func getNRIPlugin(ic *plugin.InitContext) (nri.API, error) {
+	const (
+		pluginType = plugin.NRIApiPlugin
+		pluginName = "nri"
+	)
+
+	p, err := ic.GetByID(pluginType, pluginName)
+	if err != nil {
+		return nil, err
+	}
+
+	api, ok := p.(nri.API)
+	if !ok {
+		return nil, fmt.Errorf("NRI plugin (%s, %q) has incompatible type %T",
+			pluginType, pluginName, api)
+	}
+
+	return api, nil
 }
