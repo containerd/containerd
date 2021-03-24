@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http/httptrace"
 	"os"
 	"sync"
 	"text/tabwriter"
@@ -110,6 +111,8 @@ type FetchConfig struct {
 	AllMetadata bool
 	// RemoteOpts is not used by ctr, but can be used by other CLI tools
 	RemoteOpts []containerd.RemoteOpt
+	// TraceHTTP writes DNS and connection information to the log when dealing with a container registry
+	TraceHTTP bool
 }
 
 // NewFetchConfig returns the default FetchConfig from cli flags
@@ -119,8 +122,9 @@ func NewFetchConfig(ctx context.Context, clicontext *cli.Context) (*FetchConfig,
 		return nil, err
 	}
 	config := &FetchConfig{
-		Resolver: resolver,
-		Labels:   clicontext.StringSlice("label"),
+		Resolver:  resolver,
+		Labels:    clicontext.StringSlice("label"),
+		TraceHTTP: clicontext.Bool("http-trace"),
 	}
 	if !clicontext.GlobalBool("debug") {
 		config.ProgressOutput = os.Stdout
@@ -147,6 +151,10 @@ func NewFetchConfig(ctx context.Context, clicontext *cli.Context) (*FetchConfig,
 // Fetch loads all resources into the content store and returns the image
 func Fetch(ctx context.Context, client *containerd.Client, ref string, config *FetchConfig) (images.Image, error) {
 	ongoing := NewJobs(ref)
+
+	if config.TraceHTTP {
+		ctx = httptrace.WithClientTrace(ctx, commands.NewDebugClientTrace(ctx))
+	}
 
 	pctx, stopProgress := context.WithCancel(ctx)
 	progress := make(chan struct{})

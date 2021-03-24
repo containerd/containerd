@@ -17,9 +17,7 @@
 package images
 
 import (
-	"context"
 	"fmt"
-	"net/http/httptrace"
 	"os"
 	"sort"
 	"strings"
@@ -333,24 +331,4 @@ var removeCommand = cli.Command{
 
 		return exitErr
 	},
-}
-
-// NewDebugClientTrace returns a Go http trace client predefined to write DNS and connection
-// information to the log. This is used via the --trace flag on push and pull operations in ctr.
-func NewDebugClientTrace(ctx context.Context) *httptrace.ClientTrace {
-	return &httptrace.ClientTrace{
-		DNSStart: func(dnsInfo httptrace.DNSStartInfo) {
-			log.G(ctx).WithField("host", dnsInfo.Host).Debugf("DNS lookup")
-		},
-		DNSDone: func(dnsInfo httptrace.DNSDoneInfo) {
-			if dnsInfo.Err != nil {
-				log.G(ctx).WithField("lookup_err", dnsInfo.Err).Debugf("DNS lookup error")
-			} else {
-				log.G(ctx).WithField("result", dnsInfo.Addrs[0].String()).WithField("coalesced", dnsInfo.Coalesced).Debugf("DNS lookup complete")
-			}
-		},
-		GotConn: func(connInfo httptrace.GotConnInfo) {
-			log.G(ctx).WithField("reused", connInfo.Reused).WithField("remote_addr", connInfo.Conn.RemoteAddr().String()).Debugf("Connection successful")
-		},
-	}
 }

@@ -37,6 +37,9 @@ import (
 	"github.com/pkg/errors"
 )
 
+// UpdateClientFunc is a function that lets you to amend http Client behavior used by registry clients.
+type UpdateClientFunc func(client *http.Client) error
+
 type hostConfig struct {
 	scheme string
 	host   string
@@ -61,6 +64,8 @@ type HostOptions struct {
 	Credentials   func(host string) (string, string, error)
 	DefaultTLS    *tls.Config
 	DefaultScheme string
+	// UpdateClient will be called after creating http.Client object, so clients can provide extra configuration
+	UpdateClient UpdateClientFunc
 }
 
 // ConfigureHosts creates a registry hosts function from the provided
@@ -130,6 +135,11 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 		client := &http.Client{
 			Transport: defaultTransport,
 		}
+		if options.UpdateClient != nil {
+			if err := options.UpdateClient(client); err != nil {
+				return nil, err
+			}
+		}
 
 		authOpts := []docker.AuthorizerOpt{docker.WithAuthClient(client)}
 		if options.Credentials != nil {
@@ -198,6 +208,11 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 
 				c := *client
 				c.Transport = tr
+				if options.UpdateClient != nil {
+					if err := options.UpdateClient(&c); err != nil {
+						return nil, err
+					}
+				}
 
 				rhosts[i].Client = &c
 				rhosts[i].Authorizer = docker.NewDockerAuthorizer(append(authOpts, docker.WithAuthClient(&c))...)

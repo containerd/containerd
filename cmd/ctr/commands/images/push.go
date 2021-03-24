@@ -60,9 +60,6 @@ var pushCommand = cli.Command{
 		Name:  "manifest-type",
 		Usage: "media type of manifest digest",
 		Value: ocispec.MediaTypeImageManifest,
-	}, cli.BoolFlag{
-		Name:  "trace",
-		Usage: "enable HTTP tracing for registry interactions",
 	}, cli.StringSliceFlag{
 		Name:  "platform",
 		Usage: "push content from a specific platform",
@@ -123,8 +120,8 @@ var pushCommand = cli.Command{
 			}
 		}
 
-		if context.Bool("trace") {
-			ctx = httptrace.WithClientTrace(ctx, NewDebugClientTrace(ctx))
+		if context.Bool("http-trace") {
+			ctx = httptrace.WithClientTrace(ctx, commands.NewDebugClientTrace(ctx))
 		}
 		resolver, err := commands.GetResolver(ctx, context)
 		if err != nil {
