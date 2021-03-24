@@ -63,6 +63,10 @@ command. As part of this process, we do the following:
 			Name:  "print-chainid",
 			Usage: "Print the resulting image's chain ID",
 		},
+		cli.IntFlag{
+			Name:  "max-concurrent-downloads",
+			Usage: "Set the max concurrent downloads for each pull",
+		},
 	),
 	Action: func(context *cli.Context) error {
 		var (

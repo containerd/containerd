@@ -109,7 +109,7 @@ type FetchConfig struct {
 	Platforms []string
 	// Whether or not download all metadata
 	AllMetadata bool
-	// RemoteOpts is not used by ctr, but can be used by other CLI tools
+	// RemoteOpts to configure object resolutions and transfers with remote content providers
 	RemoteOpts []containerd.RemoteOpt
 	// TraceHTTP writes DNS and connection information to the log when dealing with a container registry
 	TraceHTTP bool
@@ -143,6 +143,16 @@ func NewFetchConfig(ctx context.Context, clicontext *cli.Context) (*FetchConfig,
 		config.PlatformMatcher = platforms.Any()
 	} else if clicontext.Bool("all-metadata") {
 		config.AllMetadata = true
+	}
+
+	if clicontext.IsSet("max-concurrent-downloads") {
+		mcd := clicontext.Int("max-concurrent-downloads")
+		config.RemoteOpts = append(config.RemoteOpts, containerd.WithMaxConcurrentDownloads(mcd))
+	}
+
+	if clicontext.IsSet("max-concurrent-uploaded-layers") {
+		mcu := clicontext.Int("max-concurrent-uploaded-layers")
+		config.RemoteOpts = append(config.RemoteOpts, containerd.WithMaxConcurrentUploadedLayers(mcu))
 	}
 
 	return config, nil
