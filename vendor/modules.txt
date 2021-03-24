@@ -1,7 +1,7 @@
 # github.com/BurntSushi/toml v0.3.1
 ## explicit
 github.com/BurntSushi/toml
-# github.com/Microsoft/go-winio v0.4.17-0.20210211115548-6eac466e5fa3
+# github.com/Microsoft/go-winio v0.4.17-0.20210324224401-5516f17a5958
 ## explicit
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/backuptar
