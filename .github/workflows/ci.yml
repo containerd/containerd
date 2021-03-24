@@ -123,6 +123,88 @@ jobs:
       - run: make man
         working-directory: src/github.com/containerd/containerd
 
+  # Make sure binaries compile with other platforms
+  crossbuild:
+    name: Crossbuild Binaries
+    needs: [project, linters, protos, man]
+    runs-on: ubuntu-18.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: arm64
+          - goos: linux
+            goarch: arm
+            goarm: "7"
+          - goos: linux
+            goarch: arm
+            goarm: "5"
+          - goos: freebsd
+            goarch: amd64
+          - goos: freebsd
+            goarch: arm64
+          - goos: windows
+            goarch: arm
+            goarm: "7"
+
+    steps:
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '1.16.2'
+      - name: Set env
+        shell: bash
+        run: |
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+      - uses: actions/checkout@v2
+        with:
+          path: src/github.com/containerd/containerd
+      - run: |
+          set -e -x
+
+          packages=""
+          platform="${{matrix.goos}}/${{matrix.goarch}}"
+          if [ -n "${{matrix.goarm}}" ]; then
+            platform+="/v${{matrix.goarm}}"
+          fi
+
+          case "${platform}" in
+          linux/arm/v5)
+            packages+=" crossbuild-essential-armel"
+            echo "CGO_ENABLED=1" >> $GITHUB_ENV
+            echo "CC=arm-linux-gnueabi-gcc" >> $GITHUB_ENV
+            ;;
+          linux/arm/v7)
+            packages+=" crossbuild-essential-armhf"
+            echo "CGO_ENABLED=1" >> $GITHUB_ENV
+            echo "CC=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
+            ;;
+          linux/arm64)
+            packages+=" crossbuild-essential-arm64"
+            echo "CGO_ENABLED=1" >> $GITHUB_ENV
+            echo "CC=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+            ;;
+          windows/arm/v7)
+            echo "CGO_ENABLED=0" >> $GITHUB_ENV
+            ;;
+          esac
+
+          if [ -n "${packages}" ]; then
+            sudo apt-get update && sudo apt-get install -y ${packages}
+          fi
+        name: install deps
+      - name: Build
+        working-directory: src/github.com/containerd/containerd
+        env:
+          GOOS: ${{matrix.goos}}
+          GOARCH: ${{matrix.goarch}}
+          GOARM: ${{matrix.goarm}}
+        run: |
+          make build
+          make binaries
+
   #
   # Build containerd binaries
   #
@@ -155,13 +237,6 @@ jobs:
         run: |
           make build
           make binaries
-        working-directory: src/github.com/containerd/containerd
-
-      - name: Cross-compile
-        if: startsWith(matrix.os, 'ubuntu')
-        run : |
-          GOOS=freebsd make build
-          GOOS=freebsd make binaries
         working-directory: src/github.com/containerd/containerd
 
   #
