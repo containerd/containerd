@@ -16,10 +16,10 @@
 
 package seccomp
 
-// IsEnabled returns whether seccomp support is enabled
-// On Linux returns if the kernel has been configured to support seccomp.
-//  From https://github.com/opencontainers/runc/blob/v1.0.0-rc91/libcontainer/seccomp/seccomp_linux.go#L86-L102
-// On non-Linux returns false
+// IsEnabled checks whether seccomp support is enabled. On Linux, it returns
+// true if the kernel has been configured to support seccomp (kernel options
+// CONFIG_SECCOMP and CONFIG_SECCOMP_FILTER are set). On non-Linux, it always
+// returns false.
 func IsEnabled() bool {
 	return isEnabled()
 }
