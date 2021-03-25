@@ -20,6 +20,8 @@ package dmsetup
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -327,15 +329,18 @@ func GetFullDevicePath(deviceName string) string {
 }
 
 // BlockDeviceSize returns size of block device in bytes
-func BlockDeviceSize(devicePath string) (uint64, error) {
-	data, err := exec.Command("blockdev", "--getsize64", "-q", devicePath).CombinedOutput()
-	output := string(data)
+func BlockDeviceSize(path string) (int64, error) {
+	f, err := os.Open(path)
 	if err != nil {
-		return 0, errors.Wrapf(err, output)
+		return 0, err
 	}
+	defer f.Close()
 
-	output = strings.TrimSuffix(output, "\n")
-	return strconv.ParseUint(output, 10, 64)
+	size, err := f.Seek(0, io.SeekEnd)
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to seek on %q", path)
+	}
+	return size, nil
 }
 
 func dmsetup(args ...string) (string, error) {
