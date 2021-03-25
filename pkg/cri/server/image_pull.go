@@ -365,7 +365,7 @@ func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig
 			var (
 				transport = newTransport()
 				client    = &http.Client{Transport: transport}
-				config    = c.config.Registry.Configs[e]
+				config    = c.config.Registry.Configs[u.Host]
 			)
 
 			if config.TLS != nil {

@@ -398,6 +398,13 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 			config := c.Registry.Configs[endpoint]
 			config.Auth = &auth
 			c.Registry.Configs[endpoint] = config
+			// set both endpoint and host for tls/auth configs
+			if endpoint != u.Host {
+				// avoid overwriting
+				if _, found := c.Registry.Configs[u.Host]; !found {
+					c.Registry.Configs[u.Host] = config
+				}
+			}
 		}
 		log.G(ctx).Warning("`auths` is deprecated, please use `configs` instead")
 	}
