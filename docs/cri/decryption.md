@@ -15,32 +15,31 @@ In this model encryption is tied to worker nodes. The usecase here revolves arou
 
 ### Configuring image decryption for "node" key model
 
-The default configuration does not handle decrypting encrypted container images.
+This is the default model since containerd v1.5.
 
-An example for configuring the "node" key model for container image decryption:
-
-Configure `cri` to enable decryption with "node" key model
+For containerd v1.4, you need to add the following configuration to `/etc/containerd/config.toml` and restart the `containerd` service manually.
 ```toml
+version = 2
+
 [plugins."io.containerd.grpc.v1.cri".image_decryption]
   key_model = "node"
-```
 
-Configure `containerd` daemon [`stream_processors`](https://github.com/containerd/containerd/blob/master/docs/stream_processors.md) to handle the
-encrypted mediatypes.
-```toml
 [stream_processors]
   [stream_processors."io.containerd.ocicrypt.decoder.v1.tar.gzip"]
     accepts = ["application/vnd.oci.image.layer.v1.tar+gzip+encrypted"]
     returns = "application/vnd.oci.image.layer.v1.tar+gzip"
-    path = "/usr/local/bin/ctd-decoder"
-    args = ["--decryption-keys-path", "/keys"]
+    path = "ctd-decoder"
+    args = ["--decryption-keys-path", "/etc/containerd/ocicrypt/keys"]
+    env= ["OCICRYPT_KEYPROVIDER_CONFIG=/etc/containerd/ocicrypt/ocicrypt_keyprovider.conf"]
   [stream_processors."io.containerd.ocicrypt.decoder.v1.tar"]
     accepts = ["application/vnd.oci.image.layer.v1.tar+encrypted"]
     returns = "application/vnd.oci.image.layer.v1.tar"
-    path = "/usr/local/bin/ctd-decoder"
-    args = ["--decryption-keys-path", "/keys"]
+    path = "ctd-decoder"
+    args = ["--decryption-keys-path", "/etc/containerd/ocicrypt/keys"]
+    env= ["OCICRYPT_KEYPROVIDER_CONFIG=/etc/containerd/ocicrypt/ocicrypt_keyprovider.conf"]
 ```
 
-In this example, container image decryption is set to use the "node" key model. In addition, the decryption [`stream_processors`](https://github.com/containerd/containerd/blob/master/docs/stream_processors.md) are configured as specified in [containerd/imgcrypt project](https://github.com/containerd/imgcrypt), with the additional field `--decryption-keys-path` configured to specify where decryption keys are located locally in the node.
+In this example, container image decryption is set to use the "node" key model.
+In addition, the decryption [`stream_processors`](https://github.com/containerd/containerd/blob/master/docs/stream_processors.md) are configured as specified in [containerd/imgcrypt project](https://github.com/containerd/imgcrypt), with the additional field `--decryption-keys-path` configured to specify where decryption keys are located locally in the node.
 
-After modify this config, you need restart the `containerd` service.
+The `$OCICRYPT_KEYPROVIDER_CONFIG` environment variable is used for [ocicrypt keyprovider protocol](https://github.com/containers/ocicrypt/blob/master/docs/keyprovider.md).

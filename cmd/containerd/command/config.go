@@ -20,11 +20,15 @@ import (
 	gocontext "context"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/BurntSushi/toml"
+	"github.com/containerd/containerd/defaults"
+	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/services/server"
 	srvconfig "github.com/containerd/containerd/services/server/config"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
 )
 
@@ -112,4 +116,50 @@ var configCommand = cli.Command{
 			},
 		},
 	},
+}
+
+func platformAgnosticDefaultConfig() *srvconfig.Config {
+	return &srvconfig.Config{
+		Version: 1,
+		Root:    defaults.DefaultRootDir,
+		State:   defaults.DefaultStateDir,
+		GRPC: srvconfig.GRPCConfig{
+			Address:        defaults.DefaultAddress,
+			MaxRecvMsgSize: defaults.DefaultMaxRecvMsgSize,
+			MaxSendMsgSize: defaults.DefaultMaxSendMsgSize,
+		},
+		DisabledPlugins:  []string{},
+		RequiredPlugins:  []string{},
+		StreamProcessors: streamProcessors(),
+	}
+}
+
+func streamProcessors() map[string]srvconfig.StreamProcessor {
+	const (
+		ctdDecoder = "ctd-decoder"
+		basename   = "io.containerd.ocicrypt.decoder.v1"
+	)
+	decryptionKeysPath := filepath.Join(defaults.DefaultConfigDir, "ocicrypt", "keys")
+	ctdDecoderArgs := []string{
+		"--decryption-keys-path", decryptionKeysPath,
+	}
+	ctdDecoderEnv := []string{
+		"OCICRYPT_KEYPROVIDER_CONFIG=" + filepath.Join(defaults.DefaultConfigDir, "ocicrypt", "ocicrypt_keyprovider.conf"),
+	}
+	return map[string]srvconfig.StreamProcessor{
+		basename + ".tar.gzip": {
+			Accepts: []string{images.MediaTypeImageLayerGzipEncrypted},
+			Returns: ocispec.MediaTypeImageLayerGzip,
+			Path:    ctdDecoder,
+			Args:    ctdDecoderArgs,
+			Env:     ctdDecoderEnv,
+		},
+		basename + ".tar": {
+			Accepts: []string{images.MediaTypeImageLayerEncrypted},
+			Returns: ocispec.MediaTypeImageLayer,
+			Path:    ctdDecoder,
+			Args:    ctdDecoderArgs,
+			Env:     ctdDecoderEnv,
+		},
+	}
 }

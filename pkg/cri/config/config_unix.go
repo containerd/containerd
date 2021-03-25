@@ -72,5 +72,8 @@ func DefaultConfig() PluginConfig {
 		TolerateMissingHugetlbController: true,
 		DisableHugetlbController:         true,
 		IgnoreImageDefinedVolumes:        false,
+		ImageDecryption: ImageDecryption{
+			KeyModel: KeyModelNode,
+		},
 	}
 }
