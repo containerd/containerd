@@ -44,7 +44,6 @@ import (
 	"path/filepath"
 
 	"golang.org/x/sys/unix"
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -115,9 +114,6 @@ func parseEndpointWithFallbackProtocol(endpoint string, fallbackProtocol string)
 	if protocol, addr, err = parseEndpoint(endpoint); err != nil && protocol == "" {
 		fallbackEndpoint := fallbackProtocol + "://" + endpoint
 		protocol, addr, err = parseEndpoint(fallbackEndpoint)
-		if err == nil {
-			klog.Warningf("Using %q as endpoint is deprecated, please consider using full url format %q.", endpoint, fallbackEndpoint)
-		}
 	}
 	return
 }
