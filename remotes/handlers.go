@@ -31,6 +31,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/semaphore"
 )
 
 type refKeyPrefix struct{}
@@ -181,7 +182,8 @@ func push(ctx context.Context, provider content.Provider, pusher Pusher, desc oc
 //
 // Base handlers can be provided which will be called before any push specific
 // handlers.
-func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, store content.Store, platform platforms.MatchComparer, wrapper func(h images.Handler) images.Handler) error {
+func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, store content.Store, limiter *semaphore.Weighted, platform platforms.MatchComparer, wrapper func(h images.Handler) images.Handler) error {
+
 	var m sync.Mutex
 	manifestStack := []ocispec.Descriptor{}
 
@@ -213,7 +215,7 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, st
 		handler = wrapper(handler)
 	}
 
-	if err := images.Dispatch(ctx, handler, nil, desc); err != nil {
+	if err := images.Dispatch(ctx, handler, limiter, desc); err != nil {
 		return err
 	}
 
