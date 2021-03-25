@@ -1,7 +1,7 @@
 # github.com/BurntSushi/toml v0.3.1
 ## explicit
 github.com/BurntSushi/toml
-# github.com/Microsoft/go-winio v0.4.17-0.20210211115548-6eac466e5fa3
+# github.com/Microsoft/go-winio v0.4.17-0.20210324224401-5516f17a5958
 ## explicit
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/backuptar
@@ -105,7 +105,7 @@ github.com/containerd/ttrpc/plugin
 # github.com/containerd/typeurl v1.0.1
 ## explicit
 github.com/containerd/typeurl
-# github.com/containerd/zfs v0.0.0-20210322090317-0e92c2247fb7
+# github.com/containerd/zfs v0.0.0-20210324211415-d5c4544f0433
 ## explicit
 github.com/containerd/zfs
 github.com/containerd/zfs/plugin
