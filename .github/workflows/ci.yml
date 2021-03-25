@@ -247,6 +247,8 @@ jobs:
     runs-on: windows-2019
     timeout-minutes: 30
     needs: [project, linters, protos, man]
+    env:
+      GOTEST: gotestsum --
 
     defaults:
       run:
@@ -270,6 +272,7 @@ jobs:
       - name: Set env
         run: |
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
           echo "${{ github.workspace }}/src/github.com/containerd/containerd/bin" >> $GITHUB_PATH
 
       - run: script/setup/install-dev-tools
@@ -287,22 +290,32 @@ jobs:
           git checkout "${SHIM_COMMIT}"
           GO111MODULE=on go build -mod=vendor -o "${bindir}/integration/client/containerd-shim-runhcs-v1.exe" ./cmd/containerd-shim-runhcs-v1
 
+      - run: script/setup/install-gotestsum
       - name: Tests
         env:
           CGO_ENABLED: 1
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root.xml
         run: mingw32-make.exe test root-test
 
       - name: Integration 1
         env:
           CGO_ENABLED: 1
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
         run: mingw32-make.exe integration
 
-      # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/175
+      # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
       - name: Integration 2
         env:
           TESTFLAGS_PARALLEL: 1
           CGO_ENABLED: 1
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
         run: mingw32-make.exe integration
+      - uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: TestResults Windows
+          path: |
+            ${{github.workspace}}/*-junit.xml
 
   integration-linux:
     name: Linux Integration
@@ -321,6 +334,8 @@ jobs:
           - runtime: io.containerd.runtime.v1.linux
             runc: crun
 
+    env:
+      GOTEST: gotestsum --
     steps:
       - uses: actions/setup-go@v2
         with:
@@ -370,9 +385,12 @@ jobs:
           sudo make install
         working-directory: src/github.com/containerd/containerd
 
+      - run: sudo -E PATH=$PATH script/setup/install-gotestsum
+        working-directory: src/github.com/containerd/containerd
       - name: Tests
         env:
           GOPROXY: direct
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root-junit.xml
         run: |
           make test
           sudo -E PATH=$PATH GOPATH=$GOPATH GOPROXY=$GOPROXY make root-test
@@ -383,6 +401,7 @@ jobs:
           GOPROXY: direct
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
         run: |
           sudo GOPATH=$GOPATH GOPROXY=$GOPROXY TEST_RUNTIME=$TEST_RUNTIME RUNC_FLAVOR=$RUNC_FLAVOR make integration EXTRA_TESTFLAGS=-no-criu TESTFLAGS_RACE=-race
         working-directory: src/github.com/containerd/containerd
@@ -393,6 +412,7 @@ jobs:
           GOPROXY: direct
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
         run: |
           sudo GOPATH=$GOPATH GOPROXY=$GOPROXY TEST_RUNTIME=$TEST_RUNTIME RUNC_FLAVOR=$RUNC_FLAVOR TESTFLAGS_PARALLEL=1 make integration EXTRA_TESTFLAGS=-no-criu
         working-directory: src/github.com/containerd/containerd
@@ -404,6 +424,7 @@ jobs:
           GOPROXY: direct
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-criu-junit.xml
         # crun doesn't have "checkpoint" command.
         if: ${{ matrix.runc == 'runc' }}
         run: |
@@ -433,7 +454,7 @@ jobs:
           sudo ls /etc/cni/net.d
           sudo PATH=$PATH BDIR=$BDIR /usr/local/bin/containerd -a ${BDIR}/c.sock --config ${BDIR}/config.toml --root ${BDIR}/root --state ${BDIR}/state --log-level debug &> ${BDIR}/containerd-cri.log &
           sudo PATH=$PATH BDIR=$BDIR /usr/local/bin/ctr -a ${BDIR}/c.sock version
-          sudo PATH=$PATH BDIR=$BDIR GOPATH=$GOPATH critest --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8
+          sudo PATH=$PATH BDIR=$BDIR GOPATH=$GOPATH critest --report-dir "${{github.workspace}}/critestreport" --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8
           TEST_RC=$?
           test $TEST_RC -ne 0 && cat ${BDIR}/containerd-cri.log
           sudo pkill containerd
@@ -449,12 +470,21 @@ jobs:
           mount
           df
           losetup -l
+      - uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: TestResults ${{ matrix.runtime }} ${{matrix.runc}}
+          path: |
+            *-junit.xml
+            ${{github.workspace}}/critestreport/*.xml
 
   tests-mac-os:
     name: MacOS unit tests
     runs-on: macos-10.15
     timeout-minutes: 10
     needs: [project, linters, protos, man]
+    env:
+      GOTEST: gotestsum --
 
     steps:
       - uses: actions/setup-go@v2
@@ -470,12 +500,21 @@ jobs:
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
+      - run: sudo -E PATH=$PATH script/setup/install-gotestsum
+        working-directory: src/github.com/containerd/containerd
       - name: Tests
         env:
           GOPROXY: direct
+          GOTESTSUM_JUNITFILE: "${{ github.workspace }}/macos-test-junit.xml"
         run: |
           make test
         working-directory: src/github.com/containerd/containerd
+      - uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: TestResults MacOS
+          path: |
+            *-junit.xml
 
   cgroup2:
     name: CGroupsV2 and SELinux Integration
@@ -488,6 +527,8 @@ jobs:
         # Currently crun is disabled to decrease CI flakiness.
         # We can enable crun again when we get a better CI infra.
         runc: [runc]
+    env:
+      GOTEST: gotestsum --
     steps:
       - uses: actions/checkout@v2
 
@@ -506,10 +547,27 @@ jobs:
         env:
           RUNC_FLAVOR: ${{ matrix.runc }}
           SELINUX: Enforcing
-        run: vagrant up --provision-with=selinux,install-runc,test-integration
+          GOTESTSUM_JUNITFILE: /tmp/test-integration-junit.xml
+        run: vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
 
       - name: CRI test
         env:
           RUNC_FLAVOR: ${{ matrix.runc }}
           SELINUX: Enforcing
-        run: vagrant up --provision-with=selinux,install-runc,test-cri
+          REPORT_DIR: /tmp/critestreport
+        run: vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+      - name: Get test reports
+        if: always()
+        run: |
+          set -e
+          vagrant plugin install vagrant-vbguest
+          vagrant plugin install vagrant-scp
+          vagrant scp :/tmp/test-integration-junit.xml "${{ github.workspace }}/"
+          vagrant scp :/tmp/critestreport "${{ github.workspace }}/critestreport"
+      - uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name:  TestResults cgroup2 ${{ matrix.runtime }} ${{matrix.runc}}
+          path: |
+            ${{github.workspace}}/*-junit.xml
+            ${{github.workspace}}/critestreport/*
