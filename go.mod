@@ -65,6 +65,7 @@ require (
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 )
 
+// When updating replace rules, make sure to also update the rules in integration/client/go.mod
 replace (
 	github.com/gogo/googleapis => github.com/gogo/googleapis v1.3.2
 	github.com/golang/protobuf => github.com/golang/protobuf v1.3.5
