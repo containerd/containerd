@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/BurntSushi/toml"
 	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
@@ -310,7 +309,7 @@ func generateRuntimeOptions(r criconfig.Runtime, c criconfig.Config) (interface{
 		}, nil
 	}
 	options := getRuntimeOptionsType(r.Type)
-	if err := toml.PrimitiveDecode(*r.Options, options); err != nil {
+	if err := r.Options.Unmarshal(options); err != nil {
 		return nil, err
 	}
 	return options, nil

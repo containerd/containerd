@@ -23,8 +23,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/BurntSushi/toml"
 	"github.com/hashicorp/go-multierror"
+	"github.com/pelletier/go-toml"
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 )
