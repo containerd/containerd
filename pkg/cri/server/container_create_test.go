@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"path/filepath"
+	goruntime "runtime"
 	"testing"
 
 	"github.com/containerd/containerd/oci"
@@ -68,6 +69,10 @@ func TestGeneralContainerSpec(t *testing.T) {
 }
 
 func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
+	if goruntime.GOOS == "darwin" {
+		t.Skip("not implemented on Darwin")
+	}
+
 	testID := "test-id"
 	testSandboxID := "sandbox-id"
 	testContainerName := "container-name"
@@ -272,6 +277,10 @@ func TestVolumeMounts(t *testing.T) {
 }
 
 func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
+	if goruntime.GOOS == "darwin" {
+		t.Skip("not implemented on Darwin")
+	}
+
 	testID := "test-id"
 	testSandboxID := "sandbox-id"
 	testContainerName := "container-name"

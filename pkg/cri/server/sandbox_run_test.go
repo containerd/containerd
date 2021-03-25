@@ -18,6 +18,7 @@ package server
 
 import (
 	"net"
+	goruntime "runtime"
 	"testing"
 
 	cni "github.com/containerd/go-cni"
@@ -33,6 +34,10 @@ import (
 )
 
 func TestSandboxContainerSpec(t *testing.T) {
+	if goruntime.GOOS == "darwin" {
+		t.Skip("not implemented on Darwin")
+	}
+
 	testID := "test-id"
 	nsPath := "test-cni"
 	for desc, test := range map[string]struct {
