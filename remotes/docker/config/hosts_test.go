@@ -26,6 +26,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/remotes/docker"
 )
@@ -74,8 +76,6 @@ func TestDefaultHosts(t *testing.T) {
 }
 
 func TestParseHostFile(t *testing.T) {
-	ctx := logtest.WithT(context.Background(), t)
-
 	const testtoml = `
 server = "https://test-default.registry"
 ca = "/etc/path/default"
@@ -170,7 +170,7 @@ ca = "/etc/path/default"
 			header:       http.Header{"x-custom-1": {"custom header"}},
 		},
 	}
-	hosts, err := parseHostsFile(ctx, "", []byte(testtoml))
+	hosts, err := parseHostsFile("", []byte(testtoml))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,15 +181,7 @@ ca = "/etc/path/default"
 		}
 	}()
 
-	if len(hosts) != len(expected) {
-		t.Fatalf("Unexpected number of hosts %d, expected %d", len(hosts), len(expected))
-	}
-
-	for i := range hosts {
-		if !compareHostConfig(hosts[i], expected[i]) {
-			t.Fatalf("Mismatch at host %d", i)
-		}
-	}
+	assert.ElementsMatch(t, expected, hosts)
 }
 
 func TestLoadCertFiles(t *testing.T) {
