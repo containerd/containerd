@@ -401,10 +401,6 @@ func parseHostConfig(server string, baseDir string, config HostFileConfig) (host
 		switch cert := config.CACert.(type) {
 		case string:
 			result.caCerts = []string{makeAbsPath(cert, baseDir)}
-		case []string:
-			for _, p := range cert {
-				result.caCerts = append(result.caCerts, makeAbsPath(p, baseDir))
-			}
 		case []interface{}:
 			result.caCerts, err = makeStringSlice(cert, func(p string) string {
 				return makeAbsPath(p, baseDir)
@@ -428,7 +424,9 @@ func parseHostConfig(server string, baseDir string, config HostFileConfig) (host
 				case string:
 					result.clientPairs = append(result.clientPairs, [2]string{makeAbsPath(p, baseDir), ""})
 				case []interface{}:
-					slice, err := makeStringSlice(p, nil)
+					slice, err := makeStringSlice(p, func(s string) string {
+						return makeAbsPath(s, baseDir)
+					})
 					if err != nil {
 						return hostConfig{}, err
 					}
