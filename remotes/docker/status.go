@@ -28,6 +28,8 @@ import (
 type Status struct {
 	content.Status
 
+	Committed bool
+
 	// UploadUUID is used by the Docker registry to reference blob uploads
 	UploadUUID string
 }
