@@ -242,6 +242,17 @@ func (ah *authHandler) doBasicAuth(ctx context.Context) (string, error) {
 	return fmt.Sprintf("Basic %s", auth), nil
 }
 
+func isPostUnsupportedError(errStatus remoteerrors.ErrUnexpectedStatus, to auth.TokenOptions) bool {
+	// Registries without support for POST may return an error for POST /v2/token.
+	// As of September 2017, GCR is known to return 404.
+	// As of February 2018, JFrog Artifactory is known to return 401.
+	// As of March 2021, Mirantis Secure Registry is known to return 500.
+	return (errStatus.StatusCode == 405 && to.Username != "") ||
+		(errStatus.StatusCode == 404) ||
+		(errStatus.StatusCode == 401) ||
+		(errStatus.StatusCode == 500)
+}
+
 func (ah *authHandler) doBearerAuth(ctx context.Context) (token string, err error) {
 	// copy common tokenOptions
 	to := ah.common
@@ -281,10 +292,7 @@ func (ah *authHandler) doBearerAuth(ctx context.Context) (token string, err erro
 		if err != nil {
 			var errStatus remoteerrors.ErrUnexpectedStatus
 			if errors.As(err, &errStatus) {
-				// Registries without support for POST may return 404 for POST /v2/token.
-				// As of September 2017, GCR is known to return 404.
-				// As of February 2018, JFrog Artifactory is known to return 401.
-				if (errStatus.StatusCode == 405 && to.Username != "") || errStatus.StatusCode == 404 || errStatus.StatusCode == 401 {
+				if isPostUnsupportedError(errStatus, to) {
 					resp, err := auth.FetchToken(ctx, ah.client, ah.header, to)
 					if err != nil {
 						return "", err
