@@ -30,7 +30,7 @@ function install_runc() {
 	git clone https://github.com/opencontainers/runc.git "${TMPROOT}"/runc
 	pushd "${TMPROOT}"/runc
 	git checkout "${RUNC_VERSION}"
-	make BUILDTAGS='seccomp' runc
+	make BUILDTAGS='seccomp apparmor selinux' runc
 	make install
 	popd
 	rm -fR "${TMPROOT}"
