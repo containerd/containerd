@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package containerd
+package client
 
 import (
 	"bufio"
