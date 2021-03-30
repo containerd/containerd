@@ -181,6 +181,18 @@ func PodSandboxConfig(name, ns string, opts ...PodSandboxOpts) *runtime.PodSandb
 	return config
 }
 
+func PodSandboxConfigWithCleanup(t *testing.T, name, ns string, opts ...PodSandboxOpts) (string, *runtime.PodSandboxConfig) {
+	sbConfig := PodSandboxConfig(name, ns, opts...)
+	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		assert.NoError(t, runtimeService.StopPodSandbox(sb))
+		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
+	})
+
+	return sb, sbConfig
+}
+
 // ContainerOpts to set any specific attribute like labels,
 // annotations, metadata etc
 type ContainerOpts func(*runtime.ContainerConfig)

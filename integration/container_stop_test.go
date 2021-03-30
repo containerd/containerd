@@ -76,13 +76,7 @@ func TestContainerStopCancellation(t *testing.T) {
 		t.Skip("Skipped on Windows.")
 	}
 	t.Log("Create a pod sandbox")
-	sbConfig := PodSandboxConfig("sandbox", "cancel-container-stop")
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-	}()
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "cancel-container-stop")
 
 	var (
 		testImage     = GetImage(BusyBox)

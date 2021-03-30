@@ -28,18 +28,11 @@ import (
 )
 
 func TestImageFSInfo(t *testing.T) {
-	config := PodSandboxConfig("running-pod", "imagefs")
+	t.Logf("Create a sandbox to make sure there is an active snapshot")
+	PodSandboxConfigWithCleanup(t, "running-pod", "imagefs")
 
 	t.Logf("Pull an image to make sure image fs is not empty")
 	EnsureImageExists(t, GetImage(BusyBox))
-
-	t.Logf("Create a sandbox to make sure there is an active snapshot")
-	sb, err := runtimeService.RunPodSandbox(config, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-	}()
 
 	// It takes time to populate imagefs stats. Use eventually
 	// to check for a period of time.
@@ -66,6 +59,6 @@ func TestImageFSInfo(t *testing.T) {
 	}, time.Second, 30*time.Second))
 
 	t.Logf("Image filesystem mountpath should exist")
-	_, err = os.Stat(info.GetFsId().GetMountpoint())
+	_, err := os.Stat(info.GetFsId().GetMountpoint())
 	assert.NoError(t, err)
 }

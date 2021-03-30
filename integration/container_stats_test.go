@@ -31,13 +31,7 @@ import (
 // Test to verify for a container ID
 func TestContainerStats(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
-	sbConfig := PodSandboxConfig("sandbox1", "stats")
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-	}()
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "stats")
 
 	EnsureImageExists(t, pauseImage)
 
@@ -78,13 +72,7 @@ func TestContainerStats(t *testing.T) {
 // Test to verify if the consumed stats are correct.
 func TestContainerConsumedStats(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
-	sbConfig := PodSandboxConfig("sandbox1", "stats")
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-	}()
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "stats")
 
 	testImage := GetImage(ResourceConsumer)
 	img, err := imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil, sbConfig)
@@ -154,14 +142,12 @@ func TestContainerConsumedStats(t *testing.T) {
 
 // Test to verify filtering without any filter
 func TestContainerListStats(t *testing.T) {
+	var (
+		stats []*runtime.ContainerStats
+		err   error
+	)
 	t.Logf("Create a pod config and run sandbox container")
-	sbConfig := PodSandboxConfig("running-pod", "statsls")
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-	}()
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "running-pod", "statsls")
 
 	EnsureImageExists(t, pauseImage)
 
@@ -188,7 +174,6 @@ func TestContainerListStats(t *testing.T) {
 	}
 
 	t.Logf("Fetch all container stats")
-	var stats []*runtime.ContainerStats
 	require.NoError(t, Eventually(func() (bool, error) {
 		stats, err = runtimeService.ListContainerStats(&runtime.ContainerStatsFilter{})
 		if err != nil {
@@ -211,14 +196,12 @@ func TestContainerListStats(t *testing.T) {
 // Test to verify filtering given a specific container ID
 // TODO Convert the filter tests into table driven tests and unit tests
 func TestContainerListStatsWithIdFilter(t *testing.T) {
+	var (
+		stats []*runtime.ContainerStats
+		err   error
+	)
 	t.Logf("Create a pod config and run sandbox container")
-	sbConfig := PodSandboxConfig("running-pod", "statsls")
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-	}()
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "running-pod", "statsls")
 
 	EnsureImageExists(t, pauseImage)
 
@@ -245,7 +228,6 @@ func TestContainerListStatsWithIdFilter(t *testing.T) {
 	}
 
 	t.Logf("Fetch container stats for each container with Filter")
-	var stats []*runtime.ContainerStats
 	for id := range containerConfigMap {
 		require.NoError(t, Eventually(func() (bool, error) {
 			stats, err = runtimeService.ListContainerStats(
@@ -273,14 +255,12 @@ func TestContainerListStatsWithIdFilter(t *testing.T) {
 // Test to verify filtering given a specific Sandbox ID. Stats for
 // all the containers in a pod should be returned
 func TestContainerListStatsWithSandboxIdFilter(t *testing.T) {
+	var (
+		stats []*runtime.ContainerStats
+		err   error
+	)
 	t.Logf("Create a pod config and run sandbox container")
-	sbConfig := PodSandboxConfig("running-pod", "statsls")
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-	}()
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "running-pod", "statsls")
 
 	EnsureImageExists(t, pauseImage)
 
@@ -307,7 +287,6 @@ func TestContainerListStatsWithSandboxIdFilter(t *testing.T) {
 	}
 
 	t.Logf("Fetch container stats for each container with Filter")
-	var stats []*runtime.ContainerStats
 	require.NoError(t, Eventually(func() (bool, error) {
 		stats, err = runtimeService.ListContainerStats(
 			&runtime.ContainerStatsFilter{PodSandboxId: sb})
@@ -332,14 +311,12 @@ func TestContainerListStatsWithSandboxIdFilter(t *testing.T) {
 // Test to verify filtering given a specific container ID and
 // sandbox ID
 func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
+	var (
+		stats []*runtime.ContainerStats
+		err   error
+	)
 	t.Logf("Create a pod config and run sandbox container")
-	sbConfig := PodSandboxConfig("running-pod", "statsls")
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-	}()
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "running-pod", "statsls")
 
 	EnsureImageExists(t, pauseImage)
 
@@ -365,7 +342,6 @@ func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 		}()
 	}
 	t.Logf("Fetch container stats for sandbox ID and container ID filter")
-	var stats []*runtime.ContainerStats
 	for id, config := range containerConfigMap {
 		require.NoError(t, Eventually(func() (bool, error) {
 			stats, err = runtimeService.ListContainerStats(

@@ -19,22 +19,15 @@ package integration
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDuplicateName(t *testing.T) {
 	t.Logf("Create a sandbox")
-	sbConfig := PodSandboxConfig("sandbox", "duplicate-name")
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-	}()
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "duplicate-name")
 
 	t.Logf("Create the sandbox again should fail")
-	_, err = runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
+	_, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.Error(t, err)
 
 	EnsureImageExists(t, pauseImage)

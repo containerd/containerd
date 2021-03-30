@@ -122,13 +122,7 @@ func TestContainerdImage(t *testing.T) {
 	assert.Equal(t, imgByID.Labels()["io.cri-containerd.image"], "managed")
 
 	t.Logf("should be able to start container with the image")
-	sbConfig := PodSandboxConfig("sandbox", "containerd-image")
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-	}()
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "containerd-image")
 
 	cnConfig := ContainerConfig(
 		"test-container",
@@ -183,7 +177,7 @@ func TestContainerdImageInOtherNamespaces(t *testing.T) {
 	}
 	require.NoError(t, Consistently(checkImage, 100*time.Millisecond, time.Second))
 
-	PodSandboxConfig("sandbox", "test")
+	PodSandboxConfigWithCleanup(t, "sandbox", "test")
 	EnsureImageExists(t, testImage)
 
 	t.Logf("cri plugin should see the image now")

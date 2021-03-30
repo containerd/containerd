@@ -41,13 +41,7 @@ func checkMemoryLimit(t *testing.T, spec *runtimespec.Spec, memLimit int64) {
 func TestUpdateContainerResources(t *testing.T) {
 	// TODO(claudiub): Make this test work once https://github.com/microsoft/hcsshim/pull/931 merges.
 	t.Log("Create a sandbox")
-	sbConfig := PodSandboxConfig("sandbox", "update-container-resources")
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-	}()
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "update-container-resources")
 
 	EnsureImageExists(t, pauseImage)
 

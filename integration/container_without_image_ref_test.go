@@ -27,13 +27,7 @@ import (
 // Test container lifecycle can work without image references.
 func TestContainerLifecycleWithoutImageRef(t *testing.T) {
 	t.Log("Create a sandbox")
-	sbConfig := PodSandboxConfig("sandbox", "container-lifecycle-without-image-ref")
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-	}()
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "container-lifecycle-without-image-ref")
 
 	var (
 		testImage     = GetImage(BusyBox)
