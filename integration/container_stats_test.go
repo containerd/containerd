@@ -75,11 +75,7 @@ func TestContainerConsumedStats(t *testing.T) {
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "stats")
 
 	testImage := GetImage(ResourceConsumer)
-	img, err := imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil, sbConfig)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: img}))
-	}()
+	EnsureImageExists(t, testImage)
 
 	t.Logf("Create a container config and run container in a pod")
 	containerConfig := ContainerConfig(
