@@ -21,6 +21,8 @@ import (
 	"io"
 
 	"github.com/containerd/containerd/content"
+	artifactspec "github.com/opencontainers/artifacts/specs-go/v2"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -46,6 +48,9 @@ type Resolver interface {
 
 	// Pusher returns a new pusher for the provided reference
 	Pusher(ctx context.Context, ref string) (Pusher, error)
+
+	// Discoverer returns a new discoverer for the provided reference
+	Discoverer(ctx context.Context, ref string) (Discoverer, error)
 }
 
 // Fetcher fetches content
@@ -59,6 +64,13 @@ type Pusher interface {
 	// Push returns a content writer for the given resource identified
 	// by the descriptor.
 	Push(ctx context.Context, d ocispec.Descriptor) (content.Writer, error)
+}
+
+// Discoverer discovers content
+type Discoverer interface {
+	// Discover returns a list of artifacts of the specified type, referencing
+	// the specified reference.
+	Discover(ctx context.Context, desc ocispec.Descriptor, artifactType string) (map[digest.Digest]artifactspec.Artifact, error)
 }
 
 // FetcherFunc allows package users to implement a Fetcher with just a
@@ -77,4 +89,13 @@ type PusherFunc func(ctx context.Context, desc ocispec.Descriptor) (content.Writ
 // Push content
 func (fn PusherFunc) Push(ctx context.Context, desc ocispec.Descriptor) (content.Writer, error) {
 	return fn(ctx, desc)
+}
+
+// DiscovererFunc allows package users to implement a Discoverer with just a
+// function.
+type DiscovererFunc func(ctx context.Context, desc ocispec.Descriptor, artifactType string) ([]artifactspec.Artifact, error)
+
+// Discover content
+func (fn DiscovererFunc) Discover(ctx context.Context, desc ocispec.Descriptor, artifactType string) ([]artifactspec.Artifact, error) {
+	return fn(ctx, desc, artifactType)
 }

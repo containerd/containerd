@@ -37,6 +37,7 @@ require (
 	github.com/klauspost/compress v1.11.3
 	github.com/moby/sys/mountinfo v0.4.1
 	github.com/moby/sys/symlink v0.1.0
+	github.com/opencontainers/artifacts v0.0.0-20210209205009-a282023000bd
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.0.1
 	github.com/opencontainers/runc v1.0.0-rc93
@@ -69,6 +70,7 @@ require (
 replace (
 	github.com/gogo/googleapis => github.com/gogo/googleapis v1.3.2
 	github.com/golang/protobuf => github.com/golang/protobuf v1.3.5
+	github.com/opencontainers/artifacts => github.com/aviral26/artifacts v0.0.0-20210331072334-fac4f3a4da4e
 	// urfave/cli must be <= v1.22.1 due to a regression: https://github.com/urfave/cli/issues/1092
 	github.com/urfave/cli => github.com/urfave/cli v1.22.1
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200224152610-e50cd9704f63

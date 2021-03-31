@@ -97,6 +97,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			hosts = make([]hostConfig, 1)
 		}
 		if len(hosts) > 0 && hosts[len(hosts)-1].host == "" {
+			caps := docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush
 			if host == "docker.io" {
 				hosts[len(hosts)-1].scheme = "https"
 				hosts[len(hosts)-1].host = "registry-1.docker.io"
@@ -107,9 +108,10 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 				} else {
 					hosts[len(hosts)-1].scheme = "https"
 				}
+				caps |= docker.HostCapabilityDiscover
 			}
 			hosts[len(hosts)-1].path = "/v2"
-			hosts[len(hosts)-1].capabilities = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush
+			hosts[len(hosts)-1].capabilities = caps
 		}
 
 		var defaultTLSConfig *tls.Config
@@ -393,12 +395,14 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 				result.capabilities |= docker.HostCapabilityResolve
 			case "push":
 				result.capabilities |= docker.HostCapabilityPush
+			case "discover":
+				result.capabilities |= docker.HostCapabilityDiscover
 			default:
 				return hostConfig{}, errors.Errorf("unknown capability %v", c)
 			}
 		}
 	} else {
-		result.capabilities = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush
+		result.capabilities = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush | docker.HostCapabilityDiscover
 	}
 
 	if config.CACert != nil {

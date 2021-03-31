@@ -56,6 +56,10 @@ const (
 	// manifests
 	HostCapabilityPush
 
+	// HostCapabilityDiscover represents the capability to discover
+	// references
+	HostCapabilityDiscover
+
 	// Reserved for future capabilities (i.e. search, catalog, remove)
 )
 
@@ -167,7 +171,7 @@ func ConfigureDefaultRegistries(ropts ...RegistryOpt) RegistryHosts {
 			Host:         host,
 			Scheme:       "https",
 			Path:         "/v2",
-			Capabilities: HostCapabilityPull | HostCapabilityResolve | HostCapabilityPush,
+			Capabilities: HostCapabilityPull | HostCapabilityResolve | HostCapabilityPush | HostCapabilityDiscover,
 		}
 
 		if config.Client == nil {

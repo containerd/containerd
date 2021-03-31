@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
+	artifactspec "github.com/opencontainers/artifacts/specs-go/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -197,7 +198,8 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, st
 	filterHandler := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		switch desc.MediaType {
 		case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest,
-			images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+			images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex,
+			artifactspec.MediaTypeArtifactManifest:
 			m.Lock()
 			manifestStack = append(manifestStack, desc)
 			m.Unlock()
@@ -233,10 +235,12 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, st
 			// TODO(estesp): until we have a more complete method for index push, we need to report
 			// missing dependencies in an index/manifest list by sensing the "400 Bad Request"
 			// as a marker for this problem
-			if (manifestStack[i].MediaType == ocispec.MediaTypeImageIndex ||
-				manifestStack[i].MediaType == images.MediaTypeDockerSchema2ManifestList) &&
-				errors.Cause(err) != nil && strings.Contains(errors.Cause(err).Error(), "400 Bad Request") {
-				return errors.Wrap(err, "manifest list/index references to blobs and/or manifests are missing in your target registry")
+			switch manifestStack[i].MediaType {
+			case ocispec.MediaTypeImageIndex, images.MediaTypeDockerSchema2ManifestList,
+				artifactspec.MediaTypeArtifactManifest:
+				if errors.Cause(err) != nil && strings.Contains(errors.Cause(err).Error(), "400 Bad Request") {
+					return errors.Wrap(err, "artifact or manifest list/index references to blobs and/or manifests are missing in your target registry")
+				}
 			}
 			return err
 		}
