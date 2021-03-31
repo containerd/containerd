@@ -19,59 +19,10 @@
 package platforms
 
 import (
-	"fmt"
-	"strconv"
-	"strings"
-
 	"github.com/containerd/containerd/platforms"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"golang.org/x/sys/windows"
 )
-
-type matchComparer struct {
-	defaults        platforms.Matcher
-	osVersionPrefix string
-}
-
-// Match matches platform with the same windows major, minor
-// and build version.
-func (m matchComparer) Match(p imagespec.Platform) bool {
-	if m.defaults.Match(p) {
-		// TODO(windows): Figure out whether OSVersion is deprecated.
-		return strings.HasPrefix(p.OSVersion, m.osVersionPrefix)
-	}
-	return false
-}
-
-// Less sorts matched platforms in front of other platforms.
-// For matched platforms, it puts platforms with larger revision
-// number in front.
-func (m matchComparer) Less(p1, p2 imagespec.Platform) bool {
-	m1, m2 := m.Match(p1), m.Match(p2)
-	if m1 && m2 {
-		r1, r2 := revision(p1.OSVersion), revision(p2.OSVersion)
-		return r1 > r2
-	}
-	return m1 && !m2
-}
-
-func revision(v string) int {
-	parts := strings.Split(v, ".")
-	if len(parts) < 4 {
-		return 0
-	}
-	r, err := strconv.Atoi(parts[3])
-	if err != nil {
-		return 0
-	}
-	return r
-}
 
 // Default returns the current platform's default platform specification.
 func Default() platforms.MatchComparer {
-	major, minor, build := windows.RtlGetNtVersionNumbers()
-	return matchComparer{
-		defaults:        platforms.Only(platforms.DefaultSpec()),
-		osVersionPrefix: fmt.Sprintf("%d.%d.%d", major, minor, build),
-	}
+	return platforms.Default()
 }
