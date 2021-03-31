@@ -93,9 +93,9 @@ func (fn PusherFunc) Push(ctx context.Context, desc ocispec.Descriptor) (content
 
 // DiscovererFunc allows package users to implement a Discoverer with just a
 // function.
-type DiscovererFunc func(ctx context.Context, desc ocispec.Descriptor, artifactType string) ([]artifactspec.Artifact, error)
+type DiscovererFunc func(ctx context.Context, desc ocispec.Descriptor, artifactType string) (map[digest.Digest]artifactspec.Artifact, error)
 
 // Discover content
-func (fn DiscovererFunc) Discover(ctx context.Context, desc ocispec.Descriptor, artifactType string) ([]artifactspec.Artifact, error) {
+func (fn DiscovererFunc) Discover(ctx context.Context, desc ocispec.Descriptor, artifactType string) (map[digest.Digest]artifactspec.Artifact, error) {
 	return fn(ctx, desc, artifactType)
 }
