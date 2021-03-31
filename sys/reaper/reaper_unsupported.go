@@ -1,4 +1,4 @@
-// +build !windows,!darwin
+// +build !darwin,!windows
 
 /*
    Copyright The containerd Authors.
@@ -16,9 +16,8 @@
    limitations under the License.
 */
 
-package platforms
+package reaper
 
-// Default returns the default matcher for the platform.
-func Default() MatchComparer {
-	return Only(DefaultSpec())
+func reapOS(exits []exit) ([]exit, error) {
+	return exits, nil
 }

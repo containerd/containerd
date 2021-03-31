@@ -107,6 +107,10 @@ func TestNewContainer(t *testing.T) {
 func TestContainerStart(t *testing.T) {
 	t.Parallel()
 
+	if runtime.GOOS == "darwin" {
+		t.Skip("test with checking exit status isn't supported on darwin")
+	}
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -243,6 +247,10 @@ func withByteBuffers(stdout io.Writer) cio.Opt {
 func TestContainerExec(t *testing.T) {
 	t.Parallel()
 
+	if runtime.GOOS == "darwin" {
+		t.Skip("Test with exec isn't supported yet on darwin/runu")
+	}
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -327,6 +335,10 @@ func TestContainerExec(t *testing.T) {
 }
 func TestContainerLargeExecArgs(t *testing.T) {
 	t.Parallel()
+
+	if runtime.GOOS == "darwin" {
+		t.Skip("Test with exec isn't supported yet on darwin/runu")
+	}
 
 	client, err := newClient(t, address)
 	if err != nil {
@@ -450,7 +462,8 @@ func TestContainerPids(t *testing.T) {
 	processes, err := task.Pids(ctx)
 	switch runtime.GOOS {
 	case "windows":
-		// TODO: This is currently not implemented on windows
+	case "darwin":
+		// TODO: This is currently not implemented on windows and darwin
 	default:
 		if err != nil {
 			t.Fatal(err)
@@ -479,6 +492,9 @@ func TestContainerPids(t *testing.T) {
 
 func TestContainerCloseIO(t *testing.T) {
 	t.Parallel()
+	if runtime.GOOS == "darwin" {
+		t.Skip("Test does not run on darwin")
+	}
 
 	client, err := newClient(t, address)
 	if err != nil {
@@ -648,6 +664,10 @@ func TestKillContainerDeletedByRunc(t *testing.T) {
 
 	if runtime.GOOS == "windows" {
 		t.Skip("Test relies on runc and is not supported on Windows")
+	}
+
+	if runtime.GOOS == "darwin" {
+		t.Skip("Test relies on runc and is not supported on darwin")
 	}
 
 	// We skip this case when runtime is crun.
@@ -838,6 +858,10 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 func TestWaitStoppedTask(t *testing.T) {
 	t.Parallel()
 
+	if runtime.GOOS == "darwin" {
+		t.Skip("test with checking exit status isn't supported on darwin")
+	}
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -903,6 +927,10 @@ func TestWaitStoppedTask(t *testing.T) {
 
 func TestWaitStoppedProcess(t *testing.T) {
 	t.Parallel()
+
+	if runtime.GOOS == "darwin" {
+		t.Skip("Test with exec isn't supported yet on darwin/runu")
+	}
 
 	client, err := newClient(t, address)
 	if err != nil {
@@ -1033,6 +1061,10 @@ func TestTaskForceDelete(t *testing.T) {
 func TestProcessForceDelete(t *testing.T) {
 	t.Parallel()
 
+	if runtime.GOOS == "darwin" {
+		t.Skip("Test with exec isn't supported yet on darwin/runu")
+	}
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -1104,6 +1136,10 @@ func TestProcessForceDelete(t *testing.T) {
 
 func TestContainerHostname(t *testing.T) {
 	t.Parallel()
+
+	if runtime.GOOS == "darwin" {
+		t.Skip("hostname command does not support on darwin")
+	}
 
 	client, err := newClient(t, address)
 	if err != nil {
@@ -1234,6 +1270,10 @@ func TestContainerExitedAtSet(t *testing.T) {
 func TestDeleteContainerExecCreated(t *testing.T) {
 	t.Parallel()
 
+	if runtime.GOOS == "darwin" {
+		t.Skip("Test with exec isn't supported yet on darwin/runu")
+	}
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -1302,6 +1342,9 @@ func TestContainerMetrics(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("metrics are currently not supported on windows")
 	}
+	if runtime.GOOS == "darwin" {
+		t.Skip("metrics are currently not supported on darwin")
+	}
 	t.Parallel()
 
 	client, err := newClient(t, address)
@@ -1358,6 +1401,9 @@ func TestContainerMetrics(t *testing.T) {
 func TestDeletedContainerMetrics(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("metrics are currently not supported on windows")
+	}
+	if runtime.GOOS == "darwin" {
+		t.Skip("metrics are currently not supported on darwin")
 	}
 	t.Parallel()
 
@@ -1569,6 +1615,10 @@ func TestContainerLabels(t *testing.T) {
 func TestContainerHook(t *testing.T) {
 	t.Parallel()
 
+	if runtime.GOOS == "darwin" {
+		t.Skip("Test does not run on darwin")
+	}
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -1683,6 +1733,9 @@ func TestShimSockLength(t *testing.T) {
 func TestContainerExecLargeOutputWithTTY(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Test does not run on Windows")
+	}
+	if runtime.GOOS == "darwin" {
+		t.Skip("Test with exec isn't supported yet on darwin/runu")
 	}
 
 	t.Parallel()
