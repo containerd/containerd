@@ -275,9 +275,7 @@ func loadHostDir(ctx context.Context, hostsDir string) ([]hostConfig, error) {
 	return hosts, nil
 }
 
-// HostFileConfig describes a single host section within TOML file.
-// Note: This struct needs to be public in order to be properly deserialized by TOML library.
-type HostFileConfig struct {
+type hostFileConfig struct {
 	// Capabilities determine what operations a host is
 	// capable of performing. Allowed values
 	//  - pull
@@ -300,27 +298,26 @@ type HostFileConfig struct {
 	// Credentials: helper? name? username? alternate domain? token?
 }
 
-type configFile struct {
-	// hostConfig holds defaults for all hosts as well as
-	// for the default server
-	HostFileConfig
-
-	// Server specifies the default server. When `host` is
-	// also specified, those hosts are tried first.
-	Server string `toml:"server"`
-
-	// HostConfigs store the per-host configuration
-	HostConfigs map[string]HostFileConfig `toml:"host"`
-}
-
 func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
 	tree, err := toml.LoadBytes(b)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse TOML")
 	}
 
+	// HACK: we want to keep toml parsing structures private in this package, however go-toml ignores private embedded types.
+	// so we remap it to a public type within the func body, so technically it's public, but not possible to import elsewhere.
+	type HostFileConfig = hostFileConfig
+
+	c := struct {
+		HostFileConfig
+		// Server specifies the default server. When `host` is
+		// also specified, those hosts are tried first.
+		Server string `toml:"server"`
+		// HostConfigs store the per-host configuration
+		HostConfigs map[string]hostFileConfig `toml:"host"`
+	}{}
+
 	var (
-		c     configFile
 		hosts []hostConfig
 	)
 
@@ -347,7 +344,7 @@ func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
 	return hosts, nil
 }
 
-func parseHostConfig(server string, baseDir string, config HostFileConfig) (hostConfig, error) {
+func parseHostConfig(server string, baseDir string, config hostFileConfig) (hostConfig, error) {
 	var (
 		result = hostConfig{}
 		err    error
