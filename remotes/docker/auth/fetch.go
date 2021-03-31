@@ -160,8 +160,9 @@ func FetchToken(ctx context.Context, client *http.Client, headers http.Header, t
 		reqParams.Add("service", to.Service)
 	}
 
-	for _, scope := range to.Scopes {
-		reqParams.Add("scope", scope)
+	if len(to.Scopes) != 0 {
+		// https://docs.docker.com/registry/spec/auth/scope/#resource-scope-grammar
+		reqParams.Set("scope", strings.Join(to.Scopes, " "))
 	}
 
 	if to.Secret != "" {
