@@ -1,5 +1,3 @@
-// +build !windows,!darwin
-
 /*
    Copyright The containerd Authors.
 
@@ -16,9 +14,14 @@
    limitations under the License.
 */
 
-package platforms
+package runc
 
-// Default returns the default matcher for the platform.
-func Default() MatchComparer {
-	return Only(DefaultSpec())
+import (
+	"github.com/containerd/containerd/pkg/process"
+)
+
+func newContainerCgroup(pid int, container *Container) {
+}
+
+func (c *Container) startCgroup(p process.Process) {
 }

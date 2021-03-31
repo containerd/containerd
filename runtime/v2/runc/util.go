@@ -1,4 +1,4 @@
-// +build linux
+// +build linux darwin
 
 /*
    Copyright The containerd Authors.
