@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/snapshots"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -116,14 +117,38 @@ When you are done, use the unmount command.
 		s := client.SnapshotService(snapshotter)
 
 		var mounts []mount.Mount
-		if context.Bool("rw") {
+
+		rw := context.Bool("rw")
+		if rw {
 			mounts, err = s.Prepare(ctx, target, chainID)
 		} else {
 			mounts, err = s.View(ctx, target, chainID)
 		}
+		shouldCleanup := true
 		if err != nil {
 			if errdefs.IsAlreadyExists(err) {
+				shouldCleanup = false
+
+				info, err2 := s.Stat(ctx, target)
+				if err2 != nil {
+					return errors.Wrap(err2, "error stating already existing snapshot")
+				}
+
+				if rw && info.Kind == snapshots.KindView {
+					return errors.New("cannot make rw mount from view-only snapshot")
+				}
+
 				mounts, err = s.Mounts(ctx, target)
+				if err != nil {
+					return err
+				}
+
+				if info.Kind == snapshots.KindActive && !rw {
+					mounts, err = remountRO(mounts)
+					if err != nil {
+						return err
+					}
+				}
 			}
 			if err != nil {
 				return err
@@ -131,8 +156,10 @@ When you are done, use the unmount command.
 		}
 
 		if err := mount.All(mounts, target); err != nil {
-			if err := s.Remove(ctx, target); err != nil && !errdefs.IsNotFound(err) {
-				fmt.Fprintln(context.App.ErrWriter, "Error cleaning up snapshot after mount error:", err)
+			if shouldCleanup {
+				if err := s.Remove(ctx, target); err != nil && !errdefs.IsNotFound(err) {
+					fmt.Fprintln(context.App.ErrWriter, "Error cleaning up snapshot after mount error:", err)
+				}
 			}
 			return err
 		}
