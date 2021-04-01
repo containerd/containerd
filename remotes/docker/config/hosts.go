@@ -27,15 +27,15 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
-
-	"github.com/pelletier/go-toml"
-	"github.com/pkg/errors"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/remotes/docker"
+	"github.com/pelletier/go-toml"
+	"github.com/pkg/errors"
 )
 
 // UpdateClientFunc is a function that lets you to amend http Client behavior used by registry clients.
@@ -317,6 +317,11 @@ func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
 		HostConfigs map[string]hostFileConfig `toml:"host"`
 	}{}
 
+	orderedHosts, err := getSortedHosts(tree)
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		hosts []hostConfig
 	)
@@ -325,21 +330,23 @@ func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
 		return nil, err
 	}
 
-	// Parse root host config
-	parsed, err := parseHostConfig(c.Server, baseDir, c.HostFileConfig)
-	if err != nil {
-		return nil, err
-	}
-	hosts = append(hosts, parsed)
-
 	// Parse hosts array
-	for host, config := range c.HostConfigs {
+	for _, host := range orderedHosts {
+		config := c.HostConfigs[host]
+
 		parsed, err := parseHostConfig(host, baseDir, config)
 		if err != nil {
 			return nil, err
 		}
 		hosts = append(hosts, parsed)
 	}
+
+	// Parse root host config and append it as the last element
+	parsed, err := parseHostConfig(c.Server, baseDir, c.HostFileConfig)
+	if err != nil {
+		return nil, err
+	}
+	hosts = append(hosts, parsed)
 
 	return hosts, nil
 }
@@ -462,6 +469,26 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 	}
 
 	return result, nil
+}
+
+// getSortedHosts returns the list of hosts as they defined in the file.
+func getSortedHosts(root *toml.Tree) ([]string, error) {
+	iter, ok := root.Get("host").(*toml.Tree)
+	if !ok {
+		return nil, errors.Errorf("invalid `host` tree")
+	}
+
+	list := append([]string{}, iter.Keys()...)
+
+	// go-toml stores TOML sections in the map object, so no order guaranteed.
+	// We retrieve line number for each key and sort the keys by position.
+	sort.Slice(list, func(i, j int) bool {
+		h1 := iter.GetPath([]string{list[i]}).(*toml.Tree)
+		h2 := iter.GetPath([]string{list[j]}).(*toml.Tree)
+		return h1.Position().Line < h2.Position().Line
+	})
+
+	return list, nil
 }
 
 // makeStringSlice is a helper func to convert from []interface{} to []string.

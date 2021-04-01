@@ -26,8 +26,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/remotes/docker"
 )
@@ -181,7 +179,15 @@ ca = "/etc/path/default"
 		}
 	}()
 
-	assert.ElementsMatch(t, expected, hosts)
+	if len(hosts) != len(expected) {
+		t.Fatalf("Unexpected number of hosts %d, expected %d", len(hosts), len(expected))
+	}
+
+	for i := range hosts {
+		if !compareHostConfig(hosts[i], expected[i]) {
+			t.Fatalf("Mismatch at host %d", i)
+		}
+	}
 }
 
 func TestLoadCertFiles(t *testing.T) {
