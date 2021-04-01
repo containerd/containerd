@@ -70,7 +70,13 @@ type Pusher interface {
 type Discoverer interface {
 	// Discover returns a list of artifacts of the specified type, referencing
 	// the specified reference.
-	Discover(ctx context.Context, desc ocispec.Descriptor, artifactType string) (map[digest.Digest]artifactspec.Artifact, error)
+	Discover(ctx context.Context, desc ocispec.Descriptor, artifactType string) ([]DiscoveredArtifact, error)
+}
+
+// DiscoveredArtifact is returned by the Discoverer contains the artifact and the digest of the artifact
+type DiscoveredArtifact struct {
+	Digest   digest.Digest
+	Artifact artifactspec.Artifact
 }
 
 // FetcherFunc allows package users to implement a Fetcher with just a
@@ -93,9 +99,9 @@ func (fn PusherFunc) Push(ctx context.Context, desc ocispec.Descriptor) (content
 
 // DiscovererFunc allows package users to implement a Discoverer with just a
 // function.
-type DiscovererFunc func(ctx context.Context, desc ocispec.Descriptor, artifactType string) (map[digest.Digest]artifactspec.Artifact, error)
+type DiscovererFunc func(ctx context.Context, desc ocispec.Descriptor, artifactType string) ([]DiscoveredArtifact, error)
 
 // Discover content
-func (fn DiscovererFunc) Discover(ctx context.Context, desc ocispec.Descriptor, artifactType string) (map[digest.Digest]artifactspec.Artifact, error) {
+func (fn DiscovererFunc) Discover(ctx context.Context, desc ocispec.Descriptor, artifactType string) ([]DiscoveredArtifact, error) {
 	return fn(ctx, desc, artifactType)
 }

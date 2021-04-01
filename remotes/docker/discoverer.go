@@ -8,6 +8,7 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/remotes"
 	artifactspec "github.com/opencontainers/artifacts/specs-go/v2"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -18,7 +19,7 @@ type dockerDiscoverer struct {
 	*dockerBase
 }
 
-func (r dockerDiscoverer) Discover(ctx context.Context, desc ocispec.Descriptor, artifactType string) (map[digest.Digest]artifactspec.Artifact, error) {
+func (r dockerDiscoverer) Discover(ctx context.Context, desc ocispec.Descriptor, artifactType string) ([]remotes.DiscoveredArtifact, error) {
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("digest", desc.Digest))
 
 	hosts := r.filterHosts(HostCapabilityDiscover)
@@ -60,7 +61,7 @@ func (r dockerDiscoverer) Discover(ctx context.Context, desc ocispec.Descriptor,
 	return nil, firstErr
 }
 
-func (r dockerDiscoverer) discover(ctx context.Context, req *request) (map[digest.Digest]artifactspec.Artifact, error) {
+func (r dockerDiscoverer) discover(ctx context.Context, req *request) ([]remotes.DiscoveredArtifact, error) {
 	resp, err := req.doWithRetries(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -85,9 +86,12 @@ func (r dockerDiscoverer) discover(ctx context.Context, req *request) (map[diges
 		return nil, err
 	}
 
-	artifacts := make(map[digest.Digest]artifactspec.Artifact)
-	for _, artifact := range result.Links {
-		artifacts[artifact.Digest] = artifact.Manifest
+	artifacts := make([]remotes.DiscoveredArtifact, len(result.Links))
+	for i, artifact := range result.Links {
+		artifacts[i] = remotes.DiscoveredArtifact{
+			Digest:   artifact.Digest,
+			Artifact: artifact.Manifest,
+		}
 	}
 	return artifacts, nil
 }
