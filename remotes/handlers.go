@@ -56,25 +56,32 @@ func WithMediaTypeKeyPrefix(ctx context.Context, mediaType, prefix string) conte
 // used to lookup ongoing processes related to the descriptor. This function
 // may look to the context to namespace the reference appropriately.
 func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
+	key := desc.Digest.String()
+	if desc.Annotations != nil {
+		if name, ok := desc.Annotations[ocispec.AnnotationRefName]; ok {
+			key = fmt.Sprintf("%s@%s", name, desc.Digest.String())
+		}
+	}
+
 	if v := ctx.Value(refKeyPrefix{}); v != nil {
 		values := v.(map[string]string)
 		if prefix := values[desc.MediaType]; prefix != "" {
-			return prefix + "-" + desc.Digest.String()
+			return prefix + "-" + key
 		}
 	}
 
 	switch mt := desc.MediaType; {
 	case mt == images.MediaTypeDockerSchema2Manifest || mt == ocispec.MediaTypeImageManifest:
-		return "manifest-" + desc.Digest.String()
+		return "manifest-" + key
 	case mt == images.MediaTypeDockerSchema2ManifestList || mt == ocispec.MediaTypeImageIndex:
-		return "index-" + desc.Digest.String()
+		return "index-" + key
 	case images.IsLayerType(mt):
-		return "layer-" + desc.Digest.String()
+		return "layer-" + key
 	case images.IsKnownConfig(mt):
-		return "config-" + desc.Digest.String()
+		return "config-" + key
 	default:
 		log.G(ctx).Warnf("reference for unknown type: %s", mt)
-		return "unknown-" + desc.Digest.String()
+		return "unknown-" + key
 	}
 }
 
