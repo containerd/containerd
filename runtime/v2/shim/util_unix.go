@@ -46,11 +46,6 @@ func getSysProcAttr() *syscall.SysProcAttr {
 	}
 }
 
-// SetScore sets the oom score for a process
-func SetScore(pid int) error {
-	return sys.SetOOMScore(pid, sys.OOMScoreMaxKillable)
-}
-
 // AdjustOOMScore sets the OOM score for the process to the parents OOM score +1
 // to ensure that they parent has a lower* score than the shim
 // if not already at the maximum OOM Score
