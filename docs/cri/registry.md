@@ -2,6 +2,14 @@
 
 This document describes the method to configure the image registry for `containerd` for use with the `cri` plugin.
 
+*** registry.mirrors and registry.configs as described in this document
+have been DEPRECATED. As described in [the cri config](./config.md) you
+should now use the form
+```toml
+[plugins."io.containerd.grpc.v1.cri".registry]
+   config_path = "/etc/containerd/certs.d"
+```
+
 ## Configure Registry Endpoint
 
 With containerd, `docker.io` is the default image registry. You can also set up other image registries similar to docker.

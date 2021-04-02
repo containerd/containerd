@@ -225,23 +225,6 @@ version = 2
     # See the "CNI Config Template" section for more details.
     conf_template = ""
 
-  # 'plugins."io.containerd.grpc.v1.cri".registry' contains config related to the registry
-  [plugins."io.containerd.grpc.v1.cri".registry]
-    # Specifies a directory to look for registry configs in.
-    # Dir can be used just like /etc/docker/certs.d OR can contain a hosts.toml with more specific configurations.
-    #
-    # NOTE: Specifying this will cause the cri plugin to ignore any other registry configs specified in this configuration file.
-    config_path = "/etc/containerd/certs.d"
-
-    # 'plugins."io.containerd.grpc.v1.cri.registry.headers sets the http request headers to send for all registry requests
-    [plugins."io.containerd.grpc.v1.cri".registry.headers]
-        Foo = ["bar"]
-
-    # 'plugins."io.containerd.grpc.v1.cri".registry.mirrors' are namespace to mirror mapping for all namespaces.
-    [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
-      [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
-        endpoint = ["https://registry-1.docker.io", ]
-
   # 'plugins."io.containerd.grpc.v1.cri".image_decryption' contains config related
   # to handling decryption of encrypted container images.
   [plugins."io.containerd.grpc.v1.cri".image_decryption]
@@ -263,6 +246,34 @@ version = 2
     # * Stream processors: https://github.com/containerd/containerd/blob/master/docs/stream_processors.md
     # * Containerd imgcrypt: https://github.com/containerd/imgcrypt
     key_model = "node"
+
+  # 'plugins."io.containerd.grpc.v1.cri".registry' contains config related to
+  # the registry
+  [plugins."io.containerd.grpc.v1.cri".registry]
+    # config_path specifies a directory to look for the registry hosts configuration.
+    #
+    # The cri plugin will look for and use config_path/host-namespace/hosts.toml
+    #   configs if present OR load certificate files as laid out in the Docker/Moby
+    #   specific layout https://docs.docker.com/engine/security/certificates/
+    #
+    # If config_path is not provided defaults are used.
+    #
+    # *** registry.configs and registry.mirrors that were a part of containerd 1.4
+    # are now DEPRECATED and will only be used if the config_path is not specified.
+    config_path = "/etc/containerd/certs.d"
+```
+Here is a simple example for a default registry hosts configuration when specifying config_path:
+```
+$ tree /etc/containerd/certs.d
+/etc/containerd/certs.d
+└── docker.io
+    └── hosts.toml
+
+$ cat /etc/containerd/certs.d/docker.io/hosts.toml
+server = "https://docker.io"
+
+[host."https://registry-1.docker.io"]
+  capabilities = ["pull", "resolve"]
 ```
 
 ## Untrusted Workload
