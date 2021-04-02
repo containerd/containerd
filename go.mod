@@ -3,7 +3,6 @@ module github.com/containerd/containerd
 go 1.16
 
 require (
-	github.com/BurntSushi/toml v0.3.1
 	github.com/Microsoft/go-winio v0.4.17-0.20210324224401-5516f17a5958
 	github.com/Microsoft/hcsshim v0.8.15
 	github.com/containerd/aufs v0.0.0-20210316121734-20793ff83c97
@@ -43,6 +42,7 @@ require (
 	github.com/opencontainers/runc v1.0.0-rc93
 	github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d
 	github.com/opencontainers/selinux v1.8.0
+	github.com/pelletier/go-toml v1.8.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
 	github.com/sirupsen/logrus v1.7.0

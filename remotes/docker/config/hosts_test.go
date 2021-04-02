@@ -74,8 +74,6 @@ func TestDefaultHosts(t *testing.T) {
 }
 
 func TestParseHostFile(t *testing.T) {
-	ctx := logtest.WithT(context.Background(), t)
-
 	const testtoml = `
 server = "https://test-default.registry"
 ca = "/etc/path/default"
@@ -170,7 +168,7 @@ ca = "/etc/path/default"
 			header:       http.Header{"x-custom-1": {"custom header"}},
 		},
 	}
-	hosts, err := parseHostsFile(ctx, "", []byte(testtoml))
+	hosts, err := parseHostsFile("", []byte(testtoml))
 	if err != nil {
 		t.Fatal(err)
 	}

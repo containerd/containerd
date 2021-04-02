@@ -19,7 +19,6 @@
 package config
 
 import (
-	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/pkg/cri/streaming"
 )
@@ -39,8 +38,7 @@ func DefaultConfig() PluginConfig {
 			NoPivot:            false,
 			Runtimes: map[string]Runtime{
 				"runc": {
-					Type:    "io.containerd.runc.v2",
-					Options: new(toml.Primitive),
+					Type: "io.containerd.runc.v2",
 				},
 			},
 			DisableSnapshotAnnotations: true,

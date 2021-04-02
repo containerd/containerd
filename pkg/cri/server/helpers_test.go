@@ -21,7 +21,6 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/reference/docker"
@@ -29,6 +28,7 @@ import (
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	imagedigest "github.com/opencontainers/go-digest"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pelletier/go-toml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -223,11 +223,16 @@ systemd_cgroup = true
   NoNewKeyring = true
 `
 	var nilOptsConfig, nonNilOptsConfig criconfig.Config
-	_, err := toml.Decode(nilOpts, &nilOptsConfig)
+	tree, err := toml.Load(nilOpts)
 	require.NoError(t, err)
-	_, err = toml.Decode(nonNilOpts, &nonNilOptsConfig)
+	err = tree.Unmarshal(&nilOptsConfig)
 	require.NoError(t, err)
 	require.Len(t, nilOptsConfig.Runtimes, 3)
+
+	tree, err = toml.Load(nonNilOpts)
+	require.NoError(t, err)
+	err = tree.Unmarshal(&nonNilOptsConfig)
+	require.NoError(t, err)
 	require.Len(t, nonNilOptsConfig.Runtimes, 3)
 
 	for desc, test := range map[string]struct {

@@ -1,6 +1,3 @@
-# github.com/BurntSushi/toml v0.3.1
-## explicit
-github.com/BurntSushi/toml
 # github.com/Microsoft/go-winio v0.4.17-0.20210324224401-5516f17a5958
 ## explicit
 github.com/Microsoft/go-winio
@@ -278,6 +275,9 @@ github.com/opencontainers/runtime-spec/specs-go
 github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
 github.com/opencontainers/selinux/pkg/pwalk
+# github.com/pelletier/go-toml v1.8.1
+## explicit
+github.com/pelletier/go-toml
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors

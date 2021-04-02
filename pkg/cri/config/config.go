@@ -21,9 +21,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
+	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
 
@@ -48,8 +48,8 @@ type Runtime struct {
 	// This only works for runtime type "io.containerd.runtime.v1.linux".
 	Root string `toml:"runtime_root" json:"runtimeRoot"`
 	// Options are config options for the runtime. If options is loaded
-	// from toml config, it will be toml.Primitive.
-	Options *toml.Primitive `toml:"options" json:"options"`
+	// from toml config, it will be toml.Tree.
+	Options *toml.Tree `toml:"options" json:"options"`
 	// PrivilegedWithoutHostDevices overloads the default behaviour for adding host devices to the
 	// runtime spec when the container is privileged. Defaults to false.
 	PrivilegedWithoutHostDevices bool `toml:"privileged_without_host_devices" json:"privileged_without_host_devices"`
