@@ -366,8 +366,13 @@ func (s *Snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		}
 
 		if err := mkfs(ctx, dmsetup.GetFullDevicePath(deviceName)); err != nil {
+			status, sErr := dmsetup.Status(s.pool.poolName)
+			if sErr != nil {
+				multierror.Append(err, sErr)
+			}
+
 			// Rollback thin device creation if mkfs failed
-			log.G(ctx).WithError(err).Errorf("failed to initialize thin device %q for snapshot %s", deviceName, snap.ID)
+			log.G(ctx).WithError(err).Errorf("failed to initialize thin device %q for snapshot %s pool status %s", deviceName, snap.ID, status.RawOutput)
 			return nil, multierror.Append(err,
 				s.pool.RemoveDevice(ctx, deviceName))
 		}

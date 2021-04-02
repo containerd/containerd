@@ -274,10 +274,11 @@ func Version() (string, error) {
 
 // DeviceStatus represents devmapper device status information
 type DeviceStatus struct {
-	Offset int64
-	Length int64
-	Target string
-	Params []string
+	RawOutput string
+	Offset    int64
+	Length    int64
+	Target    string
+	Params    []string
 }
 
 // Status provides status information for devmapper device
@@ -291,6 +292,7 @@ func Status(deviceName string) (*DeviceStatus, error) {
 	if err != nil {
 		return nil, err
 	}
+	status.RawOutput = output
 
 	// Status output format:
 	//  Offset (int64)
