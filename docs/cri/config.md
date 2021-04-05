@@ -321,7 +321,7 @@ values are:
 * `.PodCIDR` is a string of the first CIDR assigned to the node.
 * `.PodCIDRRanges` is a string array of all CIDRs assigned to the node. It is
   usually used for
-  [dualstack](https://github.com/kubernetes/enhancements/blob/master/keps/sig-network/20180612-ipv4-ipv6-dual-stack.md) support.
+  [dualstack](https://github.com/kubernetes/enhancements/tree/master/keps/sig-network/563-dual-stack) support.
 * `.Routes` is a string array of all routes needed. It is usually used for
   dualstack support or single stack but IPv4 or IPv6 is decided at runtime.
 
