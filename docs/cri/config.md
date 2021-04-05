@@ -260,9 +260,16 @@ version = 2
     #
     # *** registry.configs and registry.mirrors that were a part of containerd 1.4
     # are now DEPRECATED and will only be used if the config_path is not specified.
-    config_path = "/etc/containerd/certs.d"
+    config_path = ""
 ```
-Here is a simple example for a default registry hosts configuration when specifying config_path:
+
+## Registry Configuration
+
+Here is a simple example for a default registry hosts configuration. Set
+`config_path = "/etc/containerd/certs.d"` in your config.toml for containerd.
+Make a directory tree at the config path that includes `docker.io` as a directory
+representing the host namespace to be configured. Then add a `hosts.toml` file
+in the `docker.io` to configure the host namespace. It should look like this:
 ```
 $ tree /etc/containerd/certs.d
 /etc/containerd/certs.d

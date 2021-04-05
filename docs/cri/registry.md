@@ -3,7 +3,7 @@
 This document describes the method to configure the image registry for `containerd` for use with the `cri` plugin.
 
 *** registry.mirrors and registry.configs as described in this document
-have been DEPRECATED. As described in [the cri config](./config.md) you
+have been DEPRECATED. As described in [the cri config](./config.md#registry-configuration) you
 should now use the form
 ```toml
 [plugins."io.containerd.grpc.v1.cri".registry]
