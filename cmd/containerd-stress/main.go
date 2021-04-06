@@ -149,6 +149,11 @@ func main() {
 			Usage: "set the runtime to stress test",
 			Value: plugin.RuntimeRuncV2,
 		},
+		cli.StringFlag{
+			Name:  "snapshotter",
+			Usage: "set the snapshotter to use",
+			Value: "overlayfs",
+		},
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("json") {
@@ -171,6 +176,7 @@ func main() {
 			JSON:        context.GlobalBool("json"),
 			Metrics:     context.GlobalString("metrics"),
 			Runtime:     context.GlobalString("runtime"),
+			Snapshotter: context.GlobalString("snapshotter"),
 		}
 		if config.Metrics != "" {
 			return serve(config)
@@ -191,6 +197,7 @@ type config struct {
 	JSON        bool
 	Metrics     string
 	Runtime     string
+	Snapshotter string
 }
 
 func (c config) newClient() (*containerd.Client, error) {
@@ -222,7 +229,7 @@ func test(c config) error {
 		return err
 	}
 	logrus.Infof("pulling %s", imageName)
-	image, err := client.Pull(ctx, imageName, containerd.WithPullUnpack)
+	image, err := client.Pull(ctx, imageName, containerd.WithPullUnpack, containerd.WithPullSnapshotter(c.Snapshotter))
 	if err != nil {
 		return err
 	}
@@ -247,11 +254,12 @@ func test(c config) error {
 	for i := 0; i < c.Concurrency; i++ {
 		wg.Add(1)
 		w := &worker{
-			id:     i,
-			wg:     &wg,
-			image:  image,
-			client: client,
-			commit: v.Revision,
+			id:          i,
+			wg:          &wg,
+			image:       image,
+			client:      client,
+			commit:      v.Revision,
+			snapshotter: c.Snapshotter,
 		}
 		workers = append(workers, w)
 	}
@@ -261,11 +269,12 @@ func test(c config) error {
 			wg.Add(1)
 			exec = &execWorker{
 				worker: worker{
-					id:     i,
-					wg:     &wg,
-					image:  image,
-					client: client,
-					commit: v.Revision,
+					id:          i,
+					wg:          &wg,
+					image:       image,
+					client:      client,
+					commit:      v.Revision,
+					snapshotter: c.Snapshotter,
 				},
 			}
 			go exec.exec(ctx, tctx)

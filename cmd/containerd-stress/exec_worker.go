@@ -42,6 +42,7 @@ func (w *execWorker) exec(ctx, tctx context.Context) {
 	id := fmt.Sprintf("exec-container-%d", w.id)
 	c, err := w.client.NewContainer(ctx, id,
 		containerd.WithNewSnapshot(id, w.image),
+		containerd.WithSnapshotter(w.snapshotter),
 		containerd.WithNewSpec(oci.WithImageConfig(w.image), oci.WithUsername("games"), oci.WithProcessArgs("sleep", "30d")),
 	)
 	if err != nil {
