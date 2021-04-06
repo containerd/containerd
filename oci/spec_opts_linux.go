@@ -247,3 +247,8 @@ var WithAllKnownCapabilities = func(ctx context.Context, client Client, c *conta
 	caps := cap.Known()
 	return WithCapabilities(caps)(ctx, client, c, s)
 }
+
+// WithoutRunMount removes the `/run` inside the spec
+func WithoutRunMount(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
+	return WithoutMounts("/run")(ctx, client, c, s)
+}

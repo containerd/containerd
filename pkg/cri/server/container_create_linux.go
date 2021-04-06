@@ -122,7 +122,7 @@ func (c *criService) containerSpec(
 	ociRuntime config.Runtime,
 ) (_ *runtimespec.Spec, retErr error) {
 	specOpts := []oci.SpecOpts{
-		customopts.WithoutRunMount,
+		oci.WithoutRunMount,
 	}
 	// only clear the default security settings if the runtime does not have a custom
 	// base runtime spec spec.  Admins can use this functionality to define

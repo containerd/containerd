@@ -25,6 +25,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
@@ -600,4 +601,60 @@ func getShmSize(opts []string) string {
 		}
 	}
 	return ""
+}
+
+func TestWithoutMounts(t *testing.T) {
+	t.Parallel()
+	var s Spec
+
+	x := func(s string) string {
+		if runtime.GOOS == "windows" {
+			return filepath.Join("C:\\", filepath.Clean(s))
+		}
+		return s
+	}
+	opts := []SpecOpts{
+		WithMounts([]specs.Mount{
+			{
+				Destination: x("/dst1"),
+				Source:      x("/src1"),
+			},
+			{
+				Destination: x("/dst2"),
+				Source:      x("/src2"),
+			},
+			{
+				Destination: x("/dst3"),
+				Source:      x("/src3"),
+			},
+		}),
+		WithoutMounts(x("/dst2"), x("/dst3")),
+		WithMounts([]specs.Mount{
+			{
+				Destination: x("/dst4"),
+				Source:      x("/src4"),
+			},
+		}),
+	}
+
+	expected := []specs.Mount{
+		{
+			Destination: x("/dst1"),
+			Source:      x("/src1"),
+		},
+		{
+			Destination: x("/dst4"),
+			Source:      x("/src4"),
+		},
+	}
+
+	for _, opt := range opts {
+		if err := opt(nil, nil, nil, &s); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if !reflect.DeepEqual(expected, s.Mounts) {
+		t.Fatalf("expected %+v, got %+v", expected, s.Mounts)
+	}
 }
