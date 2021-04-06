@@ -178,7 +178,9 @@ EachLayer:
 		// Abort the snapshot if commit does not happen
 		abort := func() {
 			if err := sn.Remove(ctx, key); err != nil {
-				log.G(ctx).WithError(err).Errorf("failed to cleanup %q", key)
+				if !errdefs.IsCanceled(err) && !errdefs.IsDeadlineExceeded(err) {
+					log.G(ctx).WithError(err).Errorf("failed to cleanup %q", key)
+				}
 			}
 		}
 
