@@ -185,6 +185,10 @@ var (
 			Name:  "apparmor-profile",
 			Usage: "enable AppArmor with an existing custom profile",
 		},
+		cli.StringFlag{
+			Name:  "rdt-class",
+			Usage: "name of the RDT class (or CLOS) to associate the container with",
+		},
 	}
 )
 
