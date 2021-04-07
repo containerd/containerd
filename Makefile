@@ -282,6 +282,7 @@ install-cri-deps: $(BINARIES)
 	DESTDIR=$(CRIDIR) script/setup/install-runc
 	DESTDIR=$(CRIDIR) script/setup/install-cni
 	DESTDIR=$(CRIDIR) script/setup/install-critools
+	DESTDIR=$(CRIDIR) script/setup/install-imgcrypt
 
 	@install -d $(CRIDIR)/bin
 	@install $(BINARIES) $(CRIDIR)/bin
