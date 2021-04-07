@@ -54,17 +54,10 @@ func DefaultConfig() PluginConfig {
 			TLSKeyFile:  "",
 			TLSCertFile: "",
 		},
-		SandboxImage:            "k8s.gcr.io/pause:3.5",
-		StatsCollectPeriod:      10,
-		SystemdCgroup:           false,
-		MaxContainerLogLineSize: 16 * 1024,
-		Registry: Registry{
-			Mirrors: map[string]Mirror{
-				"docker.io": {
-					Endpoints: []string{"https://registry-1.docker.io"},
-				},
-			},
-		},
+		SandboxImage:                     "k8s.gcr.io/pause:3.5",
+		StatsCollectPeriod:               10,
+		SystemdCgroup:                    false,
+		MaxContainerLogLineSize:          16 * 1024,
 		MaxConcurrentDownloads:           3,
 		DisableProcMount:                 false,
 		TolerateMissingHugetlbController: true,
