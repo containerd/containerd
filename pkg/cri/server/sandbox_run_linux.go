@@ -41,7 +41,7 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	// Creates a spec Generator with the default spec.
 	// TODO(random-liu): [P1] Compare the default settings with docker and containerd default.
 	specOpts := []oci.SpecOpts{
-		customopts.WithoutRunMount,
+		oci.WithoutRunMount,
 		customopts.WithoutDefaultSecuritySettings,
 		customopts.WithRelativeRoot(relativeRootfsPath),
 		oci.WithEnv(imageConfig.Env),
