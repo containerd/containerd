@@ -423,6 +423,8 @@ jobs:
       - name: cri-tools critest
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
+        # Temporarily disabled due to cri-tools hardcoded to use broken images
+        continue-on-error: true
         run: |
           BDIR="$(mktemp -d -p $PWD)"
           mkdir -p ${BDIR}/{root,state}
@@ -512,4 +514,6 @@ jobs:
         env:
           RUNC_FLAVOR: ${{ matrix.runc }}
           SELINUX: Enforcing
+        # Temporarily disabled due to cri-tools hardcoded to use broken images
+        continue-on-error: true
         run: vagrant up --provision-with=selinux,install-runc,test-cri
