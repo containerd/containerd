@@ -83,6 +83,7 @@ documentation.
    **mutation_threshold** guarantees GC is scheduled after n number of database mutations (Default: **100**),
    **schedule_delay** defines the delay after trigger event before scheduling a GC (Default **"0ms"** [immediate]),
    **startup_delay** defines the delay after startup before scheduling a GC (Default **"100ms"**)
+ - **[plugins.rdt]** has one option __config_file__ (Default: **""**)
 
 ## EXAMPLE
 
