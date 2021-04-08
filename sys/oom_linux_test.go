@@ -71,9 +71,11 @@ func TestSetOOMScoreBoundaries(t *testing.T) {
 
 	score, err := GetOOMScoreAdj(os.Getpid())
 	assert.NilError(t, err)
-	if score == 0 || score == OOMScoreAdjMin {
-		// we won't be able to set the score lower than the parent process,
-		// so only test if parent process does not have a oom-score-adj
+	if score == OOMScoreAdjMin {
+		// We won't be able to set the score lower than the parent process. This
+		// could also be tested if the parent process does not have a oom-score-adj
+		// set, but GetOOMScoreAdj does not distinguish between "not set" and
+		// "score is set, but zero".
 		_, adjustment, err = adjustOom(OOMScoreAdjMin)
 		assert.NilError(t, err)
 		assert.Check(t, is.Equal(adjustment, OOMScoreAdjMin))

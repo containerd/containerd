@@ -65,7 +65,8 @@ func SetOOMScore(pid, score int) error {
 	return nil
 }
 
-// GetOOMScoreAdj gets the oom score for a process
+// GetOOMScoreAdj gets the oom score for a process. It returns 0 (zero) if either
+// no oom score is set, or a sore is set to 0.
 func GetOOMScoreAdj(pid int) (int, error) {
 	path := fmt.Sprintf("/proc/%d/oom_score_adj", pid)
 	data, err := ioutil.ReadFile(path)
