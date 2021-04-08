@@ -77,17 +77,17 @@ func (r dockerDiscoverer) discover(ctx context.Context, req *request) ([]remotes
 	}
 
 	result := struct {
-		Links []struct {
+		References []struct {
 			Digest   digest.Digest         `json:"digest"`
 			Manifest artifactspec.Artifact `json:"manifest"`
-		} `json:"links"`
+		} `json:"references"`
 	}{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
 
-	artifacts := make([]remotes.DiscoveredArtifact, len(result.Links))
-	for i, artifact := range result.Links {
+	artifacts := make([]remotes.DiscoveredArtifact, len(result.References))
+	for i, artifact := range result.References {
 		artifacts[i] = remotes.DiscoveredArtifact{
 			Digest:   artifact.Digest,
 			Artifact: artifact.Manifest,
