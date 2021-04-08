@@ -75,7 +75,7 @@ func DefaultConfig() PluginConfig {
 			Runtimes: map[string]Runtime{
 				"runc": {
 					Type:    "io.containerd.runc.v2",
-					Options: tree,
+					Options: tree.ToMap(),
 				},
 			},
 			DisableSnapshotAnnotations: true,
