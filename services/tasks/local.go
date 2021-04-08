@@ -63,11 +63,18 @@ const (
 	stateTimeout = "io.containerd.timeout.task.state"
 )
 
+// Config for the tasks service plugin
+type Config struct {
+	// RdtConfigFile specifies the path to RDT configuration file
+	RdtConfigFile string `toml:"rdt_config_file" json:"rdtConfigFile"`
+}
+
 func init() {
 	plugin.Register(&plugin.Registration{
 		Type:     plugin.ServicePlugin,
 		ID:       services.TasksService,
 		Requires: tasksServiceRequires,
+		Config:   &Config{},
 		InitFn:   initFunc,
 	})
 
@@ -75,6 +82,7 @@ func init() {
 }
 
 func initFunc(ic *plugin.InitContext) (interface{}, error) {
+	config := ic.Config.(*Config)
 	runtimes, err := loadV1Runtimes(ic)
 	if err != nil {
 		return nil, err
@@ -128,6 +136,11 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 	for _, t := range v2Tasks {
 		l.monitor.Monitor(t, nil)
 	}
+
+	if err := initRdt(config.RdtConfigFile); err != nil {
+		log.G(ic.Context).WithError(err).Errorf("RDT initialization failed")
+	}
+
 	return l, nil
 }
 
