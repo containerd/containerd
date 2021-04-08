@@ -83,6 +83,9 @@ message Options {
 	// This currently only affects LCOW. The sandbox containers scratch space is re-used for all
 	// subsequent containers launched in the pod.  
 	bool share_scratch = 14;
+	//NCProxyAddr is the address of the network configuration proxy service. If omitted 
+	// the network is setup locally. 
+	string NCProxyAddr = 15; 
 }
 
 // ProcessDetails contains additional information about a process. This is the additional

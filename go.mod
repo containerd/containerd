@@ -4,7 +4,7 @@ go 1.16
 
 require (
 	github.com/Microsoft/go-winio v0.4.17-0.20210324224401-5516f17a5958
-	github.com/Microsoft/hcsshim v0.8.15
+	github.com/Microsoft/hcsshim v0.8.16
 	github.com/containerd/aufs v0.0.0-20210316121734-20793ff83c97
 	github.com/containerd/btrfs v0.0.0-20210316141732-918d888fb676
 	github.com/containerd/cgroups v0.0.0-20210114181951-8a68de567b68
@@ -52,7 +52,7 @@ require (
 	go.etcd.io/bbolt v1.3.5
 	golang.org/x/net v0.0.0-20201224014010-6772e930b67b
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
-	golang.org/x/sys v0.0.0-20210124154548-22da62e12c0c
+	golang.org/x/sys v0.0.0-20210324051608-47abb6519492
 	google.golang.org/grpc v1.33.2
 	gotest.tools/v3 v3.0.3
 	k8s.io/api v0.20.4
