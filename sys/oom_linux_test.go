@@ -18,50 +18,66 @@ package sys
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/pkg/userns"
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 )
 
 func TestSetPositiveOomScoreAdjustment(t *testing.T) {
+	// Setting a *positive* OOM score adjust does not require privileged
 	_, adjustment, err := adjustOom(123)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.NilError(t, err)
 	assert.Check(t, is.Equal(adjustment, 123))
 }
 
 func TestSetNegativeOomScoreAdjustmentWhenPrivileged(t *testing.T) {
-	if RunningUnprivileged() {
-		t.Skip("Needs to be run as root")
+	if !runningPrivileged() || userns.RunningInUserNS() {
+		t.Skip("requires root and not running in user namespace")
 		return
 	}
 
 	_, adjustment, err := adjustOom(-123)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.NilError(t, err)
 	assert.Check(t, is.Equal(adjustment, -123))
 }
 
 func TestSetNegativeOomScoreAdjustmentWhenUnprivilegedHasNoEffect(t *testing.T) {
-	if RunningPrivileged() {
-		t.Skip("Needs to be run as non-root")
+	if runningPrivileged() && !userns.RunningInUserNS() {
+		t.Skip("needs to be run as non-root or in user namespace")
 		return
 	}
 
 	initial, adjustment, err := adjustOom(-123)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.NilError(t, err)
 	assert.Check(t, is.Equal(adjustment, initial))
+}
+
+func TestSetOOMScoreBoundaries(t *testing.T) {
+	err := SetOOMScore(0, OOMScoreAdjMax+1)
+	assert.ErrorContains(t, err, fmt.Sprintf("value out of range (%d): OOM score must be between", OOMScoreAdjMax+1))
+
+	err = SetOOMScore(0, OOMScoreAdjMin-1)
+	assert.ErrorContains(t, err, fmt.Sprintf("value out of range (%d): OOM score must be between", OOMScoreAdjMin-1))
+
+	_, adjustment, err := adjustOom(OOMScoreAdjMax)
+	assert.NilError(t, err)
+	assert.Check(t, is.Equal(adjustment, OOMScoreAdjMax))
+
+	score, err := GetOOMScoreAdj(os.Getpid())
+	assert.NilError(t, err)
+	if score == 0 || score == OOMScoreAdjMin {
+		// we won't be able to set the score lower than the parent process,
+		// so only test if parent process does not have a oom-score-adj
+		_, adjustment, err = adjustOom(OOMScoreAdjMin)
+		assert.NilError(t, err)
+		assert.Check(t, is.Equal(adjustment, OOMScoreAdjMin))
+	}
 }
 
 func adjustOom(adjustment int) (int, int, error) {
