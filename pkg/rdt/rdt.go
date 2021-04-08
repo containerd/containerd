@@ -18,6 +18,8 @@
 package rdt
 
 import (
+	"fmt"
+
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 
@@ -29,6 +31,8 @@ const (
 	// ResctrlPrefix is the prefix used for class/closid directories under the resctrl filesystem
 	ResctrlPrefix = ""
 )
+
+var enabled bool
 
 // Config contains the configuration of the RDT plugin
 type Config struct {
@@ -45,6 +49,8 @@ func init() {
 }
 
 func initRdt(ic *plugin.InitContext) (interface{}, error) {
+	enabled = false
+
 	if err := rdt.Initialize(ResctrlPrefix); err != nil {
 		log.L.Infof("RDT is not enabled: %v", err)
 		return nil, nil
@@ -64,6 +70,21 @@ func initRdt(ic *plugin.InitContext) (interface{}, error) {
 		return nil, errors.Wrap(err, "configuring RDT failed")
 	}
 
+	enabled = true
+
 	return nil, nil
 
+}
+
+// ContainerClassFromAnnotations examines container and pod annotations of a
+// container and returns its effective RDT class.
+func ContainerClassFromAnnotations(containerName string, containerAnnotations, podAnnotations map[string]string) (string, error) {
+	cls, err := rdt.ContainerClassFromAnnotations(containerName, containerAnnotations, podAnnotations)
+	if err != nil {
+		return "", err
+	}
+	if cls != "" && !enabled {
+		return "", fmt.Errorf("RDT disabled, refusing to set RDT class of container %q to %q", containerName, cls)
+	}
+	return cls, nil
 }

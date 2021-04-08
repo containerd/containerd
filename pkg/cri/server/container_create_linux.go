@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/pkg/rdt"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	selinux "github.com/opencontainers/selinux/go-selinux"
@@ -259,6 +260,15 @@ func (c *criService) containerSpec(
 	}
 
 	supplementalGroups := securityContext.GetSupplementalGroups()
+
+	// Get RDT class
+	rdtClass, err := rdt.ContainerClassFromAnnotations(config.GetMetadata().GetName(), config.Annotations, sandboxConfig.Annotations)
+	if err != nil {
+		return nil, errors.Wrap(err, "invalid RDT class")
+	}
+	if rdtClass != "" {
+		specOpts = append(specOpts, oci.WithRdt(rdtClass, "", ""))
+	}
 
 	for pKey, pValue := range getPassthroughAnnotations(sandboxConfig.Annotations,
 		ociRuntime.PodAnnotations) {
