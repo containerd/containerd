@@ -36,6 +36,7 @@ brings support for the Node Resource Interface (NRI).
 * **Add platform check for snapshotter support when unpacking** [#3927](https://github.com/containerd/containerd/pull/3927)
 * **Handle loopback mounts** [#4902](https://github.com/containerd/containerd/pull/4902)
 * **Support `userxattr` mount option for overlay in user namespace** [#5076](https://github.com/containerd/containerd/pull/5076)
+* **ZFS snapshotter implementation of usage** [#5243](https://github.com/containerd/containerd/pull/5243)
 
 #### Distribution
 * **Improve registry response errors** [#4523](https://github.com/containerd/containerd/pull/4523)
@@ -52,9 +53,11 @@ brings support for the Node Resource Interface (NRI).
 * **Optimize LCOW snapshotter use of scratch layers** [#4643](https://github.com/containerd/containerd/pull/4643)
 
 #### CRI
+* **Add NRI injection points** [cri#1552](https://github.com/containerd/cri/pull/1552)
 * **Add support for registry host directory configuration** [#4978](https://github.com/containerd/containerd/pull/4978)
 * **Update privileged containers to use current capabilities instead of known capabilities** [#5017](https://github.com/containerd/containerd/pull/5017)
 * **Add pod annotations to CNI call** [#5026](https://github.com/containerd/containerd/pull/5026)
+* **Enable ocicrypt by default** [#5135](https://github.com/containerd/containerd/pull/5135)
 
 ### Impactful Client Updates
 
