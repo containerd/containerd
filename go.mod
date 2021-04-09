@@ -35,8 +35,9 @@ require (
 	github.com/google/uuid v1.2.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/hashicorp/go-multierror v1.0.0
+	github.com/hashicorp/go-multierror v1.1.1
 	github.com/imdario/mergo v0.3.12
+	github.com/intel/goresctrl v0.2.0
 	github.com/klauspost/compress v1.11.13
 	github.com/moby/locker v1.0.1
 	github.com/moby/sys/mountinfo v0.5.0
@@ -71,7 +72,7 @@ require (
 	google.golang.org/protobuf v1.27.1
 	gotest.tools/v3 v3.0.3
 	k8s.io/api v0.22.0
-	k8s.io/apimachinery v0.22.0
+	k8s.io/apimachinery v0.22.1
 	k8s.io/apiserver v0.22.0
 	k8s.io/client-go v0.22.0
 	k8s.io/component-base v0.22.0
