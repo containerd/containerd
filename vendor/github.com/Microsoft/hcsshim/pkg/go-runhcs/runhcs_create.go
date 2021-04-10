@@ -97,5 +97,5 @@ func (r *Runhcs) Create(context context.Context, id, bundle string, opts *Create
 	if err == nil && status != 0 {
 		err = fmt.Errorf("%s did not terminate sucessfully", cmd.Args[0])
 	}
-	return nil
+	return err
 }

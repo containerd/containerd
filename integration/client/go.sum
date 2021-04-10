@@ -38,10 +38,11 @@ github.com/Microsoft/go-winio v0.4.17-0.20210211115548-6eac466e5fa3/go.mod h1:JP
 github.com/Microsoft/go-winio v0.4.17-0.20210324224401-5516f17a5958 h1:koVgEW/cX7NavmMAkL6LgoMZJ9gJnxuWMwwfw5A2s34=
 github.com/Microsoft/go-winio v0.4.17-0.20210324224401-5516f17a5958/go.mod h1:JPGBdM1cNvN/6ISo+n8V5iA4v8pBzdOpzfwIujj1a84=
 github.com/Microsoft/hcsshim v0.8.6/go.mod h1:Op3hHsoHPAvb6lceZHDtd9OkTew38wNoXnJs8iY7rUg=
-github.com/Microsoft/hcsshim v0.8.15 h1:Aof83YILRs2Vx3GhHqlvvfyx1asRJKMFIMeVlHsZKtI=
 github.com/Microsoft/hcsshim v0.8.15/go.mod h1:x38A4YbHbdxJtc0sF6oIz+RG0npwSCAvn69iY6URG00=
-github.com/Microsoft/hcsshim/test v0.0.0-20210326183024-65090e5b3e45 h1:RrtjK5t7ZIaC2ObaNdXp+i42Ddn6lG3MQESVFlu4RPw=
-github.com/Microsoft/hcsshim/test v0.0.0-20210326183024-65090e5b3e45/go.mod h1:Cmvnhlie15Ha2UYrJs9EhgSx76Bq9RV2FgfEiT78GhI=
+github.com/Microsoft/hcsshim v0.8.16 h1:8/auA4LFIZFTGrqfKhGBSXwM6/4X1fHa/xniyEHu8ac=
+github.com/Microsoft/hcsshim v0.8.16/go.mod h1:o5/SZqmR7x9JNKsW3pu+nqHm0MF8vbA+VxGOoXdC600=
+github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1 h1:pVKfKyPkXna29XlGjxSr9J0A7vNucOUHZ/2ClcTWalw=
+github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1/go.mod h1:Cmvnhlie15Ha2UYrJs9EhgSx76Bq9RV2FgfEiT78GhI=
 github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46/go.mod h1:3wb06e3pkSAbeQ52E9H9iFoQsEEwGN64994WTCIhntQ=
 github.com/PuerkitoBio/purell v1.1.1/go.mod h1:c11w/QuzBsJSee3cPx9rAFu61PvFxuPbtSwDGJws/X0=
 github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578/go.mod h1:uGdkoq3SwY9Y+13GIhn11/XLaGBb4BfwItxLd5jeuXE=
