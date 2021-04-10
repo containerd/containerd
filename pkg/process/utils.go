@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	// RuncRoot is the path to the root runc state directory
+	// RuncRoot is the default path to the root runc state directory
 	RuncRoot = "/run/containerd/runc"
 	// InitPidFile name of the file that contains the init pid
 	InitPidFile = "init.pid"
