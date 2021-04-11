@@ -23,6 +23,7 @@ import (
 	"github.com/imdario/mergo"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/plugin"
@@ -94,8 +95,9 @@ func (c *Config) GetVersion() int {
 
 // ValidateV2 validates the config for a v2 file
 func (c *Config) ValidateV2() error {
-	if c.GetVersion() != 2 {
-		return nil
+	version := c.GetVersion()
+	if version < 2 {
+		logrus.Warnf("deprecated version : `%d`, please switch to version `2`", version)
 	}
 	for _, p := range c.DisabledPlugins {
 		if len(strings.Split(p, ".")) < 4 {
@@ -258,7 +260,11 @@ func LoadConfig(path string, out *Config) error {
 		out.Imports = append(out.Imports, path)
 	}
 
-	return out.ValidateV2()
+	err := out.ValidateV2()
+	if err != nil {
+		return errors.Wrapf(err, "failed to load TOML from %s", path)
+	}
+	return nil
 }
 
 // loadConfigFile decodes a TOML file at the given path

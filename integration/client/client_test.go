@@ -503,12 +503,12 @@ func createShimDebugConfig() string {
 		os.Exit(1)
 	}
 	defer f.Close()
-	if _, err := f.WriteString("version = 1\n"); err != nil {
+	if _, err := f.WriteString("version = 2\n"); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to write to config file %s: %s\n", f.Name(), err)
 		os.Exit(1)
 	}
 
-	if _, err := f.WriteString("[plugins.linux]\n\tshim_debug = true\n"); err != nil {
+	if _, err := f.WriteString("[plugins.\"io.containerd.runtime.v1.linux\"]\n\tshim_debug = true\n"); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to write to config file %s: %s\n", f.Name(), err)
 		os.Exit(1)
 	}
