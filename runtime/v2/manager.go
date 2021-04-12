@@ -35,6 +35,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 )
 
 // Config for the v2 runtime
@@ -117,20 +118,45 @@ func (m *TaskManager) ID() string {
 }
 
 // Create a new task
-func (m *TaskManager) Create(ctx context.Context, id string, opts runtime.CreateOpts) (_ runtime.Task, err error) {
-	ns, err := namespaces.NamespaceRequired(ctx)
-	if err != nil {
-		return nil, err
-	}
+func (m *TaskManager) Create(ctx context.Context, id string, opts runtime.CreateOpts) (_ runtime.Task, retErr error) {
 	bundle, err := NewBundle(ctx, m.root, m.state, id, opts.Spec.Value)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		if err != nil {
+		if retErr != nil {
 			bundle.Delete()
 		}
 	}()
+
+	shim, err := m.startShim(ctx, bundle, id, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if retErr != nil {
+			m.deleteShim(shim)
+		}
+	}()
+
+	t, err := shim.Create(ctx, opts)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create shim")
+	}
+
+	if err := m.tasks.Add(ctx, t); err != nil {
+		return nil, errors.Wrap(err, "failed to add task")
+	}
+
+	return t, nil
+}
+
+func (m *TaskManager) startShim(ctx context.Context, bundle *Bundle, id string, opts runtime.CreateOpts) (*shim, error) {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	topts := opts.TaskOptions
 	if topts == nil {
 		topts = opts.RuntimeOptions
@@ -148,29 +174,26 @@ func (m *TaskManager) Create(ctx context.Context, id string, opts runtime.Create
 		m.tasks.Delete(ctx, id)
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "start failed")
 	}
-	defer func() {
-		if err != nil {
-			dctx, cancel := timeout.WithContext(context.Background(), cleanupTimeout)
+
+	return shim, nil
+}
+
+// deleteShim attempts to properly delete and cleanup shim after error
+func (m *TaskManager) deleteShim(shim *shim) {
+	dctx, cancel := timeout.WithContext(context.Background(), cleanupTimeout)
+	defer cancel()
+
+	_, errShim := shim.Delete(dctx)
+	if errShim != nil {
+		if errdefs.IsDeadlineExceeded(errShim) {
+			dctx, cancel = timeout.WithContext(context.Background(), cleanupTimeout)
 			defer cancel()
-			_, errShim := shim.Delete(dctx)
-			if errShim != nil {
-				if errdefs.IsDeadlineExceeded(errShim) {
-					dctx, cancel = timeout.WithContext(context.Background(), cleanupTimeout)
-					defer cancel()
-				}
-				shim.Shutdown(dctx)
-				shim.Close()
-			}
 		}
-	}()
-	t, err := shim.Create(ctx, opts)
-	if err != nil {
-		return nil, err
+		shim.Shutdown(dctx)
+		shim.Close()
 	}
-	m.tasks.Add(ctx, t)
-	return t, nil
 }
 
 // Get a specific task
