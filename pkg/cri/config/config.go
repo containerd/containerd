@@ -328,7 +328,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 		return errors.New("`default_runtime_name` is empty")
 	}
 	if _, ok := c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName]; !ok {
-		return errors.New("no corresponding runtime configured in `runtimes` for `default_runtime_name`")
+		return errors.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", c.ContainerdConfig.DefaultRuntimeName)
 	}
 
 	// Validation for deprecated runtime options.

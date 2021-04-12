@@ -113,7 +113,7 @@ func TestValidateConfig(t *testing.T) {
 					DefaultRuntimeName: RuntimeDefault,
 				},
 			},
-			expectedErr: "no corresponding runtime configured in `runtimes` for `default_runtime_name`",
+			expectedErr: "no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"default\"",
 		},
 		"deprecated systemd_cgroup for v1 runtime": {
 			config: &PluginConfig{
