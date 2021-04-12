@@ -70,7 +70,7 @@ func TestOverlayApplyNoParents(t *testing.T) {
 	}
 	fstest.FSSuite(t, overlayDiffApplier{
 		tmp: base,
-		diff: func(ctx context.Context, w io.Writer, a, b string) error {
+		diff: func(ctx context.Context, w io.Writer, a, b string, _ ...WriteDiffOpt) error {
 			cw := newChangeWriter(w, b)
 			cw.addedDirs = nil
 			err := fs.Changes(ctx, a, b, cw.HandleChange)
@@ -85,7 +85,7 @@ func TestOverlayApplyNoParents(t *testing.T) {
 
 type overlayDiffApplier struct {
 	tmp  string
-	diff func(context.Context, io.Writer, string, string) error
+	diff func(context.Context, io.Writer, string, string, ...WriteDiffOpt) error
 	t    *testing.T
 }
 
