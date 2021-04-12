@@ -18,7 +18,7 @@ require (
 	github.com/containerd/ttrpc v1.0.2
 	github.com/containerd/typeurl v1.0.1
 	github.com/containerd/zfs v0.0.0-20210324211415-d5c4544f0433
-	github.com/containernetworking/plugins v0.8.6
+	github.com/containernetworking/plugins v0.9.1
 	github.com/coreos/go-systemd/v22 v22.1.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c
