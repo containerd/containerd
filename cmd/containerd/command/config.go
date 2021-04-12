@@ -120,7 +120,7 @@ var configCommand = cli.Command{
 
 func platformAgnosticDefaultConfig() *srvconfig.Config {
 	return &srvconfig.Config{
-		Version: 1,
+		Version: 2,
 		Root:    defaults.DefaultRootDir,
 		State:   defaults.DefaultStateDir,
 		GRPC: srvconfig.GRPCConfig{

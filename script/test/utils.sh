@@ -30,14 +30,15 @@ if [ -z "${CONTAINERD_CONFIG_FILE}" ]; then
   truncate --size 0 "${config_file}"
   if command -v sestatus >/dev/null 2>&1; then
     cat >>${config_file} <<EOF
-[plugins.cri]
+version=2
+[plugins."io.containerd.grpc.v1.cri"]
   enable_selinux = true
 EOF
   fi
   if [ -n "${CONTAINERD_RUNTIME}" ]; then
     cat >>${config_file} <<EOF
-[plugins.cri.containerd.default_runtime]
-  runtime_type="${CONTAINERD_RUNTIME}"
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+runtime_type = "${CONTAINERD_RUNTIME}"
 EOF
   fi
   CONTAINERD_CONFIG_FILE="${config_file}"

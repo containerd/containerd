@@ -25,7 +25,9 @@ func ExportLayerToTar(ctx context.Context, w io.Writer, path string, parentLayer
 	if err != nil {
 		return err
 	}
-	defer hcsshim.DeactivateLayer(driverInfo, path)
+	defer func() {
+		_ = hcsshim.DeactivateLayer(driverInfo, path)
+	}()
 
 	// Prepare and unprepare the layer to ensure that it has been initialized.
 	err = hcsshim.PrepareLayer(driverInfo, path, parentLayerPaths)

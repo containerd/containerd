@@ -185,8 +185,8 @@ imports = ["data1.toml", "data2.toml"]
 
 func TestDecodePlugin(t *testing.T) {
 	data := `
-version = 1
-[plugins.linux]
+version = 2
+[plugins."io.containerd.runtime.v1.linux"]
   shim_debug = true
 `
 
@@ -203,7 +203,7 @@ version = 1
 	assert.NilError(t, err)
 
 	pluginConfig := map[string]interface{}{}
-	_, err = out.Decode(&plugin.Registration{ID: "linux", Config: &pluginConfig})
+	_, err = out.Decode(&plugin.Registration{Type: "io.containerd.runtime.v1", ID: "linux", Config: &pluginConfig})
 	assert.NilError(t, err)
 	assert.Equal(t, true, pluginConfig["shim_debug"])
 }

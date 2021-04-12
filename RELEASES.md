@@ -294,7 +294,8 @@ The daemon's configuration file, commonly located in `/etc/containerd/config.tom
 is versioned and backwards compatible.  The `version` field in the config
 file specifies the config's version.  If no version number is specified inside
 the config file then it is assumed to be a version 1 config and parsed as such.
-Use `version = 2` to enable version 2 config.
+Please use `version = 2` to enable version 2 config as version 1 has been
+deprecated.
 
 ### Not Covered
 
@@ -324,3 +325,4 @@ The deprecated features are shown in the following table:
 |----------------------------------------------------------------------|---------------------|----------------------------|
 | Runtime V1 API and implementation (`io.containerd.runtime.v1.linux`) | containerd v1.4     | containerd v2.0            |
 | Runc V1 implementation of Runtime V2 (`io.containerd.runc.v1`)       | containerd v1.4     | containerd v2.0            |
+| config.toml `version = 1`                                            | containerd v1.5     | containerd v2.0            |

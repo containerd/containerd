@@ -427,8 +427,9 @@ jobs:
           BDIR="$(mktemp -d -p $PWD)"
           mkdir -p ${BDIR}/{root,state}
           cat > ${BDIR}/config.toml <<EOF
-            [plugins.cri.containerd.default_runtime]
-              runtime_type = "${TEST_RUNTIME}"
+            version = 2
+            [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+            runtime_type = "${TEST_RUNTIME}"
           EOF
           sudo ls /etc/cni/net.d
           sudo PATH=$PATH BDIR=$BDIR /usr/local/bin/containerd -a ${BDIR}/c.sock --config ${BDIR}/config.toml --root ${BDIR}/root --state ${BDIR}/state --log-level debug &> ${BDIR}/containerd-cri.log &
