@@ -22,14 +22,13 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/containerd/containerd/platforms"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestMatchComparerMatch(t *testing.T) {
 	m := matchComparer{
-		defaults: platforms.Only(imagespec.Platform{
+		defaults: Only(imagespec.Platform{
 			Architecture: "amd64",
 			OS:           "windows",
 		}),
@@ -85,7 +84,7 @@ func TestMatchComparerMatch(t *testing.T) {
 
 func TestMatchComparerLess(t *testing.T) {
 	m := matchComparer{
-		defaults: platforms.Only(imagespec.Platform{
+		defaults: Only(imagespec.Platform{
 			Architecture: "amd64",
 			OS:           "windows",
 		}),
