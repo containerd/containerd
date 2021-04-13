@@ -17,7 +17,7 @@
         make | tee $LOGS_PATH/make.txt
         make test | tee $LOGS_PATH/make_test.txt
 
-        cp -r ./bin $RESULTS_PATH
+        cp -r ./bin $RESULTS_PATH 
       chdir: '{{ zuul.project.src_dir }}'
       executable: /bin/bash
     environment: '{{ global_env }}'
