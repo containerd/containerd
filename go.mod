@@ -13,7 +13,7 @@ require (
 	github.com/containerd/fifo v0.0.0-20210316144830-115abcc95a1d
 	github.com/containerd/go-cni v1.0.1
 	github.com/containerd/go-runc v0.0.0-20201020171139-16b287bc67d0
-	github.com/containerd/imgcrypt v1.1.1-0.20210312161619-7ed62a527887
+	github.com/containerd/imgcrypt v1.1.1-0.20210412181126-0bed51b9522c
 	github.com/containerd/nri v0.0.0-20210316161719-dbaa18c31c14
 	github.com/containerd/ttrpc v1.0.2
 	github.com/containerd/typeurl v1.0.1
@@ -50,7 +50,7 @@ require (
 	github.com/tchap/go-patricia v2.2.6+incompatible
 	github.com/urfave/cli v1.22.2
 	go.etcd.io/bbolt v1.3.5
-	golang.org/x/net v0.0.0-20201224014010-6772e930b67b
+	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
 	golang.org/x/sys v0.0.0-20210324051608-47abb6519492
 	google.golang.org/grpc v1.33.2
