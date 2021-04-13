@@ -89,5 +89,61 @@ containers the same set of permissions as the calling process, preventing errors
 when privileged containers attempt to get more permissions than given to the
 caller.
 
+#### Configuration changes
+
+##### *New* `registry.config_path` for CRI plugin
+
+`registry.config_path` specifies a directory to look for registry hosts
+configuration. When resolving an image name during pull operations, the CRI
+plugin will look in the `<registry.config_path>/<image hostname>/` directory
+for host configuration. An optional `hosts.toml` file in that directory may be
+used to configure which hosts will be used for the pull operation as well
+host-specific configurations. Updates under that directory do not require
+restarting the containerd daemon.
+
+Enable `registry.config_path` in the containerd configuration file.
+
+```toml
+[plugins."io.containerd.grpc.v1.cri".registry]
+   config_path = "/etc/containerd/certs.d"
+```
+
+Configure registry hosts, such as `/etc/containerd/certs.d/docker.io/hosts.toml`
+for any image under the `docker.io` namespace (any image on Docker Hub).
+
+```
+server = "https://registry-1.docker.io"    # Exclude this to not use upstream
+
+[host."https://public-mirror.example.com"]
+  capabilities = ["pull"]                  # Requires less trust, won't resolve tag to digest from this host
+[host."https://docker-mirror.internal"]
+  capabilities = ["pull", "resolve"]
+  ca = "docker-mirror.crt"                 # Or absolute path /etc/containerd/certs.d/docker.io/docker-mirror.crt
+```
+
+If no `hosts.toml` configuration exists in the host directory, it will fallback
+to check certificate files based on Docker's certificate file
+pattern (".crt" files for CA certificates and ".cert"/".key" files for client
+certificates).
+
+##### Deprecation of `registry.mirrors` and `registry.configs` in CRI plugin
+
+Mirroring and TLS can now be configured using the new `registry.config_path`
+option. Existing configurations may be migrated to new host directory
+configuration. These fields are only deprecated with no planned removal,
+however, these configurations cannot be used while `registry.config_path` is
+defined.
+
+##### Version 1 schema is deprecated
+
+Version 2 of the containerd configuration toml is recommended format and the
+default. Starting this version, a deprecation warning will be logged when
+version 1 is used.
+
+To check version, see the version value in the containerd toml configuration.
+
+```toml
+version=2
+```
 
 See the changelog for complete list of changes"""
