@@ -35,9 +35,10 @@ type worker struct {
 	count    int
 	failures int
 
-	client *containerd.Client
-	image  containerd.Image
-	commit string
+	client      *containerd.Client
+	image       containerd.Image
+	commit      string
+	snapshotter string
 }
 
 func (w *worker) run(ctx, tctx context.Context) {
@@ -74,6 +75,7 @@ func (w *worker) run(ctx, tctx context.Context) {
 func (w *worker) runContainer(ctx context.Context, id string) (err error) {
 	// fix up cgroups path for a default config
 	c, err := w.client.NewContainer(ctx, id,
+		containerd.WithSnapshotter(w.snapshotter),
 		containerd.WithNewSnapshot(id, w.image),
 		containerd.WithNewSpec(oci.WithImageConfig(w.image), oci.WithUsername("games"), oci.WithProcessArgs("true")),
 	)
