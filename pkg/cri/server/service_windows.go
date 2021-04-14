@@ -47,6 +47,6 @@ func (c *criService) initPlatform() error {
 }
 
 // cniLoadOptions returns cni load options for the windows.
-func (c *criService) cniLoadOptions() []cni.CNIOpt {
-	return []cni.CNIOpt{cni.WithDefaultConf}
+func (c *criService) cniLoadOptions() []cni.Opt {
+	return []cni.Opt{cni.WithDefaultConf}
 }

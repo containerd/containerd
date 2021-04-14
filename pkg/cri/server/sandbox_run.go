@@ -544,7 +544,7 @@ func (c *criService) getSandboxRuntime(config *runtime.PodSandboxConfig, runtime
 	return handler, nil
 }
 
-func logDebugCNIResult(ctx context.Context, sandboxID string, result *cni.CNIResult) {
+func logDebugCNIResult(ctx context.Context, sandboxID string, result *cni.Result) {
 	if logrus.GetLevel() < logrus.DebugLevel {
 		return
 	}

@@ -139,7 +139,7 @@ type SandboxInfo struct {
 	RuntimeOptions interface{}               `json:"runtimeOptions"`
 	Config         *runtime.PodSandboxConfig `json:"config"`
 	RuntimeSpec    *runtimespec.Spec         `json:"runtimeSpec"`
-	CNIResult      *cni.CNIResult            `json:"cniResult"`
+	CNIResult      *cni.Result               `json:"cniResult"`
 }
 
 // toCRISandboxInfo converts internal container object information to CRI sandbox status response info map.

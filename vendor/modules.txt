@@ -82,7 +82,7 @@ github.com/containerd/continuity/testutil/loopback
 # github.com/containerd/fifo v0.0.0-20210316144830-115abcc95a1d
 ## explicit
 github.com/containerd/fifo
-# github.com/containerd/go-cni v1.0.1
+# github.com/containerd/go-cni v1.0.2
 ## explicit
 github.com/containerd/go-cni
 # github.com/containerd/go-runc v0.0.0-20201020171139-16b287bc67d0
