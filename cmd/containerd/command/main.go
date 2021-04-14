@@ -190,7 +190,7 @@ can be used and modified as necessary as a custom configuration.`
 
 		if config.Debug.Address != "" {
 			var l net.Listener
-			if filepath.IsAbs(config.Debug.Address) {
+			if isLocalAddress(config.Debug.Address) {
 				if l, err = sys.GetLocalListener(config.Debug.Address, config.Debug.UID, config.Debug.GID); err != nil {
 					return errors.Wrapf(err, "failed to get listener for debug endpoint")
 				}
