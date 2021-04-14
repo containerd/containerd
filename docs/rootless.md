@@ -4,9 +4,27 @@ A non-root user can execute containerd by using [`user_namespaces(7)`](http://ma
 
 For example [RootlessKit](https://github.com/rootless-containers/rootlesskit) can be used for setting up a user namespace (along with mount namespace and optionally network namespace). Please refer to RootlessKit documentation for further information.
 
-See also [Rootless Docker documentation](https://docs.docker.com/engine/security/rootless/).
+See also https://rootlesscontaine.rs/ .
 
-## Daemon
+## "Easy way"
+
+The easiest way is to use `containerd-rootless-setuptool.sh` included in [containerd/nerdctl](https://github.com/containerd/nerdctl).
+
+```console
+$ containerd-rootless-setuptool.sh install
+$ nerdctl run -d --restart=always --name nginx -p 8080:80 nginx:alpine
+```
+
+See https://github.com/containerd/nerdctl/blob/master/docs/rootless.md for the further information.
+
+## "Hard way"
+
+<details>
+<summary>Click here to show the "hard way"</summary>
+
+<p>
+
+### Daemon
 
 ```console
 $ rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run \
@@ -15,7 +33,7 @@ $ rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run \
 ```
 
 * `--net=slirp4netns --copy-up=/etc` is only required when you want to unshare network namespaces.
-  See [RootlessKit documentation](https://github.com/rootless-containers/rootlesskit/tree/v0.10.0#network-drivers) for the further information about the network drivers.
+  See [RootlessKit documentation](https://github.com/rootless-containers/rootlesskit/blob/v0.14.1/docs/network.md) for the further information about the network drivers.
 * `--copy-up=/DIR` mounts a writable tmpfs on `/DIR` with symbolic links to the files under the `/DIR` on the parent namespace
   so that the user can add/remove files under `/DIR` in the mount namespace.
   `--copy-up=/etc` and `--copy-up=/run` are needed on typical setup.
@@ -33,7 +51,7 @@ state = "/run/user/1001/containerd"
   address = "/run/user/1001/containerd/containerd.sock"
 ```
 
-## Client
+### Client
 
 A client program such as `ctr` also needs to be executed inside the daemon namespaces.
 ```console
@@ -44,7 +62,11 @@ $ ctr images pull docker.io/library/ubuntu:latest
 $ ctr run -t --rm --fifo-dir /tmp/foo-fifo --cgroup "" docker.io/library/ubuntu:latest foo
 ```
 
-* `overlayfs` snapshotter does not work inside user namespaces, except on Ubuntu and Debian kernels.
-  However, [`fuse-overlayfs` snapshotter](https://github.com/AkihiroSuda/containerd-fuse-overlayfs) can be used instead if running kernel >= 4.18.
+* The `overlayfs` snapshotter does not work inside user namespaces before kernel 5.11, except on Ubuntu and Debian kernels.
+  However, [`fuse-overlayfs` snapshotter](https://github.com/containerd/fuse-overlayfs-snapshotter) can be used instead if running kernel >= 4.18.
 * Enabling cgroup requires cgroup v2 and systemd, e.g. `ctr run --cgroup "user.slice:foo:bar" --runc-systemd-cgroup ...` .
-  See also [runc documentation](https://github.com/opencontainers/runc/blob/v1.0.0-rc92/docs/cgroup-v2.md).
+  See also [runc documentation](https://github.com/opencontainers/runc/blob/v1.0.0-rc93/docs/cgroup-v2.md).
+
+
+</p>
+</details>
