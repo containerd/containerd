@@ -73,6 +73,6 @@ func (c *criService) initPlatform() error {
 }
 
 // cniLoadOptions returns cni load options for the linux.
-func (c *criService) cniLoadOptions() []cni.CNIOpt {
-	return []cni.CNIOpt{cni.WithLoNetwork, cni.WithDefaultConf}
+func (c *criService) cniLoadOptions() []cni.Opt {
+	return []cni.Opt{cni.WithLoNetwork, cni.WithDefaultConf}
 }

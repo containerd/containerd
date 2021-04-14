@@ -34,7 +34,7 @@ func NewFakeCNIPlugin() *FakeCNIPlugin {
 }
 
 // Setup setups the network of PodSandbox.
-func (f *FakeCNIPlugin) Setup(ctx context.Context, id, path string, opts ...cni.NamespaceOpts) (*cni.CNIResult, error) {
+func (f *FakeCNIPlugin) Setup(ctx context.Context, id, path string, opts ...cni.NamespaceOpts) (*cni.Result, error) {
 	return nil, nil
 }
 
@@ -49,7 +49,7 @@ func (f *FakeCNIPlugin) Status() error {
 }
 
 // Load loads the network config.
-func (f *FakeCNIPlugin) Load(opts ...cni.CNIOpt) error {
+func (f *FakeCNIPlugin) Load(opts ...cni.Opt) error {
 	return f.LoadErr
 }
 

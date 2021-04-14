@@ -36,11 +36,11 @@ type cniNetConfSyncer struct {
 	watcher   *fsnotify.Watcher
 	confDir   string
 	netPlugin cni.CNI
-	loadOpts  []cni.CNIOpt
+	loadOpts  []cni.Opt
 }
 
 // newCNINetConfSyncer creates cni network conf syncer.
-func newCNINetConfSyncer(confDir string, netPlugin cni.CNI, loadOpts []cni.CNIOpt) (*cniNetConfSyncer, error) {
+func newCNINetConfSyncer(confDir string, netPlugin cni.CNI, loadOpts []cni.Opt) (*cniNetConfSyncer, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create fsnotify watcher")
