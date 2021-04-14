@@ -120,7 +120,11 @@ var configCommand = cli.Command{
 
 func platformAgnosticDefaultConfig() *srvconfig.Config {
 	return &srvconfig.Config{
-		Version: 2,
+		// see: https://github.com/containerd/containerd/blob/5c6ea7fdc1247939edaddb1eba62a94527418687/RELEASES.md#daemon-configuration
+		// this version MUST remain set to 1 until either there exists a means to
+		// override / configure the default at the containerd cli .. or when
+		// version 1 is no longer supported
+		Version: 1,
 		Root:    defaults.DefaultRootDir,
 		State:   defaults.DefaultStateDir,
 		GRPC: srvconfig.GRPCConfig{

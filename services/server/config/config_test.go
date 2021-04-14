@@ -207,3 +207,29 @@ version = 2
 	assert.NilError(t, err)
 	assert.Equal(t, true, pluginConfig["shim_debug"])
 }
+
+// TestDecodePluginInV1Config tests decoding non-versioned
+// config (should be parsed as V1 config).
+func TestDecodePluginInV1Config(t *testing.T) {
+	data := `
+[plugins.linux]
+  shim_debug = true
+`
+
+	tempDir, err := ioutil.TempDir("", "containerd_")
+	assert.NilError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	path := filepath.Join(tempDir, "config.toml")
+	err = ioutil.WriteFile(path, []byte(data), 0600)
+	assert.NilError(t, err)
+
+	var out Config
+	err = LoadConfig(path, &out)
+	assert.NilError(t, err)
+
+	pluginConfig := map[string]interface{}{}
+	_, err = out.Decode(&plugin.Registration{ID: "linux", Config: &pluginConfig})
+	assert.NilError(t, err)
+	assert.Equal(t, true, pluginConfig["shim_debug"])
+}
