@@ -465,7 +465,6 @@ func (s *store) Writer(ctx context.Context, opts ...content.WriterOpt) (content.
 	}
 	var lockErr error
 	for count := uint64(0); count < 10; count++ {
-		time.Sleep(time.Millisecond * time.Duration(rand.Intn(1<<count)))
 		if err := tryLock(wOpts.Ref); err != nil {
 			if !errdefs.IsUnavailable(err) {
 				return nil, err
@@ -476,6 +475,7 @@ func (s *store) Writer(ctx context.Context, opts ...content.WriterOpt) (content.
 			lockErr = nil
 			break
 		}
+		time.Sleep(time.Millisecond * time.Duration(rand.Intn(1<<count)))
 	}
 
 	if lockErr != nil {
