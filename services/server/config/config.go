@@ -98,6 +98,7 @@ func (c *Config) ValidateV2() error {
 	version := c.GetVersion()
 	if version < 2 {
 		logrus.Warnf("deprecated version : `%d`, please switch to version `2`", version)
+		return nil
 	}
 	for _, p := range c.DisabledPlugins {
 		if len(strings.Split(p, ".")) < 4 {
