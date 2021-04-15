@@ -122,17 +122,29 @@ func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxL
 		buf       [][]byte
 		length    int
 		bufSize   = defaultBufSize
+
+		timeBuffer = make([]byte, len(timestampFormat))
+		lineBuffer = bytes.Buffer{}
 	)
 	// Make sure bufSize <= maxLen
 	if maxLen > 0 && maxLen < bufSize {
 		bufSize = maxLen
 	}
 	r := bufio.NewReaderSize(rc, bufSize)
-	writeLine := func(tag, line []byte) {
-		timestamp := time.Now().AppendFormat(nil, timestampFormat)
-		data := bytes.Join([][]byte{timestamp, stream, tag, line}, delimiter)
-		data = append(data, eol)
-		if _, err := w.Write(data); err != nil {
+	writeLineBuffer := func(tag []byte, lineBytes [][]byte) {
+		timeBuffer = time.Now().AppendFormat(timeBuffer[:0], timestampFormat)
+		headers := [][]byte{timeBuffer, stream, tag}
+
+		lineBuffer.Reset()
+		for _, h := range headers {
+			lineBuffer.Write(h)
+			lineBuffer.Write(delimiter)
+		}
+		for _, l := range lineBytes {
+			lineBuffer.Write(l)
+		}
+		lineBuffer.WriteByte(eol)
+		if _, err := lineBuffer.WriteTo(w); err != nil {
 			logrus.WithError(err).Errorf("Fail to write %q log to log file %q", s, path)
 			// Continue on write error to drain the container output.
 		}
@@ -171,7 +183,7 @@ func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxL
 				panic("exceed length should <= last buffer size")
 			}
 			buf[len(buf)-1] = last[:len(last)-exceedLen]
-			writeLine(partial, bytes.Join(buf, nil))
+			writeLineBuffer(partial, buf)
 			buf = [][]byte{last[len(last)-exceedLen:]}
 			length = exceedLen
 		}
@@ -182,9 +194,9 @@ func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxL
 			// readLine only returns error when the message doesn't
 			// end with a newline, in that case it should be treated
 			// as a partial line.
-			writeLine(partial, bytes.Join(buf, nil))
+			writeLineBuffer(partial, buf)
 		} else {
-			writeLine(full, bytes.Join(buf, nil))
+			writeLineBuffer(full, buf)
 		}
 		buf = nil
 		length = 0
