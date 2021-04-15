@@ -173,6 +173,18 @@ EOF
     SHELL
   end
 
+  config.vm.provision "install-gotestsum", type: "shell",  run: "once" do |sh|
+      sh.upload_path = "/tmp/vagrant-install-gotestsum"
+      sh.inline = <<~SHELL
+        #!/usr/bin/env bash
+        source /etc/environment
+        source /etc/profile.d/sh.local
+        set -eux -o pipefail
+        ${GOPATH}/src/github.com/containerd/containerd/script/setup/install-gotestsum
+        sudo cp ${GOPATH}/bin/gotestsum /usr/local/bin/
+      SHELL
+  end
+
   # SELinux is Enforcing by default.
   # To set SELinux as Disabled on a VM that has already been provisioned:
   #   SELINUX=Disabled vagrant up --provision-with=selinux
@@ -196,6 +208,8 @@ EOF
     sh.upload_path = "/tmp/test-integration"
     sh.env = {
         'RUNC_FLAVOR': ENV['RUNC_FLAVOR'] || "runc",
+        'GOTEST': ENV['GOTEST'] || "go test",
+        'GOTESTSUM_JUNITFILE': ENV['GOTESTSUM_JUNITFILE'],
     }
     sh.inline = <<~SHELL
         #!/usr/bin/env bash
@@ -213,6 +227,10 @@ EOF
   #
   config.vm.provision "test-cri", type: "shell", run: "never" do |sh|
     sh.upload_path = "/tmp/test-cri"
+    sh.env = {
+        'GOTEST': ENV['GOTEST'] || "go test",
+        'REPORT_DIR': ENV['REPORT_DIR'],
+    }
     sh.inline = <<~SHELL
         #!/usr/bin/env bash
         source /etc/environment
@@ -235,7 +253,7 @@ EOF
         fi
         trap cleanup EXIT
         ctr version
-        critest --parallel=$(nproc) --ginkgo.skip='HostIpc is true'
+        critest --parallel=$(nproc) --report-dir="${REPORT_DIR}" --ginkgo.skip='HostIpc is true'
     SHELL
   end
 

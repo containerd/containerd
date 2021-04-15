@@ -120,6 +120,9 @@ BINARIES=$(addprefix bin/,$(COMMANDS))
 TESTFLAGS ?= $(TESTFLAGS_RACE) $(EXTRA_TESTFLAGS)
 TESTFLAGS_PARALLEL ?= 8
 
+# Use this to replace `go test` with, for instance, `gotestsum`
+GOTEST ?= go test
+
 OUTPUTDIR = $(join $(ROOTDIR), _output)
 CRIDIR=$(OUTPUTDIR)/cri
 
@@ -170,15 +173,15 @@ build: ## build the go packages
 
 test: ## run tests, except integration tests and tests that require root
 	@echo "$(WHALE) $@"
-	@go test ${TESTFLAGS} ${PACKAGES}
+	@$(GOTEST) ${TESTFLAGS} ${PACKAGES}
 
 root-test: ## run tests, except integration tests
 	@echo "$(WHALE) $@"
-	@go test ${TESTFLAGS} ${TEST_REQUIRES_ROOT_PACKAGES} -test.root
+	@$(GOTEST) ${TESTFLAGS} ${TEST_REQUIRES_ROOT_PACKAGES} -test.root
 
 integration: ## run integration tests
 	@echo "$(WHALE) $@"
-	@cd "${ROOTDIR}/integration/client" && go mod download && go test -v ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL} .
+	@cd "${ROOTDIR}/integration/client" && go mod download && $(GOTEST) -v ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL} .
 
 # TODO integrate cri integration bucket with coverage
 bin/cri-integration.test:
