@@ -245,6 +245,9 @@ github.com/matttproud/golang_protobuf_extensions/pbutil
 github.com/miekg/pkcs11
 # github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible
 github.com/mistifyio/go-zfs
+# github.com/moby/locker v1.0.1
+## explicit
+github.com/moby/locker
 # github.com/moby/sys/mountinfo v0.4.1
 ## explicit
 github.com/moby/sys/mountinfo

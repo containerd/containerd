@@ -21,6 +21,7 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/moby/locker"
 	"github.com/pkg/errors"
 )
 
@@ -40,15 +41,24 @@ type StatusTracker interface {
 	SetStatus(string, Status)
 }
 
+// StatusTrackLocker to track status of operations with lock
+type StatusTrackLocker interface {
+	StatusTracker
+	Lock(string)
+	Unlock(string)
+}
+
 type memoryStatusTracker struct {
 	statuses map[string]Status
 	m        sync.Mutex
+	locker   *locker.Locker
 }
 
 // NewInMemoryTracker returns a StatusTracker that tracks content status in-memory
-func NewInMemoryTracker() StatusTracker {
+func NewInMemoryTracker() StatusTrackLocker {
 	return &memoryStatusTracker{
 		statuses: map[string]Status{},
+		locker:   locker.New(),
 	}
 }
 
@@ -66,4 +76,12 @@ func (t *memoryStatusTracker) SetStatus(ref string, status Status) {
 	t.m.Lock()
 	t.statuses[ref] = status
 	t.m.Unlock()
+}
+
+func (t *memoryStatusTracker) Lock(ref string) {
+	t.locker.Lock(ref)
+}
+
+func (t *memoryStatusTracker) Unlock(ref string) {
+	t.locker.Unlock(ref)
 }
