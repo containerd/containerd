@@ -167,12 +167,17 @@ func run(id string, initFunc Init, config Config) error {
 		return nil
 	}
 
+	if namespaceFlag == "" {
+		return fmt.Errorf("shim namespace cannot be empty")
+	}
+
 	setRuntime()
 
 	signals, err := setupSignals(config)
 	if err != nil {
 		return err
 	}
+
 	if !config.NoSubreaper {
 		if err := subreaper(); err != nil {
 			return err
@@ -180,17 +185,12 @@ func run(id string, initFunc Init, config Config) error {
 	}
 
 	ttrpcAddress := os.Getenv(ttrpcAddressEnv)
-
 	publisher, err := NewPublisher(ttrpcAddress)
 	if err != nil {
 		return err
 	}
-
 	defer publisher.Close()
 
-	if namespaceFlag == "" {
-		return fmt.Errorf("shim namespace cannot be empty")
-	}
 	ctx := namespaces.WithNamespace(context.Background(), namespaceFlag)
 	ctx = context.WithValue(ctx, OptsKey{}, Opts{BundlePath: bundlePath, Debug: debugFlag})
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("runtime", id))
@@ -199,6 +199,7 @@ func run(id string, initFunc Init, config Config) error {
 	if err != nil {
 		return err
 	}
+
 	switch action {
 	case "delete":
 		logger := logrus.WithFields(logrus.Fields{
