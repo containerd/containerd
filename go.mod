@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/Microsoft/go-winio v0.4.17
 	github.com/Microsoft/hcsshim v0.8.16
-	github.com/containerd/aufs v0.0.0-20210316121734-20793ff83c97
+	github.com/containerd/aufs v0.0.0-20210416161429-fb0192dcb2c0
 	github.com/containerd/btrfs v0.0.0-20210316141732-918d888fb676
 	github.com/containerd/cgroups v0.0.0-20210114181951-8a68de567b68
 	github.com/containerd/console v1.0.2
