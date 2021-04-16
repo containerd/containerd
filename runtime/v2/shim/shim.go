@@ -51,6 +51,14 @@ type Publisher interface {
 	io.Closer
 }
 
+// StartOpts describes shim start configuration received from containerd
+type StartOpts struct {
+	ID               string
+	ContainerdBinary string
+	Address          string
+	TTRPCAddress     string
+}
+
 // Init func for the creation of a shim server
 type Init func(context.Context, string, Publisher, func()) (Shim, error)
 
@@ -58,7 +66,7 @@ type Init func(context.Context, string, Publisher, func()) (Shim, error)
 type Shim interface {
 	shimapi.TaskService
 	Cleanup(ctx context.Context) (*shimapi.DeleteResponse, error)
-	StartShim(ctx context.Context, id, containerdBinary, containerdAddress, containerdTTRPCAddress string) (string, error)
+	StartShim(ctx context.Context, opts StartOpts) (string, error)
 }
 
 // OptsKey is the context key for the Opts value.
@@ -219,7 +227,13 @@ func run(id string, initFunc Init, config Config) error {
 		}
 		return nil
 	case "start":
-		address, err := service.StartShim(ctx, idFlag, containerdBinaryFlag, addressFlag, ttrpcAddress)
+		opts := StartOpts{
+			ID:               idFlag,
+			ContainerdBinary: containerdBinaryFlag,
+			Address:          addressFlag,
+			TTRPCAddress:     ttrpcAddress,
+		}
+		address, err := service.StartShim(ctx, opts)
 		if err != nil {
 			return err
 		}

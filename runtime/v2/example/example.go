@@ -42,7 +42,7 @@ type service struct {
 }
 
 // StartShim is a binary call that executes a new shim returning the address
-func (s *service) StartShim(ctx context.Context, id, containerdBinary, containerdAddress, containerdTTRPCAddress string) (string, error) {
+func (s *service) StartShim(ctx context.Context, opts shim.StartOpts) (string, error) {
 	return "", nil
 }
 
