@@ -51,7 +51,7 @@ github.com/cilium/ebpf/asm
 github.com/cilium/ebpf/internal
 github.com/cilium/ebpf/internal/btf
 github.com/cilium/ebpf/internal/unix
-# github.com/containerd/aufs v0.0.0-20210316121734-20793ff83c97
+# github.com/containerd/aufs v0.0.0-20210416161429-fb0192dcb2c0
 ## explicit
 github.com/containerd/aufs
 github.com/containerd/aufs/plugin
@@ -103,7 +103,7 @@ github.com/containerd/ttrpc/plugin
 # github.com/containerd/typeurl v1.0.2
 ## explicit
 github.com/containerd/typeurl
-# github.com/containerd/zfs v0.0.0-20210324211415-d5c4544f0433
+# github.com/containerd/zfs v0.0.0-20210416085227-4140c9077d87
 ## explicit
 github.com/containerd/zfs
 github.com/containerd/zfs/plugin
