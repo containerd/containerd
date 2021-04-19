@@ -511,3 +511,9 @@ func (s *shim) State(ctx context.Context) (runtime.State, error) {
 		ExitedAt:   response.ExitedAt,
 	}, nil
 }
+
+// Sandbox returns SandboxService client to manage sandbox from this shim.
+func (s *shim) Sandbox(ctx context.Context) (task.SandboxService, error) {
+	sandboxClient := task.NewSandboxClient(s.client)
+	return sandboxClient, nil
+}

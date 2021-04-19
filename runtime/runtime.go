@@ -74,3 +74,41 @@ type PlatformRuntime interface {
 	// Delete remove a task.
 	Delete(ctx context.Context, taskID string)
 }
+
+// SandboxOpts describes sandbox creation options
+type SandboxOpts struct {
+	// RuntimeName is a runtime name containerd should bootstrap
+	RuntimeName string
+	// RuntimeOpts are options to be provided to shim when bootstrapping
+	RuntimeOpts *types.Any
+	// Spec is the sandbox spec to use
+	Spec *types.Any
+}
+
+// SandboxRuntime is an optional extension for PlatformRuntime to manage sandboxes
+type SandboxRuntime interface {
+	PlatformRuntime
+
+	// Start will launch a new sandbox instance (e.g. shim-binary --start + StartSandbox).
+	// This must be called first before using PlatformRuntime routines.
+	// Once started, clients may schedule containers on this instance like usual.
+	Start(ctx context.Context, sandboxID string, opts SandboxOpts) (Process, error)
+
+	// Shutdown will turn down existing sandbox instance
+	Shutdown(ctx context.Context, sandboxID string) error
+
+	// Pause will freeze running sandbox instance
+	Pause(ctx context.Context, sandboxID string) error
+
+	// Resume will unfreeze previously paused sandbox instance
+	Resume(ctx context.Context, sandboxID string) error
+
+	// Ping is a lightweight shim call to check whether sandbox alive
+	Ping(ctx context.Context, sandboxID string) error
+
+	// Status will return current status of the running sandbox instance
+	Status(ctx context.Context, sandboxID string) (*types.Any, error)
+
+	// Find will return a sandbox instance by identifier
+	Find(ctx context.Context, sandboxID string) (Process, error)
+}
