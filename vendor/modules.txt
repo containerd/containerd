@@ -450,10 +450,10 @@ gotest.tools/v3/internal/assert
 gotest.tools/v3/internal/difflib
 gotest.tools/v3/internal/format
 gotest.tools/v3/internal/source
-# k8s.io/api v0.20.4
+# k8s.io/api v0.20.6
 ## explicit
 k8s.io/api/core/v1
-# k8s.io/apimachinery v0.20.4
+# k8s.io/apimachinery v0.20.6
 ## explicit
 k8s.io/apimachinery/pkg/api/errors
 k8s.io/apimachinery/pkg/api/resource
@@ -493,11 +493,11 @@ k8s.io/apimachinery/pkg/version
 k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/netutil
 k8s.io/apimachinery/third_party/forked/golang/reflect
-# k8s.io/apiserver v0.20.4
+# k8s.io/apiserver v0.20.6
 ## explicit
 k8s.io/apiserver/pkg/server/httplog
 k8s.io/apiserver/pkg/util/wsstream
-# k8s.io/client-go v0.20.4
+# k8s.io/client-go v0.20.6
 ## explicit
 k8s.io/client-go/pkg/apis/clientauthentication
 k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1
@@ -517,10 +517,10 @@ k8s.io/client-go/util/exec
 k8s.io/client-go/util/flowcontrol
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/workqueue
-# k8s.io/component-base v0.20.4
+# k8s.io/component-base v0.20.6
 ## explicit
 k8s.io/component-base/logs/logreduction
-# k8s.io/cri-api v0.20.4
+# k8s.io/cri-api v0.20.6
 ## explicit
 k8s.io/cri-api/pkg/apis
 k8s.io/cri-api/pkg/apis/runtime/v1alpha2
@@ -531,7 +531,7 @@ k8s.io/klog/v2
 ## explicit
 k8s.io/utils/exec
 k8s.io/utils/integer
-# sigs.k8s.io/structured-merge-diff/v4 v4.0.2
+# sigs.k8s.io/structured-merge-diff/v4 v4.0.3
 sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.2.0
 sigs.k8s.io/yaml
