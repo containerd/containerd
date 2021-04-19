@@ -85,10 +85,19 @@ const (
 
 // hasPerCPUValue returns true if the Map stores a value per CPU.
 func (mt MapType) hasPerCPUValue() bool {
-	if mt == PerCPUHash || mt == PerCPUArray || mt == LRUCPUHash {
-		return true
-	}
-	return false
+	return mt == PerCPUHash || mt == PerCPUArray || mt == LRUCPUHash
+}
+
+// canStoreMap returns true if the map type accepts a map fd
+// for update and returns a map id for lookup.
+func (mt MapType) canStoreMap() bool {
+	return mt == ArrayOfMaps || mt == HashOfMaps
+}
+
+// canStoreProgram returns true if the map type accepts a program fd
+// for update and returns a program id for lookup.
+func (mt MapType) canStoreProgram() bool {
+	return mt == ProgramArray
 }
 
 // ProgramType of the eBPF program
@@ -134,7 +143,7 @@ const (
 // Will cause invalid argument (EINVAL) at program load time if set incorrectly.
 type AttachType uint32
 
-// AttachNone is an alias for AttachCGroupInetIngress for readability reasons
+// AttachNone is an alias for AttachCGroupInetIngress for readability reasons.
 const AttachNone AttachType = 0
 
 const (
@@ -192,3 +201,13 @@ const (
 	// Pin an object by using its name as the filename.
 	PinByName
 )
+
+// BatchOptions batch map operations options
+//
+// Mirrors libbpf struct bpf_map_batch_opts
+// Currently BPF_F_FLAG is the only supported
+// flag (for ElemFlags).
+type BatchOptions struct {
+	ElemFlags uint64
+	Flags     uint64
+}

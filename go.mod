@@ -5,19 +5,19 @@ go 1.16
 require (
 	github.com/Microsoft/go-winio v0.4.17
 	github.com/Microsoft/hcsshim v0.8.16
-	github.com/containerd/aufs v0.0.0-20210416161429-fb0192dcb2c0
-	github.com/containerd/btrfs v0.0.0-20210316141732-918d888fb676
-	github.com/containerd/cgroups v0.0.0-20210114181951-8a68de567b68
+	github.com/containerd/aufs v1.0.0
+	github.com/containerd/btrfs v1.0.0
+	github.com/containerd/cgroups v1.0.0
 	github.com/containerd/console v1.0.2
-	github.com/containerd/continuity v0.0.0-20210208174643-50096c924a4e
+	github.com/containerd/continuity v0.1.0
 	github.com/containerd/fifo v1.0.0
 	github.com/containerd/go-cni v1.0.2
-	github.com/containerd/go-runc v0.0.0-20201020171139-16b287bc67d0
+	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/imgcrypt v1.1.1
-	github.com/containerd/nri v0.0.0-20210316161719-dbaa18c31c14
+	github.com/containerd/nri v0.1.0
 	github.com/containerd/ttrpc v1.0.2
 	github.com/containerd/typeurl v1.0.2
-	github.com/containerd/zfs v0.0.0-20210416085227-4140c9077d87
+	github.com/containerd/zfs v1.0.0
 	github.com/containernetworking/plugins v0.9.1
 	github.com/coreos/go-systemd/v22 v22.1.0
 	github.com/davecgh/go-spew v1.1.1
