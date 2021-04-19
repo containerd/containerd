@@ -22,7 +22,7 @@ file {
     java_package: "com.google.protobuf"
     java_outer_classname: "AnyProto"
     java_multiple_files: true
-    go_package: "github.com/golang/protobuf/ptypes/any"
+    go_package: "google.golang.org/protobuf/types/known/anypb"
     objc_class_prefix: "GPB"
     csharp_namespace: "Google.Protobuf.WellKnownTypes"
   }
@@ -458,7 +458,7 @@ file {
     java_package: "com.google.protobuf"
     java_outer_classname: "TimestampProto"
     java_multiple_files: true
-    go_package: "github.com/golang/protobuf/ptypes/timestamp"
+    go_package: "google.golang.org/protobuf/types/known/timestamppb"
     cc_enable_arenas: true
     objc_class_prefix: "GPB"
     csharp_namespace: "Google.Protobuf.WellKnownTypes"
@@ -800,7 +800,7 @@ file {
     java_package: "com.google.protobuf"
     java_outer_classname: "EmptyProto"
     java_multiple_files: true
-    go_package: "github.com/golang/protobuf/ptypes/empty"
+    go_package: "google.golang.org/protobuf/types/known/emptypb"
     cc_enable_arenas: true
     objc_class_prefix: "GPB"
     csharp_namespace: "Google.Protobuf.WellKnownTypes"
@@ -824,7 +824,7 @@ file {
     java_package: "com.google.protobuf"
     java_outer_classname: "FieldMaskProto"
     java_multiple_files: true
-    go_package: "google.golang.org/genproto/protobuf/field_mask;field_mask"
+    go_package: "google.golang.org/protobuf/types/known/fieldmaskpb"
     cc_enable_arenas: true
     objc_class_prefix: "GPB"
     csharp_namespace: "Google.Protobuf.WellKnownTypes"
@@ -2927,6 +2927,440 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/namespaces/v1;namespaces"
   }
+  syntax: "proto3"
+}
+file {
+  name: "github.com/containerd/containerd/api/types/sandbox.proto"
+  package: "containerd.types"
+  dependency: "gogoproto/gogo.proto"
+  dependency: "google/protobuf/any.proto"
+  dependency: "google/protobuf/timestamp.proto"
+  message_type {
+    name: "Sandbox"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+    field {
+      name: "runtime"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Sandbox.Runtime"
+      options {
+        65001: 0
+      }
+      json_name: "runtime"
+    }
+    field {
+      name: "spec"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "spec"
+    }
+    field {
+      name: "labels"
+      number: 4
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Sandbox.LabelsEntry"
+      options {
+        65001: 0
+      }
+      json_name: "labels"
+    }
+    field {
+      name: "created_at"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      options {
+        65001: 0
+        65010: 1
+      }
+      json_name: "createdAt"
+    }
+    field {
+      name: "updated_at"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      options {
+        65001: 0
+        65010: 1
+      }
+      json_name: "updatedAt"
+    }
+    field {
+      name: "extensions"
+      number: 7
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Sandbox.ExtensionsEntry"
+      options {
+        65001: 0
+      }
+      json_name: "extensions"
+    }
+    nested_type {
+      name: "Runtime"
+      field {
+        name: "name"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "name"
+      }
+      field {
+        name: "options"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_MESSAGE
+        type_name: ".google.protobuf.Any"
+        json_name: "options"
+      }
+    }
+    nested_type {
+      name: "LabelsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
+    nested_type {
+      name: "ExtensionsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_MESSAGE
+        type_name: ".google.protobuf.Any"
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/types;types"
+  }
+  weak_dependency: 0
+  syntax: "proto3"
+}
+file {
+  name: "github.com/containerd/containerd/api/services/sandbox/v1/sandbox.proto"
+  package: "containerd.services.sandbox.v1"
+  dependency: "gogoproto/gogo.proto"
+  dependency: "google/protobuf/any.proto"
+  dependency: "github.com/containerd/containerd/api/types/sandbox.proto"
+  message_type {
+    name: "StoreCreateRequest"
+    field {
+      name: "sandbox"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Sandbox"
+      options {
+        65001: 0
+      }
+      json_name: "sandbox"
+    }
+  }
+  message_type {
+    name: "StoreCreateResponse"
+    field {
+      name: "sandbox"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Sandbox"
+      options {
+        65001: 0
+      }
+      json_name: "sandbox"
+    }
+  }
+  message_type {
+    name: "StoreUpdateRequest"
+    field {
+      name: "sandbox"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Sandbox"
+      options {
+        65001: 0
+      }
+      json_name: "sandbox"
+    }
+    field {
+      name: "fields"
+      number: 2
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "fields"
+    }
+  }
+  message_type {
+    name: "StoreUpdateResponse"
+    field {
+      name: "sandbox"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Sandbox"
+      options {
+        65001: 0
+      }
+      json_name: "sandbox"
+    }
+  }
+  message_type {
+    name: "StoreDeleteRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+  }
+  message_type {
+    name: "StoreDeleteResponse"
+  }
+  message_type {
+    name: "StoreListRequest"
+    field {
+      name: "filters"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "filters"
+    }
+  }
+  message_type {
+    name: "StoreListResponse"
+    field {
+      name: "list"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Sandbox"
+      options {
+        65001: 0
+      }
+      json_name: "list"
+    }
+  }
+  message_type {
+    name: "StoreGetRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+  }
+  message_type {
+    name: "StoreGetResponse"
+    field {
+      name: "sandbox"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Sandbox"
+      json_name: "sandbox"
+    }
+  }
+  message_type {
+    name: "ControllerStartRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+    field {
+      name: "spec"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "spec"
+    }
+  }
+  message_type {
+    name: "ControllerStartResponse"
+  }
+  message_type {
+    name: "ControllerShutdownRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+  }
+  message_type {
+    name: "ControllerShutdownResponse"
+  }
+  message_type {
+    name: "ControllerPauseRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+  }
+  message_type {
+    name: "ControllerPauseResponse"
+  }
+  message_type {
+    name: "ControllerResumeRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+  }
+  message_type {
+    name: "ControllerResumeResponse"
+  }
+  message_type {
+    name: "ControllerPingRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+  }
+  message_type {
+    name: "ControllerPingResponse"
+  }
+  message_type {
+    name: "ControllerStatusRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+  }
+  message_type {
+    name: "ControllerStatusResponse"
+    field {
+      name: "status"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "status"
+    }
+  }
+  service {
+    name: "Store"
+    method {
+      name: "Create"
+      input_type: ".containerd.services.sandbox.v1.StoreCreateRequest"
+      output_type: ".containerd.services.sandbox.v1.StoreCreateResponse"
+    }
+    method {
+      name: "Update"
+      input_type: ".containerd.services.sandbox.v1.StoreUpdateRequest"
+      output_type: ".containerd.services.sandbox.v1.StoreUpdateResponse"
+    }
+    method {
+      name: "Delete"
+      input_type: ".containerd.services.sandbox.v1.StoreDeleteRequest"
+      output_type: ".containerd.services.sandbox.v1.StoreDeleteResponse"
+    }
+    method {
+      name: "List"
+      input_type: ".containerd.services.sandbox.v1.StoreListRequest"
+      output_type: ".containerd.services.sandbox.v1.StoreListResponse"
+    }
+    method {
+      name: "Get"
+      input_type: ".containerd.services.sandbox.v1.StoreGetRequest"
+      output_type: ".containerd.services.sandbox.v1.StoreGetResponse"
+    }
+  }
+  service {
+    name: "Controller"
+    method {
+      name: "Start"
+      input_type: ".containerd.services.sandbox.v1.ControllerStartRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerStartResponse"
+    }
+    method {
+      name: "Shutdown"
+      input_type: ".containerd.services.sandbox.v1.ControllerShutdownRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerShutdownResponse"
+    }
+    method {
+      name: "Pause"
+      input_type: ".containerd.services.sandbox.v1.ControllerPauseRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerPauseResponse"
+    }
+    method {
+      name: "Resume"
+      input_type: ".containerd.services.sandbox.v1.ControllerResumeRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerResumeResponse"
+    }
+    method {
+      name: "Ping"
+      input_type: ".containerd.services.sandbox.v1.ControllerPingRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerPingResponse"
+    }
+    method {
+      name: "Status"
+      input_type: ".containerd.services.sandbox.v1.ControllerStatusRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerStatusResponse"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/services/sandbox/v1;sandbox"
+  }
+  weak_dependency: 0
   syntax: "proto3"
 }
 file {

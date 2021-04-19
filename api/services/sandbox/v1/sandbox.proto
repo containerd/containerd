@@ -1,0 +1,132 @@
+/*
+	Copyright The containerd Authors.
+
+	Licensed under the Apache License, Version 2.0 (the "License");
+	you may not use this file except in compliance with the License.
+	You may obtain a copy of the License at
+
+		http://www.apache.org/licenses/LICENSE-2.0
+
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	limitations under the License.
+*/
+
+syntax = "proto3";
+
+// Sandbox is a v2 runtime extension that allows more complex execution environments for containers.
+// This adds a notion of groups of containers that share same lifecycle and/or resources.
+// A few good fits for sandbox can be:
+// - A "pause" container in k8s, that acts as a parent process for child containers to hold network namespace.
+// - (micro)VMs that launch a VM process and executes containers inside guest OS.
+// containerd in this case remains implementation agnostic and delegates sandbox handling to runtimes.
+// See proposal and discussion here: https://github.com/containerd/containerd/issues/4131
+package containerd.services.sandbox.v1;
+
+import weak "gogoproto/gogo.proto";
+import "google/protobuf/any.proto";
+import "github.com/containerd/containerd/api/types/sandbox.proto";
+
+option go_package = "github.com/containerd/containerd/api/services/sandbox/v1;sandbox";
+
+// Store provides a metadata storage interface for sandboxes. Similarly to `Containers`,
+// sandbox object includes info required to start a new instance, but no runtime state.
+// When running a new sandbox instance, store objects are used as base type to create from.
+service Store {
+	rpc Create(StoreCreateRequest) returns (StoreCreateResponse);
+	rpc Update(StoreUpdateRequest) returns (StoreUpdateResponse);
+	rpc Delete(StoreDeleteRequest) returns (StoreDeleteResponse);
+	rpc List(StoreListRequest) returns (StoreListResponse);
+	rpc Get(StoreGetRequest) returns (StoreGetResponse);
+}
+
+message StoreCreateRequest {
+	containerd.types.Sandbox sandbox = 1 [(gogoproto.nullable) = false];
+}
+
+message StoreCreateResponse {
+	containerd.types.Sandbox sandbox = 1 [(gogoproto.nullable) = false];
+}
+
+message StoreUpdateRequest {
+	containerd.types.Sandbox sandbox = 1 [(gogoproto.nullable) = false];
+	repeated string fields = 2;
+}
+
+message StoreUpdateResponse {
+	containerd.types.Sandbox sandbox = 1 [(gogoproto.nullable) = false];
+}
+
+message StoreDeleteRequest {
+	string sandbox_id = 1;
+}
+
+message StoreDeleteResponse {}
+
+message StoreListRequest {
+	repeated string filters = 1;
+}
+
+message StoreListResponse {
+	repeated containerd.types.Sandbox list = 1 [(gogoproto.nullable) = false];
+}
+
+message StoreGetRequest {
+	string sandbox_id = 1;
+}
+
+message StoreGetResponse {
+	containerd.types.Sandbox sandbox = 1;
+}
+
+// Controller is an interface to manage runtime sandbox instances.
+service Controller {
+	rpc Start(ControllerStartRequest) returns (ControllerStartResponse);
+	rpc Shutdown(ControllerShutdownRequest) returns (ControllerShutdownResponse);
+	rpc Pause(ControllerPauseRequest) returns (ControllerPauseResponse);
+	rpc Resume(ControllerResumeRequest) returns (ControllerResumeResponse);
+	rpc Ping(ControllerPingRequest) returns (ControllerPingResponse);
+	rpc Status(ControllerStatusRequest) returns (ControllerStatusResponse);
+}
+
+message ControllerStartRequest {
+	string sandbox_id = 1;
+	google.protobuf.Any spec = 4;
+}
+
+message ControllerStartResponse {
+}
+
+message ControllerShutdownRequest {
+	string sandbox_id = 1;
+}
+
+message ControllerShutdownResponse {}
+
+message ControllerPauseRequest {
+	string sandbox_id = 1;
+}
+
+message ControllerPauseResponse {}
+
+message ControllerResumeRequest {
+	string sandbox_id = 1;
+}
+
+message ControllerResumeResponse {}
+
+message ControllerPingRequest {
+	string sandbox_id = 1;
+}
+
+message ControllerPingResponse {}
+
+message ControllerStatusRequest {
+	string sandbox_id = 1;
+}
+
+message ControllerStatusResponse {
+	google.protobuf.Any status = 1;
+}

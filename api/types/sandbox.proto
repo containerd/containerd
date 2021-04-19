@@ -1,0 +1,51 @@
+/*
+	Copyright The containerd Authors.
+
+	Licensed under the Apache License, Version 2.0 (the "License");
+	you may not use this file except in compliance with the License.
+	You may obtain a copy of the License at
+
+		http://www.apache.org/licenses/LICENSE-2.0
+
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	limitations under the License.
+*/
+
+syntax = "proto3";
+
+package containerd.types;
+
+import weak "gogoproto/gogo.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/containerd/containerd/api/types;types";
+
+// Sandbox represents a sandbox metadata object that keeps all info required by controller to
+// work with a particular instance. containerd keeps this in metadata store and sends it to a controller with
+// each request, so they can reflect sandbox state changes (by updating the corresponding fields).
+message Sandbox {
+	// SandboxID is a unique instance identifier within namespace
+	string sandbox_id = 1;
+	message Runtime {
+		// Name is the name of the runtime.
+		string name = 1;
+		// Options specify additional runtime initialization options.
+		google.protobuf.Any options = 2;
+	}
+	// Runtime specifies which runtime to use for executing this container.
+	Runtime runtime = 2 [(gogoproto.nullable) = false];
+	// Spec is sandbox configuration (kin of OCI runtime spec, but for VM)
+	google.protobuf.Any spec = 3;
+	// Labels provides an area to include arbitrary data on containers.
+	map<string, string> labels  = 4 [(gogoproto.nullable) = false];
+	// CreatedAt is the time the container was first created.
+	google.protobuf.Timestamp created_at = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	// UpdatedAt is the last time the container was mutated.
+	google.protobuf.Timestamp updated_at = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	// Extensions allow clients to provide optional blobs that can be handled by runtime.
+	map<string, google.protobuf.Any> extensions = 7 [(gogoproto.nullable) = false];
+}
