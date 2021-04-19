@@ -199,9 +199,9 @@ var setLabelsCommand = cli.Command{
 
 var checkCommand = cli.Command{
 	Name:        "check",
-	Usage:       "check that an image has all content available locally",
+	Usage:       "check existing images to ensure all content is available locally",
 	ArgsUsage:   "[flags] [<filter>, ...]",
-	Description: "check that an image has all content available locally",
+	Description: "check existing images to ensure all content is available locally",
 	Flags:       commands.SnapshotterFlags,
 	Action: func(context *cli.Context) error {
 		var (
@@ -212,17 +212,21 @@ var checkCommand = cli.Command{
 			return err
 		}
 		defer cancel()
-		var (
-			contentStore = client.ContentStore()
-			tw           = tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
-		)
-		fmt.Fprintln(tw, "REF\tTYPE\tDIGEST\tSTATUS\tSIZE\tUNPACKED\t")
+
+		var contentStore = client.ContentStore()
 
 		args := []string(context.Args())
 		imageList, err := client.ListImages(ctx, args...)
 		if err != nil {
 			return errors.Wrap(err, "failed listing images")
 		}
+		if len(imageList) == 0 {
+			log.G(ctx).Debugf("no images found")
+			return exitErr
+		}
+
+		var tw = tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
+		fmt.Fprintln(tw, "REF\tTYPE\tDIGEST\tSTATUS\tSIZE\tUNPACKED\t")
 
 		for _, image := range imageList {
 			var (
