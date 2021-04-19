@@ -21,10 +21,13 @@ package integration
 import (
 	"fmt"
 	"io/ioutil"
+	"testing"
 
 	"github.com/pelletier/go-toml"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 	cri "k8s.io/cri-api/pkg/apis"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 // ImageList holds public image references
@@ -98,4 +101,21 @@ func initImageMap(imageList ImageList) map[int]string {
 // GetImage returns the fully qualified URI to an image (including version)
 func GetImage(image int) string {
 	return imageMap[image]
+}
+
+// EnsureImageExists pulls the given image, ensures that no error was encountered
+// while pulling it.
+func EnsureImageExists(t *testing.T, imageName string) string {
+	img, err := imageService.ImageStatus(&runtime.ImageSpec{Image: imageName})
+	require.NoError(t, err)
+	if img != nil {
+		t.Logf("Image %q already exists, not pulling.", imageName)
+		return img.Id
+	}
+
+	t.Logf("Pull test image %q", imageName)
+	imgID, err := imageService.PullImage(&runtime.ImageSpec{Image: imageName}, nil, nil)
+	require.NoError(t, err)
+
+	return imgID
 }
