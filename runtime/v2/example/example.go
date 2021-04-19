@@ -136,3 +136,34 @@ func (s *service) Update(ctx context.Context, r *taskAPI.UpdateTaskRequest) (*pt
 func (s *service) Wait(ctx context.Context, r *taskAPI.WaitRequest) (*taskAPI.WaitResponse, error) {
 	return nil, errdefs.ErrNotImplemented
 }
+
+// Optional sandbox extensions this shim may support
+var _ taskAPI.SandboxService = (*service)(nil)
+
+func (s *service) StartSandbox(ctx context.Context, req *taskAPI.StartSandboxRequest) (*taskAPI.StartSandboxResponse, error) {
+	return nil, errdefs.ErrNotImplemented
+}
+
+func (s *service) StopSandbox(ctx context.Context, req *taskAPI.StopSandboxRequest) (*taskAPI.StopSandboxResponse, error) {
+	return nil, errdefs.ErrNotImplemented
+}
+
+func (s *service) UpdateSandbox(ctx context.Context, req *taskAPI.UpdateSandboxRequest) (*taskAPI.UpdateSandboxResponse, error) {
+	return nil, errdefs.ErrNotImplemented
+}
+
+func (s *service) PauseSandbox(ctx context.Context, req *taskAPI.PauseSandboxRequest) (*taskAPI.PauseSandboxResponse, error) {
+	return nil, errdefs.ErrNotImplemented
+}
+
+func (s *service) ResumeSandbox(ctx context.Context, req *taskAPI.ResumeSandboxRequest) (*taskAPI.ResumeSandboxResponse, error) {
+	return nil, errdefs.ErrNotImplemented
+}
+
+func (s *service) SandboxStatus(ctx context.Context, req *taskAPI.SandboxStatusRequest) (*taskAPI.SandboxStatusResponse, error) {
+	return nil, errdefs.ErrNotImplemented
+}
+
+func (s *service) PingSandbox(ctx context.Context, req *taskAPI.PingRequest) (*taskAPI.PingResponse, error) {
+	return nil, errdefs.ErrNotImplemented
+}

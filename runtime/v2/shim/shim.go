@@ -57,6 +57,7 @@ type StartOpts struct {
 	ContainerdBinary string
 	Address          string
 	TTRPCAddress     string
+	Options          io.Reader
 }
 
 // Init func for the creation of a shim server
@@ -233,6 +234,9 @@ func run(id string, initFunc Init, config Config) error {
 			ContainerdBinary: containerdBinaryFlag,
 			Address:          addressFlag,
 			TTRPCAddress:     ttrpcAddress,
+			// Additional shim options may be provided via Stdin
+			// See https://github.com/containerd/containerd/blob/c9afc4250ab183f9e944297c15df705851b3ec42/runtime/v2/shim/util.go#L116
+			Options: os.Stdin,
 		}
 		address, err := service.StartShim(ctx, opts)
 		if err != nil {
@@ -296,6 +300,11 @@ func (s *Client) Serve() error {
 
 	logrus.Debug("registering ttrpc server")
 	shimapi.RegisterTaskService(server, s.service)
+
+	// Register sandbox service if this shim is able to manage sandboxed environments
+	if sb, ok := s.service.(shimapi.SandboxService); ok {
+		shimapi.RegisterSandboxService(server, sb)
+	}
 
 	if err := serve(s.context, server, socketFlag); err != nil {
 		return err
