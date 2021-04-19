@@ -132,7 +132,7 @@ jobs:
           RUNC_FLAVOR: runc
         run: |
           if [[ "${OS}" == "linux" ]]; then
-            sudo PATH=$PATH script/setup/install-seccomp
+            sudo -E PATH=$PATH script/setup/install-seccomp
           fi
           make cri-cni-release
         working-directory: src/github.com/containerd/containerd
