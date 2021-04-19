@@ -33,56 +33,48 @@
 package seccomp
 
 import (
-	"bufio"
-	"os"
-	"strings"
+	"sync"
 
 	"golang.org/x/sys/unix"
 )
 
-// isEnabled returns if the kernel has been configured to support seccomp.
-// From https://github.com/opencontainers/runc/blob/v1.0.0-rc91/libcontainer/seccomp/seccomp_linux.go#L86-L102
+var (
+	enabled     bool
+	enabledOnce sync.Once
+)
+
+// isEnabled returns whether the kernel has been configured to support seccomp
+// (including the check for CONFIG_SECCOMP_FILTER kernel option).
 func isEnabled() bool {
-	// Try to read from /proc/self/status for kernels > 3.8
-	s, err := parseStatusFile("/proc/self/status")
-	if err != nil {
-		// Check if Seccomp is supported, via CONFIG_SECCOMP.
-		if err := unix.Prctl(unix.PR_GET_SECCOMP, 0, 0, 0, 0); err != unix.EINVAL {
-			// Make sure the kernel has CONFIG_SECCOMP_FILTER.
-			if err := unix.Prctl(unix.PR_SET_SECCOMP, unix.SECCOMP_MODE_FILTER, 0, 0, 0); err != unix.EINVAL {
-				return true
-			}
-		}
-		return false
-	}
-	_, ok := s["Seccomp"]
-	return ok
-}
+	// Excerpts from prctl(2), section ERRORS:
+	//
+	// EACCES
+	//      option is PR_SET_SECCOMP and arg2 is SECCOMP_MODE_FILTER, but
+	//      the process does not have the CAP_SYS_ADMIN capability or has
+	//      not set the no_new_privs attribute <...>.
+	// <...>
+	// EFAULT
+	//      option is PR_SET_SECCOMP, arg2 is SECCOMP_MODE_FILTER, the
+	//      system was built with CONFIG_SECCOMP_FILTER, and arg3 is an
+	//      invalid address.
+	// <...>
+	// EINVAL
+	//      option is PR_SET_SECCOMP or PR_GET_SECCOMP, and the kernel
+	//      was not configured with CONFIG_SECCOMP.
+	//
+	// EINVAL
+	//      option is PR_SET_SECCOMP, arg2 is SECCOMP_MODE_FILTER,
+	//      and the kernel was not configured with CONFIG_SECCOMP_FILTER.
+	// <end of quote>
+	//
+	// Meaning, in case these kernel options are set (this is what we check
+	// for here), we will get some other error (most probably EACCES or
+	// EFAULT). IOW, EINVAL means "seccomp not supported", any other error
+	// means it is supported.
 
-// parseStatusFile is from https://github.com/opencontainers/runc/blob/v1.0.0-rc91/libcontainer/seccomp/seccomp_linux.go#L243-L268
-func parseStatusFile(path string) (map[string]string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
+	enabledOnce.Do(func() {
+		enabled = unix.Prctl(unix.PR_SET_SECCOMP, unix.SECCOMP_MODE_FILTER, 0, 0, 0) != unix.EINVAL
+	})
 
-	s := bufio.NewScanner(f)
-	status := make(map[string]string)
-
-	for s.Scan() {
-		text := s.Text()
-		parts := strings.Split(text, ":")
-
-		if len(parts) <= 1 {
-			continue
-		}
-
-		status[parts[0]] = parts[1]
-	}
-	if err := s.Err(); err != nil {
-		return nil, err
-	}
-
-	return status, nil
+	return enabled
 }
