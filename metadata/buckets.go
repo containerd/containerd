@@ -130,6 +130,7 @@ var (
 	bucketKeyObjectBlob       = []byte("blob")       // stores content links
 	bucketKeyObjectIngests    = []byte("ingests")    // stores ingest objects
 	bucketKeyObjectLeases     = []byte("leases")     // stores leases
+	bucketKeyObjectSandboxes  = []byte("sandboxes")  // stores sandboxes
 
 	bucketKeyDigest      = []byte("digest")
 	bucketKeyMediaType   = []byte("mediatype")
@@ -149,6 +150,7 @@ var (
 	bucketKeyExpected    = []byte("expected")
 	bucketKeyRef         = []byte("ref")
 	bucketKeyExpireAt    = []byte("expireat")
+	bucketKeySandboxID   = []byte("sandboxid")
 
 	deprecatedBucketKeyObjectIngest = []byte("ingest") // stores ingest links, deprecated in v1.2
 )
@@ -269,4 +271,20 @@ func createIngestBucket(tx *bolt.Tx, namespace, ref string) (*bolt.Bucket, error
 
 func getIngestBucket(tx *bolt.Tx, namespace, ref string) *bolt.Bucket {
 	return getBucket(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectContent, bucketKeyObjectIngests, []byte(ref))
+}
+
+func createSandboxBucket(tx *bolt.Tx, namespace string) (*bolt.Bucket, error) {
+	return createBucketIfNotExists(
+		tx,
+		[]byte(namespace),
+		bucketKeyObjectSandboxes,
+	)
+}
+
+func getSandboxBucket(tx *bolt.Tx, namespace string) *bolt.Bucket {
+	return getBucket(
+		tx,
+		[]byte(namespace),
+		bucketKeyObjectSandboxes,
+	)
 }
