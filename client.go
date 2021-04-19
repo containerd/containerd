@@ -35,6 +35,7 @@ import (
 	introspectionapi "github.com/containerd/containerd/api/services/introspection/v1"
 	leasesapi "github.com/containerd/containerd/api/services/leases/v1"
 	namespacesapi "github.com/containerd/containerd/api/services/namespaces/v1"
+	sandboxsapi "github.com/containerd/containerd/api/services/sandbox/v1"
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	versionservice "github.com/containerd/containerd/api/services/version/v1"
@@ -54,13 +55,14 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
+	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/containerd/services/introspection"
 	"github.com/containerd/containerd/snapshots"
 	snproxy "github.com/containerd/containerd/snapshots/proxy"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
@@ -686,6 +688,26 @@ func (c *Client) EventService() EventService {
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
 	return NewEventServiceFromClient(eventsapi.NewEventsClient(c.conn))
+}
+
+// SandboxStore returns the underlying sandbox store client
+func (c *Client) SandboxStore() sandbox.Store {
+	if c.sandboxStore != nil {
+		return c.sandboxStore
+	}
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
+	return NewRemoteSandboxStore(sandboxsapi.NewStoreClient(c.conn))
+}
+
+// SandboxController returns the underlying sandbox controller client
+func (c *Client) SandboxController() sandbox.Controller {
+	if c.sandboxController != nil {
+		return c.sandboxController
+	}
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
+	return NewSandboxRemoteController(sandboxsapi.NewControllerClient(c.conn))
 }
 
 // VersionService returns the underlying VersionClient
