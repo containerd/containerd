@@ -34,7 +34,6 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/stdio"
-	"github.com/containerd/containerd/sys"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	"github.com/hashicorp/go-multierror"
@@ -179,7 +178,7 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 			},
 		},
 	} {
-		ok, err := sys.IsFifo(i.name)
+		ok, err := fifo.IsFifo(i.name)
 		if err != nil {
 			return err
 		}
