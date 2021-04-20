@@ -165,7 +165,15 @@ func PushHandler(pusher Pusher, provider content.Provider) images.HandlerFunc {
 func push(ctx context.Context, provider content.Provider, pusher Pusher, desc ocispec.Descriptor) error {
 	log.G(ctx).Debug("push")
 
-	cw, err := pusher.Push(ctx, desc)
+	var (
+		cw  content.Writer
+		err error
+	)
+	if cs, ok := pusher.(content.Ingester); ok {
+		cw, err = content.OpenWriter(ctx, cs, content.WithRef(MakeRefKey(ctx, desc)), content.WithDescriptor(desc))
+	} else {
+		cw, err = pusher.Push(ctx, desc)
+	}
 	if err != nil {
 		if !errdefs.IsAlreadyExists(err) {
 			return err
