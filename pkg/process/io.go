@@ -251,14 +251,6 @@ func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (_ runc.IO, err e
 		return nil, err
 	}
 
-	var args []string
-	for k, vs := range uri.Query() {
-		args = append(args, k)
-		if len(vs) > 0 {
-			args = append(args, vs[0])
-		}
-	}
-
 	var closers []func() error
 	defer func() {
 		if err == nil {
@@ -289,12 +281,7 @@ func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (_ runc.IO, err e
 	}
 	closers = append(closers, r.Close, w.Close)
 
-	cmd := exec.Command(uri.Path, args...)
-	cmd.Env = append(cmd.Env,
-		"CONTAINER_ID="+id,
-		"CONTAINER_NAMESPACE="+ns,
-	)
-
+	cmd := NewBinaryCmd(uri, id, ns)
 	cmd.ExtraFiles = append(cmd.ExtraFiles, out.r, serr.r, w)
 	// don't need to register this with the reaper or wait when
 	// running inside a shim
