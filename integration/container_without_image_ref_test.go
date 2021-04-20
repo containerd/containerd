@@ -38,7 +38,7 @@ func TestContainerLifecycleWithoutImageRef(t *testing.T) {
 	}()
 
 	const (
-		testImage     = "busybox"
+		testImage     = BusyBox132Image
 		containerName = "test-container"
 	)
 	t.Log("Pull test image")

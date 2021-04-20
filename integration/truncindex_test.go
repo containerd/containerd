@@ -34,7 +34,7 @@ func TestTruncIndex(t *testing.T) {
 	sbConfig := PodSandboxConfig("sandbox", "truncindex")
 
 	t.Logf("Pull an image")
-	const appImage = "busybox"
+	const appImage = BusyBox132Image
 	imgID, err := imageService.PullImage(&runtimeapi.ImageSpec{Image: appImage}, nil, sbConfig)
 	require.NoError(t, err)
 	imgTruncID := genTruncIndex(imgID)

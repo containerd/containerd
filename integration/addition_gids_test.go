@@ -46,7 +46,7 @@ func TestAdditionalGids(t *testing.T) {
 	}()
 
 	const (
-		testImage     = "busybox"
+		testImage     = BusyBox132Image
 		containerName = "test-container"
 	)
 	t.Logf("Pull test image %q", testImage)
@@ -59,7 +59,7 @@ func TestAdditionalGids(t *testing.T) {
 	t.Log("Create a container to print id")
 	cnConfig := ContainerConfig(
 		containerName,
-		"busybox",
+		testImage,
 		WithCommand("id"),
 		WithLogPath(containerName),
 		WithSupplementalGroups([]int64{1 /*daemon*/, 1234 /*new group*/}),

@@ -48,9 +48,10 @@ import (
 )
 
 const (
-	timeout      = 1 * time.Minute
-	pauseImage   = "k8s.gcr.io/pause:3.5" // This is the same with default sandbox image.
-	k8sNamespace = constants.K8sContainerdNamespace
+	timeout         = 1 * time.Minute
+	pauseImage      = "k8s.gcr.io/pause:3.5" // This is the same with default sandbox image.
+	k8sNamespace    = constants.K8sContainerdNamespace
+	BusyBox132Image = "ghcr.io/containerd/busybox:1.32"
 )
 
 var (

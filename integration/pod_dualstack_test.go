@@ -47,7 +47,7 @@ func TestPodDualStack(t *testing.T) {
 	}()
 
 	const (
-		testImage     = "busybox"
+		testImage     = BusyBox132Image
 		containerName = "test-container"
 	)
 	t.Logf("Pull test image %q", testImage)

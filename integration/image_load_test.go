@@ -32,8 +32,7 @@ import (
 
 // Test to load an image from tarball.
 func TestImageLoad(t *testing.T) {
-	testImage := "busybox:latest"
-	loadedImage := "docker.io/library/" + testImage
+	testImage := BusyBox132Image
 	_, err := exec.LookPath("docker")
 	if err != nil {
 		t.Skipf("Docker is not available: %v", err)
@@ -74,7 +73,7 @@ func TestImageLoad(t *testing.T) {
 		}
 		return img != nil, nil
 	}, 100*time.Millisecond, 10*time.Second))
-	require.Equal(t, []string{loadedImage}, img.RepoTags)
+	require.Equal(t, []string{testImage}, img.RepoTags)
 
 	t.Logf("create a container with the loaded image")
 	sbConfig := PodSandboxConfig("sandbox", Randomize("image-load"))
