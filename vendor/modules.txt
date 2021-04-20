@@ -59,7 +59,7 @@ github.com/containerd/aufs/plugin
 # github.com/containerd/btrfs v1.0.0
 ## explicit
 github.com/containerd/btrfs
-# github.com/containerd/cgroups v1.0.0
+# github.com/containerd/cgroups v1.0.1
 ## explicit
 github.com/containerd/cgroups
 github.com/containerd/cgroups/stats/v1
