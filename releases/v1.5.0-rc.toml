@@ -48,6 +48,7 @@ brings support for the Node Resource Interface (NRI).
 #### Runtime
 * **Add annotations to containerd task update API** [#4647](https://github.com/containerd/containerd/pull/4647)
 * **Add logging binary support when terminal is true** [#4502](https://github.com/containerd/containerd/pull/4502)
+* **Runtime support on FreeBSD** [#5375](https://github.com/containerd/containerd/pull/5375)
 
 #### Windows
 * **Optimize LCOW snapshotter use of scratch layers** [#4643](https://github.com/containerd/containerd/pull/4643)
