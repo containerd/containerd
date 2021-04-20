@@ -25,20 +25,21 @@ import "google/protobuf/timestamp.proto";
 option go_package = "github.com/containerd/containerd/api/types;types";
 
 // Sandbox represents a sandbox metadata object that keeps all info required by controller to
-// work with a particular instance. containerd keeps this in metadata store and sends it to a controller with
-// each request, so they can reflect sandbox state changes (by updating the corresponding fields).
+// work with a particular instance.
 message Sandbox {
 	// SandboxID is a unique instance identifier within namespace
 	string sandbox_id = 1;
 	message Runtime {
 		// Name is the name of the runtime.
 		string name = 1;
-		// Options specify additional runtime initialization options.
+		// Options specify additional runtime initialization options for the shim (this data will be available in StartShim).
+		// Typically this data expected to be runtime shim implementation specific.
 		google.protobuf.Any options = 2;
 	}
 	// Runtime specifies which runtime to use for executing this container.
 	Runtime runtime = 2 [(gogoproto.nullable) = false];
-	// Spec is sandbox configuration (kin of OCI runtime spec, but for VM)
+	// Spec is sandbox configuration (kin of OCI runtime spec), spec's data will be written to a config.json file in the
+	// bundle directory (similary to OCI spec).
 	google.protobuf.Any spec = 3;
 	// Labels provides an area to include arbitrary data on containers.
 	map<string, string> labels  = 4 [(gogoproto.nullable) = false];

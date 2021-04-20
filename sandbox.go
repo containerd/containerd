@@ -44,6 +44,8 @@ type Sandbox interface {
 	Resume(ctx context.Context) error
 	// Status will return current sandbox status (provided by shim runtime)
 	Status(ctx context.Context, status interface{}) error
+	// Ping will check whether existing sandbox instance alive
+	Ping(ctx context.Context) error
 }
 
 type sandboxClient struct {

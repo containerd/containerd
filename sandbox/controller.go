@@ -37,7 +37,7 @@ import (
 // 	1. Client calls `client.Controller.Start()` to launch new shim and create sandbox process
 // 	2. Run containers with `shim.TaskService.RunContainer(id=1)` and another one `shim.TaskService.RunContainer(id=2)`
 //	3. ... usual container lifecycle calls to `shim.TaskService`
-// 	4. Client calls shim to stop the VM with `client.SandboxService.Shutdown()`
+// 	4. Client calls shim to stop the sandbox with `client.SandboxService.Shutdown()`
 //  5. Shim implementation will perform cleanup similar to regular task service (e.g. shutdown, clean, and `shim_binary --delete`)
 type Controller interface {
 	// Start will start new sandbox instance.
@@ -52,9 +52,10 @@ type Controller interface {
 	Pause(ctx context.Context, sandboxID string) error
 	// Resume will unfreeze previously paused sandbox instance
 	Resume(ctx context.Context, sandboxID string) error
-	// Ping is a lightweight API call to check whether sandbox instance is still alive.
+	// Ping is a lightweight API call to check whether sandbox instance is still alive (e.g. quick livability check).
 	// This should not involve any complex logic and containerd will not debug log it as it might be called quite often.
 	Ping(ctx context.Context, sandboxID string) error
-	// Status will query sandbox process status
+	// Status will query sandbox process status. It is heavier than Ping call and must be used whenever you need to
+	// gather metadata about current sandbox state (status, uptime, resource use, etc).
 	Status(ctx context.Context, sandboxID string) (*types.Any, error)
 }

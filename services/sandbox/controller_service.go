@@ -30,7 +30,7 @@ import (
 func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
-		ID:   "controllers",
+		ID:   "sandbox-controllers",
 		Requires: []plugin.Type{
 			plugin.ServicePlugin,
 		},
