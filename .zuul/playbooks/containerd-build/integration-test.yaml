@@ -1,0 +1,96 @@
+- hosts: all
+  become: yes
+  roles:
+  - role: config-golang
+    go_version: '1.16.3'
+    arch: arm64
+  tasks:
+  - name: Install pre-requisites
+    shell:
+      cmd: |
+        set -xe
+        set -o pipefail
+        apt-get update
+        apt-get install -y btrfs-tools libseccomp-dev git pkg-config
+
+        go version
+      chdir: '{{ zuul.project.src_dir }}'
+      executable: /bin/bash
+    environment: '{{ global_env }}'
+  - name: Install containerd and cri dependencies
+    shell:
+      cmd: |
+        set -xe
+        make install-deps
+      chdir: '{{ zuul.project.src_dir }}'
+      executable: /bin/bash
+    environment: '{{ global_env }}'
+  - name: Install criu
+    shell:
+      cmd: |
+        set -xe
+        apt-get install -y \
+          libprotobuf-dev \
+          libprotobuf-c-dev \
+          protobuf-c-compiler \
+          protobuf-compiler \
+          python-protobuf \
+          libnl-3-dev \
+          libnet-dev \
+          libcap-dev \
+          python-future
+        wget https://github.com/checkpoint-restore/criu/archive/v3.13.tar.gz -O criu.tar.gz
+        tar -zxf criu.tar.gz
+        cd criu-3.13
+        make install-criu
+      chdir: '{{ zuul.project.src_dir }}'
+      executable: /bin/bash
+    environment: '{{ global_env }}'
+  - name: Install containerd
+    shell:
+      cmd: |
+        set -xe
+        make binaries
+        make install | tee $LOGS_PATH/make_install.log
+      chdir: '{{ zuul.project.src_dir }}'
+      executable: /bin/bash
+    environment: '{{ global_env }}'
+  - name: Tests
+    shell:
+      cmd: |
+        make test | tee $LOGS_PATH/make_test.log
+        make root-test | tee $LOGS_PATH/make_root-test.log
+      chdir: '{{ zuul.project.src_dir }}'
+      executable: /bin/bash
+    environment: '{{ global_env }}'
+  - name: Integration 1
+    shell:
+      cmd: |
+        make integration EXTRA_TESTFLAGS=-no-criu TESTFLAGS_RACE=-race | tee $LOGS_PATH/make_integration-test.log
+      chdir: '{{ zuul.project.src_dir }}'
+      executable: /bin/bash
+    environment: '{{ global_env }}'
+  - name: Integration 2
+    shell:
+      cmd: |
+        TESTFLAGS_PARALLEL=1 make integration EXTRA_TESTFLAGS=-no-criu | tee $LOGS_PATH/make_integration-test.log
+      chdir: '{{ zuul.project.src_dir }}'
+      executable: /bin/bash
+    environment: '{{ global_env }}'
+  - name: CRI Integration Test
+    shell:
+      cmd: |
+        CONTAINERD_RUNTIME="io.containerd.runc.v2" make cri-integration | tee $LOGS_PATH/make_cri-integration-test.log
+      chdir: '{{ zuul.project.src_dir }}'
+      executable: /bin/bash
+    environment: '{{ global_env }}'
+  - name: CRI Integration Test
+    shell:
+      cmd: |
+        if grep -q "FAIL:" $LOGS_PATH/*.log; then
+          echo "FAILURE"
+          exit 1
+        fi
+      chdir: '{{ zuul.project.src_dir }}'
+      executable: /bin/bash
+    environment: '{{ global_env }}'
