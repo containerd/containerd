@@ -68,6 +68,7 @@ Vagrant.configure("2") do |config|
             lsof \
             make \
             ${INSTALL_PACKAGES}
+        uname -a
     SHELL
   end
 
