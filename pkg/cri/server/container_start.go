@@ -84,6 +84,17 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		return nil, errors.Errorf("sandbox container %q is not running", sandboxID)
 	}
 
+	// Recheck target container validity in Linux namespace options.
+	if linux := config.GetLinux(); linux != nil {
+		nsOpts := linux.GetSecurityContext().GetNamespaceOptions()
+		if nsOpts.GetPid() == runtime.NamespaceMode_TARGET {
+			_, err := c.validateTargetContainer(sandboxID, nsOpts.TargetId)
+			if err != nil {
+				return nil, errors.Wrap(err, "invalid target container")
+			}
+		}
+	}
+
 	ioCreation := func(id string) (_ containerdio.IO, err error) {
 		stdoutWC, stderrWC, err := c.createContainerLoggers(meta.LogPath, config.GetTty())
 		if err != nil {
