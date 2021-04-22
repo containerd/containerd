@@ -47,5 +47,5 @@ func TestSnapshotterClient(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("snapshots not yet supported on Windows")
 	}
-	testsuite.SnapshotterSuite(t, "SnapshotterClient", newSnapshotter)
+	testsuite.SnapshotterSuite(t, "Overlay", newSnapshotter)
 }

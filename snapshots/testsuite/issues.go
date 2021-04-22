@@ -115,7 +115,6 @@ func checkChown(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, wor
 // checkRename
 // https://github.com/docker/docker/issues/25409
 func checkRename(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, work string) {
-	t.Skip("rename test still fails on some kernels with overlay")
 	l1Init := fstest.Apply(
 		fstest.CreateDir("/dir1", 0700),
 		fstest.CreateDir("/somefiles", 0700),

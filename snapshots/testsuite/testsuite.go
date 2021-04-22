@@ -18,6 +18,7 @@ package testsuite
 
 import (
 	"context"
+
 	//nolint:golint
 	_ "crypto/sha256"
 	"fmt"
@@ -64,7 +65,12 @@ func SnapshotterSuite(t *testing.T, name string, snapshotterFn SnapshotterFunc) 
 	t.Run("RemoveIntermediateSnapshot", makeTest(name, snapshotterFn, checkRemoveIntermediateSnapshot))
 	t.Run("DeletedFilesInChildSnapshot", makeTest(name, snapshotterFn, checkDeletedFilesInChildSnapshot))
 	t.Run("MoveFileFromLowerLayer", makeTest(name, snapshotterFn, checkFileFromLowerLayer))
-	t.Run("Rename", makeTest(name, snapshotterFn, checkRename))
+
+	if name != "Overlay" {
+		// Rename test on overlay fails without redirect_dir=on.
+		// https://www.kernel.org/doc/html/latest/filesystems/overlayfs.html#renaming-directories
+		t.Run("Rename", makeTest(name, snapshotterFn, checkRename))
+	}
 
 	t.Run("ViewReadonly", makeTest(name, snapshotterFn, checkSnapshotterViewReadonly))
 
@@ -875,9 +881,6 @@ func checkRootPermission(ctx context.Context, t *testing.T, snapshotter snapshot
 
 func check128LayersMount(name string) func(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 	return func(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
-		if name == "Aufs" {
-			t.Skip("aufs tests have issues with whiteouts here on some CI kernels")
-		}
 		lowestApply := fstest.Apply(
 			fstest.CreateFile("/bottom", []byte("way at the bottom\n"), 0777),
 			fstest.CreateFile("/overwriteme", []byte("FIRST!\n"), 0777),
