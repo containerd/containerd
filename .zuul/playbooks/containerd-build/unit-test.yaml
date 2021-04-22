@@ -5,7 +5,7 @@
     go_version: '1.16.3'
     arch: arm64
   tasks:
-  - name: Build containerd
+  - name: Build and test containerd
     shell:
       cmd: |
         set -xe
@@ -14,9 +14,7 @@
         apt-get install -y btrfs-tools libseccomp-dev git pkg-config
 
         go version
-        make | tee $LOGS_PATH/make.txt
-
-        cp -r ./bin $RESULTS_PATH
+        make build test | tee $LOGS_PATH/make_test.txt
       chdir: '{{ zuul.project.src_dir }}'
       executable: /bin/bash
     environment: '{{ global_env }}'
