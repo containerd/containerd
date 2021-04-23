@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-FROM busybox
+FROM ubuntu
 RUN mkdir -p /test_dir && \
     chown -R nobody:nogroup /test_dir
 VOLUME /test_dir
