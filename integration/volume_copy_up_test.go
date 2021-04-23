@@ -31,7 +31,7 @@ import (
 
 func TestVolumeCopyUp(t *testing.T) {
 	const (
-		testImage   = "gcr.io/k8s-cri-containerd/volume-copy-up:1.0"
+		testImage   = "gcr.io/kubernetes-development-244305/volume-copy-up:2.0"
 		execTimeout = time.Minute
 	)
 
@@ -93,7 +93,7 @@ func TestVolumeCopyUp(t *testing.T) {
 
 func TestVolumeOwnership(t *testing.T) {
 	const (
-		testImage   = "gcr.io/k8s-cri-containerd/volume-ownership:1.0"
+		testImage   = "gcr.io/kubernetes-development-244305/volume-ownership:2.0"
 		execTimeout = time.Minute
 	)
 
