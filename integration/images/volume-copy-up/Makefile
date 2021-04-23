@@ -15,13 +15,20 @@
 all: build
 
 PROJ=gcr.io/k8s-cri-containerd
-VERSION=1.0
+VERSION=2.0
 IMAGE=$(PROJ)/volume-copy-up:$(VERSION)
+PLATFORMS?=linux/amd64,linux/arm64
+
+configure-docker:
+	gcloud auth configure-docker
 
 build:
-	docker build -t $(IMAGE) .
+	docker buildx build \
+	$(OUTPUT) \
+	--platform=${PLATFORMS} \
+	--tag $(IMAGE) .
 
-push:
-	gcloud docker -- push $(IMAGE)
+push: OUTPUT=--push
+push: configure-docker build
 
-.PHONY: build push
+.PHONY: configure-docker build push
