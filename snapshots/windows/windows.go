@@ -468,7 +468,7 @@ func (s *snapshotter) createScratchLayer(ctx context.Context, snDir string, pare
 	return nil
 }
 
-// convertScratchToReadOnlyLayer reimporst the layer over itself, to transfer the files from the sandbox.vhdx to the on-disk storage.
+// convertScratchToReadOnlyLayer reimports the layer over itself, to transfer the files from the sandbox.vhdx to the on-disk storage.
 func (s *snapshotter) convertScratchToReadOnlyLayer(ctx context.Context, snapshot storage.Snapshot, path string) (retErr error) {
 
 	// TODO darrenstahlmsft: When this is done isolated, we should disable these.
