@@ -5,7 +5,7 @@
       jobs:
         - containerd-build-arm64
         - containerd-test-arm64
-        - containerd-integration-test-arm64
+        - containerd-integration-arm64
 
 - job:
     name: containerd-build-arm64
@@ -26,7 +26,7 @@
     voting: false
 
 - job:
-    name: containerd-integration-test-arm64
+    name: containerd-integration-arm64
     parent: init-test
     description: |
       Containerd unit tests in openlab cluster.
