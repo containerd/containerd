@@ -11,7 +11,7 @@
         set -xe
         set -o pipefail
         apt-get update
-        apt-get install -y btrfs-tools libseccomp-dev git pkg-config
+        apt-get install -y btrfs-tools libseccomp-dev git pkg-config lsof
 
         go version
       chdir: '{{ zuul.project.src_dir }}'
