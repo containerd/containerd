@@ -23,6 +23,7 @@ set -o nounset
 set -o pipefail
 
 source $(dirname "${BASH_SOURCE[0]}")/build-utils.sh
+source $(dirname "${BASH_SOURCE[0]}")/init-buildx.sh
 cd "${ROOT}"
 
 # ignore errors if the image already exists
