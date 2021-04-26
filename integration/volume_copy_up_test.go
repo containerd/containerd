@@ -31,7 +31,7 @@ import (
 
 func TestVolumeCopyUp(t *testing.T) {
 	const (
-		testImage   = "gcr.io/k8s-cri-containerd/volume-copy-up:1.0"
+		testImage   = "gcr.io/k8s-cri-containerd/volume-copy-up:2.0"
 		execTimeout = time.Minute
 	)
 
@@ -60,7 +60,7 @@ func TestVolumeCopyUp(t *testing.T) {
 	t.Logf("Start the container")
 	require.NoError(t, runtimeService.StartContainer(cn))
 
-	// gcr.io/k8s-cri-containerd/volume-copy-up:1.0 contains a test_dir
+	// gcr.io/k8s-cri-containerd/volume-copy-up:2.0 contains a test_dir
 	// volume, which contains a test_file with content "test_content".
 	t.Logf("Check whether volume contains the test file")
 	stdout, stderr, err := runtimeService.ExecSync(cn, []string{
@@ -93,7 +93,7 @@ func TestVolumeCopyUp(t *testing.T) {
 
 func TestVolumeOwnership(t *testing.T) {
 	const (
-		testImage   = "gcr.io/k8s-cri-containerd/volume-ownership:1.0"
+		testImage   = "gcr.io/k8s-cri-containerd/volume-ownership:2.0"
 		execTimeout = time.Minute
 	)
 
@@ -122,7 +122,7 @@ func TestVolumeOwnership(t *testing.T) {
 	t.Logf("Start the container")
 	require.NoError(t, runtimeService.StartContainer(cn))
 
-	// gcr.io/k8s-cri-containerd/volume-ownership:1.0 contains a test_dir
+	// gcr.io/k8s-cri-containerd/volume-ownership:2.0 contains a test_dir
 	// volume, which is owned by nobody:nogroup.
 	t.Logf("Check ownership of test directory inside container")
 	stdout, stderr, err := runtimeService.ExecSync(cn, []string{
