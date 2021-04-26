@@ -15,15 +15,16 @@ The sixth major release of containerd includes many stability improvements
 and code organization changes to make contribution easier and make future
 features cleaner to develop. This includes bringing CRI development into the
 main containerd repository and switching to Go modules. This release also
-brings support for the Node Resource Interface (NRI).
+brings support for the Node Resource Interface (NRI) and ARM64 builds.
 
 ### Highlights
 
 #### Project Organization
-* **Merge containerd/cri codebased into containerd/containerd** [#4593](https://github.com/containerd/containerd/pull/4593)
+* **Merge containerd/cri codebase into containerd/containerd** [#4593](https://github.com/containerd/containerd/pull/4593)
 * **Move to Go modules** [#4760](https://github.com/containerd/containerd/pull/4760)
 * **Remove `selinux` build tag** [#4849](https://github.com/containerd/containerd/pull/4849)
 * **Add json log format output option for daemon log** [#4803](https://github.com/containerd/containerd/pull/4803)
+* **Add release builds for ARM64** [#5329](https://github.com/containerd/containerd/pull/5329)
 
 #### Snapshots
 * **Add configurable overlayfs path** [#4505](https://github.com/containerd/containerd/pull/4505)
@@ -51,6 +52,8 @@ brings support for the Node Resource Interface (NRI).
 * **Runtime support on FreeBSD** [#5375](https://github.com/containerd/containerd/pull/5375)
 
 #### Windows
+* **Implement windowsDiff.Compare to allow outputting OCI images** [#4399](https://github.com/containerd/containerd/pull/4399)
+* **Optimize WCOW snapshotter to commit writable layers as read-only parent layers** [#4415](https://github.com/containerd/containerd/pull/4415)
 * **Optimize LCOW snapshotter use of scratch layers** [#4643](https://github.com/containerd/containerd/pull/4643)
 
 #### CRI
@@ -59,6 +62,7 @@ brings support for the Node Resource Interface (NRI).
 * **Update privileged containers to use current capabilities instead of known capabilities** [#5017](https://github.com/containerd/containerd/pull/5017)
 * **Add pod annotations to CNI call** [#5026](https://github.com/containerd/containerd/pull/5026)
 * **Enable ocicrypt by default** [#5135](https://github.com/containerd/containerd/pull/5135)
+* **Support PID NamespaceMode_TARGET** [#5203](https://github.com/containerd/containerd/pull/5203)
 
 ### Impactful Client Updates
 
@@ -146,5 +150,15 @@ To check version, see the version value in the containerd toml configuration.
 ```toml
 version=2
 ```
+
+#### FreeBSD Runtime Support (Experimental)
+
+This release includes changes that allow containerd to run on FreeBSD with a
+compatible runtime, such as [runj](https://github.com/samuelkarp/runj). This
+support should be considered experimental and currently there are no official
+binary releases for FreeBSD. The runtimes used by containerd are maintained
+separately and have their own stability guarantees. The containerd project
+strives to be compatible with any runtime which aims to implement containerd's
+shim API and OCI runtime specification.
 
 See the changelog for complete list of changes"""
