@@ -39,6 +39,16 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc/grpclog"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/stdout"
+	"go.opentelemetry.io/otel/metric/global"
+	"go.opentelemetry.io/otel/propagation"
+	controller "go.opentelemetry.io/otel/sdk/metric/controller/basic"
+	processor "go.opentelemetry.io/otel/sdk/metric/processor/basic"
+	"go.opentelemetry.io/otel/sdk/metric/selector/simple"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const usage = `
@@ -50,6 +60,8 @@ const usage = `
 
 high performance container runtime
 `
+
+var tp *sdktrace.TracerProvider
 
 func init() {
 	// Discard grpc logs so that they don't mess with our stdio
@@ -99,6 +111,10 @@ can be used and modified as necessary as a custom configuration.`
 			Name:  "state",
 			Usage: "containerd state directory",
 		},
+		cli.BoolFlag{
+			Name:  "with-otel-exporter",
+			Usage: "open-telemetry exporter to be used",
+		},
 	}
 	app.Flags = append(app.Flags, serviceFlags()...)
 	app.Commands = []cli.Command{
@@ -124,6 +140,54 @@ can be used and modified as necessary as a custom configuration.`
 				return err
 			}
 		}
+
+		// Add openTelemetry initialization here. Currently only stdout exporter is
+		// supported. TODO: support other exporter.
+		withOtelExporter := context.GlobalBool("with-otel-exporter")
+
+		exporter, err := stdout.NewExporter(
+			stdout.WithPrettyPrint(),
+		)
+		if err != nil {
+			logrus.Fatalf("failed to initialize stdout export pipeline: %v", err)
+		}
+
+		if !withOtelExporter {
+			exporter.Shutdown(ctx)
+		}
+
+		// Initialize Tracer provider
+		bsp := sdktrace.NewBatchSpanProcessor(exporter)
+		tp = sdktrace.NewTracerProvider(
+			sdktrace.WithSampler(sdktrace.AlwaysSample()),
+			sdktrace.WithSpanProcessor(bsp))
+
+		// Initialize Metric Provider
+		pusher := controller.New(
+			processor.New(
+				simple.NewWithExactDistribution(),
+				exporter,
+			),
+			controller.WithExporter(exporter),
+			controller.WithCollectPeriod(5*time.Second),
+		)
+
+		// Add global configs for openTelemetry
+		otel.SetTracerProvider(tp)
+		global.SetMeterProvider(pusher.MeterProvider())
+		propagator := propagation.NewCompositeTextMapPropagator(propagation.Baggage{}, propagation.TraceContext{})
+		otel.SetTextMapPropagator(propagator)
+
+		err = pusher.Start(ctx)
+		if err != nil {
+			logrus.Fatalf("failed to initialize metric controller: %v", err)
+		}
+
+		// Handle this error in a sensible manner where possible
+		defer func() { _ = pusher.Stop(ctx) }()
+
+		// Handle this error in a sensible manner where possible
+		defer func() { _ = tp.Shutdown(ctx) }()
 
 		// Apply flags to the config
 		if err := applyFlags(context, config); err != nil {
@@ -241,6 +305,10 @@ can be used and modified as necessary as a custom configuration.`
 }
 
 func serve(ctx gocontext.Context, l net.Listener, serveFunc func(net.Listener) error) {
+	span := trace.SpanFromContext(ctx)
+	_, serveSpan := (span.Tracer()).Start(ctx, "serve")
+	defer serveSpan.End()
+
 	path := l.Addr().String()
 	log.G(ctx).WithField("address", path).Info("serving...")
 	go func() {

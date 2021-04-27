@@ -30,6 +30,8 @@ import (
 	"github.com/containerd/containerd/services"
 	ptypes "github.com/gogo/protobuf/types"
 	bolt "go.etcd.io/bbolt"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	grpcm "google.golang.org/grpc/metadata"
@@ -109,8 +111,14 @@ func (l *local) ListStream(ctx context.Context, req *api.ListContainersRequest, 
 }
 
 func (l *local) Create(ctx context.Context, req *api.CreateContainerRequest, _ ...grpc.CallOption) (*api.CreateContainerResponse, error) {
+	span := trace.SpanFromContext(ctx)
+	_, ctrCreateSpan := (span.Tracer().Start(ctx, "ctrCreateSpan"))
+
+	defer ctrCreateSpan.End()
+
 	var resp api.CreateContainerResponse
 
+	ctrCreateSpan.AddEvent("container create", trace.WithAttributes(attribute.String("containerd_id", req.Container.ID), attribute.String("container_image", req.Container.Image)))
 	if err := l.withStoreUpdate(ctx, func(ctx context.Context) error {
 		container := containerFromProto(&req.Container)
 
@@ -140,6 +148,11 @@ func (l *local) Create(ctx context.Context, req *api.CreateContainerRequest, _ .
 }
 
 func (l *local) Update(ctx context.Context, req *api.UpdateContainerRequest, _ ...grpc.CallOption) (*api.UpdateContainerResponse, error) {
+	span := trace.SpanFromContext(ctx)
+	_, ctrUpdateSpan := (span.Tracer().Start(ctx, "ctrUpdateSpan"))
+
+	defer ctrUpdateSpan.End()
+
 	if req.Container.ID == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "Container.ID required")
 	}
@@ -147,6 +160,7 @@ func (l *local) Update(ctx context.Context, req *api.UpdateContainerRequest, _ .
 		resp      api.UpdateContainerResponse
 		container = containerFromProto(&req.Container)
 	)
+	ctrUpdateSpan.AddEvent("container update", trace.WithAttributes(attribute.String("containerd_id", req.Container.ID), attribute.String("container_image", req.Container.Image)))
 
 	if err := l.withStoreUpdate(ctx, func(ctx context.Context) error {
 		var fieldpaths []string
@@ -178,6 +192,12 @@ func (l *local) Update(ctx context.Context, req *api.UpdateContainerRequest, _ .
 }
 
 func (l *local) Delete(ctx context.Context, req *api.DeleteContainerRequest, _ ...grpc.CallOption) (*ptypes.Empty, error) {
+	span := trace.SpanFromContext(ctx)
+	_, ctrDeleteSpan := (span.Tracer().Start(ctx, "ctrDeleteSpan"))
+
+	defer ctrDeleteSpan.End()
+
+	ctrDeleteSpan.AddEvent("container delete", trace.WithAttributes(attribute.String("container_id", req.ID)))
 	if err := l.withStoreUpdate(ctx, func(ctx context.Context) error {
 		return l.Store.Delete(ctx, req.ID)
 	}); err != nil {

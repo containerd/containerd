@@ -36,6 +36,8 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -272,7 +274,12 @@ func (s *Snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 // Remove removes thin device and snapshot metadata by key
 func (s *Snapshotter) Remove(ctx context.Context, key string) error {
 	log.G(ctx).WithField("key", key).Debug("remove")
+	span := trace.SpanFromContext(ctx)
+	_, ssRemoveSpan := (span.Tracer().Start(ctx, "ssRemoveSpan", trace.WithAttributes(attribute.String("snapshotKey", key))))
 
+	defer ssRemoveSpan.End()
+
+	ssRemoveSpan.AddEvent("removing snapshot", trace.WithAttributes(attribute.String("snapshotKey", key)))
 	return s.withTransaction(ctx, true, func(ctx context.Context) error {
 		return s.removeDevice(ctx, key)
 	})
@@ -350,6 +357,12 @@ func (s *Snapshotter) Close() error {
 }
 
 func (s *Snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	span := trace.SpanFromContext(ctx)
+	_, ssCreateSpan := (span.Tracer().Start(ctx, "snapshotCreateSpan", trace.WithAttributes(attribute.String("snapshotKey", key), attribute.String("snapshotParent", parent))))
+
+	defer ssCreateSpan.End()
+
+	ssCreateSpan.AddEvent("creating snapshot", trace.WithAttributes(attribute.String("snapshotKey", key), attribute.String("parent", parent)))
 	snap, err := storage.CreateSnapshot(ctx, kind, key, parent, opts...)
 	if err != nil {
 		return nil, err

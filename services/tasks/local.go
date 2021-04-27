@@ -51,6 +51,8 @@ import (
 	ptypes "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -139,6 +141,11 @@ type local struct {
 }
 
 func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.CallOption) (*api.CreateTaskResponse, error) {
+	span := trace.SpanFromContext(ctx)
+	_, taskCreateSpan := (span.Tracer().Start(ctx, "taskCreateSpan", trace.WithAttributes(attribute.String("containerID", r.ContainerID))))
+
+	defer taskCreateSpan.End()
+
 	container, err := l.getContainer(ctx, r.ContainerID)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
@@ -207,6 +214,8 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 	if err == nil {
 		return nil, errdefs.ToGRPC(fmt.Errorf("task %s already exists", r.ContainerID))
 	}
+
+	taskCreateSpan.AddEvent("creating task", trace.WithAttributes(attribute.String("containerID", r.ContainerID)))
 	c, err := rtime.Create(ctx, r.ContainerID, opts)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
@@ -221,6 +230,11 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 }
 
 func (l *local) Start(ctx context.Context, r *api.StartRequest, _ ...grpc.CallOption) (*api.StartResponse, error) {
+	span := trace.SpanFromContext(ctx)
+	_, taskStartSpan := (span.Tracer().Start(ctx, "taskStartSpan", trace.WithAttributes(attribute.String("containerID", r.ContainerID))))
+
+	defer taskStartSpan.End()
+
 	t, err := l.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -231,6 +245,8 @@ func (l *local) Start(ctx context.Context, r *api.StartRequest, _ ...grpc.CallOp
 			return nil, errdefs.ToGRPC(err)
 		}
 	}
+
+	taskStartSpan.AddEvent("starting task", trace.WithAttributes(attribute.String("containerID", r.ContainerID)))
 	if err := p.Start(ctx); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -244,6 +260,11 @@ func (l *local) Start(ctx context.Context, r *api.StartRequest, _ ...grpc.CallOp
 }
 
 func (l *local) Delete(ctx context.Context, r *api.DeleteTaskRequest, _ ...grpc.CallOption) (*api.DeleteResponse, error) {
+	span := trace.SpanFromContext(ctx)
+	_, taskDeleteSpan := (span.Tracer().Start(ctx, "taskDeleteSpan", trace.WithAttributes(attribute.String("containerID", r.ContainerID))))
+
+	defer taskDeleteSpan.End()
+
 	t, err := l.getTask(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
@@ -251,6 +272,8 @@ func (l *local) Delete(ctx context.Context, r *api.DeleteTaskRequest, _ ...grpc.
 	if err := l.monitor.Stop(t); err != nil {
 		return nil, err
 	}
+
+	taskDeleteSpan.AddEvent("deleting task", trace.WithAttributes(attribute.String("containerID", r.ContainerID)))
 	exit, err := t.Delete(ctx)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
@@ -636,6 +659,12 @@ func getTasksMetrics(ctx context.Context, filter filters.Filter, tasks []runtime
 }
 
 func (l *local) writeContent(ctx context.Context, mediaType, ref string, r io.Reader) (*types.Descriptor, error) {
+	span := trace.SpanFromContext(ctx)
+	_, taskWriteContentSpan := (span.Tracer().Start(ctx, "taskWriteContentSpan", trace.WithAttributes(attribute.String("ref", ref))))
+
+	defer taskWriteContentSpan.End()
+
+	taskWriteContentSpan.AddEvent("writing content", trace.WithAttributes(attribute.String("ref", ref)))
 	writer, err := l.store.Writer(ctx, content.WithRef(ref), content.WithDescriptor(ocispec.Descriptor{MediaType: mediaType}))
 	if err != nil {
 		return nil, err

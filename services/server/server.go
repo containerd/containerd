@@ -48,9 +48,12 @@ import (
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/ttrpc"
 	metrics "github.com/docker/go-metrics"
+	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/credentials"
@@ -95,15 +98,23 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 	}
 
 	serverOpts := []grpc.ServerOption{
-		grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
-		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
+		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
+			otelgrpc.StreamServerInterceptor(),
+			grpc.StreamServerInterceptor(grpc_prometheus.StreamServerInterceptor),
+		)),
+		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
+			otelgrpc.UnaryServerInterceptor(),
+			grpc.UnaryServerInterceptor(grpc_prometheus.UnaryServerInterceptor),
+		)),
 	}
+
 	if config.GRPC.MaxRecvMsgSize > 0 {
 		serverOpts = append(serverOpts, grpc.MaxRecvMsgSize(config.GRPC.MaxRecvMsgSize))
 	}
 	if config.GRPC.MaxSendMsgSize > 0 {
 		serverOpts = append(serverOpts, grpc.MaxSendMsgSize(config.GRPC.MaxSendMsgSize))
 	}
+
 	ttrpcServer, err := newTTRPCServer()
 	if err != nil {
 		return nil, err
@@ -117,6 +128,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		}
 		tcpServerOpts = append(tcpServerOpts, grpc.Creds(creds))
 	}
+
 	var (
 		grpcServer = grpc.NewServer(serverOpts...)
 		tcpServer  = grpc.NewServer(tcpServerOpts...)
@@ -236,6 +248,11 @@ type Server struct {
 
 // ServeGRPC provides the containerd grpc APIs on the provided listener
 func (s *Server) ServeGRPC(l net.Listener) error {
+	ctx := context.Background()
+	span := trace.SpanFromContext(ctx)
+	_, grpcSpan := (span.Tracer().Start(ctx, "grpcSpan"))
+	defer grpcSpan.End()
+
 	if s.config.Metrics.GRPCHistogram {
 		// enable grpc time histograms to measure rpc latencies
 		grpc_prometheus.EnableHandlingTimeHistogram()
@@ -249,11 +266,21 @@ func (s *Server) ServeGRPC(l net.Listener) error {
 
 // ServeTTRPC provides the containerd ttrpc APIs on the provided listener
 func (s *Server) ServeTTRPC(l net.Listener) error {
+	ctx := context.Background()
+	span := trace.SpanFromContext(ctx)
+	_, ttrpcSpan := (span.Tracer().Start(ctx, "ttrpcSpan"))
+	defer ttrpcSpan.End()
+
 	return trapClosedConnErr(s.ttrpcServer.Serve(context.Background(), l))
 }
 
 // ServeMetrics provides a prometheus endpoint for exposing metrics
 func (s *Server) ServeMetrics(l net.Listener) error {
+	ctx := context.Background()
+	span := trace.SpanFromContext(ctx)
+	_, metricsSpan := (span.Tracer().Start(ctx, "metricsSpan"))
+	defer metricsSpan.End()
+
 	m := http.NewServeMux()
 	m.Handle("/v1/metrics", metrics.Handler())
 	return trapClosedConnErr(http.Serve(l, m))
@@ -261,12 +288,22 @@ func (s *Server) ServeMetrics(l net.Listener) error {
 
 // ServeTCP allows services to serve over tcp
 func (s *Server) ServeTCP(l net.Listener) error {
+	ctx := context.Background()
+	span := trace.SpanFromContext(ctx)
+	_, tcpSpan := (span.Tracer().Start(ctx, "tcpSpan"))
+	defer tcpSpan.End()
+
 	grpc_prometheus.Register(s.tcpServer)
 	return trapClosedConnErr(s.tcpServer.Serve(l))
 }
 
 // ServeDebug provides a debug endpoint
 func (s *Server) ServeDebug(l net.Listener) error {
+	ctx := context.Background()
+	span := trace.SpanFromContext(ctx)
+	_, endpointDebugSpan := (span.Tracer().Start(ctx, "endpointDebugSpan"))
+	defer endpointDebugSpan.End()
+
 	// don't use the default http server mux to make sure nothing gets registered
 	// that we don't want to expose via containerd
 	m := http.NewServeMux()
@@ -471,6 +508,9 @@ func (pc *proxyClients) getClient(address string) (*grpc.ClientConn, error) {
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(defaults.DefaultMaxRecvMsgSize)),
 		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(defaults.DefaultMaxSendMsgSize)),
 	}
+
+	gopts = append(gopts, grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()))
+	gopts = append(gopts, grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()))
 
 	conn, err := grpc.Dial(dialer.DialAddress(address), gopts...)
 	if err != nil {
