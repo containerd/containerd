@@ -20,10 +20,14 @@ import (
 	"context"
 )
 
+// PortForward is an optional interface for v2 runtimes that need to implement
+// their own custom port forwarding support.
 type PortForward interface {
+	// PortForward initiates a port forwarded connection request.
 	PortForward(context.Context, PortForwardOpts) error
 }
 
+// PortForwardOpts are options for initiating a connection request.
 type PortForwardOpts struct {
 	Port int32
 	Addr string

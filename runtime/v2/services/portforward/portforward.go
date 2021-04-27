@@ -52,10 +52,13 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 	return pf, nil
 }
 
+// PortForward is an interface that port forwarding plugins can implement.
 type PortForward interface {
+	// PortForward initiates a port forwarded connection request.
 	PortForward(context.Context, PortForwardOpts) error
 }
 
+// PortForwardOpts are options to initiate a connection request.
 type PortForwardOpts struct {
 	ID   string
 	Port int32
