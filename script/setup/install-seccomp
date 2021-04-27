@@ -27,7 +27,11 @@ export SECCOMP_PATH=$(mktemp -d)
 curl -fsSL "https://github.com/seccomp/libseccomp/releases/download/v${SECCOMP_VERSION}/libseccomp-${SECCOMP_VERSION}.tar.gz" | tar -xzC "$SECCOMP_PATH" --strip-components=1
 (
 	cd "$SECCOMP_PATH"
-	./configure --prefix=/usr/local
+	host=""
+	if [ -v SECCOMP_ARCH ]; then
+		host="--host=${SECCOMP_ARCH}"
+	fi
+	./configure --prefix=/usr/local ${host}
 	make
 	make install
 	ldconfig
