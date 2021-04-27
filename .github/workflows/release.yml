@@ -70,27 +70,12 @@ jobs:
         with:
           go-version: '1.16.3'
 
-      - name: Set env
-        shell: bash
-        env:
-          MOS: ${{ matrix.os }}
-          MARCH: ${{ matrix.arch }}
-        run: |
-          releasever=${{ github.ref }}
-          releasever="${releasever#refs/tags/}"
-          os=linux
-          [[ "${MOS}" =~ "windows" ]] && {
-            os=windows
-          }
-          echo "RELEASE_VER=${releasever}" >> $GITHUB_ENV
-          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
-          echo "GOOS=${os}" >> $GITHUB_ENV
-          echo "GOARCH=${{ matrix.arch }}" >> $GITHUB_ENV
-          [[ "${MARCH}" == "arm64" ]] && {
-            echo "CGO_ENABLED=1" >> $GITHUB_ENV
-            echo "CC=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-          }
-          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+      - name: Checkout containerd
+        uses: actions/checkout@v2
+        with:
+          repository: containerd/containerd
+          ref: ${{ github.ref }}
+          path: src/github.com/containerd/containerd
 
       - name: Install dependencies
         if: ${{ runner.os == 'Linux' }}
@@ -121,12 +106,31 @@ jobs:
               # libbtrfs-dev:ppc64el
           fi
 
-      - name: Checkout containerd
-        uses: actions/checkout@v2
-        with:
-          repository: containerd/containerd
-          ref: ${{ github.ref }}
-          path: src/github.com/containerd/containerd
+      - name: Install seccomp
+        if: ${{ runner.os == 'Linux' }}
+        shell: bash
+        run: |
+          sudo -E PATH=$PATH script/setup/install-seccomp
+        working-directory: src/github.com/containerd/containerd
+
+      - name: Set env
+        shell: bash
+        run: |
+          releasever=${{ github.ref }}
+          releasever="${releasever#refs/tags/}"
+          os=linux
+          [[ "${{ matrix.os }}" =~ "windows" ]] && {
+            os=windows
+          }
+          echo "RELEASE_VER=${releasever}" >> $GITHUB_ENV
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "GOOS=${os}" >> $GITHUB_ENV
+          echo "GOARCH=${{ matrix.arch }}" >> $GITHUB_ENV
+          [[ "${{ matrix.arch }}" == "arm64" ]] && {
+            echo "CGO_ENABLED=1" >> $GITHUB_ENV
+            echo "CC=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          }
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - name: HCS Shim commit
         id: hcsshim_commit
@@ -172,9 +176,6 @@ jobs:
         env:
           RUNC_FLAVOR: runc
         run: |
-          if [[ "${GOOS}" == "linux" ]]; then
-            sudo -E PATH=$PATH script/setup/install-seccomp
-          fi
           make cri-cni-release
         working-directory: src/github.com/containerd/containerd
 
