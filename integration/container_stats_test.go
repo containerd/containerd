@@ -20,6 +20,7 @@ package integration
 
 import (
 	"fmt"
+	goruntime "runtime"
 	"testing"
 	"time"
 
@@ -72,6 +73,83 @@ func TestContainerStats(t *testing.T) {
 
 	t.Logf("Verify stats received for container %q", cn)
 	testStats(t, s, containerConfig)
+}
+
+// Test to verify if the consumed stats are correct.
+func TestContainerConsumedStats(t *testing.T) {
+	t.Logf("Create a pod config and run sandbox container")
+	sbConfig := PodSandboxConfig("sandbox1", "stats")
+	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, runtimeService.StopPodSandbox(sb))
+		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
+	}()
+
+	testImage := GetImage(ResourceConsumer)
+	img, err := imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil, sbConfig)
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: img}))
+	}()
+
+	t.Logf("Create a container config and run container in a pod")
+	containerConfig := ContainerConfig(
+		"container1",
+		testImage,
+		WithTestLabels(),
+		WithTestAnnotations(),
+	)
+	cn, err := runtimeService.CreateContainer(sb, containerConfig, sbConfig)
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, runtimeService.RemoveContainer(cn))
+	}()
+	require.NoError(t, runtimeService.StartContainer(cn))
+	defer func() {
+		assert.NoError(t, runtimeService.StopContainer(cn, 10))
+	}()
+
+	t.Logf("Fetch initial stats for container")
+	var s *runtime.ContainerStats
+	require.NoError(t, Eventually(func() (bool, error) {
+		s, err = runtimeService.ContainerStats(cn)
+		if err != nil {
+			return false, err
+		}
+		if s.GetMemory().GetWorkingSetBytes().GetValue() > 0 {
+			return true, nil
+		}
+		return false, nil
+	}, time.Second, 30*time.Second))
+
+	initialMemory := s.GetMemory().GetWorkingSetBytes().GetValue()
+	t.Logf("Initial container memory consumption is %f MB. Consume 100 MB and expect the reported stats to increase accordingly", float64(initialMemory)/(1024*1024))
+
+	// consume 100 MB memory for 30 seconds.
+	var command []string
+	if goruntime.GOOS == "windows" {
+		// -d: Leak and touch memory in specified MBs
+		// -c: Count of number of objects to allocate
+		command = []string{"testlimit.exe", "-accepteula", "-d", "25", "-c", "4"}
+	} else {
+		command = []string{"stress", "-m", "1", "--vm-bytes", "100M", "--vm-hang", "0", "-t", "30"}
+	}
+
+	go func() {
+		_, _, err = runtimeService.ExecSync(cn, command, 30*time.Second)
+	}()
+
+	require.NoError(t, Eventually(func() (bool, error) {
+		s, err = runtimeService.ContainerStats(cn)
+		if err != nil {
+			return false, err
+		}
+		if s.GetMemory().GetWorkingSetBytes().GetValue() > initialMemory+100*1024*1024 {
+			return true, nil
+		}
+		return false, nil
+	}, time.Second, 30*time.Second))
 }
 
 // Test to verify filtering without any filter

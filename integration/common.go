@@ -29,11 +29,12 @@ import (
 
 // ImageList holds public image references
 type ImageList struct {
-	Alpine          string
-	BusyBox         string
-	Pause           string
-	VolumeCopyUp    string
-	VolumeOwnership string
+	Alpine           string
+	BusyBox          string
+	Pause            string
+	ResourceConsumer string
+	VolumeCopyUp     string
+	VolumeOwnership  string
 }
 
 var (
@@ -45,11 +46,12 @@ var (
 
 func initImages(imageListFile string) {
 	imageList = ImageList{
-		Alpine:          "docker.io/library/alpine:latest",
-		BusyBox:         "docker.io/library/busybox:latest",
-		Pause:           "k8s.gcr.io/pause:3.5",
-		VolumeCopyUp:    "gcr.io/k8s-cri-containerd/volume-copy-up:2.0",
-		VolumeOwnership: "gcr.io/k8s-cri-containerd/volume-ownership:2.0",
+		Alpine:           "docker.io/library/alpine:latest",
+		BusyBox:          "docker.io/library/busybox:latest",
+		Pause:            "k8s.gcr.io/pause:3.5",
+		ResourceConsumer: "k8s.gcr.io/e2e-test-images/resource-consumer:1.9",
+		VolumeCopyUp:     "gcr.io/k8s-cri-containerd/volume-copy-up:2.0",
+		VolumeOwnership:  "gcr.io/k8s-cri-containerd/volume-ownership:2.0",
 	}
 
 	if imageListFile != "" {
@@ -79,6 +81,8 @@ const (
 	BusyBox
 	// Pause image
 	Pause
+	// ResourceConsumer image
+	ResourceConsumer
 	// VolumeCopyUp image
 	VolumeCopyUp
 	// VolumeOwnership image
@@ -90,6 +94,7 @@ func initImageMap(imageList ImageList) map[int]string {
 	images[Alpine] = imageList.Alpine
 	images[BusyBox] = imageList.BusyBox
 	images[Pause] = imageList.Pause
+	images[ResourceConsumer] = imageList.ResourceConsumer
 	images[VolumeCopyUp] = imageList.VolumeCopyUp
 	images[VolumeOwnership] = imageList.VolumeOwnership
 	return images
