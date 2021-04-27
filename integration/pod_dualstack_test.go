@@ -46,8 +46,8 @@ func TestPodDualStack(t *testing.T) {
 		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
 	}()
 
-	const (
-		testImage     = "busybox"
+	var (
+		testImage     = GetImage(BusyBox)
 		containerName = "test-container"
 	)
 	t.Logf("Pull test image %q", testImage)
