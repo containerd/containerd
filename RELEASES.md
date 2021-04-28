@@ -326,3 +326,4 @@ The deprecated features are shown in the following table:
 | Runtime V1 API and implementation (`io.containerd.runtime.v1.linux`) | containerd v1.4     | containerd v2.0            |
 | Runc V1 implementation of Runtime V2 (`io.containerd.runc.v1`)       | containerd v1.4     | containerd v2.0            |
 | config.toml `version = 1`                                            | containerd v1.5     | containerd v2.0            |
+| Built-in `aufs` snapshotter                                          | containerd v1.5     | containerd v2.0            |
