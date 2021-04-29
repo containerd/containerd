@@ -56,6 +56,7 @@ func (r *diffRemote) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 		Diff:     fromDescriptor(desc),
 		Mounts:   fromMounts(mounts),
 		Payloads: config.ProcessorPayloads,
+		Labels:   config.Labels,
 	}
 	resp, err := r.client.Apply(ctx, req)
 	if err != nil {

@@ -19,6 +19,7 @@ package containerd
 import (
 	"context"
 
+	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/platforms"
@@ -66,6 +67,10 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 	var unpackEg *errgroup.Group
 	var unpackWrapper func(f images.Handler) images.Handler
 
+	if pullCtx.Labels != nil {
+		diffLabels := diff.FilterInheritedDiffLabels(pullCtx.Labels)
+		pullCtx.UnpackOpts = append(pullCtx.UnpackOpts, WithUnpackConfigApplyOpts(diff.WithApplyConfigLabels(diffLabels)))
+	}
 	if pullCtx.Unpack {
 		// unpacker only supports schema 2 image, for schema 1 this is noop.
 		u, err := c.newUnpacker(ctx, pullCtx)

@@ -18,11 +18,14 @@ package diff
 
 import (
 	"context"
+	"strings"
 
 	"github.com/containerd/containerd/mount"
 	"github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
+
+const diffLabelPrefix = "containerd.io/diff/"
 
 // Config is used to hold parameters needed for a diff operation
 type Config struct {
@@ -56,10 +59,46 @@ type Comparer interface {
 type ApplyConfig struct {
 	// ProcessorPayloads specifies the payload sent to various processors
 	ProcessorPayloads map[string]*types.Any
+	// Labels is used to specify any additional metadata
+	Labels map[string]string
 }
 
 // ApplyOpt is used to configure an Apply operation
 type ApplyOpt func(context.Context, ocispec.Descriptor, *ApplyConfig) error
+
+// WithApplyConfigLabels allows setting ApplyConfig Labels
+func WithApplyConfigLabels(labels map[string]string) ApplyOpt {
+	return func(_ context.Context, _ ocispec.Descriptor, c *ApplyConfig) error {
+		if labels == nil {
+			return nil
+		}
+
+		if c.Labels == nil {
+			c.Labels = make(map[string]string)
+		}
+
+		for k, v := range labels {
+			c.Labels[k] = v
+		}
+		return nil
+	}
+}
+
+// FilterInheritedDiffLabels filters the provided labels by removing any key which
+// isn't a snapshot diff label. Snapshot diff labels have a prefix of "containerd.io/snapshot/diff/"
+func FilterInheritedDiffLabels(labels map[string]string) map[string]string {
+	if labels == nil {
+		return nil
+	}
+
+	filtered := make(map[string]string)
+	for k, v := range labels {
+		if strings.HasPrefix(k, diffLabelPrefix) {
+			filtered[k] = v
+		}
+	}
+	return filtered
+}
 
 // Applier allows applying diffs between mounts
 type Applier interface {
