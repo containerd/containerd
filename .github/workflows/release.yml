@@ -89,7 +89,6 @@ jobs:
           [[ "${MARCH}" == "arm64" ]] && {
             echo "CGO_ENABLED=1" >> $GITHUB_ENV
             echo "CC=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-            echo "SECCOMP_ARCH=aarch64" >> $GITHUB_ENV
           }
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
@@ -174,7 +173,7 @@ jobs:
           RUNC_FLAVOR: runc
         run: |
           if [[ "${GOOS}" == "linux" ]]; then
-            sudo -E PATH=$PATH -E SECCOMP_ARCH="${SECCOMP_ARCH}" script/setup/install-seccomp
+            sudo -E PATH=$PATH script/setup/install-seccomp
           fi
           make cri-cni-release
         working-directory: src/github.com/containerd/containerd
