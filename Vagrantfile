@@ -17,7 +17,7 @@
 
 # Vagrantfile for cgroup2 and SELinux
 Vagrant.configure("2") do |config|
-  config.vm.box = "fedora/33-cloud-base"
+  config.vm.box = "fedora/34-cloud-base"
   memory = 4096
   cpus = 2
   config.vm.provider :virtualbox do |v|
