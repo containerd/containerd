@@ -15,7 +15,7 @@ The sixth major release of containerd includes many stability improvements
 and code organization changes to make contribution easier and make future
 features cleaner to develop. This includes bringing CRI development into the
 main containerd repository and switching to Go modules. This release also
-brings support for the Node Resource Interface (NRI) and ARM64 builds.
+brings support for the Node Resource Interface (NRI).
 
 ### Highlights
 
@@ -24,7 +24,6 @@ brings support for the Node Resource Interface (NRI) and ARM64 builds.
 * **Move to Go modules** [#4760](https://github.com/containerd/containerd/pull/4760)
 * **Remove `selinux` build tag** [#4849](https://github.com/containerd/containerd/pull/4849)
 * **Add json log format output option for daemon log** [#4803](https://github.com/containerd/containerd/pull/4803)
-* **Add release builds for ARM64** [#5329](https://github.com/containerd/containerd/pull/5329)
 
 #### Snapshots
 * **Add configurable overlayfs path** [#4505](https://github.com/containerd/containerd/pull/4505)
