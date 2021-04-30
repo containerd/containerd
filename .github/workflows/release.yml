@@ -56,13 +56,7 @@ jobs:
 
     strategy:
       matrix:
-        include:
-        - os: ubuntu-18.04
-          arch: amd64
-        - os: ubuntu-18.04
-          arch: arm64
-        - os: windows-2019
-          arch: amd64
+        os: [ubuntu-18.04, windows-2019]
 
     steps:
       - name: Install Go
@@ -74,7 +68,6 @@ jobs:
         shell: bash
         env:
           MOS: ${{ matrix.os }}
-          MARCH: ${{ matrix.arch }}
         run: |
           releasever=${{ github.ref }}
           releasever="${releasever#refs/tags/}"
@@ -84,43 +77,8 @@ jobs:
           }
           echo "RELEASE_VER=${releasever}" >> $GITHUB_ENV
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
-          echo "GOOS=${os}" >> $GITHUB_ENV
-          echo "GOARCH=${{ matrix.arch }}" >> $GITHUB_ENV
-          [[ "${MARCH}" == "arm64" ]] && {
-            echo "CGO_ENABLED=1" >> $GITHUB_ENV
-            echo "CC=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-            echo "SECCOMP_ARCH=aarch64" >> $GITHUB_ENV
-          }
+          echo "OS=${os}" >> $GITHUB_ENV
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
-
-      - name: Install dependencies
-        if: ${{ runner.os == 'Linux' }}
-        shell: bash
-        run: |
-          if [[ "${GOARCH}" != "amd64" ]]; then
-            sudo add-apt-repository "deb [arch=arm64,s390x,ppc64el] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -sc) main" || true
-            sudo add-apt-repository "deb [arch=arm64,s390x,ppc64el] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -sc)-updates main" || true
-
-            sudo dpkg --add-architecture arm64
-            sudo dpkg --add-architecture s390x
-            sudo dpkg --add-architecture ppc64el
-
-            sudo apt-get update || true
-
-            sudo apt-get install -y \
-              crossbuild-essential-arm64 \
-              crossbuild-essential-s390x \
-              crossbuild-essential-ppc64el \
-              libseccomp-dev:amd64 \
-              libseccomp-dev:arm64 \
-              libseccomp-dev:s390x \
-              libseccomp-dev:ppc64el
-              # libbtrfs-dev is not available for Ubuntu 18.04
-              # libbtrfs-dev:amd64 \
-              # libbtrfs-dev:arm64 \
-              # libbtrfs-dev:s390x \
-              # libbtrfs-dev:ppc64el
-          fi
 
       - name: Checkout containerd
         uses: actions/checkout@v2
@@ -150,14 +108,14 @@ jobs:
           make build
           make binaries
           rm bin/containerd-stress*
-          [[ "${GOOS}" == "windows" ]] && {
+          [[ "${OS}" == "windows" ]] && {
               (
                 bindir="$(pwd)/bin"
                 cd ../../Microsoft/hcsshim
                 GO111MODULE=on go build -mod=vendor -o "${bindir}/containerd-shim-runhcs-v1.exe" ./cmd/containerd-shim-runhcs-v1
               )
           }
-          TARFILE="containerd-${RELEASE_VER#v}-${GOOS}-${GOARCH}.tar.gz"
+          TARFILE="containerd-${RELEASE_VER#v}-${OS}-amd64.tar.gz"
           tar czf ${TARFILE} bin/
           sha256sum ${TARFILE} >${TARFILE}.sha256sum
         working-directory: src/github.com/containerd/containerd
@@ -165,7 +123,7 @@ jobs:
       - name: Save build binaries
         uses: actions/upload-artifact@v2
         with:
-          name: containerd-binaries-${{ matrix.os }}-${{ matrix.arch }}
+          name: containerd-binaries-${{ matrix.os }}
           path: src/github.com/containerd/containerd/*.tar.gz*
 
       - name: Make cri-containerd tar
@@ -173,8 +131,8 @@ jobs:
         env:
           RUNC_FLAVOR: runc
         run: |
-          if [[ "${GOOS}" == "linux" ]]; then
-            sudo -E PATH=$PATH -E SECCOMP_ARCH="${SECCOMP_ARCH}" script/setup/install-seccomp
+          if [[ "${OS}" == "linux" ]]; then
+            sudo -E PATH=$PATH script/setup/install-seccomp
           fi
           make cri-cni-release
         working-directory: src/github.com/containerd/containerd
@@ -182,7 +140,7 @@ jobs:
       - name: Save cri-containerd binaries
         uses: actions/upload-artifact@v2
         with:
-          name: cri-containerd-binaries-${{ matrix.os }}-${{ matrix.arch }}
+          name: cri-containerd-binaries-${{ matrix.os }}
           path: src/github.com/containerd/containerd/releases/cri-containerd-cni-*.tar.gz*
 
   release:
@@ -200,7 +158,7 @@ jobs:
         id: catalog
         run: |
           _filenum=1
-          for i in "ubuntu-18.04-amd64" "ubuntu-18.04-arm64" "windows-2019-amd64"; do
+          for i in "ubuntu-18.04" "windows-2019"; do
             for f in `ls builds/containerd-binaries-${i}`; do
               echo "::set-output name=file${_filenum}::${f}"
               let "_filenum+=1"
@@ -221,111 +179,75 @@ jobs:
           body_path: ./builds/containerd-release-notes/release-notes.md
           draft: false
           prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
-      - name: Upload Linux AMD64 containerd tarball
+      - name: Upload Linux containerd tarball
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/containerd-binaries-ubuntu-18.04-amd64/${{ steps.catalog.outputs.file1 }}
+          asset_path: ./builds/containerd-binaries-ubuntu-18.04/${{ steps.catalog.outputs.file1 }}
           asset_name: ${{ steps.catalog.outputs.file1 }}
           asset_content_type: application/gzip
-      - name: Upload Linux AMD64 sha256 sum
+      - name: Upload Linux sha256 sum
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/containerd-binaries-ubuntu-18.04-amd64/${{ steps.catalog.outputs.file2 }}
+          asset_path: ./builds/containerd-binaries-ubuntu-18.04/${{ steps.catalog.outputs.file2 }}
           asset_name: ${{ steps.catalog.outputs.file2 }}
           asset_content_type: text/plain
-      - name: Upload Linux AMD64 cri containerd tarball
+      - name: Upload Linux cri containerd tarball
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/cri-containerd-binaries-ubuntu-18.04-amd64/${{ steps.catalog.outputs.file3 }}
+          asset_path: ./builds/cri-containerd-binaries-ubuntu-18.04/${{ steps.catalog.outputs.file3 }}
           asset_name: ${{ steps.catalog.outputs.file3 }}
           asset_content_type: application/gzip
-      - name: Upload Linux AMD64 cri sha256 sum
+      - name: Upload Linux cri sha256 sum
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/cri-containerd-binaries-ubuntu-18.04-amd64/${{ steps.catalog.outputs.file4 }}
+          asset_path: ./builds/cri-containerd-binaries-ubuntu-18.04/${{ steps.catalog.outputs.file4 }}
           asset_name: ${{ steps.catalog.outputs.file4 }}
           asset_content_type: text/plain
-      - name: Upload Linux ARM64 containerd tarball
+      - name: Upload Windows containerd tarball
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/containerd-binaries-ubuntu-18.04-arm64/${{ steps.catalog.outputs.file5 }}
+          asset_path: ./builds/containerd-binaries-windows-2019/${{ steps.catalog.outputs.file5 }}
           asset_name: ${{ steps.catalog.outputs.file5 }}
           asset_content_type: application/gzip
-      - name: Upload Linux ARM64 sha256 sum
+      - name: Upload Windows sha256 sum
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/containerd-binaries-ubuntu-18.04-arm64/${{ steps.catalog.outputs.file6 }}
+          asset_path: ./builds/containerd-binaries-windows-2019/${{ steps.catalog.outputs.file6 }}
           asset_name: ${{ steps.catalog.outputs.file6 }}
           asset_content_type: text/plain
-      - name: Upload Linux ARM64 cri containerd tarball
+      - name: Upload Windows cri containerd tarball
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/cri-containerd-binaries-ubuntu-18.04-arm64/${{ steps.catalog.outputs.file7 }}
+          asset_path: ./builds/cri-containerd-binaries-windows-2019/${{ steps.catalog.outputs.file7 }}
           asset_name: ${{ steps.catalog.outputs.file7 }}
           asset_content_type: application/gzip
-      - name: Upload Linux ARM64 cri sha256 sum
+      - name: Upload Windows cri sha256 sum
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/cri-containerd-binaries-ubuntu-18.04-arm64/${{ steps.catalog.outputs.file8 }}
+          asset_path: ./builds/cri-containerd-binaries-windows-2019/${{ steps.catalog.outputs.file8 }}
           asset_name: ${{ steps.catalog.outputs.file8 }}
-          asset_content_type: text/plain
-      - name: Upload Windows AMD64 containerd tarball
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/containerd-binaries-windows-2019-amd64/${{ steps.catalog.outputs.file9 }}
-          asset_name: ${{ steps.catalog.outputs.file9 }}
-          asset_content_type: application/gzip
-      - name: Upload Windows AMD64 sha256 sum
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/containerd-binaries-windows-2019-amd64/${{ steps.catalog.outputs.file10 }}
-          asset_name: ${{ steps.catalog.outputs.file10 }}
-          asset_content_type: text/plain
-      - name: Upload Windows AMD64 cri containerd tarball
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/cri-containerd-binaries-windows-2019-amd64/${{ steps.catalog.outputs.file11 }}
-          asset_name: ${{ steps.catalog.outputs.file11 }}
-          asset_content_type: application/gzip
-      - name: Upload Windows AMD64 cri sha256 sum
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/cri-containerd-binaries-windows-2019-amd64/${{ steps.catalog.outputs.file12 }}
-          asset_name: ${{ steps.catalog.outputs.file12 }}
           asset_content_type: text/plain
