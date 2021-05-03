@@ -132,6 +132,8 @@ jobs:
           RUNC_FLAVOR: runc
         run: |
           if [[ "${OS}" == "linux" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y gperf
             sudo -E PATH=$PATH script/setup/install-seccomp
           fi
           make cri-cni-release
