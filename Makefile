@@ -342,8 +342,8 @@ clean-test: ## clean up debris from previously failed tests
 
 install: ## install binaries
 	@echo "$(WHALE) $@ $(BINARIES)"
-	@mkdir -p $(DESTDIR)/bin
-	@install $(BINARIES) $(DESTDIR)/bin
+	@mkdir -p $(DESTDIR)/usr/bin
+	@install $(BINARIES) $(DESTDIR)/usr/bin
 
 uninstall:
 	@echo "$(WHALE) $@"
