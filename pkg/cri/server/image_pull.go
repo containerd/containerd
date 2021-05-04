@@ -375,21 +375,25 @@ func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig
 				}
 			}
 
+			// Make a copy of `auth`, so that different authorizers would not reference
+			// the same auth variable.
+			auth := auth
 			if auth == nil && config.Auth != nil {
 				auth = toRuntimeAuthConfig(*config.Auth)
 			}
+			authorizer := docker.NewDockerAuthorizer(
+				docker.WithAuthClient(client),
+				docker.WithAuthCreds(func(host string) (string, string, error) {
+					return ParseAuth(auth, host)
+				}))
 
 			if u.Path == "" {
 				u.Path = "/v2"
 			}
 
 			registries = append(registries, docker.RegistryHost{
-				Client: client,
-				Authorizer: docker.NewDockerAuthorizer(
-					docker.WithAuthClient(client),
-					docker.WithAuthCreds(func(host string) (string, string, error) {
-						return ParseAuth(auth, host)
-					})),
+				Client:       client,
+				Authorizer:   authorizer,
 				Host:         u.Host,
 				Scheme:       u.Scheme,
 				Path:         u.Path,
