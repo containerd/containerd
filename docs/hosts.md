@@ -2,21 +2,21 @@
 # Registry Configuration - Introduction
 
 Configuring registries will be done by specifying (optionally) a `hosts.toml` file for
-each desired registry host in a configuration directory. **Updates under this directory
-do not require restarting the containerd daemon.**
+each desired registry host in a configuration directory. **Note**: Updates under this directory
+do not require restarting the containerd daemon.
 
 ## Specifying the Configuration Directory
 
-## Using Host Namespace Configs with CTR
+### Using Host Namespace Configs with CTR
 
 When pulling via `ctr` use the `--hosts-dir` option:
 ```
 ctr images pull --hosts-dir "/etc/containerd/certs.d"
 ```
 
-## CRI
+### CRI
 _The old CRI config pattern for specifying registry.mirrors and registry.configs has
-been **DEPRECATED**._ You should now point your registry `config_path` to path where your
+been **DEPRECATED**._ You should now point your registry `config_path` to the path where your
 `hosts.toml` files are located.
 
 Modify your `config.toml` (default location: `/etc/containerd/config.toml`) as follows:
@@ -42,7 +42,7 @@ host names. For example, docker.io, quay.io, gcr.io, and ghcr.io.
 
 A registry host namespace is, for the purpose of containerd registry configuration, a
 path to the `hosts.toml` file specified by the registry host name, or ip address, and an
-optional port identifier. When makeing a pull request for an image the format is
+optional port identifier. When making a pull request for an image the format is
 typically as follows:
 ```
 pull [registry_host_name|IP address][:port][/v2][/org_path]<image_name>[:tag|@DIGEST]
@@ -68,6 +68,45 @@ port 5000:
 pull myregistry.io:5000/image_name:tag
 ```
 The pull will resolve to `https://myregistry.io:5000/v2/image_name:tag`
+
+## Specifying Registry Credentials
+
+### CTR
+
+When performing image operations via `ctr` use the --help option to get a list of options you can set for specifying credentials:
+```
+ctr i pull --help
+...
+OPTIONS:
+   --skip-verify, -k                 skip SSL certificate validation
+   --plain-http                      allow connections using plain HTTP
+   --user value, -u value            user[:password] Registry user and password
+   --refresh value                   refresh token for authorization server
+   --hosts-dir value                 Custom hosts configuration directory
+   --tlscacert value                 path to TLS root CA
+   --tlscert value                   path to TLS client certificate
+   --tlskey value                    path to TLS client key
+   --http-dump                       dump all HTTP request/responses when interacting with container registry
+   --http-trace                      enable HTTP tracing for registry interactions
+   --snapshotter value               snapshotter name. Empty value stands for the default value. [$CONTAINERD_SNAPSHOTTER]
+   --label value                     labels to attach to the image
+   --platform value                  Pull content from a specific platform
+   --all-platforms                   pull content and metadata from all platforms
+   --all-metadata                    Pull metadata for all platforms
+   --print-chainid                   Print the resulting image's chain ID
+   --max-concurrent-downloads value  Set the max concurrent downloads for each pull (default: 0)
+```
+
+## CRI
+
+Although we have deprecated the old CRI config pattern for specifying registry.mirrors
+and registry.configs you can still specify your credentials via
+[CRI config](https://github.com/containerd/containerd/blob/master/docs/cri/registry.md#configure-registry-credentials).
+
+Additionally, the containerd CRI plugin implements/supports the authentication parameters passed in through CRI pull image service requests.
+For example, when containerd is the container runtime implementation for `Kubernetes`, the containerd CRI plugin receives
+authentication credentials from kubelet as retrieved from
+[Kubernetes Image Pull Secrets](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/)
 
 # Registry Configuration - Examples
 
@@ -123,7 +162,7 @@ For each registry host namespace directory in your registry `config_path` you ma
 include a `hosts.toml` configuration file. The following root level toml fields
 apply to the registry host namespace:
 
-*** Note: All paths specified in the `hosts.toml` file may be absolute or relative
+**Note**: All paths specified in the `hosts.toml` file may be absolute or relative
 to the `hosts.toml` file.
 
 ## server field
@@ -179,17 +218,17 @@ ca = ["/etc/certs/test-1-ca.pem", "/etc/certs/special.pem"]
 
 `client` certificates are configured as follows
 
-`a path`:
+a path:
 ```
 client = "/etc/certs/client.pem"
 ```
 
-`an array of paths`:
+an array of paths:
 ```
 client = ["/etc/certs/client-1.pem", "/etc/certs/client-2.pem"]
 ```
 
-`an array of pairs of paths`:
+an array of pairs of paths:
 ```
 client = [["/etc/certs/client.cert", "/etc/certs/client.key"],["/etc/certs/client.pem", ""]]
 ```
@@ -206,19 +245,19 @@ skip_verify = false
 
 `[header]` contains some number of keys where each key is to one of a string or
 
-`an array of strings as follows`:
+an array of strings as follows:
 ```
 [header]
   x-custom-1 = "custom header"
 ```
 
-`or`
+or
 ```
 [header]
   x-custom-1 = ["custom header part a","part b"]
 ```
 
-`or`
+or
 ```
 [header]
   x-custom-1 = "custom header",
@@ -263,8 +302,8 @@ for this registry host namespace:
   client = ["/etc/certs/client-1.pem", "/etc/certs/client-2.pem"]
 ```
 
-**Further, recursion is not supported in the specification of host mirror
-namespaces in the hosts.toml file. Thus the following is not allowed/supported:**
+**Note**: Recursion is not supported in the specification of host mirror
+namespaces in the hosts.toml file. Thus the following is not allowed/supported:
 ```
 [host."http://mirror.registry"]
   capabilities = ["pull"]
