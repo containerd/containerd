@@ -359,6 +359,7 @@ jobs:
         env:
           RUNC_FLAVOR: ${{ matrix.runc }}
         run: |
+          sudo apt-get install -y gperf
           sudo -E PATH=$PATH script/setup/install-seccomp
           sudo -E PATH=$PATH script/setup/install-runc
           sudo -E PATH=$PATH script/setup/install-cni
