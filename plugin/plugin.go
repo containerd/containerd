@@ -177,6 +177,25 @@ func checkUnique(r *Registration) error {
 	return nil
 }
 
+// AreRegisteredPluginsInitialized returns all registered plugins are initialized
+func AreRegisteredPluginsInitialized(plugins *Set) bool {
+	if len(register.r) != len(plugins.ordered) {
+		return false
+	}
+	for _, reg := range register.r {
+		byID, typeok := plugins.byTypeAndID[reg.Type]
+		if !typeok {
+			return false
+		}
+
+		if _, ok := byID[reg.ID]; !ok {
+			return false
+		}
+	}
+
+	return true
+}
+
 // DisableFilter filters out disabled plugins
 type DisableFilter func(r *Registration) bool
 

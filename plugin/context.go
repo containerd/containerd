@@ -132,9 +132,19 @@ func (ps *Set) Get(t Type) (interface{}, error) {
 	return nil, fmt.Errorf("no plugins registered for %s: %w", t, errdefs.ErrNotFound)
 }
 
+// GetAll returns all initialized plugins
+func (ps *Set) GetAll() []*Plugin {
+	return ps.ordered
+}
+
+// Plugins returns plugin set
+func (i *InitContext) Plugins() *Set {
+	return i.plugins
+}
+
 // GetAll plugins in the set
 func (i *InitContext) GetAll() []*Plugin {
-	return i.plugins.ordered
+	return i.plugins.GetAll()
 }
 
 // GetByID returns the plugin of the given type and ID
