@@ -77,8 +77,11 @@ containerd offers a full client package to help you integrate containerd into yo
 ```go
 
 import (
+  "context"
+
   "github.com/containerd/containerd"
   "github.com/containerd/containerd/cio"
+  "github.com/containerd/containerd/namespaces"
 )
 
 
