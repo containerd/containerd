@@ -15,6 +15,7 @@
 
 # Go command to use for build
 GO ?= go
+INSTALL ?= install
 
 # Root directory of the project (absolute path).
 ROOTDIR=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -249,7 +250,7 @@ man/%: docs/man/%.md FORCE
 	go-md2man -in "$<" -out "$@"
 
 define installmanpage
-mkdir -p $(DESTDIR)/man/man$(2);
+$(INSTALL) -d $(DESTDIR)/man/man$(2);
 gzip -c $(1) >$(DESTDIR)/man/man$(2)/$(3).gz;
 endef
 
@@ -260,8 +261,8 @@ install-man:
 releases/$(RELEASE).tar.gz: $(BINARIES)
 	@echo "$(WHALE) $@"
 	@rm -rf releases/$(RELEASE) releases/$(RELEASE).tar.gz
-	@install -d releases/$(RELEASE)/bin
-	@install $(BINARIES) releases/$(RELEASE)/bin
+	@$(INSTALL) -d releases/$(RELEASE)/bin
+	@$(INSTALL) $(BINARIES) releases/$(RELEASE)/bin
 	@tar -czf releases/$(RELEASE).tar.gz -C releases/$(RELEASE) bin
 	@rm -rf releases/$(RELEASE)
 
@@ -272,18 +273,18 @@ release: releases/$(RELEASE).tar.gz
 # install of cri deps into release output directory
 ifeq ($(GOOS),windows)
 install-cri-deps: $(BINARIES)
-	mkdir -p $(CRIDIR)
+	$(INSTALL) -d $(CRIDIR)
 	DESTDIR=$(CRIDIR) script/setup/install-cni-windows
 	cp bin/* $(CRIDIR)
 else
 install-cri-deps: $(BINARIES)
 	@rm -rf ${CRIDIR}
-	@install -d ${CRIDIR}/usr/local/bin
-	@install -D -m 755 bin/* ${CRIDIR}/usr/local/bin
-	@install -d ${CRIDIR}/opt/containerd/cluster
+	@$(INSTALL) -d ${CRIDIR}/usr/local/bin
+	@$(INSTALL) -D -m 755 bin/* ${CRIDIR}/usr/local/bin
+	@$(INSTALL) -d ${CRIDIR}/opt/containerd/cluster
 	@cp -r contrib/gce ${CRIDIR}/opt/containerd/cluster/
-	@install -d ${CRIDIR}/etc/systemd/system
-	@install -m 644 containerd.service ${CRIDIR}/etc/systemd/system
+	@$(INSTALL) -d ${CRIDIR}/etc/systemd/system
+	@$(INSTALL) -m 644 containerd.service ${CRIDIR}/etc/systemd/system
 	echo "CONTAINERD_VERSION: '$(VERSION:v%=%)'" | tee ${CRIDIR}/opt/containerd/cluster/version
 
 	DESTDIR=$(CRIDIR) script/setup/install-runc
@@ -291,8 +292,8 @@ install-cri-deps: $(BINARIES)
 	DESTDIR=$(CRIDIR) script/setup/install-critools
 	DESTDIR=$(CRIDIR) script/setup/install-imgcrypt
 
-	@install -d $(CRIDIR)/bin
-	@install $(BINARIES) $(CRIDIR)/bin
+	@$(INSTALL) -d $(CRIDIR)/bin
+	@$(INSTALL) $(BINARIES) $(CRIDIR)/bin
 endif
 
 ifeq ($(GOOS),windows)
@@ -345,8 +346,8 @@ clean-test: ## clean up debris from previously failed tests
 
 install: ## install binaries
 	@echo "$(WHALE) $@ $(BINARIES)"
-	@mkdir -p $(DESTDIR)/bin
-	@install $(BINARIES) $(DESTDIR)/bin
+	@$(INSTALL) -d $(DESTDIR)/bin
+	@$(INSTALL) $(BINARIES) $(DESTDIR)/bin
 
 uninstall:
 	@echo "$(WHALE) $@"
