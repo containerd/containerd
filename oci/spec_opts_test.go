@@ -552,55 +552,102 @@ func TestWithImageConfigArgs(t *testing.T) {
 
 func TestDevShmSize(t *testing.T) {
 	t.Parallel()
-	var (
-		s   Spec
-		c   = containers.Container{ID: t.Name()}
-		ctx = namespaces.WithNamespace(context.Background(), "test")
-	)
 
-	err := populateDefaultUnixSpec(ctx, &s, c.ID)
-	if err != nil {
-		t.Fatal(err)
+	ss := []Spec{
+		{
+			Mounts: []specs.Mount{
+				{
+					Destination: "/dev/shm",
+					Type:        "tmpfs",
+					Source:      "shm",
+					Options:     []string{"nosuid", "noexec", "nodev", "mode=1777"},
+				},
+			},
+		},
+		{
+			Mounts: []specs.Mount{
+				{
+					Destination: "/test/shm",
+					Type:        "tmpfs",
+					Source:      "shm",
+					Options:     []string{"nosuid", "noexec", "nodev", "mode=1777", "size=65536k"},
+				},
+			},
+		},
+		{
+			Mounts: []specs.Mount{
+				{
+					Destination: "/test/shm",
+					Type:        "tmpfs",
+					Source:      "shm",
+					Options:     []string{"nosuid", "noexec", "nodev", "mode=1777", "size=65536k"},
+				},
+				{
+					Destination: "/dev/shm",
+					Type:        "tmpfs",
+					Source:      "shm",
+					Options:     []string{"nosuid", "noexec", "nodev", "mode=1777", "size=65536k", "size=131072k"},
+				},
+			},
+		},
 	}
 
 	expected := "1024k"
-	if err := WithDevShmSize(1024)(nil, nil, nil, &s); err != nil {
-		t.Fatal(err)
-	}
-	m := getShmMount(&s)
-	if m == nil {
-		t.Fatal("no shm mount found")
-	}
-	o := getShmSize(m.Options)
-	if o == "" {
-		t.Fatal("shm size not specified")
-	}
-	parts := strings.Split(o, "=")
-	if len(parts) != 2 {
-		t.Fatal("invalid size format")
-	}
-	size := parts[1]
-	if size != expected {
-		t.Fatalf("size %s not equal %s", size, expected)
+	for _, s := range ss {
+		if err := WithDevShmSize(1024)(nil, nil, nil, &s); err != nil {
+			if err != ErrNoShmMount {
+				t.Fatal(err)
+			}
+
+			if getDevShmMount(&s) == nil {
+				continue
+			}
+			t.Fatal("excepted nil /dev/shm mount")
+		}
+
+		m := getDevShmMount(&s)
+		if m == nil {
+			t.Fatal("no shm mount found")
+		}
+		size, err := getShmSize(m.Options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if size != expected {
+			t.Fatalf("size %s not equal %s", size, expected)
+		}
 	}
 }
 
-func getShmMount(s *Spec) *specs.Mount {
+func getDevShmMount(s *Spec) *specs.Mount {
 	for _, m := range s.Mounts {
-		if m.Source == "shm" && m.Type == "tmpfs" {
+		if filepath.Clean(m.Destination) == "/dev/shm" && m.Source == "shm" && m.Type == "tmpfs" {
 			return &m
 		}
 	}
 	return nil
 }
 
-func getShmSize(opts []string) string {
+func getShmSize(opts []string) (string, error) {
+	// linux will use the last size option
+	var so string
 	for _, o := range opts {
 		if strings.HasPrefix(o, "size=") {
-			return o
+			if so != "" {
+				return "", errors.New("contains multiple size options")
+			}
+			so = o
 		}
 	}
-	return ""
+	if so == "" {
+		return "", errors.New("shm size not specified")
+	}
+
+	parts := strings.Split(so, "=")
+	if len(parts) != 2 {
+		return "", errors.New("invalid size format")
+	}
+	return parts[1], nil
 }
 
 func TestWithoutMounts(t *testing.T) {
