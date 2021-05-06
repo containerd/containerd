@@ -24,6 +24,8 @@ ROOTDIR=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # The files will be installed under `$(DESTDIR)/$(PREFIX)`.
 # The convention of `DESTDIR` was changed in containerd v1.6.
 PREFIX        ?= /usr/local
+DATADIR       ?= $(PREFIX)/share
+MANDIR        ?= $(DATADIR)/man
 
 TEST_IMAGE_LIST ?=
 
@@ -253,8 +255,8 @@ man/%: docs/man/%.md FORCE
 	go-md2man -in "$<" -out "$@"
 
 define installmanpage
-$(INSTALL) -d $(DESTDIR)/$(PREFIX)/man/man$(2);
-gzip -c $(1) >$(DESTDIR)/$(PREFIX)/man/man$(2)/$(3).gz;
+$(INSTALL) -d $(DESTDIR)/$(MANDIR)/man$(2);
+gzip -c $(1) >$(DESTDIR)/$(MANDIR)/man$(2)/$(3).gz;
 endef
 
 install-man: man
