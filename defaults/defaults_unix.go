@@ -18,7 +18,7 @@
 
 package defaults
 
-const (
+var (
 	// DefaultRootDir is the default location used by containerd to store
 	// persistent data
 	DefaultRootDir = "/var/lib/containerd"

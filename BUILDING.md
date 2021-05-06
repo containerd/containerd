@@ -87,7 +87,9 @@ sudo make install
 ```
 
 The install prefix can be changed by passing the `PREFIX` variable (defaults
-to `/usr/local`).
+to `/usr/local`). The local state dir can be changed via `LOCALSTATEDIR` (defaults
+to `/var`). The run state dir can be changed via `RUNSTATEDIR` (defaults to `/var`).
+All installation pathes are derived from these variables.
 
 Note: if you set one of these vars, set them to the same values on all make stages
 (build as well as install).
