@@ -21,7 +21,10 @@ INSTALL ?= install
 ROOTDIR=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # Base path used to install.
-DESTDIR ?= /usr/local
+# The files will be installed under `$(DESTDIR)/$(PREFIX)`.
+# The convention of `DESTDIR` was changed in containerd v1.6.
+PREFIX        ?= /usr/local
+
 TEST_IMAGE_LIST ?=
 
 # Used to populate variables in version package.
@@ -250,8 +253,8 @@ man/%: docs/man/%.md FORCE
 	go-md2man -in "$<" -out "$@"
 
 define installmanpage
-$(INSTALL) -d $(DESTDIR)/man/man$(2);
-gzip -c $(1) >$(DESTDIR)/man/man$(2)/$(3).gz;
+$(INSTALL) -d $(DESTDIR)/$(PREFIX)/man/man$(2);
+gzip -c $(1) >$(DESTDIR)/$(PREFIX)/man/man$(2)/$(3).gz;
 endef
 
 install-man: man
@@ -346,12 +349,12 @@ clean-test: ## clean up debris from previously failed tests
 
 install: ## install binaries
 	@echo "$(WHALE) $@ $(BINARIES)"
-	@$(INSTALL) -d $(DESTDIR)/bin
-	@$(INSTALL) $(BINARIES) $(DESTDIR)/bin
+	@$(INSTALL) -d $(DESTDIR)/$(PREFIX)/bin
+	@$(INSTALL) $(BINARIES) $(DESTDIR)/$(PREFIX)/bin
 
 uninstall:
 	@echo "$(WHALE) $@"
-	@rm -f $(addprefix $(DESTDIR)/bin/,$(notdir $(BINARIES)))
+	@rm -f $(addprefix $(DESTDIR)/$(PREFIX)/bin/,$(notdir $(BINARIES)))
 
 ifeq ($(GOOS),windows)
 install-deps:
