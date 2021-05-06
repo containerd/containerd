@@ -24,6 +24,7 @@ ROOTDIR=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # The files will be installed under `$(DESTDIR)/$(PREFIX)`.
 # The convention of `DESTDIR` was changed in containerd v1.6.
 PREFIX        ?= /usr/local
+BINDIR        ?= $(PREFIX)/bin
 DATADIR       ?= $(PREFIX)/share
 DOCDIR        ?= $(DATADIR)/doc
 MANDIR        ?= $(DATADIR)/man
@@ -413,12 +414,12 @@ clean-test: ## clean up debris from previously failed tests
 
 install: ## install binaries
 	@echo "$(WHALE) $@ $(BINARIES)"
-	@$(INSTALL) -d $(DESTDIR)$(PREFIX)/bin
-	@$(INSTALL) $(BINARIES) $(DESTDIR)$(PREFIX)/bin
+	@$(INSTALL) -d $(DESTDIR)$(BINDIR)
+	@$(INSTALL) $(BINARIES) $(DESTDIR)$(BINDIR)
 
 uninstall:
 	@echo "$(WHALE) $@"
-	@rm -f $(addprefix $(DESTDIR)$(PREFIX)/bin/,$(notdir $(BINARIES)))
+	@rm -f $(addprefix $(DESTDIR)$(BINDIR)/,$(notdir $(BINARIES)))
 
 ifeq ($(GOOS),windows)
 install-deps:
