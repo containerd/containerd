@@ -32,9 +32,9 @@ git clone https://github.com/kubernetes-sigs/cri-tools.git "${TMPROOT}"/cri-tool
 pushd "${TMPROOT}"/cri-tools
 git checkout "$CRITEST_COMMIT"
 make
-make install -e BINDIR=${DESTDIR:=''}/usr/local/bin
+make install -e DESTDIR=${DESTDIR:=''} BINDIR=/usr/local/bin
 
-cat << EOF | tee ${DESTDIR}/etc/crictl.yaml
+cat << EOF | tee ${DESTDIR:=''}/etc/crictl.yaml
 runtime-endpoint: unix:///run/containerd/containerd.sock
 EOF
 
