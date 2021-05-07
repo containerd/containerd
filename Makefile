@@ -25,7 +25,21 @@ ROOTDIR=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # The convention of `DESTDIR` was changed in containerd v1.6.
 PREFIX        ?= /usr/local
 
+SYSCONFDIR    ?= /etc
+LOCALSTATEDIR ?= /var
+RUNSTATEDIR   ?= /run
+
 TEST_IMAGE_LIST ?=
+
+# buid-time customization of unix default settings (defaults_unix.go)
+# the variable names have been chosen according to the const names in the go code
+CONFIG_DEFAULT_ROOT_DIR         ?= $(LOCALSTATEDIR)/lib/containerd
+CONFIG_DEFAULT_STATE_DIR        ?= $(RUNSTATEDIR)/containerd
+CONFIG_DEFAULT_ADDRESS          ?= $(CONFIG_DEFAULT_STATE_DIR)/containerd.sock
+CONFIG_DEFAULT_DEBUG_ADDRESS    ?= $(CONFIG_DEFAULT_STATE_DIR)/debug.sock
+CONFIG_DEFAULT_FIFO_DIR         ?= $(CONFIG_DEFAULT_STATE_DIR)/fifo
+CONFIG_DEFAULT_RUNTIME          ?= io.containerd.runc.v2
+CONFIG_DEFAULT_CONFIG_DIR       ?= $(SYSCONFDIR)/containerd
 
 # Used to populate variables in version package.
 VERSION=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
@@ -134,7 +148,7 @@ GOTEST ?= $(GO) test
 OUTPUTDIR = $(join $(ROOTDIR), _output)
 CRIDIR=$(OUTPUTDIR)/cri
 
-.PHONY: clean all AUTHORS build binaries test integration generate protos checkprotos coverage ci check help install uninstall vendor release mandir install-man genman install-cri-deps cri-release cri-cni-release cri-integration install-deps bin/cri-integration.test
+.PHONY: clean all AUTHORS build binaries test integration generate protos checkprotos coverage ci check help install uninstall vendor release mandir install-man genman install-cri-deps cri-release cri-cni-release cri-integration install-deps bin/cri-integration.test autogen
 .DEFAULT: default
 
 all: binaries
@@ -175,7 +189,20 @@ proto-fmt: ## check format of proto files
 	@test -z "$$(find . -path ./vendor -prune -o -name '*.proto' -type f -exec grep -Hn "Meta meta = " {} \; | grep -v '(gogoproto.nullable) = false' | tee /dev/stderr)" || \
 		(echo "$(ONI) meta fields in proto files must have option (gogoproto.nullable) = false" && false)
 
-build: ## build the go packages
+defaults/defaults_unix.go: defaults/defaults_unix.go.in Makefile
+	cat $< \
+	    | sed 's~@CONFIG_DEFAULT_ROOT_DIR@~$(CONFIG_DEFAULT_ROOT_DIR)~' \
+	    | sed 's~@CONFIG_DEFAULT_STATE_DIR@~$(CONFIG_DEFAULT_STATE_DIR)~' \
+	    | sed 's~@CONFIG_DEFAULT_ADDRESS@~$(CONFIG_DEFAULT_ADDRESS)~' \
+	    | sed 's~@CONFIG_DEFAULT_DEBUG_ADDRESS@~$(CONFIG_DEFAULT_DEBUG_ADDRESS)~' \
+	    | sed 's~@CONFIG_DEFAULT_FIFO_DIR@~$(CONFIG_DEFAULT_FIFO_DIR)~' \
+	    | sed 's~@CONFIG_DEFAULT_RUNTIME@~$(CONFIG_DEFAULT_RUNTIME)~' \
+	    | sed 's~@CONFIG_DEFAULT_CONFIG_DIR@~$(CONFIG_DEFAULT_CONFIG_DIR)~' \
+	    > $@
+
+autogen: defaults/defaults_unix.go
+
+build: autogen ## build the go packages
 	@echo "$(WHALE) $@"
 	@$(GO) build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} ${EXTRA_FLAGS} ${GO_LDFLAGS} ${PACKAGES}
 
@@ -228,7 +255,7 @@ bin/containerd-shim-runc-v2: cmd/containerd-shim-runc-v2 FORCE # set !cgo and om
 	@echo "$(WHALE) $@"
 	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./cmd/containerd-shim-runc-v2
 
-binaries: $(BINARIES) ## build binaries
+binaries: autogen $(BINARIES) ## build binaries
 	@echo "$(WHALE) $@"
 
 man: mandir $(addprefix man/,$(MANPAGES))
@@ -331,6 +358,7 @@ clean: ## clean up binaries
 	@rm -f releases/*.tar.gz*
 	@rm -rf $(OUTPUTDIR)
 	@rm -rf bin/cri-integration.test
+	@rm -f defaults/defaults_unix.go
 
 clean-test: ## clean up debris from previously failed tests
 	@echo "$(WHALE) $@"
