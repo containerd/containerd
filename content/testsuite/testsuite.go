@@ -780,6 +780,7 @@ func checkSmallBlob(ctx context.Context, t *testing.T, store content.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ra.Close()
 	r := io.NewSectionReader(ra, 0, readSize)
 	b, err := ioutil.ReadAll(r)
 	if err != nil {
