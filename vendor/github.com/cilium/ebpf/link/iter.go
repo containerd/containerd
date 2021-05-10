@@ -27,53 +27,29 @@ func AttachIter(opts IterOptions) (*Iter, error) {
 		return nil, fmt.Errorf("can't link iterator: %w", err)
 	}
 
-	return &Iter{link}, err
+	return &Iter{*link}, err
 }
 
 // LoadPinnedIter loads a pinned iterator from a bpffs.
-func LoadPinnedIter(fileName string) (*Iter, error) {
-	link, err := LoadPinnedRawLink(fileName)
+func LoadPinnedIter(fileName string, opts *ebpf.LoadPinOptions) (*Iter, error) {
+	link, err := LoadPinnedRawLink(fileName, IterType, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Iter{link}, err
+	return &Iter{*link}, err
 }
 
 // Iter represents an attached bpf_iter.
 type Iter struct {
-	link *RawLink
-}
-
-var _ Link = (*Iter)(nil)
-
-func (it *Iter) isLink() {}
-
-// FD returns the underlying file descriptor.
-func (it *Iter) FD() int {
-	return it.link.FD()
-}
-
-// Close implements Link.
-func (it *Iter) Close() error {
-	return it.link.Close()
-}
-
-// Pin implements Link.
-func (it *Iter) Pin(fileName string) error {
-	return it.link.Pin(fileName)
-}
-
-// Update implements Link.
-func (it *Iter) Update(new *ebpf.Program) error {
-	return it.link.Update(new)
+	RawLink
 }
 
 // Open creates a new instance of the iterator.
 //
 // Reading from the returned reader triggers the BPF program.
 func (it *Iter) Open() (io.ReadCloser, error) {
-	linkFd, err := it.link.fd.Value()
+	linkFd, err := it.fd.Value()
 	if err != nil {
 		return nil, err
 	}

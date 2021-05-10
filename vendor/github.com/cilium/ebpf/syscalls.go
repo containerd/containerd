@@ -383,7 +383,7 @@ func wrapMapError(err error) error {
 		return ErrNotSupported
 	}
 
-	return errors.New(err.Error())
+	return err
 }
 
 func bpfMapFreeze(m *internal.FD) error {
