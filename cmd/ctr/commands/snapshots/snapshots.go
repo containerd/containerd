@@ -164,6 +164,7 @@ var diffCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		defer ra.Close()
 		_, err = io.Copy(os.Stdout, content.NewReader(ra))
 
 		return err

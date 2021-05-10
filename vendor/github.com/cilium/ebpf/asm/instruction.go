@@ -337,7 +337,7 @@ func (insns Instructions) ReferenceOffsets() map[string][]int {
 // You can control indentation of symbols by
 // specifying a width. Setting a precision controls the indentation of
 // instructions.
-// The default character is a tab, which can be overriden by specifying
+// The default character is a tab, which can be overridden by specifying
 // the ' ' space flag.
 func (insns Instructions) Format(f fmt.State, c rune) {
 	if c != 's' && c != 'v' {
@@ -382,8 +382,6 @@ func (insns Instructions) Format(f fmt.State, c rune) {
 		}
 		fmt.Fprintf(f, "%s%*d: %v\n", indent, offsetWidth, iter.Offset, iter.Ins)
 	}
-
-	return
 }
 
 // Marshal encodes a BPF program into the kernel format.

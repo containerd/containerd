@@ -55,16 +55,19 @@ type ProgramSpec struct {
 	// depends on Type and AttachType.
 	AttachTo     string
 	Instructions asm.Instructions
-
+	// Flags is passed to the kernel and specifies additional program
+	// load attributes.
+	Flags uint32
 	// License of the program. Some helpers are only available if
 	// the license is deemed compatible with the GPL.
 	//
 	// See https://www.kernel.org/doc/html/latest/process/license-rules.html#id1
 	License string
 
-	// Version used by tracing programs.
+	// Version used by Kprobe programs.
 	//
-	// Deprecated: superseded by BTF.
+	// Deprecated on kernels 5.0 and later. Leave empty to let the library
+	// detect this value automatically.
 	KernelVersion uint32
 
 	// The BTF associated with this program. Changing Instructions
@@ -141,6 +144,19 @@ func newProgramWithOptions(spec *ProgramSpec, opts ProgramOptions, btfs btfHandl
 		return nil, fmt.Errorf("can't load %s program on %s", spec.ByteOrder, internal.NativeEndian)
 	}
 
+	// Kernels before 5.0 (6c4fc209fcf9 "bpf: remove useless version check for prog load")
+	// require the version field to be set to the value of the KERNEL_VERSION
+	// macro for kprobe-type programs.
+	// Overwrite Kprobe program version if set to zero or the magic version constant.
+	kv := spec.KernelVersion
+	if spec.Type == Kprobe && (kv == 0 || kv == internal.MagicKernelVersion) {
+		v, err := internal.KernelVersion()
+		if err != nil {
+			return nil, fmt.Errorf("detecting kernel version: %w", err)
+		}
+		kv = v.Kernel()
+	}
+
 	insns := make(asm.Instructions, len(spec.Instructions))
 	copy(insns, spec.Instructions)
 
@@ -158,11 +174,12 @@ func newProgramWithOptions(spec *ProgramSpec, opts ProgramOptions, btfs btfHandl
 	insCount := uint32(len(bytecode) / asm.InstructionSize)
 	attr := &bpfProgLoadAttr{
 		progType:           spec.Type,
+		progFlags:          spec.Flags,
 		expectedAttachType: spec.AttachType,
 		insCount:           insCount,
 		instructions:       internal.NewSlicePointer(bytecode),
 		license:            internal.NewStringPointer(spec.License),
-		kernelVersion:      spec.KernelVersion,
+		kernelVersion:      kv,
 	}
 
 	if haveObjName() == nil {
@@ -345,9 +362,12 @@ func (p *Program) Clone() (*Program, error) {
 // Pin persists the Program on the BPF virtual file system past the lifetime of
 // the process that created it
 //
+// Calling Pin on a previously pinned program will overwrite the path, except when
+// the new path already exists. Re-pinning across filesystems is not supported.
+//
 // This requires bpffs to be mounted above fileName. See https://docs.cilium.io/en/k8s-doc/admin/#admin-mount-bpffs
 func (p *Program) Pin(fileName string) error {
-	if err := pin(p.pinnedPath, fileName, p.fd); err != nil {
+	if err := internal.Pin(p.pinnedPath, fileName, p.fd); err != nil {
 		return err
 	}
 	p.pinnedPath = fileName
@@ -360,7 +380,7 @@ func (p *Program) Pin(fileName string) error {
 //
 // Unpinning an unpinned Program returns nil.
 func (p *Program) Unpin() error {
-	if err := unpin(p.pinnedPath); err != nil {
+	if err := internal.Unpin(p.pinnedPath); err != nil {
 		return err
 	}
 	p.pinnedPath = ""
@@ -369,10 +389,7 @@ func (p *Program) Unpin() error {
 
 // IsPinned returns true if the Program has a non-empty pinned path.
 func (p *Program) IsPinned() bool {
-	if p.pinnedPath == "" {
-		return false
-	}
-	return true
+	return p.pinnedPath != ""
 }
 
 // Close unloads the program from the kernel.
@@ -597,8 +614,8 @@ func (p *Program) Detach(fd int, typ AttachType, flags AttachFlags) error {
 // LoadPinnedProgram loads a Program from a BPF file.
 //
 // Requires at least Linux 4.11.
-func LoadPinnedProgram(fileName string) (*Program, error) {
-	fd, err := internal.BPFObjGet(fileName)
+func LoadPinnedProgram(fileName string, opts *LoadPinOptions) (*Program, error) {
+	fd, err := internal.BPFObjGet(fileName, opts.Marshal())
 	if err != nil {
 		return nil, err
 	}
@@ -609,7 +626,7 @@ func LoadPinnedProgram(fileName string) (*Program, error) {
 		return nil, fmt.Errorf("info for %s: %w", fileName, err)
 	}
 
-	return &Program{"", fd, filepath.Base(fileName), "", info.Type}, nil
+	return &Program{"", fd, filepath.Base(fileName), fileName, info.Type}, nil
 }
 
 // SanitizeName replaces all invalid characters in name with replacement.
