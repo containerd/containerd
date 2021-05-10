@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"runtime"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
@@ -365,6 +366,9 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 			return fmt.Errorf("unknown image config media type %s", ic.MediaType)
 		}
 
+		if runtime.GOOS == "freebsd" && ociimage.OS == "linux" {
+			freebsdLinuxEmulationMounts(s)
+		}
 		setProcess(s)
 		if s.Linux != nil {
 			defaults := config.Env
@@ -1263,4 +1267,32 @@ func WithDevShmSize(kb int64) SpecOpts {
 		}
 		return ErrNoShmMount
 	}
+}
+
+func freebsdLinuxEmulationMounts(s *Spec) error {
+	var mounts []specs.Mount
+	for _, m := range s.Mounts {
+		path := filepath.Clean(m.Destination)
+		if path == "/proc" {
+			mounts = append(mounts, specs.Mount{
+				Destination:	"/proc",
+				Type:		"linprocfs",
+				Source:		"linprocfs",
+				Options:	[]string{},
+			})
+			continue
+		}
+		if path ==  "/dev/fd" {
+			m.Options = append(m.Options, "linrdlink")
+		}
+		mounts = append(mounts, m)
+	}
+	mounts = append(mounts, specs.Mount{
+		Destination:	"/sys",
+		Type:		"linsysfs",
+		Source:		"linsysfs",
+		Options:	[]string{},})
+	s.Mounts = mounts
+	//fmt.Printf("Mounts %+v\n\n\n", mounts)
+	return nil
 }
