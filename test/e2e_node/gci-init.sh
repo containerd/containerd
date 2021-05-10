@@ -16,6 +16,34 @@
 
 # This script is used to do extra initialization on GCI.
 
+# set up cgroupv2 based on flag CONTAINERD_CGROUPV2 in containerd-env
+CONTAINERD_HOME="/home/containerd"
+CONTAINERD_ENV_METADATA="containerd-env"
+
+if [ -f "${CONTAINERD_HOME}/${CONTAINERD_ENV_METADATA}" ]; then
+  source "${CONTAINERD_HOME}/${CONTAINERD_ENV_METADATA}"
+fi
+
+if [ "${CONTAINERD_CGROUPV2:-"false"}"  == "true" ]; then
+  # check cos image
+  if uname -a | grep -q cos; then
+    if ! grep -q 'systemd.unified_cgroup_hierarchy=true' /proc/cmdline; then
+      echo "Setting up cgroupv2"
+
+      mount_path="/tmp/esp"
+      mkdir -p "${mount_path}"
+      esp_partition="/dev/sda12"
+      mount "${esp_partition}" "${mount_path}"
+      sed -i 's/systemd.unified_cgroup_hierarchy=false/systemd.unified_cgroup_hierarchy=true/g' "${mount_path}/efi/boot/grub.cfg"
+      umount "${mount_path}"
+      rmdir "${mount_path}"
+
+      echo "Reconfigured grub; rebooting..."
+      reboot
+    fi
+  fi
+fi
+
 mount /tmp /tmp -o remount,exec,suid
 #TODO(random-liu): Stop docker and remove this docker thing.
 usermod -a -G docker jenkins
