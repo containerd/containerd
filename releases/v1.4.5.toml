@@ -1,0 +1,28 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.4.4"
+
+pre_release = false
+
+preface = """\
+The fifth patch release for `containerd` 1.4 has fixes in the runc shim and
+CRI plugin as well as an updated runc version to fix some runc regressions.
+
+### Notable Updates
+* **Update runc to rc94** [#5473](https://github.com/containerd/containerd/pull/5473)
+* **Fix leaking socket path in runc shim v2** [#5195](https://github.com/containerd/containerd/pull/5195)
+* **Fix cleanup logic in new container in runc shim v2** [#5206](https://github.com/containerd/containerd/pull/5206)
+* **Fix registry mirror authorization logic in CRI plugin** [#5446](https://github.com/containerd/containerd/pull/5446)
+* **Add support for `userxattr` in overlay snapshotter for kernel 5.11+** [#5076](https://github.com/containerd/containerd/pull/5076)
+"""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+
+[breaking]
