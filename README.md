@@ -21,7 +21,7 @@ We are a large inclusive OSS project that is welcoming help of any kind shape or
 * Documentation help is needed to make the product easier to consume and extend.
 * We need OSS community outreach / organizing help to get the word out; manage
 and create messaging and educational content; and to help with social media, community forums/groups, and google groups.
-* We are actively inviting new [security advisors](https://github.com/containerd/project/blob/master/GOVERNANCE.md#security-advisors) to join the team.
+* We are actively inviting new [security advisors](https://github.com/containerd/project/blob/main/GOVERNANCE.md#security-advisors) to join the team.
 * New sub-projects are being created, core and non-core that could use additional development help.
 * Each of the [containerd projects](https://github.com/containerd) has a list of issues currently being worked on or that need help resolving.
   - If the issue has not already been assigned to someone, or has not made recent progress and you are interested, please inquire.
@@ -323,9 +323,9 @@ However, all projects within the repo have common maintainership, governance, an
 guidelines which are stored in a `project` repository commonly for all containerd projects.
 
 Please find all these core project documents, including the:
- * [Project governance](https://github.com/containerd/project/blob/master/GOVERNANCE.md),
- * [Maintainers](https://github.com/containerd/project/blob/master/MAINTAINERS),
- * and [Contributing guidelines](https://github.com/containerd/project/blob/master/CONTRIBUTING.md)
+ * [Project governance](https://github.com/containerd/project/blob/main/GOVERNANCE.md),
+ * [Maintainers](https://github.com/containerd/project/blob/main/MAINTAINERS),
+ * and [Contributing guidelines](https://github.com/containerd/project/blob/main/CONTRIBUTING.md)
 
 information in our [`containerd/project`](https://github.com/containerd/project) repository.
 
