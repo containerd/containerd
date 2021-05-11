@@ -1293,6 +1293,5 @@ func freebsdLinuxEmulationMounts(s *Spec) error {
 		Source:      "linsysfs",
 		Options:     []string{}})
 	s.Mounts = mounts
-	//fmt.Printf("Mounts %+v\n\n\n", mounts)
 	return nil
 }
