@@ -240,6 +240,17 @@ func WithVolumeMount(hostPath, containerPath string) ContainerOpts {
 	}
 }
 
+// Add Windows container resource limits.
+func WithWindowsResources(r *runtime.WindowsContainerResources) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		if c.Windows == nil {
+			c.Windows = &runtime.WindowsContainerConfig{}
+		}
+		c.Windows.Resources = r
+	}
+}
+
+// Add container's RunAsUsername
 func WithWindowsUsername(username string) ContainerOpts { //nolint:unused
 	return func(c *runtime.ContainerConfig) {
 		if c.Windows == nil {
