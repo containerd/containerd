@@ -24,9 +24,9 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
-	"runtime"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
@@ -1275,23 +1275,23 @@ func freebsdLinuxEmulationMounts(s *Spec) error {
 		path := filepath.Clean(m.Destination)
 		if path == "/proc" {
 			mounts = append(mounts, specs.Mount{
-				Destination:	"/proc",
-				Type:		"linprocfs",
-				Source:		"linprocfs",
-				Options:	[]string{},
+				Destination: "/proc",
+				Type:        "linprocfs",
+				Source:      "linprocfs",
+				Options:     []string{},
 			})
 			continue
 		}
-		if path ==  "/dev/fd" {
+		if path == "/dev/fd" {
 			m.Options = append(m.Options, "linrdlink")
 		}
 		mounts = append(mounts, m)
 	}
 	mounts = append(mounts, specs.Mount{
-		Destination:	"/sys",
-		Type:		"linsysfs",
-		Source:		"linsysfs",
-		Options:	[]string{},})
+		Destination: "/sys",
+		Type:        "linsysfs",
+		Source:      "linsysfs",
+		Options:     []string{}})
 	s.Mounts = mounts
 	//fmt.Printf("Mounts %+v\n\n\n", mounts)
 	return nil
