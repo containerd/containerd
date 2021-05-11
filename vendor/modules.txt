@@ -232,6 +232,12 @@ github.com/hashicorp/go-multierror
 # github.com/imdario/mergo v0.3.11
 ## explicit
 github.com/imdario/mergo
+# github.com/intel/goresctrl v0.0.0-20210604112228-e4a9cb7d2d2d
+## explicit
+github.com/intel/goresctrl/pkg/blockio
+github.com/intel/goresctrl/pkg/cgroups
+github.com/intel/goresctrl/pkg/kubernetes
+github.com/intel/goresctrl/pkg/log
 # github.com/json-iterator/go v1.1.10
 github.com/json-iterator/go
 # github.com/klauspost/compress v1.11.13
