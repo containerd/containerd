@@ -265,7 +265,7 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 		if body == nil {
 			return nil, errors.New("cannot reuse body, request must be retried")
 		}
-		// Only use the body once since pipe cannot be seeked
+		// Only use the body once since pipe cannot be sought
 		ob := body
 		body = nil
 		return ob, nil
