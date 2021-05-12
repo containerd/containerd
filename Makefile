@@ -253,7 +253,7 @@ mkdir -p $(DESTDIR)/man/man$(2);
 gzip -c $(1) >$(DESTDIR)/man/man$(2)/$(3).gz;
 endef
 
-install-man:
+install-man: man
 	@echo "$(WHALE) $@"
 	$(foreach manpage,$(addprefix man/,$(MANPAGES)), $(call installmanpage,$(manpage),$(subst .,,$(suffix $(manpage))),$(notdir $(manpage))))
 
