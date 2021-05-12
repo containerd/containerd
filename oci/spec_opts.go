@@ -366,6 +366,11 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 			return fmt.Errorf("unknown image config media type %s", ic.MediaType)
 		}
 
+		//FreeBSD has support for running Linux binaries via syscall redirection, while that would be enough
+		//for some binaries others depend on emulated linux file systems (procfs & sysfs).
+		//So when we are running FreeBSD and our image OS is Linux we modify our mounts to mount the emulated
+		//filesystems.
+		//We do it here since here we have access to both the OCI spec & the image OS.
 		if runtime.GOOS == "freebsd" && ociimage.OS == "linux" {
 			freebsdLinuxEmulationMounts(s)
 		}
@@ -1269,6 +1274,8 @@ func WithDevShmSize(kb int64) SpecOpts {
 	}
 }
 
+// freebsdLinuxEmulationMounts modifies the mount spec to mount emulated Linux filesystems on FreeBSD,
+// as per: https://wiki.freebsd.org/LinuxJails
 func freebsdLinuxEmulationMounts(s *Spec) error {
 	var mounts []specs.Mount
 	for _, m := range s.Mounts {
