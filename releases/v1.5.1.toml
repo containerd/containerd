@@ -1,0 +1,23 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.5.0"
+
+pre_release = false
+
+preface = """\
+The first patch release for containerd 1.5 includes an updated version
+of runc and minor fix in the CRI service
+
+### Notable Updates
+
+* **Update runc to rc94** [#5473](https://github.com/containerd/containerd/pull/5473)
+* **Fix registry mirror authorization logic in CRI plugin** [#5446](https://github.com/containerd/containerd/pull/5446)
+* **Fix regression in cri-cni-release to include cri tools** [#5462](https://github.com/containerd/containerd/pull/5462)
+
+See the changelog for complete list of changes"""
