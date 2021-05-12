@@ -391,6 +391,9 @@ func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig
 				u.Path = "/v2"
 			}
 
+			// Trim trailing slash in path so that registry URL will be valid
+			u.Path = strings.TrimSuffix(u.Path, "/")
+
 			registries = append(registries, docker.RegistryHost{
 				Client:       client,
 				Authorizer:   authorizer,
