@@ -142,7 +142,7 @@ jobs:
             sudo install -m 644 containerd.service ${DESTDIR}/etc/systemd/system
             echo "CONTAINERD_VERSION: '${RELEASE_VER#v}'" | sudo tee ${DESTDIR}/opt/containerd/cluster/version
 
-            sudo -E PATH=$PATH script/setup/install-seccomp
+            sudo PATH=$PATH script/setup/install-seccomp
             USESUDO=true script/setup/install-runc
             script/setup/install-cni
             script/setup/install-critools
