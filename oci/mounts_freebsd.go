@@ -23,12 +23,6 @@ import (
 func defaultMounts() []specs.Mount {
 	return []specs.Mount{
 		{
-			Destination: "/proc",
-			Type:        "procfs",
-			Source:      "proc",
-			Options:     []string{"nosuid", "noexec"},
-		},
-		{
 			Destination: "/dev",
 			Type:        "devfs",
 			Source:      "devfs",
@@ -39,18 +33,6 @@ func defaultMounts() []specs.Mount {
 			Type:        "fdescfs",
 			Source:      "fdescfs",
 			Options:     []string{},
-		},
-		{
-			Destination: "/dev/mqueue",
-			Type:        "mqueue",
-			Source:      "mqueue",
-			Options:     []string{"nosuid", "noexec"},
-		},
-		{
-			Destination: "/dev/shm",
-			Type:        "tmpfs",
-			Source:      "shm",
-			Options:     []string{"nosuid", "noexec", "mode=1777"},
 		},
 	}
 }
