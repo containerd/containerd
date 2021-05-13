@@ -41,12 +41,8 @@ func TestContainerLifecycleWithoutImageRef(t *testing.T) {
 		testImage     = GetImage(BusyBox)
 		containerName = "test-container"
 	)
-	t.Log("Pull test image")
-	img, err := imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil, sbConfig)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: img}))
-	}()
+
+	img := EnsureImageExists(t, testImage)
 
 	t.Log("Create test container")
 	cnConfig := ContainerConfig(

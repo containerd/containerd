@@ -26,7 +26,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 func TestVolumeCopyUp(t *testing.T) {
@@ -44,9 +43,7 @@ func TestVolumeCopyUp(t *testing.T) {
 		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
 	}()
 
-	t.Logf("Pull test image")
-	_, err = imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil, sbConfig)
-	require.NoError(t, err)
+	EnsureImageExists(t, testImage)
 
 	t.Logf("Create a container with volume-copy-up test image")
 	cnConfig := ContainerConfig(
@@ -106,9 +103,7 @@ func TestVolumeOwnership(t *testing.T) {
 		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
 	}()
 
-	t.Logf("Pull test image")
-	_, err = imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil, sbConfig)
-	require.NoError(t, err)
+	EnsureImageExists(t, testImage)
 
 	t.Logf("Create a container with volume-ownership test image")
 	cnConfig := ContainerConfig(
