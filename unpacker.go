@@ -35,6 +35,7 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
+	"github.com/containerd/containerd/remotes/docker"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -328,7 +329,7 @@ func (u *unpacker) handlerWrapper(
 				lock.Unlock()
 
 				children = nonLayers
-			case images.MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig:
+			case images.MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig, docker.LegacyConfigMediaType:
 				lock.Lock()
 				l := layers[desc.Digest]
 				lock.Unlock()
