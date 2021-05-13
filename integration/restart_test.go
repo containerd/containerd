@@ -135,11 +135,7 @@ func TestContainerdRestart(t *testing.T) {
 
 	t.Logf("Pull test images")
 	for _, image := range []string{GetImage(BusyBox), GetImage(Alpine)} {
-		img, err := imageService.PullImage(&runtime.ImageSpec{Image: image}, nil, nil)
-		require.NoError(t, err)
-		defer func() {
-			assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: img}))
-		}()
+		EnsureImageExists(t, image)
 	}
 	imagesBeforeRestart, err := imageService.ListImages(nil)
 	assert.NoError(t, err)

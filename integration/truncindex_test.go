@@ -35,12 +35,9 @@ func TestTruncIndex(t *testing.T) {
 
 	t.Logf("Pull an image")
 	var appImage = GetImage(BusyBox)
-	imgID, err := imageService.PullImage(&runtimeapi.ImageSpec{Image: appImage}, nil, sbConfig)
-	require.NoError(t, err)
+
+	imgID := EnsureImageExists(t, appImage)
 	imgTruncID := genTruncIndex(imgID)
-	defer func() {
-		assert.NoError(t, imageService.RemoveImage(&runtimeapi.ImageSpec{Image: imgTruncID}))
-	}()
 
 	t.Logf("Get image status by truncindex, truncID: %s", imgTruncID)
 	res, err := imageService.ImageStatus(&runtimeapi.ImageSpec{Image: imgTruncID})

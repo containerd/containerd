@@ -55,7 +55,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const testUserNSImage = "mirror.gcr.io/library/alpine:latest"
+const testUserNSImage = "mirror.gcr.io/library/alpine:3.13"
 
 // TestRegressionIssue4769 verifies the number of task exit events.
 //
