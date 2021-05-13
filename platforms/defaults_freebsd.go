@@ -26,5 +26,7 @@ func Default() MatchComparer {
 	return Ordered(DefaultSpec(), specs.Platform{
 		OS:           "linux",
 		Architecture: runtime.GOARCH,
+		// The Variant field will be empty if arch != ARM.
+		Variant: cpuVariant(),
 	})
 }
