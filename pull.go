@@ -27,6 +27,8 @@ import (
 	"github.com/containerd/containerd/remotes/docker/schema1"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
@@ -34,6 +36,11 @@ import (
 // Pull downloads the provided content into containerd's content store
 // and returns a platform specific image object
 func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Image, retErr error) {
+	span := trace.SpanFromContext(ctx)
+	_, pullSpan := (span.Tracer().Start(ctx, "pullSpan", trace.WithAttributes(attribute.String("imagePullRef", ref))))
+
+	defer pullSpan.End()
+
 	pullCtx := defaultRemoteContext()
 	for _, o := range opts {
 		if err := o(c, pullCtx); err != nil {
@@ -89,6 +96,8 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		}
 	}
 
+	pullSpan.AddEvent("fetching image", trace.WithAttributes(attribute.String("imagePullRef", ref)))
+
 	img, err := c.fetch(ctx, pullCtx, ref, 1)
 	if err != nil {
 		return nil, err
@@ -105,6 +114,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		}
 	}
 
+	pullSpan.AddEvent("Creating new image", trace.WithAttributes(attribute.String("imagePullRef", ref)))
 	img, err = c.createNewImage(ctx, img)
 	if err != nil {
 		return nil, err
@@ -112,6 +122,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 
 	i := NewImageWithPlatform(c, img, pullCtx.PlatformMatcher)
 
+	pullSpan.AddEvent("Fetching new image", trace.WithAttributes(attribute.String("imageName", i.Name())))
 	if pullCtx.Unpack {
 		if unpacks == 0 {
 			// Try to unpack is none is done previously.
@@ -229,6 +240,11 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 }
 
 func (c *Client) createNewImage(ctx context.Context, img images.Image) (images.Image, error) {
+	span := trace.SpanFromContext(ctx)
+	_, fetchImageSpan := (span.Tracer().Start(ctx, "fetchImageSpan", trace.WithAttributes(attribute.String("Image", img.Name))))
+
+	defer fetchImageSpan.End()
+
 	is := c.ImageService()
 	for {
 		if created, err := is.Create(ctx, img); err != nil {

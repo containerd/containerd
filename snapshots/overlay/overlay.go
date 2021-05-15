@@ -35,6 +35,8 @@ import (
 	"github.com/containerd/continuity/fs"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // SnapshotterConfig is used to configure the overlay snapshotter instance
@@ -243,6 +245,11 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 // immediately become unavailable and unrecoverable. Disk space will
 // be freed up on the next call to `Cleanup`.
 func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
+	span := trace.SpanFromContext(ctx)
+	_, ssRemoveSpan := (span.Tracer().Start(ctx, "ssRemoveSpan", trace.WithAttributes(attribute.String("snapshotKey", key))))
+
+	defer ssRemoveSpan.End()
+
 	ctx, t, err := o.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return err
@@ -255,6 +262,7 @@ func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 		}
 	}()
 
+	ssRemoveSpan.AddEvent("removing snapshot", trace.WithAttributes(attribute.String("snapshotKey", key)))
 	_, _, err = storage.Remove(ctx, key)
 	if err != nil {
 		return errors.Wrap(err, "failed to remove")
@@ -354,6 +362,11 @@ func (o *snapshotter) getCleanupDirectories(ctx context.Context, t storage.Trans
 }
 
 func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts []snapshots.Opt) (_ []mount.Mount, err error) {
+	span := trace.SpanFromContext(ctx)
+	_, ssCreateSpan := (span.Tracer().Start(ctx, "snapshotCreateSpan", trace.WithAttributes(attribute.String("snapshotKey", key), attribute.String("snapshotParent", parent))))
+
+	defer ssCreateSpan.End()
+
 	ctx, t, err := o.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return nil, err
@@ -393,6 +406,7 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		}
 	}()
 
+	ssCreateSpan.AddEvent("creating snapshot", trace.WithAttributes(attribute.String("snapshotKey", key), attribute.String("parent", parent)))
 	s, err := storage.CreateSnapshot(ctx, kind, key, parent, opts...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create snapshot")

@@ -3,6 +3,7 @@ module github.com/containerd/containerd
 go 1.16
 
 require (
+	cloud.google.com/go v0.60.0 // indirect
 	github.com/Microsoft/go-winio v0.4.17
 	github.com/Microsoft/hcsshim v0.8.16
 	github.com/containerd/aufs v1.0.0
@@ -28,16 +29,22 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/gogo/googleapis v1.4.0
 	github.com/gogo/protobuf v1.3.2
-	github.com/golang/protobuf v1.4.3
-	github.com/google/go-cmp v0.5.4
+	github.com/golang/protobuf v1.5.2
+	github.com/google/go-cmp v0.5.5
 	github.com/google/uuid v1.2.0
+	github.com/grpc-ecosystem/go-grpc-middleware v1.2.2
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/hashicorp/go-multierror v1.0.0
+	github.com/hashicorp/go-multierror v1.1.1
 	github.com/imdario/mergo v0.3.11
 	github.com/klauspost/compress v1.11.13
+	github.com/kr/text v0.2.0 // indirect
 	github.com/moby/locker v1.0.1
 	github.com/moby/sys/mountinfo v0.4.1
 	github.com/moby/sys/symlink v0.1.0
+	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
+	github.com/nxadm/tail v1.4.8 // indirect
+	github.com/onsi/ginkgo v1.15.0 // indirect
+	github.com/onsi/gomega v1.10.5 // indirect
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.0.1
 	github.com/opencontainers/runc v1.0.0-rc94
@@ -48,15 +55,26 @@ require (
 	github.com/prometheus/client_golang v1.7.1
 	github.com/prometheus/procfs v0.6.0 // indirect; temporarily force v0.6.0, which was previously defined in imgcrypt as explicit version
 	github.com/satori/go.uuid v1.2.0 // indirect
-	github.com/sirupsen/logrus v1.7.0
-	github.com/stretchr/testify v1.6.1
+	github.com/sirupsen/logrus v1.8.1
+	github.com/stretchr/testify v1.7.0
 	github.com/tchap/go-patricia v2.2.6+incompatible
 	github.com/urfave/cli v1.22.2
 	go.etcd.io/bbolt v1.3.5
-	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
-	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
+	go.opencensus.io v0.22.4 // indirect
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.20.0
+	go.opentelemetry.io/otel v0.20.0
+	go.opentelemetry.io/otel/exporters/stdout v0.20.0
+	go.opentelemetry.io/otel/metric v0.20.0
+	go.opentelemetry.io/otel/sdk v0.20.0
+	go.opentelemetry.io/otel/sdk/metric v0.20.0
+	go.opentelemetry.io/otel/trace v0.20.0
+	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20210426230700-d19ff857e887
-	google.golang.org/grpc v1.33.2
+	golang.org/x/text v0.3.5 // indirect
+	golang.org/x/tools v0.1.1-0.20210430200834-7a6108e9b210 // indirect
+	google.golang.org/grpc v1.37.0
+	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gotest.tools/v3 v3.0.3
 	k8s.io/api v0.20.6
 	k8s.io/apimachinery v0.20.6

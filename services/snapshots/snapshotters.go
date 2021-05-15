@@ -26,6 +26,8 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/snapshots"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // snapshotter wraps snapshots.Snapshotter with proper events published.
@@ -65,6 +67,12 @@ func newSnapshotter(sn snapshots.Snapshotter, publisher events.Publisher) snapsh
 }
 
 func (s *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	span := trace.SpanFromContext(ctx)
+	_, snapshotPrepareSpan := (span.Tracer().Start(ctx, "snapshotPrepareSpan"))
+
+	defer snapshotPrepareSpan.End()
+
+	snapshotPrepareSpan.AddEvent("starting snapshot prepare", trace.WithAttributes(attribute.String("snapshotterKey", key)))
 	mounts, err := s.Snapshotter.Prepare(ctx, key, parent, opts...)
 	if err != nil {
 		return nil, err
@@ -79,6 +87,12 @@ func (s *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 }
 
 func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
+	span := trace.SpanFromContext(ctx)
+	_, snapshotCommitSpan := (span.Tracer().Start(ctx, "snapshotCommitSpan"))
+
+	defer snapshotCommitSpan.End()
+
+	snapshotCommitSpan.AddEvent("starting snapshot commit", trace.WithAttributes(attribute.String("snapshotName", name), attribute.String("snapshotKey", key)))
 	if err := s.Snapshotter.Commit(ctx, name, key, opts...); err != nil {
 		return err
 	}
@@ -89,6 +103,13 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 }
 
 func (s *snapshotter) Remove(ctx context.Context, key string) error {
+	span := trace.SpanFromContext(ctx)
+	_, snapshotRemoveSpan := (span.Tracer().Start(ctx, "snapshotRemoveSpan"))
+
+	defer snapshotRemoveSpan.End()
+
+	snapshotRemoveSpan.AddEvent("removing snapshot ", trace.WithAttributes(attribute.String("snapshotKey", key)))
+
 	if err := s.Snapshotter.Remove(ctx, key); err != nil {
 		return err
 	}

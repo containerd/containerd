@@ -30,6 +30,8 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
 	ptypes "github.com/gogo/protobuf/types"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -99,6 +101,11 @@ func (l *local) List(ctx context.Context, req *imagesapi.ListImagesRequest, _ ..
 
 func (l *local) Create(ctx context.Context, req *imagesapi.CreateImageRequest, _ ...grpc.CallOption) (*imagesapi.CreateImageResponse, error) {
 	log.G(ctx).WithField("name", req.Image.Name).WithField("target", req.Image.Target.Digest).Debugf("create image")
+	span := trace.SpanFromContext(ctx)
+	_, imageCreateSpan := (span.Tracer().Start(ctx, "imageCreateSpan", trace.WithAttributes(attribute.String("imageName", req.Image.Name))))
+
+	defer imageCreateSpan.End()
+
 	if req.Image.Name == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "Image.Name required")
 	}
@@ -107,6 +114,9 @@ func (l *local) Create(ctx context.Context, req *imagesapi.CreateImageRequest, _
 		image = imageFromProto(&req.Image)
 		resp  imagesapi.CreateImageResponse
 	)
+
+	imageCreateSpan.AddEvent("Creating image", trace.WithAttributes(attribute.String("imageName", req.Image.Name)))
+
 	created, err := l.store.Create(ctx, image)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
@@ -126,6 +136,11 @@ func (l *local) Create(ctx context.Context, req *imagesapi.CreateImageRequest, _
 }
 
 func (l *local) Update(ctx context.Context, req *imagesapi.UpdateImageRequest, _ ...grpc.CallOption) (*imagesapi.UpdateImageResponse, error) {
+	span := trace.SpanFromContext(ctx)
+	_, imageUpdateSpan := (span.Tracer().Start(ctx, "imageUpdateSpan", trace.WithAttributes(attribute.String("imageName", req.Image.Name))))
+
+	defer imageUpdateSpan.End()
+
 	if req.Image.Name == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "Image.Name required")
 	}
@@ -140,6 +155,7 @@ func (l *local) Update(ctx context.Context, req *imagesapi.UpdateImageRequest, _
 		fieldpaths = append(fieldpaths, req.UpdateMask.Paths...)
 	}
 
+	imageUpdateSpan.AddEvent("Updating image", trace.WithAttributes(attribute.String("imageName", req.Image.Name)))
 	updated, err := l.store.Update(ctx, image, fieldpaths...)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
@@ -159,7 +175,12 @@ func (l *local) Update(ctx context.Context, req *imagesapi.UpdateImageRequest, _
 
 func (l *local) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest, _ ...grpc.CallOption) (*ptypes.Empty, error) {
 	log.G(ctx).WithField("name", req.Name).Debugf("delete image")
+	span := trace.SpanFromContext(ctx)
+	_, imageDeleteSpan := (span.Tracer().Start(ctx, "imageDeleteSpan", trace.WithAttributes(attribute.String("imageName", req.Name))))
 
+	defer imageDeleteSpan.End()
+
+	imageDeleteSpan.AddEvent("Deleting image", trace.WithAttributes(attribute.String("imageName", req.Name)))
 	if err := l.store.Delete(ctx, req.Name); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
