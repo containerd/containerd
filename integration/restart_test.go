@@ -1,5 +1,3 @@
-// +build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -19,6 +17,7 @@
 package integration
 
 import (
+	goruntime "runtime"
 	"sort"
 	"testing"
 
@@ -33,6 +32,9 @@ import (
 // Restart test must run sequentially.
 
 func TestContainerdRestart(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipped on Windows.")
+	}
 	type container struct {
 		name  string
 		id    string
@@ -100,6 +102,9 @@ func TestContainerdRestart(t *testing.T) {
 			runtimeService.StopPodSandbox(sid)
 			runtimeService.RemovePodSandbox(sid)
 		}()
+
+		EnsureImageExists(t, pauseImage)
+
 		s.id = sid
 		for j := range s.containers {
 			c := &s.containers[j]

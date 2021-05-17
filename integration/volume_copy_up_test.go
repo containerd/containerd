@@ -1,5 +1,3 @@
-// +build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -21,6 +19,7 @@ package integration
 import (
 	"fmt"
 	"os/exec"
+	goruntime "runtime"
 	"testing"
 	"time"
 
@@ -29,6 +28,11 @@ import (
 )
 
 func TestVolumeCopyUp(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		// TODO(claudiub): Remove this when the volume-copy-up image has Windows support.
+		// https://github.com/containerd/containerd/pull/5162
+		t.Skip("Skipped on Windows.")
+	}
 	var (
 		testImage   = GetImage(VolumeCopyUp)
 		execTimeout = time.Minute
@@ -89,6 +93,9 @@ func TestVolumeCopyUp(t *testing.T) {
 }
 
 func TestVolumeOwnership(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipped on Windows.")
+	}
 	var (
 		testImage   = GetImage(VolumeOwnership)
 		execTimeout = time.Minute

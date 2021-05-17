@@ -1,5 +1,3 @@
-// +build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -20,6 +18,7 @@ package integration
 
 import (
 	"context"
+	goruntime "runtime"
 	"testing"
 	"time"
 
@@ -73,6 +72,9 @@ func TestSharedPidMultiProcessContainerStop(t *testing.T) {
 }
 
 func TestContainerStopCancellation(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipped on Windows.")
+	}
 	t.Log("Create a pod sandbox")
 	sbConfig := PodSandboxConfig("sandbox", "cancel-container-stop")
 	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)

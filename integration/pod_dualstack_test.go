@@ -1,5 +1,3 @@
-// +build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -24,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	goruntime "runtime"
 	"testing"
 	"time"
 
@@ -54,10 +53,16 @@ func TestPodDualStack(t *testing.T) {
 	EnsureImageExists(t, testImage)
 
 	t.Log("Create a container to print env")
+	var command ContainerOpts
+	if goruntime.GOOS == "windows" {
+		command = WithCommand("ipconfig")
+	} else {
+		command = WithCommand("ip", "address", "show", "dev", "eth0")
+	}
 	cnConfig := ContainerConfig(
 		containerName,
 		testImage,
-		WithCommand("ip", "address", "show", "dev", "eth0"),
+		command,
 		WithLogPath(containerName),
 	)
 	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
@@ -85,9 +90,18 @@ func TestPodDualStack(t *testing.T) {
 	ip := status.GetNetwork().GetIp()
 	additionalIps := status.GetNetwork().GetAdditionalIps()
 
-	ipv4Enabled, err := regexp.MatchString("inet .* scope global", string(content))
+	var ipv4Regex, ipv6Regex string
+	if goruntime.GOOS == "windows" {
+		ipv4Regex = "^\\s*IPv4 Address"
+		ipv6Regex = "^\\s*IPv6 Address"
+	} else {
+		ipv4Regex = "inet .* scope global"
+		ipv6Regex = "inet6 .* scope global"
+	}
+
+	ipv4Enabled, err := regexp.MatchString(ipv4Regex, string(content))
 	assert.NoError(t, err)
-	ipv6Enabled, err := regexp.MatchString("inet6 .* scope global", string(content))
+	ipv6Enabled, err := regexp.MatchString(ipv6Regex, string(content))
 	assert.NoError(t, err)
 
 	if ipv4Enabled && ipv6Enabled {

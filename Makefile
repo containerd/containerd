@@ -194,7 +194,7 @@ bin/cri-integration.test:
 
 cri-integration: binaries bin/cri-integration.test ## run cri integration tests
 	@echo "$(WHALE) $@"
-	@./script/test/cri-integration.sh
+	@bash -x ./script/test/cri-integration.sh
 	@rm -rf bin/cri-integration.test
 
 benchmark: ## run benchmarks tests
