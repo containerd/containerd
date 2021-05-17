@@ -19,13 +19,16 @@ jobs:
   winIntegration:
     strategy:
       matrix:
-        win_ver: [sac1909]
+        win_ver: [ltsc2019, sac2004]
         include:
-        - win_ver: sac1909
-          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:Datacenter-Core-1909-with-Containers-smalldisk:18363.900.2006061800"
-          AZURE_RESOURCE_GROUP: ctrd-integration-sac1909-${{ github.run_id }}
-          GOOGLE_BUCKET: "gs://containerd-integration/logs/windows-sac1909/"
-
+        - win_ver: sac2004
+          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:datacenter-core-2004-with-containers-smalldisk:19041.928.2104150521"
+          AZURE_RESOURCE_GROUP: ctrd-integration-sac2004-${{ github.run_id }}
+          GOOGLE_BUCKET: "gs://containerd-integration/logs/windows-sac2004/"
+        - win_ver: ltsc2019
+          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2019-Datacenter-with-Containers-smalldisk:17763.1935.2105080716"
+          AZURE_RESOURCE_GROUP: ctrd-integration-ltsc2019-${{ github.run_id }}
+          GOOGLE_BUCKET: "gs://containerd-integration/logs/windows-ltsc2019/"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
