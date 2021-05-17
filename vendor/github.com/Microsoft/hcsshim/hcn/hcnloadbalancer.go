@@ -36,6 +36,7 @@ var (
 	LoadBalancerFlagsNone LoadBalancerFlags = 0
 	// LoadBalancerFlagsDSR enables Direct Server Return (DSR)
 	LoadBalancerFlagsDSR LoadBalancerFlags = 1
+	LoadBalancerFlagsIPv6 LoadBalancerFlags = 2
 )
 
 // LoadBalancerPortMappingFlags are special settings on a loadbalancer.
