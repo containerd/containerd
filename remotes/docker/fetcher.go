@@ -164,21 +164,12 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 	}
 
 	if resp.StatusCode > 299 {
-		// TODO(stevvooe): When doing a offset specific request, we should
-		// really distinguish between a 206 and a 200. In the case of 200, we
-		// can discard the bytes, hiding the seek behavior from the
-		// implementation.
-		defer resp.Body.Close()
-
-		if resp.StatusCode == http.StatusNotFound {
-			return nil, errors.Wrapf(errdefs.ErrNotFound, "content at %v not found", req.String())
-		}
-		var registryErr Errors
-		if err := json.NewDecoder(resp.Body).Decode(&registryErr); err != nil || registryErr.Len() < 1 {
-			return nil, errors.Errorf("unexpected status code %v: %v", req.String(), resp.Status)
-		}
-		return nil, errors.Errorf("unexpected status code %v: %s - Server message: %s", req.String(), resp.Status, registryErr.Error())
+		return nil, getResponseErr(ctx, req, resp)
 	}
+	// TODO(stevvooe): When doing a offset specific request, we should
+	// really distinguish between a 206 and a 200. In the case of 200, we
+	// can discard the bytes, hiding the seek behavior from the
+	// implementation.
 	if offset > 0 {
 		cr := resp.Header.Get("content-range")
 		if cr != "" {
@@ -205,4 +196,24 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 	}
 
 	return resp.Body, nil
+}
+
+func getResponseErr(ctx context.Context, req *request, resp *http.Response) error {
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return errors.Wrapf(errdefs.ErrNotFound, "content at %v not found", req.String())
+	}
+	var registryErr Errors
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(&registryErr); err != nil || registryErr.Len() < 1 {
+		// In some cases, the error may just be a simple message rather than a json encoded string.
+		sb := &strings.Builder{}
+		_, err2 := io.Copy(sb, io.LimitReader(io.MultiReader(dec.Buffered(), resp.Body), 16*1024))
+		if err2 != nil {
+			log.G(ctx).WithError(err2).Debug("Error copying response body details")
+		}
+		return errors.Errorf("unexpected status code %v: %v, details: %s", req.String(), resp.Status, sb)
+	}
+	return errors.Errorf("unexpected status code %v: %s - Server message: %s", req.String(), resp.Status, registryErr.Error())
 }
