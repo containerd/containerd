@@ -37,7 +37,7 @@ A registry host is the location where container images and artifacts are sourced
 registry hosts may be local or remote and are typically accessed via http/https using the
 [OCI distribution specification](https://github.com/opencontainers/distribution-spec/blob/main/spec.md).
 A registry mirror is not a registry host but these mirrors can also be used to pull content.
-Registry hosts are typically refered to by their internet domain names, aka. registry
+Registry hosts are typically referred to by their internet domain names, aka. registry
 host names. For example, docker.io, quay.io, gcr.io, and ghcr.io.
 
 A registry host namespace is, for the purpose of containerd registry configuration, a
