@@ -57,7 +57,6 @@ func run() error {
 
 	// clear out the usage as we use banners that do not display in man pages
 	appName.Usage = ""
-	appName.ToMan()
 	data, err := appName.ToMan()
 	if err != nil {
 		return err
