@@ -38,10 +38,8 @@ func hostSupports() bool {
 	checkAppArmor.Do(func() {
 		// see https://github.com/docker/docker/commit/de191e86321f7d3136ff42ff75826b8107399497
 		if _, err := os.Stat("/sys/kernel/security/apparmor"); err == nil && os.Getenv("container") == "" {
-			if _, err = os.Stat("/sbin/apparmor_parser"); err == nil {
-				buf, err := ioutil.ReadFile("/sys/module/apparmor/parameters/enabled")
-				appArmorSupported = err == nil && len(buf) > 1 && buf[0] == 'Y'
-			}
+			buf, err := ioutil.ReadFile("/sys/module/apparmor/parameters/enabled")
+			appArmorSupported = err == nil && len(buf) > 1 && buf[0] == 'Y'
 		}
 	})
 	return appArmorSupported
