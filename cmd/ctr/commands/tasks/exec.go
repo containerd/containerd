@@ -114,9 +114,18 @@ var execCommand = cli.Command{
 			stdinC    = &stdinCloser{
 				stdin: os.Stdin,
 			}
+			con console.Console
 		)
 
-		if logURI := context.String("log-uri"); logURI != "" {
+		ioOpts := []cio.Opt{cio.WithFIFODir(context.String("fifo-dir"))}
+		if tty {
+			con = console.Current()
+			defer con.Reset()
+			if err := con.SetRaw(); err != nil {
+				return err
+			}
+			ioCreator = cio.NewCreator(append([]cio.Opt{cio.WithStreams(con, con, nil), cio.WithTerminal}, ioOpts...)...)
+		} else if logURI := context.String("log-uri"); logURI != "" {
 			uri, err := url.Parse(logURI)
 			if err != nil {
 				return err
@@ -132,11 +141,7 @@ var execCommand = cli.Command{
 
 			ioCreator = cio.LogURI(uri)
 		} else {
-			cioOpts := []cio.Opt{cio.WithStreams(stdinC, os.Stdout, os.Stderr), cio.WithFIFODir(context.String("fifo-dir"))}
-			if tty {
-				cioOpts = append(cioOpts, cio.WithTerminal)
-			}
-			ioCreator = cio.NewCreator(cioOpts...)
+			ioCreator = cio.NewCreator(append([]cio.Opt{cio.WithStreams(stdinC, os.Stdout, os.Stderr)}, ioOpts...)...)
 		}
 
 		process, err := task.Exec(ctx, context.String("exec-id"), pspec, ioCreator)
@@ -156,14 +161,6 @@ var execCommand = cli.Command{
 			return err
 		}
 
-		var con console.Console
-		if tty {
-			con = console.Current()
-			defer con.Reset()
-			if err := con.SetRaw(); err != nil {
-				return err
-			}
-		}
 		if !detach {
 			if tty {
 				if err := HandleConsoleResize(ctx, process, con); err != nil {
