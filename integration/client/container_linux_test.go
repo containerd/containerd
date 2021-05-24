@@ -551,7 +551,7 @@ func TestDaemonReconnectsToShimIOPipesOnRestart(t *testing.T) {
 		t.Fatalf("containerd did not start within 2s: %v", err)
 	}
 
-	// After we restared containerd we write some messages to the log pipes, simulating shim writing stuff there.
+	// After we restarted containerd we write some messages to the log pipes, simulating shim writing stuff there.
 	// Then we make sure that these messages are available on the containerd log thus proving that the server reconnected to the log pipes
 	runtimeVersion := getRuntimeVersion()
 	logDirPath := getLogDirPath(runtimeVersion, id)
