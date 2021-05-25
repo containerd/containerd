@@ -26,7 +26,7 @@ func defaultMounts() []specs.Mount {
 			Destination: "/dev",
 			Type:        "devfs",
 			Source:      "devfs",
-			Options:     []string{},
+			Options:     []string{"ruleset=4"},
 		},
 		{
 			Destination: "/dev/fd",
