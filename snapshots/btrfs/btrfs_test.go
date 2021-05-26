@@ -19,6 +19,7 @@
 package btrfs
 
 import (
+	"bytes"
 	"context"
 	"io/ioutil"
 	"os"
@@ -44,7 +45,10 @@ func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshots.Snap
 		t.Skipf("could not find mkfs.btrfs: %v", err)
 	}
 
-	// TODO: Check for btrfs in /proc/module and skip if not loaded
+	procModules, err := ioutil.ReadFile("/proc/modules")
+	if err == nil && !bytes.Contains(procModules, []byte("btrfs")) {
+		t.Skip("check for btrfs kernel module failed, skipping test")
+	}
 
 	return func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
 
