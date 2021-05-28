@@ -1,10 +1,11 @@
 # Workflow intended to periodically test containerd integration tests
 
-name: win-periodic-integration
+name: Windows Periodic Tests
 
 on:
   schedule:
   - cron: "0 1 * * *"
+  workflow_dispatch:
 
 env:
   AZURE_DEFAULT_LOCATION: westeurope
