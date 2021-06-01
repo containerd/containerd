@@ -19,6 +19,7 @@ env:
 jobs:
   winIntegration:
     strategy:
+      fail-fast: false
       matrix:
         win_ver: [ltsc2019, sac2004]
         include:
