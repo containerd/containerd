@@ -12,7 +12,7 @@ or `crictl` please make sure the issue has not already been submitted.
 If you have not already installed crictl please install the version compatible
 with the `cri` plugin you are using. If you are a user, your deployment
 should have installed crictl for you. If not, get it from your release tarball.
-If you are a developer the current version of crictl is specified [here](../hack/utils.sh).
+If you are a developer the current version of crictl is specified [here](/script/setup/critools-version).
 A helper command has been included to install the dependencies at the right version:
 ```console
 $ make install.deps
