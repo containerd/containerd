@@ -79,7 +79,7 @@ CONTAINERD_FLAGS+="--address ${TRIMMED_CONTAINERD_SOCK} \
   --state ${CONTAINERD_STATE} \
   --root ${CONTAINERD_ROOT}"
 
-kill_containerd_cmd=
+pid=
 
 # NOTE: We don't have the sudo command on Windows.
 sudo=""
@@ -103,12 +103,6 @@ test_setup() {
   pid=$!
   set +m
 
-  if [ $IS_WINDOWS -eq 1 ]; then
-    kill_containerd_cmd="${sudo} kill ${pid}"
-  else
-    kill_containerd_cmd="${sudo} pkill -g $(ps -o pgid= -p ${pid})"
-  fi
-
   # Wait for containerd to be running by using the containerd client ctr to check the version
   # of the containerd server. Wait an increasing amount of time after each of five attempts
   local -r crictl_path=$(which crictl)
@@ -122,8 +116,14 @@ test_setup() {
 
 # test_teardown kills containerd.
 test_teardown() {
-  if [ -n "${kill_containerd_cmd}" ]; then
-    ${kill_containerd_cmd}
+  if [ -n "${pid}" ]; then
+    if [ $IS_WINDOWS -eq 1 ]; then
+      # NOTE(claudiub): The containerd process will have the same PGID as the keepalive process,
+      # so we can kill both of them by matching the PGID.
+      ${sudo} ps | awk "{if (\$3 == ${pid}) print \$1}" | xargs kill
+    else
+      ${sudo} pkill -g $(ps -o pgid= -p ${pid})
+    fi
   fi
 }
 
