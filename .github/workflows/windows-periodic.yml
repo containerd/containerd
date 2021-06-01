@@ -13,7 +13,7 @@ env:
   AZURE_DEFAULT_VM_SIZE: Standard_D2s_v3
   PASSWORD: Passw0rdAdmin # temp for testing, will be generated
   DEFAULT_ADMIN_USERNAME: azureuser
-  SSH_OPTS: "-o ServerAliveInterval=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+  SSH_OPTS: "-o ServerAliveInterval=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
   REMOTE_VM_BIN_PATH: "c:\\containerd\\bin"
 
 jobs:
