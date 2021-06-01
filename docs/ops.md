@@ -82,8 +82,8 @@ There are a few settings that are important for ops.
 The first setting is the `oom_score`.  Because containerd will be managing multiple containers, we need to ensure that containers are killed before the containerd daemon gets into an out of memory condition.
 We also do not want to make containerd unkillable, but we want to lower its score to the level of other system daemons.
 
-containerd also exports its own metrics as well as container level metrics via the prometheus metrics format.
-Currently, prometheus only supports TCP endpoints, therefore, the metrics address should be a TCP address that your prometheus infrastructure can scrape metrics from.
+containerd also exports its own metrics as well as container level metrics via the Prometheus metrics format under `/v1/metrics`.
+Currently, Prometheus only supports TCP endpoints, therefore, the metrics address should be a TCP address that your Prometheus infrastructure can scrape metrics from.
 
 containerd also has two different storage locations on a host system.
 One is for persistent data and the other is for runtime state.
