@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_DEFAULT_LOCATION: westeurope
+  AZURE_DEFAULT_LOCATION: westus2
   AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUB_ID }}
   AZURE_DEFAULT_VM_SIZE: Standard_D2s_v3
   PASSWORD: Passw0rdAdmin # temp for testing, will be generated
