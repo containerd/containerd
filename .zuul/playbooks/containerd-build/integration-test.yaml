@@ -11,7 +11,14 @@
         set -xe
         set -o pipefail
         apt-get update
-        apt-get install -y btrfs-tools libseccomp-dev git pkg-config lsof gperf
+        apt-get install -y btrfs-tools libseccomp-dev git pkg-config lsof gperf apparmor
+        echo "=========== apparmor_parser ========================"
+        find / -name apparmor_parser
+        echo "=========== apparmor ==============================="
+        find /sys/kernel/security/apparmor
+        echo "=========== enabled ================================"
+        cat /sys/module/apparmor/parameters/enabled
+        echo "===================================================="
 
         go version
       chdir: '{{ zuul.project.src_dir }}'
