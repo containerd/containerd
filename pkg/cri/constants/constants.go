@@ -16,8 +16,6 @@
 
 package constants
 
-// TODO(random-liu): Merge annotations package into this package.
-
 const (
 	// K8sContainerdNamespace is the namespace we use to connect containerd.
 	K8sContainerdNamespace = "k8s.io"
