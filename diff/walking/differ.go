@@ -80,7 +80,7 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 
 	var ocidesc ocispec.Descriptor
 	if err := mount.WithTempMount(ctx, lower, func(lowerRoot string) error {
-		return mount.WithTempMount(ctx, upper, func(upperRoot string) error {
+		return mount.WithTempMount(ctx, upper, func(upperRoot string) (retErr error) {
 			var newReference bool
 			if config.Reference == "" {
 				newReference = true
@@ -96,7 +96,7 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 				return errors.Wrap(err, "failed to open writer")
 			}
 			defer func() {
-				if err != nil {
+				if retErr != nil {
 					cw.Close()
 					if newReference {
 						if abortErr := s.store.Abort(ctx, config.Reference); abortErr != nil {
