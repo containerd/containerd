@@ -90,6 +90,25 @@ You can move them in your global path, `/usr/local/bin` with:
 sudo make install
 ```
 
+The install prefix can be changed by passing the `PREFIX` variable (defaults
+to `/usr/local`).
+
+Note: if you set one of these vars, set them to the same values on all make stages
+(build as well as install).
+
+If you want to prepend an additional prefix on actual installation (eg. packaging or chroot install),
+you can pass it via `DESTDIR` variable:
+
+```sudo
+sudo make install DESTDIR=/tmp/install-x973234/
+```
+
+The above command installs the `containerd` binary to `/tmp/install-x973234/usr/local/bin/containerd`
+
+The current `DESTDIR` convention is supported since containerd v1.6.
+Older releases was using `DESTDIR` for a different purpose that is similar to `PREFIX`.
+
+
 When making any changes to the gRPC API, you can use the installed `protoc`
 compiler to regenerate the API generated code packages with:
 
