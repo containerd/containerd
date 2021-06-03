@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -203,6 +204,15 @@ func WithResources(r *runtime.LinuxContainerResources) ContainerOpts { //nolint:
 			c.Linux = &runtime.LinuxContainerConfig{}
 		}
 		c.Linux.Resources = r
+	}
+}
+
+func WithVolumeMount(hostPath, containerPath string) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		hostPath, _ = filepath.Abs(hostPath)
+		containerPath, _ = filepath.Abs(containerPath)
+		mount := &runtime.Mount{HostPath: hostPath, ContainerPath: containerPath}
+		c.Mounts = append(c.Mounts, mount)
 	}
 }
 
