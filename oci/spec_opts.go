@@ -1278,6 +1278,15 @@ func WithDevShmSize(kb int64) SpecOpts {
 // as per: https://wiki.freebsd.org/LinuxJails
 func freebsdLinuxEmulationMounts(s *Spec) error {
 	var mounts []specs.Mount
+	var (
+		haveProc  = false
+		haveDevFd = false
+	)
+	/* If the mounts exist, we modify them in place, to keep the current order
+	   otherwise we add them below the for-loop. The nosuid noexec options are
+	   for consistency with Linux mounts: on FreeBSD it is by default impossible
+	   to execute anything from these filesystems.
+	*/
 	for _, m := range s.Mounts {
 		path := filepath.Clean(m.Destination)
 		if path == "/proc" {
@@ -1285,20 +1294,39 @@ func freebsdLinuxEmulationMounts(s *Spec) error {
 				Destination: "/proc",
 				Type:        "linprocfs",
 				Source:      "linprocfs",
-				Options:     []string{},
+				Options:     []string{"nosuid", "noexec"},
 			})
+			haveProc = true
 			continue
 		}
 		if path == "/dev/fd" {
 			m.Options = append(m.Options, "linrdlink")
+			haveDevFd = true
 		}
 		mounts = append(mounts, m)
+	}
+	if !haveProc {
+		mounts = append(mounts, specs.Mount{
+			Destination: "/proc",
+			Type:        "linprocfs",
+			Source:      "linprocfs",
+			Options:     []string{},
+		})
+	}
+
+	if !haveDevFd {
+		mounts = append(mounts, specs.Mount{
+			Destination: "/dev/fd",
+			Type:        "fdescfs",
+			Source:      "fdescfs",
+			Options:     []string{"linrdlink"},
+		})
 	}
 	mounts = append(mounts, specs.Mount{
 		Destination: "/sys",
 		Type:        "linsysfs",
 		Source:      "linsysfs",
-		Options:     []string{}})
+		Options:     []string{"nosuid", "noexec", "nodev"}})
 	s.Mounts = mounts
 	return nil
 }
