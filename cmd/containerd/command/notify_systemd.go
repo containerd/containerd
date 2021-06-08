@@ -1,4 +1,4 @@
-// +build linux,no_systemd
+// +build linux,!no_systemd
 
 /*
    Copyright The containerd Authors.
@@ -20,12 +20,28 @@ package command
 
 import (
 	"context"
+
+	sd "github.com/coreos/go-systemd/v22/daemon"
+
+	"github.com/containerd/containerd/log"
 )
 
+// notifyReady notifies systemd that the daemon is ready to serve requests
 func notifyReady(ctx context.Context) error {
-	return nil
+	return sdNotify(ctx, sd.SdNotifyReady)
 }
 
+// notifyStopping notifies systemd that the daemon is about to be stopped
 func notifyStopping(ctx context.Context) error {
-	return nil
+	return sdNotify(ctx, sd.SdNotifyStopping)
+}
+
+func sdNotify(ctx context.Context, state string) error {
+	notified, err := sd.SdNotify(false, state)
+	log.G(ctx).
+		WithError(err).
+		WithField("notified", notified).
+		WithField("state", state).
+		Debug("sd notification")
+	return err
 }
