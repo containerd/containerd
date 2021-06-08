@@ -244,11 +244,11 @@ genman: man/containerd.8 man/ctr.8
 
 man/containerd.8: FORCE
 	@echo "$(WHALE) $@"
-	$(GO) run cmd/gen-manpages/main.go $(@F) $(@D)
+	$(GO) run ${GO_TAGS} cmd/gen-manpages/main.go $(@F) $(@D)
 
 man/ctr.8: FORCE
 	@echo "$(WHALE) $@"
-	$(GO) run cmd/gen-manpages/main.go $(@F) $(@D)
+	$(GO) run ${GO_TAGS} cmd/gen-manpages/main.go $(@F) $(@D)
 
 man/%: docs/man/%.md FORCE
 	@echo "$(WHALE) $@"
