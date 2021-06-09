@@ -117,24 +117,22 @@ jobs:
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cat /c/Logs/integration.log | go-junit-report.exe > /c/Logs/junit_00.xml'"
 
       # CRI-integration tests for Windows PR is not merged. TO DO (adelina-t): enable these when PR #5163 merges.
-      #
-      # - name: PrepareRepoList
-      #   run: |
-      #     ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh -c 'cat > c:/repolist.yaml'" <<'EOF'
-      #       dockerLibraryRegistry: docker.io/claudiubelu
-      #       k8sCriContainerdRegistry: docker.io/claudiubelu
-      #       k8sGcrRegistry: docker.io/claudiubelu
-      #     EOF
+      - name: PrepareRepoList
+        run: |
+           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh -c 'cat > c:/repolist.toml'" <<'EOF'
+               busybox = "docker.io/claudiubelu/busybox:1.29"
+           EOF
 
-      # - name: RunCRIIntegrationTests
-      #   run: |
-      #     ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -s" <<EOF
-      #       cd c:/containerd
-      #       ./script/setup/install-cni-windows
-      #       export KUBE_TEST_REPO_LIST=c:/repolist.yaml
-      #       make cri-integration | tee c:/Logs/cri-integration.log
-      #     EOF
-      #     ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cat c:\Logs\cri-integration.log | go-junit-report.exe > c:/Logs/junit_01.xml' "
+      - name: RunCRIIntegrationTests
+        run: |
+           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -s" <<EOF
+             cd c:/containerd
+             ./script/setup/install-cni-windows
+             mkdir /c/tmp
+             export TEST_IMAGE_LIST=c:/repolist.toml
+             make cri-integration | tee c:/Logs/cri-integration.log
+           EOF
+           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cat /c/Logs/cri-integration.log | go-junit-report.exe > c:/Logs/junit_01.xml' "
 
       - name: PullLogsFromWinNode
         run: |
