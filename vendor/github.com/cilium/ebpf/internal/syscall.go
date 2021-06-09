@@ -140,9 +140,10 @@ func BPFObjPin(fileName string, fd *FD) error {
 }
 
 // BPFObjGet wraps BPF_OBJ_GET.
-func BPFObjGet(fileName string) (*FD, error) {
+func BPFObjGet(fileName string, flags uint32) (*FD, error) {
 	attr := bpfObjAttr{
-		fileName: NewStringPointer(fileName),
+		fileName:  NewStringPointer(fileName),
+		fileFlags: flags,
 	}
 	ptr, err := BPF(BPF_OBJ_GET, unsafe.Pointer(&attr), unsafe.Sizeof(attr))
 	if err != nil {
