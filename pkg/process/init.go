@@ -38,6 +38,7 @@ import (
 	google_protobuf "github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -91,6 +92,7 @@ func NewRunc(root, path, namespace, runtime, criu string, systemd bool) *runc.Ru
 		Root:          filepath.Join(root, namespace),
 		Criu:          criu,
 		SystemdCgroup: systemd,
+		Debug:         logrus.GetLevel() == logrus.DebugLevel,
 	}
 }
 
