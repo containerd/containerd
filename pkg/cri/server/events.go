@@ -300,6 +300,7 @@ func (em *eventMonitor) start() <-chan error {
 func (em *eventMonitor) stop() {
 	em.backOff.stop()
 	em.cancel()
+	logrus.Info("Event monitor stopped")
 }
 
 // handleEvent handles a containerd event.

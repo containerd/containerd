@@ -29,7 +29,7 @@ import (
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/cri/streaming"
 	"github.com/containerd/containerd/plugin"
-	cni "github.com/containerd/go-cni"
+	"github.com/containerd/go-cni"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -107,6 +107,8 @@ type criService struct {
 	// allCaps is the list of the capabilities.
 	// When nil, parsed from CapEff of /proc/self/status.
 	allCaps []string // nolint
+	// a flag value indicates whether the close of CRI service is intended or not.
+	normalClose atomic.Bool
 }
 
 // NewCRIService returns a new instance of CRIService
@@ -124,6 +126,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerNameIndex: registrar.NewRegistrar(),
 		initialized:        atomic.NewBool(false),
+		normalClose:        atomic.NewBool(false),
 	}
 
 	if client.SnapshotService(c.config.ContainerdConfig.Snapshotter) == nil {
@@ -220,48 +223,30 @@ func (c *criService) Run() error {
 	// Set the server as initialized. GRPC services could start serving traffic.
 	c.initialized.Set()
 
-	var eventMonitorErr, streamServerErr, cniNetConfMonitorErr error
+	var criticalErr error
+	var errFrom string
 	// Stop the whole CRI service if any of the critical service exits.
+	// We only care about the first error which causes the whole CRI service to exit.
 	select {
-	case eventMonitorErr = <-eventMonitorErrCh:
-	case streamServerErr = <-streamServerErrCh:
-	case cniNetConfMonitorErr = <-cniNetConfMonitorErrCh:
+	case criticalErr = <-eventMonitorErrCh:
+		errFrom = "event monitor"
+	case criticalErr = <-streamServerErrCh:
+		errFrom = "stream server"
+	case criticalErr = <-cniNetConfMonitorErrCh:
+		errFrom = "cni network conf monitor"
 	}
-	if err := c.Close(); err != nil {
-		return errors.Wrap(err, "failed to stop cri service")
-	}
-	// If the error is set above, err from channel must be nil here, because
-	// the channel is supposed to be closed. Or else, we wait and set it.
-	if err := <-eventMonitorErrCh; err != nil {
-		eventMonitorErr = err
-	}
-	logrus.Info("Event monitor stopped")
-	// There is a race condition with http.Server.Serve.
-	// When `Close` is called at the same time with `Serve`, `Close`
-	// may finish first, and `Serve` may still block.
-	// See https://github.com/golang/go/issues/20239.
-	// Here we set a 2 second timeout for the stream server wait,
-	// if it timeout, an error log is generated.
-	// TODO(random-liu): Get rid of this after https://github.com/golang/go/issues/20239
-	// is fixed.
-	const streamServerStopTimeout = 2 * time.Second
-	select {
-	case err := <-streamServerErrCh:
-		if err != nil {
-			streamServerErr = err
+	// if this is not an expected close, we need to stop all other services.
+	if !c.normalClose.IsSet() {
+		if err := c.close(); err != nil {
+			return errors.Wrap(err, "failed to stop cri service")
 		}
-		logrus.Info("Stream server stopped")
-	case <-time.After(streamServerStopTimeout):
-		logrus.Errorf("Stream server is not stopped in %q", streamServerStopTimeout)
 	}
-	if eventMonitorErr != nil {
-		return errors.Wrap(eventMonitorErr, "event monitor error")
-	}
-	if streamServerErr != nil {
-		return errors.Wrap(streamServerErr, "stream server error")
-	}
-	if cniNetConfMonitorErr != nil {
-		return errors.Wrap(cniNetConfMonitorErr, "cni network conf monitor error")
+	// The streamServerErrCh should be closed. Or we wait for it to close.
+	<-streamServerErrCh
+	logrus.Info("Stream server stopped")
+
+	if criticalErr != nil {
+		return errors.Wrap(criticalErr, errFrom+" error")
 	}
 	return nil
 }
@@ -270,6 +255,12 @@ func (c *criService) Run() error {
 // TODO(random-liu): Make close synchronous.
 func (c *criService) Close() error {
 	logrus.Info("Stop CRI service")
+	c.normalClose.Set()
+	return c.close()
+}
+
+// Close the CRI service, but don't print the "Stop CRI service" logs.
+func (c *criService) close() error {
 	if err := c.cniNetConfMonitor.stop(); err != nil {
 		logrus.WithError(err).Error("failed to stop cni network conf monitor")
 	}
