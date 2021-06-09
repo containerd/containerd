@@ -85,6 +85,9 @@ type criService struct {
 	imageStore *imagestore.Store
 	// snapshotStore stores information of all snapshots.
 	snapshotStore *snapshotstore.Store
+	// snapshotsSyncer syncs snapshots stat from specified snapshotter service
+	// to snapshotStore periodically
+	snapshotsSyncer *snapshotsSyncer
 	// netPlugin is used to setup and teardown network when run/stop pod sandbox.
 	netPlugin cni.CNI
 	// client is an instance of the containerd client
@@ -147,6 +150,12 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 		return nil, errors.Wrap(err, "failed to create cni conf monitor")
 	}
 
+	c.snapshotsSyncer = newSnapshotsSyncer(
+		c.snapshotStore,
+		c.client.SnapshotService(c.config.ContainerdConfig.Snapshotter),
+		time.Duration(c.config.StatsCollectPeriod)*time.Second,
+	)
+
 	// Preload base OCI specs
 	c.baseOCISpecs, err = loadBaseOCISpecs(&config)
 	if err != nil {
@@ -185,14 +194,9 @@ func (c *criService) Run() error {
 	logrus.Info("Start event monitor")
 	eventMonitorErrCh := c.eventMonitor.start()
 
-	// Start snapshot stats syncer, it doesn't need to be stopped.
+	// Start snapshot stats syncer
 	logrus.Info("Start snapshots syncer")
-	snapshotsSyncer := newSnapshotsSyncer(
-		c.snapshotStore,
-		c.client.SnapshotService(c.config.ContainerdConfig.Snapshotter),
-		time.Duration(c.config.StatsCollectPeriod)*time.Second,
-	)
-	snapshotsSyncer.start()
+	c.snapshotsSyncer.start()
 
 	// Start CNI network conf syncer
 	logrus.Info("Start cni network conf syncer")
@@ -270,6 +274,7 @@ func (c *criService) Close() error {
 		logrus.WithError(err).Error("failed to stop cni network conf monitor")
 	}
 	c.eventMonitor.stop()
+	c.snapshotsSyncer.stop()
 	if err := c.streamServer.Stop(); err != nil {
 		return errors.Wrap(err, "failed to stop stream server")
 	}
