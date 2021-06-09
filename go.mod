@@ -3,7 +3,7 @@ module github.com/containerd/containerd
 go 1.16
 
 require (
-	github.com/Microsoft/go-winio v0.4.17
+	github.com/Microsoft/go-winio v0.5.0
 	github.com/Microsoft/hcsshim v0.8.16
 	github.com/containerd/aufs v1.0.0
 	github.com/containerd/btrfs v1.0.0
