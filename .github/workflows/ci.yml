@@ -49,6 +49,15 @@ jobs:
     timeout-minutes: 5
 
     steps:
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '1.16.4'
+
+      - shell: bash
+        run: |
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+
       - uses: actions/checkout@v2
         with:
           path: src/github.com/containerd/containerd
