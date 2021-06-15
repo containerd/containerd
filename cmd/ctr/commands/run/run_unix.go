@@ -27,6 +27,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/nvidia"
 	"github.com/containerd/containerd/contrib/seccomp"
@@ -265,6 +266,21 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		}
 		for _, dev := range context.StringSlice("device") {
 			opts = append(opts, oci.WithDevices(dev, "", "rwm"))
+		}
+
+		rootfsPropagation := context.String("rootfs-propagation")
+		if rootfsPropagation != "" {
+			opts = append(opts, func(_ gocontext.Context, _ oci.Client, _ *containers.Container, s *oci.Spec) error {
+				if s.Linux != nil {
+					s.Linux.RootfsPropagation = rootfsPropagation
+				} else {
+					s.Linux = &specs.Linux{
+						RootfsPropagation: rootfsPropagation,
+					}
+				}
+
+				return nil
+			})
 		}
 	}
 
