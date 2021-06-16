@@ -14,4 +14,4 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-GO111MODULE=on go install gotest.tools/gotestsum@v1.6.2
+GO111MODULE=on go install gotest.tools/gotestsum@012a85e34a7ce5554057d512e55dcb54b6f2505e
