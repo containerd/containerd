@@ -29,7 +29,7 @@ git clone https://github.com/containerd/imgcrypt.git "${TMPROOT}"/imgcrypt
 pushd "${TMPROOT}"/imgcrypt
 git checkout "${IMGCRYPT_COMMIT}"
 make
-make install -e DESTDIR="${DESTDIR}/usr/local"
+make containerd-release -e DESTDIR="${DESTDIR}/usr/local"
 
 popd
 rm -fR "${TMPROOT}"

@@ -1,5 +1,3 @@
-// +build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -22,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -41,11 +40,12 @@ func TestImageLoad(t *testing.T) {
 	t.Logf("docker save image into tarball")
 	output, err := exec.Command("docker", "pull", testImage).CombinedOutput()
 	require.NoError(t, err, "output: %q", output)
-	tarF, err := ioutil.TempFile("", "image-load")
-	tar := tarF.Name()
+	// ioutil.TempFile also opens a file, which might prevent us from overwriting that file with docker save.
+	tarDir, err := ioutil.TempDir("", "image-load")
+	tar := filepath.Join(tarDir, "image.tar")
 	require.NoError(t, err)
 	defer func() {
-		assert.NoError(t, os.RemoveAll(tar))
+		assert.NoError(t, os.RemoveAll(tarDir))
 	}()
 	output, err = exec.Command("docker", "save", testImage, "-o", tar).CombinedOutput()
 	require.NoError(t, err, "output: %q", output)

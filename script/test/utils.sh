@@ -16,6 +16,11 @@
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/../..
 
+IS_WINDOWS=0
+if [ -v "OS" ] && [ "${OS}" == "Windows_NT" ]; then
+  IS_WINDOWS=1
+fi
+
 # RESTART_WAIT_PERIOD is the period to wait before restarting containerd.
 RESTART_WAIT_PERIOD=${RESTART_WAIT_PERIOD:-10}
 # CONTAINERD_FLAGS contains all containerd flags.
@@ -52,17 +57,35 @@ CONTAINERD_ROOT=${CONTAINERD_ROOT:-"/var/lib/containerd${CONTAINERD_TEST_SUFFIX}
 # The containerd state directory.
 CONTAINERD_STATE=${CONTAINERD_STATE:-"/run/containerd${CONTAINERD_TEST_SUFFIX}"}
 # The containerd socket address.
-CONTAINERD_SOCK=${CONTAINERD_SOCK:-unix://${CONTAINERD_STATE}/containerd.sock}
+if [ $IS_WINDOWS -eq 0 ]; then
+  CONTAINERD_SOCK=${CONTAINERD_SOCK:-unix://${CONTAINERD_STATE}/containerd.sock}
+  TRIMMED_CONTAINERD_SOCK="${CONTAINERD_SOCK#unix://}"
+else
+  CONTAINERD_SOCK=${CONTAINERD_SOCK:-npipe://./pipe/${CONTAINERD_STATE}/containerd}
+  TRIMMED_CONTAINERD_SOCK="${CONTAINERD_SOCK#npipe:}"
+fi
+
 # The containerd binary name.
-CONTAINERD_BIN=${CONTAINERD_BIN:-"containerd"} # don't need a suffix now
+EXE_SUFFIX=""
+if [ $IS_WINDOWS -eq 1 ]; then
+  EXE_SUFFIX=".exe"
+fi
+CONTAINERD_BIN=${CONTAINERD_BIN:-"containerd"}${EXE_SUFFIX}
 if [ -f "${CONTAINERD_CONFIG_FILE}" ]; then
   CONTAINERD_FLAGS+="--config ${CONTAINERD_CONFIG_FILE} "
 fi
-CONTAINERD_FLAGS+="--address ${CONTAINERD_SOCK#"unix://"} \
+
+CONTAINERD_FLAGS+="--address ${TRIMMED_CONTAINERD_SOCK} \
   --state ${CONTAINERD_STATE} \
   --root ${CONTAINERD_ROOT}"
 
-containerd_groupid=
+pid=
+
+# NOTE: We don't have the sudo command on Windows.
+sudo=""
+if [ $(id -u) -ne 0 ] && command -v sudo &> /dev/null; then
+  sudo="sudo PATH=${PATH}"
+fi
 
 # test_setup starts containerd.
 test_setup() {
@@ -75,11 +98,11 @@ test_setup() {
   set -m
   # Create containerd in a different process group
   # so that we can easily clean them up.
-  keepalive "sudo PATH=${PATH} bin/containerd ${CONTAINERD_FLAGS}" \
+  keepalive "${sudo} bin/containerd ${CONTAINERD_FLAGS}" \
     ${RESTART_WAIT_PERIOD} &> ${report_dir}/containerd.log &
   pid=$!
   set +m
-  containerd_groupid=$(ps -o pgid= -p ${pid})
+
   # Wait for containerd to be running by using the containerd client ctr to check the version
   # of the containerd server. Wait an increasing amount of time after each of five attempts
   local -r crictl_path=$(which crictl)
@@ -87,14 +110,20 @@ test_setup() {
     echo "crictl is not in PATH"
     exit 1
   fi
-  readiness_check "sudo bin/ctr --address ${CONTAINERD_SOCK#"unix://"} version"
-  readiness_check "sudo ${crictl_path} --runtime-endpoint=${CONTAINERD_SOCK} info"
+  readiness_check "${sudo} bin/ctr --address ${TRIMMED_CONTAINERD_SOCK} version"
+  readiness_check "${sudo} ${crictl_path} --runtime-endpoint=${CONTAINERD_SOCK} info"
 }
 
 # test_teardown kills containerd.
 test_teardown() {
-  if [ -n "${containerd_groupid}" ]; then
-    sudo pkill -g ${containerd_groupid}
+  if [ -n "${pid}" ]; then
+    if [ $IS_WINDOWS -eq 1 ]; then
+      # NOTE(claudiub): The containerd process will have the same PGID as the keepalive process,
+      # so we can kill both of them by matching the PGID.
+      ${sudo} ps | awk "{if (\$3 == ${pid}) print \$1}" | xargs kill
+    else
+      ${sudo} pkill -g $(ps -o pgid= -p ${pid})
+    fi
   fi
 }
 

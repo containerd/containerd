@@ -97,8 +97,14 @@ version = 2
   # when using containerd with Kubernetes <=1.11.
   disable_proc_mount = false
 
-  # unsetSeccompProfile is the profile containerd/cri will use if the provided seccomp profile is
-  # unset (`""`) for a container (default is `unconfined`)
+  # unset_seccomp_profile is the seccomp profile containerd/cri will use if the seccomp
+  # profile requested over CRI is unset (or nil) for a pod/container (otherwise if this field is not set the
+  # default unset profile will map to `unconfined`)
+    # Note: The default unset seccomp profile should not be confused with the seccomp profile
+    # used in CRI when the runtime default seccomp profile is requested. In the later case, the
+    # default is set by the following code (https://github.com/containerd/containerd/blob/master/contrib/seccomp/seccomp_default.go).
+    # To summarize, there are two different seccomp defaults, the unset default used when the CRI request is
+    # set to nil or `unconfined`, and the default used when the runtime default seccomp profile is requested.
   unset_seccomp_profile = ""
 
   # 'plugins."io.containerd.grpc.v1.cri".containerd' contains config related to containerd
@@ -167,7 +173,7 @@ version = 2
       # base_runtime_spec is a file path to a JSON file with the OCI spec that will be used as the base spec that all
       # container's are created from.
       # Use containerd's `ctr oci spec > /etc/containerd/cri-base.json` to output initial spec file.
-      # Spec files are loaded at launch, so containerd daemon must be restared on any changes to refresh default specs.
+      # Spec files are loaded at launch, so containerd daemon must be restarted on any changes to refresh default specs.
       # Still running containers and restarted containers will still be using the original spec from which that container was created.
       base_runtime_spec = ""
 

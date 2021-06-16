@@ -1,5 +1,3 @@
-// +build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -52,12 +50,8 @@ func TestContainerLogWithoutTailingNewLine(t *testing.T) {
 		testImage     = GetImage(BusyBox)
 		containerName = "test-container"
 	)
-	t.Logf("Pull test image %q", testImage)
-	img, err := imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil, sbConfig)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: img}))
-	}()
+
+	EnsureImageExists(t, testImage)
 
 	t.Log("Create a container with log path")
 	cnConfig := ContainerConfig(
@@ -112,12 +106,8 @@ func TestLongContainerLog(t *testing.T) {
 		testImage     = GetImage(BusyBox)
 		containerName = "test-container"
 	)
-	t.Logf("Pull test image %q", testImage)
-	img, err := imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil, sbConfig)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: img}))
-	}()
+
+	EnsureImageExists(t, testImage)
 
 	t.Log("Create a container with log path")
 	config, err := CRIConfig()

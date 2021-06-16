@@ -500,7 +500,7 @@ func (s *store) resumeStatus(ref string, total int64, digester digest.Digester) 
 	if ref != status.Ref {
 		// NOTE(stevvooe): This is fairly catastrophic. Either we have some
 		// layout corruption or a hash collision for the ref key.
-		return status, errors.Wrapf(err, "ref key does not match: %v != %v", ref, status.Ref)
+		return status, errors.Errorf("ref key does not match: %v != %v", ref, status.Ref)
 	}
 
 	if total > 0 && status.Total > 0 && total != status.Total {
@@ -683,10 +683,10 @@ func writeTimestampFile(p string, t time.Time) error {
 	if err != nil {
 		return err
 	}
-	return atomicWrite(p, b, 0666)
+	return writeToCompletion(p, b, 0666)
 }
 
-func atomicWrite(path string, data []byte, mode os.FileMode) error {
+func writeToCompletion(path string, data []byte, mode os.FileMode) error {
 	tmp := fmt.Sprintf("%s.tmp", path)
 	f, err := os.OpenFile(tmp, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_SYNC, mode)
 	if err != nil {
@@ -695,7 +695,11 @@ func atomicWrite(path string, data []byte, mode os.FileMode) error {
 	_, err = f.Write(data)
 	f.Close()
 	if err != nil {
-		return errors.Wrap(err, "write atomic data")
+		return errors.Wrap(err, "write tmp file")
 	}
-	return os.Rename(tmp, path)
+	err = os.Rename(tmp, path)
+	if err != nil {
+		return errors.Wrap(err, "rename tmp file")
+	}
+	return nil
 }

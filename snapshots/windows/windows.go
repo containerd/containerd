@@ -31,7 +31,6 @@ import (
 
 	"github.com/Microsoft/go-winio"
 	winfs "github.com/Microsoft/go-winio/pkg/fs"
-	"github.com/Microsoft/go-winio/vhd"
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/computestorage"
 	"github.com/Microsoft/hcsshim/pkg/ociwclayer"
@@ -256,11 +255,19 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 			return err
 		}
 		// If permission denied, it's possible that the scratch is still mounted, an
-		// artifact after a hard daemon crash for example. Worth a shot to try detaching it
+		// artifact after a hard daemon crash for example. Worth a shot to try deactivating it
 		// before retrying the rename.
-		if detachErr := vhd.DetachVhd(filepath.Join(path, "sandbox.vhdx")); detachErr != nil {
-			return errors.Wrapf(err, "failed to detach VHD: %s", detachErr)
+		var (
+			home, layerID = filepath.Split(path)
+			di            = hcsshim.DriverInfo{
+				HomeDir: home,
+			}
+		)
+
+		if deactvateErr := hcsshim.DeactivateLayer(di, layerID); deactvateErr != nil {
+			return errors.Wrapf(err, "failed to deactivate layer following failed rename: %s", deactvateErr)
 		}
+
 		if renameErr := os.Rename(path, renamed); renameErr != nil && !os.IsNotExist(renameErr) {
 			return errors.Wrapf(err, "second rename attempt following detach failed: %s", renameErr)
 		}
@@ -461,7 +468,7 @@ func (s *snapshotter) createScratchLayer(ctx context.Context, snDir string, pare
 	return nil
 }
 
-// convertScratchToReadOnlyLayer reimporst the layer over itself, to transfer the files from the sandbox.vhdx to the on-disk storage.
+// convertScratchToReadOnlyLayer reimports the layer over itself, to transfer the files from the sandbox.vhdx to the on-disk storage.
 func (s *snapshotter) convertScratchToReadOnlyLayer(ctx context.Context, snapshot storage.Snapshot, path string) (retErr error) {
 
 	// TODO darrenstahlmsft: When this is done isolated, we should disable these.

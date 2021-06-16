@@ -1,5 +1,3 @@
-// +build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -20,6 +18,7 @@ package integration
 
 import (
 	"context"
+	goruntime "runtime"
 	"testing"
 	"time"
 
@@ -46,12 +45,8 @@ func TestSharedPidMultiProcessContainerStop(t *testing.T) {
 				testImage     = GetImage(BusyBox)
 				containerName = "test-container"
 			)
-			t.Logf("Pull test image %q", testImage)
-			img, err := imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil, sbConfig)
-			require.NoError(t, err)
-			defer func() {
-				assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: img}))
-			}()
+
+			EnsureImageExists(t, testImage)
 
 			t.Log("Create a multi-process container")
 			cnConfig := ContainerConfig(
@@ -77,6 +72,9 @@ func TestSharedPidMultiProcessContainerStop(t *testing.T) {
 }
 
 func TestContainerStopCancellation(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipped on Windows.")
+	}
 	t.Log("Create a pod sandbox")
 	sbConfig := PodSandboxConfig("sandbox", "cancel-container-stop")
 	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
@@ -90,12 +88,8 @@ func TestContainerStopCancellation(t *testing.T) {
 		testImage     = GetImage(BusyBox)
 		containerName = "test-container"
 	)
-	t.Logf("Pull test image %q", testImage)
-	img, err := imageService.PullImage(&runtime.ImageSpec{Image: testImage}, nil, sbConfig)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: img}))
-	}()
+
+	EnsureImageExists(t, testImage)
 
 	t.Log("Create a container which traps sigterm")
 	cnConfig := ContainerConfig(

@@ -15,12 +15,18 @@
 
 # Go command to use for build
 GO ?= go
+INSTALL ?= install
 
 # Root directory of the project (absolute path).
 ROOTDIR=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # Base path used to install.
-DESTDIR ?= /usr/local
+# The files will be installed under `$(DESTDIR)/$(PREFIX)`.
+# The convention of `DESTDIR` was changed in containerd v1.6.
+PREFIX        ?= /usr/local
+DATADIR       ?= $(PREFIX)/share
+MANDIR        ?= $(DATADIR)/man
+
 TEST_IMAGE_LIST ?=
 
 # Used to populate variables in version package.
@@ -194,7 +200,7 @@ bin/cri-integration.test:
 
 cri-integration: binaries bin/cri-integration.test ## run cri integration tests
 	@echo "$(WHALE) $@"
-	@./script/test/cri-integration.sh
+	@bash -x ./script/test/cri-integration.sh
 	@rm -rf bin/cri-integration.test
 
 benchmark: ## run benchmarks tests
@@ -213,16 +219,16 @@ bin/%: cmd/% FORCE
 	$(call BUILD_BINARY)
 
 bin/containerd-shim: cmd/containerd-shim FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
-	@echo "$(WHALE) bin/containerd-shim"
-	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o bin/containerd-shim ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./cmd/containerd-shim
+	@echo "$(WHALE) $@"
+	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./cmd/containerd-shim
 
 bin/containerd-shim-runc-v1: cmd/containerd-shim-runc-v1 FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
-	@echo "$(WHALE) bin/containerd-shim-runc-v1"
-	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o bin/containerd-shim-runc-v1 ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./cmd/containerd-shim-runc-v1
+	@echo "$(WHALE) $@"
+	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./cmd/containerd-shim-runc-v1
 
 bin/containerd-shim-runc-v2: cmd/containerd-shim-runc-v2 FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
-	@echo "$(WHALE) bin/containerd-shim-runc-v2"
-	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o bin/containerd-shim-runc-v2 ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./cmd/containerd-shim-runc-v2
+	@echo "$(WHALE) $@"
+	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./cmd/containerd-shim-runc-v2
 
 binaries: $(BINARIES) ## build binaries
 	@echo "$(WHALE) $@"
@@ -249,19 +255,19 @@ man/%: docs/man/%.md FORCE
 	go-md2man -in "$<" -out "$@"
 
 define installmanpage
-mkdir -p $(DESTDIR)/man/man$(2);
-gzip -c $(1) >$(DESTDIR)/man/man$(2)/$(3).gz;
+$(INSTALL) -d $(DESTDIR)/$(MANDIR)/man$(2);
+gzip -c $(1) >$(DESTDIR)/$(MANDIR)/man$(2)/$(3).gz;
 endef
 
-install-man:
+install-man: man
 	@echo "$(WHALE) $@"
 	$(foreach manpage,$(addprefix man/,$(MANPAGES)), $(call installmanpage,$(manpage),$(subst .,,$(suffix $(manpage))),$(notdir $(manpage))))
 
 releases/$(RELEASE).tar.gz: $(BINARIES)
 	@echo "$(WHALE) $@"
 	@rm -rf releases/$(RELEASE) releases/$(RELEASE).tar.gz
-	@install -d releases/$(RELEASE)/bin
-	@install $(BINARIES) releases/$(RELEASE)/bin
+	@$(INSTALL) -d releases/$(RELEASE)/bin
+	@$(INSTALL) $(BINARIES) releases/$(RELEASE)/bin
 	@tar -czf releases/$(RELEASE).tar.gz -C releases/$(RELEASE) bin
 	@rm -rf releases/$(RELEASE)
 
@@ -272,18 +278,18 @@ release: releases/$(RELEASE).tar.gz
 # install of cri deps into release output directory
 ifeq ($(GOOS),windows)
 install-cri-deps: $(BINARIES)
-	mkdir -p $(CRIDIR)
+	$(INSTALL) -d $(CRIDIR)
 	DESTDIR=$(CRIDIR) script/setup/install-cni-windows
 	cp bin/* $(CRIDIR)
 else
 install-cri-deps: $(BINARIES)
 	@rm -rf ${CRIDIR}
-	@install -d ${CRIDIR}/usr/local/bin
-	@install -D -m 755 bin/* ${CRIDIR}/usr/local/bin
-	@install -d ${CRIDIR}/opt/containerd/cluster
+	@$(INSTALL) -d ${CRIDIR}/usr/local/bin
+	@$(INSTALL) -D -m 755 bin/* ${CRIDIR}/usr/local/bin
+	@$(INSTALL) -d ${CRIDIR}/opt/containerd/cluster
 	@cp -r contrib/gce ${CRIDIR}/opt/containerd/cluster/
-	@install -d ${CRIDIR}/etc/systemd/system
-	@install -m 644 containerd.service ${CRIDIR}/etc/systemd/system
+	@$(INSTALL) -d ${CRIDIR}/etc/systemd/system
+	@$(INSTALL) -m 644 containerd.service ${CRIDIR}/etc/systemd/system
 	echo "CONTAINERD_VERSION: '$(VERSION:v%=%)'" | tee ${CRIDIR}/opt/containerd/cluster/version
 
 	DESTDIR=$(CRIDIR) script/setup/install-runc
@@ -291,8 +297,8 @@ install-cri-deps: $(BINARIES)
 	DESTDIR=$(CRIDIR) script/setup/install-critools
 	DESTDIR=$(CRIDIR) script/setup/install-imgcrypt
 
-	@install -d $(CRIDIR)/bin
-	@install $(BINARIES) $(CRIDIR)/bin
+	@$(INSTALL) -d $(CRIDIR)/bin
+	@$(INSTALL) $(BINARIES) $(CRIDIR)/bin
 endif
 
 ifeq ($(GOOS),windows)
@@ -345,12 +351,12 @@ clean-test: ## clean up debris from previously failed tests
 
 install: ## install binaries
 	@echo "$(WHALE) $@ $(BINARIES)"
-	@mkdir -p $(DESTDIR)/bin
-	@install $(BINARIES) $(DESTDIR)/bin
+	@$(INSTALL) -d $(DESTDIR)/$(PREFIX)/bin
+	@$(INSTALL) $(BINARIES) $(DESTDIR)/$(PREFIX)/bin
 
 uninstall:
 	@echo "$(WHALE) $@"
-	@rm -f $(addprefix $(DESTDIR)/bin/,$(notdir $(BINARIES)))
+	@rm -f $(addprefix $(DESTDIR)/$(PREFIX)/bin/,$(notdir $(BINARIES)))
 
 ifeq ($(GOOS),windows)
 install-deps:

@@ -14,11 +14,25 @@
    limitations under the License.
 */
 
-package constants
+package oci
 
-const (
-	// K8sContainerdNamespace is the namespace we use to connect containerd.
-	K8sContainerdNamespace = "k8s.io"
-	// CRIVersion is the CRI version supported by the CRI plugin.
-	CRIVersion = "v1alpha2"
+import (
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
+
+func defaultMounts() []specs.Mount {
+	return []specs.Mount{
+		{
+			Destination: "/dev",
+			Type:        "devfs",
+			Source:      "devfs",
+			Options:     []string{"ruleset=4"},
+		},
+		{
+			Destination: "/dev/fd",
+			Type:        "fdescfs",
+			Source:      "fdescfs",
+			Options:     []string{},
+		},
+	}
+}

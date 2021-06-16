@@ -95,8 +95,12 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 			if err != nil {
 				return errors.Wrap(err, "failed to open writer")
 			}
+
+			// errOpen is set when an error occurs while the content writer has not been
+			// committed or closed yet to force a cleanup
+			var errOpen error
 			defer func() {
-				if err != nil {
+				if errOpen != nil {
 					cw.Close()
 					if newReference {
 						if abortErr := s.store.Abort(ctx, config.Reference); abortErr != nil {
@@ -106,22 +110,22 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 				}
 			}()
 			if !newReference {
-				if err = cw.Truncate(0); err != nil {
-					return err
+				if errOpen = cw.Truncate(0); errOpen != nil {
+					return errOpen
 				}
 			}
 
 			if isCompressed {
 				dgstr := digest.SHA256.Digester()
 				var compressed io.WriteCloser
-				compressed, err = compression.CompressStream(cw, compression.Gzip)
-				if err != nil {
-					return errors.Wrap(err, "failed to get compressed stream")
+				compressed, errOpen = compression.CompressStream(cw, compression.Gzip)
+				if errOpen != nil {
+					return errors.Wrap(errOpen, "failed to get compressed stream")
 				}
-				err = archive.WriteDiff(ctx, io.MultiWriter(compressed, dgstr.Hash()), lowerRoot, upperRoot)
+				errOpen = archive.WriteDiff(ctx, io.MultiWriter(compressed, dgstr.Hash()), lowerRoot, upperRoot)
 				compressed.Close()
-				if err != nil {
-					return errors.Wrap(err, "failed to write compressed diff")
+				if errOpen != nil {
+					return errors.Wrap(errOpen, "failed to write compressed diff")
 				}
 
 				if config.Labels == nil {
@@ -129,8 +133,8 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 				}
 				config.Labels[uncompressed] = dgstr.Digest().String()
 			} else {
-				if err = archive.WriteDiff(ctx, cw, lowerRoot, upperRoot); err != nil {
-					return errors.Wrap(err, "failed to write diff")
+				if errOpen = archive.WriteDiff(ctx, cw, lowerRoot, upperRoot); errOpen != nil {
+					return errors.Wrap(errOpen, "failed to write diff")
 				}
 			}
 
@@ -140,10 +144,11 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 			}
 
 			dgst := cw.Digest()
-			if err := cw.Commit(ctx, 0, dgst, commitopts...); err != nil {
-				if !errdefs.IsAlreadyExists(err) {
-					return errors.Wrap(err, "failed to commit")
+			if errOpen = cw.Commit(ctx, 0, dgst, commitopts...); errOpen != nil {
+				if !errdefs.IsAlreadyExists(errOpen) {
+					return errors.Wrap(errOpen, "failed to commit")
 				}
+				errOpen = nil
 			}
 
 			info, err := s.store.Info(ctx, dgst)

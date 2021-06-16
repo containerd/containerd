@@ -1,0 +1,167 @@
+# Workflow intended to periodically test containerd integration tests
+
+name: Windows Periodic Tests
+
+on:
+  schedule:
+  - cron: "0 1 * * *"
+  workflow_dispatch:
+
+env:
+  AZURE_DEFAULT_LOCATION: westeurope
+  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUB_ID }}
+  AZURE_DEFAULT_VM_SIZE: Standard_D2s_v3
+  PASSWORD: Passw0rdAdmin # temp for testing, will be generated
+  DEFAULT_ADMIN_USERNAME: azureuser
+  SSH_OPTS: "-o ServerAliveInterval=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+  REMOTE_VM_BIN_PATH: "c:\\containerd\\bin"
+
+jobs:
+  winIntegration:
+    strategy:
+      matrix:
+        win_ver: [ltsc2019, sac2004]
+        include:
+        - win_ver: sac2004
+          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:datacenter-core-2004-with-containers-smalldisk:19041.928.2104150521"
+          AZURE_RESOURCE_GROUP: ctrd-integration-sac2004-${{ github.run_id }}
+          GOOGLE_BUCKET: "gs://containerd-integration/logs/windows-sac2004/"
+        - win_ver: ltsc2019
+          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2019-Datacenter-with-Containers-smalldisk:17763.1935.2105080716"
+          AZURE_RESOURCE_GROUP: ctrd-integration-ltsc2019-${{ github.run_id }}
+          GOOGLE_BUCKET: "gs://containerd-integration/logs/windows-ltsc2019/"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install required packages
+        run: |
+          sudo apt-get install xmlstarlet -y
+
+      - name: PrepareArtifacts
+        run: |
+          STARTED_TIME=$(date +%s)
+          LOGS_DIR=$HOME/$STARTED_TIME
+          echo "STARTED_TIME=$STARTED_TIME" >> $GITHUB_ENV
+          echo "LOGS_DIR=$LOGS_DIR" >> $GITHUB_ENV
+          mkdir -p $LOGS_DIR/artifacts
+
+          jq -n --arg node temp --arg timestamp $STARTED_TIME '$timestamp|tonumber|{timestamp:.,$node}' > $LOGS_DIR/started.json
+
+      - name: Generate ssh key pair
+        run: |
+          mkdir -p $HOME/.ssh/
+          ssh-keygen -t rsa -b 4096 -C "ci@containerd.com" -f $HOME/.ssh/id_rsa -q -N ""
+          echo "SSH_PUB_KEY=$(cat ~/.ssh/id_rsa.pub)" >> $GITHUB_ENV
+
+      - name: AZLogin
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDS }}
+
+      - name: AZResourceGroupCreate
+        uses: azure/CLI@v1
+        with:
+          azcliversion: latest
+          inlinescript: |
+            az group create -n ${{ matrix.AZURE_RESOURCE_GROUP }} -l ${{ env.AZURE_DEFAULT_LOCATION }} --tags creationTimestamp=$(date +%Y-%m-%dT%T%z)
+
+      - name: AZTestVMCreate
+        uses: azure/CLI@v1
+        with:
+          azcliversion: latest
+          inlinescript: |
+            az vm create -n winTestVM --admin-username ${{ env.DEFAULT_ADMIN_USERNAME }} --admin-password ${{ env.PASSWORD }} --image ${{ matrix.AZURE_IMG }} -g ${{ matrix.AZURE_RESOURCE_GROUP }} --nsg-rule SSH --size ${{ env.AZURE_DEFAULT_VM_SIZE }}
+
+      - name: GetAZVMPublicIP
+        uses: azure/CLI@v1
+        with:
+          azcliversion: latest
+          inlinescript: |
+            echo "VM_PUB_IP=$(az network public-ip list -g ${{ matrix.AZURE_RESOURCE_GROUP }} | jq '.[0]["ipAddress"]' | tr -d '\"')" >> $GITHUB_ENV
+
+      - name: EnableAZVMSSH
+        uses: azure/CLI@v1
+        with:
+          azcliversion: latest
+          inlinescript: |
+            az vm run-command invoke  --command-id RunPowerShellScript -n winTestVM -g ${{ matrix.AZURE_RESOURCE_GROUP }} --scripts @$GITHUB_WORKSPACE/script/setup/enable_ssh_windows.ps1 --parameters 'SSHPublicKey=${{ env.SSH_PUB_KEY }}'
+
+      - name: TestSSHConnection
+        run: |
+          if ! ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }}  "hostname";
+          then
+            exit 1
+          fi
+
+      - name: PrepareTestingEnv
+        run: |
+          scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }}  $GITHUB_WORKSPACE/script/setup/prepare_env_windows.ps1  azureuser@${{ env.VM_PUB_IP }}:/prepare_env_windows.ps1
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }}  azureuser@${{ env.VM_PUB_IP }} "c:\\prepare_env_windows.ps1"
+
+      - name: MakeContainerDBins
+        run: |
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "git clone http://github.com/containerd/containerd c:\\containerd "
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "cd c:\containerd ; make binaries"
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "git clone http://github.com/Microsoft/hcsshim c:\containerd\hcsshim "
+
+          # Get shim commit from containerd local repo
+          SHIM_COMMIT=$(grep 'Microsoft/hcsshim' go.mod | awk '{ print $2 }');
+
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "cd c:\containerd\hcsshim; git fetch --tags origin $SHIM_COMMIT ; \
+                            git checkout $SHIM_COMMIT ; go build -mod=vendor -o ${{ env.REMOTE_VM_BIN_PATH }}\containerd-shim-runhcs-v1.exe .\cmd\containerd-shim-runhcs-v1"
+
+      - name: RunIntegrationTests
+        run: |
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cd /c/containerd && (make integration | tee /c/Logs/integration.log)'"
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cat /c/Logs/integration.log | go-junit-report.exe > /c/Logs/junit_00.xml'"
+
+      # CRI-integration tests for Windows PR is not merged. TO DO (adelina-t): enable these when PR #5163 merges.
+      - name: PrepareRepoList
+        run: |
+           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh -c 'cat > c:/repolist.toml'" <<'EOF'
+               busybox = "docker.io/claudiubelu/busybox:1.29"
+           EOF
+
+      - name: RunCRIIntegrationTests
+        run: |
+           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -s" <<EOF
+             cd c:/containerd
+             ./script/setup/install-cni-windows
+             mkdir /c/tmp
+             export TEST_IMAGE_LIST=c:/repolist.toml
+             make cri-integration | tee c:/Logs/cri-integration.log
+           EOF
+           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cat /c/Logs/cri-integration.log | go-junit-report.exe > c:/Logs/junit_01.xml' "
+
+      - name: PullLogsFromWinNode
+        run: |
+          scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }}:c:/Logs/*.xml ${{ env.LOGS_DIR }}/artifacts/
+          for f in $(ls ${{ env.LOGS_DIR }}/artifacts/*.xml); do
+              xmlstarlet ed -d "/testsuites/testsuite/properties" $f > ${{ env.LOGS_DIR }}/$(basename $f)
+              mv ${{ env.LOGS_DIR }}/$(basename $f) $f
+          done
+
+      - name: FinishJob
+        run: |
+          jq -n --arg result SUCCESS --arg timestamp $(date +%s) '$timestamp|tonumber|{timestamp:.,$result}' > ${{ env.LOGS_DIR }}/finished.json
+          echo "${{ env.STARTED_TIME }}" > $HOME/latest-build.txt
+
+      - name: SetUpCloudSDK
+        uses: google-github-actions/setup-gcloud@master
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
+
+      - name: UploadArtifacts
+        run: |
+          gsutil cp -r ${{ env.LOGS_DIR }} ${{ matrix.GOOGLE_BUCKET }}
+          gsutil cp $HOME/latest-build.txt ${{ matrix.GOOGLE_BUCKET }}
+
+      - name: ResourceCleanup
+        uses: azure/CLI@v1
+        with:
+          azcliversion: latest
+          inlinescript: |
+            az group delete -g ${{ matrix.AZURE_RESOURCE_GROUP }} --yes
