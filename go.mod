@@ -74,7 +74,6 @@ replace (
 	// dependency on itself through plugins. see .empty-mod/go.mod for details
 	github.com/containerd/containerd => ./.empty-mod/
 	github.com/gogo/googleapis => github.com/gogo/googleapis v1.3.2
-	github.com/golang/protobuf => github.com/golang/protobuf v1.3.5
 	// urfave/cli must be <= v1.22.1 due to a regression: https://github.com/urfave/cli/issues/1092
 	github.com/urfave/cli => github.com/urfave/cli v1.22.1
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200224152610-e50cd9704f63
