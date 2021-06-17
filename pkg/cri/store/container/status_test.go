@@ -27,7 +27,7 @@ import (
 
 	assertlib "github.com/stretchr/testify/assert"
 	requirelib "github.com/stretchr/testify/require"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func TestContainerState(t *testing.T) {

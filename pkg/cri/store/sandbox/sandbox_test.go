@@ -21,7 +21,7 @@ import (
 
 	"github.com/containerd/containerd/pkg/cri/store/label"
 	assertlib "github.com/stretchr/testify/assert"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/pkg/cri/store"
 )

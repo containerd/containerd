@@ -23,7 +23,7 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"golang.org/x/net/context"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // networkNotReadyReason is the reason reported when network is not ready.

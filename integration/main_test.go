@@ -30,13 +30,13 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	cri "github.com/containerd/containerd/integration/cri-api/pkg/apis"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
-	cri "k8s.io/cri-api/pkg/apis"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/integration/remote"
 	dialer "github.com/containerd/containerd/integration/util"

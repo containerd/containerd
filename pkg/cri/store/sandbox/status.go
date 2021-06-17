@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // The sandbox state machine in the CRI plugin:

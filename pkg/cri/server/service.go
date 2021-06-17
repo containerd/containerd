@@ -33,7 +33,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	runtime_alpha "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	"github.com/containerd/containerd/pkg/cri/store/label"
 
@@ -52,6 +53,11 @@ import (
 type grpcServices interface {
 	runtime.RuntimeServiceServer
 	runtime.ImageServiceServer
+}
+
+type grpcAlphaServices interface {
+	runtime_alpha.RuntimeServiceServer
+	runtime_alpha.ImageServiceServer
 }
 
 // CRIService is the interface implement CRI remote service server.
@@ -280,6 +286,9 @@ func (c *criService) register(s *grpc.Server) error {
 	instrumented := newInstrumentedService(c)
 	runtime.RegisterRuntimeServiceServer(s, instrumented)
 	runtime.RegisterImageServiceServer(s, instrumented)
+	instrumentedAlpha := newInstrumentedAlphaService(c)
+	runtime_alpha.RegisterRuntimeServiceServer(s, instrumentedAlpha)
+	runtime_alpha.RegisterImageServiceServer(s, instrumentedAlpha)
 	return nil
 }
 
