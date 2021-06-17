@@ -22,7 +22,7 @@ import (
 	v2 "github.com/containerd/containerd/metrics/types/v2"
 	"github.com/containerd/typeurl"
 	"github.com/pkg/errors"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 )

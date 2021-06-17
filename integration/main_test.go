@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -25,19 +26,20 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/containerd/containerd"
+	cri "github.com/containerd/containerd/integration/cri-api/pkg/apis"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
-	cri "k8s.io/cri-api/pkg/apis"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/integration/remote"
 	dialer "github.com/containerd/containerd/integration/util"
@@ -204,6 +206,15 @@ func WithResources(r *runtime.LinuxContainerResources) ContainerOpts {
 			c.Linux = &runtime.LinuxContainerConfig{}
 		}
 		c.Linux.Resources = r
+	}
+}
+
+func WithVolumeMount(hostPath, containerPath string) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		hostPath, _ = filepath.Abs(hostPath)
+		containerPath, _ = filepath.Abs(containerPath)
+		mount := &runtime.Mount{HostPath: hostPath, ContainerPath: containerPath}
+		c.Mounts = append(c.Mounts, mount)
 	}
 }
 

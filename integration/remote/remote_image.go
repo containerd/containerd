@@ -41,8 +41,8 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
-	internalapi "k8s.io/cri-api/pkg/apis"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "github.com/containerd/containerd/integration/cri-api/pkg/apis"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/integration/remote/util"
 )

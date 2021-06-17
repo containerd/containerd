@@ -21,7 +21,7 @@ import (
 
 	cni "github.com/containerd/go-cni"
 	"github.com/pkg/errors"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // NOTE(random-liu):
