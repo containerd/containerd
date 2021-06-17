@@ -58,7 +58,8 @@ type binary struct {
 
 func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ *shim, err error) {
 	args := []string{"-id", b.bundle.ID}
-	if logrus.GetLevel() == logrus.DebugLevel {
+	switch logrus.GetLevel() {
+	case logrus.DebugLevel, logrus.TraceLevel:
 		args = append(args, "-debug")
 	}
 	args = append(args, "start")
