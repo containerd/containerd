@@ -53,10 +53,7 @@ func withRemappedSnapshotBase(id string, i Image, uid, gid uint32, readonly bool
 			parent   = identity.ChainID(diffIDs).String()
 			usernsID = fmt.Sprintf("%s-%d-%d", parent, uid, gid)
 		)
-		c.Snapshotter, err = client.resolveSnapshotterName(ctx, c.Snapshotter)
-		if err != nil {
-			return err
-		}
+
 		snapshotter, err := client.getSnapshotter(ctx, c.Snapshotter)
 		if err != nil {
 			return err

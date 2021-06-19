@@ -329,10 +329,7 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 		chain    []digest.Digest
 		unpacked bool
 	)
-	snapshotterName, err = i.client.resolveSnapshotterName(ctx, snapshotterName)
-	if err != nil {
-		return err
-	}
+
 	sn, err := i.client.getSnapshotter(ctx, snapshotterName)
 	if err != nil {
 		return err
