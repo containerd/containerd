@@ -27,7 +27,7 @@ API.
 Various runtimes can be selected on a per container basis using the `WithRuntime` opt
 or to test via ctr `ctr run --runtime io.containerd.runc.v1`.
 
-[Documentation](https://github.com/containerd/containerd/blob/master/runtime/v2/README.md)
+[Documentation](https://github.com/containerd/containerd/blob/main/runtime/v2/README.md)
 
 ## Updated CRI Plugin
 
@@ -64,7 +64,7 @@ Users can:
 A new proxy plugin configuration has been added to allow external snapshotters
 be connected to containerd using gRPC.
 
-[Documentation](https://github.com/containerd/containerd/blob/master/PLUGINS.md)
+[Documentation](https://github.com/containerd/containerd/blob/main/PLUGINS.md)
 
 ## Managed /opt directory
 
@@ -80,7 +80,7 @@ containerd system. It can also be used to install `runc` and other related tools
 > ctr install docker.io/crosbymichael/runc:latest
 ```
 
-[Documentation](https://github.com/containerd/containerd/blob/master/docs/managed-opt.md)
+[Documentation](https://github.com/containerd/containerd/blob/main/docs/managed-opt.md)
 
 ## Garbage Collection
 

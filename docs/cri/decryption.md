@@ -40,6 +40,6 @@ version = 2
 ```
 
 In this example, container image decryption is set to use the "node" key model.
-In addition, the decryption [`stream_processors`](https://github.com/containerd/containerd/blob/master/docs/stream_processors.md) are configured as specified in [containerd/imgcrypt project](https://github.com/containerd/imgcrypt), with the additional field `--decryption-keys-path` configured to specify where decryption keys are located locally in the node.
+In addition, the decryption [`stream_processors`](https://github.com/containerd/containerd/blob/main/docs/stream_processors.md) are configured as specified in [containerd/imgcrypt project](https://github.com/containerd/imgcrypt), with the additional field `--decryption-keys-path` configured to specify where decryption keys are located locally in the node.
 
 The `$OCICRYPT_KEYPROVIDER_CONFIG` environment variable is used for [ocicrypt keyprovider protocol](https://github.com/containers/ocicrypt/blob/main/docs/keyprovider.md).

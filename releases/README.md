@@ -9,7 +9,7 @@
       When moving from rc to final, the rc file may just be renamed and updated.
       See [release-tool](https://github.com/containerd/release-tool)
 
-   2. Update the version file at `https://github.com/containerd/containerd/blob/master/version/version.go`
+   2. Update the version file at `https://github.com/containerd/containerd/blob/main/version/version.go`
 
    3. Update RELEASES.md to refer to the new release and dates.
 

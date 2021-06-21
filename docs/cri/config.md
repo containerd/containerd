@@ -3,7 +3,7 @@ This document provides the description of the CRI plugin configuration.
 The CRI plugin config is part of the containerd config (default
 path: `/etc/containerd/config.toml`).
 
-See [here](https://github.com/containerd/containerd/blob/master/docs/ops.md)
+See [here](https://github.com/containerd/containerd/blob/main/docs/ops.md)
 for more information about containerd config.
 
 The explanation and default value of each configuration item are as follows:
@@ -102,7 +102,7 @@ version = 2
   # default unset profile will map to `unconfined`)
     # Note: The default unset seccomp profile should not be confused with the seccomp profile
     # used in CRI when the runtime default seccomp profile is requested. In the later case, the
-    # default is set by the following code (https://github.com/containerd/containerd/blob/master/contrib/seccomp/seccomp_default.go).
+    # default is set by the following code (https://github.com/containerd/containerd/blob/main/contrib/seccomp/seccomp_default.go).
     # To summarize, there are two different seccomp defaults, the unset default used when the CRI request is
     # set to nil or `unconfined`, and the default used when the runtime default seccomp profile is requested.
   unset_seccomp_profile = ""
@@ -244,7 +244,7 @@ version = 2
   [plugins."io.containerd.grpc.v1.cri".image_decryption]
     # key_model defines the name of the key model used for how the cri obtains
     # keys used for decryption of encrypted container images.
-    # The [decryption document](https://github.com/containerd/cri/blob/master/docs/decryption.md)
+    # The [decryption document](https://github.com/containerd/containerd/blob/main/docs/cri/decryption.md)
     # contains additional information about the key models available.
     #
     # Set of available string options: {"", "node"}
@@ -252,12 +252,12 @@ version = 2
     # disabling image decryption.
     #
     # In order to use the decryption feature, additional configurations must be made.
-    # The [decryption document](https://github.com/containerd/cri/blob/master/docs/decryption.md)
+    # The [decryption document](https://github.com/containerd/containerd/blob/main/docs/cri/decryption.md)
     # provides information of how to set up stream processors and the containerd imgcrypt decoder
     # with the appropriate key models.
     #
     # Additional information:
-    # * Stream processors: https://github.com/containerd/containerd/blob/master/docs/stream_processors.md
+    # * Stream processors: https://github.com/containerd/containerd/blob/main/docs/stream_processors.md
     # * Containerd imgcrypt: https://github.com/containerd/imgcrypt
     key_model = "node"
 
