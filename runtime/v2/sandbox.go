@@ -58,11 +58,21 @@ func (m *SandboxManager) Start(ctx context.Context, sandboxID string, opts runti
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create bundle")
 	}
+	defer func() {
+		if retErr != nil {
+			bundle.Delete()
+		}
+	}()
 
 	shim, err := m.tasks.startShim(ctx, bundle, opts.RuntimeName, opts.RuntimeOpts, "")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to start shim")
 	}
+	defer func() {
+		if retErr != nil {
+			m.tasks.deleteShim(shim)
+		}
+	}()
 
 	svc, err := shim.Sandbox(ctx)
 	if err != nil {
@@ -102,7 +112,7 @@ func (m *SandboxManager) Shutdown(ctx context.Context, sandboxID string) error {
 	}
 
 	m.tasks.deleteShim(shim)
-	return nil
+	return shim.bundle.Delete()
 }
 
 // Pause will freeze running sandbox instance
