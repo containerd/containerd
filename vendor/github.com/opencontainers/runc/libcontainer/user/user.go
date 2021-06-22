@@ -2,21 +2,26 @@ package user
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
-	"os/user"
 	"strconv"
 	"strings"
 )
 
 const (
-	minId = 0
-	maxId = 1<<31 - 1 //for 32-bit systems compatibility
+	minID = 0
+	maxID = 1<<31 - 1 // for 32-bit systems compatibility
 )
 
 var (
-	ErrRange = fmt.Errorf("uids and gids must be in range %d-%d", minId, maxId)
+	// ErrNoPasswdEntries is returned if no matching entries were found in /etc/group.
+	ErrNoPasswdEntries = errors.New("no matching entries in passwd file")
+	// ErrNoGroupEntries is returned if no matching entries were found in /etc/passwd.
+	ErrNoGroupEntries = errors.New("no matching entries in group file")
+	// ErrRange is returned if a UID or GID is outside of the valid range.
+	ErrRange = fmt.Errorf("uids and gids must be in range %d-%d", minID, maxID)
 )
 
 type User struct {
@@ -29,50 +34,11 @@ type User struct {
 	Shell string
 }
 
-// userFromOS converts an os/user.(*User) to local User
-//
-// (This does not include Pass, Shell or Gecos)
-func userFromOS(u *user.User) (User, error) {
-	newUser := User{
-		Name: u.Username,
-		Home: u.HomeDir,
-	}
-	id, err := strconv.Atoi(u.Uid)
-	if err != nil {
-		return newUser, err
-	}
-	newUser.Uid = id
-
-	id, err = strconv.Atoi(u.Gid)
-	if err != nil {
-		return newUser, err
-	}
-	newUser.Gid = id
-	return newUser, nil
-}
-
 type Group struct {
 	Name string
 	Pass string
 	Gid  int
 	List []string
-}
-
-// groupFromOS converts an os/user.(*Group) to local Group
-//
-// (This does not include Pass or List)
-func groupFromOS(g *user.Group) (Group, error) {
-	newGroup := Group{
-		Name: g.Name,
-	}
-
-	id, err := strconv.Atoi(g.Gid)
-	if err != nil {
-		return newGroup, err
-	}
-	newGroup.Gid = id
-
-	return newGroup, nil
 }
 
 // SubID represents an entry in /etc/sub{u,g}id
@@ -360,7 +326,7 @@ func GetExecUser(userSpec string, defaults *ExecUser, passwd, group io.Reader) (
 		user.Uid = uidArg
 
 		// Must be inside valid uid range.
-		if user.Uid < minId || user.Uid > maxId {
+		if user.Uid < minID || user.Uid > maxID {
 			return nil, ErrRange
 		}
 
@@ -409,7 +375,7 @@ func GetExecUser(userSpec string, defaults *ExecUser, passwd, group io.Reader) (
 				user.Gid = gidArg
 
 				// Must be inside valid gid range.
-				if user.Gid < minId || user.Gid > maxId {
+				if user.Gid < minID || user.Gid > maxID {
 					return nil, ErrRange
 				}
 
@@ -433,7 +399,7 @@ func GetExecUser(userSpec string, defaults *ExecUser, passwd, group io.Reader) (
 // or the given group data is nil, the id will be returned as-is
 // provided it is in the legal range.
 func GetAdditionalGroups(additionalGroups []string, group io.Reader) ([]int, error) {
-	var groups = []Group{}
+	groups := []Group{}
 	if group != nil {
 		var err error
 		groups, err = ParseGroupFilter(group, func(g Group) bool {
@@ -471,7 +437,7 @@ func GetAdditionalGroups(additionalGroups []string, group io.Reader) ([]int, err
 				return nil, fmt.Errorf("Unable to find group %s", ag)
 			}
 			// Ensure gid is inside gid range.
-			if gid < minId || gid > maxId {
+			if gid < minID || gid > maxID {
 				return nil, ErrRange
 			}
 			gidMap[int(gid)] = struct{}{}
