@@ -147,7 +147,7 @@ var (
 			Name:  "pid-file",
 			Usage: "file path to write the task's pid",
 		},
-		cli.IntFlag{
+		cli.IntSliceFlag{
 			Name:  "gpus",
 			Usage: "add gpus to the container",
 		},
