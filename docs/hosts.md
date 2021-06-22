@@ -101,7 +101,7 @@ OPTIONS:
 
 Although we have deprecated the old CRI config pattern for specifying registry.mirrors
 and registry.configs you can still specify your credentials via
-[CRI config](https://github.com/containerd/containerd/blob/master/docs/cri/registry.md#configure-registry-credentials).
+[CRI config](https://github.com/containerd/containerd/blob/main/docs/cri/registry.md#configure-registry-credentials).
 
 Additionally, the containerd CRI plugin implements/supports the authentication parameters passed in through CRI pull image service requests.
 For example, when containerd is the container runtime implementation for `Kubernetes`, the containerd CRI plugin receives

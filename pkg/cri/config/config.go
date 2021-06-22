@@ -182,10 +182,10 @@ type ImageDecryption struct {
 	// KeyModel specifies the trust model of where keys should reside.
 	//
 	// Details of field usage can be found in:
-	// https://github.com/containerd/cri/tree/master/docs/config.md
+	// https://github.com/containerd/containerd/tree/main/docs/cri/config.md
 	//
 	// Details of key models can be found in:
-	// https://github.com/containerd/cri/tree/master/docs/decryption.md
+	// https://github.com/containerd/containerd/tree/main/docs/cri/decryption.md
 	KeyModel string `toml:"key_model" json:"keyModel"`
 }
 

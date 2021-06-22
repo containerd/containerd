@@ -130,7 +130,7 @@ To set up containerd with Kubernetes...
 
 ## Support
 
-The [_support horizon_](https://github.com/containerd/containerd/blob/master/RELEASES.md#support-horizon)
+The [_support horizon_](https://github.com/containerd/containerd/blob/main/RELEASES.md#support-horizon)
 for containerd has been updated to include the 1.1 release. With the addition of
 the CRI plugin, we are expanding the support horizon for 1.1 to include the
 entire lifespan of Kubernetes 1.10.  The containerd 1.1 release train will be
