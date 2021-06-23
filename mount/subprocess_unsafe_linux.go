@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package sys
+package mount
 
 import (
 	_ "unsafe" // required for go:linkname.

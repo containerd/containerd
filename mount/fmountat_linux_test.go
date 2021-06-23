@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package sys
+package mount
 
 import (
 	"io/ioutil"
@@ -32,7 +32,7 @@ import (
 type fMountatCaseFunc func(t *testing.T, root string)
 
 func TestFMountat(t *testing.T) {
-	if !runningPrivileged() {
+	if unix.Geteuid() != 0 {
 		t.Skip("Needs to be run as root")
 		return
 	}
