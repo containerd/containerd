@@ -165,7 +165,10 @@ func TestPoolMetadata_MarkFaulty(t *testing.T) {
 	err = store.MarkFaulty(testCtx, "test")
 	assert.NilError(t, err)
 
-	saved, err := store.GetDevice(testCtx, info.Name)
+	_, err = store.GetDevice(testCtx, info.Name)
+	// Faulty device has been moved into faulty devices bucket.
+	assert.Assert(t, err != nil)
+	saved, err := store.GetFaultyDevice(testCtx, info.Name)
 	assert.NilError(t, err)
 	assert.Equal(t, saved.State, Faulty)
 	assert.Assert(t, saved.DeviceID > 0)

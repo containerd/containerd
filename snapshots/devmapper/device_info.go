@@ -58,6 +58,8 @@ const (
 	Removed
 	// Faulty means that the device is errored and the snapshotter failed to rollback it
 	Faulty
+	// AlreadyExists means that the device already exists in meta store and the key conflicts.
+	AlreadyExists
 )
 
 func (s DeviceState) String() string {
@@ -88,6 +90,8 @@ func (s DeviceState) String() string {
 		return "Removed"
 	case Faulty:
 		return "Faulty"
+	case AlreadyExists:
+		return "AlreadyExists"
 	default:
 		return fmt.Sprintf("unknown %d", s)
 	}

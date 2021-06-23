@@ -43,8 +43,9 @@ const (
 
 // Bucket names
 var (
-	devicesBucketName  = []byte("devices")    // Contains thin devices metadata <device_name>=<DeviceInfo>
-	deviceIDBucketName = []byte("device_ids") // Tracks used device ids <device_id_[0..maxDeviceID)>=<byte_[0/1]>
+	devicesBucketName       = []byte("devices")        // Contains thin devices metadata <device_name>=<DeviceInfo>
+	deviceIDBucketName      = []byte("device_ids")     // Tracks used device ids <device_id_[0..maxDeviceID)>=<byte_[0/1]>
+	faultyDevicesBucketName = []byte("faulty_devices") // Isolates faulty devices <device_name>=<DeviceInfo>
 )
 
 var (
@@ -78,13 +79,13 @@ func NewPoolMetadata(dbfile string) (*PoolMetadata, error) {
 // ensureDatabaseInitialized creates buckets required for metadata store in order
 // to avoid bucket existence checks across the code
 func (m *PoolMetadata) ensureDatabaseInitialized() error {
-	return m.db.Update(func(tx *bolt.Tx) error {
-		if _, err := tx.CreateBucketIfNotExists(devicesBucketName); err != nil {
-			return err
-		}
+	buckets := [][]byte{devicesBucketName, deviceIDBucketName, faultyDevicesBucketName}
 
-		if _, err := tx.CreateBucketIfNotExists(deviceIDBucketName); err != nil {
-			return err
+	return m.db.Update(func(tx *bolt.Tx) error {
+		for _, bkt := range buckets {
+			if _, err := tx.CreateBucketIfNotExists(bkt); err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -95,13 +96,18 @@ func (m *PoolMetadata) ensureDatabaseInitialized() error {
 func (m *PoolMetadata) AddDevice(ctx context.Context, info *DeviceInfo) error {
 	err := m.db.Update(func(tx *bolt.Tx) error {
 		devicesBucket := tx.Bucket(devicesBucketName)
+		faultyDevicesBucket := tx.Bucket(faultyDevicesBucketName)
 
 		// Make sure device name is unique. If there is already a device with the same name,
 		// but in Faulty state, give it a try with another devmapper device ID.
 		// See https://github.com/containerd/containerd/pull/3436 for more context.
 		var existing DeviceInfo
-		if err := getObject(devicesBucket, info.Name, &existing); err == nil && existing.State != Faulty {
-			return errors.Wrapf(ErrAlreadyExists, "device %q is already there %+v", info.Name, existing)
+		if err := getObject(devicesBucket, info.Name, &existing); err == nil {
+			// Put conflicting device into faulty devices bucket so that we can continue to work.
+			existing.State = AlreadyExists
+			if err := putObject(faultyDevicesBucket, info.Name, existing, true); err != nil {
+				return errors.Wrapf(err, "failed to put conflicting device %q into faulty devices bucket", info.Name)
+			}
 		}
 
 		// Find next available device ID
@@ -130,15 +136,17 @@ func (m *PoolMetadata) ChangeDeviceState(ctx context.Context, name string, state
 	})
 }
 
-// MarkFaulty marks the given device and corresponding devmapper device ID as faulty.
+// MarkFaulty marks the given device and corresponding devmapper device ID as faulty, and move the device
+// into faulty devices bucket.
 // The snapshotter might attempt to recreate a device in 'Faulty' state with another devmapper ID in
 // subsequent calls, and in case of success it's status will be changed to 'Created' or 'Activated'.
 // The devmapper dev ID will remain in 'deviceFaulty' state until manually handled by a user.
 func (m *PoolMetadata) MarkFaulty(ctx context.Context, name string) error {
 	return m.db.Update(func(tx *bolt.Tx) error {
 		var (
-			device    = DeviceInfo{}
-			devBucket = tx.Bucket(devicesBucketName)
+			device          = DeviceInfo{}
+			devBucket       = tx.Bucket(devicesBucketName)
+			faultyDevBucket = tx.Bucket(faultyDevicesBucketName)
 		)
 
 		if err := getObject(devBucket, name, &device); err != nil {
@@ -146,8 +154,12 @@ func (m *PoolMetadata) MarkFaulty(ctx context.Context, name string) error {
 		}
 
 		device.State = Faulty
-
-		if err := putObject(devBucket, name, &device, true); err != nil {
+		// Isolate faulty device in a separate bucket.
+		if err := putObject(faultyDevBucket, name, &device, true); err != nil {
+			return err
+		}
+		// Delete from normal devices bucket.
+		if err := deleteObject(devBucket, name); err != nil {
 			return err
 		}
 
@@ -268,6 +280,21 @@ func (m *PoolMetadata) GetDevice(ctx context.Context, name string) (*DeviceInfo,
 	return &dev, err
 }
 
+// GetFaultyDevice retrieves faulty device info by name from database
+func (m *PoolMetadata) GetFaultyDevice(ctx context.Context, name string) (*DeviceInfo, error) {
+	var (
+		dev DeviceInfo
+		err error
+	)
+
+	err = m.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(faultyDevicesBucketName)
+		return getObject(bucket, name, &dev)
+	})
+
+	return &dev, err
+}
+
 // RemoveDevice removes device info from store.
 func (m *PoolMetadata) RemoveDevice(ctx context.Context, name string) error {
 	return m.db.Update(func(tx *bolt.Tx) error {
@@ -367,4 +394,8 @@ func getObject(bucket *bolt.Bucket, key string, obj interface{}) error {
 	}
 
 	return nil
+}
+
+func deleteObject(bucket *bolt.Bucket, key string) error {
+	return bucket.Delete([]byte(key))
 }

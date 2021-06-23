@@ -190,25 +190,14 @@ func TestPoolDeviceMarkFaulty(t *testing.T) {
 	err = pool.ensureDeviceStates(testCtx)
 	assert.NilError(t, err)
 
-	called := 0
-	err = pool.metadata.WalkDevices(testCtx, func(info *DeviceInfo) error {
-		called++
+	// Faulty device will be moved into faulty devices bucket in ensureDeviceStates().
+	_, err = store.GetDevice(testCtx, "1")
+	assert.Assert(t, err != nil)
+	saved, err := store.GetFaultyDevice(testCtx, "1")
+	assert.Equal(t, Faulty, saved.State)
 
-		switch called {
-		case 1:
-			assert.Equal(t, Faulty, info.State)
-			assert.Equal(t, "1", info.Name)
-		case 2:
-			assert.Equal(t, Deactivated, info.State)
-			assert.Equal(t, "2", info.Name)
-		default:
-			t.Error("unexpected walk call")
-		}
-
-		return nil
-	})
-	assert.NilError(t, err)
-	assert.Equal(t, 2, called)
+	saved, err = store.GetDevice(testCtx, "2")
+	assert.Equal(t, Deactivated, saved.State)
 }
 
 func testCreateThinDevice(t *testing.T, pool *PoolDevice) {
