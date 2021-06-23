@@ -88,7 +88,7 @@ func testFMountatNormal(t *testing.T, root string) {
 	defer f.Close()
 
 	// mount work to fs
-	if err = FMountat(f.Fd(), workdir, "fs", "bind", unix.MS_BIND|unix.MS_RDONLY, ""); err != nil {
+	if err = fMountat(f.Fd(), workdir, "fs", "bind", unix.MS_BIND|unix.MS_RDONLY, ""); err != nil {
 		t.Fatalf("expected no error here, but got error: %+v", err)
 	}
 	defer umount(t, fsdir)
@@ -124,7 +124,7 @@ func testFMountatWithFileFd(t *testing.T, root string) {
 	}
 	defer f.Close()
 
-	err = FMountat(f.Fd(), filepath.Join(root, "empty"), filepath.Join(root, "work"), "", 0, "")
+	err = fMountat(f.Fd(), filepath.Join(root, "empty"), filepath.Join(root, "work"), "", 0, "")
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("expected error %v, but got %v", expectedErr, errors.Cause(err))
 	}
@@ -145,7 +145,7 @@ func testFMountatWithInvalidSource(t *testing.T, root string) {
 	}
 	defer f.Close()
 
-	err = FMountat(f.Fd(), filepath.Join(root, "oops"), "at", "bind", unix.MS_BIND, "")
+	err = fMountat(f.Fd(), filepath.Join(root, "oops"), "at", "bind", unix.MS_BIND, "")
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("expected error %v, but got %v", expectedErr, err)
 	}

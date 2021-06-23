@@ -377,7 +377,7 @@ func mountAt(chdir string, source, target, fstype string, flags uintptr, data st
 	if !fs.IsDir() {
 		return errors.Wrap(errors.Errorf("%s is not dir", chdir), "failed to mountat")
 	}
-	return errors.Wrap(FMountat(f.Fd(), source, target, fstype, flags, data), "failed to mountat")
+	return errors.Wrap(fMountat(f.Fd(), source, target, fstype, flags, data), "failed to mountat")
 }
 
 func (m *Mount) mountWithHelper(helperBinary, typePrefix, target string) error {
