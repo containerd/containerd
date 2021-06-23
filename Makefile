@@ -27,6 +27,10 @@ PREFIX        ?= /usr/local
 DATADIR       ?= $(PREFIX)/share
 MANDIR        ?= $(DATADIR)/man
 
+MANDIR ?= $(PREFIX)/share/man
+BINDIR ?= $(PREFIX)/bin
+SBINDIR ?= $(PREFIX)/sbin
+
 TEST_IMAGE_LIST ?=
 
 # Used to populate variables in version package.
@@ -81,7 +85,9 @@ CRICNIRELEASE=cri-containerd-cni-$(VERSION:v%=%)-${GOOS}-${GOARCH}
 PKG=github.com/containerd/containerd
 
 # Project binaries.
-COMMANDS=ctr containerd containerd-stress
+COMMANDS_SYS=containerd
+COMMANDS_USR=ctr containerd-stress
+COMMANDS=$(COMMANDS_SYS) $(COMMANDS_USR)
 MANPAGES=ctr.8 containerd.8 containerd-config.8 containerd-config.toml.5
 
 ifdef BUILDTAGS
@@ -121,7 +127,9 @@ GO_GCFLAGS=$(shell				\
 	echo "-gcflags=-trimpath=$${1}/src";	\
 	)
 
-BINARIES=$(addprefix bin/,$(COMMANDS))
+BINARIES_SYS=$(addprefix bin/,$(COMMANDS_SYS))
+BINARIES_USR=$(addprefix bin/,$(COMMANDS_USR))
+BINARIES=$(BINARIES_SYS) $(BINARIES_USR)
 
 #include platform specific makefile
 -include Makefile.$(GOOS)
@@ -351,12 +359,13 @@ clean-test: ## clean up debris from previously failed tests
 
 install: ## install binaries
 	@echo "$(WHALE) $@ $(BINARIES)"
-	@$(INSTALL) -d $(DESTDIR)/$(PREFIX)/bin
-	@$(INSTALL) $(BINARIES) $(DESTDIR)/$(PREFIX)/bin
+	@$(INSTALL) -d $(DESTDIR)/$(BINDIR) $(DESTDIR)/$(SBINDIR)
+	@$(INSTALL) $(BINARIES_SYS) $(DESTDIR)/$(SBINDIR)
+	@$(INSTALL) $(BINARIES_USR) $(DESTDIR)/$(BINDIR)
 
 uninstall:
 	@echo "$(WHALE) $@"
-	@rm -f $(addprefix $(DESTDIR)/$(PREFIX)/bin/,$(notdir $(BINARIES)))
+	@rm -f $(addprefix $(DESTDIR)/$(BINDIR),$(notdir $(BINARIES)))
 
 ifeq ($(GOOS),windows)
 install-deps:
