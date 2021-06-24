@@ -45,6 +45,13 @@ func ContextDialer(ctx context.Context, address string) (net.Conn, error) {
 	return contextDialer(ctx, address, isNoent)
 }
 
+// ContextDialerFunc returns a GRPC net.Conn connected to the provided address,
+// but may tolerate certain dial errors and keep retrying until context canceled.
+// If tolerateErr is nil, it will tolerate no error and return what it got immediately while dialing.
+func ContextDialerFunc(ctx context.Context, address string, tolerateErr func(error) bool) (net.Conn, error) {
+	return contextDialer(ctx, address, tolerateErr)
+}
+
 // Dialer returns a GRPC net.Conn connected to the provided address
 // Deprecated: use ContextDialer and grpc.WithContextDialer.
 var Dialer = timeoutDialer
