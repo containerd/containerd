@@ -62,7 +62,8 @@ func timeoutDialer(address string, timeout time.Duration) (conn net.Conn, err er
 		return dialer(address, timeout)
 	}
 
-	timeoutCtx, _ := context.WithTimeout(context.TODO(), timeout)
+	timeoutCtx, cancel := context.WithTimeout(context.TODO(), timeout)
+	defer cancel()
 	return contextDialer(timeoutCtx, address, isNoent)
 }
 

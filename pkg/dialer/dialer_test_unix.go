@@ -25,5 +25,7 @@ import (
 )
 
 func newListener(hash string) (net.Listener, error) {
-	return net.Listen("unix", filepath.Join(os.TempDir(), hash+".sock"))
+	sock := filepath.Join(os.TempDir(), hash+".sock")
+	_ = os.Remove(sock)
+	return net.Listen("unix", sock)
 }

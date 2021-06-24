@@ -49,9 +49,11 @@ func TestContextDialer(t *testing.T) {
 			Err:       context.Canceled,
 		},
 		{
-			Name:      "dial timeout",
-			Server:    newBlockServer,
-			Timeout:   300 * time.Millisecond,
+			Name:   "dial timeout",
+			Server: newBlockServer,
+			// Negative timeout results in a deadline-exceeded context at creation.
+			// We use it to simulate a timeout situation.
+			Timeout:   -time.Second,
 			ExpectErr: true,
 			Err:       ErrTimeout,
 		},
@@ -72,9 +74,8 @@ func TestContextDialer(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.TODO(), tt.Timeout)
 			defer cancel()
 			if tt.Cancel {
-				go func() {
-					time.Sleep(300 * time.Millisecond)
-				}()
+				// cancel the context before passing it to dialer
+				// to avoid flaky test.
 				cancel()
 			}
 			_, err = ContextDialer(ctx, addr.String())
