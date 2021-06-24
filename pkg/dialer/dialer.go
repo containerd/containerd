@@ -18,6 +18,7 @@ package dialer
 
 import (
 	"context"
+	stderrs "errors"
 	"net"
 	"time"
 
@@ -29,51 +30,77 @@ type dialResult struct {
 	err error
 }
 
-// ContextDialer returns a GRPC net.Conn connected to the provided address
+var (
+	// ErrTimeout represents a timeout error while dialing
+	ErrTimeout = stderrs.New("timeout")
+)
+
+// ContextDialer returns a GRPC net.Conn connected to the provided address.
+// It tolerates ENOENT and keeps retrying if provided context has a deadline.
+// It does a "one shot" connect attempt if provided context doesn't have a deadline.
 func ContextDialer(ctx context.Context, address string) (net.Conn, error) {
-	if deadline, ok := ctx.Deadline(); ok {
-		return timeoutDialer(address, time.Until(deadline))
+	if _, ok := ctx.Deadline(); !ok {
+		return contextDialer(ctx, address, nil)
 	}
-	return timeoutDialer(address, 0)
+	return contextDialer(ctx, address, isNoent)
 }
 
 // Dialer returns a GRPC net.Conn connected to the provided address
 // Deprecated: use ContextDialer and grpc.WithContextDialer.
 var Dialer = timeoutDialer
 
-func timeoutDialer(address string, timeout time.Duration) (net.Conn, error) {
-	var (
-		stopC = make(chan struct{})
-		synC  = make(chan *dialResult)
-	)
+// timeoutDialer connects to the provided address with a timeout.
+func timeoutDialer(address string, timeout time.Duration) (conn net.Conn, err error) {
+	if timeout == 0 {
+		return dialer(address, timeout)
+	}
+
+	timeoutCtx, _ := context.WithTimeout(context.TODO(), timeout)
+	return contextDialer(timeoutCtx, address, isNoent)
+}
+
+// contextDialer connects to the provided address with a context.
+// It may tolerate certain errors and keep retrying before context canceled.
+// It returns immediately on context cancellation.
+func contextDialer(ctx context.Context, address string, tolerateErr func(error) bool) (net.Conn, error) {
+	stopCh := make(chan struct{})
+	resCh := make(chan *dialResult, 1)
+
 	go func() {
-		defer close(synC)
+		defer close(resCh)
 		for {
 			select {
-			case <-stopC:
+			case <-stopCh:
 				return
 			default:
-				c, err := dialer(address, timeout)
-				if isNoent(err) {
-					<-time.After(10 * time.Millisecond)
+				// Limit a single connect attempt timeout to 10s
+				c, err := dialer(address, 10*time.Second)
+				if tolerateErr != nil && tolerateErr(err) {
+					time.Sleep(10 * time.Millisecond)
 					continue
 				}
-				synC <- &dialResult{c, err}
+				resCh <- &dialResult{c: c, err: err}
 				return
 			}
 		}
 	}()
+
 	select {
-	case dr := <-synC:
-		return dr.c, dr.err
-	case <-time.After(timeout):
-		close(stopC)
+	case <-ctx.Done():
+		close(stopCh)
 		go func() {
-			dr := <-synC
-			if dr != nil && dr.c != nil {
-				dr.c.Close()
+			// If the dial succeed after timeout,
+			// close it to prevent resource leak.
+			r := <-resCh
+			if r != nil && r.c != nil {
+				r.c.Close()
 			}
 		}()
-		return nil, errors.Errorf("dial %s: timeout", address)
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, errors.Wrapf(ErrTimeout, "dial %s", address)
+		}
+		return nil, errors.Wrapf(ctx.Err(), "dial %s", address)
+	case res := <-resCh:
+		return res.c, res.err
 	}
 }
