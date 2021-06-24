@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package sys
+package mount
 
 import (
 	"runtime"
@@ -26,8 +26,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// FMountat performs mount from the provided directory.
-func FMountat(dirfd uintptr, source, target, fstype string, flags uintptr, data string) error {
+// fMountat performs mount from the provided directory.
+func fMountat(dirfd uintptr, source, target, fstype string, flags uintptr, data string) error {
 	var (
 		sourceP, targetP, fstypeP, dataP *byte
 		pid                              uintptr
