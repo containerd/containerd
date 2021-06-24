@@ -232,7 +232,7 @@ func (s *Snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 
 // View creates readonly thin device for the given snapshot key
 func (s *Snapshotter) View(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
-	log.G(ctx).WithFields(logrus.Fields{"key": key, "parent": parent}).Debug("prepare")
+	log.G(ctx).WithFields(logrus.Fields{"key": key, "parent": parent}).Debug("view")
 
 	var (
 		mounts []mount.Mount
@@ -511,6 +511,8 @@ func (s *Snapshotter) withTransaction(ctx context.Context, writable bool, fn fun
 }
 
 func (s *Snapshotter) Cleanup(ctx context.Context) error {
+	log.G(ctx).Debug("cleanup")
+
 	var removedDevices []*DeviceInfo
 
 	if !s.config.AsyncRemove {
