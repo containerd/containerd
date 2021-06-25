@@ -6,7 +6,6 @@ require (
 	github.com/Microsoft/go-winio v0.5.0
 	github.com/Microsoft/hcsshim v0.8.17
 	github.com/containerd/aufs v1.0.0
-	github.com/containerd/btrfs v1.0.0
 	github.com/containerd/cgroups v1.0.1
 	github.com/containerd/console v1.0.2
 	github.com/containerd/continuity v0.1.0
@@ -21,6 +20,7 @@ require (
 	github.com/containernetworking/plugins v0.9.1
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/davecgh/go-spew v1.1.1
+	github.com/dennwc/btrfs v0.0.0-20210625083239-ee67271a4cb4
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c
 	github.com/docker/go-metrics v0.0.1
 	github.com/docker/go-units v0.4.0
