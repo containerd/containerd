@@ -36,14 +36,8 @@ func TestAdditionalGids(t *testing.T) {
 	defer os.RemoveAll(testPodLogDir)
 
 	t.Log("Create a sandbox with log directory")
-	sbConfig := PodSandboxConfig("sandbox", "additional-gids",
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "additional-gids",
 		WithPodLogDirectory(testPodLogDir))
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-	}()
 
 	var (
 		testImage     = GetImage(BusyBox)

@@ -26,13 +26,7 @@ import (
 // Test to verify container can be restarted
 func TestContainerRestart(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
-	sbConfig := PodSandboxConfig("sandbox1", "restart")
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-	}()
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "restart")
 
 	EnsureImageExists(t, pauseImage)
 

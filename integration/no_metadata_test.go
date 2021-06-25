@@ -32,16 +32,9 @@ func TestRunPodSandboxWithoutMetadata(t *testing.T) {
 }
 
 func TestCreateContainerWithoutMetadata(t *testing.T) {
-	sbConfig := PodSandboxConfig("sandbox", "container-create")
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		// Make sure the sandbox is cleaned up in any case.
-		runtimeService.StopPodSandbox(sb)
-		runtimeService.RemovePodSandbox(sb)
-	}()
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "container-create")
 	config := &runtime.ContainerConfig{}
-	_, err = runtimeService.CreateContainer(sb, config, sbConfig)
+	_, err := runtimeService.CreateContainer(sb, config, sbConfig)
 	require.Error(t, err)
 	_, err = runtimeService.Status()
 	require.NoError(t, err)

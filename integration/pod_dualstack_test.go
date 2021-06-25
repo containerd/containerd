@@ -37,13 +37,7 @@ func TestPodDualStack(t *testing.T) {
 	defer os.RemoveAll(testPodLogDir)
 
 	t.Log("Create a sandbox")
-	sbConfig := PodSandboxConfig("sandbox", "dualstack", WithPodLogDirectory(testPodLogDir))
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-	}()
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "dualstack", WithPodLogDirectory(testPodLogDir))
 
 	var (
 		testImage     = GetImage(BusyBox)

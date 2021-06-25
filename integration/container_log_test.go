@@ -36,15 +36,9 @@ func TestContainerLogWithoutTailingNewLine(t *testing.T) {
 	defer os.RemoveAll(testPodLogDir)
 
 	t.Log("Create a sandbox with log directory")
-	sbConfig := PodSandboxConfig("sandbox", "container-log-without-tailing-newline",
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "container-log-without-tailing-newline",
 		WithPodLogDirectory(testPodLogDir),
 	)
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-	}()
 
 	var (
 		testImage     = GetImage(BusyBox)
@@ -92,15 +86,9 @@ func TestLongContainerLog(t *testing.T) {
 	defer os.RemoveAll(testPodLogDir)
 
 	t.Log("Create a sandbox with log directory")
-	sbConfig := PodSandboxConfig("sandbox", "long-container-log",
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "long-container-log",
 		WithPodLogDirectory(testPodLogDir),
 	)
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-	}()
 
 	var (
 		testImage     = GetImage(BusyBox)

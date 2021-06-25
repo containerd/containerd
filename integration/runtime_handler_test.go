@@ -29,20 +29,12 @@ import (
 // TODO(chrisfegly): add/update test(s) to allow testing of multiple runtimes at the same time
 func TestRuntimeHandler(t *testing.T) {
 	t.Logf("Create a sandbox")
-	sbConfig := PodSandboxConfig("sandbox", "test-runtime-handler")
-
 	if *runtimeHandler == "" {
 		t.Logf("The --runtime-handler flag value is empty which results internally to setting the default runtime")
 	} else {
 		t.Logf("The --runtime-handler flag value is %s", *runtimeHandler)
 	}
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		// Make sure the sandbox is cleaned up in any case.
-		runtimeService.StopPodSandbox(sb)
-		runtimeService.RemovePodSandbox(sb)
-	}()
+	sb, _ := PodSandboxConfigWithCleanup(t, "sandbox", "test-runtime-handler")
 
 	t.Logf("Verify runtimeService.PodSandboxStatus() returns previously set runtimeHandler")
 	sbStatus, err := runtimeService.PodSandboxStatus(sb)

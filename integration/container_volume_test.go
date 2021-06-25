@@ -99,15 +99,9 @@ func TestContainerSymlinkVolumes(t *testing.T) {
 			require.NoError(t, err)
 
 			t.Log("Create test sandbox with log directory")
-			sbConfig := PodSandboxConfig("sandbox", "test-symlink",
+			sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "test-symlink",
 				WithPodLogDirectory(testPodLogDir),
 			)
-			sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-			require.NoError(t, err)
-			defer func() {
-				assert.NoError(t, runtimeService.StopPodSandbox(sb))
-				assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-			}()
 
 			var (
 				testImage     = GetImage(BusyBox)

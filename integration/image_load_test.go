@@ -77,13 +77,7 @@ func TestImageLoad(t *testing.T) {
 	require.Equal(t, []string{loadedImage}, img.RepoTags)
 
 	t.Logf("create a container with the loaded image")
-	sbConfig := PodSandboxConfig("sandbox", Randomize("image-load"))
-	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, runtimeService.StopPodSandbox(sb))
-		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
-	}()
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", Randomize("image-load"))
 	containerConfig := ContainerConfig(
 		"container",
 		testImage,
