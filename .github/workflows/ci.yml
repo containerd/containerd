@@ -22,7 +22,7 @@ jobs:
 
     strategy:
       matrix:
-        go-version: [1.16.4]
+        go-version: [1.16.5]
         os: [ubuntu-18.04, macos-10.15, windows-2019]
 
     steps:
@@ -53,7 +53,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.4'
+          go-version: '1.16.5'
 
       - shell: bash
         run: |
@@ -84,7 +84,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.4'
+          go-version: '1.16.5'
 
       - uses: actions/checkout@v2
         with:
@@ -117,7 +117,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.4'
+          go-version: '1.16.5'
 
       - name: Set env
         shell: bash
@@ -163,7 +163,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.4'
+          go-version: '1.16.5'
       - name: Set env
         shell: bash
         run: |
@@ -228,7 +228,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-18.04, macos-10.15, windows-2019]
-        go-version: ['1.16.4']
+        go-version: ['1.16.5']
         include:
           # Go 1.13.x is still used by Docker/Moby
           - go-version: '1.13.x'
@@ -274,7 +274,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.4'
+          go-version: '1.16.5'
 
       - uses: actions/checkout@v2
         with:
@@ -355,7 +355,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.4'
+          go-version: '1.16.5'
 
       - uses: actions/checkout@v2
         with:
@@ -498,7 +498,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.4'
+          go-version: '1.16.5'
 
       - uses: actions/checkout@v2
         with:
