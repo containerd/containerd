@@ -282,7 +282,7 @@ In addition to `go test`-based testing executed via the `Makefile` targets, the 
 With this tool you can stress a running containerd daemon for a specified period of time, selecting a concurrency level to generate stress against the daemon. The following command is an example of having five workers running for two hours against a default containerd gRPC socket address:
 
 ```sh
-ctr stress -c 5 -t 120
+ctr stress -c 5 -d 120s
 ```
 
 For more information on this tool's options please run `ctr stress --help`.
