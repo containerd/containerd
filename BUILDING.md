@@ -276,21 +276,21 @@ ok  	github.com/containerd/containerd	4.778s
 
 ## Additional tools
 
-### containerd-stress
-In addition to `go test`-based testing executed via the `Makefile` targets, the `containerd-stress` tool is available and built with the `all` or `binaries` targets and installed during `make install`.
+### ctr stress
+In addition to `go test`-based testing executed via the `Makefile` targets, the `ctr` tool is available and built with the `all` or `binaries` targets and installed during `make install`.
 
 With this tool you can stress a running containerd daemon for a specified period of time, selecting a concurrency level to generate stress against the daemon. The following command is an example of having five workers running for two hours against a default containerd gRPC socket address:
 
 ```sh
-containerd-stress -c 5 -t 120
+ctr stress -c 5 -t 120
 ```
 
-For more information on this tool's options please run `containerd-stress --help`.
+For more information on this tool's options please run `ctr stress --help`.
 
 ### bucketbench
 [Bucketbench](https://github.com/estesp/bucketbench) is an external tool which can be used to drive load against a container runtime, specifying a particular set of lifecycle operations to run with a specified amount of concurrency. Bucketbench is more focused on generating performance details than simply inducing load against containerd.
 
-Bucketbench differs from the `containerd-stress` tool in a few ways:
+Bucketbench differs from the `ctr stress` tool in a few ways:
  - Bucketbench has support for testing the Docker engine, the `runc` binary, and containerd 0.2.x (via `ctr`) and 1.0 (via the client library) branches.
  - Bucketbench is driven via configuration file that allows specifying a list of lifecycle operations to execute. This can be used to generate detailed statistics per-command (e.g. start, stop, pause, delete).
  - Bucketbench generates detailed reports and timing data at the end of the configured test run.
