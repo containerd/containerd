@@ -255,8 +255,8 @@ man/%: docs/man/%.md FORCE
 	go-md2man -in "$<" -out "$@"
 
 define installmanpage
-$(INSTALL) -d $(DESTDIR)/$(MANDIR)/man$(2);
-gzip -c $(1) >$(DESTDIR)/$(MANDIR)/man$(2)/$(3).gz;
+$(INSTALL) -d $(DESTDIR)$(MANDIR)/man$(2);
+gzip -c $(1) >$(DESTDIR)$(MANDIR)/man$(2)/$(3).gz;
 endef
 
 install-man: man
@@ -351,12 +351,12 @@ clean-test: ## clean up debris from previously failed tests
 
 install: ## install binaries
 	@echo "$(WHALE) $@ $(BINARIES)"
-	@$(INSTALL) -d $(DESTDIR)/$(PREFIX)/bin
-	@$(INSTALL) $(BINARIES) $(DESTDIR)/$(PREFIX)/bin
+	@$(INSTALL) -d $(DESTDIR)$(PREFIX)/bin
+	@$(INSTALL) $(BINARIES) $(DESTDIR)$(PREFIX)/bin
 
 uninstall:
 	@echo "$(WHALE) $@"
-	@rm -f $(addprefix $(DESTDIR)/$(PREFIX)/bin/,$(notdir $(BINARIES)))
+	@rm -f $(addprefix $(DESTDIR)$(PREFIX)/bin/,$(notdir $(BINARIES)))
 
 ifeq ($(GOOS),windows)
 install-deps:
