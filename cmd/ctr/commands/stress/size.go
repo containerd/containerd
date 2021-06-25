@@ -1,5 +1,3 @@
-// +build freebsd
-
 /*
    Copyright The containerd Authors.
 
@@ -16,25 +14,30 @@
    limitations under the License.
 */
 
-package main
+package stress
 
 import (
-	"syscall"
+	"os"
+	"path/filepath"
+
+	"github.com/sirupsen/logrus"
 )
 
-func setRlimit() error {
-	rlimit := int64(100000)
-	if rlimit > 0 {
-		var limit syscall.Rlimit
-		if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
-			return err
+var binaries = []string{
+	"containerd",
+	"containerd-shim",
+	"containerd-shim-runc-v1",
+	"containerd-shim-runc-v2",
+}
+
+// checkBinarySizes checks and reports the binary sizes for the containerd compiled binaries to prometheus
+func checkBinarySizes() {
+	for _, name := range binaries {
+		fi, err := os.Stat(filepath.Join("/usr/local/bin", name))
+		if err != nil {
+			logrus.WithError(err).Error("stat binary")
+			continue
 		}
-		if limit.Cur < rlimit {
-			limit.Cur = rlimit
-			if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
-				return err
-			}
-		}
+		binarySizeGauge.WithValues(name).Set(float64(fi.Size()))
 	}
-	return nil
 }
