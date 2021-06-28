@@ -122,7 +122,9 @@ var Command = cli.Command{
 			Name:  "platform",
 			Usage: "run image for specific platform",
 		},
-	}, append(platformRunFlags, append(commands.SnapshotterFlags, commands.ContainerFlags...)...)...),
+	}, append(platformRunFlags,
+		append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),
+			commands.ContainerFlags...)...)...),
 	Action: func(context *cli.Context) error {
 		var (
 			err error
