@@ -18,6 +18,7 @@ package oci
 
 import (
 	"context"
+	"reflect"
 	"runtime"
 	"testing"
 
@@ -195,6 +196,81 @@ func TestWithCapabilities(t *testing.T) {
 	}
 	if len(s.Process.Capabilities.Inheritable) != 1 || s.Process.Capabilities.Inheritable[0] != "CAP_SYS_ADMIN" {
 		t.Error("Unexpected capabilities set")
+	}
+}
+
+func TestDefaultCapabilitiesAreNotAddedToAmbientSet(t *testing.T) {
+	t.Parallel()
+
+	ctx := namespaces.WithNamespace(context.Background(), "testing")
+
+	var s *specs.Spec
+	var err error
+	if runtime.GOOS != "windows" {
+		s, err = GenerateSpec(ctx, nil, &containers.Container{ID: t.Name()})
+	} else {
+		s, err = GenerateSpecWithPlatform(ctx, nil, "linux/amd64", &containers.Container{ID: t.Name()})
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(s.Process.Capabilities.Bounding) != len(defaultUnixCaps()) || !reflect.DeepEqual(s.Process.Capabilities.Bounding, defaultUnixCaps()) {
+		t.Errorf("Unexpected Bounding capabilities set got: %+v; want: %+v", s.Process.Capabilities.Bounding, defaultUnixCaps())
+	}
+	if len(s.Process.Capabilities.Effective) != len(defaultUnixCaps()) || !reflect.DeepEqual(s.Process.Capabilities.Effective, defaultUnixCaps()) {
+		t.Errorf("Unexpected Effective capabilities set got: %+v; want: %+v", s.Process.Capabilities.Effective, defaultUnixCaps())
+	}
+	if len(s.Process.Capabilities.Permitted) != len(defaultUnixCaps()) || !reflect.DeepEqual(s.Process.Capabilities.Permitted, defaultUnixCaps()) {
+		t.Errorf("Unexpected Permitted capabilities set got: %+v; want: %+v", s.Process.Capabilities.Permitted, defaultUnixCaps())
+	}
+	if len(s.Process.Capabilities.Inheritable) != len(defaultUnixCaps()) || !reflect.DeepEqual(s.Process.Capabilities.Inheritable, defaultUnixCaps()) {
+		t.Errorf("Unexpected Inheritable capabilities set got: %+v; want: %+v", s.Process.Capabilities.Inheritable, defaultUnixCaps())
+	}
+	if len(s.Process.Capabilities.Ambient) != 0 {
+		t.Errorf("Unexpected Ambient capabilities set got: %+v; want: %+v", s.Process.Capabilities.Ambient, []string{})
+	}
+}
+
+func TestWithAddedCapabilities(t *testing.T) {
+	t.Parallel()
+
+	ctx := namespaces.WithNamespace(context.Background(), "testing")
+
+	addedCap := "CAP_SYS_PTRACE"
+
+	// This should add the defaultUinxCaps to the inheritable, bounding, permitted and effective sets and only
+	// the explicitly added capability to the inheritabel, bounding, permitted, effective and ambient set.
+	opts := []SpecOpts{
+		WithAddedCapabilities([]string{addedCap}),
+	}
+	var s *specs.Spec
+	var err error
+	if runtime.GOOS != "windows" {
+		s, err = GenerateSpec(ctx, nil, &containers.Container{ID: t.Name()}, opts...)
+	} else {
+		s, err = GenerateSpecWithPlatform(ctx, nil, "linux/amd64", &containers.Container{ID: t.Name()}, opts...)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedNonAmbientCapas := append(defaultUnixCaps(), addedCap)
+
+	if len(s.Process.Capabilities.Bounding) != len(expectedNonAmbientCapas) || !reflect.DeepEqual(s.Process.Capabilities.Bounding, expectedNonAmbientCapas) {
+		t.Errorf("Unexpected Bounding capabilities set got: %+v; want: %+v", s.Process.Capabilities.Bounding, expectedNonAmbientCapas)
+	}
+	if len(s.Process.Capabilities.Effective) != len(expectedNonAmbientCapas) || !reflect.DeepEqual(s.Process.Capabilities.Effective, expectedNonAmbientCapas) {
+		t.Errorf("Unexpected Effective capabilities set got: %+v; want: %+v", s.Process.Capabilities.Effective, expectedNonAmbientCapas)
+	}
+	if len(s.Process.Capabilities.Permitted) != len(expectedNonAmbientCapas) || !reflect.DeepEqual(s.Process.Capabilities.Permitted, expectedNonAmbientCapas) {
+		t.Errorf("Unexpected Permitted capabilities set got: %+v; want: %+v", s.Process.Capabilities.Permitted, expectedNonAmbientCapas)
+	}
+	if len(s.Process.Capabilities.Inheritable) != len(expectedNonAmbientCapas) || !reflect.DeepEqual(s.Process.Capabilities.Inheritable, expectedNonAmbientCapas) {
+		t.Errorf("Unexpected Inheritable capabilities set got: %+v; want: %+v", s.Process.Capabilities.Inheritable, expectedNonAmbientCapas)
+	}
+	if len(s.Process.Capabilities.Ambient) != 1 || s.Process.Capabilities.Ambient[0] != addedCap {
+		t.Errorf("Unexpected Ambient capabilities set got: %+v; want: %+v", s.Process.Capabilities.Ambient, []string{addedCap})
 	}
 }
 
