@@ -37,6 +37,12 @@ var (
 		},
 	}
 
+	// SnapshotterLabels are cli flags specifying labels which will be add to the new snapshot for container.
+	SnapshotterLabels = cli.StringSliceFlag{
+		Name:  "snapshotter-label",
+		Usage: "labels added to the new snapshot for this container.",
+	}
+
 	// LabelFlag is a cli flag specifying labels
 	LabelFlag = cli.StringSliceFlag{
 		Name:  "label",

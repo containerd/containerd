@@ -35,6 +35,7 @@ import (
 	runtimeoptions "github.com/containerd/containerd/pkg/runtimeoptions/v1"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
+	"github.com/containerd/containerd/snapshots"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -171,7 +172,10 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 				// Even when "read-only" is set, we don't use KindView snapshot here. (#1495)
 				// We pass writable snapshot to the OCI runtime, and the runtime remounts it as read-only,
 				// after creating some mount points on demand.
-				cOpts = append(cOpts, containerd.WithNewSnapshot(id, image))
+				// For some snapshotter, such as overlaybd, it can provide 2 kind of writable snapshot(overlayfs dir or block-device)
+				// by command label values.
+				cOpts = append(cOpts, containerd.WithNewSnapshot(id, image,
+					snapshots.WithLabels(commands.LabelArgs(context.StringSlice("snapshotter-label")))))
 			}
 			cOpts = append(cOpts, containerd.WithImageStopSignal(image, "SIGTERM"))
 		}
