@@ -22,12 +22,22 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/tasks"
 	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/types"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/pkg/errors"
 )
+
+func init() {
+	const prefix = "types.containerd.io"
+
+	// TaskPlugin is the configuration of a proxy plugin to load. This is sent to
+	// containerd as types.Any (container.Extension) so register the type_url here.
+	typeurl.Register(&tasks.TaskPlugin{}, prefix, "tasks", "TaskPlugin")
+}
 
 // DeleteOpts allows the caller to set options for the deletion of a container
 type DeleteOpts func(ctx context.Context, client *Client, c containers.Container) error
@@ -285,4 +295,15 @@ func WithSpec(s *oci.Spec, opts ...oci.SpecOpts) NewContainerOpts {
 // WithoutRefreshedMetadata will use the current metadata attached to the container object
 func WithoutRefreshedMetadata(i *InfoConfig) {
 	i.Refresh = false
+}
+
+// WithLoadingProxySnapshotter loads the container as a proxy snapshotter plugin.
+func WithLoadingProxySnapshotter(name, socketPath string) NewContainerOpts {
+	// This option uses container's Extension functionality to enable this feature without
+	// changing the container API.
+	return WithContainerExtension("containerd.io/task/plugin", &tasks.TaskPlugin{
+		Name:    name,
+		Type:    plugin.SnapshotPlugin,
+		Address: socketPath,
+	})
 }

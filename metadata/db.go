@@ -66,9 +66,10 @@ type dbOptions struct {
 // while proxying data shared across namespaces to backend
 // datastores for content and snapshots.
 type DB struct {
-	db *bolt.DB
-	ss map[string]*snapshotter
-	cs *contentStore
+	db   *bolt.DB
+	ss   map[string]*snapshotter
+	ssMu sync.Mutex
+	cs   *contentStore
 
 	// wlock is used to protect access to the data structures during garbage
 	// collection. While the wlock is held no writable transactions can be
@@ -217,6 +218,8 @@ func (m *DB) ContentStore() content.Store {
 // Snapshotter returns a namespaced content store for
 // the requested snapshotter name proxied to a snapshotter.
 func (m *DB) Snapshotter(name string) snapshots.Snapshotter {
+	m.ssMu.Lock()
+	defer m.ssMu.Unlock()
 	sn, ok := m.ss[name]
 	if !ok {
 		return nil
@@ -226,11 +229,23 @@ func (m *DB) Snapshotter(name string) snapshots.Snapshotter {
 
 // Snapshotters returns all available snapshotters.
 func (m *DB) Snapshotters() map[string]snapshots.Snapshotter {
+	m.ssMu.Lock()
+	defer m.ssMu.Unlock()
 	ss := make(map[string]snapshots.Snapshotter, len(m.ss))
 	for n, sn := range m.ss {
 		ss[n] = sn
 	}
 	return ss
+}
+
+// AddSnapshotter adds a namespaced content store for
+// the requested snapshotter name proxied to a snapshotter.
+func (m *DB) AddSnapshotter(name string, sn snapshots.Snapshotter) (snapshots.Snapshotter, error) {
+	m.ssMu.Lock()
+	defer m.ssMu.Unlock()
+	s := newSnapshotter(m, name, sn)
+	m.ss[name] = s
+	return s, nil
 }
 
 // View runs a readonly transaction on the metadata store.
@@ -412,7 +427,9 @@ func (m *DB) getMarked(ctx context.Context) (map[gc.Node]struct{}, error) {
 
 func (m *DB) cleanupSnapshotter(name string) (time.Duration, error) {
 	ctx := context.Background()
+	m.ssMu.Lock()
 	sn, ok := m.ss[name]
+	m.ssMu.Unlock()
 	if !ok {
 		return 0, nil
 	}

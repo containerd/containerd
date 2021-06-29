@@ -179,6 +179,10 @@ var (
 			Name:  "apparmor-profile",
 			Usage: "enable AppArmor with an existing custom profile",
 		},
+		cli.StringFlag{
+			Name:  "load-plugin",
+			Usage: "load the container as a proxy snapshotter plugin",
+		},
 	}
 )
 

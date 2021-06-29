@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
+	"github.com/containerd/containerd/tasks"
 	"github.com/gogo/googleapis/google/rpc"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/google/uuid"
@@ -59,9 +60,19 @@ type Local struct {
 	mu      sync.Mutex
 	plugins []api.Plugin
 	root    string
+
+	// taskPluginSet is a set of plugins exposed by task service.
+	taskPluginSet tasks.TaskPluginSet
 }
 
 var _ = (api.IntrospectionClient)(&Local{})
+
+// RegisterTaskPluginSet registers a set of plugins exposed by task service.
+func (l *Local) RegisterTaskPluginSet(p tasks.TaskPluginSet) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.taskPluginSet = p
+}
 
 // UpdateLocal updates the local introspection service
 func (l *Local) UpdateLocal(root string, plugins []api.Plugin) {
@@ -96,7 +107,14 @@ func (l *Local) Plugins(ctx context.Context, req *api.PluginsRequest, _ ...grpc.
 func (l *Local) getPlugins() []api.Plugin {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	return l.plugins
+
+	plugins := l.plugins
+	if l.taskPluginSet != nil {
+		// expose plugins managed by task service as well.
+		plugins = append(plugins, pluginsToPB(l.taskPluginSet.GetAll())...)
+	}
+
+	return plugins
 }
 
 // Server returns the local server information

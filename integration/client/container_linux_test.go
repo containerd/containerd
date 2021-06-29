@@ -43,6 +43,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log/logtest"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/plugin"
@@ -2160,4 +2161,167 @@ func TestTaskSpec(t *testing.T) {
 		t.Fatal(err)
 	}
 	<-statusC
+}
+
+const (
+	// testSnapshotterPlugin is the image of the proxy snapshotter used in this test.
+	testSnapshotterPlugin = "ghcr.io/stargz-containers/stargz-snapshotter:v0.6.4-dev"
+
+	// testSnapshotterSockPath is the path to the unix socket in the container. The proxy
+	// snapshotter exposes its API over this.
+	testSnapshotterSockPath = "/run/containerd-stargz-grpc/containerd-stargz-grpc.sock"
+)
+
+// TestTaskPlugins tests a proxy plugin running as a container is usable on containerd.
+func TestTaskPlugins(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	ctx, cancel := testContext(t)
+	defer cancel()
+	image, err := client.Pull(ctx, testSnapshotterPlugin, WithPullUnpack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.ImageService().Delete(ctx, testSnapshotterPlugin, images.SynchronousDelete())
+
+	// create plugin container
+	id := t.Name()
+	snRoot := filepath.Join(defaultRoot, id)
+	if err := os.MkdirAll(snRoot, 0755); err != nil {
+		t.Fatal(err)
+	}
+	container, err := client.NewContainer(ctx, id,
+
+		// loads this container as a proxy snapshotter
+		WithLoadingProxySnapshotter(id, testSnapshotterSockPath),
+		WithNewSnapshot(id, image),
+
+		// bind-mounts the plugin's data directory to host, with sharing the mount events.
+		// this is necessary to share snapshots between the container and containerd.
+		// snapshotter also runs as a previleged container.
+		WithNewSpec(
+			oci.WithImageConfigArgs(image, []string{"--root", snRoot}),
+			oci.WithPrivileged,
+			oci.WithMounts([]specs.Mount{
+				{
+					Destination: snRoot,
+					Type:        "none",
+					Source:      snRoot,
+					Options:     []string{"rbind", "rshared"},
+				},
+			}), func(_ context.Context, _ oci.Client, _ *containers.Container, s *oci.Spec) error {
+				if s.Linux != nil {
+					s.Linux.RootfsPropagation = "shared"
+				} else {
+					s.Linux = &specs.Linux{
+						RootfsPropagation: "shared",
+					}
+				}
+				return nil
+			}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	// check if the plugins is exposed through introspection service
+	ps := client.IntrospectionService()
+	response, err := ps.Plugins(ctx, []string{"id==" + id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, pg := range response.Plugins {
+		if pg.ID == id && pg.Type == string(plugin.SnapshotPlugin) {
+			found = true
+			if pg.InitErr != nil {
+				t.Errorf("plugin reports error: %v", pg.InitErr.Message)
+				return
+			}
+		}
+	}
+	if !found {
+		t.Errorf("plugin %v not found", id)
+		return
+	}
+
+	// check if the plugin is functional
+	sn := client.SnapshotService(id)
+	key := id + "-prepare"
+	m, err := sn.Prepare(ctx, key, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sn.Remove(ctx, key)
+	if err := mount.WithTempMount(ctx, m, func(root string) error {
+		return ioutil.WriteFile(filepath.Join(root, "hello"), []byte("hello"), 0600)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	name := id + "-commit"
+	if err := sn.Commit(ctx, name, key); err != nil {
+		t.Fatal(err)
+	}
+	defer sn.Remove(ctx, name)
+	m2, err := sn.View(ctx, id+"-view", name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := mount.WithTempMount(ctx, m2, func(root string) error {
+		data, err := ioutil.ReadFile(filepath.Join(root, "hello"))
+		if err != nil {
+			return err
+		}
+		if string(data) != "hello" {
+			return fmt.Errorf("unexpected contents: %q; wanted %q", string(data), "hello")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	<-statusC
+
+	if _, err := task.Delete(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	// check if the plugin is removed
+	response, err = ps.Plugins(ctx, []string{"id==" + id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found = false
+	for _, pg := range response.Plugins {
+		if pg.ID == id && pg.Type == string(plugin.SnapshotPlugin) {
+			found = true
+		}
+	}
+	if found {
+		t.Errorf("plugin %v found; but wanted to be removed", id)
+		return
+	}
 }

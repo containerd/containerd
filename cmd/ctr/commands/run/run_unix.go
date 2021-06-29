@@ -290,6 +290,16 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	}
 	cOpts = append(cOpts, containerd.WithRuntime(context.String("runtime"), runtimeOpts))
 
+	if snproxy := context.String("load-plugin"); snproxy != "" {
+		// Load the container as a proxy snapshotter plugin.
+		// Use ":" separater for enabling the user to use this feature by one option.
+		fields := strings.Split(snproxy, ":")
+		if len(fields) < 2 || fields[0] == "" || fields[1] == "" {
+			return nil, errors.New("load-plugin option must be formed as <name>:<socket-path>")
+		}
+		cOpts = append(cOpts, containerd.WithLoadingProxySnapshotter(fields[0], fields[1]))
+	}
+
 	opts = append(opts, oci.WithAnnotations(commands.LabelArgs(context.StringSlice("label"))))
 	var s specs.Spec
 	spec = containerd.WithSpec(&s, opts...)

@@ -22,6 +22,7 @@ import (
 	api "github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
+	"github.com/containerd/containerd/tasks"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -57,6 +58,16 @@ func init() {
 				return nil, errors.Errorf("Could not create a local client for introspection service")
 			}
 			localClient.UpdateLocal(ic.Root, allPluginsPB)
+
+			ts, ok := plugins[services.TasksService]
+			if ok {
+				ti, err := ts.Instance()
+				if err == nil {
+					// enables to expose information of plugins managed by task service
+					// via introspection API.
+					localClient.RegisterTaskPluginSet(ti.(tasks.TaskPluginSet))
+				}
+			}
 
 			return &server{
 				local: localClient,

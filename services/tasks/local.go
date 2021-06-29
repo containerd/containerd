@@ -19,6 +19,7 @@ package tasks
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -27,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	api "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/task"
@@ -40,6 +42,8 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/pkg/grpcutil"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
@@ -47,9 +51,12 @@ import (
 	v2 "github.com/containerd/containerd/runtime/v2"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/services"
+	"github.com/containerd/containerd/snapshots"
+	ssproxy "github.com/containerd/containerd/snapshots/proxy"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -108,6 +115,9 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 		publisher:  ic.Events,
 		monitor:    monitor.(runtime.TaskMonitor),
 		v2Runtime:  v2r.(*v2.TaskManager),
+
+		addMetadataSnapshotter: db.AddSnapshotter,
+		taskPluginSet:          new(taskPluginSet),
 	}
 	for _, r := range runtimes {
 		tasks, err := r.Tasks(ic.Context, true)
@@ -125,6 +135,31 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 	for _, t := range v2Tasks {
 		l.monitor.Monitor(t)
 	}
+	l.pluginsState = filepath.Join(ic.State, "plugins")
+	l.pluginsRoot = filepath.Join(ic.Root, "plugins")
+
+	// load existing snaphsotters
+	snDirs, err := ioutil.ReadDir(l.pluginsState)
+	if err != nil && !os.IsNotExist(err) {
+		log.G(ic.Context).WithError(err).Warnf("plugins are not loaded")
+	} else if err == nil {
+		for _, snDir := range snDirs {
+			name := snDir.Name()
+			if len(name) > 0 && name[0] == '.' {
+				continue // skip hidden directories
+			}
+			if !l.isPluginExist(ic.Context, name) {
+				continue // do not use plugin that don't run
+			}
+			pluginDir := filepath.Join(l.pluginsState, name)
+			if err := l.addSnapshotter(ic.Context, name, filepath.Join(pluginDir, "plugin.sock"), func() error {
+				// When removing this plugin, remove the state dir of this plugin as well.
+				return os.RemoveAll(pluginDir)
+			}); err != nil {
+				log.G(ic.Context).WithError(err).Warnf("cannot load plugin %q", name)
+			}
+		}
+	}
 	return l, nil
 }
 
@@ -136,12 +171,44 @@ type local struct {
 
 	monitor   runtime.TaskMonitor
 	v2Runtime *v2.TaskManager
+
+	pluginsState string
+	pluginsRoot  string
+
+	// taskPluginSet is a set of plugins running as tasks
+	*taskPluginSet
+
+	// addMetadataSnapshotter is a function to add a snapshotter to metadata service.
+	addMetadataSnapshotter func(name string, sn snapshots.Snapshotter) (snapshots.Snapshotter, error)
 }
 
 func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.CallOption) (*api.CreateTaskResponse, error) {
 	container, err := l.getContainer(ctx, r.ContainerID)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
+	}
+	if snName, snSocketPath, err := parseSnapshotterPluginOption(ctx, container); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	} else if snName != "" && snSocketPath != "" {
+		// This is a proxys plugin. Patch the spec to recognize the socket of this container
+		// and record that proxy snapshotter to taskPluginSet.
+		var s oci.Spec
+		if err := json.Unmarshal(container.Spec.Value, &s); err != nil {
+			return nil, errdefs.ToGRPC(err) // plugin is only supported for OCI-styled config
+		}
+		patchedS, err := l.pluginSnapshotter(ctx, r.ContainerID, &s, snName, snSocketPath)
+		if err != nil {
+			return nil, errdefs.ToGRPC(err)
+		}
+		container.Spec, err = typeurl.MarshalAny(patchedS)
+		if err != nil {
+			return nil, errdefs.ToGRPC(err)
+		}
+		c, err := l.containers.Update(ctx, *container, "spec")
+		if err != nil {
+			return nil, errdefs.ToGRPC(err)
+		}
+		container = &c
 	}
 	checkpointPath, err := getRestorePath(container.Runtime.Name, r.Options)
 	if err != nil {
@@ -254,6 +321,18 @@ func (l *local) Delete(ctx context.Context, r *api.DeleteTaskRequest, _ ...grpc.
 	exit, err := t.Delete(ctx)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
+	}
+	container, err := l.getContainer(ctx, r.ContainerID)
+	if err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	if snName, snSocketPath, err := parseSnapshotterPluginOption(ctx, container); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	} else if snName != "" && snSocketPath != "" {
+		// This is a proxy plugin. Remove the plugin as well.
+		if err := l.taskPluginSet.remove(snName, plugin.SnapshotPlugin); err != nil {
+			log.G(ctx).WithError(err).Warnf("failed to remove snapshotter plugin %q", snName)
+		}
 	}
 	return &api.DeleteResponse{
 		ExitStatus: exit.Status,
@@ -700,6 +779,91 @@ func (l *local) allRuntimes() (o []runtime.PlatformRuntime) {
 	}
 	o = append(o, l.v2Runtime)
 	return o
+}
+
+// pluginSnapshotter prepares the directory for the specified snapshotter,
+// creates the snapshotter and adds it to the plugins set.
+//
+// This also patches the passed OCI configuration to enable containerd to
+// recognize the plugin's socket.
+func (l *local) pluginSnapshotter(ctx context.Context, id string, s *oci.Spec, snName, snSocketPath string) (_ *oci.Spec, err error) {
+	pluginStateDir := filepath.Join(l.pluginsState, snName)
+	if _, err := os.Stat(pluginStateDir); err == nil {
+		// avoid to overwriting existing plugin
+		if l.isPluginExist(ctx, snName) {
+			return nil, fmt.Errorf("plugin %q already exists", snName)
+		}
+		// No task run this plugin. Create a new plugin here.
+		if err := os.RemoveAll(pluginStateDir); err != nil {
+			return nil, err
+		}
+	}
+
+	// Bind-mount the directory where the plugin creates unix socket.
+	// Proxy snapshotter will be created for this unix socket provided by this container.
+	hostSocketMountDir := filepath.Join(pluginStateDir, "v")
+	if err := os.MkdirAll(hostSocketMountDir, 0600); err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			os.RemoveAll(pluginStateDir)
+		}
+	}()
+	pluginSocket := filepath.Join(pluginStateDir, "plugin.sock")
+	if err := os.Symlink(filepath.Join(hostSocketMountDir, filepath.Base(snSocketPath)), pluginSocket); err != nil {
+		return nil, err
+	}
+	s.Mounts = append(s.Mounts,
+		specs.Mount{
+			Destination: filepath.Dir(snSocketPath),
+			Type:        "none",
+			Source:      hostSocketMountDir,
+			Options:     []string{"rbind", "rprivate"},
+		},
+	)
+
+	// Record the ID of the task that run this plugin. This will be used for healthcheck of this plugin.
+	if err := ioutil.WriteFile(filepath.Join(pluginStateDir, "id"), []byte(id), 0600); err != nil {
+		return nil, err
+	}
+
+	return s, l.addSnapshotter(ctx, snName, pluginSocket, func() error {
+		// When removing this plugin, remove the state dir of this plugin as well.
+		return os.RemoveAll(pluginStateDir)
+	})
+}
+
+// addSnapshotter creates a snapshotter for the specified socket and adds it
+// to the plugins set.
+func (l *local) addSnapshotter(ctx context.Context, name, socketPath string, finiFn func() error) error {
+	r := &plugin.Registration{
+		Type: plugin.SnapshotPlugin,
+		ID:   name,
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			clients := new(grpcutil.ProxyClients)
+			conn, err := clients.GetClient(socketPath)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to connect to snapshotter %q", name)
+			}
+			return l.addMetadataSnapshotter(name, ssproxy.NewSnapshotter(snapshotsapi.NewSnapshotsClient(conn), name))
+		},
+	}
+	// Initialize this plugin and add it to taskPluginSet. Currently init context won't be used.
+	p := r.Init(plugin.NewContext(ctx, r, nil, l.pluginsRoot, l.pluginsState))
+	return l.taskPluginSet.add(p, finiFn)
+}
+
+// isPluginExist returns true if the task providing the specified pluign exists.
+func (l *local) isPluginExist(ctx context.Context, name string) bool {
+	id, err := ioutil.ReadFile(filepath.Join(l.pluginsState, name, "id"))
+	if err != nil {
+		return false
+	}
+	if _, err := l.getTask(ctx, string(id)); err != nil {
+		return false
+	}
+	return true
 }
 
 // getCheckpointPath only suitable for runc runtime now
