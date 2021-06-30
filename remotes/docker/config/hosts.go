@@ -293,6 +293,7 @@ type hostFileConfig struct {
 
 	Header map[string]interface{} `toml:"header"`
 
+	Path string `toml:"path"`
 	// API (default: "docker")
 	// API Version (default: "v2")
 	// Credentials: helper? name? username? alternate domain? token?
@@ -371,13 +372,18 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 		// Define a registry protocol type
 		//   OCI v1    - Always use given path as is
 		//   Docker v2 - Always ensure ends with /v2/
+		if len(config.Path) > 0 {
+			if !strings.HasSuffix(config.Path, "/") {
+				config.Path = "/" + config.Path
+			}
+		}
 		if len(u.Path) > 0 {
 			u.Path = path.Clean(u.Path)
 			if !strings.HasSuffix(u.Path, "/v2") {
-				u.Path = u.Path + "/v2"
+				u.Path = u.Path + "/v2" + config.Path
 			}
 		} else {
-			u.Path = "/v2"
+			u.Path = "/v2" + config.Path
 		}
 		result.path = u.Path
 	}
