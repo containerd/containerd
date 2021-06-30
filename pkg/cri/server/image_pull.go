@@ -136,6 +136,11 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 			containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
 	}
 
+	if c.config.ContainerdConfig.DisableSameLayerUnpack {
+		pullOpts = append(pullOpts,
+			containerd.WithDisableSameLayerUnpack())
+	}
+
 	image, err := c.client.Pull(ctx, ref, pullOpts...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to pull and unpack image %q", ref)

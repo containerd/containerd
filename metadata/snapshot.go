@@ -37,15 +37,69 @@ import (
 )
 
 const (
-	inheritedLabelsPrefix = "containerd.io/snapshot/"
-	labelSnapshotRef      = "containerd.io/snapshot.ref"
+	inheritedLabelsPrefix  = "containerd.io/snapshot/"
+	labelSnapshotRef       = "containerd.io/snapshot.ref"
+	labelDisableSameUnpack = "containerd.io/snapshot/disable-same-unpack"
 )
+
+type inProgress struct {
+	entries sync.Map
+}
+
+func newInProgress() *inProgress {
+	return &inProgress{}
+}
+
+func (inp *inProgress) load(key string) (*broadCaster, bool) {
+	val, ok := inp.entries.Load(key)
+	if ok {
+		return val.(*broadCaster), true
+	}
+	return nil, false
+}
+
+func (inp *inProgress) loadOrStore(key string) (*broadCaster, bool) {
+	bc, ok := inp.entries.LoadOrStore(key, newBroadcaster())
+	return bc.(*broadCaster), ok
+}
+
+func (inp *inProgress) delete(key string) {
+	inp.entries.Delete(key)
+}
+
+type broadCaster struct {
+	c        *sync.Cond
+	finished bool
+	remove   bool
+	err      error
+}
+
+func newBroadcaster() *broadCaster {
+	return &broadCaster{
+		c: sync.NewCond(&sync.Mutex{}),
+	}
+}
+
+func (br *broadCaster) wait() error {
+	br.c.L.Lock()
+	defer br.c.L.Unlock()
+	// If a broadcast was fired shortly before calling wait but after we grabbed the broadcast object itself,
+	// we can end up sitting in wait forever. finished signifies that broadcast has already sent
+	if br.finished {
+		return br.err
+	}
+	br.c.Wait()
+	return br.err
+}
 
 type snapshotter struct {
 	snapshots.Snapshotter
 	name string
 	db   *DB
 	l    sync.RWMutex
+	// inp holds all active extraction snapshots before becoming committed/removed. This can be used to wait on the
+	// result of an unpack instead of doing the same work twice if one is already underway.
+	inp *inProgress
 }
 
 // newSnapshotter returns a new Snapshotter which namespaces the given snapshot
@@ -55,6 +109,7 @@ func newSnapshotter(db *DB, name string, sn snapshots.Snapshotter) *snapshotter 
 		Snapshotter: sn,
 		name:        name,
 		db:          db,
+		inp:         newInProgress(),
 	}
 }
 
@@ -281,7 +336,7 @@ func (s *snapshotter) View(ctx context.Context, key, parent string, opts ...snap
 	return s.createSnapshot(ctx, key, parent, true, opts)
 }
 
-func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, readonly bool, opts []snapshots.Opt) ([]mount.Mount, error) {
+func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, readonly bool, opts []snapshots.Opt) (_ []mount.Mount, err error) {
 	s.l.RLock()
 	defer s.l.RUnlock()
 
@@ -302,13 +357,47 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 	}
 
 	var (
-		target  = base.Labels[labelSnapshotRef]
-		bparent string
-		bkey    string
-		bopts   = []snapshots.Opt{
+		target               = base.Labels[labelSnapshotRef]
+		_, disableSameUnpack = base.Labels[labelDisableSameUnpack]
+		bparent              string
+		bkey                 string
+		bopts                = []snapshots.Opt{
 			snapshots.WithLabels(snapshots.FilterInheritedLabels(base.Labels)),
 		}
 	)
+
+	if disableSameUnpack {
+		bc, ok := s.inp.loadOrStore(key)
+		if ok {
+			// Wait for someone to broadcast that an active snapshot with the same key was either committed or removed.
+			err := bc.wait()
+			// If the extraction snapshot we were waiting on wasn't removed, then it either
+			// 1. Succeeded and we return ErrAlreadyExists
+			// 2. Failed and we return the error as is.
+			if !bc.remove {
+				// Grab the error and if nil return ErrAlreadyExists to match the behavior of if we statted a
+				// snapshot that already exists. The client will have to have behavior to skip applying a diff
+				// on ErrAlreadyExists (which is true for schema 2 images/Unpacker). This is the same mechanism
+				// remote snapshotters employ also.
+				if err == nil {
+					return nil, errdefs.ErrAlreadyExists
+				}
+				return nil, err
+			}
+		} else {
+			// Else this is the first snapshot with this key, make sure to broadcast any errors if we
+			// error out in this call.
+			defer func() {
+				if err != nil {
+					bc.c.L.Lock()
+					bc.err = err
+					s.inp.delete(key)
+					bc.c.Broadcast()
+					bc.c.L.Unlock()
+				}
+			}()
+		}
+	}
 
 	if err := update(ctx, s.db, func(tx *bolt.Tx) error {
 		bkt, err := createSnapshotterBucket(tx, ns, s.name)
@@ -492,9 +581,23 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 	return m, nil
 }
 
-func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
+func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) (err error) {
 	s.l.RLock()
 	defer s.l.RUnlock()
+
+	defer func() {
+		bc, ok := s.inp.load(key)
+		if ok {
+			bc.c.L.Lock()
+			// Set the error that commit will return and then broadcast to all waiters that a commit has successfully
+			// completed/failed.
+			bc.finished = true
+			bc.err = err
+			s.inp.delete(key)
+			bc.c.Broadcast()
+			bc.c.L.Unlock()
+		}
+	}()
 
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
@@ -623,9 +726,24 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 
 }
 
-func (s *snapshotter) Remove(ctx context.Context, key string) error {
+func (s *snapshotter) Remove(ctx context.Context, key string) (err error) {
 	s.l.RLock()
 	defer s.l.RUnlock()
+
+	defer func() {
+		// If an active snapshot that was going to have a diff applied (or already did) is being removed we need to alert any waiters.
+		// We need to have logic to move on with creating a snapshot instead of returning from Prepare with ErrAlreadyExists, this is the role
+		// the remove field fulfills.
+		bc, ok := s.inp.load(key)
+		if ok {
+			bc.c.L.Lock()
+			bc.remove = true
+			bc.finished = true
+			s.inp.delete(key)
+			bc.c.Broadcast()
+			bc.c.L.Unlock()
+		}
+	}()
 
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {

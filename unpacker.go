@@ -154,8 +154,15 @@ EachLayer:
 		)
 
 		for try := 1; try <= 3; try++ {
+			// If we want to avoid unpacking the same layer in parallel, we need to use a key format that will
+			// intentionally cause collisions for the same layer. This is how we'll know an active snapshot is
+			// underway already, along with intentional tracking in the metadata snapshotter layer.
+			if rCtx.DisableSameLayerUnpack {
+				key = fmt.Sprintf(snapshots.UnpackKeyPrefix+"-%s", chainID)
+			} else {
+				key = fmt.Sprintf(snapshots.UnpackKeyFormat, uniquePart(), chainID)
+			}
 			// Prepare snapshot with from parent, label as root
-			key = fmt.Sprintf(snapshots.UnpackKeyFormat, uniquePart(), chainID)
 			mounts, err = sn.Prepare(ctx, key, parent.String(), opts...)
 			if err != nil {
 				if errdefs.IsAlreadyExists(err) {

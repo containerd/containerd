@@ -97,6 +97,12 @@ type ContainerdConfig struct {
 	// remove layers from the content store after successfully unpacking these
 	// layers to the snapshotter.
 	DiscardUnpackedLayers bool `toml:"discard_unpacked_layers" json:"discardUnpackedLayers"`
+
+	// DisableSameLayerUnpack changes the behavior when unpacking two or more of the same layers in parallel. If multiple
+	// snapshots are being made for the same layer, one will continue on to have a diff applied to it, and the other(s)
+	// will wait on the result of the first instead of all of them unpacking and the others simply getting garbage collected
+	// afterwards.
+	DisableSameLayerUnpack bool `toml:"disable_same_layer_unpack" json:"disableSameLayerUnpack"`
 }
 
 // CniConfig contains toml config related to cni

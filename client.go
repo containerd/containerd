@@ -370,6 +370,10 @@ type RemoteContext struct {
 	// AllMetadata downloads all manifests and known-configuration files
 	AllMetadata bool
 
+	// DisableSameLayerUnpack prevents a parallel unpack of the same image layer and will wait for the first
+	// in line to complete before either returning the error if there was one, or returning ErrAlreadyExists.
+	DisableSameLayerUnpack bool
+
 	// ChildLabelMap sets the labels used to reference child objects in the content
 	// store. By default, all GC reference labels will be set for all fetched content.
 	ChildLabelMap func(ocispec.Descriptor) []string
