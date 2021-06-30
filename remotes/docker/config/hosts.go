@@ -373,7 +373,7 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 		//   OCI v1    - Always use given path as is
 		//   Docker v2 - Always ensure ends with /v2/
 		if len(config.Path) > 0 {
-			if !strings.HasSuffix(config.Path, "/") {
+			if !strings.HasPrefix(config.Path, "/") {
 				config.Path = "/" + config.Path
 			}
 		}
