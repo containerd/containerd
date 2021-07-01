@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/log"
 	"github.com/pkg/errors"
@@ -409,15 +410,15 @@ func scanAll(ctx context.Context, tx *bolt.Tx, fn func(ctx context.Context, n gc
 	return nil
 }
 
-func remove(ctx context.Context, tx *bolt.Tx, node gc.Node) error {
+func remove(ctx context.Context, tx *bolt.Tx, node gc.Node) (interface{}, error) {
 	v1bkt := tx.Bucket(bucketKeyVersion)
 	if v1bkt == nil {
-		return nil
+		return nil, nil
 	}
 
 	nsbkt := v1bkt.Bucket([]byte(node.Namespace))
 	if nsbkt == nil {
-		return nil
+		return nil, nil
 	}
 
 	switch node.Type {
@@ -428,25 +429,28 @@ func remove(ctx context.Context, tx *bolt.Tx, node gc.Node) error {
 		}
 		if cbkt != nil {
 			log.G(ctx).WithField("key", node.Key).Debug("remove content")
-			return cbkt.DeleteBucket([]byte(node.Key))
+			return nil, cbkt.DeleteBucket([]byte(node.Key))
 		}
 	case ResourceSnapshot:
 		sbkt := nsbkt.Bucket(bucketKeyObjectSnapshots)
 		if sbkt != nil {
 			parts := strings.SplitN(node.Key, "/", 2)
 			if len(parts) != 2 {
-				return errors.Errorf("invalid snapshot gc key %s", node.Key)
+				return nil, errors.Errorf("invalid snapshot gc key %s", node.Key)
 			}
 			ssbkt := sbkt.Bucket([]byte(parts[0]))
 			if ssbkt != nil {
 				log.G(ctx).WithField("key", parts[1]).WithField("snapshotter", parts[0]).Debug("remove snapshot")
-				return ssbkt.DeleteBucket([]byte(parts[1]))
+				return &eventstypes.SnapshotRemove{
+					Key:         parts[1],
+					Snapshotter: parts[0],
+				}, ssbkt.DeleteBucket([]byte(parts[1]))
 			}
 		}
 	case ResourceLease:
 		lbkt := nsbkt.Bucket(bucketKeyObjectLeases)
 		if lbkt != nil {
-			return lbkt.DeleteBucket([]byte(node.Key))
+			return nil, lbkt.DeleteBucket([]byte(node.Key))
 		}
 	case ResourceIngest:
 		ibkt := nsbkt.Bucket(bucketKeyObjectContent)
@@ -455,11 +459,11 @@ func remove(ctx context.Context, tx *bolt.Tx, node gc.Node) error {
 		}
 		if ibkt != nil {
 			log.G(ctx).WithField("ref", node.Key).Debug("remove ingest")
-			return ibkt.DeleteBucket([]byte(node.Key))
+			return nil, ibkt.DeleteBucket([]byte(node.Key))
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 // sendLabelRefs sends all snapshot and content references referred to by the labels in the bkt

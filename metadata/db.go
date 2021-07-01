@@ -24,9 +24,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
@@ -55,9 +58,18 @@ func WithPolicyIsolated(o *dbOptions) {
 	o.shared = false
 }
 
+// WithEventsPublisher adds an events publisher to the
+// metadata db to directly publish events
+func WithEventsPublisher(p events.Publisher) DBOpt {
+	return func(o *dbOptions) {
+		o.publisher = p
+	}
+}
+
 // dbOptions configure db options.
 type dbOptions struct {
-	shared bool
+	shared    bool
+	publisher events.Publisher
 }
 
 // DB represents a metadata database backed by a bolt
@@ -264,6 +276,32 @@ func (m *DB) RegisterMutationCallback(fn func(bool)) {
 	m.wlock.Unlock()
 }
 
+// namespacedEvent is used to handle any event for a namespace
+type namespacedEvent struct {
+	namespace string
+	event     interface{}
+}
+
+func (m *DB) publishEvents(events []namespacedEvent) {
+	ctx := context.Background()
+	if publisher := m.dbopts.publisher; publisher != nil {
+		for _, ne := range events {
+			ctx := namespaces.WithNamespace(ctx, ne.namespace)
+			var topic string
+			switch ne.event.(type) {
+			case *eventstypes.SnapshotRemove:
+				topic = "/snapshot/remove"
+			default:
+				log.G(ctx).WithField("event", ne.event).Debug("unhandled event type from garbage collection removal")
+				continue
+			}
+			if err := publisher.Publish(ctx, topic, ne.event); err != nil {
+				log.G(ctx).WithError(err).WithField("topic", topic).Debug("publish event failed")
+			}
+		}
+	}
+}
+
 // GCStats holds the duration for the different phases of the garbage collector
 type GCStats struct {
 	MetaD     time.Duration
@@ -287,6 +325,7 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 		return nil, err
 	}
 
+	events := []namespacedEvent{}
 	if err := m.db.Update(func(tx *bolt.Tx) error {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
@@ -300,10 +339,19 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 				if idx := strings.IndexRune(n.Key, '/'); idx > 0 {
 					m.dirtySS[n.Key[:idx]] = struct{}{}
 				}
+				// queue event to publish after successful commit
 			} else if n.Type == ResourceContent || n.Type == ResourceIngest {
 				m.dirtyCS = true
 			}
-			return remove(ctx, tx, n)
+			event, err := remove(ctx, tx, n)
+			if event != nil && err == nil {
+				events = append(events,
+					namespacedEvent{
+						namespace: n.Namespace,
+						event:     event,
+					})
+			}
+			return err
 		}
 
 		if err := scanAll(ctx, tx, rm); err != nil {
@@ -318,6 +366,13 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 
 	var stats GCStats
 	var wg sync.WaitGroup
+
+	// Flush events asynchronously after commit
+	wg.Add(1)
+	go func() {
+		m.publishEvents(events)
+		wg.Done()
+	}()
 
 	// reset dirty, no need for atomic inside of wlock.Lock
 	m.dirty = 0
