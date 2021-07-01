@@ -237,7 +237,7 @@ func TestGCRemove(t *testing.T) {
 
 	if err := db.Update(func(tx *bolt.Tx) error {
 		for _, n := range deleted {
-			if err := c.remove(ctx, tx, n); err != nil {
+			if _, err := c.remove(ctx, tx, n); err != nil {
 				return err
 			}
 		}
@@ -482,7 +482,7 @@ func TestCollectibleResources(t *testing.T) {
 	})
 
 	if err := db.Update(func(tx *bolt.Tx) error {
-		if err := c.remove(ctx, tx, all[removeIndex]); err != nil {
+		if _, err := c.remove(ctx, tx, all[removeIndex]); err != nil {
 			return err
 		}
 		return nil
