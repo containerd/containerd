@@ -5,6 +5,14 @@ Configuring registries will be done by specifying (optionally) a `hosts.toml` fi
 each desired registry host in a configuration directory. **Note**: Updates under this directory
 do not require restarting the containerd daemon.
 
+## Registry API Support
+
+All configured registry hosts are expected to comply with the [OCI Distribution Specification](https://github.com/opencontainers/distribution-spec).
+Registries which are non-compliant or implement non-standard behavior are not guaranteed
+to be supported and may break unexpectedly between releases.
+
+Currently supported OCI Distribution version: **[v1.0.0](https://github.com/opencontainers/distribution-spec/tree/v1.0.0)**
+
 ## Specifying the Configuration Directory
 
 ### Using Host Namespace Configs with CTR
@@ -235,8 +243,10 @@ client = [["/etc/certs/client.cert", "/etc/certs/client.key"],["/etc/certs/clien
 
 ## skip_verify field
 
-`skip_verify` set this flag to `true` to skip the registry certificate
-verification for this registry host namespace. (Defaults to `false`)
+`skip_verify` skips verifications of the registry's certificate chain and
+host name when set to `true`. This should only be used for testing or in
+combination with other method of verifying connections. (Defaults to `false`)
+
 ```
 skip_verify = false
 ```

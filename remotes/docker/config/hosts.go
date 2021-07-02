@@ -54,8 +54,6 @@ type hostConfig struct {
 
 	header http.Header
 
-	// TODO: API ("docker" or "oci")
-	// TODO: API Version ("v1", "v2")
 	// TODO: Add credential configuration (domain alias, username)
 }
 
@@ -283,19 +281,28 @@ type hostFileConfig struct {
 	//  - push
 	Capabilities []string `toml:"capabilities"`
 
-	// CACert can be a string or an array of strings
+	// CACert are the public key certificates for TLS
+	// Accepted types
+	// - string - Single file with certificate(s)
+	// - []string - Multiple files with certificates
 	CACert interface{} `toml:"ca"`
 
-	// TODO: Make this an array (two key types, one for pairs (multiple files), one for single file?)
+	// Client keypair(s) for TLS with client authentication
+	// Accepted types
+	// - string - Single file with public and private keys
+	// - []string - Multiple files with public and private keys
+	// - [][2]string - Muliple keypairs with public and private keys in separate files
 	Client interface{} `toml:"client"`
 
+	// SkipVerify skips verification of the server's certificate chain
+	// and host name. This should only be used for testing or in
+	// combination with other methods of verifying connections.
 	SkipVerify *bool `toml:"skip_verify"`
 
+	// Header are additional header files to send to the server
 	Header map[string]interface{} `toml:"header"`
 
-	// API (default: "docker")
-	// API Version (default: "v2")
-	// Credentials: helper? name? username? alternate domain? token?
+	// TODO: Credentials: helper? name? username? alternate domain? token?
 }
 
 func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
