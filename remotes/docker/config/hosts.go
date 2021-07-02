@@ -291,7 +291,7 @@ type hostFileConfig struct {
 	// Accepted types
 	// - string - Single file with public and private keys
 	// - []string - Multiple files with public and private keys
-	// - [][2]string - Muliple keypairs with public and private keys in separate files
+	// - [][2]string - Multiple keypairs with public and private keys in separate files
 	Client interface{} `toml:"client"`
 
 	// SkipVerify skips verification of the server's certificate chain
@@ -301,6 +301,12 @@ type hostFileConfig struct {
 
 	// Header are additional header files to send to the server
 	Header map[string]interface{} `toml:"header"`
+
+	// OverridePath indicates the API root endpoint is defined in the URL
+	// path rather than by the API specification.
+	// This may be used with non-compliant OCI registries to override the
+	// API root endpoint.
+	OverridePath bool `toml:"override_path"`
 
 	// TODO: Credentials: helper? name? username? alternate domain? token?
 }
@@ -374,16 +380,12 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 		}
 		result.scheme = u.Scheme
 		result.host = u.Host
-		// TODO: Handle path based on registry protocol
-		// Define a registry protocol type
-		//   OCI v1    - Always use given path as is
-		//   Docker v2 - Always ensure ends with /v2/
 		if len(u.Path) > 0 {
 			u.Path = path.Clean(u.Path)
-			if !strings.HasSuffix(u.Path, "/v2") {
+			if !strings.HasSuffix(u.Path, "/v2") && !config.OverridePath {
 				u.Path = u.Path + "/v2"
 			}
-		} else {
+		} else if !config.OverridePath {
 			u.Path = "/v2"
 		}
 		result.path = u.Path

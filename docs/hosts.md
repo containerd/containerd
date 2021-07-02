@@ -274,6 +274,17 @@ or
   x-custom-1-2 = "another custom header"
 ```
 
+## override_path field
+
+`override_path` is used to indicate the host's API root endpoint is defined
+in the URL path rather than by the API specification. This may be used with
+non-compliant OCI registries which are missing the `/v2` prefix.
+(Defaults to `false`)
+
+```
+override_path = true
+```
+
 ## host field(s) (in the toml table format)
 
 `[host]."https://namespace"` and `[host].http://namespace` entries in the
@@ -310,6 +321,10 @@ for this registry host namespace:
 
 [host."https://test-3.registry"]
   client = ["/etc/certs/client-1.pem", "/etc/certs/client-2.pem"]
+
+[host."https://non-compliant-mirror.registry/v2/upstream"]
+  capabilities = ["pull"]
+  override_path = true
 ```
 
 **Note**: Recursion is not supported in the specification of host mirror
