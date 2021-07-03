@@ -35,7 +35,7 @@ import (
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/runtime"
 	client "github.com/containerd/containerd/runtime/v2/shim"
-	"github.com/containerd/containerd/runtime/v2/task"
+	shimapi "github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/ttrpc"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
@@ -117,11 +117,12 @@ func loadShim(ctx context.Context, bundle *Bundle, events *exchange.Exchange, rt
 		}
 	}()
 	s := &shim{
-		client:  client,
-		task:    task.NewTaskClient(client),
-		bundle:  bundle,
-		events:  events,
-		rtTasks: rt,
+		client:      client,
+		task:        shimapi.NewTaskClient(client),
+		portforward: shimapi.NewPortForwardClient(client),
+		bundle:      bundle,
+		events:      events,
+		rtTasks:     rt,
 	}
 	ctx, cancel := timeout.WithContext(ctx, loadTimeout)
 	defer cancel()
@@ -184,16 +185,17 @@ func cleanupAfterDeadShim(ctx context.Context, id, ns string, rt *runtime.TaskLi
 }
 
 type shim struct {
-	bundle  *Bundle
-	client  *ttrpc.Client
-	task    task.TaskService
-	taskPid int
-	events  *exchange.Exchange
-	rtTasks *runtime.TaskList
+	bundle      *Bundle
+	client      *ttrpc.Client
+	task        shimapi.TaskService
+	portforward shimapi.PortForwardService
+	taskPid     int
+	events      *exchange.Exchange
+	rtTasks     *runtime.TaskList
 }
 
 func (s *shim) Connect(ctx context.Context) error {
-	response, err := s.task.Connect(ctx, &task.ConnectRequest{
+	response, err := s.task.Connect(ctx, &shimapi.ConnectRequest{
 		ID: s.ID(),
 	})
 	if err != nil {
@@ -204,7 +206,7 @@ func (s *shim) Connect(ctx context.Context) error {
 }
 
 func (s *shim) Shutdown(ctx context.Context) error {
-	_, err := s.task.Shutdown(ctx, &task.ShutdownRequest{
+	_, err := s.task.Shutdown(ctx, &shimapi.ShutdownRequest{
 		ID: s.ID(),
 	})
 	if err != nil && !errors.Is(err, ttrpc.ErrClosed) {
@@ -238,7 +240,7 @@ func (s *shim) Close() error {
 }
 
 func (s *shim) Delete(ctx context.Context) (*runtime.Exit, error) {
-	response, shimErr := s.task.Delete(ctx, &task.DeleteRequest{
+	response, shimErr := s.task.Delete(ctx, &shimapi.DeleteRequest{
 		ID: s.ID(),
 	})
 	if shimErr != nil {
@@ -292,7 +294,7 @@ func (s *shim) Create(ctx context.Context, opts runtime.CreateOpts) (runtime.Tas
 	if topts == nil {
 		topts = opts.RuntimeOptions
 	}
-	request := &task.CreateTaskRequest{
+	request := &shimapi.CreateTaskRequest{
 		ID:         s.ID(),
 		Bundle:     s.bundle.Path,
 		Stdin:      opts.IO.Stdin,
@@ -318,7 +320,7 @@ func (s *shim) Create(ctx context.Context, opts runtime.CreateOpts) (runtime.Tas
 }
 
 func (s *shim) Pause(ctx context.Context) error {
-	if _, err := s.task.Pause(ctx, &task.PauseRequest{
+	if _, err := s.task.Pause(ctx, &shimapi.PauseRequest{
 		ID: s.ID(),
 	}); err != nil {
 		return errdefs.FromGRPC(err)
@@ -327,7 +329,7 @@ func (s *shim) Pause(ctx context.Context) error {
 }
 
 func (s *shim) Resume(ctx context.Context) error {
-	if _, err := s.task.Resume(ctx, &task.ResumeRequest{
+	if _, err := s.task.Resume(ctx, &shimapi.ResumeRequest{
 		ID: s.ID(),
 	}); err != nil {
 		return errdefs.FromGRPC(err)
@@ -336,7 +338,7 @@ func (s *shim) Resume(ctx context.Context) error {
 }
 
 func (s *shim) Start(ctx context.Context) error {
-	response, err := s.task.Start(ctx, &task.StartRequest{
+	response, err := s.task.Start(ctx, &shimapi.StartRequest{
 		ID: s.ID(),
 	})
 	if err != nil {
@@ -347,7 +349,7 @@ func (s *shim) Start(ctx context.Context) error {
 }
 
 func (s *shim) Kill(ctx context.Context, signal uint32, all bool) error {
-	if _, err := s.task.Kill(ctx, &task.KillRequest{
+	if _, err := s.task.Kill(ctx, &shimapi.KillRequest{
 		ID:     s.ID(),
 		Signal: signal,
 		All:    all,
@@ -361,7 +363,7 @@ func (s *shim) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runt
 	if err := identifiers.Validate(id); err != nil {
 		return nil, errors.Wrapf(err, "invalid exec id %s", id)
 	}
-	request := &task.ExecProcessRequest{
+	request := &shimapi.ExecProcessRequest{
 		ID:       s.ID(),
 		ExecID:   id,
 		Stdin:    opts.IO.Stdin,
@@ -380,7 +382,7 @@ func (s *shim) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runt
 }
 
 func (s *shim) Pids(ctx context.Context) ([]runtime.ProcessInfo, error) {
-	resp, err := s.task.Pids(ctx, &task.PidsRequest{
+	resp, err := s.task.Pids(ctx, &shimapi.PidsRequest{
 		ID: s.ID(),
 	})
 	if err != nil {
@@ -397,7 +399,7 @@ func (s *shim) Pids(ctx context.Context) ([]runtime.ProcessInfo, error) {
 }
 
 func (s *shim) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
-	_, err := s.task.ResizePty(ctx, &task.ResizePtyRequest{
+	_, err := s.task.ResizePty(ctx, &shimapi.ResizePtyRequest{
 		ID:     s.ID(),
 		Width:  size.Width,
 		Height: size.Height,
@@ -409,7 +411,7 @@ func (s *shim) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
 }
 
 func (s *shim) CloseIO(ctx context.Context) error {
-	_, err := s.task.CloseIO(ctx, &task.CloseIORequest{
+	_, err := s.task.CloseIO(ctx, &shimapi.CloseIORequest{
 		ID:    s.ID(),
 		Stdin: true,
 	})
@@ -420,7 +422,7 @@ func (s *shim) CloseIO(ctx context.Context) error {
 }
 
 func (s *shim) Wait(ctx context.Context) (*runtime.Exit, error) {
-	response, err := s.task.Wait(ctx, &task.WaitRequest{
+	response, err := s.task.Wait(ctx, &shimapi.WaitRequest{
 		ID: s.ID(),
 	})
 	if err != nil {
@@ -434,7 +436,7 @@ func (s *shim) Wait(ctx context.Context) (*runtime.Exit, error) {
 }
 
 func (s *shim) Checkpoint(ctx context.Context, path string, options *ptypes.Any) error {
-	request := &task.CheckpointTaskRequest{
+	request := &shimapi.CheckpointTaskRequest{
 		ID:      s.ID(),
 		Path:    path,
 		Options: options,
@@ -446,7 +448,7 @@ func (s *shim) Checkpoint(ctx context.Context, path string, options *ptypes.Any)
 }
 
 func (s *shim) Update(ctx context.Context, resources *ptypes.Any, annotations map[string]string) error {
-	if _, err := s.task.Update(ctx, &task.UpdateTaskRequest{
+	if _, err := s.task.Update(ctx, &shimapi.UpdateTaskRequest{
 		ID:          s.ID(),
 		Resources:   resources,
 		Annotations: annotations,
@@ -457,7 +459,7 @@ func (s *shim) Update(ctx context.Context, resources *ptypes.Any, annotations ma
 }
 
 func (s *shim) Stats(ctx context.Context) (*ptypes.Any, error) {
-	response, err := s.task.Stats(ctx, &task.StatsRequest{
+	response, err := s.task.Stats(ctx, &shimapi.StatsRequest{
 		ID: s.ID(),
 	})
 	if err != nil {
@@ -478,7 +480,7 @@ func (s *shim) Process(ctx context.Context, id string) (runtime.Process, error) 
 }
 
 func (s *shim) State(ctx context.Context) (runtime.State, error) {
-	response, err := s.task.State(ctx, &task.StateRequest{
+	response, err := s.task.State(ctx, &shimapi.StateRequest{
 		ID: s.ID(),
 	})
 	if err != nil {
@@ -510,4 +512,19 @@ func (s *shim) State(ctx context.Context) (runtime.State, error) {
 		ExitStatus: response.ExitStatus,
 		ExitedAt:   response.ExitedAt,
 	}, nil
+}
+
+// PortForward attempts to initiate port forwarding with the shim. It
+// implements PortForward.PortForward.
+func (s *shim) PortForward(ctx context.Context, opts PortForwardOpts) error {
+	request := &shimapi.PortForwardRequest{
+		ID:   s.ID(),
+		Port: opts.Port,
+		Addr: opts.Addr,
+	}
+
+	if _, err := s.portforward.PortForward(ctx, request); err != nil {
+		return errdefs.FromGRPC(err)
+	}
+	return nil
 }

@@ -200,3 +200,18 @@ message PauseRequest {
 message ResumeRequest {
 	string id = 1;
 }
+
+// PortForward is an optional service that shims can implement to support port
+// forwarding.
+service PortForward {
+	rpc PortForward(PortForwardRequest) returns (google.protobuf.Empty);
+}
+
+message PortForwardRequest {
+	// The container id.
+	string id = 1;
+	// The port to be forwarded inside the container.
+	int32 port = 2;
+	// A Unix domain socket address
+	string addr = 3;
+}

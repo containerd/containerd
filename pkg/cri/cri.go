@@ -32,6 +32,8 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	runtimev2services "github.com/containerd/containerd/runtime/v2/services"
+	"github.com/containerd/containerd/runtime/v2/services/portforward"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/snapshots"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -97,8 +99,12 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create containerd client")
 	}
+	pf, err := getPortForwardService(ic)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get port forward service")
+	}
 
-	s, err := server.NewCRIService(c, client)
+	s, err := server.NewCRIService(c, client, pf)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create CRI service")
 	}
@@ -110,6 +116,27 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		// TODO(random-liu): Whether and how we can stop containerd.
 	}()
 	return s, nil
+}
+
+// getPortForwardService gets the port forwarding service plugin.
+func getPortForwardService(ic *plugin.InitContext) (portforward.PortForward, error) {
+	plugins, err := ic.GetByType(plugin.ServicePlugin)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get service plugin")
+	}
+	s := runtimev2services.PortForwardService
+	p := plugins[s]
+	if p == nil {
+		return nil, errors.Errorf("service %q not found", s)
+	}
+	i, err := p.Instance()
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get instance of service %q", s)
+	}
+	if i == nil {
+		return nil, errors.Errorf("instance of service %q not found", s)
+	}
+	return i.(portforward.PortForward), nil
 }
 
 // getServicesOpts get service options from plugin context.
