@@ -197,6 +197,50 @@ DEBU[0001] PullImageResponse: &PullImageResponse{ImageRef:sha256:78096d0a5478896
 Image is up to date for sha256:78096d0a54788961ca68393e5f8038704b97d8af374249dc5c8faec1b8045e42
 ```
 
+
+### Configure Registry Credentials Example - Dockerhub (docker.io)
+
+Confirm your dockerhub account works as expected
+pulling an image as follows:
+
+```console
+docker login -u <username> -p <password>
+
+docker pull <user>/<image>:<tag>
+
+docker logout
+```
+
+
+Edit the containerd config (default location is at `/etc/containerd/config.toml`)
+to add your JSON key for dockerhub image pull requests:
+
+```toml
+version = 2
+
+[plugins."io.containerd.grpc.v1.cri".registry]
+  [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
+    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
+      endpoint = ["https://registry-1.docker.io"]
+  [plugins."io.containerd.grpc.v1.cri".registry.configs]
+    [plugins."io.containerd.grpc.v1.cri".registry.configs."registry-1.docker.io".auth]
+      username = "<username>"
+      password = "<password>"
+```
+
+Restart containerd:
+
+```console
+service containerd restart
+```
+
+Pull an image from dockerhub with `crictl`:
+
+```console
+$ sudo /usr/local/bin/crictl pull <user>/<image>:<tag>
+Image is up to date for sha256:d5cfe97127d5e989a1bc6bbcf3438a521536f09d97a31d75ec1c86d87f95f704
+```
+
 ---
 
 NOTE: The configuration syntax used in this doc is in version 2 which is the recommended since `containerd` 1.3. For the previous config format you can reference [https://github.com/containerd/cri/blob/release/1.2/docs/registry.md](https://github.com/containerd/cri/blob/release/1.2/docs/registry.md).
