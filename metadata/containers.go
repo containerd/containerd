@@ -358,6 +358,8 @@ func readContainer(container *containers.Container, bkt *bolt.Bucket) error {
 			}
 
 			container.Extensions = extensions
+		case string(bucketKeySandboxID):
+			container.SandboxID = string(v)
 		}
 
 		return nil
@@ -403,6 +405,10 @@ func writeContainer(bkt *bolt.Bucket, container *containers.Container) error {
 	}
 
 	if err := boltutil.WriteAny(rbkt, bucketKeyOptions, container.Runtime.Options); err != nil {
+		return err
+	}
+
+	if err := bkt.Put(bucketKeySandboxID, []byte(container.SandboxID)); err != nil {
 		return err
 	}
 

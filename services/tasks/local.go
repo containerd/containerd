@@ -100,6 +100,11 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 		monitor = runtime.NewNoopMonitor()
 	}
 
+	var (
+		taskManager    = v2r.(*v2.TaskManager)
+		sandboxManager = v2.NewSandboxManager(taskManager)
+	)
+
 	db := m.(*metadata.DB)
 	l := &local{
 		runtimes:   runtimes,
@@ -107,7 +112,7 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 		store:      db.ContentStore(),
 		publisher:  ic.Events,
 		monitor:    monitor.(runtime.TaskMonitor),
-		v2Runtime:  v2r.(*v2.TaskManager),
+		v2Runtime:  sandboxManager,
 	}
 	for _, r := range runtimes {
 		tasks, err := r.Tasks(ic.Context, true)
@@ -135,7 +140,7 @@ type local struct {
 	publisher  events.Publisher
 
 	monitor   runtime.TaskMonitor
-	v2Runtime *v2.TaskManager
+	v2Runtime runtime.PlatformRuntime
 }
 
 func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.CallOption) (*api.CreateTaskResponse, error) {

@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
+	"github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
@@ -129,7 +130,12 @@ func (m *TaskManager) Create(ctx context.Context, id string, opts runtime.Create
 		}
 	}()
 
-	shim, err := m.startShim(ctx, bundle, id, opts)
+	topts := opts.TaskOptions
+	if topts == nil {
+		topts = opts.RuntimeOptions
+	}
+
+	shim, err := m.startShim(ctx, bundle, opts.Runtime, topts, id)
 	if err != nil {
 		return nil, err
 	}
@@ -151,27 +157,27 @@ func (m *TaskManager) Create(ctx context.Context, id string, opts runtime.Create
 	return t, nil
 }
 
-func (m *TaskManager) startShim(ctx context.Context, bundle *Bundle, id string, opts runtime.CreateOpts) (*shim, error) {
+func (m *TaskManager) startShim(ctx context.Context, bundle *Bundle, runtimeName string, runtimeOpts *types.Any, taskID string) (*shim, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	topts := opts.TaskOptions
-	if topts == nil {
-		topts = opts.RuntimeOptions
-	}
+	b := shimBinary(ctx, bundle, runtimeName, m.containerdAddress, m.containerdTTRPCAddress, m.events, m.tasks)
+	shim, err := b.Start(ctx, runtimeOpts, func() {
+		log.G(ctx).WithField("id", taskID).Info("shim disconnected")
 
-	b := shimBinary(ctx, bundle, opts.Runtime, m.containerdAddress, m.containerdTTRPCAddress, m.events, m.tasks)
-	shim, err := b.Start(ctx, topts, func() {
-		log.G(ctx).WithField("id", id).Info("shim disconnected")
+		// Ignore in sandbox mode
+		if taskID == "" {
+			return
+		}
 
-		cleanupAfterDeadShim(context.Background(), id, ns, m.tasks, m.events, b)
+		cleanupAfterDeadShim(context.Background(), taskID, ns, m.tasks, m.events, b)
 		// Remove self from the runtime task list. Even though the cleanupAfterDeadShim()
 		// would publish taskExit event, but the shim.Delete() would always failed with ttrpc
 		// disconnect and there is no chance to remove this dead task from runtime task lists.
 		// Thus it's better to delete it here.
-		m.tasks.Delete(ctx, id)
+		m.tasks.Delete(ctx, taskID)
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "start failed")
