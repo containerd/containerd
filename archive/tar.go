@@ -395,7 +395,7 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 
 	// There is no LChmod, so ignore mode for symlink. Also, this
 	// must happen after chown, as that can modify the file mode
-	if err := handleLChmod(hdr, path, hdrInfo); err != nil {
+	if err := handleLChmod(hdr, extractDir, path, hdrInfo); err != nil {
 		return err
 	}
 

@@ -111,9 +111,13 @@ func handleTarTypeBlockCharFifo(hdr *tar.Header, path string) error {
 	return mknod(path, mode, unix.Mkdev(uint32(hdr.Devmajor), uint32(hdr.Devminor)))
 }
 
-func handleLChmod(hdr *tar.Header, path string, hdrInfo os.FileInfo) error {
+func handleLChmod(hdr *tar.Header, extractDir string, path string, hdrInfo os.FileInfo) error {
 	if hdr.Typeflag == tar.TypeLink {
-		if fi, err := os.Lstat(hdr.Linkname); err == nil && (fi.Mode()&os.ModeSymlink == 0) {
+		hdrLinkname, err := hardlinkRootPath(extractDir, hdr.Linkname)
+		if err != nil {
+			return err
+		}
+		if fi, err := os.Lstat(hdrLinkname); err == nil && (fi.Mode()&os.ModeSymlink == 0) {
 			if err := os.Chmod(path, hdrInfo.Mode()); err != nil && !os.IsNotExist(err) {
 				return err
 			}
