@@ -168,6 +168,14 @@ version = 2
       # i.e pass host devices through to privileged containers.
       privileged_without_host_devices = false
 
+      # privileged_without_host_devices_all_devices_allowed allows the allowlisting of all devices when
+      # privileged_without_host_devices is enabled.
+      # In plain privileged mode all host device nodes are added to the container's spec and all devices
+      # are put in the container's device allowlist. This flags is for the modification of the privileged_without_host_devices
+      # option so that even when no host devices are implicitly added to the container, all devices allowlisting is still enabled.
+      # Requires privileged_without_host_devices to be enabled. Defaults to false.
+      privileged_without_host_devices_all_devices_allowed = false
+
       # base_runtime_spec is a file path to a JSON file with the OCI spec that will be used as the base spec that all
       # container's are created from.
       # Use containerd's `ctr oci spec > /etc/containerd/cri-base.json` to output initial spec file.
