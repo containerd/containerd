@@ -194,7 +194,7 @@ Image is up to date for sha256:78096d0a54788961ca68393e5f8038704b97d8af374249dc5
 ### Configure Registry Credentials Example - Dockerhub (docker.io)
 
 Confirm your dockerhub account works as expected
-pushing an image to it as follows:
+pulling an image as follows:
 
 ```console
 docker login -u <username> -p <password> 
