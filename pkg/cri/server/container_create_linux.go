@@ -221,6 +221,10 @@ func (c *criService) containerSpec(
 		if !ociRuntime.PrivilegedWithoutHostDevices {
 			specOpts = append(specOpts, oci.WithHostDevices, oci.WithAllDevicesAllowed)
 		} else {
+			// allow rwm on all devices for the container
+			if ociRuntime.PrivilegedWithoutHostDevicesAllDevicesAllowed {
+				specOpts = append(specOpts, oci.WithAllDevicesAllowed)
+			}
 			// add requested devices by the config as host devices are not automatically added
 			specOpts = append(specOpts, customopts.WithDevices(c.os, config),
 				customopts.WithCapabilities(securityContext, c.allCaps))

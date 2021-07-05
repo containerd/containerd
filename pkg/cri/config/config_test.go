@@ -360,6 +360,21 @@ func TestValidateConfig(t *testing.T) {
 			},
 			expectedErr: "`configs.tls` cannot be set when `config_path` is provided",
 		},
+		"privileged_without_host_devices_all_devices_allowed without privileged_without_host_devices": {
+			config: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							PrivilegedWithoutHostDevices:                  false,
+							PrivilegedWithoutHostDevicesAllDevicesAllowed: true,
+							Type: "default",
+						},
+					},
+				},
+			},
+			expectedErr: "`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled",
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			err := ValidatePluginConfig(context.Background(), test.config)
