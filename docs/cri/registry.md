@@ -199,7 +199,7 @@ pulling an image as follows:
 ```console
 docker login -u <username> -p <password> 
 
-docker pull polarpoint/jb:0.1.0
+docker pull <user>/<image>:<tag>
 
 docker logout
 ```
@@ -231,7 +231,7 @@ service containerd restart
 Pull an image from dockerhub with `crictl`:
 
 ```console
-$ sudo /usr/local/bin/crictl pull docker.io/polarpoint/jb:0.1.0
+$ sudo /usr/local/bin/crictl pull <user>/<image>:<tag>
 Image is up to date for sha256:d5cfe97127d5e989a1bc6bbcf3438a521536f09d97a31d75ec1c86d87f95f704
 ```
 
