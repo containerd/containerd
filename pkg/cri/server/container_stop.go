@@ -21,7 +21,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd"
 	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
@@ -32,6 +31,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/store"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
+	"github.com/moby/sys/signal"
 )
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
@@ -126,7 +126,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 				}
 			}
 		}
-		sig, err := containerd.ParseSignal(stopSignal)
+		sig, err := signal.ParseSignal(stopSignal)
 		if err != nil {
 			return errors.Wrapf(err, "failed to parse stop signal %q", stopSignal)
 		}
