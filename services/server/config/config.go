@@ -67,6 +67,8 @@ type Config struct {
 	Timeouts map[string]string `toml:"timeouts"`
 	// Imports are additional file path list to config files that can overwrite main config file fields
 	Imports []string `toml:"imports"`
+	// OpenTelemetry configuration
+	OpenTelemetry OpenTelemetryConfig `toml:"otel"`
 
 	StreamProcessors map[string]StreamProcessor `toml:"stream_processors"`
 }
@@ -164,6 +166,12 @@ type ProxyPlugin struct {
 	Address string `toml:"address"`
 }
 
+// OpenTelemetryConfig provides open telemetry configuration
+type OpenTelemetryConfig struct {
+	ExporterName     string `toml:"exporter_name"`
+	ExporterEndPoint string `toml:"exporter_endpoint"`
+}
+
 // BoltConfig defines the configuration values for the bolt plugin, which is
 // loaded here, rather than back registered in the metadata package.
 type BoltConfig struct {
@@ -199,6 +207,21 @@ func (bc *BoltConfig) Validate() error {
 		return nil
 	default:
 		return errors.Wrapf(errdefs.ErrInvalidArgument, "unknown policy: %s", bc.ContentSharingPolicy)
+	}
+}
+
+const (
+	// ExporterTypeOtlp represents the open telemetry exporter OTLP
+	ExporterTypeOtlp = "otlp"
+)
+
+// Validate openTelemetry config
+func (cfg *OpenTelemetryConfig) Validate() error {
+	switch cfg.ExporterName {
+	case ExporterTypeOtlp:
+		return nil
+	default:
+		return errors.Wrapf(errdefs.ErrInvalidArgument, "unsupported exporter: %v", cfg)
 	}
 }
 
