@@ -243,6 +243,11 @@ func TestBreakouts(t *testing.T) {
 		return nil
 	}
 	errFileDiff := errors.New("files differ")
+	td, err := ioutil.TempDir("", "test-breakouts-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(td)
 
 	isSymlinkFile := func(f string) func(string) error {
 		return func(root string) error {
@@ -743,6 +748,36 @@ func TestBreakouts(t *testing.T) {
 			),
 			// resolution ends up just removing etc
 			validator: fileNotExists("etc/passwd"),
+		},
+		{
+
+			name: "HardlinkSymlinkChmod",
+			w: func() tartest.WriterToTar {
+				p := filepath.Join(td, "perm400")
+				if err := ioutil.WriteFile(p, []byte("..."), 0400); err != nil {
+					t.Fatal(err)
+				}
+				ep := filepath.Join(td, "also-exists-outside-root")
+				if err := ioutil.WriteFile(ep, []byte("..."), 0640); err != nil {
+					t.Fatal(err)
+				}
+
+				return tartest.TarAll(
+					tc.Symlink(p, ep),
+					tc.Link(ep, "sketchylink"),
+				)
+			}(),
+			validator: func(string) error {
+				p := filepath.Join(td, "perm400")
+				fi, err := os.Lstat(p)
+				if err != nil {
+					return err
+				}
+				if perm := fi.Mode() & os.ModePerm; perm != 0400 {
+					return errors.Errorf("%s perm changed from 0400 to %04o", p, perm)
+				}
+				return nil
+			},
 		},
 	}
 
