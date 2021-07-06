@@ -1509,33 +1509,7 @@ func (in *instrumentedAlphaService) Version(ctx context.Context, r *runtime_alph
 			log.G(ctx).Tracef("Version returns %+v", res)
 		}
 	}()
-	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.VersionRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.VersionResponse
-			v1res, err = in.c.Version(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.VersionResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Error("Version failed")
-					}
-				}
-			}
-		}
-	}
+	res, err = in.c.AlphaVersion(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
 }
 
