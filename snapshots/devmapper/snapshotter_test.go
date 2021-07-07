@@ -141,8 +141,14 @@ func testUsage(t *testing.T, snapshotter snapshots.Snapshotter) {
 		"%d > %d", layer2Usage.Size, sizeBytes)
 }
 
-func TestMkfs(t *testing.T) {
+func TestMkfsExt4(t *testing.T) {
 	ctx := context.Background()
-	err := mkfs(ctx, "")
+	err := mkfs(ctx, "ext4", "")
 	assert.ErrorContains(t, err, `mkfs.ext4 couldn't initialize ""`)
+}
+
+func TestMkfsXfs(t *testing.T) {
+	ctx := context.Background()
+	err := mkfs(ctx, "xfs", "")
+	assert.ErrorContains(t, err, `mkfs.xfs couldn't initialize ""`)
 }
