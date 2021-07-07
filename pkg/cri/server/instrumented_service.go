@@ -97,29 +97,24 @@ func (in *instrumentedAlphaService) RunPodSandbox(ctx context.Context, r *runtim
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.RunPodSandboxRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.RunPodSandboxResponse
-			v1res, err = in.c.RunPodSandbox(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.RunPodSandboxResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("RunPodSandbox for %+v failed, error", r.GetConfig().GetMetadata())
-					}
-				}
+	var v1r runtime.RunPodSandboxRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.RunPodSandboxResponse
+	v1res, err = in.c.RunPodSandbox(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.RunPodSandboxResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("RunPodSandbox for %+v failed, error", r.GetConfig().GetMetadata())
 			}
 		}
 	}
@@ -155,29 +150,24 @@ func (in *instrumentedAlphaService) ListPodSandbox(ctx context.Context, r *runti
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.ListPodSandboxRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.ListPodSandboxResponse
-			v1res, err = in.c.ListPodSandbox(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.ListPodSandboxResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Error("ListPodSandbox failed")
-					}
-				}
+	var v1r runtime.ListPodSandboxRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.ListPodSandboxResponse
+	v1res, err = in.c.ListPodSandbox(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.ListPodSandboxResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Error("ListPodSandbox failed")
 			}
 		}
 	}
@@ -213,29 +203,24 @@ func (in *instrumentedAlphaService) PodSandboxStatus(ctx context.Context, r *run
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.PodSandboxStatusRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.PodSandboxStatusResponse
-			v1res, err = in.c.PodSandboxStatus(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.PodSandboxStatusResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("PodSandboxStatus for %q failed", r.GetPodSandboxId())
-					}
-				}
+	var v1r runtime.PodSandboxStatusRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.PodSandboxStatusResponse
+	v1res, err = in.c.PodSandboxStatus(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.PodSandboxStatusResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("PodSandboxStatus for %q failed", r.GetPodSandboxId())
 			}
 		}
 	}
@@ -258,7 +243,7 @@ func (in *instrumentedService) StopPodSandbox(ctx context.Context, r *runtime.St
 	return res, errdefs.ToGRPC(err)
 }
 
-func (in *instrumentedAlphaService) StopPodSandbox(ctx context.Context, r *runtime_alpha.StopPodSandboxRequest) (_ *runtime_alpha.StopPodSandboxResponse, err error) {
+func (in *instrumentedAlphaService) StopPodSandbox(ctx context.Context, r *runtime_alpha.StopPodSandboxRequest) (res *runtime_alpha.StopPodSandboxResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
@@ -270,31 +255,25 @@ func (in *instrumentedAlphaService) StopPodSandbox(ctx context.Context, r *runti
 			log.G(ctx).Infof("StopPodSandbox for %q returns successfully", r.GetPodSandboxId())
 		}
 	}()
-	var res *runtime_alpha.StopPodSandboxResponse
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.StopPodSandboxRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.StopPodSandboxResponse
-			v1res, err = in.c.StopPodSandbox(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.StopPodSandboxResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("StopPodSandbox for %q failed", r.GetPodSandboxId())
-					}
-				}
+	var v1r runtime.StopPodSandboxRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.StopPodSandboxResponse
+	v1res, err = in.c.StopPodSandbox(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.StopPodSandboxResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("StopPodSandbox for %q failed", r.GetPodSandboxId())
 			}
 		}
 	}
@@ -317,7 +296,7 @@ func (in *instrumentedService) RemovePodSandbox(ctx context.Context, r *runtime.
 	return res, errdefs.ToGRPC(err)
 }
 
-func (in *instrumentedAlphaService) RemovePodSandbox(ctx context.Context, r *runtime_alpha.RemovePodSandboxRequest) (_ *runtime_alpha.RemovePodSandboxResponse, err error) {
+func (in *instrumentedAlphaService) RemovePodSandbox(ctx context.Context, r *runtime_alpha.RemovePodSandboxRequest) (res *runtime_alpha.RemovePodSandboxResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
@@ -329,31 +308,25 @@ func (in *instrumentedAlphaService) RemovePodSandbox(ctx context.Context, r *run
 			log.G(ctx).Infof("RemovePodSandbox %q returns successfully", r.GetPodSandboxId())
 		}
 	}()
-	var res *runtime_alpha.RemovePodSandboxResponse
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.RemovePodSandboxRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.RemovePodSandboxResponse
-			v1res, err = in.c.RemovePodSandbox(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.RemovePodSandboxResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("RemovePodSandbox for %q failed", r.GetPodSandboxId())
-					}
-				}
+	var v1r runtime.RemovePodSandboxRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.RemovePodSandboxResponse
+	v1res, err = in.c.RemovePodSandbox(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.RemovePodSandboxResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("RemovePodSandbox for %q failed", r.GetPodSandboxId())
 			}
 		}
 	}
@@ -389,29 +362,24 @@ func (in *instrumentedAlphaService) PortForward(ctx context.Context, r *runtime_
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.PortForwardRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.PortForwardResponse
-			v1res, err = in.c.PortForward(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.PortForwardResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("Portforward for %q failed", r.GetPodSandboxId())
-					}
-				}
+	var v1r runtime.PortForwardRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.PortForwardResponse
+	v1res, err = in.c.PortForward(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.PortForwardResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("Portforward for %q failed", r.GetPodSandboxId())
 			}
 		}
 	}
@@ -453,30 +421,25 @@ func (in *instrumentedAlphaService) CreateContainer(ctx context.Context, r *runt
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.CreateContainerRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.CreateContainerResponse
-			v1res, err = in.c.CreateContainer(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.CreateContainerResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("CreateContainer within sandbox %q for %+v failed",
-							r.GetPodSandboxId(), r.GetConfig().GetMetadata())
-					}
-				}
+	var v1r runtime.CreateContainerRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.CreateContainerResponse
+	v1res, err = in.c.CreateContainer(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.CreateContainerResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("CreateContainer within sandbox %q for %+v failed",
+					r.GetPodSandboxId(), r.GetConfig().GetMetadata())
 			}
 		}
 	}
@@ -499,7 +462,7 @@ func (in *instrumentedService) StartContainer(ctx context.Context, r *runtime.St
 	return res, errdefs.ToGRPC(err)
 }
 
-func (in *instrumentedAlphaService) StartContainer(ctx context.Context, r *runtime_alpha.StartContainerRequest) (_ *runtime_alpha.StartContainerResponse, err error) {
+func (in *instrumentedAlphaService) StartContainer(ctx context.Context, r *runtime_alpha.StartContainerRequest) (res *runtime_alpha.StartContainerResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
@@ -511,31 +474,25 @@ func (in *instrumentedAlphaService) StartContainer(ctx context.Context, r *runti
 			log.G(ctx).Infof("StartContainer for %q returns successfully", r.GetContainerId())
 		}
 	}()
-	var res *runtime_alpha.StartContainerResponse
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.StartContainerRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.StartContainerResponse
-			v1res, err = in.c.StartContainer(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.StartContainerResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("StartContainer for %q failed", r.GetContainerId())
-					}
-				}
+	var v1r runtime.StartContainerRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.StartContainerResponse
+	v1res, err = in.c.StartContainer(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.StartContainerResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("StartContainer for %q failed", r.GetContainerId())
 			}
 		}
 	}
@@ -573,29 +530,24 @@ func (in *instrumentedAlphaService) ListContainers(ctx context.Context, r *runti
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.ListContainersRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.ListContainersResponse
-			v1res, err = in.c.ListContainers(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.ListContainersResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("ListContainers with filter %+v failed", r.GetFilter())
-					}
-				}
+	var v1r runtime.ListContainersRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.ListContainersResponse
+	v1res, err = in.c.ListContainers(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.ListContainersResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("ListContainers with filter %+v failed", r.GetFilter())
 			}
 		}
 	}
@@ -631,29 +583,24 @@ func (in *instrumentedAlphaService) ContainerStatus(ctx context.Context, r *runt
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.ContainerStatusRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.ContainerStatusResponse
-			v1res, err = in.c.ContainerStatus(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.ContainerStatusResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("ContainerStatus for %q failed", r.GetContainerId())
-					}
-				}
+	var v1r runtime.ContainerStatusRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.ContainerStatusResponse
+	v1res, err = in.c.ContainerStatus(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.ContainerStatusResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("ContainerStatus for %q failed", r.GetContainerId())
 			}
 		}
 	}
@@ -689,29 +636,24 @@ func (in *instrumentedAlphaService) StopContainer(ctx context.Context, r *runtim
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.StopContainerRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.StopContainerResponse
-			v1res, err = in.c.StopContainer(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.StopContainerResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("StopContainer for %q failed", r.GetContainerId())
-					}
-				}
+	var v1r runtime.StopContainerRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.StopContainerResponse
+	v1res, err = in.c.StopContainer(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.StopContainerResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("StopContainer for %q failed", r.GetContainerId())
 			}
 		}
 	}
@@ -747,29 +689,24 @@ func (in *instrumentedAlphaService) RemoveContainer(ctx context.Context, r *runt
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.RemoveContainerRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.RemoveContainerResponse
-			v1res, err = in.c.RemoveContainer(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.RemoveContainerResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("RemoveContainer for %q failed", r.GetContainerId())
-					}
-				}
+	var v1r runtime.RemoveContainerRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.RemoveContainerResponse
+	v1res, err = in.c.RemoveContainer(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.RemoveContainerResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("RemoveContainer for %q failed", r.GetContainerId())
 			}
 		}
 	}
@@ -805,29 +742,24 @@ func (in *instrumentedAlphaService) ExecSync(ctx context.Context, r *runtime_alp
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.ExecSyncRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.ExecSyncResponse
-			v1res, err = in.c.ExecSync(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.ExecSyncResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("ExecSync for %q failed", r.GetContainerId())
-					}
-				}
+	var v1r runtime.ExecSyncRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.ExecSyncResponse
+	v1res, err = in.c.ExecSync(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.ExecSyncResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("ExecSync for %q failed", r.GetContainerId())
 			}
 		}
 	}
@@ -865,29 +797,24 @@ func (in *instrumentedAlphaService) Exec(ctx context.Context, r *runtime_alpha.E
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.ExecRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.ExecResponse
-			v1res, err = in.c.Exec(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.ExecResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("Exec for %q failed", r.GetContainerId())
-					}
-				}
+	var v1r runtime.ExecRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.ExecResponse
+	v1res, err = in.c.Exec(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.ExecResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("Exec for %q failed", r.GetContainerId())
 			}
 		}
 	}
@@ -923,29 +850,24 @@ func (in *instrumentedAlphaService) Attach(ctx context.Context, r *runtime_alpha
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.AttachRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.AttachResponse
-			v1res, err = in.c.Attach(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.AttachResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("Attach for %q failed", r.GetContainerId())
-					}
-				}
+	var v1r runtime.AttachRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.AttachResponse
+	v1res, err = in.c.Attach(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.AttachResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("Attach for %q failed", r.GetContainerId())
 			}
 		}
 	}
@@ -981,29 +903,24 @@ func (in *instrumentedAlphaService) UpdateContainerResources(ctx context.Context
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.UpdateContainerResourcesRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.UpdateContainerResourcesResponse
-			v1res, err = in.c.UpdateContainerResources(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.UpdateContainerResourcesResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("UpdateContainerResources for %q failed", r.GetContainerId())
-					}
-				}
+	var v1r runtime.UpdateContainerResourcesRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.UpdateContainerResourcesResponse
+	v1res, err = in.c.UpdateContainerResources(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.UpdateContainerResourcesResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("UpdateContainerResources for %q failed", r.GetContainerId())
 			}
 		}
 	}
@@ -1041,29 +958,24 @@ func (in *instrumentedAlphaService) PullImage(ctx context.Context, r *runtime_al
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.PullImageRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.PullImageResponse
-			v1res, err = in.c.PullImage(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.PullImageResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("PullImage %q failed", r.GetImage().GetImage())
-					}
-				}
+	var v1r runtime.PullImageRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.PullImageResponse
+	v1res, err = in.c.PullImage(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.PullImageResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("PullImage %q failed", r.GetImage().GetImage())
 			}
 		}
 	}
@@ -1101,29 +1013,24 @@ func (in *instrumentedAlphaService) ListImages(ctx context.Context, r *runtime_a
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.ListImagesRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.ListImagesResponse
-			v1res, err = in.c.ListImages(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.ListImagesResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("ListImages with filter %+v failed", r.GetFilter())
-					}
-				}
+	var v1r runtime.ListImagesRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.ListImagesResponse
+	v1res, err = in.c.ListImages(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.ListImagesResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("ListImages with filter %+v failed", r.GetFilter())
 			}
 		}
 	}
@@ -1161,29 +1068,24 @@ func (in *instrumentedAlphaService) ImageStatus(ctx context.Context, r *runtime_
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.ImageStatusRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.ImageStatusResponse
-			v1res, err = in.c.ImageStatus(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.ImageStatusResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("ImageStatus for %q failed", r.GetImage().GetImage())
-					}
-				}
+	var v1r runtime.ImageStatusRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.ImageStatusResponse
+	v1res, err = in.c.ImageStatus(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.ImageStatusResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("ImageStatus for %q failed", r.GetImage().GetImage())
 			}
 		}
 	}
@@ -1206,7 +1108,7 @@ func (in *instrumentedService) RemoveImage(ctx context.Context, r *runtime.Remov
 	return res, errdefs.ToGRPC(err)
 }
 
-func (in *instrumentedAlphaService) RemoveImage(ctx context.Context, r *runtime_alpha.RemoveImageRequest) (_ *runtime_alpha.RemoveImageResponse, err error) {
+func (in *instrumentedAlphaService) RemoveImage(ctx context.Context, r *runtime_alpha.RemoveImageRequest) (res *runtime_alpha.RemoveImageResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
@@ -1218,31 +1120,25 @@ func (in *instrumentedAlphaService) RemoveImage(ctx context.Context, r *runtime_
 			log.G(ctx).Infof("RemoveImage %q returns successfully", r.GetImage().GetImage())
 		}
 	}()
-	var res *runtime_alpha.RemoveImageResponse
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.RemoveImageRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.RemoveImageResponse
-			v1res, err = in.c.RemoveImage(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.RemoveImageResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("RemoveImage %q failed", r.GetImage().GetImage())
-					}
-				}
+	var v1r runtime.RemoveImageRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.RemoveImageResponse
+	v1res, err = in.c.RemoveImage(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.RemoveImageResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("RemoveImage %q failed", r.GetImage().GetImage())
 			}
 		}
 	}
@@ -1278,29 +1174,24 @@ func (in *instrumentedAlphaService) ImageFsInfo(ctx context.Context, r *runtime_
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.ImageFsInfoRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.ImageFsInfoResponse
-			v1res, err = in.c.ImageFsInfo(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.ImageFsInfoResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Error("ImageFsInfo failed")
-					}
-				}
+	var v1r runtime.ImageFsInfoRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.ImageFsInfoResponse
+	v1res, err = in.c.ImageFsInfo(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.ImageFsInfoResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Error("ImageFsInfo failed")
 			}
 		}
 	}
@@ -1336,29 +1227,24 @@ func (in *instrumentedAlphaService) ContainerStats(ctx context.Context, r *runti
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.ContainerStatsRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.ContainerStatsResponse
-			v1res, err = in.c.ContainerStats(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.ContainerStatsResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("ContainerStats for %q failed", r.GetContainerId())
-					}
-				}
+	var v1r runtime.ContainerStatsRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.ContainerStatsResponse
+	v1res, err = in.c.ContainerStats(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.ContainerStatsResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("ContainerStats for %q failed", r.GetContainerId())
 			}
 		}
 	}
@@ -1394,29 +1280,24 @@ func (in *instrumentedAlphaService) ListContainerStats(ctx context.Context, r *r
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.ListContainerStatsRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.ListContainerStatsResponse
-			v1res, err = in.c.ListContainerStats(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.ListContainerStatsResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Error("ListContainerStats failed")
-					}
-				}
+	var v1r runtime.ListContainerStatsRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.ListContainerStatsResponse
+	v1res, err = in.c.ListContainerStats(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.ListContainerStatsResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Error("ListContainerStats failed")
 			}
 		}
 	}
@@ -1452,29 +1333,24 @@ func (in *instrumentedAlphaService) Status(ctx context.Context, r *runtime_alpha
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.StatusRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.StatusResponse
-			v1res, err = in.c.Status(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.StatusResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Error("Status failed")
-					}
-				}
+	var v1r runtime.StatusRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.StatusResponse
+	v1res, err = in.c.Status(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.StatusResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Error("Status failed")
 			}
 		}
 	}
@@ -1542,29 +1418,24 @@ func (in *instrumentedAlphaService) UpdateRuntimeConfig(ctx context.Context, r *
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.UpdateRuntimeConfigRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.UpdateRuntimeConfigResponse
-			v1res, err = in.c.UpdateRuntimeConfig(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.UpdateRuntimeConfigResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Error("UpdateRuntimeConfig failed")
-					}
-				}
+	var v1r runtime.UpdateRuntimeConfigRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.UpdateRuntimeConfigResponse
+	v1res, err = in.c.UpdateRuntimeConfig(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.UpdateRuntimeConfigResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Error("UpdateRuntimeConfig failed")
 			}
 		}
 	}
@@ -1627,4 +1498,34 @@ func (in *instrumentedAlphaService) ReopenContainerLog(ctx context.Context, r *r
 		}
 	}
 	return res, errdefs.ToGRPC(err)
+}
+
+func alphaReqToV1Req(
+	alphar interface{ Marshal() ([]byte, error) },
+	v1r interface{ Unmarshal(_ []byte) error },
+) error {
+	p, err := alphar.Marshal()
+	if err != nil {
+		return err
+	}
+
+	if err = v1r.Unmarshal(p); err != nil {
+		return err
+	}
+	return nil
+}
+
+func v1RespToAlphaResp(
+	v1res interface{ Marshal() ([]byte, error) },
+	alphares interface{ Unmarshal(_ []byte) error },
+) error {
+	p, err := v1res.Marshal()
+	if err != nil {
+		return err
+	}
+
+	if err = alphares.Unmarshal(p); err != nil {
+		return err
+	}
+	return nil
 }
