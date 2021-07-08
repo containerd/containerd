@@ -526,7 +526,7 @@ jobs:
             *-junit.xml
 
   cgroup2:
-    name: CGroupsV2 and SELinux Integration
+    name: CGroupsV2 - SELinux enforced
     # nested virtualization is only available on macOS hosts
     runs-on: macos-10.15
     timeout-minutes: 45
@@ -580,3 +580,31 @@ jobs:
           path: |
             ${{github.workspace}}/*-junit.xml
             ${{github.workspace}}/critestreport/*
+
+  cgroup2-misc:
+    name: CGroupsV2 - rootless CRI test
+    # nested virtualization is only available on macOS hosts
+    runs-on: macos-10.15
+    timeout-minutes: 45
+    needs: [project, linters, protos, man]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: "Cache ~/.vagrant.d/boxes"
+        uses: actions/cache@v2
+        with:
+          path: ~/.vagrant.d/boxes
+          key: vagrant-${{ hashFiles('Vagrantfile*') }}
+
+      - name: Vagrant start
+        run: |
+          # Retry if it fails (download.fedoraproject.org returns 404 sometimes)
+          vagrant up || vagrant up
+
+      # slow, so separated from the regular cgroup2 task
+      - name: CRI-in-UserNS test with Rootless Podman
+        run: |
+          vagrant up --provision-with=install-rootless-podman
+          # Execute rootless podman to create the UserNS env
+          vagrant ssh -- podman build --target cri-in-userns -t cri-in-userns -f /vagrant/contrib/Dockerfile.test /vagrant
+          vagrant ssh -- podman run --rm --privileged cri-in-userns

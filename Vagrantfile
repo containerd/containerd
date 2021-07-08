@@ -257,4 +257,31 @@ EOF
     SHELL
   end
 
+  # Rootless Podman is used for testing CRI-in-UserNS
+  # (We could use rootless nerdctl, but we are using Podman here because it is available in dnf)
+  config.vm.provision "install-rootless-podman", type: "shell", run: "never" do |sh|
+    sh.upload_path = "/tmp/vagrant-install-rootless-podman"
+    sh.inline = <<~SHELL
+        #!/usr/bin/env bash
+        set -eux -o pipefail
+        # Delegate cgroup v2 controllers to rootless
+        mkdir -p /etc/systemd/system/user@.service.d
+        cat > /etc/systemd/system/user@.service.d/delegate.conf << EOF
+[Service]
+Delegate=yes
+EOF
+        systemctl daemon-reload
+        # Install Podman
+        dnf install -y podman
+        # Configure Podman to resolve `golang` to `docker.io/library/golang`
+        mkdir -p /etc/containers
+        cat > /etc/containers/registries.conf <<EOF
+[registries.search]
+registries = ['docker.io']
+EOF
+        # Disable SELinux to allow overlayfs
+        setenforce 0
+    SHELL
+  end
+
 end
