@@ -104,6 +104,9 @@ type criService struct {
 	// allCaps is the list of the capabilities.
 	// When nil, parsed from CapEff of /proc/self/status.
 	allCaps []string // nolint
+	// imagesInProgress represents any images currently being pulled. This can be used to deduplicate
+	// pulls of the same image to save work.
+	imagesInProgress *inProgress
 }
 
 // NewCRIService returns a new instance of CRIService
@@ -121,6 +124,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerNameIndex: registrar.NewRegistrar(),
 		initialized:        atomic.NewBool(false),
+		imagesInProgress:   newInProgress(),
 	}
 
 	if client.SnapshotService(c.config.ContainerdConfig.Snapshotter) == nil {

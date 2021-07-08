@@ -87,6 +87,11 @@ type ContainerdConfig struct {
 	// remove layers from the content store after successfully unpacking these
 	// layers to the snapshotter.
 	DiscardUnpackedLayers bool `toml:"discard_unpacked_layers" json:"discardUnpackedLayers"`
+
+	// DisableSameImageParallelPull disables the ability to pull the exact same image in parallel which is a common
+	// operation on Kubernetes nodes. This saves some unnecessary fetch/unpack work as it's just duplicated effort
+	// for no gain.
+	DisableSameImageParallelPull bool `toml:"disable_same_image_parallel_pull" json:"disableSameImageParallelPull"`
 }
 
 // CniConfig contains toml config related to cni
