@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/config"
+	"github.com/cpuguy83/dockercfg"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -87,7 +88,10 @@ func GetResolver(ctx gocontext.Context, clicontext *cli.Context) (remotes.Resolv
 	hostOptions.Credentials = func(host string) (string, string, error) {
 		// If host doesn't match...
 		// Only one host
-		return username, secret, nil
+		if username != "" && secret != "" {
+			return username, secret, nil
+		}
+		return dockercfg.GetRegistryCredentials(dockercfg.ResolveRegistryHost(host))
 	}
 	if clicontext.Bool("plain-http") {
 		hostOptions.DefaultScheme = "http"

@@ -140,6 +140,9 @@ github.com/containers/ocicrypt/utils/keyprovider
 ## explicit
 github.com/coreos/go-systemd/v22/daemon
 github.com/coreos/go-systemd/v22/dbus
+# github.com/cpuguy83/dockercfg v0.3.0
+## explicit
+github.com/cpuguy83/dockercfg
 # github.com/cpuguy83/go-md2man/v2 v2.0.0
 github.com/cpuguy83/go-md2man/v2/md2man
 # github.com/davecgh/go-spew v1.1.1
