@@ -1,4 +1,4 @@
-// +build gofuzz,!windows
+// +build gofuzz
 
 /*
    Copyright The containerd Authors.
@@ -12,14 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-/*
-   This fuzzer is run continuously by OSS-fuzz.
-   It is stored in contrib/fuzz for organization,
-   but in order to execute it, it must be moved to
-   remotes/docker first. This is handled by OSS-fuzz.
-*/
 
-// nolint: golint
 package docker
 
 import (
@@ -33,14 +26,14 @@ import (
 
 func FuzzFetcher(data []byte) int {
 	dataLen := len(data)
-	start := 0
+	if dataLen == 0 {
+		return -1
+	}
 
 	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		if start > 0 {
-			rw.Header().Set("content-range", fmt.Sprintf("bytes %d-%d/%d", start, dataLen-1, dataLen))
-		}
-		rw.Header().Set("content-length", fmt.Sprintf("%d", len(data[start:])))
-		rw.Write(data[start:])
+		rw.Header().Set("content-range", fmt.Sprintf("bytes %d-%d/%d", 0, dataLen-1, dataLen))
+		rw.Header().Set("content-length", fmt.Sprintf("%d", dataLen))
+		rw.Write(data)
 	}))
 	defer s.Close()
 
@@ -70,7 +63,7 @@ func FuzzFetcher(data []byte) int {
 		return 0
 	}
 
-	expected := data[start:]
+	expected := data
 	if len(b) != len(expected) {
 		panic("len of request is not equal to len of expected but should be")
 	}
