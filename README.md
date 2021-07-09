@@ -68,6 +68,14 @@ your system. See more details in [Checkpoint and Restore](#checkpoint-and-restor
 
 Build requirements for developers are listed in [BUILDING](BUILDING.md).
 
+
+## Supported Registries
+
+Any registry which is compliant with the [OCI Distribution Specification](https://github.com/opencontainers/distribution-spec)
+is supported by containerd.
+
+For configuring registries, see [registry host configuration documentation](docs/hosts.md)
+
 ## Features
 
 ### Client

@@ -54,8 +54,6 @@ type hostConfig struct {
 
 	header http.Header
 
-	// TODO: API ("docker" or "oci")
-	// TODO: API Version ("v1", "v2")
 	// TODO: Add credential configuration (domain alias, username)
 }
 
@@ -283,19 +281,34 @@ type hostFileConfig struct {
 	//  - push
 	Capabilities []string `toml:"capabilities"`
 
-	// CACert can be a string or an array of strings
+	// CACert are the public key certificates for TLS
+	// Accepted types
+	// - string - Single file with certificate(s)
+	// - []string - Multiple files with certificates
 	CACert interface{} `toml:"ca"`
 
-	// TODO: Make this an array (two key types, one for pairs (multiple files), one for single file?)
+	// Client keypair(s) for TLS with client authentication
+	// Accepted types
+	// - string - Single file with public and private keys
+	// - []string - Multiple files with public and private keys
+	// - [][2]string - Multiple keypairs with public and private keys in separate files
 	Client interface{} `toml:"client"`
 
+	// SkipVerify skips verification of the server's certificate chain
+	// and host name. This should only be used for testing or in
+	// combination with other methods of verifying connections.
 	SkipVerify *bool `toml:"skip_verify"`
 
+	// Header are additional header files to send to the server
 	Header map[string]interface{} `toml:"header"`
 
-	// API (default: "docker")
-	// API Version (default: "v2")
-	// Credentials: helper? name? username? alternate domain? token?
+	// OverridePath indicates the API root endpoint is defined in the URL
+	// path rather than by the API specification.
+	// This may be used with non-compliant OCI registries to override the
+	// API root endpoint.
+	OverridePath bool `toml:"override_path"`
+
+	// TODO: Credentials: helper? name? username? alternate domain? token?
 }
 
 func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
@@ -367,16 +380,12 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 		}
 		result.scheme = u.Scheme
 		result.host = u.Host
-		// TODO: Handle path based on registry protocol
-		// Define a registry protocol type
-		//   OCI v1    - Always use given path as is
-		//   Docker v2 - Always ensure ends with /v2/
 		if len(u.Path) > 0 {
 			u.Path = path.Clean(u.Path)
-			if !strings.HasSuffix(u.Path, "/v2") {
+			if !strings.HasSuffix(u.Path, "/v2") && !config.OverridePath {
 				u.Path = u.Path + "/v2"
 			}
-		} else {
+		} else if !config.OverridePath {
 			u.Path = "/v2"
 		}
 		result.path = u.Path

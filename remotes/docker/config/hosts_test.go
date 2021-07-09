@@ -104,6 +104,13 @@ ca = "/etc/path/default"
 
 [host."https://test-3.registry"]
   client = ["/etc/certs/client-1.pem", "/etc/certs/client-2.pem"]
+
+[host."https://noncompliantmirror.registry/v2/namespaceprefix"]
+  capabilities = ["pull"]
+  override_path = true
+
+[host."https://noprefixnoncompliant.registry"]
+  override_path = true
 `
 	var tb, fb = true, false
 	expected := []hostConfig{
@@ -158,6 +165,17 @@ ca = "/etc/path/default"
 				{filepath.FromSlash("/etc/certs/client-1.pem")},
 				{filepath.FromSlash("/etc/certs/client-2.pem")},
 			},
+		},
+		{
+			scheme:       "https",
+			host:         "noncompliantmirror.registry",
+			path:         "/v2/namespaceprefix",
+			capabilities: docker.HostCapabilityPull,
+		},
+		{
+			scheme:       "https",
+			host:         "noprefixnoncompliant.registry",
+			capabilities: allCaps,
 		},
 		{
 			scheme:       "https",
