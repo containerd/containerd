@@ -24,7 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"k8s.io/client-go/tools/remotecommand"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	cio "github.com/containerd/containerd/pkg/cri/io"
 )

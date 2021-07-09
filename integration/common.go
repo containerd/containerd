@@ -21,11 +21,11 @@ import (
 	"io/ioutil"
 	"testing"
 
+	cri "github.com/containerd/containerd/integration/cri-api/pkg/apis"
 	"github.com/pelletier/go-toml"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	cri "k8s.io/cri-api/pkg/apis"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // ImageList holds public image references

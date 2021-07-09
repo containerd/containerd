@@ -21,7 +21,7 @@ import (
 
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/stretchr/testify/assert"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func TestInitSelinuxOpts(t *testing.T) {

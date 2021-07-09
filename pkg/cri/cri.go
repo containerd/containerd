@@ -62,7 +62,7 @@ func init() {
 
 func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	ic.Meta.Platforms = []imagespec.Platform{platforms.DefaultSpec()}
-	ic.Meta.Exports = map[string]string{"CRIVersion": constants.CRIVersion}
+	ic.Meta.Exports = map[string]string{"CRIVersion": constants.CRIVersion, "CRIVersionAlpha": constants.CRIVersionAlpha}
 	ctx := ic.Context
 	pluginConfig := ic.Config.(*criconfig.PluginConfig)
 	if err := criconfig.ValidatePluginConfig(ctx, pluginConfig); err != nil {

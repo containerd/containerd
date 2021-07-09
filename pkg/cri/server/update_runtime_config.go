@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // cniConfigTemplate contains the values containerd will overwrite
