@@ -55,3 +55,44 @@ func TestContainerRestart(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, runtimeService.StartContainer(cn))
 }
+
+// Test to verify that, after a container fails to start due to a bad command, it can be removed
+// and a proper container can be created and started in its stead.
+func TestFailedContainerRestart(t *testing.T) {
+	t.Logf("Create a pod config and run sandbox container")
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "restart")
+
+	EnsureImageExists(t, pauseImage)
+
+	t.Logf("Create a container config in a pod with a command that fails")
+	containerConfig := ContainerConfig(
+		"container1",
+		pauseImage,
+		WithCommand("something-that-doesnt-exist"),
+		WithTestLabels(),
+		WithTestAnnotations(),
+	)
+	cn, err := runtimeService.CreateContainer(sb, containerConfig, sbConfig)
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, runtimeService.RemoveContainer(cn))
+	}()
+	require.Error(t, runtimeService.StartContainer(cn))
+	defer func() {
+		assert.NoError(t, runtimeService.StopContainer(cn, 10))
+	}()
+
+	t.Logf("Create the container with a proper command")
+	require.NoError(t, runtimeService.StopContainer(cn, 10))
+	require.NoError(t, runtimeService.RemoveContainer(cn))
+
+	containerConfig = ContainerConfig(
+		"container1",
+		pauseImage,
+		WithTestLabels(),
+		WithTestAnnotations(),
+	)
+	cn, err = runtimeService.CreateContainer(sb, containerConfig, sbConfig)
+	require.NoError(t, err)
+	require.NoError(t, runtimeService.StartContainer(cn))
+}
