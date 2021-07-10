@@ -127,28 +127,28 @@ func getServicesOpts(ic *plugin.InitContext) ([]containerd.ServicesOpt, error) {
 			return containerd.WithContentStore(s.(content.Store))
 		},
 		services.ImagesService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithImageService(s.(images.ImagesClient))
+			return containerd.WithImageClient(s.(images.ImagesClient))
 		},
 		services.SnapshotsService: func(s interface{}) containerd.ServicesOpt {
 			return containerd.WithSnapshotters(s.(map[string]snapshots.Snapshotter))
 		},
 		services.ContainersService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithContainerService(s.(containers.ContainersClient))
+			return containerd.WithContainerClient(s.(containers.ContainersClient))
 		},
 		services.TasksService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithTaskService(s.(tasks.TasksClient))
+			return containerd.WithTaskClient(s.(tasks.TasksClient))
 		},
 		services.DiffService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithDiffService(s.(diff.DiffClient))
+			return containerd.WithDiffClient(s.(diff.DiffClient))
 		},
 		services.NamespacesService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithNamespaceService(s.(namespaces.NamespacesClient))
+			return containerd.WithNamespaceClient(s.(namespaces.NamespacesClient))
 		},
 		services.LeasesService: func(s interface{}) containerd.ServicesOpt {
 			return containerd.WithLeasesService(s.(leases.Manager))
 		},
 		services.IntrospectionService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithIntrospectionService(s.(introspectionapi.IntrospectionClient))
+			return containerd.WithIntrospectionClient(s.(introspectionapi.IntrospectionClient))
 		},
 	} {
 		p := plugins[s]
