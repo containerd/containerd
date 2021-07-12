@@ -13,7 +13,7 @@
   when: ansible_distribution == "Ubuntu"
 
 - name: "Update the repository cache (Ubuntu)"
-  apt: 
+  apt:
     update_cache: yes
   when: ansible_distribution == "Ubuntu"
 
@@ -25,8 +25,8 @@
     gpgcheck: yes
     enabled: yes
     repo_gpgcheck: yes
-    gpgkey: 
-      - https://packages.cloud.google.com/yum/doc/yum-key.gpg 
+    gpgkey:
+      - https://packages.cloud.google.com/yum/doc/yum-key.gpg
       - https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
   when: ansible_distribution == "CentOS"
 
