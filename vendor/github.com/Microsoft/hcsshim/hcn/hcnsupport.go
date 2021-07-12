@@ -1,8 +1,13 @@
 package hcn
 
 import (
+	"fmt"
+	"sync"
+
 	"github.com/sirupsen/logrus"
 )
+
+var versionOnce sync.Once
 
 // SupportedFeatures are the features provided by the Service.
 type SupportedFeatures struct {
@@ -20,6 +25,8 @@ type SupportedFeatures struct {
 	L4Proxy                  bool        `json:"L4Proxy"`    // network policy that applies VFP rules to all endpoints on the network to redirect traffic
 	L4WfpProxy               bool        `json:"L4WfpProxy"` // endpoint policy that applies WFP filters to redirect traffic to/from that endpoint
 	TierAcl                  bool        `json:"TierAcl"`
+	NetworkACL               bool        `json:"NetworkACL"`
+	NestedIpSet              bool        `json:"NestedIpSet"`
 }
 
 // AclFeatures are the supported ACL possibilities.
@@ -71,6 +78,19 @@ func GetSupportedFeatures() SupportedFeatures {
 	features.L4Proxy = isFeatureSupported(globals.Version, L4ProxyPolicyVersion)
 	features.L4WfpProxy = isFeatureSupported(globals.Version, L4WfpProxyPolicyVersion)
 	features.TierAcl = isFeatureSupported(globals.Version, TierAclPolicyVersion)
+	features.NetworkACL = isFeatureSupported(globals.Version, NetworkACLPolicyVersion)
+	features.NestedIpSet = isFeatureSupported(globals.Version, NestedIpSetVersion)
+
+	// Only print the HCN version and features supported once, instead of everytime this is invoked. These logs are useful to
+	// debug incidents where there's confusion on if a feature is supported on the host machine. The sync.Once helps to avoid redundant
+	// spam of these anytime a check needs to be made for if an HCN feature is supported. This is a common occurrence in kubeproxy
+	// for example.
+	versionOnce.Do(func() {
+		logrus.WithFields(logrus.Fields{
+			"version":           fmt.Sprintf("%+v", globals.Version),
+			"supportedFeatures": fmt.Sprintf("%+v", features),
+		}).Info("HCN feature check")
+	})
 
 	return features
 }
@@ -87,19 +107,15 @@ func isFeatureSupported(currentVersion Version, versionsSupported VersionRanges)
 
 func isFeatureInRange(currentVersion Version, versionRange VersionRange) bool {
 	if currentVersion.Major < versionRange.MinVersion.Major {
-		logrus.Infof("currentVersion.Major < versionRange.MinVersion.Major: %v, %v", currentVersion.Major, versionRange.MinVersion.Major)
 		return false
 	}
 	if currentVersion.Major > versionRange.MaxVersion.Major {
-		logrus.Infof("currentVersion.Major > versionRange.MaxVersion.Major: %v, %v", currentVersion.Major, versionRange.MaxVersion.Major)
 		return false
 	}
 	if currentVersion.Major == versionRange.MinVersion.Major && currentVersion.Minor < versionRange.MinVersion.Minor {
-		logrus.Infof("currentVersion.Minor < versionRange.MinVersion.Major: %v, %v", currentVersion.Minor, versionRange.MinVersion.Minor)
 		return false
 	}
 	if currentVersion.Major == versionRange.MaxVersion.Major && currentVersion.Minor > versionRange.MaxVersion.Minor {
-		logrus.Infof("currentVersion.Minor > versionRange.MaxVersion.Major: %v, %v", currentVersion.Minor, versionRange.MaxVersion.Minor)
 		return false
 	}
 	return true

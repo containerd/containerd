@@ -312,16 +312,43 @@ func mountsToLayerAndParents(mounts []mount.Mount) (string, []string, error) {
 		return "", nil, errors.Wrap(errdefs.ErrInvalidArgument, "number of mounts should always be 1 for Windows layers")
 	}
 	mnt := mounts[0]
-	if mnt.Type != "windows-layer" {
+
+	if mnt.Type != "windows-layer" && mnt.Type != "bind" {
 		// This is a special case error. When this is received the diff service
 		// will attempt the next differ in the chain which for Windows is the
 		// lcow differ that we want.
+		// TODO: Is there any situation where we actually wanted a "bind" mount to
+		// fall through to the lcow differ?
 		return "", nil, errors.Wrapf(errdefs.ErrNotImplemented, "windowsDiff does not support layer type %s", mnt.Type)
 	}
 
 	parentLayerPaths, err := mnt.GetParentPaths()
 	if err != nil {
 		return "", nil, err
+	}
+
+	isView := false
+	for _, o := range mnt.Options {
+		if o == "ro" {
+			isView = true
+			break
+		}
+	}
+
+	if isView {
+		if mnt.Type == "bind" && len(parentLayerPaths) != 0 {
+			return "", nil, errors.New("unexpected bind-mount View with parents")
+		} else if mnt.Type == "bind" {
+			// rootfs.CreateDiff creates a new, empty View to diff against,
+			// when diffing something with no parent.
+			// This makes perfect sense for a walking Diff, but for WCOW,
+			// we have to recognise this as "diff against nothing"
+			return "", nil, nil
+		} else if len(parentLayerPaths) == 0 {
+			return "", nil, errors.New("unexpected windows-layer View with no parent")
+		}
+		// Ignore the dummy sandbox.
+		return parentLayerPaths[0], parentLayerPaths[1:], nil
 	}
 
 	return mnt.Source, parentLayerPaths, nil
@@ -338,8 +365,16 @@ func mountPairToLayerStack(lower, upper []mount.Mount) ([]string, error) {
 		return nil, errors.Wrapf(err, "Upper mount invalid")
 	}
 
+	lowerLayer, lowerParentLayerPaths, err := mountsToLayerAndParents(lower)
+	if errdefs.IsNotImplemented(err) {
+		// Upper was a windows-layer or bind, lower is not. We can't handle that.
+		return nil, errors.Wrap(errdefs.ErrInvalidArgument, "windowsDiff cannot diff a windows-layer against a non-windows-layer")
+	} else if err != nil {
+		return nil, errors.Wrapf(err, "Lower mount invalid")
+	}
+
 	// Trivial case, diff-against-nothing
-	if len(lower) == 0 {
+	if lowerLayer == "" {
 		if len(upperParentLayerPaths) != 0 {
 			return nil, errors.Wrap(errdefs.ErrInvalidArgument, "windowsDiff cannot diff a layer with parents against a null layer")
 		}
@@ -348,14 +383,6 @@ func mountPairToLayerStack(lower, upper []mount.Mount) ([]string, error) {
 
 	if len(upperParentLayerPaths) < 1 {
 		return nil, errors.Wrap(errdefs.ErrInvalidArgument, "windowsDiff cannot diff a layer with no parents against another layer")
-	}
-
-	lowerLayer, lowerParentLayerPaths, err := mountsToLayerAndParents(lower)
-	if errdefs.IsNotImplemented(err) {
-		// Upper was a windows-layer, lower is not. We can't handle that.
-		return nil, errors.Wrap(errdefs.ErrInvalidArgument, "windowsDiff cannot diff a windows-layer against a non-windows-layer")
-	} else if err != nil {
-		return nil, errors.Wrapf(err, "Lower mount invalid")
 	}
 
 	if upperParentLayerPaths[0] != lowerLayer {

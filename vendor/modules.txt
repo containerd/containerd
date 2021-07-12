@@ -8,12 +8,13 @@ github.com/Microsoft/go-winio/pkg/fs
 github.com/Microsoft/go-winio/pkg/guid
 github.com/Microsoft/go-winio/pkg/security
 github.com/Microsoft/go-winio/vhd
-# github.com/Microsoft/hcsshim v0.8.18
+# github.com/Microsoft/hcsshim v0.8.18 => github.com/TBBle/hcsshim v0.8.18-0.20210712024940-d8e1acd154c2
 ## explicit
 github.com/Microsoft/hcsshim
 github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options
 github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats
 github.com/Microsoft/hcsshim/computestorage
+github.com/Microsoft/hcsshim/ext4/dmverity
 github.com/Microsoft/hcsshim/ext4/internal/compactext4
 github.com/Microsoft/hcsshim/ext4/internal/format
 github.com/Microsoft/hcsshim/ext4/tar2ext4
@@ -164,6 +165,8 @@ github.com/emicklei/go-restful/log
 # github.com/fsnotify/fsnotify v1.4.9
 ## explicit
 github.com/fsnotify/fsnotify
+# github.com/gabriel-samfira/go-hivex v0.0.0-20190725123041-b40bc95a7ced
+github.com/gabriel-samfira/go-hivex
 # github.com/go-logr/logr v0.2.0
 github.com/go-logr/logr
 # github.com/godbus/dbus/v5 v5.0.4
@@ -348,6 +351,8 @@ golang.org/x/crypto/openpgp/packet
 golang.org/x/crypto/openpgp/s2k
 golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/ssh/terminal
+# golang.org/x/mod v0.3.0
+golang.org/x/mod/semver
 # golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
 ## explicit
 golang.org/x/net/context
@@ -385,10 +390,22 @@ golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
 # golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e
 golang.org/x/time/rate
+# golang.org/x/tools v0.0.0-20210106214847-113979e3529a
+golang.org/x/tools/go/gcexportdata
+golang.org/x/tools/go/internal/gcimporter
+golang.org/x/tools/go/internal/packagesdriver
+golang.org/x/tools/go/packages
+golang.org/x/tools/internal/event
+golang.org/x/tools/internal/event/core
+golang.org/x/tools/internal/event/keys
+golang.org/x/tools/internal/event/label
+golang.org/x/tools/internal/gocommand
+golang.org/x/tools/internal/packagesinternal
+golang.org/x/tools/internal/typesinternal
 # golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 golang.org/x/xerrors
 golang.org/x/xerrors/internal
-# google.golang.org/appengine v1.6.5
+# google.golang.org/appengine v1.6.6
 google.golang.org/appengine/internal
 google.golang.org/appengine/internal/base
 google.golang.org/appengine/internal/datastore
@@ -581,6 +598,7 @@ k8s.io/utils/integer
 sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.2.0
 sigs.k8s.io/yaml
+# github.com/Microsoft/hcsshim => github.com/TBBle/hcsshim v0.8.18-0.20210712024940-d8e1acd154c2
 # github.com/containerd/containerd => ./.empty-mod/
 # github.com/gogo/googleapis => github.com/gogo/googleapis v1.3.2
 # github.com/urfave/cli => github.com/urfave/cli v1.22.1

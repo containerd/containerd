@@ -294,6 +294,18 @@ func (r *legacyLayerReader) Next() (path string, size int64, fileInfo *winio.Fil
 	return
 }
 
+func (r *legacyLayerReader) LinkInfo() (uint32, *winio.FileIDInfo, error) {
+	fileStandardInfo, err := winio.GetFileStandardInfo(r.currentFile)
+	if err != nil {
+		return 0, nil, err
+	}
+	fileIDInfo, err := winio.GetFileID(r.currentFile)
+	if err != nil {
+		return 0, nil, err
+	}
+	return fileStandardInfo.NumberOfLinks, fileIDInfo, nil
+}
+
 func (r *legacyLayerReader) Read(b []byte) (int, error) {
 	if r.backupReader == nil {
 		if r.currentFile == nil {
@@ -349,7 +361,7 @@ type legacyLayerWriter struct {
 	currentIsDir    bool
 }
 
-// newLegacyLayerWriter returns a LayerWriter that can write the contaler layer
+// newLegacyLayerWriter returns a LayerWriter that can write the container layer
 // transport format to disk.
 func newLegacyLayerWriter(root string, parentRoots []string, destRoot string) (w *legacyLayerWriter, err error) {
 	w = &legacyLayerWriter{
@@ -730,7 +742,7 @@ func (w *legacyLayerWriter) AddLink(name string, target string) error {
 		return errors.New("invalid hard link in layer")
 	}
 
-	// Find to try the target of the link in a previously added file. If that
+	// Try to find the target of the link in a previously added file. If that
 	// fails, search in parent layers.
 	var selectedRoot *os.File
 	if _, ok := w.addedFiles[target]; ok {

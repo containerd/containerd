@@ -18,6 +18,8 @@ package mount
 
 import (
 	"encoding/json"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -25,13 +27,19 @@ import (
 	"github.com/pkg/errors"
 )
 
+const sourceStreamName = "containerd.io-source"
+
 var (
 	// ErrNotImplementOnWindows is returned when an action is not implemented for windows
 	ErrNotImplementOnWindows = errors.New("not implemented under windows")
 )
 
 // Mount to the provided target
-func (m *Mount) Mount(target string) error {
+func (m *Mount) Mount(target string) (err error) {
+	if m.Type == "bind" {
+		return errors.Wrapf(m.bindMount(target), "failed to bind-mount to %s", target)
+	}
+
 	if m.Type != "windows-layer" {
 		return errors.Errorf("invalid windows mount type: '%s'", m.Type)
 	}
@@ -59,6 +67,33 @@ func (m *Mount) Mount(target string) error {
 	if err = hcsshim.PrepareLayer(di, layerID, parentLayerPaths); err != nil {
 		return errors.Wrapf(err, "failed to prepare layer %s", m.Source)
 	}
+	defer func() {
+		if err != nil {
+			hcsshim.UnprepareLayer(di, layerID)
+		}
+	}()
+
+	volume, err := hcsshim.GetLayerMountPath(di, layerID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get volume path for layer %s", m.Source)
+	}
+
+	if err = setVolumeMountPoint(target, volume); err != nil {
+		return errors.Wrapf(err, "failed to set volume mount path for layer %s", m.Source)
+	}
+	defer func() {
+		if err != nil {
+			deleteVolumeMountPoint(target)
+		}
+	}()
+
+	// Add an Alternate Data Stream to record the layer source.
+	// See https://docs.microsoft.com/en-au/archive/blogs/askcore/alternate-data-streams-in-ntfs
+	// for details on Alternate Data Streams.
+	if err = ioutil.WriteFile(filepath.Clean(target)+":"+sourceStreamName, []byte(m.Source), 0666); err != nil {
+		return errors.Wrapf(err, "failed to record source for layer %s", m.Source)
+	}
+
 	return nil
 }
 
@@ -82,8 +117,34 @@ func (m *Mount) GetParentPaths() ([]string, error) {
 
 // Unmount the mount at the provided path
 func Unmount(mount string, flags int) error {
+	mount = filepath.Clean(mount)
+
+	// Helpfully, both reparse points and symlinks look like links to Go
+	// Less-helpfully, ReadLink cannot return \\?\Volume{GUID} for a volume mount,
+	// and ends up returning the directory we gave it for some reason.
+	if mountTarget, err := os.Readlink(mount); err != nil {
+		// Not a mount point.
+		// This isn't an error, per the EINVAL handling in the Linux version
+		return nil
+	} else if mount != filepath.Clean(mountTarget) {
+		// Directory symlink
+		return errors.Wrapf(bindUnmount(mount), "failed to bind-unmount from %s", mount)
+	}
+
+	layerPathb, err := ioutil.ReadFile(mount + ":" + sourceStreamName)
+
+	if err != nil {
+		return errors.Wrapf(err, "failed to retrieve source for layer %s", mount)
+	}
+
+	layerPath := string(layerPathb)
+
+	if err := deleteVolumeMountPoint(mount); err != nil {
+		return errors.Wrapf(err, "failed failed to release volume mount path for layer %s", mount)
+	}
+
 	var (
-		home, layerID = filepath.Split(mount)
+		home, layerID = filepath.Split(layerPath)
 		di            = hcsshim.DriverInfo{
 			HomeDir: home,
 		}
@@ -92,6 +153,7 @@ func Unmount(mount string, flags int) error {
 	if err := hcsshim.UnprepareLayer(di, layerID); err != nil {
 		return errors.Wrapf(err, "failed to unprepare layer %s", mount)
 	}
+
 	if err := hcsshim.DeactivateLayer(di, layerID); err != nil {
 		return errors.Wrapf(err, "failed to deactivate layer %s", mount)
 	}
@@ -101,5 +163,30 @@ func Unmount(mount string, flags int) error {
 
 // UnmountAll unmounts from the provided path
 func UnmountAll(mount string, flags int) error {
+	if mount == "" {
+		// This isn't an error, per the EINVAL handling in the Linux version
+		return nil
+	}
+
 	return Unmount(mount, flags)
+}
+
+func (m *Mount) bindMount(target string) error {
+	for _, option := range m.Options {
+		if option == "ro" {
+			return errors.Wrap(ErrNotImplementOnWindows, "read-only bind mount")
+		}
+	}
+
+	if err := os.Remove(target); err != nil {
+		return err
+	}
+
+	// TODO: We don't honour the Read-Only flag.
+	// It's possible that Windows simply lacks this.
+	return os.Symlink(m.Source, target)
+}
+
+func bindUnmount(target string) error {
+	return os.Remove(target)
 }

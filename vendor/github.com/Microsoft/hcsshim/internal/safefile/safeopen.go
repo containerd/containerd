@@ -339,6 +339,35 @@ func MkdirRelative(path string, root *os.File) error {
 	return err
 }
 
+// MkdirAllRelative creates each directory in the path relative to a root, failing if
+// any existing intermediate path components are reparse points.
+func MkdirAllRelative(path string, root *os.File) error {
+	pathParts := strings.Split(filepath.Clean(path), (string)(filepath.Separator))
+	for index := range pathParts {
+
+		partialPath := filepath.Join(pathParts[0 : index+1]...)
+		stat, err := LstatRelative(partialPath, root)
+
+		if err != nil && os.IsNotExist(err) {
+			if err := MkdirRelative(partialPath, root); err != nil {
+				return err
+			}
+			continue
+		}
+
+		if err != nil {
+			return err
+		}
+
+		if !stat.IsDir() {
+			fullPath := filepath.Join(root.Name(), partialPath)
+			return &os.PathError{Op: "mkdir", Path: fullPath, Err: syscall.ENOTDIR}
+		}
+	}
+
+	return nil
+}
+
 // LstatRelative performs a stat operation on a file relative to a root, failing
 // if any intermediate path components are reparse points.
 func LstatRelative(path string, root *os.File) (os.FileInfo, error) {

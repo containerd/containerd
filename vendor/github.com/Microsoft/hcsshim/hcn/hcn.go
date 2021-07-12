@@ -249,6 +249,25 @@ func TierAclPolicySupported() error {
 	return platformDoesNotSupportError("TierAcl")
 }
 
+// NetworkACLPolicySupported returns an error if the HCN version does not support NetworkACLPolicy
+func NetworkACLPolicySupported() error {
+	supported := GetSupportedFeatures()
+	if supported.NetworkACL {
+		return nil
+	}
+	return platformDoesNotSupportError("NetworkACL")
+}
+
+// NestedIpSetSupported returns an error if the HCN version does not support NestedIpSet
+func NestedIpSetSupported() error {
+	supported := GetSupportedFeatures()
+	if supported.NestedIpSet {
+		return nil
+	}
+	return platformDoesNotSupportError("NestedIpSet")
+}
+
+
 // RequestType are the different operations performed to settings.
 // Used to update the settings of Endpoint/Namespace objects.
 type RequestType string

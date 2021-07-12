@@ -76,6 +76,12 @@ var (
 
 	//HNS 14.0 allows for TierAcl Policy support
 	TierAclPolicyVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 14, Minor: 0}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
+
+	//HNS 15.0 allows for NetworkACL Policy support
+	NetworkACLPolicyVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 15, Minor: 0}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
+
+	//HNS 15.0 allows for NestedIpSet support
+	NestedIpSetVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 15, Minor: 0}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
 )
 
 // GetGlobals returns the global properties of the HCN Service.

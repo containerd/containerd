@@ -261,7 +261,7 @@ jobs:
   integration-windows:
     name: Windows Integration
     runs-on: windows-2019
-    timeout-minutes: 30
+    timeout-minutes: 40
     needs: [project, linters, protos, man]
     env:
       GOTEST: gotestsum --
@@ -300,7 +300,7 @@ jobs:
           set -o xtrace
           mingw32-make.exe binaries
           bindir="$(pwd)"
-          SHIM_COMMIT=$(grep 'Microsoft/hcsshim ' go.mod | awk '{print $2}')
+          SHIM_COMMIT=$(grep -m 1 'Microsoft/hcsshim ' go.mod | awk '{print $2}')
           cd ../../Microsoft/hcsshim
           git fetch --tags origin "${SHIM_COMMIT}"
           git checkout "${SHIM_COMMIT}"
