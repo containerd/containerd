@@ -323,10 +323,10 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 }
 
 // loadSandbox loads sandbox from containerd.
-func (c *criService) loadSandbox(ctx context.Context, cntr containerd.Container) (sandboxstore.Sandbox, error) {
+func (c *criService) loadSandbox(ctx context.Context, cntr containerd.Container) (*Sandbox, error) {
 	ctx, cancel := context.WithTimeout(ctx, loadContainerTimeout)
 	defer cancel()
-	var sandbox sandboxstore.Sandbox
+	var sandbox *Sandbox
 	// Load sandbox metadata.
 	exts, err := cntr.Extensions(ctx)
 	if err != nil {
@@ -409,7 +409,7 @@ func (c *criService) loadSandbox(ctx context.Context, cntr containerd.Container)
 		log.G(ctx).WithError(err).Errorf("Failed to load sandbox status for %q", cntr.ID())
 	}
 
-	sandbox = sandboxstore.NewSandbox(*meta, s)
+	sandbox = NewSandbox(*meta, s)
 	sandbox.Container = cntr
 
 	// Load network namespace.

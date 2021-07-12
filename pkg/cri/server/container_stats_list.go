@@ -70,7 +70,7 @@ func (c *criService) normalizeContainerStatsFilter(filter *runtime.ContainerStat
 		filter.Id = cntr.ID
 	}
 	if sb, err := c.SandboxStore.Get(filter.GetPodSandboxId()); err == nil {
-		filter.PodSandboxId = sb.ID
+		filter.PodSandboxId = sb.GetMetadata().ID
 	}
 }
 

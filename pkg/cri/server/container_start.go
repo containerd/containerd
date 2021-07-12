@@ -80,7 +80,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		return nil, errors.Wrapf(err, "sandbox %q not found", meta.SandboxID)
 	}
 	sandboxID := meta.SandboxID
-	if sandbox.Status.Get().State != sandboxstore.StateReady {
+	if sandbox.GetStatus().Get().State != sandboxstore.StateReady {
 		return nil, errors.Errorf("sandbox container %q is not running", sandboxID)
 	}
 
@@ -138,7 +138,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	if nric != nil {
 		nriSB := &nri.Sandbox{
 			ID:     sandboxID,
-			Labels: sandbox.Config.Labels,
+			Labels: sandbox.GetMetadata().Config.Labels,
 		}
 		if _, err := nric.InvokeWithSandbox(ctx, task, v1.Create, nriSB); err != nil {
 			return nil, errors.Wrap(err, "nri invoke")

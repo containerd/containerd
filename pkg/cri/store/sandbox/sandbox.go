@@ -19,43 +19,18 @@ package sandbox
 import (
 	"sync"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/pkg/cri/store/label"
 	"github.com/containerd/containerd/pkg/cri/store/truncindex"
 
 	"github.com/containerd/containerd/pkg/cri/store"
-	"github.com/containerd/containerd/pkg/netns"
 )
 
-// Sandbox contains all resources associated with the sandbox. All methods to
-// mutate the internal state are thread safe.
-type Sandbox struct {
-	// Metadata is the metadata of the sandbox, it is immutable after created.
-	Metadata
-	// Status stores the status of the sandbox.
-	Status StatusStorage
-	// Container is the containerd sandbox container client.
-	Container containerd.Container
-	// CNI network namespace client.
-	// For hostnetwork pod, this is always nil;
-	// For non hostnetwork pod, this should never be nil.
-	NetNS *netns.NetNS
-	// StopCh is used to propagate the stop information of the sandbox.
-	*store.StopCh
-}
-
-// NewSandbox creates an internally used sandbox type. This functions reminds
-// the caller that a sandbox must have a status.
-func NewSandbox(metadata Metadata, status Status) Sandbox {
-	s := Sandbox{
-		Metadata: metadata,
-		Status:   StoreStatus(status),
-		StopCh:   store.NewStopCh(),
-	}
-	if status.State == StateNotReady {
-		s.Stop()
-	}
-	return s
+// Sandbox interface stored by Store
+type Sandbox interface {
+	GetMetadata() *Metadata
+	GetStatus() StatusStorage
+	Stop()
+	Stopped() <-chan struct{}
 }
 
 // Store stores all sandboxes.
@@ -79,16 +54,16 @@ func NewStore(labels *label.Store) *Store {
 func (s *Store) Add(sb Sandbox) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	if _, ok := s.sandboxes[sb.ID]; ok {
+	if _, ok := s.sandboxes[sb.GetMetadata().ID]; ok {
 		return store.ErrAlreadyExist
 	}
-	if err := s.labels.Reserve(sb.ProcessLabel); err != nil {
+	if err := s.labels.Reserve(sb.GetMetadata().ProcessLabel); err != nil {
 		return err
 	}
-	if err := s.idIndex.Add(sb.ID); err != nil {
+	if err := s.idIndex.Add(sb.GetMetadata().ID); err != nil {
 		return err
 	}
-	s.sandboxes[sb.ID] = sb
+	s.sandboxes[sb.GetMetadata().ID] = sb
 	return nil
 }
 
@@ -102,12 +77,12 @@ func (s *Store) Get(id string) (Sandbox, error) {
 		if err == truncindex.ErrNotExist {
 			err = store.ErrNotExist
 		}
-		return Sandbox{}, err
+		return nil, err
 	}
 	if sb, ok := s.sandboxes[id]; ok {
 		return sb, nil
 	}
-	return Sandbox{}, store.ErrNotExist
+	return nil, store.ErrNotExist
 }
 
 // List lists all sandboxes.
@@ -131,7 +106,7 @@ func (s *Store) Delete(id string) {
 		// So we need to return if there are error.
 		return
 	}
-	s.labels.Release(s.sandboxes[id].ProcessLabel)
+	s.labels.Release(s.sandboxes[id].GetMetadata().ProcessLabel)
 	s.idIndex.Delete(id) // nolint: errcheck
 	delete(s.sandboxes, id)
 }

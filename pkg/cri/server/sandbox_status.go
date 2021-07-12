@@ -33,10 +33,11 @@ import (
 
 // PodSandboxStatus returns the status of the PodSandbox.
 func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandboxStatusRequest) (*runtime.PodSandboxStatusResponse, error) {
-	sandbox, err := c.SandboxStore.Get(r.GetPodSandboxId())
+	i, err := c.SandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		return nil, errors.Wrap(err, "an error occurred when try to find sandbox")
 	}
+	sandbox := i.(*Sandbox)
 
 	ip, additionalIPs, err := c.getIPs(sandbox)
 	if err != nil {
@@ -67,7 +68,7 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 	}, nil
 }
 
-func (c *criService) getIPs(sandbox sandboxstore.Sandbox) (string, []string, error) {
+func (c *criService) getIPs(sandbox *Sandbox) (string, []string, error) {
 	config := sandbox.Config
 
 	if goruntime.GOOS != "windows" &&
@@ -143,7 +144,7 @@ type SandboxInfo struct {
 }
 
 // toCRISandboxInfo converts internal container object information to CRI sandbox status response info map.
-func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox) (map[string]string, error) {
+func toCRISandboxInfo(ctx context.Context, sandbox *Sandbox) (map[string]string, error) {
 	container := sandbox.Container
 	task, err := container.Task(ctx, nil)
 	if err != nil && !errdefs.IsNotFound(err) {

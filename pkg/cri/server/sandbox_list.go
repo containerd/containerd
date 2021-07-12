@@ -30,8 +30,8 @@ func (c *criService) ListPodSandbox(ctx context.Context, r *runtime.ListPodSandb
 	var sandboxes []*runtime.PodSandbox
 	for _, sandboxInStore := range sandboxesInStore {
 		sandboxes = append(sandboxes, toCRISandbox(
-			sandboxInStore.Metadata,
-			sandboxInStore.Status.Get(),
+			sandboxInStore.GetMetadata(),
+			sandboxInStore.GetStatus().Get(),
 		))
 	}
 
@@ -40,7 +40,7 @@ func (c *criService) ListPodSandbox(ctx context.Context, r *runtime.ListPodSandb
 }
 
 // toCRISandbox converts sandbox metadata into CRI pod sandbox.
-func toCRISandbox(meta sandboxstore.Metadata, status sandboxstore.Status) *runtime.PodSandbox {
+func toCRISandbox(meta *sandboxstore.Metadata, status sandboxstore.Status) *runtime.PodSandbox {
 	// Set sandbox state to NOTREADY by default.
 	state := runtime.PodSandboxState_SANDBOX_NOTREADY
 	if status.State == sandboxstore.StateReady {
@@ -59,7 +59,7 @@ func toCRISandbox(meta sandboxstore.Metadata, status sandboxstore.Status) *runti
 
 func (c *criService) normalizePodSandboxFilter(filter *runtime.PodSandboxFilter) {
 	if sb, err := c.SandboxStore.Get(filter.GetId()); err == nil {
-		filter.Id = sb.ID
+		filter.Id = sb.GetMetadata().ID
 	}
 }
 

@@ -32,7 +32,7 @@ import (
 // RemovePodSandbox removes the sandbox. If there are running containers in the
 // sandbox, they should be forcibly removed.
 func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodSandboxRequest) (*runtime.RemovePodSandboxResponse, error) {
-	sandbox, err := c.SandboxStore.Get(r.GetPodSandboxId())
+	i, err := c.SandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		if err != store.ErrNotExist {
 			return nil, errors.Wrapf(err, "an error occurred when try to find sandbox %q",
@@ -43,6 +43,7 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 			r.GetPodSandboxId())
 		return &runtime.RemovePodSandboxResponse{}, nil
 	}
+	sandbox := i.(*Sandbox)
 	// Use the full sandbox id.
 	id := sandbox.ID
 

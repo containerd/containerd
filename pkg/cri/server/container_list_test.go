@@ -169,8 +169,8 @@ func (c containerForTest) toContainer() (containerstore.Container, error) {
 
 func TestListContainers(t *testing.T) {
 	c := newTestCRIService()
-	sandboxesInStore := []sandboxstore.Sandbox{
-		sandboxstore.NewSandbox(
+	sandboxesInStore := []*Sandbox{
+		NewSandbox(
 			sandboxstore.Metadata{
 				ID:     "s-1abcdef1234",
 				Name:   "sandboxname-1",
@@ -180,7 +180,7 @@ func TestListContainers(t *testing.T) {
 				State: sandboxstore.StateReady,
 			},
 		),
-		sandboxstore.NewSandbox(
+		NewSandbox(
 			sandboxstore.Metadata{
 				ID:     "s-2abcdef1234",
 				Name:   "sandboxname-2",

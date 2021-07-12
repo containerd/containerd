@@ -75,15 +75,15 @@ func TestToCRISandbox(t *testing.T) {
 			State:     test.state,
 		}
 		expect.State = test.expectedState
-		s := toCRISandbox(meta, status)
+		s := toCRISandbox(&meta, status)
 		assert.Equal(t, expect, s, desc)
 	}
 }
 
 func TestFilterSandboxes(t *testing.T) {
 	c := newTestCRIService()
-	sandboxes := []sandboxstore.Sandbox{
-		sandboxstore.NewSandbox(
+	sandboxes := []*Sandbox{
+		NewSandbox(
 			sandboxstore.Metadata{
 				ID:   "1abcdef",
 				Name: "sandboxname-1",
@@ -102,7 +102,7 @@ func TestFilterSandboxes(t *testing.T) {
 				State:     sandboxstore.StateReady,
 			},
 		),
-		sandboxstore.NewSandbox(
+		NewSandbox(
 			sandboxstore.Metadata{
 				ID:   "2abcdef",
 				Name: "sandboxname-2",
@@ -122,7 +122,7 @@ func TestFilterSandboxes(t *testing.T) {
 				State:     sandboxstore.StateNotReady,
 			},
 		),
-		sandboxstore.NewSandbox(
+		NewSandbox(
 			sandboxstore.Metadata{
 				ID:   "3abcdef",
 				Name: "sandboxname-3",
@@ -147,7 +147,7 @@ func TestFilterSandboxes(t *testing.T) {
 	// Create PodSandbox
 	testSandboxes := []*runtime.PodSandbox{}
 	for _, sb := range sandboxes {
-		testSandboxes = append(testSandboxes, toCRISandbox(sb.Metadata, sb.Status.Get()))
+		testSandboxes = append(testSandboxes, toCRISandbox(&sb.Metadata, sb.Status.Get()))
 	}
 
 	// Inject test sandbox metadata

@@ -34,11 +34,12 @@ import (
 // StopPodSandbox stops the sandbox. If there are any running containers in the
 // sandbox, they should be forcibly terminated.
 func (c *criService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandboxRequest) (*runtime.StopPodSandboxResponse, error) {
-	sandbox, err := c.SandboxStore.Get(r.GetPodSandboxId())
+	i, err := c.SandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		return nil, errors.Wrapf(err, "an error occurred when try to find sandbox %q",
 			r.GetPodSandboxId())
 	}
+	sandbox := i.(*Sandbox)
 
 	if err := c.stopPodSandbox(ctx, sandbox); err != nil {
 		return nil, err
@@ -47,7 +48,7 @@ func (c *criService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandb
 	return &runtime.StopPodSandboxResponse{}, nil
 }
 
-func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sandbox) error {
+func (c *criService) stopPodSandbox(ctx context.Context, sandbox *Sandbox) error {
 	// Use the full sandbox id.
 	id := sandbox.ID
 
@@ -103,7 +104,7 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 // stopSandboxContainer kills the sandbox container.
 // `task.Delete` is not called here because it will be called when
 // the event monitor handles the `TaskExit` event.
-func (c *criService) stopSandboxContainer(ctx context.Context, sandbox sandboxstore.Sandbox) error {
+func (c *criService) stopSandboxContainer(ctx context.Context, sandbox *Sandbox) error {
 	id := sandbox.ID
 	container := sandbox.Container
 	state := sandbox.Status.Get().State
@@ -154,7 +155,7 @@ func (c *criService) stopSandboxContainer(ctx context.Context, sandbox sandboxst
 
 // waitSandboxStop waits for sandbox to be stopped until context is cancelled or
 // the context deadline is exceeded.
-func (c *criService) waitSandboxStop(ctx context.Context, sandbox sandboxstore.Sandbox) error {
+func (c *criService) waitSandboxStop(ctx context.Context, sandbox *Sandbox) error {
 	select {
 	case <-ctx.Done():
 		return errors.Wrapf(ctx.Err(), "wait sandbox container %q", sandbox.ID)
@@ -164,7 +165,7 @@ func (c *criService) waitSandboxStop(ctx context.Context, sandbox sandboxstore.S
 }
 
 // teardownPodNetwork removes the network from the pod
-func (c *criService) teardownPodNetwork(ctx context.Context, sandbox sandboxstore.Sandbox) error {
+func (c *criService) teardownPodNetwork(ctx context.Context, sandbox *Sandbox) error {
 	if c.netPlugin == nil {
 		return errors.New("cni config not initialized")
 	}

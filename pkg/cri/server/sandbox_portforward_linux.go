@@ -33,10 +33,11 @@ import (
 // portForward uses netns to enter the sandbox namespace, and forwards a stream inside the
 // the namespace to a specific port. It keeps forwarding until it exits or client disconnect.
 func (c *criService) portForward(ctx context.Context, id string, port int32, stream io.ReadWriteCloser) error {
-	s, err := c.SandboxStore.Get(id)
+	i, err := c.SandboxStore.Get(id)
 	if err != nil {
 		return errors.Wrapf(err, "failed to find sandbox %q in store", id)
 	}
+	s := i.(*Sandbox)
 
 	var netNSDo func(func(ns.NetNS) error) error
 	// netNSPath is the network namespace path for logging.

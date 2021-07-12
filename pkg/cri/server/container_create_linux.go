@@ -175,7 +175,7 @@ func (c *criService) containerSpec(
 	if len(labelOptions) == 0 {
 		// Use pod level SELinux config
 		if sandbox, err := c.SandboxStore.Get(sandboxID); err == nil {
-			labelOptions, err = selinux.DupSecOpt(sandbox.ProcessLabel)
+			labelOptions, err = selinux.DupSecOpt(sandbox.GetMetadata().ProcessLabel)
 			if err != nil {
 				return nil, err
 			}

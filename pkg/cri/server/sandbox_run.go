@@ -81,7 +81,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}()
 
 	// Create initial internal sandbox object.
-	sandbox := sandboxstore.NewSandbox(
+	sandbox := NewSandbox(
 		sandboxstore.Metadata{
 			ID:             id,
 			Name:           name,
@@ -154,7 +154,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// In this case however caching the IP will add a subtle performance enhancement by avoiding
 		// calls to network namespace of the pod to query the IP of the veth interface on every
 		// SandboxStatus request.
-		if err := c.setupPodNetwork(ctx, &sandbox); err != nil {
+		if err := c.setupPodNetwork(ctx, sandbox); err != nil {
 			return nil, errors.Wrapf(err, "failed to setup network for sandbox %q", id)
 		}
 	}
@@ -344,7 +344,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 }
 
 // setupPodNetwork setups up the network for a pod
-func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.Sandbox) error {
+func (c *criService) setupPodNetwork(ctx context.Context, sandbox *Sandbox) error {
 	var (
 		id     = sandbox.ID
 		config = sandbox.Config

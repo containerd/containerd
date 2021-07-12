@@ -416,7 +416,8 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 }
 
 // handleSandboxExit handles TaskExit event for sandbox.
-func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxstore.Sandbox) error {
+func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sbi sandboxstore.Sandbox) error {
+	sb := sbi.(*Sandbox)
 	// No stream attached to sandbox container.
 	task, err := sb.Container.Task(ctx, nil)
 	if err != nil {
