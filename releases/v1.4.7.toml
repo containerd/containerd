@@ -1,0 +1,23 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.4.6"
+
+pre_release = false
+
+preface = """\
+The seventh patch release for containerd 1.4 updates runc to 1.0.0 and contains
+various other fixes.
+
+### Notable Updates
+* **Update runc binary to 1.0.0** [5552](https://github.com/containerd/containerd/pull/5552)
+* **Fix invalid validation error checking** [#5565](https://github.com/containerd/containerd/pull/5565)
+* **Fix error on image pull resume** [#5560](https://github.com/containerd/containerd/pull/5560)
+* **Fix symlink resolution for disk mounts on Windows** [#5411](https://github.com/containerd/containerd/pull/5411)
+
+See the changelog for complete list of changes"""
