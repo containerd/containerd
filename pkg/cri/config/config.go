@@ -56,6 +56,8 @@ type Runtime struct {
 	PrivilegedWithoutHostDevices bool `toml:"privileged_without_host_devices" json:"privileged_without_host_devices"`
 	// BaseRuntimeSpec is a json file with OCI spec to use as base spec that all container's will be created from.
 	BaseRuntimeSpec string `toml:"base_runtime_spec" json:"baseRuntimeSpec"`
+	// Mode control cri specific implementations.
+	Mode string `toml:"mode" json:"mode"`
 }
 
 // ContainerdConfig contains toml config related to containerd

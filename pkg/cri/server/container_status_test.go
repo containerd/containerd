@@ -222,10 +222,10 @@ func TestContainerStatus(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		if test.exist {
-			assert.NoError(t, c.containerStore.Add(container))
+			assert.NoError(t, c.ContainerStore.Add(container))
 		}
 		if test.imageExist {
-			c.imageStore, err = imagestore.NewFakeStore([]imagestore.Image{*image})
+			c.ImageStore, err = imagestore.NewFakeStore([]imagestore.Image{*image})
 			assert.NoError(t, err)
 		}
 		resp, err := c.ContainerStatus(context.Background(), &runtime.ContainerStatusRequest{ContainerId: container.ID})

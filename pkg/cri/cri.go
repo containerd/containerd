@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/api/services/namespaces/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
@@ -43,6 +44,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/constants"
 	criplatforms "github.com/containerd/containerd/pkg/cri/platforms"
 	"github.com/containerd/containerd/pkg/cri/server"
+	cristore "github.com/containerd/containerd/pkg/cri/store/service"
 )
 
 // TODO(random-liu): Use github.com/pkg/errors for our errors.
@@ -54,7 +56,8 @@ func init() {
 		ID:     "cri",
 		Config: &config,
 		Requires: []plugin.Type{
-			plugin.ServicePlugin,
+			plugin.CRIPlugin,
+			plugin.CRIServicePlugin,
 		},
 		InitFn: initCRIService,
 	})
@@ -86,6 +89,14 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get services")
 	}
+	criServices, err := getCRIPlugin(ic)
+	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
+		return nil, errors.Wrap(err, "failed to get CRI plugin")
+	}
+	criStore, err := getCRIStore(ic)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get CRI store services")
+	}
 
 	log.G(ctx).Info("Connect containerd service")
 	client, err := containerd.New(
@@ -98,7 +109,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, errors.Wrap(err, "failed to create containerd client")
 	}
 
-	s, err := server.NewCRIService(c, client)
+	s, err := server.NewCRIServices(c, client, criStore, criServices)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create CRI service")
 	}
@@ -165,6 +176,39 @@ func getServicesOpts(ic *plugin.InitContext) ([]containerd.ServicesOpt, error) {
 		opts = append(opts, fn(i))
 	}
 	return opts, nil
+}
+
+func getCRIStore(ic *plugin.InitContext) (*cristore.Store, error) {
+	plugins, err := ic.GetByType(plugin.CRIServicePlugin)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get cri store")
+	}
+	p := plugins[cristore.CRIStoreService]
+	if p == nil {
+		return nil, errors.Errorf("cri service store not found")
+	}
+	i, err := p.Instance()
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get instance of cri service store")
+	}
+	return i.(*cristore.Store), nil
+}
+
+// getCRIPlugin get cri services from plugin context
+func getCRIPlugin(ic *plugin.InitContext) (map[string]server.CRIPlugin, error) {
+	criPlugins := map[string]server.CRIPlugin{}
+	plugins, err := ic.GetByType(plugin.CRIPlugin)
+	if err != nil {
+		return criPlugins, errors.Wrap(err, "failed to get cri plugin")
+	}
+	for k, v := range plugins {
+		i, err := v.Instance()
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get instance of service %q", k)
+		}
+		criPlugins[k] = i.(server.CRIPlugin)
+	}
+	return criPlugins, nil
 }
 
 // Set glog level.

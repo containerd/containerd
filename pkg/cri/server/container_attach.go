@@ -31,7 +31,7 @@ import (
 
 // Attach prepares a streaming endpoint to attach to a running container, and returns the address.
 func (c *criService) Attach(ctx context.Context, r *runtime.AttachRequest) (*runtime.AttachResponse, error) {
-	cntr, err := c.containerStore.Get(r.GetContainerId())
+	cntr, err := c.ContainerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find container in store")
 	}
@@ -47,7 +47,7 @@ func (c *criService) attachContainer(ctx context.Context, id string, stdin io.Re
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	// Get container from our container store.
-	cntr, err := c.containerStore.Get(id)
+	cntr, err := c.ContainerStore.Get(id)
 	if err != nil {
 		return errors.Wrapf(err, "failed to find container %q in store", id)
 	}

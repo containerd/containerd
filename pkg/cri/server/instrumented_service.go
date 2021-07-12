@@ -30,19 +30,19 @@ import (
 
 // instrumentedService wraps service with containerd namespace and logs.
 type instrumentedService struct {
-	c *criService
+	c *criServices
 }
 
-func newInstrumentedService(c *criService) grpcServices {
+func newInstrumentedService(c *criServices) grpcServices {
 	return &instrumentedService{c: c}
 }
 
 // instrumentedAlphaService wraps service with containerd namespace and logs.
 type instrumentedAlphaService struct {
-	c *criService
+	c *criServices
 }
 
-func newInstrumentedAlphaService(c *criService) grpcAlphaServices {
+func newInstrumentedAlphaService(c *criServices) grpcAlphaServices {
 	return &instrumentedAlphaService{c: c}
 }
 
@@ -51,7 +51,7 @@ func newInstrumentedAlphaService(c *criService) grpcAlphaServices {
 // initialized.
 // NOTE(random-liu): All following functions MUST check initialized at the beginning.
 func (in *instrumentedService) checkInitialized() error {
-	if in.c.initialized.IsSet() {
+	if in.c.Initialized() {
 		return nil
 	}
 	return errors.New("server is not initialized yet")
@@ -62,7 +62,7 @@ func (in *instrumentedService) checkInitialized() error {
 // initialized.
 // NOTE(random-liu): All following functions MUST check initialized at the beginning.
 func (in *instrumentedAlphaService) checkInitialized() error {
-	if in.c.initialized.IsSet() {
+	if in.c.Initialized() {
 		return nil
 	}
 	return errors.New("server is not initialized yet")
@@ -1385,7 +1385,7 @@ func (in *instrumentedAlphaService) Version(ctx context.Context, r *runtime_alph
 			log.G(ctx).Tracef("Version returns %+v", res)
 		}
 	}()
-	res, err = in.c.AlphaVersion(ctrdutil.WithNamespace(ctx), r)
+	res, err = in.c.c.AlphaVersion(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
 }
 

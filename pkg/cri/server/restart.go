@@ -64,7 +64,7 @@ func (c *criService) recover(ctx context.Context) error {
 			continue
 		}
 		log.G(ctx).Debugf("Loaded sandbox %+v", sb)
-		if err := c.sandboxStore.Add(sb); err != nil {
+		if err := c.SandboxStore.Add(sb); err != nil {
 			return errors.Wrapf(err, "failed to add sandbox %q to store", sandbox.ID())
 		}
 		if err := c.sandboxNameIndex.Reserve(sb.Name, sb.ID); err != nil {
@@ -84,7 +84,7 @@ func (c *criService) recover(ctx context.Context) error {
 			continue
 		}
 		log.G(ctx).Debugf("Loaded container %+v", cntr)
-		if err := c.containerStore.Add(cntr); err != nil {
+		if err := c.ContainerStore.Add(cntr); err != nil {
 			return errors.Wrapf(err, "failed to add container %q to store", container.ID())
 		}
 		if err := c.containerNameIndex.Reserve(cntr.Name, cntr.ID); err != nil {
@@ -341,6 +341,10 @@ func (c *criService) loadSandbox(ctx context.Context, cntr containerd.Container)
 		return sandbox, errors.Wrapf(err, "failed to unmarshal metadata extension %q", ext)
 	}
 	meta := data.(*sandboxstore.Metadata)
+	// TODO:
+	if meta.Mode != "" && meta.Mode != "runc" {
+		return sandbox, errors.Errorf("skip %q runtime recover", meta.Mode)
+	}
 
 	s, err := func() (sandboxstore.Status, error) {
 		status := unknownSandboxStatus()

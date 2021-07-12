@@ -99,7 +99,7 @@ func TestListImages(t *testing.T) {
 	}
 
 	var err error
-	c.imageStore, err = imagestore.NewFakeStore(imagesInStore)
+	c.ImageStore, err = imagestore.NewFakeStore(imagesInStore)
 	assert.NoError(t, err)
 
 	resp, err := c.ListImages(context.Background(), &runtime.ListImagesRequest{})

@@ -329,7 +329,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// Add sandbox into sandbox store in INIT state.
 	sandbox.Container = container
 
-	if err := c.sandboxStore.Add(sandbox); err != nil {
+	if err := c.SandboxStore.Add(sandbox); err != nil {
 		return nil, errors.Wrapf(err, "failed to add sandbox %+v into store", sandbox)
 	}
 
