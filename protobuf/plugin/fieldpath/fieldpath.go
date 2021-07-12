@@ -19,7 +19,6 @@ package fieldpath
 import (
 	"strings"
 
-	"github.com/containerd/containerd/protobuf/plugin"
 	"github.com/gogo/protobuf/gogoproto"
 	"github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
 	"github.com/gogo/protobuf/protoc-gen-gogo/generator"
@@ -51,7 +50,7 @@ func (p *fieldpathGenerator) Generate(file *generator.FileDescriptor) {
 		if m.DescriptorProto.GetOptions().GetMapEntry() {
 			continue
 		}
-		if plugin.FieldpathEnabled(file.FileDescriptorProto, m.DescriptorProto) {
+		if Enabled(file.FileDescriptorProto, m.DescriptorProto) {
 			p.generateMessage(m)
 		}
 	}
