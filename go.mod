@@ -9,6 +9,7 @@ require (
 	github.com/containerd/btrfs v1.0.0
 	github.com/containerd/cgroups v1.0.1
 	github.com/containerd/console v1.0.2
+	github.com/containerd/containerd/api v0.0.0
 	github.com/containerd/continuity v0.1.0
 	github.com/containerd/fifo v1.0.0
 	github.com/containerd/go-cni v1.0.2
@@ -26,7 +27,7 @@ require (
 	github.com/docker/go-units v0.4.0
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/fsnotify/fsnotify v1.4.9
-	github.com/gogo/googleapis v1.4.0
+	github.com/gogo/googleapis v1.4.1
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/go-cmp v0.5.5
 	github.com/google/uuid v1.2.0
@@ -73,6 +74,8 @@ replace (
 	// prevent transitional dependencies due to containerd having a circular
 	// dependency on itself through plugins. see .empty-mod/go.mod for details
 	github.com/containerd/containerd => ./.empty-mod/
+	// Use the relative local source of the github.com/containerd/containerd/api to build
+	github.com/containerd/containerd/api => ./api
 	github.com/gogo/googleapis => github.com/gogo/googleapis v1.3.2
 	// urfave/cli must be <= v1.22.1 due to a regression: https://github.com/urfave/cli/issues/1092
 	github.com/urfave/cli => github.com/urfave/cli v1.22.1
