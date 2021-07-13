@@ -1,0 +1,26 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.5.2"
+
+pre_release = false
+
+preface = """\
+The third patch release for containerd 1.5 updates runc to 1.0.0 and contains
+various other fixes.
+
+### Notable Updates
+
+* **Update runc binary to 1.0.0** [5552](https://github.com/containerd/containerd/pull/5552)
+* **Send pod UID to CNI plugins as K8S_POD_UID** [#5640](https://github.com/containerd/containerd/pull/5640)
+* **Fix invalid validation error checking** [#5565](https://github.com/containerd/containerd/pull/5565)
+* **Fix error on image pull resume** [#5560](https://github.com/containerd/containerd/pull/5560)
+* **Fix User Agent sent to registry authentication server** [#5533](https://github.com/containerd/containerd/pull/5533)
+* **Fix symlink resolution for disk mounts on Windows** [#5411](https://github.com/containerd/containerd/pull/5411)
+
+See the changelog for complete list of changes"""
