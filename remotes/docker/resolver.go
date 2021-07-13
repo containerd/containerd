@@ -148,11 +148,11 @@ func NewResolver(options ResolverOptions) remotes.Resolver {
 	resolveHeader := http.Header{}
 	if _, ok := options.Headers["Accept"]; !ok {
 		// set headers for all the types we support for resolution.
-		resolveHeader.Set("Accept", strings.Join([]string{
+		resolveHeader["Accept"] = []string{
 			images.MediaTypeDockerSchema2Manifest,
 			images.MediaTypeDockerSchema2ManifestList,
 			ocispec.MediaTypeImageManifest,
-			ocispec.MediaTypeImageIndex, "*/*"}, ", "))
+			ocispec.MediaTypeImageIndex, "*/*"}
 	} else {
 		resolveHeader["Accept"] = options.Headers["Accept"]
 		delete(options.Headers, "Accept")
