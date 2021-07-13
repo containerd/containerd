@@ -81,7 +81,7 @@ version = 2
 	task.Kill(ctx, syscall.SIGKILL)
 	begin := time.Now()
 	deadline := begin.Add(interval).Add(epsilon)
-	for time.Now().Before(deadline) {
+	for {
 		status, err := task.Status(ctx)
 		now := time.Now()
 		if err != nil {
@@ -96,6 +96,9 @@ version = 2
 				t.Logf("the task was restarted within %s", elapsed.String())
 				return
 			}
+		}
+		if time.Now().After(deadline) {
+			break
 		}
 		time.Sleep(epsilon)
 	}
