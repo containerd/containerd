@@ -81,7 +81,7 @@ version = 2
 	task.Kill(ctx, syscall.SIGKILL)
 	begin := time.Now()
 	deadline := begin.Add(interval).Add(epsilon)
-	for time.Now().Before(deadline) {
+	for {
 		status, err := task.Status(ctx)
 		now := time.Now()
 		if err != nil {
@@ -97,10 +97,13 @@ version = 2
 				return
 			}
 		}
+		if time.Now().After(deadline) {
+			break
+		}
 		time.Sleep(epsilon)
 	}
-	t.Fatalf("the task was not restarted in %s + %s",
-		interval.String(), epsilon.String())
+	t.Fatalf("%v: the task was not restarted in %s + %s",
+		time.Now(), interval.String(), epsilon.String())
 }
 
 // withRestartStatus is a copy of "github.com/containerd/containerd/runtime/restart".WithStatus.
