@@ -135,7 +135,7 @@ func (em *eventMonitor) startSandboxExitMonitor(ctx context.Context, id string, 
 				dctx, dcancel := context.WithTimeout(dctx, handleEventTimeout)
 				defer dcancel()
 
-				sb, err := em.c.sandboxStore.Get(e.ID)
+				sb, err := em.c.SandboxStore.Get(e.ID)
 				if err == nil {
 					if err := handleSandboxExit(dctx, e, sb); err != nil {
 						return err
@@ -186,7 +186,7 @@ func (em *eventMonitor) startContainerExitMonitor(ctx context.Context, id string
 				dctx, dcancel := context.WithTimeout(dctx, handleEventTimeout)
 				defer dcancel()
 
-				cntr, err := em.c.containerStore.Get(e.ID)
+				cntr, err := em.c.ContainerStore.Get(e.ID)
 				if err == nil {
 					if err := handleContainerExit(dctx, e, cntr); err != nil {
 						return err
@@ -312,7 +312,7 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 	case *eventtypes.TaskExit:
 		logrus.Infof("TaskExit event %+v", e)
 		// Use ID instead of ContainerID to rule out TaskExit event for exec.
-		cntr, err := em.c.containerStore.Get(e.ID)
+		cntr, err := em.c.ContainerStore.Get(e.ID)
 		if err == nil {
 			if err := handleContainerExit(ctx, e, cntr); err != nil {
 				return errors.Wrap(err, "failed to handle container TaskExit event")
@@ -321,7 +321,7 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 		} else if err != store.ErrNotExist {
 			return errors.Wrap(err, "can't find container for TaskExit event")
 		}
-		sb, err := em.c.sandboxStore.Get(e.ID)
+		sb, err := em.c.SandboxStore.Get(e.ID)
 		if err == nil {
 			if err := handleSandboxExit(ctx, e, sb); err != nil {
 				return errors.Wrap(err, "failed to handle sandbox TaskExit event")
@@ -334,7 +334,7 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 	case *eventtypes.TaskOOM:
 		logrus.Infof("TaskOOM event %+v", e)
 		// For TaskOOM, we only care which container it belongs to.
-		cntr, err := em.c.containerStore.Get(e.ContainerID)
+		cntr, err := em.c.ContainerStore.Get(e.ContainerID)
 		if err != nil {
 			if err != store.ErrNotExist {
 				return errors.Wrap(err, "can't find container for TaskOOM event")

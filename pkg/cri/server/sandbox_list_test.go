@@ -152,7 +152,7 @@ func TestFilterSandboxes(t *testing.T) {
 
 	// Inject test sandbox metadata
 	for _, sb := range sandboxes {
-		assert.NoError(t, c.sandboxStore.Add(sb))
+		assert.NoError(t, c.SandboxStore.Add(sb))
 	}
 
 	for desc, test := range map[string]struct {
