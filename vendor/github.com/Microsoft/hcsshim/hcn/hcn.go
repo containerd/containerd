@@ -3,6 +3,7 @@
 package hcn
 
 import (
+	"encoding/json"
 	"fmt"
 	"syscall"
 
@@ -93,12 +94,12 @@ type HostComputeQuery struct {
 }
 
 type ExtraParams struct {
-	Resources        interface{} `json:",omitempty"`
-	SharedContainers interface{} `json:",omitempty"`
-	LayeredOn        string      `json:",omitempty"`
-	SwitchGuid       string      `json:",omitempty"`
-	UtilityVM        string      `json:",omitempty"`
-	VirtualMachine   string      `json:",omitempty"`
+	Resources        json.RawMessage `json:",omitempty"`
+	SharedContainers json.RawMessage `json:",omitempty"`
+	LayeredOn        string          `json:",omitempty"`
+	SwitchGuid       string          `json:",omitempty"`
+	UtilityVM        string          `json:",omitempty"`
+	VirtualMachine   string          `json:",omitempty"`
 }
 
 type Health struct {
@@ -237,6 +238,15 @@ func VxlanPortSupported() error {
 		return nil
 	}
 	return platformDoesNotSupportError("VXLAN port configuration")
+}
+
+// TierAclPolicySupported returns an error if the HCN version does not support configuring the TierAcl.
+func TierAclPolicySupported() error {
+	supported := GetSupportedFeatures()
+	if supported.TierAcl {
+		return nil
+	}
+	return platformDoesNotSupportError("TierAcl")
 }
 
 // RequestType are the different operations performed to settings.

@@ -520,6 +520,9 @@ func (w *Writer) lookup(name string, mustExist bool) (*inode, *inode, string, er
 // call to make these parent directories will be made at a later point with the correct
 // permissions, at that time the permissions of these directories will be updated.
 func (w *Writer) CreateWithParents(name string, f *File) error {
+	if err := w.finishInode(); err != nil {
+		return err
+	}
 	// go through the directories in the path one by one and create the
 	// parent directories if they don't exist.
 	cleanname := path.Clean("/" + name)[1:]
