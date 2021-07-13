@@ -99,8 +99,8 @@ version = 2
 		}
 		time.Sleep(epsilon)
 	}
-	t.Fatalf("the task was not restarted in %s + %s",
-		interval.String(), epsilon.String())
+	t.Fatalf("%v: the task was not restarted in %s + %s",
+		time.Now(), interval.String(), epsilon.String())
 }
 
 // withRestartStatus is a copy of "github.com/containerd/containerd/runtime/restart".WithStatus.
