@@ -175,7 +175,7 @@ func (c *criService) localResolve(refOrID string) (imagestore.Image, error) {
 			if err != nil {
 				return ""
 			}
-			id, err := c.imageStore.Resolve(normalized.String())
+			id, err := c.ImageStore.Resolve(normalized.String())
 			if err != nil {
 				return ""
 			}
@@ -188,7 +188,7 @@ func (c *criService) localResolve(refOrID string) (imagestore.Image, error) {
 		// Try to treat ref as imageID
 		imageID = refOrID
 	}
-	return c.imageStore.Get(imageID)
+	return c.ImageStore.Get(imageID)
 }
 
 // toContainerdImage converts an image object in image store to containerd image handler.
@@ -235,7 +235,7 @@ func (c *criService) ensureImageExists(ctx context.Context, ref string, config *
 		return nil, fmt.Errorf("failed to pull image %q: %w", ref, err)
 	}
 	imageID := resp.GetImageRef()
-	newImage, err := c.imageStore.Get(imageID)
+	newImage, err := c.ImageStore.Get(imageID)
 	if err != nil {
 		// It's still possible that someone removed the image right after it is pulled.
 		return nil, fmt.Errorf("failed to get image %q after pulling: %w", imageID, err)
@@ -248,7 +248,7 @@ func (c *criService) ensureImageExists(ctx context.Context, ref string, config *
 // The target container must be in the same sandbox and must be running.
 // Returns the target container for convenience.
 func (c *criService) validateTargetContainer(sandboxID, targetContainerID string) (containerstore.Container, error) {
-	targetContainer, err := c.containerStore.Get(targetContainerID)
+	targetContainer, err := c.ContainerStore.Get(targetContainerID)
 	if err != nil {
 		return containerstore.Container{}, fmt.Errorf("container %q does not exist: %w", targetContainerID, err)
 	}

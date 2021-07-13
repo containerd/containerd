@@ -52,7 +52,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	config := r.GetConfig()
 	log.G(ctx).Debugf("Container config %+v", config)
 	sandboxConfig := r.GetSandboxConfig()
-	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
+	sandbox, err := c.SandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandbox id %q: %w", r.GetPodSandboxId(), err)
 	}
@@ -74,13 +74,13 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	containerName := metadata.Name
 	name := makeContainerName(metadata, sandboxConfig.GetMetadata())
 	log.G(ctx).Debugf("Generated id %q for container %q", id, name)
-	if err = c.containerNameIndex.Reserve(name, id); err != nil {
+	if err = c.ContainerNameIndex.Reserve(name, id); err != nil {
 		return nil, fmt.Errorf("failed to reserve container name %q: %w", name, err)
 	}
 	defer func() {
 		// Release the name if the function returns with an error.
 		if retErr != nil {
-			c.containerNameIndex.ReleaseByName(name)
+			c.ContainerNameIndex.ReleaseByName(name)
 		}
 	}()
 
@@ -276,7 +276,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}()
 
 	// Add container into container store.
-	if err := c.containerStore.Add(container); err != nil {
+	if err := c.ContainerStore.Add(container); err != nil {
 		return nil, fmt.Errorf("failed to add container %q into store: %w", id, err)
 	}
 

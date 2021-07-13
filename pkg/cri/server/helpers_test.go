@@ -169,7 +169,7 @@ func TestLocalResolve(t *testing.T) {
 	}
 	c := newTestCRIService()
 	var err error
-	c.imageStore, err = imagestore.NewFakeStore([]imagestore.Image{image})
+	c.ImageStore, err = imagestore.NewFakeStore([]imagestore.Image{image})
 	assert.NoError(t, err)
 
 	for _, ref := range []string{
@@ -530,7 +530,7 @@ func addContainer(c *criService, containerID, sandboxID string, PID uint32, crea
 	if err != nil {
 		return err
 	}
-	return c.containerStore.Add(container)
+	return c.ContainerStore.Add(container)
 }
 
 func TestValidateTargetContainer(t *testing.T) {

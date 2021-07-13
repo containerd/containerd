@@ -30,7 +30,7 @@ import (
 func (c *criService) ListContainers(ctx context.Context, r *runtime.ListContainersRequest) (*runtime.ListContainersResponse, error) {
 	start := time.Now()
 	// List all containers from store.
-	containersInStore := c.containerStore.List()
+	containersInStore := c.ContainerStore.List()
 
 	var containers []*runtime.Container
 	for _, container := range containersInStore {
@@ -60,10 +60,10 @@ func toCRIContainer(container containerstore.Container) *runtime.Container {
 }
 
 func (c *criService) normalizeContainerFilter(filter *runtime.ContainerFilter) {
-	if cntr, err := c.containerStore.Get(filter.GetId()); err == nil {
+	if cntr, err := c.ContainerStore.Get(filter.GetId()); err == nil {
 		filter.Id = cntr.ID
 	}
-	if sb, err := c.sandboxStore.Get(filter.GetPodSandboxId()); err == nil {
+	if sb, err := c.SandboxStore.Get(filter.GetPodSandboxId()); err == nil {
 		filter.PodSandboxId = sb.ID
 	}
 }
@@ -79,7 +79,7 @@ func (c *criService) filterCRIContainers(containers []*runtime.Container, filter
 	// included in the filter.
 	sb := filter.GetPodSandboxId()
 	if sb != "" {
-		sandbox, err := c.sandboxStore.Get(sb)
+		sandbox, err := c.SandboxStore.Get(sb)
 		if err == nil {
 			sb = sandbox.ID
 		}

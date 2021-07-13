@@ -50,7 +50,7 @@ func (c *criService) ListPodSandboxStats(
 }
 
 func (c *criService) sandboxesForListPodSandboxStatsRequest(r *runtime.ListPodSandboxStatsRequest) []sandboxstore.Sandbox {
-	sandboxesInStore := c.sandboxStore.List()
+	sandboxesInStore := c.SandboxStore.List()
 
 	if r.GetFilter() == nil {
 		return sandboxesInStore

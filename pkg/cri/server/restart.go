@@ -63,10 +63,10 @@ func (c *criService) recover(ctx context.Context) error {
 			continue
 		}
 		log.G(ctx).Debugf("Loaded sandbox %+v", sb)
-		if err := c.sandboxStore.Add(sb); err != nil {
+		if err := c.SandboxStore.Add(sb); err != nil {
 			return fmt.Errorf("failed to add sandbox %q to store: %w", sandbox.ID(), err)
 		}
-		if err := c.sandboxNameIndex.Reserve(sb.Name, sb.ID); err != nil {
+		if err := c.SandboxNameIndex.Reserve(sb.Name, sb.ID); err != nil {
 			return fmt.Errorf("failed to reserve sandbox name %q: %w", sb.Name, err)
 		}
 	}
@@ -83,10 +83,10 @@ func (c *criService) recover(ctx context.Context) error {
 			continue
 		}
 		log.G(ctx).Debugf("Loaded container %+v", cntr)
-		if err := c.containerStore.Add(cntr); err != nil {
+		if err := c.ContainerStore.Add(cntr); err != nil {
 			return fmt.Errorf("failed to add container %q to store: %w", container.ID(), err)
 		}
-		if err := c.containerNameIndex.Reserve(cntr.Name, cntr.ID); err != nil {
+		if err := c.ContainerNameIndex.Reserve(cntr.Name, cntr.ID); err != nil {
 			return fmt.Errorf("failed to reserve container name %q: %w", cntr.Name, err)
 		}
 	}

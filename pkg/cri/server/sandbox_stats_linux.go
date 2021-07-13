@@ -83,7 +83,7 @@ func (c *criService) podSandboxStats(
 		}
 
 		var pidCount uint64
-		for _, cntr := range c.containerStore.List() {
+		for _, cntr := range c.ContainerStore.List() {
 			if cntr.SandboxID != sandbox.ID {
 				continue
 			}

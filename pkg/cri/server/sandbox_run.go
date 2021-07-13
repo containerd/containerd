@@ -72,13 +72,13 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	log.G(ctx).WithField("podsandboxid", id).Debugf("generated id for sandbox name %q", name)
 	// Reserve the sandbox name to avoid concurrent `RunPodSandbox` request starting the
 	// same sandbox.
-	if err := c.sandboxNameIndex.Reserve(name, id); err != nil {
+	if err := c.SandboxNameIndex.Reserve(name, id); err != nil {
 		return nil, fmt.Errorf("failed to reserve sandbox name %q: %w", name, err)
 	}
 	defer func() {
 		// Release the name if the function returns with an error.
 		if retErr != nil {
-			c.sandboxNameIndex.ReleaseByName(name)
+			c.SandboxNameIndex.ReleaseByName(name)
 		}
 	}()
 
@@ -342,7 +342,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// Add sandbox into sandbox store in INIT state.
 	sandbox.Container = container
 
-	if err := c.sandboxStore.Add(sandbox); err != nil {
+	if err := c.SandboxStore.Add(sandbox); err != nil {
 		return nil, fmt.Errorf("failed to add sandbox %+v into store: %w", sandbox, err)
 	}
 

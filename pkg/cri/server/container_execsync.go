@@ -195,7 +195,7 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 // to exit and log the exit code, but dockershim won't.
 func (c *criService) execInContainer(ctx context.Context, id string, opts execOptions) (*uint32, error) {
 	// Get container from our container store.
-	cntr, err := c.containerStore.Get(id)
+	cntr, err := c.ContainerStore.Get(id)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to find container %q in store: %w", id, err)
