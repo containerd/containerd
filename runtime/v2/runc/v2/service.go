@@ -257,9 +257,6 @@ func (s *service) StartShim(ctx context.Context, opts shim.StartOpts) (_ string,
 			if opts, ok := v.(*options.Options); ok {
 				if opts.ShimCgroup != "" {
 					if cgroups.Mode() == cgroups.Unified {
-						if err := cgroupsv2.VerifyGroupPath(opts.ShimCgroup); err != nil {
-							return "", errors.Wrapf(err, "failed to verify cgroup path %q", opts.ShimCgroup)
-						}
 						cg, err := cgroupsv2.LoadManager("/sys/fs/cgroup", opts.ShimCgroup)
 						if err != nil {
 							return "", errors.Wrapf(err, "failed to load cgroup %s", opts.ShimCgroup)
