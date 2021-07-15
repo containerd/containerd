@@ -28,6 +28,8 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
+const sharedNamespaceLabel = "containerd.io/namespace/sharable"
+
 type namespaceStore struct {
 	tx *bolt.Tx
 }

@@ -77,6 +77,10 @@ func (cs *contentStore) Info(ctx context.Context, dgst digest.Digest) (content.I
 	if err := view(ctx, cs.db, func(tx *bolt.Tx) error {
 		bkt := getBlobBucket(tx, ns, dgst)
 		if bkt == nil {
+			// try to find sharable bkt before erroring
+			bkt = getSharableBucket(tx, dgst)
+		}
+		if bkt == nil {
 			return errors.Wrapf(errdefs.ErrNotFound, "content digest %v", dgst)
 		}
 
@@ -106,7 +110,6 @@ func (cs *contentStore) Update(ctx context.Context, info content.Info, fieldpath
 		if bkt == nil {
 			return errors.Wrapf(errdefs.ErrNotFound, "content digest %v", info.Digest)
 		}
-
 		if err := readInfo(&updated, bkt); err != nil {
 			return errors.Wrapf(err, "info %q", info.Digest)
 		}
@@ -699,6 +702,10 @@ func (cs *contentStore) checkAccess(ctx context.Context, dgst digest.Digest) err
 
 	return view(ctx, cs.db, func(tx *bolt.Tx) error {
 		bkt := getBlobBucket(tx, ns, dgst)
+		if bkt == nil {
+			// try to find sharable bkt before erroring
+			bkt = getSharableBucket(tx, dgst)
+		}
 		if bkt == nil {
 			return errors.Wrapf(errdefs.ErrNotFound, "content digest %v", dgst)
 		}

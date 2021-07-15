@@ -15,7 +15,7 @@
 */
 
 // Package metadata stores all labels and object specific metadata by namespace.
-// This package also contains the main garbage collection logic  for cleaning up
+// This package also contains the main garbage collection logic for cleaning up
 // resources consistently and atomically. Resources used by backends will be
 // tracked in the metadata store to be exposed to consumers of this package.
 //
@@ -116,6 +116,7 @@ package metadata
 
 import (
 	digest "github.com/opencontainers/go-digest"
+	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -151,6 +152,8 @@ var (
 	bucketKeyExpireAt    = []byte("expireat")
 
 	deprecatedBucketKeyObjectIngest = []byte("ingest") // stores ingest links, deprecated in v1.2
+
+	errFoundSharedLabel = errors.New("found shared label")
 )
 
 func getBucket(tx *bolt.Tx, keys ...[]byte) *bolt.Bucket {
@@ -180,6 +183,39 @@ func createBucketIfNotExists(tx *bolt.Tx, keys ...[]byte) (*bolt.Bucket, error) 
 	}
 
 	return bkt, nil
+}
+
+func namespacesBucketPath() []byte {
+	return bucketKeyVersion
+}
+
+func getNamespacesBucket(tx *bolt.Tx) *bolt.Bucket {
+	return getBucket(tx, namespacesBucketPath())
+}
+
+func getSharableBucket(tx *bolt.Tx, dgst digest.Digest) *bolt.Bucket {
+	var bkt *bolt.Bucket
+	nsbkt := getNamespacesBucket(tx)
+	cur := nsbkt.Cursor()
+	for k, _ := cur.First(); k != nil; k, _ = cur.Next() {
+		// Check if v has shared values
+		labelsBkt := getNamespaceLabelsBucket(tx, string(k))
+		if labelsBkt == nil {
+			continue
+		}
+		err := labelsBkt.ForEach(func(k, v []byte) error {
+			if string(k) == sharedNamespaceLabel {
+				return errFoundSharedLabel
+			}
+			return nil
+		})
+		// if it is, check if K has image.
+		if err == errFoundSharedLabel {
+			bkt = getBlobBucket(tx, string(k), dgst)
+			break
+		}
+	}
+	return bkt
 }
 
 func namespaceLabelsBucketPath(namespace string) [][]byte {

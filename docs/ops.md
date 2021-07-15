@@ -232,3 +232,6 @@ The default is "shared". While this is largely the most desired policy, one can 
 [plugins.bolt]
 	content_sharing_policy = "isolated"
 ```
+
+It is possible to share only the contents of a specific namespace by adding the label `containerd.io/namespace/sharable` to that namespace.
+This will share the contents of the namespace even if the content_sharing_policy is set to isolated and make it's images usable by all other namespaces.
