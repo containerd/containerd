@@ -69,6 +69,8 @@ type Config struct {
 	Imports []string `toml:"imports"`
 
 	StreamProcessors map[string]StreamProcessor `toml:"stream_processors"`
+
+	OS OSConfig `toml:"os"`
 }
 
 // StreamProcessor provides configuration for diff content processors
@@ -83,6 +85,18 @@ type StreamProcessor struct {
 	Args []string `toml:"args"`
 	// Environment variables for the binary
 	Env []string `toml:"env"`
+}
+
+// OSConfig provides OS specific configuration options
+type OSConfig struct {
+	Windows WindowsConfig `toml:"windows"`
+}
+
+// WindowsConfig provides Windows specific OS configuration options
+type WindowsConfig struct {
+	// PriorityClass is the priority class used to run containerd and child processes at on Windows machines
+	// Valid values and more information can be found at https://docs.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities
+	PriorityClass string `toml:"priority_class"`
 }
 
 // GetVersion returns the config file's version
