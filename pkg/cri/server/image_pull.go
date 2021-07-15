@@ -27,6 +27,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -89,7 +90,7 @@ import (
 // contents are missing but snapshots are ready, is the image still "READY"?
 
 // PullImage pulls an image with authentication config.
-func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (*runtime.PullImageResponse, error) {
+func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (_ *runtime.PullImageResponse, err error) {
 	imageRef := r.GetImage().GetImage()
 	namedRef, err := distribution.ParseDockerRef(imageRef)
 	if err != nil {
@@ -136,7 +137,47 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 			containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
 	}
 
-	image, err := c.client.Pull(ctx, ref, pullOpts...)
+	// Check if there's currently an ongoing pull of the same image, and if so just wait on the result.
+	var (
+		bc     *imageBroadcaster
+		loaded bool
+		name   string
+		desc   imagespec.Descriptor
+		// ref + manifest digest/index
+		resolvedName string
+	)
+	if c.config.DisableSameImageParallelPull {
+		name, desc, err = resolver.Resolve(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		resolvedName = fmt.Sprintf("%s@%s", name, desc.Digest.String())
+		bc, loaded = c.imagesInProgress.loadOrStore(resolvedName)
+		if loaded {
+			for !bc.done {
+				bc.wait()
+			}
+			// Other pull of the same image succeeded. Return the same as we would normally
+			if bc.err == nil {
+				configDesc, err := bc.image.Config(ctx)
+				if err != nil {
+					return nil, errors.Wrap(err, "get image config descriptor")
+				}
+				return &runtime.PullImageResponse{ImageRef: configDesc.Digest.String()}, nil
+			}
+			// The pull failed in some way, return the error.
+			return nil, err
+		}
+	}
+
+	var image containerd.Image
+	defer func() {
+		if c.config.DisableSameImageParallelPull {
+			c.imagesInProgress.done(ctx, bc, resolvedName, err, image)
+		}
+	}()
+
+	image, err = c.client.Pull(ctx, ref, pullOpts...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to pull and unpack image %q", ref)
 	}
@@ -574,4 +615,56 @@ func getLayers(ctx context.Context, key string, descs []imagespec.Descriptor, va
 		}
 	}
 	return
+}
+
+type inProgress struct {
+	entries sync.Map
+}
+
+func newInProgress() *inProgress {
+	return &inProgress{}
+}
+
+func (inp *inProgress) loadOrStore(key string) (*imageBroadcaster, bool) {
+	bc := newimageBroadcaster()
+	val, loaded := inp.entries.LoadOrStore(key, bc)
+	return val.(*imageBroadcaster), loaded
+}
+
+func (inp *inProgress) delete(key string) {
+	inp.entries.Delete(key)
+}
+
+type imageBroadcaster struct {
+	c     *sync.Cond
+	image containerd.Image
+	done  bool
+	err   error
+}
+
+func newimageBroadcaster() *imageBroadcaster {
+	return &imageBroadcaster{
+		c: sync.NewCond(&sync.Mutex{}),
+	}
+}
+
+func (inp *inProgress) done(ctx context.Context, bc *imageBroadcaster, key string, err error, image containerd.Image) {
+	// broadcaster shouldn't be nil at this point
+	if bc == nil {
+		log.G(ctx).Error("imageBroadcaster is nil, aborting broadcast")
+		return
+	}
+	bc.c.L.Lock()
+	bc.done = true
+	bc.image = image
+	bc.err = err
+	bc.c.Broadcast()
+	inp.delete(key)
+	bc.c.L.Unlock()
+}
+
+func (br *imageBroadcaster) wait() {
+	br.c.L.Lock()
+	br.c.Wait()
+	br.c.L.Unlock()
 }
