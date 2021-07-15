@@ -29,6 +29,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/sys"
@@ -62,7 +63,7 @@ func AdjustOOMScore(pid int) error {
 	return nil
 }
 
-const socketRoot = "/run/containerd"
+const socketRoot = defaults.DefaultStateDir
 
 // SocketAddress returns a socket address
 func SocketAddress(ctx context.Context, socketPath, id string) (string, error) {

@@ -1,4 +1,4 @@
-// +build linux
+// +build linux darwin
 
 /*
    Copyright The containerd Authors.
@@ -26,8 +26,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/containerd/cgroups"
-	cgroupsv2 "github.com/containerd/cgroups/v2"
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
@@ -139,24 +137,7 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 	}
 	pid := p.Pid()
 	if pid > 0 {
-		var cg interface{}
-		if cgroups.Mode() == cgroups.Unified {
-			g, err := cgroupsv2.PidGroupPath(pid)
-			if err != nil {
-				logrus.WithError(err).Errorf("loading cgroup2 for %d", pid)
-				return container, nil
-			}
-			cg, err = cgroupsv2.LoadManager("/sys/fs/cgroup", g)
-			if err != nil {
-				logrus.WithError(err).Errorf("loading cgroup2 for %d", pid)
-			}
-		} else {
-			cg, err = cgroups.Load(cgroups.V1, cgroups.PidPath(pid))
-			if err != nil {
-				logrus.WithError(err).Errorf("loading cgroup for %d", pid)
-			}
-		}
-		container.cgroup = cg
+		newContainerCgroup(pid, container)
 	}
 	return container, nil
 }
@@ -359,25 +340,7 @@ func (c *Container) Start(ctx context.Context, r *task.StartRequest) (process.Pr
 	if err := p.Start(ctx); err != nil {
 		return nil, err
 	}
-	if c.Cgroup() == nil && p.Pid() > 0 {
-		var cg interface{}
-		if cgroups.Mode() == cgroups.Unified {
-			g, err := cgroupsv2.PidGroupPath(p.Pid())
-			if err != nil {
-				logrus.WithError(err).Errorf("loading cgroup2 for %d", p.Pid())
-			}
-			cg, err = cgroupsv2.LoadManager("/sys/fs/cgroup", g)
-			if err != nil {
-				logrus.WithError(err).Errorf("loading cgroup2 for %d", p.Pid())
-			}
-		} else {
-			cg, err = cgroups.Load(cgroups.V1, cgroups.PidPath(p.Pid()))
-			if err != nil {
-				logrus.WithError(err).Errorf("loading cgroup for %d", p.Pid())
-			}
-		}
-		c.cgroup = cg
-	}
+	c.startCgroup(p)
 	return p, nil
 }
 
