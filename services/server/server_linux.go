@@ -41,12 +41,7 @@ func apply(ctx context.Context, config *srvconfig.Config) error {
 		if cgroups.Mode() == cgroups.Unified {
 			cg, err := cgroupsv2.LoadManager("/sys/fs/cgroup", config.Cgroup.Path)
 			if err != nil {
-				if err != cgroupsv2.ErrCgroupDeleted {
-					return err
-				}
-				if cg, err = cgroupsv2.NewManager("/sys/fs/cgroup", config.Cgroup.Path, nil); err != nil {
-					return err
-				}
+				return err
 			}
 			if err := cg.AddProc(uint64(os.Getpid())); err != nil {
 				return err
