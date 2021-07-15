@@ -22,6 +22,9 @@ require (
 )
 
 replace (
+	// TODO wip: https://github.com/containerd/cgroups/pull/202
+	github.com/containerd/cgroups => github.com/thaJeztah/cgroups v0.0.0-20210715163241-4fe70f3edc25
+
 	// use the containerd module from this repository instead of downloading
 	//
 	// IMPORTANT: this replace rule ONLY replaces containerd itself; dependencies
