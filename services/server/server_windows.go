@@ -1,3 +1,6 @@
+//go:build windows
+// +build windows
+
 /*
    Copyright The containerd Authors.
 
@@ -50,32 +53,37 @@ func getPriorityClass(priorityClassName string) uint32 {
 func addCurrentProcessToJobObjectAndSetPriorityClass(pc uint32) error {
 	job, err := windows.CreateJobObject(nil, nil)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "windows.CreateJobObject failed")
 	}
-	limitInfo := windows.JOBOBJECT_BASIC_LIMIT_INFORMATION{
-		LimitFlags:    windows.JOB_OBJECT_LIMIT_PRIORITY_CLASS,
-		PriorityClass: pc}
+	limitInfo := windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION{
+		BasicLimitInformation: windows.JOBOBJECT_BASIC_LIMIT_INFORMATION{
+			LimitFlags:    windows.JOB_OBJECT_LIMIT_BREAKAWAY_OK | windows.JOB_OBJECT_LIMIT_PRIORITY_CLASS,
+			PriorityClass: pc,
+		},
+	}
+
 	if _, err := windows.SetInformationJobObject(
 		job,
-		windows.JobObjectBasicLimitInformation,
+		windows.JobObjectExtendedLimitInformation,
 		uintptr(unsafe.Pointer(&limitInfo)),
 		uint32(unsafe.Sizeof(limitInfo))); err != nil {
-		return err
+		return errors.Wrap(err, "windows.SetInformationJobObject failed")
 	}
 	if err := windows.AssignProcessToJobObject(job, windows.CurrentProcess()); err != nil {
-		return err
+		return errors.Wrap(err, "windows.AssignProcessToJobObject failed")
 	}
 	return nil
 }
 
 func apply(ctx context.Context, config *srvconfig.Config) error {
-	if config.WindowsPriorityClass != "" {
-		log.G(ctx).Infof("Setting process priority class to %s", config.WindowsPriorityClass)
+	priorityClassName := config.OS.Windows.PriorityClass
+	if priorityClassName != "" {
+		log.G(ctx).Infof("Setting process priority class to %s", priorityClassName)
 
-		pc := getPriorityClass(config.WindowsPriorityClass)
+		pc := getPriorityClass(priorityClassName)
 		if pc == 0 {
 			return errors.Errorf("Invalid priority class %s, valid priority classes are defined at "+
-				"https://docs.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities", config.WindowsPriorityClass)
+				"https://docs.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities", priorityClassName)
 		}
 		if err := addCurrentProcessToJobObjectAndSetPriorityClass(pc); err != nil {
 			log.G(ctx).Error(err)
