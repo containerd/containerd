@@ -207,9 +207,7 @@ func (s *service) StartShim(ctx context.Context, opts shim.StartOpts) (_ string,
 					if err != nil {
 						return "", fmt.Errorf("failed to load cgroup %s: %w", opts.ShimCgroup, err)
 					}
-					if err := cg.Add(cgroups.Process{
-						Pid: cmd.Process.Pid,
-					}); err != nil {
+					if err := cg.AddProc(uint64(cmd.Process.Pid)); err != nil {
 						return "", fmt.Errorf("failed to join cgroup %s: %w", opts.ShimCgroup, err)
 					}
 				}

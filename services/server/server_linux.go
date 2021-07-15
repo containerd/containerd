@@ -56,9 +56,7 @@ func apply(ctx context.Context, config *srvconfig.Config) error {
 					return err
 				}
 			}
-			if err := cg.Add(cgroups.Process{
-				Pid: os.Getpid(),
-			}); err != nil {
+			if err := cg.AddProc(uint64(os.Getpid())); err != nil {
 				return err
 			}
 		}
