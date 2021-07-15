@@ -13,6 +13,13 @@
    limitations under the License.
 */
 
+/*
+   This fuzzer is run continuously by OSS-fuzz.
+   It is stored in contrib/fuzz for organization,
+   but in order to execute it, it must be moved to
+   remotes/docker first.
+*/
+
 package docker
 
 import (

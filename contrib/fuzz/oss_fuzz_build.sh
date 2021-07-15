@@ -14,9 +14,12 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+cd "$(dirname "${BASH_SOURCE[0]}")"
+cd ../../
+
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzFiltersParse fuzz_filters_parse
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzPlatformsParse fuzz_platforms_parse
 
-mv $SRC/containerd/contrib/fuzz/docker_fuzzer.go $SRC/containerd/remotes/docker/
+mv contrib/fuzz/docker_fuzzer.go remotes/docker/
 compile_go_fuzzer github.com/containerd/containerd/remotes/docker FuzzFetcher fuzz_fetcher
-mv $SRC/containerd/remotes/docker/docker_fuzzer.go $SRC/containerd/contrib/fuzz/
+mv remotes/docker/docker_fuzzer.go contrib/fuzz/
