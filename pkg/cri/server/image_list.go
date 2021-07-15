@@ -25,7 +25,7 @@ import (
 // TODO(random-liu): Add image list filters after CRI defines this more clear, and kubelet
 // actually needs it.
 func (c *criService) ListImages(ctx context.Context, r *runtime.ListImagesRequest) (*runtime.ListImagesResponse, error) {
-	imagesInStore := c.imageStore.List()
+	imagesInStore := c.ImageStore.List()
 
 	var images []*runtime.Image
 	for _, image := range imagesInStore {

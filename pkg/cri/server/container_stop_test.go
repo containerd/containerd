@@ -67,7 +67,7 @@ func TestWaitContainerStop(t *testing.T) {
 			containerstore.WithFakeStatus(*test.status),
 		)
 		assert.NoError(t, err)
-		assert.NoError(t, c.containerStore.Add(container))
+		assert.NoError(t, c.ContainerStore.Add(container))
 		ctx := context.Background()
 		if test.cancel {
 			cancelledCtx, cancel := context.WithCancel(ctx)

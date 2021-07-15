@@ -41,6 +41,7 @@ import (
 	"github.com/containerd/containerd/pkg/cap"
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	"github.com/containerd/containerd/pkg/cri/config"
+	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/opts"
 	"github.com/containerd/containerd/pkg/cri/util"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
@@ -907,7 +908,9 @@ func TestGenerateSeccompSecurityProfileSpecOpts(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("TestCase %q", desc), func(t *testing.T) {
-			cri := &criService{}
+			cri := &criService{
+				config: &criconfig.Config{},
+			}
 			cri.config.UnsetSeccompProfile = test.defaultProfile
 			ssp := test.sp
 			csp, err := generateSeccompSecurityProfile(

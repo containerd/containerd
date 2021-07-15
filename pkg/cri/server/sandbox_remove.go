@@ -32,7 +32,7 @@ import (
 // RemovePodSandbox removes the sandbox. If there are running containers in the
 // sandbox, they should be forcibly removed.
 func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodSandboxRequest) (*runtime.RemovePodSandboxResponse, error) {
-	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
+	i, err := c.SandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		if err != store.ErrNotExist {
 			return nil, errors.Wrapf(err, "an error occurred when try to find sandbox %q",
@@ -43,6 +43,7 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 			r.GetPodSandboxId())
 		return &runtime.RemovePodSandboxResponse{}, nil
 	}
+	sandbox := i.(*Sandbox)
 	// Use the full sandbox id.
 	id := sandbox.ID
 
@@ -70,7 +71,7 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	// not rely on this behavior.
 	// TODO(random-liu): Introduce an intermediate state to avoid container creation after
 	// this point.
-	cntrs := c.containerStore.List()
+	cntrs := c.ContainerStore.List()
 	for _, cntr := range cntrs {
 		if cntr.SandboxID != id {
 			continue
@@ -106,7 +107,7 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	// 1) ListPodSandbox will not include this sandbox.
 	// 2) PodSandboxStatus and StopPodSandbox will return error.
 	// 3) On-going operations which have held the reference will not be affected.
-	c.sandboxStore.Delete(id)
+	c.SandboxStore.Delete(id)
 
 	// Release the sandbox name reserved for the sandbox.
 	c.sandboxNameIndex.ReleaseByKey(id)

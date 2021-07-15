@@ -492,7 +492,7 @@ func TestGetSandboxRuntime(t *testing.T) {
 	} {
 		t.Run(desc, func(t *testing.T) {
 			cri := newTestCRIService()
-			cri.config = criconfig.Config{
+			cri.config = &criconfig.Config{
 				PluginConfig: criconfig.DefaultConfig(),
 			}
 			cri.config.ContainerdConfig.DefaultRuntimeName = criconfig.RuntimeDefault

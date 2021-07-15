@@ -52,7 +52,7 @@ func TestWaitSandboxStop(t *testing.T) {
 		},
 	} {
 		c := newTestCRIService()
-		sandbox := sandboxstore.NewSandbox(
+		sandbox := NewSandbox(
 			sandboxstore.Metadata{ID: id},
 			sandboxstore.Status{State: test.state},
 		)

@@ -14,12 +14,13 @@
    limitations under the License.
 */
 
-package sandbox
+package server
 
 import (
 	"testing"
 
 	"github.com/containerd/containerd/pkg/cri/store/label"
+	"github.com/containerd/containerd/pkg/cri/store/sandbox"
 	assertlib "github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -27,9 +28,9 @@ import (
 )
 
 func TestSandboxStore(t *testing.T) {
-	sandboxes := map[string]Sandbox{
+	sandboxes := map[string]*Sandbox{
 		"1": NewSandbox(
-			Metadata{
+			sandbox.Metadata{
 				ID:   "1",
 				Name: "Sandbox-1",
 				Config: &runtime.PodSandboxConfig{
@@ -42,10 +43,10 @@ func TestSandboxStore(t *testing.T) {
 				},
 				NetNSPath: "TestNetNS-1",
 			},
-			Status{State: StateReady},
+			sandbox.Status{State: sandbox.StateReady},
 		),
 		"2abcd": NewSandbox(
-			Metadata{
+			sandbox.Metadata{
 				ID:   "2abcd",
 				Name: "Sandbox-2abcd",
 				Config: &runtime.PodSandboxConfig{
@@ -58,10 +59,10 @@ func TestSandboxStore(t *testing.T) {
 				},
 				NetNSPath: "TestNetNS-2",
 			},
-			Status{State: StateNotReady},
+			sandbox.Status{State: sandbox.StateNotReady},
 		),
 		"4a333": NewSandbox(
-			Metadata{
+			sandbox.Metadata{
 				ID:   "4a333",
 				Name: "Sandbox-4a333",
 				Config: &runtime.PodSandboxConfig{
@@ -74,10 +75,10 @@ func TestSandboxStore(t *testing.T) {
 				},
 				NetNSPath: "TestNetNS-3",
 			},
-			Status{State: StateNotReady},
+			sandbox.Status{State: sandbox.StateNotReady},
 		),
 		"4abcd": NewSandbox(
-			Metadata{
+			sandbox.Metadata{
 				ID:   "4abcd",
 				Name: "Sandbox-4abcd",
 				Config: &runtime.PodSandboxConfig{
@@ -90,11 +91,11 @@ func TestSandboxStore(t *testing.T) {
 				},
 				NetNSPath: "TestNetNS-4abcd",
 			},
-			Status{State: StateReady},
+			sandbox.Status{State: sandbox.StateReady},
 		),
 	}
 	unknown := NewSandbox(
-		Metadata{
+		sandbox.Metadata{
 			ID:   "3defg",
 			Name: "Sandbox-3defg",
 			Config: &runtime.PodSandboxConfig{
@@ -107,10 +108,10 @@ func TestSandboxStore(t *testing.T) {
 			},
 			NetNSPath: "TestNetNS-3defg",
 		},
-		Status{State: StateUnknown},
+		sandbox.Status{State: sandbox.StateUnknown},
 	)
 	assert := assertlib.New(t)
-	s := NewStore(label.NewStore())
+	s := sandbox.NewStore(label.NewStore())
 
 	t.Logf("should be able to add sandbox")
 	for _, sb := range sandboxes {
@@ -150,7 +151,7 @@ func TestSandboxStore(t *testing.T) {
 
 		t.Logf("get should return not exist error after deletion")
 		sb, err := s.Get(truncID)
-		assert.Equal(Sandbox{}, sb)
+		assert.Equal(nil, sb)
 		assert.Equal(store.ErrNotExist, err)
 	}
 }

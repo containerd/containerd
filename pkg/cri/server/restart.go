@@ -41,6 +41,9 @@ import (
 	"github.com/containerd/containerd/pkg/netns"
 )
 
+// ErrSkip is a error, used to skip recover
+var ErrSkip = errors.New("skip sandbox recover")
+
 // NOTE: The recovery logic has following assumption: when the cri plugin is down:
 // 1) Files (e.g. root directory, netns) and checkpoint maintained by the plugin MUST NOT be
 // touched. Or else, recovery logic for those containers/sandboxes may return error.
@@ -60,11 +63,13 @@ func (c *criService) recover(ctx context.Context) error {
 	for _, sandbox := range sandboxes {
 		sb, err := c.loadSandbox(ctx, sandbox)
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("Failed to load sandbox %q", sandbox.ID())
+			if !errors.Is(err, ErrSkip) {
+				log.G(ctx).WithError(err).Errorf("Failed to load sandbox %q", sandbox.ID())
+			}
 			continue
 		}
 		log.G(ctx).Debugf("Loaded sandbox %+v", sb)
-		if err := c.sandboxStore.Add(sb); err != nil {
+		if err := c.SandboxStore.Add(sb); err != nil {
 			return errors.Wrapf(err, "failed to add sandbox %q to store", sandbox.ID())
 		}
 		if err := c.sandboxNameIndex.Reserve(sb.Name, sb.ID); err != nil {
@@ -84,7 +89,7 @@ func (c *criService) recover(ctx context.Context) error {
 			continue
 		}
 		log.G(ctx).Debugf("Loaded container %+v", cntr)
-		if err := c.containerStore.Add(cntr); err != nil {
+		if err := c.ContainerStore.Add(cntr); err != nil {
 			return errors.Wrapf(err, "failed to add container %q to store", container.ID())
 		}
 		if err := c.containerNameIndex.Reserve(cntr.Name, cntr.ID); err != nil {
@@ -323,10 +328,10 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 }
 
 // loadSandbox loads sandbox from containerd.
-func (c *criService) loadSandbox(ctx context.Context, cntr containerd.Container) (sandboxstore.Sandbox, error) {
+func (c *criService) loadSandbox(ctx context.Context, cntr containerd.Container) (*Sandbox, error) {
 	ctx, cancel := context.WithTimeout(ctx, loadContainerTimeout)
 	defer cancel()
-	var sandbox sandboxstore.Sandbox
+	var sandbox *Sandbox
 	// Load sandbox metadata.
 	exts, err := cntr.Extensions(ctx)
 	if err != nil {
@@ -341,6 +346,10 @@ func (c *criService) loadSandbox(ctx context.Context, cntr containerd.Container)
 		return sandbox, errors.Wrapf(err, "failed to unmarshal metadata extension %q", ext)
 	}
 	meta := data.(*sandboxstore.Metadata)
+	// TODO(wllenyj): runc is default implementation
+	if meta.Mode != "" && meta.Mode != DefaultCRIMode {
+		return sandbox, ErrSkip
+	}
 
 	s, err := func() (sandboxstore.Status, error) {
 		status := unknownSandboxStatus()
@@ -405,7 +414,7 @@ func (c *criService) loadSandbox(ctx context.Context, cntr containerd.Container)
 		log.G(ctx).WithError(err).Errorf("Failed to load sandbox status for %q", cntr.ID())
 	}
 
-	sandbox = sandboxstore.NewSandbox(*meta, s)
+	sandbox = NewSandbox(*meta, s)
 	sandbox.Container = cntr
 
 	// Load network namespace.

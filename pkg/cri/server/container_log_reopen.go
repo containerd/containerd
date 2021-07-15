@@ -26,7 +26,7 @@ import (
 // ReopenContainerLog asks the cri plugin to reopen the stdout/stderr log file for the container.
 // This is often called after the log file has been rotated.
 func (c *criService) ReopenContainerLog(ctx context.Context, r *runtime.ReopenContainerLogRequest) (*runtime.ReopenContainerLogResponse, error) {
-	container, err := c.containerStore.Get(r.GetContainerId())
+	container, err := c.ContainerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, errors.Wrapf(err, "an error occurred when try to find container %q", r.GetContainerId())
 	}
