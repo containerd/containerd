@@ -151,36 +151,20 @@ func (c *cgroup) Subsystems() []Subsystem {
 
 // Add moves the provided process into the new cgroup
 func (c *cgroup) Add(process Process) error {
-	if process.Pid <= 0 {
-		return ErrInvalidPid
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.err != nil {
-		return c.err
-	}
-	return c.add(process)
+	return c.add(process, cgroupProcs)
 }
 
-func (c *cgroup) add(process Process) error {
-	for _, s := range pathers(c.subsystems) {
-		p, err := c.path(s.Name())
-		if err != nil {
-			return err
-		}
-		if err := retryingWriteFile(
-			filepath.Join(s.Path(p), cgroupProcs),
-			[]byte(strconv.Itoa(process.Pid)),
-			defaultFilePerm,
-		); err != nil {
-			return err
-		}
-	}
-	return nil
+// AddProc moves the provided process id into the new cgroup
+func (c *cgroup) AddProc(pid uint64) error {
+	return c.add(Process{Pid: int(pid)}, cgroupProcs)
 }
 
 // AddTask moves the provided tasks (threads) into the new cgroup
 func (c *cgroup) AddTask(process Process) error {
+	return c.add(process, cgroupTasks)
+}
+
+func (c *cgroup) add(process Process, pType procType) error {
 	if process.Pid <= 0 {
 		return ErrInvalidPid
 	}
@@ -189,20 +173,17 @@ func (c *cgroup) AddTask(process Process) error {
 	if c.err != nil {
 		return c.err
 	}
-	return c.addTask(process)
-}
-
-func (c *cgroup) addTask(process Process) error {
 	for _, s := range pathers(c.subsystems) {
 		p, err := c.path(s.Name())
 		if err != nil {
 			return err
 		}
-		if err := retryingWriteFile(
-			filepath.Join(s.Path(p), cgroupTasks),
+		err = retryingWriteFile(
+			filepath.Join(s.Path(p), pType),
 			[]byte(strconv.Itoa(process.Pid)),
 			defaultFilePerm,
-		); err != nil {
+		)
+		if err != nil {
 			return err
 		}
 	}
@@ -326,10 +307,21 @@ func (c *cgroup) Processes(subsystem Name, recursive bool) ([]Process, error) {
 	if c.err != nil {
 		return nil, c.err
 	}
-	return c.processes(subsystem, recursive)
+	return c.processes(subsystem, recursive, cgroupProcs)
 }
 
-func (c *cgroup) processes(subsystem Name, recursive bool) ([]Process, error) {
+// Tasks returns the tasks running inside the cgroup along
+// with the subsystem used, pid, and path
+func (c *cgroup) Tasks(subsystem Name, recursive bool) ([]Task, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.err != nil {
+		return nil, c.err
+	}
+	return c.processes(subsystem, recursive, cgroupTasks)
+}
+
+func (c *cgroup) processes(subsystem Name, recursive bool, pType procType) ([]Process, error) {
 	s := c.getSubsystem(subsystem)
 	sp, err := c.path(subsystem)
 	if err != nil {
@@ -348,10 +340,10 @@ func (c *cgroup) processes(subsystem Name, recursive bool) ([]Process, error) {
 			return filepath.SkipDir
 		}
 		dir, name := filepath.Split(p)
-		if name != cgroupProcs {
+		if name != pType {
 			return nil
 		}
-		procs, err := readPids(dir, subsystem)
+		procs, err := readPids(dir, subsystem, pType)
 		if err != nil {
 			return err
 		}
@@ -359,49 +351,6 @@ func (c *cgroup) processes(subsystem Name, recursive bool) ([]Process, error) {
 		return nil
 	})
 	return processes, err
-}
-
-// Tasks returns the tasks running inside the cgroup along
-// with the subsystem used, pid, and path
-func (c *cgroup) Tasks(subsystem Name, recursive bool) ([]Task, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.err != nil {
-		return nil, c.err
-	}
-	return c.tasks(subsystem, recursive)
-}
-
-func (c *cgroup) tasks(subsystem Name, recursive bool) ([]Task, error) {
-	s := c.getSubsystem(subsystem)
-	sp, err := c.path(subsystem)
-	if err != nil {
-		return nil, err
-	}
-	path := s.(pather).Path(sp)
-	var tasks []Task
-	err = filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !recursive && info.IsDir() {
-			if p == path {
-				return nil
-			}
-			return filepath.SkipDir
-		}
-		dir, name := filepath.Split(p)
-		if name != cgroupTasks {
-			return nil
-		}
-		procs, err := readTasksPids(dir, subsystem)
-		if err != nil {
-			return err
-		}
-		tasks = append(tasks, procs...)
-		return nil
-	})
-	return tasks, err
 }
 
 // Freeze freezes the entire cgroup and all the processes inside it
@@ -511,7 +460,7 @@ func (c *cgroup) MoveTo(destination Cgroup) error {
 		return c.err
 	}
 	for _, s := range c.subsystems {
-		processes, err := c.processes(s.Name(), true)
+		processes, err := c.processes(s.Name(), true, cgroupProcs)
 		if err != nil {
 			return err
 		}

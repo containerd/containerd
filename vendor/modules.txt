@@ -61,7 +61,7 @@ github.com/containerd/aufs/plugin
 # github.com/containerd/btrfs v1.0.0
 ## explicit
 github.com/containerd/btrfs
-# github.com/containerd/cgroups v1.0.1
+# github.com/containerd/cgroups v1.0.1 => github.com/thaJeztah/cgroups v0.0.0-20210715163241-4fe70f3edc25
 ## explicit
 github.com/containerd/cgroups
 github.com/containerd/cgroups/stats/v1
@@ -581,6 +581,7 @@ k8s.io/utils/integer
 sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.2.0
 sigs.k8s.io/yaml
+# github.com/containerd/cgroups => github.com/thaJeztah/cgroups v0.0.0-20210715163241-4fe70f3edc25
 # github.com/containerd/containerd => ./.empty-mod/
 # github.com/gogo/googleapis => github.com/gogo/googleapis v1.3.2
 # github.com/urfave/cli => github.com/urfave/cli v1.22.1

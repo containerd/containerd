@@ -37,9 +37,7 @@ func setCgroup(cgroupPath string, cmd *exec.Cmd) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to load cgroup %s", cgroupPath)
 	}
-	if err := cg.Add(cgroups.Process{
-		Pid: cmd.Process.Pid,
-	}); err != nil {
+	if err := cg.AddProc(uint64(cmd.Process.Pid)); err != nil {
 		return errors.Wrapf(err, "failed to join cgroup %s", cgroupPath)
 	}
 	return nil

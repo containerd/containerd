@@ -18,6 +18,7 @@ package v2
 
 import (
 	"bufio"
+	"context"
 	"io/ioutil"
 	"math"
 	"os"
@@ -662,8 +663,9 @@ func NewSystemd(slice, group string, pid int, resources *Resources) (*Manager, e
 	if slice == "" {
 		slice = defaultSlice
 	}
+	ctx := context.TODO()
 	path := filepath.Join(defaultCgroup2Path, slice, group)
-	conn, err := systemdDbus.New()
+	conn, err := systemdDbus.NewWithContext(ctx)
 	if err != nil {
 		return &Manager{}, err
 	}
@@ -733,7 +735,7 @@ func NewSystemd(slice, group string, pid int, resources *Resources) (*Manager, e
 	}
 
 	statusChan := make(chan string, 1)
-	if _, err := conn.StartTransientUnit(group, "replace", properties, statusChan); err == nil {
+	if _, err := conn.StartTransientUnitContext(ctx, group, "replace", properties, statusChan); err == nil {
 		select {
 		case <-statusChan:
 		case <-time.After(time.Second):
@@ -759,14 +761,15 @@ func LoadSystemd(slice, group string) (*Manager, error) {
 }
 
 func (c *Manager) DeleteSystemd() error {
-	conn, err := systemdDbus.New()
+	ctx := context.TODO()
+	conn, err := systemdDbus.NewWithContext(ctx)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 	group := systemdUnitFromPath(c.path)
 	ch := make(chan string)
-	_, err = conn.StopUnit(group, "replace", ch)
+	_, err = conn.StopUnitContext(ctx, group, "replace", ch)
 	if err != nil {
 		return err
 	}

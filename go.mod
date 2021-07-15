@@ -70,6 +70,8 @@ require (
 
 // When updating replace rules, make sure to also update the rules in integration/client/go.mod
 replace (
+	// TODO wip: https://github.com/containerd/cgroups/pull/202
+	github.com/containerd/cgroups => github.com/thaJeztah/cgroups v0.0.0-20210715163241-4fe70f3edc25
 	// prevent transitional dependencies due to containerd having a circular
 	// dependency on itself through plugins. see .empty-mod/go.mod for details
 	github.com/containerd/containerd => ./.empty-mod/
