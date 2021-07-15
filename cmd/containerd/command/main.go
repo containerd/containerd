@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/metrics"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/services/server"
 	srvconfig "github.com/containerd/containerd/services/server/config"
@@ -202,6 +203,7 @@ can be used and modified as necessary as a custom configuration.`
 			serve(ctx, l, server.ServeDebug)
 		}
 		if config.Metrics.Address != "" {
+			metrics.Register()
 			l, err := net.Listen("tcp", config.Metrics.Address)
 			if err != nil {
 				return errors.Wrapf(err, "failed to get listener for metrics endpoint")
