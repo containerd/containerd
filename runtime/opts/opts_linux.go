@@ -29,9 +29,6 @@ func WithNamespaceCgroupDeletion(ctx context.Context, i *namespaces.DeleteInfo) 
 	if cgroups.Mode() == cgroups.Unified {
 		cg, err := cgroupsv2.LoadManager("/sys/fs/cgroup", i.Name)
 		if err != nil {
-			if err == cgroupsv2.ErrCgroupDeleted {
-				return nil
-			}
 			return err
 		}
 		return cg.Delete()
