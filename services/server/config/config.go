@@ -41,6 +41,8 @@ type Config struct {
 	State string `toml:"state"`
 	// PluginDir is the directory for dynamic plugins to be stored
 	PluginDir string `toml:"plugin_dir"`
+	// WindowsPriorityClass is the priority class used to run containerd and child processes at on Windows machines
+	WindowsPriorityClass string `toml:"windows_priority_class"`
 	// GRPC configuration settings
 	GRPC GRPCConfig `toml:"grpc"`
 	// TTRPC configuration settings
