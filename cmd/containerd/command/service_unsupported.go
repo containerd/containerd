@@ -30,7 +30,7 @@ func serviceFlags() []cli.Flag {
 }
 
 // applyPlatformFlags applies platform-specific flags.
-func applyPlatformFlags(context *cli.Context) {
+func applyPlatformFlags(context *cli.Context) error {
 }
 
 // registerUnregisterService is only relevant on Windows.
