@@ -37,9 +37,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// upperdirKey is a key of an optional lablel to each snapshot.
+// This optional label of a snapshot contains the location of "upperdir" where
+// the change set between this snapshot and its parent is stored.
+const upperdirKey = "containerd.io/snapshot/overlay.upperdir"
+
 // SnapshotterConfig is used to configure the overlay snapshotter instance
 type SnapshotterConfig struct {
-	asyncRemove bool
+	asyncRemove   bool
+	upperdirLabel bool
 }
 
 // Opt is an option to configure the overlay snapshotter
@@ -54,12 +60,22 @@ func AsynchronousRemove(config *SnapshotterConfig) error {
 	return nil
 }
 
+// WithUpperdirLabel adds as an optional label
+// "containerd.io/snapshot/overlay.upperdir". This stores the location
+// of the upperdir that contains the changeset between the labelled
+// snapshot and its parent.
+func WithUpperdirLabel(config *SnapshotterConfig) error {
+	config.upperdirLabel = true
+	return nil
+}
+
 type snapshotter struct {
-	root        string
-	ms          *storage.MetaStore
-	asyncRemove bool
-	indexOff    bool
-	userxattr   bool // whether to enable "userxattr" mount option
+	root          string
+	ms            *storage.MetaStore
+	asyncRemove   bool
+	upperdirLabel bool
+	indexOff      bool
+	userxattr     bool // whether to enable "userxattr" mount option
 }
 
 // NewSnapshotter returns a Snapshotter which uses overlayfs. The overlayfs
@@ -105,11 +121,12 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 	}
 
 	return &snapshotter{
-		root:        root,
-		ms:          ms,
-		asyncRemove: config.asyncRemove,
-		indexOff:    indexOff,
-		userxattr:   userxattr,
+		root:          root,
+		ms:            ms,
+		asyncRemove:   config.asyncRemove,
+		upperdirLabel: config.upperdirLabel,
+		indexOff:      indexOff,
+		userxattr:     userxattr,
 	}, nil
 }
 
@@ -235,6 +252,11 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 
 	if _, err = storage.CommitActive(ctx, key, name, snapshots.Usage(usage), opts...); err != nil {
 		return errors.Wrap(err, "failed to commit snapshot")
+	}
+	if o.upperdirLabel {
+		if err := o.addUpperdirLabel(ctx, name); err != nil {
+			return err
+		}
 	}
 	return t.Commit()
 }
@@ -397,6 +419,11 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create snapshot")
 	}
+	if o.upperdirLabel {
+		if err := o.addUpperdirLabel(ctx, key); err != nil {
+			return nil, err
+		}
+	}
 
 	if len(s.ParentIDs) > 0 {
 		st, err := os.Stat(o.upperPath(s.ParentIDs[0]))
@@ -510,6 +537,21 @@ func (o *snapshotter) mounts(s storage.Snapshot) []mount.Mount {
 		},
 	}
 
+}
+
+func (o *snapshotter) addUpperdirLabel(ctx context.Context, key string) error {
+	id, info, _, err := storage.GetInfo(ctx, key)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get info of created snapshot %s", key)
+	}
+	if info.Labels == nil {
+		info.Labels = make(map[string]string)
+	}
+	info.Labels[upperdirKey] = o.upperPath(id)
+	if _, err = storage.UpdateInfo(ctx, info, "labels."+upperdirKey); err != nil {
+		return errors.Wrapf(err, "failed to add upper dir label to snapshot")
+	}
+	return nil
 }
 
 func (o *snapshotter) upperPath(id string) string {
