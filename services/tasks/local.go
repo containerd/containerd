@@ -115,7 +115,7 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 			return nil, err
 		}
 		for _, t := range tasks {
-			l.monitor.Monitor(t)
+			l.monitor.Monitor(t, nil)
 		}
 	}
 	v2Tasks, err := l.v2Runtime.Tasks(ic.Context, true)
@@ -123,7 +123,7 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 		return nil, err
 	}
 	for _, t := range v2Tasks {
-		l.monitor.Monitor(t)
+		l.monitor.Monitor(t, nil)
 	}
 	return l, nil
 }
@@ -211,7 +211,8 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-	if err := l.monitor.Monitor(c); err != nil {
+	labels := map[string]string{"runtime": container.Runtime.Name}
+	if err := l.monitor.Monitor(c, labels); err != nil {
 		return nil, errors.Wrap(err, "monitor task")
 	}
 	return &api.CreateTaskResponse{
