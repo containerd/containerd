@@ -139,14 +139,14 @@ jobs:
             sudo apt-get install -y gperf
             sudo -E PATH=$PATH script/setup/install-seccomp
           fi
-          make cri-cni-release
+          make cri-release cri-cni-release
         working-directory: src/github.com/containerd/containerd
 
       - name: Save cri-containerd binaries
         uses: actions/upload-artifact@v2
         with:
           name: cri-containerd-binaries-${{ matrix.os }}
-          path: src/github.com/containerd/containerd/releases/cri-containerd-cni-*.tar.gz*
+          path: src/github.com/containerd/containerd/releases/cri-containerd-*.tar.gz*
 
   release:
     name: Create containerd Release
