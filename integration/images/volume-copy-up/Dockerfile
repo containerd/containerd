@@ -12,6 +12,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-FROM busybox
+FROM ghcr.io/containerd/busybox:1.32
 RUN sh -c "mkdir /test_dir; echo test_content > /test_dir/test_file"
 VOLUME "/test_dir"

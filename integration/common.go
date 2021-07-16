@@ -47,8 +47,8 @@ var (
 
 func initImages(imageListFile string) {
 	imageList = ImageList{
-		Alpine:           "docker.io/library/alpine:latest",
-		BusyBox:          "docker.io/library/busybox:latest",
+		Alpine:           "ghcr.io/containerd/alpine:3.14.0",
+		BusyBox:          "ghcr.io/containerd/busybox:1.32",
 		Pause:            "k8s.gcr.io/pause:3.5",
 		ResourceConsumer: "k8s.gcr.io/e2e-test-images/resource-consumer:1.9",
 		VolumeCopyUp:     "gcr.io/k8s-cri-containerd/volume-copy-up:2.0",
