@@ -168,6 +168,12 @@ version = 2
       # i.e pass host devices through to privileged containers.
       privileged_without_host_devices = false
 
+      # privileged_without_host_devices_all_devices_allowed allows the whitelisting of all devices
+      # when privileged_without_host_devices is enabled. This is useful for when the behaviour on
+      # non-implicit mounting of host devices node is needed but all devices whitelisting behaviour of plain
+      # privilege is needed. Requires privileged_without_host_devices to be enabled. Defaults to false.
+      privileged_without_host_devices_all_devices_allowed = false
+
       # base_runtime_spec is a file path to a JSON file with the OCI spec that will be used as the base spec that all
       # container's are created from.
       # Use containerd's `ctr oci spec > /etc/containerd/cri-base.json` to output initial spec file.
