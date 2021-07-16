@@ -8,6 +8,7 @@ require (
 	github.com/containerd/cgroups v1.0.1
 	// the actual version of containerd is replaced with the code at the root of this repository
 	github.com/containerd/containerd v1.5.1
+	github.com/containerd/containerd/api v0.0.0
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/ttrpc v1.0.2
 	github.com/containerd/typeurl v1.0.2
@@ -28,6 +29,7 @@ replace (
 	// in the "require" section above are still taken into account for version
 	// resolution if newer.
 	github.com/containerd/containerd => ../../
+	github.com/containerd/containerd/api => ../../api
 
 	// Replace rules below must be kept in sync with the main go.mod file at the
 	// root, because that's the actual version expected by the "containerd/containerd"

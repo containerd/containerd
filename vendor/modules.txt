@@ -70,6 +70,23 @@ github.com/containerd/cgroups/v2/stats
 # github.com/containerd/console v1.0.2
 ## explicit
 github.com/containerd/console
+# github.com/containerd/containerd/api v0.0.0 => ./api
+## explicit
+github.com/containerd/containerd/api/events
+github.com/containerd/containerd/api/services/containers/v1
+github.com/containerd/containerd/api/services/content/v1
+github.com/containerd/containerd/api/services/diff/v1
+github.com/containerd/containerd/api/services/events/v1
+github.com/containerd/containerd/api/services/images/v1
+github.com/containerd/containerd/api/services/introspection/v1
+github.com/containerd/containerd/api/services/leases/v1
+github.com/containerd/containerd/api/services/namespaces/v1
+github.com/containerd/containerd/api/services/snapshots/v1
+github.com/containerd/containerd/api/services/tasks/v1
+github.com/containerd/containerd/api/services/ttrpc/events/v1
+github.com/containerd/containerd/api/services/version/v1
+github.com/containerd/containerd/api/types
+github.com/containerd/containerd/api/types/task
 # github.com/containerd/continuity v0.1.0
 ## explicit
 github.com/containerd/continuity
@@ -168,7 +185,7 @@ github.com/fsnotify/fsnotify
 github.com/go-logr/logr
 # github.com/godbus/dbus/v5 v5.0.4
 github.com/godbus/dbus/v5
-# github.com/gogo/googleapis v1.4.0 => github.com/gogo/googleapis v1.3.2
+# github.com/gogo/googleapis v1.4.1 => github.com/gogo/googleapis v1.3.2
 ## explicit
 github.com/gogo/googleapis/google/rpc
 # github.com/gogo/protobuf v1.3.2
@@ -582,6 +599,7 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.2.0
 sigs.k8s.io/yaml
 # github.com/containerd/containerd => ./.empty-mod/
+# github.com/containerd/containerd/api => ./api
 # github.com/gogo/googleapis => github.com/gogo/googleapis v1.3.2
 # github.com/urfave/cli => github.com/urfave/cli v1.22.1
 # google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200224152610-e50cd9704f63
