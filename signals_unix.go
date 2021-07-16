@@ -24,8 +24,15 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
+
+// SIGRTMIN is defined by libc and different libc implementations have different values.
+// But containerd only uses 34, the value used by GNU libc + NPTL's SIGRTMIN,
+// to be compatible with Docker Engine.
+const SIGRTMIN = 34
+const rtPrefix = "SIGRTMIN+"
 
 // ParseSignal parses a given string into a syscall.Signal
 // the rawSignal can be a string with "SIG" prefix,
@@ -35,9 +42,25 @@ func ParseSignal(rawSignal string) (syscall.Signal, error) {
 	if err == nil {
 		return syscall.Signal(s), nil
 	}
-	signal := unix.SignalNum(strings.ToUpper(rawSignal))
-	if signal == 0 {
-		return -1, fmt.Errorf("unknown signal %q", rawSignal)
+
+	return signalNum(rawSignal)
+}
+
+func signalNum(rawSignal string) (syscall.Signal, error) {
+	name := strings.ToUpper(rawSignal)
+	signal := unix.SignalNum(name)
+	if signal != 0 {
+		return signal, nil
 	}
-	return signal, nil
+
+	if strings.HasPrefix(name, rtPrefix) {
+		i, err := strconv.Atoi(name[len(rtPrefix):])
+		if err != nil {
+			return -1, errors.Wrapf(err, "unknown signal %q", rawSignal)
+		}
+
+		return syscall.Signal(SIGRTMIN + i), nil
+	}
+
+	return -1, fmt.Errorf("unknown signal %q", rawSignal)
 }
