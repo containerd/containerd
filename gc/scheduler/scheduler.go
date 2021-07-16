@@ -330,6 +330,7 @@ func (s *gcScheduler) run(ctx context.Context) {
 
 		gcTime += stats.Elapsed()
 		collections++
+		collectionsCount.Inc()
 		triggered = false
 		deletions = 0
 		mutations = 0
