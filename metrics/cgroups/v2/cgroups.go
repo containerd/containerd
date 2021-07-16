@@ -23,7 +23,7 @@ import (
 
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/runtime"
-	metrics "github.com/docker/go-metrics"
+	"github.com/docker/go-metrics"
 )
 
 // NewTaskMonitor returns a new cgroups monitor
@@ -42,8 +42,8 @@ type cgroupsMonitor struct {
 	publisher events.Publisher
 }
 
-func (m *cgroupsMonitor) Monitor(c runtime.Task) error {
-	if err := m.collector.Add(c); err != nil {
+func (m *cgroupsMonitor) Monitor(c runtime.Task, labels map[string]string) error {
+	if err := m.collector.Add(c, labels); err != nil {
 		return err
 	}
 	return nil
