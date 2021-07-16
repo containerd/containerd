@@ -90,7 +90,10 @@ func NewSocket(address string) (*net.UnixListener, error) {
 		sock = socket(address)
 		path = sock.path()
 	)
-	if !sock.isAbstract() {
+
+	isAbstract := sock.isAbstract()
+
+	if !isAbstract {
 		if err := os.MkdirAll(filepath.Dir(path), 0600); err != nil {
 			return nil, errors.Wrapf(err, "%s", path)
 		}
@@ -99,10 +102,13 @@ func NewSocket(address string) (*net.UnixListener, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := os.Chmod(path, 0600); err != nil {
-		os.Remove(sock.path())
-		l.Close()
-		return nil, err
+
+	if !isAbstract {
+		if err := os.Chmod(path, 0600); err != nil {
+			os.Remove(sock.path())
+			l.Close()
+			return nil, err
+		}
 	}
 	return l.(*net.UnixListener), nil
 }
