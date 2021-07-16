@@ -48,6 +48,8 @@ const (
 	shutdownTimeout = "io.containerd.timeout.shim.shutdown"
 )
 
+var _ runtime.Task = &shim{}
+
 func init() {
 	timeout.Set(loadTimeout, 5*time.Second)
 	timeout.Set(cleanupTimeout, 5*time.Second)
