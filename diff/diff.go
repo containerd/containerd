@@ -18,6 +18,7 @@ package diff
 
 import (
 	"context"
+	"io"
 
 	"github.com/containerd/containerd/mount"
 	"github.com/gogo/protobuf/types"
@@ -37,6 +38,10 @@ type Config struct {
 
 	// Labels are the labels to apply to the generated content
 	Labels map[string]string
+
+	// Compressor is a function to compress the diff stream
+	// instead of the default gzip compressor.
+	Compressor func(dest io.Writer) (io.WriteCloser, error)
 }
 
 // Opt is used to configure a diff operation
@@ -69,6 +74,16 @@ type Applier interface {
 	// case the descriptor is a file system difference in tar format,
 	// that tar would be applied on top of the mounts.
 	Apply(ctx context.Context, desc ocispec.Descriptor, mount []mount.Mount, opts ...ApplyOpt) (ocispec.Descriptor, error)
+}
+
+// WithCompressor sets the function to be used to compress the diff
+// stream and the MediaType to be used for the compressed content.
+func WithCompressor(mediaType string, f func(dest io.Writer) (io.WriteCloser, error)) Opt {
+	return func(c *Config) error {
+		c.MediaType = mediaType
+		c.Compressor = f
+		return nil
+	}
 }
 
 // WithMediaType sets the media type to use for creating the diff, without
