@@ -12,7 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-FROM ubuntu
+# Use alpine since busybox doesn't have "nogroup" group.
+FROM ghcr.io/containerd/alpine:3.14.0
 RUN mkdir -p /test_dir && \
     chown -R nobody:nogroup /test_dir
 VOLUME /test_dir

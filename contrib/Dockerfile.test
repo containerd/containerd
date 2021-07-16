@@ -12,7 +12,7 @@
 
 ARG GOLANG_VERSION=1.16.6
 
-FROM golang:${GOLANG_VERSION} AS golang-base
+FROM ghcr.io/containerd/golang:${GOLANG_VERSION} AS golang-base
 RUN mkdir -p /go/src/github.com/containerd/containerd
 WORKDIR /go/src/github.com/containerd/containerd
 
