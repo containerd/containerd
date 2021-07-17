@@ -37,6 +37,12 @@ RUN apt-get update && apt-get install -y \
 RUN mkdir -p /go/src/github.com/containerd/containerd
 WORKDIR /go/src/github.com/containerd/containerd
 
+FROM golang AS cni
+ENV DESTDIR=/build
+COPY script/setup/install-cni ./
+COPY go.mod /go/src/github.com/containerd/containerd/go.mod
+RUN ./install-cni
+
 # cri-in-userns stage is for testing "CRI-in-UserNS", which should be used in conjunction with
 # "Kubelet-in-UserNS": https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2033-kubelet-in-userns-aka-rootless
 # This feature is mostly expected to be used for `kind` and `minikube`.
@@ -48,8 +54,8 @@ RUN apt-get update && apt-get install -y iptables
 COPY contrib/Dockerfile.test.d/cri-in-userns/etc_containerd_config.toml /etc/containerd/config.toml
 COPY contrib/Dockerfile.test.d/cri-in-userns/docker-entrypoint.sh       /docker-entrypoint.sh
 COPY --from=runc       /build/ /
+COPY --from=cni        /build/ /
 COPY . .
-RUN ./script/setup/install-cni
 RUN ./script/setup/install-critools
 RUN make BUILDTAGS="no_btrfs no_devmapper" binaries install
 VOLUME /var/lib/containerd
