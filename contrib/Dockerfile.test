@@ -16,9 +16,9 @@ FROM golang:${GOLANG_VERSION} AS golang
 
 # Install runc
 FROM golang AS runc
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libseccomp-dev \
-  --no-install-recommends
+ && rm -rf /var/lib/apt/lists/*
 
 COPY script/setup/runc-version script/setup/install-runc ./
 # Allow overriding the version of runc to install through build-args
@@ -28,12 +28,12 @@ ARG DESTDIR=/build
 RUN ./install-runc
 
 FROM golang AS build-env
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libbtrfs-dev \
     btrfs-progs \
     libseccomp-dev \
     xfsprogs \
-  --no-install-recommends
+ && rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /go/src/github.com/containerd/containerd
 WORKDIR /go/src/github.com/containerd/containerd
 
@@ -55,7 +55,9 @@ RUN GOBIN=$DESTDIR/usr/local/bin ./install-critools
 # Requires Rootless Docker/Podman/nerdctl with cgroup v2 delegation: https://rootlesscontaine.rs/getting-started/common/cgroup2/
 # (Rootless Docker/Podman/nerdctl prepares the UserNS, so we do not need to create UserNS by ourselves)
 FROM build-env AS cri-in-userns
-RUN apt-get update && apt-get install -y iptables
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    iptables \
+ && rm -rf /var/lib/apt/lists/*
 COPY contrib/Dockerfile.test.d/cri-in-userns/etc_containerd_config.toml /etc/containerd/config.toml
 COPY contrib/Dockerfile.test.d/cri-in-userns/docker-entrypoint.sh       /docker-entrypoint.sh
 COPY --from=runc       /build/ /
@@ -78,7 +80,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     automake \
     g++ \
     libtool \
-    unzip
+    unzip \
+ && rm -rf /var/lib/apt/lists/*
 
 COPY script/setup/install-protobuf install-protobuf
 RUN ./install-protobuf \
