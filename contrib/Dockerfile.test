@@ -49,6 +49,11 @@ ARG DESTDIR=/build
 COPY script/setup/install-critools script/setup/critools-version  ./
 RUN GOBIN=$DESTDIR/usr/local/bin ./install-critools
 
+FROM build-env AS containerd
+ARG DESTDIR=/build
+COPY . .
+RUN make BUILDTAGS="no_btrfs no_devmapper" binaries install
+
 # cri-in-userns stage is for testing "CRI-in-UserNS", which should be used in conjunction with
 # "Kubelet-in-UserNS": https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2033-kubelet-in-userns-aka-rootless
 # This feature is mostly expected to be used for `kind` and `minikube`.
@@ -64,8 +69,7 @@ COPY contrib/Dockerfile.test.d/cri-in-userns/docker-entrypoint.sh       /docker-
 COPY --from=runc       /build/ /
 COPY --from=cni        /build/ /
 COPY --from=critools   /build/ /
-COPY . .
-RUN make BUILDTAGS="no_btrfs no_devmapper" binaries install
+COPY --from=containerd /build/ /
 VOLUME /var/lib/containerd
 ENTRYPOINT ["/docker-entrypoint.sh"]
 # Skip "runtime should support unsafe sysctls": `container init caused:  write sysctl key fs.mqueue.msg_max: open /proc/sys/fs/mqueue/msg_max: permission denied`
