@@ -26,7 +26,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	csapi "github.com/containerd/containerd/api/services/content/v1"
@@ -34,12 +33,11 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/content/local"
 	csproxy "github.com/containerd/containerd/content/proxy"
-	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
-	"github.com/containerd/containerd/pkg/dialer"
+	"github.com/containerd/containerd/pkg/grpcutil"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin"
 	srvconfig "github.com/containerd/containerd/services/server/config"
@@ -52,7 +50,6 @@ import (
 	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/credentials"
 )
 
@@ -394,7 +391,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 		},
 	})
 
-	clients := &proxyClients{}
+	clients := new(grpcutil.ProxyClients)
 	for name, pp := range config.ProxyPlugins {
 		var (
 			t plugin.Type
@@ -425,7 +422,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 			ID:   name,
 			InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 				ic.Meta.Exports["address"] = address
-				conn, err := clients.getClient(address)
+				conn, err := clients.GetClient(address)
 				if err != nil {
 					return nil, err
 				}
@@ -441,45 +438,6 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 	}
 	// return the ordered graph for plugins
 	return plugin.Graph(filter(config.DisabledPlugins)), nil
-}
-
-type proxyClients struct {
-	m       sync.Mutex
-	clients map[string]*grpc.ClientConn
-}
-
-func (pc *proxyClients) getClient(address string) (*grpc.ClientConn, error) {
-	pc.m.Lock()
-	defer pc.m.Unlock()
-	if pc.clients == nil {
-		pc.clients = map[string]*grpc.ClientConn{}
-	} else if c, ok := pc.clients[address]; ok {
-		return c, nil
-	}
-
-	backoffConfig := backoff.DefaultConfig
-	backoffConfig.MaxDelay = 3 * time.Second
-	connParams := grpc.ConnectParams{
-		Backoff: backoffConfig,
-	}
-	gopts := []grpc.DialOption{
-		grpc.WithInsecure(),
-		grpc.WithConnectParams(connParams),
-		grpc.WithContextDialer(dialer.ContextDialer),
-
-		// TODO(stevvooe): We may need to allow configuration of this on the client.
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(defaults.DefaultMaxRecvMsgSize)),
-		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(defaults.DefaultMaxSendMsgSize)),
-	}
-
-	conn, err := grpc.Dial(dialer.DialAddress(address), gopts...)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to dial %q", address)
-	}
-
-	pc.clients[address] = conn
-
-	return conn, nil
 }
 
 func trapClosedConnErr(err error) error {

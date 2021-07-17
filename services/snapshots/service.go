@@ -22,11 +22,13 @@ import (
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/tasks"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -47,6 +49,11 @@ var empty = &ptypes.Empty{}
 
 type service struct {
 	ss map[string]snapshots.Snapshotter
+
+	publisher events.Publisher
+
+	// taskPluginSet is a set of plugins managed by task service
+	taskPluginSet tasks.TaskPluginSet
 }
 
 func newService(ic *plugin.InitContext) (interface{}, error) {
@@ -63,7 +70,22 @@ func newService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, err
 	}
 	ss := i.(map[string]snapshots.Snapshotter)
-	return &service{ss: ss}, nil
+
+	s := &service{ss: ss, publisher: ic.Events}
+
+	sPlugins, err := ic.GetByType(plugin.ServicePlugin)
+	if err != nil {
+		return nil, err
+	}
+	ts, ok := sPlugins[services.TasksService]
+	if ok {
+		ti, err := ts.Instance()
+		if err == nil {
+			// enables to make use of proxy snapshotters managed by task service
+			s.taskPluginSet = ti.(tasks.TaskPluginSet)
+		}
+	}
+	return s, nil
 }
 
 func (s *service) getSnapshotter(name string) (snapshots.Snapshotter, error) {
@@ -72,8 +94,21 @@ func (s *service) getSnapshotter(name string) (snapshots.Snapshotter, error) {
 	}
 
 	sn := s.ss[name]
-	if sn == nil {
-		return nil, errdefs.ToGRPCf(errdefs.ErrInvalidArgument, "snapshotter not loaded: %s", name)
+	if sn == nil && s.taskPluginSet != nil {
+		// search the snapshotter also in task service.
+		snSet, err := s.taskPluginSet.GetByType(plugin.SnapshotPlugin)
+		if err != nil {
+			return nil, errdefs.ToGRPCf(errdefs.ErrInvalidArgument, "snapshotter not loaded: %s: %v", name, err)
+		}
+		pg, ok := snSet[name]
+		if !ok {
+			return nil, errdefs.ToGRPCf(errdefs.ErrInvalidArgument, "snapshotter not loaded: %s", name)
+		}
+		i, err := pg.Instance()
+		if err != nil {
+			return nil, errdefs.ToGRPCf(errdefs.ErrInvalidArgument, "snapshotter not loaded: %s: %v", name, err)
+		}
+		sn = newSnapshotter(i.(snapshots.Snapshotter), s.publisher)
 	}
 	return sn, nil
 }
