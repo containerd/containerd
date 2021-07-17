@@ -19,6 +19,7 @@
 package devmapper
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -38,9 +39,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type fsType string
+
 const (
 	metadataFileName = "metadata.db"
 	fsTypeExt4       = "ext4"
+	fsTypeXfs        = "xfs"
 )
 
 type closeFunc func() error
@@ -53,6 +57,14 @@ type Snapshotter struct {
 	config    *Config
 	cleanupFn []closeFunc
 	closeOnce sync.Once
+}
+
+// FsSigData structure describes the signature for a fsType and the offset on
+// the partition where it is located
+type fsSigData struct {
+	fsType   string
+	magicStr string
+	offset   uint64
 }
 
 // NewSnapshotter creates new device mapper snapshotter.
@@ -365,7 +377,7 @@ func (s *Snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			return nil, err
 		}
 
-		if err := mkfs(ctx, dmsetup.GetFullDevicePath(deviceName)); err != nil {
+		if err := mkfs(ctx, fsType(s.config.FileSystemType), dmsetup.GetFullDevicePath(deviceName)); err != nil {
 			status, sErr := dmsetup.Status(s.pool.poolName)
 			if sErr != nil {
 				multierror.Append(err, sErr)
@@ -398,24 +410,84 @@ func (s *Snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	return mounts, nil
 }
 
-// mkfs creates ext4 filesystem on the given devmapper device
-func mkfs(ctx context.Context, path string) error {
-	args := []string{
-		"-E",
-		// We don't want any zeroing in advance when running mkfs on thin devices (see "man mkfs.ext4")
-		"nodiscard,lazy_itable_init=0,lazy_journal_init=0",
-		path,
+// mkfs creates filesystem on the given devmapper device based on type
+// specified in config.
+func mkfs(ctx context.Context, fs fsType, path string) error {
+	mkfsCommand := ""
+	var args []string
+
+	switch fs {
+	case fsTypeExt4:
+		mkfsCommand = "mkfs.ext4"
+		args = []string{
+			"-E",
+			// We don't want any zeroing in advance when running mkfs on thin devices (see "man mkfs.ext4")
+			"nodiscard,lazy_itable_init=0,lazy_journal_init=0",
+			path,
+		}
+	case fsTypeXfs:
+		mkfsCommand = "mkfs.xfs"
+		args = []string{
+			path,
+		}
+	default:
+		return errors.New("file system not supported")
 	}
 
-	log.G(ctx).Debugf("mkfs.ext4 %s", strings.Join(args, " "))
-	b, err := exec.Command("mkfs.ext4", args...).CombinedOutput()
+	log.G(ctx).Debugf("%s %s", mkfsCommand, strings.Join(args, " "))
+	b, err := exec.Command(mkfsCommand, args...).CombinedOutput()
 	out := string(b)
 	if err != nil {
-		return errors.Wrapf(err, "mkfs.ext4 couldn't initialize %q: %s", path, out)
+		return errors.Wrapf(err, "%s couldn't initialize %q: %s", mkfsCommand, path, out)
 	}
 
 	log.G(ctx).Debugf("mkfs:\n%s", out)
 	return nil
+}
+
+func (s *Snapshotter) getFsType(device string) string {
+	fsSigs := []fsSigData{
+		// ext4 filesystem always has the bytes 0x53 0xEF at positions 1080–1081 (0x438)
+		{"ext4", "\123\357", 0x438},
+		// XFS magic number is in bytes 0-3 and has the byte sequence "XFSB" at offset 0
+		{"xfs", "XFSB", 0},
+	}
+
+	maxReadLen := uint64(0)
+	for _, f := range fsSigs {
+		l := f.offset + uint64(len(f.magicStr))
+		if l > maxReadLen {
+			maxReadLen = l
+		}
+	}
+
+	file, err := os.Open(device)
+	if err != nil {
+		log.L.Debugf("error opening device %s", device)
+		return ""
+	}
+	defer file.Close()
+
+	buf := make([]byte, maxReadLen)
+	l, err := file.Read(buf)
+
+	if err != nil {
+		log.L.Debugf("error reading from device %d", l)
+		return ""
+	}
+
+	if uint64(l) != maxReadLen {
+		log.L.Debugf("could not read %d from device %d", maxReadLen, l)
+		return ""
+	}
+
+	for _, f := range fsSigs {
+		if bytes.Equal([]byte(f.magicStr), buf[f.offset:f.offset+uint64(len(f.magicStr))]) {
+			return f.fsType
+		}
+	}
+
+	return ""
 }
 
 func (s *Snapshotter) getDeviceName(snapID string) string {
@@ -438,9 +510,16 @@ func (s *Snapshotter) buildMounts(snap storage.Snapshot) []mount.Mount {
 	mounts := []mount.Mount{
 		{
 			Source:  s.getDevicePath(snap),
-			Type:    fsTypeExt4,
+			Type:    s.getFsType(s.getDevicePath(snap)),
 			Options: options,
 		},
+	}
+
+	// fsType for each of the mount is expected to be same as config file
+	for _, m := range mounts {
+		if m.Type != s.config.FileSystemType {
+			log.L.Debugf("Existing file system type for %s : %v does not match config %v", s.getDevicePath(snap), m.Type, s.config.FileSystemType)
+		}
 	}
 
 	return mounts

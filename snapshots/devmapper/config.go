@@ -43,6 +43,9 @@ type Config struct {
 
 	// Flag to async remove device using Cleanup() callback in snapshots GC
 	AsyncRemove bool `toml:"async_remove"`
+
+	// Defines file system to use for snapshout device mount. Defaults to "ext4"
+	FileSystemType string `toml:"fs_type"`
 }
 
 // LoadConfig reads devmapper configuration file from disk in TOML format
@@ -82,6 +85,10 @@ func (c *Config) parse() error {
 		return errors.Wrapf(err, "failed to parse base image size: '%s'", c.BaseImageSize)
 	}
 
+	if c.FileSystemType == "" {
+		c.FileSystemType = string(fsTypeExt4)
+	}
+
 	c.BaseImageSizeBytes = uint64(baseImageSize)
 	return nil
 }
@@ -100,6 +107,14 @@ func (c *Config) Validate() error {
 
 	if c.BaseImageSize == "" {
 		result = multierror.Append(result, fmt.Errorf("base_image_size is required"))
+	}
+
+	if c.FileSystemType != "" {
+		switch c.FileSystemType {
+		case string(fsTypeExt4), string(fsTypeXfs):
+		default:
+			return fmt.Errorf("unsupported Filesystem Type: %q", c.FileSystemType)
+		}
 	}
 
 	return result.ErrorOrNil()
