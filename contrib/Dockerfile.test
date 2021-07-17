@@ -43,6 +43,11 @@ COPY script/setup/install-cni ./
 COPY go.mod /go/src/github.com/containerd/containerd/go.mod
 RUN ./install-cni
 
+FROM golang AS critools
+ARG DESTDIR=/build
+COPY script/setup/install-critools script/setup/critools-version  ./
+RUN GOBIN=$DESTDIR/usr/local/bin ./install-critools
+
 # cri-in-userns stage is for testing "CRI-in-UserNS", which should be used in conjunction with
 # "Kubelet-in-UserNS": https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2033-kubelet-in-userns-aka-rootless
 # This feature is mostly expected to be used for `kind` and `minikube`.
@@ -55,8 +60,8 @@ COPY contrib/Dockerfile.test.d/cri-in-userns/etc_containerd_config.toml /etc/con
 COPY contrib/Dockerfile.test.d/cri-in-userns/docker-entrypoint.sh       /docker-entrypoint.sh
 COPY --from=runc       /build/ /
 COPY --from=cni        /build/ /
+COPY --from=critools   /build/ /
 COPY . .
-RUN ./script/setup/install-critools
 RUN make BUILDTAGS="no_btrfs no_devmapper" binaries install
 VOLUME /var/lib/containerd
 ENTRYPOINT ["/docker-entrypoint.sh"]
