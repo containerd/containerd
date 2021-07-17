@@ -12,12 +12,54 @@
 
 ARG GOLANG_VERSION=1.16.6
 
-FROM golang:${GOLANG_VERSION} AS golang-base
+FROM golang:${GOLANG_VERSION} AS golang
+
+# Install runc
+FROM golang AS runc
+RUN apt-get update && apt-get install -y \
+    libseccomp-dev \
+  --no-install-recommends
+
+COPY script/setup/runc-version script/setup/install-runc ./
+# Allow overriding the version of runc to install through build-args
+ARG RUNC_VERSION
+ARG GOPROXY=direct
+RUN ./install-runc
+
+FROM golang AS build-env
+RUN apt-get update && apt-get install -y \
+    libbtrfs-dev \
+    btrfs-progs \
+    libseccomp-dev \
+    xfsprogs \
+  --no-install-recommends
 RUN mkdir -p /go/src/github.com/containerd/containerd
 WORKDIR /go/src/github.com/containerd/containerd
 
+# cri-in-userns stage is for testing "CRI-in-UserNS", which should be used in conjunction with
+# "Kubelet-in-UserNS": https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2033-kubelet-in-userns-aka-rootless
+# This feature is mostly expected to be used for `kind` and `minikube`.
+#
+# Requires Rootless Docker/Podman/nerdctl with cgroup v2 delegation: https://rootlesscontaine.rs/getting-started/common/cgroup2/
+# (Rootless Docker/Podman/nerdctl prepares the UserNS, so we do not need to create UserNS by ourselves)
+FROM build-env AS cri-in-userns
+RUN apt-get update && apt-get install -y iptables
+COPY contrib/Dockerfile.test.d/cri-in-userns/etc_containerd_config.toml /etc/containerd/config.toml
+COPY contrib/Dockerfile.test.d/cri-in-userns/docker-entrypoint.sh       /docker-entrypoint.sh
+COPY --from=runc   /usr/local/sbin/runc      /usr/local/go/bin/runc
+COPY . .
+RUN ./script/setup/install-cni
+RUN ./script/setup/install-critools
+RUN make BUILDTAGS="no_btrfs no_devmapper" binaries install
+VOLUME /var/lib/containerd
+ENTRYPOINT ["/docker-entrypoint.sh"]
+# Skip "runtime should support unsafe sysctls": `container init caused:  write sysctl key fs.mqueue.msg_max: open /proc/sys/fs/mqueue/msg_max: permission denied`
+# Skip "runtime should support safe sysctls": `container init caused: write sysctl key kernel.shm_rmid_forced: open /proc/sys/kernel/shm_rmid_forced: permission denied`
+# Skip "should allow privilege escalation when (NoNewPrivis is) false": expected log "Effective uid: 0\n" (stream="stdout") not found in logs [{timestamp:{wall:974487519 ext:63761339984 loc:<nil>} stream:stdout log:Effective uid: 1000) }]
+CMD ["critest", "--ginkgo.skip=should support unsafe sysctls|should support safe sysctls|should allow privilege escalation when false"]
+
 # Install proto3
-FROM golang-base AS proto3
+FROM golang AS proto3
 RUN apt-get update && apt-get install -y \
    autoconf \
    automake \
@@ -29,50 +71,8 @@ RUN apt-get update && apt-get install -y \
 COPY script/setup/install-protobuf install-protobuf
 RUN ./install-protobuf
 
-# Install runc
-FROM golang-base AS runc
-RUN apt-get update && apt-get install -y \
-    libseccomp-dev \
-  --no-install-recommends
-
-COPY script/setup/runc-version script/setup/install-runc ./
-# Allow overriding the version of runc to install through build-args
-ARG RUNC_VERSION
-ARG GOPROXY=direct
-RUN ./install-runc
-
-FROM golang-base AS dev
-RUN apt-get update && apt-get install -y \
-    libbtrfs-dev \
-    btrfs-progs \
-    libseccomp-dev \
-    xfsprogs \
-  --no-install-recommends
-
+FROM build-env AS dev
 COPY --from=proto3 /usr/local/bin/protoc     /usr/local/bin/protoc
 COPY --from=proto3 /usr/local/include/google /usr/local/include/google
 COPY --from=runc   /usr/local/sbin/runc      /usr/local/go/bin/runc
-
 COPY . .
-
-# cri-in-userns stage is for testing "CRI-in-UserNS", which should be used in conjunction with
-# "Kubelet-in-UserNS": https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2033-kubelet-in-userns-aka-rootless
-# This feature is mostly expected to be used for `kind` and `minikube`.
-#
-# Requires Rootless Docker/Podman/nerdctl with cgroup v2 delegation: https://rootlesscontaine.rs/getting-started/common/cgroup2/
-# (Rootless Docker/Podman/nerdctl prepares the UserNS, so we do not need to create UserNS by ourselves)
-FROM dev AS cri-in-userns
-RUN make BUILDTAGS="no_btrfs no_devmapper" binaries install
-RUN apt-get update && apt-get install -y iptables
-RUN ./script/setup/install-cni
-RUN ./script/setup/install-critools
-COPY contrib/Dockerfile.test.d/cri-in-userns/etc_containerd_config.toml /etc/containerd/config.toml
-COPY contrib/Dockerfile.test.d/cri-in-userns/docker-entrypoint.sh /docker-entrypoint.sh
-VOLUME /var/lib/containerd
-ENTRYPOINT ["/docker-entrypoint.sh"]
-# Skip "runtime should support unsafe sysctls": `container init caused:  write sysctl key fs.mqueue.msg_max: open /proc/sys/fs/mqueue/msg_max: permission denied`
-# Skip "runtime should support safe sysctls": `container init caused: write sysctl key kernel.shm_rmid_forced: open /proc/sys/kernel/shm_rmid_forced: permission denied`
-# Skip "should allow privilege escalation when (NoNewPrivis is) false": expected log "Effective uid: 0\n" (stream="stdout") not found in logs [{timestamp:{wall:974487519 ext:63761339984 loc:<nil>} stream:stdout log:Effective uid: 1000) }]
-CMD ["critest", "--ginkgo.skip=should support unsafe sysctls|should support safe sysctls|should allow privilege escalation when false"]
-
-FROM dev AS default
