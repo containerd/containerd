@@ -27,6 +27,7 @@ const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 type SnapshotPrepare struct {
 	Key                  string   `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	Parent               string   `protobuf:"bytes,2,opt,name=parent,proto3" json:"parent,omitempty"`
+	Snapshotter          string   `protobuf:"bytes,5,opt,name=snapshotter,proto3" json:"snapshotter,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -67,6 +68,7 @@ var xxx_messageInfo_SnapshotPrepare proto.InternalMessageInfo
 type SnapshotCommit struct {
 	Key                  string   `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	Name                 string   `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Snapshotter          string   `protobuf:"bytes,5,opt,name=snapshotter,proto3" json:"snapshotter,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -106,6 +108,7 @@ var xxx_messageInfo_SnapshotCommit proto.InternalMessageInfo
 
 type SnapshotRemove struct {
 	Key                  string   `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Snapshotter          string   `protobuf:"bytes,5,opt,name=snapshotter,proto3" json:"snapshotter,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -154,22 +157,23 @@ func init() {
 }
 
 var fileDescriptor_bd6c184d3d9aa5f2 = []byte{
-	// 235 bytes of a gzipped FileDescriptorProto
+	// 255 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xb2, 0x4a, 0xcf, 0x2c, 0xc9,
 	0x28, 0x4d, 0xd2, 0x4b, 0xce, 0xcf, 0xd5, 0x4f, 0xce, 0xcf, 0x2b, 0x49, 0xcc, 0xcc, 0x4b, 0x2d,
 	0x4a, 0x41, 0x66, 0x26, 0x16, 0x64, 0xea, 0xa7, 0x96, 0xa5, 0xe6, 0x95, 0x14, 0xeb, 0x17, 0xe7,
 	0x25, 0x16, 0x14, 0x67, 0xe4, 0x97, 0xe8, 0x15, 0x14, 0xe5, 0x97, 0xe4, 0x0b, 0x09, 0x22, 0x54,
 	0xe9, 0x41, 0x54, 0x48, 0x39, 0x10, 0x34, 0x0e, 0xac, 0x35, 0xa9, 0x34, 0x4d, 0xbf, 0x20, 0xa7,
 	0x34, 0x3d, 0x33, 0x4f, 0x3f, 0x2d, 0x33, 0x35, 0x27, 0xa5, 0x20, 0xb1, 0x24, 0x03, 0x62, 0xa8,
-	0x92, 0x35, 0x17, 0x7f, 0x30, 0xd4, 0x9a, 0x80, 0xa2, 0xd4, 0x82, 0xc4, 0xa2, 0x54, 0x21, 0x01,
+	0x52, 0x2c, 0x17, 0x7f, 0x30, 0xd4, 0x9a, 0x80, 0xa2, 0xd4, 0x82, 0xc4, 0xa2, 0x54, 0x21, 0x01,
 	0x2e, 0xe6, 0xec, 0xd4, 0x4a, 0x09, 0x46, 0x05, 0x46, 0x0d, 0xce, 0x20, 0x10, 0x53, 0x48, 0x8c,
-	0x8b, 0x0d, 0x24, 0x93, 0x57, 0x22, 0xc1, 0x04, 0x16, 0x84, 0xf2, 0x94, 0xcc, 0xb8, 0xf8, 0x60,
-	0x9a, 0x9d, 0xf3, 0x73, 0x73, 0x33, 0x4b, 0xb0, 0xe8, 0x15, 0xe2, 0x62, 0xc9, 0x4b, 0xcc, 0x4d,
-	0x85, 0xea, 0x04, 0xb3, 0x95, 0x94, 0x10, 0xfa, 0x82, 0x52, 0x73, 0xf3, 0xcb, 0xb0, 0xd8, 0xe9,
-	0x14, 0x70, 0xe2, 0xa1, 0x1c, 0xc3, 0x8d, 0x87, 0x72, 0x0c, 0x0d, 0x8f, 0xe4, 0x18, 0x4f, 0x3c,
-	0x92, 0x63, 0xbc, 0xf0, 0x48, 0x8e, 0xf1, 0xc1, 0x23, 0x39, 0xc6, 0x05, 0x5f, 0xe4, 0x18, 0xa3,
-	0x8c, 0x48, 0x08, 0x47, 0x6b, 0x08, 0x15, 0xc1, 0x90, 0xc4, 0x06, 0xf6, 0xb3, 0x31, 0x20, 0x00,
-	0x00, 0xff, 0xff, 0x69, 0x66, 0xa9, 0x2a, 0x86, 0x01, 0x00, 0x00,
+	0x8b, 0x0d, 0x24, 0x93, 0x57, 0x22, 0xc1, 0x04, 0x16, 0x84, 0xf2, 0x84, 0x14, 0xb8, 0xb8, 0x61,
+	0x6e, 0x2c, 0x49, 0x2d, 0x92, 0x60, 0x05, 0x4b, 0x22, 0x0b, 0x29, 0x45, 0x70, 0xf1, 0xc1, 0x8c,
+	0x77, 0xce, 0xcf, 0xcd, 0xcd, 0x2c, 0xc1, 0x62, 0xba, 0x10, 0x17, 0x4b, 0x5e, 0x62, 0x6e, 0x2a,
+	0xd4, 0x6c, 0x30, 0x9b, 0x08, 0x93, 0x5d, 0x10, 0x26, 0x07, 0xa5, 0xe6, 0xe6, 0x97, 0x61, 0x73,
+	0x37, 0x41, 0x53, 0x9c, 0x02, 0x4e, 0x3c, 0x94, 0x63, 0xb8, 0xf1, 0x50, 0x8e, 0xa1, 0xe1, 0x91,
+	0x1c, 0xe3, 0x89, 0x47, 0x72, 0x8c, 0x17, 0x1e, 0xc9, 0x31, 0x3e, 0x78, 0x24, 0xc7, 0xb8, 0xe0,
+	0x8b, 0x1c, 0x63, 0x94, 0x11, 0x09, 0xb1, 0x65, 0x0d, 0xa1, 0x22, 0x18, 0x92, 0xd8, 0xc0, 0x21,
+	0x6b, 0x0c, 0x08, 0x00, 0x00, 0xff, 0xff, 0xd8, 0x66, 0xd9, 0xf5, 0xec, 0x01, 0x00, 0x00,
 }
 
 // Field returns the value for the given fieldpath as a string, if defined.
@@ -184,6 +188,8 @@ func (m *SnapshotPrepare) Field(fieldpath []string) (string, bool) {
 		return string(m.Key), len(m.Key) > 0
 	case "parent":
 		return string(m.Parent), len(m.Parent) > 0
+	case "snapshotter":
+		return string(m.Snapshotter), len(m.Snapshotter) > 0
 	}
 	return "", false
 }
@@ -200,6 +206,8 @@ func (m *SnapshotCommit) Field(fieldpath []string) (string, bool) {
 		return string(m.Key), len(m.Key) > 0
 	case "name":
 		return string(m.Name), len(m.Name) > 0
+	case "snapshotter":
+		return string(m.Snapshotter), len(m.Snapshotter) > 0
 	}
 	return "", false
 }
@@ -214,6 +222,8 @@ func (m *SnapshotRemove) Field(fieldpath []string) (string, bool) {
 	switch fieldpath[0] {
 	case "key":
 		return string(m.Key), len(m.Key) > 0
+	case "snapshotter":
+		return string(m.Snapshotter), len(m.Snapshotter) > 0
 	}
 	return "", false
 }
@@ -240,6 +250,13 @@ func (m *SnapshotPrepare) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	if m.XXX_unrecognized != nil {
 		i -= len(m.XXX_unrecognized)
 		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	if len(m.Snapshotter) > 0 {
+		i -= len(m.Snapshotter)
+		copy(dAtA[i:], m.Snapshotter)
+		i = encodeVarintSnapshot(dAtA, i, uint64(len(m.Snapshotter)))
+		i--
+		dAtA[i] = 0x2a
 	}
 	if len(m.Parent) > 0 {
 		i -= len(m.Parent)
@@ -282,6 +299,13 @@ func (m *SnapshotCommit) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i -= len(m.XXX_unrecognized)
 		copy(dAtA[i:], m.XXX_unrecognized)
 	}
+	if len(m.Snapshotter) > 0 {
+		i -= len(m.Snapshotter)
+		copy(dAtA[i:], m.Snapshotter)
+		i = encodeVarintSnapshot(dAtA, i, uint64(len(m.Snapshotter)))
+		i--
+		dAtA[i] = 0x2a
+	}
 	if len(m.Name) > 0 {
 		i -= len(m.Name)
 		copy(dAtA[i:], m.Name)
@@ -323,6 +347,13 @@ func (m *SnapshotRemove) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i -= len(m.XXX_unrecognized)
 		copy(dAtA[i:], m.XXX_unrecognized)
 	}
+	if len(m.Snapshotter) > 0 {
+		i -= len(m.Snapshotter)
+		copy(dAtA[i:], m.Snapshotter)
+		i = encodeVarintSnapshot(dAtA, i, uint64(len(m.Snapshotter)))
+		i--
+		dAtA[i] = 0x2a
+	}
 	if len(m.Key) > 0 {
 		i -= len(m.Key)
 		copy(dAtA[i:], m.Key)
@@ -358,6 +389,10 @@ func (m *SnapshotPrepare) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovSnapshot(uint64(l))
 	}
+	l = len(m.Snapshotter)
+	if l > 0 {
+		n += 1 + l + sovSnapshot(uint64(l))
+	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
 	}
@@ -378,6 +413,10 @@ func (m *SnapshotCommit) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovSnapshot(uint64(l))
 	}
+	l = len(m.Snapshotter)
+	if l > 0 {
+		n += 1 + l + sovSnapshot(uint64(l))
+	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
 	}
@@ -391,6 +430,10 @@ func (m *SnapshotRemove) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.Key)
+	if l > 0 {
+		n += 1 + l + sovSnapshot(uint64(l))
+	}
+	l = len(m.Snapshotter)
 	if l > 0 {
 		n += 1 + l + sovSnapshot(uint64(l))
 	}
@@ -413,6 +456,7 @@ func (this *SnapshotPrepare) String() string {
 	s := strings.Join([]string{`&SnapshotPrepare{`,
 		`Key:` + fmt.Sprintf("%v", this.Key) + `,`,
 		`Parent:` + fmt.Sprintf("%v", this.Parent) + `,`,
+		`Snapshotter:` + fmt.Sprintf("%v", this.Snapshotter) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -425,6 +469,7 @@ func (this *SnapshotCommit) String() string {
 	s := strings.Join([]string{`&SnapshotCommit{`,
 		`Key:` + fmt.Sprintf("%v", this.Key) + `,`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`Snapshotter:` + fmt.Sprintf("%v", this.Snapshotter) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -436,6 +481,7 @@ func (this *SnapshotRemove) String() string {
 	}
 	s := strings.Join([]string{`&SnapshotRemove{`,
 		`Key:` + fmt.Sprintf("%v", this.Key) + `,`,
+		`Snapshotter:` + fmt.Sprintf("%v", this.Snapshotter) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -541,6 +587,38 @@ func (m *SnapshotPrepare) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Parent = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Snapshotter", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSnapshot
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthSnapshot
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthSnapshot
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Snapshotter = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -657,6 +735,38 @@ func (m *SnapshotCommit) Unmarshal(dAtA []byte) error {
 			}
 			m.Name = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Snapshotter", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSnapshot
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthSnapshot
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthSnapshot
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Snapshotter = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipSnapshot(dAtA[iNdEx:])
@@ -739,6 +849,38 @@ func (m *SnapshotRemove) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Key = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Snapshotter", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSnapshot
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthSnapshot
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthSnapshot
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Snapshotter = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

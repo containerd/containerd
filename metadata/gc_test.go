@@ -242,7 +242,7 @@ func TestGCRemove(t *testing.T) {
 
 	if err := db.Update(func(tx *bolt.Tx) error {
 		for _, n := range deleted {
-			if err := remove(ctx, tx, n); err != nil {
+			if _, err := remove(ctx, tx, n); err != nil {
 				return err
 			}
 		}
