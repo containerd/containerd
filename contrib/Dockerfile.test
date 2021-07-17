@@ -24,6 +24,7 @@ COPY script/setup/runc-version script/setup/install-runc ./
 # Allow overriding the version of runc to install through build-args
 ARG RUNC_VERSION
 ARG GOPROXY=direct
+ARG DESTDIR=/build
 RUN ./install-runc
 
 FROM golang AS build-env
@@ -46,7 +47,7 @@ FROM build-env AS cri-in-userns
 RUN apt-get update && apt-get install -y iptables
 COPY contrib/Dockerfile.test.d/cri-in-userns/etc_containerd_config.toml /etc/containerd/config.toml
 COPY contrib/Dockerfile.test.d/cri-in-userns/docker-entrypoint.sh       /docker-entrypoint.sh
-COPY --from=runc   /usr/local/sbin/runc      /usr/local/go/bin/runc
+COPY --from=runc       /build/ /
 COPY . .
 RUN ./script/setup/install-cni
 RUN ./script/setup/install-critools
@@ -60,19 +61,20 @@ CMD ["critest", "--ginkgo.skip=should support unsafe sysctls|should support safe
 
 # Install proto3
 FROM golang AS proto3
-RUN apt-get update && apt-get install -y \
-   autoconf \
-   automake \
-   g++ \
-   libtool \
-   unzip \
- --no-install-recommends
+ARG DESTDIR=/build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    autoconf \
+    automake \
+    g++ \
+    libtool \
+    unzip
 
 COPY script/setup/install-protobuf install-protobuf
-RUN ./install-protobuf
+RUN ./install-protobuf \
+ && mv /usr/local/bin/protoc $DESTDIR/usr/local/bin/protoc \
+ && mv /usr/local/include/google $DESTDIR/usr/local/include/google
 
 FROM build-env AS dev
-COPY --from=proto3 /usr/local/bin/protoc     /usr/local/bin/protoc
-COPY --from=proto3 /usr/local/include/google /usr/local/include/google
-COPY --from=runc   /usr/local/sbin/runc      /usr/local/go/bin/runc
+COPY --from=proto3 /build/ /
+COPY --from=runc   /build/ /
 COPY . .
