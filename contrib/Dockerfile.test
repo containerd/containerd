@@ -32,7 +32,6 @@ RUN ./install-protobuf
 # Install runc
 FROM golang-base AS runc
 RUN apt-get update && apt-get install -y \
-    curl \
     libseccomp-dev \
   --no-install-recommends
 
@@ -46,10 +45,7 @@ FROM golang-base AS dev
 RUN apt-get update && apt-get install -y \
     libbtrfs-dev \
     btrfs-progs \
-    gcc \
-    git \
     libseccomp-dev \
-    make \
     xfsprogs \
   --no-install-recommends
 
