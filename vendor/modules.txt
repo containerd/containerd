@@ -58,9 +58,6 @@ github.com/cilium/ebpf/link
 ## explicit
 github.com/containerd/aufs
 github.com/containerd/aufs/plugin
-# github.com/containerd/btrfs v1.0.0
-## explicit
-github.com/containerd/btrfs
 # github.com/containerd/cgroups v1.0.1
 ## explicit
 github.com/containerd/cgroups
@@ -145,6 +142,12 @@ github.com/cpuguy83/go-md2man/v2/md2man
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
+# github.com/dennwc/btrfs v0.0.0-20210625083239-ee67271a4cb4
+## explicit
+github.com/dennwc/btrfs
+github.com/dennwc/btrfs/mtab
+# github.com/dennwc/ioctl v1.0.0
+github.com/dennwc/ioctl
 # github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c
 ## explicit
 github.com/docker/go-events

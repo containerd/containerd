@@ -1,4 +1,4 @@
-// +build linux,!no_btrfs,cgo
+// +build linux,!no_btrfs
 
 /*
    Copyright The containerd Authors.
@@ -25,8 +25,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/containerd/btrfs"
 	"github.com/containerd/continuity/fs"
+	"github.com/dennwc/btrfs"
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
@@ -213,7 +213,7 @@ func (b *snapshotter) makeSnapshot(ctx context.Context, kind snapshots.Kind, key
 	if len(s.ParentIDs) == 0 {
 		// create new subvolume
 		// btrfs subvolume create /dir
-		if err = btrfs.SubvolCreate(target); err != nil {
+		if err = btrfs.CreateSubVolume(target); err != nil {
 			return nil, err
 		}
 	} else {
@@ -225,14 +225,14 @@ func (b *snapshotter) makeSnapshot(ctx context.Context, kind snapshots.Kind, key
 		}
 
 		// btrfs subvolume snapshot /parent /subvol
-		if err = btrfs.SubvolSnapshot(target, parentp, readonly); err != nil {
+		if err = btrfs.SnapshotSubVolume(parentp, target, readonly); err != nil {
 			return nil, err
 		}
 	}
 	err = t.Commit()
 	t = nil
 	if err != nil {
-		if derr := btrfs.SubvolDelete(target); derr != nil {
+		if derr := btrfs.DeleteSubVolume(target); derr != nil {
 			log.G(ctx).WithError(derr).WithField("subvolume", target).Error("failed to delete subvolume")
 		}
 		return nil, err
@@ -245,7 +245,13 @@ func (b *snapshotter) mounts(dir string, s storage.Snapshot) ([]mount.Mount, err
 	var options []string
 
 	// get the subvolume id back out for the mount
-	sid, err := btrfs.SubvolID(dir)
+	root, err := btrfs.Open(dir, true)
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+
+	sid, err := root.SubVolumeID()
 	if err != nil {
 		return nil, err
 	}
@@ -293,20 +299,20 @@ func (b *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	source := filepath.Join(b.root, "active", id)
 	target := filepath.Join(b.root, "snapshots", id)
 
-	if err := btrfs.SubvolSnapshot(target, source, true); err != nil {
+	if err := btrfs.SnapshotSubVolume(source, target, true); err != nil {
 		return err
 	}
 
 	err = t.Commit()
 	t = nil
 	if err != nil {
-		if derr := btrfs.SubvolDelete(target); derr != nil {
+		if derr := btrfs.DeleteSubVolume(target); derr != nil {
 			log.G(ctx).WithError(derr).WithField("subvolume", target).Error("failed to delete subvolume")
 		}
 		return err
 	}
 
-	if derr := btrfs.SubvolDelete(source); derr != nil {
+	if derr := btrfs.DeleteSubVolume(source); derr != nil {
 		// Log as warning, only needed for cleanup, will not cause name collision
 		log.G(ctx).WithError(derr).WithField("subvolume", source).Warn("failed to delete subvolume")
 	}
@@ -353,7 +359,7 @@ func (b *snapshotter) Remove(ctx context.Context, key string) (err error) {
 		}
 
 		if removed != "" {
-			if derr := btrfs.SubvolDelete(removed); derr != nil {
+			if derr := btrfs.DeleteSubVolume(removed); derr != nil {
 				log.G(ctx).WithError(derr).WithField("subvolume", removed).Warn("failed to delete subvolume")
 			}
 		}
@@ -378,12 +384,12 @@ func (b *snapshotter) Remove(ctx context.Context, key string) (err error) {
 		readonly = true
 	}
 
-	if err := btrfs.SubvolSnapshot(removed, source, readonly); err != nil {
+	if err := btrfs.SnapshotSubVolume(source, removed, readonly); err != nil {
 		removed = ""
 		return err
 	}
 
-	if err := btrfs.SubvolDelete(source); err != nil {
+	if err := btrfs.DeleteSubVolume(source); err != nil {
 		return errors.Wrapf(err, "failed to remove snapshot %v", source)
 	}
 
@@ -391,7 +397,7 @@ func (b *snapshotter) Remove(ctx context.Context, key string) (err error) {
 	t = nil
 	if err != nil {
 		// Attempt to restore source
-		if err1 := btrfs.SubvolSnapshot(source, removed, readonly); err1 != nil {
+		if err1 := btrfs.SnapshotSubVolume(removed, source, readonly); err1 != nil {
 			log.G(ctx).WithFields(logrus.Fields{
 				logrus.ErrorKey: err1,
 				"subvolume":     source,

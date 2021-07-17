@@ -16,7 +16,6 @@ To build the `containerd` daemon, and the `ctr` simple test client, the followin
 
 * Go 1.13.x or above except 1.14.x
 * Protoc 3.x compiler and headers (download at the [Google protobuf releases page](https://github.com/google/protobuf/releases))
-* Btrfs headers and libraries for your distribution. Note that building the btrfs driver can be disabled via the build tag `no_btrfs`, removing this dependency.
 
 ## Build the development environment
 
@@ -36,13 +35,6 @@ For proper results, install the `protoc` release into `/usr/local` on your build
 $ wget -c https://github.com/google/protobuf/releases/download/v3.11.4/protoc-3.11.4-linux-x86_64.zip
 $ sudo unzip protoc-3.11.4-linux-x86_64.zip -d /usr/local
 ```
-
-`containerd` uses [Btrfs](https://en.wikipedia.org/wiki/Btrfs) it means that you
-need to satisfy these dependencies in your system:
-
-* CentOS/Fedora: `yum install btrfs-progs-devel`
-* Debian/Ubuntu: `apt-get install btrfs-progs libbtrfs-dev`
-  * Debian(before Buster)/Ubuntu(before 19.10): `apt-get install btrfs-tools`
 
 At this point you are ready to build `containerd` yourself!
 
@@ -153,23 +145,14 @@ The following instructions assume you are at the parent directory of containerd 
 ## Build containerd
 
 You can build `containerd` via a Linux-based Docker container.
-You can build an image from this `Dockerfile`:
 
-```
-FROM golang
-
-RUN apt-get update && \
-    apt-get install -y libbtrfs-dev
-```
-
-Let's suppose that you built an image called `containerd/build`. From the
-containerd source root directory you can run the following command:
+From the containerd source root directory you can run the following command:
 
 ```sh
 docker run -it \
     -v ${PWD}/containerd:/go/src/github.com/containerd/containerd \
     -e GOPATH=/go \
-    -w /go/src/github.com/containerd/containerd containerd/build sh
+    -w /go/src/github.com/containerd/containerd golang sh
 ```
 
 This mounts `containerd` repository
@@ -195,7 +178,7 @@ We can build an image from this `Dockerfile`:
 FROM golang
 
 RUN apt-get update && \
-    apt-get install -y libbtrfs-dev libseccomp-dev
+    apt-get install -y libseccomp-dev
 
 ```
 

@@ -48,15 +48,7 @@ jobs:
           sudo apt-get install -y \
             crossbuild-essential-arm64 \
             crossbuild-essential-s390x \
-            crossbuild-essential-ppc64el \
-            libseccomp-dev:amd64 \
-            libseccomp-dev:arm64 \
-            libseccomp-dev:s390x \
-            libseccomp-dev:ppc64el \
-            libbtrfs-dev:amd64 \
-            libbtrfs-dev:arm64 \
-            libbtrfs-dev:s390x \
-            libbtrfs-dev:ppc64el
+            crossbuild-essential-ppc64el
 
       - name: Build amd64
         env:

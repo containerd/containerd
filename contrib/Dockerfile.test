@@ -44,7 +44,6 @@ RUN ./install-runc
 
 FROM golang-base AS dev
 RUN apt-get update && apt-get install -y \
-    libbtrfs-dev \
     btrfs-progs \
     gcc \
     git \
