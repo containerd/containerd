@@ -185,6 +185,14 @@ var (
 			Name:  "apparmor-profile",
 			Usage: "enable AppArmor with an existing custom profile",
 		},
+		cli.StringFlag{
+			Name:  "blockio-class",
+			Usage: "name of the block I/O class in the blockio-config-file to associate the container with",
+		},
+		cli.StringFlag{
+			Name:  "blockio-config-file",
+			Usage: "file containing block I/O classes",
+		},
 	}
 )
 

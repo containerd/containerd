@@ -69,6 +69,7 @@ the main config.
 The following plugins are enabled by default and their settings are shown below.
 Plugins that are not enabled by default will provide their own configuration values
 documentation.
+ - **[plugins.blockio]** has one option __config_file__ (Default: **""**)
  - **[plugins.cgroup]** has one option __no_prometheus__ (Default: **false**)
  - **[plugins.diff]** has one option __default__, a list by default set to **["walking"]**
  - **[plugins.linux]** has several options for configuring the runtime, shim, and related options:

@@ -40,6 +40,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+	"github.com/intel/goresctrl/pkg/blockio"
 )
 
 var platformRunFlags = []cli.Flag{
@@ -221,6 +222,20 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 				return nil, fmt.Errorf("apparmor-profile conflicts with apparmor-default-profile")
 			}
 			opts = append(opts, apparmor.WithProfile(s))
+		}
+
+		if c := context.String("blockio-config-file"); c != "" {
+			if err := blockio.SetConfigFromFile(c, false); err != nil {
+				return nil, fmt.Errorf("blockio-config-file error: %w", err)
+			}
+		}
+
+		if c := context.String("blockio-class"); c != "" {
+			if linuxBlockIO, err := blockio.OciLinuxBlockIO(c); err == nil {
+				opts = append(opts, oci.WithBlockIO(linuxBlockIO))
+			} else {
+				return nil, fmt.Errorf("blockio-class error: %w", err)
+			}
 		}
 
 		if cpus := context.Float64("cpus"); cpus > 0.0 {

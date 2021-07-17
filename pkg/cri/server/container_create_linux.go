@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
+	"github.com/intel/goresctrl/pkg/blockio"
 	"github.com/containerd/containerd/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -255,6 +256,12 @@ func (c *criService) containerSpec(
 		if sandboxConfig.GetLinux().GetCgroupParent() != "" {
 			cgroupsPath := getCgroupsPath(sandboxConfig.GetLinux().GetCgroupParent(), id)
 			specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
+		}
+	}
+
+	if blockioClass, err := blockio.ContainerClassFromAnnotations(config.Metadata.Name, config.Annotations, sandboxConfig.Annotations); blockioClass != "" && err == nil {
+		if linuxBlockIO, err := blockio.OciLinuxBlockIO(blockioClass); err == nil {
+			specOpts = append(specOpts, oci.WithBlockIO(linuxBlockIO))
 		}
 	}
 
