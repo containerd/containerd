@@ -34,6 +34,7 @@ git checkout "$CRITEST_COMMIT"
 make
 make install -e DESTDIR=${DESTDIR:=''} BINDIR=/usr/local/bin
 
+mkdir -p ${DESTDIR:=''}/etc/
 cat << EOF | tee ${DESTDIR:=''}/etc/crictl.yaml
 runtime-endpoint: unix:///run/containerd/containerd.sock
 EOF

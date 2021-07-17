@@ -11,53 +11,48 @@
 # docker build -t containerd-test --build-arg RUNC_VERSION=v1.0.0-rc94 -f Dockerfile.test ../
 
 ARG GOLANG_VERSION=1.16.6
+ARG GOLANG_IMAGE=golang
 
-FROM golang:${GOLANG_VERSION} AS golang-base
-RUN mkdir -p /go/src/github.com/containerd/containerd
-WORKDIR /go/src/github.com/containerd/containerd
-
-# Install proto3
-FROM golang-base AS proto3
-RUN apt-get update && apt-get install -y \
-   autoconf \
-   automake \
-   g++ \
-   libtool \
-   unzip \
- --no-install-recommends
-
-COPY script/setup/install-protobuf install-protobuf
-RUN ./install-protobuf
+FROM ${GOLANG_IMAGE}:${GOLANG_VERSION} AS golang
 
 # Install runc
-FROM golang-base AS runc
-RUN apt-get update && apt-get install -y \
-    curl \
+FROM golang AS runc
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libseccomp-dev \
-  --no-install-recommends
+ && rm -rf /var/lib/apt/lists/*
 
 COPY script/setup/runc-version script/setup/install-runc ./
 # Allow overriding the version of runc to install through build-args
 ARG RUNC_VERSION
 ARG GOPROXY=direct
+ARG DESTDIR=/build
 RUN ./install-runc
 
-FROM golang-base AS dev
-RUN apt-get update && apt-get install -y \
+FROM golang AS build-env
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libbtrfs-dev \
     btrfs-progs \
-    gcc \
-    git \
     libseccomp-dev \
-    make \
     xfsprogs \
-  --no-install-recommends
+ && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /go/src/github.com/containerd/containerd
+WORKDIR /go/src/github.com/containerd/containerd
 
-COPY --from=proto3 /usr/local/bin/protoc     /usr/local/bin/protoc
-COPY --from=proto3 /usr/local/include/google /usr/local/include/google
-COPY --from=runc   /usr/local/sbin/runc      /usr/local/go/bin/runc
+FROM golang AS cni
+ENV DESTDIR=/build
+COPY script/setup/install-cni ./
+COPY go.mod /go/src/github.com/containerd/containerd/go.mod
+RUN ./install-cni
 
+FROM golang AS critools
+ARG DESTDIR=/build
+COPY script/setup/install-critools script/setup/critools-version  ./
+RUN GOBIN=$DESTDIR/usr/local/bin ./install-critools
+
+FROM build-env AS containerd
+ARG DESTDIR=/build
 COPY . .
+RUN make BUILDTAGS="no_btrfs no_devmapper" binaries install
 
 # cri-in-userns stage is for testing "CRI-in-UserNS", which should be used in conjunction with
 # "Kubelet-in-UserNS": https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2033-kubelet-in-userns-aka-rootless
@@ -65,13 +60,16 @@ COPY . .
 #
 # Requires Rootless Docker/Podman/nerdctl with cgroup v2 delegation: https://rootlesscontaine.rs/getting-started/common/cgroup2/
 # (Rootless Docker/Podman/nerdctl prepares the UserNS, so we do not need to create UserNS by ourselves)
-FROM dev AS cri-in-userns
-RUN make BUILDTAGS="no_btrfs no_devmapper" binaries install
-RUN apt-get update && apt-get install -y iptables
-RUN ./script/setup/install-cni
-RUN ./script/setup/install-critools
+FROM build-env AS cri-in-userns
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    iptables \
+ && rm -rf /var/lib/apt/lists/*
 COPY contrib/Dockerfile.test.d/cri-in-userns/etc_containerd_config.toml /etc/containerd/config.toml
-COPY contrib/Dockerfile.test.d/cri-in-userns/docker-entrypoint.sh /docker-entrypoint.sh
+COPY contrib/Dockerfile.test.d/cri-in-userns/docker-entrypoint.sh       /docker-entrypoint.sh
+COPY --from=runc       /build/ /
+COPY --from=cni        /build/ /
+COPY --from=critools   /build/ /
+COPY --from=containerd /build/ /
 VOLUME /var/lib/containerd
 ENTRYPOINT ["/docker-entrypoint.sh"]
 # Skip "runtime should support unsafe sysctls": `container init caused:  write sysctl key fs.mqueue.msg_max: open /proc/sys/fs/mqueue/msg_max: permission denied`
@@ -79,4 +77,23 @@ ENTRYPOINT ["/docker-entrypoint.sh"]
 # Skip "should allow privilege escalation when (NoNewPrivis is) false": expected log "Effective uid: 0\n" (stream="stdout") not found in logs [{timestamp:{wall:974487519 ext:63761339984 loc:<nil>} stream:stdout log:Effective uid: 1000) }]
 CMD ["critest", "--ginkgo.skip=should support unsafe sysctls|should support safe sysctls|should allow privilege escalation when false"]
 
-FROM dev AS default
+# Install proto3
+FROM golang AS proto3
+ARG DESTDIR=/build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    autoconf \
+    automake \
+    g++ \
+    libtool \
+    unzip \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY script/setup/install-protobuf install-protobuf
+RUN ./install-protobuf \
+ && mv /usr/local/bin/protoc $DESTDIR/usr/local/bin/protoc \
+ && mv /usr/local/include/google $DESTDIR/usr/local/include/google
+
+FROM build-env AS dev
+COPY --from=proto3 /build/ /
+COPY --from=runc   /build/ /
+COPY . .
