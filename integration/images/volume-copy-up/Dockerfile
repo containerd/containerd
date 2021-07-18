@@ -12,6 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-FROM busybox
+ARG BASE
+
+FROM $BASE
 RUN sh -c "mkdir /test_dir; echo test_content > /test_dir/test_file"
 VOLUME "/test_dir"
