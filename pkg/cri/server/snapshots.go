@@ -37,6 +37,9 @@ type snapshotsSyncer struct {
 	store       *snapshotstore.Store
 	snapshotter snapshot.Snapshotter
 	syncPeriod  time.Duration
+	syncTicker  *time.Ticker
+	ctx         context.Context
+	cancel      context.CancelFunc
 }
 
 // newSnapshotsSyncer creates a snapshot syncer.
@@ -49,27 +52,46 @@ func newSnapshotsSyncer(store *snapshotstore.Store, snapshotter snapshot.Snapsho
 	}
 }
 
-// start starts the snapshots syncer. No stop function is needed because
-// the syncer doesn't update any persistent states, it's fine to let it
-// exit with the process.
+// start starts the snapshots syncer.
 func (s *snapshotsSyncer) start() {
-	tick := time.NewTicker(s.syncPeriod)
+	if s.syncTicker != nil {
+		s.syncTicker.Stop()
+	}
+	s.syncTicker = time.NewTicker(s.syncPeriod)
+
+	// build a context for stopping the syncer
+	s.ctx, s.cancel = context.WithCancel(context.TODO())
+
 	go func() {
-		defer tick.Stop()
+		defer s.syncTicker.Stop()
 		// TODO(random-liu): This is expensive. We should do benchmark to
 		// check the resource usage and optimize this.
 		for {
-			if err := s.sync(); err != nil {
-				logrus.WithError(err).Error("Failed to sync snapshot stats")
+			select {
+			case <-s.syncTicker.C:
+				if err := s.sync(); err != nil {
+					logrus.WithError(err).Error("Failed to sync snapshot stats")
+				}
+			case <-s.ctx.Done():
+				logrus.Info("Snapshots syncer stopped")
+				return
 			}
-			<-tick.C
 		}
 	}()
 }
 
+func (s *snapshotsSyncer) stop() {
+	if s.syncTicker != nil {
+		s.syncTicker.Stop()
+	}
+	if s.cancel != nil {
+		s.cancel()
+	}
+}
+
 // sync updates all snapshots stats.
 func (s *snapshotsSyncer) sync() error {
-	ctx := ctrdutil.NamespacedContext()
+	ctx := ctrdutil.WithNamespace(s.ctx)
 	start := time.Now().UnixNano()
 	var snapshots []snapshot.Info
 	// Do not call `Usage` directly in collect function, because

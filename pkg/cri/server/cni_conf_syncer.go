@@ -121,5 +121,9 @@ func (syncer *cniNetConfSyncer) updateLastStatus(err error) {
 
 // stop stops watcher in the syncLoop.
 func (syncer *cniNetConfSyncer) stop() error {
-	return syncer.watcher.Close()
+	err := syncer.watcher.Close()
+	if err == nil {
+		logrus.Info("CNI network conf syncer stopped")
+	}
+	return err
 }
