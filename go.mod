@@ -48,13 +48,13 @@ require (
 	github.com/prometheus/procfs v0.6.0 // indirect; temporarily force v0.6.0, which was previously defined in imgcrypt as explicit version
 	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/sirupsen/logrus v1.8.1
-	github.com/stretchr/testify v1.6.1
+	github.com/stretchr/testify v1.7.0
 	github.com/tchap/go-patricia v2.2.6+incompatible
 	github.com/urfave/cli v1.22.2
 	go.etcd.io/bbolt v1.3.5
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
-	golang.org/x/sys v0.0.0-20210426230700-d19ff857e887
+	golang.org/x/sys v0.0.0-20210616094352-59db8d763f22
 	google.golang.org/grpc v1.38.0
 	google.golang.org/protobuf v1.26.0
 	gotest.tools/v3 v3.0.3
@@ -63,7 +63,7 @@ require (
 	k8s.io/apiserver v0.20.6
 	k8s.io/client-go v0.20.6
 	k8s.io/component-base v0.20.6
-	k8s.io/cri-api v0.20.6
+	k8s.io/cri-api v0.22.0-beta.0.0.20210622194357-b4aee72dfd61
 	k8s.io/klog/v2 v2.4.0
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 )
