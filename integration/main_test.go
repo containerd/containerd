@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -338,7 +339,14 @@ func Randomize(str string) string {
 
 // KillProcess kills the process by name. pkill is used.
 func KillProcess(name string) error {
-	output, err := exec.Command("pkill", "-x", fmt.Sprintf("^%s$", name)).CombinedOutput()
+	var command []string
+	if goruntime.GOOS == "windows" {
+		command = []string{"tskill", strings.TrimSuffix(name, ".exe")}
+	} else {
+		command = []string{"pkill", "-x", fmt.Sprintf("^%s$", name)}
+	}
+
+	output, err := exec.Command(command[0], command[1:]...).CombinedOutput()
 	if err != nil {
 		return errors.Errorf("failed to kill %q - error: %v, output: %q", name, err, output)
 	}

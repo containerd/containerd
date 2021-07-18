@@ -32,9 +32,6 @@ import (
 // Restart test must run sequentially.
 
 func TestContainerdRestart(t *testing.T) {
-	if goruntime.GOOS == "windows" {
-		t.Skip("Skipped on Windows.")
-	}
 	type container struct {
 		name  string
 		id    string
@@ -76,16 +73,22 @@ func TestContainerdRestart(t *testing.T) {
 					state: runtime.ContainerState_CONTAINER_CREATED,
 				},
 				{
-					name:  "running-container",
-					state: runtime.ContainerState_CONTAINER_RUNNING,
-				},
-				{
 					name:  "exited-container",
 					state: runtime.ContainerState_CONTAINER_EXITED,
 				},
 			},
 		},
 	}
+	// NOTE(claudiub): The test will set the container's Linux.SecurityContext.NamespaceOptions.Pid = NamespaceMode_CONTAINER,
+	// and the expectation is that the container will keep running even if the sandbox container dies.
+	// We do not have that option on Windows.
+	if goruntime.GOOS != "windows" {
+		sandboxes[1].containers = append(sandboxes[1].containers, container{
+			name:  "running-container",
+			state: runtime.ContainerState_CONTAINER_RUNNING,
+		})
+	}
+
 	t.Logf("Make sure no sandbox is running before test")
 	existingSandboxes, err := runtimeService.ListPodSandbox(&runtime.PodSandboxFilter{})
 	require.NoError(t, err)
@@ -133,13 +136,19 @@ func TestContainerdRestart(t *testing.T) {
 			require.NoError(t, err)
 			_, err = task.Delete(ctx, containerd.WithProcessKill)
 			if err != nil {
+				// NOTE(claudiub): On Windows, task.Delete returns an error, but the task is
+				// still being deleted.
+				// TODO: Clean up after https://github.com/containerd/containerd/issues/5607 merges
+				if goruntime.GOOS == "windows" {
+					_, err = task.Delete(ctx, containerd.WithProcessKill)
+				}
 				require.True(t, errdefs.IsNotFound(err))
 			}
 		}
 	}
 
 	t.Logf("Pull test images")
-	for _, image := range []string{GetImage(BusyBox), GetImage(Alpine)} {
+	for _, image := range []string{GetImage(BusyBox), GetImage(Pause)} {
 		EnsureImageExists(t, image)
 	}
 	imagesBeforeRestart, err := imageService.ListImages(nil)
@@ -158,6 +167,7 @@ func TestContainerdRestart(t *testing.T) {
 	for _, s := range sandboxes {
 		for _, loaded := range loadedSandboxes {
 			if s.id == loaded.Id {
+				t.Logf("Checking sandbox state for '%s'", s.name)
 				assert.Equal(t, s.state, loaded.State)
 				break
 			}
@@ -165,6 +175,7 @@ func TestContainerdRestart(t *testing.T) {
 		for _, c := range s.containers {
 			for _, loaded := range loadedContainers {
 				if c.id == loaded.Id {
+					t.Logf("Checking container state for '%s' in sandbox '%s'", c.name, s.name)
 					assert.Equal(t, c.state, loaded.State)
 					break
 				}
