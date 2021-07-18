@@ -17,6 +17,7 @@
 package metadata
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/containerd/containerd/containers"
@@ -47,11 +48,11 @@ func adaptImage(o interface{}) filters.Adaptor {
 				return obj.Target.Digest.String(), len(obj.Target.Digest) > 0
 			case "mediatype":
 				return obj.Target.MediaType, len(obj.Target.MediaType) > 0
+			case "size":
+				return strconv.FormatInt(obj.Target.Size, 10), true
 			}
 		case "labels":
 			return checkMap(fieldpath[1:], obj.Labels)
-			// TODO(stevvooe): Greater/Less than filters would be awesome for
-			// size. Let's do it!
 		case "annotations":
 			return checkMap(fieldpath[1:], obj.Target.Annotations)
 		}

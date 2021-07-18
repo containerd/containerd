@@ -160,6 +160,8 @@ func (s *scanner) scanOperator() {
 		switch ch {
 		case '=', '!', '~':
 			s.next()
+		case '<', '>':
+			return
 		default:
 			return
 		}
@@ -262,7 +264,7 @@ func isDigitRune(r rune) bool {
 
 func isOperatorRune(r rune) bool {
 	switch r {
-	case '=', '!', '~':
+	case '=', '!', '~', '<', '>':
 		return true
 	}
 

@@ -70,6 +70,7 @@ package filters
 
 import (
 	"regexp"
+	"strconv"
 
 	"github.com/containerd/containerd/log"
 )
@@ -127,6 +128,8 @@ const (
 	operatorEqual
 	operatorNotEqual
 	operatorMatches
+	operatorLessThan
+	operatorGreaterThan
 )
 
 func (op operator) String() string {
@@ -139,6 +142,10 @@ func (op operator) String() string {
 		return "!="
 	case operatorMatches:
 		return "~="
+	case operatorLessThan:
+		return "<"
+	case operatorGreaterThan:
+		return ">"
 	}
 
 	return "unknown"
@@ -149,6 +156,10 @@ type selector struct {
 	operator  operator
 	value     string
 	re        *regexp.Regexp
+}
+
+func atoi64(s string) (int64, error) {
+	return strconv.ParseInt(s, 10, 64)
 }
 
 func (m selector) Match(adaptor Adaptor) bool {
@@ -173,6 +184,38 @@ func (m selector) Match(adaptor Adaptor) bool {
 		}
 
 		return m.re.MatchString(value)
+	case operatorLessThan:
+		if !present {
+			return false
+		}
+		lhs, err := atoi64(value)
+		if err != nil {
+			log.L.Errorf("error converting %q to integer", value)
+			return false
+		}
+
+		rhs, err := atoi64(m.value)
+		if err != nil {
+			log.L.Errorf("error converting %q (%q) to integer", m.value, m.fieldpath)
+			return false
+		}
+		return lhs < rhs
+	case operatorGreaterThan:
+		if !present {
+			return false
+		}
+		lhs, err := atoi64(value)
+		if err != nil {
+			log.L.Errorf("error converting %q to integer", value)
+			return false
+		}
+
+		rhs, err := atoi64(m.value)
+		if err != nil {
+			log.L.Errorf("error converting %q (%q) to integer", m.value, m.fieldpath)
+			return false
+		}
+		return lhs > rhs
 	default:
 		return false
 	}
