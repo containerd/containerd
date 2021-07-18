@@ -31,6 +31,8 @@ const (
 	BPF_F_RDONLY_PROG        = linux.BPF_F_RDONLY_PROG
 	BPF_F_WRONLY_PROG        = linux.BPF_F_WRONLY_PROG
 	BPF_F_SLEEPABLE          = linux.BPF_F_SLEEPABLE
+	BPF_F_MMAPABLE           = linux.BPF_F_MMAPABLE
+	BPF_F_INNER_MAP          = linux.BPF_F_INNER_MAP
 	BPF_OBJ_NAME_LEN         = linux.BPF_OBJ_NAME_LEN
 	BPF_TAG_SIZE             = linux.BPF_TAG_SIZE
 	SYS_BPF                  = linux.SYS_BPF

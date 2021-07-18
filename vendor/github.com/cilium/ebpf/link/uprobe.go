@@ -35,6 +35,14 @@ type Executable struct {
 	symbols map[string]elf.Symbol
 }
 
+// UprobeOptions defines additional parameters that will be used
+// when loading Uprobes.
+type UprobeOptions struct {
+	// Symbol offset. Must be provided in case of external symbols (shared libs).
+	// If set, overrides the offset eventually parsed from the executable.
+	Offset uint64
+}
+
 // To open a new Executable, use:
 //
 //	OpenExecutable("/bin/bash")
@@ -78,6 +86,10 @@ func (ex *Executable) addSymbols(f func() ([]elf.Symbol, error)) error {
 		return err
 	}
 	for _, s := range syms {
+		if elf.ST_TYPE(s.Info) != elf.STT_FUNC {
+			// Symbol not associated with a function or other executable code.
+			continue
+		}
 		ex.symbols[s.Name] = s
 	}
 	return nil
@@ -95,13 +107,18 @@ func (ex *Executable) symbol(symbol string) (*elf.Symbol, error) {
 // For example, /bin/bash::main():
 //
 //  ex, _ = OpenExecutable("/bin/bash")
-//  ex.Uprobe("main", prog)
+//  ex.Uprobe("main", prog, nil)
+//
+// When using symbols which belongs to shared libraries,
+// an offset must be provided via options:
+//
+//  ex.Uprobe("main", prog, &UprobeOptions{Offset: 0x123})
 //
 // The resulting Link must be Closed during program shutdown to avoid leaking
 // system resources. Functions provided by shared libraries can currently not
 // be traced and will result in an ErrNotSupported.
-func (ex *Executable) Uprobe(symbol string, prog *ebpf.Program) (Link, error) {
-	u, err := ex.uprobe(symbol, prog, false)
+func (ex *Executable) Uprobe(symbol string, prog *ebpf.Program, opts *UprobeOptions) (Link, error) {
+	u, err := ex.uprobe(symbol, prog, opts, false)
 	if err != nil {
 		return nil, err
 	}
@@ -119,13 +136,18 @@ func (ex *Executable) Uprobe(symbol string, prog *ebpf.Program) (Link, error) {
 // before the given symbol exits. For example, /bin/bash::main():
 //
 //  ex, _ = OpenExecutable("/bin/bash")
-//  ex.Uretprobe("main", prog)
+//  ex.Uretprobe("main", prog, nil)
+//
+// When using symbols which belongs to shared libraries,
+// an offset must be provided via options:
+//
+//  ex.Uretprobe("main", prog, &UprobeOptions{Offset: 0x123})
 //
 // The resulting Link must be Closed during program shutdown to avoid leaking
 // system resources. Functions provided by shared libraries can currently not
 // be traced and will result in an ErrNotSupported.
-func (ex *Executable) Uretprobe(symbol string, prog *ebpf.Program) (Link, error) {
-	u, err := ex.uprobe(symbol, prog, true)
+func (ex *Executable) Uretprobe(symbol string, prog *ebpf.Program, opts *UprobeOptions) (Link, error) {
+	u, err := ex.uprobe(symbol, prog, opts, true)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +163,7 @@ func (ex *Executable) Uretprobe(symbol string, prog *ebpf.Program) (Link, error)
 
 // uprobe opens a perf event for the given binary/symbol and attaches prog to it.
 // If ret is true, create a uretprobe.
-func (ex *Executable) uprobe(symbol string, prog *ebpf.Program, ret bool) (*perfEvent, error) {
+func (ex *Executable) uprobe(symbol string, prog *ebpf.Program, opts *UprobeOptions, ret bool) (*perfEvent, error) {
 	if prog == nil {
 		return nil, fmt.Errorf("prog cannot be nil: %w", errInvalidInput)
 	}
@@ -149,20 +171,28 @@ func (ex *Executable) uprobe(symbol string, prog *ebpf.Program, ret bool) (*perf
 		return nil, fmt.Errorf("eBPF program type %s is not Kprobe: %w", prog.Type(), errInvalidInput)
 	}
 
-	sym, err := ex.symbol(symbol)
-	if err != nil {
-		return nil, fmt.Errorf("symbol '%s' not found in '%s': %w", symbol, ex.path, err)
-	}
+	var offset uint64
+	if opts != nil && opts.Offset != 0 {
+		offset = opts.Offset
+	} else {
+		sym, err := ex.symbol(symbol)
+		if err != nil {
+			return nil, fmt.Errorf("symbol '%s' not found: %w", symbol, err)
+		}
 
-	// Symbols with location 0 from section undef are shared library calls and
-	// are relocated before the binary is executed. Dynamic linking is not
-	// implemented by the library, so mark this as unsupported for now.
-	if sym.Section == elf.SHN_UNDEF && sym.Value == 0 {
-		return nil, fmt.Errorf("cannot resolve %s library call '%s': %w", ex.path, symbol, ErrNotSupported)
+		// Symbols with location 0 from section undef are shared library calls and
+		// are relocated before the binary is executed. Dynamic linking is not
+		// implemented by the library, so mark this as unsupported for now.
+		if sym.Section == elf.SHN_UNDEF && sym.Value == 0 {
+			return nil, fmt.Errorf("cannot resolve %s library call '%s', "+
+				"consider providing the offset via options: %w", ex.path, symbol, ErrNotSupported)
+		}
+
+		offset = sym.Value
 	}
 
 	// Use uprobe PMU if the kernel has it available.
-	tp, err := pmuUprobe(sym.Name, ex.path, sym.Value, ret)
+	tp, err := pmuUprobe(symbol, ex.path, offset, ret)
 	if err == nil {
 		return tp, nil
 	}
@@ -171,7 +201,7 @@ func (ex *Executable) uprobe(symbol string, prog *ebpf.Program, ret bool) (*perf
 	}
 
 	// Use tracefs if uprobe PMU is missing.
-	tp, err = tracefsUprobe(uprobeSanitizedSymbol(sym.Name), ex.path, sym.Value, ret)
+	tp, err = tracefsUprobe(uprobeSanitizedSymbol(symbol), ex.path, offset, ret)
 	if err != nil {
 		return nil, fmt.Errorf("creating trace event '%s:%s' in tracefs: %w", ex.path, symbol, err)
 	}
