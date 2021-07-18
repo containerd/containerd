@@ -122,6 +122,7 @@ func (c *Config) ValidateV2() error {
 type GRPCConfig struct {
 	Address        string `toml:"address"`
 	TCPAddress     string `toml:"tcp_address"`
+	TCPTLSCA       string `toml:"tcp_tls_ca"`
 	TCPTLSCert     string `toml:"tcp_tls_cert"`
 	TCPTLSKey      string `toml:"tcp_tls_key"`
 	UID            int    `toml:"uid"`
