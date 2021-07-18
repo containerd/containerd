@@ -228,6 +228,16 @@ func WithVolumeMount(hostPath, containerPath string) ContainerOpts {
 	}
 }
 
+// Add Windows container resource limits.
+func WithWindowsResources(r *runtime.WindowsContainerResources) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		if c.Windows == nil {
+			c.Windows = &runtime.WindowsContainerConfig{}
+		}
+		c.Windows.Resources = r
+	}
+}
+
 // Add container command.
 func WithCommand(cmd string, args ...string) ContainerOpts {
 	return func(c *runtime.ContainerConfig) {
