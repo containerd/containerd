@@ -48,6 +48,8 @@ github.com/Microsoft/hcsshim/pkg/ociwclayer
 github.com/beorn7/perks/quantile
 # github.com/bits-and-blooms/bitset v1.2.0
 github.com/bits-and-blooms/bitset
+# github.com/cenkalti/backoff/v4 v4.1.1
+github.com/cenkalti/backoff/v4
 # github.com/cespare/xxhash/v2 v2.1.1
 github.com/cespare/xxhash/v2
 # github.com/cilium/ebpf v0.6.2
@@ -222,13 +224,17 @@ github.com/gogo/protobuf/vanity
 github.com/gogo/protobuf/vanity/command
 # github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e
 github.com/golang/groupcache/lru
-# github.com/golang/protobuf v1.5.0
+# github.com/golang/protobuf v1.5.2
+github.com/golang/protobuf/descriptor
+github.com/golang/protobuf/jsonpb
 github.com/golang/protobuf/proto
+github.com/golang/protobuf/protoc-gen-go/descriptor
 github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
-# github.com/google/go-cmp v0.5.5
+github.com/golang/protobuf/ptypes/wrappers
+# github.com/google/go-cmp v0.5.6
 ## explicit
 github.com/google/go-cmp/cmp
 github.com/google/go-cmp/cmp/cmpopts
@@ -241,9 +247,16 @@ github.com/google/gofuzz
 # github.com/google/uuid v1.2.0
 ## explicit
 github.com/google/uuid
+# github.com/grpc-ecosystem/go-grpc-middleware v1.0.1-0.20190118093823-f849b5445de4
+## explicit
+github.com/grpc-ecosystem/go-grpc-middleware
 # github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 ## explicit
 github.com/grpc-ecosystem/go-grpc-prometheus
+# github.com/grpc-ecosystem/grpc-gateway v1.16.0
+github.com/grpc-ecosystem/grpc-gateway/internal
+github.com/grpc-ecosystem/grpc-gateway/runtime
+github.com/grpc-ecosystem/grpc-gateway/utilities
 # github.com/hashicorp/errwrap v1.0.0
 github.com/hashicorp/errwrap
 # github.com/hashicorp/go-multierror v1.0.0
@@ -338,7 +351,7 @@ github.com/shurcooL/sanitized_anchor_name
 github.com/sirupsen/logrus
 # github.com/stefanberger/go-pkcs11uri v0.0.0-20201008174630-78d3cae3a980
 github.com/stefanberger/go-pkcs11uri
-# github.com/stretchr/testify v1.6.1
+# github.com/stretchr/testify v1.7.0
 ## explicit
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
@@ -359,6 +372,44 @@ go.opencensus.io/internal
 go.opencensus.io/trace
 go.opencensus.io/trace/internal
 go.opencensus.io/trace/tracestate
+# go.opentelemetry.io/contrib v0.21.0
+go.opentelemetry.io/contrib
+# go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.21.0
+## explicit
+go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc
+# go.opentelemetry.io/otel v1.0.0-RC1
+## explicit
+go.opentelemetry.io/otel
+go.opentelemetry.io/otel/attribute
+go.opentelemetry.io/otel/baggage
+go.opentelemetry.io/otel/codes
+go.opentelemetry.io/otel/internal
+go.opentelemetry.io/otel/internal/baggage
+go.opentelemetry.io/otel/internal/global
+go.opentelemetry.io/otel/propagation
+go.opentelemetry.io/otel/semconv/v1.4.0
+# go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.0.0-RC1
+go.opentelemetry.io/otel/exporters/otlp/otlptrace
+go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal/connection
+go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal/otlpconfig
+go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal/tracetransform
+# go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.0.0-RC1
+## explicit
+go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc
+# go.opentelemetry.io/otel/sdk v1.0.0-RC1
+## explicit
+go.opentelemetry.io/otel/sdk/instrumentation
+go.opentelemetry.io/otel/sdk/internal
+go.opentelemetry.io/otel/sdk/resource
+go.opentelemetry.io/otel/sdk/trace
+# go.opentelemetry.io/otel/trace v1.0.0-RC1
+## explicit
+go.opentelemetry.io/otel/trace
+# go.opentelemetry.io/proto/otlp v0.9.0
+go.opentelemetry.io/proto/otlp/collector/trace/v1
+go.opentelemetry.io/proto/otlp/common/v1
+go.opentelemetry.io/proto/otlp/resource/v1
+go.opentelemetry.io/proto/otlp/trace/v1
 # golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
 golang.org/x/crypto/cast5
 golang.org/x/crypto/ed25519
@@ -420,7 +471,10 @@ google.golang.org/appengine/internal/remote_api
 google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/urlfetch
 # google.golang.org/genproto v0.0.0-20201110150050-8816d57aaa9a => google.golang.org/genproto v0.0.0-20200224152610-e50cd9704f63
+google.golang.org/genproto/googleapis/api/httpbody
+google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
+google.golang.org/genproto/protobuf/field_mask
 # google.golang.org/grpc v1.38.0
 ## explicit
 google.golang.org/grpc
@@ -435,6 +489,7 @@ google.golang.org/grpc/codes
 google.golang.org/grpc/connectivity
 google.golang.org/grpc/credentials
 google.golang.org/grpc/encoding
+google.golang.org/grpc/encoding/gzip
 google.golang.org/grpc/encoding/proto
 google.golang.org/grpc/grpclog
 google.golang.org/grpc/health
@@ -471,12 +526,14 @@ google.golang.org/grpc/status
 google.golang.org/grpc/tap
 # google.golang.org/protobuf v1.26.0
 ## explicit
+google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire
 google.golang.org/protobuf/internal/descfmt
 google.golang.org/protobuf/internal/descopts
 google.golang.org/protobuf/internal/detrand
 google.golang.org/protobuf/internal/encoding/defval
+google.golang.org/protobuf/internal/encoding/json
 google.golang.org/protobuf/internal/encoding/messageset
 google.golang.org/protobuf/internal/encoding/tag
 google.golang.org/protobuf/internal/encoding/text
@@ -501,6 +558,7 @@ google.golang.org/protobuf/types/descriptorpb
 google.golang.org/protobuf/types/known/anypb
 google.golang.org/protobuf/types/known/durationpb
 google.golang.org/protobuf/types/known/timestamppb
+google.golang.org/protobuf/types/known/wrapperspb
 # gopkg.in/inf.v0 v0.9.1
 gopkg.in/inf.v0
 # gopkg.in/square/go-jose.v2 v2.5.1
