@@ -31,6 +31,8 @@ const (
 	BPF_F_RDONLY_PROG        = 0
 	BPF_F_WRONLY_PROG        = 0
 	BPF_F_SLEEPABLE          = 0
+	BPF_F_MMAPABLE           = 0
+	BPF_F_INNER_MAP          = 0
 	BPF_OBJ_NAME_LEN         = 0x10
 	BPF_TAG_SIZE             = 0x8
 	SYS_BPF                  = 321

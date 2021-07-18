@@ -377,7 +377,7 @@ func (s *Spec) marshal(opts marshalOpts) ([]byte, error) {
 	for _, raw := range s.rawTypes {
 		switch {
 		case opts.StripFuncLinkage && raw.Kind() == kindFunc:
-			raw.SetLinkage(linkageStatic)
+			raw.SetLinkage(StaticFunc)
 		}
 
 		if err := raw.Marshal(&buf, opts.ByteOrder); err != nil {
@@ -779,7 +779,7 @@ var haveFuncLinkage = internal.FeatureTest("BTF func linkage", "5.6", func() err
 	types.Func.SetKind(kindFunc)
 	types.Func.SizeType = 1 // aka FuncProto
 	types.Func.NameOff = 1
-	types.Func.SetLinkage(linkageGlobal)
+	types.Func.SetLinkage(GlobalFunc)
 
 	btf := marshalBTF(&types, strings, internal.NativeEndian)
 
