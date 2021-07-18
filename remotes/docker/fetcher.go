@@ -60,7 +60,7 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 				log.G(ctx).WithError(err).Debug("failed to parse")
 				continue
 			}
-			log.G(ctx).Debug("trying alternative url")
+			log.G(ctx).Info("request")
 
 			// Try this first, parse it
 			host := RegistryHost{
