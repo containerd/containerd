@@ -1,0 +1,37 @@
+ARG GO_VERSION=1.16.4
+
+FROM --platform=$BUILDPLATFORM golang:${GO_VERSION} AS base
+RUN apt-get update && apt-get install -y \
+	binutils-mingw-w64 \
+	g++-mingw-w64-x86-64
+ARG TARGETARCH
+ENV CGO_ENABLED=1
+ENV GOOS=windows
+ENV GOARCH=$TARGETARCH
+SHELL ["/bin/bash", "-xec"]
+
+FROM base as base-amd64
+ENV CC=x86_64-w64-mingw32-gcc
+
+FROM base-${TARGETARCH}${TARGETVARIANT} AS base-target
+
+FROM base-target AS containerd
+COPY . /go/src/github.com/containerd/containerd
+WORKDIR /go/src/github.com/containerd/containerd
+RUN make binaries; rm bin/containerd-stress.exe
+
+FROM base-target AS runhcs
+WORKDIR /go/src/github.com/microsoft/hcsshim
+ARG HCS_REPO=https://github.com/Microsoft/hcsshim.git
+RUN \
+	--mount=source=go.mod,target=/tmp/go.mod \
+	HCS_COMMIT="$(grep 'Microsoft/hcsshim ' /tmp/go.mod | awk '{print $2}')"; \
+	git clone --depth=1 "${HCS_REPO}" .; \
+	git fetch --tags origin "${HCS_COMMIT}";
+RUN GO111MODULE=on go build -mod=vendor -o containerd-shim-runhcs-v1.exe ./cmd/containerd-shim-runhcs-v1
+
+FROM scratch
+ARG TARGETARCH
+ARG TARGETVARIANT
+COPY --from=containerd /go/src/github.com/containerd/containerd/bin/* /windows-${TARGETARCH}${TARGETVARIANT}/
+COPY --from=runhcs /go/src/github.com/microsoft/hcsshim/containerd-shim-runhcs-v1.exe /windows-${TARGETARCH}${TARGETVARIANT}/
