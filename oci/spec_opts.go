@@ -824,6 +824,7 @@ func WithAddedCapabilities(caps []string) SpecOpts {
 				&s.Process.Capabilities.Effective,
 				&s.Process.Capabilities.Permitted,
 				&s.Process.Capabilities.Inheritable,
+				&s.Process.Capabilities.Ambient,
 			} {
 				if !capsContain(*cl, c) {
 					*cl = append(*cl, c)
@@ -844,6 +845,7 @@ func WithDroppedCapabilities(caps []string) SpecOpts {
 				&s.Process.Capabilities.Effective,
 				&s.Process.Capabilities.Permitted,
 				&s.Process.Capabilities.Inheritable,
+				&s.Process.Capabilities.Ambient,
 			} {
 				removeCap(cl, c)
 			}
