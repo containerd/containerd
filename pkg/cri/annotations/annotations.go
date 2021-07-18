@@ -59,4 +59,7 @@ const (
 
 	// PodAnnotations are the annotations of the pod
 	PodAnnotations = "io.kubernetes.cri.pod-annotations"
+
+	// WindowsHostProcess is used by hcsshim to identify windows pods that are running HostProcesses
+	WindowsHostProcess = "microsoft.com/hostprocess-container"
 )

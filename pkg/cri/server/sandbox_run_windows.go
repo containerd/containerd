@@ -19,6 +19,8 @@
 package server
 
 import (
+	"strconv"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -67,6 +69,7 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		customopts.WithAnnotation(annotations.SandboxNamespace, config.GetMetadata().GetNamespace()),
 		customopts.WithAnnotation(annotations.SandboxName, config.GetMetadata().GetName()),
 		customopts.WithAnnotation(annotations.SandboxLogDir, config.GetLogDirectory()),
+		customopts.WithAnnotation(annotations.WindowsHostProcess, strconv.FormatBool(config.GetWindows().GetSecurityContext().GetHostProcess())),
 	)
 
 	return c.runtimeSpec(id, "", specOpts...)

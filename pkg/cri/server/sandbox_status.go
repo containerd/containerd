@@ -76,6 +76,9 @@ func (c *criService) getIPs(sandbox sandboxstore.Sandbox) (string, []string, err
 		// responsible for reporting the IP.
 		return "", nil, nil
 	}
+	if goruntime.GOOS == "windows" && config.GetWindows().GetSecurityContext().GetHostProcess() {
+		return "", nil, nil
+	}
 
 	if closed, err := sandbox.NetNS.Closed(); err != nil {
 		return "", nil, errors.Wrap(err, "check network namespace closed")

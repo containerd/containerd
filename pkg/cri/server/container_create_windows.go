@@ -19,6 +19,8 @@
 package server
 
 import (
+	"strconv"
+
 	"github.com/containerd/containerd/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -120,6 +122,7 @@ func (c *criService) containerSpec(
 		customopts.WithAnnotation(annotations.SandboxName, sandboxConfig.GetMetadata().GetName()),
 		customopts.WithAnnotation(annotations.ContainerName, containerName),
 		customopts.WithAnnotation(annotations.ImageName, imageName),
+		customopts.WithAnnotation(annotations.WindowsHostProcess, strconv.FormatBool(sandboxConfig.GetWindows().GetSecurityContext().GetHostProcess())),
 	)
 	return c.runtimeSpec(id, ociRuntime.BaseRuntimeSpec, specOpts...)
 }
