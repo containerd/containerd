@@ -14,12 +14,11 @@
    limitations under the License.
 */
 
-package main
+package stress
 
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -45,7 +44,7 @@ var (
 	binarySizeGauge metrics.LabeledGauge
 )
 
-func init() {
+func initLocal() {
 	ns := metrics.NewNamespace("stress", "", nil)
 	// if you want more fine grained metrics then you can drill down with the metrics in prom that
 	// containerd is outputting
@@ -105,23 +104,11 @@ type result struct {
 	ExecFailures        int     `json:"execFailures"`
 }
 
-func main() {
-	// morr power!
-	runtime.GOMAXPROCS(runtime.NumCPU())
-
-	app := cli.NewApp()
-	app.Name = "containerd-stress"
-	app.Description = "stress test a containerd daemon"
-	app.Flags = []cli.Flag{
-		cli.BoolFlag{
-			Name:  "debug",
-			Usage: "set debug output in the logs",
-		},
-		cli.StringFlag{
-			Name:  "address,a",
-			Value: "/run/containerd/containerd.sock",
-			Usage: "path to the containerd socket",
-		},
+// Command is a cli command to output the client and containerd server version
+var Command = cli.Command{
+	Name:        "stress",
+	Description: "stress test a containerd daemon",
+	Flags: []cli.Flag{
 		cli.IntFlag{
 			Name:  "concurrent,c",
 			Value: 1,
@@ -154,39 +141,37 @@ func main() {
 			Usage: "set the snapshotter to use",
 			Value: "overlayfs",
 		},
-	}
-	app.Before = func(context *cli.Context) error {
-		if context.GlobalBool("json") {
+	},
+	Before: func(context *cli.Context) error {
+		if context.Bool("json") {
 			logrus.SetLevel(logrus.WarnLevel)
 		}
-		if context.GlobalBool("debug") {
-			logrus.SetLevel(logrus.DebugLevel)
-		}
 		return nil
-	}
-	app.Commands = []cli.Command{
+	},
+	Subcommands: []cli.Command{
 		densityCommand,
-	}
-	app.Action = func(context *cli.Context) error {
+	},
+	Action: func(context *cli.Context) error {
+		initLocal()
+
+		// morr power!
+		runtime.GOMAXPROCS(runtime.NumCPU())
+
 		config := config{
 			Address:     context.GlobalString("address"),
-			Duration:    context.GlobalDuration("duration"),
-			Concurrency: context.GlobalInt("concurrent"),
-			Exec:        context.GlobalBool("exec"),
-			JSON:        context.GlobalBool("json"),
-			Metrics:     context.GlobalString("metrics"),
-			Runtime:     context.GlobalString("runtime"),
-			Snapshotter: context.GlobalString("snapshotter"),
+			Duration:    context.Duration("duration"),
+			Concurrency: context.Int("concurrent"),
+			Exec:        context.Bool("exec"),
+			JSON:        context.Bool("json"),
+			Metrics:     context.String("metrics"),
+			Runtime:     context.String("runtime"),
+			Snapshotter: context.String("snapshotter"),
 		}
 		if config.Metrics != "" {
 			return serve(config)
 		}
 		return test(config)
-	}
-	if err := app.Run(os.Args); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	},
 }
 
 type config struct {

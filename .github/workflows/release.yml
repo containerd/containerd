@@ -110,7 +110,6 @@ jobs:
         run: |
           make build
           make binaries
-          rm bin/containerd-stress*
           [[ "${OS}" == "windows" ]] && {
               (
                 bindir="$(pwd)/bin"

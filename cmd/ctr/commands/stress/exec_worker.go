@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package main
+package stress
 
 import (
 	"context"

@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands/pprof"
 	"github.com/containerd/containerd/cmd/ctr/commands/run"
 	"github.com/containerd/containerd/cmd/ctr/commands/snapshots"
+	"github.com/containerd/containerd/cmd/ctr/commands/stress"
 	"github.com/containerd/containerd/cmd/ctr/commands/tasks"
 	versionCmd "github.com/containerd/containerd/cmd/ctr/commands/version"
 	"github.com/containerd/containerd/defaults"
@@ -114,6 +115,7 @@ containerd CLI
 		tasks.Command,
 		install.Command,
 		ociCmd.Command,
+		stress.Command,
 	}, extraCmds...)
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
