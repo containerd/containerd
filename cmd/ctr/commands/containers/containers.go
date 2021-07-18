@@ -101,11 +101,16 @@ var listCommand = cli.Command{
 			Name:  "quiet, q",
 			Usage: "print only the container id",
 		},
+		cli.BoolFlag{
+			Name:  "show-labels, l",
+			Usage: "print labels of container",
+		},
 	},
 	Action: func(context *cli.Context) error {
 		var (
-			filters = context.Args()
-			quiet   = context.Bool("quiet")
+			filters    = context.Args()
+			quiet      = context.Bool("quiet")
+			showLabels = context.Bool("show-labels")
 		)
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -123,7 +128,11 @@ var listCommand = cli.Command{
 			return nil
 		}
 		w := tabwriter.NewWriter(os.Stdout, 4, 8, 4, ' ', 0)
-		fmt.Fprintln(w, "CONTAINER\tIMAGE\tRUNTIME\t")
+		if showLabels {
+			_, _ = fmt.Fprintln(w, "CONTAINER\tIMAGE\tRUNTIME\tLABEL\t")
+		} else {
+			_, _ = fmt.Fprintln(w, "CONTAINER\tIMAGE\tRUNTIME\t")
+		}
 		for _, c := range containers {
 			info, err := c.Info(ctx, containerd.WithoutRefreshedMetadata)
 			if err != nil {
@@ -133,11 +142,31 @@ var listCommand = cli.Command{
 			if imageName == "" {
 				imageName = "-"
 			}
-			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t\n",
-				c.ID(),
-				imageName,
-				info.Runtime.Name,
-			); err != nil {
+			if showLabels {
+				var labelsStrings string
+				if len(info.Labels) == 0 {
+					labelsStrings = "-"
+				} else {
+					labels := make([]string, 0)
+					for k, v := range info.Labels {
+						labels = append(labels, fmt.Sprintf("%s=%s", k, v))
+					}
+					labelsStrings = strings.Join(labels, ",")
+				}
+				_, err = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t\n",
+					c.ID(),
+					imageName,
+					info.Runtime.Name,
+					labelsStrings,
+				)
+			} else {
+				_, err = fmt.Fprintf(w, "%s\t%s\t%s\t\n",
+					c.ID(),
+					imageName,
+					info.Runtime.Name,
+				)
+			}
+			if err != nil {
 				return err
 			}
 		}
