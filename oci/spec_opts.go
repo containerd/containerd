@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -365,6 +366,14 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 			return fmt.Errorf("unknown image config media type %s", ic.MediaType)
 		}
 
+		//FreeBSD has support for running Linux binaries via syscall redirection, while that would be enough
+		//for some binaries others depend on emulated linux file systems (procfs & sysfs).
+		//So when we are running FreeBSD and our image OS is Linux we modify our mounts to mount the emulated
+		//filesystems.
+		//We do it here since here we have access to both the OCI spec & the image OS.
+		if runtime.GOOS == "freebsd" && ociimage.OS == "linux" {
+			freebsdLinuxEmulationMounts(s)
+		}
 		setProcess(s)
 		if s.Linux != nil {
 			defaults := config.Env
@@ -1263,4 +1272,61 @@ func WithDevShmSize(kb int64) SpecOpts {
 		}
 		return ErrNoShmMount
 	}
+}
+
+// freebsdLinuxEmulationMounts modifies the mount spec to mount emulated Linux filesystems on FreeBSD,
+// as per: https://wiki.freebsd.org/LinuxJails
+func freebsdLinuxEmulationMounts(s *Spec) error {
+	var mounts []specs.Mount
+	var (
+		haveProc  = false
+		haveDevFd = false
+	)
+	/* If the mounts exist, we modify them in place, to keep the current order
+	   otherwise we add them below the for-loop. The nosuid noexec options are
+	   for consistency with Linux mounts: on FreeBSD it is by default impossible
+	   to execute anything from these filesystems.
+	*/
+	for _, m := range s.Mounts {
+		path := filepath.Clean(m.Destination)
+		if path == "/proc" {
+			mounts = append(mounts, specs.Mount{
+				Destination: "/proc",
+				Type:        "linprocfs",
+				Source:      "linprocfs",
+				Options:     []string{"nosuid", "noexec"},
+			})
+			haveProc = true
+			continue
+		}
+		if path == "/dev/fd" {
+			m.Options = append(m.Options, "linrdlink")
+			haveDevFd = true
+		}
+		mounts = append(mounts, m)
+	}
+	if !haveProc {
+		mounts = append(mounts, specs.Mount{
+			Destination: "/proc",
+			Type:        "linprocfs",
+			Source:      "linprocfs",
+			Options:     []string{},
+		})
+	}
+
+	if !haveDevFd {
+		mounts = append(mounts, specs.Mount{
+			Destination: "/dev/fd",
+			Type:        "fdescfs",
+			Source:      "fdescfs",
+			Options:     []string{"linrdlink"},
+		})
+	}
+	mounts = append(mounts, specs.Mount{
+		Destination: "/sys",
+		Type:        "linsysfs",
+		Source:      "linsysfs",
+		Options:     []string{"nosuid", "noexec", "nodev"}})
+	s.Mounts = mounts
+	return nil
 }
