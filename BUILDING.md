@@ -40,8 +40,8 @@ $ sudo unzip protoc-3.11.4-linux-x86_64.zip -d /usr/local
 `containerd` uses [Btrfs](https://en.wikipedia.org/wiki/Btrfs) it means that you
 need to satisfy these dependencies in your system:
 
-* CentOS/Fedora: `yum install btrfs-progs-devel`
-* Debian/Ubuntu: `apt-get install btrfs-progs libbtrfs-dev`
+* CentOS/Fedora: `sudo yum install btrfs-progs-devel`
+* Debian/Ubuntu: `sudo apt-get install btrfs-progs libbtrfs-dev`
   * Debian(before Buster)/Ubuntu(before 19.10): `apt-get install btrfs-tools`
 
 At this point you are ready to build `containerd` yourself!
@@ -56,8 +56,8 @@ correct version of `runc` installed.
 
 `runc` requires `libseccomp`. You may need to install the missing dependencies:
 
-* CentOS/Fedora: `yum install libseccomp libseccomp-devel`
-* Debian/Ubuntu: `apt-get install libseccomp libseccomp-dev`
+* CentOS/Fedora: `sudo yum install libseccomp libseccomp-devel`
+* Debian/Ubuntu: `sudo apt-get install libseccomp2 libseccomp-dev`
 
 
 For the quick and dirty installation, you can use the following:
