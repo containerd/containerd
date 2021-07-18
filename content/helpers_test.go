@@ -87,6 +87,41 @@ func TestCopy(t *testing.T) {
 	}
 }
 
+func TestTrylock(t *testing.T) {
+	l := newTrylock()
+
+	assert.NilError(t, l.lock(context.TODO(), "c1"))
+
+	var (
+		ackCh = make(chan struct{}, 1)
+		errCh = make(chan error, 1)
+	)
+
+	// expected error when cancel context
+	ctx, cancel := context.WithCancel(context.TODO())
+	go func() {
+		ackCh <- struct{}{}
+		errCh <- l.lock(ctx, "c1")
+	}()
+
+	<-ackCh
+	cancel()
+	assert.Check(t, is.Equal(<-errCh, context.Canceled))
+
+	// expected nil error if the key has been released
+	go func() {
+		ackCh <- struct{}{}
+		errCh <- l.lock(context.TODO(), "c1")
+	}()
+
+	<-ackCh
+	l.unlock("c1")
+	assert.NilError(t, <-errCh)
+
+	assert.NilError(t, l.lock(context.TODO(), "c2"))
+	assert.Check(t, is.Equal(len(l.locks), 2))
+}
+
 func newCopySource(raw string) copySource {
 	return copySource{
 		reader: strings.NewReader(raw),

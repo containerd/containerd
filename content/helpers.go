@@ -28,13 +28,43 @@ import (
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/semaphore"
 )
 
-var bufPool = sync.Pool{
-	New: func() interface{} {
-		buffer := make([]byte, 1<<20)
-		return &buffer
-	},
+var (
+	bufPool = sync.Pool{
+		New: func() interface{} {
+			buffer := make([]byte, 1<<20)
+			return &buffer
+		},
+	}
+
+	keyLocks = newTrylock()
+)
+
+type contentWriterWrapper struct {
+	Writer
+
+	ref        string
+	unlockOnce sync.Once
+}
+
+func (w *contentWriterWrapper) Close() error {
+	defer w.unlockRef()
+
+	return w.Writer.Close()
+}
+
+func (w *contentWriterWrapper) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...Opt) error {
+	defer w.unlockRef()
+
+	return w.Writer.Commit(ctx, size, expected, opts...)
+}
+
+func (w *contentWriterWrapper) unlockRef() {
+	w.unlockOnce.Do(func() {
+		keyLocks.unlock(w.ref)
+	})
 }
 
 // NewReader returns a io.Reader from a ReaderAt
@@ -90,38 +120,65 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, desc o
 // OpenWriter opens a new writer for the given reference, retrying if the writer
 // is locked until the reference is available or returns an error.
 func OpenWriter(ctx context.Context, cs Ingester, opts ...WriterOpt) (Writer, error) {
-	var (
-		cw    Writer
-		err   error
-		retry = 16
-	)
-	for {
-		cw, err = cs.Writer(ctx, opts...)
-		if err != nil {
-			if !errdefs.IsUnavailable(err) {
-				return nil, err
-			}
-
-			// TODO: Check status to determine if the writer is active,
-			// continue waiting while active, otherwise return lock
-			// error or abort. Requires asserting for an ingest manager
-
-			select {
-			case <-time.After(time.Millisecond * time.Duration(rand.Intn(retry))):
-				if retry < 2048 {
-					retry = retry << 1
-				}
-				continue
-			case <-ctx.Done():
-				// Propagate lock error
-				return nil, err
-			}
-
-		}
-		break
+	wOpt := &WriterOpts{}
+	for _, o := range opts {
+		o(wOpt)
 	}
 
-	return cw, err
+	ref := wOpt.Ref
+	if ref == "" {
+		return nil, errors.Wrap(errdefs.ErrInvalidArgument, "ref must not be empty")
+	}
+
+	// TODO: Keep the ref with namespace scope.
+	if err := keyLocks.lock(ctx, ref); err != nil {
+		return nil, err
+	}
+
+	// Even if the lock has been hold, the lock is on one client side and it
+	// still receives unavailable error when other client already holds the
+	// reference in the content backend. We still needs backoff retry here.
+	cw, err := func() (Writer, error) {
+		var (
+			cw    Writer
+			err   error
+			retry = 16
+		)
+
+		for {
+			cw, err = cs.Writer(ctx, opts...)
+			if err != nil {
+				if !errdefs.IsUnavailable(err) {
+					return nil, err
+				}
+
+				// TODO: Check status to determine if the writer is active,
+				// continue waiting while active, otherwise return lock
+				// error or abort. Requires asserting for an ingest manager
+				select {
+				case <-time.After(time.Millisecond * time.Duration(rand.Intn(retry))):
+					if retry < 2048 {
+						retry = retry << 1
+					}
+					continue
+				case <-ctx.Done():
+					// Propagate lock error
+					return nil, err
+				}
+			}
+			break
+		}
+		return cw, nil
+	}()
+	if err != nil {
+		keyLocks.unlock(ref)
+		return nil, err
+	}
+
+	return &contentWriterWrapper{
+		Writer: cw,
+		ref:    ref,
+	}, nil
 }
 
 // Copy copies data with the expected digest from the reader into the
@@ -272,4 +329,59 @@ func copyWithBuffer(dst io.Writer, src io.Reader) (written int64, err error) {
 		}
 	}
 	return
+}
+
+func newTrylock() *trylock {
+	return &trylock{
+		locks: make(map[string]*lockItem),
+	}
+}
+
+type trylock struct {
+	sync.Mutex
+
+	locks map[string]*lockItem
+}
+
+type lockItem struct {
+	waiter *semaphore.Weighted
+	cnt    int
+}
+
+func (l *trylock) lock(ctx context.Context, key string) error {
+	l.Lock()
+	w, ok := l.locks[key]
+	if !ok {
+		l.locks[key] = &lockItem{
+			waiter: semaphore.NewWeighted(1),
+		}
+		w = l.locks[key]
+	}
+	w.cnt++
+	l.Unlock()
+
+	if err := w.waiter.Acquire(ctx, 1); err != nil {
+		l.Lock()
+		w.cnt--
+		if w.cnt <= 0 {
+			delete(l.locks, key)
+		}
+		l.Unlock()
+		return err
+	}
+	return nil
+}
+
+func (l *trylock) unlock(key string) {
+	l.Lock()
+	defer l.Unlock()
+
+	w, ok := l.locks[key]
+	if ok {
+		w.waiter.Release(1)
+		w.cnt--
+		if w.cnt <= 0 {
+			delete(l.locks, key)
+		}
+	}
 }
