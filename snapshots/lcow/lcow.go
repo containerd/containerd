@@ -232,6 +232,16 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 	path := s.getSnapshotDir(id)
 	renamed := s.getSnapshotDir("rm-" + id)
 	if err := os.Rename(path, renamed); err != nil && !os.IsNotExist(err) {
+		// Sometimes if there are some open handles to the files (especially VHD)
+		// inside the snapshot directory the rename call will return "access
+		// denied" or "file is being used by another process" errors.  Just
+		// returning that error causes the entire snapshot garbage collection
+		// operation to fail. To avoid that we return failed pre-condition error
+		// here so that snapshot garbage collection can continue and can cleanup
+		// other snapshots.
+		if strings.Contains(err.Error(), "being used by another process") || os.IsPermission(err) {
+			return errors.Wrap(errdefs.ErrFailedPrecondition, err.Error())
+		}
 		return err
 	}
 

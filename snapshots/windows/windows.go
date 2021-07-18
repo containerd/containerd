@@ -251,25 +251,36 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 	renamedID := "rm-" + id
 	renamed := s.getSnapshotDir(renamedID)
 	if err := os.Rename(path, renamed); err != nil && !os.IsNotExist(err) {
-		if !os.IsPermission(err) {
+		// Sometimes if there are some open handles to the files (especially VHD)
+		// inside the snapshot directory the rename call will return "access
+		// denied" or "file is being used by another process" errors.  Just
+		// returning that error causes the entire snapshot garbage collection
+		// operation to fail. To avoid that we return failed pre-condition error
+		// here so that snapshot garbage collection can continue and can cleanup
+		// other snapshots.
+		if !(strings.Contains(err.Error(), "being used by another process") || os.IsPermission(err)) {
 			return err
 		}
-		// If permission denied, it's possible that the scratch is still mounted, an
-		// artifact after a hard daemon crash for example. Worth a shot to try deactivating it
-		// before retrying the rename.
-		var (
-			home, layerID = filepath.Split(path)
-			di            = hcsshim.DriverInfo{
-				HomeDir: home,
+		if os.IsPermission(err) {
+			// If permission denied, it's possible that the scratch is still mounted, an
+			// artifact after a hard daemon crash for example. Worth a shot to try detaching it
+			// before retrying the rename.
+			var (
+				home, layerID = filepath.Split(path)
+				di            = hcsshim.DriverInfo{
+					HomeDir: home,
+				}
+			)
+
+			if deactvateErr := hcsshim.DeactivateLayer(di, layerID); deactvateErr != nil {
+				return errors.Wrapf(errdefs.ErrFailedPrecondition, "failed to deactivate layer following rename failure %s : %s", deactvateErr.Error(), err.Error())
 			}
-		)
+			if renameErr := os.Rename(path, renamed); renameErr != nil && !os.IsNotExist(renameErr) {
 
-		if deactvateErr := hcsshim.DeactivateLayer(di, layerID); deactvateErr != nil {
-			return errors.Wrapf(err, "failed to deactivate layer following failed rename: %s", deactvateErr)
-		}
-
-		if renameErr := os.Rename(path, renamed); renameErr != nil && !os.IsNotExist(renameErr) {
-			return errors.Wrapf(err, "second rename attempt following detach failed: %s", renameErr)
+				return errors.Wrapf(errdefs.ErrFailedPrecondition, "second rename failed during %s: %s", renameErr.Error(), err.Error())
+			}
+		} else {
+			return errors.Wrap(errdefs.ErrFailedPrecondition, err.Error())
 		}
 	}
 
