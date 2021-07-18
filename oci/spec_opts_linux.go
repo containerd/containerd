@@ -20,6 +20,8 @@ package oci
 
 import (
 	"context"
+	"strconv"
+	"strings"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/pkg/cap"
@@ -42,13 +44,23 @@ func WithHostDevices(_ context.Context, _ Client, _ *containers.Container, s *Sp
 // If devicePath is a dir it traverses the dir to add all devices in that dir.
 // If devicePath is not a dir, it attempts to add the single device.
 // If containerPath is not set then the device path is used for the container path.
-func WithDevices(devicePath, containerPath, permissions string) SpecOpts {
+func WithDevices(devicePath, containerPath, permissions, ownership string) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		devs, err := getDevices(devicePath, containerPath)
 		if err != nil {
 			return err
 		}
+
+		var UID, GID *uint32 = nil, nil
+		if ownership != "" {
+			UID, GID = getDeviceOwnershipOverride(ownership)
+		}
+
 		for _, dev := range devs {
+			if UID != nil && GID != nil {
+				dev.UID = UID
+				dev.GID = GID
+			}
 			s.Linux.Devices = append(s.Linux.Devices, dev)
 			s.Linux.Resources.Devices = append(s.Linux.Resources.Devices, specs.LinuxDeviceCgroup{
 				Allow:  true,
@@ -60,6 +72,26 @@ func WithDevices(devicePath, containerPath, permissions string) SpecOpts {
 		}
 		return nil
 	}
+}
+
+func getDeviceOwnershipOverride(UIDGIDStr string) (*uint32, *uint32) {
+	s := strings.SplitN(UIDGIDStr, ":", 3)
+	if len(s) < 2 {
+		return nil, nil
+	}
+	u, err := strconv.ParseUint(s[0], 10, 32)
+	if err != nil {
+		return nil, nil
+	}
+	g, err := strconv.ParseUint(s[1], 10, 32)
+	if err != nil {
+		return nil, nil
+	}
+
+	u32 := uint32(u)
+	g32 := uint32(g)
+
+	return &u32, &g32
 }
 
 // WithMemorySwap sets the container's swap in bytes

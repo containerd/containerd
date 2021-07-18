@@ -59,4 +59,8 @@ const (
 
 	// PodAnnotations are the annotations of the pod
 	PodAnnotations = "io.kubernetes.cri.pod-annotations"
+
+	// DisableDeviceOwnershipFromSecurityContextAnnotation is the K8S annotation used by kubelet/device-plugins
+	// to opt-out getting Devices UID/GID set as RunAsUser/RunAsGroup
+	DisableDeviceOwnershipFromSecurityContext = "io.kubernetes.cri.DisableDeviceOwnershipFromSecurityContext"
 )
