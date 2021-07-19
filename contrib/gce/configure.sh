@@ -176,6 +176,8 @@ if [ "${KUBERNETES_MASTER:-}" != "true" ]; then
     cni_template_path=""
   fi
 fi
+# Use systemd cgroup if cgroupv2 is enabled
+systemdCgroup="${CONTAINERD_CGROUPV2:-"false"}"
 log_level="${CONTAINERD_LOG_LEVEL:-"info"}"
 max_container_log_line="${CONTAINERD_MAX_CONTAINER_LOG_LINE:-16384}"
 cat > ${config_path} <<EOF
@@ -204,6 +206,7 @@ disabled_plugins = ["io.containerd.internal.v1.restart"]
   runtime_type = "io.containerd.runc.v2"
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
   BinaryName = "${CONTAINERD_HOME}/usr/local/sbin/runc"
+  SystemdCgroup = ${systemdCgroup}
 EOF
 chmod 644 "${config_path}"
 
