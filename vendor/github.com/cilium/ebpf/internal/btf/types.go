@@ -380,11 +380,12 @@ func (r *Restrict) copy() Type {
 type Func struct {
 	TypeID
 	Name
-	Type Type
+	Type    Type
+	Linkage FuncLinkage
 }
 
 func (f *Func) String() string {
-	return fmt.Sprintf("func#%d[%q proto=#%d]", f.TypeID, f.Name, f.Type.ID())
+	return fmt.Sprintf("func#%d[%s %q proto=#%d]", f.TypeID, f.Linkage, f.Name, f.Type.ID())
 }
 
 func (f *Func) walk(tdq *typeDeque) { tdq.push(&f.Type) }
@@ -433,12 +434,12 @@ type FuncParam struct {
 type Var struct {
 	TypeID
 	Name
-	Type Type
+	Type    Type
+	Linkage VarLinkage
 }
 
 func (v *Var) String() string {
-	// TODO: Linkage
-	return fmt.Sprintf("var#%d[%q]", v.TypeID, v.Name)
+	return fmt.Sprintf("var#%d[%s %q]", v.TypeID, v.Linkage, v.Name)
 }
 
 func (v *Var) walk(tdq *typeDeque) { tdq.push(&v.Type) }
@@ -803,7 +804,7 @@ func inflateRawTypes(rawTypes []rawType, rawStrings stringTable) (types []Type, 
 			typ = restrict
 
 		case kindFunc:
-			fn := &Func{id, name, nil}
+			fn := &Func{id, name, nil, raw.Linkage()}
 			fixup(raw.Type(), kindFuncProto, &fn.Type)
 			typ = fn
 
@@ -828,7 +829,8 @@ func inflateRawTypes(rawTypes []rawType, rawStrings stringTable) (types []Type, 
 			typ = fp
 
 		case kindVar:
-			v := &Var{id, name, nil}
+			variable := raw.data.(*btfVariable)
+			v := &Var{id, name, nil, VarLinkage(variable.Linkage)}
 			fixup(raw.Type(), kindUnknown, &v.Type)
 			typ = v
 

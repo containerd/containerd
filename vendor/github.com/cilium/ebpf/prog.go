@@ -175,7 +175,7 @@ func newProgramWithOptions(spec *ProgramSpec, opts ProgramOptions, handles *hand
 	}
 
 	if haveObjName() == nil {
-		attr.progName = newBPFObjName(spec.Name)
+		attr.progName = internal.NewBPFObjName(spec.Name)
 	}
 
 	var err error
