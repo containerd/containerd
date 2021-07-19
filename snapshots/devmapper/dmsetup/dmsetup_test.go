@@ -83,6 +83,7 @@ func TestDMSetup(t *testing.T) {
 	t.Run("ActivateDevice", testActivateDevice)
 	t.Run("DeviceStatus", testDeviceStatus)
 	t.Run("SuspendResumeDevice", testSuspendResumeDevice)
+	t.Run("DiscardBlocks", testDiscardBlocks)
 	t.Run("RemoveDevice", testRemoveDevice)
 
 	t.Run("RemovePool", func(t *testing.T) {
@@ -167,6 +168,11 @@ func testSuspendResumeDevice(t *testing.T) {
 
 	err = ResumeDevice(testDeviceName)
 	assert.NilError(t, err)
+}
+
+func testDiscardBlocks(t *testing.T) {
+	err := DiscardBlocks(testDeviceName)
+	assert.NilError(t, err, "failed to discard blocks")
 }
 
 func testRemoveDevice(t *testing.T) {

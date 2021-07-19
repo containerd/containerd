@@ -85,6 +85,7 @@ func TestPoolDevice(t *testing.T) {
 		RootPath:           tempDir,
 		BaseImageSize:      "16mb",
 		BaseImageSizeBytes: 16 * 1024 * 1024,
+		DiscardBlocks:      true,
 	}
 
 	pool, err := NewPoolDevice(ctx, config)
