@@ -41,8 +41,8 @@ func AttachNetNs(ns int, prog *ebpf.Program) (*NetNsLink, error) {
 }
 
 // LoadPinnedNetNs loads a network namespace link from bpffs.
-func LoadPinnedNetNs(fileName string) (*NetNsLink, error) {
-	link, err := loadPinnedRawLink(fileName, NetNsType)
+func LoadPinnedNetNs(fileName string, opts *ebpf.LoadPinOptions) (*NetNsLink, error) {
+	link, err := LoadPinnedRawLink(fileName, NetNsType, opts)
 	if err != nil {
 		return nil, err
 	}

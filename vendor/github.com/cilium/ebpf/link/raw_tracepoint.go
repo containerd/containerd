@@ -55,3 +55,7 @@ func (rt *progAttachRawTracepoint) Update(_ *ebpf.Program) error {
 func (rt *progAttachRawTracepoint) Pin(_ string) error {
 	return fmt.Errorf("can't pin raw_tracepoint: %w", ErrNotSupported)
 }
+
+func (rt *progAttachRawTracepoint) Unpin() error {
+	return fmt.Errorf("unpin raw_tracepoint: %w", ErrNotSupported)
+}

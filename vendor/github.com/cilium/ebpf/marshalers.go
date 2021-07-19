@@ -84,7 +84,9 @@ func makeBuffer(dst interface{}, length int) (internal.Pointer, []byte) {
 func unmarshalBytes(data interface{}, buf []byte) error {
 	switch value := data.(type) {
 	case unsafe.Pointer:
-		sh := &reflect.SliceHeader{
+		// This could be solved in Go 1.17 by unsafe.Slice instead. (https://github.com/golang/go/issues/19367)
+		// We could opt for removing unsafe.Pointer support in the lib as well.
+		sh := &reflect.SliceHeader{ //nolint:govet
 			Data: uintptr(value),
 			Len:  len(buf),
 			Cap:  len(buf),
