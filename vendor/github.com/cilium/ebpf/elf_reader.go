@@ -96,7 +96,7 @@ func LoadCollectionSpecFromReader(rd io.ReaderAt) (*CollectionSpec, error) {
 	}
 
 	btfSpec, err := btf.LoadSpecFromReader(rd)
-	if err != nil {
+	if err != nil && !errors.Is(err, btf.ErrNotFound) {
 		return nil, fmt.Errorf("load BTF: %w", err)
 	}
 
@@ -159,7 +159,7 @@ func LoadCollectionSpecFromReader(rd io.ReaderAt) (*CollectionSpec, error) {
 			}
 
 			if target.Flags&elf.SHF_STRINGS > 0 {
-				return nil, fmt.Errorf("section %q: string %q is not stack allocated: %w", section.Name, rel.Name, ErrNotSupported)
+				return nil, fmt.Errorf("section %q: string is not stack allocated: %w", section.Name, ErrNotSupported)
 			}
 
 			target.references++
@@ -272,11 +272,12 @@ func (ec *elfCode) loadPrograms() (map[string]*ProgramSpec, error) {
 			return nil, fmt.Errorf("program %s: %w", funcSym.Name, err)
 		}
 
-		progType, attachType, attachTo := getProgType(sec.Name)
+		progType, attachType, progFlags, attachTo := getProgType(sec.Name)
 
 		spec := &ProgramSpec{
 			Name:          funcSym.Name,
 			Type:          progType,
+			Flags:         progFlags,
 			AttachType:    attachType,
 			AttachTo:      attachTo,
 			License:       ec.license,
@@ -373,16 +374,24 @@ func (ec *elfCode) relocateInstruction(ins *asm.Instruction, rel elf.Symbol) err
 		}
 
 	case dataSection:
+		var offset uint32
 		switch typ {
 		case elf.STT_SECTION:
 			if bind != elf.STB_LOCAL {
 				return fmt.Errorf("direct load: %s: unsupported relocation %s", name, bind)
 			}
 
+			// This is really a reference to a static symbol, which clang doesn't
+			// emit a symbol table entry for. Instead it encodes the offset in
+			// the instruction itself.
+			offset = uint32(uint64(ins.Constant))
+
 		case elf.STT_OBJECT:
 			if bind != elf.STB_GLOBAL {
 				return fmt.Errorf("direct load: %s: unsupported relocation %s", name, bind)
 			}
+
+			offset = uint32(rel.Value)
 
 		default:
 			return fmt.Errorf("incorrect relocation type %v for direct map load", typ)
@@ -393,10 +402,8 @@ func (ec *elfCode) relocateInstruction(ins *asm.Instruction, rel elf.Symbol) err
 		// it's not clear how to encode that into Instruction.
 		name = target.Name
 
-		// For some reason, clang encodes the offset of the symbol its
-		// section in the first basic BPF instruction, while the kernel
-		// expects it in the second one.
-		ins.Constant <<= 32
+		// The kernel expects the offset in the second basic BPF instruction.
+		ins.Constant = int64(uint64(offset) << 32)
 		ins.Src = asm.PseudoMapValue
 
 		// Mark the instruction as needing an update when creating the
@@ -490,33 +497,38 @@ func (ec *elfCode) loadMaps(maps map[string]*MapSpec) error {
 				return fmt.Errorf("section %s: missing symbol for map at offset %d", sec.Name, offset)
 			}
 
-			if maps[mapSym.Name] != nil {
+			mapName := mapSym.Name
+			if maps[mapName] != nil {
 				return fmt.Errorf("section %v: map %v already exists", sec.Name, mapSym)
 			}
 
 			lr := io.LimitReader(r, int64(size))
 
 			spec := MapSpec{
-				Name: SanitizeName(mapSym.Name, -1),
+				Name: SanitizeName(mapName, -1),
 			}
 			switch {
 			case binary.Read(lr, ec.ByteOrder, &spec.Type) != nil:
-				return fmt.Errorf("map %v: missing type", mapSym)
+				return fmt.Errorf("map %s: missing type", mapName)
 			case binary.Read(lr, ec.ByteOrder, &spec.KeySize) != nil:
-				return fmt.Errorf("map %v: missing key size", mapSym)
+				return fmt.Errorf("map %s: missing key size", mapName)
 			case binary.Read(lr, ec.ByteOrder, &spec.ValueSize) != nil:
-				return fmt.Errorf("map %v: missing value size", mapSym)
+				return fmt.Errorf("map %s: missing value size", mapName)
 			case binary.Read(lr, ec.ByteOrder, &spec.MaxEntries) != nil:
-				return fmt.Errorf("map %v: missing max entries", mapSym)
+				return fmt.Errorf("map %s: missing max entries", mapName)
 			case binary.Read(lr, ec.ByteOrder, &spec.Flags) != nil:
-				return fmt.Errorf("map %v: missing flags", mapSym)
+				return fmt.Errorf("map %s: missing flags", mapName)
 			}
 
 			if _, err := io.Copy(internal.DiscardZeroes{}, lr); err != nil {
-				return fmt.Errorf("map %v: unknown and non-zero fields in definition", mapSym)
+				return fmt.Errorf("map %s: unknown and non-zero fields in definition", mapName)
 			}
 
-			maps[mapSym.Name] = &spec
+			if err := spec.clampPerfEventArraySize(); err != nil {
+				return fmt.Errorf("map %s: %w", mapName, err)
+			}
+
+			maps[mapName] = &spec
 		}
 	}
 
@@ -533,28 +545,25 @@ func (ec *elfCode) loadBTFMaps(maps map[string]*MapSpec) error {
 			return fmt.Errorf("missing BTF")
 		}
 
-		if len(sec.symbols) == 0 {
-			return fmt.Errorf("section %v: no symbols", sec.Name)
-		}
-
 		_, err := io.Copy(internal.DiscardZeroes{}, bufio.NewReader(sec.Open()))
 		if err != nil {
 			return fmt.Errorf("section %v: initializing BTF map definitions: %w", sec.Name, internal.ErrNotSupported)
 		}
 
-		for _, sym := range sec.symbols {
-			name := sym.Name
-			if maps[name] != nil {
-				return fmt.Errorf("section %v: map %v already exists", sec.Name, sym)
-			}
+		var ds btf.Datasec
+		if err := ec.btf.FindType(sec.Name, &ds); err != nil {
+			return fmt.Errorf("cannot find section '%s' in BTF: %w", sec.Name, err)
+		}
 
-			// A global Var is created by declaring a struct with a 'structure variable',
-			// as is common in eBPF C to declare eBPF maps. For example,
-			// `struct { ... } map_name ...;` emits a global variable `map_name`
-			// with the type of said struct (which can be anonymous).
-			var v btf.Var
-			if err := ec.btf.FindType(name, &v); err != nil {
-				return fmt.Errorf("cannot find global variable '%s' in BTF: %w", name, err)
+		for _, vs := range ds.Vars {
+			v, ok := vs.Type.(*btf.Var)
+			if !ok {
+				return fmt.Errorf("section %v: unexpected type %s", sec.Name, vs.Type)
+			}
+			name := string(v.Name)
+
+			if maps[name] != nil {
+				return fmt.Errorf("section %v: map %s already exists", sec.Name, name)
 			}
 
 			mapStruct, ok := v.Type.(*btf.Struct)
@@ -564,6 +573,10 @@ func (ec *elfCode) loadBTFMaps(maps map[string]*MapSpec) error {
 
 			mapSpec, err := mapSpecFromBTF(name, mapStruct, false, ec.btf)
 			if err != nil {
+				return fmt.Errorf("map %v: %w", name, err)
+			}
+
+			if err := mapSpec.clampPerfEventArraySize(); err != nil {
 				return fmt.Errorf("map %v: %w", name, err)
 			}
 
@@ -834,56 +847,66 @@ func (ec *elfCode) loadDataSections(maps map[string]*MapSpec) error {
 	return nil
 }
 
-func getProgType(sectionName string) (ProgramType, AttachType, string) {
+func getProgType(sectionName string) (ProgramType, AttachType, uint32, string) {
 	types := map[string]struct {
 		progType   ProgramType
 		attachType AttachType
+		progFlags  uint32
 	}{
 		// From https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/tools/lib/bpf/libbpf.c
-		"socket":                {SocketFilter, AttachNone},
-		"seccomp":               {SocketFilter, AttachNone},
-		"kprobe/":               {Kprobe, AttachNone},
-		"uprobe/":               {Kprobe, AttachNone},
-		"kretprobe/":            {Kprobe, AttachNone},
-		"uretprobe/":            {Kprobe, AttachNone},
-		"tracepoint/":           {TracePoint, AttachNone},
-		"raw_tracepoint/":       {RawTracepoint, AttachNone},
-		"xdp":                   {XDP, AttachNone},
-		"perf_event":            {PerfEvent, AttachNone},
-		"lwt_in":                {LWTIn, AttachNone},
-		"lwt_out":               {LWTOut, AttachNone},
-		"lwt_xmit":              {LWTXmit, AttachNone},
-		"lwt_seg6local":         {LWTSeg6Local, AttachNone},
-		"sockops":               {SockOps, AttachCGroupSockOps},
-		"sk_skb/stream_parser":  {SkSKB, AttachSkSKBStreamParser},
-		"sk_skb/stream_verdict": {SkSKB, AttachSkSKBStreamParser},
-		"sk_msg":                {SkMsg, AttachSkSKBStreamVerdict},
-		"lirc_mode2":            {LircMode2, AttachLircMode2},
-		"flow_dissector":        {FlowDissector, AttachFlowDissector},
-		"iter/":                 {Tracing, AttachTraceIter},
-		"sk_lookup/":            {SkLookup, AttachSkLookup},
-		"lsm/":                  {LSM, AttachLSMMac},
+		"socket":                {SocketFilter, AttachNone, 0},
+		"seccomp":               {SocketFilter, AttachNone, 0},
+		"kprobe/":               {Kprobe, AttachNone, 0},
+		"uprobe/":               {Kprobe, AttachNone, 0},
+		"kretprobe/":            {Kprobe, AttachNone, 0},
+		"uretprobe/":            {Kprobe, AttachNone, 0},
+		"tracepoint/":           {TracePoint, AttachNone, 0},
+		"raw_tracepoint/":       {RawTracepoint, AttachNone, 0},
+		"raw_tp/":               {RawTracepoint, AttachNone, 0},
+		"tp_btf/":               {Tracing, AttachTraceRawTp, 0},
+		"xdp":                   {XDP, AttachNone, 0},
+		"perf_event":            {PerfEvent, AttachNone, 0},
+		"lwt_in":                {LWTIn, AttachNone, 0},
+		"lwt_out":               {LWTOut, AttachNone, 0},
+		"lwt_xmit":              {LWTXmit, AttachNone, 0},
+		"lwt_seg6local":         {LWTSeg6Local, AttachNone, 0},
+		"sockops":               {SockOps, AttachCGroupSockOps, 0},
+		"sk_skb/stream_parser":  {SkSKB, AttachSkSKBStreamParser, 0},
+		"sk_skb/stream_verdict": {SkSKB, AttachSkSKBStreamParser, 0},
+		"sk_msg":                {SkMsg, AttachSkSKBStreamVerdict, 0},
+		"lirc_mode2":            {LircMode2, AttachLircMode2, 0},
+		"flow_dissector":        {FlowDissector, AttachFlowDissector, 0},
+		"iter/":                 {Tracing, AttachTraceIter, 0},
+		"fentry/":               {Tracing, AttachTraceFEntry, 0},
+		"fmod_ret/":             {Tracing, AttachModifyReturn, 0},
+		"fexit/":                {Tracing, AttachTraceFExit, 0},
+		"fentry.s/":             {Tracing, AttachTraceFEntry, unix.BPF_F_SLEEPABLE},
+		"fmod_ret.s/":           {Tracing, AttachModifyReturn, unix.BPF_F_SLEEPABLE},
+		"fexit.s/":              {Tracing, AttachTraceFExit, unix.BPF_F_SLEEPABLE},
+		"sk_lookup/":            {SkLookup, AttachSkLookup, 0},
+		"lsm/":                  {LSM, AttachLSMMac, 0},
+		"lsm.s/":                {LSM, AttachLSMMac, unix.BPF_F_SLEEPABLE},
 
-		"cgroup_skb/ingress": {CGroupSKB, AttachCGroupInetIngress},
-		"cgroup_skb/egress":  {CGroupSKB, AttachCGroupInetEgress},
-		"cgroup/dev":         {CGroupDevice, AttachCGroupDevice},
-		"cgroup/skb":         {CGroupSKB, AttachNone},
-		"cgroup/sock":        {CGroupSock, AttachCGroupInetSockCreate},
-		"cgroup/post_bind4":  {CGroupSock, AttachCGroupInet4PostBind},
-		"cgroup/post_bind6":  {CGroupSock, AttachCGroupInet6PostBind},
-		"cgroup/bind4":       {CGroupSockAddr, AttachCGroupInet4Bind},
-		"cgroup/bind6":       {CGroupSockAddr, AttachCGroupInet6Bind},
-		"cgroup/connect4":    {CGroupSockAddr, AttachCGroupInet4Connect},
-		"cgroup/connect6":    {CGroupSockAddr, AttachCGroupInet6Connect},
-		"cgroup/sendmsg4":    {CGroupSockAddr, AttachCGroupUDP4Sendmsg},
-		"cgroup/sendmsg6":    {CGroupSockAddr, AttachCGroupUDP6Sendmsg},
-		"cgroup/recvmsg4":    {CGroupSockAddr, AttachCGroupUDP4Recvmsg},
-		"cgroup/recvmsg6":    {CGroupSockAddr, AttachCGroupUDP6Recvmsg},
-		"cgroup/sysctl":      {CGroupSysctl, AttachCGroupSysctl},
-		"cgroup/getsockopt":  {CGroupSockopt, AttachCGroupGetsockopt},
-		"cgroup/setsockopt":  {CGroupSockopt, AttachCGroupSetsockopt},
-		"classifier":         {SchedCLS, AttachNone},
-		"action":             {SchedACT, AttachNone},
+		"cgroup_skb/ingress": {CGroupSKB, AttachCGroupInetIngress, 0},
+		"cgroup_skb/egress":  {CGroupSKB, AttachCGroupInetEgress, 0},
+		"cgroup/dev":         {CGroupDevice, AttachCGroupDevice, 0},
+		"cgroup/skb":         {CGroupSKB, AttachNone, 0},
+		"cgroup/sock":        {CGroupSock, AttachCGroupInetSockCreate, 0},
+		"cgroup/post_bind4":  {CGroupSock, AttachCGroupInet4PostBind, 0},
+		"cgroup/post_bind6":  {CGroupSock, AttachCGroupInet6PostBind, 0},
+		"cgroup/bind4":       {CGroupSockAddr, AttachCGroupInet4Bind, 0},
+		"cgroup/bind6":       {CGroupSockAddr, AttachCGroupInet6Bind, 0},
+		"cgroup/connect4":    {CGroupSockAddr, AttachCGroupInet4Connect, 0},
+		"cgroup/connect6":    {CGroupSockAddr, AttachCGroupInet6Connect, 0},
+		"cgroup/sendmsg4":    {CGroupSockAddr, AttachCGroupUDP4Sendmsg, 0},
+		"cgroup/sendmsg6":    {CGroupSockAddr, AttachCGroupUDP6Sendmsg, 0},
+		"cgroup/recvmsg4":    {CGroupSockAddr, AttachCGroupUDP4Recvmsg, 0},
+		"cgroup/recvmsg6":    {CGroupSockAddr, AttachCGroupUDP6Recvmsg, 0},
+		"cgroup/sysctl":      {CGroupSysctl, AttachCGroupSysctl, 0},
+		"cgroup/getsockopt":  {CGroupSockopt, AttachCGroupGetsockopt, 0},
+		"cgroup/setsockopt":  {CGroupSockopt, AttachCGroupSetsockopt, 0},
+		"classifier":         {SchedCLS, AttachNone, 0},
+		"action":             {SchedACT, AttachNone, 0},
 	}
 
 	for prefix, t := range types {
@@ -892,13 +915,13 @@ func getProgType(sectionName string) (ProgramType, AttachType, string) {
 		}
 
 		if !strings.HasSuffix(prefix, "/") {
-			return t.progType, t.attachType, ""
+			return t.progType, t.attachType, t.progFlags, ""
 		}
 
-		return t.progType, t.attachType, sectionName[len(prefix):]
+		return t.progType, t.attachType, t.progFlags, sectionName[len(prefix):]
 	}
 
-	return UnspecifiedProgram, AttachNone, ""
+	return UnspecifiedProgram, AttachNone, 0, ""
 }
 
 func (ec *elfCode) loadRelocations(sec *elf.Section, symbols []elf.Symbol) (map[uint64]elf.Symbol, error) {

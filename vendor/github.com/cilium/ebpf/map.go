@@ -18,6 +18,7 @@ var (
 	ErrKeyNotExist      = errors.New("key does not exist")
 	ErrKeyExist         = errors.New("key already exists")
 	ErrIterationAborted = errors.New("iteration aborted")
+	ErrMapIncompatible  = errors.New("map's spec is incompatible with pinned map")
 )
 
 // MapOptions control loading a map into the kernel.
@@ -25,7 +26,8 @@ type MapOptions struct {
 	// The base path to pin maps in if requested via PinByName.
 	// Existing maps will be re-used if they are compatible, otherwise an
 	// error is returned.
-	PinPath string
+	PinPath        string
+	LoadPinOptions LoadPinOptions
 }
 
 // MapID represents the unique ID of an eBPF map
@@ -40,7 +42,10 @@ type MapSpec struct {
 	KeySize    uint32
 	ValueSize  uint32
 	MaxEntries uint32
-	Flags      uint32
+
+	// Flags is passed to the kernel and specifies additional map
+	// creation attributes.
+	Flags uint32
 
 	// Automatically pin and load a map from MapOptions.PinPath.
 	// Generates an error if an existing pinned map is incompatible with the MapSpec.
@@ -83,6 +88,23 @@ func (ms *MapSpec) Copy() *MapSpec {
 	return &cpy
 }
 
+func (ms *MapSpec) clampPerfEventArraySize() error {
+	if ms.Type != PerfEventArray {
+		return nil
+	}
+
+	n, err := internal.PossibleCPUs()
+	if err != nil {
+		return fmt.Errorf("perf event array: %w", err)
+	}
+
+	if n := uint32(n); ms.MaxEntries > n {
+		ms.MaxEntries = n
+	}
+
+	return nil
+}
+
 // MapKV is used to initialize the contents of a Map.
 type MapKV struct {
 	Key   interface{}
@@ -92,19 +114,19 @@ type MapKV struct {
 func (ms *MapSpec) checkCompatibility(m *Map) error {
 	switch {
 	case m.typ != ms.Type:
-		return fmt.Errorf("expected type %v, got %v", ms.Type, m.typ)
+		return fmt.Errorf("expected type %v, got %v: %w", ms.Type, m.typ, ErrMapIncompatible)
 
 	case m.keySize != ms.KeySize:
-		return fmt.Errorf("expected key size %v, got %v", ms.KeySize, m.keySize)
+		return fmt.Errorf("expected key size %v, got %v: %w", ms.KeySize, m.keySize, ErrMapIncompatible)
 
 	case m.valueSize != ms.ValueSize:
-		return fmt.Errorf("expected value size %v, got %v", ms.ValueSize, m.valueSize)
+		return fmt.Errorf("expected value size %v, got %v: %w", ms.ValueSize, m.valueSize, ErrMapIncompatible)
 
 	case m.maxEntries != ms.MaxEntries:
-		return fmt.Errorf("expected max entries %v, got %v", ms.MaxEntries, m.maxEntries)
+		return fmt.Errorf("expected max entries %v, got %v: %w", ms.MaxEntries, m.maxEntries, ErrMapIncompatible)
 
 	case m.flags != ms.Flags:
-		return fmt.Errorf("expected flags %v, got %v", ms.Flags, m.flags)
+		return fmt.Errorf("expected flags %v, got %v: %w", ms.Flags, m.flags, ErrMapIncompatible)
 	}
 	return nil
 }
@@ -167,31 +189,40 @@ func NewMap(spec *MapSpec) (*Map, error) {
 // The caller is responsible for ensuring the process' rlimit is set
 // sufficiently high for locking memory during map creation. This can be done
 // by calling unix.Setrlimit with unix.RLIMIT_MEMLOCK prior to calling NewMapWithOptions.
+//
+// May return an error wrapping ErrMapIncompatible.
 func NewMapWithOptions(spec *MapSpec, opts MapOptions) (*Map, error) {
-	btfs := make(btfHandleCache)
-	defer btfs.close()
+	handles := newHandleCache()
+	defer handles.close()
 
-	return newMapWithOptions(spec, opts, btfs)
+	return newMapWithOptions(spec, opts, handles)
 }
 
-func newMapWithOptions(spec *MapSpec, opts MapOptions, btfs btfHandleCache) (*Map, error) {
+func newMapWithOptions(spec *MapSpec, opts MapOptions, handles *handleCache) (_ *Map, err error) {
+	closeOnError := func(c io.Closer) {
+		if err != nil {
+			c.Close()
+		}
+	}
+
 	switch spec.Pinning {
 	case PinByName:
 		if spec.Name == "" || opts.PinPath == "" {
 			return nil, fmt.Errorf("pin by name: missing Name or PinPath")
 		}
 
-		m, err := LoadPinnedMap(filepath.Join(opts.PinPath, spec.Name))
+		path := filepath.Join(opts.PinPath, spec.Name)
+		m, err := LoadPinnedMap(path, &opts.LoadPinOptions)
 		if errors.Is(err, unix.ENOENT) {
 			break
 		}
 		if err != nil {
-			return nil, fmt.Errorf("load pinned map: %s", err)
+			return nil, fmt.Errorf("load pinned map: %w", err)
 		}
+		defer closeOnError(m)
 
 		if err := spec.checkCompatibility(m); err != nil {
-			m.Close()
-			return nil, fmt.Errorf("use pinned map %s: %s", spec.Name, err)
+			return nil, fmt.Errorf("use pinned map %s: %w", spec.Name, err)
 		}
 
 		return m, nil
@@ -200,7 +231,7 @@ func newMapWithOptions(spec *MapSpec, opts MapOptions, btfs btfHandleCache) (*Ma
 		// Nothing to do here
 
 	default:
-		return nil, fmt.Errorf("unsupported pin type %d", int(spec.Pinning))
+		return nil, fmt.Errorf("pin type %d: %w", int(spec.Pinning), ErrNotSupported)
 	}
 
 	var innerFd *internal.FD
@@ -213,7 +244,7 @@ func newMapWithOptions(spec *MapSpec, opts MapOptions, btfs btfHandleCache) (*Ma
 			return nil, errors.New("inner maps cannot be pinned")
 		}
 
-		template, err := createMap(spec.InnerMap, nil, opts, btfs)
+		template, err := createMap(spec.InnerMap, nil, opts, handles)
 		if err != nil {
 			return nil, err
 		}
@@ -222,14 +253,15 @@ func newMapWithOptions(spec *MapSpec, opts MapOptions, btfs btfHandleCache) (*Ma
 		innerFd = template.fd
 	}
 
-	m, err := createMap(spec, innerFd, opts, btfs)
+	m, err := createMap(spec, innerFd, opts, handles)
 	if err != nil {
 		return nil, err
 	}
+	defer closeOnError(m)
 
 	if spec.Pinning == PinByName {
-		if err := m.Pin(filepath.Join(opts.PinPath, spec.Name)); err != nil {
-			m.Close()
+		path := filepath.Join(opts.PinPath, spec.Name)
+		if err := m.Pin(path); err != nil {
 			return nil, fmt.Errorf("pin map: %s", err)
 		}
 	}
@@ -237,7 +269,7 @@ func newMapWithOptions(spec *MapSpec, opts MapOptions, btfs btfHandleCache) (*Ma
 	return m, nil
 }
 
-func createMap(spec *MapSpec, inner *internal.FD, opts MapOptions, btfs btfHandleCache) (_ *Map, err error) {
+func createMap(spec *MapSpec, inner *internal.FD, opts MapOptions, handles *handleCache) (_ *Map, err error) {
 	closeOnError := func(closer io.Closer) {
 		if err != nil {
 			closer.Close()
@@ -284,44 +316,54 @@ func createMap(spec *MapSpec, inner *internal.FD, opts MapOptions, btfs btfHandl
 			return nil, fmt.Errorf("map create: %w", err)
 		}
 	}
+	if spec.Flags&unix.BPF_F_MMAPABLE > 0 {
+		if err := haveMmapableMaps(); err != nil {
+			return nil, fmt.Errorf("map create: %w", err)
+		}
+	}
+	if spec.Flags&unix.BPF_F_INNER_MAP > 0 {
+		if err := haveInnerMaps(); err != nil {
+			return nil, fmt.Errorf("map create: %w", err)
+		}
+	}
 
-	attr := bpfMapCreateAttr{
-		mapType:    spec.Type,
-		keySize:    spec.KeySize,
-		valueSize:  spec.ValueSize,
-		maxEntries: spec.MaxEntries,
-		flags:      spec.Flags,
-		numaNode:   spec.NumaNode,
+	attr := internal.BPFMapCreateAttr{
+		MapType:    uint32(spec.Type),
+		KeySize:    spec.KeySize,
+		ValueSize:  spec.ValueSize,
+		MaxEntries: spec.MaxEntries,
+		Flags:      spec.Flags,
+		NumaNode:   spec.NumaNode,
 	}
 
 	if inner != nil {
 		var err error
-		attr.innerMapFd, err = inner.Value()
+		attr.InnerMapFd, err = inner.Value()
 		if err != nil {
 			return nil, fmt.Errorf("map create: %w", err)
 		}
 	}
 
 	if haveObjName() == nil {
-		attr.mapName = newBPFObjName(spec.Name)
+		attr.MapName = internal.NewBPFObjName(spec.Name)
 	}
 
 	var btfDisabled bool
 	if spec.BTF != nil {
-		handle, err := btfs.load(btf.MapSpec(spec.BTF))
+		handle, err := handles.btfHandle(btf.MapSpec(spec.BTF))
 		btfDisabled = errors.Is(err, btf.ErrNotSupported)
 		if err != nil && !btfDisabled {
 			return nil, fmt.Errorf("load BTF: %w", err)
 		}
 
 		if handle != nil {
-			attr.btfFd = uint32(handle.FD())
-			attr.btfKeyTypeID = btf.MapKey(spec.BTF).ID()
-			attr.btfValueTypeID = btf.MapValue(spec.BTF).ID()
+			attr.BTFFd = uint32(handle.FD())
+			attr.BTFKeyTypeID = uint32(btf.MapKey(spec.BTF).ID())
+			attr.BTFValueTypeID = uint32(btf.MapValue(spec.BTF).ID())
 		}
 	}
 
-	fd, err := bpfMapCreate(&attr)
+	fd, err := internal.BPFMapCreate(&attr)
 	if err != nil {
 		if errors.Is(err, unix.EPERM) {
 			return nil, fmt.Errorf("map create: RLIMIT_MEMLOCK may be too low: %w", err)
@@ -805,12 +847,13 @@ func (m *Map) Clone() (*Map, error) {
 // Pin persists the map on the BPF virtual file system past the lifetime of
 // the process that created it .
 //
-// Calling Pin on a previously pinned map will override the path.
+// Calling Pin on a previously pinned map will overwrite the path, except when
+// the new path already exists. Re-pinning across filesystems is not supported.
 // You can Clone a map to pin it to a different path.
 //
 // This requires bpffs to be mounted above fileName. See https://docs.cilium.io/en/k8s-doc/admin/#admin-mount-bpffs
 func (m *Map) Pin(fileName string) error {
-	if err := pin(m.pinnedPath, fileName, m.fd); err != nil {
+	if err := internal.Pin(m.pinnedPath, fileName, m.fd); err != nil {
 		return err
 	}
 	m.pinnedPath = fileName
@@ -823,7 +866,7 @@ func (m *Map) Pin(fileName string) error {
 //
 // Unpinning an unpinned Map returns nil.
 func (m *Map) Unpin() error {
-	if err := unpin(m.pinnedPath); err != nil {
+	if err := internal.Unpin(m.pinnedPath); err != nil {
 		return err
 	}
 	m.pinnedPath = ""
@@ -832,10 +875,7 @@ func (m *Map) Unpin() error {
 
 // IsPinned returns true if the map has a non-empty pinned path.
 func (m *Map) IsPinned() bool {
-	if m.pinnedPath == "" {
-		return false
-	}
-	return true
+	return m.pinnedPath != ""
 }
 
 // Freeze prevents a map to be modified from user space.
@@ -937,7 +977,9 @@ func (m *Map) unmarshalValue(value interface{}, buf []byte) error {
 			return err
 		}
 
-		(*value).Close()
+		// The caller might close the map externally, so ignore errors.
+		_ = (*value).Close()
+
 		*value = other
 		return nil
 
@@ -957,7 +999,9 @@ func (m *Map) unmarshalValue(value interface{}, buf []byte) error {
 			return err
 		}
 
-		(*value).Close()
+		// The caller might close the program externally, so ignore errors.
+		_ = (*value).Close()
+
 		*value = other
 		return nil
 
@@ -971,9 +1015,9 @@ func (m *Map) unmarshalValue(value interface{}, buf []byte) error {
 	return unmarshalBytes(value, buf)
 }
 
-// LoadPinnedMap load a Map from a BPF file.
-func LoadPinnedMap(fileName string) (*Map, error) {
-	fd, err := internal.BPFObjGet(fileName)
+// LoadPinnedMap loads a Map from a BPF file.
+func LoadPinnedMap(fileName string, opts *LoadPinOptions) (*Map, error) {
+	fd, err := internal.BPFObjGet(fileName, opts.Marshal())
 	if err != nil {
 		return nil, err
 	}

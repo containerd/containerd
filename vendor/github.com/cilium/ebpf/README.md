@@ -13,7 +13,7 @@ be used in long running processes.
 * [perf](https://pkg.go.dev/github.com/cilium/ebpf/perf) allows reading from a
   `PERF_EVENT_ARRAY`
 * [cmd/bpf2go](https://pkg.go.dev/github.com/cilium/ebpf/cmd/bpf2go) allows
-  embedding eBPF in Go
+  compiling and embedding eBPF programs in Go code
 
 The library is maintained by [Cloudflare](https://www.cloudflare.com) and
 [Cilium](https://www.cilium.io). Feel free to
@@ -24,6 +24,14 @@ The library is maintained by [Cloudflare](https://www.cloudflare.com) and
 
 The package is production ready, but **the API is explicitly unstable right
 now**. Expect to update your code if you want to follow along.
+
+## Getting Started
+
+A small collection of Go and eBPF programs that serve as examples for building
+your own tools can be found under [examples/](examples/).
+
+Contributions are highly encouraged, as they highlight certain use cases of
+eBPF and the library, and help shape the future of the project.
 
 ## Requirements
 
