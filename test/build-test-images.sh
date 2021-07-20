@@ -27,6 +27,8 @@ set -o pipefail
 basedir="$(dirname "${BASH_SOURCE[0]}")"
 source "${basedir}/build-utils.sh"
 source "${basedir}/init-buildx.sh"
+
+ROOT="$( cd "$basedir" && pwd )"/..
 cd "${ROOT}"
 
 # ignore errors if the image already exists

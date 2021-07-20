@@ -14,10 +14,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
-
 # PROJECT is the gce project to upload tarball.
-PROJECT=${PROJECT:-"k8s-cri-containerd"}
+: "${PROJECT:=k8s-cri-containerd}"
 
 # GOOGLE_APPLICATION_CREDENTIALS is the path of service account file.
 if [ -z "${GOOGLE_APPLICATION_CREDENTIALS:-""}" ]; then

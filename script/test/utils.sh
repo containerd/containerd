@@ -14,8 +14,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/../..
-
 IS_WINDOWS=0
 if [ -v "OS" ] && [ "${OS}" == "Windows_NT" ]; then
   IS_WINDOWS=1

@@ -22,7 +22,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-source "$(dirname "${BASH_SOURCE[0]}")/build-utils.sh"
+basedir="$(dirname "${BASH_SOURCE[0]}")"
+source "${basedir}/build-utils.sh"
+
+ROOT="$( cd "${basedir}" && pwd )"/..
 cd "${ROOT}"
 
 # Make sure output directory is clean.

@@ -14,10 +14,14 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+set -o errexit
 set -o nounset
 set -o pipefail
 
-source "$(dirname "${BASH_SOURCE[0]}")/utils.sh"
+basedir="$(dirname "${BASH_SOURCE[0]}")"
+source "${basedir}/utils.sh"
+
+ROOT="$( cd "${basedir}" && pwd )"/../..
 cd "${ROOT}"
 
 # FOCUS focuses the test to run.
