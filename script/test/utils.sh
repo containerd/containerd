@@ -85,8 +85,8 @@ test_setup() {
   set -m
   # Create containerd in a different process group
   # so that we can easily clean them up.
-  keepalive "sudo PATH=${PATH} bin/containerd ${CONTAINERD_FLAGS}" \
-    ${RESTART_WAIT_PERIOD} &> ${report_dir}/containerd.log &
+  keepalive "sudo -E PATH=${PATH} bin/containerd ${CONTAINERD_FLAGS}" \
+    "${RESTART_WAIT_PERIOD}" &> "${report_dir}/containerd.log" &
   pid=$!
   set +m
   containerd_groupid=$(ps -o pgid= -p ${pid})
@@ -117,11 +117,11 @@ keepalive() {
   # e.g. containerd receives SIGKILL
   set +e
   local command=$1
-  echo ${command}
+  echo "${command}"
   local wait_period=$2
   while true; do
     ${command}
-    sleep ${wait_period}
+    sleep "${wait_period}"
   done
 }
 

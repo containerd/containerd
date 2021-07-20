@@ -37,7 +37,7 @@ split_ip() {
   local -r varname="$1"
   local -r ip="$2"
   for i in {0..3}; do
-    eval "$varname"[$i]=$( echo "$ip" | cut -d '.' -f $((i + 1)) )
+    eval "$varname"[$i]="$( echo "$ip" | cut -d '.' -f $((i + 1)) )"
   done
 }
 

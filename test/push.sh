@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-source $(dirname "${BASH_SOURCE[0]}")/utils.sh
+source "$(dirname "${BASH_SOURCE[0]}")/utils.sh"
 
 # DEPLOY_BUCKET is the gcs bucket where the tarball should be stored in.
 DEPLOY_BUCKET=${DEPLOY_BUCKET:-"cri-containerd-staging"}
@@ -41,7 +41,7 @@ if [[ ! -e ${release_tar} || ! -e ${release_tar_checksum} ]]; then
 fi
 
 if ! gsutil ls "gs://${DEPLOY_BUCKET}" > /dev/null; then
-  create_ttl_bucket ${DEPLOY_BUCKET}
+  create_ttl_bucket "${DEPLOY_BUCKET}"
 fi
 
 if [ -z "${DEPLOY_DIR}" ]; then
@@ -50,8 +50,8 @@ else
   DEPLOY_PATH="${DEPLOY_BUCKET}/${DEPLOY_DIR}"
 fi
 
-gsutil cp ${release_tar} "gs://${DEPLOY_PATH}/"
-gsutil cp ${release_tar_checksum} "gs://${DEPLOY_PATH}/"
+gsutil cp "${release_tar}" "gs://${DEPLOY_PATH}/"
+gsutil cp "${release_tar_checksum}" "gs://${DEPLOY_PATH}/"
 echo "Release tarball is uploaded to:
   https://storage.googleapis.com/${DEPLOY_PATH}/${TARBALL}"
 
@@ -60,7 +60,7 @@ if ${PUSH_VERSION}; then
     echo "VERSION is not set"
     exit 1
   fi
-  echo ${VERSION} | gsutil cp - "gs://${DEPLOY_PATH}/${LATEST}"
+  echo "${VERSION}" | gsutil cp - "gs://${DEPLOY_PATH}/${LATEST}"
   echo "Latest version is uploaded to:
   https://storage.googleapis.com/${DEPLOY_PATH}/${LATEST}"
 fi
