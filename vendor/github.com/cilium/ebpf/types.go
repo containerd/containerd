@@ -1,5 +1,9 @@
 package ebpf
 
+import (
+	"github.com/cilium/ebpf/internal/unix"
+)
+
 //go:generate stringer -output types_string.go -type=MapType,ProgramType,AttachType,PinType
 
 // MapType indicates the type map structure
@@ -81,6 +85,10 @@ const (
 	SkStorage
 	// DevMapHash - Hash-based indexing scheme for references to network devices.
 	DevMapHash
+	StructOpts
+	RingBuf
+	InodeStorage
+	TaskStorage
 )
 
 // hasPerCPUValue returns true if the Map stores a value per CPU.
@@ -201,6 +209,33 @@ const (
 	// Pin an object by using its name as the filename.
 	PinByName
 )
+
+// LoadPinOptions control how a pinned object is loaded.
+type LoadPinOptions struct {
+	// Request a read-only or write-only object. The default is a read-write
+	// object. Only one of the flags may be set.
+	ReadOnly  bool
+	WriteOnly bool
+
+	// Raw flags for the syscall. Other fields of this struct take precedence.
+	Flags uint32
+}
+
+// Marshal returns a value suitable for BPF_OBJ_GET syscall file_flags parameter.
+func (lpo *LoadPinOptions) Marshal() uint32 {
+	if lpo == nil {
+		return 0
+	}
+
+	flags := lpo.Flags
+	if lpo.ReadOnly {
+		flags |= unix.BPF_F_RDONLY
+	}
+	if lpo.WriteOnly {
+		flags |= unix.BPF_F_WRONLY
+	}
+	return flags
+}
 
 // BatchOptions batch map operations options
 //

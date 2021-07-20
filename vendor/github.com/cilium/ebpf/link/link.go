@@ -22,6 +22,11 @@ type Link interface {
 	// May return an error wrapping ErrNotSupported.
 	Pin(string) error
 
+	// Undo a previous call to Pin.
+	//
+	// May return an error wrapping ErrNotSupported.
+	Unpin() error
+
 	// Close frees resources.
 	//
 	// The link will be broken unless it has been pinned. A link
@@ -58,7 +63,8 @@ type RawLinkInfo struct {
 // You should consider using the higher level interfaces in this
 // package instead.
 type RawLink struct {
-	fd *internal.FD
+	fd         *internal.FD
+	pinnedPath string
 }
 
 // AttachRawLink creates a raw link.
@@ -86,22 +92,21 @@ func AttachRawLink(opts RawLinkOptions) (*RawLink, error) {
 		return nil, fmt.Errorf("can't create link: %s", err)
 	}
 
-	return &RawLink{fd}, nil
+	return &RawLink{fd, ""}, nil
 }
 
 // LoadPinnedRawLink loads a persisted link from a bpffs.
-func LoadPinnedRawLink(fileName string) (*RawLink, error) {
-	return loadPinnedRawLink(fileName, UnspecifiedType)
-}
-
-func loadPinnedRawLink(fileName string, typ Type) (*RawLink, error) {
-	fd, err := internal.BPFObjGet(fileName)
+//
+// Returns an error if the pinned link type doesn't match linkType. Pass
+// UnspecifiedType to disable this behaviour.
+func LoadPinnedRawLink(fileName string, linkType Type, opts *ebpf.LoadPinOptions) (*RawLink, error) {
+	fd, err := internal.BPFObjGet(fileName, opts.Marshal())
 	if err != nil {
-		return nil, fmt.Errorf("load pinned link: %s", err)
+		return nil, fmt.Errorf("load pinned link: %w", err)
 	}
 
-	link := &RawLink{fd}
-	if typ == UnspecifiedType {
+	link := &RawLink{fd, fileName}
+	if linkType == UnspecifiedType {
 		return link, nil
 	}
 
@@ -111,9 +116,9 @@ func loadPinnedRawLink(fileName string, typ Type) (*RawLink, error) {
 		return nil, fmt.Errorf("get pinned link info: %s", err)
 	}
 
-	if info.Type != typ {
+	if info.Type != linkType {
 		link.Close()
-		return nil, fmt.Errorf("link type %v doesn't match %v", info.Type, typ)
+		return nil, fmt.Errorf("link type %v doesn't match %v", info.Type, linkType)
 	}
 
 	return link, nil
@@ -142,13 +147,23 @@ func (l *RawLink) Close() error {
 // Calling Close on a pinned Link will not break the link
 // until the pin is removed.
 func (l *RawLink) Pin(fileName string) error {
-	if err := internal.BPFObjPin(fileName, l.fd); err != nil {
-		return fmt.Errorf("can't pin link: %s", err)
+	if err := internal.Pin(l.pinnedPath, fileName, l.fd); err != nil {
+		return err
 	}
+	l.pinnedPath = fileName
 	return nil
 }
 
-// Update implements Link.
+// Unpin implements the Link interface.
+func (l *RawLink) Unpin() error {
+	if err := internal.Unpin(l.pinnedPath); err != nil {
+		return err
+	}
+	l.pinnedPath = ""
+	return nil
+}
+
+// Update implements the Link interface.
 func (l *RawLink) Update(new *ebpf.Program) error {
 	return l.UpdateArgs(RawLinkUpdateOptions{
 		New: new,

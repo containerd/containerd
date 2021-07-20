@@ -43,9 +43,11 @@ github.com/Microsoft/hcsshim/pkg/go-runhcs
 github.com/Microsoft/hcsshim/pkg/ociwclayer
 # github.com/beorn7/perks v1.0.1
 github.com/beorn7/perks/quantile
+# github.com/bits-and-blooms/bitset v1.2.0
+github.com/bits-and-blooms/bitset
 # github.com/cespare/xxhash/v2 v2.1.1
 github.com/cespare/xxhash/v2
-# github.com/cilium/ebpf v0.4.0
+# github.com/cilium/ebpf v0.6.2
 github.com/cilium/ebpf
 github.com/cilium/ebpf/asm
 github.com/cilium/ebpf/internal
@@ -134,7 +136,7 @@ github.com/containers/ocicrypt/keywrap/pkcs7
 github.com/containers/ocicrypt/spec
 github.com/containers/ocicrypt/utils
 github.com/containers/ocicrypt/utils/keyprovider
-# github.com/coreos/go-systemd/v22 v22.1.0
+# github.com/coreos/go-systemd/v22 v22.3.2
 ## explicit
 github.com/coreos/go-systemd/v22/daemon
 github.com/coreos/go-systemd/v22/dbus
@@ -164,7 +166,7 @@ github.com/emicklei/go-restful/log
 github.com/fsnotify/fsnotify
 # github.com/go-logr/logr v0.2.0
 github.com/go-logr/logr
-# github.com/godbus/dbus/v5 v5.0.3
+# github.com/godbus/dbus/v5 v5.0.4
 github.com/godbus/dbus/v5
 # github.com/gogo/googleapis v1.4.0 => github.com/gogo/googleapis v1.3.2
 ## explicit
@@ -200,14 +202,14 @@ github.com/gogo/protobuf/vanity
 github.com/gogo/protobuf/vanity/command
 # github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e
 github.com/golang/groupcache/lru
-# github.com/golang/protobuf v1.4.3 => github.com/golang/protobuf v1.3.5
+# github.com/golang/protobuf v1.5.0 => github.com/golang/protobuf v1.3.5
 ## explicit
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
-# github.com/google/go-cmp v0.5.4
+# github.com/google/go-cmp v0.5.5
 ## explicit
 github.com/google/go-cmp/cmp
 github.com/google/go-cmp/cmp/cmpopts
@@ -268,13 +270,13 @@ github.com/opencontainers/go-digest/digestset
 github.com/opencontainers/image-spec/identity
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/opencontainers/runc v1.0.0-rc93
+# github.com/opencontainers/runc v1.0.1
 ## explicit
 github.com/opencontainers/runc/libcontainer/user
-# github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d
+# github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 ## explicit
 github.com/opencontainers/runtime-spec/specs-go
-# github.com/opencontainers/selinux v1.8.0
+# github.com/opencontainers/selinux v1.8.2
 ## explicit
 github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
@@ -309,7 +311,7 @@ github.com/russross/blackfriday/v2
 ## explicit
 # github.com/shurcooL/sanitized_anchor_name v1.0.0
 github.com/shurcooL/sanitized_anchor_name
-# github.com/sirupsen/logrus v1.7.0
+# github.com/sirupsen/logrus v1.8.1
 ## explicit
 github.com/sirupsen/logrus
 # github.com/stefanberger/go-pkcs11uri v0.0.0-20201008174630-78d3cae3a980
@@ -324,8 +326,6 @@ github.com/tchap/go-patricia/patricia
 # github.com/urfave/cli v1.22.2 => github.com/urfave/cli v1.22.1
 ## explicit
 github.com/urfave/cli
-# github.com/willf/bitset v1.1.11
-github.com/willf/bitset
 # go.etcd.io/bbolt v1.3.5
 ## explicit
 go.etcd.io/bbolt
@@ -367,7 +367,7 @@ golang.org/x/oauth2/internal
 ## explicit
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.0.0-20210324051608-47abb6519492
+# golang.org/x/sys v0.0.0-20210426230700-d19ff857e887
 ## explicit
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/plan9
