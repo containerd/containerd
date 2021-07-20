@@ -45,4 +45,4 @@ case "${SELINUX}" in
     ;;
 esac
 
-echo SELinux is $(getenforce)
+echo SELinux is "$(getenforce)"

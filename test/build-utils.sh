@@ -20,7 +20,7 @@ ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
 PROJECT=${PROJECT:-"k8s-cri-containerd"}
 
 # GOOGLE_APPLICATION_CREDENTIALS is the path of service account file.
-if [ -z ${GOOGLE_APPLICATION_CREDENTIALS:-""} ]; then
+if [ -z "${GOOGLE_APPLICATION_CREDENTIALS:-""}" ]; then
   echo "GOOGLE_APPLICATION_CREDENTIALS is not set"
   exit 1
 fi
@@ -33,6 +33,6 @@ apt-get update
 apt-get install -y libseccomp2 libseccomp-dev
 
 # PULL_REFS is from prow.
-if [ ! -z "${PULL_REFS:-""}" ]; then
+if [ -n "${PULL_REFS:-""}" ]; then
   DEPLOY_DIR=$(echo "${PULL_REFS}" | sha1sum | awk '{print $1}')
 fi

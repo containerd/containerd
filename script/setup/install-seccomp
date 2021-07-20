@@ -23,7 +23,8 @@ set -eu -o pipefail
 set -x
 
 export SECCOMP_VERSION=2.5.1
-export SECCOMP_PATH=$(mktemp -d)
+SECCOMP_PATH=$(mktemp -d)
+export SECCOMP_PATH
 curl -fsSL "https://github.com/seccomp/libseccomp/releases/download/v${SECCOMP_VERSION}/libseccomp-${SECCOMP_VERSION}.tar.gz" | tar -xzC "$SECCOMP_PATH" --strip-components=1
 (
 	cd "$SECCOMP_PATH"

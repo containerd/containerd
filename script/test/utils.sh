@@ -83,7 +83,7 @@ pid=
 
 # NOTE: We don't have the sudo command on Windows.
 sudo=""
-if [ $(id -u) -ne 0 ] && command -v sudo &> /dev/null; then
+if [ "$(id -u)" -ne 0 ] && command -v sudo &> /dev/null; then
   sudo="sudo PATH=${PATH}"
 fi
 
@@ -99,7 +99,7 @@ test_setup() {
   # Create containerd in a different process group
   # so that we can easily clean them up.
   keepalive "${sudo} bin/containerd ${CONTAINERD_FLAGS}" \
-    ${RESTART_WAIT_PERIOD} &> ${report_dir}/containerd.log &
+    "${RESTART_WAIT_PERIOD}" &> "${report_dir}/containerd.log" &
   pid=$!
   set +m
 
@@ -122,7 +122,7 @@ test_teardown() {
       # so we can kill both of them by matching the PGID.
       ${sudo} ps | awk "{if (\$3 == ${pid}) print \$1}" | xargs kill
     else
-      ${sudo} pkill -g $(ps -o pgid= -p ${pid})
+      ${sudo} pkill -g $(ps -o pgid= -p "${pid}")
     fi
   fi
 }
@@ -131,11 +131,11 @@ test_teardown() {
 # keepalive process is eventually killed in test_teardown.
 keepalive() {
   local command=$1
-  echo ${command}
+  echo "${command}"
   local wait_period=$2
   while true; do
     ${command}
-    sleep ${wait_period}
+    sleep "${wait_period}"
   done
 }
 

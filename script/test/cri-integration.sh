@@ -17,8 +17,8 @@
 set -o nounset
 set -o pipefail
 
-source $(dirname "${BASH_SOURCE[0]}")/utils.sh
-cd ${ROOT}
+source "$(dirname "${BASH_SOURCE[0]}")/utils.sh"
+cd "${ROOT}"
 
 # FOCUS focuses the test to run.
 FOCUS=${FOCUS:-""}
@@ -29,15 +29,15 @@ RUNTIME=${RUNTIME:-""}
 
 CRI_ROOT="${CONTAINERD_ROOT}/io.containerd.grpc.v1.cri"
 
-mkdir -p ${REPORT_DIR}
-test_setup ${REPORT_DIR}
+mkdir -p "${REPORT_DIR}"
+test_setup "${REPORT_DIR}"
 
 # Run integration test.
 ${sudo} bin/cri-integration.test --test.run="${FOCUS}" --test.v \
-  --cri-endpoint=${CONTAINERD_SOCK} \
-  --cri-root=${CRI_ROOT} \
-  --runtime-handler=${RUNTIME} \
-  --containerd-bin=${CONTAINERD_BIN} \
+  --cri-endpoint="${CONTAINERD_SOCK}" \
+  --cri-root="${CRI_ROOT}" \
+  --runtime-handler="${RUNTIME}" \
+  --containerd-bin="${CONTAINERD_BIN}" \
   --image-list="${TEST_IMAGE_LIST:-}"
 
 test_exit_code=$?

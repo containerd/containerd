@@ -22,10 +22,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-source $(dirname "${BASH_SOURCE[0]}")/build-utils.sh
-source $(dirname "${BASH_SOURCE[0]}")/init-buildx.sh
+: "${PROJECT:=k8s-cri-containerd}"
+
+basedir="$(dirname "${BASH_SOURCE[0]}")"
+source "${basedir}/build-utils.sh"
+source "${basedir}/init-buildx.sh"
 cd "${ROOT}"
 
 # ignore errors if the image already exists
-make -C integration/images/volume-copy-up push PROJ="gcr.io/${PROJECT:-k8s-cri-containerd}" || true
-make -C integration/images/volume-ownership push PROJ="gcr.io/${PROJECT:-k8s-cri-containerd}" || true
+make -C integration/images/volume-copy-up push PROJ="gcr.io/${PROJECT}" || true
+make -C integration/images/volume-ownership push PROJ="gcr.io/${PROJECT}" || true
