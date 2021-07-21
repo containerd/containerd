@@ -129,7 +129,7 @@ jobs:
         with:
           path: src/github.com/containerd/containerd
 
-      - run: GO111MODULE=on go get github.com/cpuguy83/go-md2man/v2@v2.0.0
+      - run: GO111MODULE=on go get github.com/cpuguy83/go-md2man/v2@v2.0.1
 
       - run: make man
         working-directory: src/github.com/containerd/containerd
