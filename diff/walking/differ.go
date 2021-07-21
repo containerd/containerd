@@ -65,17 +65,24 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 		}
 	}
 
-	if config.MediaType == "" {
-		config.MediaType = ocispec.MediaTypeImageLayerGzip
-	}
-
 	var isCompressed bool
-	switch config.MediaType {
-	case ocispec.MediaTypeImageLayer:
-	case ocispec.MediaTypeImageLayerGzip:
+	if config.Compressor != nil {
+		if config.MediaType == "" {
+			return emptyDesc, errors.New("media type must be explicitly specified when using custom compressor")
+		}
 		isCompressed = true
-	default:
-		return emptyDesc, errors.Wrapf(errdefs.ErrNotImplemented, "unsupported diff media type: %v", config.MediaType)
+	} else {
+		if config.MediaType == "" {
+			config.MediaType = ocispec.MediaTypeImageLayerGzip
+		}
+
+		switch config.MediaType {
+		case ocispec.MediaTypeImageLayer:
+		case ocispec.MediaTypeImageLayerGzip:
+			isCompressed = true
+		default:
+			return emptyDesc, errors.Wrapf(errdefs.ErrNotImplemented, "unsupported diff media type: %v", config.MediaType)
+		}
 	}
 
 	var ocidesc ocispec.Descriptor
@@ -118,9 +125,16 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 			if isCompressed {
 				dgstr := digest.SHA256.Digester()
 				var compressed io.WriteCloser
-				compressed, errOpen = compression.CompressStream(cw, compression.Gzip)
-				if errOpen != nil {
-					return errors.Wrap(errOpen, "failed to get compressed stream")
+				if config.Compressor != nil {
+					compressed, errOpen = config.Compressor(cw, config.MediaType)
+					if errOpen != nil {
+						return errors.Wrap(errOpen, "failed to get compressed stream")
+					}
+				} else {
+					compressed, errOpen = compression.CompressStream(cw, compression.Gzip)
+					if errOpen != nil {
+						return errors.Wrap(errOpen, "failed to get compressed stream")
+					}
 				}
 				errOpen = archive.WriteDiff(ctx, io.MultiWriter(compressed, dgstr.Hash()), lowerRoot, upperRoot)
 				compressed.Close()
