@@ -462,7 +462,7 @@ func TestContainerPids(t *testing.T) {
 		if len(processes) > 0 {
 			actual := processes[0].Pid
 			if pid != actual {
-				t.Errorf("expected pid %d but received %d", pid, actual)
+				t.Errorf("expected pid %d but received %d. processes = %+v", pid, actual, processes)
 			}
 		}
 	}
