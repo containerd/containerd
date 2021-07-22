@@ -111,11 +111,14 @@ func TestTruncIndex(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, cn, cStats.Attributes.Id)
 
+	t.Logf("Update container memory limit after started")
 	if goruntime.GOOS != "windows" {
-		// TODO(claudiub): remove this when UpdateContainerResources works on running Windows Containers.
-		// https://github.com/containerd/containerd/issues/5187
-		t.Logf("Update container memory limit after started")
 		err = runtimeService.UpdateContainerResources(cnTruncIndex, &runtimeapi.LinuxContainerResources{
+			MemoryLimitInBytes: 50 * 1024 * 1024,
+		}, nil)
+		assert.NoError(t, err)
+	} else {
+		err = runtimeService.UpdateContainerResources(cnTruncIndex, nil, &runtimeapi.WindowsContainerResources{
 			MemoryLimitInBytes: 50 * 1024 * 1024,
 		})
 		assert.NoError(t, err)

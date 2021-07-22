@@ -67,7 +67,7 @@ func TestUpdateContainerResources(t *testing.T) {
 	t.Log("Update container memory limit after created")
 	err = runtimeService.UpdateContainerResources(cn, &runtime.LinuxContainerResources{
 		MemoryLimitInBytes: 400 * 1024 * 1024,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	t.Log("Check memory limit in container OCI spec")
@@ -90,7 +90,7 @@ func TestUpdateContainerResources(t *testing.T) {
 	t.Log("Update container memory limit after started")
 	err = runtimeService.UpdateContainerResources(cn, &runtime.LinuxContainerResources{
 		MemoryLimitInBytes: 800 * 1024 * 1024,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	t.Log("Check memory limit in container OCI spec")

@@ -174,9 +174,6 @@ func WithWindowsResources(resources *runtime.WindowsContainerResources) oci.Spec
 		if s.Windows.Resources == nil {
 			s.Windows.Resources = &runtimespec.WindowsResources{}
 		}
-		if s.Windows.Resources.CPU == nil {
-			s.Windows.Resources.CPU = &runtimespec.WindowsCPUResources{}
-		}
 		if s.Windows.Resources.Memory == nil {
 			s.Windows.Resources.Memory = &runtimespec.WindowsMemoryResources{}
 		}
@@ -187,6 +184,9 @@ func WithWindowsResources(resources *runtime.WindowsContainerResources) oci.Spec
 			max    = uint16(resources.GetCpuMaximum())
 			limit  = uint64(resources.GetMemoryLimitInBytes())
 		)
+		if s.Windows.Resources.CPU == nil && (count != 0 || shares != 0 || max != 0) {
+			s.Windows.Resources.CPU = &runtimespec.WindowsCPUResources{}
+		}
 		if count != 0 {
 			s.Windows.Resources.CPU.Count = &count
 		}

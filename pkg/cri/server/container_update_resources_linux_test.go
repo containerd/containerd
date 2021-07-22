@@ -24,6 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	criconfig "github.com/containerd/containerd/pkg/cri/config"
 )
 
 func TestUpdateOCILinuxResource(t *testing.T) {
@@ -31,7 +33,7 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 	*oomscoreadj = -500
 	for desc, test := range map[string]struct {
 		spec      *runtimespec.Spec
-		resources *runtime.LinuxContainerResources
+		request   *runtime.UpdateContainerResourcesRequest
 		expected  *runtimespec.Spec
 		expectErr bool
 	}{
@@ -52,15 +54,17 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 					},
 				},
 			},
-			resources: &runtime.LinuxContainerResources{
-				CpuPeriod:          6666,
-				CpuQuota:           5555,
-				CpuShares:          4444,
-				MemoryLimitInBytes: 54321,
-				OomScoreAdj:        500,
-				CpusetCpus:         "4-5",
-				CpusetMems:         "6-7",
-				Unified:            map[string]string{"memory.min": "1507328", "memory.swap.max": "0"},
+			request: &runtime.UpdateContainerResourcesRequest{
+				Linux: &runtime.LinuxContainerResources{
+					CpuPeriod:          6666,
+					CpuQuota:           5555,
+					CpuShares:          4444,
+					MemoryLimitInBytes: 54321,
+					OomScoreAdj:        500,
+					CpusetCpus:         "4-5",
+					CpusetMems:         "6-7",
+					Unified:            map[string]string{"memory.min": "1507328", "memory.swap.max": "0"},
+				},
 			},
 			expected: &runtimespec.Spec{
 				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
@@ -96,12 +100,14 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 					},
 				},
 			},
-			resources: &runtime.LinuxContainerResources{
-				CpuQuota:           5555,
-				CpuShares:          4444,
-				MemoryLimitInBytes: 54321,
-				OomScoreAdj:        500,
-				CpusetMems:         "6-7",
+			request: &runtime.UpdateContainerResourcesRequest{
+				Linux: &runtime.LinuxContainerResources{
+					CpuQuota:           5555,
+					CpuShares:          4444,
+					MemoryLimitInBytes: 54321,
+					OomScoreAdj:        500,
+					CpusetMems:         "6-7",
+				},
 			},
 			expected: &runtimespec.Spec{
 				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
@@ -129,15 +135,17 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 					},
 				},
 			},
-			resources: &runtime.LinuxContainerResources{
-				CpuPeriod:          6666,
-				CpuQuota:           5555,
-				CpuShares:          4444,
-				MemoryLimitInBytes: 54321,
-				OomScoreAdj:        500,
-				CpusetCpus:         "4-5",
-				CpusetMems:         "6-7",
-				Unified:            map[string]string{"memory.min": "65536", "memory.swap.max": "1024"},
+			request: &runtime.UpdateContainerResourcesRequest{
+				Linux: &runtime.LinuxContainerResources{
+					CpuPeriod:          6666,
+					CpuQuota:           5555,
+					CpuShares:          4444,
+					MemoryLimitInBytes: 54321,
+					OomScoreAdj:        500,
+					CpusetCpus:         "4-5",
+					CpusetMems:         "6-7",
+					Unified:            map[string]string{"memory.min": "65536", "memory.swap.max": "1024"},
+				},
 			},
 			expected: &runtimespec.Spec{
 				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
@@ -173,15 +181,17 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 					},
 				},
 			},
-			resources: &runtime.LinuxContainerResources{
-				CpuPeriod:          6666,
-				CpuQuota:           5555,
-				CpuShares:          4444,
-				MemoryLimitInBytes: 54321,
-				OomScoreAdj:        500,
-				CpusetCpus:         "4-5",
-				CpusetMems:         "6-7",
-				Unified:            map[string]string{"memory.min": "1507328", "memory.swap.max": "1024"},
+			request: &runtime.UpdateContainerResourcesRequest{
+				Linux: &runtime.LinuxContainerResources{
+					CpuPeriod:          6666,
+					CpuQuota:           5555,
+					CpuShares:          4444,
+					MemoryLimitInBytes: 54321,
+					OomScoreAdj:        500,
+					CpusetCpus:         "4-5",
+					CpusetMems:         "6-7",
+					Unified:            map[string]string{"memory.min": "1507328", "memory.swap.max": "1024"},
+				},
 			},
 			expected: &runtimespec.Spec{
 				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
@@ -202,7 +212,13 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		got, err := updateOCILinuxResource(context.Background(), test.spec, test.resources, false, false)
+		config := criconfig.Config{
+			PluginConfig: criconfig.PluginConfig{
+				TolerateMissingHugetlbController: false,
+				DisableHugetlbController:         false,
+			},
+		}
+		got, err := updateOCIResource(context.Background(), test.spec, test.request, config)
 		if test.expectErr {
 			assert.Error(t, err)
 		} else {
