@@ -17,9 +17,10 @@
 cd "$(dirname "${BASH_SOURCE[0]}")"
 cd ../../
 
-compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzFiltersParse fuzz_filters_parse
-compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzPlatformsParse fuzz_platforms_parse
-
+# Don't move docker_fuzzer.go back into contrib/fuzz
 mv contrib/fuzz/docker_fuzzer.go remotes/docker/
 compile_go_fuzzer github.com/containerd/containerd/remotes/docker FuzzFetcher fuzz_fetcher
-mv remotes/docker/docker_fuzzer.go contrib/fuzz/
+
+compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzFiltersParse fuzz_filters_parse
+compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzPlatformsParse fuzz_platforms_parse
+compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzApply fuzz_apply
