@@ -17,10 +17,46 @@
 cd "$(dirname "${BASH_SOURCE[0]}")"
 cd ../../
 
-# Don't move docker_fuzzer.go back into contrib/fuzz
+# Move all fuzzers that don't have the "fuzz" package out of this dir
 mv contrib/fuzz/docker_fuzzer.go remotes/docker/
-compile_go_fuzzer github.com/containerd/containerd/remotes/docker FuzzFetcher fuzz_fetcher
+mv contrib/fuzz/container_fuzzer.go integration/client/
 
+
+compile_go_fuzzer github.com/containerd/containerd/remotes/docker FuzzFetcher fuzz_fetcher
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzFiltersParse fuzz_filters_parse
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzPlatformsParse fuzz_platforms_parse
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzApply fuzz_apply
+
+
+# FuzzCreateContainer requires more setup than the fuzzers above.
+# We need the binaries from "make".
+wget -c https://github.com/google/protobuf/releases/download/v3.11.4/protoc-3.11.4-linux-x86_64.zip
+unzip protoc-3.11.4-linux-x86_64.zip -d /usr/local
+
+export CGO_ENABLED=1
+export GOARCH=amd64
+
+# Build runc
+cd $SRC/
+git clone https://github.com/opencontainers/runc
+cd runc
+make
+make install
+
+
+# Build static containerd
+cd $SRC/containerd
+make EXTRA_FLAGS="-buildmode pie" \
+	EXTRA_LDFLAGS='-linkmode external -extldflags "-fno-PIC -static"' \
+	BUILDTAGS="netgo osusergo static_build"
+
+
+mkdir $OUT/containerd-binaries || true
+cd $SRC/containerd/bin && cp * $OUT/containerd-binaries/ && cd -
+
+cd integration/client
+# Rename all *_test.go to *_test_fuzz.go to use their declarations:
+for i in $( ls *_test.go ); do mv $i ./${i%.*}_fuzz.go; done
+# Remove windows test to avoid double declarations
+rm ./client_windows_test_fuzz.go
+compile_go_fuzzer . FuzzCreateContainer fuzz_create_container
