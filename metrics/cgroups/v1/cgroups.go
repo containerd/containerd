@@ -29,7 +29,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/v1/linux"
-	metrics "github.com/docker/go-metrics"
+	"github.com/docker/go-metrics"
 	"github.com/sirupsen/logrus"
 )
 
@@ -55,8 +55,8 @@ type cgroupsMonitor struct {
 	publisher events.Publisher
 }
 
-func (m *cgroupsMonitor) Monitor(c runtime.Task) error {
-	if err := m.collector.Add(c); err != nil {
+func (m *cgroupsMonitor) Monitor(c runtime.Task, labels map[string]string) error {
+	if err := m.collector.Add(c, labels); err != nil {
 		return err
 	}
 	t, ok := c.(*linux.Task)
