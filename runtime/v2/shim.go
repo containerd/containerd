@@ -183,6 +183,8 @@ func cleanupAfterDeadShim(ctx context.Context, id, ns string, rt *runtime.TaskLi
 	})
 }
 
+var _ runtime.Task = &shim{}
+
 type shim struct {
 	bundle  *Bundle
 	client  *ttrpc.Client
