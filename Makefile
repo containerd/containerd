@@ -89,7 +89,7 @@ ifdef BUILDTAGS
 endif
 GO_BUILDTAGS ?=
 GO_BUILDTAGS += ${DEBUG_TAGS}
-GO_TAGS=$(if $(GO_BUILDTAGS),-tags "$(GO_BUILDTAGS)",)
+GO_TAGS=$(if $(GO_BUILDTAGS),-tags "$(strip $(GO_BUILDTAGS))",)
 GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) $(EXTRA_LDFLAGS)'
 SHIM_GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) -extldflags "-static" $(EXTRA_LDFLAGS)'
 
@@ -244,11 +244,11 @@ genman: man/containerd.8 man/ctr.8
 
 man/containerd.8: FORCE
 	@echo "$(WHALE) $@"
-	$(GO) run cmd/gen-manpages/main.go $(@F) $(@D)
+	$(GO) run ${GO_TAGS} cmd/gen-manpages/main.go $(@F) $(@D)
 
 man/ctr.8: FORCE
 	@echo "$(WHALE) $@"
-	$(GO) run cmd/gen-manpages/main.go $(@F) $(@D)
+	$(GO) run ${GO_TAGS} cmd/gen-manpages/main.go $(@F) $(@D)
 
 man/%: docs/man/%.md FORCE
 	@echo "$(WHALE) $@"
