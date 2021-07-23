@@ -16,6 +16,8 @@
    limitations under the License.
 */
 
+// Copyright 2012-2017 Docker, Inc.
+
 package dmsetup
 
 import (
@@ -26,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 
+	blkdiscard "github.com/containerd/containerd/snapshots/devmapper/blkdiscard"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
@@ -36,6 +39,9 @@ const (
 	// SectorSize represents the number of bytes in one sector on devmapper devices
 	SectorSize = 512
 )
+
+// ErrInUse represents an error mutating a device because it is in use elsewhere
+var ErrInUse = errors.New("device is in use")
 
 // DeviceInfo represents device info returned by "dmsetup info".
 // dmsetup(8) provides more information on each of these fields.
@@ -345,6 +351,24 @@ func BlockDeviceSize(path string) (int64, error) {
 	return size, nil
 }
 
+// DiscardBlocks discards all blocks for the given thin device
+//  ported from https://github.com/moby/moby/blob/7b9275c0da707b030e62c96b679a976f31f929d3/pkg/devicemapper/devmapper.go#L416
+func DiscardBlocks(deviceName string) error {
+	inUse, err := isInUse(deviceName)
+	if err != nil {
+		return err
+	}
+	if inUse {
+		return ErrInUse
+	}
+	path := GetFullDevicePath(deviceName)
+	_, err = blkdiscard.BlkDiscard(path)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func dmsetup(args ...string) (string, error) {
 	data, err := exec.Command("dmsetup", args...).CombinedOutput()
 	output := string(data)
@@ -405,4 +429,15 @@ func parseDmsetupError(output string) string {
 
 	str = strings.ToLower(str)
 	return str
+}
+
+func isInUse(deviceName string) (bool, error) {
+	info, err := Info(deviceName)
+	if err != nil {
+		return true, err
+	}
+	if len(info) != 1 {
+		return true, errors.New("could not get device info")
+	}
+	return info[0].OpenCount != 0, nil
 }

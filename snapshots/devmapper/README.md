@@ -26,6 +26,7 @@ The following configuration flags are supported:
   should be the same as in `/dev/mapper/` directory
 * `base_image_size` - defines how much space to allocate when creating the base device
 * `async_remove` - flag to async remove device using snapshot GC's cleanup callback
+* `discard_blocks` - whether to discard blocks when removing a device. This is especially useful for returning disk space to the filesystem when using loopback devices.
 
 Pool name and base image size are required snapshotter parameters.
 
@@ -93,6 +94,7 @@ cat << EOF
     pool_name = "${POOL_NAME}"
     root_path = "${DATA_DIR}"
     base_image_size = "10GB"
+    discard_blocks = true
 EOF
 ```
 

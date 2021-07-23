@@ -43,6 +43,9 @@ type Config struct {
 
 	// Flag to async remove device using Cleanup() callback in snapshots GC
 	AsyncRemove bool `toml:"async_remove"`
+
+	// Whether to discard blocks when removing a thin device.
+	DiscardBlocks bool `toml:"discard_blocks"`
 }
 
 // LoadConfig reads devmapper configuration file from disk in TOML format

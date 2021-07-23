@@ -29,13 +29,15 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/log"
+	blkdiscard "github.com/containerd/containerd/snapshots/devmapper/blkdiscard"
 	"github.com/containerd/containerd/snapshots/devmapper/dmsetup"
 )
 
 // PoolDevice ties together data and metadata volumes, represents thin-pool and manages volumes, snapshots and device ids.
 type PoolDevice struct {
-	poolName string
-	metadata *PoolMetadata
+	poolName      string
+	metadata      *PoolMetadata
+	discardBlocks bool
 }
 
 // NewPoolDevice creates new thin-pool from existing data and metadata volumes.
@@ -51,6 +53,15 @@ func NewPoolDevice(ctx context.Context, config *Config) (*PoolDevice, error) {
 
 	log.G(ctx).Infof("using dmsetup:\n%s", version)
 
+	if config.DiscardBlocks {
+		blkdiscardVersion, err := blkdiscard.Version()
+		if err != nil {
+			log.G(ctx).Error("blkdiscard is not available")
+			return nil, err
+		}
+		log.G(ctx).Infof("using blkdiscard:\n%s", blkdiscardVersion)
+	}
+
 	dbpath := filepath.Join(config.RootPath, config.PoolName+".db")
 	poolMetaStore, err := NewPoolMetadata(dbpath)
 	if err != nil {
@@ -64,8 +75,9 @@ func NewPoolDevice(ctx context.Context, config *Config) (*PoolDevice, error) {
 	}
 
 	poolDevice := &PoolDevice{
-		poolName: config.PoolName,
-		metadata: poolMetaStore,
+		poolName:      config.PoolName,
+		metadata:      poolMetaStore,
+		discardBlocks: config.DiscardBlocks,
 	}
 
 	if err := poolDevice.ensureDeviceStates(ctx); err != nil {
@@ -422,6 +434,16 @@ func (p *PoolDevice) DeactivateDevice(ctx context.Context, deviceName string, de
 
 	if err := p.transition(ctx, deviceName, Deactivating, Deactivated, func() error {
 		return retry(ctx, func() error {
+			if !deferred && p.discardBlocks {
+				err := dmsetup.DiscardBlocks(deviceName)
+				if err != nil {
+					if err == dmsetup.ErrInUse {
+						log.G(ctx).Warnf("device %q is in use, skipping blkdiscard", deviceName)
+					} else {
+						return err
+					}
+				}
+			}
 			if err := dmsetup.RemoveDevice(deviceName, opts...); err != nil {
 				return errors.Wrap(err, "failed to deactivate device")
 			}
