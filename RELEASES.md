@@ -89,7 +89,7 @@ whichever is longer. Additionally, releases may have an extended security suppor
 period after the end of the active period to accept security backports. This
 timeframe will be decided by maintainers before the end of the active status.
 
-The current state is available in the following table:
+The current state is available in the following tables:
 
 | Release | Status      | Start            | End of Life       |
 |---------|-------------|------------------|-------------------|
@@ -106,7 +106,19 @@ The current state is available in the following table:
 
 Note that branches and release from before 1.0 may not follow these rules.
 
-This table should be updated as part of the release preparation process.
+| CRI-Containerd Version | Containerd Version | Kubernetes Version | CRI Version |
+|------------------------|--------------------|--------------------|-------------|
+| v1.0.0-alpha.x   |                    | 1.7, 1.8    | v1alpha1 |
+| v1.0.0-beta.x    |                    | 1.9         | v1alpha1 |
+| End-Of-Life      | v1.1 (End-Of-Life) | 1.10+       | v1alpha2 |
+|                  | v1.2 (End-Of-Life) | 1.10+       | v1alpha2 |
+|                  | v1.3 (End-Of-Life) | 1.12+       | v1alpha2 |
+|                  | v1.4               | 1.19+       | v1alpha2 |
+|                  | v1.5               | 1.20+       | v1alpha2 |
+
+**Note:** The support table above specifies the Kubernetes Version that was supported at time of release of the containerd - cri integration and Kubernetes only supports n-3 minor release versions.
+
+These tables should be updated as part of the release preparation process.
 
 ### Backporting
 
