@@ -1,9 +1,13 @@
 
 # Registry Configuration - Introduction
 
-Configuring registries will be done by specifying (optionally) a `hosts.toml` file for
-each desired registry host in a configuration directory. **Note**: Updates under this directory
-do not require restarting the containerd daemon.
+New and additional registry hosts config support has been implemented in containerd v1.5 for the `ctr`
+client (the containerd tool for admins/developers), containerd image service clients, and CRI clients
+such as `kubectl` and `crictl`.
+
+Configuring registries, for these clients, will be done by specifying (optionally) a `hosts.toml` file for
+each desired registry host in a configuration directory. **Note**: Updates under this directory do not
+require restarting the containerd daemon.
 
 ## Registry API Support
 
@@ -17,9 +21,10 @@ Currently supported OCI Distribution version: **[v1.0.0](https://github.com/open
 
 ### Using Host Namespace Configs with CTR
 
-When pulling via `ctr` use the `--hosts-dir` option:
+When pulling a container image via `ctr` using the `--hosts-dir` option tells `ctr`
+to find and use the host configuration files located in the specified path:
 ```
-ctr images pull --hosts-dir "/etc/containerd/certs.d"
+ctr images pull --hosts-dir "/etc/containerd/certs.d" myregistry.io:5000/image_name:tag
 ```
 
 ### CRI
