@@ -18,8 +18,11 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"expvar"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -111,11 +114,25 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 	tcpServerOpts := serverOpts
 	if config.GRPC.TCPTLSCert != "" {
 		log.G(ctx).Info("setting up tls on tcp GRPC services...")
-		creds, err := credentials.NewServerTLSFromFile(config.GRPC.TCPTLSCert, config.GRPC.TCPTLSKey)
+
+		tlsCert, err := tls.LoadX509KeyPair(config.GRPC.TCPTLSCert, config.GRPC.TCPTLSKey)
 		if err != nil {
 			return nil, err
 		}
-		tcpServerOpts = append(tcpServerOpts, grpc.Creds(creds))
+		tlsConfig := &tls.Config{Certificates: []tls.Certificate{tlsCert}}
+
+		if config.GRPC.TCPTLSCA != "" {
+			caCertPool := x509.NewCertPool()
+			caCert, err := ioutil.ReadFile(config.GRPC.TCPTLSCA)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to load CA file")
+			}
+			caCertPool.AppendCertsFromPEM(caCert)
+			tlsConfig.ClientCAs = caCertPool
+			tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+		}
+
+		tcpServerOpts = append(tcpServerOpts, grpc.Creds(credentials.NewTLS(tlsConfig)))
 	}
 	var (
 		grpcServer = grpc.NewServer(serverOpts...)
