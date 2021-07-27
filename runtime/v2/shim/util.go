@@ -100,7 +100,7 @@ func Command(ctx context.Context, runtime, containerdAddress, containerdTTRPCAdd
 		}
 	}
 
-	cmd := exec.Command(cmdPath, args...)
+	cmd := exec.CommandContext(ctx, cmdPath, args...)
 	cmd.Dir = path
 	cmd.Env = append(
 		os.Environ(),
