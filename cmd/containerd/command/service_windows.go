@@ -337,6 +337,13 @@ func initPanicFile(path string) error {
 	// and replace it.
 	if st.Size() > 0 {
 		panicFile.Close()
+
+		if content, err := ioutil.ReadFile(path); err != nil {
+			logrus.WithError(err).Debug("failed to read containerd panic.log")
+		} else {
+			logrus.WithField("panic.log", string(content)).Debug("containerd panic.log content")
+		}
+
 		os.Rename(path, path+".old")
 		panicFile, err = os.Create(path)
 		if err != nil {
