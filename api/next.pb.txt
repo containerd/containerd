@@ -2389,6 +2389,7 @@ file {
     java_outer_classname: "StatusProto"
     java_multiple_files: true
     go_package: "rpc"
+    cc_enable_arenas: true
     objc_class_prefix: "RPC"
   }
   syntax: "proto3"
