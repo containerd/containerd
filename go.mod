@@ -38,6 +38,7 @@ require (
 	github.com/klauspost/compress v1.11.13
 	github.com/moby/locker v1.0.1
 	github.com/moby/sys/mountinfo v0.4.1
+	github.com/moby/sys/signal v0.5.1-0.20210723232958-8a51b5cc8879
 	github.com/moby/sys/symlink v0.1.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.0.1
@@ -56,7 +57,7 @@ require (
 	go.etcd.io/bbolt v1.3.5
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
-	golang.org/x/sys v0.0.0-20210426230700-d19ff857e887
+	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c
 	google.golang.org/grpc v1.38.0
 	google.golang.org/protobuf v1.26.0
 	gotest.tools/v3 v3.0.3

@@ -19,6 +19,7 @@ package tasks
 import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/moby/sys/signal"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -49,7 +50,7 @@ var killCommand = cli.Command{
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		signal, err := containerd.ParseSignal(defaultSignal)
+		sig, err := signal.ParseSignal(defaultSignal)
 		if err != nil {
 			return err
 		}
@@ -77,12 +78,12 @@ var killCommand = cli.Command{
 			return err
 		}
 		if context.String("signal") != "" {
-			signal, err = containerd.ParseSignal(context.String("signal"))
+			sig, err = signal.ParseSignal(context.String("signal"))
 			if err != nil {
 				return err
 			}
 		} else {
-			signal, err = containerd.GetStopSignal(ctx, container, signal)
+			sig, err = containerd.GetStopSignal(ctx, container, sig)
 			if err != nil {
 				return err
 			}
@@ -91,6 +92,6 @@ var killCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		return task.Kill(ctx, signal, opts...)
+		return task.Kill(ctx, sig, opts...)
 	},
 }
