@@ -26,18 +26,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/sys"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
-
-	fuzz "github.com/AdaLogics/go-fuzz-headers"
-
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/sys"
 )
 
 func init() {
@@ -45,6 +43,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
 }
 
 func tearDown() error {
@@ -61,11 +60,25 @@ func tearDown() error {
 	if err := sys.ForceRemoveAll(defaultRoot); err != nil {
 		return err
 	}
+
 	return nil
 }
 
+// checkIfShouldRestart() checks if an error indicates that
+// the daemon is not running. If the daemon is not running,
+// it deletes it to allow the fuzzer to create a new and
+// working socket.
+func checkIfShouldRestart(err error) {
+	if strings.Contains(err.Error(), "daemon is not running") {
+		err2 := deleteSocket()
+		if err2 != nil {
+			panic(err2)
+		}
+	}
+}
+
 // startDaemon() starts the daemon.
-func startDaemon(ctx context.Context) {
+func startDaemon(ctx context.Context, shouldTearDown bool) {
 	buf := bytes.NewBuffer(nil)
 	stdioFile, err := ioutil.TempFile("", "")
 	if err != nil {
@@ -94,16 +107,14 @@ func startDaemon(ctx context.Context) {
 			panic(err)
 		}
 	}
-	// Whether or not we should tear down after each fuzz iteration
-	// requires further investigation. The fuzzer runs fine without
-	// but if there is no performance-penalty, then we should tear down.
-	// To-do @AdamKorcz
-	/*defer func() {
-		err = tearDown()
-		if err != nil {
-			panic(err)
-		}
-	}()*/
+	if shouldTearDown {
+		defer func() {
+			err = tearDown()
+			if err != nil {
+				checkIfShouldRestart(err)
+			}
+		}()
+	}
 	seconds := 4 * time.Second
 	waitCtx, waitCancel := context.WithTimeout(ctx, seconds)
 
@@ -123,8 +134,7 @@ func startDaemon(ctx context.Context) {
 // refuse a connection to it, and deleting it allows us
 // to create a new socket when invoking containerd.New()
 func deleteSocket() error {
-	cmd := exec.Command("rm", "/run/containerd-test/containerd.sock")
-	err := cmd.Run()
+	err := os.Remove("/run/containerd-test/containerd.sock")
 	if err != nil {
 		return err
 	}
@@ -252,18 +262,20 @@ func newContainer(client *containerd.Client, f *fuzz.ConsumeFuzzer, ctx context.
 	return nil, errors.New("Could not create container")
 }
 
-// FuzzCreateContainer() implements the fuzzer.
+// doFuzz() implements the logic of FuzzCreateContainerNoTearDown()
+// and FuzzCreateContainerWithTearDown() and allows for
+// the option to turn on/off teardown after each iteration.
 // From a high level it:
 // - Creates a client
 // - Imports a bunch of fuzzed tar archives
 // - Creates a bunch of containers
-func FuzzCreateContainer(data []byte) int {
+func doFuzz(data []byte, shouldTearDown bool) int {
 	ctx, cancel := testContext(nil)
 	defer cancel()
 
 	// Check if daemon is running and start it if it isn't
 	if ctrd.cmd == nil {
-		startDaemon(ctx)
+		startDaemon(ctx, shouldTearDown)
 	}
 	client, err := containerd.New(address)
 	if err != nil {
@@ -317,4 +329,23 @@ func FuzzCreateContainer(data []byte) int {
 	// End create containers
 
 	return 1
+}
+
+// FuzzCreateContainerNoTearDown() implements a fuzzer
+// similar to FuzzCreateContainerWithTearDown() with
+// with one minor distinction: One tears down the
+// daemon after each iteration whereas the other doesn't.
+// The two fuzzers' performance will be compared over time.
+func FuzzCreateContainerNoTearDown(data []byte) int {
+	ret := doFuzz(data, false)
+	return ret
+}
+
+// FuzzCreateContainerWithTearDown() is similar to
+// FuzzCreateContainerNoTearDown() except that
+// FuzzCreateContainerWithTearDown tears down the daemon
+// after each iteration.
+func FuzzCreateContainerWithTearDown(data []byte) int {
+	ret := doFuzz(data, true)
+	return ret
 }
