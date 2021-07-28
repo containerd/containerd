@@ -15,7 +15,7 @@ This doc includes:
 To build the `containerd` daemon, and the `ctr` simple test client, the following build system dependencies are required:
 
 * Go 1.13.x or above except 1.14.x
-* Protoc 3.x compiler and headers (download at the [Google protobuf releases page](https://github.com/google/protobuf/releases))
+* Protoc 3.x compiler and headers (download at the [Google protobuf releases page](https://github.com/protocolbuffers/protobuf/releases))
 * Btrfs headers and libraries for your distribution. Note that building the btrfs driver can be disabled via the build tag `no_btrfs`, removing this dependency.
 
 ## Build the development environment
@@ -33,7 +33,7 @@ git clone https://github.com/containerd/containerd
 For proper results, install the `protoc` release into `/usr/local` on your build system. For example, the following commands will download and install the 3.11.4 release for a 64-bit Linux host:
 
 ```
-$ wget -c https://github.com/google/protobuf/releases/download/v3.11.4/protoc-3.11.4-linux-x86_64.zip
+$ wget -c https://github.com/protocolbuffers/protobuf/releases/download/v3.11.4/protoc-3.11.4-linux-x86_64.zip
 $ sudo unzip protoc-3.11.4-linux-x86_64.zip -d /usr/local
 ```
 
