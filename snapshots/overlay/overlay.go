@@ -37,9 +37,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// upperdirKey is a key of an optional lablel to each snapshot.
+// This optional label of a snapshot contains the location of "upperdir" where
+// the change set between this snapshot and its parent is stored.
+const upperdirKey = "containerd.io/snapshot/overlay.upperdir"
+
 // SnapshotterConfig is used to configure the overlay snapshotter instance
 type SnapshotterConfig struct {
-	asyncRemove bool
+	asyncRemove   bool
+	upperdirLabel bool
 }
 
 // Opt is an option to configure the overlay snapshotter
@@ -54,12 +60,22 @@ func AsynchronousRemove(config *SnapshotterConfig) error {
 	return nil
 }
 
+// WithUpperdirLabel adds as an optional label
+// "containerd.io/snapshot/overlay.upperdir". This stores the location
+// of the upperdir that contains the changeset between the labelled
+// snapshot and its parent.
+func WithUpperdirLabel(config *SnapshotterConfig) error {
+	config.upperdirLabel = true
+	return nil
+}
+
 type snapshotter struct {
-	root        string
-	ms          *storage.MetaStore
-	asyncRemove bool
-	indexOff    bool
-	userxattr   bool // whether to enable "userxattr" mount option
+	root          string
+	ms            *storage.MetaStore
+	asyncRemove   bool
+	upperdirLabel bool
+	indexOff      bool
+	userxattr     bool // whether to enable "userxattr" mount option
 }
 
 // NewSnapshotter returns a Snapshotter which uses overlayfs. The overlayfs
@@ -105,11 +121,12 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 	}
 
 	return &snapshotter{
-		root:        root,
-		ms:          ms,
-		asyncRemove: config.asyncRemove,
-		indexOff:    indexOff,
-		userxattr:   userxattr,
+		root:          root,
+		ms:            ms,
+		asyncRemove:   config.asyncRemove,
+		upperdirLabel: config.upperdirLabel,
+		indexOff:      indexOff,
+		userxattr:     userxattr,
 	}, nil
 }
 
@@ -124,9 +141,16 @@ func (o *snapshotter) Stat(ctx context.Context, key string) (snapshots.Info, err
 		return snapshots.Info{}, err
 	}
 	defer t.Rollback()
-	_, info, _, err := storage.GetInfo(ctx, key)
+	id, info, _, err := storage.GetInfo(ctx, key)
 	if err != nil {
 		return snapshots.Info{}, err
+	}
+
+	if o.upperdirLabel {
+		if info.Labels == nil {
+			info.Labels = make(map[string]string)
+		}
+		info.Labels[upperdirKey] = o.upperPath(id)
 	}
 
 	return info, nil
@@ -146,6 +170,17 @@ func (o *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 
 	if err := t.Commit(); err != nil {
 		return snapshots.Info{}, err
+	}
+
+	if o.upperdirLabel {
+		id, _, _, err := storage.GetInfo(ctx, info.Name)
+		if err != nil {
+			return snapshots.Info{}, err
+		}
+		if info.Labels == nil {
+			info.Labels = make(map[string]string)
+		}
+		info.Labels[upperdirKey] = o.upperPath(id)
 	}
 
 	return info, nil
@@ -292,6 +327,19 @@ func (o *snapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...str
 		return err
 	}
 	defer t.Rollback()
+	if o.upperdirLabel {
+		return storage.WalkInfo(ctx, func(ctx context.Context, info snapshots.Info) error {
+			id, _, _, err := storage.GetInfo(ctx, info.Name)
+			if err != nil {
+				return err
+			}
+			if info.Labels == nil {
+				info.Labels = make(map[string]string)
+			}
+			info.Labels[upperdirKey] = o.upperPath(id)
+			return fn(ctx, info)
+		}, fs...)
+	}
 	return storage.WalkInfo(ctx, fn, fs...)
 }
 

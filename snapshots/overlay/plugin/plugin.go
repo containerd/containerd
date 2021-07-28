@@ -29,7 +29,8 @@ import (
 // Config represents configuration for the overlay plugin.
 type Config struct {
 	// Root directory for the plugin
-	RootPath string `toml:"root_path"`
+	RootPath      string `toml:"root_path"`
+	UpperdirLabel bool   `toml:"upperdir_label"`
 }
 
 func init() {
@@ -50,8 +51,13 @@ func init() {
 				root = config.RootPath
 			}
 
+			var oOpts []overlay.Opt
+			if config.UpperdirLabel {
+				oOpts = append(oOpts, overlay.WithUpperdirLabel)
+			}
+
 			ic.Meta.Exports["root"] = root
-			return overlay.NewSnapshotter(root, overlay.AsynchronousRemove)
+			return overlay.NewSnapshotter(root, append(oOpts, overlay.AsynchronousRemove)...)
 		},
 	})
 }
