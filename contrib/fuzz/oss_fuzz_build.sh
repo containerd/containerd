@@ -30,7 +30,7 @@ compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzApply fuzz_a
 
 # FuzzCreateContainer requires more setup than the fuzzers above.
 # We need the binaries from "make".
-wget -c https://github.com/google/protobuf/releases/download/v3.11.4/protoc-3.11.4-linux-x86_64.zip
+wget -c https://github.com/protocolbuffers/protobuf/releases/download/v3.11.4/protoc-3.11.4-linux-x86_64.zip
 unzip protoc-3.11.4-linux-x86_64.zip -d /usr/local
 
 export CGO_ENABLED=1
@@ -42,7 +42,6 @@ git clone https://github.com/opencontainers/runc
 cd runc
 make
 make install
-
 
 # Build static containerd
 cd $SRC/containerd
