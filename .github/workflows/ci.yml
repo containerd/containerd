@@ -385,20 +385,9 @@ jobs:
 
       - name: Install criu
         run: |
-          sudo apt-get install -y \
-            libprotobuf-dev \
-            libprotobuf-c-dev \
-            protobuf-c-compiler \
-            protobuf-compiler \
-            python-protobuf \
-            libnl-3-dev \
-            libnet-dev \
-            libcap-dev \
-            python-future
-          wget https://github.com/checkpoint-restore/criu/archive/v3.13.tar.gz -O criu.tar.gz
-          tar -zxf criu.tar.gz
-          cd criu-3.13
-          sudo make install-criu
+          sudo add-apt-repository ppa:criu/ppa
+          sudo apt-get update
+          sudo apt-get install -y criu
 
       - name: Install containerd
         env:
