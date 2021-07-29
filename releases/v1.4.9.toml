@@ -1,0 +1,23 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.4.8"
+
+pre_release = false
+
+preface = """\
+The ninth patch release for containerd 1.4 updates runc to 1.0.1 and contains
+other minor updates.
+
+### Notable Updates
+
+* **Update runc binary to 1.0.1** [#5751](https://github.com/containerd/containerd/pull/5751)
+* **Update pull authorization logic on redirect** [#5504](https://github.com/containerd/containerd/pull/5504)
+* **Fix user agent used for fetching registry authentication tokens** [#5761](https://github.com/containerd/containerd/pull/5761)
+
+See the changelog for complete list of changes"""
