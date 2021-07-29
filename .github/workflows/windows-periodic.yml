@@ -134,6 +134,18 @@ jobs:
            EOF
            ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cat /c/Logs/cri-integration.log | go-junit-report.exe > c:/Logs/junit_01.xml' "
 
+      - name: GetCritestRepo
+        run: |
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "git clone https://github.com/kubernetes-sigs/cri-tools c:/cri-tools"
+
+      - name: BuildCritest
+        run: |
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cd /c/cri-tools && make critest'"
+
+      - name: RunCritest
+        run: |
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "powershell.exe -command { Start-Process -FilePath C:\containerd\bin\containerd.exe -NoNewWindow -RedirectStandardError true -PassThru ; get-process | sls containerd ; start-sleep 5 ; c:\cri-tools\build\bin\critest.exe --runtime-endpoint=\"npipe:\\\\.\\pipe\\containerd-containerd\" --report-dir='c:\Logs' }"
+
       - name: PullLogsFromWinNode
         run: |
           scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }}:c:/Logs/*.xml ${{ env.LOGS_DIR }}/artifacts/
