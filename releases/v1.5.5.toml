@@ -1,0 +1,23 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.5.4"
+
+pre_release = false
+
+preface = """\
+The fifth patch release for containerd 1.5 updates runc to 1.0.1 and contains
+other minor updates.
+
+### Notable Updates
+
+* **Update runc binary to 1.0.1** [#5751](https://github.com/containerd/containerd/pull/5751)
+* **Update pull logic to try next mirror on non-404 response** [#5275](https://github.com/containerd/containerd/pull/5275)
+* **Update pull authorization logic on redirect** [#5504](https://github.com/containerd/containerd/pull/5504)
+
+See the changelog for complete list of changes"""
