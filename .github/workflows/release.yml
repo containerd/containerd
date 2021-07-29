@@ -139,40 +139,28 @@ jobs:
             sudo apt-get install -y gperf
             sudo -E PATH=$PATH script/setup/install-seccomp
           fi
-          make cri-cni-release
+          make cri-release cri-cni-release
         working-directory: src/github.com/containerd/containerd
 
       - name: Save cri-containerd binaries
         uses: actions/upload-artifact@v2
         with:
           name: cri-containerd-binaries-${{ matrix.os }}
-          path: src/github.com/containerd/containerd/releases/cri-containerd-cni-*.tar.gz*
+          path: src/github.com/containerd/containerd/releases/cri-containerd-*.tar.gz*
 
   release:
     name: Create containerd Release
     runs-on: ubuntu-18.04
     timeout-minutes: 10
     needs: [build, check]
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
 
     steps:
       - name: Download builds and release notes
         uses: actions/download-artifact@v2
         with:
           path: builds
-      - name: Catalog build assets for upload
-        id: catalog
-        run: |
-          _filenum=1
-          for i in "ubuntu-18.04" "windows-2019"; do
-            for f in `ls builds/containerd-binaries-${i}`; do
-              echo "::set-output name=file${_filenum}::${f}"
-              let "_filenum+=1"
-            done
-            for f in `ls builds/cri-containerd-binaries-${i}`; do
-              echo "::set-output name=file${_filenum}::${f}"
-              let "_filenum+=1"
-            done
-          done
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1.1.2
@@ -184,75 +172,87 @@ jobs:
           body_path: ./builds/containerd-release-notes/release-notes.md
           draft: false
           prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
-      - name: Upload Linux containerd tarball
+
+  release-upload:
+    name: Upload containerd tarballs
+    runs-on: ubuntu-18.04
+    timeout-minutes: 10
+    needs: [release]
+
+    strategy:
+      matrix:
+        os: [ubuntu-18.04, windows-2019]
+
+    steps:
+      - name: Download builds and release notes
+        uses: actions/download-artifact@v2
+        with:
+          path: builds
+      - name: Catalog build assets for upload
+        id: catalog
+        env:
+          OS: ${{ matrix.os }}
+        run: |
+          _filenum=1
+          for f in `ls "builds/containerd-binaries-${OS}"`; do
+            echo "::set-output name=file${_filenum}::${f}"
+            let "_filenum+=1"
+          done
+          for f in `ls builds/cri-containerd-binaries-${OS}`; do
+            echo "::set-output name=file${_filenum}::${f}"
+            let "_filenum+=1"
+          done
+      - name: Upload containerd tarball
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/containerd-binaries-ubuntu-18.04/${{ steps.catalog.outputs.file1 }}
+          upload_url: ${{ needs.release.outputs.upload_url }}
+          asset_path: ./builds/containerd-binaries-${{ matrix.os }}/${{ steps.catalog.outputs.file1 }}
           asset_name: ${{ steps.catalog.outputs.file1 }}
           asset_content_type: application/gzip
-      - name: Upload Linux sha256 sum
+      - name: Upload sha256 sum
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/containerd-binaries-ubuntu-18.04/${{ steps.catalog.outputs.file2 }}
+          upload_url: ${{ needs.release.outputs.upload_url }}
+          asset_path: ./builds/containerd-binaries-${{ matrix.os }}/${{ steps.catalog.outputs.file2 }}
           asset_name: ${{ steps.catalog.outputs.file2 }}
           asset_content_type: text/plain
-      - name: Upload Linux cri containerd tarball
+      - name: Upload cri containerd tarball
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/cri-containerd-binaries-ubuntu-18.04/${{ steps.catalog.outputs.file3 }}
+          upload_url: ${{ needs.release.outputs.upload_url }}
+          asset_path: ./builds/cri-containerd-binaries-${{ matrix.os }}/${{ steps.catalog.outputs.file3 }}
           asset_name: ${{ steps.catalog.outputs.file3 }}
           asset_content_type: application/gzip
-      - name: Upload Linux cri sha256 sum
+      - name: Upload cri sha256 sum
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/cri-containerd-binaries-ubuntu-18.04/${{ steps.catalog.outputs.file4 }}
+          upload_url: ${{ needs.release.outputs.upload_url }}
+          asset_path: ./builds/cri-containerd-binaries-${{ matrix.os }}/${{ steps.catalog.outputs.file4 }}
           asset_name: ${{ steps.catalog.outputs.file4 }}
           asset_content_type: text/plain
-      - name: Upload Windows containerd tarball
+      - name: Upload cri/cni containerd tarball
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/containerd-binaries-windows-2019/${{ steps.catalog.outputs.file5 }}
+          upload_url: ${{ needs.release.outputs.upload_url }}
+          asset_path: ./builds/cri-containerd-binaries-${{ matrix.os }}/${{ steps.catalog.outputs.file5 }}
           asset_name: ${{ steps.catalog.outputs.file5 }}
           asset_content_type: application/gzip
-      - name: Upload Windows sha256 sum
+      - name: Upload cri/cni sha256 sum
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/containerd-binaries-windows-2019/${{ steps.catalog.outputs.file6 }}
+          upload_url: ${{ needs.release.outputs.upload_url }}
+          asset_path: ./builds/cri-containerd-binaries-${{ matrix.os }}/${{ steps.catalog.outputs.file6 }}
           asset_name: ${{ steps.catalog.outputs.file6 }}
-          asset_content_type: text/plain
-      - name: Upload Windows cri containerd tarball
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/cri-containerd-binaries-windows-2019/${{ steps.catalog.outputs.file7 }}
-          asset_name: ${{ steps.catalog.outputs.file7 }}
-          asset_content_type: application/gzip
-      - name: Upload Windows cri sha256 sum
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/cri-containerd-binaries-windows-2019/${{ steps.catalog.outputs.file8 }}
-          asset_name: ${{ steps.catalog.outputs.file8 }}
           asset_content_type: text/plain
