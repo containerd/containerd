@@ -19,6 +19,7 @@ package snapshots
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,6 +39,8 @@ const (
 	LabelSnapshotUIDMapping = "containerd.io/snapshot/uidmapping"
 	// LabelSnapshotGIDMapping is the label used for GID mappings
 	LabelSnapshotGIDMapping = "containerd.io/snapshot/gidmapping"
+	// LabelSnapshotQuotaSize is the quota size.
+	LabelSnapshotQuotaSize = "containerd.io/snapshot/quotasize"
 )
 
 // Kind identifies the kind of snapshot.
@@ -377,6 +380,24 @@ func WithLabels(labels map[string]string) Opt {
 
 		return nil
 	}
+}
+
+// WithLabels appends labels to a created snapshot
+func WithQuotaSize(bytesize uint64) Opt {
+	return func(info *Info) error {
+		if info.Labels == nil {
+			info.Labels = make(map[string]string)
+		}
+		info.Labels[LabelSnapshotQuotaSize] = strconv.FormatUint(bytesize, 10)
+		return nil
+	}
+}
+
+func QuotaSize(labels map[string]string) string {
+	if labels == nil {
+		return ""
+	}
+	return labels[LabelSnapshotQuotaSize]
 }
 
 // FilterInheritedLabels filters the provided labels by removing any key which

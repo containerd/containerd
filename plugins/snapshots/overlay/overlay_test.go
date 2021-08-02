@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"syscall"
 	"testing"
@@ -34,6 +35,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/userns"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/containerd/v2/plugins/snapshots/overlay/overlayutils"
+	"github.com/containerd/continuity/testutil/loopback"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -85,6 +87,9 @@ func TestOverlay(t *testing.T) {
 			})
 			t.Run("TestOverlayView", func(t *testing.T) {
 				testOverlayView(t, newSnapshotterWithOpts(append(opts, WithMountOptions([]string{"volatile"}))...))
+			})
+			t.Run("TestOverlayQuota", func(t *testing.T) {
+				testOverlayQuota(t, newSnapshotterWithOpts(append(opts, WithEnableQuota)...))
 			})
 		})
 	}
@@ -576,6 +581,66 @@ func testOverlayRemappedInvalidMapping(t *testing.T, newSnapshotter testsuite.Sn
 	}
 }
 
+func testOverlayQuota(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
+	var (
+		opts      []snapshots.Opt
+		mounts    []mount.Mount
+		size      uint64 = 1048576
+		writeSize        = int64(921600) // 900 KB
+	)
+
+	ctx := context.TODO()
+	root := t.TempDir()
+
+	loop, err := loopback.New(400 << 20) // 400 MB
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if out, err := exec.Command("mkfs.xfs", "-n", "ftype=1", loop.Device).CombinedOutput(); err != nil {
+		loop.Close()
+		t.Fatalf("could not mkfs.xfs %s: %v (out: %q)", loop.Device, err, string(out))
+	}
+	if out, err := exec.Command("mount", "-t", "xfs", "-o", "defaults,pquota", loop.Device, root).CombinedOutput(); err != nil {
+		loop.Close()
+		t.Fatalf("could not mount %s: %v (out: %q)", loop.Device, err, string(out))
+	}
+
+	defer func() {
+		syscall.Unmount(root, 0)
+		loop.Close()
+	}()
+
+	o, closefn, err := newSnapshotter(ctx, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closefn()
+	if sn, ok := o.(*snapshotter); !ok || sn.quotaSetter == nil {
+		t.Skip("overlayfs doesn't support quota set")
+	}
+
+	key := "/tmp/test"
+	opts = append(opts, snapshots.WithQuotaSize(size))
+	if mounts, err = o.Prepare(ctx, key, "", opts...); err != nil {
+		t.Fatal(err)
+	}
+	if len(mounts) != 1 {
+		t.Errorf("should only have 1 mount but received %d", len(mounts))
+	}
+	workPath := filepath.Join(getBasePath(ctx, o, root, key), "fs")
+
+	err = writeSizeToDir(writeSize, workPath)
+	if err != nil {
+		t.Fatalf("expect %v but got %v", nil, err)
+	}
+	// no space failed.
+	err = writeSizeToDir(writeSize, workPath)
+	if err == nil {
+		t.Fatalf("expect %v but got %v", err, nil)
+	}
+}
+
 func getBasePath(ctx context.Context, sn snapshots.Snapshotter, root, key string) string {
 	o := sn.(*snapshotter)
 	ctx, t, err := o.ms.TransactionContext(ctx, false)
@@ -590,6 +655,18 @@ func getBasePath(ctx context.Context, sn snapshots.Snapshotter, root, key string
 	}
 
 	return filepath.Join(root, "snapshots", s.ID)
+}
+
+func writeSizeToDir(bytesize int64, dirpath string) error {
+	file, err := os.CreateTemp(dirpath, "test")
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	data := make([]byte, bytesize)
+	_, err = file.Write(data)
+
+	return err
 }
 
 func getParents(ctx context.Context, sn snapshots.Snapshotter, root, key string) []string {

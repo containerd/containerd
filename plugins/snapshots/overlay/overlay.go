@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -48,6 +49,7 @@ type SnapshotterConfig struct {
 	mountOptions  []string
 	remapIDs      bool
 	slowChown     bool
+	enableQuota   bool
 }
 
 // Opt is an option to configure the overlay snapshotter
@@ -68,6 +70,12 @@ func AsynchronousRemove(config *SnapshotterConfig) error {
 // snapshot and its parent.
 func WithUpperdirLabel(config *SnapshotterConfig) error {
 	config.upperdirLabel = true
+	return nil
+}
+
+// WithEnableQuota define the enable quota
+func WithEnableQuota(config *SnapshotterConfig) error {
+	config.enableQuota = true
 	return nil
 }
 
@@ -113,13 +121,17 @@ type snapshotter struct {
 	options       []string
 	remapIDs      bool
 	slowChown     bool
+	quotaSetter   overlayutils.QuotaSetter
 }
 
 // NewSnapshotter returns a Snapshotter which uses overlayfs. The overlayfs
 // diffs are stored under the provided root. A metadata file is stored under
 // the root.
 func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
-	var config SnapshotterConfig
+	var (
+		config   SnapshotterConfig
+		quotaSet overlayutils.QuotaSetter
+	)
 	for _, opt := range opts {
 		if err := opt(&config); err != nil {
 			return nil, err
@@ -162,8 +174,16 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		config.mountOptions = append(config.mountOptions, "index=off")
 	}
 
+	if config.enableQuota {
+		quotaSet, err = overlayutils.SupportQuota(root)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &snapshotter{
 		root:          root,
+		quotaSetter:   quotaSet,
 		ms:            config.ms,
 		asyncRemove:   config.asyncRemove,
 		upperdirLabel: config.upperdirLabel,
@@ -431,6 +451,12 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		td, path string
 		info     snapshots.Info
 	)
+	info.Kind = kind
+	for _, opt := range opts {
+		if err := opt(&info); err != nil {
+			return nil, err
+		}
+	}
 
 	defer func() {
 		if err != nil {
@@ -450,7 +476,7 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 
 	if err := o.ms.WithTransaction(ctx, true, func(ctx context.Context) (err error) {
 		snapshotDir := filepath.Join(o.root, "snapshots")
-		td, err = o.prepareDirectory(ctx, snapshotDir, kind)
+		td, err = o.prepareDirectory(ctx, snapshotDir, info)
 		if err != nil {
 			return fmt.Errorf("failed to create prepare snapshot dir: %w", err)
 		}
@@ -530,7 +556,7 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	return o.mounts(s, info), nil
 }
 
-func (o *snapshotter) prepareDirectory(ctx context.Context, snapshotDir string, kind snapshots.Kind) (string, error) {
+func (o *snapshotter) prepareDirectory(ctx context.Context, snapshotDir string, info snapshots.Info) (string, error) {
 	td, err := os.MkdirTemp(snapshotDir, "new-")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp dir: %w", err)
@@ -540,9 +566,22 @@ func (o *snapshotter) prepareDirectory(ctx context.Context, snapshotDir string, 
 		return td, err
 	}
 
-	if kind == snapshots.KindActive {
+	if info.Kind == snapshots.KindActive {
+
 		if err := os.Mkdir(filepath.Join(td, "work"), 0711); err != nil {
 			return td, err
+		}
+
+		size := snapshots.QuotaSize(info.Labels)
+		if len(size) != 0 && o.quotaSetter != nil {
+			bytesize, err := strconv.ParseUint(size, 10, 64)
+			if err != nil {
+				return td, err
+			}
+			err = o.quotaSetter([]string{filepath.Join(td, "fs"), filepath.Join(td, "work")}, bytesize)
+			if err != nil {
+				return td, err
+			}
 		}
 	}
 
