@@ -36,6 +36,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
@@ -227,6 +228,8 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err != nil {
 		return nil, err
 	}
+
+	sOpts = append([]snapshots.Opt{snapshots.WithQuotaSize(c.config.DefaultSnapshotQuotaSize)}, sOpts...)
 
 	// Set snapshotter before any other options.
 	opts := []containerd.NewContainerOpts{
