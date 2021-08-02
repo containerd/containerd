@@ -17,6 +17,7 @@
 package platforms
 
 import (
+	"path"
 	"reflect"
 	"runtime"
 	"testing"
@@ -204,7 +205,7 @@ func TestParseSelector(t *testing.T) {
 				OS:           defaultOS,
 				Architecture: "arm",
 			},
-			formatted: joinNotEmpty(defaultOS, "arm"),
+			formatted: path.Join(defaultOS, "arm"),
 		},
 		{
 			input: "armel",
@@ -213,7 +214,7 @@ func TestParseSelector(t *testing.T) {
 				Architecture: "arm",
 				Variant:      "v6",
 			},
-			formatted: joinNotEmpty(defaultOS, "arm/v6"),
+			formatted: path.Join(defaultOS, "arm/v6"),
 		},
 		{
 			input: "armhf",
@@ -221,7 +222,7 @@ func TestParseSelector(t *testing.T) {
 				OS:           defaultOS,
 				Architecture: "arm",
 			},
-			formatted: joinNotEmpty(defaultOS, "arm"),
+			formatted: path.Join(defaultOS, "arm"),
 		},
 		{
 			input: "Aarch64",
@@ -229,7 +230,7 @@ func TestParseSelector(t *testing.T) {
 				OS:           defaultOS,
 				Architecture: "arm64",
 			},
-			formatted: joinNotEmpty(defaultOS, "arm64"),
+			formatted: path.Join(defaultOS, "arm64"),
 		},
 		{
 			input: "x86_64",
@@ -237,7 +238,7 @@ func TestParseSelector(t *testing.T) {
 				OS:           defaultOS,
 				Architecture: "amd64",
 			},
-			formatted: joinNotEmpty(defaultOS, "amd64"),
+			formatted: path.Join(defaultOS, "amd64"),
 		},
 		{
 			input: "Linux/x86_64",
@@ -253,7 +254,7 @@ func TestParseSelector(t *testing.T) {
 				OS:           defaultOS,
 				Architecture: "386",
 			},
-			formatted: joinNotEmpty(defaultOS, "386"),
+			formatted: path.Join(defaultOS, "386"),
 		},
 		{
 			input: "linux",
@@ -262,7 +263,7 @@ func TestParseSelector(t *testing.T) {
 				Architecture: defaultArch,
 				Variant:      defaultVariant,
 			},
-			formatted: joinNotEmpty("linux", defaultArch, defaultVariant),
+			formatted: path.Join("linux", defaultArch, defaultVariant),
 		},
 		{
 			input: "s390x",
@@ -270,7 +271,7 @@ func TestParseSelector(t *testing.T) {
 				OS:           defaultOS,
 				Architecture: "s390x",
 			},
-			formatted: joinNotEmpty(defaultOS, "s390x"),
+			formatted: path.Join(defaultOS, "s390x"),
 		},
 		{
 			input: "linux/s390x",
@@ -287,7 +288,7 @@ func TestParseSelector(t *testing.T) {
 				Architecture: defaultArch,
 				Variant:      defaultVariant,
 			},
-			formatted: joinNotEmpty("darwin", defaultArch, defaultVariant),
+			formatted: path.Join("darwin", defaultArch, defaultVariant),
 		},
 	} {
 		t.Run(testcase.input, func(t *testing.T) {
