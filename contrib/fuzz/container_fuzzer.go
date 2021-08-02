@@ -70,10 +70,7 @@ func tearDown() error {
 // working socket.
 func checkIfShouldRestart(err error) {
 	if strings.Contains(err.Error(), "daemon is not running") {
-		err2 := deleteSocket()
-		if err2 != nil {
-			panic(err2)
-		}
+		deleteSocket()
 	}
 }
 
@@ -104,7 +101,6 @@ func startDaemon(ctx context.Context, shouldTearDown bool) {
 		// so we panic
 		if !strings.Contains(err.Error(), "daemon is already running") {
 			fmt.Fprintf(os.Stderr, "%s: %s\n", err, buf.String())
-			panic(err)
 		}
 	}
 	if shouldTearDown {
