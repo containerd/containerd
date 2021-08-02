@@ -398,6 +398,11 @@ type RuntimeConfig struct {
 	// IgnoreDeprecationWarnings is the list of the deprecation IDs (such as "io.containerd.deprecation/pull-schema-1-image")
 	// that should be ignored for checking "ContainerdHasNoDeprecationWarnings" condition.
 	IgnoreDeprecationWarnings []string `toml:"ignore_deprecation_warnings" json:"ignoreDeprecationWarnings"`
+
+	// DefaultSnapshotQuotaSize is used to the capacity of the snapshot writable layer.
+	// This only takes effect when the snapshot supports setting capacity; otherwise, it is meaningless.
+	// now overlayfs supports configuring capacity.
+	DefaultSnapshotQuotaSize string `toml:"default_snapshot_quota_size" json:"defaultSnapshotQuotaSize"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
