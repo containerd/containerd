@@ -311,6 +311,18 @@ func TestScanner(t *testing.T) {
 			},
 		},
 		{
+			name:  "DashAsField",
+			input: `labels.fo-obr==bla`,
+			expected: []tokenResult{
+				{pos: 0, token: tokenField, text: "labels"},
+				{pos: 6, token: tokenSeparator, text: "."},
+				{pos: 7, token: tokenField, text: `fo-obr`},
+				{pos: 13, token: tokenOperator, text: "=="},
+				{pos: 15, token: tokenValue, text: "bla"},
+				{pos: 18, token: tokenEOF},
+			},
+		},
+		{
 			name:  "IllegalNumericEscapeSequence",
 			input: `labels."\xaz"`,
 			expected: []tokenResult{
