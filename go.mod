@@ -14,7 +14,7 @@ require (
 	github.com/containerd/cgroups/v3 v3.0.3
 	github.com/containerd/console v1.0.4
 	github.com/containerd/containerd/api v1.8.0-rc.2
-	github.com/containerd/continuity v0.4.3
+	github.com/containerd/continuity v0.4.4-0.20240406122502-56a67e3ba427
 	github.com/containerd/errdefs v0.1.0
 	github.com/containerd/fifo v1.1.0
 	github.com/containerd/go-cni v1.1.9
