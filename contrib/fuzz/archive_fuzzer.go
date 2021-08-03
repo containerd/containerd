@@ -24,6 +24,8 @@ import (
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 
 	"github.com/containerd/containerd/archive"
+	"github.com/containerd/containerd/content/local"
+	imageArchive "github.com/containerd/containerd/images/archive"
 )
 
 // FuzzApply implements a fuzzer that applies
@@ -48,5 +50,27 @@ func FuzzApply(data []byte) int {
 		r := bytes.NewReader(rBytes)
 		_, _ = archive.Apply(context.Background(), tmpDir, r)
 	}
+	return 1
+}
+
+// FuzzImportIndex implements a fuzzer
+// that targets archive.ImportIndex()
+func FuzzImportIndex(data []byte) int {
+	f := fuzz.NewConsumer(data)
+	tarBytes, err := f.TarBytes()
+	if err != nil {
+		return 0
+	}
+	ctx := context.Background()
+	r := bytes.NewReader(tarBytes)
+	tmpdir, err := ioutil.TempDir("", "fuzzing-")
+	if err != nil {
+		return 0
+	}
+	cs, err := local.NewStore(tmpdir)
+	if err != nil {
+		return 0
+	}
+	_, _ = imageArchive.ImportIndex(ctx, cs, r)
 	return 1
 }

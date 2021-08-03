@@ -14,6 +14,11 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+set -o nounset
+set -o pipefail
+set -o errexit
+set -x
+
 cd "$(dirname "${BASH_SOURCE[0]}")"
 cd ../../
 
@@ -26,7 +31,8 @@ compile_go_fuzzer github.com/containerd/containerd/remotes/docker FuzzFetcher fu
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzFiltersParse fuzz_filters_parse
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzPlatformsParse fuzz_platforms_parse
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzApply fuzz_apply
-
+compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzImportIndex fuzz_import_index
+compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzCSWalk fuzz_cs_walk
 
 # FuzzCreateContainer requires more setup than the fuzzers above.
 # We need the binaries from "make".
