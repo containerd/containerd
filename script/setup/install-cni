@@ -28,7 +28,7 @@ CNI_CONFIG_DIR=${DESTDIR}/etc/cni/net.d
 TMPROOT=$(mktemp -d)
 git clone https://github.com/containernetworking/plugins.git "${TMPROOT}"/plugins
 pushd "${TMPROOT}"/plugins
-git checkout $CNI_COMMIT
+git checkout "$CNI_COMMIT"
 ./build_linux.sh
 mkdir -p $CNI_DIR
 cp -r ./bin $CNI_DIR

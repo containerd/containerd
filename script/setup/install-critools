@@ -26,16 +26,17 @@ cd "$GOPATH"
 go get -u github.com/onsi/ginkgo/ginkgo
 
 : "${CRITEST_COMMIT:=$(cat "${script_dir}/critools-version")}"
+: "${DESTDIR:=""}"
 
 TMPROOT=$(mktemp -d)
-git clone https://github.com/kubernetes-sigs/cri-tools.git "${TMPROOT}"/cri-tools
+git clone https://github.com/kubernetes-sigs/cri-tools.git "${TMPROOT}/cri-tools"
 pushd "${TMPROOT}"/cri-tools
 git checkout "$CRITEST_COMMIT"
 make
-make install -e DESTDIR=${DESTDIR:=''} BINDIR=/usr/local/bin
+make install -e DESTDIR="${DESTDIR}" BINDIR=/usr/local/bin
 
-mkdir -p ${DESTDIR:=''}/etc/
-cat << EOF | tee ${DESTDIR:=''}/etc/crictl.yaml
+mkdir -p "${DESTDIR}/etc/"
+cat << EOF | tee "${DESTDIR}/etc/crictl.yaml"
 runtime-endpoint: unix:///run/containerd/containerd.sock
 EOF
 

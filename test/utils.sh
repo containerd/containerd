@@ -26,11 +26,11 @@ upload_logs_to_gcs() {
   local -r dir=$2
   local -r result=$3
   if ! gsutil ls "gs://${bucket}" > /dev/null; then
-    create_ttl_bucket ${bucket}
+    create_ttl_bucket "${bucket}"
   fi
   local -r upload_log_path=${bucket}/${dir}
   gsutil cp -r "${result}" "gs://${upload_log_path}"
-  echo "Test logs are uploaed to:
+  echo "Test logs are uploaded to:
     http://gcsweb.k8s.io/gcs/${upload_log_path}/"
 }
 
@@ -43,7 +43,7 @@ create_ttl_bucket() {
   gsutil mb "gs://${bucket}"
   local -r bucket_rule=$(mktemp)
   # Set 30 day TTL for logs inside the bucket.
-  echo '{"rule": [{"action": {"type": "Delete"},"condition": {"age": 30}}]}' > ${bucket_rule}
+  echo '{"rule": [{"action": {"type": "Delete"},"condition": {"age": 30}}]}' > "${bucket_rule}"
   gsutil lifecycle set "${bucket_rule}" "gs://${bucket}"
   rm "${bucket_rule}"
 
