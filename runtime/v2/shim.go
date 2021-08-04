@@ -62,7 +62,7 @@ func loadAddress(path string) (string, error) {
 	return string(data), nil
 }
 
-func loadShim(ctx context.Context, bundle *Bundle, events *exchange.Exchange, rt *runtime.TaskList, onClose func()) (_ *shim, err error) {
+func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ *shim, err error) {
 	address, err := loadAddress(filepath.Join(bundle.Path, "address"))
 	if err != nil {
 		return nil, err
@@ -117,15 +117,15 @@ func loadShim(ctx context.Context, bundle *Bundle, events *exchange.Exchange, rt
 		}
 	}()
 	s := &shim{
-		client:  client,
-		task:    task.NewTaskClient(client),
-		bundle:  bundle,
-		events:  events,
-		rtTasks: rt,
+		client: client,
+		task:   task.NewTaskClient(client),
+		bundle: bundle,
 	}
 	ctx, cancel := timeout.WithContext(ctx, loadTimeout)
 	defer cancel()
-	if err := s.Connect(ctx); err != nil {
+
+	// Check connectivity
+	if _, err := s.PID(ctx); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -186,23 +186,9 @@ func cleanupAfterDeadShim(ctx context.Context, id, ns string, rt *runtime.TaskLi
 var _ runtime.Task = &shim{}
 
 type shim struct {
-	bundle  *Bundle
-	client  *ttrpc.Client
-	task    task.TaskService
-	taskPid int
-	events  *exchange.Exchange
-	rtTasks *runtime.TaskList
-}
-
-func (s *shim) Connect(ctx context.Context) error {
-	response, err := s.task.Connect(ctx, &task.ConnectRequest{
-		ID: s.ID(),
-	})
-	if err != nil {
-		return err
-	}
-	s.taskPid = int(response.TaskPid)
-	return nil
+	bundle *Bundle
+	client *ttrpc.Client
+	task   task.TaskService
 }
 
 func (s *shim) Shutdown(ctx context.Context) error {
@@ -227,8 +213,15 @@ func (s *shim) ID() string {
 }
 
 // PID of the task
-func (s *shim) PID() uint32 {
-	return uint32(s.taskPid)
+func (s *shim) PID(ctx context.Context) (uint32, error) {
+	response, err := s.task.Connect(ctx, &task.ConnectRequest{
+		ID: s.ID(),
+	})
+	if err != nil {
+		return 0, errdefs.FromGRPC(err)
+	}
+
+	return response.TaskPid, nil
 }
 
 func (s *shim) Namespace() string {
@@ -239,7 +232,7 @@ func (s *shim) Close() error {
 	return s.client.Close()
 }
 
-func (s *shim) Delete(ctx context.Context) (*runtime.Exit, error) {
+func (s *shim) delete(ctx context.Context, removeTask func(ctx context.Context, id string)) (*runtime.Exit, error) {
 	response, shimErr := s.task.Delete(ctx, &task.DeleteRequest{
 		ID: s.ID(),
 	})
@@ -264,7 +257,7 @@ func (s *shim) Delete(ctx context.Context) (*runtime.Exit, error) {
 	// So we should remove the record and prevent duplicate events from
 	// ttrpc-callback-on-close.
 	if shimErr == nil {
-		s.rtTasks.Delete(ctx, s.ID())
+		removeTask(ctx, s.ID())
 	}
 
 	if err := s.waitShutdown(ctx); err != nil {
@@ -275,7 +268,7 @@ func (s *shim) Delete(ctx context.Context) (*runtime.Exit, error) {
 
 	// remove self from the runtime task list
 	// this seems dirty but it cleans up the API across runtimes, tasks, and the service
-	s.rtTasks.Delete(ctx, s.ID())
+	removeTask(ctx, s.ID())
 	if err := s.bundle.Delete(); err != nil {
 		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete bundle")
 	}
@@ -311,11 +304,12 @@ func (s *shim) Create(ctx context.Context, opts runtime.CreateOpts) (runtime.Tas
 			Options: m.Options,
 		})
 	}
-	response, err := s.task.Create(ctx, request)
+
+	_, err := s.task.Create(ctx, request)
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
-	s.taskPid = int(response.Pid)
+
 	return s, nil
 }
 
@@ -338,13 +332,12 @@ func (s *shim) Resume(ctx context.Context) error {
 }
 
 func (s *shim) Start(ctx context.Context) error {
-	response, err := s.task.Start(ctx, &task.StartRequest{
+	_, err := s.task.Start(ctx, &task.StartRequest{
 		ID: s.ID(),
 	})
 	if err != nil {
 		return errdefs.FromGRPC(err)
 	}
-	s.taskPid = int(response.Pid)
 	return nil
 }
 
@@ -359,7 +352,7 @@ func (s *shim) Kill(ctx context.Context, signal uint32, all bool) error {
 	return nil
 }
 
-func (s *shim) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runtime.Process, error) {
+func (s *shim) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runtime.ExecProcess, error) {
 	if err := identifiers.Validate(id); err != nil {
 		return nil, errors.Wrapf(err, "invalid exec id %s", id)
 	}
@@ -422,6 +415,10 @@ func (s *shim) CloseIO(ctx context.Context) error {
 }
 
 func (s *shim) Wait(ctx context.Context) (*runtime.Exit, error) {
+	taskPid, err := s.PID(ctx)
+	if err != nil {
+		return nil, err
+	}
 	response, err := s.task.Wait(ctx, &task.WaitRequest{
 		ID: s.ID(),
 	})
@@ -429,7 +426,7 @@ func (s *shim) Wait(ctx context.Context) (*runtime.Exit, error) {
 		return nil, errdefs.FromGRPC(err)
 	}
 	return &runtime.Exit{
-		Pid:       uint32(s.taskPid),
+		Pid:       taskPid,
 		Timestamp: response.ExitedAt,
 		Status:    response.ExitStatus,
 	}, nil
@@ -468,7 +465,7 @@ func (s *shim) Stats(ctx context.Context) (*ptypes.Any, error) {
 	return response.Stats, nil
 }
 
-func (s *shim) Process(ctx context.Context, id string) (runtime.Process, error) {
+func (s *shim) Process(ctx context.Context, id string) (runtime.ExecProcess, error) {
 	p := &process{
 		id:   id,
 		shim: s,

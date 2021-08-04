@@ -24,7 +24,6 @@ import (
 	gruntime "runtime"
 	"strings"
 
-	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/runtime"
@@ -36,14 +35,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func shimBinary(ctx context.Context, bundle *Bundle, runtime, containerdAddress string, containerdTTRPCAddress string, events *exchange.Exchange, rt *runtime.TaskList) *binary {
+func shimBinary(bundle *Bundle, runtime, containerdAddress string, containerdTTRPCAddress string) *binary {
 	return &binary{
 		bundle:                 bundle,
 		runtime:                runtime,
 		containerdAddress:      containerdAddress,
 		containerdTTRPCAddress: containerdTTRPCAddress,
-		events:                 events,
-		rtTasks:                rt,
 	}
 }
 
@@ -52,8 +49,6 @@ type binary struct {
 	containerdAddress      string
 	containerdTTRPCAddress string
 	bundle                 *Bundle
-	events                 *exchange.Exchange
-	rtTasks                *runtime.TaskList
 }
 
 func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ *shim, err error) {
@@ -123,11 +118,9 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 	}
 	client := ttrpc.NewClient(conn, ttrpc.WithOnClose(onCloseWithShimLog))
 	return &shim{
-		bundle:  b.bundle,
-		client:  client,
-		task:    task.NewTaskClient(client),
-		events:  b.events,
-		rtTasks: b.rtTasks,
+		bundle: b.bundle,
+		client: client,
+		task:   task.NewTaskClient(client),
 	}, nil
 }
 

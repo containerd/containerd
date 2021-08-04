@@ -43,8 +43,8 @@ import (
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	v1 "github.com/containerd/containerd/runtime/v1"
-	shim "github.com/containerd/containerd/runtime/v1/shim/v1"
-	runc "github.com/containerd/go-runc"
+	"github.com/containerd/containerd/runtime/v1/shim/v1"
+	"github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -315,8 +315,20 @@ func (r *Runtime) Add(ctx context.Context, task runtime.Task) error {
 }
 
 // Delete a runtime task
-func (r *Runtime) Delete(ctx context.Context, id string) {
+func (r *Runtime) Delete(ctx context.Context, id string) (*runtime.Exit, error) {
+	task, err := r.tasks.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	s := task.(*Task)
+	exit, err := s.Delete(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	r.tasks.Delete(ctx, id)
+	return exit, nil
 }
 
 func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
