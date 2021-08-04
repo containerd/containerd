@@ -59,10 +59,15 @@ make EXTRA_FLAGS="-buildmode pie" \
 mkdir $OUT/containerd-binaries || true
 cd $SRC/containerd/bin && cp * $OUT/containerd-binaries/ && cd -
 
+# Change defaultState and defaultAddress fron /run/containerd-test to /tmp/containerd-test:
+sed -i 's/\/run\/containerd-test/\/tmp\/containerd-test/g' $SRC/containerd/integration/client/client_unix_test.go
+
 cd integration/client
+
 # Rename all *_test.go to *_test_fuzz.go to use their declarations:
 for i in $( ls *_test.go ); do mv $i ./${i%.*}_fuzz.go; done
-# Remove windows test to avoid double declarations
+
+# Remove windows test to avoid double declarations:
 rm ./client_windows_test_fuzz.go
 compile_go_fuzzer . FuzzCreateContainerNoTearDown fuzz_create_container_no_teardown
 compile_go_fuzzer . FuzzCreateContainerWithTearDown fuzz_create_container_with_teardown

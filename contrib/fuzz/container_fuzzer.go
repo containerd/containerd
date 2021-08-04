@@ -41,9 +41,8 @@ import (
 func init() {
 	err := updatePathEnv()
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
 	}
-
 }
 
 func tearDown() error {
@@ -130,7 +129,7 @@ func startDaemon(ctx context.Context, shouldTearDown bool) {
 // refuse a connection to it, and deleting it allows us
 // to create a new socket when invoking containerd.New()
 func deleteSocket() error {
-	err := os.Remove("/run/containerd-test/containerd.sock")
+	err := os.Remove(defaultAddress)
 	if err != nil {
 		return err
 	}
@@ -143,7 +142,7 @@ func deleteSocket() error {
 // to $PATH, since the binaries are available there.
 func updatePathEnv() error {
 	// Create test dir for socket
-	err := os.MkdirAll("/run/containerd-test", 0777)
+	err := os.MkdirAll(defaultState, 0777)
 	if err != nil {
 		return err
 	}
@@ -273,7 +272,7 @@ func doFuzz(data []byte, shouldTearDown bool) int {
 	if ctrd.cmd == nil {
 		startDaemon(ctx, shouldTearDown)
 	}
-	client, err := containerd.New(address)
+	client, err := containerd.New(defaultAddress)
 	if err != nil {
 		// The error here is most likely with the socket.
 		// Deleting it will allow the creation of a new
@@ -282,6 +281,7 @@ func doFuzz(data []byte, shouldTearDown bool) int {
 		return -1
 	}
 	defer client.Close()
+
 	f := fuzz.NewConsumer(data)
 
 	// Begin import tars:
