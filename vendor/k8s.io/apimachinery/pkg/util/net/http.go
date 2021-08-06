@@ -113,6 +113,7 @@ func SetOldTransportDefaults(t *http.Transport) *http.Transport {
 		t.Proxy = NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)
 	}
 	// If no custom dialer is set, use the default context dialer
+	//lint:file-ignore SA1019 Keep supporting deprecated Dial method of custom transports
 	if t.DialContext == nil && t.Dial == nil {
 		t.DialContext = defaultTransport.DialContext
 	}
@@ -131,7 +132,7 @@ func SetTransportDefaults(t *http.Transport) *http.Transport {
 	t = SetOldTransportDefaults(t)
 	// Allow clients to disable http2 if needed.
 	if s := os.Getenv("DISABLE_HTTP2"); len(s) > 0 {
-		klog.Infof("HTTP2 has been explicitly disabled")
+		klog.Info("HTTP2 has been explicitly disabled")
 	} else if allowsHTTP2(t) {
 		if err := configureHTTP2Transport(t); err != nil {
 			klog.Warningf("Transport failed http2 configuration: %v", err)
@@ -693,7 +694,7 @@ func parseQuotedString(quotedString string) (string, string, error) {
 	var remainder string
 	escaping := false
 	closedQuote := false
-	result := &bytes.Buffer{}
+	result := &strings.Builder{}
 loop:
 	for i := 0; i < len(quotedString); i++ {
 		b := quotedString[i]
