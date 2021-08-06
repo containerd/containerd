@@ -1,5 +1,3 @@
-// +build darwin
-
 /*
    Copyright The containerd Authors.
 
