@@ -3,12 +3,10 @@ on:
   push:
     branches:
       - main
-      - master
       - 'release/**'
   pull_request:
     branches:
       - main
-      - master
       - 'release/**'
 
 jobs:
@@ -27,19 +25,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-        with:
-          path: src/github.com/containerd/containerd
-
-      - name: Set env
-        shell: bash
-        run: |
-          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
-          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
-
       - uses: golangci/golangci-lint-action@v2
         with:
           version: v1.36.0
-          working-directory: src/github.com/containerd/containerd
           args: --timeout=5m
 
   #
@@ -54,11 +42,6 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: '1.16.6'
-
-      - shell: bash
-        run: |
-          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
-          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - uses: actions/checkout@v2
         with:
@@ -124,21 +107,9 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: '1.16.6'
-
-      - name: Set env
-        shell: bash
-        run: |
-          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
-          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
-
       - uses: actions/checkout@v2
-        with:
-          path: src/github.com/containerd/containerd
-
-      - run: GO111MODULE=on go get github.com/cpuguy83/go-md2man/v2@v2.0.1
-
+      - run: go get github.com/cpuguy83/go-md2man/v2@v2.0.1
       - run: make man
-        working-directory: src/github.com/containerd/containerd
 
   # Make sure binaries compile with other platforms
   crossbuild:
@@ -170,14 +141,7 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: '1.16.6'
-      - name: Set env
-        shell: bash
-        run: |
-          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
-          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
       - uses: actions/checkout@v2
-        with:
-          path: src/github.com/containerd/containerd
       - run: |
           set -e -x
 
@@ -211,9 +175,8 @@ jobs:
           if [ -n "${packages}" ]; then
             sudo apt-get update && sudo apt-get install -y ${packages}
           fi
-        name: install deps
+        name: Install deps
       - name: Build
-        working-directory: src/github.com/containerd/containerd
         env:
           GOOS: ${{matrix.goos}}
           GOARCH: ${{matrix.goarch}}
@@ -364,24 +327,17 @@ jobs:
           go-version: '1.16.6'
 
       - uses: actions/checkout@v2
-        with:
-          path: src/github.com/containerd/containerd
-
-      - name: Set env
-        run: |
-          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
-          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - name: Install containerd dependencies
         env:
           RUNC_FLAVOR: ${{ matrix.runc }}
+          GOFLAGS: -modcacherw
         run: |
           sudo apt-get install -y gperf
           sudo -E PATH=$PATH script/setup/install-seccomp
           sudo -E PATH=$PATH script/setup/install-runc
-          sudo -E PATH=$PATH script/setup/install-cni
+          sudo -E PATH=$PATH script/setup/install-cni $(grep containernetworking/plugins go.mod | awk '{print $2}')
           sudo -E PATH=$PATH script/setup/install-critools
-        working-directory: src/github.com/containerd/containerd
 
       - name: Install criu
         run: |
@@ -393,12 +349,10 @@ jobs:
         env:
           CGO_ENABLED: 1
         run: |
-          make binaries
+          make binaries GO_BUILD_FLAGS="-mod=vendor"
           sudo -E PATH=$PATH make install
-        working-directory: src/github.com/containerd/containerd
 
       - run: sudo -E PATH=$PATH script/setup/install-gotestsum
-        working-directory: src/github.com/containerd/containerd
       - name: Tests
         env:
           GOPROXY: direct
@@ -406,7 +360,6 @@ jobs:
         run: |
           make test
           sudo -E PATH=$PATH make root-test
-        working-directory: src/github.com/containerd/containerd
 
       - name: Integration 1
         env:
@@ -420,7 +373,6 @@ jobs:
                   extraflags="EXTRA_TESTFLAGS=-no-criu";
           }
           sudo -E PATH=$PATH make integration ${extraflags} TESTFLAGS_RACE=-race
-        working-directory: src/github.com/containerd/containerd
 
       # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
       - name: Integration 2
@@ -435,14 +387,12 @@ jobs:
                   extraflags="EXTRA_TESTFLAGS=-no-criu";
           }
           sudo -E PATH=$PATH TESTFLAGS_PARALLEL=1 make integration ${extraflags}
-        working-directory: src/github.com/containerd/containerd
 
       - name: CRI Integration Test
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
         run: |
           CONTAINERD_RUNTIME=$TEST_RUNTIME make cri-integration
-        working-directory: src/github.com/containerd/containerd
 
       - name: cri-tools critest
         env:
@@ -494,25 +444,13 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: '1.16.6'
-
       - uses: actions/checkout@v2
-        with:
-          path: src/github.com/containerd/containerd
-
-      - name: Set env
-        run: |
-          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
-          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
-
       - run: sudo -E PATH=$PATH script/setup/install-gotestsum
-        working-directory: src/github.com/containerd/containerd
       - name: Tests
         env:
           GOPROXY: direct
           GOTESTSUM_JUNITFILE: "${{ github.workspace }}/macos-test-junit.xml"
-        run: |
-          make test
-        working-directory: src/github.com/containerd/containerd
+        run: make test
       - uses: actions/upload-artifact@v2
         if: always()
         with:
