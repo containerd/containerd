@@ -39,6 +39,7 @@ func init() {
 		Type: plugin.ServicePlugin,
 		ID:   services.SnapshotsService,
 		Requires: []plugin.Type{
+			plugin.EventPlugin,
 			plugin.MetadataPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
@@ -46,11 +47,15 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
+			ep, err := ic.Get(plugin.EventPlugin)
+			if err != nil {
+				return nil, err
+			}
 
 			db := m.(*metadata.DB)
 			ss := make(map[string]snapshots.Snapshotter)
 			for n, sn := range db.Snapshotters() {
-				ss[n] = newSnapshotter(sn, ic.Events)
+				ss[n] = newSnapshotter(sn, ep.(events.Publisher))
 			}
 			return ss, nil
 		},

@@ -53,6 +53,7 @@ func init() {
 		ID:     "cri",
 		Config: &config,
 		Requires: []plugin.Type{
+			plugin.EventPlugin,
 			plugin.ServicePlugin,
 		},
 		InitFn: initCRIService,
@@ -118,8 +119,13 @@ func getServicesOpts(ic *plugin.InitContext) ([]containerd.ServicesOpt, error) {
 		return nil, errors.Wrap(err, "failed to get service plugin")
 	}
 
+	ep, err := ic.Get(plugin.EventPlugin)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get event plugin")
+	}
+
 	opts := []containerd.ServicesOpt{
-		containerd.WithEventService(ic.Events),
+		containerd.WithEventService(ep.(containerd.EventService)),
 	}
 	for s, fn := range map[string]func(interface{}) containerd.ServicesOpt{
 		services.ContentService: func(s interface{}) containerd.ServicesOpt {

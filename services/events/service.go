@@ -35,8 +35,15 @@ func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
 		ID:   "events",
+		Requires: []plugin.Type{
+			plugin.EventPlugin,
+		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			return NewService(ic.Events), nil
+			ep, err := ic.GetByID(plugin.EventPlugin, "exchange")
+			if err != nil {
+				return nil, err
+			}
+			return NewService(ep.(*exchange.Exchange)), nil
 		},
 	})
 }

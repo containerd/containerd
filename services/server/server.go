@@ -146,9 +146,10 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			grpcServer:  grpcServer,
 			tcpServer:   tcpServer,
 			ttrpcServer: ttrpcServer,
-			events:      exchange.NewExchange(),
 			config:      config,
 		}
+		// TODO: Remove this in 2.0 and let event plugin crease it
+		events      = exchange.NewExchange()
 		initialized = plugin.NewPluginSet()
 		required    = make(map[string]struct{})
 	)
@@ -170,7 +171,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			config.Root,
 			config.State,
 		)
-		initContext.Events = s.events
+		initContext.Events = events
 		initContext.Address = config.GRPC.Address
 		initContext.TTRPCAddress = config.TTRPC.Address
 
@@ -246,7 +247,6 @@ type Server struct {
 	grpcServer  *grpc.Server
 	ttrpcServer *ttrpc.Server
 	tcpServer   *grpc.Server
-	events      *exchange.Exchange
 	config      *srvconfig.Config
 	plugins     []*plugin.Plugin
 }

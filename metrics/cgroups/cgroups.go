@@ -20,6 +20,7 @@ package cgroups
 
 import (
 	"github.com/containerd/cgroups"
+	"github.com/containerd/containerd/events"
 	v1 "github.com/containerd/containerd/metrics/cgroups/v1"
 	v2 "github.com/containerd/containerd/metrics/cgroups/v2"
 	"github.com/containerd/containerd/platforms"
@@ -38,6 +39,9 @@ func init() {
 		Type:   plugin.TaskMonitorPlugin,
 		ID:     "cgroups",
 		InitFn: New,
+		Requires: []plugin.Type{
+			plugin.EventPlugin,
+		},
 		Config: &Config{},
 	})
 }
@@ -53,10 +57,16 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		tm  runtime.TaskMonitor
 		err error
 	)
+
+	ep, err := ic.Get(plugin.EventPlugin)
+	if err != nil {
+		return nil, err
+	}
+
 	if cgroups.Mode() == cgroups.Unified {
-		tm, err = v2.NewTaskMonitor(ic.Context, ic.Events, ns)
+		tm, err = v2.NewTaskMonitor(ic.Context, ep.(events.Publisher), ns)
 	} else {
-		tm, err = v1.NewTaskMonitor(ic.Context, ic.Events, ns)
+		tm, err = v1.NewTaskMonitor(ic.Context, ep.(events.Publisher), ns)
 	}
 	if err != nil {
 		return nil, err

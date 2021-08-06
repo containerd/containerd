@@ -26,6 +26,7 @@ import (
 )
 
 var tasksServiceRequires = []plugin.Type{
+	plugin.EventPlugin,
 	plugin.RuntimePlugin,
 	plugin.RuntimePluginV2,
 	plugin.MetadataPlugin,

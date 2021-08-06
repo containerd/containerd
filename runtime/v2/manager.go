@@ -49,6 +49,7 @@ func init() {
 		Type: plugin.RuntimePluginV2,
 		ID:   "task",
 		Requires: []plugin.Type{
+			plugin.EventPlugin,
 			plugin.MetadataPlugin,
 		},
 		Config: &Config{
@@ -71,9 +72,14 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
+			ep, err := ic.GetByID(plugin.EventPlugin, "exchange")
+			if err != nil {
+				return nil, err
+			}
 			cs := metadata.NewContainerStore(m.(*metadata.DB))
+			events := ep.(*exchange.Exchange)
 
-			return New(ic.Context, ic.Root, ic.State, ic.Address, ic.TTRPCAddress, ic.Events, cs)
+			return New(ic.Context, ic.Root, ic.State, ic.Address, ic.TTRPCAddress, events, cs)
 		},
 	})
 }
