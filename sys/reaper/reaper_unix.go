@@ -61,6 +61,10 @@ func (s *subscriber) do(fn func()) {
 func Reap() error {
 	now := time.Now()
 	exits, err := reap(false)
+	if err != nil {
+		return err
+	}
+	exits, err = reapOS(exits)
 	for _, e := range exits {
 		done := Default.notify(runc.Exit{
 			Timestamp: now,
