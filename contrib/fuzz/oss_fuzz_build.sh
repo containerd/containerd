@@ -69,5 +69,7 @@ for i in $( ls *_test.go ); do mv $i ./${i%.*}_fuzz.go; done
 
 # Remove windows test to avoid double declarations:
 rm ./client_windows_test_fuzz.go
+rm ./helpers_windows_test_fuzz.go
 compile_go_fuzzer . FuzzCreateContainerNoTearDown fuzz_create_container_no_teardown
 compile_go_fuzzer . FuzzCreateContainerWithTearDown fuzz_create_container_with_teardown
+compile_go_fuzzer . FuzzNoTearDownWithDownload fuzz_no_teardown_with_download
