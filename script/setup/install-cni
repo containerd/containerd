@@ -21,7 +21,7 @@
 #
 set -eu -o pipefail
 
-CNI_COMMIT=$(grep containernetworking/plugins "$GOPATH"/src/github.com/containerd/containerd/go.mod | awk '{print $2}')
+CNI_COMMIT=${1:-$(grep containernetworking/plugins "$GOPATH"/src/github.com/containerd/containerd/go.mod | awk '{print $2}')}
 CNI_DIR=${DESTDIR:=''}/opt/cni
 CNI_CONFIG_DIR=${DESTDIR}/etc/cni/net.d
 

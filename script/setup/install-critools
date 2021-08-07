@@ -22,7 +22,7 @@ set -eu -o pipefail
 
 script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
 
-cd "$GOPATH"
+cd "$(go env GOPATH)"
 go get -u github.com/onsi/ginkgo/ginkgo
 
 : "${CRITEST_COMMIT:=$(cat "${script_dir}/critools-version")}"
