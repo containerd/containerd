@@ -40,6 +40,7 @@ func init() {
 		Type: plugin.ServicePlugin,
 		ID:   services.NamespacesService,
 		Requires: []plugin.Type{
+			plugin.EventPlugin,
 			plugin.MetadataPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
@@ -47,9 +48,13 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
+			ep, err := ic.Get(plugin.EventPlugin)
+			if err != nil {
+				return nil, err
+			}
 			return &local{
 				db:        m.(*metadata.DB),
-				publisher: ic.Events,
+				publisher: ep.(events.Publisher),
 			}, nil
 		},
 	})

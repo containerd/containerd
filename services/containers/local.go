@@ -41,10 +41,15 @@ func init() {
 		Type: plugin.ServicePlugin,
 		ID:   services.ContainersService,
 		Requires: []plugin.Type{
+			plugin.EventPlugin,
 			plugin.MetadataPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			m, err := ic.Get(plugin.MetadataPlugin)
+			if err != nil {
+				return nil, err
+			}
+			ep, err := ic.Get(plugin.EventPlugin)
 			if err != nil {
 				return nil, err
 			}
@@ -53,7 +58,7 @@ func init() {
 			return &local{
 				Store:     metadata.NewContainerStore(db),
 				db:        db,
-				publisher: ic.Events,
+				publisher: ep.(events.Publisher),
 			}, nil
 		},
 	})

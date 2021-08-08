@@ -39,6 +39,7 @@ func init() {
 		Type: plugin.ServicePlugin,
 		ID:   services.ContentService,
 		Requires: []plugin.Type{
+			plugin.EventPlugin,
 			plugin.MetadataPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
@@ -46,8 +47,12 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
+			ep, err := ic.Get(plugin.EventPlugin)
+			if err != nil {
+				return nil, err
+			}
 
-			s, err := newContentStore(m.(*metadata.DB).ContentStore(), ic.Events)
+			s, err := newContentStore(m.(*metadata.DB).ContentStore(), ep.(events.Publisher))
 			return s, err
 		},
 	})

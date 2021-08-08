@@ -75,6 +75,8 @@ const (
 	ContentPlugin Type = "io.containerd.content.v1"
 	// GCPlugin implements garbage collection policy
 	GCPlugin Type = "io.containerd.gc.v1"
+	// EventPlugin implements event handling
+	EventPlugin Type = "io.containerd.event.v1"
 )
 
 const (

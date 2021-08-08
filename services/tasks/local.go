@@ -92,6 +92,11 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 		return nil, err
 	}
 
+	ep, err := ic.Get(plugin.EventPlugin)
+	if err != nil {
+		return nil, err
+	}
+
 	monitor, err := ic.Get(plugin.TaskMonitorPlugin)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
@@ -105,7 +110,7 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 		runtimes:   runtimes,
 		containers: metadata.NewContainerStore(db),
 		store:      db.ContentStore(),
-		publisher:  ic.Events,
+		publisher:  ep.(events.Publisher),
 		monitor:    monitor.(runtime.TaskMonitor),
 		v2Runtime:  v2r.(*v2.TaskManager),
 	}

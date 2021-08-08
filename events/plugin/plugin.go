@@ -14,21 +14,19 @@
    limitations under the License.
 */
 
-package tasks
+package plugin
 
 import (
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/runtime"
 )
 
-var tasksServiceRequires = []plugin.Type{
-	plugin.EventPlugin,
-	plugin.RuntimePluginV2,
-	plugin.MetadataPlugin,
-	plugin.TaskMonitorPlugin,
-}
-
-// loadV1Runtimes on Windows V2 returns an empty map. There are no v1 runtimes
-func loadV1Runtimes(ic *plugin.InitContext) (map[string]runtime.PlatformRuntime, error) {
-	return make(map[string]runtime.PlatformRuntime), nil
+func init() {
+	plugin.Register(&plugin.Registration{
+		Type: plugin.EventPlugin,
+		ID:   "exchange",
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			// TODO: In 2.0, create exchange since ic.Events will be removed
+			return ic.Events, nil
+		},
+	})
 }

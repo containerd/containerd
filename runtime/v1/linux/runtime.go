@@ -73,6 +73,7 @@ func init() {
 		ID:     "linux",
 		InitFn: New,
 		Requires: []plugin.Type{
+			plugin.EventPlugin,
 			plugin.MetadataPlugin,
 		},
 		Config: &Config{
@@ -112,6 +113,12 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	ep, err := ic.GetByID(plugin.EventPlugin, "exchange")
+	if err != nil {
+		return nil, err
+	}
+
 	cfg := ic.Config.(*Config)
 	r := &Runtime{
 		root:       ic.Root,
@@ -119,7 +126,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		tasks:      runtime.NewTaskList(),
 		containers: metadata.NewContainerStore(m.(*metadata.DB)),
 		address:    ic.Address,
-		events:     ic.Events,
+		events:     ep.(*exchange.Exchange),
 		config:     cfg,
 	}
 	tasks, err := r.restoreTasks(ic.Context)
