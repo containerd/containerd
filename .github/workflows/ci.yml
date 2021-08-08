@@ -24,11 +24,16 @@ jobs:
         os: [ubuntu-18.04, macos-10.15, windows-2019]
 
     steps:
+      - uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+
       - uses: actions/checkout@v2
       - uses: golangci/golangci-lint-action@v2
         with:
           version: v1.36.0
           args: --timeout=5m
+          skip-go-installation: true
 
   #
   # Project checks
