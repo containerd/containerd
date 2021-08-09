@@ -27,7 +27,7 @@ considered "pre-releases".
 
 ### Major and Minor Releases
 
-Major and minor releases of containerd will be made from master. Releases of
+Major and minor releases of containerd will be made from main. Releases of
 containerd will be marked with GPG signed tags and announced at
 https://github.com/containerd/containerd/releases. The tag will be of the
 format `v<major>.<minor>.<patch>` and should be made with the command `git tag
@@ -43,7 +43,7 @@ done against that branch.
 
 Pre-releases, such as alphas, betas and release candidates will be conducted
 from their source branch. For major and minor releases, these releases will be
-done from master. For patch releases, these pre-releases should be done within
+done from main. For patch releases, these pre-releases should be done within
 the corresponding release branch.
 
 While pre-releases are done to assist in the stabilization process, no
@@ -132,7 +132,7 @@ If there are important fixes that need to be backported, please let use know in
 one of three ways:
 
 1. Open an issue.
-2. Open a PR with cherry-picked change from master.
+2. Open a PR with cherry-picked change from main.
 3. Open a PR with a ported fix.
 
 __If you are reporting a security issue, please reach out discreetly at security@containerd.io__.
@@ -140,10 +140,10 @@ Remember that backported PRs must follow the versioning guidelines from this doc
 
 Any release that is "active" can accept backports. Opening a backport PR is
 fairly straightforward. The steps differ depending on whether you are pulling
-a fix from master or need to draft a new commit specific to a particular
+a fix from main or need to draft a new commit specific to a particular
 branch.
 
-To cherry pick a straightforward commit from master, simply use the cherry pick
+To cherry pick a straightforward commit from main, simply use the cherry pick
 process:
 
 1. Pick the branch to which you want backported, usually in the format
@@ -167,7 +167,7 @@ process:
 	```
 
    Make sure to replace `stevvooe` with whatever fork you are using to open
-   the PR. When you open the PR, make sure to switch `master` with whatever
+   the PR. When you open the PR, make sure to switch `main` with whatever
    release branch you are targeting with the fix. Make sure the PR title has
    `[<release branch>]` prefixed. e.g.:
 
@@ -175,11 +175,11 @@ process:
    [release/1.4] Fix foo in bar
    ```
 
-If there is no existing fix in master, you should first fix the bug in master,
+If there is no existing fix in main, you should first fix the bug in main,
 or ask us a maintainer or contributor to do it via an issue. Once that PR is
 completed, open a PR using the process above.
 
-Only when the bug is not seen in master and must be made for the specific
+Only when the bug is not seen in main and must be made for the specific
 release branch should you open a PR with new code.
 
 ## Public API Stability
