@@ -28,5 +28,5 @@ func TestTryLock(t *testing.T) {
 	defer unlock("testref")
 
 	err = tryLock("testref")
-	assert.ErrorContains(t, err, "ref testref locked since ")
+	assert.ErrorContains(t, err, "ref testref locked for ")
 }
