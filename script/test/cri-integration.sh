@@ -44,8 +44,6 @@ ${sudo} bin/cri-integration.test --test.run="${FOCUS}" --test.v \
   --cri-root="${CRI_ROOT}" \
   --runtime-handler="${RUNTIME}" \
   --containerd-bin="${CONTAINERD_BIN}" \
-  --image-list="${TEST_IMAGE_LIST:-}"
-
-test_exit_code=$?
+  --image-list="${TEST_IMAGE_LIST:-}" && test_exit_code=$? || test_exit_code=$?
 
 exit ${test_exit_code}

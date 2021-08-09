@@ -96,9 +96,21 @@ test_setup() {
   set -m
   # Create containerd in a different process group
   # so that we can easily clean them up.
-  keepalive "${sudo} bin/containerd ${CONTAINERD_FLAGS}" \
-    "${RESTART_WAIT_PERIOD}" &> "${report_dir}/containerd.log" &
-  pid=$!
+  if [ $IS_WINDOWS -eq 0 ]; then
+    keepalive "${sudo} bin/containerd ${CONTAINERD_FLAGS}" \
+      "${RESTART_WAIT_PERIOD}" &> "${report_dir}/containerd.log" &
+    pid=$!
+  else
+    # NOTE(claudiub): For Windows HostProcess containers, containerd needs to be privileged enough to
+    # start them. For this, we can register containerd as a service, so the LocalSystem will run it
+    # for us. Additionally, we don't need to worry about keeping it alive, Windows will do it for us.
+    nssm install containerd-test "$(pwd)/bin/containerd.exe" ${CONTAINERD_FLAGS} \
+      --log-file "${report_dir}/containerd.log"
+
+    # it might still result in SERVICE_START_PENDING, but we can ignore it.
+    nssm start containerd-test || true
+    pid="1"  # for teardown
+  fi
   set +m
 
   # Wait for containerd to be running by using the containerd client ctr to check the version
@@ -116,9 +128,8 @@ test_setup() {
 test_teardown() {
   if [ -n "${pid}" ]; then
     if [ $IS_WINDOWS -eq 1 ]; then
-      # NOTE(claudiub): The containerd process will have the same PGID as the keepalive process,
-      # so we can kill both of them by matching the PGID.
-      ${sudo} ps | awk "{if (\$3 == ${pid}) print \$1}" | xargs kill
+      nssm stop containerd-test
+      nssm remove containerd-test confirm
     else
       ${sudo} pkill -g $(ps -o pgid= -p "${pid}")
     fi
