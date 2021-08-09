@@ -70,6 +70,11 @@ var platformRunFlags = []cli.Flag{
 		Usage: "set the CFS cpu quota",
 		Value: 0.0,
 	},
+	cli.IntFlag{
+		Name:  "cpu-shares",
+		Usage: "set the cpu shares",
+		Value: 1024,
+	},
 	cli.BoolFlag{
 		Name:  "cni",
 		Usage: "enable cni networking for the container",
@@ -224,6 +229,10 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 				quota  = int64(cpus * 100000.0)
 			)
 			opts = append(opts, oci.WithCPUCFS(quota, period))
+		}
+
+		if shares := context.Int("cpu-shares"); shares > 0 {
+			opts = append(opts, oci.WithCPUShares(uint64(shares)))
 		}
 
 		quota := context.Int64("cpu-quota")
