@@ -1,5 +1,7 @@
+# Runc version requirements for containerd
+
 containerd is built with OCI support and with support for advanced features
-provided by [runc](https://github.com/opencontainers/runc).
+provided by the [runc container runtime](https://github.com/opencontainers/runc).
 
 Development (`-dev`) and pre-releases of containerd may depend features in `runc`
 that have not yet been released, and may require a specific runc build. The version
@@ -14,35 +16,25 @@ or higher than the version of runc described in [`script/setup/runc-version`](..
 If you encounter any runtime errors, make sure your runc is in sync with the
 commit or tag provided in that file.
 
-## building
+If you do not have the correct version of `runc` installed, you can refer to the
+["building" section in the runc documentation](https://github.com/opencontainers/runc#building)
+to learn how to build `runc` from source.
 
-> For more information on how to clone and build runc also refer to the runc
-> building [documentation](https://github.com/opencontainers/runc#building).
+runc builds have [SELinux](https://en.wikipedia.org/wiki/Security-Enhanced_Linux),
+[AppArmor](https://en.wikipedia.org/wiki/AppArmor), and [seccomp](https://en.wikipedia.org/wiki/seccomp)
+support enabled by default.
 
-Before building runc you may need to install additional build dependencies, which
-will vary by platform. For example, you may need to install `libseccomp` e.g.
-`libseccomp-dev` for Ubuntu.
+Note that "seccomp" can be disabled by passing an empty `BUILDTAGS` make
+variable, but is highly recommended to keep enabled.
 
-From within your `opencontainers/runc` repository run:
-
-```bash
-make && sudo make install
-```
-
-Starting with runc 1.0.0-rc93, the "selinux" and "apparmor" buildtags have been
-removed, and runc builds have SELinux, AppArmor, and seccomp support enabled
-by default. Note that "seccomp" can be disabled by passing an empty `BUILDTAGS`
-make variable, but is highly recommended to keep enabled.
-
-By default, runc is compiled with kernel-memory limiting support enabled. This
-functionality is deprecated in kernel 5.4 and up, and is known to be broken on
-RHEL7 and CentOS 7 3.10 kernels. For these kernels, we recommend disabling kmem
-support using the `nokmem` build-tag. When doing so, be sure to set the `seccomp`
-build-tag to enable seccomp support, for example:
+Use the output of the `runc --version` output to verify if your version of runc
+has seccomp enabled. For example:
 
 ```sh
-make BUILDTAGS='nokmem seccomp' && make install
+$ runc --version
+runc version 1.0.1
+commit: v1.0.1-0-g4144b638
+spec: 1.0.2-dev
+go: go1.16.6
+libseccomp: 2.4.4
 ```
-
-For details about the `nokmem` build-tag, refer to the discussion on [opencontainers/runc#2594](https://github.com/opencontainers/runc/pull/2594).
-For further details on building runc, refer to the [build instructions in the runc README](https://github.com/opencontainers/runc#building).

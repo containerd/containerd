@@ -32,9 +32,9 @@ git clone https://github.com/containerd/containerd
 
 For proper results, install the `protoc` release into `/usr/local` on your build system. For example, the following commands will download and install the 3.11.4 release for a 64-bit Linux host:
 
-```
-$ wget -c https://github.com/protocolbuffers/protobuf/releases/download/v3.11.4/protoc-3.11.4-linux-x86_64.zip
-$ sudo unzip protoc-3.11.4-linux-x86_64.zip -d /usr/local
+```sh
+wget -c https://github.com/protocolbuffers/protobuf/releases/download/v3.11.4/protoc-3.11.4-linux-x86_64.zip
+sudo unzip protoc-3.11.4-linux-x86_64.zip -d /usr/local
 ```
 
 `containerd` uses [Btrfs](https://en.wikipedia.org/wiki/Btrfs) it means that you
@@ -46,38 +46,20 @@ need to satisfy these dependencies in your system:
 
 At this point you are ready to build `containerd` yourself!
 
-## Build runc
+## Runc
 
-`runc` is the default container runtime used by `containerd` and is required to
-run containerd. While it is okay to download a runc binary and install that on
+Runc is the default container runtime used by `containerd` and is required to
+run containerd. While it is okay to download a `runc` binary and install that on
 the system, sometimes it is necessary to build runc directly when working with
-container runtime development. You can skip this step if you already have the
-correct version of `runc` installed.
-
-`runc` requires `libseccomp`. You may need to install the missing dependencies:
-
-* CentOS/Fedora: `yum install libseccomp libseccomp-devel`
-* Debian/Ubuntu: `apt-get install libseccomp libseccomp-dev`
-
-
-For the quick and dirty installation, you can use the following:
-
-```
-git clone https://github.com/opencontainers/runc
-cd runc
-make
-sudo make install
-```
-
-Make sure to follow the guidelines for versioning in [RUNC.md](/docs/RUNC.md) for the
-best results.
+container runtime development. Make sure to follow the guidelines for versioning
+in [RUNC.md](/docs/RUNC.md) for the best results.
 
 ## Build containerd
 
 `containerd` uses `make` to create a repeatable build flow. It means that you
 can run:
 
-```
+```sh
 cd containerd
 make
 ```
@@ -86,7 +68,7 @@ This is going to build all the project binaries in the `./bin/` directory.
 
 You can move them in your global path, `/usr/local/bin` with:
 
-```sudo
+```sh
 sudo make install
 ```
 
@@ -99,7 +81,7 @@ Note: if you set one of these vars, set them to the same values on all make stag
 If you want to prepend an additional prefix on actual installation (eg. packaging or chroot install),
 you can pass it via `DESTDIR` variable:
 
-```sudo
+```sh
 sudo make install DESTDIR=/tmp/install-x973234/
 ```
 
@@ -112,7 +94,7 @@ Older releases was using `DESTDIR` for a different purpose that is similar to `P
 When making any changes to the gRPC API, you can use the installed `protoc`
 compiler to regenerate the API generated code packages with:
 
-```sudo
+```sh
 make generate
 ```
 
@@ -139,7 +121,7 @@ Please refer to [RUNC.md](/docs/RUNC.md) for the currently supported version of 
 
 You can build static binaries by providing a few variables to `make`:
 
-```sudo
+```sh
 make EXTRA_FLAGS="-buildmode pie" \
 	EXTRA_LDFLAGS='-linkmode external -extldflags "-fno-PIC -static"' \
 	BUILDTAGS="netgo osusergo static_build"
@@ -153,12 +135,12 @@ make EXTRA_FLAGS="-buildmode pie" \
 
 The following instructions assume you are at the parent directory of containerd source directory.
 
-## Build containerd
+## Build containerd in a container
 
 You can build `containerd` via a Linux-based Docker container.
 You can build an image from this `Dockerfile`:
 
-```
+```dockerfile
 FROM golang
 
 RUN apt-get update && \
@@ -180,10 +162,11 @@ This mounts `containerd` repository
 You are now ready to [build](#build-containerd):
 
 ```sh
- make && make install
+make && make install
 ```
 
-## Build containerd and runc
+## Build containerd and runc in a container
+
 To have complete core container runtime, you will need both `containerd` and `runc`. It is possible to build both of these via Docker container.
 
 You can use `git` to checkout `runc`:
@@ -199,7 +182,6 @@ FROM golang
 
 RUN apt-get update && \
     apt-get install -y libbtrfs-dev libseccomp-dev
-
 ```
 
 In our Docker container we will build `runc` build, which includes
@@ -268,6 +250,7 @@ go test -v -run . -test.root
 ```
 
 Example output from directly running `go test` to execute the `TestContainerList` test:
+
 ```sh
 sudo go test -v -run "TestContainerList" . -test.root
 INFO[0000] running tests against containerd revision=f2ae8a020a985a8d9862c9eb5ab66902c2888361 version=v1.0.0-beta.2-49-gf2ae8a0
