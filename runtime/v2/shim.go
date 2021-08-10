@@ -317,6 +317,15 @@ func (s *shim) Create(ctx context.Context, opts runtime.CreateOpts) (runtime.Tas
 	return s, nil
 }
 
+func (s *shim) PullImage(ctx context.Context) error {
+	if _, err := s.task.PullImage(ctx, &task.PullImageRequest{
+		ID: s.ID(),
+	}); err != nil {
+		return errdefs.FromGRPC(err)
+	}
+	return nil
+}
+
 func (s *shim) Pause(ctx context.Context) error {
 	if _, err := s.task.Pause(ctx, &task.PauseRequest{
 		ID: s.ID(),

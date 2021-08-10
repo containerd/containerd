@@ -43,6 +43,7 @@ service Task {
 	rpc Kill(KillRequest) returns (google.protobuf.Empty);
 	rpc Exec(ExecProcessRequest) returns (google.protobuf.Empty);
 	rpc ResizePty(ResizePtyRequest) returns (google.protobuf.Empty);
+	rpc PullImage(PullImageRequest) returns (google.protobuf.Empty);
 	rpc CloseIO(CloseIORequest) returns (google.protobuf.Empty);
 	rpc Update(UpdateTaskRequest) returns (google.protobuf.Empty);
 	rpc Wait(WaitRequest) returns (WaitResponse);
@@ -97,6 +98,11 @@ message ResizePtyRequest {
 	string exec_id = 2;
 	uint32 width = 3;
 	uint32 height = 4;
+}
+
+message PullImageRequest {
+	string id = 1;
+	string image = 2;
 }
 
 message StateRequest {

@@ -74,6 +74,7 @@ var Command = cli.Command{
 		execCommand,
 		startCommand,
 		stateCommand,
+		pullImageCommand,
 	},
 }
 
@@ -107,6 +108,25 @@ var deleteCommand = cli.Command{
 			return err
 		}
 		fmt.Printf("container deleted and returned exit status %d\n", r.ExitStatus)
+		return nil
+	},
+}
+
+var pullImageCommand = cli.Command{
+	Name:  "pullimage",
+	Usage: "pull an image",
+	Action: func(context *cli.Context) error {
+		service, err := getTaskService(context)
+		if err != nil {
+			return err
+		}
+		_, err = service.PullImage(gocontext.Background(), &task.PullImageRequest{
+			ID: context.GlobalString("id"),
+			Image: context.Args().First(),
+		})
+		if err != nil {
+			return err
+		}
 		return nil
 	},
 }

@@ -479,6 +479,11 @@ func (s *service) ResizePty(ctx context.Context, r *taskAPI.ResizePtyRequest) (*
 	return empty, nil
 }
 
+// PullImage
+func (s *service) PullImage(ctx context.Context, r *taskAPI.PullImageRequest) (*ptypes.Empty, error) {
+	return nil, nil
+}
+
 // State returns runtime state information for a process
 func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.StateResponse, error) {
 	container, err := s.getContainer(r.ID)
