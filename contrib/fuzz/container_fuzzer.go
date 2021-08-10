@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/sys"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -39,12 +40,38 @@ import (
 )
 
 var (
-	haveInstalledWget      = false
 	haveDownloadedbinaries = false
 	haveExtractedBinaries  = false
 	haveChangedPATH        = false
 	haveInitialized        = false
+
+	downloadLink = "https://github.com/containerd/containerd/releases/download/v1.5.4/containerd-1.5.4-linux-amd64.tar.gz"
+	downloadPath = "/tmp/containerd-1.5.4-linux-amd64.tar.gz"
+	binariesDir  = "/tmp/containerd-binaries"
 )
+
+// downloadFile downloads a file from a url
+func downloadFile(filepath string, url string) (err error) {
+
+	out, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
 
 // initInSteps() performs initialization in several steps
 // The reason for spreading the initialization out in
@@ -52,35 +79,21 @@ var (
 // take 25 seconds when running through OSS-fuzz.
 // Should an iteration exceed that, then the fuzzer stops.
 func initInSteps() bool {
-	// Install wget
-	if !haveInstalledWget {
-		cmd := exec.Command("apt-get", "install", "-y", "wget")
-		err := cmd.Run()
-		if err != nil {
-			return true
-		}
-		haveInstalledWget = true
-		return true
-	}
 	// Download binaries
 	if !haveDownloadedbinaries {
-		tarLink := "https://github.com/containerd/containerd/releases/download/v1.5.4/containerd-1.5.4-linux-amd64.tar.gz"
-		cmd := exec.Command("wget", tarLink)
-		err := cmd.Run()
+		err := downloadFile(downloadPath, downloadLink)
 		if err != nil {
-			return true
+			panic(err)
 		}
 		haveDownloadedbinaries = true
-		return true
 	}
 	// Extract binaries
-	binariesDir := "/tmp/containerd-binaries"
 	if !haveExtractedBinaries {
 		err := os.MkdirAll(binariesDir, 0777)
 		if err != nil {
 			return true
 		}
-		cmd := exec.Command("tar", "xvf", "containerd-1.5.4-linux-amd64.tar.gz", "-C", binariesDir)
+		cmd := exec.Command("tar", "xvf", downloadPath, "-C", binariesDir)
 		err = cmd.Run()
 		if err != nil {
 			return true
@@ -91,7 +104,7 @@ func initInSteps() bool {
 	// Add binaries to $PATH:
 	if !haveChangedPATH {
 		oldPathEnv := os.Getenv("PATH")
-		newPathEnv := fmt.Sprintf("%s:%s/bin", oldPathEnv, binariesDir)
+		newPathEnv := fmt.Sprintf("%s/bin:%s", binariesDir, oldPathEnv)
 		err := os.Setenv("PATH", newPathEnv)
 		if err != nil {
 			return true
