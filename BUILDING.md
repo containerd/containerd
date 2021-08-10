@@ -117,10 +117,13 @@ make generate
 ```
 
 > *Note*: Several build tags are currently available:
-> * `no_btrfs`: A build tag disables building the btrfs snapshot driver.
 > * `no_cri`: A build tag disables building Kubernetes [CRI](http://blog.kubernetes.io/2016/12/container-runtime-interface-cri-in-kubernetes.html) support into containerd.
 > See [here](https://github.com/containerd/cri-containerd#build-tags) for build tags of CRI plugin.
-> * `no_devmapper`: A build tag disables building the device mapper snapshot driver.
+> * snapshotters (alphabetical order)
+>   * `no_aufs`: A build tag disables building the aufs snapshot driver.
+>   * `no_btrfs`: A build tag disables building the Btrfs snapshot driver.
+>   * `no_devmapper`: A build tag disables building the device mapper snapshot driver.
+>   * `no_zfs`: A build tag disables building the ZFS snapshot driver.
 >
 > For example, adding `BUILDTAGS=no_btrfs` to your environment before calling the **binaries**
 > Makefile target will disable the btrfs driver within the containerd Go build.
