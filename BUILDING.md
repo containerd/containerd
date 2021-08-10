@@ -46,31 +46,13 @@ need to satisfy these dependencies in your system:
 
 At this point you are ready to build `containerd` yourself!
 
-## Build runc
+## Runc
 
-`runc` is the default container runtime used by `containerd` and is required to
-run containerd. While it is okay to download a runc binary and install that on
+Runc is the default container runtime used by `containerd` and is required to
+run containerd. While it is okay to download a `runc` binary and install that on
 the system, sometimes it is necessary to build runc directly when working with
-container runtime development. You can skip this step if you already have the
-correct version of `runc` installed.
-
-`runc` requires `libseccomp`. You may need to install the missing dependencies:
-
-* CentOS/Fedora: `yum install libseccomp libseccomp-devel`
-* Debian/Ubuntu: `apt-get install libseccomp libseccomp-dev`
-
-
-For the quick and dirty installation, you can use the following:
-
-```
-git clone https://github.com/opencontainers/runc
-cd runc
-make
-sudo make install
-```
-
-Make sure to follow the guidelines for versioning in [RUNC.md](/docs/RUNC.md) for the
-best results.
+container runtime development. Make sure to follow the guidelines for versioning
+in [RUNC.md](/docs/RUNC.md) for the best results.
 
 ## Build containerd
 
