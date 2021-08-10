@@ -40,7 +40,7 @@ If you are interested in trying out containerd see our example at [Getting Start
 ## Nightly builds
 
 There are nightly builds available for download [here](https://github.com/containerd/containerd/actions?query=workflow%3ANightly).
-Binaries are generated from `master` branch every night for `Linux` and `Windows`.
+Binaries are generated from `main` branch every night for `Linux` and `Windows`.
 
 Please be aware: nightly builds might have critical bugs, it's not recommended for use in production and no support provided.
 
