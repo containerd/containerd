@@ -21,6 +21,8 @@ set -o pipefail
 basedir="$(dirname "${BASH_SOURCE[0]}")"
 source "${basedir}/utils.sh"
 
+trap test_teardown EXIT
+
 ROOT="$( cd "${basedir}" && pwd )"/../..
 cd "${ROOT}"
 
@@ -45,7 +47,5 @@ ${sudo} bin/cri-integration.test --test.run="${FOCUS}" --test.v \
   --image-list="${TEST_IMAGE_LIST:-}"
 
 test_exit_code=$?
-
-test_teardown
 
 exit ${test_exit_code}
