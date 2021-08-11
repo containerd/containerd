@@ -32,6 +32,7 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/content/local"
+	"github.com/containerd/containerd/images/archive"
 )
 
 // checkBlobPath performs some basic validation
@@ -87,8 +88,7 @@ func populateBlobStore(ctx context.Context, cs content.Store, f *fuzz.ConsumeFuz
 	}
 
 	for dgst, p := range blobs {
-		d, err := checkWrite(ctx, cs, dgst, p)
-		_ = d
+		_, err := checkWrite(ctx, cs, dgst, p)
 		if err != nil {
 			return blobs, err
 		}
@@ -112,7 +112,6 @@ func FuzzCSWalk(data []byte) int {
 
 	f := fuzz.NewConsumer(data)
 	blobs, err := populateBlobStore(ctx, cs, f)
-	_ = blobs
 	if err != nil {
 		return 0
 	}
@@ -134,5 +133,36 @@ func FuzzCSWalk(data []byte) int {
 	if !reflect.DeepEqual(expected, found) {
 		panic(fmt.Sprintf("%v != %v but should be equal", found, expected))
 	}
+	return 1
+}
+
+func FuzzArchiveExport(data []byte) int {
+	f := fuzz.NewConsumer(data)
+	manifest := ocispec.Descriptor{}
+	err := f.GenerateStruct(&manifest)
+	if err != nil {
+		return 0
+	}
+	ctx := context.Background()
+	tmpdir, err := ioutil.TempDir("", "fuzzing-")
+	if err != nil {
+		return 0
+	}
+	defer os.RemoveAll(tmpdir)
+	cs, err := local.NewStore(tmpdir)
+	if err != nil {
+		return 0
+	}
+	_, err = populateBlobStore(ctx, cs, f)
+	if err != nil {
+		return 0
+	}
+	w, err := os.Create("fuzz-output-file")
+	if err != nil {
+		return 0
+	}
+	defer w.Close()
+	defer os.Remove("fuzz-output-file")
+	_ = archive.Export(ctx, cs, w, archive.WithManifest(manifest, "name"))
 	return 1
 }
