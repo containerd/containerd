@@ -32,17 +32,88 @@ import (
 	"github.com/containerd/containerd/sys"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 )
 
-func init() {
-	err := updatePathEnv()
+var (
+	haveDownloadedbinaries = false
+	haveExtractedBinaries  = false
+	haveChangedPATH        = false
+	haveInitialized        = false
+
+	downloadLink = "https://github.com/containerd/containerd/releases/download/v1.5.4/containerd-1.5.4-linux-amd64.tar.gz"
+	downloadPath = "/tmp/containerd-1.5.4-linux-amd64.tar.gz"
+	binariesDir  = "/tmp/containerd-binaries"
+)
+
+// downloadFile downloads a file from a url
+func downloadFile(filepath string, url string) (err error) {
+
+	out, err := os.Create(filepath)
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
+	defer out.Close()
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// initInSteps() performs initialization in several steps
+// The reason for spreading the initialization out in
+// multiple steps is that each fuzz iteration can maximum
+// take 25 seconds when running through OSS-fuzz.
+// Should an iteration exceed that, then the fuzzer stops.
+func initInSteps() bool {
+	// Download binaries
+	if !haveDownloadedbinaries {
+		err := downloadFile(downloadPath, downloadLink)
+		if err != nil {
+			panic(err)
+		}
+		haveDownloadedbinaries = true
+	}
+	// Extract binaries
+	if !haveExtractedBinaries {
+		err := os.MkdirAll(binariesDir, 0777)
+		if err != nil {
+			return true
+		}
+		cmd := exec.Command("tar", "xvf", downloadPath, "-C", binariesDir)
+		err = cmd.Run()
+		if err != nil {
+			return true
+		}
+		haveExtractedBinaries = true
+		return true
+	}
+	// Add binaries to $PATH:
+	if !haveChangedPATH {
+		oldPathEnv := os.Getenv("PATH")
+		newPathEnv := fmt.Sprintf("%s/bin:%s", binariesDir, oldPathEnv)
+		err := os.Setenv("PATH", newPathEnv)
+		if err != nil {
+			return true
+		}
+		haveChangedPATH = true
+		return true
+	}
+	haveInitialized = true
+	return false
 }
 
 func tearDown() error {
@@ -153,6 +224,7 @@ func updatePathEnv() error {
 	if err != nil {
 		return err
 	}
+	haveInitialized = true
 	return nil
 }
 
@@ -328,11 +400,38 @@ func doFuzz(data []byte, shouldTearDown bool) int {
 }
 
 // FuzzCreateContainerNoTearDown() implements a fuzzer
+// similar to FuzzCreateContainerWithTearDown() and
+// FuzzCreateContainerWithTearDown(), but it takes a
+// different approach to the initialization. Where
+// the other 2 fuzzers depend on the containerd binaries
+// that were built manually, this fuzzer downloads them
+// when starting a fuzz run.
+// This fuzzer is experimental for now and is being run
+// continuously by OSS-fuzz to collect feedback on
+// its sustainability.
+func FuzzNoTearDownWithDownload(data []byte) int {
+	if !haveInitialized {
+		shouldRestart := initInSteps()
+		if shouldRestart {
+			return 0
+		}
+	}
+	ret := doFuzz(data, false)
+	return ret
+}
+
+// FuzzCreateContainerNoTearDown() implements a fuzzer
 // similar to FuzzCreateContainerWithTearDown() with
 // with one minor distinction: One tears down the
 // daemon after each iteration whereas the other doesn't.
 // The two fuzzers' performance will be compared over time.
 func FuzzCreateContainerNoTearDown(data []byte) int {
+	if !haveInitialized {
+		err := updatePathEnv()
+		if err != nil {
+			return 0
+		}
+	}
 	ret := doFuzz(data, false)
 	return ret
 }
@@ -342,6 +441,12 @@ func FuzzCreateContainerNoTearDown(data []byte) int {
 // FuzzCreateContainerWithTearDown tears down the daemon
 // after each iteration.
 func FuzzCreateContainerWithTearDown(data []byte) int {
+	if !haveInitialized {
+		err := updatePathEnv()
+		if err != nil {
+			return 0
+		}
+	}
 	ret := doFuzz(data, true)
 	return ret
 }
