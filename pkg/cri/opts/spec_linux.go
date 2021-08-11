@@ -446,6 +446,15 @@ func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHu
 				logrus.Warn("hugetlb cgroup controller is absent. skipping huge pages limits")
 			}
 		}
+
+		if unified := resources.GetUnified(); unified != nil {
+			if s.Linux.Resources.Unified == nil {
+				s.Linux.Resources.Unified = make(map[string]string)
+			}
+			for k, v := range unified {
+				s.Linux.Resources.Unified[k] = v
+			}
+		}
 		return nil
 	}
 }
