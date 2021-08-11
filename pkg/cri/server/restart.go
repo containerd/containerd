@@ -414,6 +414,9 @@ func (c *criService) loadSandbox(ctx context.Context, cntr containerd.Container)
 		// Don't need to load netns for host network sandbox.
 		return sandbox, nil
 	}
+	if goruntime.GOOS == "windows" && meta.Config.GetWindows().GetSecurityContext().GetHostProcess() {
+		return sandbox, nil
+	}
 	sandbox.NetNS = netns.LoadNetNS(meta.NetNSPath)
 
 	// It doesn't matter whether task is running or not. If it is running, sandbox

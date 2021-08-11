@@ -40,6 +40,13 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 		LogDirectory: "test-log-directory",
 		Labels:       map[string]string{"a": "b"},
 		Annotations:  map[string]string{"c": "d"},
+		Windows: &runtime.WindowsPodSandboxConfig{
+			SecurityContext: &runtime.WindowsSandboxSecurityContext{
+				RunAsUsername:  "test-user",
+				CredentialSpec: "{\"test\": \"spec\"}",
+				HostProcess:    false,
+			},
+		},
 	}
 	imageConfig := &imagespec.ImageConfig{
 		Env:        []string{"a=b", "c=d"},
@@ -70,6 +77,9 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 
 		assert.Contains(t, spec.Annotations, annotations.SandboxLogDir)
 		assert.EqualValues(t, spec.Annotations[annotations.SandboxLogDir], "test-log-directory")
+
+		assert.Contains(t, spec.Annotations, annotations.WindowsHostProcess)
+		assert.EqualValues(t, spec.Annotations[annotations.WindowsHostProcess], "false")
 	}
 	return config, imageConfig, specCheck
 }

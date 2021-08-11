@@ -72,6 +72,7 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 			SecurityContext: &runtime.WindowsContainerSecurityContext{
 				RunAsUsername:  "test-user",
 				CredentialSpec: "{\"test\": \"spec\"}",
+				HostProcess:    false,
 			},
 		},
 	}
@@ -130,6 +131,9 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 
 		assert.Contains(t, spec.Annotations, annotations.SandboxName)
 		assert.EqualValues(t, spec.Annotations[annotations.SandboxName], "test-sandbox-name")
+
+		assert.Contains(t, spec.Annotations, annotations.WindowsHostProcess)
+		assert.EqualValues(t, spec.Annotations[annotations.WindowsHostProcess], "false")
 	}
 	return config, sandboxConfig, imageConfig, specCheck
 }
