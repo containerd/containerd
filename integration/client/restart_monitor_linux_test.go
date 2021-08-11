@@ -34,6 +34,7 @@ func TestRestartMonitor(t *testing.T) {
 	const (
 		interval = 10 * time.Second
 		epsilon  = 1 * time.Second
+		count    = 20
 	)
 	configTOML := fmt.Sprintf(`
 version = 2
@@ -78,9 +79,14 @@ version = 2
 		t.Fatal(err)
 	}
 
-	task.Kill(ctx, syscall.SIGKILL)
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+
 	begin := time.Now()
-	deadline := begin.Add(interval).Add(epsilon)
+
+	expected := begin.Add(interval).Add(epsilon)
+	deadline := begin.Add(interval).Add(epsilon * count)
 	for {
 		status, err := task.Status(ctx)
 		now := time.Now()
@@ -92,18 +98,21 @@ version = 2
 			t.Logf("%v: status=%q", now, status)
 
 			if status.Status == Running {
-				elapsed := time.Since(begin)
-				t.Logf("the task was restarted within %s", elapsed.String())
-				return
+				break
 			}
 		}
 		if time.Now().After(deadline) {
-			break
+			t.Logf("%v: the task was not restarted", now)
+			return
 		}
 		time.Sleep(epsilon)
 	}
-	t.Fatalf("%v: the task was not restarted in %s + %s",
-		time.Now(), interval.String(), epsilon.String())
+
+	now := time.Now()
+	if now.After(expected) {
+		t.Fatalf("%v: the task was restarted, but it must be before %v", now, expected)
+	}
+	t.Logf("%v: the task was restarted before %v", now, expected)
 }
 
 // withRestartStatus is a copy of "github.com/containerd/containerd/runtime/restart".WithStatus.
