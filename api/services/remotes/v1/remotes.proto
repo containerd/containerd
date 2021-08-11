@@ -1,0 +1,115 @@
+/*
+   Copyright The containerd Authors.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+syntax = "proto3";
+
+package containerd.services.remtotes.v1;
+
+import weak "gogoproto/gogo.proto";
+import "google/protobuf/timestamp.proto";
+import "github.com/containerd/containerd/api/types/descriptor.proto";
+import "github.com/containerd/containerd/api/types/platform.proto";
+
+option go_package = "github.com/containerd/containerd/api/services/remotes/v1;remotes";
+
+// PushService is the service that handles pushing content to a remote.
+service PushService {
+    rpc Push(PushRequest) returns (stream PushResponse);
+}
+
+// PushRequest describes a request to push content.
+message PushRequest {
+	// Source is the descitptor of the source content to push.
+	types.Descriptor source = 1 [(gogoproto.nullable) = false];
+	// Platform is the platform to push content for.
+	// TODO: Should we require the client to give us the exact descriptor they want to push?
+	//
+	// Platform is used to, essentially, determine if when the descriptor is an index if we
+	// should push that
+	types.Platform platform = 2;
+	// Target is the canonical reference for the repository to push to.
+	string target = 3;
+	// Auth is a mapping of registry host => credentials.
+	// This will be used to authorize pushes to the remote.
+	UserPassAuth auth = 4;
+	// Maxconcurrency is the maximum number of concurrent blob pushes.
+	int64 max_concurrency = 5;
+}
+
+// UserPassAuth is used to pass auth credentials from the client to use during Push
+message UserPassAuth {
+	string username = 1;
+	string password = 2;
+}
+
+// Action defines the action that occurs when pushing content.
+// It is returned as part of the push/pull response streams.
+enum Action {
+	option (gogoproto.goproto_enum_prefix) = true;
+	option (gogoproto.enum_customname) = "Action";
+
+	// Upload not registered yet
+	Waiting = 0;
+	// Content is being uploaded to the remote repository
+	Write = 1;
+	// Content is committed to the remote repository
+	Commit = 2;
+	// Content is fully uploaded to the remote repository.
+	Done = 3;
+}
+
+// PushResponse is the response to a push request.
+// It is a used as a stream sent to the push client to indicate progress of the push.
+// Each blob should have a corresponding status message.
+message PushResponse {
+	repeated Status statuses = 1;
+}
+
+// Status indicates the current state of an ongoing push
+message Status {
+	Action action = 1;
+
+	// StartedAt provides the time at which the write began.
+	//
+	// This must be set for stat and commit write actions. All other write
+	// actions may omit this.
+	google.protobuf.Timestamp started_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+
+	// UpdatedAt provides the last time of a successful write.
+	//
+	// This must be set for stat and commit write actions. All other write
+	// actions may omit this.
+	google.protobuf.Timestamp updated_at = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+
+	// Offset is the current committed size for the write.
+	int64 offset = 4;
+
+	// Total provides the current, expected total size of the write.
+	//
+	// We include this to provide consistency with the Status structure on the
+	// client writer.
+	//
+	// This is only valid on the Stat and Commit response.
+	int64 total = 5;
+
+	// Digest, if present, includes the digest up to the currently committed
+	// bytes. If action is commit, this field will be set. It is implementation
+	// defined if this is set for other actions.
+	string digest = 6 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
+
+	// Name is the name of the blob being written.
+	string name = 7;
+}

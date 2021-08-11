@@ -56,16 +56,12 @@ func passwordPrompt() (string, error) {
 	return string(line), nil
 }
 
-// GetResolver prepares the resolver from the environment and options
-func GetResolver(ctx gocontext.Context, clicontext *cli.Context) (remotes.Resolver, error) {
+func GetAuth(clicontext *cli.Context) (string, string, error) {
 	username := clicontext.String("user")
 	var secret string
 	if i := strings.IndexByte(username, ':'); i > 0 {
 		secret = username[i+1:]
 		username = username[0:i]
-	}
-	options := docker.ResolverOptions{
-		Tracker: PushTracker,
 	}
 	if username != "" {
 		if secret == "" {
@@ -74,7 +70,7 @@ func GetResolver(ctx gocontext.Context, clicontext *cli.Context) (remotes.Resolv
 			var err error
 			secret, err = passwordPrompt()
 			if err != nil {
-				return nil, err
+				return "", "", err
 			}
 
 			fmt.Print("\n")
@@ -83,11 +79,19 @@ func GetResolver(ctx gocontext.Context, clicontext *cli.Context) (remotes.Resolv
 		secret = rt
 	}
 
+	return username, secret, nil
+}
+
+// GetResolver prepares the resolver from the environment and options
+func GetResolver(ctx gocontext.Context, clicontext *cli.Context) (remotes.Resolver, error) {
+	options := docker.ResolverOptions{
+		Tracker: PushTracker,
+	}
 	hostOptions := config.HostOptions{}
 	hostOptions.Credentials = func(host string) (string, string, error) {
 		// If host doesn't match...
 		// Only one host
-		return username, secret, nil
+		return GetAuth(clicontext)
 	}
 	if clicontext.Bool("plain-http") {
 		hostOptions.DefaultScheme = "http"

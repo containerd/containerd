@@ -18,26 +18,24 @@ package images
 
 import (
 	gocontext "context"
+	"io"
+	"io/ioutil"
 	"net/http/httptrace"
 	"os"
-	"sync"
 	"text/tabwriter"
 	"time"
 
-	"github.com/containerd/containerd"
+	pushapi "github.com/containerd/containerd/api/services/remotes/v1"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/cmd/ctr/commands/content"
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/progress"
 	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/remotes"
-	"github.com/containerd/containerd/remotes/docker"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
-	"golang.org/x/sync/errgroup"
 )
 
 var pushCommand = cli.Command{
@@ -100,159 +98,110 @@ var pushCommand = cli.Command{
 				return errors.Wrap(err, "unable to resolve image to manifest")
 			}
 			desc = img.Target
-
-			if pss := context.StringSlice("platform"); len(pss) == 1 {
-				p, err := platforms.Parse(pss[0])
-				if err != nil {
-					return errors.Wrapf(err, "invalid platform %q", pss[0])
-				}
-
-				cs := client.ContentStore()
-				if manifests, err := images.Children(ctx, cs, desc); err == nil && len(manifests) > 0 {
-					matcher := platforms.NewMatcher(p)
-					for _, manifest := range manifests {
-						if manifest.Platform != nil && matcher.Match(*manifest.Platform) {
-							if _, err := images.Children(ctx, cs, manifest); err != nil {
-								return errors.Wrap(err, "no matching manifest")
-							}
-							desc = manifest
-							break
-						}
-					}
-				}
-			}
 		}
 
 		if context.Bool("http-trace") {
 			ctx = httptrace.WithClientTrace(ctx, commands.NewDebugClientTrace(ctx))
 		}
-		resolver, err := commands.GetResolver(ctx, context)
+
+		var (
+			platform *types.Platform
+			p        v1.Platform
+		)
+
+		if pss := context.StringSlice("platform"); len(pss) == 1 {
+			p, err = platforms.Parse(pss[0])
+			if err != nil {
+				return err
+			}
+
+			platform = &types.Platform{
+				Architecture: p.Architecture,
+				OS:           p.OS,
+				Variant:      p.Variant,
+			}
+		}
+
+		req := &pushapi.PushRequest{
+			Source: types.Descriptor{
+				Digest:    desc.Digest,
+				MediaType: desc.MediaType,
+				Size_:     desc.Size,
+			},
+			Target:         ref,
+			MaxConcurrency: context.Int64("max-concurrent-uploaded-layers"),
+			Platform:       platform,
+		}
+
+		username, secret, err := commands.GetAuth(context)
 		if err != nil {
 			return err
 		}
-		ongoing := newPushJobs(commands.PushTracker)
+		req.Auth = &pushapi.UserPassAuth{Username: username, Password: secret}
 
-		eg, ctx := errgroup.WithContext(ctx)
+		ctx, cancel = gocontext.WithCancel(ctx)
+		defer cancel()
 
-		// used to notify the progress writer
-		doneCh := make(chan struct{})
-
-		eg.Go(func() error {
-			defer close(doneCh)
-
-			log.G(ctx).WithField("image", ref).WithField("digest", desc.Digest).Debug("pushing")
-
-			jobHandler := images.HandlerFunc(func(ctx gocontext.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-				ongoing.add(remotes.MakeRefKey(ctx, desc))
-				return nil, nil
-			})
-
-			ropts := []containerd.RemoteOpt{
-				containerd.WithResolver(resolver),
-				containerd.WithImageHandler(jobHandler),
-			}
-
-			if context.IsSet("max-concurrent-uploaded-layers") {
-				mcu := context.Int("max-concurrent-uploaded-layers")
-				ropts = append(ropts, containerd.WithMaxConcurrentUploadedLayers(mcu))
-			}
-
-			return client.Push(ctx, ref, desc, ropts...)
-		})
+		ch, err := client.PushService().Push(ctx, req)
+		if err != nil {
+			return err
+		}
 
 		// don't show progress if debug mode is set
-		if !debug {
-			eg.Go(func() error {
-				var (
-					ticker = time.NewTicker(100 * time.Millisecond)
-					fw     = progress.NewWriter(os.Stdout)
-					start  = time.Now()
-					done   bool
-				)
-
-				defer ticker.Stop()
-
-				for {
-					select {
-					case <-ticker.C:
-						fw.Flush()
-
-						tw := tabwriter.NewWriter(fw, 1, 8, 1, ' ', 0)
-
-						content.Display(tw, ongoing.status(), start)
-						tw.Flush()
-
-						if done {
-							fw.Flush()
-							return nil
-						}
-					case <-doneCh:
-						done = true
-					case <-ctx.Done():
-						done = true // allow ui to update once more
-					}
-				}
-			})
+		out := io.Writer(os.Stdout)
+		if debug {
+			out = ioutil.Discard
 		}
-		return eg.Wait()
+		var (
+			fw    = progress.NewWriter(out)
+			start = time.Now()
+			tw    = tabwriter.NewWriter(fw, 1, 8, 1, ' ', 0)
+		)
+
+		for status := range ch {
+			fw.Flush()
+
+			if status.Err != nil {
+				return status.Err
+			}
+			if status.PushResponse != nil {
+				content.Display(tw, apiPushStatusToContent(status.Statuses), start)
+				tw.Flush()
+			}
+		}
+
+		fw.Flush()
+
+		return nil
 	},
 }
 
-type pushjobs struct {
-	jobs    map[string]struct{}
-	ordered []string
-	tracker docker.StatusTracker
-	mu      sync.Mutex
-}
-
-func newPushJobs(tracker docker.StatusTracker) *pushjobs {
-	return &pushjobs{
-		jobs:    make(map[string]struct{}),
-		tracker: tracker,
-	}
-}
-
-func (j *pushjobs) add(ref string) {
-	j.mu.Lock()
-	defer j.mu.Unlock()
-
-	if _, ok := j.jobs[ref]; ok {
-		return
-	}
-	j.ordered = append(j.ordered, ref)
-	j.jobs[ref] = struct{}{}
-}
-
-func (j *pushjobs) status() []content.StatusInfo {
-	j.mu.Lock()
-	defer j.mu.Unlock()
-
-	statuses := make([]content.StatusInfo, 0, len(j.jobs))
-	for _, name := range j.ordered {
+// TODO: Add ref to API type
+func apiPushStatusToContent(status []*pushapi.Status) []content.StatusInfo {
+	ls := make([]content.StatusInfo, 0, len(status))
+	for _, s := range status {
 		si := content.StatusInfo{
-			Ref: name,
+			Ref:       s.Name,
+			Offset:    s.Offset,
+			Total:     s.Total,
+			StartedAt: s.StartedAt,
+			UpdatedAt: s.UpdatedAt,
 		}
 
-		status, err := j.tracker.GetStatus(name)
-		if err != nil {
+		switch s.Action {
+		case pushapi.Action_Waiting:
 			si.Status = "waiting"
-		} else {
-			si.Offset = status.Offset
-			si.Total = status.Total
-			si.StartedAt = status.StartedAt
-			si.UpdatedAt = status.UpdatedAt
-			if status.Offset >= status.Total {
-				if status.UploadUUID == "" {
-					si.Status = "done"
-				} else {
-					si.Status = "committing"
-				}
-			} else {
-				si.Status = "uploading"
-			}
+		case pushapi.Action_Write:
+			si.Status = "uploading"
+		case pushapi.Action_Commit:
+			si.Status = "committing"
+		case pushapi.Action_Done:
+			si.Status = "done"
+		default:
+			si.Status = s.Action.String()
 		}
-		statuses = append(statuses, si)
-	}
 
-	return statuses
+		ls = append(ls, si)
+	}
+	return ls
 }

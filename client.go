@@ -55,6 +55,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
+	remotesservice "github.com/containerd/containerd/remotes/service"
 	"github.com/containerd/containerd/services/introspection"
 	"github.com/containerd/containerd/snapshots"
 	snproxy "github.com/containerd/containerd/snapshots/proxy"
@@ -607,6 +608,11 @@ func (c *Client) ContentStore() content.Store {
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
 	return contentproxy.NewContentStore(contentapi.NewContentClient(c.conn))
+}
+
+// PushServices returns the underlying push client
+func (c *Client) PushService() remotesservice.PushService {
+	return remotesservice.NewPushClient(c.conn)
 }
 
 // SnapshotService returns the underlying snapshotter for the provided snapshotter name

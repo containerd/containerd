@@ -22,7 +22,7 @@ file {
     java_package: "com.google.protobuf"
     java_outer_classname: "AnyProto"
     java_multiple_files: true
-    go_package: "github.com/golang/protobuf/ptypes/any"
+    go_package: "google.golang.org/protobuf/types/known/anypb"
     objc_class_prefix: "GPB"
     csharp_namespace: "Google.Protobuf.WellKnownTypes"
   }
@@ -470,7 +470,7 @@ file {
     java_package: "com.google.protobuf"
     java_outer_classname: "TimestampProto"
     java_multiple_files: true
-    go_package: "github.com/golang/protobuf/ptypes/timestamp"
+    go_package: "google.golang.org/protobuf/types/known/timestamppb"
     cc_enable_arenas: true
     objc_class_prefix: "GPB"
     csharp_namespace: "Google.Protobuf.WellKnownTypes"
@@ -815,7 +815,7 @@ file {
     java_package: "com.google.protobuf"
     java_outer_classname: "EmptyProto"
     java_multiple_files: true
-    go_package: "github.com/golang/protobuf/ptypes/empty"
+    go_package: "google.golang.org/protobuf/types/known/emptypb"
     cc_enable_arenas: true
     objc_class_prefix: "GPB"
     csharp_namespace: "Google.Protobuf.WellKnownTypes"
@@ -839,7 +839,7 @@ file {
     java_package: "com.google.protobuf"
     java_outer_classname: "FieldMaskProto"
     java_multiple_files: true
-    go_package: "google.golang.org/genproto/protobuf/field_mask;field_mask"
+    go_package: "google.golang.org/protobuf/types/known/fieldmaskpb"
     cc_enable_arenas: true
     objc_class_prefix: "GPB"
     csharp_namespace: "Google.Protobuf.WellKnownTypes"
@@ -2996,6 +2996,190 @@ file {
   }
   options {
     go_package: "github.com/containerd/containerd/api/services/namespaces/v1;namespaces"
+  }
+  weak_dependency: 0
+  syntax: "proto3"
+}
+file {
+  name: "github.com/containerd/containerd/api/services/remotes/v1/remotes.proto"
+  package: "containerd.services.remtotes.v1"
+  dependency: "gogoproto/gogo.proto"
+  dependency: "google/protobuf/timestamp.proto"
+  dependency: "github.com/containerd/containerd/api/types/descriptor.proto"
+  dependency: "github.com/containerd/containerd/api/types/platform.proto"
+  message_type {
+    name: "PushRequest"
+    field {
+      name: "source"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Descriptor"
+      options {
+        65001: 0
+      }
+      json_name: "source"
+    }
+    field {
+      name: "platform"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Platform"
+      json_name: "platform"
+    }
+    field {
+      name: "target"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "target"
+    }
+    field {
+      name: "auth"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.remtotes.v1.UserPassAuth"
+      json_name: "auth"
+    }
+    field {
+      name: "max_concurrency"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_INT64
+      json_name: "maxConcurrency"
+    }
+  }
+  message_type {
+    name: "UserPassAuth"
+    field {
+      name: "username"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "username"
+    }
+    field {
+      name: "password"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "password"
+    }
+  }
+  message_type {
+    name: "PushResponse"
+    field {
+      name: "statuses"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.remtotes.v1.Status"
+      json_name: "statuses"
+    }
+  }
+  message_type {
+    name: "Status"
+    field {
+      name: "action"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_ENUM
+      type_name: ".containerd.services.remtotes.v1.Action"
+      json_name: "action"
+    }
+    field {
+      name: "started_at"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      options {
+        65001: 0
+        65010: 1
+      }
+      json_name: "startedAt"
+    }
+    field {
+      name: "updated_at"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      options {
+        65001: 0
+        65010: 1
+      }
+      json_name: "updatedAt"
+    }
+    field {
+      name: "offset"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_INT64
+      json_name: "offset"
+    }
+    field {
+      name: "total"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_INT64
+      json_name: "total"
+    }
+    field {
+      name: "digest"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      options {
+        65001: 0
+        65003: "github.com/opencontainers/go-digest.Digest"
+      }
+      json_name: "digest"
+    }
+    field {
+      name: "name"
+      number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+  }
+  enum_type {
+    name: "Action"
+    value {
+      name: "Waiting"
+      number: 0
+    }
+    value {
+      name: "Write"
+      number: 1
+    }
+    value {
+      name: "Commit"
+      number: 2
+    }
+    value {
+      name: "Done"
+      number: 3
+    }
+    options {
+      62001: 1
+      62023: "Action"
+    }
+  }
+  service {
+    name: "PushService"
+    method {
+      name: "Push"
+      input_type: ".containerd.services.remtotes.v1.PushRequest"
+      output_type: ".containerd.services.remtotes.v1.PushResponse"
+      server_streaming: true
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/services/remotes/v1;remotes"
   }
   weak_dependency: 0
   syntax: "proto3"
