@@ -168,7 +168,7 @@ func (m *TaskManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 		topts = opts.RuntimeOptions
 	}
 
-	b := shimBinary(ctx, bundle, opts.Runtime, m.containerdAddress, m.containerdTTRPCAddress, m.events, m.tasks)
+	b := shimBinary(bundle, opts.Runtime, m.containerdAddress, m.containerdTTRPCAddress)
 	shim, err := b.Start(ctx, topts, func() {
 		log.G(ctx).WithField("id", id).Info("shim disconnected")
 
@@ -191,7 +191,7 @@ func (m *TaskManager) deleteShim(shim *shim) {
 	dctx, cancel := timeout.WithContext(context.Background(), cleanupTimeout)
 	defer cancel()
 
-	_, errShim := shim.Delete(dctx)
+	_, errShim := shim.delete(dctx, m.tasks.Delete)
 	if errShim != nil {
 		if errdefs.IsDeadlineExceeded(errShim) {
 			dctx, cancel = timeout.WithContext(context.Background(), cleanupTimeout)
@@ -213,8 +213,19 @@ func (m *TaskManager) Add(ctx context.Context, task runtime.Task) error {
 }
 
 // Delete a runtime task
-func (m *TaskManager) Delete(ctx context.Context, id string) {
-	m.tasks.Delete(ctx, id)
+func (m *TaskManager) Delete(ctx context.Context, id string) (*runtime.Exit, error) {
+	task, err := m.tasks.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	shim := task.(*shim)
+	exit, err := shim.delete(ctx, m.tasks.Delete)
+	if err != nil {
+		return nil, err
+	}
+
+	return exit, err
 }
 
 // Tasks lists all tasks
@@ -293,8 +304,8 @@ func (m *TaskManager) loadTasks(ctx context.Context) error {
 			bundle.Delete()
 			continue
 		}
-		binaryCall := shimBinary(ctx, bundle, container.Runtime.Name, m.containerdAddress, m.containerdTTRPCAddress, m.events, m.tasks)
-		shim, err := loadShim(ctx, bundle, m.events, m.tasks, func() {
+		binaryCall := shimBinary(bundle, container.Runtime.Name, m.containerdAddress, m.containerdTTRPCAddress)
+		shim, err := loadShim(ctx, bundle, func() {
 			log.G(ctx).WithField("id", id).Info("shim disconnected")
 
 			cleanupAfterDeadShim(context.Background(), id, ns, m.tasks, m.events, binaryCall)

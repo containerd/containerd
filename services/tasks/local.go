@@ -220,9 +220,13 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 	if err := l.monitor.Monitor(c, labels); err != nil {
 		return nil, errors.Wrap(err, "monitor task")
 	}
+	pid, err := c.PID(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get task pid")
+	}
 	return &api.CreateTaskResponse{
 		ContainerID: r.ContainerID,
-		Pid:         c.PID(),
+		Pid:         pid,
 	}, nil
 }
 
@@ -250,17 +254,32 @@ func (l *local) Start(ctx context.Context, r *api.StartRequest, _ ...grpc.CallOp
 }
 
 func (l *local) Delete(ctx context.Context, r *api.DeleteTaskRequest, _ ...grpc.CallOption) (*api.DeleteResponse, error) {
-	t, err := l.getTask(ctx, r.ContainerID)
+	container, err := l.getContainer(ctx, r.ContainerID)
 	if err != nil {
 		return nil, err
 	}
+
+	// Find runtime manager
+	rtime, err := l.getRuntime(container.Runtime.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get task object
+	t, err := rtime.Get(ctx, container.ID)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "task %v not found", container.ID)
+	}
+
 	if err := l.monitor.Stop(t); err != nil {
 		return nil, err
 	}
-	exit, err := t.Delete(ctx)
+
+	exit, err := rtime.Delete(ctx, r.ContainerID)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
+
 	return &api.DeleteResponse{
 		ExitStatus: exit.Status,
 		ExitedAt:   exit.Timestamp,
