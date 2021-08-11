@@ -128,7 +128,7 @@ will be features for the next _minor_ or _major_ release. For the most part,
 this process is straightforward and we are here to help make it as smooth as
 possible.
 
-If there are important fixes that need to be backported, please let use know in
+If there are important fixes that need to be backported, please let us know in
 one of three ways:
 
 1. Open an issue.
