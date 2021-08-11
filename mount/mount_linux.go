@@ -61,7 +61,7 @@ func (m *Mount) Mount(target string) (err error) {
 		chdir, options = compactLowerdirOption(options)
 	}
 
-	flags, data, losetup := parseMountOptions(options)
+	flags, data, losetup, mapuid, mapgid := parseMountOptions(options)
 	if len(data) > pagesize {
 		return errors.Errorf("mount options is too long")
 	}
@@ -107,6 +107,17 @@ func (m *Mount) Mount(target string) (err error) {
 		// Remount the bind to apply read only.
 		return unix.Mount("", target, "", uintptr(oflags|unix.MS_REMOUNT), "")
 	}
+
+	// The only remapping of both GID and UID is supported
+	if mapuid != "" && mapgid != "" {
+		// Remap GID UID of container rootfs from host to container
+		// to have proper ownership of rootfs files in container
+		// user namespace
+		if err := MapMount(mapuid, mapgid, target); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -198,11 +209,13 @@ func UnmountAll(mount string, flags int) error {
 
 // parseMountOptions takes fstab style mount options and parses them for
 // use with a standard mount() syscall
-func parseMountOptions(options []string) (int, string, bool) {
+func parseMountOptions(options []string) (int, string, bool, string, string) {
 	var (
 		flag    int
 		losetup bool
 		data    []string
+		mapuid  string
+		mapgid  string
 	)
 	loopOpt := "loop"
 	flags := map[string]struct {
@@ -247,11 +260,15 @@ func parseMountOptions(options []string) (int, string, bool) {
 			}
 		} else if o == loopOpt {
 			losetup = true
+		} else if strings.HasPrefix(o, "mapuid=") {
+			mapuid = strings.TrimPrefix(o, "mapuid=")
+		} else if strings.HasPrefix(o, "mapgid=") {
+			mapgid = strings.TrimPrefix(o, "mapgid=")
 		} else {
 			data = append(data, o)
 		}
 	}
-	return flag, strings.Join(data, ","), losetup
+	return flag, strings.Join(data, ","), losetup, mapuid, mapgid
 }
 
 // compactLowerdirOption updates overlay lowdir option and returns the common
