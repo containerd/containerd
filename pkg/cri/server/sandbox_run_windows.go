@@ -56,6 +56,25 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 
 	specOpts = append(specOpts, customopts.WithWindowsDefaultSandboxShares)
 
+	// Start with the image config user and override below if RunAsUsername is not "".
+	username := imageConfig.User
+
+	runAsUser := config.GetWindows().GetSecurityContext().GetRunAsUsername()
+	if runAsUser != "" {
+		username = runAsUser
+	}
+
+	cs := config.GetWindows().GetSecurityContext().GetCredentialSpec()
+	if cs != "" {
+		specOpts = append(specOpts, customopts.WithWindowsCredentialSpec(cs))
+	}
+
+	// There really isn't a good Windows way to verify that the username is available in the
+	// image as early as here like there is for Linux. Later on in the stack hcsshim
+	// will handle the behavior of erroring out if the user isn't available in the image
+	// when trying to run the init process.
+	specOpts = append(specOpts, oci.WithUser(username))
+
 	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
 		runtimePodAnnotations) {
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
