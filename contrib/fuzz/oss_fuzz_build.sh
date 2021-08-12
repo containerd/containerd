@@ -28,11 +28,15 @@ mv contrib/fuzz/container_fuzzer.go integration/client/
 
 
 compile_go_fuzzer github.com/containerd/containerd/remotes/docker FuzzFetcher fuzz_fetcher
+compile_go_fuzzer github.com/containerd/containerd/remotes/docker FuzzParseDockerRef fuzz_parse_docker_ref
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzFiltersParse fuzz_filters_parse
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzPlatformsParse fuzz_platforms_parse
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzApply fuzz_apply
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzImportIndex fuzz_import_index
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzCSWalk fuzz_cs_walk
+compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzArchiveExport fuzz_archive_export
+compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzParseAuth fuzz_parse_auth
+compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzParseProcPIDStatus fuzz_parse_proc_pid_status
 
 # FuzzCreateContainer requires more setup than the fuzzers above.
 # We need the binaries from "make".
@@ -70,6 +74,6 @@ for i in $( ls *_test.go ); do mv $i ./${i%.*}_fuzz.go; done
 # Remove windows test to avoid double declarations:
 rm ./client_windows_test_fuzz.go
 rm ./helpers_windows_test_fuzz.go
-compile_go_fuzzer . FuzzCreateContainerNoTearDown fuzz_create_container_no_teardown
-compile_go_fuzzer . FuzzCreateContainerWithTearDown fuzz_create_container_with_teardown
-compile_go_fuzzer . FuzzNoTearDownWithDownload fuzz_no_teardown_with_download
+compile_go_fuzzer github.com/containerd/containerd/integration/client FuzzCreateContainerNoTearDown fuzz_create_container_no_teardown
+compile_go_fuzzer github.com/containerd/containerd/integration/client FuzzCreateContainerWithTearDown fuzz_create_container_with_teardown
+compile_go_fuzzer github.com/containerd/containerd/integration/client FuzzNoTearDownWithDownload fuzz_no_teardown_with_download
