@@ -615,6 +615,11 @@ func (c *Client) PushService() remotesservice.PushService {
 	return remotesservice.NewPushClient(c.conn)
 }
 
+// PushServices returns the underlying push client
+func (c *Client) PullService() remotesservice.PullService {
+	return remotesservice.NewPullClient(c.conn)
+}
+
 // SnapshotService returns the underlying snapshotter for the provided snapshotter name
 func (c *Client) SnapshotService(snapshotterName string) snapshots.Snapshotter {
 	snapshotterName, err := c.resolveSnapshotterName(context.Background(), snapshotterName)

@@ -20,23 +20,20 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http/httptrace"
 	"os"
-	"sync"
 	"text/tabwriter"
 	"time"
 
 	"github.com/containerd/containerd"
+	api "github.com/containerd/containerd/api/services/remotes/v1"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/progress"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
-	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
 )
 
@@ -113,6 +110,7 @@ type FetchConfig struct {
 	RemoteOpts []containerd.RemoteOpt
 	// TraceHTTP writes DNS and connection information to the log when dealing with a container registry
 	TraceHTTP bool
+	Auth      *api.UserPassAuth
 }
 
 // NewFetchConfig returns the default FetchConfig from cli flags
@@ -160,229 +158,108 @@ func NewFetchConfig(ctx context.Context, clicontext *cli.Context) (*FetchConfig,
 
 // Fetch loads all resources into the content store and returns the image
 func Fetch(ctx context.Context, client *containerd.Client, ref string, config *FetchConfig) (images.Image, error) {
-	ongoing := NewJobs(ref)
-
-	if config.TraceHTTP {
-		ctx = httptrace.WithClientTrace(ctx, commands.NewDebugClientTrace(ctx))
+	var p *types.Platform
+	if len(config.Platforms) > 0 {
+		pl, err := platforms.Parse(config.Platforms[0])
+		if err != nil {
+			return images.Image{}, err
+		}
+		p = &types.Platform{
+			OS:           pl.OS,
+			Architecture: pl.Architecture,
+			Variant:      pl.Variant,
+		}
 	}
 
-	pctx, stopProgress := context.WithCancel(ctx)
-	progress := make(chan struct{})
-
-	go func() {
-		if config.ProgressOutput != nil {
-			// no progress bar, because it hides some debug logs
-			ShowProgress(pctx, ongoing, client.ContentStore(), config.ProgressOutput)
-		}
-		close(progress)
-	}()
-
-	h := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		if desc.MediaType != images.MediaTypeDockerSchema1Manifest {
-			ongoing.Add(desc)
-		}
-		return nil, nil
+	start := time.Now()
+	ch, err := client.PullService().Pull(ctx, &api.PullRequest{
+		Remote:   ref,
+		Platform: p,
+		Auth:     config.Auth,
+		// AllMetadata: config.AllMetadata,
 	})
-
-	log.G(pctx).WithField("image", ref).Debug("fetching")
-	labels := commands.LabelArgs(config.Labels)
-	opts := []containerd.RemoteOpt{
-		containerd.WithPullLabels(labels),
-		containerd.WithResolver(config.Resolver),
-		containerd.WithImageHandler(h),
-		containerd.WithSchema1Conversion,
-	}
-	opts = append(opts, config.RemoteOpts...)
-
-	if config.AllMetadata {
-		opts = append(opts, containerd.WithAllMetadata())
-	}
-
-	if config.PlatformMatcher != nil {
-		opts = append(opts, containerd.WithPlatformMatcher(config.PlatformMatcher))
-	} else {
-		for _, platform := range config.Platforms {
-			opts = append(opts, containerd.WithPlatform(platform))
-		}
-	}
-
-	img, err := client.Fetch(pctx, ref, opts...)
-	stopProgress()
 	if err != nil {
 		return images.Image{}, err
 	}
 
-	<-progress
+	var img images.Image
+
+	out := config.ProgressOutput
+	if out == nil {
+		out = io.Discard
+	}
+	fw := progress.NewWriter(out)
+	tw := tabwriter.NewWriter(fw, 1, 8, 1, ' ', 0)
+
+	for status := range ch {
+		status := status
+
+		fw.Flush()
+		if status.Err != nil {
+			return images.Image{}, status.Err
+		}
+
+		if status != nil {
+			Display(tw, apiPushStatusToContent(ctx, status.Statuses), start)
+			tw.Flush()
+		}
+		if status.Image != nil {
+			img = apiToImage(*status.Image)
+		}
+	}
+
+	fw.Flush()
+
+	log.G(ctx).Debugf("+%v", img)
+
 	return img, nil
 }
 
-// ShowProgress continuously updates the output with job progress
-// by checking status in the content store.
-func ShowProgress(ctx context.Context, ongoing *Jobs, cs content.Store, out io.Writer) {
-	var (
-		ticker   = time.NewTicker(100 * time.Millisecond)
-		fw       = progress.NewWriter(out)
-		start    = time.Now()
-		statuses = map[string]StatusInfo{}
-		done     bool
-	)
-	defer ticker.Stop()
+func apiPushStatusToContent(ctx context.Context, status []*api.Status) []StatusInfo {
+	ls := make([]StatusInfo, 0, len(status))
 
-outer:
-	for {
-		select {
-		case <-ticker.C:
-			fw.Flush()
-
-			tw := tabwriter.NewWriter(fw, 1, 8, 1, ' ', 0)
-
-			resolved := "resolved"
-			if !ongoing.IsResolved() {
-				resolved = "resolving"
-			}
-			statuses[ongoing.name] = StatusInfo{
-				Ref:    ongoing.name,
-				Status: resolved,
-			}
-			keys := []string{ongoing.name}
-
-			activeSeen := map[string]struct{}{}
-			if !done {
-				active, err := cs.ListStatuses(ctx, "")
-				if err != nil {
-					log.G(ctx).WithError(err).Error("active check failed")
-					continue
-				}
-				// update status of active entries!
-				for _, active := range active {
-					statuses[active.Ref] = StatusInfo{
-						Ref:       active.Ref,
-						Status:    "downloading",
-						Offset:    active.Offset,
-						Total:     active.Total,
-						StartedAt: active.StartedAt,
-						UpdatedAt: active.UpdatedAt,
-					}
-					activeSeen[active.Ref] = struct{}{}
-				}
-			}
-
-			// now, update the items in jobs that are not in active
-			for _, j := range ongoing.Jobs() {
-				key := remotes.MakeRefKey(ctx, j)
-				keys = append(keys, key)
-				if _, ok := activeSeen[key]; ok {
-					continue
-				}
-
-				status, ok := statuses[key]
-				if !done && (!ok || status.Status == "downloading") {
-					info, err := cs.Info(ctx, j.Digest)
-					if err != nil {
-						if !errdefs.IsNotFound(err) {
-							log.G(ctx).WithError(err).Errorf("failed to get content info")
-							continue outer
-						} else {
-							statuses[key] = StatusInfo{
-								Ref:    key,
-								Status: "waiting",
-							}
-						}
-					} else if info.CreatedAt.After(start) {
-						statuses[key] = StatusInfo{
-							Ref:       key,
-							Status:    "done",
-							Offset:    info.Size,
-							Total:     info.Size,
-							UpdatedAt: info.CreatedAt,
-						}
-					} else {
-						statuses[key] = StatusInfo{
-							Ref:    key,
-							Status: "exists",
-						}
-					}
-				} else if done {
-					if ok {
-						if status.Status != "done" && status.Status != "exists" {
-							status.Status = "done"
-							statuses[key] = status
-						}
-					} else {
-						statuses[key] = StatusInfo{
-							Ref:    key,
-							Status: "done",
-						}
-					}
-				}
-			}
-
-			var ordered []StatusInfo
-			for _, key := range keys {
-				ordered = append(ordered, statuses[key])
-			}
-
-			Display(tw, ordered, start)
-			tw.Flush()
-
-			if done {
-				fw.Flush()
-				return
-			}
-		case <-ctx.Done():
-			done = true // allow ui to update once more
+	for _, s := range status {
+		si := StatusInfo{
+			Ref:       s.Name,
+			Offset:    s.Offset,
+			Total:     s.Total,
+			StartedAt: s.StartedAt,
+			UpdatedAt: s.UpdatedAt,
 		}
+
+		switch s.Action {
+		case api.Action_Resolving:
+			si.Status = "resolving"
+		case api.Action_Resolved:
+			si.Status = "resolved"
+		case api.Action_Waiting:
+			si.Status = "waiting"
+		case api.Action_Write:
+			si.Status = "downloading"
+		case api.Action_Commit:
+			si.Status = "committing"
+		case api.Action_Done:
+			si.Status = "done"
+		default:
+			si.Status = s.Action.String()
+		}
+
+		ls = append(ls, si)
 	}
+	return ls
 }
 
-// Jobs provides a way of identifying the download keys for a particular task
-// encountering during the pull walk.
-//
-// This is very minimal and will probably be replaced with something more
-// featured.
-type Jobs struct {
-	name     string
-	added    map[digest.Digest]struct{}
-	descs    []ocispec.Descriptor
-	mu       sync.Mutex
-	resolved bool
-}
-
-// NewJobs creates a new instance of the job status tracker
-func NewJobs(name string) *Jobs {
-	return &Jobs{
-		name:  name,
-		added: map[digest.Digest]struct{}{},
+func apiToImage(img api.Image) images.Image {
+	return images.Image{
+		Name:   img.Name,
+		Labels: img.Labels,
+		Target: v1.Descriptor{
+			MediaType:   img.Target.MediaType,
+			Digest:      img.Target.Digest,
+			Size:        img.Target.Size_,
+			Annotations: img.Target.Annotations,
+		},
 	}
-}
-
-// Add adds a descriptor to be tracked
-func (j *Jobs) Add(desc ocispec.Descriptor) {
-	j.mu.Lock()
-	defer j.mu.Unlock()
-	j.resolved = true
-
-	if _, ok := j.added[desc.Digest]; ok {
-		return
-	}
-	j.descs = append(j.descs, desc)
-	j.added[desc.Digest] = struct{}{}
-}
-
-// Jobs returns a list of all tracked descriptors
-func (j *Jobs) Jobs() []ocispec.Descriptor {
-	j.mu.Lock()
-	defer j.mu.Unlock()
-
-	var descs []ocispec.Descriptor
-	return append(descs, j.descs...)
-}
-
-// IsResolved checks whether a descriptor has been resolved
-func (j *Jobs) IsResolved() bool {
-	j.mu.Lock()
-	defer j.mu.Unlock()
-	return j.resolved
 }
 
 // StatusInfo holds the status info for an upload or download

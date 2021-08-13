@@ -3146,23 +3146,188 @@ file {
       json_name: "name"
     }
   }
+  message_type {
+    name: "PullRequest"
+    field {
+      name: "remote"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "remote"
+    }
+    field {
+      name: "platform"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Platform"
+      json_name: "platform"
+    }
+    field {
+      name: "auth"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.remtotes.v1.UserPassAuth"
+      json_name: "auth"
+    }
+    field {
+      name: "max_concurrency"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_INT64
+      json_name: "maxConcurrency"
+    }
+    field {
+      name: "unpack"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "unpack"
+    }
+    field {
+      name: "snapshotter"
+      number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "snapshotter"
+    }
+    field {
+      name: "discard_content"
+      number: 8
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "discardContent"
+    }
+    field {
+      name: "all_metadata"
+      number: 9
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "allMetadata"
+    }
+  }
+  message_type {
+    name: "PullResponse"
+    field {
+      name: "statuses"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.remtotes.v1.Status"
+      json_name: "statuses"
+    }
+    field {
+      name: "image"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.remtotes.v1.Image"
+      json_name: "image"
+    }
+  }
+  message_type {
+    name: "Image"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "labels"
+      number: 2
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.remtotes.v1.Image.LabelsEntry"
+      json_name: "labels"
+    }
+    field {
+      name: "target"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Descriptor"
+      options {
+        65001: 0
+      }
+      json_name: "target"
+    }
+    field {
+      name: "created_at"
+      number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      options {
+        65001: 0
+        65010: 1
+      }
+      json_name: "createdAt"
+    }
+    field {
+      name: "updated_at"
+      number: 8
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      options {
+        65001: 0
+        65010: 1
+      }
+      json_name: "updatedAt"
+    }
+    nested_type {
+      name: "LabelsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
+  }
   enum_type {
     name: "Action"
     value {
-      name: "Waiting"
+      name: "Resolving"
       number: 0
     }
     value {
-      name: "Write"
+      name: "Resolved"
       number: 1
     }
     value {
-      name: "Commit"
+      name: "Waiting"
       number: 2
     }
     value {
-      name: "Done"
+      name: "Write"
       number: 3
+    }
+    value {
+      name: "Commit"
+      number: 4
+    }
+    value {
+      name: "Done"
+      number: 5
+    }
+    value {
+      name: "Exists"
+      number: 6
     }
     options {
       62001: 1
@@ -3175,6 +3340,15 @@ file {
       name: "Push"
       input_type: ".containerd.services.remtotes.v1.PushRequest"
       output_type: ".containerd.services.remtotes.v1.PushResponse"
+      server_streaming: true
+    }
+  }
+  service {
+    name: "PullService"
+    method {
+      name: "Pull"
+      input_type: ".containerd.services.remtotes.v1.PullRequest"
+      output_type: ".containerd.services.remtotes.v1.PullResponse"
       server_streaming: true
     }
   }

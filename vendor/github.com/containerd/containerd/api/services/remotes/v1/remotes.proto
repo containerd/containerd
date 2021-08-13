@@ -30,6 +30,11 @@ service PushService {
     rpc Push(PushRequest) returns (stream PushResponse);
 }
 
+// PullService is the interrface for pulling content from a remote.
+service PullService {
+    rpc Pull(PullRequest) returns (stream PullResponse);
+}
+
 // PushRequest describes a request to push content.
 message PushRequest {
 	// Source is the descitptor of the source content to push.
@@ -61,14 +66,19 @@ enum Action {
 	option (gogoproto.goproto_enum_prefix) = true;
 	option (gogoproto.enum_customname) = "Action";
 
-	// Upload not registered yet
-	Waiting = 0;
-	// Content is being uploaded to the remote repository
-	Write = 1;
-	// Content is committed to the remote repository
-	Commit = 2;
+	// Resolving indicates that the content is being resolved with the remote.
+	Resolving = 0;
+	Resolved = 1;
+	// Upload/Download not registered yet
+	Waiting = 2;
+	// Content is being uploaded to the remote repository or downloaded to the local store.
+	Write = 3;
+	// Content is committed to the remote repository or local store.
+	Commit = 4;
 	// Content is fully uploaded to the remote repository.
-	Done = 3;
+	Done = 5;
+	// Exists specifies that the content already exists.
+	Exists = 6;
 }
 
 // PushResponse is the response to a push request.
@@ -112,4 +122,56 @@ message Status {
 
 	// Name is the name of the blob being written.
 	string name = 7;
+}
+
+// PullRequest is the request for a pull operation.
+message PullRequest {
+    // Remote is the full canonical reference of the remote content to pull
+    // <host>[:<port>]/<namespace>/<repository>[:<tag>][@<digest>]
+    string remote = 1;
+	// Platform is the platform to pull content for.
+	types.Platform platform = 2;
+	// Auth is a mapping of registry host => credentials.
+	// This will be used to authorize pushes to the remote.
+	UserPassAuth auth = 4;
+	// Maxconcurrency is the maximum number of concurrent blob pushes.
+	int64 max_concurrency = 5;
+	// Unpack is a flag to indicate if the content should be unpacked into a snapshotter.
+	bool unpack = 6;
+	// Snapshotter is the name of the snapshotter to use for unpacking.
+	string snapshotter = 7;
+	// DiscardContent defines if the fetched content should be discarded after unpacking.
+	bool discard_content = 8;
+	// AllMetadata filters manifests by platforms but allow to handle manifest
+	// and configuration for not-target platforms.
+	bool all_metadata = 9;
+}
+
+// PullResponse is the response to a pull operation.
+message PullResponse {
+    repeated Status statuses = 1;
+	Image image = 2;
+}
+
+message Image {
+	// Name provides a unique name for the image.
+	//
+	// Containerd treats this as the primary identifier.
+	string name = 1;
+
+	// Labels provides free form labels for the image. These are runtime only
+	// and do not get inherited into the package image in any way.
+	//
+	// Labels may be updated using the field mask.
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
+	map<string, string> labels = 2;
+
+	// Target describes the content entry point of the image.
+	types.Descriptor target = 3 [(gogoproto.nullable) = false];
+
+	// CreatedAt is the time the image was first created.
+	google.protobuf.Timestamp created_at = 7 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+
+	// UpdatedAt is the last time the image was mutated.
+	google.protobuf.Timestamp updated_at = 8 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }

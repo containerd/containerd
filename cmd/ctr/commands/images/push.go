@@ -176,7 +176,6 @@ var pushCommand = cli.Command{
 	},
 }
 
-// TODO: Add ref to API type
 func apiPushStatusToContent(status []*pushapi.Status) []content.StatusInfo {
 	ls := make([]content.StatusInfo, 0, len(status))
 	for _, s := range status {

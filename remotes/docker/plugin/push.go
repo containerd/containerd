@@ -20,12 +20,12 @@ import (
 	"context"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	api "github.com/containerd/containerd/api/services/remotes/v1"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/platforms"
@@ -65,6 +65,7 @@ func init() {
 				cs:         mdb.ContentStore(),
 				configRoot: cfg.ConfigPath,
 				headers:    cfg.Headers,
+				lm:         metadata.NewLeaseManager(mdb),
 			}, nil
 		},
 	})
@@ -82,9 +83,17 @@ type localPusher struct {
 	cs         content.Store
 	configRoot string
 	headers    http.Header
+	lm         leases.Manager
 }
 
-func (l *localPusher) Push(ctx context.Context, req *api.PushRequest) (<-chan *service.PushResponseEnvelope, error) {
+func (l *localPusher) Push(ctx context.Context, req *api.PushRequest) (_ <-chan *service.PushResponseEnvelope, retErr error) {
+	ctx, done, err := withLease(ctx, l.lm)
+	defer func() {
+		if retErr != nil {
+			done(context.Background())
+		}
+	}()
+
 	tracker := docker.NewInMemoryTracker()
 
 	log.G(ctx).WithField("digest", req.Source).Debug("push request received")
@@ -111,7 +120,7 @@ func (l *localPusher) Push(ctx context.Context, req *api.PushRequest) (<-chan *s
 		return nil, err
 	}
 
-	jobs := newPushJobs(tracker)
+	jobs := newJobTracker(tracker)
 
 	wrap := func(h images.Handler) images.Handler {
 		return images.Handlers(images.HandlerFunc(func(ctx context.Context, desc v1.Descriptor) ([]v1.Descriptor, error) {
@@ -163,6 +172,7 @@ func (l *localPusher) Push(ctx context.Context, req *api.PushRequest) (<-chan *s
 	}()
 
 	go func() {
+		defer done(context.Background())
 		var ticker = time.NewTicker(100 * time.Millisecond)
 
 		defer close(ch)
@@ -201,60 +211,4 @@ func (l *localPusher) Push(ctx context.Context, req *api.PushRequest) (<-chan *s
 
 	return ch, nil
 
-}
-
-type pushjobs struct {
-	jobs    map[string]struct{}
-	ordered []string
-	tracker docker.StatusTracker
-	mu      sync.Mutex
-}
-
-func newPushJobs(tracker docker.StatusTracker) *pushjobs {
-	return &pushjobs{
-		jobs:    make(map[string]struct{}),
-		tracker: tracker,
-	}
-}
-
-func (j *pushjobs) add(ref string) {
-	j.mu.Lock()
-	defer j.mu.Unlock()
-
-	if _, ok := j.jobs[ref]; ok {
-		return
-	}
-	j.ordered = append(j.ordered, ref)
-	j.jobs[ref] = struct{}{}
-}
-
-func (j *pushjobs) status() []*api.Status {
-	j.mu.Lock()
-	defer j.mu.Unlock()
-
-	statuses := make([]*api.Status, 0, len(j.ordered))
-	for _, name := range j.ordered {
-		si := &api.Status{Name: name}
-		status, err := j.tracker.GetStatus(name)
-		if err != nil {
-			si.Action = api.PushAction_Waiting
-		} else {
-			si.Offset = status.Offset
-			si.Total = status.Total
-			si.StartedAt = status.StartedAt
-			si.UpdatedAt = status.UpdatedAt
-			if status.Offset >= status.Total {
-				if status.UploadUUID == "" {
-					si.Action = api.PushAction_Done
-				} else {
-					si.Action = api.PushAction_Commit
-				}
-			} else {
-				si.Action = api.PushAction_Write
-			}
-		}
-		statuses = append(statuses, si)
-	}
-
-	return statuses
 }

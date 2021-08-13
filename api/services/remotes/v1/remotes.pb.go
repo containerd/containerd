@@ -8,6 +8,7 @@ import (
 	fmt "fmt"
 	types "github.com/containerd/containerd/api/types"
 	proto "github.com/gogo/protobuf/proto"
+	github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
 	_ "github.com/gogo/protobuf/types"
 	github_com_gogo_protobuf_types "github.com/gogo/protobuf/types"
 	github_com_opencontainers_go_digest "github.com/opencontainers/go-digest"
@@ -39,28 +40,39 @@ const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 type Action int32
 
 const (
-	// Upload not registered yet
-	Action_Waiting Action = 0
-	// Content is being uploaded to the remote repository
-	Action_Write Action = 1
-	// Content is committed to the remote repository
-	Action_Commit Action = 2
+	// Resolving indicates that the content is being resolved with the remote.
+	Action_Resolving Action = 0
+	Action_Resolved  Action = 1
+	// Upload/Download not registered yet
+	Action_Waiting Action = 2
+	// Content is being uploaded to the remote repository or downloaded to the local store.
+	Action_Write Action = 3
+	// Content is committed to the remote repository or local store.
+	Action_Commit Action = 4
 	// Content is fully uploaded to the remote repository.
-	Action_Done Action = 3
+	Action_Done Action = 5
+	// Exists specifies that the content already exists.
+	Action_Exists Action = 6
 )
 
 var Action_name = map[int32]string{
-	0: "Waiting",
-	1: "Write",
-	2: "Commit",
-	3: "Done",
+	0: "Resolving",
+	1: "Resolved",
+	2: "Waiting",
+	3: "Write",
+	4: "Commit",
+	5: "Done",
+	6: "Exists",
 }
 
 var Action_value = map[string]int32{
-	"Waiting": 0,
-	"Write":   1,
-	"Commit":  2,
-	"Done":    3,
+	"Resolving": 0,
+	"Resolved":  1,
+	"Waiting":   2,
+	"Write":     3,
+	"Commit":    4,
+	"Done":      5,
+	"Exists":    6,
 }
 
 func (x Action) String() string {
@@ -273,12 +285,169 @@ func (m *Status) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_Status proto.InternalMessageInfo
 
+// PullRequest is the request for a pull operation.
+type PullRequest struct {
+	// Remote is the full canonical reference of the remote content to pull
+	// <host>[:<port>]/<namespace>/<repository>[:<tag>][@<digest>]
+	Remote string `protobuf:"bytes,1,opt,name=remote,proto3" json:"remote,omitempty"`
+	// Platform is the platform to pull content for.
+	Platform *types.Platform `protobuf:"bytes,2,opt,name=platform,proto3" json:"platform,omitempty"`
+	// Auth is a mapping of registry host => credentials.
+	// This will be used to authorize pushes to the remote.
+	Auth *UserPassAuth `protobuf:"bytes,4,opt,name=auth,proto3" json:"auth,omitempty"`
+	// Maxconcurrency is the maximum number of concurrent blob pushes.
+	MaxConcurrency int64 `protobuf:"varint,5,opt,name=max_concurrency,json=maxConcurrency,proto3" json:"max_concurrency,omitempty"`
+	// Unpack is a flag to indicate if the content should be unpacked into a snapshotter.
+	Unpack bool `protobuf:"varint,6,opt,name=unpack,proto3" json:"unpack,omitempty"`
+	// Snapshotter is the name of the snapshotter to use for unpacking.
+	Snapshotter string `protobuf:"bytes,7,opt,name=snapshotter,proto3" json:"snapshotter,omitempty"`
+	// DiscardContent defines if the fetched content should be discarded after unpacking.
+	DiscardContent bool `protobuf:"varint,8,opt,name=discard_content,json=discardContent,proto3" json:"discard_content,omitempty"`
+	// AllMetadata filters manifests by platforms but allow to handle manifest
+	// and configuration for not-target platforms.
+	AllMetadata          bool     `protobuf:"varint,9,opt,name=all_metadata,json=allMetadata,proto3" json:"all_metadata,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *PullRequest) Reset()      { *m = PullRequest{} }
+func (*PullRequest) ProtoMessage() {}
+func (*PullRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_d36e6abae2750e37, []int{4}
+}
+func (m *PullRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *PullRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_PullRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *PullRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PullRequest.Merge(m, src)
+}
+func (m *PullRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *PullRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_PullRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_PullRequest proto.InternalMessageInfo
+
+// PullResponse is the response to a pull operation.
+type PullResponse struct {
+	Statuses             []*Status `protobuf:"bytes,1,rep,name=statuses,proto3" json:"statuses,omitempty"`
+	Image                *Image    `protobuf:"bytes,2,opt,name=image,proto3" json:"image,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}  `json:"-"`
+	XXX_unrecognized     []byte    `json:"-"`
+	XXX_sizecache        int32     `json:"-"`
+}
+
+func (m *PullResponse) Reset()      { *m = PullResponse{} }
+func (*PullResponse) ProtoMessage() {}
+func (*PullResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_d36e6abae2750e37, []int{5}
+}
+func (m *PullResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *PullResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_PullResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *PullResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PullResponse.Merge(m, src)
+}
+func (m *PullResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *PullResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_PullResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_PullResponse proto.InternalMessageInfo
+
+type Image struct {
+	// Name provides a unique name for the image.
+	//
+	// Containerd treats this as the primary identifier.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Labels provides free form labels for the image. These are runtime only
+	// and do not get inherited into the package image in any way.
+	//
+	// Labels may be updated using the field mask.
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
+	Labels map[string]string `protobuf:"bytes,2,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	// Target describes the content entry point of the image.
+	Target types.Descriptor `protobuf:"bytes,3,opt,name=target,proto3" json:"target"`
+	// CreatedAt is the time the image was first created.
+	CreatedAt time.Time `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3,stdtime" json:"created_at"`
+	// UpdatedAt is the last time the image was mutated.
+	UpdatedAt            time.Time `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt,proto3,stdtime" json:"updated_at"`
+	XXX_NoUnkeyedLiteral struct{}  `json:"-"`
+	XXX_unrecognized     []byte    `json:"-"`
+	XXX_sizecache        int32     `json:"-"`
+}
+
+func (m *Image) Reset()      { *m = Image{} }
+func (*Image) ProtoMessage() {}
+func (*Image) Descriptor() ([]byte, []int) {
+	return fileDescriptor_d36e6abae2750e37, []int{6}
+}
+func (m *Image) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *Image) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_Image.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *Image) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Image.Merge(m, src)
+}
+func (m *Image) XXX_Size() int {
+	return m.Size()
+}
+func (m *Image) XXX_DiscardUnknown() {
+	xxx_messageInfo_Image.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Image proto.InternalMessageInfo
+
 func init() {
 	proto.RegisterEnum("containerd.services.remtotes.v1.Action", Action_name, Action_value)
 	proto.RegisterType((*PushRequest)(nil), "containerd.services.remtotes.v1.PushRequest")
 	proto.RegisterType((*UserPassAuth)(nil), "containerd.services.remtotes.v1.UserPassAuth")
 	proto.RegisterType((*PushResponse)(nil), "containerd.services.remtotes.v1.PushResponse")
 	proto.RegisterType((*Status)(nil), "containerd.services.remtotes.v1.Status")
+	proto.RegisterType((*PullRequest)(nil), "containerd.services.remtotes.v1.PullRequest")
+	proto.RegisterType((*PullResponse)(nil), "containerd.services.remtotes.v1.PullResponse")
+	proto.RegisterType((*Image)(nil), "containerd.services.remtotes.v1.Image")
+	proto.RegisterMapType((map[string]string)(nil), "containerd.services.remtotes.v1.Image.LabelsEntry")
 }
 
 func init() {
@@ -286,48 +455,65 @@ func init() {
 }
 
 var fileDescriptor_d36e6abae2750e37 = []byte{
-	// 649 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x94, 0xc1, 0x6e, 0xd3, 0x40,
-	0x10, 0x86, 0xe3, 0x24, 0x75, 0x93, 0x4d, 0x55, 0xa2, 0x55, 0x85, 0xac, 0x08, 0x39, 0x51, 0x2e,
-	0x8d, 0x2a, 0x6a, 0xd3, 0x20, 0x21, 0x41, 0x0f, 0x90, 0xa4, 0xea, 0x81, 0x53, 0xe5, 0x82, 0x8a,
-	0x7a, 0xa9, 0xb6, 0xce, 0xc4, 0xb1, 0x54, 0x7b, 0xcd, 0xee, 0xb8, 0xb4, 0x37, 0x2e, 0x48, 0x1c,
-	0x79, 0x07, 0x78, 0x0a, 0x9e, 0xa0, 0x47, 0x8e, 0x88, 0x43, 0xa1, 0x79, 0x12, 0xe4, 0xf5, 0xc6,
-	0x8d, 0xc4, 0xa1, 0x29, 0xa7, 0xcc, 0x38, 0xff, 0xf7, 0xc7, 0x3b, 0xff, 0x6c, 0xc8, 0x7e, 0x10,
-	0xe2, 0x34, 0x3d, 0x75, 0x7c, 0x1e, 0xb9, 0x3e, 0x8f, 0x91, 0x85, 0x31, 0x88, 0xf1, 0x62, 0xc9,
-	0x92, 0xd0, 0x95, 0x20, 0xce, 0x43, 0x1f, 0xa4, 0x2b, 0x20, 0xe2, 0x08, 0xd2, 0x3d, 0xdf, 0x99,
-	0x97, 0x4e, 0x22, 0x38, 0x72, 0xda, 0xbe, 0x25, 0x9c, 0xb9, 0xda, 0x11, 0x10, 0xa1, 0xd2, 0x9c,
-	0xef, 0xb4, 0x36, 0x02, 0x1e, 0x70, 0xa5, 0x75, 0xb3, 0x2a, 0xc7, 0x5a, 0xed, 0x80, 0xf3, 0xe0,
-	0x0c, 0x5c, 0xd5, 0x9d, 0xa6, 0x13, 0x17, 0xc3, 0x08, 0x24, 0xb2, 0x28, 0xd1, 0x82, 0xdd, 0xa5,
-	0xde, 0x0f, 0x2f, 0x13, 0x90, 0xee, 0x18, 0xa4, 0x2f, 0xc2, 0x04, 0xb9, 0xd0, 0xf0, 0xf3, 0x7b,
-	0xc0, 0xc9, 0x19, 0xc3, 0x09, 0x17, 0x51, 0x8e, 0x76, 0x3f, 0x95, 0x49, 0xe3, 0x20, 0x95, 0x53,
-	0x0f, 0xde, 0xa7, 0x20, 0x91, 0xbe, 0x20, 0xa6, 0xe4, 0xa9, 0xf0, 0xc1, 0x32, 0x3a, 0x46, 0xaf,
-	0xd1, 0x7f, 0xe4, 0x2c, 0x1c, 0x58, 0x39, 0x38, 0x7b, 0xc5, 0xcf, 0x0f, 0xab, 0x57, 0xd7, 0xed,
-	0x92, 0xa7, 0x09, 0xfa, 0x8c, 0xd4, 0xe6, 0xee, 0x56, 0x59, 0xd1, 0xad, 0x7f, 0xe9, 0x03, 0xad,
-	0xf0, 0x0a, 0x2d, 0x7d, 0x48, 0x4c, 0x64, 0x22, 0x00, 0xb4, 0x2a, 0x1d, 0xa3, 0x57, 0xf7, 0x74,
-	0x47, 0x07, 0xa4, 0xca, 0x52, 0x9c, 0x5a, 0x55, 0xe5, 0xb5, 0xed, 0xdc, 0x31, 0x7a, 0xe7, 0xad,
-	0x04, 0x71, 0xc0, 0xa4, 0x1c, 0xa4, 0x38, 0xf5, 0x14, 0x4a, 0x37, 0xc9, 0x83, 0x88, 0x5d, 0x9c,
-	0xf8, 0x3c, 0xf6, 0x53, 0x21, 0x20, 0xf6, 0x2f, 0xad, 0x95, 0x8e, 0xd1, 0xab, 0x78, 0xeb, 0x11,
-	0xbb, 0x18, 0xdd, 0x3e, 0xed, 0xee, 0x93, 0xb5, 0x45, 0x9c, 0xb6, 0x48, 0x2d, 0x95, 0x20, 0x62,
-	0x16, 0xe5, 0x93, 0xa8, 0x7b, 0x45, 0x9f, 0x7d, 0x97, 0x30, 0x29, 0x3f, 0x70, 0x31, 0x56, 0xe7,
-	0xac, 0x7b, 0x45, 0xdf, 0x3d, 0x24, 0x6b, 0xf9, 0x38, 0x65, 0xc2, 0x63, 0x09, 0x74, 0x44, 0x6a,
-	0x12, 0x19, 0xa6, 0x12, 0xa4, 0x65, 0x74, 0x2a, 0xbd, 0x46, 0x7f, 0xf3, 0xce, 0x73, 0x1c, 0x2a,
-	0xc0, 0x2b, 0xc0, 0xee, 0x4d, 0x99, 0x98, 0xf9, 0x43, 0xfa, 0x92, 0x98, 0xcc, 0xc7, 0x90, 0xc7,
-	0xea, 0xad, 0xd6, 0x97, 0x70, 0x1b, 0x28, 0xb9, 0xa7, 0x31, 0x3a, 0x22, 0x44, 0x22, 0x13, 0x08,
-	0xe3, 0x13, 0x86, 0x45, 0x4c, 0xf9, 0x7a, 0x3a, 0xf3, 0xf5, 0x74, 0xde, 0xcc, 0xd7, 0x73, 0x58,
-	0xcb, 0x22, 0xfe, 0xf2, 0xbb, 0x6d, 0x78, 0x75, 0xcd, 0x0d, 0x30, 0x33, 0x49, 0x93, 0x31, 0xd3,
-	0x26, 0x95, 0xfb, 0x98, 0x68, 0x6e, 0x80, 0x59, 0xec, 0x7c, 0x32, 0x91, 0x80, 0x2a, 0xe0, 0x8a,
-	0xa7, 0x3b, 0xba, 0x41, 0x56, 0x90, 0x23, 0x3b, 0xd3, 0x49, 0xe5, 0x0d, 0x7d, 0x4d, 0xcc, 0x71,
-	0x18, 0x80, 0x44, 0xcb, 0xcc, 0x46, 0x3e, 0xec, 0x67, 0x96, 0xbf, 0xae, 0xdb, 0x5b, 0x0b, 0xbb,
-	0xcf, 0x13, 0x88, 0x8b, 0x71, 0x48, 0x37, 0xe0, 0xdb, 0x39, 0xe2, 0xec, 0xa9, 0x0f, 0x4f, 0x3b,
-	0x50, 0x4a, 0xaa, 0x2a, 0xd8, 0x55, 0x15, 0x9e, 0xaa, 0xb7, 0xf6, 0x89, 0x99, 0x4f, 0x8a, 0x36,
-	0xc8, 0xea, 0x11, 0x0b, 0x31, 0x8c, 0x83, 0x66, 0x89, 0xd6, 0xc9, 0xca, 0x91, 0x08, 0x11, 0x9a,
-	0x06, 0x25, 0xc4, 0x1c, 0xf1, 0x28, 0x0a, 0xb1, 0x59, 0xa6, 0x35, 0x52, 0xdd, 0xe3, 0x31, 0x34,
-	0x2b, 0xad, 0xf5, 0xcf, 0x5f, 0x6d, 0xe3, 0xfb, 0x37, 0x5b, 0xd3, 0x7d, 0xcc, 0xef, 0xd3, 0x61,
-	0x1e, 0x05, 0x05, 0x52, 0xcd, 0x5a, 0xfa, 0xf8, 0xce, 0x9c, 0x16, 0x6e, 0x61, 0x6b, 0x7b, 0x49,
-	0x75, 0xbe, 0x64, 0x4f, 0x8c, 0xe1, 0xf1, 0xd5, 0x8d, 0x5d, 0xfa, 0x79, 0x63, 0x97, 0x3e, 0xce,
-	0x6c, 0xe3, 0x6a, 0x66, 0x1b, 0x3f, 0x66, 0xb6, 0xf1, 0x67, 0x66, 0x1b, 0xc7, 0xaf, 0xfe, 0xf7,
-	0x8f, 0x6f, 0x57, 0x97, 0xef, 0x4a, 0xa7, 0xa6, 0x8a, 0xf4, 0xe9, 0xdf, 0x00, 0x00, 0x00, 0xff,
-	0xff, 0x47, 0x5f, 0x92, 0x5c, 0x45, 0x05, 0x00, 0x00,
+	// 915 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xbc, 0x56, 0xcd, 0x6e, 0x23, 0x45,
+	0x10, 0xce, 0xf8, 0x67, 0x62, 0xb7, 0x43, 0xb0, 0x5a, 0xab, 0xd5, 0xc8, 0x42, 0xb6, 0xf1, 0x81,
+	0x8d, 0x56, 0x64, 0xbc, 0x6b, 0x24, 0xc4, 0xee, 0x22, 0x81, 0xe3, 0xec, 0x4a, 0x20, 0x90, 0xa2,
+	0x09, 0x68, 0xd1, 0x5e, 0xa2, 0xce, 0x4c, 0x65, 0x3c, 0xda, 0x99, 0xe9, 0xa1, 0xbb, 0xc6, 0x24,
+	0x37, 0x2e, 0x48, 0x1c, 0xe1, 0x19, 0xe0, 0x29, 0x78, 0x82, 0xdc, 0xe0, 0x88, 0x38, 0x2c, 0x24,
+	0x27, 0x1e, 0x03, 0xf5, 0x8f, 0x27, 0x46, 0x7b, 0x88, 0x13, 0x21, 0x4e, 0xae, 0xaa, 0xa9, 0xef,
+	0xab, 0xee, 0xfa, 0x6b, 0x93, 0x67, 0x71, 0x82, 0xf3, 0xf2, 0xd8, 0x0f, 0x79, 0x36, 0x0e, 0x79,
+	0x8e, 0x2c, 0xc9, 0x41, 0x44, 0xab, 0x22, 0x2b, 0x92, 0xb1, 0x04, 0xb1, 0x48, 0x42, 0x90, 0x63,
+	0x01, 0x19, 0x47, 0x90, 0xe3, 0xc5, 0xc3, 0xa5, 0xe8, 0x17, 0x82, 0x23, 0xa7, 0x83, 0x2b, 0x84,
+	0xbf, 0xf4, 0xf6, 0x05, 0x64, 0xa8, 0x7d, 0x16, 0x0f, 0x7b, 0x77, 0x62, 0x1e, 0x73, 0xed, 0x3b,
+	0x56, 0x92, 0x81, 0xf5, 0x06, 0x31, 0xe7, 0x71, 0x0a, 0x63, 0xad, 0x1d, 0x97, 0x27, 0x63, 0x4c,
+	0x32, 0x90, 0xc8, 0xb2, 0xc2, 0x3a, 0x3c, 0x59, 0xeb, 0x7c, 0x78, 0x56, 0x80, 0x1c, 0x47, 0x20,
+	0x43, 0x91, 0x14, 0xc8, 0x85, 0x05, 0x3f, 0xba, 0x01, 0xb8, 0x48, 0x19, 0x9e, 0x70, 0x91, 0x19,
+	0xe8, 0xe8, 0xbb, 0x1a, 0xe9, 0x1c, 0x94, 0x72, 0x1e, 0xc0, 0xd7, 0x25, 0x48, 0xa4, 0x8f, 0x89,
+	0x2b, 0x79, 0x29, 0x42, 0xf0, 0x9c, 0xa1, 0xb3, 0xd3, 0x99, 0xbc, 0xe5, 0xaf, 0x5c, 0x58, 0x33,
+	0xf8, 0xfb, 0x55, 0xf8, 0xbd, 0xc6, 0xf9, 0xab, 0xc1, 0x46, 0x60, 0x11, 0xf4, 0x7d, 0xd2, 0x5a,
+	0xb2, 0x7b, 0x35, 0x8d, 0xee, 0xbd, 0x8e, 0x3e, 0xb0, 0x1e, 0x41, 0xe5, 0x4b, 0xef, 0x12, 0x17,
+	0x99, 0x88, 0x01, 0xbd, 0xfa, 0xd0, 0xd9, 0x69, 0x07, 0x56, 0xa3, 0x53, 0xd2, 0x60, 0x25, 0xce,
+	0xbd, 0x86, 0xe6, 0xda, 0xf5, 0xaf, 0x49, 0xbd, 0xff, 0xa5, 0x04, 0x71, 0xc0, 0xa4, 0x9c, 0x96,
+	0x38, 0x0f, 0x34, 0x94, 0xde, 0x23, 0x6f, 0x66, 0xec, 0xf4, 0x28, 0xe4, 0x79, 0x58, 0x0a, 0x01,
+	0x79, 0x78, 0xe6, 0x35, 0x87, 0xce, 0x4e, 0x3d, 0xd8, 0xce, 0xd8, 0xe9, 0xec, 0xca, 0x3a, 0x7a,
+	0x46, 0xb6, 0x56, 0xe1, 0xb4, 0x47, 0x5a, 0xa5, 0x04, 0x91, 0xb3, 0xcc, 0x64, 0xa2, 0x1d, 0x54,
+	0xba, 0xfa, 0x56, 0x30, 0x29, 0xbf, 0xe1, 0x22, 0xd2, 0xf7, 0x6c, 0x07, 0x95, 0x3e, 0x3a, 0x24,
+	0x5b, 0x26, 0x9d, 0xb2, 0xe0, 0xb9, 0x04, 0x3a, 0x23, 0x2d, 0x89, 0x0c, 0x4b, 0x09, 0xd2, 0x73,
+	0x86, 0xf5, 0x9d, 0xce, 0xe4, 0xde, 0xb5, 0xf7, 0x38, 0xd4, 0x80, 0xa0, 0x02, 0x8e, 0x2e, 0x6a,
+	0xc4, 0x35, 0x46, 0xfa, 0x11, 0x71, 0x59, 0x88, 0x09, 0xcf, 0xf5, 0xa9, 0xb6, 0xd7, 0x60, 0x9b,
+	0x6a, 0xf7, 0xc0, 0xc2, 0xe8, 0x8c, 0x10, 0x89, 0x4c, 0x20, 0x44, 0x47, 0x0c, 0xab, 0x32, 0x99,
+	0xf6, 0xf4, 0x97, 0xed, 0xe9, 0x7f, 0xb1, 0x6c, 0xcf, 0xbd, 0x96, 0x2a, 0xf1, 0x0f, 0x7f, 0x0e,
+	0x9c, 0xa0, 0x6d, 0x71, 0x53, 0x54, 0x24, 0x65, 0x11, 0x31, 0x4b, 0x52, 0xbf, 0x09, 0x89, 0xc5,
+	0x4d, 0x51, 0x95, 0x9d, 0x9f, 0x9c, 0x48, 0x40, 0x5d, 0xe0, 0x7a, 0x60, 0x35, 0x7a, 0x87, 0x34,
+	0x91, 0x23, 0x4b, 0x6d, 0xa5, 0x8c, 0x42, 0x3f, 0x25, 0x6e, 0x94, 0xc4, 0x20, 0xd1, 0x73, 0x55,
+	0xca, 0xf7, 0x26, 0x8a, 0xf2, 0x8f, 0x57, 0x83, 0xfb, 0x2b, 0xbd, 0xcf, 0x0b, 0xc8, 0xab, 0x74,
+	0xc8, 0x71, 0xcc, 0x77, 0x0d, 0xc4, 0xdf, 0xd7, 0x3f, 0x81, 0x65, 0xa0, 0x94, 0x34, 0x74, 0x61,
+	0x37, 0x75, 0xf1, 0xb4, 0x3c, 0xfa, 0x55, 0x0f, 0x42, 0x9a, 0x2e, 0x07, 0xe1, 0x2e, 0x71, 0xcd,
+	0xe4, 0xdb, 0xf2, 0x5b, 0xed, 0xd6, 0x4d, 0xfe, 0x3f, 0x36, 0xb3, 0x3a, 0x7b, 0x99, 0x17, 0x2c,
+	0x7c, 0xa9, 0x73, 0xd5, 0x0a, 0xac, 0x46, 0x87, 0xa4, 0x23, 0x73, 0x56, 0xc8, 0x39, 0x47, 0x04,
+	0x61, 0xaf, 0xbf, 0x6a, 0x52, 0x21, 0xa2, 0x44, 0x86, 0x4c, 0x44, 0x2a, 0x0c, 0x42, 0x8e, 0x5e,
+	0x4b, 0x53, 0x6c, 0x5b, 0xf3, 0xcc, 0x58, 0xe9, 0xdb, 0x64, 0x8b, 0xa5, 0xe9, 0x51, 0x06, 0xc8,
+	0x22, 0x86, 0xcc, 0x6b, 0x6b, 0xaf, 0x0e, 0x4b, 0xd3, 0xcf, 0xad, 0x69, 0xf4, 0xa3, 0xa3, 0x66,
+	0x41, 0x65, 0xf4, 0x3f, 0x9c, 0x05, 0xfa, 0x21, 0x69, 0x26, 0x19, 0x8b, 0xc1, 0x26, 0xff, 0x9d,
+	0x6b, 0x19, 0x3e, 0x51, 0xde, 0x81, 0x01, 0x8d, 0xfe, 0xae, 0x91, 0xa6, 0x36, 0x54, 0x3d, 0xe0,
+	0x5c, 0xf5, 0x80, 0xea, 0xb1, 0x94, 0x1d, 0x43, 0x2a, 0xbd, 0x9a, 0x3e, 0xde, 0x64, 0x3d, 0x72,
+	0xff, 0x33, 0x0d, 0x7a, 0x9a, 0xa3, 0x38, 0x0b, 0x2c, 0x83, 0x5a, 0xa4, 0x2b, 0x4b, 0x6d, 0xcd,
+	0x45, 0x6a, 0x17, 0xdf, 0x8c, 0x90, 0x50, 0xc0, 0x72, 0xbc, 0x36, 0x6f, 0x32, 0x5e, 0x16, 0xf7,
+	0xda, 0x8c, 0xb6, 0x6e, 0x35, 0xa3, 0xbd, 0x47, 0xa4, 0xb3, 0x72, 0x39, 0xda, 0x25, 0xf5, 0x97,
+	0x70, 0x66, 0x73, 0xa6, 0x44, 0x35, 0xac, 0x0b, 0x96, 0x96, 0x60, 0x17, 0xa1, 0x51, 0x1e, 0xd7,
+	0x3e, 0x70, 0xee, 0x73, 0xe2, 0x9a, 0xd5, 0x43, 0xdf, 0x20, 0xed, 0x00, 0x24, 0x4f, 0x17, 0x49,
+	0x1e, 0x77, 0x37, 0xe8, 0x16, 0x69, 0x19, 0x15, 0xa2, 0xae, 0x43, 0x3b, 0x64, 0xf3, 0x39, 0x4b,
+	0x50, 0x7d, 0xaa, 0xd1, 0x36, 0x69, 0x3e, 0x17, 0x09, 0x42, 0xb7, 0x4e, 0x09, 0x71, 0x67, 0x3c,
+	0xcb, 0x12, 0xec, 0x36, 0x68, 0x8b, 0x34, 0xf6, 0x79, 0x0e, 0xdd, 0xa6, 0xb2, 0x3e, 0x3d, 0x4d,
+	0x24, 0xca, 0xae, 0xdb, 0xdb, 0xfe, 0xfe, 0xa7, 0xbe, 0xf3, 0xcb, 0xcf, 0x7d, 0x1b, 0x66, 0x82,
+	0xe6, 0x25, 0x3b, 0x34, 0x75, 0xa2, 0x40, 0x1a, 0x4a, 0xa5, 0xef, 0x5e, 0x5b, 0xc4, 0x95, 0xf7,
+	0xaf, 0xb7, 0xbb, 0xa6, 0xb7, 0x69, 0xe9, 0x07, 0x8e, 0x89, 0x9a, 0xa6, 0xff, 0x8a, 0x9a, 0xa6,
+	0x6b, 0x45, 0xad, 0x96, 0xcd, 0x5a, 0x51, 0xaf, 0x06, 0xe9, 0x81, 0xb3, 0xf7, 0xe2, 0xfc, 0xa2,
+	0xbf, 0xf1, 0xfb, 0x45, 0x7f, 0xe3, 0xdb, 0xcb, 0xbe, 0x73, 0x7e, 0xd9, 0x77, 0x7e, 0xbb, 0xec,
+	0x3b, 0x7f, 0x5d, 0xf6, 0x9d, 0x17, 0x1f, 0xdf, 0xf6, 0x8f, 0xce, 0x13, 0x2b, 0x7e, 0xb5, 0x71,
+	0xec, 0xea, 0xf6, 0x78, 0xef, 0x9f, 0x00, 0x00, 0x00, 0xff, 0xff, 0x9d, 0x9b, 0x47, 0x41, 0x35,
+	0x09, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -431,6 +617,105 @@ var _PushService_serviceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "Push",
 			Handler:       _PushService_Push_Handler,
+			ServerStreams: true,
+		},
+	},
+	Metadata: "github.com/containerd/containerd/api/services/remotes/v1/remotes.proto",
+}
+
+// PullServiceClient is the client API for PullService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
+type PullServiceClient interface {
+	Pull(ctx context.Context, in *PullRequest, opts ...grpc.CallOption) (PullService_PullClient, error)
+}
+
+type pullServiceClient struct {
+	cc *grpc.ClientConn
+}
+
+func NewPullServiceClient(cc *grpc.ClientConn) PullServiceClient {
+	return &pullServiceClient{cc}
+}
+
+func (c *pullServiceClient) Pull(ctx context.Context, in *PullRequest, opts ...grpc.CallOption) (PullService_PullClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_PullService_serviceDesc.Streams[0], "/containerd.services.remtotes.v1.PullService/Pull", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &pullServicePullClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type PullService_PullClient interface {
+	Recv() (*PullResponse, error)
+	grpc.ClientStream
+}
+
+type pullServicePullClient struct {
+	grpc.ClientStream
+}
+
+func (x *pullServicePullClient) Recv() (*PullResponse, error) {
+	m := new(PullResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// PullServiceServer is the server API for PullService service.
+type PullServiceServer interface {
+	Pull(*PullRequest, PullService_PullServer) error
+}
+
+// UnimplementedPullServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedPullServiceServer struct {
+}
+
+func (*UnimplementedPullServiceServer) Pull(req *PullRequest, srv PullService_PullServer) error {
+	return status.Errorf(codes.Unimplemented, "method Pull not implemented")
+}
+
+func RegisterPullServiceServer(s *grpc.Server, srv PullServiceServer) {
+	s.RegisterService(&_PullService_serviceDesc, srv)
+}
+
+func _PullService_Pull_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(PullRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(PullServiceServer).Pull(m, &pullServicePullServer{stream})
+}
+
+type PullService_PullServer interface {
+	Send(*PullResponse) error
+	grpc.ServerStream
+}
+
+type pullServicePullServer struct {
+	grpc.ServerStream
+}
+
+func (x *pullServicePullServer) Send(m *PullResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+var _PullService_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "containerd.services.remtotes.v1.PullService",
+	HandlerType: (*PullServiceServer)(nil),
+	Methods:     []grpc.MethodDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "Pull",
+			Handler:       _PullService_Pull_Handler,
 			ServerStreams: true,
 		},
 	},
@@ -664,6 +949,238 @@ func (m *Status) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *PullRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PullRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PullRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	if m.AllMetadata {
+		i--
+		if m.AllMetadata {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x48
+	}
+	if m.DiscardContent {
+		i--
+		if m.DiscardContent {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x40
+	}
+	if len(m.Snapshotter) > 0 {
+		i -= len(m.Snapshotter)
+		copy(dAtA[i:], m.Snapshotter)
+		i = encodeVarintRemotes(dAtA, i, uint64(len(m.Snapshotter)))
+		i--
+		dAtA[i] = 0x3a
+	}
+	if m.Unpack {
+		i--
+		if m.Unpack {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x30
+	}
+	if m.MaxConcurrency != 0 {
+		i = encodeVarintRemotes(dAtA, i, uint64(m.MaxConcurrency))
+		i--
+		dAtA[i] = 0x28
+	}
+	if m.Auth != nil {
+		{
+			size, err := m.Auth.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintRemotes(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x22
+	}
+	if m.Platform != nil {
+		{
+			size, err := m.Platform.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintRemotes(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.Remote) > 0 {
+		i -= len(m.Remote)
+		copy(dAtA[i:], m.Remote)
+		i = encodeVarintRemotes(dAtA, i, uint64(len(m.Remote)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *PullResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PullResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PullResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	if m.Image != nil {
+		{
+			size, err := m.Image.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintRemotes(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.Statuses) > 0 {
+		for iNdEx := len(m.Statuses) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Statuses[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintRemotes(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *Image) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *Image) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *Image) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	n9, err9 := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.UpdatedAt, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdTime(m.UpdatedAt):])
+	if err9 != nil {
+		return 0, err9
+	}
+	i -= n9
+	i = encodeVarintRemotes(dAtA, i, uint64(n9))
+	i--
+	dAtA[i] = 0x42
+	n10, err10 := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.CreatedAt, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdTime(m.CreatedAt):])
+	if err10 != nil {
+		return 0, err10
+	}
+	i -= n10
+	i = encodeVarintRemotes(dAtA, i, uint64(n10))
+	i--
+	dAtA[i] = 0x3a
+	{
+		size, err := m.Target.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintRemotes(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0x1a
+	if len(m.Labels) > 0 {
+		for k := range m.Labels {
+			v := m.Labels[k]
+			baseI := i
+			i -= len(v)
+			copy(dAtA[i:], v)
+			i = encodeVarintRemotes(dAtA, i, uint64(len(v)))
+			i--
+			dAtA[i] = 0x12
+			i -= len(k)
+			copy(dAtA[i:], k)
+			i = encodeVarintRemotes(dAtA, i, uint64(len(k)))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintRemotes(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	if len(m.Name) > 0 {
+		i -= len(m.Name)
+		copy(dAtA[i:], m.Name)
+		i = encodeVarintRemotes(dAtA, i, uint64(len(m.Name)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
 func encodeVarintRemotes(dAtA []byte, offset int, v uint64) int {
 	offset -= sovRemotes(v)
 	base := offset
@@ -775,6 +1292,98 @@ func (m *Status) Size() (n int) {
 	return n
 }
 
+func (m *PullRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Remote)
+	if l > 0 {
+		n += 1 + l + sovRemotes(uint64(l))
+	}
+	if m.Platform != nil {
+		l = m.Platform.Size()
+		n += 1 + l + sovRemotes(uint64(l))
+	}
+	if m.Auth != nil {
+		l = m.Auth.Size()
+		n += 1 + l + sovRemotes(uint64(l))
+	}
+	if m.MaxConcurrency != 0 {
+		n += 1 + sovRemotes(uint64(m.MaxConcurrency))
+	}
+	if m.Unpack {
+		n += 2
+	}
+	l = len(m.Snapshotter)
+	if l > 0 {
+		n += 1 + l + sovRemotes(uint64(l))
+	}
+	if m.DiscardContent {
+		n += 2
+	}
+	if m.AllMetadata {
+		n += 2
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *PullResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Statuses) > 0 {
+		for _, e := range m.Statuses {
+			l = e.Size()
+			n += 1 + l + sovRemotes(uint64(l))
+		}
+	}
+	if m.Image != nil {
+		l = m.Image.Size()
+		n += 1 + l + sovRemotes(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *Image) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Name)
+	if l > 0 {
+		n += 1 + l + sovRemotes(uint64(l))
+	}
+	if len(m.Labels) > 0 {
+		for k, v := range m.Labels {
+			_ = k
+			_ = v
+			mapEntrySize := 1 + len(k) + sovRemotes(uint64(len(k))) + 1 + len(v) + sovRemotes(uint64(len(v)))
+			n += mapEntrySize + 1 + sovRemotes(uint64(mapEntrySize))
+		}
+	}
+	l = m.Target.Size()
+	n += 1 + l + sovRemotes(uint64(l))
+	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.CreatedAt)
+	n += 1 + l + sovRemotes(uint64(l))
+	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.UpdatedAt)
+	n += 1 + l + sovRemotes(uint64(l))
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
 func sovRemotes(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
@@ -836,6 +1445,66 @@ func (this *Status) String() string {
 		`Total:` + fmt.Sprintf("%v", this.Total) + `,`,
 		`Digest:` + fmt.Sprintf("%v", this.Digest) + `,`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PullRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PullRequest{`,
+		`Remote:` + fmt.Sprintf("%v", this.Remote) + `,`,
+		`Platform:` + strings.Replace(fmt.Sprintf("%v", this.Platform), "Platform", "types.Platform", 1) + `,`,
+		`Auth:` + strings.Replace(this.Auth.String(), "UserPassAuth", "UserPassAuth", 1) + `,`,
+		`MaxConcurrency:` + fmt.Sprintf("%v", this.MaxConcurrency) + `,`,
+		`Unpack:` + fmt.Sprintf("%v", this.Unpack) + `,`,
+		`Snapshotter:` + fmt.Sprintf("%v", this.Snapshotter) + `,`,
+		`DiscardContent:` + fmt.Sprintf("%v", this.DiscardContent) + `,`,
+		`AllMetadata:` + fmt.Sprintf("%v", this.AllMetadata) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PullResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForStatuses := "[]*Status{"
+	for _, f := range this.Statuses {
+		repeatedStringForStatuses += strings.Replace(f.String(), "Status", "Status", 1) + ","
+	}
+	repeatedStringForStatuses += "}"
+	s := strings.Join([]string{`&PullResponse{`,
+		`Statuses:` + repeatedStringForStatuses + `,`,
+		`Image:` + strings.Replace(this.Image.String(), "Image", "Image", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Image) String() string {
+	if this == nil {
+		return "nil"
+	}
+	keysForLabels := make([]string, 0, len(this.Labels))
+	for k, _ := range this.Labels {
+		keysForLabels = append(keysForLabels, k)
+	}
+	github_com_gogo_protobuf_sortkeys.Strings(keysForLabels)
+	mapStringForLabels := "map[string]string{"
+	for _, k := range keysForLabels {
+		mapStringForLabels += fmt.Sprintf("%v: %v,", k, this.Labels[k])
+	}
+	mapStringForLabels += "}"
+	s := strings.Join([]string{`&Image{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`Labels:` + mapStringForLabels + `,`,
+		`Target:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Target), "Descriptor", "types.Descriptor", 1), `&`, ``, 1) + `,`,
+		`CreatedAt:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.CreatedAt), "Timestamp", "types1.Timestamp", 1), `&`, ``, 1) + `,`,
+		`UpdatedAt:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.UpdatedAt), "Timestamp", "types1.Timestamp", 1), `&`, ``, 1) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -1471,6 +2140,702 @@ func (m *Status) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRemotes(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *PullRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRemotes
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PullRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PullRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Remote", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRemotes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Remote = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Platform", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRemotes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Platform == nil {
+				m.Platform = &types.Platform{}
+			}
+			if err := m.Platform.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Auth", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRemotes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Auth == nil {
+				m.Auth = &UserPassAuth{}
+			}
+			if err := m.Auth.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MaxConcurrency", wireType)
+			}
+			m.MaxConcurrency = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRemotes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.MaxConcurrency |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Unpack", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRemotes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Unpack = bool(v != 0)
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Snapshotter", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRemotes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Snapshotter = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 8:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DiscardContent", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRemotes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.DiscardContent = bool(v != 0)
+		case 9:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AllMetadata", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRemotes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.AllMetadata = bool(v != 0)
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRemotes(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *PullResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRemotes
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PullResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PullResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Statuses", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRemotes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Statuses = append(m.Statuses, &Status{})
+			if err := m.Statuses[len(m.Statuses)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Image", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRemotes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Image == nil {
+				m.Image = &Image{}
+			}
+			if err := m.Image.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRemotes(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *Image) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRemotes
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Image: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Image: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRemotes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Labels", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRemotes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Labels == nil {
+				m.Labels = make(map[string]string)
+			}
+			var mapkey string
+			var mapvalue string
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowRemotes
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowRemotes
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLengthRemotes
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLengthRemotes
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = string(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					var stringLenmapvalue uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowRemotes
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapvalue |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapvalue := int(stringLenmapvalue)
+					if intStringLenmapvalue < 0 {
+						return ErrInvalidLengthRemotes
+					}
+					postStringIndexmapvalue := iNdEx + intStringLenmapvalue
+					if postStringIndexmapvalue < 0 {
+						return ErrInvalidLengthRemotes
+					}
+					if postStringIndexmapvalue > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapvalue = string(dAtA[iNdEx:postStringIndexmapvalue])
+					iNdEx = postStringIndexmapvalue
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skipRemotes(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
+						return ErrInvalidLengthRemotes
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.Labels[mapkey] = mapvalue
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Target", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRemotes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Target.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CreatedAt", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRemotes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := github_com_gogo_protobuf_types.StdTimeUnmarshal(&m.CreatedAt, dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field UpdatedAt", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRemotes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthRemotes
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := github_com_gogo_protobuf_types.StdTimeUnmarshal(&m.UpdatedAt, dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

@@ -82,16 +82,16 @@ command. As part of this process, we do the following:
 		}
 		defer cancel()
 
-		ctx, done, err := client.WithLease(ctx)
-		if err != nil {
-			return err
-		}
-		defer done(ctx)
+		// user, pass, err := commands.GetAuth(context)
+		// if err != nil {
+		// 	return err
+		// }
 
 		config, err := content.NewFetchConfig(ctx, context)
 		if err != nil {
 			return err
 		}
+		// config.Auth = api.UserPassAuth{Username: user, Password: pass}
 
 		img, err := content.Fetch(ctx, client, ref, config)
 		if err != nil {
