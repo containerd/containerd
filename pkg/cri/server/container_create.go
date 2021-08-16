@@ -37,6 +37,7 @@ import (
 	cio "github.com/containerd/containerd/pkg/cri/io"
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	"github.com/containerd/containerd/pkg/cri/util"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 )
@@ -56,6 +57,10 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, errors.Wrapf(err, "failed to find sandbox id %q", r.GetPodSandboxId())
 	}
 	sandboxID := sandbox.ID
+	if sandbox.Status.Get().State != sandboxstore.StateReady {
+		return nil, errors.Errorf("sandbox container %q is not running", sandboxID)
+	}
+
 	s, err := sandbox.Container.Task(ctx, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get sandbox container task")

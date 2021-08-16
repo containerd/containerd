@@ -372,31 +372,29 @@ func (c *criService) loadSandbox(ctx context.Context, cntr containerd.Container)
 				notFound = true
 			}
 		}
+
 		if notFound {
-			// Task does not exist, set sandbox state as NOTREADY.
-			status.State = sandboxstore.StateNotReady
-		} else {
-			if taskStatus.Status == containerd.Running {
-				// Wait for the task for sandbox monitor.
-				// wait is a long running background request, no timeout needed.
-				exitCh, err := t.Wait(ctrdutil.NamespacedContext())
-				if err != nil {
-					if !errdefs.IsNotFound(err) {
-						return status, errors.Wrap(err, "failed to wait for task")
-					}
-					status.State = sandboxstore.StateNotReady
-				} else {
-					// Task is running, set sandbox state as READY.
-					status.State = sandboxstore.StateReady
-					status.Pid = t.Pid()
-					c.eventMonitor.startSandboxExitMonitor(context.Background(), meta.ID, status.Pid, exitCh)
+			return status, nil
+		}
+
+		if taskStatus.Status == containerd.Running {
+			// Wait for the task for sandbox monitor.
+			// wait is a long running background request, no timeout needed.
+			exitCh, err := t.Wait(ctrdutil.NamespacedContext())
+			if err != nil {
+				if !errdefs.IsNotFound(err) {
+					return status, errors.Wrap(err, "failed to wait for task")
 				}
 			} else {
-				// Task is not running. Delete the task and set sandbox state as NOTREADY.
-				if _, err := t.Delete(ctx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
-					return status, errors.Wrap(err, "failed to delete task")
-				}
-				status.State = sandboxstore.StateNotReady
+				// Task is running, set sandbox state as READY.
+				status.State = sandboxstore.StateReady
+				status.Pid = t.Pid()
+				c.eventMonitor.startSandboxExitMonitor(context.Background(), meta.ID, status.Pid, exitCh)
+			}
+		} else {
+			// Task is not running. Delete the task and set sandbox state as NOTREADY.
+			if _, err := t.Delete(ctx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
+				return status, errors.Wrap(err, "failed to delete task")
 			}
 		}
 		return status, nil

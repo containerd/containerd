@@ -106,6 +106,11 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 func (c *criService) stopSandboxContainer(ctx context.Context, sandbox sandboxstore.Sandbox) error {
 	id := sandbox.ID
 	container := sandbox.Container
+
+	if container == nil {
+		return cleanupUnknownSandbox(ctx, id, sandbox)
+	}
+
 	state := sandbox.Status.Get().State
 	task, err := container.Task(ctx, nil)
 	if err != nil {
