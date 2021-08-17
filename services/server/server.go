@@ -142,13 +142,29 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 
 		tcpServerOpts = append(tcpServerOpts, grpc.Creds(credentials.NewTLS(tlsConfig)))
 	}
+
+	// grpcService allows GRPC services to be registered with the underlying server
+	type grpcService interface {
+		Register(*grpc.Server) error
+	}
+
+	// tcpService allows GRPC services to be registered with the underlying tcp server
+	type tcpService interface {
+		RegisterTCP(*grpc.Server) error
+	}
+
+	// ttrpcService allows TTRPC services to be registered with the underlying server
+	type ttrpcService interface {
+		RegisterTTRPC(*ttrpc.Server) error
+	}
+
 	var (
 		grpcServer = grpc.NewServer(serverOpts...)
 		tcpServer  = grpc.NewServer(tcpServerOpts...)
 
-		grpcServices  []plugin.Service
-		tcpServices   []plugin.TCPService
-		ttrpcServices []plugin.TTRPCService
+		grpcServices  []grpcService
+		tcpServices   []tcpService
+		ttrpcServices []ttrpcService
 
 		s = &Server{
 			grpcServer:  grpcServer,
@@ -211,13 +227,13 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 
 		delete(required, reqID)
 		// check for grpc services that should be registered with the server
-		if src, ok := instance.(plugin.Service); ok {
+		if src, ok := instance.(grpcService); ok {
 			grpcServices = append(grpcServices, src)
 		}
-		if src, ok := instance.(plugin.TTRPCService); ok {
+		if src, ok := instance.(ttrpcService); ok {
 			ttrpcServices = append(ttrpcServices, src)
 		}
-		if service, ok := instance.(plugin.TCPService); ok {
+		if service, ok := instance.(tcpService); ok {
 			tcpServices = append(tcpServices, service)
 		}
 
