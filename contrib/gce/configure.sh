@@ -176,8 +176,8 @@ if [ "${KUBERNETES_MASTER:-}" != "true" ]; then
     cni_template_path=""
   fi
 fi
-# Use systemd cgroup if cgroupv2 is enabled
-systemdCgroup="${CONTAINERD_CGROUPV2:-"false"}"
+# Use systemd cgroup if specified in env
+systemdCgroup="${CONTAINERD_SYSTEMD_CGROUP:-"false"}"
 log_level="${CONTAINERD_LOG_LEVEL:-"info"}"
 max_container_log_line="${CONTAINERD_MAX_CONTAINER_LOG_LINE:-16384}"
 cat > ${config_path} <<EOF
