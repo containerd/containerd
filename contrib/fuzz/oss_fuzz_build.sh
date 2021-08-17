@@ -27,6 +27,30 @@ mv contrib/fuzz/docker_fuzzer.go remotes/docker/
 mv contrib/fuzz/container_fuzzer.go integration/client/
 
 
+# Change path of socket since OSS-fuzz does not grant access to /run
+sed -i 's/\/run\/containerd/\/tmp\/containerd/g' $SRC/containerd/defaults/defaults_unix.go
+
+# To build FuzzContainer2 we need to prepare a few things:
+# We change the name of the cmd/containerd package
+# so that we can import it.
+# We furthermore add an exported function that is similar
+# to cmd/containerd.main and call that instead of calling
+# the containerd binary.
+#
+# In the fuzzer we import cmd/containerd as a low-maintenance
+# way of initializing all the plugins.
+# Make backup of cmd/containerd:
+cp -r $SRC/containerd/cmd/containerd $SRC/cmd-containerd-backup
+# Rename package:
+find $SRC/containerd/cmd/containerd -type f -exec sed -i 's/package main/package mainfuzz/g' {} \;
+# Add an exported function
+sed -i -e '$afunc StartDaemonForFuzzing(arguments []string) {\n\tapp := App()\n\t_ = app.Run(arguments)\n}' $SRC/containerd/cmd/containerd/command/main.go
+# Build fuzzer:
+compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzContainerdImport fuzz_containerd_import
+# Reinstante backup of cmd/containerd:
+mv $SRC/cmd-containerd-backup $SRC/containerd/cmd/containerd
+
+# Compile more fuzzers
 compile_go_fuzzer github.com/containerd/containerd/remotes/docker FuzzFetcher fuzz_fetcher
 compile_go_fuzzer github.com/containerd/containerd/remotes/docker FuzzParseDockerRef fuzz_parse_docker_ref
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzFiltersParse fuzz_filters_parse
@@ -38,7 +62,7 @@ compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzArchiveExpor
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzParseAuth fuzz_parse_auth
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzParseProcPIDStatus fuzz_parse_proc_pid_status
 
-# FuzzCreateContainer requires more setup than the fuzzers above.
+# The below fuzzers require more setup than the fuzzers above.
 # We need the binaries from "make".
 wget -c https://github.com/protocolbuffers/protobuf/releases/download/v3.11.4/protoc-3.11.4-linux-x86_64.zip
 unzip protoc-3.11.4-linux-x86_64.zip -d /usr/local
