@@ -21,6 +21,7 @@ package run
 import (
 	gocontext "context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -200,7 +201,16 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			opts = append(opts, oci.WithPrivileged, oci.WithAllDevicesAllowed, oci.WithHostDevices)
 		}
 		if context.Bool("net-host") {
-			opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace), oci.WithHostHostsFile, oci.WithHostResolvconf)
+			hostname, err := os.Hostname()
+			if err != nil {
+				return nil, errors.Wrap(err, "get hostname")
+			}
+			opts = append(opts,
+				oci.WithHostNamespace(specs.NetworkNamespace),
+				oci.WithHostHostsFile,
+				oci.WithHostResolvconf,
+				oci.WithEnv([]string{fmt.Sprintf("HOSTNAME=%s", hostname)}),
+			)
 		}
 
 		seccompProfile := context.String("seccomp-profile")
