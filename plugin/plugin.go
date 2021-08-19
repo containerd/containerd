@@ -77,6 +77,8 @@ const (
 	GCPlugin Type = "io.containerd.gc.v1"
 	// EventPlugin implements event handling
 	EventPlugin Type = "io.containerd.event.v1"
+	// RemotePlugin implements a remote service
+	RemotePlugin Type = "io.containerd.remote.v1"
 )
 
 const (

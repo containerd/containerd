@@ -28,12 +28,11 @@ const (
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type: plugin.ServicePlugin,
+		Type: plugin.RemotePlugin,
 		ID:   dockerPullerPlugin,
 		// TODO: Don't hardcode /etc/containerd... but I didn't see anywhere that this was being set otherwise.
 		Config: &Config{ConfigPath: "/etc/containerd/certs.d"},
 		Requires: []plugin.Type{
-			plugin.EventPlugin,
 			plugin.ServicePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {

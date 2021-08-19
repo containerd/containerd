@@ -1,9 +1,6 @@
 package plugin
 
 import (
-	"context"
-	"time"
-
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/diff/v1"
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
@@ -34,24 +31,6 @@ func descriptorAPIToOCI(d types.Descriptor) v1.Descriptor {
 		Digest:    d.Digest,
 		Size:      d.Size_,
 	}
-}
-
-func withLease(ctx context.Context, lm leases.Manager) (context.Context, func(context.Context) error, error) {
-	nop := func(context.Context) error { return nil }
-	if _, ok := leases.FromContext(ctx); ok {
-		return ctx, nop, nil
-	}
-	l, err := lm.Create(ctx,
-		leases.WithRandomID(),
-		leases.WithExpiration(24*time.Hour),
-	)
-	if err != nil {
-		return ctx, nop, err
-	}
-	ctx = leases.WithLease(ctx, l.ID)
-	return ctx, func(ctx context.Context) error {
-		return lm.Delete(ctx, l)
-	}, nil
 }
 
 func ociDescriptorToAPI(d v1.Descriptor) types.Descriptor {

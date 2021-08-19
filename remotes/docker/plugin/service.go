@@ -14,10 +14,10 @@ func init() {
 		Type: plugin.GRPCPlugin,
 		ID:   "docker-pusher",
 		Requires: []plugin.Type{
-			plugin.ServicePlugin,
+			plugin.RemotePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			local, err := ic.GetByID(plugin.ServicePlugin, dockerPusherPlugin)
+			local, err := ic.GetByID(plugin.RemotePlugin, dockerPusherPlugin)
 			if err != nil {
 				return nil, err
 			}
@@ -28,10 +28,10 @@ func init() {
 		Type: plugin.GRPCPlugin,
 		ID:   "docker-puller",
 		Requires: []plugin.Type{
-			plugin.ServicePlugin,
+			plugin.RemotePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			local, err := ic.GetByID(plugin.ServicePlugin, dockerPullerPlugin)
+			local, err := ic.GetByID(plugin.RemotePlugin, dockerPullerPlugin)
 			if err != nil {
 				return nil, err
 			}

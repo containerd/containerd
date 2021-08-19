@@ -22,12 +22,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/containerd"
 	api "github.com/containerd/containerd/api/services/remotes/v1"
-	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/remotes"
@@ -35,8 +33,6 @@ import (
 	"github.com/containerd/containerd/remotes/docker/config"
 	"github.com/containerd/containerd/remotes/service"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
-	"golang.org/x/sync/semaphore"
 )
 
 const (
@@ -45,27 +41,28 @@ const (
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type: plugin.ServicePlugin,
+		Type: plugin.RemotePlugin,
 		ID:   dockerPusherPlugin,
 		// TODO: Don't hardcode /etc/containerd... but I didn't see anywhere that this was being set otherwise.
 		Config: &Config{ConfigPath: "/etc/containerd/certs.d"},
 		Requires: []plugin.Type{
-			plugin.MetadataPlugin,
+			plugin.ServicePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			m, err := ic.Get(plugin.MetadataPlugin)
+			cfg := ic.Config.(*Config)
+
+			opts, err := getServicesOpts(ic)
 			if err != nil {
 				return nil, err
 			}
-
-			mdb := m.(*metadata.DB)
-			cfg := ic.Config.(*Config)
-
+			client, err := containerd.New("", containerd.WithServices(opts...))
+			if err != nil {
+				return nil, err
+			}
 			return &localPusher{
-				cs:         mdb.ContentStore(),
 				configRoot: cfg.ConfigPath,
 				headers:    cfg.Headers,
-				lm:         metadata.NewLeaseManager(mdb),
+				client:     client,
 			}, nil
 		},
 	})
@@ -80,20 +77,12 @@ type Config struct {
 }
 
 type localPusher struct {
-	cs         content.Store
+	client     *containerd.Client
 	configRoot string
 	headers    http.Header
-	lm         leases.Manager
 }
 
 func (l *localPusher) Push(ctx context.Context, req *api.PushRequest) (_ <-chan *service.PushResponseEnvelope, retErr error) {
-	ctx, done, err := withLease(ctx, l.lm)
-	defer func() {
-		if retErr != nil {
-			done(context.Background())
-		}
-	}()
-
 	tracker := docker.NewInMemoryTracker()
 
 	log.G(ctx).WithField("digest", req.Source).Debug("push request received")
@@ -105,6 +94,7 @@ func (l *localPusher) Push(ctx context.Context, req *api.PushRequest) (_ <-chan 
 			return auth.Username, auth.Password, nil
 		},
 	}
+
 	resolver := docker.NewResolver(docker.ResolverOptions{
 		Tracker: tracker,
 		Hosts:   config.ConfigureHosts(ctx, hostOptions),
@@ -115,50 +105,7 @@ func (l *localPusher) Push(ctx context.Context, req *api.PushRequest) (_ <-chan 
 		req.Target = req.Target + "@" + req.Source.Digest.String()
 	}
 
-	pusher, err := resolver.Pusher(ctx, req.Target)
-	if err != nil {
-		return nil, err
-	}
-
 	jobs := newJobTracker(tracker)
-
-	wrap := func(h images.Handler) images.Handler {
-		return images.Handlers(images.HandlerFunc(func(ctx context.Context, desc v1.Descriptor) ([]v1.Descriptor, error) {
-			jobs.add(remotes.MakeRefKey(ctx, desc))
-			return nil, nil
-		}), h)
-	}
-
-	desc := descriptorAPIToOCI(req.Source)
-
-	var matcher platforms.MatchComparer
-	if req.Platform != nil {
-		p := platformAPIToOCI(*req.Platform)
-		matcher = platforms.Any(p)
-
-		// If the platform is specified we need to get down to the manifest for
-		// that platform, in cases where the provided descriptor is an index, otherwise
-		// the pusher will try to push the index.
-		if manifests, err := images.Children(ctx, l.cs, desc); err == nil && len(manifests) > 0 {
-			matcher := platforms.NewMatcher(p)
-			for _, manifest := range manifests {
-				if manifest.Platform != nil && matcher.Match(*manifest.Platform) {
-					if _, err := images.Children(ctx, l.cs, manifest); err != nil {
-						return nil, errors.Wrap(err, "no matching manifest")
-					}
-					desc = manifest
-					break
-				}
-			}
-		}
-	} else {
-		matcher = platforms.All
-	}
-
-	var limit *semaphore.Weighted
-	if req.MaxConcurrency > 0 {
-		limit = semaphore.NewWeighted(req.MaxConcurrency)
-	}
 
 	ch := make(chan *service.PushResponseEnvelope)
 	chErr := make(chan error, 1)
@@ -168,15 +115,37 @@ func (l *localPusher) Push(ctx context.Context, req *api.PushRequest) (_ <-chan 
 	// things are not setup correctly a cancelled context can prevent us from
 	// sending errors down the channel.
 	go func() {
-		chErr <- remotes.PushContent(ctx, pusher, desc, l.cs, limit, matcher, wrap)
+		chErr <- l.client.Push(ctx,
+			req.Target,
+			descriptorAPIToOCI(req.Source),
+			containerd.WithResolver(resolver),
+			containerd.WithImageHandlerWrapper(func(h images.Handler) images.Handler {
+				return images.Handlers(h, images.HandlerFunc(func(ctx context.Context, desc v1.Descriptor) (subdescs []v1.Descriptor, err error) {
+					jobs.add(remotes.MakeRefKey(ctx, desc))
+					return nil, nil
+				}))
+			}),
+			func(_ *containerd.Client, rc *containerd.RemoteContext) error {
+				if req.Platform != nil {
+					p := platformAPIToOCI(*req.Platform)
+					rc.PlatformMatcher = platforms.Any(p)
+				} else {
+					rc.PlatformMatcher = platforms.All
+				}
+
+				if req.MaxConcurrency > 0 {
+					rc.MaxConcurrentUploadedLayers = int(req.MaxConcurrency)
+				}
+				return nil
+			},
+		)
+
 	}()
 
 	go func() {
-		defer done(context.Background())
 		var ticker = time.NewTicker(100 * time.Millisecond)
 
 		defer close(ch)
-
 		defer ticker.Stop()
 
 		var (
