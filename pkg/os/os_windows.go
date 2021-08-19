@@ -58,7 +58,7 @@ func openPath(path string) (windows.Handle, error) {
 }
 
 // GetFinalPathNameByHandle flags.
-//nolint:golint
+//nolint:revive // SNAKE_CASE is not idiomatic in Go, but aligned with Win32 API.
 const (
 	cFILE_NAME_OPENED = 0x8
 

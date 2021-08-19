@@ -40,7 +40,7 @@ jobs:
 
       - uses: golangci/golangci-lint-action@v2
         with:
-          version: v1.36.0
+          version: v1.42.0
           working-directory: src/github.com/containerd/containerd
           args: --timeout=5m
           skip-go-installation: true

@@ -18,7 +18,7 @@ package testsuite
 
 import (
 	"context"
-	//nolint:golint
+	//nolint:revive // go-digest needs the blank import. See https://github.com/opencontainers/go-digest#usage.
 	_ "crypto/sha256"
 	"fmt"
 	"io/ioutil"
