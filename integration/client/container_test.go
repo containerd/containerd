@@ -443,9 +443,9 @@ func TestContainerPids(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pid := task.Pid()
-	if pid < 1 {
-		t.Errorf("invalid task pid %d", pid)
+	taskPid := task.Pid()
+	if taskPid < 1 {
+		t.Errorf("invalid task pid %d", taskPid)
 	}
 	processes, err := task.Pids(ctx)
 	switch runtime.GOOS {
@@ -459,11 +459,16 @@ func TestContainerPids(t *testing.T) {
 		if l := len(processes); l != 2 {
 			t.Errorf("expected 2 process but received %d", l)
 		}
-		if len(processes) > 0 {
-			actual := processes[0].Pid
-			if pid != actual {
-				t.Errorf("expected pid %d but received %d. processes = %+v", pid, actual, processes)
+
+		var found bool
+		for _, p := range processes {
+			if p.Pid == taskPid {
+				found = true
+				break
 			}
+		}
+		if !found {
+			t.Errorf("pid %d must be in %+v", taskPid, processes)
 		}
 	}
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
