@@ -18,88 +18,21 @@ package plugin
 
 import (
 	"context"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/containerd/containerd"
 	api "github.com/containerd/containerd/api/services/remotes/v1"
 	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
-	"github.com/containerd/containerd/remotes/docker/config"
 	"github.com/containerd/containerd/remotes/service"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-const (
-	dockerPusherPlugin = "docker-pusher-service"
-)
-
-func init() {
-	plugin.Register(&plugin.Registration{
-		Type: plugin.RemotePlugin,
-		ID:   dockerPusherPlugin,
-		// TODO: Don't hardcode /etc/containerd... but I didn't see anywhere that this was being set otherwise.
-		Config: &Config{ConfigPath: "/etc/containerd/certs.d"},
-		Requires: []plugin.Type{
-			plugin.ServicePlugin,
-		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			cfg := ic.Config.(*Config)
-
-			opts, err := getServicesOpts(ic)
-			if err != nil {
-				return nil, err
-			}
-			client, err := containerd.New("", containerd.WithServices(opts...))
-			if err != nil {
-				return nil, err
-			}
-			return &localPusher{
-				configRoot: cfg.ConfigPath,
-				headers:    cfg.Headers,
-				client:     client,
-			}, nil
-		},
-	})
-}
-
-// Config is used to configure the docker-pusher
-type Config struct {
-	// ConfigPath sets the root path for registry host configuration (e.g. /etc/containerd/certs.d).
-	ConfigPath string `toml:"config-path",json:"configPath"`
-	// Headers are the HTTP headers that get set on push.
-	Headers http.Header `toml:"headers",json:"headers"`
-}
-
-type localPusher struct {
-	client     *containerd.Client
-	configRoot string
-	headers    http.Header
-}
-
-func (l *localPusher) Push(ctx context.Context, req *api.PushRequest) (_ <-chan *service.PushResponseEnvelope, retErr error) {
+func (r *remote) Push(ctx context.Context, req *api.PushRequest) (_ <-chan *service.PushResponseEnvelope, retErr error) {
 	tracker := docker.NewInMemoryTracker()
-
-	log.G(ctx).WithField("digest", req.Source).Debug("push request received")
-
-	auth := req.Auth
-	hostOptions := config.HostOptions{
-		HostDir: config.HostDirFromRoot(l.configRoot),
-		Credentials: func(host string) (string, string, error) {
-			return auth.Username, auth.Password, nil
-		},
-	}
-
-	resolver := docker.NewResolver(docker.ResolverOptions{
-		Tracker: tracker,
-		Hosts:   config.ConfigureHosts(ctx, hostOptions),
-		Headers: l.headers,
-	})
 
 	if !strings.Contains(req.Target, "@") {
 		req.Target = req.Target + "@" + req.Source.Digest.String()
@@ -115,10 +48,10 @@ func (l *localPusher) Push(ctx context.Context, req *api.PushRequest) (_ <-chan 
 	// things are not setup correctly a cancelled context can prevent us from
 	// sending errors down the channel.
 	go func() {
-		chErr <- l.client.Push(ctx,
+		chErr <- r.client.Push(ctx,
 			req.Target,
 			descriptorAPIToOCI(req.Source),
-			containerd.WithResolver(resolver),
+			containerd.WithResolver(r.newResolver(ctx, req.Auth, tracker)),
 			containerd.WithImageHandlerWrapper(func(h images.Handler) images.Handler {
 				return images.Handlers(h, images.HandlerFunc(func(ctx context.Context, desc v1.Descriptor) (subdescs []v1.Descriptor, err error) {
 					jobs.add(remotes.MakeRefKey(ctx, desc))

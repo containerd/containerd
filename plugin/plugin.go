@@ -88,6 +88,9 @@ const (
 	RuntimeRuncV1 = "io.containerd.runc.v1"
 	// RuntimeRuncV2 is the runc runtime that supports multiple containers per shim
 	RuntimeRuncV2 = "io.containerd.runc.v2"
+
+	// RemoteDockerV1 is the remote to pull using docker-style auth.
+	RemoteDockerV1 = "io.containerd.remotes.docker.v1"
 )
 
 // Registration contains information for registering a plugin

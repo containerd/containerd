@@ -1,8 +1,23 @@
+/*
+   Copyright The containerd Authors.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 package plugin
 
 import (
 	"context"
-	"net/http"
 	"sync"
 	"time"
 
@@ -13,74 +28,17 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/remotes"
-	"github.com/containerd/containerd/remotes/docker"
-	"github.com/containerd/containerd/remotes/docker/config"
 	"github.com/containerd/containerd/remotes/service"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-const (
-	dockerPullerPlugin = "docker-puller-service"
-)
-
-func init() {
-	plugin.Register(&plugin.Registration{
-		Type: plugin.RemotePlugin,
-		ID:   dockerPullerPlugin,
-		// TODO: Don't hardcode /etc/containerd... but I didn't see anywhere that this was being set otherwise.
-		Config: &Config{ConfigPath: "/etc/containerd/certs.d"},
-		Requires: []plugin.Type{
-			plugin.ServicePlugin,
-		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			cfg := ic.Config.(*Config)
-
-			opts, err := getServicesOpts(ic)
-			if err != nil {
-				return nil, err
-			}
-			client, err := containerd.New("", containerd.WithServices(opts...))
-			if err != nil {
-				return nil, err
-			}
-			return &localPuller{
-				client:     client,
-				configRoot: cfg.ConfigPath,
-				headers:    cfg.Headers,
-			}, nil
-		},
-	})
-}
-
-type localPuller struct {
-	client     *containerd.Client
-	configRoot string
-	headers    http.Header
-}
-
-func (l *localPuller) Pull(ctx context.Context, req *api.PullRequest) (_ <-chan *service.PullResponseEnvelope, retErr error) {
-	auth := req.Auth
-	hostOptions := config.HostOptions{
-		HostDir: config.HostDirFromRoot(l.configRoot),
-		Credentials: func(host string) (string, string, error) {
-			if auth == nil {
-				return "", "", nil
-			}
-			return auth.Username, auth.Password, nil
-		},
-	}
-	resolver := docker.NewResolver(docker.ResolverOptions{
-		Hosts:   config.ConfigureHosts(ctx, hostOptions),
-		Headers: l.headers,
-	})
-
-	jobs := newPullJobs(l.client.ContentStore(), req.Remote)
+func (r *remote) Pull(ctx context.Context, req *api.PullRequest) (_ <-chan *service.PullResponseEnvelope, retErr error) {
+	jobs := newPullJobs(r.client.ContentStore(), req.Remote)
 
 	pullOpts := []containerd.RemoteOpt{
-		containerd.WithResolver(resolver),
+		containerd.WithResolver(r.newResolver(ctx, req.Auth, nil)),
 		containerd.WithImageHandlerWrapper(func(h images.Handler) images.Handler {
 			return images.Handlers(h, images.HandlerFunc(func(ctx context.Context, desc v1.Descriptor) ([]v1.Descriptor, error) {
 				jobs.add(desc)
@@ -116,7 +74,7 @@ func (l *localPuller) Pull(ctx context.Context, req *api.PullRequest) (_ <-chan 
 	}
 	chPull := make(chan result, 1)
 	go func() {
-		image, err := l.client.Pull(ctx, req.Remote, pullOpts...)
+		image, err := r.client.Pull(ctx, req.Remote, pullOpts...)
 		chPull <- result{image, err}
 	}()
 
