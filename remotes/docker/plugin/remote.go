@@ -60,9 +60,9 @@ func init() {
 // Config is used to configure the docker-pusher
 type Config struct {
 	// ConfigPath sets the root path for registry host configuration (e.g. /etc/containerd/certs.d).
-	ConfigPath string `toml:"config-path",json:"configPath"`
+	ConfigPath string `toml:"config-path", json:"configPath"`
 	// Headers are the HTTP headers that get set on push.
-	Headers http.Header `toml:"headers",json:"headers"`
+	Headers http.Header `toml:"headers", json:"headers"`
 }
 
 type remote struct {

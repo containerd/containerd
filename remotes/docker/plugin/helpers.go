@@ -5,10 +5,8 @@ import (
 	"github.com/containerd/containerd/api/services/diff/v1"
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	"github.com/containerd/containerd/api/services/namespaces/v1"
-	api "github.com/containerd/containerd/api/services/remotes/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
@@ -39,16 +37,6 @@ func ociDescriptorToAPI(d v1.Descriptor) types.Descriptor {
 		Digest:      d.Digest,
 		Size_:       d.Size,
 		Annotations: d.Annotations,
-	}
-}
-
-func imageToAPI(i images.Image) api.Image {
-	return api.Image{
-		Name:      i.Name,
-		Labels:    i.Labels,
-		Target:    ociDescriptorToAPI(i.Target),
-		CreatedAt: i.CreatedAt,
-		UpdatedAt: i.UpdatedAt,
 	}
 }
 

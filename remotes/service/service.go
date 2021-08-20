@@ -32,8 +32,8 @@ const (
 
 // Config is the configuration for the remote service
 type Config struct {
-	DefaultPullService string `toml:"default_pull_service",json:"defaultPullService"`
-	DefaultPushService string `toml:"default_push_service",json:"defaultPushService"`
+	DefaultPullService string `toml:"default_pull_service", json:"defaultPullService"`
+	DefaultPushService string `toml:"default_push_service", json:"defaultPushService"`
 }
 
 func init() {
