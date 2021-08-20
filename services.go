@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/namespaces"
+	remotesservice "github.com/containerd/containerd/remotes/service"
 	"github.com/containerd/containerd/services/introspection"
 	"github.com/containerd/containerd/snapshots"
 )
@@ -43,6 +44,8 @@ type services struct {
 	eventService         EventService
 	leasesService        leases.Manager
 	introspectionService introspection.Service
+	pullService          remotesservice.PullService
+	pushService          remotesservice.PushService
 }
 
 // ServicesOpt allows callers to set options on the services
@@ -153,5 +156,19 @@ func WithIntrospectionClient(in introspectionapi.IntrospectionClient) ServicesOp
 func WithIntrospectionService(in introspection.Service) ServicesOpt {
 	return func(s *services) {
 		s.introspectionService = in
+	}
+}
+
+// WithPullService sets the pull service.
+func WithPullService(r remotesservice.PullService) ServicesOpt {
+	return func(s *services) {
+		s.pullService = r
+	}
+}
+
+// WithPushService sets the push service.
+func WithPushService(r remotesservice.PushService) ServicesOpt {
+	return func(s *services) {
+		s.pushService = r
 	}
 }

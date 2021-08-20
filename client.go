@@ -612,11 +612,21 @@ func (c *Client) ContentStore() content.Store {
 
 // PushServices returns the underlying push client
 func (c *Client) PushService() remotesservice.PushService {
+	if c.pushService != nil {
+		return c.pushService
+	}
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
 	return remotesservice.NewPushClient(c.conn)
 }
 
 // PushServices returns the underlying push client
 func (c *Client) PullService() remotesservice.PullService {
+	if c.pullService != nil {
+		return c.pullService
+	}
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
 	return remotesservice.NewPullClient(c.conn)
 }
 

@@ -141,7 +141,6 @@ func (s *service) Push(ctx context.Context, r *api.PushRequest) (<-chan *PushRes
 	return pusher.Push(ctx, r)
 }
 
-// TODO: Read remote from grpc metadata?
 type server struct {
 	service pushPullService
 }
