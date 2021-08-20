@@ -394,7 +394,8 @@ nameserver server.google.com
 options timeout:1
 `,
 		},
-		"should return error if dns search exceeds limit(6)": {
+		"expanded dns config should return correct content on modern libc (e.g. glibc 2.26 and above)": {
+			servers: []string{"8.8.8.8", "server.google.com"},
 			searches: []string{
 				"server0.google.com",
 				"server1.google.com",
@@ -404,7 +405,12 @@ options timeout:1
 				"server5.google.com",
 				"server6.google.com",
 			},
-			expectErr: true,
+			options: []string{"timeout:1"},
+			expectedContent: `search server0.google.com server1.google.com server2.google.com server3.google.com server4.google.com server5.google.com server6.google.com
+nameserver 8.8.8.8
+nameserver server.google.com
+options timeout:1
+`,
 		},
 	} {
 		t.Logf("TestCase %q", desc)
