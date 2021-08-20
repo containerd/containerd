@@ -23,6 +23,7 @@ import (
 	api "github.com/containerd/containerd/api/services/remotes/v1"
 	"github.com/containerd/containerd/errdefs"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 type PullResponseEnvelope struct {
@@ -44,6 +45,10 @@ type pullClient struct {
 
 func (c *pullClient) Pull(ctx context.Context, req *api.PullRequest) (<-chan *PullResponseEnvelope, error) {
 	ctx, cancel := context.WithCancel(ctx)
+
+	if v := ctx.Value(remoteCtxKey{}); v != nil {
+		ctx = metadata.AppendToOutgoingContext(ctx, mdRemoteKey, v.(string))
+	}
 
 	recv, err := c.c.Pull(ctx, req)
 	if err != nil {

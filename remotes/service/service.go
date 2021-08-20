@@ -155,13 +155,13 @@ func (s *server) Register(srv *grpc.Server) error {
 func (s *server) Push(req *api.PushRequest, srv api.PushService_PushServer) (retErr error) {
 	ctx := srv.Context()
 
-	if md, ok := metadata.FromIncomingContext(srv.Context()); ok {
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
 		if remotes := md.Get(mdRemoteKey); len(remotes) > 0 {
 			ctx = WithRemote(ctx, remotes[0])
 		}
 	}
 
-	ch, err := s.service.Push(srv.Context(), req)
+	ch, err := s.service.Push(ctx, req)
 	if err != nil {
 		return errdefs.ToGRPC(err)
 	}
@@ -181,13 +181,13 @@ func (s *server) Push(req *api.PushRequest, srv api.PushService_PushServer) (ret
 func (s *server) Pull(req *api.PullRequest, srv api.PullService_PullServer) (retErr error) {
 	ctx := srv.Context()
 
-	if md, ok := metadata.FromIncomingContext(srv.Context()); ok {
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
 		if remotes := md.Get(mdRemoteKey); len(remotes) > 0 {
 			ctx = WithRemote(ctx, remotes[0])
 		}
 	}
 
-	ch, err := s.service.Pull(srv.Context(), req)
+	ch, err := s.service.Pull(ctx, req)
 	if err != nil {
 		return errdefs.ToGRPC(err)
 	}

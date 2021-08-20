@@ -23,6 +23,7 @@ import (
 	api "github.com/containerd/containerd/api/services/remotes/v1"
 	"github.com/containerd/containerd/errdefs"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 type PushResponseEnvelope struct {
@@ -44,6 +45,10 @@ type pushClient struct {
 
 func (c *pushClient) Push(ctx context.Context, req *api.PushRequest) (<-chan *PushResponseEnvelope, error) {
 	ctx, cancel := context.WithCancel(ctx)
+
+	if v := ctx.Value(remoteCtxKey{}); v != nil {
+		ctx = metadata.AppendToOutgoingContext(ctx, mdRemoteKey, v.(string))
+	}
 
 	recv, err := c.c.Push(ctx, req)
 	if err != nil {
