@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	remotesservice "github.com/containerd/containerd/remotes/service"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/snapshots"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -55,6 +56,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.EventPlugin,
 			plugin.ServicePlugin,
+			plugin.RemotePlugin,
 		},
 		InitFn: initCRIService,
 	})
@@ -124,8 +126,14 @@ func getServicesOpts(ic *plugin.InitContext) ([]containerd.ServicesOpt, error) {
 		return nil, errors.Wrap(err, "failed to get event plugin")
 	}
 
+	rp, err := ic.GetByID(plugin.RemotePlugin, remotesservice.ServiceName)
+	if err != nil {
+		return nil, err
+	}
+
 	opts := []containerd.ServicesOpt{
 		containerd.WithEventService(ep.(containerd.EventService)),
+		containerd.WithPullService(rp.(remotesservice.PullService)),
 	}
 	for s, fn := range map[string]func(interface{}) containerd.ServicesOpt{
 		services.ContentService: func(s interface{}) containerd.ServicesOpt {
@@ -169,6 +177,7 @@ func getServicesOpts(ic *plugin.InitContext) ([]containerd.ServicesOpt, error) {
 		}
 		opts = append(opts, fn(i))
 	}
+
 	return opts, nil
 }
 

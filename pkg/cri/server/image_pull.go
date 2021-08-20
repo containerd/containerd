@@ -30,7 +30,10 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/api/services/remotes/v1"
+	pullapi "github.com/containerd/containerd/api/services/remotes/v1"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/images"
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/log"
@@ -40,6 +43,7 @@ import (
 	"github.com/containerd/imgcrypt"
 	"github.com/containerd/imgcrypt/images/encryption"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -90,6 +94,12 @@ import (
 
 // PullImage pulls an image with authentication config.
 func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (*runtime.PullImageResponse, error) {
+	// TODO: schema1
+	// TODO: image labels
+	// TODO: encryption
+
+	isSchema1 := false
+
 	imageRef := r.GetImage().GetImage()
 	namedRef, err := distribution.ParseDockerRef(imageRef)
 	if err != nil {
@@ -99,46 +109,52 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	if ref != imageRef {
 		log.G(ctx).Debugf("PullImage using normalized image ref: %q", ref)
 	}
-	var (
-		resolver = docker.NewResolver(docker.ResolverOptions{
-			Headers: c.config.Registry.Headers,
-			Hosts:   c.registryHosts(ctx, r.GetAuth()),
-		})
-		isSchema1    bool
-		imageHandler containerdimages.HandlerFunc = func(_ context.Context,
-			desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
-			if desc.MediaType == containerdimages.MediaTypeDockerSchema1Manifest {
-				isSchema1 = true
-			}
-			return nil, nil
-		}
-	)
 
-	pullOpts := []containerd.RemoteOpt{
-		containerd.WithSchema1Conversion,
-		containerd.WithResolver(resolver),
-		containerd.WithPullSnapshotter(c.config.ContainerdConfig.Snapshotter),
-		containerd.WithPullUnpack,
-		containerd.WithPullLabel(imageLabelKey, imageLabelValue),
-		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
-		containerd.WithImageHandler(imageHandler),
-	}
+	auth := r.GetAuth()
 
-	pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
-	if !c.config.ContainerdConfig.DisableSnapshotAnnotations {
-		pullOpts = append(pullOpts,
-			containerd.WithImageHandlerWrapper(appendInfoHandlerWrapper(ref)))
-	}
-
-	if c.config.ContainerdConfig.DiscardUnpackedLayers {
-		// Allows GC to clean layers up from the content store after unpacking
-		pullOpts = append(pullOpts,
-			containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
-	}
-
-	image, err := c.client.Pull(ctx, ref, pullOpts...)
+	// TODO: This isn't exactly what we were doing before...
+	u, p, err := ParseAuth(auth, distribution.Domain(namedRef))
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to pull and unpack image %q", ref)
+		return nil, err
+	}
+
+	ch, err := c.client.PullService().Pull(ctx, &remotes.PullRequest{
+		Remote:         ref,
+		MaxConcurrency: int64(c.config.MaxConcurrentDownloads),
+		Unpack:         true,
+		Snapshotter:    c.config.ContainerdConfig.Snapshotter,
+		Auth: &pullapi.UserPassAuth{
+			Username: u,
+			Password: p,
+		},
+		DiscardContent: c.config.ContainerdConfig.DiscardUnpackedLayers,
+		// Labels:         map[string]string{imageLabelKey: imageLabelValue},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var image containerd.Image
+
+	for resp := range ch {
+		if resp.Err != nil {
+			return nil, err
+		}
+
+		if resp.PullResponse != nil && resp.Image != nil {
+			image = containerd.NewImage(c.client, images.Image{
+				Name:      resp.Image.Name,
+				Labels:    resp.Image.Labels,
+				CreatedAt: resp.Image.CreatedAt,
+				UpdatedAt: resp.Image.UpdatedAt,
+				Target: v1.Descriptor{
+					MediaType:   resp.Image.Target.MediaType,
+					Digest:      resp.Image.Target.Digest,
+					Size:        resp.Image.Target.Size_,
+					Annotations: resp.Image.Target.Annotations,
+				},
+			})
+		}
 	}
 
 	configDesc, err := image.Config(ctx)
