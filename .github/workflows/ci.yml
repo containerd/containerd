@@ -20,7 +20,7 @@ jobs:
 
     strategy:
       matrix:
-        go-version: [1.16.7]
+        go-version: [1.17]
         os: [ubuntu-18.04, macos-10.15, windows-2019]
 
     steps:
@@ -46,7 +46,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.7'
+          go-version: '1.17'
 
       - uses: actions/checkout@v2
         with:
@@ -78,7 +78,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.7'
+          go-version: '1.17'
 
       - uses: actions/checkout@v2
         with:
@@ -111,7 +111,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.7'
+          go-version: '1.17'
       - uses: actions/checkout@v2
       - run: go get github.com/cpuguy83/go-md2man/v2@v2.0.1
       - run: make man
@@ -145,7 +145,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.7'
+          go-version: '1.17'
       - uses: actions/checkout@v2
       - run: |
           set -e -x
@@ -202,7 +202,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-18.04, macos-10.15, windows-2019]
-        go-version: ['1.16.7']
+        go-version: ['1.17']
 
     steps:
       - uses: actions/setup-go@v2
@@ -231,7 +231,7 @@ jobs:
   integration-windows:
     name: Windows Integration
     runs-on: windows-2019
-    timeout-minutes: 30
+    timeout-minutes: 35
     needs: [project, linters, protos, man]
     env:
       GOTEST: gotestsum --
@@ -244,7 +244,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.7'
+          go-version: '1.17'
 
       - uses: actions/checkout@v2
         with:
@@ -306,7 +306,7 @@ jobs:
   integration-linux:
     name: Linux Integration
     runs-on: ubuntu-18.04
-    timeout-minutes: 30
+    timeout-minutes: 35
     needs: [project, linters, protos, man]
 
     strategy:
@@ -325,7 +325,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.7'
+          go-version: '1.17'
 
       - uses: actions/checkout@v2
 
@@ -444,7 +444,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.7'
+          go-version: '1.17'
       - uses: actions/checkout@v2
       - run: sudo -E PATH=$PATH script/setup/install-gotestsum
       - name: Tests
