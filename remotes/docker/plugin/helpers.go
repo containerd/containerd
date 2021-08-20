@@ -54,9 +54,34 @@ func imageToAPI(i images.Image) api.Image {
 
 // getServicesOpts get service options from plugin context.
 func getServicesOpts(ic *plugin.InitContext) ([]containerd.ServicesOpt, error) {
-	plugins, err := ic.GetByType(plugin.ServicePlugin)
+	cs, err := ic.GetByID(plugin.ServicePlugin, services.ContentService)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get service plugin")
+		return nil, err
+	}
+
+	is, err := ic.GetByID(plugin.ServicePlugin, services.ImagesService)
+	if err != nil {
+		return nil, err
+	}
+
+	ss, err := ic.GetByID(plugin.ServicePlugin, services.SnapshotsService)
+	if err != nil {
+		return nil, err
+	}
+
+	ds, err := ic.GetByID(plugin.ServicePlugin, services.DiffService)
+	if err != nil {
+		return nil, err
+	}
+
+	ns, err := ic.GetByID(plugin.ServicePlugin, services.NamespacesService)
+	if err != nil {
+		return nil, err
+	}
+
+	ls, err := ic.GetByID(plugin.ServicePlugin, services.LeasesService)
+	if err != nil {
+		return nil, err
 	}
 
 	ep, err := ic.Get(plugin.EventPlugin)
@@ -64,41 +89,13 @@ func getServicesOpts(ic *plugin.InitContext) ([]containerd.ServicesOpt, error) {
 		return nil, errors.Wrap(err, "failed to get event plugin")
 	}
 
-	opts := []containerd.ServicesOpt{
+	return []containerd.ServicesOpt{
 		containerd.WithEventService(ep.(containerd.EventService)),
-	}
-	for s, fn := range map[string]func(interface{}) containerd.ServicesOpt{
-		services.ContentService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithContentStore(s.(content.Store))
-		},
-		services.ImagesService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithImageClient(s.(imagesapi.ImagesClient))
-		},
-		services.SnapshotsService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithSnapshotters(s.(map[string]snapshots.Snapshotter))
-		},
-		services.DiffService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithDiffClient(s.(diff.DiffClient))
-		},
-		services.NamespacesService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithNamespaceClient(s.(namespaces.NamespacesClient))
-		},
-		services.LeasesService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithLeasesService(s.(leases.Manager))
-		},
-	} {
-		p := plugins[s]
-		if p == nil {
-			return nil, errors.Errorf("service %q not found", s)
-		}
-		i, err := p.Instance()
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get instance of service %q", s)
-		}
-		if i == nil {
-			return nil, errors.Errorf("instance of service %q not found", s)
-		}
-		opts = append(opts, fn(i))
-	}
-	return opts, nil
+		containerd.WithContentStore(cs.(content.Store)),
+		containerd.WithImageClient(is.(imagesapi.ImagesClient)),
+		containerd.WithSnapshotters(ss.(map[string]snapshots.Snapshotter)),
+		containerd.WithDiffClient(ds.(diff.DiffClient)),
+		containerd.WithNamespaceClient(ns.(namespaces.NamespacesClient)),
+		containerd.WithLeasesService(ls.(leases.Manager)),
+	}, nil
 }
