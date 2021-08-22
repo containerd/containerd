@@ -1,3 +1,4 @@
+//go:build !no_zfs
 // +build !no_zfs
 
 /*
