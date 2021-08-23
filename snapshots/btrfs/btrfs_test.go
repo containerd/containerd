@@ -24,7 +24,6 @@ import (
 	"context"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -37,6 +36,7 @@ import (
 	"github.com/containerd/containerd/snapshots/testsuite"
 	"github.com/containerd/continuity/testutil/loopback"
 	"github.com/pkg/errors"
+	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 )
 

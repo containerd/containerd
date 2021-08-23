@@ -25,12 +25,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 
 	blkdiscard "github.com/containerd/containerd/snapshots/devmapper/blkdiscard"
 	"github.com/pkg/errors"
+	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 )
 

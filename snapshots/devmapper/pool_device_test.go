@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -34,6 +33,7 @@ import (
 	"github.com/containerd/containerd/snapshots/devmapper/dmsetup"
 	"github.com/docker/go-units"
 	"github.com/sirupsen/logrus"
+	exec "golang.org/x/sys/execabs"
 	"gotest.tools/v3/assert"
 )
 

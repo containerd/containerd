@@ -19,13 +19,13 @@ package integration
 import (
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	exec "golang.org/x/sys/execabs"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 

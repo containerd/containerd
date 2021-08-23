@@ -26,17 +26,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	fuzz "github.com/AdaLogics/go-fuzz-headers"
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/sys"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
+
+	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/sys"
+	exec "golang.org/x/sys/execabs"
 )
 
 var (

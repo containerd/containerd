@@ -25,7 +25,6 @@ import (
 	"io"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -39,6 +38,7 @@ import (
 	runc "github.com/containerd/go-runc"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	exec "golang.org/x/sys/execabs"
 )
 
 const binaryIOProcTermTimeout = 12 * time.Second // Give logger process solid 10 seconds for cleanup

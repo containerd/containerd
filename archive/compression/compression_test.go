@@ -24,11 +24,12 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+
+	exec "golang.org/x/sys/execabs"
 )
 
 func TestMain(m *testing.M) {
