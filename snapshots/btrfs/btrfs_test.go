@@ -1,3 +1,4 @@
+//go:build linux && !no_btrfs && cgo
 // +build linux,!no_btrfs,cgo
 
 /*
