@@ -120,7 +120,6 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 	return &shim{
 		bundle: b.bundle,
 		client: client,
-		task:   task.NewTaskClient(client),
 	}, nil
 }
 
