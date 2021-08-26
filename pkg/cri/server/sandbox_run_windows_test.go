@@ -53,6 +53,7 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 		Entrypoint: []string{"/pause"},
 		Cmd:        []string{"forever"},
 		WorkingDir: "/workspace",
+		User:       "test-image-user",
 	}
 	specCheck := func(t *testing.T, id string, spec *runtimespec.Spec) {
 		assert.Equal(t, "test-hostname", spec.Hostname)
@@ -61,6 +62,13 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 		assert.Equal(t, []string{"/pause", "forever"}, spec.Process.Args)
 		assert.Equal(t, "/workspace", spec.Process.Cwd)
 		assert.EqualValues(t, *spec.Windows.Resources.CPU.Shares, opts.DefaultSandboxCPUshares)
+
+		// Also checks if override of the image configs user is behaving.
+		t.Logf("Check username")
+		assert.Contains(t, spec.Process.User.Username, "test-user")
+
+		t.Logf("Check credential spec")
+		assert.Contains(t, spec.Windows.CredentialSpec, "{\"test\": \"spec\"}")
 
 		t.Logf("Check PodSandbox annotations")
 		assert.Contains(t, spec.Annotations, annotations.SandboxID)
