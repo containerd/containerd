@@ -18,6 +18,7 @@ package v2
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -37,6 +38,7 @@ import (
 	"github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/ttrpc"
 	ptypes "github.com/gogo/protobuf/types"
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -202,6 +204,27 @@ func (s *shim) Close() error {
 	return s.client.Close()
 }
 
+func (s *shim) delete(ctx context.Context) error {
+	var (
+		result *multierror.Error
+	)
+
+	if err := s.Close(); err != nil {
+		result = multierror.Append(result, fmt.Errorf("failed to close ttrpc client: %w", err))
+	}
+
+	if err := s.client.UserOnCloseWait(ctx); err != nil {
+		result = multierror.Append(result, fmt.Errorf("close wait error: %w", err))
+	}
+
+	if err := s.bundle.Delete(); err != nil {
+		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete bundle")
+		result = multierror.Append(result, fmt.Errorf("failed to delete bundle: %w", err))
+	}
+
+	return result.ErrorOrNil()
+}
+
 var _ runtime.Task = &shimTask{}
 
 // shimTask wraps shim process and adds task service client for compatibility with existing shim manager.
@@ -267,20 +290,21 @@ func (s *shimTask) delete(ctx context.Context, removeTask func(ctx context.Conte
 	}
 
 	if err := s.waitShutdown(ctx); err != nil {
-		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim")
+		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim task")
 	}
-	s.Close()
-	s.client.UserOnCloseWait(ctx)
+
+	if err := s.shim.delete(ctx); err != nil {
+		log.G(ctx).WithField("id", s.ID()).WithError(err).Errorf("failed to delete shim")
+	}
 
 	// remove self from the runtime task list
 	// this seems dirty but it cleans up the API across runtimes, tasks, and the service
 	removeTask(ctx, s.ID())
-	if err := s.bundle.Delete(); err != nil {
-		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete bundle")
-	}
+
 	if shimErr != nil {
 		return nil, shimErr
 	}
+
 	return &runtime.Exit{
 		Status:    response.ExitStatus,
 		Timestamp: response.ExitedAt,

@@ -60,7 +60,7 @@ type binary struct {
 	bundle                 *Bundle
 }
 
-func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ *shimTask, err error) {
+func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ *shim, err error) {
 	args := []string{"-id", b.bundle.ID}
 	switch logrus.GetLevel() {
 	case logrus.DebugLevel, logrus.TraceLevel:
@@ -128,12 +128,9 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 		f.Close()
 	}
 	client := ttrpc.NewClient(conn, ttrpc.WithOnClose(onCloseWithShimLog))
-	return &shimTask{
-		shim: &shim{
-			bundle: b.bundle,
-			client: client,
-		},
-		task: task.NewTaskClient(client),
+	return &shim{
+		bundle: b.bundle,
+		client: client,
 	}, nil
 }
 
