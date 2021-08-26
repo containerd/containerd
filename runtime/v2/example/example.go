@@ -76,6 +76,11 @@ func (s *service) ResizePty(ctx context.Context, r *taskAPI.ResizePtyRequest) (*
 	return nil, errdefs.ErrNotImplemented
 }
 
+// PullImage on guest
+func (s *service) PullImage(ctx context.Context, r *taskAPI.PullImageRequest) (*ptypes.Empty, error) {
+	return nil, errdefs.ErrNotImplemented
+}
+
 // State returns runtime state of a process
 func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.StateResponse, error) {
 	return nil, errdefs.ErrNotImplemented
