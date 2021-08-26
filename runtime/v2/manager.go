@@ -92,6 +92,20 @@ func init() {
 			})
 		},
 	})
+
+	plugin.Register(&plugin.Registration{
+		Type: plugin.RuntimePluginV2,
+		ID:   "task",
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			shimInstance, err := ic.GetByID(plugin.RuntimePluginV2, "shim")
+			if err != nil {
+				return nil, err
+			}
+
+			shimManager := shimInstance.(*ShimManager)
+			return NewTaskManager(shimManager), nil
+		},
+	})
 }
 
 type ManagerConfig struct {
@@ -399,4 +413,41 @@ func parsePlatforms(platformStr []string) ([]ocispec.Platform, error) {
 		p[i] = parsed
 	}
 	return p, nil
+}
+
+// TaskManager wraps task service client on top of shim manager.
+type TaskManager struct {
+	shims *ShimManager
+}
+
+// NewTaskManager creates a new task manager instance.
+func NewTaskManager(shims *ShimManager) *TaskManager {
+	return &TaskManager{
+		shims: shims,
+	}
+}
+
+// ID of the task manager
+func (m *TaskManager) ID() string {
+	return fmt.Sprintf("%s.%s", plugin.RuntimePluginV2, "task")
+}
+
+// Create launches new shim instance and creates new task
+func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.CreateOpts) (runtime.Task, error) {
+	return m.shims.Create(ctx, taskID, opts)
+}
+
+// Get a specific task
+func (m *TaskManager) Get(ctx context.Context, id string) (runtime.Task, error) {
+	return m.shims.Get(ctx, id)
+}
+
+// Tasks lists all tasks
+func (m *TaskManager) Tasks(ctx context.Context, all bool) ([]runtime.Task, error) {
+	return m.shims.Tasks(ctx, all)
+}
+
+// Delete deletes the task and shim instance
+func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit, error) {
+	return m.shims.Delete(ctx, taskID)
 }
