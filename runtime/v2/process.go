@@ -29,7 +29,7 @@ import (
 
 type process struct {
 	id   string
-	shim *shim
+	shim *shimTask
 }
 
 func (p *process) ID() string {

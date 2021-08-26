@@ -111,7 +111,7 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 		store:      db.ContentStore(),
 		publisher:  ep.(events.Publisher),
 		monitor:    monitor.(runtime.TaskMonitor),
-		v2Runtime:  v2r.(*v2.TaskManager),
+		v2Runtime:  v2r.(*v2.ShimManager),
 	}
 	for _, r := range runtimes {
 		tasks, err := r.Tasks(ic.Context, true)
@@ -139,7 +139,7 @@ type local struct {
 	publisher  events.Publisher
 
 	monitor   runtime.TaskMonitor
-	v2Runtime *v2.TaskManager
+	v2Runtime *v2.ShimManager
 }
 
 func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.CallOption) (*api.CreateTaskResponse, error) {
