@@ -25,6 +25,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"reflect"
+	"runtime"
 	"testing"
 
 	. "github.com/containerd/containerd"
@@ -98,7 +99,8 @@ func TestImport(t *testing.T) {
 	empty := []byte("{}")
 	version := []byte("1.0")
 
-	c1, d2 := createConfig()
+	c1, d2 := createConfig(runtime.GOOS, runtime.GOARCH)
+	badConfig, _ := createConfig("foo", "lish")
 
 	m1, d3, expManifest := createManifest(c1, [][]byte{b1})
 
@@ -171,6 +173,17 @@ func TestImport(t *testing.T) {
 				checkImages(t, imgs[0].Target.Digest, imgs, names...)
 				checkManifest(ctx, t, imgs[0].Target, nil)
 			},
+		},
+		{
+			Name: "DockerV2.1-BadOSArch",
+			Writer: tartest.TarAll(
+				tc.Dir("bd765cd43e95212f7aa2cab51d0a", 0755),
+				tc.File("bd765cd43e95212f7aa2cab51d0a/json", empty, 0644),
+				tc.File("bd765cd43e95212f7aa2cab51d0a/layer.tar", b1, 0644),
+				tc.File("bd765cd43e95212f7aa2cab51d0a/VERSION", version, 0644),
+				tc.File("e95212f7aa2cab51d0abd765cd43.json", badConfig, 0644),
+				tc.File("manifest.json", []byte(`[{"Config":"e95212f7aa2cab51d0abd765cd43.json","RepoTags":["test-import:notlatest", "another/repo:tag"],"Layers":["bd765cd43e95212f7aa2cab51d0a/layer.tar"]}]`), 0644),
+			),
 		},
 		{
 			Name: "OCI-BadFormat",
@@ -302,10 +315,10 @@ func createContent(size int64, seed int64) ([]byte, digest.Digest) {
 	return b, digest.FromBytes(b)
 }
 
-func createConfig() ([]byte, digest.Digest) {
+func createConfig(osName, archName string) ([]byte, digest.Digest) {
 	image := ocispec.Image{
-		OS:           "any",
-		Architecture: "any",
+		OS:           osName,
+		Architecture: archName,
 		Author:       "test",
 	}
 	b, _ := json.Marshal(image)
