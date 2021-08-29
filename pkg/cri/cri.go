@@ -98,18 +98,18 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, errors.Wrap(err, "failed to create containerd client")
 	}
 
-	s, err := server.NewCRIService(&c, client)
+	manager, err := server.NewCRIManager(c, client)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create CRI service")
+		return nil, errors.Wrap(err, "failed to create CRI manager")
 	}
 
 	go func() {
-		if err := s.Run(); err != nil {
-			log.G(ctx).WithError(err).Fatal("Failed to run CRI service")
+		if err := manager.Run(); err != nil {
+			log.G(ctx).WithError(err).Fatal("Failed to run CRI manager")
 		}
 		// TODO(random-liu): Whether and how we can stop containerd.
 	}()
-	return s, nil
+	return manager, nil
 }
 
 // getServicesOpts get service options from plugin context.

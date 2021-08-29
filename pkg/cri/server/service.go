@@ -32,7 +32,6 @@ import (
 	cni "github.com/containerd/go-cni"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtime_alpha "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
@@ -112,8 +111,8 @@ type criService struct {
 	allCaps []string // nolint
 }
 
-// NewCRIService returns a new instance of CRIService
-func NewCRIService(config *criconfig.Config, client *containerd.Client) (CRIService, error) {
+// newCRIService returns a new instance of criService
+func newCRIService(config *criconfig.Config, client *containerd.Client) (*criService, error) {
 	var err error
 	labels := label.NewStore()
 	c := &criService{
@@ -160,21 +159,6 @@ func NewCRIService(config *criconfig.Config, client *containerd.Client) (CRIServ
 	}
 
 	return c, nil
-}
-
-// Register registers all required services onto a specific grpc server.
-// This is used by containerd cri plugin.
-func (c *criService) Register(s *grpc.Server) error {
-	return c.register(s)
-}
-
-// RegisterTCP register all required services onto a GRPC server on TCP.
-// This is used by containerd CRI plugin.
-func (c *criService) RegisterTCP(s *grpc.Server) error {
-	if !c.config.DisableTCPService {
-		return c.register(s)
-	}
-	return nil
 }
 
 // Run starts the CRI service.
@@ -279,16 +263,6 @@ func (c *criService) Close() error {
 	if err := c.streamServer.Stop(); err != nil {
 		return errors.Wrap(err, "failed to stop stream server")
 	}
-	return nil
-}
-
-func (c *criService) register(s *grpc.Server) error {
-	instrumented := newInstrumentedService(c)
-	runtime.RegisterRuntimeServiceServer(s, instrumented)
-	runtime.RegisterImageServiceServer(s, instrumented)
-	instrumentedAlpha := newInstrumentedAlphaService(c)
-	runtime_alpha.RegisterRuntimeServiceServer(s, instrumentedAlpha)
-	runtime_alpha.RegisterImageServiceServer(s, instrumentedAlpha)
 	return nil
 }
 
