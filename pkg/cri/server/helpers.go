@@ -333,7 +333,7 @@ func parseImageReferences(refs []string) ([]string, []string) {
 }
 
 // generateRuntimeOptions generates runtime options from cri plugin config.
-func generateRuntimeOptions(r criconfig.Runtime, c criconfig.Config) (interface{}, error) {
+func generateRuntimeOptions(r criconfig.Runtime, c *criconfig.Config) (interface{}, error) {
 	if r.Options == nil {
 		if r.Type != plugin.RuntimeLinuxV1 {
 			return nil, nil

@@ -30,7 +30,7 @@ import (
 
 // updateOCIResource updates container resource limit.
 func updateOCIResource(ctx context.Context, spec *runtimespec.Spec, r *runtime.UpdateContainerResourcesRequest,
-	config criconfig.Config) (*runtimespec.Spec, error) {
+	config *criconfig.Config) (*runtimespec.Spec, error) {
 
 	// Copy to make sure old spec is not changed.
 	var cloned runtimespec.Spec

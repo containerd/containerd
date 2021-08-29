@@ -97,7 +97,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, fmt.Errorf("failed to create containerd client: %w", err)
 	}
 
-	s, err := server.NewCRIService(c, client)
+	s, err := server.NewCRIService(&c, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRI service: %w", err)
 	}

@@ -218,7 +218,7 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 				DisableHugetlbController:         false,
 			},
 		}
-		got, err := updateOCIResource(context.Background(), test.spec, test.request, config)
+		got, err := updateOCIResource(context.Background(), test.spec, test.request, &config)
 		if test.expectErr {
 			assert.Error(t, err)
 		} else {

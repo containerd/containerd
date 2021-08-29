@@ -51,7 +51,7 @@ const (
 func newTestCRIService() *criService {
 	labels := label.NewStore()
 	return &criService{
-		config: criconfig.Config{
+		config: &criconfig.Config{
 			RootDir:  testRootDir,
 			StateDir: testStateDir,
 			PluginConfig: criconfig.PluginConfig{
