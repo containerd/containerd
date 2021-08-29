@@ -72,7 +72,7 @@ type CRIService interface {
 // criService implements CRIService.
 type criService struct {
 	// config contains all configurations.
-	config criconfig.Config
+	config *criconfig.Config
 	// imageFSPath is the path to image filesystem.
 	imageFSPath string
 	// os is an interface for all required os operations.
@@ -113,7 +113,7 @@ type criService struct {
 }
 
 // NewCRIService returns a new instance of CRIService
-func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIService, error) {
+func NewCRIService(config *criconfig.Config, client *containerd.Client) (CRIService, error) {
 	var err error
 	labels := label.NewStore()
 	c := &criService{
@@ -154,7 +154,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 	}
 
 	// Preload base OCI specs
-	c.baseOCISpecs, err = loadBaseOCISpecs(&config)
+	c.baseOCISpecs, err = loadBaseOCISpecs(config)
 	if err != nil {
 		return nil, err
 	}

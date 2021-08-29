@@ -287,7 +287,7 @@ systemd_cgroup = true
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			opts, err := generateRuntimeOptions(test.r, test.c)
+			opts, err := generateRuntimeOptions(test.r, &test.c)
 			assert.NoError(t, err)
 			assert.Equal(t, test.expectedOptions, opts)
 		})
