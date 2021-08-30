@@ -77,6 +77,8 @@ const (
 	GCPlugin Type = "io.containerd.gc.v1"
 	// EventPlugin implements event handling
 	EventPlugin Type = "io.containerd.event.v1"
+	// CRIServicePlugin implements cri needed service
+	CRIServicePlugin Type = "io.containerd.cri.service.v1"
 )
 
 const (
