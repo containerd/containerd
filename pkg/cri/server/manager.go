@@ -34,20 +34,27 @@ type criManager struct {
 	*cristore.Store
 	// config contains all configurations.
 	config *criconfig.Config
+	// services contains all cri plugins
+	services map[string]CRIPlugin
 	// default service
 	c *criService
 }
 
 // NewCRIManager returns a new instance of CRIService
-func NewCRIManager(config criconfig.Config, client *containerd.Client, store *cristore.Store) (CRIService, error) {
+func NewCRIManager(config criconfig.Config, client *containerd.Client, store *cristore.Store, services map[string]CRIPlugin) (CRIService, error) {
 	c, err := newCRIService(&config, client, store)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create CRI service")
 	}
+	for _, cri := range services {
+		cri.SetDelegate(c)
+		cri.SetConfig(&config)
+	}
 	cm := &criManager{
-		Store:  store,
-		config: &config,
-		c:      c,
+		Store:    store,
+		config:   &config,
+		c:        c,
+		services: services,
 	}
 	return cm, nil
 }
