@@ -32,9 +32,10 @@ const (
 )
 
 var (
-	testImage    = "ghcr.io/containerd/busybox:1.32"
-	shortCommand = withProcessArgs("true")
-	longCommand  = withProcessArgs("/bin/sh", "-c", "while true; do sleep 1; done")
+	testImage             = "ghcr.io/containerd/busybox:1.32"
+	testMultiLayeredImage = "gcr.io/k8s-cri-containerd/volume-copy-up:2.1"
+	shortCommand          = withProcessArgs("true")
+	longCommand           = withProcessArgs("/bin/sh", "-c", "while true; do sleep 1; done")
 )
 
 func TestImagePullSchema1WithEmptyLayers(t *testing.T) {
