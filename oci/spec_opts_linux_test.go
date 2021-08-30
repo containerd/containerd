@@ -160,6 +160,37 @@ func TestGetDevices(t *testing.T) {
 			}
 		})
 	})
+	t.Run("two devices", func(t *testing.T) {
+		nullDev := filepath.Join(dir, "null")
+		if err := ioutil.WriteFile(nullDev, nil, 0600); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := unix.Mount("/dev/null", nullDev, "", unix.MS_BIND, ""); err != nil {
+			t.Fatal(err)
+		}
+		defer unix.Unmount(filepath.Join(dir, "null"), unix.MNT_DETACH)
+		devices, err := getDevices(dir, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(devices) != 2 {
+			t.Fatalf("expected two devices %v", devices)
+		}
+		if devices[0].Path == devices[1].Path {
+			t.Fatalf("got same path for the two devices %s", devices[0].Path)
+		}
+		if devices[0].Path != zero && devices[0].Path != nullDev {
+			t.Fatalf("got unexpected device path %s", devices[0].Path)
+		}
+		if devices[1].Path != zero && devices[1].Path != nullDev {
+			t.Fatalf("got unexpected device path %s", devices[1].Path)
+		}
+		if devices[0].Major == devices[1].Major && devices[0].Minor == devices[1].Minor {
+			t.Fatalf("got sema mojor and minor on two devices %s %s", devices[0].Path, devices[1].Path)
+		}
+	})
 	t.Run("With symlink in dir", func(t *testing.T) {
 		if err := os.Symlink("/dev/zero", filepath.Join(dir, "zerosym")); err != nil {
 			t.Fatal(err)
