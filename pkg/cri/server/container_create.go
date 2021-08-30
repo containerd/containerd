@@ -71,7 +71,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, errors.New("container config must include metadata")
 	}
 	containerName := metadata.Name
-	name := makeContainerName(metadata, sandboxConfig.GetMetadata())
+	name := MakeContainerName(metadata, sandboxConfig.GetMetadata())
 	log.G(ctx).Debugf("Generated id %q for container %q", id, name)
 	if err = c.ContainerNameIndex.Reserve(name, id); err != nil {
 		return nil, errors.Wrapf(err, "failed to reserve container name %q", name)
@@ -164,7 +164,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	meta.ProcessLabel = spec.Process.SelinuxLabel
 
 	// handle any KVM based runtime
-	if err := modifyProcessLabel(ociRuntime.Type, spec); err != nil {
+	if err := ModifyProcessLabel(ociRuntime.Type, spec); err != nil {
 		return nil, err
 	}
 
@@ -230,9 +230,9 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, errors.Wrap(err, "failed to get container spec opts")
 	}
 
-	containerLabels := buildLabels(config.Labels, containerKindContainer)
+	containerLabels := BuildLabels(config.Labels, containerKindContainer)
 
-	runtimeOptions, err := getRuntimeOptions(sandboxInfo)
+	runtimeOptions, err := GetRuntimeOptions(sandboxInfo)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get runtime options")
 	}
@@ -290,7 +290,7 @@ func (c *criService) volumeMounts(containerRootDir string, criMounts []*runtime.
 	}
 	var mounts []*runtime.Mount
 	for dst := range config.Volumes {
-		if isInCRIMounts(dst, criMounts) {
+		if IsInCRIMounts(dst, criMounts) {
 			// Skip the image volume, if there is CRI defined volume mapping.
 			// TODO(random-liu): This should be handled by Kubelet in the future.
 			// Kubelet should decide what to use for image volume, and also de-duplicate

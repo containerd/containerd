@@ -39,6 +39,6 @@ func ensureRemoveAll(ctx context.Context, dir string) error {
 	return os.RemoveAll(dir)
 }
 
-func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
+func ModifyProcessLabel(runtimeType string, spec *specs.Spec) error {
 	return nil
 }

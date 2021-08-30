@@ -293,7 +293,7 @@ func (cm *criManager) PullImage(ctx context.Context, r *runtime.PullImageRequest
 	if r.GetSandboxConfig() == nil || r.GetSandboxConfig().GetMetadata() == nil {
 		return cm.c.PullImage(ctx, r)
 	}
-	key := cm.SandboxNameIndex.GetKeyByName(makeSandboxName(r.GetSandboxConfig().GetMetadata()))
+	key := cm.SandboxNameIndex.GetKeyByName(MakeSandboxName(r.GetSandboxConfig().GetMetadata()))
 	if len(key) == 0 {
 		return cm.c.PullImage(ctx, r)
 	}

@@ -56,7 +56,7 @@ func TestGetCgroupsPath(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		got := getCgroupsPath(test.cgroupsParent, testID)
+		got := GetCgroupsPath(test.cgroupsParent, testID)
 		assert.Equal(t, test.expected, got)
 	}
 }

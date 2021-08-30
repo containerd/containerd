@@ -166,7 +166,7 @@ func toCRIContainerInfo(ctx context.Context, container containerstore.Container,
 	ci.SnapshotKey = ctrInfo.SnapshotKey
 	ci.Snapshotter = ctrInfo.Snapshotter
 
-	runtimeOptions, err := getRuntimeOptions(ctrInfo)
+	runtimeOptions, err := GetRuntimeOptions(ctrInfo)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get runtime options")
 	}

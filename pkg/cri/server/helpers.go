@@ -92,9 +92,9 @@ const (
 	runtimeRunhcsV1 = "io.containerd.runhcs.v1"
 )
 
-// makeSandboxName generates sandbox name from sandbox metadata. The name
+// MakeSandboxName generates sandbox name from sandbox metadata. The name
 // generated is unique as long as sandbox metadata is unique.
-func makeSandboxName(s *runtime.PodSandboxMetadata) string {
+func MakeSandboxName(s *runtime.PodSandboxMetadata) string {
 	return strings.Join([]string{
 		s.Name,                       // 0
 		s.Namespace,                  // 1
@@ -103,10 +103,10 @@ func makeSandboxName(s *runtime.PodSandboxMetadata) string {
 	}, nameDelimiter)
 }
 
-// makeContainerName generates container name from sandbox and container metadata.
+// MakeContainerName generates container name from sandbox and container metadata.
 // The name generated is unique as long as the sandbox container combination is
 // unique.
-func makeContainerName(c *runtime.ContainerMetadata, s *runtime.PodSandboxMetadata) string {
+func MakeContainerName(c *runtime.ContainerMetadata, s *runtime.PodSandboxMetadata) string {
 	return strings.Join([]string{
 		c.Name,                       // 0
 		s.Name,                       // 1: pod name
@@ -266,8 +266,8 @@ func (c *criService) validateTargetContainer(sandboxID, targetContainerID string
 	return targetContainer, nil
 }
 
-// isInCRIMounts checks whether a destination is in CRI mount list.
-func isInCRIMounts(dst string, mounts []*runtime.Mount) bool {
+// IsInCRIMounts checks whether a destination is in CRI mount list.
+func IsInCRIMounts(dst string, mounts []*runtime.Mount) bool {
 	for _, m := range mounts {
 		if filepath.Clean(m.ContainerPath) == filepath.Clean(dst) {
 			return true
@@ -283,7 +283,7 @@ func filterLabel(k, v string) string {
 }
 
 // buildLabel builds the labels from config to be passed to containerd
-func buildLabels(configLabels map[string]string, containerType string) map[string]string {
+func BuildLabels(configLabels map[string]string, containerType string) map[string]string {
 	labels := make(map[string]string)
 	for k, v := range configLabels {
 		labels[k] = v
@@ -337,15 +337,15 @@ func generateRuntimeOptions(r criconfig.Runtime, c *criconfig.Config) (interface
 	if err != nil {
 		return nil, err
 	}
-	options := getRuntimeOptionsType(r.Type)
+	options := GetRuntimeOptionsType(r.Type)
 	if err := optionsTree.Unmarshal(options); err != nil {
 		return nil, err
 	}
 	return options, nil
 }
 
-// getRuntimeOptionsType gets empty runtime options by the runtime type name.
-func getRuntimeOptionsType(t string) interface{} {
+// GetRuntimeOptionsType gets empty runtime options by the runtime type name.
+func GetRuntimeOptionsType(t string) interface{} {
 	switch t {
 	case plugin.RuntimeRuncV1:
 		fallthrough
@@ -360,8 +360,8 @@ func getRuntimeOptionsType(t string) interface{} {
 	}
 }
 
-// getRuntimeOptions get runtime options from container metadata.
-func getRuntimeOptions(c containers.Container) (interface{}, error) {
+// GetRuntimeOptions get runtime options from container metadata.
+func GetRuntimeOptions(c containers.Container) (interface{}, error) {
 	if c.Runtime.Options == nil {
 		return nil, nil
 	}
@@ -398,9 +398,9 @@ func unknownSandboxStatus() sandboxstore.Status {
 	}
 }
 
-// getPassthroughAnnotations filters requested pod annotations by comparing
+// GetPassthroughAnnotations filters requested pod annotations by comparing
 // against permitted annotations for the given runtime.
-func getPassthroughAnnotations(podAnnotations map[string]string,
+func GetPassthroughAnnotations(podAnnotations map[string]string,
 	runtimePodAnnotations []string) (passthroughAnnotations map[string]string) {
 	passthroughAnnotations = make(map[string]string)
 
