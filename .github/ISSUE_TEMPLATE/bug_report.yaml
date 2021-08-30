@@ -10,8 +10,9 @@ body:
         repository. If there is a duplicate, please close your issue and add a comment
         to the existing issue instead.
 
-        Tips:
+        Please have a look on the following tips before opening the issue:
 
+        <details>
         * If containerd gets stuck on something and enables debug socket, `ctr pprof goroutines`
           dumps the golang stack of containerd, which is helpful! If containerd runs
           without debug socket, `kill -SIGUSR1 $(pidof containerd)` also dumps the stack
@@ -20,6 +21,9 @@ body:
         * If there is something about running containerd, like consuming more CPU resources,
           `ctr pprof` subcommands will help you to get some useful profiles. Enable debug
           socket makes life easier.
+
+        * `ctr` can't be used for testing CRI configs, as it does not use CRI API.
+        </details>
 
   - type: textarea
     attributes:
@@ -57,9 +61,10 @@ body:
         runc version, CRI configuration, OS/Kernel version, etc.
         Use the following commands:
         $ runc --version
-        $ crictl info
+        $ crictl info (if you use Kubernetes)
         $ uname -a
 
   - type: textarea
     attributes:
       label: Show configuration if it is related to CRI plugin.
+      placeholder: $ cat /etc/containerd/config.toml
