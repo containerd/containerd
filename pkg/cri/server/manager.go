@@ -72,6 +72,11 @@ func (cm *criManager) Run() error {
 	return cm.c.Run()
 }
 
+// implement CRIPlugin Initialized interface
+func (cm *criManager) Initialized() bool {
+	return cm.c.Initialized()
+}
+
 // Close stops the CRI service.
 func (cm *criManager) Close() error {
 	return cm.c.Close()

@@ -33,7 +33,7 @@ type instrumentedService struct {
 	c *criManager
 }
 
-func newInstrumentedService(c *criManager) grpcServices {
+func newInstrumentedService(c *criManager) GrpcServices {
 	return &instrumentedService{c: c}
 }
 
@@ -51,7 +51,7 @@ func newInstrumentedAlphaService(c *criManager) grpcAlphaServices {
 // initialized.
 // NOTE(random-liu): All following functions MUST check initialized at the beginning.
 func (in *instrumentedService) checkInitialized() error {
-	if in.c.c.initialized.IsSet() {
+	if in.c.Initialized() {
 		return nil
 	}
 	return errors.New("server is not initialized yet")
@@ -62,7 +62,7 @@ func (in *instrumentedService) checkInitialized() error {
 // initialized.
 // NOTE(random-liu): All following functions MUST check initialized at the beginning.
 func (in *instrumentedAlphaService) checkInitialized() error {
-	if in.c.c.initialized.IsSet() {
+	if in.c.Initialized() {
 		return nil
 	}
 	return errors.New("server is not initialized yet")
