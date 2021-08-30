@@ -78,6 +78,8 @@ const (
 	EventPlugin Type = "io.containerd.event.v1"
 	// TracingProcessorPlugin implements a open telemetry span processor
 	TracingProcessorPlugin Type = "io.containerd.tracing.processor.v1"
+	// CRIServicePlugin implements cri needed service
+	CRIServicePlugin Type = "io.containerd.cri.service.v1"
 )
 
 const (

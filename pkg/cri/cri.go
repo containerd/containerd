@@ -42,6 +42,7 @@ import (
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/pkg/cri/server"
+	cristore "github.com/containerd/containerd/pkg/cri/store/service"
 )
 
 // Register CRI service plugin
@@ -53,7 +54,7 @@ func init() {
 		Config: &config,
 		Requires: []plugin.Type{
 			plugin.EventPlugin,
-			plugin.ServicePlugin,
+			plugin.CRIServicePlugin,
 		},
 		InitFn: initCRIService,
 	})
@@ -85,6 +86,10 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get services: %w", err)
 	}
+	criStore, err := getCRIStore(ic)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get CRI store services: %w", err)
+	}
 
 	log.G(ctx).Info("Connect containerd service")
 	client, err := containerd.New(
@@ -97,7 +102,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, fmt.Errorf("failed to create containerd client: %w", err)
 	}
 
-	manager, err := server.NewCRIManager(c, client)
+	manager, err := server.NewCRIManager(c, client, criStore)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRI service: %w", err)
 	}
@@ -169,6 +174,22 @@ func getServicesOpts(ic *plugin.InitContext) ([]containerd.ServicesOpt, error) {
 		opts = append(opts, fn(i))
 	}
 	return opts, nil
+}
+
+func getCRIStore(ic *plugin.InitContext) (*cristore.Store, error) {
+	plugins, err := ic.GetByType(plugin.CRIServicePlugin)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cri store: %w", err)
+	}
+	p := plugins[cristore.CRIStoreService]
+	if p == nil {
+		return nil, fmt.Errorf("cri service store not found")
+	}
+	i, err := p.Instance()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get instance of cri service store: %w", err)
+	}
+	return i.(*cristore.Store), nil
 }
 
 // Set glog level.

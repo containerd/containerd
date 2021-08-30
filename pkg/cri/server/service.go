@@ -36,18 +36,12 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtime_alpha "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	"github.com/containerd/containerd/pkg/cri/store/label"
-
 	"github.com/containerd/containerd/pkg/atomic"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	cristore "github.com/containerd/containerd/pkg/cri/store/service"
 	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	osinterface "github.com/containerd/containerd/pkg/os"
-	"github.com/containerd/containerd/pkg/registrar"
 )
 
 // defaultNetworkPlugin is used for the default CNI configuration
@@ -107,23 +101,16 @@ type criService struct {
 }
 
 // newCRIService returns a new instance of criService
-func newCRIService(config *criconfig.Config, client *containerd.Client) (*criService, error) {
+func newCRIService(config *criconfig.Config, client *containerd.Client, store *cristore.Store) (*criService, error) {
 	var err error
-	labels := label.NewStore()
 	c := &criService{
+		Store:         store,
 		config:        config,
 		client:        client,
 		os:            osinterface.RealOS{},
 		snapshotStore: snapshotstore.NewStore(),
-		Store: &cristore.Store{
-			SandboxStore:       sandboxstore.NewStore(labels),
-			ContainerStore:     containerstore.NewStore(labels),
-			ImageStore:         imagestore.NewStore(client),
-			SandboxNameIndex:   registrar.NewRegistrar(),
-			ContainerNameIndex: registrar.NewRegistrar(),
-		},
-		initialized: atomic.NewBool(false),
-		netPlugin:   make(map[string]cni.CNI),
+		netPlugin:     make(map[string]cni.CNI),
+		initialized:   atomic.NewBool(false),
 	}
 
 	if client.SnapshotService(c.config.ContainerdConfig.Snapshotter) == nil {

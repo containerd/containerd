@@ -26,9 +26,12 @@ import (
 	runtime_alpha "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
+	cristore "github.com/containerd/containerd/pkg/cri/store/service"
 )
 
 type criManager struct {
+	// stores all resources associated with cri
+	*cristore.Store
 	// config contains all configurations.
 	config *criconfig.Config
 	// default service
@@ -36,12 +39,13 @@ type criManager struct {
 }
 
 // NewCRIManager returns a new instance of CRIService
-func NewCRIManager(config criconfig.Config, client *containerd.Client) (CRIService, error) {
-	c, err := newCRIService(&config, client)
+func NewCRIManager(config criconfig.Config, client *containerd.Client, store *cristore.Store) (CRIService, error) {
+	c, err := newCRIService(&config, client, store)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create CRI service")
 	}
 	cm := &criManager{
+		Store:  store,
 		config: &config,
 		c:      c,
 	}
