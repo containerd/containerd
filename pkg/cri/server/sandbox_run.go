@@ -54,6 +54,15 @@ func init() {
 		"github.com/containerd/cri/pkg/store/sandbox", "Metadata")
 }
 
+func (c *criService) getCRIHandlerByRuntime(runtime string) string {
+	if r, ok := c.config.ContainerdConfig.Runtimes[runtime]; ok {
+		if len(r.CRIHandler) != 0 {
+			return r.CRIHandler
+		}
+	}
+	return criconfig.DefaultCRIHandler
+}
+
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 // the sandbox is in ready state.
 func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandboxRequest) (_ *runtime.RunPodSandboxResponse, retErr error) {
@@ -107,6 +116,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get sandbox runtime")
 	}
+	sandbox.Metadata.CRIHandler = c.getCRIHandlerByRuntime(r.GetRuntimeHandler())
+
 	log.G(ctx).Debugf("Use OCI %+v for sandbox %q", ociRuntime, id)
 
 	podNetwork := true
