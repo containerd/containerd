@@ -17,12 +17,35 @@
 package platforms
 
 import (
+	"fmt"
+	"reflect"
+	"runtime"
 	"sort"
 	"testing"
 
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/sys/windows"
 )
+
+func TestDefault(t *testing.T) {
+	major, minor, build := windows.RtlGetNtVersionNumbers()
+	expected := imagespec.Platform{
+		OS:           runtime.GOOS,
+		Architecture: runtime.GOARCH,
+		OSVersion:    fmt.Sprintf("%d.%d.%d", major, minor, build),
+		Variant:      cpuVariant(),
+	}
+	p := DefaultSpec()
+	if !reflect.DeepEqual(p, expected) {
+		t.Fatalf("default platform not as expected: %#v != %#v", p, expected)
+	}
+
+	s := DefaultString()
+	if s != Format(p) {
+		t.Fatalf("default specifier should match formatted default spec: %v != %v", s, p)
+	}
+}
 
 func TestMatchComparerMatch(t *testing.T) {
 	m := matchComparer{
@@ -36,6 +59,10 @@ func TestMatchComparerMatch(t *testing.T) {
 		platform imagespec.Platform
 		match    bool
 	}{
+		{
+			platform: DefaultSpec(),
+			match:    true,
+		},
 		{
 			platform: imagespec.Platform{
 				Architecture: "amd64",
