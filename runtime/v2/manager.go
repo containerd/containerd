@@ -95,8 +95,11 @@ func init() {
 	})
 
 	plugin.Register(&plugin.Registration{
-		Type: plugin.RuntimePluginV2,
+		Type: plugin.RuntimePluginV2Service,
 		ID:   "task",
+		Requires: []plugin.Type{
+			plugin.RuntimePluginV2,
+		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			shimInstance, err := ic.GetByID(plugin.RuntimePluginV2, "shim")
 			if err != nil {
@@ -417,7 +420,7 @@ func NewTaskManager(shims *ShimManager) *TaskManager {
 
 // ID of the task manager
 func (m *TaskManager) ID() string {
-	return fmt.Sprintf("%s.%s", plugin.RuntimePluginV2, "task")
+	return fmt.Sprintf("%s.%s", plugin.RuntimePluginV2Service, "task")
 }
 
 // Create launches new shim instance and creates new task
