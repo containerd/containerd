@@ -20,6 +20,8 @@ import (
 	"context"
 
 	"github.com/containerd/containerd/plugin"
+	v2 "github.com/containerd/containerd/runtime/v2"
+	"github.com/containerd/containerd/runtime/v2/task"
 	"github.com/pkg/errors"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -34,6 +36,7 @@ func init() {
 		ID:   "cc",
 		Requires: []plugin.Type{
 			plugin.CRIServicePlugin,
+			plugin.RuntimePluginV2,
 		},
 		InitFn: initCRICCService,
 	})
@@ -44,10 +47,26 @@ func initCRICCService(ic *plugin.InitContext) (interface{}, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get CRI store services")
 	}
+	v2r, err := ic.Get(plugin.RuntimePluginV2)
+	if err != nil {
+		return nil, err
+	}
 	cc := &ccService{
-		Store: criStore,
+		Store:     criStore,
+		v2Runtime: v2r.(*v2.TaskManager),
 	}
 	return cc, nil
+}
+
+type ccService struct {
+	// stores all resources associated with CRI
+	*cristore.Store
+	// config contains all configurations.
+	config *criconfig.Config
+	// default CRI implemention
+	delegate server.GrpcServices
+	// TODO: Implemented with shim Service
+	v2Runtime *v2.TaskManager
 }
 
 func getCRIStore(ic *plugin.InitContext) (*cristore.Store, error) {
@@ -64,15 +83,6 @@ func getCRIStore(ic *plugin.InitContext) (*cristore.Store, error) {
 		return nil, errors.Wrapf(err, "failed to get instance of cri service store")
 	}
 	return i.(*cristore.Store), nil
-}
-
-type ccService struct {
-	// stores all resources associated with cri
-	*cristore.Store
-	// config contains all configurations.
-	config *criconfig.Config
-	// default cir implemention
-	delegate server.GrpcServices
 }
 
 func (cc *ccService) SetDelegate(delegate server.GrpcServices) {
@@ -163,7 +173,113 @@ func (cc *ccService) UpdateContainerResources(ctx context.Context, r *runtime.Up
 }
 
 func (cc *ccService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (*runtime.PullImageResponse, error) {
-	return cc.delegate.PullImage(ctx, r)
+	name := server.MakeSandboxName(r.SandboxConfig.GetMetadata())
+	sandboxID := cc.SandboxNameIndex.GetKeyByName(name)
+
+	req := &task.PullImageRequest{}
+	if r.Image != nil {
+		req.Image = &task.ImageSpec{
+			Image:       r.Image.Image,
+			Annotations: r.Image.Annotations,
+		}
+	}
+	if r.Auth != nil {
+		req.Auth = &task.AuthConfig{
+			Username:      r.Auth.Username,
+			Password:      r.Auth.Password,
+			Auth:          r.Auth.Auth,
+			ServerAddress: r.Auth.ServerAddress,
+			IdentityToken: r.Auth.IdentityToken,
+			RegistryToken: r.Auth.RegistryToken,
+		}
+	}
+	if r.SandboxConfig != nil {
+		req.SandboxConfig = &task.PodSandboxConfig{
+			Hostname:     r.SandboxConfig.Hostname,
+			LogDirectory: r.SandboxConfig.LogDirectory,
+			Labels:       r.SandboxConfig.Labels,
+			Annotations:  r.SandboxConfig.Annotations,
+		}
+		portMappings := []*task.PortMapping{}
+		for _, pm := range r.SandboxConfig.PortMappings {
+			portMappings = append(portMappings, &task.PortMapping{
+				Protocol:      task.Protocol(pm.Protocol),
+				ContainerPort: pm.ContainerPort,
+				HostPort:      pm.HostPort,
+				HostIp:        pm.HostIp,
+			})
+		}
+		req.SandboxConfig.PortMappings = portMappings
+		if r.SandboxConfig.Metadata != nil {
+			req.SandboxConfig.Metadata = &task.PodSandboxMetadata{
+				Name:      r.SandboxConfig.Metadata.Name,
+				Uid:       r.SandboxConfig.Metadata.Uid,
+				Namespace: r.SandboxConfig.Metadata.Namespace,
+				Attempt:   r.SandboxConfig.Metadata.Attempt,
+			}
+		}
+		if r.SandboxConfig.Linux != nil {
+			req.SandboxConfig.Linux = &task.LinuxPodSandboxConfig{
+				CgroupParent: r.SandboxConfig.Linux.CgroupParent,
+				Sysctls:      r.SandboxConfig.Linux.Sysctls,
+			}
+			if r.SandboxConfig.Linux.SecurityContext != nil {
+				req.SandboxConfig.Linux.SecurityContext = &task.LinuxSandboxSecurityContext{
+					ReadonlyRootfs:     r.SandboxConfig.Linux.SecurityContext.ReadonlyRootfs,
+					SupplementalGroups: r.SandboxConfig.Linux.SecurityContext.SupplementalGroups,
+					Privileged:         r.SandboxConfig.Linux.SecurityContext.Privileged,
+					SeccompProfilePath: r.SandboxConfig.Linux.SecurityContext.SeccompProfilePath,
+				}
+				if r.SandboxConfig.Linux.SecurityContext.NamespaceOptions != nil {
+					req.SandboxConfig.Linux.SecurityContext.NamespaceOptions = &task.NamespaceOption{
+						Network:  task.NamespaceMode(r.SandboxConfig.Linux.SecurityContext.NamespaceOptions.Network),
+						Pid:      task.NamespaceMode(r.SandboxConfig.Linux.SecurityContext.NamespaceOptions.Pid),
+						Ipc:      task.NamespaceMode(r.SandboxConfig.Linux.SecurityContext.NamespaceOptions.Ipc),
+						TargetId: r.SandboxConfig.Linux.SecurityContext.NamespaceOptions.TargetId,
+					}
+				}
+				if r.SandboxConfig.Linux.SecurityContext.SelinuxOptions != nil {
+					req.SandboxConfig.Linux.SecurityContext.SelinuxOptions = &task.SELinuxOption{
+						User:  r.SandboxConfig.Linux.SecurityContext.SelinuxOptions.User,
+						Role:  r.SandboxConfig.Linux.SecurityContext.SelinuxOptions.Role,
+						Type:  r.SandboxConfig.Linux.SecurityContext.SelinuxOptions.Type,
+						Level: r.SandboxConfig.Linux.SecurityContext.SelinuxOptions.Level,
+					}
+				}
+				if r.SandboxConfig.Linux.SecurityContext.RunAsUser != nil {
+					req.SandboxConfig.Linux.SecurityContext.RunAsUser = &task.Int64Value{
+						Value: r.SandboxConfig.Linux.SecurityContext.RunAsUser.Value,
+					}
+				}
+				if r.SandboxConfig.Linux.SecurityContext.RunAsGroup != nil {
+					req.SandboxConfig.Linux.SecurityContext.RunAsGroup = &task.Int64Value{
+						Value: r.SandboxConfig.Linux.SecurityContext.RunAsGroup.Value,
+					}
+				}
+
+				if r.SandboxConfig.Linux.SecurityContext.Seccomp != nil {
+					req.SandboxConfig.Linux.SecurityContext.Seccomp = &task.SecurityProfile{
+						ProfileType:  task.SecurityProfile_ProfileType(r.SandboxConfig.Linux.SecurityContext.Seccomp.ProfileType),
+						LocalhostRef: r.SandboxConfig.Linux.SecurityContext.Seccomp.LocalhostRef,
+					}
+				}
+				if r.SandboxConfig.Linux.SecurityContext.Apparmor != nil {
+					req.SandboxConfig.Linux.SecurityContext.Apparmor = &task.SecurityProfile{
+						ProfileType:  task.SecurityProfile_ProfileType(r.SandboxConfig.Linux.SecurityContext.Apparmor.ProfileType),
+						LocalhostRef: r.SandboxConfig.Linux.SecurityContext.Apparmor.LocalhostRef,
+					}
+				}
+			}
+		}
+	}
+	resp, err := cc.v2Runtime.PullImage(ctx, sandboxID, req)
+	if resp != nil {
+		ret := &runtime.PullImageResponse{
+			ImageRef: resp.ImageRef,
+		}
+		return ret, err
+	}
+	return nil, err
 }
 
 func (cc *ccService) ListImages(ctx context.Context, r *runtime.ListImagesRequest) (*runtime.ListImagesResponse, error) {
