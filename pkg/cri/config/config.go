@@ -67,6 +67,10 @@ type Runtime struct {
 	// be loaded from the cni config directory by go-cni. Set the value to 0 to
 	// load all config files (no arbitrary limit). The legacy default value is 1.
 	NetworkPluginMaxConfNum int `toml:"cni_max_conf_num" json:"cniMaxConfNum"`
+	// CRIHandler control cri specific implementations.
+	// e.g. The "vm" is the mode used by the vm based runtime,
+	// the "cc" is the mode used by the confidential computing.
+	CRIHandler string `toml:"cri_handler" json:"cri_handler"`
 }
 
 // ContainerdConfig contains toml config related to containerd
@@ -335,6 +339,8 @@ const (
 	// KeyModelNode is the key model where key for encrypted images reside
 	// on the worker nodes
 	KeyModelNode = "node"
+	// CriDefaultHandler is the default runtime mode
+	DefaultCRIHandler = "default"
 )
 
 // ValidatePluginConfig validates the given plugin configuration.

@@ -63,6 +63,8 @@ type Metadata struct {
 	CNIResult *cni.Result
 	// ProcessLabel is the SELinux process label for the container
 	ProcessLabel string
+	// CRIHandler control cri specific implementations.
+	CRIHandler string
 }
 
 // MarshalJSON encodes Metadata into bytes in json format.
