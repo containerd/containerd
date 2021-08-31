@@ -61,6 +61,6 @@
     # TODO This needs to be removed once we have consistent concurrent pull results
     - name: "Pre-pull pause container image"
       shell: |
-        /usr/local/bin/ctr pull k8s.gcr.io/pause:3.5
+        /usr/local/bin/ctr pull k8s.gcr.io/pause:3.6
         /usr/local/bin/crictl --runtime-endpoint unix:///run/containerd/containerd.sock \
-        pull k8s.gcr.io/pause:3.5
+        pull k8s.gcr.io/pause:3.6
