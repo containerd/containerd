@@ -59,26 +59,26 @@ command. With the load command you inject a container image into the container
 runtime from a file. First you need to create a container image tarball. For
 example to create an image tarball for a pause container using Docker:
 ```console
-$ docker pull k8s.gcr.io/pause:3.5
-  3.5: Pulling from pause
-  019d8da33d91: Pull complete
-  Digest: sha256:1ff6c18fbef2045af6b9c16bf034cc421a29027b800e4f9b68ae9b1cb3e9ae07
-  Status: Downloaded newer image for k8s.gcr.io/pause:3.5
-  k8s.gcr.io/pause:3.5
-$ docker save k8s.gcr.io/pause:3.5 -o pause.tar
+$ docker pull k8s.gcr.io/pause:3.6
+  3.6: Pulling from pause
+  fbe1a72f5dcd: Pull complete
+  Digest: sha256:3d380ca8864549e74af4b29c10f9cb0956236dfb01c40ca076fb6c37253234db
+  Status: Downloaded newer image for k8s.gcr.io/pause:3.6
+  k8s.gcr.io/pause:3.6
+$ docker save k8s.gcr.io/pause:3.6 -o pause.tar
 ```
 Then use `ctr` to load the container image into the container runtime:
 ```console
 # The cri plugin uses the "k8s.io" containerd namespace.
 $ sudo ctr -n=k8s.io images import pause.tar
-  Loaded image: k8s.gcr.io/pause:3.5
+  Loaded image: k8s.gcr.io/pause:3.6
 ```
 List images and inspect the pause image:
 ```console
 $ sudo crictl images
 IMAGE                       TAG                 IMAGE ID            SIZE
 docker.io/library/busybox   latest              f6e427c148a76       728kB
-k8s.gcr.io/pause            3.5                 ed210e3e4a5ba       683kB
+k8s.gcr.io/pause            3.6                 ed210e3e4a5ba       683kB
 $ sudo crictl inspecti ed210e3e4a5ba
   ... displays information about the pause image.
 $ sudo crictl inspecti k8s.gcr.io/pause:3.5
@@ -201,7 +201,7 @@ $ crictl info
       }
     },
     "streamServerPort": "10010",
-    "sandboxImage": "k8s.gcr.io/pause:3.5",
+    "sandboxImage": "k8s.gcr.io/pause:3.6",
     "statsCollectPeriod": 10,
     "containerdRootDir": "/var/lib/containerd",
     "containerdEndpoint": "unix:///run/containerd/containerd.sock",
