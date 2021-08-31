@@ -1304,6 +1304,72 @@ func TestGenerateUserString(t *testing.T) {
 	}
 }
 
+func TestNonRootUserAndDevices(t *testing.T) {
+	testPid := uint32(1234)
+	c := newTestCRIService()
+	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
+	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+
+	hostDevicesRaw, err := oci.HostDevices()
+	assert.NoError(t, err)
+
+	testDevice := hostDevicesRaw[0]
+
+	for desc, test := range map[string]struct {
+		uid, gid                           *runtime.Int64Value
+		deviceOwnershipFromSecurityContext bool
+		expectedDeviceUID                  uint32
+		expectedDeviceGID                  uint32
+	}{
+		"expect non-root container's Devices Uid/Gid to be the same as the device Uid/Gid on the host when deviceOwnershipFromSecurityContext is disabled": {
+			uid:               &runtime.Int64Value{Value: 1},
+			gid:               &runtime.Int64Value{Value: 10},
+			expectedDeviceUID: *testDevice.UID,
+			expectedDeviceGID: *testDevice.GID,
+		},
+		"expect root container's Devices Uid/Gid to be the same as the device Uid/Gid on the host when deviceOwnershipFromSecurityContext is disabled": {
+			uid:               &runtime.Int64Value{Value: 0},
+			gid:               &runtime.Int64Value{Value: 0},
+			expectedDeviceUID: *testDevice.UID,
+			expectedDeviceGID: *testDevice.GID,
+		},
+		"expect non-root container's Devices Uid/Gid to be the same as RunAsUser/RunAsGroup when deviceOwnershipFromSecurityContext is enabled": {
+			uid:                                &runtime.Int64Value{Value: 1},
+			gid:                                &runtime.Int64Value{Value: 10},
+			deviceOwnershipFromSecurityContext: true,
+			expectedDeviceUID:                  1,
+			expectedDeviceGID:                  10,
+		},
+		"expect root container's Devices Uid/Gid to be the same as the device Uid/Gid on the host when deviceOwnershipFromSecurityContext is enabled": {
+			uid:                                &runtime.Int64Value{Value: 0},
+			gid:                                &runtime.Int64Value{Value: 0},
+			deviceOwnershipFromSecurityContext: true,
+			expectedDeviceUID:                  *testDevice.UID,
+			expectedDeviceGID:                  *testDevice.GID,
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+
+		c.config.DeviceOwnershipFromSecurityContext = test.deviceOwnershipFromSecurityContext
+		containerConfig.Linux.SecurityContext.RunAsUser = test.uid
+		containerConfig.Linux.SecurityContext.RunAsGroup = test.gid
+		containerConfig.Devices = []*runtime.Device{
+			{
+				ContainerPath: testDevice.Path,
+				HostPath:      testDevice.Path,
+				Permissions:   "r",
+			},
+		}
+
+		spec, err := c.containerSpec(t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
+		assert.NoError(t, err)
+
+		assert.Equal(t, test.expectedDeviceUID, *spec.Linux.Devices[0].UID)
+		assert.Equal(t, test.expectedDeviceGID, *spec.Linux.Devices[0].GID)
+	}
+}
+
 func TestPrivilegedDevices(t *testing.T) {
 	testPid := uint32(1234)
 	c := newTestCRIService()

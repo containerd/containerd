@@ -285,8 +285,30 @@ func ensureSharedOrSlave(path string, lookupMount func(string) (mount.Info, erro
 	return errors.Errorf("path %q is mounted on %q but it is not a shared or slave mount", path, mountInfo.Mountpoint)
 }
 
+// getDeviceUserGroupID() is used to find the right uid/gid
+// value for the device node created in the container namespace.
+// The runtime executes mknod() and chmod()s the created
+// device with the values returned here.
+//
+// On Linux, uid and gid are sufficient and the user/groupname do not
+// need to be resolved.
+//
+// TODO(mythi): In case of user namespaces, the runtime simply bind
+// mounts the devices from the host. Additional logic is needed
+// to check that the runtimes effective UID/GID on the host has the
+// permissions to access the device node and/or the right user namespace
+// mappings are created.
+//
+// Ref: https://github.com/kubernetes/kubernetes/issues/92211
+func getDeviceUserGroupID(runAsVal *runtime.Int64Value) uint32 {
+	if runAsVal != nil {
+		return uint32(runAsVal.GetValue())
+	}
+	return 0
+}
+
 // WithDevices sets the provided devices onto the container spec
-func WithDevices(osi osinterface.OS, config *runtime.ContainerConfig) oci.SpecOpts {
+func WithDevices(osi osinterface.OS, config *runtime.ContainerConfig, enableDeviceOwnershipFromSecurityContext bool) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
 		if s.Linux == nil {
 			s.Linux = &runtimespec.Linux{}
@@ -294,6 +316,8 @@ func WithDevices(osi osinterface.OS, config *runtime.ContainerConfig) oci.SpecOp
 		if s.Linux.Resources == nil {
 			s.Linux.Resources = &runtimespec.LinuxResources{}
 		}
+
+		oldDevices := len(s.Linux.Devices)
 
 		for _, device := range config.GetDevices() {
 			path, err := osi.ResolveSymbolicLink(device.HostPath)
@@ -304,6 +328,24 @@ func WithDevices(osi osinterface.OS, config *runtime.ContainerConfig) oci.SpecOp
 			o := oci.WithDevices(path, device.ContainerPath, device.Permissions)
 			if err := o(ctx, client, c, s); err != nil {
 				return err
+			}
+		}
+
+		if enableDeviceOwnershipFromSecurityContext {
+			UID := getDeviceUserGroupID(config.GetLinux().GetSecurityContext().GetRunAsUser())
+			GID := getDeviceUserGroupID(config.GetLinux().GetSecurityContext().GetRunAsGroup())
+			// Loop all new devices added by oci.WithDevices() to update their
+			// dev.UID/dev.GID.
+			//
+			// non-zero UID/GID from SecurityContext is used to override host's
+			// device UID/GID for the container.
+			for idx := oldDevices; idx < len(s.Linux.Devices); idx++ {
+				if UID != 0 {
+					*s.Linux.Devices[idx].UID = UID
+				}
+				if GID != 0 {
+					*s.Linux.Devices[idx].GID = GID
+				}
 			}
 		}
 		return nil

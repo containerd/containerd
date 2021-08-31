@@ -222,11 +222,11 @@ func (c *criService) containerSpec(
 			specOpts = append(specOpts, oci.WithHostDevices, oci.WithAllDevicesAllowed)
 		} else {
 			// add requested devices by the config as host devices are not automatically added
-			specOpts = append(specOpts, customopts.WithDevices(c.os, config),
+			specOpts = append(specOpts, customopts.WithDevices(c.os, config, c.config.DeviceOwnershipFromSecurityContext),
 				customopts.WithCapabilities(securityContext, c.allCaps))
 		}
 	} else { // not privileged
-		specOpts = append(specOpts, customopts.WithDevices(c.os, config),
+		specOpts = append(specOpts, customopts.WithDevices(c.os, config, c.config.DeviceOwnershipFromSecurityContext),
 			customopts.WithCapabilities(securityContext, c.allCaps))
 	}
 
