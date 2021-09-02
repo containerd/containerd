@@ -1,5 +1,4 @@
-//go:build !windows && !darwin
-// +build !windows,!darwin
+// +build darwin
 
 /*
    Copyright The containerd Authors.
@@ -17,25 +16,20 @@
    limitations under the License.
 */
 
-package platforms
+package tasks
 
 import (
-	"runtime"
-
-	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/runtime"
 )
 
-// DefaultSpec returns the current platform's default platform specification.
-func DefaultSpec() specs.Platform {
-	return specs.Platform{
-		OS:           runtime.GOOS,
-		Architecture: runtime.GOARCH,
-		// The Variant field will be empty if arch != ARM.
-		Variant: cpuVariant(),
-	}
+var tasksServiceRequires = []plugin.Type{
+	plugin.RuntimePluginV2,
+	plugin.MetadataPlugin,
+	plugin.TaskMonitorPlugin,
 }
 
-// Default returns the default matcher for the platform.
-func Default() MatchComparer {
-	return Only(DefaultSpec())
+// loadV1Runtimes on darwin returns an empty map. There are no v1 runtimes
+func loadV1Runtimes(ic *plugin.InitContext) (map[string]runtime.PlatformRuntime, error) {
+	return make(map[string]runtime.PlatformRuntime), nil
 }
