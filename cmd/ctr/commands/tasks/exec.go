@@ -104,6 +104,10 @@ var execCommand = cli.Command{
 		pspec.Terminal = tty
 		pspec.Args = args
 
+		if cwd := context.String("cwd"); cwd != "" {
+			pspec.Cwd = cwd
+		}
+
 		task, err := container.Task(ctx, nil)
 		if err != nil {
 			return err
