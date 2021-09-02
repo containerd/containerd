@@ -22,6 +22,7 @@ import (
 	"github.com/containerd/containerd/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/pkg/cri/annotations"
@@ -102,6 +103,15 @@ func (c *criService) containerSpec(
 	// will handle the behavior of erroring out if the user isn't available in the image
 	// when trying to run the init process.
 	specOpts = append(specOpts, oci.WithUser(username))
+
+	ociHooksProfile := c.config.DefaultOCIHooks
+	hooks, err := c.generateOCIHooks(ociHooksProfile)
+	if err != nil { // TODO (mikebrow): clean up prototype
+		return nil, errors.Wrapf(err, "failed to generate OCI hooks %+v", ociHooksProfile)
+	}
+	if hooks != nil {
+		specOpts = append(specOpts, customopts.WithHooks(hooks))
+	}
 
 	for pKey, pValue := range getPassthroughAnnotations(sandboxConfig.Annotations,
 		ociRuntime.PodAnnotations) {

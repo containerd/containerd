@@ -247,6 +247,10 @@ type PluginConfig struct {
 	// DisableProcMount disables Kubernetes ProcMount support. This MUST be set to `true`
 	// when using containerd with Kubernetes <=1.11.
 	DisableProcMount bool `toml:"disable_proc_mount" json:"disableProcMount"`
+	// DefaultOCIHooks (optional) is a path to a json file that specifies a
+	// default OCI spec Hooks struct. ** Note: The any hooks set by default can be
+	// overridden if/when the hooks are set via the CRI.
+	DefaultOCIHooks string `toml:"default_oci_hooks" json:"defaultOCIHooks,omitempty"`
 	// UnsetSeccompProfile is the profile containerd/cri will use If the provided seccomp profile is
 	// unset (`""`) for a container (default is `unconfined`)
 	UnsetSeccompProfile string `toml:"unset_seccomp_profile" json:"unsetSeccompProfile"`

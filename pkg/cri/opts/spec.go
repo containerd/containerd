@@ -111,3 +111,11 @@ func WithAnnotation(k, v string) oci.SpecOpts {
 		return nil
 	}
 }
+
+// WithHooks sets or replaces the runtimespec.Hooks with the provided hooks
+func WithHooks(hooks *runtimespec.Hooks) oci.SpecOpts {
+	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+		s.Hooks = hooks
+		return nil
+	}
+}

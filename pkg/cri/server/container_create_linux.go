@@ -260,6 +260,15 @@ func (c *criService) containerSpec(
 
 	supplementalGroups := securityContext.GetSupplementalGroups()
 
+	ociHooksProfile := c.config.DefaultOCIHooks
+	hooks, err := c.generateOCIHooks(ociHooksProfile)
+	if err != nil { // TODO (mikebrow): clean up prototype
+		return nil, errors.Wrapf(err, "failed to generate OCI hooks %+v", ociHooksProfile)
+	}
+	if hooks != nil {
+		specOpts = append(specOpts, customopts.WithHooks(hooks))
+	}
+
 	for pKey, pValue := range getPassthroughAnnotations(sandboxConfig.Annotations,
 		ociRuntime.PodAnnotations) {
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))

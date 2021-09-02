@@ -97,6 +97,12 @@ version = 2
   # when using containerd with Kubernetes <=1.11.
   disable_proc_mount = false
 
+  # default_oci_hooks is the filepath to an OCI runtime spec Hooks struct in json.
+  # see details and example:
+  #    https://github.com/opencontainers/runtime-spec/blob/master/config.md#posix-platform-hooks
+  # ** Note: Overridden if set by CRI
+  default_oci_hooks = ""
+
   # unset_seccomp_profile is the seccomp profile containerd/cri will use if the seccomp
   # profile requested over CRI is unset (or nil) for a pod/container (otherwise if this field is not set the
   # default unset profile will map to `unconfined`)
