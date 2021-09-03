@@ -12,6 +12,7 @@ require (
 )
 
 replace (
+	github.com/Microsoft/hcsshim => github.com/Microsoft/hcsshim v0.8.22-0.20210902162931-11a4b537475b
 	github.com/gogo/googleapis => github.com/gogo/googleapis v1.3.2
 	// urfave/cli must be <= v1.22.1 due to a regression: https://github.com/urfave/cli/issues/1092
 	github.com/urfave/cli => github.com/urfave/cli v1.22.1

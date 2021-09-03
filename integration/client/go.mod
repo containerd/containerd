@@ -23,6 +23,7 @@ require (
 )
 
 replace (
+	github.com/Microsoft/hcsshim => github.com/Microsoft/hcsshim v0.8.22-0.20210902162931-11a4b537475b
 	// use the containerd module from this repository instead of downloading
 	//
 	// IMPORTANT: this replace rule ONLY replaces containerd itself; dependencies
