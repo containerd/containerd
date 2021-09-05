@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"runtime"
 	"strconv"
 	"strings"
@@ -370,9 +369,7 @@ type RemoteContext struct {
 
 func defaultRemoteContext() *RemoteContext {
 	return &RemoteContext{
-		Resolver: docker.NewResolver(docker.ResolverOptions{
-			Client: http.DefaultClient,
-		}),
+		Resolver: docker.NewResolver(docker.ResolverOptions{}),
 	}
 }
 
