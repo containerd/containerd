@@ -233,7 +233,7 @@ func (c *criService) createImageReference(ctx context.Context, name string, desc
 	if oldImg.Target.Digest == img.Target.Digest && oldImg.Labels[imageLabelKey] == imageLabelValue {
 		return nil
 	}
-	_, err = c.client.ImageService().Update(ctx, img, "target", "labels")
+	_, err = c.client.ImageService().Update(ctx, img, "target", "labels."+imageLabelKey)
 	return err
 }
 
