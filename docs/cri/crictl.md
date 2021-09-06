@@ -81,7 +81,7 @@ docker.io/library/busybox   latest              f6e427c148a76       728kB
 k8s.gcr.io/pause            3.6                 ed210e3e4a5ba       683kB
 $ sudo crictl inspecti ed210e3e4a5ba
   ... displays information about the pause image.
-$ sudo crictl inspecti k8s.gcr.io/pause:3.5
+$ sudo crictl inspecti k8s.gcr.io/pause:3.6
   ... displays information about the pause image.
 ```
 
