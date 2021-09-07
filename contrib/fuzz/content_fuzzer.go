@@ -105,6 +105,7 @@ func FuzzCSWalk(data []byte) int {
 	if err != nil {
 		return 0
 	}
+	defer os.RemoveAll(tmpdir)
 	cs, err := local.NewStore(tmpdir)
 	if err != nil {
 		return 0
