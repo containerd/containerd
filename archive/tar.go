@@ -54,6 +54,9 @@ func Diff(ctx context.Context, a, b string) io.ReadCloser {
 
 	go func() {
 		err := WriteDiff(ctx, w, a, b)
+		if err != nil {
+			log.G(ctx).WithError(err).Debugf("write diff failed")
+		}
 		if err = w.CloseWithError(err); err != nil {
 			log.G(ctx).WithError(err).Debugf("closing tar pipe failed")
 		}
