@@ -20,7 +20,7 @@ jobs:
   winIntegration:
     strategy:
       matrix:
-        win_ver: [ltsc2019, sac2004]
+        win_ver: [ltsc2019, sac2004, ltsc2022]
         include:
         - win_ver: sac2004
           AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:datacenter-core-2004-with-containers-smalldisk:19041.928.2104150521"
@@ -30,6 +30,10 @@ jobs:
           AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2019-Datacenter-with-Containers-smalldisk:17763.1935.2105080716"
           AZURE_RESOURCE_GROUP: ctrd-integration-ltsc2019-${{ github.run_id }}
           GOOGLE_BUCKET: "gs://containerd-integration/logs/windows-ltsc2019/"
+        - win_ver: ltsc2022
+          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2022-datacenter-smalldisk-g2:20348.169.2108120020"
+          AZURE_RESOURCE_GROUP: ctrd-integration-ltsc2022-${{ github.run_id }}
+          GOOGLE_BUCKET: "gs://containerd-integration/logs/windows-ltsc2022/"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -94,6 +98,29 @@ jobs:
             exit 1
           fi
 
+      - name: InstallContainerFeatureWS2022
+        if: ${{ matrix.win_ver == 'ltsc2022' }}
+        run: |
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "powershell.exe -command { Install-WindowsFeature -Name 'Containers' -Restart }"
+
+      - name: WaitForVMToRestart
+        if: ${{ matrix.win_ver == 'ltsc2022' }}
+        timeout-minutes: 5
+        run: |
+          # give the vm 30 seconds to actually stop. SSH server might actually respond while server is shutting down.
+          sleep 30
+          while [ ! $( ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }}  "hostname") ];
+          do
+             echo "Unable to connect to azurevm"
+          done
+          echo "Connection reestablished. VM restarted succesfully."
+
+      - name: CreateNatNetworkWS2022
+        if: ${{ matrix.win_ver == 'ltsc2022' }}
+        run: |
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "powershell.exe -command { curl.exe -L 'https://raw.githubusercontent.com/microsoft/SDN/master/Kubernetes/windows/hns.psm1' -o hns.psm1 }"
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "powershell.exe -command { Import-Module .\hns.psm1 ; New-HnsNetwork -Type NAT -Name nat -AddressPrefix 172.19.208.0/20 -Gateway 172.19.208.1 }"
+
       - name: PrepareTestingEnv
         run: |
           scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }}  $GITHUB_WORKSPACE/script/setup/prepare_env_windows.ps1  azureuser@${{ env.VM_PUB_IP }}:/prepare_env_windows.ps1
@@ -120,7 +147,8 @@ jobs:
       - name: PrepareRepoList
         run: |
            ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh -c 'cat > c:/repolist.toml'" <<'EOF'
-               busybox = "docker.io/claudiubelu/busybox:1.29"
+               busybox = "k8s.gcr.io/e2e-test-images/busybox:1.29-2"
+               ResourceConsumer = "k8s.gcr.io/e2e-test-images/resource-consumer:1.10"
            EOF
 
       - name: RunCRIIntegrationTests
@@ -135,14 +163,17 @@ jobs:
            ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cat /c/Logs/cri-integration.log | go-junit-report.exe > c:/Logs/junit_01.xml' "
 
       - name: GetCritestRepo
+        if: ${{ matrix.win_ver != 'ltsc2022' }}
         run: |
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "git clone https://github.com/kubernetes-sigs/cri-tools c:/cri-tools"
 
       - name: BuildCritest
+        if: ${{ matrix.win_ver != 'ltsc2022' }}
         run: |
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cd /c/cri-tools && make critest'"
 
       - name: RunCritest
+        if: ${{ matrix.win_ver != 'ltsc2022' }}
         run: |
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "powershell.exe -command { Start-Process -FilePath C:\containerd\bin\containerd.exe -NoNewWindow -RedirectStandardError true -PassThru ; get-process | sls containerd ; start-sleep 5 ; c:\cri-tools\build\bin\critest.exe --runtime-endpoint=\"npipe:\\\\.\\pipe\\containerd-containerd\" --report-dir='c:\Logs' }"
 
