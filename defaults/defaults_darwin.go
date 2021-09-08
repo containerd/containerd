@@ -30,8 +30,7 @@ const (
 	// DefaultFIFODir is the default location used by client-side cio library
 	// to store FIFOs.
 	DefaultFIFODir = "/var/run/containerd/fifo"
-	// DefaultRuntime is the default Darwin runtime.
-	// NOTE: there is no runtime on Darwin as of now.
+	// DefaultRuntime would be a multiple of choices, thus empty
 	DefaultRuntime = ""
 	// DefaultConfigDir is the default location for config files.
 	DefaultConfigDir = "/etc/containerd"

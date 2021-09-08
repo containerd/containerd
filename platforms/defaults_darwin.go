@@ -1,5 +1,4 @@
-//go:build !windows && !darwin
-// +build !windows,!darwin
+// +build darwin
 
 /*
    Copyright The containerd Authors.
@@ -37,5 +36,9 @@ func DefaultSpec() specs.Platform {
 
 // Default returns the default matcher for the platform.
 func Default() MatchComparer {
-	return Only(DefaultSpec())
+	return Ordered(DefaultSpec(), specs.Platform{
+		// darwin runtime also supports Linux binary via runu/LKL
+		OS:           "linux",
+		Architecture: runtime.GOARCH,
+	})
 }
