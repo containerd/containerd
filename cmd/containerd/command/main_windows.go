@@ -39,7 +39,7 @@ var (
 	}
 )
 
-func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *server.Server) chan struct{} {
+func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *server.Server, cancel func()) chan struct{} {
 	done := make(chan struct{})
 	go func() {
 		var server *server.Server
@@ -54,12 +54,12 @@ func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *se
 					log.G(ctx).WithError(err).Error("notify stopping failed")
 				}
 
-				if server == nil {
-					close(done)
-					return
+				cancel()
+				if server != nil {
+					server.Stop()
 				}
-				server.Stop()
 				close(done)
+				return
 			}
 		}
 	}()
