@@ -65,10 +65,11 @@ func TestCopy(t *testing.T) {
 		},
 		{
 			name:   "commit already exists",
-			source: defaultSource,
+			source: newCopySource("this already exists"),
 			writer: fakeWriter{commitFunc: func() error {
 				return errdefs.ErrAlreadyExists
 			}},
+			expected: "this already exists",
 		},
 	}
 
