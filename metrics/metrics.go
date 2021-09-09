@@ -17,56 +17,13 @@
 package metrics
 
 import (
+	"github.com/containerd/containerd/version"
 	goMetrics "github.com/docker/go-metrics"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
-// Collector provides the ability to collect generic metrics and export
-// them in the prometheus format
-type Collector struct {
-	ns *goMetrics.Namespace
-	m  metric
-}
-
-type metric struct {
-	name   string
-	help   string
-	unit   goMetrics.Unit
-	vt     prometheus.ValueType
-	labels []string
-	// getValues returns the value and labels for the data
-	getValues func() []value
-}
-
-type value struct {
-	v float64
-	l []string
-}
-
-// Describe prometheus metrics
-func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
-	m := c.m
-	ch <- c.ns.NewDesc(m.name, m.help, m.unit, m.labels...)
-}
-
-// Collect prometheus metrics
-func (c *Collector) Collect(ch chan<- prometheus.Metric) {
-	m := c.m
-	for _, v := range m.getValues() {
-		ch <- prometheus.MustNewConstMetric(
-			c.ns.NewDesc(m.name, m.help, m.unit, m.labels...),
-			m.vt,
-			v.v,
-			v.l...,
-		)
-	}
-}
-
-// Register a prometheus namespace for generic metrics
-func Register() {
+func init() {
 	ns := goMetrics.NewNamespace("containerd", "", nil)
-
-	c := newBuildInfoCollector(ns)
-	ns.Add(c)
+	c := ns.NewLabeledCounter("build_info", "containerd build information", "version", "revision")
+	c.WithValues(version.Version, version.Revision).Inc()
 	goMetrics.Register(ns)
 }
