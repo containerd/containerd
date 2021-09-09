@@ -25,7 +25,7 @@ cd "$GOPATH"
 
 # install the `protobuild` binary in $GOPATH/bin; requires module-aware install
 # to pin dependencies
-GO111MODULE=on go get github.com/stevvooe/protobuild
+GO111MODULE=on go get github.com/stevvooe/protobuild@v0.1.0
 
 # the following packages need to exist in $GOPATH so we can't use
 # go modules-aware mode of `go get` for these includes used during
