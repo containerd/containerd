@@ -238,6 +238,12 @@ version = 2
     # This will be deprecated when kubenet is deprecated.
     # See the "CNI Config Template" section for more details.
     conf_template = ""
+    # ip_pref specifies the strategy to use when selecting the main IP address for a pod.
+    # options include:
+    # * ipv4, "" - (default) select the first ipv4 address
+    # * ipv6 - select the first ipv6 address
+    # * cni - use the order returned by the CNI plugins, returning the first IP address from the results
+    ip_pref = "ipv4"
 
   # 'plugins."io.containerd.grpc.v1.cri".image_decryption' contains config related
   # to handling decryption of encrypted container images.

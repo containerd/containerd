@@ -26,6 +26,7 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/pkg/cri/annotations"
@@ -260,12 +261,26 @@ func TestSelectPodIP(t *testing.T) {
 		ips                   []string
 		expectedIP            string
 		expectedAdditionalIPs []string
+		pref                  string
 	}{
 		"ipv4 should be picked even if ipv6 comes first": {
 			ips:                   []string{"2001:db8:85a3::8a2e:370:7334", "192.168.17.43"},
 			expectedIP:            "192.168.17.43",
 			expectedAdditionalIPs: []string{"2001:db8:85a3::8a2e:370:7334"},
 		},
+		"ipv6 should be picked even if ipv4 comes first": {
+			ips:                   []string{"2001:db8:85a3::8a2e:370:7334", "192.168.17.43"},
+			expectedIP:            "2001:db8:85a3::8a2e:370:7334",
+			expectedAdditionalIPs: []string{"192.168.17.43"},
+			pref:                  "ipv6",
+		},
+		"order should reflect ip selection": {
+			ips:                   []string{"2001:db8:85a3::8a2e:370:7334", "192.168.17.43"},
+			expectedIP:            "2001:db8:85a3::8a2e:370:7334",
+			expectedAdditionalIPs: []string{"192.168.17.43"},
+			pref:                  "cni",
+		},
+
 		"ipv4 should be picked when there is only ipv4": {
 			ips:                   []string{"192.168.17.43"},
 			expectedIP:            "192.168.17.43",
@@ -289,7 +304,7 @@ func TestSelectPodIP(t *testing.T) {
 				IP: net.ParseIP(ip),
 			})
 		}
-		ip, additionalIPs := selectPodIPs(ipConfigs)
+		ip, additionalIPs := selectPodIPs(context.Background(), ipConfigs, test.pref)
 		assert.Equal(t, test.expectedIP, ip)
 		assert.Equal(t, test.expectedAdditionalIPs, additionalIPs)
 	}

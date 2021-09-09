@@ -111,6 +111,13 @@ type CniConfig struct {
 	// a temporary backward-compatible solution for them.
 	// TODO(random-liu): Deprecate this option when kubenet is deprecated.
 	NetworkPluginConfTemplate string `toml:"conf_template" json:"confTemplate"`
+	// IPPreference specifies the strategy to use when selecting the main IP address for a pod.
+	//
+	// Options include:
+	// * ipv4, "" - (default) select the first ipv4 address
+	// * ipv6 - select the first ipv6 address
+	// * cni - use the order returned by the CNI plugins, returning the first IP address from the results
+	IPPreference string `toml:"ip_pref" json:"ipPref"`
 }
 
 // Mirror contains the config related to the registry mirror

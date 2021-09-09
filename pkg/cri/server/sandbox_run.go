@@ -372,7 +372,7 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 	logDebugCNIResult(ctx, id, result)
 	// Check if the default interface has IP config
 	if configs, ok := result.Interfaces[defaultIfName]; ok && len(configs.IPConfigs) > 0 {
-		sandbox.IP, sandbox.AdditionalIPs = selectPodIPs(configs.IPConfigs)
+		sandbox.IP, sandbox.AdditionalIPs = selectPodIPs(ctx, configs.IPConfigs, c.config.IPPreference)
 		sandbox.CNIResult = result
 		return nil
 	}
@@ -475,28 +475,46 @@ func toCNIDNS(dns *runtime.DNSConfig) *cni.DNS {
 	}
 }
 
-// selectPodIPs select an ip from the ip list. It prefers ipv4 more than ipv6
-// and returns the additional ips
-// TODO(random-liu): Revisit the ip order in the ipv6 beta stage. (cri#1278)
-func selectPodIPs(ipConfigs []*cni.IPConfig) (string, []string) {
-	var (
-		additionalIPs []string
-		ip            string
-	)
-	for _, c := range ipConfigs {
-		if c.IP.To4() != nil && ip == "" {
-			ip = c.IP.String()
-		} else {
-			additionalIPs = append(additionalIPs, c.IP.String())
+// selectPodIPs select an ip from the ip list.
+func selectPodIPs(ctx context.Context, configs []*cni.IPConfig, preference string) (string, []string) {
+	if len(configs) == 1 {
+		return ipString(configs[0]), nil
+	}
+	toStrings := func(ips []*cni.IPConfig) (o []string) {
+		for _, i := range ips {
+			o = append(o, ipString(i))
 		}
+		return o
 	}
-	if ip != "" {
-		return ip, additionalIPs
+	var extra []string
+	switch preference {
+	default:
+		if preference != "ipv4" && preference != "" {
+			log.G(ctx).WithField("ip_pref", preference).Warn("invalid ip_pref, falling back to ipv4")
+		}
+		for i, ip := range configs {
+			if ip.IP.To4() != nil {
+				return ipString(ip), append(extra, toStrings(configs[i+1:])...)
+			}
+			extra = append(extra, ipString(ip))
+		}
+	case "ipv6":
+		for i, ip := range configs {
+			if ip.IP.To16() != nil {
+				return ipString(ip), append(extra, toStrings(configs[i+1:])...)
+			}
+			extra = append(extra, ipString(ip))
+		}
+	case "cni":
+		// use func default return
 	}
-	if len(ipConfigs) == 1 {
-		return additionalIPs[0], nil
-	}
-	return additionalIPs[0], additionalIPs[1:]
+
+	all := toStrings(configs)
+	return all[0], all[1:]
+}
+
+func ipString(ip *cni.IPConfig) string {
+	return ip.IP.String()
 }
 
 // untrustedWorkload returns true if the sandbox contains untrusted workload.
