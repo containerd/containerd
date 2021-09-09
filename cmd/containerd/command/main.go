@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
+	_ "github.com/containerd/containerd/metrics" // import containerd build info
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/services/server"
 	srvconfig "github.com/containerd/containerd/services/server/config"
