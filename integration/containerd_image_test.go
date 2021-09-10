@@ -44,7 +44,7 @@ func TestContainerdImage(t *testing.T) {
 	}
 
 	t.Logf("pull the image into containerd")
-	_, err = containerdClient.Pull(ctx, testImage, containerd.WithPullUnpack)
+	_, err = containerdClient.Pull(ctx, testImage, containerd.WithPullUnpack, containerd.WithPullLabel("foo", "bar"))
 	assert.NoError(t, err)
 	defer func() {
 		// Make sure the image is cleaned up in any case.
@@ -120,6 +120,11 @@ func TestContainerdImage(t *testing.T) {
 	imgByID, err := containerdClient.GetImage(ctx, id)
 	assert.NoError(t, err)
 	assert.Equal(t, imgByID.Labels()["io.cri-containerd.image"], "managed")
+
+	t.Logf("the image should be labeled")
+	img, err := containerdClient.GetImage(ctx, testImage)
+	assert.NoError(t, err)
+	assert.Equal(t, img.Labels()["foo"], "bar")
 
 	t.Logf("should be able to start container with the image")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "containerd-image")
