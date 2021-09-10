@@ -280,13 +280,13 @@ jobs:
       - name: Tests
         env:
           CGO_ENABLED: 1
-          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root.xml
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/windows-2019-amd64-test-unit-root.xml
         run: mingw32-make.exe test root-test
 
       - name: Integration 1
         env:
           CGO_ENABLED: 1
-          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/windows-2019-amd64.test-integration-serial-junit.xml
         run: mingw32-make.exe integration
 
       # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
@@ -294,7 +294,7 @@ jobs:
         env:
           TESTFLAGS_PARALLEL: 1
           CGO_ENABLED: 1
-          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/windows-2019-amd64.test-integration-parallel-junit.xml
         run: mingw32-make.exe integration
       - uses: actions/upload-artifact@v2
         if: always()
@@ -367,7 +367,7 @@ jobs:
           GOPROXY: direct
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
-          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/linux-amd64-${{matrix.runtime}}-${{matrix.runc}}.test-integration-serial-junit.xml
         run: |
           extraflags=""
           [ "${RUNC_FLAVOR}" == "crun" ] && {
@@ -381,7 +381,7 @@ jobs:
           GOPROXY: direct
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
-          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/linux-amd64-${{matrix.runtime}}-${{matrix.runc}}.test-integration-parallel-junit.xml
         run: |
           extraflags=""
           [ "${RUNC_FLAVOR}" == "crun" ] && {
@@ -490,7 +490,7 @@ jobs:
         env:
           RUNC_FLAVOR: ${{ matrix.runc }}
           SELINUX: Enforcing
-          GOTESTSUM_JUNITFILE: /tmp/test-integration-junit.xml
+          GOTESTSUM_JUNITFILE: /tmp/linux-amd64-${{matrix.runc}}-cgroupsv2.test-integration-junit.xml
         run: vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
 
       - name: CRI test
@@ -505,8 +505,11 @@ jobs:
           set -e
           vagrant plugin install vagrant-vbguest
           vagrant plugin install vagrant-scp
-          vagrant scp :/tmp/test-integration-junit.xml "${{ github.workspace }}/"
+          vagrant scp :/tmp/linux-amd64-${{matrix.runc}}-cgroupsv2.test-integration-junit.xml "${{ github.workspace }}/"
           vagrant scp :/tmp/critestreport "${{ github.workspace }}/critestreport"
+          for i in ${{ github.workspace }}/critestreport/*; do
+            mv $i ${{ github.workspace }}/critestreport/linux-amd64-${{matrix.runc}}-cgroupsv2.test.$(basname $i)
+          done
       - uses: actions/upload-artifact@v2
         if: always()
         with:
@@ -536,6 +539,8 @@ jobs:
           vagrant up || vagrant up
 
       # slow, so separated from the regular cgroup2 task
+      #
+      ## TODO: junit test report
       - name: CRI-in-UserNS test with Rootless Podman
         run: |
           vagrant up --provision-with=install-rootless-podman
