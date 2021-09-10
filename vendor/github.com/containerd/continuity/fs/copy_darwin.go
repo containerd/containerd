@@ -1,4 +1,4 @@
-// +build darwin openbsd solaris
+// +build darwin
 
 /*
    Copyright The containerd Authors.
@@ -35,6 +35,8 @@ func copyDevice(dst string, fi os.FileInfo) error {
 }
 
 func utimesNano(name string, atime, mtime syscall.Timespec) error {
-	timespec := []syscall.Timespec{atime, mtime}
-	return syscall.UtimesNano(name, timespec)
+	at := unix.NsecToTimespec(atime.Nano())
+	mt := unix.NsecToTimespec(mtime.Nano())
+	utimes := [2]unix.Timespec{at, mt}
+	return unix.UtimesNanoAt(unix.AT_FDCWD, name, utimes[0:], unix.AT_SYMLINK_NOFOLLOW)
 }
