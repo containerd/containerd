@@ -22,7 +22,6 @@ package btrfs
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -46,7 +45,7 @@ func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshots.Snap
 		t.Skipf("could not find mkfs.btrfs: %v", err)
 	}
 
-	procModules, err := ioutil.ReadFile("/proc/modules")
+	procModules, err := os.ReadFile("/proc/modules")
 	if err == nil && !bytes.Contains(procModules, []byte("btrfs")) {
 		t.Skip("check for btrfs kernel module failed, skipping test")
 	}
@@ -122,14 +121,14 @@ func TestBtrfsMounts(t *testing.T) {
 	ctx := context.Background()
 
 	// create temporary directory for mount point
-	mountPoint, err := ioutil.TempDir("", "containerd-btrfs-test")
+	mountPoint, err := os.MkdirTemp("", "containerd-btrfs-test")
 	if err != nil {
 		t.Fatal("could not create mount point for btrfs test", err)
 	}
 	defer os.RemoveAll(mountPoint)
 	t.Log("temporary mount point created", mountPoint)
 
-	root, err := ioutil.TempDir(mountPoint, "TestBtrfsPrepare-")
+	root, err := os.MkdirTemp(mountPoint, "TestBtrfsPrepare-")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +167,7 @@ func TestBtrfsMounts(t *testing.T) {
 	defer testutil.Unmount(t, target)
 
 	// write in some data
-	if err := ioutil.WriteFile(filepath.Join(target, "foo"), []byte("content"), 0777); err != nil {
+	if err := os.WriteFile(filepath.Join(target, "foo"), []byte("content"), 0777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -198,7 +197,7 @@ func TestBtrfsMounts(t *testing.T) {
 	defer testutil.Unmount(t, target)
 
 	// TODO(stevvooe): Verify contents of "foo"
-	if err := ioutil.WriteFile(filepath.Join(target, "bar"), []byte("content"), 0777); err != nil {
+	if err := os.WriteFile(filepath.Join(target, "bar"), []byte("content"), 0777); err != nil {
 		t.Fatal(err)
 	}
 

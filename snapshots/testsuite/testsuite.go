@@ -21,7 +21,6 @@ import (
 	//nolint:revive // go-digest needs the blank import. See https://github.com/opencontainers/go-digest#usage.
 	_ "crypto/sha256"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -87,7 +86,7 @@ func makeTest(name string, snapshotterFn func(ctx context.Context, root string) 
 		// 		work/ -> passed to test functions
 		// 		root/ -> passed to snapshotter
 		//
-		tmpDir, err := ioutil.TempDir("", "snapshot-suite-"+name+"-")
+		tmpDir, err := os.MkdirTemp("", "snapshot-suite-"+name+"-")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -297,7 +296,7 @@ func checkSnapshotterStatActive(ctx context.Context, t *testing.T, snapshotter s
 	}
 	defer testutil.Unmount(t, preparing)
 
-	if err = ioutil.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0777); err != nil {
+	if err = os.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -331,7 +330,7 @@ func checkSnapshotterStatCommitted(ctx context.Context, t *testing.T, snapshotte
 	}
 	defer testutil.Unmount(t, preparing)
 
-	if err = ioutil.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0777); err != nil {
+	if err = os.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -379,7 +378,7 @@ func checkSnapshotterTransitivity(ctx context.Context, t *testing.T, snapshotter
 	}
 	defer testutil.Unmount(t, preparing)
 
-	if err = ioutil.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0777); err != nil {
+	if err = os.WriteFile(filepath.Join(preparing, "foo"), []byte("foo\n"), 0777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -394,7 +393,7 @@ func checkSnapshotterTransitivity(ctx context.Context, t *testing.T, snapshotter
 	}
 	defer testutil.Unmount(t, next)
 
-	if err = ioutil.WriteFile(filepath.Join(next, "foo"), []byte("foo bar\n"), 0777); err != nil {
+	if err = os.WriteFile(filepath.Join(next, "foo"), []byte("foo bar\n"), 0777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -804,7 +803,7 @@ func checkSnapshotterViewReadonly(ctx context.Context, t *testing.T, snapshotter
 	}
 
 	testfile := filepath.Join(viewMountPoint, "testfile")
-	if err := ioutil.WriteFile(testfile, []byte("testcontent"), 0777); err != nil {
+	if err := os.WriteFile(testfile, []byte("testcontent"), 0777); err != nil {
 		t.Logf("write to %q failed with %v (EROFS is expected but can be other error code)", testfile, err)
 	} else {
 		t.Fatalf("write to %q should fail (EROFS) but did not fail", testfile)

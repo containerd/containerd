@@ -22,7 +22,6 @@ package overlay
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -80,7 +79,7 @@ func TestOverlay(t *testing.T) {
 
 func testOverlayMounts(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	ctx := context.TODO()
-	root, err := ioutil.TempDir("", "overlay")
+	root, err := os.MkdirTemp("", "overlay")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +113,7 @@ func testOverlayMounts(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 
 func testOverlayCommit(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	ctx := context.TODO()
-	root, err := ioutil.TempDir("", "overlay")
+	root, err := os.MkdirTemp("", "overlay")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +128,7 @@ func testOverlayCommit(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 		t.Fatal(err)
 	}
 	m := mounts[0]
-	if err := ioutil.WriteFile(filepath.Join(m.Source, "foo"), []byte("hi"), 0660); err != nil {
+	if err := os.WriteFile(filepath.Join(m.Source, "foo"), []byte("hi"), 0660); err != nil {
 		t.Fatal(err)
 	}
 	if err := o.Commit(ctx, "base", key); err != nil {
@@ -139,7 +138,7 @@ func testOverlayCommit(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 
 func testOverlayOverlayMount(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	ctx := context.TODO()
-	root, err := ioutil.TempDir("", "overlay")
+	root, err := os.MkdirTemp("", "overlay")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +232,7 @@ func getParents(ctx context.Context, sn snapshots.Snapshotter, root, key string)
 func testOverlayOverlayRead(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	testutil.RequiresRoot(t)
 	ctx := context.TODO()
-	root, err := ioutil.TempDir("", "overlay")
+	root, err := os.MkdirTemp("", "overlay")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +247,7 @@ func testOverlayOverlayRead(t *testing.T, newSnapshotter testsuite.SnapshotterFu
 		t.Fatal(err)
 	}
 	m := mounts[0]
-	if err := ioutil.WriteFile(filepath.Join(m.Source, "foo"), []byte("hi"), 0660); err != nil {
+	if err := os.WriteFile(filepath.Join(m.Source, "foo"), []byte("hi"), 0660); err != nil {
 		t.Fatal(err)
 	}
 	if err := o.Commit(ctx, "base", key); err != nil {
@@ -265,7 +264,7 @@ func testOverlayOverlayRead(t *testing.T, newSnapshotter testsuite.SnapshotterFu
 		t.Fatal(err)
 	}
 	defer syscall.Unmount(dest, 0)
-	data, err := ioutil.ReadFile(filepath.Join(dest, "foo"))
+	data, err := os.ReadFile(filepath.Join(dest, "foo"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +275,7 @@ func testOverlayOverlayRead(t *testing.T, newSnapshotter testsuite.SnapshotterFu
 
 func testOverlayView(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	ctx := context.TODO()
-	root, err := ioutil.TempDir("", "overlay")
+	root, err := os.MkdirTemp("", "overlay")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,7 +290,7 @@ func testOverlayView(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 		t.Fatal(err)
 	}
 	m := mounts[0]
-	if err := ioutil.WriteFile(filepath.Join(m.Source, "foo"), []byte("hi"), 0660); err != nil {
+	if err := os.WriteFile(filepath.Join(m.Source, "foo"), []byte("hi"), 0660); err != nil {
 		t.Fatal(err)
 	}
 	if err := o.Commit(ctx, "base", key); err != nil {
@@ -303,7 +302,7 @@ func testOverlayView(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(filepath.Join(getParents(ctx, o, root, "/tmp/top")[0], "foo"), []byte("hi, again"), 0660); err != nil {
+	if err := os.WriteFile(filepath.Join(getParents(ctx, o, root, "/tmp/top")[0], "foo"), []byte("hi, again"), 0660); err != nil {
 		t.Fatal(err)
 	}
 	if err := o.Commit(ctx, "top", key); err != nil {

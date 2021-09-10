@@ -22,8 +22,8 @@ package shim
 import (
 	gocontext "context"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -174,7 +174,7 @@ var execCommand = cli.Command{
 		}
 
 		// read spec file and extract Any object
-		spec, err := ioutil.ReadFile(context.String("spec"))
+		spec, err := os.ReadFile(context.String("spec"))
 		if err != nil {
 			return err
 		}

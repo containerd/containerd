@@ -19,7 +19,6 @@ package testutil
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -53,7 +52,7 @@ func DumpDir(t *testing.T, root string) {
 			}
 			t.Log(fi.Mode(), fmt.Sprintf("%10s", ""), path, "->", target)
 		} else if fi.Mode().IsRegular() {
-			p, err := ioutil.ReadFile(path)
+			p, err := os.ReadFile(path)
 			if err != nil {
 				t.Logf("error reading file: %v", err)
 				return nil

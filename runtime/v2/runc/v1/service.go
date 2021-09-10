@@ -21,7 +21,7 @@ package v1
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -180,7 +180,7 @@ func (s *service) StartShim(ctx context.Context, opts shim.StartOpts) (_ string,
 	if err := shim.WritePidFile("shim.pid", cmd.Process.Pid); err != nil {
 		return "", err
 	}
-	if data, err := ioutil.ReadAll(os.Stdin); err == nil {
+	if data, err := io.ReadAll(os.Stdin); err == nil {
 		if len(data) > 0 {
 			var any ptypes.Any
 			if err := proto.Unmarshal(data, &any); err != nil {

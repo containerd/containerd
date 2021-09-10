@@ -22,7 +22,6 @@ import (
 	"crypto/x509"
 	"expvar"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -131,7 +130,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 
 		if config.GRPC.TCPTLSCA != "" {
 			caCertPool := x509.NewCertPool()
-			caCert, err := ioutil.ReadFile(config.GRPC.TCPTLSCA)
+			caCert, err := os.ReadFile(config.GRPC.TCPTLSCA)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to load CA file")
 			}

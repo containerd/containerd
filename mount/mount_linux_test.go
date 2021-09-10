@@ -18,7 +18,6 @@ package mount
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -105,7 +104,7 @@ func TestFUSEHelper(t *testing.T) {
 	if err != nil {
 		t.Skip("fuse-overlayfs not installed")
 	}
-	td, err := ioutil.TempDir("", "fuse")
+	td, err := os.MkdirTemp("", "fuse")
 	if err != nil {
 		t.Fatal(err)
 	}

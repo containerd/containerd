@@ -22,7 +22,7 @@ package v2
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -245,7 +245,7 @@ func (s *service) StartShim(ctx context.Context, opts shim.StartOpts) (_ string,
 	}()
 	// make sure to wait after start
 	go cmd.Wait()
-	if data, err := ioutil.ReadAll(os.Stdin); err == nil {
+	if data, err := io.ReadAll(os.Stdin); err == nil {
 		if len(data) > 0 {
 			var any ptypes.Any
 			if err := proto.Unmarshal(data, &any); err != nil {

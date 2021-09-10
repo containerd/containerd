@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -574,7 +573,7 @@ func testocimanifest(ctx context.Context, f remotes.Fetcher, desc ocispec.Descri
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to fetch %s", desc.Digest)
 	}
-	p, err := ioutil.ReadAll(r)
+	p, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}

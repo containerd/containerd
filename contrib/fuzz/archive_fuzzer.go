@@ -18,7 +18,6 @@ package fuzz
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
 	"os"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
@@ -37,7 +36,7 @@ func FuzzApply(data []byte) int {
 		return 0
 	}
 	maxIters := 20
-	tmpDir, err := ioutil.TempDir("", "prefix-test")
+	tmpDir, err := os.MkdirTemp("", "prefix-test")
 	if err != nil {
 		return 0
 	}
@@ -63,7 +62,7 @@ func FuzzImportIndex(data []byte) int {
 	}
 	ctx := context.Background()
 	r := bytes.NewReader(tarBytes)
-	tmpdir, err := ioutil.TempDir("", "fuzzing-")
+	tmpdir, err := os.MkdirTemp("", "fuzzing-")
 	if err != nil {
 		return 0
 	}

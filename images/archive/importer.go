@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"path"
 
 	"github.com/containerd/containerd/archive/compression"
@@ -223,7 +222,7 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opt
 }
 
 func onUntarJSON(r io.Reader, j interface{}) error {
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}

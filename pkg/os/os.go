@@ -18,7 +18,6 @@ package os
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/moby/sys/symlink"
@@ -78,9 +77,9 @@ func (RealOS) CopyFile(src, dest string, perm os.FileMode) error {
 	return err
 }
 
-// WriteFile will call ioutil.WriteFile to write data into a file.
+// WriteFile will call os.WriteFile to write data into a file.
 func (RealOS) WriteFile(filename string, data []byte, perm os.FileMode) error {
-	return ioutil.WriteFile(filename, data, perm)
+	return os.WriteFile(filename, data, perm)
 }
 
 // Hostname will call os.Hostname to get the hostname of the host.

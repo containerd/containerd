@@ -22,7 +22,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -90,7 +89,7 @@ func TestMain(m *testing.M) {
 	if !noDaemon {
 		sys.ForceRemoveAll(defaultRoot)
 
-		stdioFile, err := ioutil.TempFile("", "")
+		stdioFile, err := os.CreateTemp("", "")
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "could not create a new stdio temp file: %s\n", err)
 			os.Exit(1)
@@ -497,7 +496,7 @@ func TestClientReconnect(t *testing.T) {
 }
 
 func createShimDebugConfig() string {
-	f, err := ioutil.TempFile("", "containerd-config-")
+	f, err := os.CreateTemp("", "containerd-config-")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create config file: %s\n", err)
 		os.Exit(1)

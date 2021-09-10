@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -52,7 +51,7 @@ func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, fun
 		buf               = bytes.NewBuffer(nil)
 	)
 
-	tempDir, err := ioutil.TempDir("", "containerd-test-new-daemon-with-config")
+	tempDir, err := os.MkdirTemp("", "containerd-test-new-daemon-with-config")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +62,7 @@ func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, fun
 	}()
 
 	configTOMLFile := filepath.Join(tempDir, "config.toml")
-	if err = ioutil.WriteFile(configTOMLFile, []byte(configTOML), 0600); err != nil {
+	if err = os.WriteFile(configTOMLFile, []byte(configTOML), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -119,7 +118,7 @@ func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, fun
 
 // TestDaemonRuntimeRoot ensures plugin.linux.runtime_root is not ignored
 func TestDaemonRuntimeRoot(t *testing.T) {
-	runtimeRoot, err := ioutil.TempDir("", "containerd-test-runtime-root")
+	runtimeRoot, err := os.MkdirTemp("", "containerd-test-runtime-root")
 	if err != nil {
 		t.Fatal(err)
 	}

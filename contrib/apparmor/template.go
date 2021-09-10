@@ -25,7 +25,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -131,7 +130,7 @@ func loadData(name string) (*data, error) {
 	p.Version = ver
 
 	// Figure out the daemon profile.
-	currentProfile, err := ioutil.ReadFile("/proc/self/attr/current")
+	currentProfile, err := os.ReadFile("/proc/self/attr/current")
 	if err != nil {
 		// If we couldn't get the daemon profile, assume we are running
 		// unconfined which is generally the default.

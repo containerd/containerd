@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -193,7 +192,7 @@ func ReadAddress(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
 	}

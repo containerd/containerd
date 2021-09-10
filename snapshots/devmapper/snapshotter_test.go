@@ -23,7 +23,6 @@ import (
 	"context"
 	_ "crypto/sha256"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -87,7 +86,7 @@ func TestSnapshotterSuite(t *testing.T) {
 	ctx = namespaces.WithNamespace(ctx, "testsuite")
 
 	t.Run("DevMapperUsage", func(t *testing.T) {
-		tempDir, err := ioutil.TempDir("", "snapshot-suite-usage")
+		tempDir, err := os.MkdirTemp("", "snapshot-suite-usage")
 		assert.NilError(t, err)
 		defer os.RemoveAll(tempDir)
 

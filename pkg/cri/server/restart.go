@@ -17,7 +17,6 @@
 package server
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
@@ -458,7 +457,7 @@ func (c *criService) loadImages(ctx context.Context, cImages []containerd.Image)
 
 func cleanupOrphanedIDDirs(ctx context.Context, cntrs []containerd.Container, base string) error {
 	// Cleanup orphaned id directories.
-	dirs, err := ioutil.ReadDir(base)
+	dirs, err := os.ReadDir(base)
 	if err != nil && !os.IsNotExist(err) {
 		return errors.Wrap(err, "failed to read base directory")
 	}

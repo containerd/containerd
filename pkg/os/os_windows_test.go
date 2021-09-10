@@ -19,7 +19,6 @@ package os
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -162,7 +161,7 @@ func setupVHDVolume(t *testing.T, vhdPath string) string {
 }
 
 func writeFile(t *testing.T, path string, content []byte) {
-	if err := ioutil.WriteFile(path, content, 0644); err != nil {
+	if err := os.WriteFile(path, content, 0644); err != nil {
 		t.Fatal(err)
 	}
 }

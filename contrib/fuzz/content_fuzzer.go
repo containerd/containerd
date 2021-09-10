@@ -21,7 +21,6 @@ import (
 	"context"
 	_ "crypto/sha256" // required by go-digest
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -101,7 +100,7 @@ func FuzzCSWalk(data []byte) int {
 	ctx := context.Background()
 	expected := map[digest.Digest]struct{}{}
 	found := map[digest.Digest]struct{}{}
-	tmpdir, err := ioutil.TempDir("", "fuzzing-")
+	tmpdir, err := os.MkdirTemp("", "fuzzing-")
 	if err != nil {
 		return 0
 	}
@@ -145,7 +144,7 @@ func FuzzArchiveExport(data []byte) int {
 		return 0
 	}
 	ctx := context.Background()
-	tmpdir, err := ioutil.TempDir("", "fuzzing-")
+	tmpdir, err := os.MkdirTemp("", "fuzzing-")
 	if err != nil {
 		return 0
 	}

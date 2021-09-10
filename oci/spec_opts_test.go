@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -327,7 +326,7 @@ func TestWithSpecFromFile(t *testing.T) {
 		ctx = namespaces.WithNamespace(context.Background(), "test")
 	)
 
-	fp, err := ioutil.TempFile("", "testwithdefaultspec.json")
+	fp, err := os.CreateTemp("", "testwithdefaultspec.json")
 	if err != nil {
 		t.Fatal(err)
 	}

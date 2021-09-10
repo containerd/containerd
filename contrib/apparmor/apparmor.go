@@ -22,7 +22,6 @@ package apparmor
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
 	"os"
 
 	"github.com/containerd/containerd/containers"
@@ -65,7 +64,7 @@ func LoadDefaultProfile(name string) error {
 	if err != nil {
 		return err
 	}
-	f, err := ioutil.TempFile(os.Getenv("XDG_RUNTIME_DIR"), p.Name)
+	f, err := os.CreateTemp(os.Getenv("XDG_RUNTIME_DIR"), p.Name)
 	if err != nil {
 		return err
 	}

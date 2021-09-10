@@ -17,7 +17,6 @@
 package ioutil
 
 import (
-	"io/ioutil"
 	"os"
 	"sort"
 	"strconv"
@@ -69,7 +68,7 @@ func TestSerialWriteCloser(t *testing.T) {
 			testData[i] = []byte(repeatNumber(i, dataLen) + "\n")
 		}
 
-		f, err := ioutil.TempFile("", "serial-write-closer")
+		f, err := os.CreateTemp("", "serial-write-closer")
 		require.NoError(t, err)
 		defer os.RemoveAll(f.Name())
 		defer f.Close()
@@ -91,7 +90,7 @@ func TestSerialWriteCloser(t *testing.T) {
 		wc.Close()
 
 		// Check test result
-		content, err := ioutil.ReadFile(f.Name())
+		content, err := os.ReadFile(f.Name())
 		require.NoError(t, err)
 		resultData := strings.Split(strings.TrimSpace(string(content)), "\n")
 		require.Len(t, resultData, goroutine)

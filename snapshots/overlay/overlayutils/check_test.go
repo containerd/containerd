@@ -20,7 +20,6 @@
 package overlayutils
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -31,7 +30,7 @@ import (
 
 func testOverlaySupported(t testing.TB, expected bool, mkfs ...string) {
 	testutil.RequiresRoot(t)
-	mnt, err := ioutil.TempDir("", "containerd-fs-test-supports-overlay")
+	mnt, err := os.MkdirTemp("", "containerd-fs-test-supports-overlay")
 	if err != nil {
 		t.Fatal(err)
 	}

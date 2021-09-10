@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -38,7 +37,7 @@ import (
 func TestOverlayApply(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	base, err := ioutil.TempDir("", "test-ovl-diff-apply-")
+	base, err := os.MkdirTemp("", "test-ovl-diff-apply-")
 	if err != nil {
 		t.Fatalf("unable to create temp dir: %+v", err)
 	}
@@ -57,7 +56,7 @@ func TestOverlayApply(t *testing.T) {
 func TestOverlayApplyNoParents(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	base, err := ioutil.TempDir("", "test-ovl-diff-apply-")
+	base, err := os.MkdirTemp("", "test-ovl-diff-apply-")
 	if err != nil {
 		t.Fatalf("unable to create temp dir: %+v", err)
 	}
@@ -96,7 +95,7 @@ type overlayContext struct {
 type contextKey struct{}
 
 func (d overlayDiffApplier) TestContext(ctx context.Context) (context.Context, func(), error) {
-	merged, err := ioutil.TempDir(d.tmp, "merged")
+	merged, err := os.MkdirTemp(d.tmp, "merged")
 	if err != nil {
 		return ctx, nil, errors.Wrap(err, "failed to make merged dir")
 	}
@@ -117,7 +116,7 @@ func (d overlayDiffApplier) TestContext(ctx context.Context) (context.Context, f
 func (d overlayDiffApplier) Apply(ctx context.Context, a fstest.Applier) (string, func(), error) {
 	oc := ctx.Value(contextKey{}).(*overlayContext)
 
-	applyCopy, err := ioutil.TempDir(d.tmp, "apply-copy-")
+	applyCopy, err := os.MkdirTemp(d.tmp, "apply-copy-")
 	if err != nil {
 		return "", nil, errors.Wrap(err, "failed to create temp dir")
 	}
@@ -149,7 +148,7 @@ func (d overlayDiffApplier) Apply(ctx context.Context, a fstest.Applier) (string
 		oc.mounted = false
 	}
 
-	next, err := ioutil.TempDir(d.tmp, "lower-")
+	next, err := os.MkdirTemp(d.tmp, "lower-")
 	if err != nil {
 		return "", nil, errors.Wrap(err, "failed to create temp dir")
 	}

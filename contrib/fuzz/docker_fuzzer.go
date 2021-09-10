@@ -25,7 +25,7 @@ package docker
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -67,7 +67,7 @@ func FuzzFetcher(data []byte) int {
 	if err != nil {
 		return 0
 	}
-	b, err := ioutil.ReadAll(rc)
+	b, err := io.ReadAll(rc)
 	if err != nil {
 		return 0
 	}

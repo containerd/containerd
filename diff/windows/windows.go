@@ -24,7 +24,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"time"
 
 	winio "github.com/Microsoft/go-winio"
@@ -150,7 +149,7 @@ func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 	}
 
 	// Read any trailing data
-	if _, err := io.Copy(ioutil.Discard, rc); err != nil {
+	if _, err := io.Copy(io.Discard, rc); err != nil {
 		return emptyDesc, err
 	}
 

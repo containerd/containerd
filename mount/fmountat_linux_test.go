@@ -17,7 +17,6 @@
 package mount
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -46,7 +45,7 @@ func makeTestForFMountat(fn fMountatCaseFunc) func(t *testing.T) {
 	return func(t *testing.T) {
 		t.Parallel()
 
-		suiteDir, err := ioutil.TempDir("", "fmountat-test-")
+		suiteDir, err := os.MkdirTemp("", "fmountat-test-")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -94,7 +93,7 @@ func testFMountatNormal(t *testing.T, root string) {
 	defer umount(t, fsdir)
 
 	// check hi file
-	content, err := ioutil.ReadFile(filepath.Join(fsdir, "hi"))
+	content, err := os.ReadFile(filepath.Join(fsdir, "hi"))
 	if err != nil {
 		t.Fatalf("failed to read file: %+v", err)
 	}

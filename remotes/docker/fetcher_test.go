@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -73,7 +72,7 @@ func TestFetcherOpen(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to open: %+v", err)
 		}
-		b, err := ioutil.ReadAll(rc)
+		b, err := io.ReadAll(rc)
 		if err != nil {
 			t.Fatal(err)
 		}

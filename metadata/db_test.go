@@ -21,7 +21,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -74,7 +73,7 @@ func testDB(t *testing.T, opt ...testOpt) (context.Context, *DB, func()) {
 		o(&topts)
 	}
 
-	dirname, err := ioutil.TempDir("", strings.Replace(t.Name(), "/", "_", -1)+"-")
+	dirname, err := os.MkdirTemp("", strings.Replace(t.Name(), "/", "_", -1)+"-")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -765,7 +764,7 @@ type testLease struct {
 }
 
 func newStores(t testing.TB) (*DB, content.Store, snapshots.Snapshotter, func()) {
-	td, err := ioutil.TempDir("", "gc-test-")
+	td, err := os.MkdirTemp("", "gc-test-")
 	if err != nil {
 		t.Fatal(err)
 	}

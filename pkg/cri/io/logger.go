@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -43,7 +42,7 @@ const (
 
 // NewDiscardLogger creates logger which discards all the input.
 func NewDiscardLogger() io.WriteCloser {
-	return cioutil.NewNopWriteCloser(ioutil.Discard)
+	return cioutil.NewNopWriteCloser(io.Discard)
 }
 
 // NewCRILogger returns a write closer which redirect container log into

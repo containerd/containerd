@@ -19,7 +19,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -67,7 +66,7 @@ func MetaStoreSuite(t *testing.T, name string, meta func(root string) (*MetaStor
 func makeTest(t *testing.T, name string, metaFn metaFactory, fn testFunc) func(t *testing.T) {
 	return func(t *testing.T) {
 		ctx := context.Background()
-		tmpDir, err := ioutil.TempDir("", "metastore-test-"+name+"-")
+		tmpDir, err := os.MkdirTemp("", "metastore-test-"+name+"-")
 		if err != nil {
 			t.Fatal(err)
 		}

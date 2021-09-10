@@ -19,7 +19,6 @@ package testsuite
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 
@@ -30,7 +29,7 @@ import (
 )
 
 func applyToMounts(m []mount.Mount, work string, a fstest.Applier) (err error) {
-	td, err := ioutil.TempDir(work, "prepare")
+	td, err := os.MkdirTemp(work, "prepare")
 	if err != nil {
 		return errors.Wrap(err, "failed to create temp dir")
 	}
@@ -71,7 +70,7 @@ func createSnapshot(ctx context.Context, sn snapshots.Snapshotter, parent, work 
 }
 
 func checkSnapshot(ctx context.Context, sn snapshots.Snapshotter, work, name, check string) (err error) {
-	td, err := ioutil.TempDir(work, "check")
+	td, err := os.MkdirTemp(work, "check")
 	if err != nil {
 		return errors.Wrap(err, "failed to create temp dir")
 	}
@@ -112,7 +111,7 @@ func checkSnapshot(ctx context.Context, sn snapshots.Snapshotter, work, name, ch
 // using the provided appliers, checking each snapshot created in a view
 // against the changes applied to a single directory.
 func checkSnapshots(ctx context.Context, sn snapshots.Snapshotter, work string, as ...fstest.Applier) error {
-	td, err := ioutil.TempDir(work, "flat")
+	td, err := os.MkdirTemp(work, "flat")
 	if err != nil {
 		return errors.Wrap(err, "failed to create temp dir")
 	}

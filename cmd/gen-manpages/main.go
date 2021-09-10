@@ -19,7 +19,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -62,7 +61,7 @@ func run() error {
 		return err
 	}
 	_ = os.MkdirAll(dir, os.ModePerm)
-	if err := ioutil.WriteFile(filepath.Join(dir, fmt.Sprintf("%s.%s", name, section)), []byte(data), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("%s.%s", name, section)), []byte(data), 0644); err != nil {
 		return err
 	}
 	return nil

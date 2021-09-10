@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -288,7 +287,7 @@ func (r *Runtime) Tasks(ctx context.Context, all bool) ([]runtime.Task, error) {
 }
 
 func (r *Runtime) restoreTasks(ctx context.Context) ([]*Task, error) {
-	dir, err := ioutil.ReadDir(r.state)
+	dir, err := os.ReadDir(r.state)
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +339,7 @@ func (r *Runtime) Delete(ctx context.Context, id string) (*runtime.Exit, error) 
 }
 
 func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
-	dir, err := ioutil.ReadDir(filepath.Join(r.state, ns))
+	dir, err := os.ReadDir(filepath.Join(r.state, ns))
 	if err != nil {
 		return nil, err
 	}
@@ -413,7 +412,7 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 		if r.config.ShimDebug {
 			go copyAndClose(os.Stdout, shimStdoutLog)
 		} else {
-			go copyAndClose(ioutil.Discard, shimStdoutLog)
+			go copyAndClose(io.Discard, shimStdoutLog)
 		}
 
 		shimStderrLog, err := v1.OpenShimStderrLog(ctx, logDirPath)
@@ -428,7 +427,7 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 		if r.config.ShimDebug {
 			go copyAndClose(os.Stderr, shimStderrLog)
 		} else {
-			go copyAndClose(ioutil.Discard, shimStderrLog)
+			go copyAndClose(io.Discard, shimStderrLog)
 		}
 
 		t, err := newTask(id, ns, pid, s, r.events, r.tasks, bundle)

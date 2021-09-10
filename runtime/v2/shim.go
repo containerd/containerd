@@ -19,7 +19,6 @@ package v2
 import (
 	"context"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -55,7 +54,7 @@ func init() {
 }
 
 func loadAddress(path string) (string, error) {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
 	}

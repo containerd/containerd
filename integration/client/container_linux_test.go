@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -573,7 +572,7 @@ func TestDaemonReconnectsToShimIOPipesOnRestart(t *testing.T) {
 
 	<-statusC
 
-	stdioContents, err := ioutil.ReadFile(ctrdStdioFilePath)
+	stdioContents, err := os.ReadFile(ctrdStdioFilePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1963,7 +1962,7 @@ func TestContainerNoSTDIN(t *testing.T) {
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
-	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStreams(nil, ioutil.Discard, ioutil.Discard)))
+	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStreams(nil, io.Discard, io.Discard)))
 	if err != nil {
 		t.Fatal(err)
 	}

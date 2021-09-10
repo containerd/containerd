@@ -18,7 +18,6 @@ package oci
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -115,14 +114,14 @@ func TestDropCaps(t *testing.T) {
 func TestGetDevices(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	dir, err := ioutil.TempDir("/dev", t.Name())
+	dir, err := os.MkdirTemp("/dev", t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
 
 	zero := filepath.Join(dir, "zero")
-	if err := ioutil.WriteFile(zero, nil, 0600); err != nil {
+	if err := os.WriteFile(zero, nil, 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -162,7 +161,7 @@ func TestGetDevices(t *testing.T) {
 	})
 	t.Run("two devices", func(t *testing.T) {
 		nullDev := filepath.Join(dir, "null")
-		if err := ioutil.WriteFile(nullDev, nil, 0600); err != nil {
+		if err := os.WriteFile(nullDev, nil, 0600); err != nil {
 			t.Fatal(err)
 		}
 
@@ -237,7 +236,7 @@ func TestGetDevices(t *testing.T) {
 			}
 		})
 		t.Run("regular file in dir", func(t *testing.T) {
-			if err := ioutil.WriteFile(filepath.Join(dir, "somefile"), []byte("hello"), 0600); err != nil {
+			if err := os.WriteFile(filepath.Join(dir, "somefile"), []byte("hello"), 0600); err != nil {
 				t.Fatal(err)
 			}
 			defer os.Remove(filepath.Join(dir, "somefile"))

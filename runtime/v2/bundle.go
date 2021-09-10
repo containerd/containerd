@@ -19,7 +19,6 @@ package v2
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -100,7 +99,7 @@ func NewBundle(ctx context.Context, root, state, id string, spec []byte) (b *Bun
 		return nil, err
 	}
 	// write the spec to the bundle
-	err = ioutil.WriteFile(filepath.Join(b.Path, configFilename), spec, 0666)
+	err = os.WriteFile(filepath.Join(b.Path, configFilename), spec, 0666)
 	return b, err
 }
 

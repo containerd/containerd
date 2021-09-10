@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -155,7 +154,7 @@ func (c *binaryProcessor) Close() error {
 }
 
 func getUiqPath() (string, error) {
-	dir, err := ioutil.TempDir("", "")
+	dir, err := os.MkdirTemp("", "")
 	if err != nil {
 		return "", err
 	}

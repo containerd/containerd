@@ -19,7 +19,6 @@ package content
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -519,7 +518,7 @@ func edit(context *cli.Context, rd io.Reader) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("editor is required")
 	}
 
-	tmp, err := ioutil.TempFile(os.Getenv("XDG_RUNTIME_DIR"), "edit-")
+	tmp, err := os.CreateTemp(os.Getenv("XDG_RUNTIME_DIR"), "edit-")
 	if err != nil {
 		return nil, err
 	}

@@ -20,7 +20,6 @@
 package dmsetup
 
 import (
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -44,7 +43,7 @@ const (
 func TestDMSetup(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	tempDir, err := ioutil.TempDir("", "dmsetup-tests-")
+	tempDir, err := os.MkdirTemp("", "dmsetup-tests-")
 	assert.NilError(t, err, "failed to make temp dir for tests")
 
 	defer func() {
@@ -191,7 +190,7 @@ func testVersion(t *testing.T) {
 }
 
 func createLoopbackDevice(t *testing.T, dir string) (string, string) {
-	file, err := ioutil.TempFile(dir, "dmsetup-tests-")
+	file, err := os.CreateTemp(dir, "dmsetup-tests-")
 	assert.NilError(t, err)
 
 	size, err := units.RAMInBytes("16Mb")

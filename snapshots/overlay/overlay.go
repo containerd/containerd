@@ -22,7 +22,6 @@ package overlay
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -478,7 +477,7 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 }
 
 func (o *snapshotter) prepareDirectory(ctx context.Context, snapshotDir string, kind snapshots.Kind) (string, error) {
-	td, err := ioutil.TempDir(snapshotDir, "new-")
+	td, err := os.MkdirTemp(snapshotDir, "new-")
 	if err != nil {
 		return "", errors.Wrap(err, "failed to create temp dir")
 	}

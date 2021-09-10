@@ -18,7 +18,6 @@ package server
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -73,7 +72,7 @@ func newTestCRIService() *criService {
 func TestLoadBaseOCISpec(t *testing.T) {
 	spec := oci.Spec{Version: "1.0.2", Hostname: "default"}
 
-	file, err := ioutil.TempFile("", "spec-test-")
+	file, err := os.CreateTemp("", "spec-test-")
 	require.NoError(t, err)
 
 	defer func() {
