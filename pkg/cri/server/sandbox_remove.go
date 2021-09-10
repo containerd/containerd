@@ -26,7 +26,6 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/pkg/cri/store"
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 )
 
 // RemovePodSandbox removes the sandbox. If there are running containers in the
@@ -46,13 +45,12 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	// Use the full sandbox id.
 	id := sandbox.ID
 
-	// If the sandbox is still running or in an unknown state, forcibly stop it.
-	state := sandbox.Status.Get().State
-	if state == sandboxstore.StateReady || state == sandboxstore.StateUnknown {
-		logrus.Infof("Forcibly stopping sandbox %q", id)
-		if err := c.stopPodSandbox(ctx, sandbox); err != nil {
-			return nil, errors.Wrapf(err, "failed to forcibly stop sandbox %q", id)
-		}
+	// If the sandbox is still running, not ready, or in an unknown state, forcibly stop it.
+	// Even if it's in a NotReady state, this will close its network namespace, if open.
+	// This can happen if the task process associated with the Pod died or it was killed.
+	logrus.Infof("Forcibly stopping sandbox %q", id)
+	if err := c.stopPodSandbox(ctx, sandbox); err != nil {
+		return nil, errors.Wrapf(err, "failed to forcibly stop sandbox %q", id)
 	}
 
 	// Return error if sandbox network namespace is not closed yet.
