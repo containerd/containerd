@@ -27,13 +27,13 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path"
 	"strconv"
 	"strings"
 	"text/template"
 
 	"github.com/pkg/errors"
+	exec "golang.org/x/sys/execabs"
 )
 
 // NOTE: This code is copied from <github.com/docker/docker/profiles/apparmor>.

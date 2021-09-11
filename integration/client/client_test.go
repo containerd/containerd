@@ -24,7 +24,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"testing"
 	"time"
 
@@ -42,6 +41,7 @@ import (
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/sirupsen/logrus"
+	exec "golang.org/x/sys/execabs"
 )
 
 var (

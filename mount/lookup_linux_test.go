@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -29,6 +28,7 @@ import (
 	// so we use continuity/testutil instead.
 	"github.com/containerd/continuity/testutil"
 	"github.com/containerd/continuity/testutil/loopback"
+	exec "golang.org/x/sys/execabs"
 	"gotest.tools/v3/assert"
 )
 

@@ -20,11 +20,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"testing"
 	"time"
 
 	"github.com/containerd/containerd/pkg/userns"
+	exec "golang.org/x/sys/execabs"
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 )

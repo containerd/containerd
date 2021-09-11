@@ -22,7 +22,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path"
 	"runtime"
 	"strings"
@@ -33,18 +32,18 @@ import (
 	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	_ "github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
-	"github.com/containerd/typeurl"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
-
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/go-runc"
+	"github.com/containerd/typeurl"
 	gogotypes "github.com/gogo/protobuf/types"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
+	exec "golang.org/x/sys/execabs"
 )
 
 func empty() cio.Creator {

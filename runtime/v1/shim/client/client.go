@@ -26,19 +26,12 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
-
-	"golang.org/x/sys/unix"
-
-	"github.com/containerd/ttrpc"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
@@ -47,7 +40,12 @@ import (
 	"github.com/containerd/containerd/runtime/v1/shim"
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/containerd/sys"
+	"github.com/containerd/ttrpc"
 	ptypes "github.com/gogo/protobuf/types"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	exec "golang.org/x/sys/execabs"
+	"golang.org/x/sys/unix"
 )
 
 var empty = &ptypes.Empty{}

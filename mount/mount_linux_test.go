@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"testing"
 
 	"github.com/containerd/continuity/testutil"
+	exec "golang.org/x/sys/execabs"
 )
 
 func TestLongestCommonPrefix(t *testing.T) {

@@ -27,7 +27,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -39,6 +38,7 @@ import (
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/continuity/fs/fstest"
 	"github.com/pkg/errors"
+	exec "golang.org/x/sys/execabs"
 )
 
 const tarCmd = "tar"

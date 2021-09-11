@@ -18,13 +18,13 @@ package integration
 
 import (
 	"fmt"
-	"os/exec"
 	goruntime "runtime"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	exec "golang.org/x/sys/execabs"
 )
 
 func TestVolumeCopyUp(t *testing.T) {

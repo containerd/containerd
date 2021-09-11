@@ -19,12 +19,12 @@ package client
 import (
 	"context"
 	"io"
-	"os/exec"
 	"sync"
 	"syscall"
 
 	. "github.com/containerd/containerd"
 	"github.com/pkg/errors"
+	exec "golang.org/x/sys/execabs"
 )
 
 type daemon struct {

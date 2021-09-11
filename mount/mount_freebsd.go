@@ -18,10 +18,10 @@ package mount
 
 import (
 	"os"
-	"os/exec"
 	"time"
 
 	"github.com/pkg/errors"
+	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 )
 

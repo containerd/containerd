@@ -21,7 +21,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -35,6 +34,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
+	exec "golang.org/x/sys/execabs"
 )
 
 var (

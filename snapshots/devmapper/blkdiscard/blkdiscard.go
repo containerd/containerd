@@ -19,7 +19,7 @@
 
 package blkdiscard
 
-import "os/exec"
+import exec "golang.org/x/sys/execabs"
 
 // Version returns the output of "blkdiscard --version"
 func Version() (string, error) {

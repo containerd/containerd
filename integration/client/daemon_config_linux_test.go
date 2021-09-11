@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -37,6 +36,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	srvconfig "github.com/containerd/containerd/services/server/config"
+	exec "golang.org/x/sys/execabs"
 )
 
 // the following nolint is for shutting up gometalinter on non-linux.
