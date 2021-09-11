@@ -29,6 +29,5 @@ func getLinkInfo(fi os.FileInfo) (uint64, bool) {
 		return 0, false
 	}
 
-	// Ino is uint32 on bsd, uint64 on darwin/linux/solaris
-	return uint64(s.Ino), !fi.IsDir() && s.Nlink > 1 // nolint: unconvert
+	return uint64(s.Ino), !fi.IsDir() && s.Nlink > 1 //nolint: unconvert // ino is uint32 on bsd, uint64 on darwin/linux/solaris
 }

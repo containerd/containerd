@@ -19,6 +19,7 @@
 package loopback
 
 import (
+	"bytes"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -46,22 +47,25 @@ func New(size int64) (*Loopback, error) {
 
 	// create device
 	losetup := exec.Command("losetup", "--find", "--show", file.Name())
-	p, err := losetup.Output()
-	if err != nil {
+	var stdout, stderr bytes.Buffer
+	losetup.Stdout = &stdout
+	losetup.Stderr = &stderr
+	if err := losetup.Run(); err != nil {
 		os.Remove(file.Name())
-		return nil, errors.Wrap(err, "loopback setup failed")
+		return nil, errors.Wrapf(err, "loopback setup failed (%v): stdout=%q, stderr=%q",
+			losetup.Args, stdout.String(), stderr.String())
 	}
 
-	deviceName := strings.TrimSpace(string(p))
+	deviceName := strings.TrimSpace(stdout.String())
 	logrus.Debugf("Created loop device %s (using %s)", deviceName, file.Name())
 
 	cleanup := func() error {
 		// detach device
 		logrus.Debugf("Removing loop device %s", deviceName)
 		losetup := exec.Command("losetup", "--detach", deviceName)
-		err := losetup.Run()
-		if err != nil {
-			return errors.Wrapf(err, "Could not remove loop device %s", deviceName)
+		if out, err := losetup.CombinedOutput(); err != nil {
+			return errors.Wrapf(err, "Could not remove loop device %s (%v): %q",
+				deviceName, losetup.Args, string(out))
 		}
 
 		// remove file
