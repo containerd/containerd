@@ -125,7 +125,7 @@ func (a byValue) Less(i, j int) bool { return a[i].Value < a[j].Value }
 
 // GetGroupNames returns the list of Error group names that are registered
 func GetGroupNames() []string {
-	keys := []string{}
+	keys := make([]string, 0, len(groupToDescriptors))
 
 	for k := range groupToDescriptors {
 		keys = append(keys, k)
