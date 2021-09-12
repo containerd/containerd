@@ -65,7 +65,7 @@ type CRIService interface {
 	Run() error
 	// io.Closer is used by containerd to gracefully stop cri service.
 	io.Closer
-	plugin.Service
+	Register(*grpc.Server) error
 	grpcServices
 }
 
