@@ -26,7 +26,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// InitContext is used for plugin inititalization
+// InitContext is used for plugin initialization
 type InitContext struct {
 	Context      context.Context
 	Root         string
