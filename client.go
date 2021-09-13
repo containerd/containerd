@@ -62,6 +62,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
@@ -134,8 +135,13 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 		if copts.defaultns != "" {
 			unary, stream := newNSInterceptors(copts.defaultns)
 			gopts = append(gopts,
-				grpc.WithUnaryInterceptor(unary),
-				grpc.WithStreamInterceptor(stream),
+				grpc.WithChainUnaryInterceptor(unary, otelgrpc.UnaryClientInterceptor()),
+				grpc.WithChainStreamInterceptor(stream, otelgrpc.StreamClientInterceptor()),
+			)
+		} else {
+			gopts = append(gopts,
+				grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
+				grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
 			)
 		}
 		connector := func() (*grpc.ClientConn, error) {
