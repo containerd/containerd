@@ -17,6 +17,7 @@
 package docker
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"io/ioutil"
@@ -263,16 +264,18 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 
 	pr, pw := io.Pipe()
 	respC := make(chan response, 1)
-	body := ioutil.NopCloser(pr)
+	var body []byte
 
 	req.body = func() (io.ReadCloser, error) {
 		if body == nil {
-			return nil, errors.New("cannot reuse body, request must be retried")
+			// Explicitly declare err so that we can use = instead of := (which would cause body to shadow the outer scope)
+			var err error
+			body, err = ioutil.ReadAll(pr)
+			if err != nil {
+				return nil, err
+			}
 		}
-		// Only use the body once since pipe cannot be seeked
-		ob := body
-		body = nil
-		return ob, nil
+		return ioutil.NopCloser(bytes.NewBuffer(body)), nil
 	}
 	req.size = desc.Size
 
