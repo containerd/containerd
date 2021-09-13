@@ -47,6 +47,9 @@ type Config struct {
 
 	// Whether to discard blocks when removing a thin device.
 	DiscardBlocks bool `toml:"discard_blocks"`
+
+	// Defines file system to use for snapshout device mount. Defaults to "ext4"
+	FileSystemType fsType `toml:"fs_type"`
 }
 
 // LoadConfig reads devmapper configuration file from disk in TOML format
@@ -86,6 +89,10 @@ func (c *Config) parse() error {
 		return errors.Wrapf(err, "failed to parse base image size: '%s'", c.BaseImageSize)
 	}
 
+	if c.FileSystemType == "" {
+		c.FileSystemType = fsTypeExt4
+	}
+
 	c.BaseImageSizeBytes = uint64(baseImageSize)
 	return nil
 }
@@ -104,6 +111,16 @@ func (c *Config) Validate() error {
 
 	if c.BaseImageSize == "" {
 		result = multierror.Append(result, fmt.Errorf("base_image_size is required"))
+	}
+
+	if c.FileSystemType != "" {
+		switch c.FileSystemType {
+		case fsTypeExt4, fsTypeXFS:
+		default:
+			result = multierror.Append(result, fmt.Errorf("unsupported Filesystem Type: %q", c.FileSystemType))
+		}
+	} else {
+		result = multierror.Append(result, fmt.Errorf("filesystem type cannot be empty"))
 	}
 
 	return result.ErrorOrNil()

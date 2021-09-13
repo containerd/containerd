@@ -39,9 +39,13 @@ import (
 	exec "golang.org/x/sys/execabs"
 )
 
+type fsType string
+
 const (
-	metadataFileName = "metadata.db"
-	fsTypeExt4       = "ext4"
+	metadataFileName               = "metadata.db"
+	fsTypeExt4              fsType = "ext4"
+	fsTypeXFS               fsType = "xfs"
+	devmapperSnapshotFsType        = "containerd.io/snapshot/devmapper/fstype"
 )
 
 type closeFunc func() error
@@ -183,7 +187,13 @@ func (s *Snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 		return err
 	})
 
-	return s.buildMounts(snap), nil
+	snapInfo, err := s.Stat(ctx, key)
+	if err != nil {
+		log.G(ctx).WithError(err).Errorf("cannot retrieve snapshot info for key %s", key)
+		return nil, err
+	}
+
+	return s.buildMounts(ctx, snap, fsType(snapInfo.Labels[devmapperSnapshotFsType])), nil
 }
 
 // Prepare creates thin device for an active snapshot identified by key
@@ -227,7 +237,7 @@ func (s *Snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	log.G(ctx).WithFields(logrus.Fields{"name": name, "key": key}).Debug("commit")
 
 	return s.withTransaction(ctx, true, func(ctx context.Context) error {
-		id, _, _, err := storage.GetInfo(ctx, key)
+		id, snapInfo, _, err := storage.GetInfo(ctx, key)
 		if err != nil {
 			return err
 		}
@@ -242,6 +252,15 @@ func (s *Snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 			Size: size,
 		}
 
+		// Add file system type label if present. In case more than one file system
+		// type is supported file system type from parent will be used for creating
+		// snapshot.
+		fsTypeActive := snapInfo.Labels[devmapperSnapshotFsType]
+		if fsTypeActive != "" {
+			fsLabel := make(map[string]string)
+			fsLabel[devmapperSnapshotFsType] = fsTypeActive
+			opts = append(opts, snapshots.WithLabels(fsLabel))
+		}
 		_, err = storage.CommitActive(ctx, key, name, usage, opts...)
 		if err != nil {
 			return err
@@ -351,6 +370,33 @@ func (s *Snapshotter) Close() error {
 }
 
 func (s *Snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	var fileSystemType fsType
+
+	// For snapshots with no parents, we use file system type as configured in config.
+	// For snapshots with parents, we inherit the file system type. We use the same
+	// file system type derived here for building mount points later.
+	fsLabel := make(map[string]string)
+	if len(parent) == 0 {
+		fileSystemType = s.config.FileSystemType
+	} else {
+		_, snapInfo, _, err := storage.GetInfo(ctx, parent)
+		if err != nil {
+			log.G(ctx).Errorf("failed to read snapshotInfo for %s", parent)
+			return nil, err
+		}
+		fileSystemType = fsType(snapInfo.Labels[devmapperSnapshotFsType])
+		if fileSystemType == "" {
+			// For parent snapshots created without label support, we can assume that
+			// they are ext4 type. Children of parents with no label for fsType will
+			// now have correct label and committed snapshots from them will carry fs type
+			// label. TODO: find out if it is better to update the parent's label with
+			// fsType as ext4.
+			fileSystemType = fsTypeExt4
+		}
+	}
+	fsLabel[devmapperSnapshotFsType] = string(fileSystemType)
+	opts = append(opts, snapshots.WithLabels(fsLabel))
+
 	snap, err := storage.CreateSnapshot(ctx, kind, key, parent, opts...)
 	if err != nil {
 		return nil, err
@@ -366,7 +412,7 @@ func (s *Snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			return nil, err
 		}
 
-		if err := mkfs(ctx, dmsetup.GetFullDevicePath(deviceName)); err != nil {
+		if err := mkfs(ctx, s.config.FileSystemType, dmsetup.GetFullDevicePath(deviceName)); err != nil {
 			status, sErr := dmsetup.Status(s.pool.poolName)
 			if sErr != nil {
 				multierror.Append(err, sErr)
@@ -380,16 +426,17 @@ func (s *Snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	} else {
 		parentDeviceName := s.getDeviceName(snap.ParentIDs[0])
 		snapDeviceName := s.getDeviceName(snap.ID)
-		log.G(ctx).Debugf("creating snapshot device '%s' from '%s'", snapDeviceName, parentDeviceName)
 
-		err := s.pool.CreateSnapshotDevice(ctx, parentDeviceName, snapDeviceName, s.config.BaseImageSizeBytes)
+		log.G(ctx).Debugf("creating snapshot device '%s' from '%s' with fsType: '%s'", snapDeviceName, parentDeviceName, fileSystemType)
+
+		err = s.pool.CreateSnapshotDevice(ctx, parentDeviceName, snapDeviceName, s.config.BaseImageSizeBytes)
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("failed to create snapshot device from parent %s", parentDeviceName)
 			return nil, err
 		}
 	}
 
-	mounts := s.buildMounts(snap)
+	mounts := s.buildMounts(ctx, snap, fileSystemType)
 
 	// Remove default directories not expected by the container image
 	_ = mount.WithTempMount(ctx, mounts, func(root string) error {
@@ -399,20 +446,35 @@ func (s *Snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	return mounts, nil
 }
 
-// mkfs creates ext4 filesystem on the given devmapper device
-func mkfs(ctx context.Context, path string) error {
-	args := []string{
-		"-E",
-		// We don't want any zeroing in advance when running mkfs on thin devices (see "man mkfs.ext4")
-		"nodiscard,lazy_itable_init=0,lazy_journal_init=0",
-		path,
+// mkfs creates filesystem on the given devmapper device based on type
+// specified in config.
+func mkfs(ctx context.Context, fs fsType, path string) error {
+	mkfsCommand := ""
+	var args []string
+
+	switch fs {
+	case fsTypeExt4:
+		mkfsCommand = "mkfs.ext4"
+		args = []string{
+			"-E",
+			// We don't want any zeroing in advance when running mkfs on thin devices (see "man mkfs.ext4")
+			"nodiscard,lazy_itable_init=0,lazy_journal_init=0",
+			path,
+		}
+	case fsTypeXFS:
+		mkfsCommand = "mkfs.xfs"
+		args = []string{
+			path,
+		}
+	default:
+		return errors.New("file system not supported")
 	}
 
-	log.G(ctx).Debugf("mkfs.ext4 %s", strings.Join(args, " "))
-	b, err := exec.Command("mkfs.ext4", args...).CombinedOutput()
+	log.G(ctx).Debugf("%s %s", mkfsCommand, strings.Join(args, " "))
+	b, err := exec.Command(mkfsCommand, args...).CombinedOutput()
 	out := string(b)
 	if err != nil {
-		return errors.Wrapf(err, "mkfs.ext4 couldn't initialize %q: %s", path, out)
+		return errors.Wrapf(err, "%s couldn't initialize %q: %s", mkfsCommand, path, out)
 	}
 
 	log.G(ctx).Debugf("mkfs:\n%s", out)
@@ -429,9 +491,13 @@ func (s *Snapshotter) getDevicePath(snap storage.Snapshot) string {
 	return dmsetup.GetFullDevicePath(name)
 }
 
-func (s *Snapshotter) buildMounts(snap storage.Snapshot) []mount.Mount {
+func (s *Snapshotter) buildMounts(ctx context.Context, snap storage.Snapshot, fileSystemType fsType) []mount.Mount {
 	var options []string
 
+	if fileSystemType == "" {
+		log.G(ctx).Error("File system type cannot be empty")
+		return nil
+	}
 	if snap.Kind != snapshots.KindActive {
 		options = append(options, "ro")
 	}
@@ -439,7 +505,7 @@ func (s *Snapshotter) buildMounts(snap storage.Snapshot) []mount.Mount {
 	mounts := []mount.Mount{
 		{
 			Source:  s.getDevicePath(snap),
-			Type:    fsTypeExt4,
+			Type:    string(fileSystemType),
 			Options: options,
 		},
 	}
