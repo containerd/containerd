@@ -598,7 +598,7 @@ func (cw *ChangeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 
 		if capability, err := getxattr(source, "security.capability"); err != nil {
 			return errors.Wrap(err, "failed to get capabilities xattr")
-		} else if capability != nil {
+		} else if len(capability) > 0 {
 			if hdr.PAXRecords == nil {
 				hdr.PAXRecords = map[string]string{}
 			}
