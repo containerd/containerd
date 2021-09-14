@@ -77,6 +77,8 @@ const (
 	GCPlugin Type = "io.containerd.gc.v1"
 	// EventPlugin implements event handling
 	EventPlugin Type = "io.containerd.event.v1"
+	// TracingProcessorPlugin implements a open telemetry span processor
+	TracingProcessorPlugin Type = "io.containerd.tracing.processor.v1"
 )
 
 const (
