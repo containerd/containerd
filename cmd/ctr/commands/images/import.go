@@ -60,6 +60,10 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			Name:  "digests",
 			Usage: "whether to create digest images (default: false)",
 		},
+		cli.BoolFlag{
+			Name:  "skip-digest-for-named",
+			Usage: "skip applying --digests option to images named in the importing tar (use it in conjunction with --digests)",
+		},
 		cli.StringFlag{
 			Name:  "index-name",
 			Usage: "image name to keep index as, by default index is discarded",
@@ -95,6 +99,12 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 
 		if context.Bool("digests") {
 			opts = append(opts, containerd.WithDigestRef(archive.DigestTranslator(prefix)))
+		}
+		if context.Bool("skip-digest-for-named") {
+			if !context.Bool("digests") {
+				return fmt.Errorf("--skip-digest-for-named must be specified with --digests option")
+			}
+			opts = append(opts, containerd.WithSkipDigestRef(func(name string) bool { return name != "" }))
 		}
 
 		if idxName := context.String("index-name"); idxName != "" {
