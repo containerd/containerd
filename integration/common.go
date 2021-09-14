@@ -58,12 +58,12 @@ func initImages(imageListFile string) {
 	if imageListFile != "" {
 		fileContent, err := ioutil.ReadFile(imageListFile)
 		if err != nil {
-			panic(fmt.Errorf("Error reading '%v' file contents: %v", imageList, err))
+			panic(fmt.Errorf("error reading '%v' file contents: %v", imageList, err))
 		}
 
 		err = toml.Unmarshal(fileContent, &imageList)
 		if err != nil {
-			panic(fmt.Errorf("Error unmarshalling '%v' TOML file: %v", imageList, err))
+			panic(fmt.Errorf("error unmarshalling '%v' TOML file: %v", imageList, err))
 		}
 	}
 
