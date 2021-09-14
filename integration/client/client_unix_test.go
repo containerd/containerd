@@ -32,7 +32,7 @@ const (
 )
 
 var (
-	testImage    = "mirror.gcr.io/library/busybox:1.32"
+	testImage    = "mirror.gcr.io/library/busybox:1.32.0"
 	shortCommand = withProcessArgs("true")
 	longCommand  = withProcessArgs("/bin/sh", "-c", "while true; do sleep 1; done")
 )
