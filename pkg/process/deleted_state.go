@@ -59,7 +59,7 @@ func (s *deletedState) Delete(ctx context.Context) error {
 	return errors.Wrap(errdefs.ErrNotFound, "cannot delete a deleted process")
 }
 
-func (s *deletedState) Kill(ctx context.Context, sig uint32, all bool) error {
+func (s *deletedState) Kill(ctx context.Context, sig uint32, all bool, rawSignal string) error {
 	return errors.Wrap(errdefs.ErrNotFound, "cannot kill a deleted process")
 }
 

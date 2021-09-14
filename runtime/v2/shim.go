@@ -381,11 +381,12 @@ func (s *shimTask) Start(ctx context.Context) error {
 	return nil
 }
 
-func (s *shimTask) Kill(ctx context.Context, signal uint32, all bool) error {
+func (s *shimTask) Kill(ctx context.Context, signal uint32, all bool, rawSignal string) error {
 	if _, err := s.task.Kill(ctx, &task.KillRequest{
-		ID:     s.ID(),
-		Signal: signal,
-		All:    all,
+		ID:        s.ID(),
+		Signal:    signal,
+		RawSignal: rawSignal,
+		All:       all,
 	}); err != nil {
 		return errdefs.FromGRPC(err)
 	}

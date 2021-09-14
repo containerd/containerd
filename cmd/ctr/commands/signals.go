@@ -42,7 +42,7 @@ func ForwardAllSignals(ctx gocontext.Context, task killer) chan os.Signal {
 				continue
 			}
 			logrus.Debug("forwarding signal ", s)
-			if err := task.Kill(ctx, s.(syscall.Signal)); err != nil {
+			if err := task.Kill(ctx, 0, containerd.WithKillRawSignal(s.String())); err != nil {
 				if errdefs.IsNotFound(err) {
 					logrus.WithError(err).Debugf("Not forwarding signal %s", s)
 					return

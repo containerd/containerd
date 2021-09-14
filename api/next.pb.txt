@@ -4008,6 +4008,13 @@ file {
       type: TYPE_BOOL
       json_name: "all"
     }
+    field {
+      name: "raw_signal"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "rawSignal"
+    }
   }
   message_type {
     name: "ExecProcessRequest"

@@ -50,7 +50,7 @@ type Process interface {
 	// Delete deletes the process and its resourcess
 	Delete(context.Context) error
 	// Kill kills the process
-	Kill(context.Context, uint32, bool) error
+	Kill(context.Context, uint32, bool, string) error
 	// SetExited sets the exit status for the process
 	SetExited(status int)
 }

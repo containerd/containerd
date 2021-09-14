@@ -142,6 +142,7 @@ message KillRequest {
 	string exec_id = 2;
 	uint32 signal = 3;
 	bool all = 4;
+	string raw_signal = 5;
 }
 
 message ExecProcessRequest {

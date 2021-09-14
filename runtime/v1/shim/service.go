@@ -374,7 +374,7 @@ func (s *Service) Kill(ctx context.Context, r *shimapi.KillRequest) (*ptypes.Emp
 		if err != nil {
 			return nil, err
 		}
-		if err := p.Kill(ctx, r.Signal, r.All); err != nil {
+		if err := p.Kill(ctx, r.Signal, r.All, r.RawSignal); err != nil {
 			return nil, errdefs.ToGRPC(err)
 		}
 		return empty, nil
@@ -384,7 +384,7 @@ func (s *Service) Kill(ctx context.Context, r *shimapi.KillRequest) (*ptypes.Emp
 	if err != nil {
 		return nil, err
 	}
-	if err := p.Kill(ctx, r.Signal, r.All); err != nil {
+	if err := p.Kill(ctx, r.Signal, r.All, r.RawSignal); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 	return empty, nil

@@ -26,6 +26,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -33,6 +34,7 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	runc "github.com/containerd/go-runc"
+	"github.com/moby/sys/signal"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
@@ -200,4 +202,17 @@ func stateName(v interface{}) string {
 		return "stopped"
 	}
 	panic(errors.Errorf("invalid state %v", v))
+}
+
+func parseRawSignal(rawSignal string) (unix.Signal, error) {
+	// allow 0 as valid signal
+	s, err := strconv.Atoi(rawSignal)
+	if err == nil {
+		return unix.Signal(s), nil
+	}
+	signal, err := signal.ParseSignal(rawSignal)
+	if err != nil {
+		return -1, err
+	}
+	return signal, nil
 }

@@ -426,7 +426,7 @@ func (l *local) Kill(ctx context.Context, r *api.KillRequest, _ ...grpc.CallOpti
 			return nil, errdefs.ToGRPC(err)
 		}
 	}
-	if err := p.Kill(ctx, r.Signal, r.All); err != nil {
+	if err := p.Kill(ctx, r.Signal, r.All, r.RawSignal); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 	return empty, nil

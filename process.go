@@ -139,10 +139,11 @@ func (p *process) Kill(ctx context.Context, s syscall.Signal, opts ...KillOpts) 
 		}
 	}
 	_, err := p.task.client.TaskService().Kill(ctx, &tasks.KillRequest{
-		Signal:      uint32(s),
 		ContainerID: p.task.id,
 		ExecID:      p.id,
 		All:         i.All,
+		Signal:      uint32(s),
+		RawSignal:   i.RawSignal,
 	})
 	return errdefs.FromGRPC(err)
 }

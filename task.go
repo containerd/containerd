@@ -233,6 +233,7 @@ func (t *task) Kill(ctx context.Context, s syscall.Signal, opts ...KillOpts) err
 		ContainerID: t.id,
 		ExecID:      i.ExecID,
 		All:         i.All,
+		RawSignal:   i.RawSignal,
 	})
 	if err != nil {
 		return errdefs.FromGRPC(err)

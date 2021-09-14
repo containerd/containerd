@@ -27,9 +27,9 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"testing"
 
+	"github.com/containerd/containerd"
 	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/oci"
@@ -250,7 +250,7 @@ func TestCheckpointRestore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Fatal(err)
 	}
 	<-statusC
@@ -337,7 +337,7 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Fatal(err)
 	}
 	<-statusC
@@ -407,7 +407,7 @@ func TestCheckpointLeaveRunning(t *testing.T) {
 		t.Fatalf("expected status %q but received %q", Running, status)
 	}
 
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -466,7 +466,7 @@ func TestCheckpointRestoreWithImagePath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Fatal(err)
 	}
 	<-statusC
@@ -527,7 +527,7 @@ func TestCheckpointRestoreWithImagePath(t *testing.T) {
 	}
 
 	// we wrote the same thing after attach
-	if err := ntask.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := ntask.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Fatal(err)
 	}
 	<-statusC
@@ -607,7 +607,7 @@ func TestCheckpointOnPauseStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Fatal(err)
 	}
 

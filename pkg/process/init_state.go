@@ -36,7 +36,7 @@ type initState interface {
 	Update(context.Context, *google_protobuf.Any) error
 	Checkpoint(context.Context, *CheckpointConfig) error
 	Exec(context.Context, string, *ExecConfig) (Process, error)
-	Kill(context.Context, uint32, bool) error
+	Kill(context.Context, uint32, bool, string) error
 	SetExited(int)
 	Status(context.Context) (string, error)
 }
@@ -89,8 +89,8 @@ func (s *createdState) Delete(ctx context.Context) error {
 	return s.transition("deleted")
 }
 
-func (s *createdState) Kill(ctx context.Context, sig uint32, all bool) error {
-	return s.p.kill(ctx, sig, all)
+func (s *createdState) Kill(ctx context.Context, sig uint32, all bool, rawSignal string) error {
+	return s.p.kill(ctx, sig, all, rawSignal)
 }
 
 func (s *createdState) SetExited(status int) {
@@ -198,8 +198,8 @@ func (s *createdCheckpointState) Delete(ctx context.Context) error {
 	return s.transition("deleted")
 }
 
-func (s *createdCheckpointState) Kill(ctx context.Context, sig uint32, all bool) error {
-	return s.p.kill(ctx, sig, all)
+func (s *createdCheckpointState) Kill(ctx context.Context, sig uint32, all bool, rawSignal string) error {
+	return s.p.kill(ctx, sig, all, rawSignal)
 }
 
 func (s *createdCheckpointState) SetExited(status int) {
@@ -269,8 +269,8 @@ func (s *runningState) Delete(ctx context.Context) error {
 	return errors.Errorf("cannot delete a running process")
 }
 
-func (s *runningState) Kill(ctx context.Context, sig uint32, all bool) error {
-	return s.p.kill(ctx, sig, all)
+func (s *runningState) Kill(ctx context.Context, sig uint32, all bool, rawSignal string) error {
+	return s.p.kill(ctx, sig, all, rawSignal)
 }
 
 func (s *runningState) SetExited(status int) {
@@ -333,8 +333,8 @@ func (s *pausedState) Delete(ctx context.Context) error {
 	return errors.Errorf("cannot delete a paused process")
 }
 
-func (s *pausedState) Kill(ctx context.Context, sig uint32, all bool) error {
-	return s.p.kill(ctx, sig, all)
+func (s *pausedState) Kill(ctx context.Context, sig uint32, all bool, rawSignal string) error {
+	return s.p.kill(ctx, sig, all, rawSignal)
 }
 
 func (s *pausedState) SetExited(status int) {
@@ -398,8 +398,8 @@ func (s *stoppedState) Delete(ctx context.Context) error {
 	return s.transition("deleted")
 }
 
-func (s *stoppedState) Kill(ctx context.Context, sig uint32, all bool) error {
-	return s.p.kill(ctx, sig, all)
+func (s *stoppedState) Kill(ctx context.Context, sig uint32, all bool, rawSignal string) error {
+	return s.p.kill(ctx, sig, all, rawSignal)
 }
 
 func (s *stoppedState) SetExited(status int) {

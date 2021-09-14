@@ -36,11 +36,12 @@ func (p *process) ID() string {
 	return p.id
 }
 
-func (p *process) Kill(ctx context.Context, signal uint32, _ bool) error {
+func (p *process) Kill(ctx context.Context, signal uint32, _ bool, rawSignal string) error {
 	_, err := p.shim.task.Kill(ctx, &task.KillRequest{
-		Signal: signal,
-		ID:     p.shim.ID(),
-		ExecID: p.id,
+		Signal:    signal,
+		ID:        p.shim.ID(),
+		ExecID:    p.id,
+		RawSignal: rawSignal,
 	})
 	if err != nil {
 		return errdefs.FromGRPC(err)

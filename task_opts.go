@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"syscall"
 
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/content"
@@ -157,7 +156,7 @@ func WithProcessKill(ctx context.Context, p Process) error {
 	if err != nil {
 		return err
 	}
-	if err := p.Kill(ctx, syscall.SIGKILL, WithKillAll); err != nil {
+	if err := p.Kill(ctx, 0, WithKillRawSignal("SIGKILL"), WithKillAll); err != nil {
 		// Kill might still return an IsNotFound error, even if it actually
 		// killed the process.
 		if errdefs.IsNotFound(err) {
@@ -185,10 +184,21 @@ type KillInfo struct {
 	All bool
 	// ExecID is the ID of a process to kill
 	ExecID string
+	// RawSignal is the raw signal to send the process. This can be either
+	// the name of the signal or the number representation of the signal to send.
+	RawSignal string
 }
 
 // KillOpts allows options to be set for the killing of a process
 type KillOpts func(context.Context, *KillInfo) error
+
+// WithKillRawSignal specifies the raw signal
+func WithKillRawSignal(rawSignal string) KillOpts {
+	return func(ctx context.Context, i *KillInfo) error {
+		i.RawSignal = rawSignal
+		return nil
+	}
+}
 
 // WithKillAll kills all processes for a task
 func WithKillAll(ctx context.Context, i *KillInfo) error {

@@ -442,7 +442,7 @@ func (c *Container) Kill(ctx context.Context, r *task.KillRequest) error {
 	if err != nil {
 		return err
 	}
-	return p.Kill(ctx, r.Signal, r.All)
+	return p.Kill(ctx, r.Signal, r.All, r.RawSignal)
 }
 
 // CloseIO of a process

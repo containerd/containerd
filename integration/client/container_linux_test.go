@@ -32,6 +32,7 @@ import (
 
 	"github.com/containerd/cgroups"
 	cgroupsv2 "github.com/containerd/cgroups/v2"
+	"github.com/containerd/containerd"
 	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
@@ -152,7 +153,7 @@ func TestTaskUpdate(t *testing.T) {
 			t.Errorf("expected memory limit to be set to %d but received %d", limit, stat.Memory.Usage.Limit)
 		}
 	}
-	if err := task.Kill(ctx, unix.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -231,7 +232,7 @@ func TestShimInCgroup(t *testing.T) {
 			t.Errorf("created cgroup should have at least one process inside: %d", len(processes))
 		}
 	}
-	if err := task.Kill(ctx, unix.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -282,7 +283,7 @@ func TestShimDoesNotLeakPipes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -386,7 +387,7 @@ func TestDaemonReconnectsToShimIOPipesOnRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -873,7 +874,7 @@ func TestContainerAttachProcess(t *testing.T) {
 
 	wg.Wait()
 
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Error(err)
 	}
 
@@ -951,7 +952,7 @@ func TestContainerLoadUnexistingProcess(t *testing.T) {
 		t.Fatalf("an error of type NotFound should have been returned when loading a process that does not exist, got %#v instead ", err)
 	}
 
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Error(err)
 	}
 
@@ -1076,7 +1077,7 @@ func TestContainerKillAll(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := task.Kill(ctx, syscall.SIGKILL, WithKillAll); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL"), WithKillAll); err != nil {
 		t.Error(err)
 	}
 
@@ -1154,7 +1155,7 @@ func TestDaemonRestartWithRunningShim(t *testing.T) {
 		t.Error(err)
 	}
 
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1510,7 +1511,7 @@ func TestBindLowPortNonOpt(t *testing.T) {
 	}
 	go func() {
 		time.Sleep(2 * time.Second)
-		task.Kill(ctx, unix.SIGTERM)
+		task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGTERM"))
 	}()
 	status := <-statusC
 	code, _, err := status.Result()
@@ -1623,7 +1624,7 @@ func TestShimOOMScore(t *testing.T) {
 		}
 	}
 
-	if err := task.Kill(ctx, unix.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Fatal(err)
 	}
 

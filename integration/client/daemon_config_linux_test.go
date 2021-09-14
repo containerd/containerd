@@ -22,11 +22,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/containerd/cgroups"
+	"github.com/containerd/containerd"
 	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/plugin"
@@ -87,7 +87,7 @@ version = 2
 		t.Errorf("error while getting stat for %s: %v", containerPath, err)
 	}
 
-	if err = task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err = task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Error(err)
 	}
 	<-status

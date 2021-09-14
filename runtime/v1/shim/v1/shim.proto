@@ -134,6 +134,7 @@ message KillRequest {
 	string id = 1;
 	uint32 signal = 2;
 	bool all = 3;
+	string raw_signal = 4;
 }
 
 message CloseIORequest {

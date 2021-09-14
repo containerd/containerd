@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -75,7 +74,7 @@ func (w *execWorker) exec(ctx, tctx context.Context) {
 	for {
 		select {
 		case <-tctx.Done():
-			if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+			if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 				logrus.WithError(err).Error("kill exec container's task")
 			}
 			<-statusC

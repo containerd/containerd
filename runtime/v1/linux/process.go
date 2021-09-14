@@ -45,7 +45,7 @@ func (p *Process) ID() string {
 // Kill sends the provided signal to the underlying process
 //
 // Unable to kill all processes in the task using this method on a process
-func (p *Process) Kill(ctx context.Context, signal uint32, _ bool) error {
+func (p *Process) Kill(ctx context.Context, signal uint32, _ bool, _ string) error {
 	_, err := p.t.shim.Kill(ctx, &shim.KillRequest{
 		Signal: signal,
 		ID:     p.id,

@@ -347,15 +347,24 @@ func (p *Init) Resume(ctx context.Context) error {
 }
 
 // Kill the init process
-func (p *Init) Kill(ctx context.Context, signal uint32, all bool) error {
+func (p *Init) Kill(ctx context.Context, signal uint32, all bool, rawSignal string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	return p.initState.Kill(ctx, signal, all)
+	return p.initState.Kill(ctx, signal, all, rawSignal)
 }
 
-func (p *Init) kill(ctx context.Context, signal uint32, all bool) error {
-	err := p.runtime.Kill(ctx, p.id, int(signal), &runc.KillOpts{
+func (p *Init) kill(ctx context.Context, signal uint32, all bool, rawSignal string) (err error) {
+	killSignal := unix.Signal(signal)
+	if rawSignal != "" {
+		// prefer `rawSignal` over `signal`
+		killSignal, err = parseRawSignal(rawSignal)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = p.runtime.Kill(ctx, p.id, int(killSignal), &runc.KillOpts{
 		All: all,
 	})
 	return checkKillError(err)

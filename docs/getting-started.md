@@ -270,7 +270,7 @@ To do this we will simply call `Kill` on the task after waiting a couple of seco
 ```go
 	time.Sleep(3 * time.Second)
 
-	if err := task.Kill(ctx, syscall.SIGTERM); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGTERM")); err != nil {
 		return err
 	}
 
@@ -368,7 +368,7 @@ func redisExample() error {
 	time.Sleep(3 * time.Second)
 
 	// kill the process and get the exit status
-	if err := task.Kill(ctx, syscall.SIGTERM); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGTERM")); err != nil {
 		return err
 	}
 

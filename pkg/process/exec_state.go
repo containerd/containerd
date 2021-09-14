@@ -30,7 +30,7 @@ type execState interface {
 	Resize(console.WinSize) error
 	Start(context.Context) error
 	Delete(context.Context) error
-	Kill(context.Context, uint32, bool) error
+	Kill(context.Context, uint32, bool, string) error
 	SetExited(int)
 	Status(context.Context) (string, error)
 }
@@ -72,8 +72,8 @@ func (s *execCreatedState) Delete(ctx context.Context) error {
 	return s.transition("deleted")
 }
 
-func (s *execCreatedState) Kill(ctx context.Context, sig uint32, all bool) error {
-	return s.p.kill(ctx, sig, all)
+func (s *execCreatedState) Kill(ctx context.Context, sig uint32, all bool, rawSignal string) error {
+	return s.p.kill(ctx, sig, all, rawSignal)
 }
 
 func (s *execCreatedState) SetExited(status int) {
@@ -114,8 +114,8 @@ func (s *execRunningState) Delete(ctx context.Context) error {
 	return errors.Errorf("cannot delete a running process")
 }
 
-func (s *execRunningState) Kill(ctx context.Context, sig uint32, all bool) error {
-	return s.p.kill(ctx, sig, all)
+func (s *execRunningState) Kill(ctx context.Context, sig uint32, all bool, rawSignal string) error {
+	return s.p.kill(ctx, sig, all, rawSignal)
 }
 
 func (s *execRunningState) SetExited(status int) {
@@ -160,8 +160,8 @@ func (s *execStoppedState) Delete(ctx context.Context) error {
 	return s.transition("deleted")
 }
 
-func (s *execStoppedState) Kill(ctx context.Context, sig uint32, all bool) error {
-	return s.p.kill(ctx, sig, all)
+func (s *execStoppedState) Kill(ctx context.Context, sig uint32, all bool, rawSignal string) error {
+	return s.p.kill(ctx, sig, all, rawSignal)
 }
 
 func (s *execStoppedState) SetExited(status int) {

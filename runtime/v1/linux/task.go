@@ -215,7 +215,7 @@ func (t *Task) Resume(ctx context.Context) error {
 // Kill the task using the provided signal
 //
 // Optionally send the signal to all processes that are a child of the task
-func (t *Task) Kill(ctx context.Context, signal uint32, all bool) error {
+func (t *Task) Kill(ctx context.Context, signal uint32, all bool, _ string) error {
 	if _, err := t.shim.Kill(ctx, &shim.KillRequest{
 		ID:     t.id,
 		Signal: signal,

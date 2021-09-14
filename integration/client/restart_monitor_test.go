@@ -23,10 +23,10 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"syscall"
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd"
 	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
@@ -168,7 +168,7 @@ version = 2
 		t.Fatal(err)
 	}
 
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Fatal(err)
 	}
 

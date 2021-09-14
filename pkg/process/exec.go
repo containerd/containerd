@@ -135,14 +135,23 @@ func (e *execProcess) resize(ws console.WinSize) error {
 	return e.console.Resize(ws)
 }
 
-func (e *execProcess) Kill(ctx context.Context, sig uint32, _ bool) error {
+func (e *execProcess) Kill(ctx context.Context, sig uint32, _ bool, rawSignal string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	return e.execState.Kill(ctx, sig, false)
+	return e.execState.Kill(ctx, sig, false, rawSignal)
 }
 
-func (e *execProcess) kill(ctx context.Context, sig uint32, _ bool) error {
+func (e *execProcess) kill(ctx context.Context, sig uint32, _ bool, rawSignal string) (err error) {
+	killSignal := unix.Signal(sig)
+	if rawSignal != "" {
+		// prefer `rawSignal` over `sig`
+		killSignal, err = parseRawSignal(rawSignal)
+		if err != nil {
+			return err
+		}
+	}
+
 	pid := e.pid.get()
 	switch {
 	case pid == 0:
@@ -150,7 +159,7 @@ func (e *execProcess) kill(ctx context.Context, sig uint32, _ bool) error {
 	case !e.exited.IsZero():
 		return errors.Wrapf(errdefs.ErrNotFound, "process already finished")
 	default:
-		if err := unix.Kill(pid, syscall.Signal(sig)); err != nil {
+		if err := unix.Kill(pid, killSignal); err != nil {
 			return errors.Wrapf(checkKillError(err), "exec kill error")
 		}
 	}

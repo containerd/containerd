@@ -18,16 +18,14 @@ package server
 
 import (
 	"sync/atomic"
-	"syscall"
 	"time"
 
+	"github.com/containerd/containerd"
 	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
-
-	"github.com/moby/sys/signal"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -125,26 +123,22 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 				}
 			}
 		}
-		sig, err := signal.ParseSignal(stopSignal)
-		if err != nil {
-			return errors.Wrapf(err, "failed to parse stop signal %q", stopSignal)
-		}
 
 		var sswt bool
 		if container.IsStopSignaledWithTimeout == nil {
-			log.G(ctx).Infof("unable to ensure stop signal %v was not sent twice to container %v", sig, id)
+			log.G(ctx).Infof("unable to ensure stop signal %v was not sent twice to container %v", stopSignal, id)
 			sswt = true
 		} else {
 			sswt = atomic.CompareAndSwapUint32(container.IsStopSignaledWithTimeout, 0, 1)
 		}
 
 		if sswt {
-			log.G(ctx).Infof("Stop container %q with signal %v", id, sig)
-			if err = task.Kill(ctx, sig); err != nil && !errdefs.IsNotFound(err) {
+			log.G(ctx).Infof("Stop container %q with signal %v", id, stopSignal)
+			if err = task.Kill(ctx, 0, containerd.WithKillRawSignal(stopSignal)); err != nil && !errdefs.IsNotFound(err) {
 				return errors.Wrapf(err, "failed to stop container %q", id)
 			}
 		} else {
-			log.G(ctx).Infof("Skipping the sending of signal %v to container %q because a prior stop with timeout>0 request already sent the signal", sig, id)
+			log.G(ctx).Infof("Skipping the sending of signal %v to container %q because a prior stop with timeout>0 request already sent the signal", stopSignal, id)
 		}
 
 		sigTermCtx, sigTermCtxCancel := context.WithTimeout(ctx, timeout)
@@ -159,11 +153,11 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 			return ctx.Err()
 		}
 		// sigTermCtx was exceeded. Send SIGKILL
-		log.G(ctx).Debugf("Stop container %q with signal %v timed out", id, sig)
+		log.G(ctx).Debugf("Stop container %q with signal %v timed out", id, stopSignal)
 	}
 
 	log.G(ctx).Infof("Kill container %q", id)
-	if err = task.Kill(ctx, syscall.SIGKILL); err != nil && !errdefs.IsNotFound(err) {
+	if err = task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil && !errdefs.IsNotFound(err) {
 		return errors.Wrapf(err, "failed to kill container %q", id)
 	}
 

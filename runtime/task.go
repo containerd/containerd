@@ -38,7 +38,7 @@ type Process interface {
 	// State returns the process state
 	State(ctx context.Context) (State, error)
 	// Kill signals a container
-	Kill(ctx context.Context, signal uint32, all bool) error
+	Kill(ctx context.Context, signal uint32, all bool, rawSignal string) error
 	// ResizePty resizes the processes pty/console
 	ResizePty(ctx context.Context, size ConsoleSize) error
 	// CloseIO closes the processes IO

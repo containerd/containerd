@@ -19,7 +19,6 @@ package monitor
 import (
 	"context"
 	"net/url"
-	"syscall"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
@@ -79,7 +78,7 @@ func killTask(ctx context.Context, container containerd.Container) error {
 			}
 			return err
 		}
-		if err := task.Kill(ctx, syscall.SIGKILL, containerd.WithKillAll); err != nil {
+		if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL"), containerd.WithKillAll); err != nil {
 			if _, derr := task.Delete(ctx); derr == nil {
 				return nil
 			}

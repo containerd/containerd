@@ -25,10 +25,10 @@ import (
 	"path"
 	"runtime"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd"
 	. "github.com/containerd/containerd"
 	apievents "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/cio"
@@ -323,7 +323,7 @@ func TestContainerExec(t *testing.T) {
 	if ec := deleteStatus.ExitCode(); ec != 6 {
 		t.Errorf("expected delete exit code 6 but received %d", ec)
 	}
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Error(err)
 	}
 	<-finishedC
@@ -398,7 +398,7 @@ func TestContainerLargeExecArgs(t *testing.T) {
 	if _, err := process.Delete(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Error(err)
 	}
 	<-finishedC
@@ -474,7 +474,7 @@ func TestContainerPids(t *testing.T) {
 			t.Errorf("pid %d must be in %+v", taskPid, processes)
 		}
 	}
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		select {
 		case s := <-statusC:
 			t.Log(s.Result())
@@ -590,7 +590,7 @@ func TestDeleteRunningContainer(t *testing.T) {
 	if !errdefs.IsFailedPrecondition(err) {
 		t.Errorf("expected error %q but received %q", errdefs.ErrFailedPrecondition, err)
 	}
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Fatal(err)
 	}
 	<-statusC
@@ -637,17 +637,182 @@ func TestContainerKill(t *testing.T) {
 	if err := task.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Fatal(err)
 	}
 	<-statusC
 
-	err = task.Kill(ctx, syscall.SIGTERM)
+	err = task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGTERM"))
 	if err == nil {
 		t.Fatal("second call to kill should return an error")
 	}
 	if !errdefs.IsNotFound(err) {
 		t.Errorf("expected error %q but received %q", errdefs.ErrNotFound, err)
+	}
+}
+
+func TestContainerKillSignal(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), longCommand))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
+		t.Fatal(err)
+	}
+
+	status := <-statusC
+	if status.Error() != nil {
+		t.Fatal(status.Error())
+	}
+	// 128 + SIGKILL
+	if status.ExitCode() != 137 {
+		t.Fatalf("expected to get exit code 137 from killing the task, instead got %d", status.ExitCode())
+	}
+}
+
+func TestContainerKillSignalPreferRawSignal(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), longCommand))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := task.Kill(ctx, 12, containerd.WithKillRawSignal("SIGKILL")); err != nil {
+		t.Fatal(err)
+	}
+
+	status := <-statusC
+	if status.Error() != nil {
+		t.Fatal(status.Error())
+	}
+	// 128 + SIGKILL
+	if status.ExitCode() != 137 {
+		t.Fatalf("expected to get exit code 137 from killing the task, instead got %d", status.ExitCode())
+	}
+}
+
+func TestContainerKillSignalNoRawSignal(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), longCommand))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := task.Kill(ctx, 9); err != nil {
+		t.Fatal(err)
+	}
+
+	status := <-statusC
+	if status.Error() != nil {
+		t.Fatal(status.Error())
+	}
+	// 128 + SIGKILL
+	if status.ExitCode() != 137 {
+		t.Fatalf("expected to get exitcode 137 from killing the task, instead got %d", status.ExitCode())
 	}
 }
 
@@ -717,7 +882,7 @@ func TestKillContainerDeletedByRunc(t *testing.T) {
 	if err := rcmd.Delete(ctx, id, &runc.DeleteOpts{Force: true}); err != nil {
 		t.Fatal(err)
 	}
-	err = task.Kill(ctx, syscall.SIGKILL)
+	err = task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL"))
 	if err == nil {
 		t.Fatal("kill should return NotFound error")
 	} else if !errdefs.IsNotFound(err) {
@@ -837,7 +1002,7 @@ func TestContainerExecNoBinaryExists(t *testing.T) {
 	if err := process.Start(ctx); err == nil {
 		t.Error("Process.Start should fail when process does not exist")
 	}
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Error(err)
 	}
 	<-finishedC
@@ -991,7 +1156,7 @@ func TestWaitStoppedProcess(t *testing.T) {
 		t.Errorf("exit status from stopped process should be 6 but received %d", code)
 	}
 
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Error(err)
 	}
 	<-finishedC
@@ -1104,7 +1269,7 @@ func TestProcessForceDelete(t *testing.T) {
 	if _, err := process.Delete(ctx, WithProcessKill); err != nil {
 		t.Error(err)
 	}
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Fatal(err)
 	}
 	<-statusC
@@ -1300,7 +1465,7 @@ func TestDeleteContainerExecCreated(t *testing.T) {
 	if ec := deleteStatus.ExitCode(); ec != 0 {
 		t.Errorf("expected delete exit code 0 but received %d", ec)
 	}
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Error(err)
 	}
 	<-finished
@@ -1353,7 +1518,7 @@ func TestContainerMetrics(t *testing.T) {
 	if metric.ID != id {
 		t.Errorf("expected metric id %q but received %q", id, metric.ID)
 	}
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1776,7 +1941,7 @@ func TestContainerExecLargeOutputWithTTY(t *testing.T) {
 
 	}
 
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Error(err)
 	}
 	<-finishedC
@@ -2004,7 +2169,7 @@ func TestDaemonRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2012,7 +2177,7 @@ func TestDaemonRestart(t *testing.T) {
 }
 
 type directIO struct {
-    cio.DirectIO
+	cio.DirectIO
 }
 
 // ioCreate returns IO available for use with task creation
@@ -2097,7 +2262,7 @@ func initContainerAndCheckChildrenDieOnKill(t *testing.T, opts ...oci.SpecOpts) 
 		t.Fatal(err)
 	}
 
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Error(err)
 	}
 
@@ -2169,7 +2334,7 @@ func TestTaskResize(t *testing.T) {
 	if err := task.Resize(ctx, 32, 32); err != nil {
 		t.Fatal(err)
 	}
-	task.Kill(ctx, syscall.SIGKILL)
+	task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL"))
 	<-statusC
 }
 
@@ -2347,7 +2512,7 @@ func TestTaskSpec(t *testing.T) {
 		t.Fatal("spec from loaded task is nil")
 	}
 
-	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+	if err := task.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil {
 		t.Fatal(err)
 	}
 	<-statusC

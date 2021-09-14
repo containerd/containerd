@@ -19,7 +19,6 @@ package server
 import (
 	"bytes"
 	"io"
-	"syscall"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -159,7 +158,7 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 	select {
 	case <-execCtx.Done():
 		// Ignore the not found error because the process may exit itself before killing.
-		if err := process.Kill(ctx, syscall.SIGKILL); err != nil && !errdefs.IsNotFound(err) {
+		if err := process.Kill(ctx, 0, containerd.WithKillRawSignal("SIGKILL")); err != nil && !errdefs.IsNotFound(err) {
 			return nil, errors.Wrapf(err, "failed to kill exec %q", execID)
 		}
 		// Wait for the process to be killed.
