@@ -37,6 +37,8 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/typeurl"
+	"github.com/gogo/protobuf/types"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
@@ -45,6 +47,9 @@ import (
 const (
 	// maxLcowVhdSizeGB is the max size in GB of any layer
 	maxLcowVhdSizeGB = 128 * 1024 * 1024 * 1024
+	// appendDmVerityFooterPayloadOption is a diff label that is used to enable appending dm-verity footer
+	// to LCOW layer VHDs
+	appendDmVerityFooterPayloadOption = diff.DiffLabelPrefix + "io.microsoft.lcow.append-dm-verity"
 )
 
 func init() {
@@ -155,7 +160,24 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 		}
 	}()
 
-	err = tar2ext4.Convert(rc, outFile, tar2ext4.ConvertWhiteout, tar2ext4.AppendVhdFooter, tar2ext4.MaximumDiskSize(maxLcowVhdSizeGB))
+	t2e4Opts := []tar2ext4.Option{
+		tar2ext4.ConvertWhiteout,
+		tar2ext4.AppendVhdFooter,
+		tar2ext4.MaximumDiskSize(maxLcowVhdSizeGB),
+	}
+	if config.ProcessorPayloads != nil {
+		if msg, ok := config.ProcessorPayloads[appendDmVerityFooterPayloadOption]; ok {
+			val, err := typeurl.UnmarshalAny(msg)
+			if err != nil {
+				return emptyDesc, fmt.Errorf("failed to unmarshal processor payloads: %w", err)
+			}
+			if str, ok := val.(*types.StringValue); ok && str.Value == "true" {
+				t2e4Opts = append(t2e4Opts, tar2ext4.AppendDMVerity)
+			}
+		}
+	}
+
+	err = tar2ext4.Convert(rc, outFile, t2e4Opts...)
 	if err != nil {
 		return emptyDesc, fmt.Errorf("failed to convert tar2ext4 vhd: %w", err)
 	}

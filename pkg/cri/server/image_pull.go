@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/labels"
@@ -121,6 +122,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		containerd.WithPullLabel(imageLabelKey, imageLabelValue),
 		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
 		containerd.WithImageHandler(imageHandler),
+		containerd.WithPullLabels(diff.FilterDiffLabels(r.GetSandboxConfig().GetLabels())),
 	}
 
 	pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)

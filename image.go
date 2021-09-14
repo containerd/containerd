@@ -300,6 +300,14 @@ func WithSnapshotterPlatformCheck() UnpackOpt {
 	}
 }
 
+// WithUnpackConfigApplyOpts sets ApplyOpts for UnpackConfig
+func WithUnpackConfigApplyOpts(opts ...diff.ApplyOpt) UnpackOpt {
+	return func(_ context.Context, uc *UnpackConfig) error {
+		uc.ApplyOpts = append(uc.ApplyOpts, opts...)
+		return nil
+	}
+}
+
 func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...UnpackOpt) error {
 	ctx, done, err := i.client.WithLease(ctx)
 	if err != nil {
