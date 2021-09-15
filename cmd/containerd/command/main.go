@@ -320,6 +320,8 @@ func applyFlags(context *cli.Context, config *srvconfig.Config) error {
 	if err := setLogFormat(config); err != nil {
 		return err
 	}
+	setLogHooks()
+
 	for _, v := range []struct {
 		name string
 		d    *string
@@ -383,6 +385,10 @@ func setLogFormat(config *srvconfig.Config) error {
 	}
 
 	return nil
+}
+
+func setLogHooks() {
+	logrus.StandardLogger().AddHook(tracing.NewLogrusHook())
 }
 
 func dumpStacks(writeToFile bool) {
