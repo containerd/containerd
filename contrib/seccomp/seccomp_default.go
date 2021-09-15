@@ -50,6 +50,7 @@ func arches() []specs.Arch {
 
 // DefaultProfile defines the allowed syscalls for the default seccomp profile.
 func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
+	nosys := uint(unix.ENOSYS)
 	syscalls := []specs.LinuxSyscall{
 		{
 			Names: []string{
@@ -527,6 +528,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				Names: []string{
 					"bpf",
 					"clone",
+					"clone3",
 					"fanotify_init",
 					"fsconfig",
 					"fsmount",
@@ -658,6 +660,15 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				},
 			})
 		}
+		// clone3 is explicitly requested to give ENOSYS instead of the default EPERM, when CAP_SYS_ADMIN is unset
+		// https://github.com/moby/moby/pull/42681
+		s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			Names: []string{
+				"clone3",
+			},
+			Action:   specs.ActErrno,
+			ErrnoRet: &nosys,
+		})
 	}
 
 	return s
