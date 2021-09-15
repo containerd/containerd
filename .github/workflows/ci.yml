@@ -26,7 +26,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v2
         with:
-          go-version: '1.15.13'
+          go-version: '1.15.11'
 
       - name: Set env
         shell: bash
@@ -80,7 +80,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.15.13'
+          go-version: '1.15.11'
 
       - name: Set env
         shell: bash
@@ -126,7 +126,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.15.13'
+          go-version: '1.15.11'
 
       - name: Set env
         shell: bash
@@ -162,7 +162,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.15.13'
+          go-version: '1.15.11'
 
       - name: Set env
         shell: bash
@@ -193,7 +193,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.15.13'
+          go-version: '1.15.11'
 
       - name: Set env
         shell: bash
@@ -272,7 +272,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.15.13'
+          go-version: '1.15.11'
 
       - name: Set env
         shell: bash
