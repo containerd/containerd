@@ -41,6 +41,8 @@ import (
 type Config struct {
 	// Supported platforms
 	Platforms []string `toml:"platforms"`
+	// SchedCore enabled linux core scheduling
+	SchedCore bool `toml:"sched_core"`
 }
 
 func init() {
@@ -55,7 +57,8 @@ func init() {
 			Platforms: defaultPlatforms(),
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			supportedPlatforms, err := parsePlatforms(ic.Config.(*Config).Platforms)
+			config := ic.Config.(*Config)
+			supportedPlatforms, err := parsePlatforms(config.Platforms)
 			if err != nil {
 				return nil, err
 			}
@@ -78,26 +81,45 @@ func init() {
 			cs := metadata.NewContainerStore(m.(*metadata.DB))
 			events := ep.(*exchange.Exchange)
 
-			return New(ic.Context, ic.Root, ic.State, ic.Address, ic.TTRPCAddress, events, cs)
+			return New(ic.Context, &ManagerConfig{
+				Root:         ic.Root,
+				State:        ic.State,
+				Address:      ic.Address,
+				TTRPCAddress: ic.TTRPCAddress,
+				Events:       events,
+				Store:        cs,
+				SchedCore:    config.SchedCore,
+			})
 		},
 	})
 }
 
+type ManagerConfig struct {
+	Root         string
+	State        string
+	Store        containers.Store
+	Events       *exchange.Exchange
+	Address      string
+	TTRPCAddress string
+	SchedCore    bool
+}
+
 // New task manager for v2 shims
-func New(ctx context.Context, root, state, containerdAddress, containerdTTRPCAddress string, events *exchange.Exchange, cs containers.Store) (*TaskManager, error) {
-	for _, d := range []string{root, state} {
+func New(ctx context.Context, config *ManagerConfig) (*TaskManager, error) {
+	for _, d := range []string{config.Root, config.State} {
 		if err := os.MkdirAll(d, 0711); err != nil {
 			return nil, err
 		}
 	}
 	m := &TaskManager{
-		root:                   root,
-		state:                  state,
-		containerdAddress:      containerdAddress,
-		containerdTTRPCAddress: containerdTTRPCAddress,
+		root:                   config.Root,
+		state:                  config.State,
+		containerdAddress:      config.Address,
+		containerdTTRPCAddress: config.TTRPCAddress,
+		schedCore:              config.SchedCore,
 		tasks:                  runtime.NewTaskList(),
-		events:                 events,
-		containers:             cs,
+		events:                 config.Events,
+		containers:             config.Store,
 	}
 	if err := m.loadExistingTasks(ctx); err != nil {
 		return nil, err
@@ -111,6 +133,7 @@ type TaskManager struct {
 	state                  string
 	containerdAddress      string
 	containerdTTRPCAddress string
+	schedCore              bool
 
 	tasks      *runtime.TaskList
 	events     *exchange.Exchange
@@ -167,7 +190,12 @@ func (m *TaskManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 		topts = opts.RuntimeOptions
 	}
 
-	b := shimBinary(bundle, opts.Runtime, m.containerdAddress, m.containerdTTRPCAddress)
+	b := shimBinary(bundle, shimBinaryConfig{
+		runtime:      opts.Runtime,
+		address:      m.containerdAddress,
+		ttrpcAddress: m.containerdTTRPCAddress,
+		schedCore:    m.schedCore,
+	})
 	shim, err := b.Start(ctx, topts, func() {
 		log.G(ctx).WithField("id", id).Info("shim disconnected")
 
@@ -303,7 +331,13 @@ func (m *TaskManager) loadTasks(ctx context.Context) error {
 			bundle.Delete()
 			continue
 		}
-		binaryCall := shimBinary(bundle, container.Runtime.Name, m.containerdAddress, m.containerdTTRPCAddress)
+		binaryCall := shimBinary(bundle,
+			shimBinaryConfig{
+				runtime:      container.Runtime.Name,
+				address:      m.containerdAddress,
+				ttrpcAddress: m.containerdTTRPCAddress,
+				schedCore:    m.schedCore,
+			})
 		shim, err := loadShim(ctx, bundle, func() {
 			log.G(ctx).WithField("id", id).Info("shim disconnected")
 

@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -40,6 +41,7 @@ import (
 	oomv1 "github.com/containerd/containerd/pkg/oom/v1"
 	oomv2 "github.com/containerd/containerd/pkg/oom/v2"
 	"github.com/containerd/containerd/pkg/process"
+	"github.com/containerd/containerd/pkg/schedcore"
 	"github.com/containerd/containerd/pkg/stdio"
 	"github.com/containerd/containerd/pkg/userns"
 	"github.com/containerd/containerd/runtime/v2/runc"
@@ -234,10 +236,20 @@ func (s *service) StartShim(ctx context.Context, opts shim.StartOpts) (_ string,
 
 	cmd.ExtraFiles = append(cmd.ExtraFiles, f)
 
+	goruntime.LockOSThread()
+	if os.Getenv("SCHED_CORE") != "" {
+		if err := schedcore.Create(schedcore.ProcessGroup); err != nil {
+			return "", errors.Wrap(err, "enable sched core support")
+		}
+	}
+
 	if err := cmd.Start(); err != nil {
 		f.Close()
 		return "", err
 	}
+
+	goruntime.UnlockOSThread()
+
 	defer func() {
 		if retErr != nil {
 			cmd.Process.Kill()

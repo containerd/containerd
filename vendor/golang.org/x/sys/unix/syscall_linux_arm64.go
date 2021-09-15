@@ -9,13 +9,6 @@ package unix
 
 import "unsafe"
 
-func EpollCreate(size int) (fd int, err error) {
-	if size <= 0 {
-		return -1, EINVAL
-	}
-	return EpollCreate1(0)
-}
-
 //sys	EpollWait(epfd int, events []EpollEvent, msec int) (n int, err error) = SYS_EPOLL_PWAIT
 //sys	Fadvise(fd int, offset int64, length int64, advice int) (err error) = SYS_FADVISE64
 //sys	Fchown(fd int, uid int, gid int) (err error)
@@ -171,7 +164,7 @@ func Pipe2(p []int, flags int) (err error) {
 
 // Getrlimit prefers the prlimit64 system call. See issue 38604.
 func Getrlimit(resource int, rlim *Rlimit) error {
-	err := prlimit(0, resource, nil, rlim)
+	err := Prlimit(0, resource, nil, rlim)
 	if err != ENOSYS {
 		return err
 	}
@@ -180,7 +173,7 @@ func Getrlimit(resource int, rlim *Rlimit) error {
 
 // Setrlimit prefers the prlimit64 system call. See issue 38604.
 func Setrlimit(resource int, rlim *Rlimit) error {
-	err := prlimit(0, resource, rlim, nil)
+	err := Prlimit(0, resource, rlim, nil)
 	if err != ENOSYS {
 		return err
 	}
@@ -209,10 +202,6 @@ func (cmsg *Cmsghdr) SetLen(length int) {
 
 func (rsa *RawSockaddrNFCLLCP) SetServiceNameLen(length int) {
 	rsa.Service_name_len = uint64(length)
-}
-
-func InotifyInit() (fd int, err error) {
-	return InotifyInit1(0)
 }
 
 // dup2 exists because func Dup3 in syscall_linux.go references

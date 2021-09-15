@@ -35,12 +35,20 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func shimBinary(bundle *Bundle, runtime, containerdAddress string, containerdTTRPCAddress string) *binary {
+type shimBinaryConfig struct {
+	runtime      string
+	address      string
+	ttrpcAddress string
+	schedCore    bool
+}
+
+func shimBinary(bundle *Bundle, config shimBinaryConfig) *binary {
 	return &binary{
 		bundle:                 bundle,
-		runtime:                runtime,
-		containerdAddress:      containerdAddress,
-		containerdTTRPCAddress: containerdTTRPCAddress,
+		runtime:                config.runtime,
+		containerdAddress:      config.address,
+		containerdTTRPCAddress: config.ttrpcAddress,
+		schedCore:              config.schedCore,
 	}
 }
 
@@ -48,6 +56,7 @@ type binary struct {
 	runtime                string
 	containerdAddress      string
 	containerdTTRPCAddress string
+	schedCore              bool
 	bundle                 *Bundle
 }
 
@@ -61,13 +70,15 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 
 	cmd, err := client.Command(
 		ctx,
-		b.runtime,
-		b.containerdAddress,
-		b.containerdTTRPCAddress,
-		b.bundle.Path,
-		opts,
-		args...,
-	)
+		&client.CommandConfig{
+			Runtime:      b.runtime,
+			Address:      b.containerdAddress,
+			TTRPCAddress: b.containerdTTRPCAddress,
+			Path:         b.bundle.Path,
+			Opts:         opts,
+			Args:         args,
+			SchedCore:    b.schedCore,
+		})
 	if err != nil {
 		return nil, err
 	}
@@ -138,14 +149,19 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 	}
 
 	cmd, err := client.Command(ctx,
-		b.runtime,
-		b.containerdAddress,
-		b.containerdTTRPCAddress,
-		bundlePath,
-		nil,
-		"-id", b.bundle.ID,
-		"-bundle", b.bundle.Path,
-		"delete")
+		&client.CommandConfig{
+			Runtime:      b.runtime,
+			Address:      b.containerdAddress,
+			TTRPCAddress: b.containerdTTRPCAddress,
+			Path:         bundlePath,
+			Opts:         nil,
+			Args: []string{
+				"-id", b.bundle.ID,
+				"-bundle", b.bundle.Path,
+				"delete",
+			},
+		})
+
 	if err != nil {
 		return nil, err
 	}
