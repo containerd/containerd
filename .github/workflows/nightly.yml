@@ -63,6 +63,7 @@ jobs:
           GOPATH: ${{ runner.workspace }}
           GOOS: linux
           GOARCH: amd64
+          GO111MODULE: off
         run: |
           make binaries
           mv bin bin_amd64
@@ -74,6 +75,7 @@ jobs:
           GOARCH: arm64
           CC: aarch64-linux-gnu-gcc
           CGO_ENABLED: 1
+          GO111MODULE: off
         run: |
           make binaries
           mv bin bin_arm64
@@ -85,6 +87,7 @@ jobs:
           GOARCH: s390x
           CGO_ENABLED: 1
           CC: s390x-linux-gnu-gcc
+          GO111MODULE: off
         run: |
           make binaries
           mv bin bin_s390x
@@ -96,6 +99,7 @@ jobs:
           GOARCH: ppc64le
           CGO_ENABLED: 1
           CC: powerpc64le-linux-gnu-gcc
+          GO111MODULE: off
         run: |
           make binaries
           mv bin bin_ppc64le
@@ -155,6 +159,7 @@ jobs:
           GOPATH: ${{ runner.workspace }}
           GOOS: windows
           GOARCH: amd64
+          GO111MODULE: off
         run: |
           make binaries
 

@@ -103,6 +103,8 @@ jobs:
           path: src/github.com/Microsoft/hcsshim
 
       - name: Make
+        env:
+          GO111MODULE: off
         shell: bash
         run: |
           make build
