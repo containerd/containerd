@@ -33,7 +33,7 @@ import (
 
 // PodSandboxStatus returns the status of the PodSandbox.
 func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandboxStatusRequest) (*runtime.PodSandboxStatusResponse, error) {
-	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
+	sandbox, err := c.SandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		return nil, errors.Wrap(err, "an error occurred when try to find sandbox")
 	}
@@ -203,7 +203,7 @@ func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox) (map[st
 	si.SnapshotKey = ctrInfo.SnapshotKey
 	si.Snapshotter = ctrInfo.Snapshotter
 
-	runtimeOptions, err := getRuntimeOptions(ctrInfo)
+	runtimeOptions, err := GetRuntimeOptions(ctrInfo)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get runtime options")
 	}

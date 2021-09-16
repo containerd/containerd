@@ -122,7 +122,7 @@ func TestBuildLabels(t *testing.T) {
 		"a": "b",
 		"c": "d",
 	}
-	newLabels := buildLabels(configLabels, containerKindSandbox)
+	newLabels := BuildLabels(configLabels, containerKindSandbox)
 	assert.Len(t, newLabels, 3)
 	assert.Equal(t, "b", newLabels["a"])
 	assert.Equal(t, "d", newLabels["c"])
@@ -161,7 +161,7 @@ func TestLocalResolve(t *testing.T) {
 	}
 	c := newTestCRIService()
 	var err error
-	c.imageStore, err = imagestore.NewFakeStore([]imagestore.Image{image})
+	c.ImageStore, err = imagestore.NewFakeStore([]imagestore.Image{image})
 	assert.NoError(t, err)
 
 	for _, ref := range []string{
@@ -287,7 +287,7 @@ systemd_cgroup = true
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			opts, err := generateRuntimeOptions(test.r, test.c)
+			opts, err := generateRuntimeOptions(test.r, &test.c)
 			assert.NoError(t, err)
 			assert.Equal(t, test.expectedOptions, opts)
 		})
@@ -470,7 +470,7 @@ func TestPassThroughAnnotationsFilter(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			passthroughAnnotations := getPassthroughAnnotations(test.podAnnotations, test.runtimePodAnnotations)
+			passthroughAnnotations := GetPassthroughAnnotations(test.podAnnotations, test.runtimePodAnnotations)
 			assert.Equal(t, test.passthroughAnnotations, passthroughAnnotations)
 		})
 	}
@@ -522,7 +522,7 @@ func addContainer(c *criService, containerID, sandboxID string, PID uint32, crea
 	if err != nil {
 		return err
 	}
-	return c.containerStore.Add(container)
+	return c.ContainerStore.Add(container)
 }
 
 func TestValidateTargetContainer(t *testing.T) {

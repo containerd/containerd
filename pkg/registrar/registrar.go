@@ -100,3 +100,15 @@ func (r *Registrar) ReleaseByKey(key string) {
 	delete(r.nameToKey, name)
 	delete(r.keyToName, key)
 }
+
+// GetKeyByName get the key by name.
+func (r *Registrar) GetKeyByName(name string) string {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	key, exists := r.nameToKey[name]
+	if !exists {
+		return ""
+	}
+	return key
+}

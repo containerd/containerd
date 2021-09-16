@@ -37,7 +37,7 @@ import (
 // StopContainer stops a running container with a grace period (i.e., timeout).
 func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainerRequest) (*runtime.StopContainerResponse, error) {
 	// Get container config from container store.
-	container, err := c.containerStore.Get(r.GetContainerId())
+	container, err := c.ContainerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, errors.Wrapf(err, "an error occurred when try to find container %q", r.GetContainerId())
 	}
@@ -114,7 +114,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 			// default SIGTERM is still better than returning error and leaving
 			// the container unstoppable. (See issue #990)
 			// TODO(random-liu): Remove this logic when containerd 1.2 is deprecated.
-			image, err := c.imageStore.Get(container.ImageRef)
+			image, err := c.ImageStore.Get(container.ImageRef)
 			if err != nil {
 				if err != store.ErrNotExist {
 					return errors.Wrapf(err, "failed to get image %q", container.ImageRef)

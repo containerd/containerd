@@ -103,12 +103,12 @@ func (c *criService) containerSpec(
 	// when trying to run the init process.
 	specOpts = append(specOpts, oci.WithUser(username))
 
-	for pKey, pValue := range getPassthroughAnnotations(sandboxConfig.Annotations,
+	for pKey, pValue := range GetPassthroughAnnotations(sandboxConfig.Annotations,
 		ociRuntime.PodAnnotations) {
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
 	}
 
-	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
+	for pKey, pValue := range GetPassthroughAnnotations(config.Annotations,
 		ociRuntime.ContainerAnnotations) {
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
 	}

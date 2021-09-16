@@ -63,7 +63,7 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		specOpts = append(specOpts, customopts.WithDisabledCgroups)
 	} else {
 		if config.GetLinux().GetCgroupParent() != "" {
-			cgroupsPath := getCgroupsPath(config.GetLinux().GetCgroupParent(), id)
+			cgroupsPath := GetCgroupsPath(config.GetLinux().GetCgroupParent(), id)
 			specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
 		}
 	}
@@ -143,7 +143,7 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	}
 	specOpts = append(specOpts, customopts.WithPodOOMScoreAdj(int(defaultSandboxOOMAdj), c.config.RestrictOOMScoreAdj))
 
-	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
+	for pKey, pValue := range GetPassthroughAnnotations(config.Annotations,
 		runtimePodAnnotations) {
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
 	}
@@ -169,17 +169,17 @@ func (c *criService) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 	)
 	ssp := securityContext.GetSeccomp()
 	if ssp == nil {
-		ssp, err = generateSeccompSecurityProfile(
+		ssp, err = GenerateSeccompSecurityProfile(
 			securityContext.GetSeccompProfilePath(), //nolint:staticcheck // Deprecated but we don't want to remove yet
 			c.config.UnsetSeccompProfile)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to generate seccomp spec opts")
 		}
 	}
-	seccompSpecOpts, err := c.generateSeccompSpecOpts(
+	seccompSpecOpts, err := GenerateSeccompSpecOpts(
 		ssp,
 		securityContext.GetPrivileged(),
-		c.seccompEnabled())
+		SeccompEnabled())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate seccomp spec opts")
 	}
@@ -187,7 +187,7 @@ func (c *criService) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 		specOpts = append(specOpts, seccompSpecOpts)
 	}
 
-	userstr, err := generateUserString(
+	userstr, err := GenerateUserString(
 		"",
 		securityContext.GetRunAsUser(),
 		securityContext.GetRunAsGroup(),

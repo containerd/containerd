@@ -61,7 +61,7 @@ func TestImageStatus(t *testing.T) {
 	require.NotNil(t, resp)
 	assert.Nil(t, resp.GetImage())
 
-	c.imageStore, err = imagestore.NewFakeStore([]imagestore.Image{image})
+	c.ImageStore, err = imagestore.NewFakeStore([]imagestore.Image{image})
 	assert.NoError(t, err)
 
 	t.Logf("should return correct image status for exist image")

@@ -60,8 +60,8 @@ const (
 	hostnameEnv = "HOSTNAME"
 )
 
-// getCgroupsPath generates container cgroups path.
-func getCgroupsPath(cgroupsParent, id string) string {
+// GetCgroupsPath generates container cgroups path.
+func GetCgroupsPath(cgroupsParent, id string) string {
 	base := path.Base(cgroupsParent)
 	if strings.HasSuffix(base, ".slice") {
 		// For a.slice/b.slice/c.slice, base is c.slice.
@@ -91,7 +91,7 @@ func (c *criService) getSandboxDevShm(id string) string {
 	return filepath.Join(c.getVolatileSandboxRootDir(id), "shm")
 }
 
-func toLabel(selinuxOptions *runtime.SELinuxOption) ([]string, error) {
+func ToLabel(selinuxOptions *runtime.SELinuxOption) ([]string, error) {
 	var labels []string
 
 	if selinuxOptions == nil {
@@ -117,7 +117,7 @@ func toLabel(selinuxOptions *runtime.SELinuxOption) ([]string, error) {
 }
 
 func initLabelsFromOpt(selinuxOpts *runtime.SELinuxOption) (string, string, error) {
-	labels, err := toLabel(selinuxOpts)
+	labels, err := ToLabel(selinuxOpts)
 	if err != nil {
 		return "", "", err
 	}
@@ -148,7 +148,7 @@ func (c *criService) apparmorEnabled() bool {
 	return apparmor.HostSupports()
 }
 
-func (c *criService) seccompEnabled() bool {
+func SeccompEnabled() bool {
 	return seccomp.IsEnabled()
 }
 
@@ -265,7 +265,7 @@ func isVMBasedRuntime(runtimeType string) bool {
 	return false
 }
 
-func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
+func ModifyProcessLabel(runtimeType string, spec *specs.Spec) error {
 	if !isVMBasedRuntime(runtimeType) {
 		return nil
 	}

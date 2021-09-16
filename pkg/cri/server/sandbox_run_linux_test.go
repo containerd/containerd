@@ -57,7 +57,7 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 	}
 	specCheck := func(t *testing.T, id string, spec *runtimespec.Spec) {
 		assert.Equal(t, "test-hostname", spec.Hostname)
-		assert.Equal(t, getCgroupsPath("/test/cgroup/parent", id), spec.Linux.CgroupsPath)
+		assert.Equal(t, GetCgroupsPath("/test/cgroup/parent", id), spec.Linux.CgroupsPath)
 		assert.Equal(t, relativeRootfsPath, spec.Root.Path)
 		assert.Equal(t, true, spec.Root.Readonly)
 		assert.Contains(t, spec.Process.Env, "a=b", "c=d")
