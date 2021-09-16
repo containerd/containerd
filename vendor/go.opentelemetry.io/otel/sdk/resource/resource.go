@@ -43,7 +43,14 @@ var (
 			otel.Handle(err)
 		}
 		return r
-	}(Detect(context.Background(), defaultServiceNameDetector{}, fromEnv{}, telemetrySDK{}))
+	}(
+		Detect(
+			context.Background(),
+			defaultServiceNameDetector{},
+			fromEnv{},
+			telemetrySDK{},
+		),
+	)
 )
 
 var (
@@ -125,10 +132,13 @@ func (r *Resource) Attributes() []attribute.KeyValue {
 }
 
 func (r *Resource) SchemaURL() string {
+	if r == nil {
+		return ""
+	}
 	return r.schemaURL
 }
 
-// Iter returns an interator of the Resource attributes.
+// Iter returns an iterator of the Resource attributes.
 // This is ideal to use if you do not want a copy of the attributes.
 func (r *Resource) Iter() attribute.Iterator {
 	if r == nil {
@@ -192,14 +202,14 @@ func Merge(a, b *Resource) (*Resource, error) {
 	return merged, nil
 }
 
-// Empty returns an instance of Resource with no attributes.  It is
+// Empty returns an instance of Resource with no attributes. It is
 // equivalent to a `nil` Resource.
 func Empty() *Resource {
 	return &emptyResource
 }
 
 // Default returns an instance of Resource with a default
-// "service.name" and OpenTelemetrySDK attributes
+// "service.name" and OpenTelemetrySDK attributes.
 func Default() *Resource {
 	return defaultResource
 }
@@ -216,13 +226,13 @@ func Environment() *Resource {
 }
 
 // Equivalent returns an object that can be compared for equality
-// between two resources.  This value is suitable for use as a key in
+// between two resources. This value is suitable for use as a key in
 // a map.
 func (r *Resource) Equivalent() attribute.Distinct {
 	return r.Set().Equivalent()
 }
 
-// Set returns the equivalent *attribute.Set of this resources attributes.
+// Set returns the equivalent *attribute.Set of this resource's attributes.
 func (r *Resource) Set() *attribute.Set {
 	if r == nil {
 		r = Empty()

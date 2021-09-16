@@ -113,6 +113,7 @@ A PR is considered to be **ready to merge** when:
   one day and may be merged with a single Maintainer's approval.
 * `CHANGELOG.md` has been updated to reflect what has been
   added, changed, removed, or fixed.
+* `README.md` has been updated if necessary.
 * Urgent fix can take exception as long as it has been actively
   communicated.
 
@@ -142,6 +143,26 @@ patterns in the spec.
 
 For a deeper discussion, see
 [this](https://github.com/open-telemetry/opentelemetry-specification/issues/165).
+
+## Documentation
+
+Each non-example Go Module should have its own `README.md` containing:
+
+- A pkg.go.dev badge which can be generated [here](https://pkg.go.dev/badge/).
+- Brief description.
+- Installation instructions (and requirements if applicable).
+- Hyperlink to an example. Depending on the component the example can be:
+  - An `example_test.go` like [here](exporters/stdout/stdouttrace/example_test.go).
+  - A sample Go application with its own `README.md`, like [here](example/zipkin).
+- Additional documentation sections such us:
+  - Configuration,
+  - Contributing,
+  - References.
+
+[Here](exporters/jaeger/README.md) is an example of a concise `README.md`.
+
+Moreover, it should be possible to navigate to any `README.md` from the
+root `README.md`.
 
 ## Style Guide
 
@@ -461,6 +482,7 @@ Approvers:
 - [David Ashpole](https://github.com/dashpole), Google
 - [Gustavo Silva Paiva](https://github.com/paivagustavo), LightStep
 - [Aaron Clawson](https://github.com/MadVikingGod)
+- [Robert Pająk](https://github.com/pellared), Splunk
 
 Maintainers:
 

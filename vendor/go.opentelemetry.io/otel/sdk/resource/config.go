@@ -60,13 +60,6 @@ func (o detectorsOption) apply(cfg *config) {
 	cfg.detectors = append(cfg.detectors, o.detectors...)
 }
 
-// WithBuiltinDetectors adds the built detectors to the configured resource.
-func WithBuiltinDetectors() Option {
-	return WithDetectors(telemetrySDK{},
-		host{},
-		fromEnv{})
-}
-
 // WithFromEnv adds attributes from environment variables to the configured resource.
 func WithFromEnv() Option {
 	return WithDetectors(fromEnv{})
@@ -91,4 +84,88 @@ type schemaURLOption string
 
 func (o schemaURLOption) apply(cfg *config) {
 	cfg.schemaURL = string(o)
+}
+
+// WithOS adds all the OS attributes to the configured Resource.
+// See individual WithOS* functions to configure specific attributes.
+func WithOS() Option {
+	return WithDetectors(
+		osTypeDetector{},
+		osDescriptionDetector{},
+	)
+}
+
+// WithOSType adds an attribute with the operating system type to the configured Resource.
+func WithOSType() Option {
+	return WithDetectors(osTypeDetector{})
+}
+
+// WithOSDescription adds an attribute with the operating system description to the
+// configured Resource. The formatted string is equivalent to the output of the
+// `uname -snrvm` command.
+func WithOSDescription() Option {
+	return WithDetectors(osDescriptionDetector{})
+}
+
+// WithProcess adds all the Process attributes to the configured Resource.
+// See individual WithProcess* functions to configure specific attributes.
+func WithProcess() Option {
+	return WithDetectors(
+		processPIDDetector{},
+		processExecutableNameDetector{},
+		processExecutablePathDetector{},
+		processCommandArgsDetector{},
+		processOwnerDetector{},
+		processRuntimeNameDetector{},
+		processRuntimeVersionDetector{},
+		processRuntimeDescriptionDetector{},
+	)
+}
+
+// WithProcessPID adds an attribute with the process identifier (PID) to the
+// configured Resource.
+func WithProcessPID() Option {
+	return WithDetectors(processPIDDetector{})
+}
+
+// WithProcessExecutableName adds an attribute with the name of the process
+// executable to the configured Resource.
+func WithProcessExecutableName() Option {
+	return WithDetectors(processExecutableNameDetector{})
+}
+
+// WithProcessExecutablePath adds an attribute with the full path to the process
+// executable to the configured Resource.
+func WithProcessExecutablePath() Option {
+	return WithDetectors(processExecutablePathDetector{})
+}
+
+// WithProcessCommandArgs adds an attribute with all the command arguments (including
+// the command/executable itself) as received by the process the configured Resource.
+func WithProcessCommandArgs() Option {
+	return WithDetectors(processCommandArgsDetector{})
+}
+
+// WithProcessOwner adds an attribute with the username of the user that owns the process
+// to the configured Resource.
+func WithProcessOwner() Option {
+	return WithDetectors(processOwnerDetector{})
+}
+
+// WithProcessRuntimeName adds an attribute with the name of the runtime of this
+// process to the configured Resource.
+func WithProcessRuntimeName() Option {
+	return WithDetectors(processRuntimeNameDetector{})
+}
+
+// WithProcessRuntimeVersion adds an attribute with the version of the runtime of
+// this process to the configured Resource.
+func WithProcessRuntimeVersion() Option {
+	return WithDetectors(processRuntimeVersionDetector{})
+}
+
+// WithProcessRuntimeDescription adds an attribute with an additional description
+// about the runtime of the process to the configured Resource.
+func WithProcessRuntimeDescription() Option {
+	return WithDetectors(processRuntimeDescriptionDetector{})
 }

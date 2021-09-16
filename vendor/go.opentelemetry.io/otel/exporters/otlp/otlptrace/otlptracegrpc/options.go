@@ -20,6 +20,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal/otlpconfig"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal/retry"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -30,9 +31,9 @@ type Option interface {
 	applyGRPCOption(*otlpconfig.Config)
 }
 
-// RetrySettings defines configuration for retrying batches in case of export failure
-// using an exponential backoff.
-type RetrySettings otlpconfig.RetrySettings
+// RetryConfig defines configuration for retrying batches in case of export
+// failure using an exponential backoff.
+type RetryConfig retry.Config
 
 type wrappedOption struct {
 	otlpconfig.GRPCOption
@@ -121,12 +122,11 @@ func WithTimeout(duration time.Duration) Option {
 	return wrappedOption{otlpconfig.WithTimeout(duration)}
 }
 
-// WithRetry configures the retry policy for transient errors that may occurs when
-// exporting traces. An exponential back-off algorithm is used to
-// ensure endpoints are not overwhelmed with retries. If unset, the default
-// ensure endpoints are not overwhelmed with retries. If unset, the default
-// retry policy will retry after 5 seconds and increase exponentially after each
+// WithRetry configures the retry policy for transient errors that may occurs
+// when exporting traces. An exponential back-off algorithm is used to ensure
+// endpoints are not overwhelmed with retries. If unset, the default retry
+// policy will retry after 5 seconds and increase exponentially after each
 // error for a total of 1 minute.
-func WithRetry(settings RetrySettings) Option {
-	return wrappedOption{otlpconfig.WithRetry(otlpconfig.RetrySettings(settings))}
+func WithRetry(settings RetryConfig) Option {
+	return wrappedOption{otlpconfig.WithRetry(retry.Config(settings))}
 }

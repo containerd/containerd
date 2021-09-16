@@ -50,7 +50,9 @@ func (tc TraceContext) Inject(ctx context.Context, carrier TextMapCarrier) {
 		return
 	}
 
-	carrier.Set(tracestateHeader, sc.TraceState().String())
+	if ts := sc.TraceState().String(); ts != "" {
+		carrier.Set(tracestateHeader, ts)
+	}
 
 	// Clear all flags other than the trace-context supported sampling bit.
 	flags := sc.TraceFlags() & trace.FlagsSampled

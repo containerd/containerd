@@ -10,6 +10,7 @@ coverage.*
 
 gen/
 
+/example/fib/fib
 /example/jaeger/jaeger
 /example/namedtracer/namedtracer
 /example/opencensus/opencensus
