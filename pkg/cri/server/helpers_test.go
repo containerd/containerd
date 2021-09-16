@@ -118,14 +118,19 @@ func TestGetRepoDigestAndTag(t *testing.T) {
 }
 
 func TestBuildLabels(t *testing.T) {
+	imageConfigLabels := map[string]string{
+		"a": "z",
+		"d": "y",
+	}
 	configLabels := map[string]string{
 		"a": "b",
 		"c": "d",
 	}
-	newLabels := buildLabels(configLabels, containerKindSandbox)
-	assert.Len(t, newLabels, 3)
+	newLabels := buildLabels(configLabels, imageConfigLabels, containerKindSandbox)
+	assert.Len(t, newLabels, 4)
 	assert.Equal(t, "b", newLabels["a"])
 	assert.Equal(t, "d", newLabels["c"])
+	assert.Equal(t, "y", newLabels["d"])
 	assert.Equal(t, containerKindSandbox, newLabels[containerKindLabel])
 
 	newLabels["a"] = "e"
