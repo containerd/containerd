@@ -53,7 +53,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const testUserNSImage = "mirror.gcr.io/library/alpine:3.13.5"
+// plain mirror, NOT stargz-converted image
+const testUserNSImage = "ghcr.io/stargz-containers/alpine:3.13-org"
 
 // TestRegressionIssue4769 verifies the number of task exit events.
 //

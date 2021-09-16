@@ -32,7 +32,8 @@ const (
 )
 
 var (
-	testImage    = "mirror.gcr.io/library/busybox:1.32.0"
+	// plain mirror, NOT stargz-converted image
+	testImage    = "ghcr.io/stargz-containers/busybox:1.32.0-org"
 	shortCommand = withProcessArgs("true")
 	longCommand  = withProcessArgs("/bin/sh", "-c", "while true; do sleep 1; done")
 )
