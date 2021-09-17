@@ -1,0 +1,23 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.4.9"
+
+pre_release = false
+
+preface = """\
+The tenth patch release for containerd 1.4 updates runc to 1.0.2, hcsshim to 0.8.21, Go
+to 1.15.15 and other minor updates.
+
+### Notable Updates
+
+* **Update Go to 1.15.15** [#5841](https://github.com/containerd/containerd/pull/5841)
+* **Update hcsshim to v0.8.21** [#5957](https://github.com/containerd/containerd/pull/5957)
+* **Update runc to v1.0.2** [#5984](https://github.com/containerd/containerd/pull/5984)
+
+See the changelog for complete list of changes"""
