@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/shutdown"
 	"github.com/containerd/containerd/plugin"
 	shimapi "github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/containerd/version"
@@ -58,7 +59,7 @@ type Init func(context.Context, string, Publisher, func()) (Shim, error)
 
 // Shim server interface
 type Shim interface {
-	Cleanup(ctx context.Context) (*shimapi.DeleteResponse, error)
+	Cleanup(ctx context.Context) (*shimapi.DeleteResponse, error) // TODO(2.0): Update interface to pass ID directly to Cleanup
 	StartShim(ctx context.Context, opts StartOpts) (string, error)
 }
 
@@ -159,6 +160,7 @@ func setLogger(ctx context.Context, id string) error {
 }
 
 // Run initializes and runs a shim server
+// TODO(2.0): Remove initFunc from arguments
 func Run(id string, initFunc Init, opts ...BinaryOpts) {
 	var config Config
 	for _, o := range opts {
@@ -209,8 +211,9 @@ func run(id string, initFunc Init, config Config) error {
 	ctx := namespaces.WithNamespace(context.Background(), namespaceFlag)
 	ctx = context.WithValue(ctx, OptsKey{}, Opts{BundlePath: bundlePath, Debug: debugFlag})
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("runtime", id))
-	ctx, cancel := context.WithCancel(ctx)
-	service, err := initFunc(ctx, idFlag, publisher, cancel)
+	ctx, sd := shutdown.WithShutdown(ctx)
+	defer sd.Shutdown()
+	service, err := initFunc(ctx, idFlag, publisher, sd.Shutdown)
 	if err != nil {
 		return err
 	}
@@ -259,6 +262,14 @@ func run(id string, initFunc Init, config Config) error {
 		}
 	}
 
+	plugin.Register(&plugin.Registration{
+		Type: plugin.InternalPlugin,
+		ID:   "shutdown",
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			return sd, nil
+		},
+	})
+
 	// Register event plugin
 	plugin.Register(&plugin.Registration{
 		Type: plugin.EventPlugin,
@@ -273,6 +284,9 @@ func run(id string, initFunc Init, config Config) error {
 		plugin.Register(&plugin.Registration{
 			Type: plugin.TTRPCPlugin,
 			ID:   "task",
+			Requires: []plugin.Type{
+				plugin.EventPlugin,
+			},
 			InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 				return &taskService{ts}, nil
 			},
@@ -345,7 +359,7 @@ func run(id string, initFunc Init, config Config) error {
 	}
 
 	if err := serve(ctx, server, signals); err != nil {
-		if err != context.Canceled {
+		if err != shutdown.ErrShutdown {
 			return err
 		}
 	}

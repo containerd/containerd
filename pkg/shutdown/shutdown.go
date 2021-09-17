@@ -75,7 +75,8 @@ func (s *shutdownService) Shutdown() {
 		ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
 		defer cancel()
 		grp, ctx := errgroup.WithContext(ctx)
-		for _, fn := range callbacks {
+		for i := range callbacks {
+			fn := callbacks[i]
 			grp.Go(func() error { return fn(ctx) })
 		}
 		err := grp.Wait()
