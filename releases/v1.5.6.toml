@@ -1,0 +1,23 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.5.5"
+
+pre_release = false
+
+preface = """\
+The sixth patch release for containerd 1.5 updates runc to 1.0.2, seccomp to 2.5.1, and contains various other fixes.
+
+### Notable Updates
+
+* **Update runc binary to 1.0.2** [#5983](https://github.com/containerd/containerd/pull/5983)
+* **Update hcsshim to v0.8.21 which contains a fix in the Windows shim for layer issues on Windows Server 2019** [#5942](https://github.com/containerd/containerd/pull/5942)
+* **Install apparmor parser for arm64 and update seccomp to 2.5.1** [#5763](https://github.com/containerd/containerd/pull/5763)
+* **Add support for 'clone3' syscall to fix issues with certain images when seccomp is enabled** [#6013](https://github.com/containerd/containerd/pull/6013)
+
+See the changelog for complete list of changes"""
