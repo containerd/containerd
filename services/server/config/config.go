@@ -67,8 +67,6 @@ type Config struct {
 	Timeouts map[string]string `toml:"timeouts"`
 	// Imports are additional file path list to config files that can overwrite main config file fields
 	Imports []string `toml:"imports"`
-	// OpenTelemetry configuration
-	OpenTelemetry OpenTelemetryConfig `toml:"otel"`
 	// StreamProcessors configuration
 	StreamProcessors map[string]StreamProcessor `toml:"stream_processors"`
 }
@@ -165,14 +163,6 @@ type CgroupConfig struct {
 type ProxyPlugin struct {
 	Type    string `toml:"type"`
 	Address string `toml:"address"`
-}
-
-// OpenTelemetryConfig provides open telemetry configuration
-type OpenTelemetryConfig struct {
-	ServiceName        string  `toml:"service_name"`
-	ExporterName       string  `toml:"exporter_name"`
-	ExporterEndpoint   string  `toml:"exporter_endpoint"`
-	TraceSamplingRatio float64 `toml:"trace_sampling_ratio"`
 }
 
 // BoltConfig defines the configuration values for the bolt plugin, which is
