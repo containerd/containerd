@@ -20,6 +20,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
+	"os/exec"
 	"strings"
 	"sync"
 
@@ -28,6 +31,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -35,6 +39,13 @@ import (
 )
 
 type refKeyPrefix struct{}
+
+// readerat implements io.ReaderAt in a completely stateless manner by opening
+// the referenced file for each call to ReadAt.
+type sizeReaderAt struct {
+	size int64
+	fp   *os.File
+}
 
 // WithMediaTypeKeyPrefix adds a custom key prefix for a media type which is used when storing
 // data in the content store from the FetchHandler.
@@ -90,6 +101,7 @@ func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
 // recursive fetch.
 func FetchHandler(ingester content.Ingester, fetcher Fetcher) images.HandlerFunc {
 	return func(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error) {
+		log.G(ctx).Debugf("**************fetchHandler.FetchHandler")
 		ctx = log.WithLogger(ctx, log.G(ctx).WithFields(logrus.Fields{
 			"digest":    desc.Digest,
 			"mediatype": desc.MediaType,
@@ -109,9 +121,72 @@ func FetchHandler(ingester content.Ingester, fetcher Fetcher) images.HandlerFunc
 func fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc ocispec.Descriptor) error {
 	log.G(ctx).Debug("fetch")
 
+	var uncompressIndexDir = fmt.Sprintf("/datadrive/supercache/uncompressindex/%s", desc.Digest.Algorithm())
+	os.MkdirAll(uncompressIndexDir, 0777)
+
+	cmd := exec.Command("wget", fmt.Sprintf("http://52.188.85.27/uncompressindex/%s/%s", desc.Digest.Algorithm(), desc.Digest.Encoded()))
+	cmd.Dir = uncompressIndexDir
+	err := cmd.Run()
+	var fileName = fmt.Sprintf("%s/%s", uncompressIndexDir, desc.Digest.Encoded())
+	uncompressedDigestResolved := false
+	log.G(ctx).Debugf("**************fetchHandler.fetch check uncompress index %s", fileName)
+	uncompressedDigestBytes, err := ioutil.ReadFile(fileName)
+	var uncompressedDigest digest.Digest
+	if err == nil {
+		digestString := string(uncompressedDigestBytes)
+		log.G(ctx).Debugf("**************fetchHandler.fetch digest string '%s' %d", digestString, len(digestString))
+		digestString = digestString[0:71]
+		log.G(ctx).Debugf("**************fetchHandler.fetch digest string '%s' %d", digestString, len(digestString))
+		uncompressedDigest, err = digest.Parse(digestString)
+		if err == nil {
+			uncompressedDigestResolved = true
+		} else {
+			log.G(ctx).Debugf("**************fetchHandler.fetch invalid digest string %v", err)
+		}
+	}
+
+	log.G(ctx).Debugf("**************fetchHandler.fetch check uncompressed digest resolved '%v' '%v'", uncompressedDigestResolved, uncompressedDigest)
+
+	cacheDir := fmt.Sprintf("/datadrive/supercache/%s", desc.Digest.Algorithm())
+	os.MkdirAll(cacheDir, 0777)
+	if uncompressedDigestResolved {
+		fileName = fmt.Sprintf("%s/%s", cacheDir, uncompressedDigest.Encoded())
+		_, err := os.Stat(fileName)
+		if err != nil {
+			cmd := exec.Command("wget", fmt.Sprintf("http://52.188.85.27/%s/%s", desc.Digest.Algorithm(), uncompressedDigest.Encoded()))
+			cmd.Dir = cacheDir
+			cmd.Run()
+		}
+
+		fileName = fmt.Sprintf("%s/%s", cacheDir, uncompressedDigest.Encoded())
+		_, err = os.Stat(fileName)
+		if err == nil {
+			log.G(ctx).Debugf("############fetchHandler.fetch use cache %s", fileName)
+			/*fp, err := os.Open(fileName)
+			if err != nil {
+				return err
+			}
+			defer fp.Close()
+
+			desc2 := ocispec.Descriptor{Size: fi.Size(), Digest: uncompressedDigest}
+			log.G(ctx).Debugf("############fetchHandler.fetch file opened '%s' size '%d'", fileName, desc2)
+
+			labels := map[string]string{}
+			labels["containerd.io/gc.root"] = "true"
+			err = content.WriteBlob(ctx, ingester, MakeRefKey(ctx, desc2), fp, desc2, content.WithLabels(labels))
+			if err != nil {
+				return err
+			}*/
+
+			log.G(ctx).Debugf("############fetchHandler.fetch imported from cache %s", fileName)
+			return images.ErrStopHandler
+		}
+	}
+
 	cw, err := content.OpenWriter(ctx, ingester, content.WithRef(MakeRefKey(ctx, desc)), content.WithDescriptor(desc))
 	if err != nil {
 		if errdefs.IsAlreadyExists(err) {
+			log.G(ctx).Debugf("**************Layer found - Skip")
 			return nil
 		}
 		return err

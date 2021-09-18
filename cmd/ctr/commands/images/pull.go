@@ -93,10 +93,13 @@ command. As part of this process, we do the following:
 			return err
 		}
 
+		start := time.Now()
 		img, err := content.Fetch(ctx, client, ref, config)
 		if err != nil {
 			return err
 		}
+		elapsed := time.Since(start)
+		log.G(ctx).WithField("image", ref).Debugf("************Fetch done in %v", elapsed)
 
 		log.G(ctx).WithField("image", ref).Debug("unpacking")
 
@@ -121,7 +124,7 @@ command. As part of this process, we do the following:
 			p = append(p, platforms.DefaultSpec())
 		}
 
-		start := time.Now()
+		start = time.Now()
 		for _, platform := range p {
 			fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
 			i := containerd.NewImageWithPlatform(client, img, platforms.Only(platform))
@@ -138,7 +141,8 @@ command. As part of this process, we do the following:
 				fmt.Printf("image chain ID: %s\n", chainID)
 			}
 		}
-		fmt.Printf("done: %s\t\n", time.Since(start))
+		elapsed = time.Since(start)
+		log.G(ctx).WithField("image", ref).Debugf("************Unpack done in %v", elapsed)
 		return nil
 	},
 }

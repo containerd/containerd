@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/snapshots"
@@ -359,7 +360,7 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 				},
 			}
 			if _, err := cs.Update(ctx, cinfo, "labels.containerd.io/uncompressed"); err != nil {
-				return err
+				//return err
 			}
 		}
 

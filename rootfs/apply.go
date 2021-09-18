@@ -122,11 +122,19 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 		err     error
 	)
 
+	if opts == nil {
+		opts = []snapshots.Opt{}
+	}
+
 	for {
 		key = fmt.Sprintf(snapshots.UnpackKeyFormat, uniquePart(), chainID)
+		Labels := map[string]string{}
+		Labels["containerd.io/snapshot.ref"] = layer.Diff.Digest.String()
+		Labels["containerd.io/snapshot/chainid"] = chainID.String()
 
-		// Prepare snapshot with from parent, label as root
-		mounts, err = sn.Prepare(ctx, key, parent.String(), opts...)
+		opts2 := append(opts, snapshots.WithLabels(Labels))
+
+		mounts, err = sn.Prepare(ctx, key, parent.String(), opts2...)
 		if err != nil {
 			if errdefs.IsNotFound(err) && len(layers) > 1 {
 				if err := applyLayers(ctx, layers[:len(layers)-1], chain[:len(chain)-1], sn, a, opts, applyOpts); err != nil {
@@ -160,16 +168,27 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 		}
 	}()
 
-	diff, err = a.Apply(ctx, layer.Blob, mounts, applyOpts...)
-	if err != nil {
-		err = errors.Wrapf(err, "failed to extract layer %s", layer.Diff.Digest)
-		return err
-	}
-	if diff.Digest != layer.Diff.Digest {
-		err = errors.Errorf("wrong diff id calculated on extraction %q", diff.Digest)
-		return err
+	skipApply := false
+	for _, m := range mounts {
+		for _, o := range m.Options {
+			if o == "skipapply" {
+				skipApply = true
+			}
+		}
 	}
 
+	if !skipApply {
+		diff, err = a.Apply(ctx, layer.Blob, mounts, applyOpts...)
+		if err != nil {
+			err = errors.Wrapf(err, "failed to extract layer %s", layer.Diff.Digest)
+			return err
+		}
+		if diff.Digest != layer.Diff.Digest {
+			err = errors.Errorf("wrong diff id calculated on extraction %q", diff.Digest)
+			return err
+		}
+	}
+	
 	if err = sn.Commit(ctx, chainID.String(), key, opts...); err != nil {
 		err = errors.Wrapf(err, "failed to commit snapshot %s", key)
 		return err
