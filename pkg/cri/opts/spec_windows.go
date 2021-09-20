@@ -18,6 +18,7 @@ package opts
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -119,19 +120,28 @@ func WithWindowsMounts(osi osinterface.OS, config *runtime.ContainerConfig, extr
 			// paths, so don't use it.
 			if !namedPipePath(src) {
 				if _, err := osi.Stat(src); err != nil {
-					// If the source doesn't exist, return an error instead
-					// of creating the source. This aligns with Docker's
-					// behavior on windows.
-					return errors.Wrapf(err, "failed to stat %q", src)
+					// Create the host path if it doesn't exist. This will align
+					// the behavior with the Linux implementation, but it doesn't
+					// align with Docker's behavior on Windows.
+					if !os.IsNotExist(err) {
+						return errors.Wrapf(err, "failed to stat %q", src)
+					}
+					if err := osi.MkdirAll(src, 0755); err != nil {
+						return errors.Wrapf(err, "failed to mkdir %q", src)
+					}
 				}
 				var err error
 				src, err = osi.ResolveSymbolicLink(src)
 				if err != nil {
 					return errors.Wrapf(err, "failed to resolve symlink %q", src)
 				}
-				// hcsshim requires clean path, especially '/' -> '\'.
+				// hcsshim requires clean path, especially '/' -> '\'. Additionally,
+				// for the destination, absolute paths should have the C: prefix.
 				src = filepath.Clean(src)
 				dst = filepath.Clean(dst)
+				if dst[0] == '\\' {
+					dst = "C:" + dst
+				}
 			}
 
 			var options []string

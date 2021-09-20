@@ -21,6 +21,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
+	"strings"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
@@ -76,29 +78,51 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 		// refer to https://github.com/containerd/containerd/pull/1868
 		// https://github.com/containerd/containerd/pull/1785
 		defer os.Remove(root) // nolint: errcheck
-		if err := mount.All(mounts, root); err != nil {
-			return errors.Wrap(err, "failed to mount")
-		}
-		defer func() {
-			if uerr := mount.Unmount(root, 0); uerr != nil {
-				log.G(ctx).WithError(uerr).Errorf("Failed to unmount snapshot %q", c.SnapshotKey)
+
+		unmounter := func(mountPath string) {
+			if uerr := mount.Unmount(mountPath, 0); uerr != nil {
+				log.G(ctx).WithError(uerr).Errorf("Failed to unmount snapshot %q", root)
 				if err == nil {
 					err = uerr
 				}
 			}
-		}()
+		}
+
+		var mountPaths []string
+		if goruntime.GOOS == "windows" {
+			for _, m := range mounts {
+				// appending the layerID to the root.
+				mountPath := filepath.Join(root, filepath.Base(m.Source))
+				mountPaths = append(mountPaths, mountPath)
+				if err := m.Mount(mountPath); err != nil {
+					return err
+				}
+
+				defer unmounter(m.Source)
+			}
+		} else {
+			mountPaths = append(mountPaths, root)
+			if err := mount.All(mounts, root); err != nil {
+				return errors.Wrap(err, "failed to mount")
+			}
+			defer unmounter(root)
+		}
 
 		for host, volume := range volumeMounts {
-			src := filepath.Join(root, volume)
-			if _, err := os.Stat(src); err != nil {
-				if os.IsNotExist(err) {
-					// Skip copying directory if it does not exist.
-					continue
+			// The volume may have been defined with a C: prefix, which we can't use here.
+			volume = strings.TrimPrefix(volume, "C:")
+			for _, mountPath := range mountPaths {
+				src := filepath.Join(mountPath, volume)
+				if _, err := os.Stat(src); err != nil {
+					if os.IsNotExist(err) {
+						// Skip copying directory if it does not exist.
+						continue
+					}
+					return errors.Wrap(err, "stat volume in rootfs")
 				}
-				return errors.Wrap(err, "stat volume in rootfs")
-			}
-			if err := copyExistingContents(src, host); err != nil {
-				return errors.Wrap(err, "taking runtime copy of volume")
+				if err := copyExistingContents(src, host); err != nil {
+					return errors.Wrap(err, "taking runtime copy of volume")
+				}
 			}
 		}
 		return nil
