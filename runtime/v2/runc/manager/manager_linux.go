@@ -1,5 +1,3 @@
-// +build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -16,7 +14,7 @@
    limitations under the License.
 */
 
-package service
+package manager
 
 import (
 	"context"
@@ -30,6 +28,7 @@ import (
 
 	"github.com/containerd/cgroups"
 	cgroupsv2 "github.com/containerd/cgroups/v2"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/process"
@@ -37,22 +36,20 @@ import (
 	"github.com/containerd/containerd/runtime/v2/runc"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/runtime/v2/shim"
-	taskAPI "github.com/containerd/containerd/runtime/v2/task"
 	runcC "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/proto"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 )
 
 // NewShimManager returns an implementation of the shim manager
 // using runc
-func NewShimManager(id string) shim.Shim {
+func NewShimManager(name string) shim.Manager {
 	return &manager{
-		id: id,
+		name: name,
 	}
 }
 
@@ -69,7 +66,7 @@ type spec struct {
 }
 
 type manager struct {
-	id string
+	name string
 }
 
 func newCommand(ctx context.Context, id, containerdBinary, containerdAddress, containerdTTRPCAddress string) (*exec.Cmd, error) {
@@ -112,12 +109,16 @@ func readSpec() (*spec, error) {
 	return &s, nil
 }
 
-func (manager) StartShim(ctx context.Context, opts shim.StartOpts) (_ string, retErr error) {
-	cmd, err := newCommand(ctx, opts.ID, opts.ContainerdBinary, opts.Address, opts.TTRPCAddress)
+func (m manager) Name() string {
+	return m.name
+}
+
+func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ string, retErr error) {
+	cmd, err := newCommand(ctx, id, opts.ContainerdBinary, opts.Address, opts.TTRPCAddress)
 	if err != nil {
 		return "", err
 	}
-	grouping := opts.ID
+	grouping := id
 	spec, err := readSpec()
 	if err != nil {
 		return "", err
@@ -236,24 +237,24 @@ func (manager) StartShim(ctx context.Context, opts shim.StartOpts) (_ string, re
 	return address, nil
 }
 
-func (m manager) Cleanup(ctx context.Context) (*taskAPI.DeleteResponse, error) {
+func (manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return nil, err
+		return shim.StopStatus{}, err
 	}
 
-	path := filepath.Join(filepath.Dir(cwd), m.id)
+	path := filepath.Join(filepath.Dir(cwd), id)
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
-		return nil, err
+		return shim.StopStatus{}, err
 	}
 	runtime, err := runc.ReadRuntime(path)
 	if err != nil {
-		return nil, err
+		return shim.StopStatus{}, err
 	}
 	opts, err := runc.ReadOptions(path)
 	if err != nil {
-		return nil, err
+		return shim.StopStatus{}, err
 	}
 	root := process.RuncRoot
 	if opts != nil && opts.Root != "" {
@@ -261,16 +262,16 @@ func (m manager) Cleanup(ctx context.Context) (*taskAPI.DeleteResponse, error) {
 	}
 
 	r := process.NewRunc(root, path, ns, runtime, "", false)
-	if err := r.Delete(ctx, m.id, &runcC.DeleteOpts{
+	if err := r.Delete(ctx, id, &runcC.DeleteOpts{
 		Force: true,
 	}); err != nil {
-		logrus.WithError(err).Warn("failed to remove runc container")
+		log.G(ctx).WithError(err).Warn("failed to remove runc container")
 	}
 	if err := mount.UnmountAll(filepath.Join(path, "rootfs"), 0); err != nil {
-		logrus.WithError(err).Warn("failed to cleanup rootfs mount")
+		log.G(ctx).WithError(err).Warn("failed to cleanup rootfs mount")
 	}
-	return &taskAPI.DeleteResponse{
+	return shim.StopStatus{
 		ExitedAt:   time.Now(),
-		ExitStatus: 128 + uint32(unix.SIGKILL),
+		ExitStatus: 128 + int(unix.SIGKILL),
 	}, nil
 }
