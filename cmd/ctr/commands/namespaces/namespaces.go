@@ -47,7 +47,7 @@ var createCommand = cli.Command{
 	Name:        "create",
 	Aliases:     []string{"c"},
 	Usage:       "create a new namespace",
-	ArgsUsage:   "<name> [<key>=<value]",
+	ArgsUsage:   "<name> [<key>=<value>]",
 	Description: "create a new namespace. it must be unique",
 	Action: func(context *cli.Context) error {
 		namespace, labels := commands.ObjectWithLabelArgs(context)
@@ -68,7 +68,7 @@ var setLabelsCommand = cli.Command{
 	Name:        "label",
 	Usage:       "set and clear labels for a namespace",
 	ArgsUsage:   "<name> [<key>=<value>, ...]",
-	Description: "set and clear labels for a namespace",
+	Description: "set and clear labels for a namespace. empty value clears the label",
 	Action: func(context *cli.Context) error {
 		namespace, labels := commands.ObjectWithLabelArgs(context)
 		if namespace == "" {
