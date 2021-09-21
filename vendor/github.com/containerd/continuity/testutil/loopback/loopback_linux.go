@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -20,13 +21,14 @@ package loopback
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -35,13 +37,13 @@ func New(size int64) (*Loopback, error) {
 	// create temporary file for the disk image
 	file, err := ioutil.TempFile("", "containerd-test-loopback")
 	if err != nil {
-		return nil, errors.Wrap(err, "could not create temporary file for loopback")
+		return nil, fmt.Errorf("could not create temporary file for loopback: %w", err)
 	}
 
 	if err := file.Truncate(size); err != nil {
 		file.Close()
 		os.Remove(file.Name())
-		return nil, errors.Wrap(err, "failed to resize temp file")
+		return nil, fmt.Errorf("failed to resize temp file: %w", err)
 	}
 	file.Close()
 
@@ -52,8 +54,7 @@ func New(size int64) (*Loopback, error) {
 	losetup.Stderr = &stderr
 	if err := losetup.Run(); err != nil {
 		os.Remove(file.Name())
-		return nil, errors.Wrapf(err, "loopback setup failed (%v): stdout=%q, stderr=%q",
-			losetup.Args, stdout.String(), stderr.String())
+		return nil, fmt.Errorf("loopback setup failed (%v): stdout=%q, stderr=%q: %w", losetup.Args, stdout.String(), stderr.String(), err)
 	}
 
 	deviceName := strings.TrimSpace(stdout.String())
@@ -64,8 +65,7 @@ func New(size int64) (*Loopback, error) {
 		logrus.Debugf("Removing loop device %s", deviceName)
 		losetup := exec.Command("losetup", "--detach", deviceName)
 		if out, err := losetup.CombinedOutput(); err != nil {
-			return errors.Wrapf(err, "Could not remove loop device %s (%v): %q",
-				deviceName, losetup.Args, string(out))
+			return fmt.Errorf("Could not remove loop device %s (%v): %q: %w", deviceName, losetup.Args, string(out), err)
 		}
 
 		// remove file
