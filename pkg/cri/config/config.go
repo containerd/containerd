@@ -276,6 +276,12 @@ type PluginConfig struct {
 	// of being placed under the hardcoded directory /var/run/netns. Changing this setting requires
 	// that all containers are deleted.
 	NetNSMountsUnderStateDir bool `toml:"netns_mounts_under_state_dir" json:"netnsMountsUnderStateDir"`
+	// ProcessRLimitNoFileSoft sets the soft limit of maximum file
+	// descriptors each container process can use.
+	ProcessRLimitNoFileSoft *int `toml:"process_rlimit_no_file_soft" json:"process_rlimit_no_file_soft"`
+	// ProcessRLimitNoFileHard sets the hard limit of maximum file
+	// descriptors each container process can use.
+	ProcessRLimitNoFileHard *int `toml:"process_rlimit_no_file_hard" json:"process_rlimit_no_file_hard"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
@@ -419,5 +425,18 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 			return errors.Wrap(err, "invalid stream idle timeout")
 		}
 	}
+
+	// Validate rlimit_nofile configuration
+	noFileSoft := c.ProcessRLimitNoFileSoft
+	noFileHard := c.ProcessRLimitNoFileHard
+	if noFileSoft != nil && noFileHard != nil {
+		// Soft limit cannot be set higher than hard limit
+		if *noFileSoft > *noFileHard {
+			return errors.Errorf("`process_rlimit_no_file_soft` must not be greater than `process_rlimit_no_file_hard`")
+		}
+	} else if noFileSoft != nil || noFileHard != nil {
+		return errors.Errorf("`process_rlimit_no_file_soft` and `process_rlimit_no_file_hard` must both be configured")
+	}
+
 	return nil
 }

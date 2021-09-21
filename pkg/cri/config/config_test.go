@@ -26,6 +26,10 @@ import (
 )
 
 func TestValidateConfig(t *testing.T) {
+	// Values to be used in tests that require *int
+	hardLimit := 512
+	softLimit := 1024
+
 	for desc, test := range map[string]struct {
 		config      *PluginConfig
 		expectedErr string
@@ -359,6 +363,49 @@ func TestValidateConfig(t *testing.T) {
 				},
 			},
 			expectedErr: "`configs.tls` cannot be set when `config_path` is provided",
+		},
+		"invalid rlimit_nofile config": {
+			config: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							Type: plugin.RuntimeLinuxV1,
+						},
+					},
+				},
+				ProcessRLimitNoFileSoft: &softLimit,
+				ProcessRLimitNoFileHard: &hardLimit,
+			},
+			expectedErr: "`process_rlimit_no_file_soft` must not be greater than `process_rlimit_no_file_hard`",
+		},
+		"missing process_rlimit_no_file_soft": {
+			config: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							Type: plugin.RuntimeLinuxV1,
+						},
+					},
+				},
+				ProcessRLimitNoFileSoft: &softLimit,
+			},
+			expectedErr: "`process_rlimit_no_file_soft` and `process_rlimit_no_file_hard` must both be configured",
+		},
+		"missing process_rlimit_no_file_hard": {
+			config: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							Type: plugin.RuntimeLinuxV1,
+						},
+					},
+				},
+				ProcessRLimitNoFileHard: &hardLimit,
+			},
+			expectedErr: "`process_rlimit_no_file_soft` and `process_rlimit_no_file_hard` must both be configured",
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
