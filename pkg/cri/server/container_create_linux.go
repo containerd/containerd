@@ -302,6 +302,19 @@ func (c *criService) containerSpec(
 				Type: runtimespec.CgroupNamespace,
 			}))
 	}
+
+	// Override the default oci.Spec RLIMIT_NOFILE if these values are set in config
+	if c.config.PluginConfig.ProcessRLimitNoFileHard != nil && c.config.PluginConfig.ProcessRLimitNoFileSoft != nil {
+		var rlimits = []runtimespec.POSIXRlimit{
+			{
+				Type: "RLIMIT_NOFILE",
+				Hard: uint64(*c.config.PluginConfig.ProcessRLimitNoFileHard),
+				Soft: uint64(*c.config.PluginConfig.ProcessRLimitNoFileSoft),
+			},
+		}
+		specOpts = append(specOpts, customopts.WithProcessRLimits(rlimits))
+	}
+
 	return c.runtimeSpec(id, ociRuntime.BaseRuntimeSpec, specOpts...)
 }
 
