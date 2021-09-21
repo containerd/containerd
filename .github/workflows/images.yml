@@ -1,0 +1,67 @@
+name: "Mirror Test Image"
+on:
+  workflow_dispatch:
+    inputs:
+      upstream:
+        description: "Upstream image to mirror"
+        required: true
+        default: "docker.io/library/busybox:1.32"
+
+jobs:
+  mirror:
+    name: "Mirror Image"
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+
+    defaults:
+      run:
+        working-directory: src/github.com/containerd/containerd
+
+    steps:
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '1.17.1'
+
+      - uses: actions/checkout@v2
+        with:
+          path: src/github.com/containerd/containerd
+
+      - name: Set env
+        shell: bash
+        run: |
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+
+      - name: Install containerd dependencies
+        env:
+          RUNC_FLAVOR: ${{ matrix.runc }}
+          GOFLAGS: -modcacherw
+        run: |
+          sudo apt-get install -y gperf
+          sudo -E PATH=$PATH script/setup/install-seccomp
+
+      - name: Install containerd
+        env:
+          CGO_ENABLED: 1
+        run: |
+          make binaries GO_BUILD_FLAGS="-mod=vendor" GO_BUILDTAGS="no_btrfs"
+          sudo -E PATH=$PATH make install
+
+      - name: Pull and push image
+        shell: bash
+        run: |
+          sudo containerd -l debug & > /tmp/containerd.out
+          containerd_pid=$!
+          sleep 5
+
+          upstream=${{ github.event.inputs.upstream }}
+          mirror="ghcr.io/containerd/${upstream##*/}"
+
+          echo "Mirroring $upstream to $mirror"
+
+          sudo ctr content fetch --all-platforms ${upstream}
+          sudo ctr images ls
+          sudo ctr --debug images push -u ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} ${mirror} ${upstream}
+
+          sudo kill $containerd_pid
