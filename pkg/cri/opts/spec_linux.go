@@ -43,6 +43,17 @@ import (
 	osinterface "github.com/containerd/containerd/pkg/os"
 )
 
+// WithProcessRLimits sets the RLimits for this container process
+func WithProcessRLimits(rlimits []runtimespec.POSIXRlimit) oci.SpecOpts {
+	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
+		if s.Process == nil {
+			s.Process = &runtimespec.Process{}
+		}
+		s.Process.Rlimits = rlimits
+		return nil
+	}
+}
+
 // WithAdditionalGIDs adds any additional groups listed for a particular user in the
 // /etc/groups file of the image's root filesystem to the OCI spec's additionalGids array.
 func WithAdditionalGIDs(userstr string) oci.SpecOpts {
