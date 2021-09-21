@@ -74,7 +74,7 @@ github.com/containerd/cgroups
 github.com/containerd/cgroups/stats/v1
 github.com/containerd/cgroups/v2
 github.com/containerd/cgroups/v2/stats
-# github.com/containerd/console v1.0.2
+# github.com/containerd/console v1.0.3
 ## explicit
 github.com/containerd/console
 # github.com/containerd/containerd/api v0.0.0 => ./api
@@ -94,7 +94,7 @@ github.com/containerd/containerd/api/services/ttrpc/events/v1
 github.com/containerd/containerd/api/services/version/v1
 github.com/containerd/containerd/api/types
 github.com/containerd/containerd/api/types/task
-# github.com/containerd/continuity v0.1.1-0.20210910181051-2e0898a8e801
+# github.com/containerd/continuity v0.2.0
 ## explicit
 github.com/containerd/continuity
 github.com/containerd/continuity/devices

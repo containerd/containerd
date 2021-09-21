@@ -1,6 +1,3 @@
-//go:build freebsd
-// +build freebsd
-
 /*
    Copyright The containerd Authors.
 
@@ -17,10 +14,13 @@
    limitations under the License.
 */
 
-package devices
+package console
 
-import "golang.org/x/sys/unix"
+import (
+	"golang.org/x/sys/unix"
+)
 
-func mknod(path string, mode uint32, dev uint64) (err error) {
-	return unix.Mknod(path, mode, dev)
-}
+const (
+	cmdTcGet = unix.TCGETS
+	cmdTcSet = unix.TCSETS
+)
