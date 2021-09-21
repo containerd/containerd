@@ -499,6 +499,11 @@ jobs:
           SELINUX: Enforcing
           REPORT_DIR: /tmp/critestreport
         run: vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+
+      - name: Collect the VM's IP address for Docker Hub's throttling issue
+        if: failure()
+        run: vagrant ssh -- curl https://api64.ipify.org/
+
       - name: Get test reports
         if: always()
         run: |
@@ -542,3 +547,7 @@ jobs:
           # Execute rootless podman to create the UserNS env
           vagrant ssh -- podman build --target cri-in-userns -t cri-in-userns -f /vagrant/contrib/Dockerfile.test /vagrant
           vagrant ssh -- podman run --rm --privileged cri-in-userns
+
+      - name: Collect the VM's IP address for Docker Hub's throttling issue
+        if: failure()
+        run: vagrant ssh -- curl https://api64.ipify.org/
