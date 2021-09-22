@@ -541,7 +541,14 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 	}
 	resp, err := ctxhttp.Do(ctx, r.host.Client, req)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to do request")
+		if strings.Contains(err.Error(), "http: server gave HTTP response to HTTPS client") {
+			// retry with http
+			req.URL.Scheme = "http"
+			resp, err = ctxhttp.Do(ctx, r.host.Client, req)
+		}
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to do request")
+		}
 	}
 	log.G(ctx).WithFields(responseFields(resp)).Debug("fetch response received")
 	return resp, nil
