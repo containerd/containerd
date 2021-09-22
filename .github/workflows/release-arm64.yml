@@ -1,9 +1,9 @@
 on:
   push:
     tags:
-      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+      - '*arm64' # Push events to matching v*, i.e. v1.0, v20.15.10
 
-name: Containerd Release
+name: Release Arm64
 
 jobs:
   check:
@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           ref: ${{ github.ref }}
-          path: src/github.com/containerd/containerd
+          path: src/github.com/hhstu/containerd
 
       - name: Check signature
         run: |
@@ -27,12 +27,12 @@ jobs:
           TAGCHECK=$(git tag -v ${releasever} 2>&1 >/dev/null) ||
           echo "${TAGCHECK}" | grep -q "error" && {
               echo "::error::tag ${releasever} is not a signed tag. Failing release process."
-              exit 1
+              exit 0
           } || {
               echo "Tag ${releasever} is signed."
               exit 0
           }
-        working-directory: src/github.com/containerd/containerd
+        working-directory: src/github.com/hhstu/containerd
 
       - name: Release content
         id: contentrel
@@ -40,13 +40,13 @@ jobs:
           RELEASEVER=${{ github.ref }}
           echo "::set-output name=stringver::${RELEASEVER#refs/tags/v}"
           git tag -l ${RELEASEVER#refs/tags/} -n20000 | tail -n +3 | cut -c 5- >release-notes.md
-        working-directory: src/github.com/containerd/containerd
+        working-directory: src/github.com/hhstu/containerd
 
       - name: Save release notes
         uses: actions/upload-artifact@v2
         with:
           name: containerd-release-notes
-          path: src/github.com/containerd/containerd/release-notes.md
+          path: src/github.com/hhstu/containerd/release-notes.md
 
   build:
     name: Build Release Binaries
@@ -56,7 +56,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-18.04, windows-2019]
+        os: [ubuntu-18.04]
 
     steps:
       - name: Install Go
@@ -80,19 +80,24 @@ jobs:
           echo "OS=${os}" >> $GITHUB_ENV
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
+      - name: Checkout hhstu containerd
+        uses: actions/checkout@v2
+        with:
+          repository: hhstu/containerd
+          ref: ${{ github.ref }}
+          path: src/github.com/hhstu/containerd
       - name: Checkout containerd
         uses: actions/checkout@v2
         with:
           repository: containerd/containerd
-          ref: ${{ github.ref }}
+          ref: v1.5.2
           path: src/github.com/containerd/containerd
-
       - name: HCS Shim commit
         id: hcsshim_commit
         if: startsWith(matrix.os, 'windows')
         shell: bash
         run: echo "::set-output name=sha::$(grep 'Microsoft/hcsshim ' go.mod | awk '{print $2}')"
-        working-directory: src/github.com/containerd/containerd
+        working-directory: src/github.com/hhstu/containerd
 
       - name: Checkout hcsshim source
         if: startsWith(matrix.os, 'windows')
@@ -112,36 +117,37 @@ jobs:
               (
                 bindir="$(pwd)/bin"
                 cd ../../Microsoft/hcsshim
-                GO111MODULE=on go build -mod=vendor -o "${bindir}/containerd-shim-runhcs-v1.exe" ./cmd/containerd-shim-runhcs-v1
+                GO111MODULE=on GOARCH=arm64 go build -mod=vendor -o "${bindir}/containerd-shim-runhcs-v1.exe" ./cmd/containerd-shim-runhcs-v1
               )
           }
-          TARFILE="containerd-${RELEASE_VER#v}-${OS}-amd64.tar.gz"
+          TARFILE="containerd-${RELEASE_VER#v}-${OS}-arm64.tar.gz"
           tar czf ${TARFILE} bin/
           sha256sum ${TARFILE} >${TARFILE}.sha256sum
-        working-directory: src/github.com/containerd/containerd
+        working-directory: src/github.com/hhstu/containerd
 
       - name: Save build binaries
         uses: actions/upload-artifact@v2
         with:
           name: containerd-binaries-${{ matrix.os }}
-          path: src/github.com/containerd/containerd/*.tar.gz*
+          path: src/github.com/hhstu/containerd/*.tar.gz*
 
       - name: Make cri-containerd tar
         shell: bash
         env:
           RUNC_FLAVOR: runc
+          GOARCH: arm64
         run: |
           if [[ "${OS}" == "linux" ]]; then
             sudo -E PATH=$PATH script/setup/install-seccomp
           fi
           make cri-cni-release
-        working-directory: src/github.com/containerd/containerd
+        working-directory: src/github.com/hhstu/containerd
 
       - name: Save cri-containerd binaries
         uses: actions/upload-artifact@v2
         with:
           name: cri-containerd-binaries-${{ matrix.os }}
-          path: src/github.com/containerd/containerd/releases/cri-containerd-cni-*.tar.gz*
+          path: src/github.com/hhstu/containerd/releases/cri-containerd-cni-*.tar.gz*
 
   release:
     name: Create containerd Release
@@ -158,7 +164,7 @@ jobs:
         id: catalog
         run: |
           _filenum=1
-          for i in "ubuntu-18.04" "windows-2019"; do
+          for i in "ubuntu-18.04"; do
             for f in `ls builds/containerd-binaries-${i}`; do
               echo "::set-output name=file${_filenum}::${f}"
               let "_filenum+=1"
@@ -214,40 +220,4 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./builds/cri-containerd-binaries-ubuntu-18.04/${{ steps.catalog.outputs.file4 }}
           asset_name: ${{ steps.catalog.outputs.file4 }}
-          asset_content_type: text/plain
-      - name: Upload Windows containerd tarball
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/containerd-binaries-windows-2019/${{ steps.catalog.outputs.file5 }}
-          asset_name: ${{ steps.catalog.outputs.file5 }}
-          asset_content_type: application/gzip
-      - name: Upload Windows sha256 sum
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/containerd-binaries-windows-2019/${{ steps.catalog.outputs.file6 }}
-          asset_name: ${{ steps.catalog.outputs.file6 }}
-          asset_content_type: text/plain
-      - name: Upload Windows cri containerd tarball
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/cri-containerd-binaries-windows-2019/${{ steps.catalog.outputs.file7 }}
-          asset_name: ${{ steps.catalog.outputs.file7 }}
-          asset_content_type: application/gzip
-      - name: Upload Windows cri sha256 sum
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./builds/cri-containerd-binaries-windows-2019/${{ steps.catalog.outputs.file8 }}
-          asset_name: ${{ steps.catalog.outputs.file8 }}
           asset_content_type: text/plain
