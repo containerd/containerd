@@ -185,7 +185,7 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 
 	handler = images.FilterPlatforms(handler, platformMatcher)
 	handler = images.SetChildrenLabels(cs, handler)
-	if err := images.Walk(ctx, handler, index); err != nil {
+	if err := images.WalkNotEmpty(ctx, handler, index); err != nil {
 		return nil, err
 	}
 
