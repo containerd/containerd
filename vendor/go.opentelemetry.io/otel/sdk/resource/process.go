@@ -138,7 +138,7 @@ func (processExecutablePathDetector) Detect(ctx context.Context) (*Resource, err
 // Detect returns a *Resource that describes all the command arguments as received
 // by the process.
 func (processCommandArgsDetector) Detect(ctx context.Context) (*Resource, error) {
-	return NewWithAttributes(semconv.SchemaURL, semconv.ProcessCommandArgsKey.Array(commandArgs())), nil
+	return NewWithAttributes(semconv.SchemaURL, semconv.ProcessCommandArgsKey.StringSlice(commandArgs())), nil
 }
 
 // Detect returns a *Resource that describes the username of the user that owns the
@@ -172,67 +172,4 @@ func (processRuntimeDescriptionDetector) Detect(ctx context.Context) (*Resource,
 		semconv.SchemaURL,
 		semconv.ProcessRuntimeDescriptionKey.String(runtimeDescription),
 	), nil
-}
-
-// WithProcessPID adds an attribute with the process identifier (PID) to the
-// configured Resource.
-func WithProcessPID() Option {
-	return WithDetectors(processPIDDetector{})
-}
-
-// WithProcessExecutableName adds an attribute with the name of the process
-// executable to the configured Resource.
-func WithProcessExecutableName() Option {
-	return WithDetectors(processExecutableNameDetector{})
-}
-
-// WithProcessExecutablePath adds an attribute with the full path to the process
-// executable to the configured Resource.
-func WithProcessExecutablePath() Option {
-	return WithDetectors(processExecutablePathDetector{})
-}
-
-// WithProcessCommandArgs adds an attribute with all the command arguments (including
-// the command/executable itself) as received by the process the configured Resource.
-func WithProcessCommandArgs() Option {
-	return WithDetectors(processCommandArgsDetector{})
-}
-
-// WithProcessOwner adds an attribute with the username of the user that owns the process
-// to the configured Resource.
-func WithProcessOwner() Option {
-	return WithDetectors(processOwnerDetector{})
-}
-
-// WithProcessRuntimeName adds an attribute with the name of the runtime of this
-// process to the configured Resource.
-func WithProcessRuntimeName() Option {
-	return WithDetectors(processRuntimeNameDetector{})
-}
-
-// WithProcessRuntimeVersion adds an attribute with the version of the runtime of
-// this process to the configured Resource.
-func WithProcessRuntimeVersion() Option {
-	return WithDetectors(processRuntimeVersionDetector{})
-}
-
-// WithProcessRuntimeDescription adds an attribute with an additional description
-// about the runtime of the process to the configured Resource.
-func WithProcessRuntimeDescription() Option {
-	return WithDetectors(processRuntimeDescriptionDetector{})
-}
-
-// WithProcess adds all the Process attributes to the configured Resource.
-// See individual WithProcess* functions to configure specific attributes.
-func WithProcess() Option {
-	return WithDetectors(
-		processPIDDetector{},
-		processExecutableNameDetector{},
-		processExecutablePathDetector{},
-		processCommandArgsDetector{},
-		processOwnerDetector{},
-		processRuntimeNameDetector{},
-		processRuntimeVersionDetector{},
-		processRuntimeDescriptionDetector{},
-	)
 }

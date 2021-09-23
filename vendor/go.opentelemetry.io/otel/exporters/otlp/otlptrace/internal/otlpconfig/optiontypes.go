@@ -14,8 +14,6 @@
 
 package otlpconfig // import "go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal/otlpconfig"
 
-import "time"
-
 const (
 	// DefaultCollectorPort is the port the Exporter will attempt connect to
 	// if no collector port is provided.
@@ -47,18 +45,3 @@ const (
 	// MarshalJSON tells the driver to send using json format.
 	MarshalJSON
 )
-
-// RetrySettings defines configuration for retrying batches in case of export failure
-// using an exponential backoff.
-type RetrySettings struct {
-	// Enabled indicates whether to not retry sending batches in case of export failure.
-	Enabled bool
-	// InitialInterval the time to wait after the first failure before retrying.
-	InitialInterval time.Duration
-	// MaxInterval is the upper bound on backoff interval. Once this value is reached the delay between
-	// consecutive retries will always be `MaxInterval`.
-	MaxInterval time.Duration
-	// MaxElapsedTime is the maximum amount of time (including retries) spent trying to send a request/batch.
-	// Once this value is reached, the data is discarded.
-	MaxElapsedTime time.Duration
-}

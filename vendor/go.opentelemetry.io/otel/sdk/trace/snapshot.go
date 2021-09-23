@@ -34,7 +34,7 @@ type snapshot struct {
 	endTime                time.Time
 	attributes             []attribute.KeyValue
 	events                 []Event
-	links                  []trace.Link
+	links                  []Link
 	status                 Status
 	childSpanCount         int
 	droppedAttributeCount  int
@@ -87,7 +87,7 @@ func (s snapshot) Attributes() []attribute.KeyValue {
 }
 
 // Links returns all the links the span has to other spans.
-func (s snapshot) Links() []trace.Link {
+func (s snapshot) Links() []Link {
 	return s.links
 }
 

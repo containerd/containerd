@@ -78,7 +78,7 @@ type TextMapPropagator interface {
 	// DO NOT CHANGE: any modification will not be backwards compatible and
 	// must never be done outside of a new major release.
 
-	// Fields returns the keys who's values are set with Inject.
+	// Fields returns the keys whose values are set with Inject.
 	Fields() []string
 	// DO NOT CHANGE: any modification will not be backwards compatible and
 	// must never be done outside of a new major release.

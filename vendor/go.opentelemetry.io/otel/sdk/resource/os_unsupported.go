@@ -12,10 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/*
-Package trace contains support for OpenTelemetry distributed tracing.
+// +build !aix
+// +build !darwin
+// +build !dragonfly
+// +build !freebsd
+// +build !linux
+// +build !netbsd
+// +build !openbsd
+// +build !solaris
+// +build !windows
+// +build !zos
 
-The following assumes a basic familiarity with OpenTelemetry concepts.
-See https://opentelemetry.io.
-*/
-package trace // import "go.opentelemetry.io/otel/sdk/trace"
+package resource // import "go.opentelemetry.io/otel/sdk/resource"
+
+// platformOSDescription is a placeholder implementation for OSes
+// for which this project currently doesn't support os.description
+// attribute detection. See build tags declaration early on this file
+// for a list of unsupported OSes.
+func platformOSDescription() (string, error) {
+	return "<unknown>", nil
+}
