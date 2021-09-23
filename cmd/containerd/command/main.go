@@ -35,12 +35,10 @@ import (
 	"github.com/containerd/containerd/services/server"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/containerd/containerd/sys"
-	"github.com/containerd/containerd/tracing"
 	"github.com/containerd/containerd/version"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	"go.opentelemetry.io/otel"
 	"google.golang.org/grpc/grpclog"
 )
 
@@ -134,20 +132,6 @@ can be used and modified as necessary as a custom configuration.`
 		if err := applyFlags(context, config); err != nil {
 			return err
 		}
-
-		// Initialize OpenTelemetry tracing
-		shutdown, err := tracing.InitOpenTelemetry(config)
-		if err != nil {
-			errors.Wrap(err, "failed to initialize OpenTelemetry tracing")
-		}
-		if shutdown != nil {
-			defer shutdown()
-		}
-
-		// Get a tracer
-		ctrdTracer := otel.Tracer("containerd")
-		ctx, mainCtrdSpan := ctrdTracer.Start(ctx, "containerd-exporter")
-		defer mainCtrdSpan.End()
 
 		// Make sure top-level directories are created early.
 		if err := server.CreateTopLevelDirectories(config); err != nil {
@@ -300,9 +284,6 @@ can be used and modified as necessary as a custom configuration.`
 func serve(ctx gocontext.Context, l net.Listener, serveFunc func(net.Listener) error) {
 	path := l.Addr().String()
 	log.G(ctx).WithField("address", path).Info("serving...")
-	serveSpan, ctx := tracing.StartSpan(ctx, l.Addr().String())
-	defer tracing.StopSpan(serveSpan)
-
 	go func() {
 		defer l.Close()
 		if err := serveFunc(l); err != nil {

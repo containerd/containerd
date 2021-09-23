@@ -35,4 +35,5 @@ import (
 	_ "github.com/containerd/containerd/services/snapshots"
 	_ "github.com/containerd/containerd/services/tasks"
 	_ "github.com/containerd/containerd/services/version"
+	_ "github.com/containerd/containerd/tracing/plugin"
 )
