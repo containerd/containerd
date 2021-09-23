@@ -233,12 +233,7 @@ func (c *criService) containerSpec(
 		}
 	}
 
-	// Clear all ambient capabilities. The implication of non-root + caps
-	// is not clearly defined in Kubernetes.
-	// See https://github.com/kubernetes/kubernetes/issues/56374
-	// Keep docker's behavior for now.
 	specOpts = append(specOpts,
-		customopts.WithoutAmbientCaps,
 		customopts.WithSelinuxLabels(processLabel, mountLabel),
 	)
 
