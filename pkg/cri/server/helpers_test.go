@@ -22,21 +22,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
+	criconfig "github.com/containerd/containerd/pkg/cri/config"
+	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
+
 	imagedigest "github.com/opencontainers/go-digest"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pelletier/go-toml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	"github.com/containerd/containerd/pkg/cri/store"
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 )
 
 // TestGetUserFromImage tests the logic of getting image uid or user name of image user.
@@ -189,7 +189,7 @@ func TestLocalResolve(t *testing.T) {
 		assert.Equal(t, image, img)
 	}
 	img, err := c.localResolve("randomid")
-	assert.Equal(t, store.ErrNotExist, err)
+	assert.Equal(t, errdefs.IsNotFound(err), true)
 	assert.Equal(t, imagestore.Image{}, img)
 }
 

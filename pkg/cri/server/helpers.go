@@ -23,26 +23,26 @@ import (
 	"strconv"
 	"strings"
 
-	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/errdefs"
+	criconfig "github.com/containerd/containerd/pkg/cri/config"
+	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
+	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	runtimeoptions "github.com/containerd/containerd/pkg/runtimeoptions/v1"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl"
+
+	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	"github.com/containerd/containerd/pkg/cri/store"
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-	runtimeoptions "github.com/containerd/containerd/pkg/runtimeoptions/v1"
 )
 
 const (
@@ -222,7 +222,7 @@ func getUserFromImage(user string) (*int64, string) {
 // pulled yet, the function will pull the image.
 func (c *criService) ensureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig) (*imagestore.Image, error) {
 	image, err := c.localResolve(ref)
-	if err != nil && err != store.ErrNotExist {
+	if err != nil && !errdefs.IsNotFound(err) {
 		return nil, errors.Wrapf(err, "failed to get image %q", ref)
 	}
 	if err == nil {

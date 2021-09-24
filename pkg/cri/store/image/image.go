@@ -24,14 +24,13 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/pkg/cri/util"
+
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/go-digest/digestset"
 	imageidentity "github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
-
-	storeutil "github.com/containerd/containerd/pkg/cri/store"
-	"github.com/containerd/containerd/pkg/cri/util"
 )
 
 // Image contains all resources associated with the image. All fields
@@ -159,7 +158,7 @@ func (s *Store) Resolve(ref string) (string, error) {
 	defer s.lock.RUnlock()
 	id, ok := s.refCache[ref]
 	if !ok {
-		return "", storeutil.ErrNotExist
+		return "", errdefs.ErrNotFound
 	}
 	return id, nil
 }
@@ -222,14 +221,14 @@ func (s *store) get(id string) (Image, error) {
 	digest, err := s.digestSet.Lookup(id)
 	if err != nil {
 		if err == digestset.ErrDigestNotFound {
-			err = storeutil.ErrNotExist
+			err = errdefs.ErrNotFound
 		}
 		return Image{}, err
 	}
 	if i, ok := s.images[digest.String()]; ok {
 		return i, nil
 	}
-	return Image{}, storeutil.ErrNotExist
+	return Image{}, errdefs.ErrNotFound
 }
 
 func (s *store) delete(id, ref string) {

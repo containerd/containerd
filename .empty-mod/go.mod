@@ -9,3 +9,5 @@
 // containerd to be the source of truth, helping us catch missing go.mod rules,
 // or version changes early.
 module empty-mod
+
+go 1.13

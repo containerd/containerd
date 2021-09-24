@@ -21,10 +21,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/containerd/containerd/errdefs"
+
 	"github.com/opencontainers/go-digest/digestset"
 	assertlib "github.com/stretchr/testify/assert"
-
-	storeutil "github.com/containerd/containerd/pkg/cri/store"
 )
 
 func TestInternalStore(t *testing.T) {
@@ -128,7 +128,7 @@ func TestInternalStore(t *testing.T) {
 		t.Logf("should be able to delete image")
 		s.delete(truncID, newRef)
 		got, err = s.get(truncID)
-		assert.Equal(storeutil.ErrNotExist, err)
+		assert.Equal(errdefs.ErrNotFound, err)
 		assert.Equal(Image{}, got)
 
 		imageNum--
@@ -241,7 +241,7 @@ func TestImageStore(t *testing.T) {
 		if test.image == nil {
 			// Shouldn't be able to index by removed ref.
 			id, err := s.Resolve(test.ref)
-			assert.Equal(storeutil.ErrNotExist, err)
+			assert.Equal(errdefs.ErrNotFound, err)
 			assert.Empty(id)
 		}
 	}

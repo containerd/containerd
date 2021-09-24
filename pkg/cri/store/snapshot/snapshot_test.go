@@ -20,10 +20,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/errdefs"
 	snapshot "github.com/containerd/containerd/snapshots"
-	assertlib "github.com/stretchr/testify/assert"
 
-	"github.com/containerd/containerd/pkg/cri/store"
+	assertlib "github.com/stretchr/testify/assert"
 )
 
 func TestSnapshotStore(t *testing.T) {
@@ -80,5 +80,5 @@ func TestSnapshotStore(t *testing.T) {
 	t.Logf("get should return empty struct and ErrNotExist after deletion")
 	sn, err := s.Get(testKey)
 	assert.Equal(Snapshot{}, sn)
-	assert.Equal(store.ErrNotExist, err)
+	assert.Equal(errdefs.ErrNotFound, err)
 }

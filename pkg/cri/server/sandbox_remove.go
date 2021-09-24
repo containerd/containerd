@@ -20,12 +20,11 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	"github.com/containerd/containerd/pkg/cri/store"
 )
 
 // RemovePodSandbox removes the sandbox. If there are running containers in the
@@ -33,7 +32,7 @@ import (
 func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodSandboxRequest) (*runtime.RemovePodSandboxResponse, error) {
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
-		if err != store.ErrNotExist {
+		if !errdefs.IsNotFound(err) {
 			return nil, errors.Wrapf(err, "an error occurred when try to find sandbox %q",
 				r.GetPodSandboxId())
 		}

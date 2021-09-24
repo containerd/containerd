@@ -25,18 +25,17 @@ import (
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/pkg/cri/constants"
+	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/typeurl"
+
 	gogotypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/util/clock"
-
-	"github.com/containerd/containerd/pkg/cri/constants"
-	"github.com/containerd/containerd/pkg/cri/store"
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 )
 
 const (
@@ -141,7 +140,7 @@ func (em *eventMonitor) startSandboxExitMonitor(ctx context.Context, id string, 
 						return err
 					}
 					return nil
-				} else if err != store.ErrNotExist {
+				} else if !errdefs.IsNotFound(err) {
 					return errors.Wrapf(err, "failed to get sandbox %s", e.ID)
 				}
 				return nil
@@ -192,7 +191,7 @@ func (em *eventMonitor) startContainerExitMonitor(ctx context.Context, id string
 						return err
 					}
 					return nil
-				} else if err != store.ErrNotExist {
+				} else if !errdefs.IsNotFound(err) {
 					return errors.Wrapf(err, "failed to get container %s", e.ID)
 				}
 				return nil
@@ -318,7 +317,7 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 				return errors.Wrap(err, "failed to handle container TaskExit event")
 			}
 			return nil
-		} else if err != store.ErrNotExist {
+		} else if !errdefs.IsNotFound(err) {
 			return errors.Wrap(err, "can't find container for TaskExit event")
 		}
 		sb, err := em.c.sandboxStore.Get(e.ID)
@@ -327,7 +326,7 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 				return errors.Wrap(err, "failed to handle sandbox TaskExit event")
 			}
 			return nil
-		} else if err != store.ErrNotExist {
+		} else if !errdefs.IsNotFound(err) {
 			return errors.Wrap(err, "can't find sandbox for TaskExit event")
 		}
 		return nil
@@ -336,7 +335,7 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 		// For TaskOOM, we only care which container it belongs to.
 		cntr, err := em.c.containerStore.Get(e.ContainerID)
 		if err != nil {
-			if err != store.ErrNotExist {
+			if !errdefs.IsNotFound(err) {
 				return errors.Wrap(err, "can't find container for TaskOOM event")
 			}
 			return nil

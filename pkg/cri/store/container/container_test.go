@@ -21,13 +21,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/errdefs"
+	cio "github.com/containerd/containerd/pkg/cri/io"
 	"github.com/containerd/containerd/pkg/cri/store/label"
+
 	"github.com/opencontainers/selinux/go-selinux"
 	assertlib "github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	cio "github.com/containerd/containerd/pkg/cri/io"
-	"github.com/containerd/containerd/pkg/cri/store"
 )
 
 func TestContainerStore(t *testing.T) {
@@ -183,7 +183,7 @@ func TestContainerStore(t *testing.T) {
 		truncID := genTruncIndex(testID)
 
 		t.Logf("add should return already exists error for duplicated container")
-		assert.Equal(store.ErrAlreadyExist, s.Add(v))
+		assert.Equal(errdefs.ErrAlreadyExists, s.Add(v))
 
 		t.Logf("should be able to delete container")
 		s.Delete(truncID)
@@ -194,7 +194,7 @@ func TestContainerStore(t *testing.T) {
 		t.Logf("get should return not exist error after deletion")
 		c, err := s.Get(truncID)
 		assert.Equal(Container{}, c)
-		assert.Equal(store.ErrNotExist, err)
+		assert.Equal(errdefs.ErrNotFound, err)
 	}
 
 	if selinux.GetEnabled() {
