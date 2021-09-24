@@ -20,12 +20,13 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/pkg/cri/store/label"
-	"github.com/containerd/containerd/pkg/cri/store/truncindex"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
+	"github.com/containerd/containerd/errdefs"
 	cio "github.com/containerd/containerd/pkg/cri/io"
 	"github.com/containerd/containerd/pkg/cri/store"
+	"github.com/containerd/containerd/pkg/cri/store/label"
+	"github.com/containerd/containerd/pkg/cri/store/truncindex"
+
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // Container contains all resources associated with the container. All methods to
@@ -124,7 +125,7 @@ func (s *Store) Add(c Container) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	if _, ok := s.containers[c.ID]; ok {
-		return store.ErrAlreadyExist
+		return errdefs.ErrAlreadyExists
 	}
 	if err := s.labels.Reserve(c.ProcessLabel); err != nil {
 		return err
@@ -144,14 +145,14 @@ func (s *Store) Get(id string) (Container, error) {
 	id, err := s.idIndex.Get(id)
 	if err != nil {
 		if err == truncindex.ErrNotExist {
-			err = store.ErrNotExist
+			err = errdefs.ErrNotFound
 		}
 		return Container{}, err
 	}
 	if c, ok := s.containers[id]; ok {
 		return c, nil
 	}
-	return Container{}, store.ErrNotExist
+	return Container{}, errdefs.ErrNotFound
 }
 
 // List lists all containers.

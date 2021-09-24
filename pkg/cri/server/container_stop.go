@@ -24,14 +24,13 @@ import (
 	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
+	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
+
+	"github.com/moby/sys/signal"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	"github.com/containerd/containerd/pkg/cri/store"
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
-	"github.com/moby/sys/signal"
 )
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
@@ -116,7 +115,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 			// TODO(random-liu): Remove this logic when containerd 1.2 is deprecated.
 			image, err := c.imageStore.Get(container.ImageRef)
 			if err != nil {
-				if err != store.ErrNotExist {
+				if !errdefs.IsNotFound(err) {
 					return errors.Wrapf(err, "failed to get image %q", container.ImageRef)
 				}
 				log.G(ctx).Warningf("Image %q not found, stop container with signal %q", container.ImageRef, stopSignal)

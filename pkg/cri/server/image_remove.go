@@ -19,11 +19,10 @@ package server
 import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	"github.com/containerd/containerd/pkg/cri/store"
 )
 
 // RemoveImage removes the image.
@@ -35,7 +34,7 @@ import (
 func (c *criService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequest) (*runtime.RemoveImageResponse, error) {
 	image, err := c.localResolve(r.GetImage().GetImage())
 	if err != nil {
-		if err == store.ErrNotExist {
+		if errdefs.IsNotFound(err) {
 			// return empty without error when image not found.
 			return &runtime.RemoveImageResponse{}, nil
 		}

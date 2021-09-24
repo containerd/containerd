@@ -19,14 +19,14 @@ package store
 import (
 	"testing"
 
+	"github.com/containerd/containerd/errdefs"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"github.com/containerd/containerd/errdefs"
 )
 
 func TestStoreErrAlreadyExistGRPCStatus(t *testing.T) {
-	err := errdefs.ToGRPC(ErrAlreadyExist)
+	err := errdefs.ToGRPC(errdefs.ErrAlreadyExists)
 	s, ok := status.FromError(err)
 	if !ok {
 		t.Fatalf("failed to convert err: %v to status: %d", err, codes.AlreadyExists)
@@ -37,7 +37,7 @@ func TestStoreErrAlreadyExistGRPCStatus(t *testing.T) {
 }
 
 func TestStoreErrNotExistGRPCStatus(t *testing.T) {
-	err := errdefs.ToGRPC(ErrNotExist)
+	err := errdefs.ToGRPC(errdefs.ErrNotFound)
 	s, ok := status.FromError(err)
 	if !ok {
 		t.Fatalf("failed to convert err: %v to status: %d", err, codes.NotFound)

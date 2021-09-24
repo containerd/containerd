@@ -20,20 +20,19 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
+	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	"github.com/containerd/containerd/pkg/cri/store"
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 )
 
 // RemoveContainer removes the container.
 func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveContainerRequest) (_ *runtime.RemoveContainerResponse, retErr error) {
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
-		if err != store.ErrNotExist {
+		if !errdefs.IsNotFound(err) {
 			return nil, errors.Wrapf(err, "an error occurred when try to find container %q", r.GetContainerId())
 		}
 		// Do not return error if container metadata doesn't exist.

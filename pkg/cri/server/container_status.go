@@ -19,13 +19,13 @@ package server
 import (
 	"encoding/json"
 
+	"github.com/containerd/containerd/errdefs"
+	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	"github.com/containerd/containerd/pkg/cri/store"
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 )
 
 // ContainerStatus inspects the container and returns the status.
@@ -44,7 +44,7 @@ func (c *criService) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 	imageRef := container.ImageRef
 	image, err := c.imageStore.Get(imageRef)
 	if err != nil {
-		if err != store.ErrNotExist {
+		if !errdefs.IsNotFound(err) {
 			return nil, errors.Wrapf(err, "failed to get image %q", imageRef)
 		}
 	} else {

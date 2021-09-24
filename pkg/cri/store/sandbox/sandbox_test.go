@@ -19,11 +19,11 @@ package sandbox
 import (
 	"testing"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/pkg/cri/store/label"
+
 	assertlib "github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	"github.com/containerd/containerd/pkg/cri/store"
 )
 
 func TestSandboxStore(t *testing.T) {
@@ -140,7 +140,7 @@ func TestSandboxStore(t *testing.T) {
 		truncID := genTruncIndex(testID)
 
 		t.Logf("add should return already exists error for duplicated sandbox")
-		assert.Equal(store.ErrAlreadyExist, s.Add(v))
+		assert.Equal(errdefs.ErrAlreadyExists, s.Add(v))
 
 		t.Logf("should be able to delete sandbox")
 		s.Delete(truncID)
@@ -151,6 +151,6 @@ func TestSandboxStore(t *testing.T) {
 		t.Logf("get should return not exist error after deletion")
 		sb, err := s.Get(truncID)
 		assert.Equal(Sandbox{}, sb)
-		assert.Equal(store.ErrNotExist, err)
+		assert.Equal(errdefs.ErrNotFound, err)
 	}
 }

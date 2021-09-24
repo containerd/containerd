@@ -20,10 +20,10 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/pkg/cri/store"
 	"github.com/containerd/containerd/pkg/cri/store/label"
 	"github.com/containerd/containerd/pkg/cri/store/truncindex"
-
-	"github.com/containerd/containerd/pkg/cri/store"
 	"github.com/containerd/containerd/pkg/netns"
 )
 
@@ -80,7 +80,7 @@ func (s *Store) Add(sb Sandbox) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	if _, ok := s.sandboxes[sb.ID]; ok {
-		return store.ErrAlreadyExist
+		return errdefs.ErrAlreadyExists
 	}
 	if err := s.labels.Reserve(sb.ProcessLabel); err != nil {
 		return err
@@ -100,14 +100,14 @@ func (s *Store) Get(id string) (Sandbox, error) {
 	id, err := s.idIndex.Get(id)
 	if err != nil {
 		if err == truncindex.ErrNotExist {
-			err = store.ErrNotExist
+			err = errdefs.ErrNotFound
 		}
 		return Sandbox{}, err
 	}
 	if sb, ok := s.sandboxes[id]; ok {
 		return sb, nil
 	}
-	return Sandbox{}, store.ErrNotExist
+	return Sandbox{}, errdefs.ErrNotFound
 }
 
 // List lists all sandboxes.

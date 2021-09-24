@@ -19,9 +19,8 @@ package snapshot
 import (
 	"sync"
 
+	"github.com/containerd/containerd/errdefs"
 	snapshot "github.com/containerd/containerd/snapshots"
-
-	"github.com/containerd/containerd/pkg/cri/store"
 )
 
 // Snapshot contains the information about the snapshot.
@@ -65,7 +64,7 @@ func (s *Store) Get(key string) (Snapshot, error) {
 	if sn, ok := s.snapshots[key]; ok {
 		return sn, nil
 	}
-	return Snapshot{}, store.ErrNotExist
+	return Snapshot{}, errdefs.ErrNotFound
 }
 
 // List lists all snapshots.
