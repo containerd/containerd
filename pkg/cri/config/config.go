@@ -97,6 +97,10 @@ type ContainerdConfig struct {
 	// remove layers from the content store after successfully unpacking these
 	// layers to the snapshotter.
 	DiscardUnpackedLayers bool `toml:"discard_unpacked_layers" json:"discardUnpackedLayers"`
+
+	// IgnoreRdtNotEnabledErrors is a boolean flag to ignore RDT related errors
+	// when RDT support has not been enabled.
+	IgnoreRdtNotEnabledErrors bool `toml:"ignore_rdt_not_enabled_errors" json:"ignoreRdtNotEnabledErrors"`
 }
 
 // CniConfig contains toml config related to cni

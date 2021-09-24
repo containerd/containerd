@@ -257,7 +257,7 @@ func (c *criService) containerSpec(
 	supplementalGroups := securityContext.GetSupplementalGroups()
 
 	// Get RDT class
-	rdtClass, err := rdtClassFromAnnotations(config.GetMetadata().GetName(), config.Annotations, sandboxConfig.Annotations)
+	rdtClass, err := c.rdtClassFromAnnotations(config.GetMetadata().GetName(), config.Annotations, sandboxConfig.Annotations)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to set RDT class")
 	}

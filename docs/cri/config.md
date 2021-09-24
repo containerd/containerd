@@ -143,6 +143,14 @@ version = 2
     # default_runtime_name is the default runtime name to use.
     default_runtime_name = "runc"
 
+    # ignore_rdt_not_enabled_errors disables RDT related errors when RDT
+    # support has not been enabled. Intel RDT is a technology for cache and
+    # memory bandwidth management. By default, trying to set the RDT class of
+    # a container via annotations produces an error if RDT hasn't been enabled.
+    # This config option practically enables a "soft" mode for RDT where these
+    # errors are ignored and the container gets no RDT class.
+    ignore_rdt_not_enabled_errors = false
+
     # 'plugins."io.containerd.grpc.v1.cri".containerd.default_runtime' is the runtime to use in containerd.
     # DEPRECATED: use `default_runtime_name` and `plugins."io.containerd.grpc.v1.cri".containerd.runtimes` instead.
     [plugins."io.containerd.grpc.v1.cri".containerd.default_runtime]

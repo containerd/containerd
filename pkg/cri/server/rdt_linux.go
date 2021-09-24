@@ -23,17 +23,24 @@ import (
 
 	"github.com/containerd/containerd/services/tasks"
 	"github.com/intel/goresctrl/pkg/rdt"
+	"github.com/sirupsen/logrus"
 )
 
 // rdtClassFromAnnotations examines container and pod annotations of a
 // container and returns its effective RDT class.
-func rdtClassFromAnnotations(containerName string, containerAnnotations, podAnnotations map[string]string) (string, error) {
+func (c *criService) rdtClassFromAnnotations(containerName string, containerAnnotations, podAnnotations map[string]string) (string, error) {
 	cls, err := rdt.ContainerClassFromAnnotations(containerName, containerAnnotations, podAnnotations)
 	if err != nil {
 		return "", err
 	}
+
 	if cls != "" && !tasks.RdtEnabled() {
-		return "", fmt.Errorf("RDT disabled, refusing to set RDT class of container %q to %q", containerName, cls)
+		if c.config.ContainerdConfig.IgnoreRdtNotEnabledErrors {
+			cls = ""
+			logrus.Debugf("continuing create container %s, ignoring rdt not enabled (%v)", containerName, err)
+		} else {
+			return "", fmt.Errorf("RDT disabled, refusing to set RDT class of container %q to %q", containerName, cls)
+		}
 	}
 	return cls, nil
 }
