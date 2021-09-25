@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/docker/go-metrics"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -61,6 +62,8 @@ func init() {
 }
 
 func initCRIService(ic *plugin.InitContext) (interface{}, error) {
+	ns := metrics.NewNamespace("cri", "", nil)
+
 	ic.Meta.Platforms = []imagespec.Platform{platforms.DefaultSpec()}
 	ic.Meta.Exports = map[string]string{"CRIVersion": constants.CRIVersion, "CRIVersionAlpha": constants.CRIVersionAlpha}
 	ctx := ic.Context
@@ -98,7 +101,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, errors.Wrap(err, "failed to create containerd client")
 	}
 
-	s, err := server.NewCRIService(c, client)
+	s, err := server.NewCRIService(c, client, ns)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create CRI service")
 	}

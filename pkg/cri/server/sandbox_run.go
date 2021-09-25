@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
+	"time"
 
 	"github.com/containerd/containerd"
 	containerdio "github.com/containerd/containerd/cio"
@@ -123,6 +124,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 
 	if podNetwork {
+		c.metrics.networkSetupTotal.Inc()
 		// If it is not in host network namespace then create a namespace and set the sandbox
 		// handle. NetNSPath in sandbox metadata and NetNS is non empty only for non host network
 		// namespaces. If the pod is in host network namespace then both are empty and should not
@@ -131,6 +133,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		if c.config.NetNSMountsUnderStateDir {
 			netnsMountDir = filepath.Join(c.config.StateDir, "netns")
 		}
+		nsStart := time.Now()
 		sandbox.NetNS, err = netns.NewNetNS(netnsMountDir)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create network namespace for sandbox %q", id)
@@ -160,7 +163,10 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// In this case however caching the IP will add a subtle performance enhancement by avoiding
 		// calls to network namespace of the pod to query the IP of the veth interface on every
 		// SandboxStatus request.
-		if err := c.setupPodNetwork(ctx, &sandbox); err != nil {
+		err = c.setupPodNetwork(ctx, &sandbox)
+		c.metrics.networkSetupLatency.UpdateSince(nsStart)
+		if err != nil {
+			c.metrics.networkSetupErrors.Inc()
 			return nil, errors.Wrapf(err, "failed to setup network for sandbox %q", id)
 		}
 	}
@@ -350,12 +356,13 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 }
 
 // setupPodNetwork setups up the network for a pod
-func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.Sandbox) error {
+func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.Sandbox) (retErr error) {
 	var (
 		id     = sandbox.ID
 		config = sandbox.Config
 		path   = sandbox.NetNSPath
 	)
+
 	if c.netPlugin == nil {
 		return errors.New("cni config not initialized")
 	}
@@ -376,6 +383,7 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		sandbox.CNIResult = result
 		return nil
 	}
+
 	return errors.Errorf("failed to find network info for sandbox %q", id)
 }
 

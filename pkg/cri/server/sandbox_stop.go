@@ -80,18 +80,28 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 
 	// Teardown network for sandbox.
 	if sandbox.NetNS != nil {
-		// Use empty netns path if netns is not available. This is defined in:
-		// https://github.com/containernetworking/cni/blob/v0.7.0-alpha1/SPEC.md
-		if closed, err := sandbox.NetNS.Closed(); err != nil {
-			return errors.Wrap(err, "failed to check network namespace closed")
-		} else if closed {
-			sandbox.NetNSPath = ""
-		}
-		if err := c.teardownPodNetwork(ctx, sandbox); err != nil {
-			return errors.Wrapf(err, "failed to destroy network for sandbox %q", id)
-		}
-		if err := sandbox.NetNS.Remove(); err != nil {
-			return errors.Wrapf(err, "failed to remove network namespace for sandbox %q", id)
+		c.metrics.networkTeardownTotal.Inc()
+		started := time.Now()
+		err := func() error {
+			// Use empty netns path if netns is not available. This is defined in:
+			// https://github.com/containernetworking/cni/blob/v0.7.0-alpha1/SPEC.md
+			if closed, err := sandbox.NetNS.Closed(); err != nil {
+				return errors.Wrap(err, "failed to check network namespace closed")
+			} else if closed {
+				sandbox.NetNSPath = ""
+			}
+			if err := c.teardownPodNetwork(ctx, sandbox); err != nil {
+				return errors.Wrapf(err, "failed to destroy network for sandbox %q", id)
+			}
+			if err := sandbox.NetNS.Remove(); err != nil {
+				return errors.Wrapf(err, "failed to remove network namespace for sandbox %q", id)
+			}
+			return nil
+		}()
+		c.metrics.networkTeardownLatency.UpdateSince(started)
+		if err != nil {
+			c.metrics.networkTeardownErrors.Inc()
+			return err
 		}
 	}
 
@@ -164,7 +174,7 @@ func (c *criService) waitSandboxStop(ctx context.Context, sandbox sandboxstore.S
 }
 
 // teardownPodNetwork removes the network from the pod
-func (c *criService) teardownPodNetwork(ctx context.Context, sandbox sandboxstore.Sandbox) error {
+func (c *criService) teardownPodNetwork(ctx context.Context, sandbox sandboxstore.Sandbox) (retErr error) {
 	if c.netPlugin == nil {
 		return errors.New("cni config not initialized")
 	}

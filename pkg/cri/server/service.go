@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/streaming"
 	"github.com/containerd/containerd/plugin"
 	cni "github.com/containerd/go-cni"
+	"github.com/docker/go-metrics"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -110,10 +111,12 @@ type criService struct {
 	// allCaps is the list of the capabilities.
 	// When nil, parsed from CapEff of /proc/self/status.
 	allCaps []string // nolint
+
+	metrics collector
 }
 
 // NewCRIService returns a new instance of CRIService
-func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIService, error) {
+func NewCRIService(config criconfig.Config, client *containerd.Client, ns *metrics.Namespace) (CRIService, error) {
 	var err error
 	labels := label.NewStore()
 	c := &criService{
@@ -128,6 +131,11 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 		containerNameIndex: registrar.NewRegistrar(),
 		initialized:        atomic.NewBool(false),
 	}
+
+	if ns == nil {
+		return nil, errors.New("metrics namespace is not configured")
+	}
+	c.configureMetrics(ns)
 
 	if client.SnapshotService(c.config.ContainerdConfig.Snapshotter) == nil {
 		return nil, errors.Errorf("failed to find snapshotter %q", c.config.ContainerdConfig.Snapshotter)
