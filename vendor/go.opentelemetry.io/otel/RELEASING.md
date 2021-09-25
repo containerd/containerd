@@ -3,8 +3,8 @@
 ## Semantic Convention Generation
 
 If a new version of the OpenTelemetry Specification has been released it will be necessary to generate a new
-semantic convention package from the YAML definitions in the specification repository. There is a `semconvgen` utility
-installed by `make tools` that can be used to generate the a package with the name matching the specification
+semantic convention package from the YAML definitions in the specification repository. There is a utility in
+`internal/tools/semconv-gen` that can be used to generate the a package with the name matching the specification
 version number under the `semconv` package. This will ideally be done soon after the specification release is
 tagged. Make sure that the specification repo contains a checkout of the the latest tagged release so that the
 generated files match the released semantic conventions.
@@ -12,8 +12,9 @@ generated files match the released semantic conventions.
 There are currently two categories of semantic conventions that must be generated, `resource` and `trace`.
 
 ```
-.tools/semconvgen -i /path/to/specification/repo/semantic_conventions/resource -t semconv/template.j2
-.tools/semconvgen -i /path/to/specification/repo/semantic_conventions/trace -t semconv/template.j2
+cd internal/tools/semconv-gen
+go run generator.go -i /path/to/specification/repo/semantic_conventions/resource
+go run generator.go -i /path/to/specification/repo/semantic_conventions/trace
 ```
 
 Using default values for all options other than `input` will result in using the `template.j2` template to

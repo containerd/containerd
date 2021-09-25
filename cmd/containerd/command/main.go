@@ -35,6 +35,7 @@ import (
 	"github.com/containerd/containerd/services/server"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/containerd/containerd/sys"
+	"github.com/containerd/containerd/tracing"
 	"github.com/containerd/containerd/version"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
