@@ -138,7 +138,7 @@ func (processExecutablePathDetector) Detect(ctx context.Context) (*Resource, err
 // Detect returns a *Resource that describes all the command arguments as received
 // by the process.
 func (processCommandArgsDetector) Detect(ctx context.Context) (*Resource, error) {
-	return NewWithAttributes(semconv.SchemaURL, semconv.ProcessCommandArgsKey.StringSlice(commandArgs())), nil
+	return NewWithAttributes(semconv.SchemaURL, semconv.ProcessCommandArgsKey.Array(commandArgs())), nil
 }
 
 // Detect returns a *Resource that describes the username of the user that owns the

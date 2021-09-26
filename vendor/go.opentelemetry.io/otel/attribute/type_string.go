@@ -13,15 +13,12 @@ func _() {
 	_ = x[INT64-2]
 	_ = x[FLOAT64-3]
 	_ = x[STRING-4]
-	_ = x[BOOLSLICE-5]
-	_ = x[INT64SLICE-6]
-	_ = x[FLOAT64SLICE-7]
-	_ = x[STRINGSLICE-8]
+	_ = x[ARRAY-5]
 }
 
-const _Type_name = "INVALIDBOOLINT64FLOAT64STRINGBOOLSLICEINT64SLICEFLOAT64SLICESTRINGSLICE"
+const _Type_name = "INVALIDBOOLINT64FLOAT64STRINGARRAY"
 
-var _Type_index = [...]uint8{0, 7, 11, 16, 23, 29, 38, 48, 60, 71}
+var _Type_index = [...]uint8{0, 7, 11, 16, 23, 29, 34}
 
 func (i Type) String() string {
 	if i < 0 || i >= Type(len(_Type_index)-1) {
