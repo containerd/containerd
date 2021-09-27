@@ -11,13 +11,14 @@ previous = "v1.4.9"
 pre_release = false
 
 preface = """\
-The tenth patch release for containerd 1.4 updates runc to 1.0.2, hcsshim to 0.8.21, Go
-to 1.15.15 and other minor updates.
+The tenth patch release for containerd 1.4 contains minor fixes and updates
+including an updated runc and hcsshim.
 
 ### Notable Updates
 
-* **Update Go to 1.15.15** [#5841](https://github.com/containerd/containerd/pull/5841)
+* **Update runc to v1.0.2** [#5899](https://github.com/containerd/containerd/pull/5899)
 * **Update hcsshim to v0.8.21** [#5957](https://github.com/containerd/containerd/pull/5957)
-* **Update runc to v1.0.2** [#5984](https://github.com/containerd/containerd/pull/5984)
+* **Support "clone3" in default seccomp profile** [#5982](https://github.com/containerd/containerd/pull/5982)
+* **Fix panic in metadata content writer on copy error** [#6043](https://github.com/containerd/containerd/pull/6043)
 
 See the changelog for complete list of changes"""
