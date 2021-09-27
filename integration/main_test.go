@@ -192,6 +192,17 @@ func PodSandboxConfigWithCleanup(t *testing.T, name, ns string, opts ...PodSandb
 	return sb, sbConfig
 }
 
+// Set Windows HostProcess.
+func WithWindowsHostProcess(p *runtime.PodSandboxConfig) { //nolint:unused
+	if p.Windows == nil {
+		p.Windows = &runtime.WindowsPodSandboxConfig{}
+	}
+	if p.Windows.SecurityContext == nil {
+		p.Windows.SecurityContext = &runtime.WindowsSandboxSecurityContext{}
+	}
+	p.Windows.SecurityContext.HostProcess = true
+}
+
 // ContainerOpts to set any specific attribute like labels,
 // annotations, metadata etc
 type ContainerOpts func(*runtime.ContainerConfig)
@@ -224,6 +235,18 @@ func WithVolumeMount(hostPath, containerPath string) ContainerOpts {
 		containerPath, _ = filepath.Abs(containerPath)
 		mount := &runtime.Mount{HostPath: hostPath, ContainerPath: containerPath}
 		c.Mounts = append(c.Mounts, mount)
+	}
+}
+
+func WithWindowsUsername(username string) ContainerOpts { //nolint:unused
+	return func(c *runtime.ContainerConfig) {
+		if c.Windows == nil {
+			c.Windows = &runtime.WindowsContainerConfig{}
+		}
+		if c.Windows.SecurityContext == nil {
+			c.Windows.SecurityContext = &runtime.WindowsContainerSecurityContext{}
+		}
+		c.Windows.SecurityContext.RunAsUsername = username
 	}
 }
 
