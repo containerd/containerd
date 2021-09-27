@@ -49,7 +49,9 @@ var publishCommand = cli.Command{
 		},
 	},
 	Action: func(context *cli.Context) error {
-		ctx := namespaces.WithNamespace(gocontext.Background(), context.String("namespace"))
+		ctx, cancel := gocontext.WithTimeout(gocontext.Background(), 3*time.Second)
+		defer cancel()
+		ctx = namespaces.WithNamespace(ctx, context.String("namespace"))
 		topic := context.String("topic")
 		if topic == "" {
 			return errors.Wrap(errdefs.ErrInvalidArgument, "topic required to publish event")
