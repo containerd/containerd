@@ -26,7 +26,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v2
         with:
-          go-version: '1.15.15'
+          go-version: '1.16.8'
 
       - name: Set env
         shell: bash
@@ -47,6 +47,8 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
       - name: Make check
+        env:
+          GO111MODULE: off
         shell: bash
         run: make check
         working-directory: src/github.com/containerd/containerd
@@ -80,7 +82,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.15.15'
+          go-version: '1.16.8'
 
       - name: Set env
         shell: bash
@@ -126,7 +128,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.15.15'
+          go-version: '1.16.8'
 
       - name: Set env
         shell: bash
@@ -143,6 +145,8 @@ jobs:
         run: GO111MODULE=on go get github.com/cpuguy83/go-md2man/v2@v2.0.0
 
       - name: Make
+        env:
+          GO111MODULE: off
         run: make man
         working-directory: src/github.com/containerd/containerd
 
@@ -162,7 +166,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.15.15'
+          go-version: '1.16.8'
 
       - name: Set env
         shell: bash
@@ -176,6 +180,8 @@ jobs:
           path: src/github.com/containerd/containerd
 
       - name: Make
+        env:
+          GO111MODULE: off
         run: |
           make build
           make binaries
@@ -193,7 +199,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.15.15'
+          go-version: '1.16.8'
 
       - name: Set env
         shell: bash
@@ -217,6 +223,8 @@ jobs:
           cd src/github.com/containerd/containerd
           script/setup/install-dev-tools
       - name: Binaries
+        env:
+          GO111MODULE: off
         shell: bash
         run: |
           set -o xtrace
@@ -234,11 +242,14 @@ jobs:
         shell: bash
         env:
           CGO_ENABLED: 1
+          GO111MODULE: off
         run: |
           cd src/github.com/containerd/containerd
           mingw32-make.exe test root-test
 
       - name: Integration 1
+        env:
+          GO111MODULE: off
         shell: bash
         run: |
           cd src/github.com/containerd/containerd
@@ -246,6 +257,8 @@ jobs:
           mingw32-make.exe integration
       # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/175
       - name: Integration 2
+        env:
+          GO111MODULE: off
         shell: bash
         run: |
           cd src/github.com/containerd/containerd
@@ -272,7 +285,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.15.15'
+          go-version: '1.16.8'
 
       - name: Set env
         shell: bash
@@ -315,6 +328,7 @@ jobs:
       - name: Install containerd
         env:
           CGO_ENABLED: 1
+          GO111MODULE: off
         run: |
           make binaries
           sudo -E PATH=$PATH make install
@@ -324,6 +338,7 @@ jobs:
         env:
           GOPROXY: direct
           SKIPTESTS: github.com/containerd/containerd/snapshots/devmapper
+          GO111MODULE: off
         run: |
           make test
           sudo -E PATH=$PATH make root-test
@@ -334,6 +349,7 @@ jobs:
           GOPROXY: direct
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
+          GO111MODULE: off
         run: |
           sudo -E PATH=$PATH make integration EXTRA_TESTFLAGS=-no-criu TESTFLAGS_RACE=-race
         working-directory: src/github.com/containerd/containerd
@@ -344,6 +360,7 @@ jobs:
           GOPROXY: direct
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
+          GO111MODULE: off
         run: |
           sudo -E PATH=$PATH TESTFLAGS_PARALLEL=1 make integration EXTRA_TESTFLAGS=-no-criu
         working-directory: src/github.com/containerd/containerd
