@@ -76,6 +76,9 @@ func (fromEnv) Detect(context.Context) (*Resource, error) {
 }
 
 func constructOTResources(s string) (*Resource, error) {
+	if s == "" {
+		return Empty(), nil
+	}
 	pairs := strings.Split(s, ",")
 	attrs := []attribute.KeyValue{}
 	var invalid []string

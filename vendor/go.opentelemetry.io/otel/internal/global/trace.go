@@ -90,9 +90,10 @@ func (p *tracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.T
 
 	// At this moment it is guaranteed that no sdk is installed, save the tracer in the tracers map.
 
+	c := trace.NewTracerConfig(opts...)
 	key := il{
 		name:    name,
-		version: trace.NewTracerConfig(opts...).InstrumentationVersion(),
+		version: c.InstrumentationVersion(),
 	}
 
 	if p.tracers == nil {
