@@ -17,11 +17,11 @@
 package uncompress
 
 import (
-	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
 
+	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
@@ -49,7 +49,7 @@ func LayerConvertFunc(ctx context.Context, cs content.Store, desc ocispec.Descri
 	}
 	defer readerAt.Close()
 	sr := io.NewSectionReader(readerAt, 0, desc.Size)
-	newR, err := gzip.NewReader(sr)
+	newR, err := compression.DecompressStream(sr)
 	if err != nil {
 		return nil, err
 	}
@@ -112,9 +112,9 @@ func convertMediaType(mt string) string {
 		return images.MediaTypeDockerSchema2Layer
 	case images.MediaTypeDockerSchema2LayerForeignGzip:
 		return images.MediaTypeDockerSchema2LayerForeign
-	case ocispec.MediaTypeImageLayerGzip:
+	case ocispec.MediaTypeImageLayerGzip, ocispec.MediaTypeImageLayerZstd:
 		return ocispec.MediaTypeImageLayer
-	case ocispec.MediaTypeImageLayerNonDistributableGzip:
+	case ocispec.MediaTypeImageLayerNonDistributableGzip, ocispec.MediaTypeImageLayerNonDistributableZstd:
 		return ocispec.MediaTypeImageLayerNonDistributable
 	default:
 		return mt
