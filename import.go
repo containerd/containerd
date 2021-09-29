@@ -31,11 +31,12 @@ import (
 )
 
 type importOpts struct {
-	indexName    string
-	imageRefT    func(string) string
-	dgstRefT     func(digest.Digest) string
-	allPlatforms bool
-	compress     bool
+	indexName       string
+	imageRefT       func(string) string
+	dgstRefT        func(digest.Digest) string
+	allPlatforms    bool
+	platformMatcher platforms.MatchComparer
+	compress        bool
 }
 
 // ImportOpt allows the caller to specify import specific options
@@ -71,6 +72,14 @@ func WithIndexName(name string) ImportOpt {
 func WithAllPlatforms(allPlatforms bool) ImportOpt {
 	return func(c *importOpts) error {
 		c.allPlatforms = allPlatforms
+		return nil
+	}
+}
+
+// WithImportPlatform is used to import content for specific platform.
+func WithImportPlatform(platformMacher platforms.MatchComparer) ImportOpt {
+	return func(c *importOpts) error {
+		c.platformMatcher = platformMacher
 		return nil
 	}
 }
@@ -123,9 +132,11 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 			Target: index,
 		})
 	}
-	var platformMatcher = platforms.All
-	if !iopts.allPlatforms {
-		platformMatcher = c.platform
+	var platformMatcher = c.platform
+	if iopts.allPlatforms {
+		platformMatcher = platforms.All
+	} else if iopts.platformMatcher != nil {
+		platformMatcher = iopts.platformMatcher
 	}
 
 	var handler images.HandlerFunc = func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
