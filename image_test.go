@@ -34,7 +34,7 @@ func TestImageIsUnpacked(t *testing.T) {
 		t.Skip()
 	}
 
-	const imageName = "docker.io/library/busybox:latest"
+	const imageName = "ghcr.io/containerd/busybox:latest"
 	ctx, cancel := testContext(t)
 	defer cancel()
 
@@ -140,7 +140,7 @@ func TestImageUsage(t *testing.T) {
 		t.Skip()
 	}
 
-	imageName := "docker.io/library/busybox:latest"
+	imageName := "ghcr.io/containerd/busybox:latest"
 	ctx, cancel := testContext(t)
 	defer cancel()
 
