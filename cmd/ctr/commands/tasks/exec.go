@@ -31,7 +31,6 @@ import (
 	"github.com/urfave/cli"
 )
 
-//TODO:(jessvalarezo) exec-id is optional here, update to required arg
 var execCommand = cli.Command{
 	Name:           "exec",
 	Usage:          "execute additional processes in an existing container",
@@ -51,8 +50,9 @@ var execCommand = cli.Command{
 			Usage: "detach from the task after it has started execution",
 		},
 		cli.StringFlag{
-			Name:  "exec-id",
-			Usage: "exec specific id for the process",
+			Name:     "exec-id",
+			Required: true,
+			Usage:    "exec specific id for the process",
 		},
 		cli.StringFlag{
 			Name:  "fifo-dir",
