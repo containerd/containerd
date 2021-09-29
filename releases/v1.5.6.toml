@@ -11,13 +11,16 @@ previous = "v1.5.5"
 pre_release = false
 
 preface = """\
-The sixth patch release for containerd 1.5 updates runc to 1.0.2, seccomp to 2.5.1, and contains various other fixes.
+The sixth patch release for containerd 1.5 contains minor fixes and updates
+including an updated runc and hcsshim.
 
 ### Notable Updates
 
-* **Update runc binary to 1.0.2** [#5983](https://github.com/containerd/containerd/pull/5983)
-* **Update hcsshim to v0.8.21 which contains a fix in the Windows shim for layer issues on Windows Server 2019** [#5942](https://github.com/containerd/containerd/pull/5942)
 * **Install apparmor parser for arm64 and update seccomp to 2.5.1** [#5763](https://github.com/containerd/containerd/pull/5763)
-* **Add support for 'clone3' syscall to fix issues with certain images when seccomp is enabled** [#6013](https://github.com/containerd/containerd/pull/6013)
+* **Update runc binary to 1.0.2** [#5899](https://github.com/containerd/containerd/pull/5899)
+* **Update hcsshim to v0.8.21 to fix layer issue on Windows Server 2019** [#5942](https://github.com/containerd/containerd/pull/5942)
+* **Add support for 'clone3' syscall to fix issue with certain images when seccomp is enabled** [#5982](https://github.com/containerd/containerd/pull/5982)
+* **Add image config labels in CRI container creation** [#6012](https://github.com/containerd/containerd/pull/6012)
+* **Fix panic in metadata content writer on copy error** [#6043](https://github.com/containerd/containerd/pull/6043)
 
 See the changelog for complete list of changes"""
