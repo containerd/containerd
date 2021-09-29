@@ -73,7 +73,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			Name:  "all-platforms",
 			Usage: "imports content for all platforms, false by default",
 		},
-		cli.BoolFlag{
+		cli.StringFlag{
 			Name:  "platform",
 			Usage: "imports content for specific platform",
 		},
