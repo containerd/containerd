@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/platforms"
 	"github.com/urfave/cli"
 )
 
@@ -72,6 +73,10 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			Name:  "all-platforms",
 			Usage: "imports content for all platforms, false by default",
 		},
+		cli.StringFlag{
+			Name:  "platform",
+			Usage: "imports content for specific platform",
+		},
 		cli.BoolFlag{
 			Name:  "no-unpack",
 			Usage: "skip unpacking the images, false by default",
@@ -84,8 +89,9 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 
 	Action: func(context *cli.Context) error {
 		var (
-			in   = context.Args().First()
-			opts []containerd.ImportOpt
+			in             = context.Args().First()
+			opts           []containerd.ImportOpt
+			platformMacher platforms.MatchComparer
 		)
 
 		prefix := context.String("base-name")
@@ -113,6 +119,15 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 
 		if context.Bool("compress-blobs") {
 			opts = append(opts, containerd.WithImportCompression())
+		}
+
+		if platform := context.String("platform"); platform != "" {
+			platSpec, err := platforms.Parse(platform)
+			if err != nil {
+				return err
+			}
+			platformMacher = platforms.Only(platSpec)
+			opts = append(opts, containerd.WithImportPlatform(platformMacher))
 		}
 
 		opts = append(opts, containerd.WithAllPlatforms(context.Bool("all-platforms")))
@@ -145,8 +160,10 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			log.G(ctx).Debugf("unpacking %d images", len(imgs))
 
 			for _, img := range imgs {
-				// TODO: Allow configuration of the platform
-				image := containerd.NewImage(client, img)
+				if platformMacher == nil { // if platform not specified use default.
+					platformMacher = platforms.Default()
+				}
+				image := containerd.NewImageWithPlatform(client, img, platformMacher)
 
 				// TODO: Show unpack status
 				fmt.Printf("unpacking %s (%s)...", img.Name, img.Target.Digest)
