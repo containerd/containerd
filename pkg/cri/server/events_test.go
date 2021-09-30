@@ -23,13 +23,13 @@ import (
 	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/typeurl"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/util/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 // TestBackOff tests the logic of backOff struct.
 func TestBackOff(t *testing.T) {
 	testStartTime := time.Now()
-	testClock := clock.NewFakeClock(testStartTime)
+	testClock := testingclock.NewFakeClock(testStartTime)
 	inputQueues := map[string]*backOffQueue{
 		"container1": {
 			events: []interface{}{
