@@ -309,7 +309,7 @@ func TestImagePullAllPlatforms(t *testing.T) {
 	defer cancel()
 
 	cs := client.ContentStore()
-	img, err := client.Fetch(ctx, "docker.io/library/busybox:latest")
+	img, err := client.Fetch(ctx, "ghcr.io/containerd/busybox:latest")
 	if err != nil {
 		t.Fatal(err)
 	}

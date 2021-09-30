@@ -40,17 +40,17 @@ var (
 func init() {
 	switch runtime.GOARCH {
 	case "386":
-		testImage = "docker.io/i386/alpine:latest"
+		testImage = "ghcr.io/containerd/alpine:latest-i386"
 	case "arm":
-		testImage = "docker.io/arm32v6/alpine:latest"
+		testImage = "ghcr.io/containerd/alpine:latest-arm32v6"
 	case "arm64":
-		testImage = "docker.io/arm64v8/alpine:latest"
+		testImage = "ghcr.io/containerd/alpine:latest-arm64v8"
 	case "ppc64le":
-		testImage = "docker.io/ppc64le/alpine:latest"
+		testImage = "ghcr.io/containerd/alpine:latest-ppc64le"
 	case "s390x":
-		testImage = "docker.io/s390x/alpine:latest"
+		testImage = "ghcr.io/containerd/alpine:latest-s390x"
 	default:
-		testImage = "docker.io/library/alpine:latest"
+		testImage = "ghcr.io/containerd/alpine:latest"
 	}
 }
 
