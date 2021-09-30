@@ -37,43 +37,44 @@ package cri
 import (
 	"time"
 
+	"google.golang.org/grpc"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // RuntimeVersioner contains methods for runtime name, version and API version.
 type RuntimeVersioner interface {
 	// Version returns the runtime name, runtime version and runtime API version
-	Version(apiVersion string) (*runtimeapi.VersionResponse, error)
+	Version(apiVersion string, opts ...grpc.CallOption) (*runtimeapi.VersionResponse, error)
 }
 
 // ContainerManager contains methods to manipulate containers managed by a
 // container runtime. The methods are thread-safe.
 type ContainerManager interface {
 	// CreateContainer creates a new container in specified PodSandbox.
-	CreateContainer(podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error)
+	CreateContainer(podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig, opts ...grpc.CallOption) (string, error)
 	// StartContainer starts the container.
-	StartContainer(containerID string) error
+	StartContainer(containerID string, opts ...grpc.CallOption) error
 	// StopContainer stops a running container with a grace period (i.e., timeout).
-	StopContainer(containerID string, timeout int64) error
+	StopContainer(containerID string, timeout int64, opts ...grpc.CallOption) error
 	// RemoveContainer removes the container.
-	RemoveContainer(containerID string) error
+	RemoveContainer(containerID string, opts ...grpc.CallOption) error
 	// ListContainers lists all containers by filters.
-	ListContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error)
+	ListContainers(filter *runtimeapi.ContainerFilter, opts ...grpc.CallOption) ([]*runtimeapi.Container, error)
 	// ContainerStatus returns the status of the container.
-	ContainerStatus(containerID string) (*runtimeapi.ContainerStatus, error)
+	ContainerStatus(containerID string, opts ...grpc.CallOption) (*runtimeapi.ContainerStatus, error)
 	// UpdateContainerResources updates the cgroup resources for the container.
-	UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) error
+	UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources, opts ...grpc.CallOption) error
 	// ExecSync executes a command in the container, and returns the stdout output.
 	// If command exits with a non-zero exit code, an error is returned.
-	ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error)
+	ExecSync(containerID string, cmd []string, timeout time.Duration, opts ...grpc.CallOption) (stdout []byte, stderr []byte, err error)
 	// Exec prepares a streaming endpoint to execute a command in the container, and returns the address.
-	Exec(*runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error)
+	Exec(req *runtimeapi.ExecRequest, opts ...grpc.CallOption) (*runtimeapi.ExecResponse, error)
 	// Attach prepares a streaming endpoint to attach to a running container, and returns the address.
-	Attach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error)
+	Attach(req *runtimeapi.AttachRequest, opts ...grpc.CallOption) (*runtimeapi.AttachResponse, error)
 	// ReopenContainerLog asks runtime to reopen the stdout/stderr log file
 	// for the container. If it returns error, new container log file MUST NOT
 	// be created.
-	ReopenContainerLog(ContainerID string) error
+	ReopenContainerLog(ContainerID string, opts ...grpc.CallOption) error
 }
 
 // PodSandboxManager contains methods for operating on PodSandboxes. The methods
@@ -81,19 +82,19 @@ type ContainerManager interface {
 type PodSandboxManager interface {
 	// RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 	// the sandbox is in ready state.
-	RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error)
+	RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string, opts ...grpc.CallOption) (string, error)
 	// StopPodSandbox stops the sandbox. If there are any running containers in the
 	// sandbox, they should be force terminated.
-	StopPodSandbox(podSandboxID string) error
+	StopPodSandbox(podSandboxID string, opts ...grpc.CallOption) error
 	// RemovePodSandbox removes the sandbox. If there are running containers in the
 	// sandbox, they should be forcibly removed.
-	RemovePodSandbox(podSandboxID string) error
+	RemovePodSandbox(podSandboxID string, opts ...grpc.CallOption) error
 	// PodSandboxStatus returns the Status of the PodSandbox.
-	PodSandboxStatus(podSandboxID string) (*runtimeapi.PodSandboxStatus, error)
+	PodSandboxStatus(podSandboxID string, opts ...grpc.CallOption) (*runtimeapi.PodSandboxStatus, error)
 	// ListPodSandbox returns a list of Sandbox.
-	ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error)
+	ListPodSandbox(filter *runtimeapi.PodSandboxFilter, opts ...grpc.CallOption) ([]*runtimeapi.PodSandbox, error)
 	// PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
-	PortForward(*runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error)
+	PortForward(req *runtimeapi.PortForwardRequest, opts ...grpc.CallOption) (*runtimeapi.PortForwardResponse, error)
 }
 
 // ContainerStatsManager contains methods for retrieving the container
@@ -101,9 +102,9 @@ type PodSandboxManager interface {
 type ContainerStatsManager interface {
 	// ContainerStats returns stats of the container. If the container does not
 	// exist, the call returns an error.
-	ContainerStats(containerID string) (*runtimeapi.ContainerStats, error)
+	ContainerStats(containerID string, opts ...grpc.CallOption) (*runtimeapi.ContainerStats, error)
 	// ListContainerStats returns stats of all running containers.
-	ListContainerStats(filter *runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error)
+	ListContainerStats(filter *runtimeapi.ContainerStatsFilter, opts ...grpc.CallOption) ([]*runtimeapi.ContainerStats, error)
 }
 
 // RuntimeService interface should be implemented by a container runtime.
@@ -115,9 +116,9 @@ type RuntimeService interface {
 	ContainerStatsManager
 
 	// UpdateRuntimeConfig updates runtime configuration if specified
-	UpdateRuntimeConfig(runtimeConfig *runtimeapi.RuntimeConfig) error
+	UpdateRuntimeConfig(runtimeConfig *runtimeapi.RuntimeConfig, opts ...grpc.CallOption) error
 	// Status returns the status of the runtime.
-	Status() (*runtimeapi.RuntimeStatus, error)
+	Status(opts ...grpc.CallOption) (*runtimeapi.RuntimeStatus, error)
 }
 
 // ImageManagerService interface should be implemented by a container image
@@ -125,13 +126,13 @@ type RuntimeService interface {
 // The methods should be thread-safe.
 type ImageManagerService interface {
 	// ListImages lists the existing images.
-	ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error)
+	ListImages(filter *runtimeapi.ImageFilter, opts ...grpc.CallOption) ([]*runtimeapi.Image, error)
 	// ImageStatus returns the status of the image.
-	ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error)
+	ImageStatus(image *runtimeapi.ImageSpec, opts ...grpc.CallOption) (*runtimeapi.Image, error)
 	// PullImage pulls an image with the authentication config.
-	PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error)
+	PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, opts ...grpc.CallOption) (string, error)
 	// RemoveImage removes the image.
-	RemoveImage(image *runtimeapi.ImageSpec) error
+	RemoveImage(image *runtimeapi.ImageSpec, opts ...grpc.CallOption) error
 	// ImageFsInfo returns information of the filesystem that is used to store images.
-	ImageFsInfo() ([]*runtimeapi.FilesystemUsage, error)
+	ImageFsInfo(opts ...grpc.CallOption) ([]*runtimeapi.FilesystemUsage, error)
 }

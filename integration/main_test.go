@@ -84,7 +84,7 @@ func ConnectDaemons() error {
 	}
 	// Since CRI grpc client doesn't have `WithBlock` specified, we
 	// need to check whether it is actually connected.
-	// TODO(random-liu): Extend cri remote client to accept extra grpc options.
+	// TODO(#6069) Use grpc options to block on connect and remove for this list containers request.
 	_, err = runtimeService.ListContainers(&runtime.ContainerFilter{})
 	if err != nil {
 		return errors.Wrap(err, "failed to list containers")
