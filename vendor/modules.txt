@@ -611,7 +611,7 @@ k8s.io/apimachinery/pkg/runtime/serializer/streaming
 k8s.io/apimachinery/pkg/runtime/serializer/versioning
 k8s.io/apimachinery/pkg/selection
 k8s.io/apimachinery/pkg/types
-k8s.io/utils/clock
+k8s.io/apimachinery/pkg/util/clock
 k8s.io/apimachinery/pkg/util/errors
 k8s.io/apimachinery/pkg/util/framer
 k8s.io/apimachinery/pkg/util/httpstream
@@ -685,6 +685,7 @@ k8s.io/klog/v2
 # k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
 ## explicit
 k8s.io/utils/clock
+k8s.io/utils/clock/testing
 k8s.io/utils/exec
 k8s.io/utils/integer
 # sigs.k8s.io/structured-merge-diff/v4 v4.1.2
