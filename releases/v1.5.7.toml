@@ -1,0 +1,19 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.5.6"
+
+pre_release = false
+
+preface = """\
+The seventh patch release for containerd 1.5 is a security release to fix CVE-2021-41103.
+
+### Notable Updates
+* **Fix insufficiently restricted permissions on container root and plugin directories** [GHSA-c2h3-6mxw-7mvq](https://github.com/containerd/containerd/security/advisories/GHSA-c2h3-6mxw-7mvq)
+
+See the changelog for complete list of changes"""
