@@ -23,7 +23,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -70,7 +69,7 @@ func newBundle(id, path, workDir string, spec []byte) (b *bundle, err error) {
 	if err := os.MkdirAll(rootfs, 0711); err != nil {
 		return nil, err
 	}
-	err = ioutil.WriteFile(filepath.Join(path, configFilename), spec, 0666)
+	err = os.WriteFile(filepath.Join(path, configFilename), spec, 0666)
 	return &bundle{
 		id:      id,
 		path:    path,
@@ -148,7 +147,7 @@ func (b *bundle) shimAddress(namespace, socketPath string) string {
 
 func (b *bundle) loadAddress() (string, error) {
 	addressPath := filepath.Join(b.path, "address")
-	data, err := ioutil.ReadFile(addressPath)
+	data, err := os.ReadFile(addressPath)
 	if err != nil {
 		return "", err
 	}

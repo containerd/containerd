@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"runtime"
@@ -231,7 +230,7 @@ func TestContainerOutput(t *testing.T) {
 }
 
 func withByteBuffers(stdout io.Writer) cio.Opt {
-	// TODO: could this use ioutil.Discard?
+	// TODO: could this use io.Discard?
 	return func(streams *cio.Streams) {
 		streams.Stdin = new(bytes.Buffer)
 		streams.Stdout = stdout
@@ -515,7 +514,7 @@ func TestContainerCloseIO(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStreams(r, stdout, ioutil.Discard)))
+	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStreams(r, stdout, io.Discard)))
 	if err != nil {
 		t.Fatal(err)
 	}

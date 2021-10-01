@@ -18,7 +18,7 @@ package io
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -237,7 +237,7 @@ func TestRedirectLogs(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		rc := ioutil.NopCloser(strings.NewReader(test.input))
+		rc := io.NopCloser(strings.NewReader(test.input))
 		buf := bytes.NewBuffer(nil)
 		wc := cioutil.NewNopWriteCloser(buf)
 		redirectLogs("test-path", rc, wc, test.stream, test.maxLen)

@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -209,7 +208,7 @@ ca = "/etc/path/default"
 }
 
 func TestLoadCertFiles(t *testing.T) {
-	dir, err := ioutil.TempDir("", t.Name())
+	dir, err := os.MkdirTemp("", t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,16 +256,16 @@ func TestLoadCertFiles(t *testing.T) {
 			defer os.RemoveAll(hostDir)
 
 			for _, f := range tc.input.caCerts {
-				if err := ioutil.WriteFile(f, testKey, 0600); err != nil {
+				if err := os.WriteFile(f, testKey, 0600); err != nil {
 					t.Fatal(err)
 				}
 			}
 
 			for _, pair := range tc.input.clientPairs {
-				if err := ioutil.WriteFile(pair[0], testKey, 0600); err != nil {
+				if err := os.WriteFile(pair[0], testKey, 0600); err != nil {
 					t.Fatal(err)
 				}
-				if err := ioutil.WriteFile(pair[1], testKey, 0600); err != nil {
+				if err := os.WriteFile(pair[1], testKey, 0600); err != nil {
 					t.Fatal(err)
 				}
 			}

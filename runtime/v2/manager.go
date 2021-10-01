@@ -19,7 +19,6 @@ package v2
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -234,7 +233,7 @@ func (m *TaskManager) Tasks(ctx context.Context, all bool) ([]runtime.Task, erro
 }
 
 func (m *TaskManager) loadExistingTasks(ctx context.Context) error {
-	nsDirs, err := ioutil.ReadDir(m.state)
+	nsDirs, err := os.ReadDir(m.state)
 	if err != nil {
 		return err
 	}
@@ -265,7 +264,7 @@ func (m *TaskManager) loadTasks(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	shimDirs, err := ioutil.ReadDir(filepath.Join(m.state, ns))
+	shimDirs, err := os.ReadDir(filepath.Join(m.state, ns))
 	if err != nil {
 		return err
 	}
@@ -285,7 +284,7 @@ func (m *TaskManager) loadTasks(ctx context.Context) error {
 			return err
 		}
 		// fast path
-		bf, err := ioutil.ReadDir(bundle.Path)
+		bf, err := os.ReadDir(bundle.Path)
 		if err != nil {
 			bundle.Delete()
 			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
@@ -334,7 +333,7 @@ func (m *TaskManager) cleanupWorkDirs(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	dirs, err := ioutil.ReadDir(filepath.Join(m.root, ns))
+	dirs, err := os.ReadDir(filepath.Join(m.root, ns))
 	if err != nil {
 		return err
 	}

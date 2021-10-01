@@ -17,7 +17,7 @@
 package metadata
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -28,7 +28,7 @@ import (
 )
 
 func TestHasSharedLabel(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "bucket-testing-")
+	tmpdir, err := os.MkdirTemp("", "bucket-testing-")
 	if err != nil {
 		t.Error(err)
 	}
@@ -64,7 +64,7 @@ func TestHasSharedLabel(t *testing.T) {
 }
 
 func TestGetShareableBucket(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "bucket-testing-")
+	tmpdir, err := os.MkdirTemp("", "bucket-testing-")
 	if err != nil {
 		t.Error(err)
 	}

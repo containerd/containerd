@@ -19,7 +19,6 @@ package metadata
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -715,7 +714,7 @@ func testEnv(t *testing.T) (context.Context, *bolt.DB, func()) {
 	ctx = namespaces.WithNamespace(ctx, "testing")
 	ctx = logtest.WithT(ctx, t)
 
-	dirname, err := ioutil.TempDir("", strings.Replace(t.Name(), "/", "_", -1)+"-")
+	dirname, err := os.MkdirTemp("", strings.Replace(t.Name(), "/", "_", -1)+"-")
 	if err != nil {
 		t.Fatal(err)
 	}

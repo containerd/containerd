@@ -18,7 +18,7 @@ package integration
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	cri "github.com/containerd/containerd/integration/cri-api/pkg/apis"
@@ -56,7 +56,7 @@ func initImages(imageListFile string) {
 	}
 
 	if imageListFile != "" {
-		fileContent, err := ioutil.ReadFile(imageListFile)
+		fileContent, err := os.ReadFile(imageListFile)
 		if err != nil {
 			panic(fmt.Errorf("error reading '%v' file contents: %v", imageList, err))
 		}

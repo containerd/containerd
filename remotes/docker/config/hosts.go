@@ -20,7 +20,6 @@ package config
 import (
 	"context"
 	"crypto/tls"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -170,7 +169,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 						tlsConfig.RootCAs = rootPool
 					}
 					for _, f := range host.caCerts {
-						data, err := ioutil.ReadFile(f)
+						data, err := os.ReadFile(f)
 						if err != nil {
 							return nil, errors.Wrapf(err, "unable to read CA cert %q", f)
 						}
@@ -182,13 +181,13 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 
 				if host.clientPairs != nil {
 					for _, pair := range host.clientPairs {
-						certPEMBlock, err := ioutil.ReadFile(pair[0])
+						certPEMBlock, err := os.ReadFile(pair[0])
 						if err != nil {
 							return nil, errors.Wrapf(err, "unable to read CERT file %q", pair[0])
 						}
 						var keyPEMBlock []byte
 						if pair[1] != "" {
-							keyPEMBlock, err = ioutil.ReadFile(pair[1])
+							keyPEMBlock, err = os.ReadFile(pair[1])
 							if err != nil {
 								return nil, errors.Wrapf(err, "unable to read CERT file %q", pair[1])
 							}
@@ -251,7 +250,7 @@ func hostDirectory(host string) string {
 }
 
 func loadHostDir(ctx context.Context, hostsDir string) ([]hostConfig, error) {
-	b, err := ioutil.ReadFile(filepath.Join(hostsDir, "hosts.toml"))
+	b, err := os.ReadFile(filepath.Join(hostsDir, "hosts.toml"))
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
@@ -536,7 +535,7 @@ func makeAbsPath(p string, base string) string {
 //   the ".cert", which may contain the private key. If the ".cert" file
 //   does not contain the private key, the caller should detect and error.
 func loadCertFiles(ctx context.Context, certsDir string) ([]hostConfig, error) {
-	fs, err := ioutil.ReadDir(certsDir)
+	fs, err := os.ReadDir(certsDir)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}

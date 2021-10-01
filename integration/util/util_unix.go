@@ -38,7 +38,6 @@ package util
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/url"
 	"os"
@@ -73,7 +72,7 @@ func CreateListener(endpoint string) (net.Listener, error) {
 	}
 
 	// Create the socket on a tempfile and move it to the destination socket to handle improprer cleanup
-	file, err := ioutil.TempFile(filepath.Dir(addr), "")
+	file, err := os.CreateTemp(filepath.Dir(addr), "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temporary file: %v", err)
 	}

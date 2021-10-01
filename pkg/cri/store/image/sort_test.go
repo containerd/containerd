@@ -18,7 +18,6 @@ package image
 
 import (
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"testing"
 
@@ -27,7 +26,7 @@ import (
 
 func TestReferenceSorting(t *testing.T) {
 	digested := func(seed int64) string {
-		b, err := ioutil.ReadAll(io.LimitReader(rand.New(rand.NewSource(seed)), 64))
+		b, err := io.ReadAll(io.LimitReader(rand.New(rand.NewSource(seed)), 64))
 		if err != nil {
 			panic(err)
 		}

@@ -23,7 +23,6 @@ import (
 	_ "crypto/sha256" // required for digest package
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -158,7 +157,7 @@ func TestContentWriter(t *testing.T) {
 	}
 	expected := digest.FromBytes(p)
 
-	checkCopy(t, int64(len(p)), cw, bufio.NewReader(ioutil.NopCloser(bytes.NewReader(p))))
+	checkCopy(t, int64(len(p)), cw, bufio.NewReader(io.NopCloser(bytes.NewReader(p))))
 
 	if err := cw.Commit(ctx, int64(len(p)), expected); err != nil {
 		t.Fatal(err)
@@ -174,7 +173,7 @@ func TestContentWriter(t *testing.T) {
 	}
 
 	// now, attempt to write the same data again
-	checkCopy(t, int64(len(p)), cw, bufio.NewReader(ioutil.NopCloser(bytes.NewReader(p))))
+	checkCopy(t, int64(len(p)), cw, bufio.NewReader(io.NopCloser(bytes.NewReader(p))))
 	if err := cw.Commit(ctx, int64(len(p)), expected); err == nil {
 		t.Fatal("expected already exists error")
 	} else if !errdefs.IsAlreadyExists(err) {
@@ -184,7 +183,7 @@ func TestContentWriter(t *testing.T) {
 	path := checkBlobPath(t, cs, expected)
 
 	// read the data back, make sure its the same
-	pp, err := ioutil.ReadFile(path)
+	pp, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,7 +298,7 @@ func contentStoreEnv(t checker) (context.Context, string, content.Store, func())
 	}
 	fn := runtime.FuncForPC(pc)
 
-	tmpdir, err := ioutil.TempDir("", filepath.Base(fn.Name())+"-")
+	tmpdir, err := os.MkdirTemp("", filepath.Base(fn.Name())+"-")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -362,7 +361,7 @@ func checkWrite(ctx context.Context, t checker, cs content.Store, dgst digest.Di
 }
 
 func TestWriterTruncateRecoversFromIncompleteWrite(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "test-local-content-store-recover")
+	tmpdir, err := os.MkdirTemp("", "test-local-content-store-recover")
 	assert.NilError(t, err)
 	defer os.RemoveAll(tmpdir)
 
@@ -401,7 +400,7 @@ func setupIncompleteWrite(ctx context.Context, t *testing.T, cs content.Store, r
 }
 
 func TestWriteReadEmptyFileTimestamp(t *testing.T) {
-	root, err := ioutil.TempDir("", "test-write-read-file-timestamp")
+	root, err := os.MkdirTemp("", "test-write-read-file-timestamp")
 	if err != nil {
 		t.Errorf("failed to create a tmp dir: %v", err)
 	}

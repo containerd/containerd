@@ -22,7 +22,7 @@ package runc
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/containerd/containerd/api/events"
@@ -66,7 +66,7 @@ func GetTopic(e interface{}) string {
 // there is an error reading the spec or if the container has a private PID namespace
 func ShouldKillAllOnExit(ctx context.Context, bundlePath string) bool {
 	var bundleSpec specs.Spec
-	bundleConfigContents, err := ioutil.ReadFile(filepath.Join(bundlePath, "config.json"))
+	bundleConfigContents, err := os.ReadFile(filepath.Join(bundlePath, "config.json"))
 	if err != nil {
 		log.G(ctx).WithError(err).Error("shouldKillAllOnExit: failed to read config.json")
 		return true

@@ -19,7 +19,6 @@ package command
 import (
 	gocontext "context"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"time"
@@ -73,7 +72,7 @@ var publishCommand = cli.Command{
 }
 
 func getEventPayload(r io.Reader) (*types.Any, error) {
-	data, err := ioutil.ReadAll(r)
+	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}

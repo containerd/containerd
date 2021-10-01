@@ -17,7 +17,6 @@
 package integration
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -40,8 +39,8 @@ func TestImageLoad(t *testing.T) {
 	t.Logf("docker save image into tarball")
 	output, err := exec.Command("docker", "pull", testImage).CombinedOutput()
 	require.NoError(t, err, "output: %q", output)
-	// ioutil.TempFile also opens a file, which might prevent us from overwriting that file with docker save.
-	tarDir, err := ioutil.TempDir("", "image-load")
+	// os.CreateTemp also opens a file, which might prevent us from overwriting that file with docker save.
+	tarDir, err := os.MkdirTemp("", "image-load")
 	tar := filepath.Join(tarDir, "image.tar")
 	require.NoError(t, err)
 	defer func() {

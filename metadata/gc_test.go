@@ -19,7 +19,6 @@ package metadata
 import (
 	"context"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -389,7 +388,7 @@ func TestGCRefs(t *testing.T) {
 }
 
 func newDatabase() (*bolt.DB, func(), error) {
-	td, err := ioutil.TempDir("", "gc-roots-")
+	td, err := os.MkdirTemp("", "gc-roots-")
 	if err != nil {
 		return nil, nil, err
 	}

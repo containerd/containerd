@@ -18,7 +18,6 @@ package native
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -234,7 +233,7 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	)
 
 	if kind == snapshots.KindActive || parent == "" {
-		td, err = ioutil.TempDir(filepath.Join(o.root, "snapshots"), "new-")
+		td, err = os.MkdirTemp(filepath.Join(o.root, "snapshots"), "new-")
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create temp dir")
 		}

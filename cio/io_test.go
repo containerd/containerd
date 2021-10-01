@@ -23,7 +23,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -50,7 +49,7 @@ func TestNewFIFOSetInDir(t *testing.T) {
 		t.Skip("NewFIFOSetInDir has different behaviour on windows")
 	}
 
-	root, err := ioutil.TempDir("", "test-new-fifo-set")
+	root, err := os.MkdirTemp("", "test-new-fifo-set")
 	assert.NilError(t, err)
 	defer os.RemoveAll(root)
 
@@ -69,12 +68,12 @@ func TestNewFIFOSetInDir(t *testing.T) {
 	}
 	assert.Assert(t, is.DeepEqual(fifos, expected, cmpFIFOSet))
 
-	files, err := ioutil.ReadDir(root)
+	files, err := os.ReadDir(root)
 	assert.NilError(t, err)
 	assert.Check(t, is.Len(files, 1))
 
 	assert.NilError(t, fifos.Close())
-	files, err = ioutil.ReadDir(root)
+	files, err = os.ReadDir(root)
 	assert.NilError(t, err)
 	assert.Check(t, is.Len(files, 0))
 }
@@ -102,19 +101,19 @@ func TestNewAttach(t *testing.T) {
 	fifos, err := NewFIFOSetInDir("", "theid", false)
 	assert.NilError(t, err)
 
-	io, err := attacher(fifos)
+	attachedFifos, err := attacher(fifos)
 	assert.NilError(t, err)
-	defer io.Close()
+	defer attachedFifos.Close()
 
-	producers := setupFIFOProducers(t, io.Config())
+	producers := setupFIFOProducers(t, attachedFifos.Config())
 	initProducers(t, producers, expectedStdout, expectedStderr)
 
-	actualStdin, err := ioutil.ReadAll(producers.Stdin)
+	actualStdin, err := io.ReadAll(producers.Stdin)
 	assert.NilError(t, err)
 
-	io.Wait()
-	io.Cancel()
-	assert.NilError(t, io.Close())
+	attachedFifos.Wait()
+	attachedFifos.Cancel()
+	assert.NilError(t, attachedFifos.Close())
 
 	assert.Check(t, is.Equal(expectedStdout, stdout.String()))
 	assert.Check(t, is.Equal(expectedStderr, stderr.String()))

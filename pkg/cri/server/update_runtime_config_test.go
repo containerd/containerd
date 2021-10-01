@@ -17,7 +17,6 @@
 package server
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -94,11 +93,11 @@ func TestUpdateRuntimeConfig(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			testDir, err := ioutil.TempDir(os.TempDir(), "test-runtime-config")
+			testDir, err := os.MkdirTemp(os.TempDir(), "test-runtime-config")
 			require.NoError(t, err)
 			defer os.RemoveAll(testDir)
 			templateName := filepath.Join(testDir, "template")
-			err = ioutil.WriteFile(templateName, []byte(testTemplate), 0666)
+			err = os.WriteFile(templateName, []byte(testTemplate), 0666)
 			require.NoError(t, err)
 			confDir := filepath.Join(testDir, "net.d")
 			confName := filepath.Join(confDir, cniConfigFileName)
@@ -131,7 +130,7 @@ func TestUpdateRuntimeConfig(t *testing.T) {
 				_, err := os.Stat(confName)
 				assert.Error(t, err)
 			} else {
-				got, err := ioutil.ReadFile(confName)
+				got, err := os.ReadFile(confName)
 				assert.NoError(t, err)
 				assert.Equal(t, expected, string(got))
 			}

@@ -18,7 +18,6 @@ package integration
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,7 +30,7 @@ import (
 )
 
 func TestContainerLogWithoutTailingNewLine(t *testing.T) {
-	testPodLogDir, err := ioutil.TempDir("/tmp", "container-log-without-tailing-newline")
+	testPodLogDir, err := os.MkdirTemp("/tmp", "container-log-without-tailing-newline")
 	require.NoError(t, err)
 	defer os.RemoveAll(testPodLogDir)
 
@@ -73,7 +72,7 @@ func TestContainerLogWithoutTailingNewLine(t *testing.T) {
 	}, time.Second, 30*time.Second))
 
 	t.Log("Check container log")
-	content, err := ioutil.ReadFile(filepath.Join(testPodLogDir, containerName))
+	content, err := os.ReadFile(filepath.Join(testPodLogDir, containerName))
 	assert.NoError(t, err)
 	checkContainerLog(t, string(content), []string{
 		fmt.Sprintf("%s %s %s", runtime.Stdout, runtime.LogTagPartial, "abcd"),
@@ -81,7 +80,7 @@ func TestContainerLogWithoutTailingNewLine(t *testing.T) {
 }
 
 func TestLongContainerLog(t *testing.T) {
-	testPodLogDir, err := ioutil.TempDir("/tmp", "long-container-log")
+	testPodLogDir, err := os.MkdirTemp("/tmp", "long-container-log")
 	require.NoError(t, err)
 	defer os.RemoveAll(testPodLogDir)
 
@@ -130,7 +129,7 @@ func TestLongContainerLog(t *testing.T) {
 	}, time.Second, 30*time.Second))
 
 	t.Log("Check container log")
-	content, err := ioutil.ReadFile(filepath.Join(testPodLogDir, containerName))
+	content, err := os.ReadFile(filepath.Join(testPodLogDir, containerName))
 	assert.NoError(t, err)
 	checkContainerLog(t, string(content), []string{
 		fmt.Sprintf("%s %s %s", runtime.Stdout, runtime.LogTagFull, strings.Repeat("a", maxSize-1)),

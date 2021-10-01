@@ -20,7 +20,6 @@
 package devmapper
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -37,7 +36,7 @@ func TestLoadConfig(t *testing.T) {
 		BaseImageSize: "128Mb",
 	}
 
-	file, err := ioutil.TempFile("", "devmapper-config-")
+	file, err := os.CreateTemp("", "devmapper-config-")
 	assert.NilError(t, err)
 
 	encoder := toml.NewEncoder(file)

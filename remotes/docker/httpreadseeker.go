@@ -19,7 +19,6 @@ package docker
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
@@ -162,7 +161,7 @@ func (hrs *httpReadSeeker) reader() (io.Reader, error) {
 		// as the length is already satisfied but we just return the empty
 		// reader instead.
 
-		hrs.rc = ioutil.NopCloser(bytes.NewReader([]byte{}))
+		hrs.rc = io.NopCloser(bytes.NewReader([]byte{}))
 	}
 
 	return hrs.rc, nil

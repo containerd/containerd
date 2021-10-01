@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -75,8 +74,8 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 		}
 		defer f.Close()
 
-		stdoutCopy := ioutil.Discard
-		stderrCopy := ioutil.Discard
+		stdoutCopy := io.Discard
+		stderrCopy := io.Discard
 		stdoutLog, err := v1.OpenShimStdoutLog(ctx, config.WorkDir)
 		if err != nil {
 			return nil, nil, errors.Wrapf(err, "failed to create stdout log")

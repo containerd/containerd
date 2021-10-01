@@ -17,7 +17,6 @@
 package integration
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
@@ -65,7 +64,7 @@ func TestPodHostname(t *testing.T) {
 			if test.needsHostNetwork && goruntime.GOOS == "windows" {
 				t.Skip("Skipped on Windows.")
 			}
-			testPodLogDir, err := ioutil.TempDir("/tmp", "hostname")
+			testPodLogDir, err := os.MkdirTemp("/tmp", "hostname")
 			require.NoError(t, err)
 			defer os.RemoveAll(testPodLogDir)
 
@@ -121,7 +120,7 @@ func TestPodHostname(t *testing.T) {
 				return false, nil
 			}, time.Second, 30*time.Second))
 
-			content, err := ioutil.ReadFile(filepath.Join(testPodLogDir, containerName))
+			content, err := os.ReadFile(filepath.Join(testPodLogDir, containerName))
 			assert.NoError(t, err)
 
 			t.Log("Search hostname env in container log")

@@ -18,7 +18,6 @@ package opts
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -67,7 +66,7 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 		if err != nil {
 			return err
 		}
-		root, err := ioutil.TempDir("", "ctd-volume")
+		root, err := os.MkdirTemp("", "ctd-volume")
 		if err != nil {
 			return err
 		}
@@ -108,7 +107,7 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 // copyExistingContents copies from the source to the destination and
 // ensures the ownership is appropriately set.
 func copyExistingContents(source, destination string) error {
-	dstList, err := ioutil.ReadDir(destination)
+	dstList, err := os.ReadDir(destination)
 	if err != nil {
 		return err
 	}

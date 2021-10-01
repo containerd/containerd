@@ -21,7 +21,6 @@ package lcow
 import (
 	"context"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"runtime"
@@ -166,7 +165,7 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 	outFile.Close()
 
 	// Read any trailing data
-	if _, err := io.Copy(ioutil.Discard, rc); err != nil {
+	if _, err := io.Copy(io.Discard, rc); err != nil {
 		return emptyDesc, err
 	}
 

@@ -18,7 +18,7 @@ package server
 
 import (
 	"context"
-	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -489,7 +489,7 @@ func TestEnsureRemoveAllNotExist(t *testing.T) {
 }
 
 func TestEnsureRemoveAllWithDir(t *testing.T) {
-	dir, err := ioutil.TempDir("", "test-ensure-removeall-with-dir")
+	dir, err := os.MkdirTemp("", "test-ensure-removeall-with-dir")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -499,7 +499,7 @@ func TestEnsureRemoveAllWithDir(t *testing.T) {
 }
 
 func TestEnsureRemoveAllWithFile(t *testing.T) {
-	tmp, err := ioutil.TempFile("", "test-ensure-removeall-with-dir")
+	tmp, err := os.CreateTemp("", "test-ensure-removeall-with-dir")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -18,7 +18,7 @@ package app
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 
 	"github.com/containerd/containerd/cmd/ctr/commands/containers"
 	"github.com/containerd/containerd/cmd/ctr/commands/content"
@@ -46,7 +46,7 @@ var extraCmds = []cli.Command{}
 
 func init() {
 	// Discard grpc logs so that they don't mess with our stdio
-	grpclog.SetLoggerV2(grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, ioutil.Discard))
+	grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, io.Discard, io.Discard))
 
 	cli.VersionPrinter = func(c *cli.Context) {
 		fmt.Println(c.App.Name, version.Package, c.App.Version)

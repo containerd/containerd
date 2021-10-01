@@ -22,7 +22,6 @@ package runc
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -175,7 +174,7 @@ func ReadOptions(path string) (*options.Options, error) {
 		return nil, err
 	}
 
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -192,12 +191,12 @@ func WriteOptions(path string, opts options.Options) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(filepath.Join(path, optionsFilename), data, 0600)
+	return os.WriteFile(filepath.Join(path, optionsFilename), data, 0600)
 }
 
 // ReadRuntime reads the runtime information from the path
 func ReadRuntime(path string) (string, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, "runtime"))
+	data, err := os.ReadFile(filepath.Join(path, "runtime"))
 	if err != nil {
 		return "", err
 	}
@@ -206,7 +205,7 @@ func ReadRuntime(path string) (string, error) {
 
 // WriteRuntime writes the runtime information into the path
 func WriteRuntime(path, runtime string) error {
-	return ioutil.WriteFile(filepath.Join(path, "runtime"), []byte(runtime), 0600)
+	return os.WriteFile(filepath.Join(path, "runtime"), []byte(runtime), 0600)
 }
 
 func newInit(ctx context.Context, path, workDir, namespace string, platform stdio.Platform,

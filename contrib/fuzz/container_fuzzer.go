@@ -27,7 +27,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
@@ -148,7 +147,7 @@ func checkIfShouldRestart(err error) {
 // startDaemon() starts the daemon.
 func startDaemon(ctx context.Context, shouldTearDown bool) {
 	buf := bytes.NewBuffer(nil)
-	stdioFile, err := ioutil.TempFile("", "")
+	stdioFile, err := os.CreateTemp("", "")
 	if err != nil {
 		// We panic here as it is a fuzz-blocker that
 		// may need fixing

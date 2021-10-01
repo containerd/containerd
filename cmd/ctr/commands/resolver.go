@@ -23,10 +23,10 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptrace"
 	"net/http/httputil"
+	"os"
 	"strings"
 
 	"github.com/containerd/console"
@@ -124,7 +124,7 @@ func resolverDefaultTLS(clicontext *cli.Context) (*tls.Config, error) {
 	}
 
 	if tlsRootPath := clicontext.String("tlscacert"); tlsRootPath != "" {
-		tlsRootData, err := ioutil.ReadFile(tlsRootPath)
+		tlsRootData, err := os.ReadFile(tlsRootPath)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to read %q", tlsRootPath)
 		}

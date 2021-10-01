@@ -20,7 +20,6 @@
 package integration
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -32,7 +31,7 @@ import (
 )
 
 func TestAdditionalGids(t *testing.T) {
-	testPodLogDir, err := ioutil.TempDir("/tmp", "additional-gids")
+	testPodLogDir, err := os.MkdirTemp("/tmp", "additional-gids")
 	require.NoError(t, err)
 	defer os.RemoveAll(testPodLogDir)
 
@@ -74,7 +73,7 @@ func TestAdditionalGids(t *testing.T) {
 	}, time.Second, 30*time.Second))
 
 	t.Log("Search additional groups in container log")
-	content, err := ioutil.ReadFile(filepath.Join(testPodLogDir, containerName))
+	content, err := os.ReadFile(filepath.Join(testPodLogDir, containerName))
 	assert.NoError(t, err)
 	assert.Contains(t, string(content), "groups=1(daemon),10(wheel),1234")
 }

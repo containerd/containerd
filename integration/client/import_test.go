@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"io"
 
-	"io/ioutil"
 	"math/rand"
 	"reflect"
 	"runtime"
@@ -298,7 +297,7 @@ func checkImages(t *testing.T, target digest.Digest, actual []images.Image, name
 }
 
 func createContent(size int64, seed int64) ([]byte, digest.Digest) {
-	b, err := ioutil.ReadAll(io.LimitReader(rand.New(rand.NewSource(seed)), size))
+	b, err := io.ReadAll(io.LimitReader(rand.New(rand.NewSource(seed)), size))
 	if err != nil {
 		panic(err)
 	}

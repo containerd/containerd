@@ -18,7 +18,6 @@ package container
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -182,7 +181,7 @@ func StoreStatus(root, id string, status Status) (StatusStorage, error) {
 // writing to the file during loading.
 func LoadStatus(root, id string) (Status, error) {
 	path := filepath.Join(root, "status")
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return Status{}, errors.Wrapf(err, "failed to read status from %q", path)
 	}

@@ -19,7 +19,7 @@ package logtest
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -37,7 +37,7 @@ func WithT(ctx context.Context, t testing.TB) context.Context {
 
 	// Increase debug level for tests
 	l.SetLevel(logrus.DebugLevel)
-	l.SetOutput(ioutil.Discard)
+	l.SetOutput(io.Discard)
 	l.SetReportCaller(true)
 
 	// Add testing hook

@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -491,7 +490,7 @@ func (s *snapshotter) convertScratchToReadOnlyLayer(ctx context.Context, snapsho
 		return errors.Wrap(err, "failed to reimport snapshot")
 	}
 
-	if _, err := io.Copy(ioutil.Discard, reader); err != nil {
+	if _, err := io.Copy(io.Discard, reader); err != nil {
 		return errors.Wrap(err, "failed discarding extra data in import stream")
 	}
 

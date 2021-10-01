@@ -18,7 +18,7 @@ package command
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -249,7 +249,7 @@ func registerUnregisterService(root string) (bool, error) {
 			return true, err
 		}
 
-		logOutput := ioutil.Discard
+		logOutput := io.Discard
 		if logFileFlag != "" {
 			f, err := os.OpenFile(logFileFlag, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {

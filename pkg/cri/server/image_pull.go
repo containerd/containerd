@@ -21,10 +21,10 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -301,7 +301,7 @@ func (c *criService) getTLSConfig(registryTLSConfig criconfig.TLSConfig) (*tls.C
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get system cert pool")
 		}
-		caCert, err := ioutil.ReadFile(registryTLSConfig.CAFile)
+		caCert, err := os.ReadFile(registryTLSConfig.CAFile)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to load CA file")
 		}

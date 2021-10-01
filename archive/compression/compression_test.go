@@ -21,7 +21,6 @@ import (
 	"compress/gzip"
 	"context"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -80,7 +79,7 @@ func testCompressDecompress(t *testing.T, size int, compression Compression) Dec
 	if err != nil {
 		t.Fatal(err)
 	}
-	decompressed, err := ioutil.ReadAll(decompressor)
+	decompressed, err := io.ReadAll(decompressor)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +122,7 @@ func TestCompressDecompressUncompressed(t *testing.T) {
 
 func TestDetectPigz(t *testing.T) {
 	// Create fake PATH with unpigz executable, make sure detectPigz can find it
-	tempPath, err := ioutil.TempDir("", "containerd_temp_")
+	tempPath, err := os.MkdirTemp("", "containerd_temp_")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +134,7 @@ func TestDetectPigz(t *testing.T) {
 
 	fullPath := filepath.Join(tempPath, filename)
 
-	if err := ioutil.WriteFile(fullPath, []byte(""), 0111); err != nil {
+	if err := os.WriteFile(fullPath, []byte(""), 0111); err != nil {
 		t.Fatal(err)
 	}
 
@@ -165,7 +164,7 @@ func TestCmdStream(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	buf, err := ioutil.ReadAll(out)
+	buf, err := io.ReadAll(out)
 	if err != nil {
 		t.Fatalf("failed to read from stdout: %s", err)
 	}
@@ -181,7 +180,7 @@ func TestCmdStreamBad(t *testing.T) {
 		t.Fatalf("failed to start command: %v", err)
 	}
 
-	if buf, err := ioutil.ReadAll(out); err == nil {
+	if buf, err := io.ReadAll(out); err == nil {
 		t.Fatal("command should have failed")
 	} else if err.Error() != "exit status 1: bad result\n" {
 		t.Fatalf("wrong error: %s", err.Error())

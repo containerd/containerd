@@ -17,7 +17,6 @@
 package integration
 
 import (
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -32,7 +31,7 @@ import (
 )
 
 func TestPodDualStack(t *testing.T) {
-	testPodLogDir, err := ioutil.TempDir("/tmp", "dualstack")
+	testPodLogDir, err := os.MkdirTemp("/tmp", "dualstack")
 	require.NoError(t, err)
 	defer os.RemoveAll(testPodLogDir)
 
@@ -77,7 +76,7 @@ func TestPodDualStack(t *testing.T) {
 		return false, nil
 	}, time.Second, 30*time.Second))
 
-	content, err := ioutil.ReadFile(filepath.Join(testPodLogDir, containerName))
+	content, err := os.ReadFile(filepath.Join(testPodLogDir, containerName))
 	assert.NoError(t, err)
 	status, err := runtimeService.PodSandboxStatus(sb)
 	require.NoError(t, err)

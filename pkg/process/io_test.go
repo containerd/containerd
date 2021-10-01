@@ -21,8 +21,8 @@ package process
 
 import (
 	"context"
-	"io/ioutil"
 	"net/url"
+	"os"
 	"testing"
 
 	"github.com/containerd/containerd/namespaces"
@@ -68,6 +68,6 @@ func TestNewBinaryIOCleanup(t *testing.T) {
 
 func descriptorCount(t *testing.T) int {
 	t.Helper()
-	files, _ := ioutil.ReadDir("/proc/self/fd")
+	files, _ := os.ReadDir("/proc/self/fd")
 	return len(files)
 }
