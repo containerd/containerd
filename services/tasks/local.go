@@ -209,7 +209,7 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 		return nil, errdefs.ToGRPC(err)
 	}
 	if err == nil {
-		return nil, errdefs.ToGRPC(fmt.Errorf("task %s already exists", r.ContainerID))
+		return nil, errdefs.ToGRPC(fmt.Errorf("task %s: %w", r.ContainerID, errdefs.ErrAlreadyExists))
 	}
 	c, err := rtime.Create(ctx, r.ContainerID, opts)
 	if err != nil {
