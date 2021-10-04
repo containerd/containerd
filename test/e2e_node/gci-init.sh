@@ -26,7 +26,10 @@ fi
 
 if [ "${CONTAINERD_CGROUPV2:-"false"}"  == "true" ]; then
   # check cos image
-  if uname -a | grep -q cos; then
+  if [ -r /etc/os-release ]; then
+    OS_ID="$(. /etc/os-release && echo "$ID")"
+  fi
+  if [ "${OS_ID}" = "cos" ]; then
     if ! grep -q 'systemd.unified_cgroup_hierarchy=true' /proc/cmdline; then
       echo "Setting up cgroupv2"
 
