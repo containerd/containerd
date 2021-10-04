@@ -61,6 +61,11 @@ compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzCSWalk fuzz_
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzArchiveExport fuzz_archive_export
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzParseAuth fuzz_parse_auth
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzParseProcPIDStatus fuzz_parse_proc_pid_status
+compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzImageStore fuzz_image_store
+compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzLeaseManager fuzz_lease_manager
+compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzContainerStore fuzz_container_store
+compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzContentStore fuzz_content_store
+
 
 # The below fuzzers require more setup than the fuzzers above.
 # We need the binaries from "make".
@@ -72,7 +77,7 @@ export GOARCH=amd64
 
 # Build runc
 cd $SRC/
-git clone https://github.com/opencontainers/runc
+git clone https://github.com/opencontainers/runc --branch release-1.0
 cd runc
 make
 make install

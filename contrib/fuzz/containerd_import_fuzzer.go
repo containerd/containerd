@@ -18,6 +18,8 @@ package fuzz
 import (
 	"bytes"
 	"context"
+	"sync"
+	"time"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 
@@ -33,7 +35,11 @@ const (
 	defaultAddress = "/tmp/containerd/containerd.sock"
 )
 
-func init() {
+var (
+	initDaemon sync.Once
+)
+
+func startDaemon() {
 	args := []string{"--log-level", "debug"}
 	go func() {
 		// This is similar to invoking the
@@ -42,6 +48,7 @@ func init() {
 		// for more info.
 		command.StartDaemonForFuzzing(args)
 	}()
+	time.Sleep(time.Second * 4)
 }
 
 func fuzzContext() (context.Context, context.CancelFunc) {
@@ -51,6 +58,8 @@ func fuzzContext() (context.Context, context.CancelFunc) {
 }
 
 func FuzzContainerdImport(data []byte) int {
+	initDaemon.Do(startDaemon)
+
 	client, err := containerd.New(defaultAddress)
 	if err != nil {
 		return 0
