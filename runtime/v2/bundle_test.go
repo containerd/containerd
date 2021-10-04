@@ -14,21 +14,10 @@
    limitations under the License.
 */
 
-package version
+package v2
 
-import "runtime"
-
-var (
-	// Package is filled at linking time
-	Package = "github.com/containerd/containerd"
-
-	// Version holds the complete version number. Filled in at linking time.
-	Version = "1.4.11+unknown"
-
-	// Revision is filled with the VCS (e.g. git) revision being used to build
-	// the program at linking time.
-	Revision = ""
-
-	// GoVersion is Go tree's version.
-	GoVersion = runtime.Version()
+import (
+	// When testutil is imported for one platform (bundle_linux_test.go) it
+	// should be imported for all platforms.
+	_ "github.com/containerd/containerd/pkg/testutil"
 )
