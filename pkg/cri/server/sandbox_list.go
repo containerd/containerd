@@ -63,6 +63,12 @@ func (c *criService) normalizePodSandboxFilter(filter *runtime.PodSandboxFilter)
 	}
 }
 
+func (c *criService) normalizePodSandboxStatsFilter(filter *runtime.PodSandboxStatsFilter) {
+	if sb, err := c.sandboxStore.Get(filter.GetId()); err == nil {
+		filter.Id = sb.ID
+	}
+}
+
 // filterCRISandboxes filters CRISandboxes.
 func (c *criService) filterCRISandboxes(sandboxes []*runtime.PodSandbox, filter *runtime.PodSandboxFilter) []*runtime.PodSandbox {
 	if filter == nil {

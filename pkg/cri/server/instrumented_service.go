@@ -1198,6 +1198,59 @@ func (in *instrumentedAlphaService) ImageFsInfo(ctx context.Context, r *runtime_
 	return res, errdefs.ToGRPC(err)
 }
 
+func (in *instrumentedService) PodSandboxStats(ctx context.Context, r *runtime.PodSandboxStatsRequest) (res *runtime.PodSandboxStatsResponse, err error) {
+	if err := in.checkInitialized(); err != nil {
+		return nil, err
+	}
+	log.G(ctx).Debugf("PodSandboxStats for %q", r.GetPodSandboxId())
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("PodSandboxStats for %q failed", r.GetPodSandboxId())
+		} else {
+			log.G(ctx).Debugf("PodSandboxStats for %q returns stats %+v", r.GetPodSandboxId(), res.GetStats())
+		}
+	}()
+	res, err = in.c.PodSandboxStats(ctrdutil.WithNamespace(ctx), r)
+	return res, errdefs.ToGRPC(err)
+}
+
+func (in *instrumentedAlphaService) PodSandboxStats(ctx context.Context, r *runtime_alpha.PodSandboxStatsRequest) (res *runtime_alpha.PodSandboxStatsResponse, err error) {
+	if err := in.checkInitialized(); err != nil {
+		return nil, err
+	}
+	log.G(ctx).Debugf("PodSandboxStats for %q", r.GetPodSandboxId())
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("PodSandboxStats for %q failed", r.GetPodSandboxId())
+		} else {
+			log.G(ctx).Debugf("PodSandboxStats for %q returns stats %+v", r.GetPodSandboxId(), res.GetStats())
+		}
+	}()
+	// converts request and response for earlier CRI version to call and get response from the current version
+	var v1r runtime.PodSandboxStatsRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.PodSandboxStatsResponse
+	v1res, err = in.c.PodSandboxStats(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.PodSandboxStatsResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(err).Errorf("PodSandboxStats for %q failed", r.GetPodSandboxId())
+			}
+		}
+	}
+	return res, errdefs.ToGRPC(err)
+}
+
 func (in *instrumentedService) ContainerStats(ctx context.Context, r *runtime.ContainerStatsRequest) (res *runtime.ContainerStatsResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
@@ -1245,6 +1298,59 @@ func (in *instrumentedAlphaService) ContainerStats(ctx context.Context, r *runti
 			} else {
 				// extra log entry if convert response parse error and request error
 				log.G(ctx).WithError(perr).Errorf("ContainerStats for %q failed", r.GetContainerId())
+			}
+		}
+	}
+	return res, errdefs.ToGRPC(err)
+}
+
+func (in *instrumentedService) ListPodSandboxStats(ctx context.Context, r *runtime.ListPodSandboxStatsRequest) (res *runtime.ListPodSandboxStatsResponse, err error) {
+	if err := in.checkInitialized(); err != nil {
+		return nil, err
+	}
+	log.G(ctx).Tracef("ListPodSandboxStats with filter %+v", r.GetFilter())
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Error("ListPodSandboxStats failed")
+		} else {
+			log.G(ctx).Tracef("ListPodSandboxStats returns stats %+v", res.GetStats())
+		}
+	}()
+	res, err = in.c.ListPodSandboxStats(ctrdutil.WithNamespace(ctx), r)
+	return res, errdefs.ToGRPC(err)
+}
+
+func (in *instrumentedAlphaService) ListPodSandboxStats(ctx context.Context, r *runtime_alpha.ListPodSandboxStatsRequest) (res *runtime_alpha.ListPodSandboxStatsResponse, err error) {
+	if err := in.checkInitialized(); err != nil {
+		return nil, err
+	}
+	log.G(ctx).Tracef("ListPodSandboxStats with filter %+v", r.GetFilter())
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Error("ListPodSandboxStats failed")
+		} else {
+			log.G(ctx).Tracef("ListPodSandboxStats returns stats %+v", res.GetStats())
+		}
+	}()
+	// converts request and response for earlier CRI version to call and get response from the current version
+	var v1r runtime.ListPodSandboxStatsRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.ListPodSandboxStatsResponse
+	v1res, err = in.c.ListPodSandboxStats(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.ListPodSandboxStatsResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Error("ListPodSandboxStats failed")
 			}
 		}
 	}
