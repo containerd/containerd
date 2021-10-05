@@ -57,8 +57,8 @@ const (
 	RuntimePlugin Type = "io.containerd.runtime.v1"
 	// RuntimePluginV2 implements a runtime v2
 	RuntimePluginV2 Type = "io.containerd.runtime.v2"
-	// RuntimePluginV2Service is a shim provided service implemented on top of runtime v2 plugins.
-	RuntimePluginV2Service Type = "io.containerd.runtime.v2.service"
+	// RuntimeShimPlugin implements the shim manager for runtime v2.
+	RuntimeShimPlugin Type = "io.containerd.runtime-shim.v2"
 	// ServicePlugin implements a internal service
 	ServicePlugin Type = "io.containerd.service.v1"
 	// GRPCPlugin implements a grpc service

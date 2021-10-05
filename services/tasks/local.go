@@ -81,7 +81,7 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 		return nil, err
 	}
 
-	v2r, err := ic.GetByID(plugin.RuntimePluginV2Service, "task")
+	v2r, err := ic.GetByID(plugin.RuntimePluginV2, "task")
 	if err != nil {
 		return nil, err
 	}
