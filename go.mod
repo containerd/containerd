@@ -13,7 +13,7 @@ require (
 	github.com/containerd/containerd/api v1.6.0-beta.1
 	github.com/containerd/continuity v0.2.0
 	github.com/containerd/fifo v1.0.0
-	github.com/containerd/go-cni v1.1.0
+	github.com/containerd/go-cni v1.1.1-0.20211026134925-aa8bf14323a5
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/imgcrypt v1.1.1
 	github.com/containerd/nri v0.1.0
