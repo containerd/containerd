@@ -26,36 +26,42 @@ var (
 	// throughout an OpenTelemetry instrumented project. When a user
 	// specified ErrorHandler is registered (`SetErrorHandler`) all calls to
 	// `Handle` and will be delegated to the registered ErrorHandler.
-	globalErrorHandler = &loggingErrorHandler{
-		l: log.New(os.Stderr, "", log.LstdFlags),
-	}
+	globalErrorHandler = defaultErrorHandler()
 
 	// delegateErrorHandlerOnce ensures that a user provided ErrorHandler is
 	// only ever registered once.
 	delegateErrorHandlerOnce sync.Once
 
-	// Comiple time check that loggingErrorHandler implements ErrorHandler.
-	_ ErrorHandler = (*loggingErrorHandler)(nil)
+	// Compile-time check that delegator implements ErrorHandler.
+	_ ErrorHandler = (*delegator)(nil)
 )
 
-// loggingErrorHandler logs all errors to STDERR.
-type loggingErrorHandler struct {
+type holder struct {
+	eh ErrorHandler
+}
+
+func defaultErrorHandler() *atomic.Value {
+	v := &atomic.Value{}
+	v.Store(holder{eh: &delegator{l: log.New(os.Stderr, "", log.LstdFlags)}})
+	return v
+}
+
+// delegator logs errors if no delegate is set, otherwise they are delegated.
+type delegator struct {
 	delegate atomic.Value
 
 	l *log.Logger
 }
 
-// setDelegate sets the ErrorHandler delegate if one is not already set.
-func (h *loggingErrorHandler) setDelegate(d ErrorHandler) {
-	if h.delegate.Load() != nil {
-		// Delegate already registered
-		return
-	}
+// setDelegate sets the ErrorHandler delegate.
+func (h *delegator) setDelegate(d ErrorHandler) {
+	// It is critical this is guarded with delegateErrorHandlerOnce, if it is
+	// called again with a different concrete type it will panic.
 	h.delegate.Store(d)
 }
 
-// Handle implements ErrorHandler.
-func (h *loggingErrorHandler) Handle(err error) {
+// Handle logs err if no delegate is set, otherwise it is delegated.
+func (h *delegator) Handle(err error) {
 	if d := h.delegate.Load(); d != nil {
 		d.(ErrorHandler).Handle(err)
 		return
@@ -63,27 +69,39 @@ func (h *loggingErrorHandler) Handle(err error) {
 	h.l.Print(err)
 }
 
-// GetErrorHandler returns the global ErrorHandler instance. If no ErrorHandler
-// instance has been set (`SetErrorHandler`), the default ErrorHandler which
-// logs errors to STDERR is returned.
+// GetErrorHandler returns the global ErrorHandler instance.
+//
+// The default ErrorHandler instance returned will log all errors to STDERR
+// until an override ErrorHandler is set with SetErrorHandler. All
+// ErrorHandler returned prior to this will automatically forward errors to
+// the set instance instead of logging.
+//
+// Subsequent calls to SetErrorHandler after the first will not forward errors
+// to the new ErrorHandler for prior returned instances.
 func GetErrorHandler() ErrorHandler {
-	return globalErrorHandler
+	return globalErrorHandler.Load().(holder).eh
 }
 
-// SetErrorHandler sets the global ErrorHandler to be h.
+// SetErrorHandler sets the global ErrorHandler to h.
+//
+// The first time this is called all ErrorHandler previously returned from
+// GetErrorHandler will send errors to h instead of the default logging
+// ErrorHandler. Subsequent calls will set the global ErrorHandler, but not
+// delegate errors to h.
 func SetErrorHandler(h ErrorHandler) {
 	delegateErrorHandlerOnce.Do(func() {
 		current := GetErrorHandler()
 		if current == h {
 			return
 		}
-		if internalHandler, ok := current.(*loggingErrorHandler); ok {
+		if internalHandler, ok := current.(*delegator); ok {
 			internalHandler.setDelegate(h)
 		}
 	})
+	globalErrorHandler.Store(holder{eh: h})
 }
 
-// Handle is a convience function for ErrorHandler().Handle(err)
+// Handle is a convenience function for ErrorHandler().Handle(err)
 func Handle(err error) {
 	GetErrorHandler().Handle(err)
 }

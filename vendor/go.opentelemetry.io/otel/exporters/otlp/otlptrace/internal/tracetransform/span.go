@@ -60,6 +60,7 @@ func Spans(sdl []tracesdk.ReadOnlySpan) []*tracepb.ResourceSpans {
 			ils = &tracepb.InstrumentationLibrarySpans{
 				InstrumentationLibrary: InstrumentationLibrary(sd.InstrumentationLibrary()),
 				Spans:                  []*tracepb.Span{},
+				SchemaUrl:              sd.InstrumentationLibrary().SchemaURL,
 			}
 		}
 		ils.Spans = append(ils.Spans, span(sd))
@@ -72,6 +73,7 @@ func Spans(sdl []tracesdk.ReadOnlySpan) []*tracepb.ResourceSpans {
 			rs = &tracepb.ResourceSpans{
 				Resource:                    Resource(sd.Resource()),
 				InstrumentationLibrarySpans: []*tracepb.InstrumentationLibrarySpans{ils},
+				SchemaUrl:                   sd.Resource().SchemaURL(),
 			}
 			rsm[rKey] = rs
 			continue
@@ -114,7 +116,7 @@ func span(sd tracesdk.ReadOnlySpan) *tracepb.Span {
 		Links:                  links(sd.Links()),
 		Kind:                   spanKind(sd.SpanKind()),
 		Name:                   sd.Name(),
-		Attributes:             Attributes(sd.Attributes()),
+		Attributes:             KeyValues(sd.Attributes()),
 		Events:                 spanEvents(sd.Events()),
 		DroppedAttributesCount: uint32(sd.DroppedAttributes()),
 		DroppedEventsCount:     uint32(sd.DroppedEvents()),
@@ -163,7 +165,7 @@ func links(links []tracesdk.Link) []*tracepb.Span_Link {
 		sl = append(sl, &tracepb.Span_Link{
 			TraceId:    tid[:],
 			SpanId:     sid[:],
-			Attributes: Attributes(otLink.Attributes),
+			Attributes: KeyValues(otLink.Attributes),
 		})
 	}
 	return sl
@@ -192,7 +194,7 @@ func spanEvents(es []tracesdk.Event) []*tracepb.Span_Event {
 			&tracepb.Span_Event{
 				Name:         e.Name,
 				TimeUnixNano: uint64(e.Time.UnixNano()),
-				Attributes:   Attributes(e.Attributes),
+				Attributes:   KeyValues(e.Attributes),
 				// TODO (rghetia) : Add Drop Counts when supported.
 			},
 		)
