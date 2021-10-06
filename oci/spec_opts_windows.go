@@ -18,10 +18,11 @@ package oci
 
 import (
 	"context"
+	"errors"
 
 	"github.com/containerd/containerd/containers"
+
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 )
 
 // WithWindowsCPUCount sets the `Windows.Resources.CPU.Count` section to the

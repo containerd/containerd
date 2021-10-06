@@ -26,8 +26,8 @@ import (
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
+
 	"github.com/opencontainers/image-spec/identity"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
@@ -93,7 +93,7 @@ When you are done, use the unmount command.
 		ps := context.String("platform")
 		p, err := platforms.Parse(ps)
 		if err != nil {
-			return errors.Wrapf(err, "unable to parse platform %s", ps)
+			return fmt.Errorf("unable to parse platform %s: %w", ps, err)
 		}
 
 		img, err := client.ImageService().Get(ctx, ref)
@@ -103,7 +103,7 @@ When you are done, use the unmount command.
 
 		i := containerd.NewImageWithPlatform(client, img, platforms.Only(p))
 		if err := i.Unpack(ctx, snapshotter); err != nil {
-			return errors.Wrap(err, "error unpacking image")
+			return fmt.Errorf("error unpacking image: %w", err)
 		}
 
 		diffIDs, err := i.RootFS(ctx)

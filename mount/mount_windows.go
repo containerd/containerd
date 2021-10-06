@@ -18,11 +18,12 @@ package mount
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 
 	"github.com/Microsoft/hcsshim"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -33,7 +34,7 @@ var (
 // Mount to the provided target
 func (m *Mount) Mount(target string) error {
 	if m.Type != "windows-layer" {
-		return errors.Errorf("invalid windows mount type: '%s'", m.Type)
+		return fmt.Errorf("invalid windows mount type: '%s'", m.Type)
 	}
 
 	home, layerID := filepath.Split(m.Source)
@@ -48,7 +49,7 @@ func (m *Mount) Mount(target string) error {
 	}
 
 	if err = hcsshim.ActivateLayer(di, layerID); err != nil {
-		return errors.Wrapf(err, "failed to activate layer %s", m.Source)
+		return fmt.Errorf("failed to activate layer %s: %w", m.Source, err)
 	}
 	defer func() {
 		if err != nil {
@@ -57,7 +58,7 @@ func (m *Mount) Mount(target string) error {
 	}()
 
 	if err = hcsshim.PrepareLayer(di, layerID, parentLayerPaths); err != nil {
-		return errors.Wrapf(err, "failed to prepare layer %s", m.Source)
+		return fmt.Errorf("failed to prepare layer %s: %w", m.Source, err)
 	}
 	return nil
 }
@@ -73,7 +74,7 @@ func (m *Mount) GetParentPaths() ([]string, error) {
 		if strings.HasPrefix(option, ParentLayerPathsFlag) {
 			err := json.Unmarshal([]byte(option[len(ParentLayerPathsFlag):]), &parentLayerPaths)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to unmarshal parent layer paths from mount")
+				return nil, fmt.Errorf("failed to unmarshal parent layer paths from mount: %w", err)
 			}
 		}
 	}
@@ -90,10 +91,10 @@ func Unmount(mount string, flags int) error {
 	)
 
 	if err := hcsshim.UnprepareLayer(di, layerID); err != nil {
-		return errors.Wrapf(err, "failed to unprepare layer %s", mount)
+		return fmt.Errorf("failed to unprepare layer %s: %w", mount, err)
 	}
 	if err := hcsshim.DeactivateLayer(di, layerID); err != nil {
-		return errors.Wrapf(err, "failed to deactivate layer %s", mount)
+		return fmt.Errorf("failed to deactivate layer %s: %w", mount, err)
 	}
 
 	return nil

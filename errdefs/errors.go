@@ -28,8 +28,7 @@ package errdefs
 
 import (
 	"context"
-
-	"github.com/pkg/errors"
+	"errors"
 )
 
 // Definitions of common error types used throughout containerd. All containerd

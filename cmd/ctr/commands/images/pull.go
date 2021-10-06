@@ -26,9 +26,9 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
+
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
@@ -106,13 +106,13 @@ command. As part of this process, we do the following:
 		if context.Bool("all-platforms") {
 			p, err = images.Platforms(ctx, client.ContentStore(), img.Target)
 			if err != nil {
-				return errors.Wrap(err, "unable to resolve image platforms")
+				return fmt.Errorf("unable to resolve image platforms: %w", err)
 			}
 		} else {
 			for _, s := range context.StringSlice("platform") {
 				ps, err := platforms.Parse(s)
 				if err != nil {
-					return errors.Wrapf(err, "unable to parse platform %s", s)
+					return fmt.Errorf("unable to parse platform %s: %w", s, err)
 				}
 				p = append(p, ps)
 			}

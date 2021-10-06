@@ -31,8 +31,6 @@ import (
 	"sync"
 	"time"
 
-	winfs "github.com/Microsoft/go-winio/pkg/fs"
-	"github.com/Microsoft/hcsshim/pkg/go-runhcs"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
@@ -40,8 +38,10 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/continuity/fs"
+
+	winfs "github.com/Microsoft/go-winio/pkg/fs"
+	"github.com/Microsoft/hcsshim/pkg/go-runhcs"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 )
 
 func init() {
@@ -79,7 +79,7 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 		return nil, err
 	}
 	if strings.ToLower(fsType) != "ntfs" {
-		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "%s is not on an NTFS volume - only NTFS volumes are supported", root)
+		return nil, fmt.Errorf("%s is not on an NTFS volume - only NTFS volumes are supported: %w", root, errdefs.ErrInvalidArgument)
 	}
 
 	if err := os.MkdirAll(root, 0700); err != nil {
@@ -179,7 +179,7 @@ func (s *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 
 	snapshot, err := storage.GetSnapshot(ctx, key)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get snapshot mount")
+		return nil, fmt.Errorf("failed to get snapshot mount: %w", err)
 	}
 	return s.mounts(snapshot), nil
 }
@@ -209,7 +209,7 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	}
 
 	if _, err = storage.CommitActive(ctx, key, name, snapshots.Usage(usage), opts...); err != nil {
-		return errors.Wrap(err, "failed to commit snapshot")
+		return fmt.Errorf("failed to commit snapshot: %w", err)
 	}
 
 	return t.Commit()
@@ -226,7 +226,7 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 
 	id, _, err := storage.Remove(ctx, key)
 	if err != nil {
-		return errors.Wrap(err, "failed to remove")
+		return fmt.Errorf("failed to remove: %w", err)
 	}
 
 	path := s.getSnapshotDir(id)
@@ -240,7 +240,7 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 			// May cause inconsistent data on disk
 			log.G(ctx).WithError(err1).WithField("path", renamed).Errorf("Failed to rename after failed commit")
 		}
-		return errors.Wrap(err, "failed to commit")
+		return fmt.Errorf("failed to commit: %w", err)
 	}
 
 	if err := os.RemoveAll(renamed); err != nil {
@@ -318,7 +318,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 
 	newSnapshot, err := storage.CreateSnapshot(ctx, kind, key, parent, opts...)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create snapshot")
+		return nil, fmt.Errorf("failed to create snapshot: %w", err)
 	}
 
 	if kind == snapshots.KindActive {
@@ -384,20 +384,20 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 				destPath := filepath.Join(snDir, "sandbox.vhdx")
 				dest, err := os.OpenFile(destPath, os.O_RDWR|os.O_CREATE, 0700)
 				if err != nil {
-					return nil, errors.Wrap(err, "failed to create sandbox.vhdx in snapshot")
+					return nil, fmt.Errorf("failed to create sandbox.vhdx in snapshot: %w", err)
 				}
 				defer dest.Close()
 				if _, err := io.Copy(dest, scratchSource); err != nil {
 					dest.Close()
 					os.Remove(destPath)
-					return nil, errors.Wrap(err, "failed to copy cached scratch.vhdx to sandbox.vhdx in snapshot")
+					return nil, fmt.Errorf("failed to copy cached scratch.vhdx to sandbox.vhdx in snapshot: %w", err)
 				}
 			}
 		}
 	}
 
 	if err := t.Commit(); err != nil {
-		return nil, errors.Wrap(err, "commit failed")
+		return nil, fmt.Errorf("commit failed: %w", err)
 	}
 
 	return s.mounts(newSnapshot), nil
@@ -416,19 +416,19 @@ func (s *snapshotter) handleSharing(ctx context.Context, id, snDir string) error
 
 	mounts, err := s.Mounts(ctx, key)
 	if err != nil {
-		return errors.Wrap(err, "failed to get mounts for owner snapshot")
+		return fmt.Errorf("failed to get mounts for owner snapshot: %w", err)
 	}
 
 	sandboxPath := filepath.Join(mounts[0].Source, "sandbox.vhdx")
 	linkPath := filepath.Join(snDir, "sandbox.vhdx")
 	if _, err := os.Stat(sandboxPath); err != nil {
-		return errors.Wrap(err, "failed to find sandbox.vhdx in snapshot directory")
+		return fmt.Errorf("failed to find sandbox.vhdx in snapshot directory: %w", err)
 	}
 
 	// We've found everything we need, now just make a symlink in our new snapshot to the
 	// sandbox.vhdx in the scratch we're asking to share.
 	if err := os.Symlink(sandboxPath, linkPath); err != nil {
-		return errors.Wrap(err, "failed to create symlink for sandbox scratch space")
+		return fmt.Errorf("failed to create symlink for sandbox scratch space: %w", err)
 	}
 	return nil
 }
@@ -451,7 +451,7 @@ func (s *snapshotter) openOrCreateScratch(ctx context.Context, sizeGB int, scrat
 	scratchSource, err := os.OpenFile(scratchFinalPath, os.O_RDONLY, 0700)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return nil, errors.Wrapf(err, "failed to open vhd %s for read", vhdFileName)
+			return nil, fmt.Errorf("failed to open vhd %s for read: %w", vhdFileName, err)
 		}
 
 		log.G(ctx).Debugf("vhdx %s not found, creating a new one", vhdFileName)
@@ -477,16 +477,16 @@ func (s *snapshotter) openOrCreateScratch(ctx context.Context, sizeGB int, scrat
 
 		if err := rhcs.CreateScratchWithOpts(ctx, scratchTempPath, &opt); err != nil {
 			os.Remove(scratchTempPath)
-			return nil, errors.Wrapf(err, "failed to create '%s' temp file", scratchTempName)
+			return nil, fmt.Errorf("failed to create '%s' temp file: %w", scratchTempName, err)
 		}
 		if err := os.Rename(scratchTempPath, scratchFinalPath); err != nil {
 			os.Remove(scratchTempPath)
-			return nil, errors.Wrapf(err, "failed to rename '%s' temp file to 'scratch.vhdx'", scratchTempName)
+			return nil, fmt.Errorf("failed to rename '%s' temp file to 'scratch.vhdx': %w", scratchTempName, err)
 		}
 		scratchSource, err = os.OpenFile(scratchFinalPath, os.O_RDONLY, 0700)
 		if err != nil {
 			os.Remove(scratchFinalPath)
-			return nil, errors.Wrap(err, "failed to open scratch.vhdx for read after creation")
+			return nil, fmt.Errorf("failed to open scratch.vhdx for read after creation: %w", err)
 		}
 	} else {
 		log.G(ctx).Debugf("scratch vhd %s was already present. Retrieved from cache", vhdFileName)

@@ -17,11 +17,13 @@
 package tasks
 
 import (
+	"errors"
+
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/pkg/errors"
+
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )

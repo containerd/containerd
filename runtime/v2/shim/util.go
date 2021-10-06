@@ -19,6 +19,7 @@ package shim
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -28,9 +29,9 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/namespaces"
+
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
 	exec "golang.org/x/sys/execabs"
 )
 
@@ -80,7 +81,7 @@ func Command(ctx context.Context, runtime, containerdAddress, containerdTTRPCAdd
 							cmdPath = testPath
 						}
 						if cmdPath == "" {
-							return nil, errors.Wrapf(os.ErrNotExist, "runtime %q binary not installed %q", runtime, name)
+							return nil, fmt.Errorf("runtime %q binary not installed %q: %w", runtime, name, os.ErrNotExist)
 						}
 					}
 				}

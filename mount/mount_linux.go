@@ -17,13 +17,13 @@
 package mount
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 )
@@ -63,7 +63,7 @@ func (m *Mount) Mount(target string) (err error) {
 
 	flags, data, losetup := parseMountOptions(options)
 	if len(data) > pagesize {
-		return errors.Errorf("mount options is too long")
+		return fmt.Errorf("mount options is too long")
 	}
 
 	// propagation types.
@@ -163,7 +163,7 @@ func unmount(target string, flags int) error {
 		}
 		return nil
 	}
-	return errors.Wrapf(unix.EBUSY, "failed to unmount target %s", target)
+	return fmt.Errorf("failed to unmount target %s: %w", target, unix.EBUSY)
 }
 
 // UnmountAll repeatedly unmounts the given mount point until there
@@ -365,19 +365,19 @@ func mountAt(chdir string, source, target, fstype string, flags uintptr, data st
 
 	f, err := os.Open(chdir)
 	if err != nil {
-		return errors.Wrap(err, "failed to mountat")
+		return fmt.Errorf("failed to mountat: %w", err)
 	}
 	defer f.Close()
 
 	fs, err := f.Stat()
 	if err != nil {
-		return errors.Wrap(err, "failed to mountat")
+		return fmt.Errorf("failed to mountat: %w", err)
 	}
 
 	if !fs.IsDir() {
-		return errors.Wrap(errors.Errorf("%s is not dir", chdir), "failed to mountat")
+		return fmt.Errorf("failed to mountat: %w", fmt.Errorf("%s is not dir", chdir))
 	}
-	return errors.Wrap(fMountat(f.Fd(), source, target, fstype, flags, data), "failed to mountat")
+	return fmt.Errorf("failed to mountat: %w", fMountat(f.Fd(), source, target, fstype, flags, data))
 }
 
 func (m *Mount) mountWithHelper(helperBinary, typePrefix, target string) error {
@@ -406,7 +406,7 @@ func (m *Mount) mountWithHelper(helperBinary, typePrefix, target string) error {
 			return nil
 		}
 		if !errors.Is(err, unix.ECHILD) {
-			return errors.Wrapf(err, "mount helper [%s %v] failed: %q", helperBinary, args, string(out))
+			return fmt.Errorf("mount helper [%s %v] failed: %q: %w", helperBinary, args, string(out), err)
 		}
 		// We got ECHILD, we are not sure whether the mount was successful.
 		// If the mount ID has changed, we are sure we got some new mount, but still not sure it is fully completed.
@@ -419,5 +419,5 @@ func (m *Mount) mountWithHelper(helperBinary, typePrefix, target string) error {
 			_ = unmount(target, 0)
 		}
 	}
-	return errors.Errorf("mount helper [%s %v] failed with ECHILD (retired %d times)", helperBinary, args, retriesOnECHILD)
+	return fmt.Errorf("mount helper [%s %v] failed with ECHILD (retired %d times)", helperBinary, args, retriesOnECHILD)
 }

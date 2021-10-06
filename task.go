@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	goruntime "runtime"
@@ -41,12 +42,12 @@ import (
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl"
+
 	google_protobuf "github.com/gogo/protobuf/types"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/go-digest"
 	is "github.com/opencontainers/image-spec/specs-go"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // UnknownExitStatus is returned when containerd is unable to
@@ -312,7 +313,7 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 		}
 		fallthrough
 	default:
-		return nil, errors.Wrapf(errdefs.ErrFailedPrecondition, "task must be stopped before deletion: %s", status.Status)
+		return nil, fmt.Errorf("task must be stopped before deletion(%s): %w", status.Status, errdefs.ErrFailedPrecondition)
 	}
 	if t.io != nil {
 		t.io.Close()
@@ -334,7 +335,7 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 
 func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreate cio.Creator) (_ Process, err error) {
 	if id == "" {
-		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "exec id must not be empty")
+		return nil, fmt.Errorf("exec id must not be empty: %w", errdefs.ErrInvalidArgument)
 	}
 	i, err := ioCreate(id)
 	if err != nil {
@@ -555,7 +556,7 @@ func (t *task) LoadProcess(ctx context.Context, id string, ioAttach cio.Attach) 
 	if err != nil {
 		err = errdefs.FromGRPC(err)
 		if errdefs.IsNotFound(err) {
-			return nil, errors.Wrapf(err, "no running process found")
+			return nil, fmt.Errorf("no running process found: %w", err)
 		}
 		return nil, err
 	}

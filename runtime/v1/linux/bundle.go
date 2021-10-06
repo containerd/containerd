@@ -31,8 +31,8 @@ import (
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v1/shim"
 	"github.com/containerd/containerd/runtime/v1/shim/client"
+
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 )
 
 // loadBundle loads an existing bundle from disk
@@ -185,7 +185,7 @@ func (b *bundle) Delete() error {
 	if err2 == nil {
 		return err
 	}
-	return errors.Wrapf(err, "Failed to remove both bundle and workdir locations: %v", err2)
+	return fmt.Errorf("failed to remove both bundle and workdir locations %v: %w", err2, err)
 }
 
 func (b *bundle) legacyShimAddress(namespace string) string {

@@ -18,36 +18,36 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	goruntime "runtime"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
-	cni "github.com/containerd/go-cni"
+	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	"github.com/containerd/go-cni"
+
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 )
 
 // PodSandboxStatus returns the status of the PodSandbox.
 func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandboxStatusRequest) (*runtime.PodSandboxStatusResponse, error) {
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
-		return nil, errors.Wrap(err, "an error occurred when try to find sandbox")
+		return nil, fmt.Errorf("an error occurred when try to find sandbox: %w", err)
 	}
 
 	ip, additionalIPs, err := c.getIPs(sandbox)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get sandbox ip")
+		return nil, fmt.Errorf("failed to get sandbox ip: %w", err)
 	}
 	status := toCRISandboxStatus(sandbox.Metadata, sandbox.Status.Get(), ip, additionalIPs)
 	if status.GetCreatedAt() == 0 {
 		// CRI doesn't allow CreatedAt == 0.
 		info, err := sandbox.Container.Info(ctx)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get CreatedAt for sandbox container in %q state", status.State)
+			return nil, fmt.Errorf("failed to get CreatedAt for sandbox container in %q state: %w", status.State, err)
 		}
 		status.CreatedAt = info.CreatedAt.UnixNano()
 	}
@@ -58,7 +58,7 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 	// Generate verbose information.
 	info, err := toCRISandboxInfo(ctx, sandbox)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get verbose sandbox container info")
+		return nil, fmt.Errorf("failed to get verbose sandbox container info: %w", err)
 	}
 
 	return &runtime.PodSandboxStatusResponse{
@@ -81,7 +81,7 @@ func (c *criService) getIPs(sandbox sandboxstore.Sandbox) (string, []string, err
 	}
 
 	if closed, err := sandbox.NetNS.Closed(); err != nil {
-		return "", nil, errors.Wrap(err, "check network namespace closed")
+		return "", nil, fmt.Errorf("check network namespace closed: %w", err)
 	} else if closed {
 		return "", nil, nil
 	}
@@ -150,14 +150,14 @@ func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox) (map[st
 	container := sandbox.Container
 	task, err := container.Task(ctx, nil)
 	if err != nil && !errdefs.IsNotFound(err) {
-		return nil, errors.Wrap(err, "failed to get sandbox container task")
+		return nil, fmt.Errorf("failed to get sandbox container task: %w", err)
 	}
 
 	var processStatus containerd.ProcessStatus
 	if task != nil {
 		taskStatus, err := task.Status(ctx)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to get task status")
+			return nil, fmt.Errorf("failed to get task status: %w", err)
 		}
 
 		processStatus = taskStatus.Status
@@ -181,20 +181,20 @@ func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox) (map[st
 		// Add network closed information if sandbox is not using host network.
 		closed, err := sandbox.NetNS.Closed()
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to check network namespace closed")
+			return nil, fmt.Errorf("failed to check network namespace closed: %w", err)
 		}
 		si.NetNSClosed = closed
 	}
 
 	spec, err := container.Spec(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get sandbox container runtime spec")
+		return nil, fmt.Errorf("failed to get sandbox container runtime spec: %w", err)
 	}
 	si.RuntimeSpec = spec
 
 	ctrInfo, err := container.Info(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get sandbox container info")
+		return nil, fmt.Errorf("failed to get sandbox container info: %w", err)
 	}
 	// Do not use config.SandboxImage because the configuration might
 	// be changed during restart. It may not reflect the actual image
@@ -205,14 +205,14 @@ func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox) (map[st
 
 	runtimeOptions, err := getRuntimeOptions(ctrInfo)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get runtime options")
+		return nil, fmt.Errorf("failed to get runtime options: %w", err)
 	}
 	si.RuntimeType = ctrInfo.Runtime.Name
 	si.RuntimeOptions = runtimeOptions
 
 	infoBytes, err := json.Marshal(si)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal info %v", si)
+		return nil, fmt.Errorf("failed to marshal info %v: %w", si, err)
 	}
 	return map[string]string{
 		"info": string(infoBytes),

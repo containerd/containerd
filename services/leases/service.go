@@ -18,16 +18,16 @@ package leases
 
 import (
 	"context"
-
-	"google.golang.org/grpc"
+	"errors"
 
 	api "github.com/containerd/containerd/api/services/leases/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
+
 	ptypes "github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
+	"google.golang.org/grpc"
 )
 
 func init() {

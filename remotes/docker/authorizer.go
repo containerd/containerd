@@ -19,6 +19,7 @@ package docker
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -28,7 +29,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/remotes/docker/auth"
 	remoteerrors "github.com/containerd/containerd/remotes/errors"
-	"github.com/pkg/errors"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -181,7 +182,7 @@ func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.R
 			}
 		}
 	}
-	return errors.Wrap(errdefs.ErrNotImplemented, "failed to find supported auth scheme")
+	return fmt.Errorf("failed to find supported auth scheme: %w", errdefs.ErrNotImplemented)
 }
 
 // authResult is used to control limit rate.
@@ -227,7 +228,7 @@ func (ah *authHandler) authorize(ctx context.Context) (string, error) {
 	case auth.BearerAuth:
 		return ah.doBearerAuth(ctx)
 	default:
-		return "", errors.Wrapf(errdefs.ErrNotImplemented, "failed to find supported auth scheme: %s", string(ah.scheme))
+		return "", fmt.Errorf("failed to find supported auth scheme %s: %w", string(ah.scheme), errdefs.ErrNotImplemented)
 	}
 }
 
@@ -273,14 +274,14 @@ func (ah *authHandler) doBearerAuth(ctx context.Context) (token string, err erro
 	// fetch token for the resource scope
 	if to.Secret != "" {
 		defer func() {
-			err = errors.Wrap(err, "failed to fetch oauth token")
+			err = fmt.Errorf("failed to fetch oauth token: %w", err)
 		}()
 		// credential information is provided, use oauth POST endpoint
 		// TODO: Allow setting client_id
 		resp, err := auth.FetchTokenWithOAuth(ctx, ah.client, ah.header, "containerd-client", to)
 		if err != nil {
 			var errStatus remoteerrors.ErrUnexpectedStatus
-			if errors.As(err, &errStatus) {
+			if errors.Is(err, &errStatus) {
 				// Registries without support for POST may return 404 for POST /v2/token.
 				// As of September 2017, GCR is known to return 404.
 				// As of February 2018, JFrog Artifactory is known to return 401.
@@ -303,7 +304,7 @@ func (ah *authHandler) doBearerAuth(ctx context.Context) (token string, err erro
 	// do request anonymously
 	resp, err := auth.FetchToken(ctx, ah.client, ah.header, to)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to fetch anonymous token")
+		return "", fmt.Errorf("failed to fetch anonymous token: %w", err)
 	}
 	return resp.Token, nil
 }
@@ -319,7 +320,7 @@ func invalidAuthorization(c auth.Challenge, responses []*http.Response) error {
 		return nil
 	}
 
-	return errors.Wrapf(ErrInvalidAuthorization, "server message: %s", errStr)
+	return fmt.Errorf("server message(%s): %w", errStr, ErrInvalidAuthorization)
 }
 
 func sameRequest(r1, r2 *http.Request) bool {

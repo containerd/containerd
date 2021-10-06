@@ -19,6 +19,7 @@ package metadata
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sync/atomic"
@@ -30,9 +31,9 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/namespaces"
-	digest "github.com/opencontainers/go-digest"
+
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -190,11 +191,11 @@ func checkContentLeased(ctx context.Context, db *DB, dgst digest.Digest) error {
 	return db.View(func(tx *bolt.Tx) error {
 		bkt := getBucket(tx, bucketKeyVersion, []byte(ns), bucketKeyObjectLeases, []byte(lease), bucketKeyObjectContent)
 		if bkt == nil {
-			return errors.Wrapf(errdefs.ErrNotFound, "bucket not found %s", lease)
+			return fmt.Errorf("bucket not found %s: %w", lease, errdefs.ErrNotFound)
 		}
 		v := bkt.Get([]byte(dgst.String()))
 		if v == nil {
-			return errors.Wrap(errdefs.ErrNotFound, "object not leased")
+			return fmt.Errorf("object not leased: %w", errdefs.ErrNotFound)
 		}
 
 		return nil
@@ -214,11 +215,11 @@ func checkIngestLeased(ctx context.Context, db *DB, ref string) error {
 	return db.View(func(tx *bolt.Tx) error {
 		bkt := getBucket(tx, bucketKeyVersion, []byte(ns), bucketKeyObjectLeases, []byte(lease), bucketKeyObjectIngests)
 		if bkt == nil {
-			return errors.Wrapf(errdefs.ErrNotFound, "bucket not found %s", lease)
+			return fmt.Errorf("bucket not found %s: %w", lease, errdefs.ErrNotFound)
 		}
 		v := bkt.Get([]byte(ref))
 		if v == nil {
-			return errors.Wrap(errdefs.ErrNotFound, "object not leased")
+			return fmt.Errorf("object not leased: %w", errdefs.ErrNotFound)
 		}
 
 		return nil

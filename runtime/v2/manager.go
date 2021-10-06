@@ -33,8 +33,8 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
+
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 )
 
 // Config for the v2 runtime
@@ -146,11 +146,11 @@ func (m *TaskManager) Create(ctx context.Context, id string, opts runtime.Create
 
 	t, err := shim.Create(ctx, opts)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create shim")
+		return nil, fmt.Errorf("failed to create shim: %w", err)
 	}
 
 	if err := m.tasks.Add(ctx, t); err != nil {
-		return nil, errors.Wrap(err, "failed to add task")
+		return nil, fmt.Errorf("failed to add task: %w", err)
 	}
 
 	return t, nil
@@ -179,7 +179,7 @@ func (m *TaskManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 		m.tasks.Delete(ctx, id)
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "start failed")
+		return nil, fmt.Errorf("start failed: %w", err)
 	}
 
 	return shim, nil

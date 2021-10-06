@@ -18,6 +18,7 @@ package contentserver
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync"
 
@@ -25,10 +26,10 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
+
 	ptypes "github.com/gogo/protobuf/types"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -383,7 +384,7 @@ func (s *service) Write(session api.Content_WriteServer) (err error) {
 
 			if req.Offset == 0 && ws.Offset > 0 {
 				if err := wr.Truncate(req.Offset); err != nil {
-					return errors.Wrapf(err, "truncate failed")
+					return fmt.Errorf("truncate failed: %w", err)
 				}
 				msg.Offset = req.Offset
 			}

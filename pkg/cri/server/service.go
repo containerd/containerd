@@ -27,26 +27,24 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/pkg/cri/streaming"
-	"github.com/containerd/containerd/plugin"
-	cni "github.com/containerd/go-cni"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-	runtime_alpha "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-
-	"github.com/containerd/containerd/pkg/cri/store/label"
-
 	"github.com/containerd/containerd/pkg/atomic"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
+	"github.com/containerd/containerd/pkg/cri/store/label"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
+	"github.com/containerd/containerd/pkg/cri/streaming"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	osinterface "github.com/containerd/containerd/pkg/os"
 	"github.com/containerd/containerd/pkg/registrar"
+	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/go-cni"
+
+	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	runtime_alpha "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 // grpcServices are all the grpc services provided by cri containerd.
@@ -130,27 +128,27 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 	}
 
 	if client.SnapshotService(c.config.ContainerdConfig.Snapshotter) == nil {
-		return nil, errors.Errorf("failed to find snapshotter %q", c.config.ContainerdConfig.Snapshotter)
+		return nil, fmt.Errorf("failed to find snapshotter %q", c.config.ContainerdConfig.Snapshotter)
 	}
 
 	c.imageFSPath = imageFSPath(config.ContainerdRootDir, config.ContainerdConfig.Snapshotter)
 	logrus.Infof("Get image filesystem path %q", c.imageFSPath)
 
 	if err := c.initPlatform(); err != nil {
-		return nil, errors.Wrap(err, "initialize platform")
+		return nil, fmt.Errorf("initialize platform: %w", err)
 	}
 
 	// prepare streaming server
 	c.streamServer, err = newStreamServer(c, config.StreamServerAddress, config.StreamServerPort, config.StreamIdleTimeout)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create stream server")
+		return nil, fmt.Errorf("failed to create stream server: %w", err)
 	}
 
 	c.eventMonitor = newEventMonitor(c)
 
 	c.cniNetConfMonitor, err = newCNINetConfSyncer(c.config.NetworkPluginConfDir, c.netPlugin, c.cniLoadOptions())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create cni conf monitor")
+		return nil, fmt.Errorf("failed to create cni conf monitor: %w", err)
 	}
 
 	// Preload base OCI specs
@@ -184,7 +182,7 @@ func (c *criService) Run() error {
 
 	logrus.Infof("Start recovering state")
 	if err := c.recover(ctrdutil.NamespacedContext()); err != nil {
-		return errors.Wrap(err, "failed to recover state")
+		return fmt.Errorf("failed to recover state: %w", err)
 	}
 
 	// Start event handler.
@@ -230,7 +228,7 @@ func (c *criService) Run() error {
 	case cniNetConfMonitorErr = <-cniNetConfMonitorErrCh:
 	}
 	if err := c.Close(); err != nil {
-		return errors.Wrap(err, "failed to stop cri service")
+		return fmt.Errorf("failed to stop cri service: %w", err)
 	}
 	// If the error is set above, err from channel must be nil here, because
 	// the channel is supposed to be closed. Or else, we wait and set it.
@@ -257,13 +255,13 @@ func (c *criService) Run() error {
 		logrus.Errorf("Stream server is not stopped in %q", streamServerStopTimeout)
 	}
 	if eventMonitorErr != nil {
-		return errors.Wrap(eventMonitorErr, "event monitor error")
+		return fmt.Errorf("event monitor error: %w", eventMonitorErr)
 	}
 	if streamServerErr != nil {
-		return errors.Wrap(streamServerErr, "stream server error")
+		return fmt.Errorf("stream server error: %w", streamServerErr)
 	}
 	if cniNetConfMonitorErr != nil {
-		return errors.Wrap(cniNetConfMonitorErr, "cni network conf monitor error")
+		return fmt.Errorf("cni network conf monitor error: %w", cniNetConfMonitorErr)
 	}
 	return nil
 }
@@ -277,7 +275,7 @@ func (c *criService) Close() error {
 	}
 	c.eventMonitor.stop()
 	if err := c.streamServer.Stop(); err != nil {
-		return errors.Wrap(err, "failed to stop stream server")
+		return fmt.Errorf("failed to stop stream server: %w", err)
 	}
 	return nil
 }
@@ -301,13 +299,13 @@ func imageFSPath(rootDir, snapshotter string) string {
 func loadOCISpec(filename string) (*oci.Spec, error) {
 	file, err := os.Open(filename)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open base OCI spec: %s", filename)
+		return nil, fmt.Errorf("failed to open base OCI spec %s: %w", filename, err)
 	}
 	defer file.Close()
 
 	spec := oci.Spec{}
 	if err := json.NewDecoder(file).Decode(&spec); err != nil {
-		return nil, errors.Wrap(err, "failed to parse base OCI spec file")
+		return nil, fmt.Errorf("failed to parse base OCI spec file: %w", err)
 	}
 
 	return &spec, nil
@@ -327,7 +325,7 @@ func loadBaseOCISpecs(config *criconfig.Config) (map[string]*oci.Spec, error) {
 
 		spec, err := loadOCISpec(cfg.BaseRuntimeSpec)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to load base OCI spec from file: %s", cfg.BaseRuntimeSpec)
+			return nil, fmt.Errorf("failed to load base OCI spec from file %s: %w", cfg.BaseRuntimeSpec, err)
 		}
 
 		specs[cfg.BaseRuntimeSpec] = spec

@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/defaults"
-	"github.com/pkg/errors"
+
 	"github.com/urfave/cli"
 )
 
@@ -183,7 +183,7 @@ func httpGetRequest(client *http.Client, request string) (io.ReadCloser, error) 
 		return nil, err
 	}
 	if resp.StatusCode != 200 {
-		return nil, errors.Errorf("http get failed with status: %s", resp.Status)
+		return nil, fmt.Errorf("http get failed with status: %s", resp.Status)
 	}
 	return resp.Body, nil
 }

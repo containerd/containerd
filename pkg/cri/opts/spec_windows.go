@@ -18,17 +18,17 @@ package opts
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
 	osinterface "github.com/containerd/containerd/pkg/os"
+
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // WithWindowsNetworkNamespace sets windows network namespace for container.
@@ -122,12 +122,12 @@ func WithWindowsMounts(osi osinterface.OS, config *runtime.ContainerConfig, extr
 					// If the source doesn't exist, return an error instead
 					// of creating the source. This aligns with Docker's
 					// behavior on windows.
-					return errors.Wrapf(err, "failed to stat %q", src)
+					return fmt.Errorf("failed to stat %q: %w", src, err)
 				}
 				var err error
 				src, err = osi.ResolveSymbolicLink(src)
 				if err != nil {
-					return errors.Wrapf(err, "failed to resolve symlink %q", src)
+					return fmt.Errorf("failed to resolve symlink %q: %w", src, err)
 				}
 				// hcsshim requires clean path, especially '/' -> '\'.
 				src = filepath.Clean(src)

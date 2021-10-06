@@ -18,6 +18,7 @@ package metadata
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -34,7 +35,7 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/native"
 	"github.com/containerd/containerd/snapshots/testsuite"
-	"github.com/pkg/errors"
+
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -319,7 +320,7 @@ func (s *tmpSnapshotter) create(ctx context.Context, key, parent string, kind sn
 	if target != "" {
 		for _, name := range s.targets[target] {
 			if s.snapshots[name].Parent == parent {
-				return nil, errors.Wrap(errdefs.ErrAlreadyExists, "found target")
+				return nil, fmt.Errorf("found target: %w", errdefs.ErrAlreadyExists)
 			}
 		}
 	}
@@ -355,7 +356,7 @@ func (s *tmpSnapshotter) Commit(ctx context.Context, name, key string, opts ...s
 	base.Kind = snapshots.KindCommitted
 
 	if _, ok := s.snapshots[name]; ok {
-		return errors.Wrap(errdefs.ErrAlreadyExists, "found name")
+		return fmt.Errorf("found name: %w", errdefs.ErrAlreadyExists)
 	}
 
 	src, ok := s.snapshots[key]

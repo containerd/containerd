@@ -21,12 +21,11 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/pkg/errors"
-	"golang.org/x/net/context"
-	"k8s.io/utils/exec"
-
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	"github.com/containerd/containerd/pkg/ioutil"
+
+	"golang.org/x/net/context"
+	"k8s.io/utils/exec"
 )
 
 func (c *criService) portForward(ctx context.Context, id string, port int32, stream io.ReadWriter) error {
@@ -38,7 +37,7 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 	cmd := []string{"wincat.exe", "127.0.0.1", fmt.Sprint(port)}
 	err := c.execInSandbox(ctx, id, cmd, stream, stdout, stderr)
 	if err != nil {
-		return errors.Wrapf(err, "failed to execute port forward in sandbox: %s", stderrBuffer.String())
+		return fmt.Errorf("failed to execute port forward in sandbox %s: %w", stderrBuffer.String(), err)
 	}
 	return nil
 }
@@ -47,13 +46,13 @@ func (c *criService) execInSandbox(ctx context.Context, sandboxID string, cmd []
 	// Get sandbox from our sandbox store.
 	sb, err := c.sandboxStore.Get(sandboxID)
 	if err != nil {
-		return errors.Wrapf(err, "failed to find sandbox %q in store", sandboxID)
+		return fmt.Errorf("failed to find sandbox %q in store: %w", sandboxID, err)
 	}
 
 	// Check the sandbox state
 	state := sb.Status.Get().State
 	if state != sandboxstore.StateReady {
-		return errors.Errorf("sandbox is in %s state", fmt.Sprint(state))
+		return fmt.Errorf("sandbox is in %s state", fmt.Sprint(state))
 	}
 
 	opts := execOptions{
@@ -66,13 +65,13 @@ func (c *criService) execInSandbox(ctx context.Context, sandboxID string, cmd []
 	}
 	exitCode, err := c.execInternal(ctx, sb.Container, sandboxID, opts)
 	if err != nil {
-		return errors.Wrap(err, "failed to exec in sandbox")
+		return fmt.Errorf("failed to exec in sandbox: %w", err)
 	}
 	if *exitCode == 0 {
 		return nil
 	}
 	return &exec.CodeExitError{
-		Err:  errors.Errorf("error executing command %v, exit code %d", cmd, *exitCode),
+		Err:  fmt.Errorf("error executing command %v, exit code %d", cmd, *exitCode),
 		Code: int(*exitCode),
 	}
 }

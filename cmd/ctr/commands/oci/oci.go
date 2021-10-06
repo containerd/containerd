@@ -17,12 +17,13 @@
 package oci
 
 import (
-	"github.com/pkg/errors"
-	"github.com/urfave/cli"
+	"fmt"
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
+
+	"github.com/urfave/cli"
 )
 
 // Command is the parent for all OCI related tools under 'oci'
@@ -43,7 +44,7 @@ var defaultSpecCommand = cli.Command{
 
 		spec, err := oci.GenerateSpec(ctx, nil, &containers.Container{})
 		if err != nil {
-			return errors.Wrap(err, "failed to generate spec")
+			return fmt.Errorf("failed to generate spec: %w", err)
 		}
 
 		commands.PrintAsJSON(spec)

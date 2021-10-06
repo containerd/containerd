@@ -18,14 +18,15 @@ package rootfs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
-	digest "github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
+
+	"github.com/opencontainers/go-digest"
 )
 
 var (
@@ -44,7 +45,7 @@ type Mounter interface {
 func InitRootFS(ctx context.Context, name string, parent digest.Digest, readonly bool, snapshotter snapshots.Snapshotter, mounter Mounter) ([]mount.Mount, error) {
 	_, err := snapshotter.Stat(ctx, name)
 	if err == nil {
-		return nil, errors.Errorf("rootfs already exists")
+		return nil, errors.New("rootfs already exists")
 	}
 	// TODO: ensure not exist error once added to snapshot package
 

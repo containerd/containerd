@@ -23,10 +23,11 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/containerd/containerd/snapshots"
-	"github.com/pkg/errors"
+
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -88,7 +89,7 @@ func (ms *MetaStore) TransactionContext(ctx context.Context, writable bool) (con
 		db, err := bolt.Open(ms.dbfile, 0600, nil)
 		if err != nil {
 			ms.dbL.Unlock()
-			return ctx, nil, errors.Wrap(err, "failed to open database file")
+			return ctx, nil, fmt.Errorf("failed to open database file: %w", err)
 		}
 		ms.db = db
 	}
@@ -96,7 +97,7 @@ func (ms *MetaStore) TransactionContext(ctx context.Context, writable bool) (con
 
 	tx, err := ms.db.Begin(writable)
 	if err != nil {
-		return ctx, nil, errors.Wrap(err, "failed to start transaction")
+		return ctx, nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
 
 	ctx = context.WithValue(ctx, transactionKey{}, tx)

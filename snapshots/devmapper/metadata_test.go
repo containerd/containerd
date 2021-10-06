@@ -21,12 +21,12 @@ package devmapper
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
 
-	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"

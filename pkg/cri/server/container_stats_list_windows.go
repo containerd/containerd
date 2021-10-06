@@ -17,13 +17,15 @@
 package server
 
 import (
-	wstats "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
-	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/typeurl"
-	"github.com/pkg/errors"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"errors"
+	"fmt"
 
+	"github.com/containerd/containerd/api/types"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+	"github.com/containerd/typeurl"
+
+	wstats "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func (c *criService) containerMetrics(
@@ -57,7 +59,7 @@ func (c *criService) containerMetrics(
 	if stats != nil {
 		s, err := typeurl.UnmarshalAny(stats.Data)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to extract container metrics")
+			return nil, fmt.Errorf("failed to extract container metrics: %w", err)
 		}
 		wstats := s.(*wstats.Statistics).GetWindows()
 		if wstats == nil {

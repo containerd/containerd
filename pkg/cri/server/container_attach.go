@@ -17,27 +17,27 @@
 package server
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
-	"github.com/pkg/errors"
+	cio "github.com/containerd/containerd/pkg/cri/io"
+
 	"golang.org/x/net/context"
 	"k8s.io/client-go/tools/remotecommand"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	cio "github.com/containerd/containerd/pkg/cri/io"
 )
 
 // Attach prepares a streaming endpoint to attach to a running container, and returns the address.
 func (c *criService) Attach(ctx context.Context, r *runtime.AttachRequest) (*runtime.AttachResponse, error) {
 	cntr, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to find container in store")
+		return nil, fmt.Errorf("failed to find container in store: %w", err)
 	}
 	state := cntr.Status.Get().State()
 	if state != runtime.ContainerState_CONTAINER_RUNNING {
-		return nil, errors.Errorf("container is in %s state", criContainerStateToString(state))
+		return nil, fmt.Errorf("container is in %s state", criContainerStateToString(state))
 	}
 	return c.streamServer.GetAttach(r)
 }
@@ -49,18 +49,18 @@ func (c *criService) attachContainer(ctx context.Context, id string, stdin io.Re
 	// Get container from our container store.
 	cntr, err := c.containerStore.Get(id)
 	if err != nil {
-		return errors.Wrapf(err, "failed to find container %q in store", id)
+		return fmt.Errorf("failed to find container %q in store: %w", id, err)
 	}
 	id = cntr.ID
 
 	state := cntr.Status.Get().State()
 	if state != runtime.ContainerState_CONTAINER_RUNNING {
-		return errors.Errorf("container is in %s state", criContainerStateToString(state))
+		return fmt.Errorf("container is in %s state", criContainerStateToString(state))
 	}
 
 	task, err := cntr.Container.Task(ctx, nil)
 	if err != nil {
-		return errors.Wrap(err, "failed to load task")
+		return fmt.Errorf("failed to load task: %w", err)
 	}
 	handleResizing(ctx, resize, func(size remotecommand.TerminalSize) {
 		if err := task.Resize(ctx, uint32(size.Width), uint32(size.Height)); err != nil {

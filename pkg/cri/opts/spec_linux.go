@@ -18,6 +18,7 @@ package opts
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -31,15 +32,14 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/pkg/cri/util"
+	osinterface "github.com/containerd/containerd/pkg/os"
+
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux/label"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	"github.com/containerd/containerd/pkg/cri/util"
-	osinterface "github.com/containerd/containerd/pkg/os"
 )
 
 // WithAdditionalGIDs adds any additional groups listed for a particular user in the
@@ -159,17 +159,17 @@ func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 			// TODO(random-liu): Add CRI validation test for this case.
 			if _, err := osi.Stat(src); err != nil {
 				if !os.IsNotExist(err) {
-					return errors.Wrapf(err, "failed to stat %q", src)
+					return fmt.Errorf("failed to stat %q: %w", src, err)
 				}
 				if err := osi.MkdirAll(src, 0755); err != nil {
-					return errors.Wrapf(err, "failed to mkdir %q", src)
+					return fmt.Errorf("failed to mkdir %q: %w", src, err)
 				}
 			}
 			// TODO(random-liu): Add cri-containerd integration test or cri validation test
 			// for this.
 			src, err := osi.ResolveSymbolicLink(src)
 			if err != nil {
-				return errors.Wrapf(err, "failed to resolve symlink %q", src)
+				return fmt.Errorf("failed to resolve symlink %q: %w", src, err)
 			}
 			if s.Linux == nil {
 				s.Linux = &runtimespec.Linux{}
@@ -210,7 +210,7 @@ func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 
 			if mount.GetSelinuxRelabel() {
 				if err := label.Relabel(src, mountLabel, false); err != nil && err != unix.ENOTSUP {
-					return errors.Wrapf(err, "relabel %q with %q failed", src, mountLabel)
+					return fmt.Errorf("relabel %q with %q failed: %w", src, mountLabel, err)
 				}
 			}
 			s.Mounts = append(s.Mounts, runtimespec.Mount{
@@ -263,7 +263,7 @@ func ensureShared(path string, lookupMount func(string) (mount.Info, error)) err
 		}
 	}
 
-	return errors.Errorf("path %q is mounted on %q but it is not a shared mount", path, mountInfo.Mountpoint)
+	return fmt.Errorf("path %q is mounted on %q but it is not a shared mount", path, mountInfo.Mountpoint)
 }
 
 // ensure mount point on which path is mounted, is either shared or slave.
@@ -281,7 +281,7 @@ func ensureSharedOrSlave(path string, lookupMount func(string) (mount.Info, erro
 			return nil
 		}
 	}
-	return errors.Errorf("path %q is mounted on %q but it is not a shared or slave mount", path, mountInfo.Mountpoint)
+	return fmt.Errorf("path %q is mounted on %q but it is not a shared or slave mount", path, mountInfo.Mountpoint)
 }
 
 // getDeviceUserGroupID() is used to find the right uid/gid
@@ -481,7 +481,7 @@ func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHu
 				}
 			} else {
 				if !tolerateMissingHugetlbController {
-					return errors.Errorf("huge pages limits are specified but hugetlb cgroup controller is missing. " +
+					return errors.New("huge pages limits are specified but hugetlb cgroup controller is missing. " +
 						"Please set tolerate_missing_hugetlb_controller to `true` to ignore this error")
 				}
 				logrus.Warn("hugetlb cgroup controller is absent. skipping huge pages limits")
@@ -533,7 +533,7 @@ var (
 func cgroupv1HasHugetlb() (bool, error) {
 	_cgroupv1HasHugetlbOnce.Do(func() {
 		if _, err := os.ReadDir("/sys/fs/cgroup/hugetlb"); err != nil {
-			_cgroupv1HasHugetlbErr = errors.Wrap(err, "readdir /sys/fs/cgroup/hugetlb")
+			_cgroupv1HasHugetlbErr = fmt.Errorf("readdir /sys/fs/cgroup/hugetlb: %w", err)
 			_cgroupv1HasHugetlb = false
 		} else {
 			_cgroupv1HasHugetlbErr = nil
@@ -549,7 +549,7 @@ func cgroupv2HasHugetlb() (bool, error) {
 	_cgroupv2HasHugetlbOnce.Do(func() {
 		controllers, err := os.ReadFile("/sys/fs/cgroup/cgroup.controllers")
 		if err != nil {
-			_cgroupv2HasHugetlbErr = errors.Wrap(err, "read /sys/fs/cgroup/cgroup.controllers")
+			_cgroupv2HasHugetlbErr = fmt.Errorf("read /sys/fs/cgroup/cgroup.controllers: %w", err)
 			return
 		}
 		_cgroupv2HasHugetlb = strings.Contains(string(controllers), "hugetlb")
@@ -697,12 +697,12 @@ func nullOpt(_ context.Context, _ oci.Client, _ *containers.Container, _ *runtim
 func getCurrentOOMScoreAdj() (int, error) {
 	b, err := os.ReadFile("/proc/self/oom_score_adj")
 	if err != nil {
-		return 0, errors.Wrap(err, "could not get the daemon oom_score_adj")
+		return 0, fmt.Errorf("could not get the daemon oom_score_adj: %w", err)
 	}
 	s := strings.TrimSpace(string(b))
 	i, err := strconv.Atoi(s)
 	if err != nil {
-		return 0, errors.Wrap(err, "could not get the daemon oom_score_adj")
+		return 0, fmt.Errorf("could not get the daemon oom_score_adj: %w", err)
 	}
 	return i, nil
 }

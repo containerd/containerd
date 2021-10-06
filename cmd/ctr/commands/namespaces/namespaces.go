@@ -17,6 +17,7 @@
 package namespaces
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -26,7 +27,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-	"github.com/pkg/errors"
+
 	"github.com/urfave/cli"
 )
 
@@ -167,7 +168,7 @@ var removeCommand = cli.Command{
 			if err := namespaces.Delete(ctx, target, opts...); err != nil {
 				if !errdefs.IsNotFound(err) {
 					if exitErr == nil {
-						exitErr = errors.Wrapf(err, "unable to delete %v", target)
+						exitErr = fmt.Errorf("unable to delete %v: %w", target, err)
 					}
 					log.G(ctx).WithError(err).Errorf("unable to delete %v", target)
 					continue

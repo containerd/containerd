@@ -20,11 +20,12 @@
 package oci
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
-	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
 )
 
@@ -38,7 +39,7 @@ func HostDevices() ([]specs.LinuxDevice, error) {
 func getDevices(path, containerPath string) ([]specs.LinuxDevice, error) {
 	stat, err := os.Stat(path)
 	if err != nil {
-		return nil, errors.Wrap(err, "error stating device path")
+		return nil, fmt.Errorf("error stating device path: %w", err)
 	}
 
 	if !stat.IsDir() {

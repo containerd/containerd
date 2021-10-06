@@ -25,7 +25,7 @@ import (
 
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/log"
-	"github.com/pkg/errors"
+
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -290,7 +290,7 @@ func references(ctx context.Context, tx *bolt.Tx, node gc.Node, fn func(gc.Node)
 	case ResourceSnapshot, resourceSnapshotFlat:
 		parts := strings.SplitN(node.Key, "/", 2)
 		if len(parts) != 2 {
-			return errors.Errorf("invalid snapshot gc key %s", node.Key)
+			return fmt.Errorf("invalid snapshot gc key %s", node.Key)
 		}
 		ss := parts[0]
 		name := parts[1]
@@ -435,7 +435,7 @@ func remove(ctx context.Context, tx *bolt.Tx, node gc.Node) error {
 		if sbkt != nil {
 			parts := strings.SplitN(node.Key, "/", 2)
 			if len(parts) != 2 {
-				return errors.Errorf("invalid snapshot gc key %s", node.Key)
+				return fmt.Errorf("invalid snapshot gc key %s", node.Key)
 			}
 			ssbkt := sbkt.Bucket([]byte(parts[0]))
 			if ssbkt != nil {

@@ -23,7 +23,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/mount"
-	"github.com/pkg/errors"
+
 	"github.com/urfave/cli"
 )
 
@@ -60,10 +60,10 @@ var unmountCommand = cli.Command{
 			snapshotter := context.String("snapshotter")
 			s := client.SnapshotService(snapshotter)
 			if err := client.LeasesService().Delete(ctx, leases.Lease{ID: target}); err != nil && !errdefs.IsNotFound(err) {
-				return errors.Wrap(err, "error deleting lease")
+				return fmt.Errorf("error deleting lease: %w", err)
 			}
 			if err := s.Remove(ctx, target); err != nil && !errdefs.IsNotFound(err) {
-				return errors.Wrap(err, "error removing snapshot")
+				return fmt.Errorf("error removing snapshot: %w", err)
 			}
 		}
 

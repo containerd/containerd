@@ -17,11 +17,12 @@
 package content
 
 import (
+	"errors"
+
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/services/content/contentserver"
-	"github.com/pkg/errors"
 )
 
 func init() {

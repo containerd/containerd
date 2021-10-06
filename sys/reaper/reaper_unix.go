@@ -20,11 +20,12 @@
 package reaper
 
 import (
+	"errors"
 	"sync"
 	"time"
 
-	runc "github.com/containerd/go-runc"
-	"github.com/pkg/errors"
+	"github.com/containerd/go-runc"
+
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 )

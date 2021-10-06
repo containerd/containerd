@@ -17,10 +17,9 @@
 package plugin
 
 import (
+	"errors"
 	"fmt"
 	"sync"
-
-	"github.com/pkg/errors"
 )
 
 var (
@@ -172,7 +171,7 @@ func Register(r *Registration) {
 func checkUnique(r *Registration) error {
 	for _, registered := range register.r {
 		if r.URI() == registered.URI() {
-			return errors.Wrap(ErrIDRegistered, r.URI())
+			return fmt.Errorf("%s: %w", r.URI(), ErrIDRegistered)
 		}
 	}
 	return nil

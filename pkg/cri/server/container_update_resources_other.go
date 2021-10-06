@@ -20,18 +20,19 @@
 package server
 
 import (
-	"github.com/pkg/errors"
-	"golang.org/x/net/context"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"fmt"
 
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+
+	"golang.org/x/net/context"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // UpdateContainerResources updates ContainerConfig of the container.
 func (c *criService) UpdateContainerResources(ctx context.Context, r *runtime.UpdateContainerResourcesRequest) (retRes *runtime.UpdateContainerResourcesResponse, retErr error) {
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to find container")
+		return nil, fmt.Errorf("failed to find container: %w", err)
 	}
 	// Update resources in status update transaction, so that:
 	// 1) There won't be race condition with container start.
@@ -39,7 +40,7 @@ func (c *criService) UpdateContainerResources(ctx context.Context, r *runtime.Up
 	if err := container.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
 		return status, nil
 	}); err != nil {
-		return nil, errors.Wrap(err, "failed to update resources")
+		return nil, fmt.Errorf("failed to update resources: %w", err)
 	}
 	return &runtime.UpdateContainerResourcesResponse{}, nil
 }

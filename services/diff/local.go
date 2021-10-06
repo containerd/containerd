@@ -18,6 +18,7 @@ package diff
 
 import (
 	"context"
+	"fmt"
 
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	"github.com/containerd/containerd/api/types"
@@ -26,8 +27,8 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
+
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 
@@ -65,16 +66,16 @@ func init() {
 			for i, n := range orderedNames {
 				differp, ok := differs[n]
 				if !ok {
-					return nil, errors.Errorf("needed differ not loaded: %s", n)
+					return nil, fmt.Errorf("needed differ not loaded: %s", n)
 				}
 				d, err := differp.Instance()
 				if err != nil {
-					return nil, errors.Wrapf(err, "could not load required differ due plugin init error: %s", n)
+					return nil, fmt.Errorf("could not load required differ due plugin init error(%s): %w", n, err)
 				}
 
 				ordered[i], ok = d.(differ)
 				if !ok {
-					return nil, errors.Errorf("differ does not implement Comparer and Applier interface: %s", n)
+					return nil, fmt.Errorf("differ does not implement Comparer and Applier interface: %s", n)
 				}
 			}
 

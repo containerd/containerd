@@ -17,12 +17,13 @@
 package containers
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/pkg/errors"
+
 	"github.com/urfave/cli"
 )
 
@@ -88,7 +89,7 @@ var checkpointCommand = cli.Command{
 			}
 			defer func() {
 				if err := task.Resume(ctx); err != nil {
-					fmt.Println(errors.Wrap(err, "error resuming task"))
+					fmt.Println(fmt.Errorf("error resuming task: %w", err))
 				}
 			}()
 		}

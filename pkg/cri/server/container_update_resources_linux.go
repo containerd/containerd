@@ -18,28 +18,28 @@ package server
 
 import (
 	gocontext "context"
+	"fmt"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/typeurl"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
-	"golang.org/x/net/context"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
 	"github.com/containerd/containerd/pkg/cri/opts"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	"github.com/containerd/containerd/pkg/cri/util"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
+	"github.com/containerd/typeurl"
+
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"golang.org/x/net/context"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // UpdateContainerResources updates ContainerConfig of the container.
 func (c *criService) UpdateContainerResources(ctx context.Context, r *runtime.UpdateContainerResourcesRequest) (retRes *runtime.UpdateContainerResourcesResponse, retErr error) {
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to find container")
+		return nil, fmt.Errorf("failed to find container: %w", err)
 	}
 	// Update resources in status update transaction, so that:
 	// 1) There won't be race condition with container start.
@@ -47,7 +47,7 @@ func (c *criService) UpdateContainerResources(ctx context.Context, r *runtime.Up
 	if err := container.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
 		return status, c.updateContainerResources(ctx, container, r.GetLinux(), status)
 	}); err != nil {
-		return nil, errors.Wrap(err, "failed to update resources")
+		return nil, fmt.Errorf("failed to update resources: %w", err)
 	}
 	return &runtime.UpdateContainerResourcesResponse{}, nil
 }
@@ -59,7 +59,7 @@ func (c *criService) updateContainerResources(ctx context.Context,
 	id := cntr.ID
 	// Do not update the container when there is a removal in progress.
 	if status.Removing {
-		return errors.Errorf("container %q is in removing state", id)
+		return fmt.Errorf("container %q is in removing state", id)
 	}
 
 	// Update container spec. If the container is not started yet, updating
@@ -68,12 +68,12 @@ func (c *criService) updateContainerResources(ctx context.Context,
 	// the spec will become our source of truth for resource limits.
 	oldSpec, err := cntr.Container.Spec(ctx)
 	if err != nil {
-		return errors.Wrap(err, "failed to get container spec")
+		return fmt.Errorf("failed to get container spec: %w", err)
 	}
 	newSpec, err := updateOCILinuxResource(ctx, oldSpec, resources,
 		c.config.TolerateMissingHugetlbController, c.config.DisableHugetlbController)
 	if err != nil {
-		return errors.Wrap(err, "failed to update resource in spec")
+		return fmt.Errorf("failed to update resource in spec: %w", err)
 	}
 
 	if err := updateContainerSpec(ctx, cntr.Container, newSpec); err != nil {
@@ -102,7 +102,7 @@ func (c *criService) updateContainerResources(ctx context.Context,
 			// Task exited already.
 			return nil
 		}
-		return errors.Wrap(err, "failed to get task")
+		return fmt.Errorf("failed to get task: %w", err)
 	}
 	// newSpec.Linux won't be nil
 	if err := task.Update(ctx, containerd.WithResources(newSpec.Linux.Resources)); err != nil {
@@ -110,7 +110,7 @@ func (c *criService) updateContainerResources(ctx context.Context,
 			// Task exited already.
 			return nil
 		}
-		return errors.Wrap(err, "failed to update resources")
+		return fmt.Errorf("failed to update resources: %w", err)
 	}
 	return nil
 }
@@ -119,13 +119,13 @@ func (c *criService) updateContainerResources(ctx context.Context,
 func updateContainerSpec(ctx context.Context, cntr containerd.Container, spec *runtimespec.Spec) error {
 	any, err := typeurl.MarshalAny(spec)
 	if err != nil {
-		return errors.Wrapf(err, "failed to marshal spec %+v", spec)
+		return fmt.Errorf("failed to marshal spec %+v: %w", spec, err)
 	}
 	if err := cntr.Update(ctx, func(ctx gocontext.Context, client *containerd.Client, c *containers.Container) error {
 		c.Spec = any
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "failed to update container spec")
+		return fmt.Errorf("failed to update container spec: %w", err)
 	}
 	return nil
 }
@@ -136,13 +136,13 @@ func updateOCILinuxResource(ctx context.Context, spec *runtimespec.Spec, new *ru
 	// Copy to make sure old spec is not changed.
 	var cloned runtimespec.Spec
 	if err := util.DeepCopy(&cloned, spec); err != nil {
-		return nil, errors.Wrap(err, "failed to deep copy")
+		return nil, fmt.Errorf("failed to deep copy: %w", err)
 	}
 	if cloned.Linux == nil {
 		cloned.Linux = &runtimespec.Linux{}
 	}
 	if err := opts.WithResources(new, tolerateMissingHugetlbController, disableHugetlbController)(ctx, nil, nil, &cloned); err != nil {
-		return nil, errors.Wrap(err, "unable to set linux container resources")
+		return nil, fmt.Errorf("unable to set linux container resources: %w", err)
 	}
 	return &cloned, nil
 }

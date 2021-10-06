@@ -21,6 +21,7 @@ package windows
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -28,11 +29,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Microsoft/go-winio"
-	winfs "github.com/Microsoft/go-winio/pkg/fs"
-	"github.com/Microsoft/hcsshim"
-	"github.com/Microsoft/hcsshim/computestorage"
-	"github.com/Microsoft/hcsshim/pkg/ociwclayer"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
@@ -41,8 +37,13 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/continuity/fs"
+
+	"github.com/Microsoft/go-winio"
+	winfs "github.com/Microsoft/go-winio/pkg/fs"
+	"github.com/Microsoft/hcsshim"
+	"github.com/Microsoft/hcsshim/computestorage"
+	"github.com/Microsoft/hcsshim/pkg/ociwclayer"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 )
 
 func init() {
@@ -76,7 +77,7 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 		return nil, err
 	}
 	if strings.ToLower(fsType) != "ntfs" {
-		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "%s is not on an NTFS volume - only NTFS volumes are supported", root)
+		return nil, fmt.Errorf("%s is not on an NTFS volume - only NTFS volumes are supported: %w", root, errdefs.ErrInvalidArgument)
 	}
 
 	if err := os.MkdirAll(root, 0700); err != nil {
@@ -181,7 +182,7 @@ func (s *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 
 	snapshot, err := storage.GetSnapshot(ctx, key)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get snapshot mount")
+		return nil, fmt.Errorf("failed to get snapshot mount: %w", err)
 	}
 	return s.mounts(snapshot), nil
 }
@@ -203,7 +204,7 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	// grab the existing id
 	id, _, _, err := storage.GetInfo(ctx, key)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get storage info for %s", key)
+		return fmt.Errorf("failed to get storage info for %s: %w", key, err)
 	}
 
 	snapshot, err := storage.GetSnapshot(ctx, key)
@@ -223,11 +224,11 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 
 	usage, err := fs.DiskUsage(ctx, path)
 	if err != nil {
-		return errors.Wrapf(err, "failed to collect disk usage of snapshot storage: %s", path)
+		return fmt.Errorf("failed to collect disk usage of snapshot storage %s: %w", path, err)
 	}
 
 	if _, err := storage.CommitActive(ctx, key, name, snapshots.Usage(usage), opts...); err != nil {
-		return errors.Wrap(err, "failed to commit snapshot")
+		return fmt.Errorf("failed to commit snapshot: %w", err)
 	}
 	return t.Commit()
 }
@@ -243,7 +244,7 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 
 	id, _, err := storage.Remove(ctx, key)
 	if err != nil {
-		return errors.Wrap(err, "failed to remove")
+		return fmt.Errorf("failed to remove: %w", err)
 	}
 
 	path := s.getSnapshotDir(id)
@@ -264,11 +265,11 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 		)
 
 		if deactvateErr := hcsshim.DeactivateLayer(di, layerID); deactvateErr != nil {
-			return errors.Wrapf(err, "failed to deactivate layer following failed rename: %s", deactvateErr)
+			return fmt.Errorf("failed to deactivate layer following failed rename %s: %w", deactvateErr, err)
 		}
 
 		if renameErr := os.Rename(path, renamed); renameErr != nil && !os.IsNotExist(renameErr) {
-			return errors.Wrapf(err, "second rename attempt following detach failed: %s", renameErr)
+			return fmt.Errorf("second rename attempt following detach failed %s: %w", renameErr, err)
 		}
 	}
 
@@ -277,7 +278,7 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 			// May cause inconsistent data on disk
 			log.G(ctx).WithError(err1).WithField("path", renamed).Errorf("Failed to rename after failed commit")
 		}
-		return errors.Wrap(err, "failed to commit")
+		return fmt.Errorf("failed to commit: %w", err)
 	}
 
 	if err := hcsshim.DestroyLayer(s.info, renamedID); err != nil {
@@ -355,7 +356,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 
 	newSnapshot, err := storage.CreateSnapshot(ctx, kind, key, parent, opts...)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create snapshot")
+		return nil, fmt.Errorf("failed to create snapshot: %w", err)
 	}
 
 	if kind == snapshots.KindActive {
@@ -384,7 +385,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			if sizeGBstr, ok := snapshotInfo.Labels[rootfsSizeLabel]; ok {
 				i32, err := strconv.ParseInt(sizeGBstr, 10, 32)
 				if err != nil {
-					return nil, errors.Wrapf(err, "failed to parse label %q=%q", rootfsSizeLabel, sizeGBstr)
+					return nil, fmt.Errorf("failed to parse label %q=%q: %w", rootfsSizeLabel, sizeGBstr, err)
 				}
 				sizeGB = int(i32)
 			}
@@ -397,17 +398,17 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			// This has to be run first to avoid clashing with the containers sandbox.vhdx.
 			if makeUVMScratch {
 				if err := s.createUVMScratchLayer(ctx, snDir, parentLayerPaths); err != nil {
-					return nil, errors.Wrap(err, "failed to make UVM's scratch layer")
+					return nil, fmt.Errorf("failed to make UVM's scratch layer: %w", err)
 				}
 			}
 			if err := s.createScratchLayer(ctx, snDir, parentLayerPaths, sizeGB); err != nil {
-				return nil, errors.Wrap(err, "failed to create scratch layer")
+				return nil, fmt.Errorf("failed to create scratch layer: %w", err)
 			}
 		}
 	}
 
 	if err := t.Commit(); err != nil {
-		return nil, errors.Wrap(err, "commit failed")
+		return nil, fmt.Errorf("commit failed: %w", err)
 	}
 
 	return s.mounts(newSnapshot), nil
@@ -449,7 +450,7 @@ func (s *snapshotter) createScratchLayer(ctx context.Context, snDir string, pare
 	if _, err := os.Stat(templateDiffDisk); os.IsNotExist(err) {
 		// Scratch disk not present so lets make it.
 		if err := computestorage.SetupContainerBaseLayer(ctx, baseLayer, templateBase, templateDiffDisk, 1); err != nil {
-			return errors.Wrapf(err, "failed to create scratch vhdx at %q", baseLayer)
+			return fmt.Errorf("failed to create scratch vhdx at %q: %w", baseLayer, err)
 		}
 	}
 
@@ -461,7 +462,7 @@ func (s *snapshotter) createScratchLayer(ctx context.Context, snDir string, pare
 	if expand {
 		gbToByte := 1024 * 1024 * 1024
 		if err := hcsshim.ExpandSandboxSize(s.info, filepath.Base(snDir), uint64(gbToByte*sizeGB)); err != nil {
-			return errors.Wrapf(err, "failed to expand sandbox vhdx size to %d GB", sizeGB)
+			return fmt.Errorf("failed to expand sandbox vhdx size to %d GB: %w", sizeGB, err)
 		}
 	}
 	return nil
@@ -475,7 +476,7 @@ func (s *snapshotter) convertScratchToReadOnlyLayer(ctx context.Context, snapsho
 	// temporary, leaving it enabled is OK for now.
 	// https://github.com/containerd/containerd/issues/1681
 	if err := winio.EnableProcessPrivileges([]string{winio.SeBackupPrivilege, winio.SeRestorePrivilege}); err != nil {
-		return errors.Wrap(err, "failed to enable necessary privileges")
+		return fmt.Errorf("failed to enable necessary privileges: %w", err)
 	}
 
 	parentLayerPaths := s.parentIDsToParentPaths(snapshot.ParentIDs)
@@ -487,11 +488,11 @@ func (s *snapshotter) convertScratchToReadOnlyLayer(ctx context.Context, snapsho
 	}()
 
 	if _, err := ociwclayer.ImportLayerFromTar(ctx, reader, path, parentLayerPaths); err != nil {
-		return errors.Wrap(err, "failed to reimport snapshot")
+		return fmt.Errorf("failed to reimport snapshot: %w", err)
 	}
 
 	if _, err := io.Copy(io.Discard, reader); err != nil {
-		return errors.Wrap(err, "failed discarding extra data in import stream")
+		return fmt.Errorf("failed discarding extra data in import stream: %w", err)
 	}
 
 	// NOTE: We do not delete the sandbox.vhdx here, as that will break later calls to
@@ -515,7 +516,7 @@ func (s *snapshotter) createUVMScratchLayer(ctx context.Context, snDir string, p
 	// Make sure base layer has a UtilityVM folder.
 	uvmPath := filepath.Join(baseLayer, "UtilityVM")
 	if _, err := os.Stat(uvmPath); os.IsNotExist(err) {
-		return errors.Wrapf(err, "failed to find UtilityVM directory in base layer %q", baseLayer)
+		return fmt.Errorf("failed to find UtilityVM directory in base layer %q: %w", baseLayer, err)
 	}
 
 	templateDiffDisk := filepath.Join(uvmPath, "SystemTemplate.vhdx")
@@ -529,7 +530,7 @@ func (s *snapshotter) createUVMScratchLayer(ctx context.Context, snDir string, p
 	// Move the sandbox.vhdx into a nested vm folder to avoid clashing with a containers sandbox.vhdx.
 	vmScratchDir := filepath.Join(snDir, "vm")
 	if err := os.MkdirAll(vmScratchDir, 0777); err != nil {
-		return errors.Wrap(err, "failed to make `vm` directory for vm's scratch space")
+		return fmt.Errorf("failed to make `vm` directory for vm's scratch space: %w", err)
 	}
 
 	return copyScratchDisk(templateDiffDisk, filepath.Join(vmScratchDir, "sandbox.vhdx"))
@@ -538,19 +539,19 @@ func (s *snapshotter) createUVMScratchLayer(ctx context.Context, snDir string, p
 func copyScratchDisk(source, dest string) error {
 	scratchSource, err := os.OpenFile(source, os.O_RDWR, 0700)
 	if err != nil {
-		return errors.Wrapf(err, "failed to open %s", source)
+		return fmt.Errorf("failed to open %s: %w", source, err)
 	}
 	defer scratchSource.Close()
 
 	f, err := os.OpenFile(dest, os.O_RDWR|os.O_CREATE, 0700)
 	if err != nil {
-		return errors.Wrap(err, "failed to create sandbox.vhdx in snapshot")
+		return fmt.Errorf("failed to create sandbox.vhdx in snapshot: %w", err)
 	}
 	defer f.Close()
 
 	if _, err := io.Copy(f, scratchSource); err != nil {
 		os.Remove(dest)
-		return errors.Wrapf(err, "failed to copy cached %q to %q in snapshot", source, dest)
+		return fmt.Errorf("failed to copy cached %q to %q in snapshot: %w", source, dest, err)
 	}
 	return nil
 }

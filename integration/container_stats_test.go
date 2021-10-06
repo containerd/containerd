@@ -17,12 +17,12 @@
 package integration
 
 import (
+	"errors"
 	"fmt"
 	goruntime "runtime"
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"

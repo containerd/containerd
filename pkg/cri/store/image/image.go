@@ -19,6 +19,7 @@ package image
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 
 	"github.com/containerd/containerd"
@@ -30,7 +31,6 @@ import (
 	"github.com/opencontainers/go-digest/digestset"
 	imageidentity "github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 )
 
 // Image contains all resources associated with the image. All fields
@@ -77,13 +77,13 @@ func (s *Store) Update(ctx context.Context, ref string) error {
 	defer s.lock.Unlock()
 	i, err := s.client.GetImage(ctx, ref)
 	if err != nil && !errdefs.IsNotFound(err) {
-		return errors.Wrap(err, "get image from containerd")
+		return fmt.Errorf("get image from containerd: %w", err)
 	}
 	var img *Image
 	if err == nil {
 		img, err = getImage(ctx, i)
 		if err != nil {
-			return errors.Wrap(err, "get image info from containerd")
+			return fmt.Errorf("get image info from containerd: %w", err)
 		}
 	}
 	return s.update(ref, img)
@@ -119,28 +119,28 @@ func getImage(ctx context.Context, i containerd.Image) (*Image, error) {
 	// Get image information.
 	diffIDs, err := i.RootFS(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "get image diffIDs")
+		return nil, fmt.Errorf("get image diffIDs: %w", err)
 	}
 	chainID := imageidentity.ChainID(diffIDs)
 
 	size, err := i.Size(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "get image compressed resource size")
+		return nil, fmt.Errorf("get image compressed resource size: %w", err)
 	}
 
 	desc, err := i.Config(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "get image config descriptor")
+		return nil, fmt.Errorf("get image config descriptor: %w", err)
 	}
 	id := desc.Digest.String()
 
 	rb, err := content.ReadBlob(ctx, i.ContentStore(), desc)
 	if err != nil {
-		return nil, errors.Wrap(err, "read image config from content store")
+		return nil, fmt.Errorf("read image config from content store: %w", err)
 	}
 	var ociimage imagespec.Image
 	if err := json.Unmarshal(rb, &ociimage); err != nil {
-		return nil, errors.Wrapf(err, "unmarshal image config %s", rb)
+		return nil, fmt.Errorf("unmarshal image config %s: %w", rb, err)
 	}
 
 	return &Image{

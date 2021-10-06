@@ -18,12 +18,13 @@ package monitor
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"syscall"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
-	"github.com/pkg/errors"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -49,7 +50,7 @@ func (s *startChange) apply(ctx context.Context, client *containerd.Client) erro
 	if s.logURI != "" {
 		uri, err := url.Parse(s.logURI)
 		if err != nil {
-			return errors.Wrapf(err, "failed to parse %v into url", s.logURI)
+			return fmt.Errorf("failed to parse %v into url: %w", s.logURI, err)
 		}
 		log = cio.LogURI(uri)
 	} else if s.logPath != "" {

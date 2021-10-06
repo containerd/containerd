@@ -17,14 +17,15 @@
 package server
 
 import (
+	"fmt"
+
 	"github.com/containerd/containerd/api/types"
 	v1 "github.com/containerd/containerd/metrics/types/v1"
 	v2 "github.com/containerd/containerd/metrics/types/v2"
-	"github.com/containerd/typeurl"
-	"github.com/pkg/errors"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+	"github.com/containerd/typeurl"
+
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func (c *criService) containerMetrics(
@@ -58,7 +59,7 @@ func (c *criService) containerMetrics(
 	if stats != nil {
 		s, err := typeurl.UnmarshalAny(stats.Data)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to extract container metrics")
+			return nil, fmt.Errorf("failed to extract container metrics: %w", err)
 		}
 		switch metrics := s.(type) {
 		case *v1.Metrics:
@@ -92,7 +93,7 @@ func (c *criService) containerMetrics(
 				}
 			}
 		default:
-			return &cs, errors.Errorf("unexpected metrics type: %v", metrics)
+			return &cs, fmt.Errorf("unexpected metrics type: %v", metrics)
 		}
 	}
 

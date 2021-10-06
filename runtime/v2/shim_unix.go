@@ -21,6 +21,7 @@ package v2
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"os"
@@ -28,7 +29,7 @@ import (
 	"time"
 
 	"github.com/containerd/fifo"
-	"github.com/pkg/errors"
+
 	"golang.org/x/sys/unix"
 )
 

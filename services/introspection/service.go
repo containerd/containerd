@@ -17,13 +17,14 @@
 package introspection
 
 import (
-	context "context"
+	"context"
+	"errors"
 
 	api "github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
+
 	ptypes "github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 
@@ -54,7 +55,7 @@ func init() {
 
 			localClient, ok := i.(*Local)
 			if !ok {
-				return nil, errors.Errorf("Could not create a local client for introspection service")
+				return nil, errors.New("could not create a local client for introspection service")
 			}
 			localClient.UpdateLocal(ic.Root, allPluginsPB)
 

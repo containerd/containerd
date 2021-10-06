@@ -18,15 +18,15 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
-	snapshot "github.com/containerd/containerd/snapshots"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-
 	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
+	snapshot "github.com/containerd/containerd/snapshots"
+
+	"github.com/sirupsen/logrus"
 )
 
 // snapshotsSyncer syncs snapshot stats periodically. imagefs info and container stats
@@ -80,7 +80,7 @@ func (s *snapshotsSyncer) sync() error {
 		snapshots = append(snapshots, info)
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "walk all snapshots failed")
+		return fmt.Errorf("walk all snapshots failed: %w", err)
 	}
 	for _, info := range snapshots {
 		sn, err := s.store.Get(info.Name)

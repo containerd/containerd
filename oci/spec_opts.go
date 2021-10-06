@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,10 +34,10 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/continuity/fs"
+
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runc/libcontainer/user"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 )
 
 // SpecOpts sets spec specific information to a newly generated OCI spec
@@ -137,7 +138,7 @@ func WithSpecFromBytes(p []byte) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		*s = Spec{} // make sure spec is cleared.
 		if err := json.Unmarshal(p, s); err != nil {
-			return errors.Wrapf(err, "decoding spec config file failed, current supported OCI runtime-spec : v%s", specs.Version)
+			return fmt.Errorf("decoding spec config file failed, current supported OCI runtime-spec v%s: %w", specs.Version, err)
 		}
 		return nil
 	}
@@ -148,7 +149,7 @@ func WithSpecFromFile(filename string) SpecOpts {
 	return func(ctx context.Context, c Client, container *containers.Container, s *Spec) error {
 		p, err := os.ReadFile(filename)
 		if err != nil {
-			return errors.Wrap(err, "cannot load spec config file")
+			return fmt.Errorf("cannot load spec config file: %w", err)
 		}
 		return WithSpecFromBytes(p)(ctx, c, container, s)
 	}
@@ -627,7 +628,7 @@ func WithUserID(uid uint32) SpecOpts {
 		setProcess(s)
 		if c.Snapshotter == "" && c.SnapshotKey == "" {
 			if !isRootfsAbs(s.Root.Path) {
-				return errors.Errorf("rootfs absolute path is required")
+				return errors.New("rootfs absolute path is required")
 			}
 			user, err := UserFromPath(s.Root.Path, func(u user.User) bool {
 				return u.Uid == int(uid)
@@ -644,10 +645,10 @@ func WithUserID(uid uint32) SpecOpts {
 
 		}
 		if c.Snapshotter == "" {
-			return errors.Errorf("no snapshotter set for container")
+			return errors.New("no snapshotter set for container")
 		}
 		if c.SnapshotKey == "" {
-			return errors.Errorf("rootfs snapshot not created for container")
+			return errors.New("rootfs snapshot not created for container")
 		}
 		snapshotter := client.SnapshotService(c.Snapshotter)
 		mounts, err := snapshotter.Mounts(ctx, c.SnapshotKey)
@@ -683,7 +684,7 @@ func WithUsername(username string) SpecOpts {
 		if s.Linux != nil {
 			if c.Snapshotter == "" && c.SnapshotKey == "" {
 				if !isRootfsAbs(s.Root.Path) {
-					return errors.Errorf("rootfs absolute path is required")
+					return errors.New("rootfs absolute path is required")
 				}
 				user, err := UserFromPath(s.Root.Path, func(u user.User) bool {
 					return u.Name == username
@@ -695,10 +696,10 @@ func WithUsername(username string) SpecOpts {
 				return nil
 			}
 			if c.Snapshotter == "" {
-				return errors.Errorf("no snapshotter set for container")
+				return errors.New("no snapshotter set for container")
 			}
 			if c.SnapshotKey == "" {
-				return errors.Errorf("rootfs snapshot not created for container")
+				return errors.New("rootfs snapshot not created for container")
 			}
 			snapshotter := client.SnapshotService(c.Snapshotter)
 			mounts, err := snapshotter.Mounts(ctx, c.SnapshotKey)
@@ -774,15 +775,15 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 		}
 		if c.Snapshotter == "" && c.SnapshotKey == "" {
 			if !isRootfsAbs(s.Root.Path) {
-				return errors.Errorf("rootfs absolute path is required")
+				return errors.New("rootfs absolute path is required")
 			}
 			return setAdditionalGids(s.Root.Path)
 		}
 		if c.Snapshotter == "" {
-			return errors.Errorf("no snapshotter set for container")
+			return errors.New("no snapshotter set for container")
 		}
 		if c.SnapshotKey == "" {
-			return errors.Errorf("rootfs snapshot not created for container")
+			return errors.New("rootfs snapshot not created for container")
 		}
 		snapshotter := client.SnapshotService(c.Snapshotter)
 		mounts, err := snapshotter.Mounts(ctx, c.SnapshotKey)

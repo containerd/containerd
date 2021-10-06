@@ -18,11 +18,13 @@ package metadata
 
 import (
 	_ "crypto/sha256"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/leases"
-	"github.com/pkg/errors"
+
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -365,7 +367,7 @@ func TestLeaseResource(t *testing.T) {
 		if err := db.Update(func(tx *bolt.Tx) error {
 			err0 := lm.AddResource(WithTransactionContext(ctx, tx), tc.lease, tc.resource)
 			if !errors.Is(err0, tc.err) {
-				return errors.Errorf("expect error (%v), but got (%v)", tc.err, err0)
+				return fmt.Errorf("expect error (%v), but got (%v)", tc.err, err0)
 			}
 
 			if err0 == nil {
