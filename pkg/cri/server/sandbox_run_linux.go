@@ -19,6 +19,7 @@ package server
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/containerd/containerd"
@@ -155,6 +156,15 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	if !c.config.DisableCgroup {
 		specOpts = append(specOpts, customopts.WithDefaultSandboxShares)
 	}
+
+	if res := config.GetLinux().GetResources(); res != nil {
+		specOpts = append(specOpts,
+			customopts.WithAnnotation(annotations.SandboxCPUPeriod, strconv.FormatInt(res.CpuPeriod, 10)),
+			customopts.WithAnnotation(annotations.SandboxCPUQuota, strconv.FormatInt(res.CpuQuota, 10)),
+			customopts.WithAnnotation(annotations.SandboxCPUShares, strconv.FormatInt(res.CpuShares, 10)),
+			customopts.WithAnnotation(annotations.SandboxMem, strconv.FormatInt(res.MemoryLimitInBytes, 10)))
+	}
+
 	specOpts = append(specOpts, customopts.WithPodOOMScoreAdj(int(defaultSandboxOOMAdj), c.config.RestrictOOMScoreAdj))
 
 	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
