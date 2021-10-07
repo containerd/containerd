@@ -17,6 +17,8 @@
 package server
 
 import (
+	"time"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
@@ -30,6 +32,7 @@ import (
 
 // RemoveContainer removes the container.
 func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveContainerRequest) (_ *runtime.RemoveContainerResponse, retErr error) {
+	start := time.Now()
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
@@ -40,6 +43,10 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 		return &runtime.RemoveContainerResponse{}, nil
 	}
 	id := container.ID
+	i, err := container.Container.Info(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "get container info")
+	}
 
 	// Forcibly stop the containers if they are in running or unknown state
 	state := container.Status.Get().State()
@@ -98,6 +105,8 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	c.containerStore.Delete(id)
 
 	c.containerNameIndex.ReleaseByKey(id)
+
+	containerRemoveTimer.WithValues(i.Runtime.Name).UpdateSince(start)
 
 	return &runtime.RemoveContainerResponse{}, nil
 }

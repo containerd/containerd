@@ -17,6 +17,8 @@
 package server
 
 import (
+	"time"
+
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -25,6 +27,7 @@ import (
 
 // ListPodSandbox returns a list of Sandbox.
 func (c *criService) ListPodSandbox(ctx context.Context, r *runtime.ListPodSandboxRequest) (*runtime.ListPodSandboxResponse, error) {
+	start := time.Now()
 	// List all sandboxes from store.
 	sandboxesInStore := c.sandboxStore.List()
 	var sandboxes []*runtime.PodSandbox
@@ -36,6 +39,8 @@ func (c *criService) ListPodSandbox(ctx context.Context, r *runtime.ListPodSandb
 	}
 
 	sandboxes = c.filterCRISandboxes(sandboxes, r.GetFilter())
+
+	sandboxListTimer.UpdateSince(start)
 	return &runtime.ListPodSandboxResponse{Items: sandboxes}, nil
 }
 

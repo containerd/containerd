@@ -102,6 +102,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, errors.Wrapf(err, "failed to get image from containerd %q", image.ID)
 	}
 
+	start := time.Now()
 	// Run container using the same runtime with sandbox.
 	sandboxInfo, err := sandbox.Container.Info(ctx)
 	if err != nil {
@@ -277,6 +278,8 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err := c.containerStore.Add(container); err != nil {
 		return nil, errors.Wrapf(err, "failed to add container %q into store", id)
 	}
+
+	containerCreateTimer.WithValues(ociRuntime.Type).UpdateSince(start)
 
 	return &runtime.CreateContainerResponse{ContainerId: id}, nil
 }

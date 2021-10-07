@@ -35,6 +35,7 @@ import (
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
 func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainerRequest) (*runtime.StopContainerResponse, error) {
+	start := time.Now()
 	// Get container config from container store.
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
@@ -44,6 +45,13 @@ func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainer
 	if err := c.stopContainer(ctx, container, time.Duration(r.GetTimeout())*time.Second); err != nil {
 		return nil, err
 	}
+
+	i, err := container.Container.Info(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "get container info")
+	}
+
+	containerStopTimer.WithValues(i.Runtime.Name).UpdateSince(start)
 
 	return &runtime.StopContainerResponse{}, nil
 }

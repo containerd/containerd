@@ -40,9 +40,15 @@ import (
 
 // StartContainer starts the container.
 func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContainerRequest) (retRes *runtime.StartContainerResponse, retErr error) {
+	start := time.Now()
 	cntr, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, errors.Wrapf(err, "an error occurred when try to find container %q", r.GetContainerId())
+	}
+
+	info, err := cntr.Container.Info(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "get container info")
 	}
 
 	id := cntr.ID
@@ -161,6 +167,8 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 
 	// It handles the TaskExit event and update container state after this.
 	c.eventMonitor.startContainerExitMonitor(context.Background(), id, task.Pid(), exitCh)
+
+	containerStartTimer.WithValues(info.Runtime.Name).UpdateSince(start)
 
 	return &runtime.StartContainerResponse{}, nil
 }
