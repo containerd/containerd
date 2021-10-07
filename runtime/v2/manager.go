@@ -20,14 +20,12 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
-	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/platforms"
@@ -94,6 +92,8 @@ func init() {
 		ID:   "task",
 		Requires: []plugin.Type{
 			plugin.RuntimeShimPlugin,
+			plugin.EventPlugin,
+			plugin.MetadataPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			m, err := ic.Get(plugin.MetadataPlugin)
@@ -117,6 +117,10 @@ func init() {
 				SchedCore:    false,
 			})
 			if err != nil {
+				return nil, err
+			}
+
+			if err := shimManager.loadExistingTasks(ic.Context); err != nil {
 				return nil, err
 			}
 
@@ -291,131 +295,6 @@ func (m *ShimManager) Delete(ctx context.Context, id string) error {
 	m.list.Delete(ctx, id)
 
 	return err
-}
-
-func (m *ShimManager) loadExistingTasks(ctx context.Context) error {
-	nsDirs, err := os.ReadDir(m.state)
-	if err != nil {
-		return err
-	}
-	for _, nsd := range nsDirs {
-		if !nsd.IsDir() {
-			continue
-		}
-		ns := nsd.Name()
-		// skip hidden directories
-		if len(ns) > 0 && ns[0] == '.' {
-			continue
-		}
-		log.G(ctx).WithField("namespace", ns).Debug("loading tasks in namespace")
-		if err := m.loadShims(namespaces.WithNamespace(ctx, ns)); err != nil {
-			log.G(ctx).WithField("namespace", ns).WithError(err).Error("loading tasks in namespace")
-			continue
-		}
-		if err := m.cleanupWorkDirs(namespaces.WithNamespace(ctx, ns)); err != nil {
-			log.G(ctx).WithField("namespace", ns).WithError(err).Error("cleanup working directory in namespace")
-			continue
-		}
-	}
-	return nil
-}
-
-func (m *ShimManager) loadShims(ctx context.Context) error {
-	ns, err := namespaces.NamespaceRequired(ctx)
-	if err != nil {
-		return err
-	}
-	shimDirs, err := os.ReadDir(filepath.Join(m.state, ns))
-	if err != nil {
-		return err
-	}
-	for _, sd := range shimDirs {
-		if !sd.IsDir() {
-			continue
-		}
-		id := sd.Name()
-		// skip hidden directories
-		if len(id) > 0 && id[0] == '.' {
-			continue
-		}
-		bundle, err := LoadBundle(ctx, m.state, id)
-		if err != nil {
-			// fine to return error here, it is a programmer error if the context
-			// does not have a namespace
-			return err
-		}
-		// fast path
-		bf, err := os.ReadDir(bundle.Path)
-		if err != nil {
-			bundle.Delete()
-			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
-			continue
-		}
-		if len(bf) == 0 {
-			bundle.Delete()
-			continue
-		}
-		container, err := m.container(ctx, id)
-		if err != nil {
-			log.G(ctx).WithError(err).Errorf("loading container %s", id)
-			if err := mount.UnmountAll(filepath.Join(bundle.Path, "rootfs"), 0); err != nil {
-				log.G(ctx).WithError(err).Errorf("forceful unmount of rootfs %s", id)
-			}
-			bundle.Delete()
-			continue
-		}
-		binaryCall := shimBinary(bundle,
-			shimBinaryConfig{
-				runtime:      container.Runtime.Name,
-				address:      m.containerdAddress,
-				ttrpcAddress: m.containerdTTRPCAddress,
-				schedCore:    m.schedCore,
-			})
-		shim, err := loadShim(ctx, bundle, func() {
-			log.G(ctx).WithField("id", id).Info("shim disconnected")
-
-			cleanupAfterDeadShim(context.Background(), id, ns, m.list, m.events, binaryCall)
-			// Remove self from the runtime task list.
-			m.list.Delete(ctx, id)
-		})
-		if err != nil {
-			cleanupAfterDeadShim(ctx, id, ns, m.list, m.events, binaryCall)
-			continue
-		}
-		m.list.Add(ctx, shim)
-	}
-	return nil
-}
-
-func (m *ShimManager) container(ctx context.Context, id string) (*containers.Container, error) {
-	container, err := m.containers.Get(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	return &container, nil
-}
-
-func (m *ShimManager) cleanupWorkDirs(ctx context.Context) error {
-	ns, err := namespaces.NamespaceRequired(ctx)
-	if err != nil {
-		return err
-	}
-	dirs, err := os.ReadDir(filepath.Join(m.root, ns))
-	if err != nil {
-		return err
-	}
-	for _, d := range dirs {
-		// if the task was not loaded, cleanup and empty working directory
-		// this can happen on a reboot where /run for the bundle state is cleaned up
-		// but that persistent working dir is left
-		if _, err := m.list.Get(ctx, d.Name()); err != nil {
-			path := filepath.Join(m.root, ns, d.Name())
-			if err := os.RemoveAll(path); err != nil {
-				log.G(ctx).WithError(err).Errorf("cleanup working dir %s", path)
-			}
-		}
-	}
-	return nil
 }
 
 func parsePlatforms(platformStr []string) ([]ocispec.Platform, error) {

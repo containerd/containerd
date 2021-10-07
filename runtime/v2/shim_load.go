@@ -21,25 +21,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/runtime"
 )
 
-func loadExistingTasks(ic *plugin.InitContext, list *runtime.TaskList, events *exchange.Exchange, containers containers.Store) error {
-	var (
-		ctx                    = ic.Context
-		state                  = ic.State
-		root                   = ic.Root
-		containerdAddress      = ic.Address
-		containerdTTRPCAddress = ic.TTRPCAddress
-	)
-
-	nsDirs, err := os.ReadDir(state)
+func (m *ShimManager) loadExistingTasks(ctx context.Context) error {
+	nsDirs, err := os.ReadDir(m.state)
 	if err != nil {
 		return err
 	}
@@ -53,25 +41,24 @@ func loadExistingTasks(ic *plugin.InitContext, list *runtime.TaskList, events *e
 			continue
 		}
 		log.G(ctx).WithField("namespace", ns).Debug("loading tasks in namespace")
-		if err := loadShims(namespaces.WithNamespace(ctx, ns), state, list, events, containers, containerdAddress, containerdTTRPCAddress); err != nil {
+		if err := m.loadShims(namespaces.WithNamespace(ctx, ns)); err != nil {
 			log.G(ctx).WithField("namespace", ns).WithError(err).Error("loading tasks in namespace")
 			continue
 		}
-		if err := cleanupWorkDirs(namespaces.WithNamespace(ctx, ns), root, list); err != nil {
+		if err := m.cleanupWorkDirs(namespaces.WithNamespace(ctx, ns)); err != nil {
 			log.G(ctx).WithField("namespace", ns).WithError(err).Error("cleanup working directory in namespace")
 			continue
 		}
 	}
-
 	return nil
 }
 
-func loadShims(ctx context.Context, state string, list *runtime.TaskList, events *exchange.Exchange, containers containers.Store, containerdAddress string, containerdTTRPCAddress string) error {
+func (m *ShimManager) loadShims(ctx context.Context) error {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return err
 	}
-	shimDirs, err := os.ReadDir(filepath.Join(state, ns))
+	shimDirs, err := os.ReadDir(filepath.Join(m.state, ns))
 	if err != nil {
 		return err
 	}
@@ -84,7 +71,7 @@ func loadShims(ctx context.Context, state string, list *runtime.TaskList, events
 		if len(id) > 0 && id[0] == '.' {
 			continue
 		}
-		bundle, err := LoadBundle(ctx, state, id)
+		bundle, err := LoadBundle(ctx, m.state, id)
 		if err != nil {
 			// fine to return error here, it is a programmer error if the context
 			// does not have a namespace
@@ -101,7 +88,7 @@ func loadShims(ctx context.Context, state string, list *runtime.TaskList, events
 			bundle.Delete()
 			continue
 		}
-		container, err := containers.Get(ctx, id)
+		container, err := m.containers.Get(ctx, id)
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("loading container %s", id)
 			if err := mount.UnmountAll(filepath.Join(bundle.Path, "rootfs"), 0); err != nil {
@@ -110,29 +97,35 @@ func loadShims(ctx context.Context, state string, list *runtime.TaskList, events
 			bundle.Delete()
 			continue
 		}
-		binaryCall := shimBinary(bundle, container.Runtime.Name, containerdAddress, containerdTTRPCAddress)
+		binaryCall := shimBinary(bundle,
+			shimBinaryConfig{
+				runtime:      container.Runtime.Name,
+				address:      m.containerdAddress,
+				ttrpcAddress: m.containerdTTRPCAddress,
+				schedCore:    m.schedCore,
+			})
 		shim, err := loadShim(ctx, bundle, func() {
 			log.G(ctx).WithField("id", id).Info("shim disconnected")
 
-			cleanupAfterDeadShim(context.Background(), id, ns, list, events, binaryCall)
+			cleanupAfterDeadShim(context.Background(), id, ns, m.list, m.events, binaryCall)
 			// Remove self from the runtime task list.
-			list.Delete(ctx, id)
+			m.list.Delete(ctx, id)
 		})
 		if err != nil {
-			cleanupAfterDeadShim(ctx, id, ns, list, events, binaryCall)
+			cleanupAfterDeadShim(ctx, id, ns, m.list, m.events, binaryCall)
 			continue
 		}
-		list.Add(ctx, shim)
+		m.list.Add(ctx, shim)
 	}
 	return nil
 }
 
-func cleanupWorkDirs(ctx context.Context, root string, list *runtime.TaskList) error {
+func (m *ShimManager) cleanupWorkDirs(ctx context.Context) error {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return err
 	}
-	dirs, err := os.ReadDir(filepath.Join(root, ns))
+	dirs, err := os.ReadDir(filepath.Join(m.root, ns))
 	if err != nil {
 		return err
 	}
@@ -140,8 +133,8 @@ func cleanupWorkDirs(ctx context.Context, root string, list *runtime.TaskList) e
 		// if the task was not loaded, cleanup and empty working directory
 		// this can happen on a reboot where /run for the bundle state is cleaned up
 		// but that persistent working dir is left
-		if _, err := list.Get(ctx, d.Name()); err != nil {
-			path := filepath.Join(root, ns, d.Name())
+		if _, err := m.list.Get(ctx, d.Name()); err != nil {
+			path := filepath.Join(m.root, ns, d.Name())
 			if err := os.RemoveAll(path); err != nil {
 				log.G(ctx).WithError(err).Errorf("cleanup working dir %s", path)
 			}
