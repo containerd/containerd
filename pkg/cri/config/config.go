@@ -282,6 +282,9 @@ type PluginConfig struct {
 	// of being placed under the hardcoded directory /var/run/netns. Changing this setting requires
 	// that all containers are deleted.
 	NetNSMountsUnderStateDir bool `toml:"netns_mounts_under_state_dir" json:"netnsMountsUnderStateDir"`
+	// DisableLandlock indicates to disable the landlock support.
+	// This is useful when the containerd does not have permission to access Landlock.
+	DisableLandlock bool `toml:"disable_landlock" json:"disableLandlock"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
