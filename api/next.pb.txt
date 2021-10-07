@@ -3821,6 +3821,13 @@ file {
       type_name: ".google.protobuf.Any"
       json_name: "options"
     }
+    field {
+      name: "runtime_path"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "runtimePath"
+    }
   }
   message_type {
     name: "CreateTaskResponse"
