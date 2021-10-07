@@ -23,6 +23,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -2479,8 +2480,8 @@ func TestContainerUsername(t *testing.T) {
 	}
 	<-statusC
 	if _, err := task.Delete(ctx); err != nil {
-                t.Fatal(err)
-        }
+		t.Fatal(err)
+	}
 
 	output := strings.TrimSuffix(buf.String(), newLine)
 	if output != expectedOutput {
@@ -2540,5 +2541,114 @@ func TestContainerPTY(t *testing.T) {
 	out := buf.String()
 	if !strings.ContainsAny(fmt.Sprintf("%#q", out), `\x00`) {
 		t.Fatal(`expected \x00 in output`)
+	}
+}
+
+func TestContainerAccessMount(t *testing.T) {
+	// The Linux busybox image has a www-data user.
+	username := "www-data"
+	isWindows := runtime.GOOS == "windows"
+	if isWindows {
+		username = "ContainerUser"
+	}
+
+	// FIXME(claudiub): Currently, this won't be able to pass on Windows. This should be removed once
+	// the issue is fixed.
+	checkContainerAccessMount(t, username, !isWindows)
+}
+
+func TestContainerAccessMountRoot(t *testing.T) {
+	username := "root"
+	if runtime.GOOS == "windows" {
+		username = "ContainerAdministrator"
+	}
+	checkContainerAccessMount(t, username, true)
+}
+
+func checkContainerAccessMount(t *testing.T, username string, shouldPass bool) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	tempDir, err := os.MkdirTemp("", id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		os.RemoveAll(tempDir)
+	}()
+
+	const expectedStr = "Hello there."
+	tempFile := filepath.Join(tempDir, "hello.txt")
+	os.WriteFile(tempFile, []byte(expectedStr), 0644)
+
+	command := []string{"cat", "/greetings/hello.txt"}
+	destination := "/greetings"
+	if runtime.GOOS == "windows" {
+		command = []string{"type", `C:\greetings\hello.txt`}
+		destination = `C:\greetings`
+	}
+	mounts := []specs.Mount{
+		{
+			Destination: destination,
+			Source:      tempDir,
+			Options:     []string{"rbind", "ro"},
+		},
+	}
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithMounts(mounts), oci.WithUsername(username), withProcessArgs(command...)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	stdout := bytes.NewBuffer(nil)
+	task, err := container.NewTask(ctx, cio.NewCreator(withByteBuffers(stdout)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	status := <-statusC
+	code, _, err := status.Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if shouldPass && code != 0 {
+		t.Errorf("expected exec exit code 0 but received %d", code)
+	}
+	if _, err := task.Delete(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	stdoutStr := stdout.String()
+	if (shouldPass && !strings.Contains(stdoutStr, expectedStr)) || (!shouldPass && strings.Contains(stdoutStr, expectedStr)) {
+		t.Fatalf("process output does not match expectation: expected to pass: %t, ideal output: %q, actual output:\n\n %q", shouldPass, expectedStr, stdoutStr)
 	}
 }
