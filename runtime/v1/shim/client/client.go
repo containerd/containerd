@@ -34,7 +34,6 @@ import (
 
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/pkg/dialer"
 	v1 "github.com/containerd/containerd/runtime/v1"
 	"github.com/containerd/containerd/runtime/v1/shim"
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
@@ -298,12 +297,19 @@ func RemoveSocket(address string) error {
 	return nil
 }
 
+// AnonDialer returns a dialer for a socket
+//
+// NOTE: It is only used for testing.
+func AnonDialer(address string, timeout time.Duration) (net.Conn, error) {
+	return anonDialer(address, timeout)
+}
+
 func connect(address string, d func(string, time.Duration) (net.Conn, error)) (net.Conn, error) {
 	return d(address, 100*time.Second)
 }
 
 func anonDialer(address string, timeout time.Duration) (net.Conn, error) {
-	return dialer.Dialer(socket(address).path(), timeout)
+	return net.DialTimeout("unix", socket(address).path(), timeout)
 }
 
 // WithConnect connects to an existing shim

@@ -32,7 +32,6 @@ import (
 
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/sys"
 	"github.com/pkg/errors"
 )
@@ -78,9 +77,7 @@ func SocketAddress(ctx context.Context, socketPath, id string) (string, error) {
 
 // AnonDialer returns a dialer for a socket
 func AnonDialer(address string, timeout time.Duration) (net.Conn, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	return dialer.ContextDialer(ctx, socket(address).path())
+	return net.DialTimeout("unix", socket(address).path(), timeout)
 }
 
 // AnonReconnectDialer returns a dialer for an existing socket on reconnection
