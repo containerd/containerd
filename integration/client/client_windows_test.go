@@ -30,11 +30,12 @@ const (
 )
 
 var (
-	defaultRoot  = filepath.Join(os.Getenv("programfiles"), "containerd", "root-test")
-	defaultState = filepath.Join(os.Getenv("programfiles"), "containerd", "state-test")
-	testImage    string
-	shortCommand = withTrue()
-	longCommand  = withProcessArgs("ping", "-t", "localhost")
+	defaultRoot           = filepath.Join(os.Getenv("programfiles"), "containerd", "root-test")
+	defaultState          = filepath.Join(os.Getenv("programfiles"), "containerd", "state-test")
+	testImage             string
+	testMultiLayeredImage = "gcr.io/k8s-cri-containerd/volume-copy-up:2.1"
+	shortCommand          = withTrue()
+	longCommand           = withProcessArgs("ping", "-t", "localhost")
 )
 
 func init() {
