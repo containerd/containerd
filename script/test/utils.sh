@@ -131,7 +131,12 @@ test_teardown() {
       nssm stop containerd-test
       nssm remove containerd-test confirm
     else
-      ${sudo} pkill -g $(ps -o pgid= -p "${pid}")
+      pgid=$(ps -o pgid= -p "${pid}" || true)
+      if [ ! -z "${pgid}" ]; then
+        ${sudo} pkill -g ${pgid}
+      else
+        echo "pid(${pid}) not found, skipping pkill"
+      fi
     fi
   fi
 }
