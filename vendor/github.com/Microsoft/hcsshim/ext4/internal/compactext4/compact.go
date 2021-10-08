@@ -95,17 +95,17 @@ const (
 	inodeFirst        = 11
 	inodeLostAndFound = inodeFirst
 
-	blockSize               = 4096
-	blocksPerGroup          = blockSize * 8
+	BlockSize               = 4096
+	blocksPerGroup          = BlockSize * 8
 	inodeSize               = 256
-	maxInodesPerGroup       = blockSize * 8 // Limited by the inode bitmap
-	inodesPerGroupIncrement = blockSize / inodeSize
+	maxInodesPerGroup       = BlockSize * 8 // Limited by the inode bitmap
+	inodesPerGroupIncrement = BlockSize / inodeSize
 
 	defaultMaxDiskSize = 16 * 1024 * 1024 * 1024        // 16GB
 	maxMaxDiskSize     = 16 * 1024 * 1024 * 1024 * 1024 // 16TB
 
 	groupDescriptorSize      = 32 // Use the small group descriptor
-	groupsPerDescriptorBlock = blockSize / groupDescriptorSize
+	groupsPerDescriptorBlock = BlockSize / groupDescriptorSize
 
 	maxFileSize             = 128 * 1024 * 1024 * 1024 // 128GB file size maximum for now
 	smallSymlinkSize        = 59                       // max symlink size that goes directly in the inode
@@ -252,7 +252,7 @@ type xattrState struct {
 
 func (s *xattrState) init() {
 	s.inodeLeft = inodeExtraSize - xattrInodeOverhead
-	s.blockLeft = blockSize - xattrBlockOverhead
+	s.blockLeft = BlockSize - xattrBlockOverhead
 }
 
 func (s *xattrState) addXattr(name string, value []byte) bool {
@@ -331,7 +331,7 @@ func (w *Writer) writeXattrs(inode *inode, state *xattrState) error {
 				state.block[i].Name < state.block[j].Name
 		})
 
-		var b [blockSize]byte
+		var b [BlockSize]byte
 		binary.LittleEndian.PutUint32(b[0:], format.XAttrHeaderMagic) // Magic
 		binary.LittleEndian.PutUint32(b[4:], 1)                       // ReferenceCount
 		binary.LittleEndian.PutUint32(b[8:], 1)                       // Blocks
@@ -665,7 +665,7 @@ func (w *Writer) Stat(name string) (*File, error) {
 			if w.err != nil {
 				return nil, w.err
 			}
-			var b [blockSize]byte
+			var b [BlockSize]byte
 			_, err := w.f.Read(b[:])
 			w.seekBlock(orig)
 			if err != nil {
@@ -717,11 +717,11 @@ func (w *Writer) startInode(name string, inode *inode, size int64) {
 }
 
 func (w *Writer) block() uint32 {
-	return uint32(w.pos / blockSize)
+	return uint32(w.pos / BlockSize)
 }
 
 func (w *Writer) seekBlock(block uint32) {
-	w.pos = int64(block) * blockSize
+	w.pos = int64(block) * BlockSize
 	if w.err != nil {
 		return
 	}
@@ -733,9 +733,9 @@ func (w *Writer) seekBlock(block uint32) {
 }
 
 func (w *Writer) nextBlock() {
-	if w.pos%blockSize != 0 {
+	if w.pos%BlockSize != 0 {
 		// Simplify callers; w.err is updated on failure.
-		_, _ = w.zero(blockSize - w.pos%blockSize)
+		_, _ = w.zero(BlockSize - w.pos%BlockSize)
 	}
 }
 
@@ -763,17 +763,17 @@ func fillExtents(hdr *format.ExtentHeader, extents []format.ExtentLeafNode, star
 
 func (w *Writer) writeExtents(inode *inode) error {
 	start := w.pos - w.dataWritten
-	if start%blockSize != 0 {
+	if start%BlockSize != 0 {
 		panic("unaligned")
 	}
 	w.nextBlock()
 
-	startBlock := uint32(start / blockSize)
+	startBlock := uint32(start / BlockSize)
 	blocks := w.block() - startBlock
 	usedBlocks := blocks
 
 	const extentNodeSize = 12
-	const extentsPerBlock = blockSize/extentNodeSize - 1
+	const extentsPerBlock = BlockSize/extentNodeSize - 1
 
 	extents := (blocks + maxBlocksPerExtent - 1) / maxBlocksPerExtent
 	var b bytes.Buffer
@@ -787,7 +787,7 @@ func (w *Writer) writeExtents(inode *inode) error {
 		fillExtents(&root.hdr, root.extents[:extents], startBlock, 0, blocks)
 		_ = binary.Write(&b, binary.LittleEndian, root)
 	} else if extents <= 4*extentsPerBlock {
-		const extentsPerBlock = blockSize/extentNodeSize - 1
+		const extentsPerBlock = BlockSize/extentNodeSize - 1
 		extentBlocks := extents/extentsPerBlock + 1
 		usedBlocks += extentBlocks
 		var b2 bytes.Buffer
@@ -815,13 +815,13 @@ func (w *Writer) writeExtents(inode *inode) error {
 			var node struct {
 				hdr     format.ExtentHeader
 				extents [extentsPerBlock]format.ExtentLeafNode
-				_       [blockSize - (extentsPerBlock+1)*extentNodeSize]byte
+				_       [BlockSize - (extentsPerBlock+1)*extentNodeSize]byte
 			}
 
 			offset := i * extentsPerBlock * maxBlocksPerExtent
 			fillExtents(&node.hdr, node.extents[:extentsInBlock], startBlock+offset, offset, blocks)
 			_ = binary.Write(&b2, binary.LittleEndian, node)
-			if _, err := w.write(b2.Next(blockSize)); err != nil {
+			if _, err := w.write(b2.Next(BlockSize)); err != nil {
 				return err
 			}
 		}
@@ -900,7 +900,7 @@ func (w *Writer) writeDirectory(dir, parent *inode) error {
 
 	// The size of the directory is not known yet.
 	w.startInode("", dir, 0x7fffffffffffffff)
-	left := blockSize
+	left := BlockSize
 	finishBlock := func() error {
 		if left > 0 {
 			e := format.DirectoryEntry{
@@ -919,7 +919,7 @@ func (w *Writer) writeDirectory(dir, parent *inode) error {
 				return err
 			}
 		}
-		left = blockSize
+		left = BlockSize
 		return nil
 	}
 
@@ -1114,7 +1114,7 @@ func MaximumDiskSize(size int64) Option {
 		} else if size == 0 {
 			w.maxDiskSize = defaultMaxDiskSize
 		} else {
-			w.maxDiskSize = (size + blockSize - 1) &^ (blockSize - 1)
+			w.maxDiskSize = (size + BlockSize - 1) &^ (BlockSize - 1)
 		}
 	}
 }
@@ -1129,7 +1129,7 @@ func (w *Writer) init() error {
 	root.LinkCount++ // The root is linked to itself.
 	// Skip until the first non-reserved inode.
 	w.inodes = append(w.inodes, make([]*inode, inodeFirst-len(w.inodes)-1)...)
-	maxBlocks := (w.maxDiskSize-1)/blockSize + 1
+	maxBlocks := (w.maxDiskSize-1)/BlockSize + 1
 	maxGroups := (maxBlocks-1)/blocksPerGroup + 1
 	w.gdBlocks = uint32((maxGroups-1)/groupsPerDescriptorBlock + 1)
 
@@ -1145,7 +1145,7 @@ func (w *Writer) init() error {
 }
 
 func groupCount(blocks uint32, inodes uint32, inodesPerGroup uint32) uint32 {
-	inodeBlocksPerGroup := inodesPerGroup * inodeSize / blockSize
+	inodeBlocksPerGroup := inodesPerGroup * inodeSize / BlockSize
 	dataBlocksPerGroup := blocksPerGroup - inodeBlocksPerGroup - 2 // save room for the bitmaps
 
 	// Increase the block count to ensure there are enough groups for all the
@@ -1207,16 +1207,16 @@ func (w *Writer) Close() error {
 	}
 
 	gds := make([]format.GroupDescriptor, w.gdBlocks*groupsPerDescriptorBlock)
-	inodeTableSizePerGroup := inodesPerGroup * inodeSize / blockSize
+	inodeTableSizePerGroup := inodesPerGroup * inodeSize / BlockSize
 	var totalUsedBlocks, totalUsedInodes uint32
 	for g := uint32(0); g < groups; g++ {
-		var b [blockSize * 2]byte
+		var b [BlockSize * 2]byte
 		var dirCount, usedInodeCount, usedBlockCount uint16
 
 		// Block bitmap
 		if (g+1)*blocksPerGroup <= validDataSize {
 			// This group is fully allocated.
-			for j := range b[:blockSize] {
+			for j := range b[:BlockSize] {
 				b[j] = 0xff
 			}
 			usedBlockCount = blocksPerGroup
@@ -1246,7 +1246,7 @@ func (w *Writer) Close() error {
 			ino := format.InodeNumber(1 + g*inodesPerGroup + j)
 			inode := w.getInode(ino)
 			if ino < inodeFirst || inode != nil {
-				b[blockSize+j/8] |= 1 << (j % 8)
+				b[BlockSize+j/8] |= 1 << (j % 8)
 				usedInodeCount++
 			}
 			if inode != nil && inode.Mode&format.TypeMask == format.S_IFDIR {
@@ -1271,7 +1271,7 @@ func (w *Writer) Close() error {
 	}
 
 	// Zero up to the disk size.
-	_, err = w.zero(int64(diskSize-bitmapOffset-bitmapSize) * blockSize)
+	_, err = w.zero(int64(diskSize-bitmapOffset-bitmapSize) * BlockSize)
 	if err != nil {
 		return err
 	}
@@ -1287,7 +1287,7 @@ func (w *Writer) Close() error {
 	}
 
 	// Write the super block
-	var blk [blockSize]byte
+	var blk [BlockSize]byte
 	b := bytes.NewBuffer(blk[:1024])
 	sb := &format.SuperBlock{
 		InodesCount:        inodesPerGroup * groups,

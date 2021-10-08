@@ -122,7 +122,7 @@ func defaultQuery() HostComputeQuery {
 
 // PlatformDoesNotSupportError happens when users are attempting to use a newer shim on an older OS
 func platformDoesNotSupportError(featureName string) error {
-	return fmt.Errorf("Platform does not support feature %s", featureName)
+	return fmt.Errorf("platform does not support feature %s", featureName)
 }
 
 // V2ApiSupported returns an error if the HCN version does not support the V2 Apis.
@@ -286,6 +286,30 @@ func TierAclPolicySupported() error {
 		return nil
 	}
 	return platformDoesNotSupportError("TierAcl")
+}
+
+// NetworkACLPolicySupported returns an error if the HCN version does not support NetworkACLPolicy
+func NetworkACLPolicySupported() error {
+	supported, err := GetCachedSupportedFeatures()
+	if err != nil {
+		return err
+	}
+	if supported.NetworkACL {
+		return nil
+	}
+	return platformDoesNotSupportError("NetworkACL")
+}
+
+// NestedIpSetSupported returns an error if the HCN version does not support NestedIpSet
+func NestedIpSetSupported() error {
+	supported, err := GetCachedSupportedFeatures()
+	if err != nil {
+		return err
+	}
+	if supported.NestedIpSet {
+		return nil
+	}
+	return platformDoesNotSupportError("NestedIpSet")
 }
 
 // RequestType are the different operations performed to settings.

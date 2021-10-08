@@ -50,6 +50,7 @@ const (
 	SetPolicy           NetworkPolicyType = "SetPolicy"
 	NetworkL4Proxy      NetworkPolicyType = "L4Proxy"
 	LayerConstraint     NetworkPolicyType = "LayerConstraint"
+	NetworkACL          NetworkPolicyType = "NetworkACL"
 )
 
 // NetworkPolicy is a collection of Policy settings for a Network.
@@ -132,7 +133,7 @@ type AclPolicySetting struct {
 	RemotePorts     string        `json:",omitempty"`
 	RuleType        RuleType      `json:",omitempty"`
 	Priority        uint16        `json:",omitempty"`
-}
+} 
 
 // QosPolicySetting sets Quality of Service bandwidth caps on an Endpoint.
 type QosPolicySetting struct {
@@ -153,6 +154,19 @@ type SDNRoutePolicySetting struct {
 	NextHop           string `json:",omitempty"`
 	NeedEncap         bool   `json:",omitempty"`
 }
+
+// NetworkACLPolicySetting creates ACL rules on a network
+type NetworkACLPolicySetting struct {
+	Protocols       string        `json:",omitempty"` // EX: 6 (TCP), 17 (UDP), 1 (ICMPv4), 58 (ICMPv6), 2 (IGMP)
+	Action          ActionType    `json:","`
+	Direction       DirectionType `json:","`
+	LocalAddresses  string        `json:",omitempty"`
+	RemoteAddresses string        `json:",omitempty"`
+	LocalPorts      string        `json:",omitempty"`
+	RemotePorts     string        `json:",omitempty"`
+	RuleType        RuleType      `json:",omitempty"`
+	Priority        uint16        `json:",omitempty"`
+} 
 
 // FiveTuple is nested in L4ProxyPolicySetting  for WFP support.
 type FiveTuple struct {
@@ -271,6 +285,7 @@ type SetPolicyType string
 
 const (
 	SetPolicyTypeIpSet SetPolicyType = "IPSET"
+	SetPolicyTypeNestedIpSet SetPolicyType = "NESTEDIPSET"
 )
 
 // SetPolicySetting creates IPSets on network
@@ -305,7 +320,7 @@ type L4ProxyPolicySetting struct {
 	Protocol    ProtocolType `json:",omitempty"`
 	Exceptions  []string     `json:",omitempty"`
 	Destination string
-	OutboundNAT bool `json:",omitempty"`
+	OutboundNAT bool         `json:",omitempty"`
 }
 
 // TierAclRule represents an ACL within TierAclPolicySetting
