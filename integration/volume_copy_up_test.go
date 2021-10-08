@@ -28,11 +28,6 @@ import (
 )
 
 func TestVolumeCopyUp(t *testing.T) {
-	if goruntime.GOOS == "windows" {
-		// TODO(claudiub): Remove this when the volume-copy-up image has Windows support.
-		// https://github.com/containerd/containerd/pull/5162
-		t.Skip("Skipped on Windows.")
-	}
 	var (
 		testImage   = GetImage(VolumeCopyUp)
 		execTimeout = time.Minute
@@ -47,7 +42,7 @@ func TestVolumeCopyUp(t *testing.T) {
 	cnConfig := ContainerConfig(
 		"container",
 		testImage,
-		WithCommand("tail", "-f", "/dev/null"),
+		WithCommand("sleep", "150"),
 	)
 	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
 	require.NoError(t, err)
@@ -67,7 +62,9 @@ func TestVolumeCopyUp(t *testing.T) {
 	assert.Equal(t, "test_content\n", string(stdout))
 
 	t.Logf("Check host path of the volume")
-	hostCmd := fmt.Sprintf("find %s/containers/%s/volumes/*/test_file | xargs cat", *criRoot, cn)
+	// Windows paths might have spaces in them (e.g.: Program Files), which would
+	// cause issues for this command. This will allow us to bypass them.
+	hostCmd := fmt.Sprintf("find '%s/containers/%s/volumes/' -type f -print0 | xargs -0 cat", *criRoot, cn)
 	output, err := exec.Command("sh", "-c", hostCmd).CombinedOutput()
 	require.NoError(t, err)
 	assert.Equal(t, "test_content\n", string(output))
