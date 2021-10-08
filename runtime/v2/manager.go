@@ -166,6 +166,7 @@ func NewShimManager(ctx context.Context, config *ManagerConfig) (*ShimManager, e
 		list:                   runtime.NewTaskList(),
 		events:                 config.Events,
 		containers:             config.Store,
+		schedCore:              config.SchedCore,
 	}
 
 	if err := m.loadExistingTasks(ctx); err != nil {
