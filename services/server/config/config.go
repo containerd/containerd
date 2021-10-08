@@ -67,7 +67,7 @@ type Config struct {
 	Timeouts map[string]string `toml:"timeouts"`
 	// Imports are additional file path list to config files that can overwrite main config file fields
 	Imports []string `toml:"imports"`
-
+	// StreamProcessors configuration
 	StreamProcessors map[string]StreamProcessor `toml:"stream_processors"`
 }
 
