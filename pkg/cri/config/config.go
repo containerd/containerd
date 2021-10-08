@@ -56,6 +56,12 @@ type Runtime struct {
 	PrivilegedWithoutHostDevices bool `toml:"privileged_without_host_devices" json:"privileged_without_host_devices"`
 	// BaseRuntimeSpec is a json file with OCI spec to use as base spec that all container's will be created from.
 	BaseRuntimeSpec string `toml:"base_runtime_spec" json:"baseRuntimeSpec"`
+	// NetworkPluginConfDir is a directory containing the CNI network information for the runtime class.
+	NetworkPluginConfDir string `toml:"cni_conf_dir" json:"cniConfDir"`
+	// NetworkPluginMaxConfNum is the max number of plugin config files that will
+	// be loaded from the cni config directory by go-cni. Set the value to 0 to
+	// load all config files (no arbitrary limit). The legacy default value is 1.
+	NetworkPluginMaxConfNum int `toml:"cni_max_conf_num" json:"cniMaxConfNum"`
 }
 
 // ContainerdConfig contains toml config related to containerd

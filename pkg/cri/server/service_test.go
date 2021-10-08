@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/go-cni"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -65,7 +66,9 @@ func newTestCRIService() *criService {
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerStore:     containerstore.NewStore(labels),
 		containerNameIndex: registrar.NewRegistrar(),
-		netPlugin:          servertesting.NewFakeCNIPlugin(),
+		netPlugin: map[string]cni.CNI{
+			defaultNetworkPlugin: servertesting.NewFakeCNIPlugin(),
+		},
 	}
 }
 
