@@ -136,7 +136,7 @@ func TestContainerdRestart(t *testing.T) {
 			require.NoError(t, err)
 			_, err = task.Delete(ctx, containerd.WithProcessKill)
 			if err != nil {
-				require.True(t, errdefs.IsNotFound(err))
+				require.True(t, errdefs.IsNotFound(err), "delete should return not found error but returned %v", err)
 			}
 		}
 	}
