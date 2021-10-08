@@ -46,8 +46,6 @@ ${sudo} bin/cri-integration.test --test.run="${FOCUS}" --test.v \
   --containerd-bin="${CONTAINERD_BIN}" \
   --image-list="${TEST_IMAGE_LIST:-}" && test_exit_code=$? || test_exit_code=$?
 
-test_teardown
-
 test $test_exit_code -ne 0 && \
   cat "$REPORT_DIR/containerd.log"
 
