@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20210715213245-6c3934b029d8
 	github.com/Microsoft/go-winio v0.5.0
-	github.com/Microsoft/hcsshim v0.8.21
+	github.com/Microsoft/hcsshim v0.9.0
 	github.com/containerd/aufs v1.0.0
 	github.com/containerd/btrfs v1.0.0
 	github.com/containerd/cgroups v1.0.1
@@ -60,7 +60,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.0.1
 	go.opentelemetry.io/otel/sdk v1.0.1
 	go.opentelemetry.io/otel/trace v1.0.1
-	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
+	golang.org/x/net v0.0.0-20210825183410-e898025ed96a
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c
 	google.golang.org/grpc v1.41.0
