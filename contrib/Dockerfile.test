@@ -10,7 +10,7 @@
 #
 # docker build -t containerd-test --build-arg RUNC_VERSION=v1.0.0-rc93 -f Dockerfile.test ../
 
-ARG GOLANG_VERSION=1.16.8
+ARG GOLANG_VERSION=1.16.9
 
 FROM golang:${GOLANG_VERSION} AS golang-base
 RUN mkdir -p /go/src/github.com/containerd/containerd
