@@ -186,6 +186,16 @@ func cleanupAfterDeadShim(ctx context.Context, id, ns string, rt *runtime.TaskLi
 	})
 }
 
+// ShimProcess represents a shim instance managed by the shim service.
+type ShimProcess interface {
+	runtime.Process
+
+	// ID of the shim.
+	ID() string
+	// Namespace of this shim.
+	Namespace() string
+}
+
 type shim struct {
 	bundle *Bundle
 	client *ttrpc.Client

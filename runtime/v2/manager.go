@@ -197,7 +197,7 @@ func (m *ShimManager) ID() string {
 }
 
 // Start launches a new shim instance
-func (m *ShimManager) Start(ctx context.Context, id string, opts runtime.CreateOpts) (_ *shimTask, retErr error) {
+func (m *ShimManager) Start(ctx context.Context, id string, opts runtime.CreateOpts) (_ ShimProcess, retErr error) {
 	bundle, err := NewBundle(ctx, m.root, m.state, id, opts.Spec.Value)
 	if err != nil {
 		return nil, err
@@ -275,24 +275,24 @@ func (m *ShimManager) cleanupShim(shim *shim) {
 	m.list.Delete(dctx, shim.ID())
 }
 
-func (m *ShimManager) Get(ctx context.Context, id string) (*shim, error) {
-	item, err := m.list.Get(ctx, id)
+func (m *ShimManager) Get(ctx context.Context, id string) (ShimProcess, error) {
+	proc, err := m.list.Get(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	shimTask := item.(*shimTask)
-	return shimTask.shim, nil
+	return proc, nil
 }
 
 // Delete a runtime task
 func (m *ShimManager) Delete(ctx context.Context, id string) error {
-	shim, err := m.Get(ctx, id)
+	proc, err := m.list.Get(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	err = shim.delete(ctx)
+	shimTask := proc.(*shimTask)
+	err = shimTask.shim.delete(ctx)
 	m.list.Delete(ctx, id)
 
 	return err
@@ -329,11 +329,12 @@ func (m *TaskManager) ID() string {
 
 // Create launches new shim instance and creates new task
 func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.CreateOpts) (runtime.Task, error) {
-	shim, err := m.shims.Start(ctx, taskID, opts)
+	process, err := m.shims.Start(ctx, taskID, opts)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to start shim")
 	}
 
+	shim := process.(*shimTask)
 	t, err := shim.Create(ctx, opts)
 	if err != nil {
 		dctx, cancel := timeout.WithContext(context.Background(), cleanupTimeout)
