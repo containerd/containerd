@@ -196,7 +196,14 @@ func TestBtrfsMounts(t *testing.T) {
 	}
 	defer testutil.Unmount(t, target)
 
-	// TODO(stevvooe): Verify contents of "foo"
+	bs, err := os.ReadFile(filepath.Join(target, "foo"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(bs) != "content" {
+		t.Fatalf("wrong content in foo want: content, got: %s", bs)
+	}
+
 	if err := os.WriteFile(filepath.Join(target, "bar"), []byte("content"), 0777); err != nil {
 		t.Fatal(err)
 	}
