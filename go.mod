@@ -8,7 +8,7 @@ require (
 	github.com/Microsoft/hcsshim v0.9.0
 	github.com/containerd/aufs v1.0.0
 	github.com/containerd/btrfs v1.0.0
-	github.com/containerd/cgroups v1.0.1
+	github.com/containerd/cgroups v1.0.2
 	github.com/containerd/console v1.0.3
 	github.com/containerd/containerd/api v0.0.0
 	github.com/containerd/continuity v0.2.0
