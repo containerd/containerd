@@ -128,3 +128,16 @@ func (l *TaskList) Delete(ctx context.Context, id string) {
 		delete(tasks, id)
 	}
 }
+
+func (l *TaskList) IsEmpty() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	for ns := range l.tasks {
+		if len(l.tasks[ns]) > 0 {
+			return false
+		}
+	}
+
+	return true
+}

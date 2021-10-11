@@ -92,52 +92,62 @@ func init() {
 		ID:   "task",
 		Requires: []plugin.Type{
 			plugin.RuntimeShimPlugin,
-			plugin.EventPlugin,
-			plugin.MetadataPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			m, err := ic.Get(plugin.MetadataPlugin)
-			if err != nil {
-				return nil, err
-			}
-			ep, err := ic.GetByID(plugin.EventPlugin, "exchange")
-			if err != nil {
-				return nil, err
-			}
-			cs := metadata.NewContainerStore(m.(*metadata.DB))
-			events := ep.(*exchange.Exchange)
-
-			shimManager, err := NewShimManager(ic.Context, &ManagerConfig{
-				Root:         ic.Root,
-				State:        ic.State,
-				Address:      ic.Address,
-				TTRPCAddress: ic.TTRPCAddress,
-				Events:       events,
-				Store:        cs,
-				SchedCore:    false,
-			})
+			shimManagerInterface, err := ic.Get(plugin.RuntimeShimPlugin)
 			if err != nil {
 				return nil, err
 			}
 
-			if err := shimManager.loadExistingTasks(ic.Context); err != nil {
-				return nil, err
+			shimManager := shimManagerInterface.(*ShimManager)
+
+			// From now on task manager works via shim manager, which has different home directory.
+			// Check if there are any leftovers from previous containerd versions and migrate home directory,
+			// so we can properly restore existing tasks as well.
+			if err := migrateTasks(ic, shimManager); err != nil {
+				log.G(ic.Context).WithError(err).Error("unable to migrate tasks")
 			}
 
-			// Internally task manager relies on shim manager to launch task shims.
-			// It's also possible to use shim manager independently and launch other types of shims.
-			//
-			// Ideally task manager should depend on shim instance we registered above, however it'll use
-			// different home directory (`io.containerd.runtime.v2.task` vs `io.containerd.runtime.v2.shim`),
-			// which will break backward compatibility when upgrading containerd to the new version.
-			//
-			// For now, we create another instance of shim manager with the "old" home directory, so shim tasks
-			// are properly restored, but will work independently.
-			//
-			// See more context https://github.com/containerd/containerd/pull/5918#discussion_r705434412
 			return NewTaskManager(shimManager), nil
 		},
 	})
+}
+
+func migrateTasks(ic *plugin.InitContext, shimManager *ShimManager) error {
+	if !shimManager.list.IsEmpty() {
+		return nil
+	}
+
+	// Rename below will fail is target directory exists.
+	// `Root` and `State` dirs expected to be empty at this point (we check that there are no shims loaded above).
+	// If for some they are not empty, these remove calls will fail (`os.Remove` requires a dir to be empty to succeed).
+	if err := os.Remove(shimManager.root); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	if err := os.Remove(shimManager.state); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	if err := os.Rename(ic.Root, shimManager.root); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to migrate task `root` directory")
+	}
+
+	if err := os.Rename(ic.State, shimManager.state); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to migrate task `state` directory")
+	}
+
+	if err := shimManager.loadExistingTasks(ic.Context); err != nil {
+		return fmt.Errorf("failed to load tasks after migration")
+	}
+
+	return nil
 }
 
 type ManagerConfig struct {
@@ -193,7 +203,7 @@ type ShimManager struct {
 
 // ID of the shim manager
 func (m *ShimManager) ID() string {
-	return fmt.Sprintf("%s.%s", plugin.RuntimePluginV2, "shim")
+	return fmt.Sprintf("%s.%s", plugin.RuntimeShimPlugin, "shim")
 }
 
 // Start launches a new shim instance
@@ -324,7 +334,7 @@ func NewTaskManager(shims *ShimManager) *TaskManager {
 
 // ID of the task manager
 func (m *TaskManager) ID() string {
-	return fmt.Sprintf("%s.%s", plugin.RuntimeShimPlugin, "task")
+	return fmt.Sprintf("%s.%s", plugin.RuntimePluginV2, "task")
 }
 
 // Create launches new shim instance and creates new task
