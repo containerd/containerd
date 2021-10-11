@@ -22,7 +22,7 @@ import (
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
-
+//Here container log reopen
 // ReopenContainerLog asks the cri plugin to reopen the stdout/stderr log file for the container.
 // This is often called after the log file has been rotated.
 func (c *criService) ReopenContainerLog(ctx context.Context, r *runtime.ReopenContainerLogRequest) (*runtime.ReopenContainerLogResponse, error) {

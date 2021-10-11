@@ -211,7 +211,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		log.G(ctx).Infof("Logging will be disabled due to empty log paths for sandbox (%q) or container (%q)",
 			sandboxConfig.GetLogDirectory(), config.GetLogPath())
 	}
-
+	//here "create container" container IO
 	containerIO, err := cio.NewContainerIO(id,
 		cio.WithNewFIFOs(volatileContainerRootDir, config.GetTty(), config.GetStdin()))
 	if err != nil {

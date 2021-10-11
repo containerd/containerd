@@ -94,7 +94,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 			}
 		}
 	}
-
+	//Here "start container" createIO
 	ioCreation := func(id string) (_ containerdio.IO, err error) {
 		stdoutWC, stderrWC, err := c.createContainerLoggers(meta.LogPath, config.GetTty())
 		if err != nil {
