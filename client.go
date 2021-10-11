@@ -265,8 +265,8 @@ func (c *Client) Containers(ctx context.Context, filters ...string) ([]Container
 	return out, nil
 }
 
-// NewContainer will create a new container in container with the provided id
-// the id must be unique within the namespace
+// NewContainer will create a new container with the provided id.
+// The id must be unique within the namespace.
 func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error) {
 	ctx, done, err := c.WithLease(ctx)
 	if err != nil {
