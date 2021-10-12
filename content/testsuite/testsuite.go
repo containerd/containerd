@@ -820,6 +820,7 @@ func checkCrossNSShare(ctx context.Context, t *testing.T, cs content.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer w.Close()
 	t2 := time.Now()
 
 	checkStatus(t, w, content.Status{
@@ -878,6 +879,7 @@ func checkCrossNSAppend(ctx context.Context, t *testing.T, cs content.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer w.Close()
 	t2 := time.Now()
 
 	checkStatus(t, w, content.Status{
@@ -940,6 +942,7 @@ func checkCrossNSIsolate(ctx context.Context, t *testing.T, cs content.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer w.Close()
 	t4 := time.Now()
 
 	checkNewlyCreated(t, w, t1, t2, t3, t4)
