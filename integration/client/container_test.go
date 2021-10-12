@@ -54,7 +54,7 @@ func empty() cio.Creator {
 	// TODO (@mlaventure) windows searches for pipes
 	// when none are provided
 	if runtime.GOOS == "windows" {
-		return cio.NewCreator(cio.WithStdio)
+		return cio.NewCreator(cio.WithStdio, cio.WithTerminal)
 	}
 	return cio.NullIO
 }
@@ -1941,6 +1941,238 @@ func TestRegressionIssue4769(t *testing.T) {
 	}
 }
 
+func TestDaemonRestart(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), longCommand))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	var exitStatus ExitStatus
+	if err := ctrd.Restart(func() {
+		exitStatus = <-statusC
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if exitStatus.Error() == nil {
+		t.Errorf(`first task.Wait() should have failed with "transport is closing"`)
+	}
+
+	waitCtx, waitCancel := context.WithTimeout(ctx, 2*time.Second)
+	serving, err := client.IsServing(waitCtx)
+	waitCancel()
+	if !serving {
+		t.Fatalf("containerd did not start within 2s: %v", err)
+	}
+
+	statusC, err = task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+
+	<-statusC
+}
+
+type directIO struct {
+    cio.DirectIO
+}
+
+// ioCreate returns IO available for use with task creation
+func (f *directIO) IOCreate(id string) (cio.IO, error) {
+	return f, nil
+}
+
+// ioAttach returns IO available for use with task attachment
+func (f *directIO) IOAttach(set *cio.FIFOSet) (cio.IO, error) {
+	return f, nil
+}
+
+func (f *directIO) Cancel() {
+	// nothing to cancel as all operations are handled externally
+}
+
+// Close closes all open fds
+func (f *directIO) Close() error {
+	err := f.Stdin.Close()
+	if f.Stdout != nil {
+		if err2 := f.Stdout.Close(); err == nil {
+			err = err2
+		}
+	}
+	if f.Stderr != nil {
+		if err2 := f.Stderr.Close(); err == nil {
+			err = err2
+		}
+	}
+	return err
+}
+
+// Delete removes the underlying directory containing fifos
+func (f *directIO) Delete() error {
+	return f.DirectIO.Close()
+}
+
+func initContainerAndCheckChildrenDieOnKill(t *testing.T, opts ...oci.SpecOpts) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	opts = append(opts, oci.WithImageConfig(image))
+	opts = append(opts, longCommand)
+
+	container, err := client.NewContainer(ctx, id,
+		WithNewSnapshot(id, image),
+		WithNewSpec(opts...),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	stdout := bytes.NewBuffer(nil)
+	task, err := container.NewTask(ctx, cio.NewCreator(withByteBuffers(stdout)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Error(err)
+	}
+
+	// Give the shim time to reap the init process and kill the orphans
+	select {
+	case <-statusC:
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	command := []string{"ps", "ax"}
+	if runtime.GOOS == "windows" {
+		command = []string{"tasklist"}
+	}
+	b, err := exec.Command(command[0], command[1:]...).CombinedOutput()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The container is using longCommand, which contains sleep 1 on Linux, and ping -t localhost on Windows.
+	if strings.Contains(string(b), "sleep 1") || strings.Contains(string(b), "ping -t localhost") {
+		t.Fatalf("killing init didn't kill all its children:\n%v", string(b))
+	}
+
+	if _, err := task.Delete(ctx, WithProcessKill); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestContainerKillInitKillsChildWhenNotHostPid(t *testing.T) {
+	initContainerAndCheckChildrenDieOnKill(t)
+}
+
+func TestTaskResize(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := task.Resize(ctx, 32, 32); err != nil {
+		t.Fatal(err)
+	}
+	task.Kill(ctx, syscall.SIGKILL)
+	<-statusC
+}
+
 func TestContainerImage(t *testing.T) {
 	t.Parallel()
 
@@ -2049,4 +2281,74 @@ func TestContainerNoSTDIN(t *testing.T) {
 	if code != 0 {
 		t.Errorf("expected status 0 from wait but received %d", code)
 	}
+}
+
+func TestTaskSpec(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), longCommand))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	spec, err := task.Spec(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec == nil {
+		t.Fatal("spec from task is nil")
+	}
+	direct, err := newDirectIO(ctx, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer direct.Delete()
+
+	lt, err := container.Task(ctx, direct.IOAttach)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	spec, err = lt.Spec(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec == nil {
+		t.Fatal("spec from loaded task is nil")
+	}
+
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	<-statusC
 }
