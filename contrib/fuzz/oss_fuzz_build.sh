@@ -65,6 +65,7 @@ compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzImageStore f
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzLeaseManager fuzz_lease_manager
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzContainerStore fuzz_container_store
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzContentStore fuzz_content_store
+compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzApiMarshaling fuzz_api_marshaling
 
 
 # The below fuzzers require more setup than the fuzzers above.
