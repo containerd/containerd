@@ -63,7 +63,7 @@ type ContainerManager interface {
 	// ContainerStatus returns the status of the container.
 	ContainerStatus(containerID string, opts ...grpc.CallOption) (*runtimeapi.ContainerStatus, error)
 	// UpdateContainerResources updates the cgroup resources for the container.
-	UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources, opts ...grpc.CallOption) error
+	UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources, windowsResources *runtimeapi.WindowsContainerResources, opts ...grpc.CallOption) error
 	// ExecSync executes a command in the container, and returns the stdout output.
 	// If command exits with a non-zero exit code, an error is returned.
 	ExecSync(containerID string, cmd []string, timeout time.Duration, opts ...grpc.CallOption) (stdout []byte, stderr []byte, err error)

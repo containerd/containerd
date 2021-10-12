@@ -878,7 +878,7 @@ func (in *instrumentedService) UpdateContainerResources(ctx context.Context, r *
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	log.G(ctx).Infof("UpdateContainerResources for %q with %+v", r.GetContainerId(), r.GetLinux())
+	log.G(ctx).Infof("UpdateContainerResources for %q with Linux: %+v / Windows: %+v", r.GetContainerId(), r.GetLinux(), r.GetWindows())
 	defer func() {
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("UpdateContainerResources for %q failed", r.GetContainerId())
@@ -894,7 +894,7 @@ func (in *instrumentedAlphaService) UpdateContainerResources(ctx context.Context
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	log.G(ctx).Infof("UpdateContainerResources for %q with %+v", r.GetContainerId(), r.GetLinux())
+	log.G(ctx).Infof("UpdateContainerResources for %q with Linux: %+v / Windows: %+v", r.GetContainerId(), r.GetLinux(), r.GetWindows())
 	defer func() {
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("UpdateContainerResources for %q failed", r.GetContainerId())
