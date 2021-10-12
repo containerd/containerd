@@ -17,9 +17,12 @@
 package client
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"strconv"
 
+	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -52,4 +55,22 @@ func withExecExitStatus(s *specs.Process, es int) {
 
 func withExecArgs(s *specs.Process, args ...string) {
 	s.Args = append([]string{"cmd", "/c"}, args...)
+}
+
+type bytesBuffer struct {
+	*bytes.Buffer
+}
+
+// Close is a noop operation.
+func (b bytesBuffer) Close() error {
+	return nil
+}
+
+func newDirectIO(ctx context.Context, terminal bool) (*directIO, error) {
+	readb := bytesBuffer{bytes.NewBuffer(nil)}
+	writeb := io.NopCloser(bytes.NewBuffer(nil))
+	errb := io.NopCloser(bytes.NewBuffer(nil))
+
+	dio := cio.NewDirectIO(readb, writeb, errb, terminal)
+	return &directIO{DirectIO: *dio}, nil
 }
