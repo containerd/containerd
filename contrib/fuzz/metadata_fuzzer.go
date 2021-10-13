@@ -19,7 +19,6 @@ package fuzz
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -43,7 +42,7 @@ func testEnv() (context.Context, *bolt.DB, func(), error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = namespaces.WithNamespace(ctx, "testing")
 
-	dirname, err := ioutil.TempDir("", "fuzz-")
+	dirname, err := os.MkdirTemp("", "fuzz-")
 	if err != nil {
 		return ctx, nil, nil, err
 	}
@@ -263,7 +262,7 @@ func testDB(opt ...testOpt) (context.Context, *metadata.DB, func(), error) {
 		o(&topts)
 	}
 
-	dirname, err := ioutil.TempDir("", "fuzzing-")
+	dirname, err := os.MkdirTemp("", "fuzzing-")
 	if err != nil {
 		return ctx, nil, func() { cancel() }, err
 	}

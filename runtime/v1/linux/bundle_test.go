@@ -22,7 +22,6 @@ package linux
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -49,7 +48,7 @@ func TestNewBundle(t *testing.T) {
 
 	for i, tc := range tests {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			dir, err := ioutil.TempDir("", "test-new-bundle")
+			dir, err := os.MkdirTemp("", "test-new-bundle")
 			require.NoError(t, err, "failed to create test directory")
 			defer os.RemoveAll(dir)
 			work := filepath.Join(dir, "work")
