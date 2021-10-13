@@ -57,3 +57,10 @@ func WithProfile(profile string) oci.SpecOpts {
 		return nil
 	}
 }
+
+// Supporting a default landlock profile is under discussion with community: https://github.com/containerd/containerd/issues/6056
+func WithDefaultProfile() oci.SpecOpts {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {		
+		return nil
+	}
+}
