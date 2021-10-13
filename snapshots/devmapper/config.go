@@ -50,6 +50,9 @@ type Config struct {
 
 	// Defines file system to use for snapshout device mount. Defaults to "ext4"
 	FileSystemType fsType `toml:"fs_type"`
+
+	// Defines optional file system options passed through config file
+	FsOptions string `toml:"fs_options"`
 }
 
 // LoadConfig reads devmapper configuration file from disk in TOML format
