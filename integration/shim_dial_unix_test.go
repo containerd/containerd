@@ -21,7 +21,6 @@ package integration
 
 import (
 	"context"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -147,7 +146,7 @@ func testFailFastWhenConnectShim(abstract bool, dialFn dialFunc) func(*testing.T
 }
 
 func newTestListener(t testing.TB, abstract bool) (string, net.Listener, func()) {
-	tmpDir, err := ioutil.TempDir("", "shim-ut-XX")
+	tmpDir, err := os.MkdirTemp("", "shim-ut-XX")
 	if err != nil {
 		t.Fatalf("failed to create tmp directory: %v", err)
 	}
