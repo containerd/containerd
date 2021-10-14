@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -119,8 +120,9 @@ func TestGetRepoDigestAndTag(t *testing.T) {
 
 func TestBuildLabels(t *testing.T) {
 	imageConfigLabels := map[string]string{
-		"a": "z",
-		"d": "y",
+		"a":          "z",
+		"d":          "y",
+		"long-label": strings.Repeat("example", 10000),
 	}
 	configLabels := map[string]string{
 		"a": "b",
@@ -132,6 +134,7 @@ func TestBuildLabels(t *testing.T) {
 	assert.Equal(t, "d", newLabels["c"])
 	assert.Equal(t, "y", newLabels["d"])
 	assert.Equal(t, containerKindSandbox, newLabels[containerKindLabel])
+	assert.NotContains(t, newLabels, "long-label")
 
 	newLabels["a"] = "e"
 	assert.Empty(t, configLabels[containerKindLabel], "should not add new labels into original label")
