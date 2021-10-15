@@ -42,6 +42,10 @@ Imported files will overwrite simple fields like `int` or
 Imported files are also versioned, and the version can't be higher than
 the main config.
 
+**sched_core**
+: Core scheduling is a feature that allows only trusted tasks to run concurrently
+on cpus sharing compute resources (eg: hyperthreads on a core).
+
 **[grpc]**
 : Section for gRPC socket listener settings. Contains three properties:
  - **address** (Default: "/run/containerd/containerd.sock")
@@ -93,6 +97,7 @@ root = "/var/lib/containerd"
 state = "/run/containerd"
 oom_score = 0
 imports = ["/etc/containerd/runtime_*.toml", "./debug.toml"]
+sched_core = true
 
 [grpc]
   address = "/run/containerd/containerd.sock"
