@@ -113,7 +113,7 @@ var deleteCommand = cli.Command{
 }
 
 var pullImageCommand = cli.Command{
-	Name:  "pullimage",
+	Name:  "pull-image",
 	Usage: "pull an image",
 	Action: func(context *cli.Context) error {
 		service, err := getTaskService(context)
@@ -121,8 +121,9 @@ var pullImageCommand = cli.Command{
 			return err
 		}
 		_, err = service.PullImage(gocontext.Background(), &task.PullImageRequest{
-			ID:    context.GlobalString("id"),
-			Image: context.Args().First(),
+			ID:             context.GlobalString("id"),
+			Image:          context.Args().First(),
+			NewContainerID: context.Args().Get(1),
 		})
 		if err != nil {
 			return err
