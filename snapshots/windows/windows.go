@@ -264,8 +264,8 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 			}
 		)
 
-		if deactvateErr := hcsshim.DeactivateLayer(di, layerID); deactvateErr != nil {
-			return errors.Wrapf(err, "failed to deactivate layer following failed rename: %s", deactvateErr)
+		if deactivateErr := hcsshim.DeactivateLayer(di, layerID); deactivateErr != nil {
+			return errors.Wrapf(err, "failed to deactivate layer following failed rename: %s", deactivateErr)
 		}
 
 		if renameErr := os.Rename(path, renamed); renameErr != nil && !os.IsNotExist(renameErr) {
