@@ -102,10 +102,12 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
 			otelgrpc.StreamServerInterceptor(),
 			grpc.StreamServerInterceptor(grpc_prometheus.StreamServerInterceptor),
+			streamNamespaceInterceptor,
 		)),
 		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
 			otelgrpc.UnaryServerInterceptor(),
 			grpc.UnaryServerInterceptor(grpc_prometheus.UnaryServerInterceptor),
+			unaryNamespaceInterceptor,
 		)),
 	}
 	if config.GRPC.MaxRecvMsgSize > 0 {
