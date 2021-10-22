@@ -10,7 +10,7 @@ require (
 	github.com/containerd/btrfs v1.0.0
 	github.com/containerd/cgroups v1.0.2
 	github.com/containerd/console v1.0.3
-	github.com/containerd/containerd/api v0.0.0
+	github.com/containerd/containerd/api v1.6.0-beta.1
 	github.com/containerd/continuity v0.2.0
 	github.com/containerd/fifo v1.0.0
 	github.com/containerd/go-cni v1.0.2
