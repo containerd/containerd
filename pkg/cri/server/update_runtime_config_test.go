@@ -36,7 +36,7 @@ func TestUpdateRuntimeConfig(t *testing.T) {
 		testTemplate = `
 {
 	"name": "test-pod-network",
-	"cniVersion": "0.3.1",
+	"cniVersion": "1.0.0",
 	"plugins": [
 	{
 		"type": "ptp",
@@ -54,7 +54,7 @@ func TestUpdateRuntimeConfig(t *testing.T) {
 		expected = `
 {
 	"name": "test-pod-network",
-	"cniVersion": "0.3.1",
+	"cniVersion": "1.0.0",
 	"plugins": [
 	{
 		"type": "ptp",

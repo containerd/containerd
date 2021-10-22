@@ -17,11 +17,11 @@
 package cni
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/containernetworking/cni/pkg/types"
-	"github.com/containernetworking/cni/pkg/types/current"
-	"github.com/pkg/errors"
+	types100 "github.com/containernetworking/cni/pkg/types/100"
 )
 
 type IPConfig struct {
@@ -43,6 +43,12 @@ type Result struct {
 	Interfaces map[string]*Config
 	DNS        []types.DNS
 	Routes     []*types.Route
+	raw        []*types100.Result
+}
+
+// Raw returns the raw CNI results of multiple networks.
+func (r *Result) Raw() []*types100.Result {
+	return r.raw
 }
 
 type Config struct {
@@ -51,15 +57,16 @@ type Config struct {
 	Sandbox   string
 }
 
-// createResult creates a Result from the given slice of current.Result, adding
+// createResult creates a Result from the given slice of types100.Result, adding
 // structured data containing the interface configuration for each of the
 // interfaces created in the namespace. It returns an error if validation of
 // results fails, or if a network could not be found.
-func (c *libcni) createResult(results []*current.Result) (*Result, error) {
+func (c *libcni) createResult(results []*types100.Result) (*Result, error) {
 	c.RLock()
 	defer c.RUnlock()
 	r := &Result{
 		Interfaces: make(map[string]*Config),
+		raw:        results,
 	}
 
 	// Plugins may not need to return Interfaces in result if
@@ -80,7 +87,7 @@ func (c *libcni) createResult(results []*current.Result) (*Result, error) {
 		// interfaces
 		for _, ipConf := range result.IPs {
 			if err := validateInterfaceConfig(ipConf, len(result.Interfaces)); err != nil {
-				return nil, errors.Wrapf(ErrInvalidResult, "invalid interface config: %v", err)
+				return nil, fmt.Errorf("invalid interface config: %v: %w", err, ErrInvalidResult)
 			}
 			name := c.getInterfaceName(result.Interfaces, ipConf)
 			r.Interfaces[name].IPConfigs = append(r.Interfaces[name].IPConfigs,
@@ -90,7 +97,7 @@ func (c *libcni) createResult(results []*current.Result) (*Result, error) {
 		r.Routes = append(r.Routes, result.Routes...)
 	}
 	if _, ok := r.Interfaces[defaultInterface(c.prefix)]; !ok {
-		return nil, errors.Wrapf(ErrNotFound, "default network not found for: %s", defaultInterface(c.prefix))
+		return nil, fmt.Errorf("default network not found for: %s: %w", defaultInterface(c.prefix), ErrNotFound)
 	}
 	return r, nil
 }
@@ -98,8 +105,8 @@ func (c *libcni) createResult(results []*current.Result) (*Result, error) {
 // getInterfaceName returns the interface name if the plugins
 // return the result with associated interfaces. If interface
 // is not present then default interface name is used
-func (c *libcni) getInterfaceName(interfaces []*current.Interface,
-	ipConf *current.IPConfig) string {
+func (c *libcni) getInterfaceName(interfaces []*types100.Interface,
+	ipConf *types100.IPConfig) string {
 	if ipConf.Interface != nil {
 		return interfaces[*ipConf.Interface].Name
 	}

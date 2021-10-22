@@ -19,10 +19,10 @@ package cni
 import (
 	"fmt"
 
-	"github.com/containernetworking/cni/pkg/types/current"
+	types100 "github.com/containernetworking/cni/pkg/types/100"
 )
 
-func validateInterfaceConfig(ipConf *current.IPConfig, ifs int) error {
+func validateInterfaceConfig(ipConf *types100.IPConfig, ifs int) error {
 	if ipConf == nil {
 		return fmt.Errorf("invalid IP configuration (nil)")
 	}
