@@ -13,14 +13,14 @@ require (
 	github.com/containerd/containerd/api v0.0.0
 	github.com/containerd/continuity v0.2.0
 	github.com/containerd/fifo v1.0.0
-	github.com/containerd/go-cni v1.0.2
+	github.com/containerd/go-cni v1.1.0
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/imgcrypt v1.1.1
 	github.com/containerd/nri v0.1.0
 	github.com/containerd/ttrpc v1.0.2
 	github.com/containerd/typeurl v1.0.2
 	github.com/containerd/zfs v1.0.0
-	github.com/containernetworking/plugins v0.9.1
+	github.com/containernetworking/plugins v1.0.1
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c

@@ -35,7 +35,7 @@ cp -r ./bin $CNI_DIR
 mkdir -p $CNI_CONFIG_DIR
 cat << EOF | tee $CNI_CONFIG_DIR/10-containerd-net.conflist
 {
-  "cniVersion": "0.4.0",
+  "cniVersion": "1.0.0",
   "name": "containerd-net",
   "plugins": [
     {
