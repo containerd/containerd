@@ -65,10 +65,10 @@ calculate_subnet() {
 
 # nat already exists on the Windows VM, the subnet and gateway
 # we specify should match that.
-gateway="$(powershell -c "(Get-NetIPAddress -InterfaceAlias 'vEthernet (nat)' -AddressFamily IPv4).IPAddress")"
-prefix_len="$(powershell -c "(Get-NetIPAddress -InterfaceAlias 'vEthernet (nat)' -AddressFamily IPv4).PrefixLength")"
+: ${GATEWAY:="$(powershell -c "(Get-NetIPAddress -InterfaceAlias 'vEthernet (nat)' -AddressFamily IPv4).IPAddress")"}
+: ${PREFIX_LEN:="$(powershell -c "(Get-NetIPAddress -InterfaceAlias 'vEthernet (nat)' -AddressFamily IPv4).PrefixLength")"}
 
-subnet="$(calculate_subnet "$gateway" "$prefix_len")"
+subnet="$(calculate_subnet "$GATEWAY" "$PREFIX_LEN")"
 
 # The "name" field in the config is used as the underlying
 # network type right now (see
@@ -85,7 +85,7 @@ bash -c 'cat >"'"${CNI_CONFIG_DIR}"'"/0-containerd-nat.conf <<EOF
         "subnet": "'$subnet'",
         "routes": [
             {
-                "GW": "'$gateway'"
+                "GW": "'$GATEWAY'"
             }
         ]
     },

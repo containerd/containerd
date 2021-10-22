@@ -1,0 +1,4 @@
+.github/
+.dockerignore
+releases/
+bin/
