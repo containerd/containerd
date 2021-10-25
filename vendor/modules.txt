@@ -289,7 +289,7 @@ github.com/moby/locker
 # github.com/moby/spdystream v0.2.0
 github.com/moby/spdystream
 github.com/moby/spdystream/spdy
-# github.com/moby/sys/mountinfo v0.4.1
+# github.com/moby/sys/mountinfo v0.4.2-0.20211022201527-95edfa939201
 ## explicit
 github.com/moby/sys/mountinfo
 # github.com/moby/sys/signal v0.5.1-0.20210723232958-8a51b5cc8879

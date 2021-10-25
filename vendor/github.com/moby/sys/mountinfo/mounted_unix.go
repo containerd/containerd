@@ -1,4 +1,4 @@
-// +build linux freebsd,cgo openbsd,cgo
+// +build linux freebsd,cgo openbsd,cgo darwin,cgo
 
 package mountinfo
 
