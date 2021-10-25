@@ -21,11 +21,17 @@ import (
 	"context"
 	"io"
 	"strconv"
+	"strings"
+	"syscall"
+	"testing"
 
+	"github.com/Microsoft/hcsshim"
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	exec "golang.org/x/sys/execabs"
 )
 
 const newLine = "\r\n"
@@ -57,6 +63,19 @@ func withExecArgs(s *specs.Process, args ...string) {
 	s.Args = append([]string{"cmd", "/c"}, args...)
 }
 
+func kill(pid int, signal syscall.Signal) error {
+	kill := exec.Command("taskkill", "/T", "/F", "/PID", strconv.Itoa(pid))
+	err := kill.Run()
+
+	// Note: We return syscall.ESRCH if the process was not found, so we have the
+	// same behaviour as unix.Kill in this regard.
+	if err != nil && strings.Contains(err.Error(), " not found.") {
+		return syscall.ESRCH
+	}
+
+	return err
+}
+
 type bytesBuffer struct {
 	*bytes.Buffer
 }
@@ -73,4 +92,20 @@ func newDirectIO(ctx context.Context, terminal bool) (*directIO, error) {
 
 	dio := cio.NewDirectIO(readb, writeb, errb, terminal)
 	return &directIO{DirectIO: *dio}, nil
+}
+
+func checkTaskMemoryUsage(t *testing.T, task containerd.Task, expectedLimit int64) {
+	container, err := hcsshim.OpenContainer(task.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stats, err := container.Statistics()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if stats.Memory.UsageCommitPeakBytes != uint64(expectedLimit) {
+		t.Fatalf("expected memory limit to be set to %d but received %d", expectedLimit, stats.Memory.UsageCommitPeakBytes)
+	}
 }

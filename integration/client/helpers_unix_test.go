@@ -22,7 +22,12 @@ package client
 import (
 	"context"
 	"fmt"
+	"syscall"
+	"testing"
 
+	"github.com/containerd/cgroups"
+	cgroupsv2 "github.com/containerd/cgroups/v2"
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
@@ -58,6 +63,10 @@ func withExecArgs(s *specs.Process, args ...string) {
 	s.Args = args
 }
 
+func kill(pid int, signal syscall.Signal) error {
+	return syscall.Kill(pid, signal)
+}
+
 func newDirectIO(ctx context.Context, terminal bool) (*directIO, error) {
 	fifos, err := cio.NewFIFOSetInDir("", "", terminal)
 	if err != nil {
@@ -68,4 +77,36 @@ func newDirectIO(ctx context.Context, terminal bool) (*directIO, error) {
 		return nil, err
 	}
 	return &directIO{DirectIO: *dio}, nil
+}
+
+func checkTaskMemoryUsage(t *testing.T, task containerd.Task, expectedLimit int64) {
+	if cgroups.Mode() == cgroups.Unified {
+		groupPath, err := cgroupsv2.PidGroupPath(int(task.Pid()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		cgroup2, err := cgroupsv2.LoadManager("/sys/fs/cgroup", groupPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		stat, err := cgroup2.Stat()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if int64(stat.Memory.UsageLimit) != expectedLimit {
+			t.Fatalf("expected memory limit to be set to %d but received %d", expectedLimit, stat.Memory.UsageLimit)
+		}
+	} else {
+		cgroup, err := cgroups.Load(cgroups.V1, cgroups.PidPath(int(task.Pid())))
+		if err != nil {
+			t.Fatal(err)
+		}
+		stat, err := cgroup.Stat(cgroups.IgnoreNotExist)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if int64(stat.Memory.Usage.Limit) != expectedLimit {
+			t.Fatalf("expected memory limit to be set to %d but received %d", expectedLimit, stat.Memory.Usage.Limit)
+		}
+	}
 }

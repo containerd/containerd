@@ -17,6 +17,7 @@
 package client
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -1683,10 +1684,6 @@ func TestShimSockLength(t *testing.T) {
 }
 
 func TestContainerExecLargeOutputWithTTY(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Test does not run on Windows")
-	}
-
 	t.Parallel()
 
 	client, err := newClient(t, address)
@@ -1702,12 +1699,46 @@ func TestContainerExecLargeOutputWithTTY(t *testing.T) {
 	)
 	defer cancel()
 
+	f, err := os.CreateTemp("", id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		f.Close()
+		os.Remove(f.Name())
+	}()
+
+	w := bufio.NewWriter(f)
+	for i := 0; i <= 1000000; i++ {
+		w.WriteString(fmt.Sprintf("%d ", i))
+	}
+
+	w.Flush()
+	f.Close()
+
+	destination := "/numbers.txt"
+	if runtime.GOOS == "windows" {
+		destination = `C:\numbers.txt`
+	}
+	mounts := []specs.Mount{
+		{
+			Destination: destination,
+			Source:      f.Name(),
+			Options:     []string{"rbind", "ro"},
+		},
+	}
+
 	image, err = client.GetImage(ctx, testImage)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), longCommand))
+	opts := []oci.SpecOpts{oci.WithImageConfig(image), oci.WithMounts(mounts), longCommand}
+	if runtime.GOOS == "windows" {
+		opts = append(opts, oci.WithUsername("ContainerAdministrator"))
+	}
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(opts...))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1736,7 +1767,11 @@ func TestContainerExecLargeOutputWithTTY(t *testing.T) {
 
 		// start an exec process without running the original container process info
 		processSpec := spec.Process
-		withExecArgs(processSpec, "sh", "-c", `seq -s " " 1000000`)
+		cmd := []string{"sh", "-c", `cat /numbers.txt`}
+		if runtime.GOOS == "windows" {
+			cmd = []string{"cmd", "/S", "/C", `type C:\numbers.txt`}
+		}
+		withExecArgs(processSpec, cmd...)
 
 		stdout := bytes.NewBuffer(nil)
 
@@ -1768,12 +1803,16 @@ func TestContainerExecLargeOutputWithTTY(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		const expectedSuffix = "999999 1000000"
+		const expectedSuffix = "999999 1000000 "
 		stdoutString := stdout.String()
 		if !strings.Contains(stdoutString, expectedSuffix) {
-			t.Fatalf("process output does not end with %q at iteration %d, here are the last 20 characters of the output:\n\n %q", expectedSuffix, i, stdoutString[len(stdoutString)-20:])
+			startIndex := len(stdoutString) - 20
+			startIndex = 0
+			if startIndex < 0 {
+				startIndex = 0
+			}
+			t.Fatalf("process output does not end with %q at iteration %d, here are the last 20 characters of the output:\n\n %q", expectedSuffix, i, stdoutString[startIndex:])
 		}
-
 	}
 
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
@@ -1941,6 +1980,97 @@ func TestRegressionIssue4769(t *testing.T) {
 	}
 }
 
+func TestTaskUpdate(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err := client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	limit := int64(32 * 1024 * 1024)
+	memory := func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+		ulimit := uint64(limit)
+		if runtime.GOOS == "windows" {
+			if s.Windows.Resources == nil {
+				s.Windows.Resources = &specs.WindowsResources{}
+			}
+			s.Windows.Resources.Memory = &specs.WindowsMemoryResources{
+				Limit: &ulimit,
+			}
+		} else {
+			s.Linux.Resources.Memory = &specs.LinuxMemory{
+				Limit: &limit,
+			}
+		}
+		return nil
+	}
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image),
+		WithNewSpec(oci.WithImageConfig(image), longCommand, memory))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	// check that the task has a limit of 32mb
+	checkTaskMemoryUsage(t, task, limit)
+
+	limit = 64 * 1024 * 1024
+	var memoryOpts UpdateTaskOpts
+	if runtime.GOOS == "windows" {
+		ulimit := uint64(limit)
+		memoryOpts = WithResources(&specs.WindowsResources{
+			Memory: &specs.WindowsMemoryResources{
+				Limit: &ulimit,
+			},
+		})
+	} else {
+		memoryOpts = WithResources(&specs.LinuxResources{
+			Memory: &specs.LinuxMemory{
+				Limit: &limit,
+			},
+		})
+	}
+
+	if err := task.Update(ctx, memoryOpts); err != nil {
+		t.Error(err)
+	}
+	// check that the task has a limit of 64mb
+	checkTaskMemoryUsage(t, task, limit)
+
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+
+	<-statusC
+}
+
 func TestDaemonRestart(t *testing.T) {
 	client, err := newClient(t, address)
 	if err != nil {
@@ -2012,7 +2142,7 @@ func TestDaemonRestart(t *testing.T) {
 }
 
 type directIO struct {
-    cio.DirectIO
+	cio.DirectIO
 }
 
 // ioCreate returns IO available for use with task creation
@@ -2048,6 +2178,86 @@ func (f *directIO) Close() error {
 // Delete removes the underlying directory containing fifos
 func (f *directIO) Delete() error {
 	return f.DirectIO.Close()
+}
+
+func TestDaemonRestartWithRunningShim(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), longCommand))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+	defer task.Kill(ctx, syscall.SIGKILL)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+	}
+
+	pid := task.Pid()
+	if pid < 1 {
+		t.Fatalf("invalid task pid %d", pid)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	var exitStatus ExitStatus
+	if err := ctrd.Restart(func() {
+		exitStatus = <-statusC
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if exitStatus.Error() == nil {
+		t.Errorf(`first task.Wait() should have failed with "transport is closing"`)
+	}
+
+	waitCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	c, err := ctrd.waitForStart(waitCtx)
+	cancel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Close()
+
+	statusC, err = task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+
+	<-statusC
+
+	if err := kill(int(pid), 0); err != syscall.ESRCH {
+		t.Errorf("pid %d still exists. Error: %v", pid, err)
+	}
 }
 
 func initContainerAndCheckChildrenDieOnKill(t *testing.T, opts ...oci.SpecOpts) {
