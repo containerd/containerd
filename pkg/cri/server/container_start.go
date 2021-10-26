@@ -18,10 +18,9 @@ package server
 
 import (
 	"io"
+	"net/url"
 	"time"
-
 	"github.com/containerd/containerd"
-	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/nri"
@@ -30,8 +29,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
 	cio "github.com/containerd/containerd/pkg/cri/io"
+	cioo "github.com/containerd/containerd/cio"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
@@ -94,8 +93,18 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 			}
 		}
 	}
+	//Code  start
+	var logURI = "binary:/home/sergey/Studing/Final-Qualifying-Work/ContainerdUpdate/plugin?" + meta.LogPath
+	var ioCreator cioo.Creator
+	u, err := url.Parse(logURI)
+	if err != nil {
+		return nil, err
+	}
+	ioCreator = cioo.LogURI(u)
+	//Code end
+
 	//Here "start container" createIO
-	ioCreation := func(id string) (_ containerdio.IO, err error) {
+	/*ioCreation := func(id string) (_ containerdio.IO, err error) {
 		stdoutWC, stderrWC, err := c.createContainerLoggers(meta.LogPath, config.GetTty())
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create container loggers")
@@ -103,7 +112,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		cntr.IO.AddOutput("log", stdoutWC, stderrWC)
 		cntr.IO.Pipe()
 		return cntr.IO, nil
-	}
+	}*/
 
 	ctrInfo, err := container.Info(ctx)
 	if err != nil {
@@ -111,7 +120,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	}
 
 	taskOpts := c.taskOpts(ctrInfo.Runtime.Name)
-	task, err := container.NewTask(ctx, ioCreation, taskOpts...)
+	task, err := container.NewTask(ctx, ioCreator, taskOpts...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create containerd task")
 	}
