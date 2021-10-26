@@ -24,9 +24,9 @@ including the Balena project listed below.
 
 **_Alibaba's PouchContainer_** - The Alibaba [PouchContainer](https://github.com/alibaba/pouch) project uses containerd as its runtime for a cloud native offering that has unique isolation and image distribution capabilities.
 
-**_Rancher's k3s project_** - Rancher Labs [k3s](https://github.com/rancher/k3s) is a lightweight Kubernetes distribution; in their words: "Easy to install, half the memory, all in a binary less than 40mb." k8s uses containerd as the embedded runtime for this popular lightweight Kubernetes variant.
+**_CNCF's k3s project_** - The CNCF's [k3s](https://github.com/k3s-io/k3s) is a lightweight Kubernetes distribution; in their words: "Easy to install, half the memory, all in a binary less than 40mb." k8s uses containerd as the embedded runtime for this popular lightweight Kubernetes variant.
 
-**_Rancher's Rio project_** - Rancher Labs [Rio](https://github.com/rancher/rio) project uses containerd as the runtime for a combined Kubernetes, Istio, and container "Cloud Native Container Distribution" platform.
+**_Rancher's RKE2_** - Rancher Labs [RKE2](https://github.com/rancher/rke2) uses containerd as the runtime for its next-generation Kubernetes distribution. This build of containerd is compiled with [Rancher's Kubernetes Cryptographic Library](https://csrc.nist.gov/projects/cryptographic-algorithm-validation-program/details?validation=33463) to meet strict FIPS 140-2 encryption standards. 
 
 **_Eliot_** - The [Eliot](https://github.com/ernoaapa/eliot) container project for IoT device container management uses containerd as the runtime.
 
