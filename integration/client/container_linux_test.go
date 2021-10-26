@@ -46,7 +46,10 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const testUserNSImage = "ghcr.io/containerd/alpine:3.14.0"
+const (
+	testUserNSImage  = "ghcr.io/containerd/alpine:3.14.0"
+	capabilityToTest = "CAP_NET_ADMIN"
+)
 
 func TestTaskUpdate(t *testing.T) {
 	t.Parallel()
@@ -817,6 +820,75 @@ func TestContainerLoadUnexistingProcess(t *testing.T) {
 	}
 
 	<-status
+}
+
+func TestContainerCapabilities(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	direct, err := newDirectIO(ctx, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer direct.Delete()
+	var (
+		wg  sync.WaitGroup
+		buf = bytes.NewBuffer(nil)
+	)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		io.Copy(buf, direct.Stdout)
+	}()
+
+	// the www-data user in the busybox image has a uid of 33
+	container, err := client.NewContainer(ctx, id,
+		WithNewSnapshot(id, image),
+		WithNewSpec(oci.WithImageConfig(image), oci.WithUsername("www-data"), oci.WithProcessArgs("grep", "CapAmb", "/proc/self/status"), oci.WithCapabilities([]string{capabilityToTest}), oci.WithAmbientCapabilities([]string{capabilityToTest})),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, direct.IOCreate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	<-statusC
+
+	wg.Wait()
+
+	output := strings.TrimSuffix(buf.String(), "\n")
+	if !strings.Contains(output, "000000000001000") {
+		t.Errorf("expected ambient capability is set to only %v in %q", capabilityToTest, output)
+	}
 }
 
 func TestContainerUserID(t *testing.T) {

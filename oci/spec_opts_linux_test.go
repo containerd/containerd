@@ -107,6 +107,23 @@ func TestDropCaps(t *testing.T) {
 	}
 }
 
+func TestAmbientCaps(t *testing.T) {
+	t.Parallel()
+
+	var s specs.Spec
+
+	if err := WithAmbientCapabilities([]string{"CAP_NET_ADMIN"})(context.Background(), nil, nil, &s); err != nil {
+		t.Fatal(err)
+	}
+	for i, cl := range [][]string{
+		s.Process.Capabilities.Ambient,
+	} {
+		if !capsContain(cl, "CAP_NET_ADMIN") {
+			t.Errorf("cap list %d does not contain added ambient cap", i)
+		}
+	}
+}
+
 func TestGetDevices(t *testing.T) {
 	testutil.RequiresRoot(t)
 
