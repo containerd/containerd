@@ -1,0 +1,30 @@
+{
+  "author": "hsanjuan",
+  "bugs": {
+    "url": "https://github.com/ipfs/go-ipfs-exchange-interface"
+  },
+  "gx": {
+    "dvcsimport": "github.com/ipfs/go-ipfs-exchange-interface"
+  },
+  "gxDependencies": [
+    {
+      "author": "stebalien",
+      "hash": "QmYYLnAzR28nAQ4U5MFniLprnktu6eTFKibeNt96V21EZK",
+      "name": "go-block-format",
+      "version": "0.2.2"
+    },
+    {
+      "author": "whyrusleeping",
+      "hash": "QmTbxNB1NwDesLmKTscr4udL2tVP7MaxvXnD1D9yX7g3PN",
+      "name": "go-cid",
+      "version": "0.9.3"
+    }
+  ],
+  "gxVersion": "0.12.1",
+  "language": "go",
+  "license": "MIT",
+  "name": "go-ipfs-exchange-interface",
+  "releaseCmd": "git commit -a -m \"gx publish $VERSION\"",
+  "version": "0.1.3"
+}
+

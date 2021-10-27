@@ -1,0 +1,53 @@
+#!/bin/bash
+set -euo pipefail
+
+### Normalize path -- all work should be relative to this script's location.
+## Set up gopath -- also relative to this dir, so we work in isolation.
+cd "$( dirname "${BASH_SOURCE[0]}" )"
+export GOPATH="$PWD/.gopath/"
+
+funcs=()
+funcs+=("Benchmark_ArrayFlatIntToJson_Refmt")
+funcs+=("Benchmark_ArrayFlatIntToJson_Stdlib")
+funcs+=("Benchmark_ArrayFlatStrToJson_Refmt")
+funcs+=("Benchmark_ArrayFlatStrToJson_Stdlib")
+
+funcs+=("Benchmark_StructToJson_Refmt")
+funcs+=("Benchmark_StructToJson_Stdlib")
+
+profPath=".gopath/tmp/prof/" ; mkdir -p "$profPath"
+go test -i .
+export GODEBUG=allocfreetrace=1
+while read -r -u3 -d' ' func; do
+	(go test \
+		-run=XXX -bench=$func \
+		-count=1
+	) 2> "$profPath/$func.allocfreetrace" | grep "^Benchmark_"
+done 3< <(echo "${funcs[@]} ")
+ls -lah "$profPath"/*.allocfreetrace
+
+##
+## Recommendations for extracting knowledge:
+## - grep for 'refmt' lines with context ~8
+##   - you really want to get the 'tracealloc' lines in sight, because they list the object type being allocated in plain english
+## - to find the beginning of a run, it's currently correct to grep for 'api.go', then find the start of pump.Run,
+##   then feed that line number back into a grep (where your first grep for refmt lines emits line numbers).
+##   - you'll see ~3 different line numbers from api.go; the least frequent is the start of Run.
+##   - grepping ", tok.Token)" is also valid, since we have succeeded at only allocating that once per Run
+##     (though actually it's a bit of a wonder to me that it doesn't stay on the stack).
+##
+
+##
+## More generally: want:
+## - foreach tracealloc line: that line
+## - accept the following '^goroutine' line
+## - skip lines matching '^runtime.' and '^t'
+##   - maybe keep the '^runtime.' lines, because they tell you if 'newObject' vs 'makeSlice'
+## - accept two lines -- this is the proximate cause, call and source file.
+## - you can probably discard the rest
+##
+
+##
+## ALTERNATIVELY to all of this:
+##  just try '-gcflags -m' for things.  Result is much shorter, much faster, much more to the point.
+##

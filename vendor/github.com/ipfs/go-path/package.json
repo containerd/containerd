@@ -1,0 +1,41 @@
+{
+  "author": "why",
+  "bugs": {
+    "url": "https://github.com/ipfs/go-path"
+  },
+  "gx": {
+    "dvcsimport": "github.com/ipfs/go-path"
+  },
+  "gxDependencies": [
+    {
+      "author": "why",
+      "hash": "QmY6UwsN3D6uoxrRkYpJ8Wos8R66gwLmdn3wy7jM7CCRQ1",
+      "name": "go-merkledag",
+      "version": "1.1.40"
+    },
+    {
+      "author": "whyrusleeping",
+      "hash": "QmZ6nzCLwGLVfRzYLpD7pW6UNuBDKEcA2imJtVpbEx2rxy",
+      "name": "go-ipld-format",
+      "version": "0.8.1"
+    },
+    {
+      "author": "whyrusleeping",
+      "hash": "QmTbxNB1NwDesLmKTscr4udL2tVP7MaxvXnD1D9yX7g3PN",
+      "name": "go-cid",
+      "version": "0.9.3"
+    },
+    {
+      "hash": "QmbkT7eMTyXfpeyB3ZMxxcxg7XH8t6uXp49jqzz4HB7BGF",
+      "name": "go-log",
+      "version": "1.5.9"
+    }
+  ],
+  "gxVersion": "0.12.1",
+  "language": "go",
+  "license": "",
+  "name": "go-path",
+  "releaseCmd": "git commit -a -m \"gx publish $VERSION\"",
+  "version": "1.1.41"
+}
+

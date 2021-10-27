@@ -1,0 +1,10 @@
+{
+  "author": "whyrusleeping",
+  "bugs": {
+    "url": "https://github.com/multiformats/go-multibase"
+  },
+  "language": "go",
+  "license": "",
+  "name": "go-multibase",
+  "version": "0.3.0"
+}

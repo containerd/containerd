@@ -1,0 +1,6 @@
+[submodule "spec/multicodec"]
+	path = spec/multicodec
+	url = https://github.com/multiformats/multicodec.git
+[submodule "spec/multihash"]
+	path = spec/multihash
+	url = https://github.com/multiformats/multihash.git

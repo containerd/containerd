@@ -1,0 +1,22 @@
+#!/bin/bash
+set -euo pipefail
+
+PROJECT="github.com/polydawn/refmt"
+SUBSECTION=${1:-./...}
+
+export GOPATH="$PWD/.gopath"
+
+CoverPkg() {
+	pkg="$1"
+	
+	coverFile="$GOPATH/tmp/$pkg.cover"
+	mkdir -p "$(dirname "$coverFile")"
+	rm -f "$coverFile"
+	go test -coverprofile="$coverFile" "$pkg" \
+	| tee /dev/stderr | grep "\[no test files\]$" > /dev/null || \
+	go tool cover -html="$coverFile"
+}
+
+for pkg in $(go list "$SUBSECTION" | sed "s#^_${PWD}#${PROJECT}#"); do
+	CoverPkg "$pkg" || true # continue even if errors from packages that lack tests.
+done

@@ -1,0 +1,142 @@
+#!/bin/bash
+set -euo pipefail
+
+### Project details
+name="refmt"
+pkg="github.com/polydawn/$name" # everything under here will be tested
+cmd="$pkg/cmd/$name"    # if you have a main.main not at the repo root, set this
+
+
+
+### Normalize path -- all work should be relative to this script's location.
+## Set up gopath -- also relative to this dir, so we work in isolation.
+cd "$( dirname "${BASH_SOURCE[0]}" )"
+export GOPATH="$PWD/.gopath/"
+export GOBIN="$PWD/bin/"
+
+
+
+### other config scripts?  invoke here.
+## pass pointer to project root dir down, for tests (tests run in varying CWDs, so need this hint)
+export PROJ="$PWD"
+## use LDFLAGS to inject vars at compile time.
+LDFLAGS=""
+
+
+
+### Last bits of our flag parsery.
+# subcommand arg?
+SUBCOMMAND=${1:-}
+# subsection arg?
+SUBSECTION=${2:-"..."}
+SUBSECTION="./$SUBSECTION"
+# default test timeouts are far too high.  override this if you like.
+TEST_TIMEOUT="${TEST_TIMEOUT:-"5s"}"
+
+
+
+### action begins!
+if [ -z "$SUBCOMMAND" ] ; then
+	(
+		go fmt "$SUBSECTION"
+		go install -ldflags "$LDFLAGS" "$cmd" && {
+			echo -e "\E[1;32minstall successful.\E[0;m\n"
+		} || {
+			echo -e "\E[1;41minstall failed!\E[0;m"
+			exit 8
+		}
+		go test "$SUBSECTION" -timeout="$TEST_TIMEOUT" && {
+			echo -e "\n\E[1;32mall tests green.\E[0;m"
+		} || {
+			echo -e "\n\E[1;41msome tests failed!\E[0;m"
+			exit 4
+		}
+	)
+else
+	shift # munch $subcommand from passing on in "$@"
+	case "$SUBCOMMAND" in
+	-)
+		# passthrough for other commands
+		go "$@"
+		;;
+	env)
+		echo "GOROOT=`go env GOROOT`"
+		echo "GOPATH=`go env GOPATH`"
+		;;
+	path)
+		echo "$GOPATH"
+		;;
+	init)
+		# it's your responsibility to do this the first time
+		# (we don't do it at the front of every build because it will move submodules if you already have them, and that might not be what you want as you're plowing along)
+		git submodule update --init
+		# also make sure the self-symlink exists.  should be committed anyway (but then, this is also useful for project-first-steps.)
+		mkdir -p "$(dirname ".gopath/src/$pkg")"
+		ln -snf "$(echo "${pkg//[^\/]}/" | sed s#/#../#g)"../ ".gopath/src/$pkg"
+		;;
+	test)
+		set +e ; shift ; set -e # munch $subsection from passing on in "$@"
+		go test -i "$SUBSECTION" "$@" &&
+		go test -v "$SUBSECTION" -timeout="$TEST_TIMEOUT" "$@" && {
+			echo -e "\n\E[1;32mall tests green.\E[0;m"
+		} || {
+			echo -e "\n\E[1;41msome tests failed!\E[0;m"
+			exit 4
+		}
+		;;
+	install)
+		go install -ldflags "$LDFLAGS" "$cmd"
+		;;
+	bench)
+		profPath="$GOPATH/tmp/prof/"
+		mkdir -p "$profPath"
+		set +e ; shift ; set -e # munch $subsection from passing on in "$@"
+		go test -i "$SUBSECTION" "$@" &&
+		GOCONVEY_REPORTER=silent \
+		go test \
+			-run=XXX -bench=. \
+			-o "$profPath/bench.bin" \
+			-cpuprofile="$profPath/cpu.pprof" \
+			"$SUBSECTION" "$@"  || {
+				echo -e "\E[1;41msome benchmarks failed!\E[0;m"
+				exit 4
+		}
+		# use e.g.: go tool pprof --text .gopath/tmp/prof/bench.bin .gopath/tmp/prof/cpu.pprof
+		;;
+	fmt)
+		go fmt "$SUBSECTION"
+		;;
+	doc)
+		set +e ; shift ; set -e # munch $subsection from passing on in "$@"
+		for package in $(go list "$SUBSECTION" | sed "s#^_${PWD}#${pkg}#"); do
+			echo -e "==== $package ====\n"
+			godoc "$@" "$package"
+			echo -e "\n\n\n"
+		done
+		;;
+	cover)
+		coverFile="$GOPATH/tmp/cover/cover.out"
+		mkdir -p "$(dirname "$coverFile")"
+		for package in $(go list "$SUBSECTION" | sed "s#^_${PWD}#${pkg}#"); do
+			rm -f "$coverFile"
+			echo "==== $package ===="
+			go test -coverprofile="$coverFile" "$package" && \
+			[ -f "$coverFile" ] && \
+			echo ---- && \
+			go tool cover -func="$coverFile" && \
+			echo ---- && \
+			go tool cover -html="$coverFile"
+			echo ====
+			echo
+		done
+		rm -f "$coverFile"
+		;;
+	clean)
+		rm -rf "$GOBIN" "$GOPATH/pkg" "$GOPATH/tmp"
+		;;
+	*)
+		echo "Usage: $0 {init|test|install|bench|fmt|doc|cover|clean}" 1>&2;
+		exit 1
+	;;
+	esac
+fi

@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands/events"
 	"github.com/containerd/containerd/cmd/ctr/commands/images"
 	"github.com/containerd/containerd/cmd/ctr/commands/install"
+	"github.com/containerd/containerd/cmd/ctr/commands/ipfs"
 	"github.com/containerd/containerd/cmd/ctr/commands/leases"
 	namespacesCmd "github.com/containerd/containerd/cmd/ctr/commands/namespaces"
 	ociCmd "github.com/containerd/containerd/cmd/ctr/commands/oci"
@@ -114,6 +115,7 @@ containerd CLI
 		tasks.Command,
 		install.Command,
 		ociCmd.Command,
+		ipfs.Command,
 	}, extraCmds...)
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {

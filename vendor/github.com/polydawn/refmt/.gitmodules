@@ -1,0 +1,18 @@
+[submodule ".gopath/src/github.com/smartystreets/goconvey"]
+	path = .gopath/src/github.com/smartystreets/goconvey
+	url = https://github.com/smartystreets/goconvey
+[submodule ".gopath/src/github.com/smartystreets/assertions"]
+	path = .gopath/src/github.com/smartystreets/assertions
+	url = https://github.com/smartystreets/assertions
+[submodule ".gopath/src/github.com/jtolds/gls"]
+	path = .gopath/src/github.com/jtolds/gls
+	url = https://github.com/jtolds/gls
+[submodule ".gopath/src/github.com/urfave/cli"]
+	path = .gopath/src/github.com/urfave/cli
+	url = https://github.com/urfave/cli/
+[submodule ".gopath/src/github.com/go-yaml/yaml"]
+	path = .gopath/src/github.com/go-yaml/yaml
+	url = https://github.com/go-yaml/yaml/
+[submodule ".gopath/src/github.com/warpfork/go-wish"]
+	path = .gopath/src/github.com/warpfork/go-wish
+	url = https://github.com/warpfork/go-wish

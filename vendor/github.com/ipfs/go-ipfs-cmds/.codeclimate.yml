@@ -1,0 +1,15 @@
+ratings:
+  paths: 
+  - "**/*.go"
+
+exclude_paths:
+
+engines:
+  fixme:
+    enabled: true
+  golint:
+    enabled: true
+  govet:
+    enabled: true
+  gofmt:
+    enabled: true

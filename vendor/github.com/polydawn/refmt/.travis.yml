@@ -1,0 +1,17 @@
+language: go
+
+go:
+  - 1.12
+
+# I know I like my dependencies specified by custom meta tags in HTML!
+# Oh wait, no. No I don't.
+install: true
+
+script:
+  - git submodule update --init
+  - GOPATH="$PWD/.gopath/" go test ./... -v
+  - GOPATH="$PWD/.gopath/" go test ./bench/... -run=X -bench=. -benchtime=1x
+  - GOPATH="$PWD/.gopath/" GOBIN="$PWD/bin"
+
+notifications:
+  email: false

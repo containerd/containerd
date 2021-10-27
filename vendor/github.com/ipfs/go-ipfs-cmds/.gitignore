@@ -1,0 +1,9 @@
+.*.swp
+.*.swo
+cover.out
+c.out
+cover.html
+examples/adder/local/local
+examples/adder/remote/client/client
+examples/adder/remote/server/server
+coverage.out

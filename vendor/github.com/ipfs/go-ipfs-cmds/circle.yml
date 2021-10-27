@@ -1,0 +1,21 @@
+machine:
+  environment:
+    IMPORT_PATH: "github.com/ipfs/go-ipfs-cmds"
+    GOPATH: "$HOME/.go_workspace"
+
+  services:
+    - docker
+
+dependencies:
+
+  override:
+    - rm -rf "$HOME/.go_workspace/src/$IMPORT_PATH"
+    - mkdir -p "$HOME/.go_workspace/src/$IMPORT_PATH"
+    - cp -aT . "$HOME/.go_workspace/src/$IMPORT_PATH"
+    - cd "$HOME/.go_workspace/src/$IMPORT_PATH" && make deps
+
+test:
+  override:
+    - go test -race ./...:
+        pwd: "../.go_workspace/src/$IMPORT_PATH"
+        parallel: true

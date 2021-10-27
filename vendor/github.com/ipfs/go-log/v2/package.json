@@ -1,0 +1,41 @@
+{
+  "bugs": {
+    "url": "https://github.com/ipfs/go-log"
+  },
+  "gx": {
+    "dvcsimport": "github.com/ipfs/go-log"
+  },
+  "gxDependencies": [
+    {
+      "author": "whyrusleeping",
+      "hash": "QmcaSwFc5RBg8yCq54QURwEU4nwjfCpjbpmaAm4VbdGLKv",
+      "name": "go-logging",
+      "version": "0.0.0"
+    },
+    {
+      "author": "frist",
+      "hash": "QmWLWmRVSiagqP15jczsGME1qpob6HDbtbHAY2he9W5iUo",
+      "name": "opentracing-go",
+      "version": "0.0.3"
+    },
+    {
+      "author": "mattn",
+      "hash": "QmTsHcKgTQ4VeYZd8eKYpTXeLW7KNwkRD9wjnrwsV2sToq",
+      "name": "go-colorable",
+      "version": "0.2.0"
+    },
+    {
+      "author": "whyrusleeping",
+      "hash": "QmddjPSGZb3ieihSseFeCfVRpZzcqczPNsD2DvarSwnjJB",
+      "name": "gogo-protobuf",
+      "version": "1.2.1"
+    }
+  ],
+  "gxVersion": "0.12.1",
+  "language": "go",
+  "license": "",
+  "name": "go-log",
+  "releaseCmd": "git commit -a -m \"gx publish $VERSION\"",
+  "version": "1.5.9"
+}
+

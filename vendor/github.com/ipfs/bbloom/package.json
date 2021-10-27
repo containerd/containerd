@@ -1,0 +1,15 @@
+{
+  "author": "AndreasBriese",
+  "bugs": {
+    "url": "https://github.com/ipfs/bbloom"
+  },
+  "gx": {
+    "dvcsimport": "github.com/ipfs/bbloom"
+  },
+  "gxVersion": "0.7.0",
+  "language": "go",
+  "license": "MIT",
+  "name": "bbloom",
+  "version": "0.1.2"
+}
+

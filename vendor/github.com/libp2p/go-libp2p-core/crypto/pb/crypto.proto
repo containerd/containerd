@@ -1,0 +1,22 @@
+syntax = "proto2";
+
+package crypto.pb;
+
+option go_package = "github.com/libp2p/go-libp2p-core/crypto/pb";
+
+enum KeyType {
+	RSA = 0;
+	Ed25519 = 1;
+	Secp256k1 = 2;
+	ECDSA = 3;
+}
+
+message PublicKey {
+	required KeyType Type = 1;
+	required bytes Data = 2;
+}
+
+message PrivateKey {
+	required KeyType Type = 1;
+	required bytes Data = 2;
+}
