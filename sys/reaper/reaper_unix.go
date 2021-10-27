@@ -21,6 +21,7 @@ package reaper
 
 import (
 	"sync"
+	"syscall"
 	"time"
 
 	runc "github.com/containerd/go-runc"
@@ -114,6 +115,28 @@ func (m *Monitor) Wait(c *exec.Cmd, ec chan runc.Exit) (int, error) {
 	// return no such process if the ec channel is closed and no more exit
 	// events will be sent
 	return -1, ErrNoSuchProcess
+}
+
+// WaitTimeout is used to skip the blocked command and kill the left process.
+func (m *Monitor) WaitTimeout(c *exec.Cmd, ec chan runc.Exit, timeout time.Duration) (int, error) {
+	sch := make(chan int)
+	ech := make(chan error)
+	go func() {
+		status, err := m.Wait(c, ec)
+		sch <- status
+		if err != nil {
+			ech <- err
+		}
+	}()
+	select {
+	case <-time.After(timeout):
+		syscall.Kill(c.Process.Pid, syscall.SIGKILL)
+		return 0, errors.Errorf("timeout %ds for cmd(pid=%d): %s, %s", timeout/time.Second, c.Process.Pid, c.Path, c.Args)
+	case status := <-sch:
+		return status, nil
+	case err := <-ech:
+		return -1, err
+	}
 }
 
 // Subscribe to process exit changes
