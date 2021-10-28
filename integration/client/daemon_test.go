@@ -19,6 +19,7 @@ package client
 import (
 	"context"
 	"io"
+	"runtime"
 	"sync"
 	"syscall"
 
@@ -110,8 +111,12 @@ func (d *daemon) Restart(stopCb func()) error {
 		return errors.New("daemon is not running")
 	}
 
+	signal := syscall.SIGTERM
+	if runtime.GOOS == "windows" {
+		signal = syscall.SIGKILL
+	}
 	var err error
-	if err = d.cmd.Process.Signal(syscall.SIGTERM); err != nil {
+	if err = d.cmd.Process.Signal(signal); err != nil {
 		return errors.Wrap(err, "failed to signal daemon")
 	}
 

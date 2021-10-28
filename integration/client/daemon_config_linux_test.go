@@ -18,8 +18,6 @@ package client
 
 import (
 	"bufio"
-	"bytes"
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -31,90 +29,9 @@ import (
 	"github.com/containerd/cgroups"
 	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
-	srvconfig "github.com/containerd/containerd/services/server/config"
-	exec "golang.org/x/sys/execabs"
 )
-
-// the following nolint is for shutting up gometalinter on non-linux.
-// nolint: unused
-func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, func()) {
-	if testing.Short() {
-		t.Skip()
-	}
-	testutil.RequiresRoot(t)
-	var (
-		ctrd              = daemon{}
-		configTOMLDecoded srvconfig.Config
-		buf               = bytes.NewBuffer(nil)
-	)
-
-	tempDir, err := os.MkdirTemp("", "containerd-test-new-daemon-with-config")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err != nil {
-			os.RemoveAll(tempDir)
-		}
-	}()
-
-	configTOMLFile := filepath.Join(tempDir, "config.toml")
-	if err = os.WriteFile(configTOMLFile, []byte(configTOML), 0600); err != nil {
-		t.Fatal(err)
-	}
-
-	if err = srvconfig.LoadConfig(configTOMLFile, &configTOMLDecoded); err != nil {
-		t.Fatal(err)
-	}
-
-	address := configTOMLDecoded.GRPC.Address
-	if address == "" {
-		address = filepath.Join(tempDir, "containerd.sock")
-	}
-	args := []string{"-c", configTOMLFile}
-	if configTOMLDecoded.Root == "" {
-		args = append(args, "--root", filepath.Join(tempDir, "root"))
-	}
-	if configTOMLDecoded.State == "" {
-		args = append(args, "--state", filepath.Join(tempDir, "state"))
-	}
-	if err = ctrd.start("containerd", address, args, buf, buf); err != nil {
-		t.Fatalf("%v: %s", err, buf.String())
-	}
-
-	waitCtx, waitCancel := context.WithTimeout(context.TODO(), 2*time.Second)
-	client, err := ctrd.waitForStart(waitCtx)
-	waitCancel()
-	if err != nil {
-		ctrd.Kill()
-		ctrd.Wait()
-		t.Fatalf("%v: %s", err, buf.String())
-	}
-
-	cleanup := func() {
-		if err := client.Close(); err != nil {
-			t.Fatalf("failed to close client: %v", err)
-		}
-		if err := ctrd.Stop(); err != nil {
-			if err := ctrd.Kill(); err != nil {
-				t.Fatalf("failed to signal containerd: %v", err)
-			}
-		}
-		if err := ctrd.Wait(); err != nil {
-			if _, ok := err.(*exec.ExitError); !ok {
-				t.Fatalf("failed to wait for: %v", err)
-			}
-		}
-		if err := os.RemoveAll(tempDir); err != nil {
-			t.Fatalf("failed to remove %s: %v", tempDir, err)
-		}
-		// cleaning config-specific resources is up to the caller
-	}
-	return client, &ctrd, cleanup
-}
 
 // TestDaemonRuntimeRoot ensures plugin.linux.runtime_root is not ignored
 func TestDaemonRuntimeRoot(t *testing.T) {
