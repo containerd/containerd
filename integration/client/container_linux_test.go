@@ -33,130 +33,20 @@ import (
 	"github.com/containerd/cgroups"
 	cgroupsv2 "github.com/containerd/cgroups/v2"
 	. "github.com/containerd/containerd"
-	apievents "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/log/logtest"
-	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/sys"
-	"github.com/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 )
 
 const testUserNSImage = "ghcr.io/containerd/alpine:3.14.0"
-
-// TestRegressionIssue4769 verifies the number of task exit events.
-//
-// Issue: https://github.com/containerd/containerd/issues/4769.
-func TestRegressionIssue4769(t *testing.T) {
-	t.Parallel()
-
-	client, err := newClient(t, address)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
-
-	// use unique namespace to get unique task events
-	id := t.Name()
-	ns := fmt.Sprintf("%s-%s", testNamespace, id)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ctx = namespaces.WithNamespace(ctx, ns)
-	ctx = logtest.WithT(ctx, t)
-
-	image, err := client.Pull(ctx, testImage, WithPullUnpack)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.ImageService().Delete(ctx, testImage, images.SynchronousDelete())
-
-	container, err := client.NewContainer(ctx, id,
-		WithNewSnapshot(id, image),
-		WithNewSpec(oci.WithImageConfig(image), withTrue()),
-		WithRuntime(client.Runtime(), nil),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer container.Delete(ctx, WithSnapshotCleanup)
-
-	task, err := container.NewTask(ctx, empty())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer task.Delete(ctx)
-
-	statusC, err := task.Wait(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	eventStream, errC := client.EventService().Subscribe(ctx, "namespace=="+ns+",topic~=|^/tasks/exit|")
-
-	if err := task.Start(ctx); err != nil {
-		t.Fatal(err)
-	}
-
-	var timeout = 3 * time.Second
-
-	select {
-	case et := <-statusC:
-		if got := et.ExitCode(); got != 0 {
-			t.Fatal(errors.Errorf("expect zero exit status, but got %v", got))
-		}
-	case <-time.After(timeout):
-		t.Fatal(fmt.Errorf("failed to get exit event in time"))
-	}
-
-	// start to check events
-	select {
-	case et := <-eventStream:
-		if et.Event == nil {
-			t.Fatal(errors.Errorf("unexpected empty event: %+v", et))
-		}
-
-		v, err := typeurl.UnmarshalAny(et.Event)
-		if err != nil {
-			t.Fatal(errors.Wrap(err, "failed to unmarshal event"))
-		}
-
-		if e, ok := v.(*apievents.TaskExit); !ok {
-			t.Fatal(errors.Errorf("unexpected event type: %+v", v))
-		} else if e.ExitStatus != 0 {
-			t.Fatal(errors.Errorf("expect zero exit status, but got %v", e.ExitStatus))
-		}
-	case err := <-errC:
-		t.Fatal(errors.Wrap(err, "unexpected error from event service"))
-
-	case <-time.After(timeout):
-		t.Fatal(fmt.Errorf("failed to get exit event in time"))
-	}
-
-	if _, err := task.Delete(ctx); err != nil {
-		t.Fatal(err)
-	}
-
-	// check duplicate event should not show up
-	select {
-	case event := <-eventStream:
-		t.Fatal(errors.Errorf("unexpected exit event: %+v", event))
-	case err := <-errC:
-		t.Fatal(errors.Wrap(err, "unexpected error from event service"))
-	case <-time.After(timeout):
-	}
-}
 
 func TestTaskUpdate(t *testing.T) {
 	t.Parallel()
@@ -1723,67 +1613,6 @@ func TestTaskResize(t *testing.T) {
 	<-statusC
 }
 
-func TestContainerImage(t *testing.T) {
-	t.Parallel()
-
-	ctx, cancel := testContext(t)
-	defer cancel()
-	id := t.Name()
-
-	client, err := newClient(t, address)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
-
-	image, err := client.GetImage(ctx, testImage)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	container, err := client.NewContainer(ctx, id, WithNewSpec(), WithImage(image))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer container.Delete(ctx)
-
-	i, err := container.Image(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if i.Name() != image.Name() {
-		t.Fatalf("expected container image name %s but received %s", image.Name(), i.Name())
-	}
-}
-
-func TestContainerNoImage(t *testing.T) {
-	t.Parallel()
-
-	ctx, cancel := testContext(t)
-	defer cancel()
-	id := t.Name()
-
-	client, err := newClient(t, address)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
-
-	container, err := client.NewContainer(ctx, id, WithNewSpec())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer container.Delete(ctx)
-
-	_, err = container.Image(ctx)
-	if err == nil {
-		t.Fatal("error should not be nil when container is created without an image")
-	}
-	if !errdefs.IsNotFound(err) {
-		t.Fatalf("expected error to be %s but received %s", errdefs.ErrNotFound, err)
-	}
-}
-
 func TestUIDNoGID(t *testing.T) {
 	t.Parallel()
 
@@ -1933,55 +1762,6 @@ func TestBindLowPortNonOpt(t *testing.T) {
 	}
 	if _, err := task.Delete(ctx); err != nil {
 		t.Fatal(err)
-	}
-}
-
-func TestContainerNoSTDIN(t *testing.T) {
-	t.Parallel()
-
-	client, err := newClient(t, address)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
-
-	var (
-		image       Image
-		ctx, cancel = testContext(t)
-		id          = t.Name()
-	)
-	defer cancel()
-
-	image, err = client.GetImage(ctx, testImage)
-	if err != nil {
-		t.Fatal(err)
-	}
-	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withExitStatus(0)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer container.Delete(ctx, WithSnapshotCleanup)
-
-	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStreams(nil, io.Discard, io.Discard)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer task.Delete(ctx)
-
-	statusC, err := task.Wait(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := task.Start(ctx); err != nil {
-		t.Fatal(err)
-	}
-	status := <-statusC
-	code, _, err := status.Result()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if code != 0 {
-		t.Errorf("expected status 0 from wait but received %d", code)
 	}
 }
 
