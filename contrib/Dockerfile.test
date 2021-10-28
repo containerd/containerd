@@ -90,6 +90,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY script/setup/install-protobuf install-protobuf
 RUN ./install-protobuf \
+ && mkdir -p $DESTDIR/usr/local/bin $DESTDIR/usr/local/include \
  && mv /usr/local/bin/protoc $DESTDIR/usr/local/bin/protoc \
  && mv /usr/local/include/google $DESTDIR/usr/local/include/google
 
