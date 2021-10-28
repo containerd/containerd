@@ -23,32 +23,39 @@ settings.
 
 ## FORMAT
 
+**version**
+: The version field in the config file specifies the config’s version. If no
+version number is specified inside the config file then it is assumed to be a
+version 1 config and parsed as such. Please use version = 2 to enable version 2
+config as version 1 has been deprecated.
+
 **root**
 : The root directory for containerd metadata. (Default: "/var/lib/containerd")
 
 **state**
 : The state directory for containerd (Default: "/run/containerd")
 
-**oom_score**
-: The out of memory (OOM) score applied to the containerd daemon process (Default: 0)
-
-**imports**
-: Imports is a list of additional configuration files to include.
-This allows one to split the main configuration file and keep some sections
-separately (for example vendors may keep a custom runtime configuration in a
-separate file without modifying the main `config.toml`).
-Imported files will overwrite simple fields like `int` or
-`string` (if not empty) and will append `array` and `map` fields.
-Imported files are also versioned, and the version can't be higher than
-the main config.
+**plugin_dir**
+: The directory for dynamic plugins to be stored
 
 **sched_core**
 : Core scheduling is a feature that allows only trusted tasks to run concurrently
 on cpus sharing compute resources (eg: hyperthreads on a core).
 
 **[grpc]**
-: Section for gRPC socket listener settings. Contains three properties:
+: Section for gRPC socket listener settings. Contains the following properties:
  - **address** (Default: "/run/containerd/containerd.sock")
+ - **tcp_address**
+ - **tcp_tls_cert**
+ - **tcp_tls_key**
+ - **uid** (Default: 0)
+ - **gid** (Default: 0)
+ - **max_recv_message_size**
+ - **max_send_message_size**
+
+**[ttrpc]**
+: Section for TTRPC settings. Contains properties:
+ - **address** (Default: "")
  - **uid** (Default: 0)
  - **gid** (Default: 0)
 
@@ -64,9 +71,13 @@ on cpus sharing compute resources (eg: hyperthreads on a core).
  - **address** (Default: "") Metrics endpoint does not listen by default
  - **grpc_histogram** (Default: false) Turn on or off gRPC histogram metrics
 
-**[cgroup]**
-: Section for Linux cgroup specific settings
- - **path** (Default: "") Specify a custom cgroup path for created containers
+**disabled_plugins**
+: Disabled plugins are IDs of plugins to disable. Disabled plugins won't be
+initialized and started.
+
+**required_plugins**
+: Required plugins are IDs of required plugins. Containerd exits if any
+required plugin doesn't exist or fails to be initialized or started.
 
 **[plugins]**
 : The plugins section contains configuration options exposed from installed plugins.
@@ -81,12 +92,49 @@ documentation.
    **runtime_root** is the root directory used by the runtime (Default: **""**),
    **no_shim** specifies whether to use a shim or not (Default: **false**),
    **shim_debug** turns on debugging for the shim (Default: **false**)
- - **[plugins.scheduler]** has several options that perform advanced tuning for the scheduler:
+ - **[plugins."io.containerd.gc.v1.scheduler"]** has several options that perform advanced tuning for the scheduler:
    **pause_threshold** is the maximum amount of time GC should be scheduled (Default: **0.02**),
    **deletion_threshold** guarantees GC is scheduled after n number of deletions (Default: **0** [not triggered]),
    **mutation_threshold** guarantees GC is scheduled after n number of database mutations (Default: **100**),
    **schedule_delay** defines the delay after trigger event before scheduling a GC (Default **"0ms"** [immediate]),
    **startup_delay** defines the delay after startup before scheduling a GC (Default **"100ms"**)
+
+**oom_score**
+: The out of memory (OOM) score applied to the containerd daemon process (Default: 0)
+
+**[cgroup]**
+: Section for Linux cgroup specific settings
+ - **path** (Default: "") Specify a custom cgroup path for created containers
+
+**[proxy_plugins]**
+: Proxy plugins configures plugins which are communicated to over gRPC
+ - **type** (Default: "")
+ - **address** (Default: "")
+
+**timeouts**
+: Timeouts specified as a duration
+
+<!-- [timeouts]
+  "io.containerd.timeout.shim.cleanup" = "5s"
+  "io.containerd.timeout.shim.load" = "5s"
+  "io.containerd.timeout.shim.shutdown" = "3s"
+  "io.containerd.timeout.task.state" = "2s" -->
+
+**imports**
+: Imports is a list of additional configuration files to include.
+This allows to split the main configuration file and keep some sections
+separately (for example vendors may keep a custom runtime configuration in a
+separate file without modifying the main `config.toml`).
+Imported files will overwrite simple fields like `int` or
+`string` (if not empty) and will append `array` and `map` fields.
+Imported files are also versioned, and the version can't be higher than
+the main config.
+
+**stream_processors**
+ - **accepts** (Default: "[]") Accepts specific media-types
+ - **returns** (Default: "") Returns the media-type
+ - **path** (Default: "") Path or name of the binary
+ - **args** (Default: "[]") Args to the binary
 
 ## EXAMPLE
 
