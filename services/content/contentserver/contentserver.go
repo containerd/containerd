@@ -423,6 +423,10 @@ func (s *service) Write(session api.Content_WriteServer) (err error) {
 			return err
 		}
 
+		if req.Action == api.WriteActionCommit {
+			return nil
+		}
+
 		req, err = session.Recv()
 		if err != nil {
 			if err == io.EOF {
