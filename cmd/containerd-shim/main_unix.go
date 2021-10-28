@@ -308,7 +308,7 @@ func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event
 	if err != nil {
 		return err
 	}
-	status, err := reaper.Default.Wait(cmd, c)
+	status, err := reaper.Default.WaitTimeout(cmd, c, 30*time.Second)
 	if err != nil {
 		return errors.Wrapf(err, "failed to publish event: %s", b.String())
 	}
