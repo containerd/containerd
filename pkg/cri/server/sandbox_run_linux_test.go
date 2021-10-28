@@ -115,6 +115,8 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 				assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
 					Type: runtimespec.IPCNamespace,
 				})
+				assert.Contains(t, spec.Linux.Sysctl["net.ipv4.ip_unprivileged_port_start"], "0")
+				assert.Contains(t, spec.Linux.Sysctl["net.ipv4.ping_group_range"], "0 2147483647")
 			},
 		},
 		"host namespace": {
@@ -142,6 +144,8 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 				assert.NotContains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
 					Type: runtimespec.IPCNamespace,
 				})
+				assert.NotContains(t, spec.Linux.Sysctl["net.ipv4.ip_unprivileged_port_start"], "0")
+				assert.NotContains(t, spec.Linux.Sysctl["net.ipv4.ping_group_range"], "0 2147483647")
 			},
 		},
 		"should set supplemental groups correctly": {
@@ -156,9 +160,24 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 				assert.Contains(t, spec.Process.User.AdditionalGids, uint32(2222))
 			},
 		},
+		"should overwrite default sysctls": {
+			configChange: func(c *runtime.PodSandboxConfig) {
+				c.Linux.Sysctls = map[string]string{
+					"net.ipv4.ip_unprivileged_port_start": "500",
+					"net.ipv4.ping_group_range":           "1 1000",
+				}
+			},
+			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
+				require.NotNil(t, spec.Process)
+				assert.Contains(t, spec.Linux.Sysctl["net.ipv4.ip_unprivileged_port_start"], "500")
+				assert.Contains(t, spec.Linux.Sysctl["net.ipv4.ping_group_range"], "1 1000")
+			},
+		},
 	} {
 		t.Logf("TestCase %q", desc)
 		c := newTestCRIService()
+		c.config.EnableUnprivilegedICMP = true
+		c.config.EnableUnprivilegedPorts = true
 		config, imageConfig, specCheck := getRunPodSandboxTestData()
 		if test.configChange != nil {
 			test.configChange(config)

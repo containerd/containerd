@@ -107,6 +107,19 @@ version = 2
     # set to nil or `unconfined`, and the default used when the runtime default seccomp profile is requested.
   unset_seccomp_profile = ""
 
+  # enable_unprivileged_ports configures net.ipv4.ip_unprivileged_port_start=0
+  # for all containers which are not using host network
+  # and if it is not overwritten by PodSandboxConfig
+  # Note that currently default is set to disabled but target change it in future, see:
+  #   [k8s discussion](https://github.com/kubernetes/kubernetes/issues/102612)
+  enable_unprivileged_ports = false
+
+  # enable_unprivileged_icmp configures net.ipv4.ping_group_range="0 2147483647"
+  # for all containers which are not using host network, are not running in user namespace
+  # and if it is not overwritten by PodSandboxConfig
+  # Note that currently default is set to disabled but target change it in future together with enable_unprivileged_ports
+  enable_unprivileged_icmp = false
+
   # 'plugins."io.containerd.grpc.v1.cri".containerd' contains config related to containerd
   [plugins."io.containerd.grpc.v1.cri".containerd]
 
