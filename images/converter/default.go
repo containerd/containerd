@@ -48,12 +48,35 @@ func DefaultIndexConvertFunc(layerConvertFunc ConvertFunc, docker2oci bool, plat
 	return c.convert
 }
 
+// ConvertHookFunc is a callback function called during conversion of a blob.
+// orgDesc is the target descriptor to convert. newDesc is passed if conversion happens.
+type ConvertHookFunc func(ctx context.Context, cs content.Store, orgDesc ocispec.Descriptor, newDesc *ocispec.Descriptor) (*ocispec.Descriptor, error)
+
+// ConvertHooks is a configuration for hook callbacks called during blob conversion.
+type ConvertHooks struct {
+	// PostConvertHook is a callback function called for each blob after conversion is done.
+	PostConvertHook ConvertHookFunc
+}
+
+// IndexConvertFuncWithHook is the convert func used by Convert with hook functions support.
+func IndexConvertFuncWithHook(layerConvertFunc ConvertFunc, docker2oci bool, platformMC platforms.MatchComparer, hooks ConvertHooks) ConvertFunc {
+	c := &defaultConverter{
+		layerConvertFunc: layerConvertFunc,
+		docker2oci:       docker2oci,
+		platformMC:       platformMC,
+		diffIDMap:        make(map[digest.Digest]digest.Digest),
+		hooks:            hooks,
+	}
+	return c.convert
+}
+
 type defaultConverter struct {
 	layerConvertFunc ConvertFunc
 	docker2oci       bool
 	platformMC       platforms.MatchComparer
 	diffIDMap        map[digest.Digest]digest.Digest // key: old diffID, value: new diffID
 	diffIDMapMu      sync.RWMutex
+	hooks            ConvertHooks
 }
 
 // convert dispatches desc.MediaType and calls c.convert{Layer,Manifest,Index,Config}.
@@ -76,6 +99,15 @@ func (c *defaultConverter) convert(ctx context.Context, cs content.Store, desc o
 	if err != nil {
 		return nil, err
 	}
+
+	if c.hooks.PostConvertHook != nil {
+		if newDescPost, err := c.hooks.PostConvertHook(ctx, cs, desc, newDesc); err != nil {
+			return nil, err
+		} else if newDescPost != nil {
+			newDesc = newDescPost
+		}
+	}
+
 	if images.IsDockerType(desc.MediaType) {
 		if c.docker2oci {
 			if newDesc == nil {
