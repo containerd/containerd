@@ -10,7 +10,7 @@ require (
 	github.com/containerd/containerd v1.5.7
 	github.com/containerd/containerd/api v1.6.0-beta.1
 	github.com/containerd/go-runc v1.0.0
-	github.com/containerd/ttrpc v1.0.2
+	github.com/containerd/ttrpc v1.0.3-0.20211030004808-d2d6bb6f8968
 	github.com/containerd/typeurl v1.0.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/opencontainers/go-digest v1.0.0

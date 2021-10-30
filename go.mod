@@ -17,7 +17,7 @@ require (
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/imgcrypt v1.1.1
 	github.com/containerd/nri v0.1.0
-	github.com/containerd/ttrpc v1.0.2
+	github.com/containerd/ttrpc v1.0.3-0.20211030004808-d2d6bb6f8968
 	github.com/containerd/typeurl v1.0.2
 	github.com/containerd/zfs v1.0.0
 	github.com/containernetworking/plugins v1.0.1
