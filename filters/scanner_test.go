@@ -66,7 +66,7 @@ func TestScanner(t *testing.T) {
 		},
 		{
 			name:  "SelectorsWithFieldPaths",
-			input: "name==value,labels.foo=value,other.bar~=match",
+			input: "name==value,labels.foo=value,other.bar~=match,labels.io-foo==value",
 			expected: []tokenResult{
 				{pos: 0, token: tokenField, text: "name"},
 				{pos: 4, token: tokenOperator, text: "=="},
@@ -83,7 +83,13 @@ func TestScanner(t *testing.T) {
 				{pos: 35, token: tokenField, text: "bar"},
 				{pos: 38, token: tokenOperator, text: "~="},
 				{pos: 40, token: tokenValue, text: "match"},
-				{pos: 45, token: tokenEOF},
+				{pos: 45, token: tokenSeparator, text: ","},
+				{pos: 46, token: tokenField, text: "labels"},
+				{pos: 52, token: tokenSeparator, text: "."},
+				{pos: 53, token: tokenField, text: "io-foo"},
+				{pos: 59, token: tokenOperator, text: "=="},
+				{pos: 61, token: tokenValue, text: "value"},
+				{pos: 66, token: tokenEOF},
 			},
 		},
 		{
