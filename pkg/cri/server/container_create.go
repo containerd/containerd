@@ -237,6 +237,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, errors.Wrap(err, "failed to get runtime options")
 	}
 	opts = append(opts,
+		containerd.WithCDIdevices(spec),
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithRuntime(sandboxInfo.Runtime.Name, runtimeOptions),
 		containerd.WithContainerLabels(containerLabels),

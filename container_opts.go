@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	cdi "github.com/container-orchestrated-devices/container-device-interface/pkg"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
@@ -323,4 +324,26 @@ func WithSpec(s *oci.Spec, opts ...oci.SpecOpts) NewContainerOpts {
 // WithoutRefreshedMetadata will use the current metadata attached to the container object
 func WithoutRefreshedMetadata(i *InfoConfig) {
 	i.Refresh = false
+}
+
+// WithCDIdevices adds CDI devices to the spec
+func WithCDIdevices(s *oci.Spec) NewContainerOpts {
+	return func(ctx context.Context, _ *Client, c *containers.Container) error {
+		cdiDevs := []string{}
+		for _, d := range s.Linux.Devices {
+			isCDI, err := cdi.HasDevice(d.Path)
+			if err != nil {
+				continue
+			}
+			if isCDI {
+				cdiDevs = append(cdiDevs, d.Path)
+			}
+		}
+		if len(cdiDevs) > 0 {
+			if err := cdi.UpdateOCISpecForDevices(s, cdiDevs); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 }
