@@ -83,6 +83,10 @@ var platformRunFlags = []cli.Flag{
 		Name:  "cni",
 		Usage: "enable cni networking for the container",
 	},
+	cli.StringSliceFlag{
+		Name:  "cdi",
+		Usage: "CDI device in the vendor.com/device=<device name> format to add to the container",
+	},
 }
 
 // NewContainer creates a new container
@@ -294,6 +298,10 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		}
 		for _, dev := range context.StringSlice("device") {
 			opts = append(opts, oci.WithDevices(dev, "", "rwm"))
+		}
+		cdiDevices := context.StringSlice("cdi")
+		if len(cdiDevices) > 0 {
+			opts = append(opts, oci.WithCDIdevices(cdiDevices))
 		}
 
 		rootfsPropagation := context.String("rootfs-propagation")
