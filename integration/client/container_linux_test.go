@@ -41,10 +41,7 @@ import (
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/sys"
-	"github.com/containerd/typeurl"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 )
