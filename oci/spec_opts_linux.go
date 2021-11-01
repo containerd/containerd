@@ -19,6 +19,7 @@ package oci
 import (
 	"context"
 
+	cdi "github.com/container-orchestrated-devices/container-device-interface/pkg"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/pkg/cap"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -140,4 +141,12 @@ var WithAllKnownCapabilities = func(ctx context.Context, client Client, c *conta
 // WithoutRunMount removes the `/run` inside the spec
 func WithoutRunMount(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
 	return WithoutMounts("/run")(ctx, client, c, s)
+}
+
+// WithCDIDevices adds CDI devices to the spec
+func WithCDIDevices(cdiDevices []string) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		err := cdi.UpdateOCISpecForDevices(s, cdiDevices)
+		return err
+	}
 }

@@ -22,6 +22,7 @@ package oci
 import (
 	"context"
 
+	cdi "github.com/container-orchestrated-devices/container-device-interface/pkg"
 	"github.com/containerd/containerd/containers"
 )
 
@@ -55,5 +56,13 @@ func WithDevices(devicePath, containerPath, permissions string) SpecOpts {
 func WithCPUCFS(quota int64, period uint64) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
 		return nil
+	}
+}
+
+// WithCDIDevices adds CDI devices to the spec
+func WithCDIDevices(cdiDevices []string) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		err := cdi.UpdateOCISpecForDevices(s, cdiDevices)
+		return err
 	}
 }
