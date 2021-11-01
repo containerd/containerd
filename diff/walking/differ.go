@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/containerd/containerd/archive"
@@ -55,6 +56,26 @@ func NewWalkingDiff(store content.Store) diff.Comparer {
 	}
 }
 
+func readonlyOverlay(opt []string) []string {
+	out := make([]string, 0, len(opt))
+	upper := ""
+	for _, o := range opt {
+		if strings.HasPrefix(o, "upperdir=") {
+			upper = strings.TrimPrefix(o, "upperdir=")
+		} else if !strings.HasPrefix(o, "workdir=") {
+			out = append(out, o)
+		}
+	}
+	if upper != "" {
+		for i, o := range out {
+			if strings.HasPrefix(o, "lowerdir=") {
+				out[i] = "lowerdir=" + upper + ":" + strings.TrimPrefix(o, "lowerdir=")
+			}
+		}
+	}
+	return out
+}
+
 // Compare creates a diff between the given mounts and uploads the result
 // to the content store.
 func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
@@ -64,7 +85,12 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 			return emptyDesc, err
 		}
 	}
-
+	for i, m := range upper {
+		if m.Type == "overlay" {
+			upper[i].Options = readonlyOverlay(m.Options)
+			continue
+		}
+	}
 	var isCompressed bool
 	if config.Compressor != nil {
 		if config.MediaType == "" {
