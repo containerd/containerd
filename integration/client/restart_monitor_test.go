@@ -202,6 +202,7 @@ version = 2
 		t.Fatalf("%v: the task was restarted, but it must be before %v", now, expected)
 	}
 	t.Logf("%v: the task was restarted before %v", now, expected)
+	t.Log("test")
 }
 
 // withRestartStatus is a copy of "github.com/containerd/containerd/runtime/restart".WithStatus.
