@@ -107,15 +107,15 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 		shim, err := loadShim(ctx, bundle, func() {
 			log.G(ctx).WithField("id", id).Info("shim disconnected")
 
-			cleanupAfterDeadShim(context.Background(), id, ns, m.list, m.events, binaryCall)
+			cleanupAfterDeadShim(context.Background(), id, ns, m.shims, m.events, binaryCall)
 			// Remove self from the runtime task list.
-			m.list.Delete(ctx, id)
+			m.shims.Delete(ctx, id)
 		})
 		if err != nil {
-			cleanupAfterDeadShim(ctx, id, ns, m.list, m.events, binaryCall)
+			cleanupAfterDeadShim(ctx, id, ns, m.shims, m.events, binaryCall)
 			continue
 		}
-		m.list.Add(ctx, shim)
+		m.shims.Add(ctx, shim)
 	}
 	return nil
 }
@@ -133,7 +133,7 @@ func (m *ShimManager) cleanupWorkDirs(ctx context.Context) error {
 		// if the task was not loaded, cleanup and empty working directory
 		// this can happen on a reboot where /run for the bundle state is cleaned up
 		// but that persistent working dir is left
-		if _, err := m.list.Get(ctx, d.Name()); err != nil {
+		if _, err := m.shims.Get(ctx, d.Name()); err != nil {
 			path := filepath.Join(m.root, ns, d.Name())
 			if err := os.RemoveAll(path); err != nil {
 				log.G(ctx).WithError(err).Errorf("cleanup working dir %s", path)

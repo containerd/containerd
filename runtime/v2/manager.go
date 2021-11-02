@@ -114,7 +114,7 @@ func init() {
 }
 
 func migrateTasks(ic *plugin.InitContext, shimManager *ShimManager) error {
-	if !shimManager.list.IsEmpty() {
+	if !shimManager.shims.IsEmpty() {
 		return nil
 	}
 
@@ -122,29 +122,29 @@ func migrateTasks(ic *plugin.InitContext, shimManager *ShimManager) error {
 	// `Root` and `State` dirs expected to be empty at this point (we check that there are no shims loaded above).
 	// If for some they are not empty, these remove calls will fail (`os.Remove` requires a dir to be empty to succeed).
 	if err := os.Remove(shimManager.root); err != nil && !os.IsNotExist(err) {
-		return err
+		return fmt.Errorf("failed to remove `root` dir: %w", err)
 	}
 
 	if err := os.Remove(shimManager.state); err != nil && !os.IsNotExist(err) {
-		return err
+		return fmt.Errorf("failed to remove `state` dir: %w", err)
 	}
 
 	if err := os.Rename(ic.Root, shimManager.root); err != nil {
 		if os.IsNotExist(err) {
 			return nil
 		}
-		return fmt.Errorf("failed to migrate task `root` directory")
+		return fmt.Errorf("failed to migrate task `root` directory: %w", err)
 	}
 
 	if err := os.Rename(ic.State, shimManager.state); err != nil {
 		if os.IsNotExist(err) {
 			return nil
 		}
-		return fmt.Errorf("failed to migrate task `state` directory")
+		return fmt.Errorf("failed to migrate task `state` directory: %w", err)
 	}
 
 	if err := shimManager.loadExistingTasks(ic.Context); err != nil {
-		return fmt.Errorf("failed to load tasks after migration")
+		return fmt.Errorf("failed to load tasks after migration: %w", err)
 	}
 
 	return nil
@@ -173,7 +173,7 @@ func NewShimManager(ctx context.Context, config *ManagerConfig) (*ShimManager, e
 		state:                  config.State,
 		containerdAddress:      config.Address,
 		containerdTTRPCAddress: config.TTRPCAddress,
-		list:                   runtime.NewTaskList(),
+		shims:                  runtime.NewTaskList(),
 		events:                 config.Events,
 		containers:             config.Store,
 		schedCore:              config.SchedCore,
@@ -196,7 +196,7 @@ type ShimManager struct {
 	containerdAddress      string
 	containerdTTRPCAddress string
 	schedCore              bool
-	list                   *runtime.TaskList
+	shims                  *runtime.TaskList
 	events                 *exchange.Exchange
 	containers             containers.Store
 }
@@ -235,7 +235,7 @@ func (m *ShimManager) Start(ctx context.Context, id string, opts runtime.CreateO
 		task: task.NewTaskClient(shim.client),
 	}
 
-	if err := m.list.Add(ctx, shimTask); err != nil {
+	if err := m.shims.Add(ctx, shimTask); err != nil {
 		return nil, errors.Wrap(err, "failed to add task")
 	}
 
@@ -262,12 +262,12 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 	shim, err := b.Start(ctx, topts, func() {
 		log.G(ctx).WithField("id", id).Info("shim disconnected")
 
-		cleanupAfterDeadShim(context.Background(), id, ns, m.list, m.events, b)
+		cleanupAfterDeadShim(context.Background(), id, ns, m.shims, m.events, b)
 		// Remove self from the runtime task list. Even though the cleanupAfterDeadShim()
 		// would publish taskExit event, but the shim.Delete() would always failed with ttrpc
 		// disconnect and there is no chance to remove this dead task from runtime task lists.
 		// Thus it's better to delete it here.
-		m.list.Delete(ctx, id)
+		m.shims.Delete(ctx, id)
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "start failed")
@@ -282,11 +282,11 @@ func (m *ShimManager) cleanupShim(shim *shim) {
 	defer cancel()
 
 	_ = shim.delete(dctx)
-	m.list.Delete(dctx, shim.ID())
+	m.shims.Delete(dctx, shim.ID())
 }
 
 func (m *ShimManager) Get(ctx context.Context, id string) (ShimProcess, error) {
-	proc, err := m.list.Get(ctx, id)
+	proc, err := m.shims.Get(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -296,14 +296,14 @@ func (m *ShimManager) Get(ctx context.Context, id string) (ShimProcess, error) {
 
 // Delete a runtime task
 func (m *ShimManager) Delete(ctx context.Context, id string) error {
-	proc, err := m.list.Get(ctx, id)
+	proc, err := m.shims.Get(ctx, id)
 	if err != nil {
 		return err
 	}
 
 	shimTask := proc.(*shimTask)
 	err = shimTask.shim.delete(ctx)
-	m.list.Delete(ctx, id)
+	m.shims.Delete(ctx, id)
 
 	return err
 }
@@ -322,13 +322,13 @@ func parsePlatforms(platformStr []string) ([]ocispec.Platform, error) {
 
 // TaskManager wraps task service client on top of shim manager.
 type TaskManager struct {
-	shims *ShimManager
+	manager *ShimManager
 }
 
 // NewTaskManager creates a new task manager instance.
 func NewTaskManager(shims *ShimManager) *TaskManager {
 	return &TaskManager{
-		shims: shims,
+		manager: shims,
 	}
 }
 
@@ -339,11 +339,13 @@ func (m *TaskManager) ID() string {
 
 // Create launches new shim instance and creates new task
 func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.CreateOpts) (runtime.Task, error) {
-	process, err := m.shims.Start(ctx, taskID, opts)
+	process, err := m.manager.Start(ctx, taskID, opts)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to start shim")
 	}
 
+	// Cast to shim task and call task service to create a new container task instance.
+	// This will not be required once shim service / client implemented.
 	shim := process.(*shimTask)
 	t, err := shim.Create(ctx, opts)
 	if err != nil {
@@ -351,7 +353,7 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 		defer cancel()
 
 		_, errShim := shim.delete(dctx, func(ctx context.Context, id string) {
-			m.shims.list.Delete(ctx, id)
+			m.manager.shims.Delete(ctx, id)
 		})
 
 		if errShim != nil {
@@ -372,24 +374,24 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 
 // Get a specific task
 func (m *TaskManager) Get(ctx context.Context, id string) (runtime.Task, error) {
-	return m.shims.list.Get(ctx, id)
+	return m.manager.shims.Get(ctx, id)
 }
 
 // Tasks lists all tasks
 func (m *TaskManager) Tasks(ctx context.Context, all bool) ([]runtime.Task, error) {
-	return m.shims.list.GetAll(ctx, all)
+	return m.manager.shims.GetAll(ctx, all)
 }
 
 // Delete deletes the task and shim instance
 func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit, error) {
-	item, err := m.shims.list.Get(ctx, taskID)
+	item, err := m.manager.shims.Get(ctx, taskID)
 	if err != nil {
 		return nil, err
 	}
 
 	shimTask := item.(*shimTask)
 	exit, err := shimTask.delete(ctx, func(ctx context.Context, id string) {
-		m.shims.list.Delete(ctx, id)
+		m.manager.shims.Delete(ctx, id)
 	})
 
 	if err != nil {
