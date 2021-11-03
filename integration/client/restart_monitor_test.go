@@ -174,7 +174,11 @@ version = 2
 
 	begin := time.Now()
 
-	expected := begin.Add(interval).Add(epsilon)
+	// The restart is "truly" expected after (interval + epsilon), but due to some flakiness in CI, we give it a bit extra time.
+	// Specifically, we give an extra "grace period" of (count / 2) seconds.
+	expected := begin.Add(interval).Add(epsilon * (count / 2))
+
+	// Deadline determines when check for restart should be aborted.
 	deadline := begin.Add(interval).Add(epsilon * count)
 	for {
 		status, err := task.Status(ctx)
