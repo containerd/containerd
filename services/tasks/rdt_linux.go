@@ -31,7 +31,13 @@ const (
 	ResctrlPrefix = ""
 )
 
+var rdtEnabled bool
+
+func RdtEnabled() bool { return rdtEnabled }
+
 func initRdt(configFilePath string) error {
+	rdtEnabled = false
+
 	if configFilePath == "" {
 		log.L.Debug("No RDT config file specified, RDT not configured")
 		return nil
@@ -44,6 +50,8 @@ func initRdt(configFilePath string) error {
 	if err := rdt.SetConfigFromFile(configFilePath, true); err != nil {
 		return err
 	}
+
+	rdtEnabled = true
 
 	return nil
 
