@@ -32,6 +32,6 @@ func init() {
 	ns := metrics.NewNamespace("containerd", "", nil)
 	buildInfoLabeledCounter = ns.NewLabeledCounter("build_info", "containerd build information", "version", "revision")
 	buildInfoLabeledCounter.WithValues(version.Version, version.Revision).Inc()
-	GcCounter = ns.NewLabeledCounter("gc", "Run time of garbage collection", "success", "failed")
+	GcCounter = ns.NewLabeledCounter("gc", "Run time of garbage collection", "status")
 	metrics.Register(ns)
 }
