@@ -18,12 +18,20 @@ package metrics
 
 import (
 	"github.com/containerd/containerd/version"
-	goMetrics "github.com/docker/go-metrics"
+	metrics "github.com/docker/go-metrics"
+)
+
+var (
+	// GcCounter metrics for garbage collection
+	GcCounter metrics.LabeledCounter
+
+	buildInfoLabeledCounter metrics.LabeledCounter
 )
 
 func init() {
-	ns := goMetrics.NewNamespace("containerd", "", nil)
-	c := ns.NewLabeledCounter("build_info", "containerd build information", "version", "revision")
-	c.WithValues(version.Version, version.Revision).Inc()
-	goMetrics.Register(ns)
+	ns := metrics.NewNamespace("containerd", "", nil)
+	buildInfoLabeledCounter = ns.NewLabeledCounter("build_info", "containerd build information", "version", "revision")
+	buildInfoLabeledCounter.WithValues(version.Version, version.Revision).Inc()
+	GcCounter = ns.NewLabeledCounter("gc", "Run time of garbage collection", "success", "failed")
+	metrics.Register(ns)
 }

@@ -24,6 +24,7 @@ import (
 
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/metrics"
 	"github.com/containerd/containerd/plugin"
 	"github.com/pkg/errors"
 )
@@ -255,7 +256,6 @@ func (s *gcScheduler) run(ctx context.Context) {
 		interval    = time.Second
 		gcTime      time.Duration
 		collections int
-		// TODO(dmcg): expose collection stats as metrics
 
 		triggered bool
 		deletions int
@@ -311,7 +311,7 @@ func (s *gcScheduler) run(ctx context.Context) {
 		last := time.Now()
 		if err != nil {
 			log.G(ctx).WithError(err).Error("garbage collection failed")
-
+			metrics.GcCounter.WithValues("failed").Inc()
 			// Reschedule garbage collection for same duration + 1 second
 			schedC, nextCollection = schedule(nextCollection.Sub(*lastCollection) + time.Second)
 
@@ -330,6 +330,7 @@ func (s *gcScheduler) run(ctx context.Context) {
 
 		gcTime += stats.Elapsed()
 		collections++
+		metrics.GcCounter.WithValues("success").Inc()
 		triggered = false
 		deletions = 0
 		mutations = 0
