@@ -18,6 +18,7 @@ package v2
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -37,6 +38,7 @@ import (
 	"github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/ttrpc"
 	ptypes "github.com/gogo/protobuf/types"
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -61,7 +63,7 @@ func loadAddress(path string) (string, error) {
 	return string(data), nil
 }
 
-func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ *shim, err error) {
+func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ *shimTask, err error) {
 	address, err := loadAddress(filepath.Join(bundle.Path, "address"))
 	if err != nil {
 		return nil, err
@@ -115,10 +117,12 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ *shim, err
 			client.Close()
 		}
 	}()
-	s := &shim{
-		client: client,
-		task:   task.NewTaskClient(client),
-		bundle: bundle,
+	s := &shimTask{
+		shim: &shim{
+			bundle: bundle,
+			client: client,
+		},
+		task: task.NewTaskClient(client),
 	}
 	ctx, cancel := timeout.WithContext(ctx, loadTimeout)
 	defer cancel()
@@ -182,45 +186,24 @@ func cleanupAfterDeadShim(ctx context.Context, id, ns string, rt *runtime.TaskLi
 	})
 }
 
-var _ runtime.Task = &shim{}
+// ShimProcess represents a shim instance managed by the shim service.
+type ShimProcess interface {
+	runtime.Process
+
+	// ID of the shim.
+	ID() string
+	// Namespace of this shim.
+	Namespace() string
+}
 
 type shim struct {
 	bundle *Bundle
 	client *ttrpc.Client
-	task   task.TaskService
-}
-
-func (s *shim) Shutdown(ctx context.Context) error {
-	_, err := s.task.Shutdown(ctx, &task.ShutdownRequest{
-		ID: s.ID(),
-	})
-	if err != nil && !errors.Is(err, ttrpc.ErrClosed) {
-		return errdefs.FromGRPC(err)
-	}
-	return nil
-}
-
-func (s *shim) waitShutdown(ctx context.Context) error {
-	ctx, cancel := timeout.WithContext(ctx, shutdownTimeout)
-	defer cancel()
-	return s.Shutdown(ctx)
 }
 
 // ID of the shim/task
 func (s *shim) ID() string {
 	return s.bundle.ID
-}
-
-// PID of the task
-func (s *shim) PID(ctx context.Context) (uint32, error) {
-	response, err := s.task.Connect(ctx, &task.ConnectRequest{
-		ID: s.ID(),
-	})
-	if err != nil {
-		return 0, errdefs.FromGRPC(err)
-	}
-
-	return response.TaskPid, nil
 }
 
 func (s *shim) Namespace() string {
@@ -231,7 +214,64 @@ func (s *shim) Close() error {
 	return s.client.Close()
 }
 
-func (s *shim) delete(ctx context.Context, removeTask func(ctx context.Context, id string)) (*runtime.Exit, error) {
+func (s *shim) delete(ctx context.Context) error {
+	var (
+		result *multierror.Error
+	)
+
+	if err := s.Close(); err != nil {
+		result = multierror.Append(result, fmt.Errorf("failed to close ttrpc client: %w", err))
+	}
+
+	if err := s.client.UserOnCloseWait(ctx); err != nil {
+		result = multierror.Append(result, fmt.Errorf("close wait error: %w", err))
+	}
+
+	if err := s.bundle.Delete(); err != nil {
+		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete bundle")
+		result = multierror.Append(result, fmt.Errorf("failed to delete bundle: %w", err))
+	}
+
+	return result.ErrorOrNil()
+}
+
+var _ runtime.Task = &shimTask{}
+
+// shimTask wraps shim process and adds task service client for compatibility with existing shim manager.
+type shimTask struct {
+	*shim
+	task task.TaskService
+}
+
+func (s *shimTask) Shutdown(ctx context.Context) error {
+	_, err := s.task.Shutdown(ctx, &task.ShutdownRequest{
+		ID: s.ID(),
+	})
+	if err != nil && !errors.Is(err, ttrpc.ErrClosed) {
+		return errdefs.FromGRPC(err)
+	}
+	return nil
+}
+
+func (s *shimTask) waitShutdown(ctx context.Context) error {
+	ctx, cancel := timeout.WithContext(ctx, shutdownTimeout)
+	defer cancel()
+	return s.Shutdown(ctx)
+}
+
+// PID of the task
+func (s *shimTask) PID(ctx context.Context) (uint32, error) {
+	response, err := s.task.Connect(ctx, &task.ConnectRequest{
+		ID: s.ID(),
+	})
+	if err != nil {
+		return 0, errdefs.FromGRPC(err)
+	}
+
+	return response.TaskPid, nil
+}
+
+func (s *shimTask) delete(ctx context.Context, removeTask func(ctx context.Context, id string)) (*runtime.Exit, error) {
 	response, shimErr := s.task.Delete(ctx, &task.DeleteRequest{
 		ID: s.ID(),
 	})
@@ -260,20 +300,21 @@ func (s *shim) delete(ctx context.Context, removeTask func(ctx context.Context, 
 	}
 
 	if err := s.waitShutdown(ctx); err != nil {
-		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim")
+		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim task")
 	}
-	s.Close()
-	s.client.UserOnCloseWait(ctx)
+
+	if err := s.shim.delete(ctx); err != nil {
+		log.G(ctx).WithField("id", s.ID()).WithError(err).Errorf("failed to delete shim")
+	}
 
 	// remove self from the runtime task list
 	// this seems dirty but it cleans up the API across runtimes, tasks, and the service
 	removeTask(ctx, s.ID())
-	if err := s.bundle.Delete(); err != nil {
-		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete bundle")
-	}
+
 	if shimErr != nil {
 		return nil, shimErr
 	}
+
 	return &runtime.Exit{
 		Status:    response.ExitStatus,
 		Timestamp: response.ExitedAt,
@@ -281,7 +322,7 @@ func (s *shim) delete(ctx context.Context, removeTask func(ctx context.Context, 
 	}, nil
 }
 
-func (s *shim) Create(ctx context.Context, opts runtime.CreateOpts) (runtime.Task, error) {
+func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime.Task, error) {
 	topts := opts.TaskOptions
 	if topts == nil {
 		topts = opts.RuntimeOptions
@@ -312,7 +353,7 @@ func (s *shim) Create(ctx context.Context, opts runtime.CreateOpts) (runtime.Tas
 	return s, nil
 }
 
-func (s *shim) Pause(ctx context.Context) error {
+func (s *shimTask) Pause(ctx context.Context) error {
 	if _, err := s.task.Pause(ctx, &task.PauseRequest{
 		ID: s.ID(),
 	}); err != nil {
@@ -321,7 +362,7 @@ func (s *shim) Pause(ctx context.Context) error {
 	return nil
 }
 
-func (s *shim) Resume(ctx context.Context) error {
+func (s *shimTask) Resume(ctx context.Context) error {
 	if _, err := s.task.Resume(ctx, &task.ResumeRequest{
 		ID: s.ID(),
 	}); err != nil {
@@ -330,7 +371,7 @@ func (s *shim) Resume(ctx context.Context) error {
 	return nil
 }
 
-func (s *shim) Start(ctx context.Context) error {
+func (s *shimTask) Start(ctx context.Context) error {
 	_, err := s.task.Start(ctx, &task.StartRequest{
 		ID: s.ID(),
 	})
@@ -340,7 +381,7 @@ func (s *shim) Start(ctx context.Context) error {
 	return nil
 }
 
-func (s *shim) Kill(ctx context.Context, signal uint32, all bool) error {
+func (s *shimTask) Kill(ctx context.Context, signal uint32, all bool) error {
 	if _, err := s.task.Kill(ctx, &task.KillRequest{
 		ID:     s.ID(),
 		Signal: signal,
@@ -351,7 +392,7 @@ func (s *shim) Kill(ctx context.Context, signal uint32, all bool) error {
 	return nil
 }
 
-func (s *shim) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runtime.ExecProcess, error) {
+func (s *shimTask) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runtime.ExecProcess, error) {
 	if err := identifiers.Validate(id); err != nil {
 		return nil, errors.Wrapf(err, "invalid exec id %s", id)
 	}
@@ -373,7 +414,7 @@ func (s *shim) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runt
 	}, nil
 }
 
-func (s *shim) Pids(ctx context.Context) ([]runtime.ProcessInfo, error) {
+func (s *shimTask) Pids(ctx context.Context) ([]runtime.ProcessInfo, error) {
 	resp, err := s.task.Pids(ctx, &task.PidsRequest{
 		ID: s.ID(),
 	})
@@ -390,7 +431,7 @@ func (s *shim) Pids(ctx context.Context) ([]runtime.ProcessInfo, error) {
 	return processList, nil
 }
 
-func (s *shim) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
+func (s *shimTask) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
 	_, err := s.task.ResizePty(ctx, &task.ResizePtyRequest{
 		ID:     s.ID(),
 		Width:  size.Width,
@@ -402,7 +443,7 @@ func (s *shim) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
 	return nil
 }
 
-func (s *shim) CloseIO(ctx context.Context) error {
+func (s *shimTask) CloseIO(ctx context.Context) error {
 	_, err := s.task.CloseIO(ctx, &task.CloseIORequest{
 		ID:    s.ID(),
 		Stdin: true,
@@ -413,7 +454,7 @@ func (s *shim) CloseIO(ctx context.Context) error {
 	return nil
 }
 
-func (s *shim) Wait(ctx context.Context) (*runtime.Exit, error) {
+func (s *shimTask) Wait(ctx context.Context) (*runtime.Exit, error) {
 	taskPid, err := s.PID(ctx)
 	if err != nil {
 		return nil, err
@@ -431,7 +472,7 @@ func (s *shim) Wait(ctx context.Context) (*runtime.Exit, error) {
 	}, nil
 }
 
-func (s *shim) Checkpoint(ctx context.Context, path string, options *ptypes.Any) error {
+func (s *shimTask) Checkpoint(ctx context.Context, path string, options *ptypes.Any) error {
 	request := &task.CheckpointTaskRequest{
 		ID:      s.ID(),
 		Path:    path,
@@ -443,7 +484,7 @@ func (s *shim) Checkpoint(ctx context.Context, path string, options *ptypes.Any)
 	return nil
 }
 
-func (s *shim) Update(ctx context.Context, resources *ptypes.Any, annotations map[string]string) error {
+func (s *shimTask) Update(ctx context.Context, resources *ptypes.Any, annotations map[string]string) error {
 	if _, err := s.task.Update(ctx, &task.UpdateTaskRequest{
 		ID:          s.ID(),
 		Resources:   resources,
@@ -454,7 +495,7 @@ func (s *shim) Update(ctx context.Context, resources *ptypes.Any, annotations ma
 	return nil
 }
 
-func (s *shim) Stats(ctx context.Context) (*ptypes.Any, error) {
+func (s *shimTask) Stats(ctx context.Context) (*ptypes.Any, error) {
 	response, err := s.task.Stats(ctx, &task.StatsRequest{
 		ID: s.ID(),
 	})
@@ -464,7 +505,7 @@ func (s *shim) Stats(ctx context.Context) (*ptypes.Any, error) {
 	return response.Stats, nil
 }
 
-func (s *shim) Process(ctx context.Context, id string) (runtime.ExecProcess, error) {
+func (s *shimTask) Process(ctx context.Context, id string) (runtime.ExecProcess, error) {
 	p := &process{
 		id:   id,
 		shim: s,
@@ -475,7 +516,7 @@ func (s *shim) Process(ctx context.Context, id string) (runtime.ExecProcess, err
 	return p, nil
 }
 
-func (s *shim) State(ctx context.Context) (runtime.State, error) {
+func (s *shimTask) State(ctx context.Context) (runtime.State, error) {
 	response, err := s.task.State(ctx, &task.StateRequest{
 		ID: s.ID(),
 	})

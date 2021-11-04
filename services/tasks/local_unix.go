@@ -30,6 +30,7 @@ var tasksServiceRequires = []plugin.Type{
 	plugin.EventPlugin,
 	plugin.RuntimePlugin,
 	plugin.RuntimePluginV2,
+	plugin.RuntimeShimPlugin,
 	plugin.MetadataPlugin,
 	plugin.TaskMonitorPlugin,
 }

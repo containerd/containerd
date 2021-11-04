@@ -24,6 +24,7 @@ import (
 var tasksServiceRequires = []plugin.Type{
 	plugin.EventPlugin,
 	plugin.RuntimePluginV2,
+	plugin.RuntimeShimPlugin,
 	plugin.MetadataPlugin,
 	plugin.TaskMonitorPlugin,
 }
