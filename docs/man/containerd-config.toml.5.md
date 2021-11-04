@@ -44,32 +44,36 @@ on cpus sharing compute resources (eg: hyperthreads on a core).
 
 **[grpc]**
 : Section for gRPC socket listener settings. Contains the following properties:
- - **address** (Default: "/run/containerd/containerd.sock")
- - **tcp_address**
- - **tcp_tls_cert**
- - **tcp_tls_key**
- - **uid** (Default: 0)
- - **gid** (Default: 0)
- - **max_recv_message_size**
- - **max_send_message_size**
+
+- **address** (Default: "/run/containerd/containerd.sock")
+- **tcp_address**
+- **tcp_tls_cert**
+- **tcp_tls_key**
+- **uid** (Default: 0)
+- **gid** (Default: 0)
+- **max_recv_message_size**
+- **max_send_message_size**
 
 **[ttrpc]**
 : Section for TTRPC settings. Contains properties:
- - **address** (Default: "")
- - **uid** (Default: 0)
- - **gid** (Default: 0)
+
+- **address** (Default: "")
+- **uid** (Default: 0)
+- **gid** (Default: 0)
 
 **[debug]**
 : Section to enable and configure a debug socket listener. Contains four properties:
- - **address** (Default: "/run/containerd/debug.sock")
- - **uid** (Default: 0)
- - **gid** (Default: 0)
- - **level** (Default: "info") sets the debug log level
+
+- **address** (Default: "/run/containerd/debug.sock")
+- **uid** (Default: 0)
+- **gid** (Default: 0)
+- **level** (Default: "info") sets the debug log level
 
 **[metrics]**
 : Section to enable and configure a metrics listener. Contains two properties:
- - **address** (Default: "") Metrics endpoint does not listen by default
- - **grpc_histogram** (Default: false) Turn on or off gRPC histogram metrics
+
+- **address** (Default: "") Metrics endpoint does not listen by default
+- **grpc_histogram** (Default: false) Turn on or off gRPC histogram metrics
 
 **disabled_plugins**
 : Disabled plugins are IDs of plugins to disable. Disabled plugins won't be
@@ -84,32 +88,35 @@ required plugin doesn't exist or fails to be initialized or started.
 The following plugins are enabled by default and their settings are shown below.
 Plugins that are not enabled by default will provide their own configuration values
 documentation.
- - **[plugins.cgroup]** has one option __no_prometheus__ (Default: **false**)
- - **[plugins.diff]** has one option __default__, a list by default set to **["walking"]**
- - **[plugins.linux]** has several options for configuring the runtime, shim, and related options:
-   **shim** specifies the shim binary (Default: **"containerd-shim"**),
-   **runtime** is the OCI compliant runtime binary (Default: **"runc"**),
-   **runtime_root** is the root directory used by the runtime (Default: **""**),
-   **no_shim** specifies whether to use a shim or not (Default: **false**),
-   **shim_debug** turns on debugging for the shim (Default: **false**)
- - **[plugins."io.containerd.gc.v1.scheduler"]** has several options that perform advanced tuning for the scheduler:
-   **pause_threshold** is the maximum amount of time GC should be scheduled (Default: **0.02**),
-   **deletion_threshold** guarantees GC is scheduled after n number of deletions (Default: **0** [not triggered]),
-   **mutation_threshold** guarantees GC is scheduled after n number of database mutations (Default: **100**),
-   **schedule_delay** defines the delay after trigger event before scheduling a GC (Default **"0ms"** [immediate]),
-   **startup_delay** defines the delay after startup before scheduling a GC (Default **"100ms"**)
+
+- **[plugins.cgroup]** has one option __no_prometheus__ (Default: **false**)
+- **[plugins.diff]** has one option __default__, a list by default set to **["walking"]**
+- **[plugins.linux]** has several options for configuring the runtime, shim, and related options:
+  - **shim** specifies the shim binary (Default: **"containerd-shim"**),
+  - **runtime** is the OCI compliant runtime binary (Default: **"runc"**),
+  - **runtime_root** is the root directory used by the runtime (Default: **""**),
+  - **no_shim** specifies whether to use a shim or not (Default: **false**),
+  - **shim_debug** turns on debugging for the shim (Default: **false**)
+- **[plugins."io.containerd.gc.v1.scheduler"]** has several options that perform advanced tuning for the scheduler:
+  - **pause_threshold** is the maximum amount of time GC should be scheduled (Default: **0.02**),
+  - **deletion_threshold** guarantees GC is scheduled after n number of deletions (Default: **0** [not triggered]),
+  - **mutation_threshold** guarantees GC is scheduled after n number of database mutations (Default: **100**),
+  - **schedule_delay** defines the delay after trigger event before scheduling a GC (Default **"0ms"** [immediate]),
+  - **startup_delay** defines the delay after startup before scheduling a GC (Default **"100ms"**)
 
 **oom_score**
 : The out of memory (OOM) score applied to the containerd daemon process (Default: 0)
 
 **[cgroup]**
 : Section for Linux cgroup specific settings
- - **path** (Default: "") Specify a custom cgroup path for created containers
+
+- **path** (Default: "") Specify a custom cgroup path for created containers
 
 **[proxy_plugins]**
 : Proxy plugins configures plugins which are communicated to over gRPC
- - **type** (Default: "")
- - **address** (Default: "")
+
+- **type** (Default: "")
+- **address** (Default: "")
 
 **timeouts**
 : Timeouts specified as a duration
@@ -131,10 +138,11 @@ Imported files are also versioned, and the version can't be higher than
 the main config.
 
 **stream_processors**
- - **accepts** (Default: "[]") Accepts specific media-types
- - **returns** (Default: "") Returns the media-type
- - **path** (Default: "") Path or name of the binary
- - **args** (Default: "[]") Args to the binary
+
+- **accepts** (Default: "[]") Accepts specific media-types
+- **returns** (Default: "") Returns the media-type
+- **path** (Default: "") Path or name of the binary
+- **args** (Default: "[]") Args to the binary
 
 ## EXAMPLE
 
