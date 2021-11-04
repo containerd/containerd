@@ -38,10 +38,6 @@ config as version 1 has been deprecated.
 **plugin_dir**
 : The directory for dynamic plugins to be stored
 
-**sched_core**
-: Core scheduling is a feature that allows only trusted tasks to run concurrently
-on cpus sharing compute resources (eg: hyperthreads on a core).
-
 **[grpc]**
 : Section for gRPC socket listener settings. Contains the following properties:
 
@@ -103,6 +99,11 @@ documentation.
   - **mutation_threshold** guarantees GC is scheduled after n number of database mutations (Default: **100**),
   - **schedule_delay** defines the delay after trigger event before scheduling a GC (Default **"0ms"** [immediate]),
   - **startup_delay** defines the delay after startup before scheduling a GC (Default **"100ms"**)
+- **[plugins."io.containerd.runtime-shim.v2.shim"]** specifies options for configuring the runtime shim:
+  - **platforms** specifies the list of supported platforms
+  - **sched_core** Core scheduling is a feature that allows only trusted tasks
+    to run concurrently on cpus sharing compute resources (eg: hyperthreads on
+    a core). (Default: **false**)
 
 **oom_score**
 : The out of memory (OOM) score applied to the containerd daemon process (Default: 0)
@@ -153,7 +154,6 @@ root = "/var/lib/containerd"
 state = "/run/containerd"
 oom_score = 0
 imports = ["/etc/containerd/runtime_*.toml", "./debug.toml"]
-sched_core = true
 
 [grpc]
   address = "/run/containerd/containerd.sock"
@@ -190,6 +190,9 @@ sched_core = true
     mutation_threshold = 100
     schedule_delay = 0
     startup_delay = "100ms"
+  [plugins."io.containerd.runtime-shim.v2.shim"]
+    platforms = ["linux/amd64"]
+    sched_core = true
 ```
 
 ## BUGS
