@@ -54,6 +54,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/tchap/go-patricia v2.2.6+incompatible
 	github.com/urfave/cli v1.22.2
+	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
 	go.etcd.io/bbolt v1.3.6
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.24.0
 	go.opentelemetry.io/otel v1.0.1
@@ -71,7 +72,7 @@ require (
 	k8s.io/apiserver v0.22.0
 	k8s.io/client-go v0.22.0
 	k8s.io/component-base v0.22.0
-	k8s.io/cri-api v0.22.0
+	k8s.io/cri-api v0.23.0-alpha.4
 	k8s.io/klog/v2 v2.9.0
 	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
 )

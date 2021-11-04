@@ -24,6 +24,7 @@ import (
 	cio "github.com/containerd/containerd/pkg/cri/io"
 	"github.com/containerd/containerd/pkg/cri/store"
 	"github.com/containerd/containerd/pkg/cri/store/label"
+	"github.com/containerd/containerd/pkg/cri/store/stats"
 	"github.com/containerd/containerd/pkg/cri/store/truncindex"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -46,6 +47,8 @@ type Container struct {
 	// IsStopSignaledWithTimeout the default is 0, and it is set to 1 after sending
 	// the signal once to avoid repeated sending of the signal.
 	IsStopSignaledWithTimeout *uint32
+	// Stats contains (mutable) stats for the container
+	Stats *stats.ContainerStats
 }
 
 // Opts sets specific information to newly created Container.
@@ -164,6 +167,27 @@ func (s *Store) List() []Container {
 		containers = append(containers, c)
 	}
 	return containers
+}
+
+func (s *Store) UpdateContainerStats(id string, newContainerStats *stats.ContainerStats) error {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	id, err := s.idIndex.Get(id)
+	if err != nil {
+		if err == truncindex.ErrNotExist {
+			err = errdefs.ErrNotFound
+		}
+		return err
+	}
+
+	if _, ok := s.containers[id]; !ok {
+		return errdefs.ErrNotFound
+	}
+
+	c := s.containers[id]
+	c.Stats = newContainerStats
+	s.containers[id] = c
+	return nil
 }
 
 // Delete deletes the container from store with specified id.

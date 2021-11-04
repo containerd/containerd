@@ -18,9 +18,11 @@ package sandbox
 
 import (
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/pkg/cri/store/label"
+	"github.com/containerd/containerd/pkg/cri/store/stats"
 
 	assertlib "github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -109,6 +111,24 @@ func TestSandboxStore(t *testing.T) {
 		},
 		Status{State: StateUnknown},
 	)
+	stats := map[string]*stats.ContainerStats{
+		"1": {
+			Timestamp:            time.Now(),
+			UsageCoreNanoSeconds: 1,
+		},
+		"2abcd": {
+			Timestamp:            time.Now(),
+			UsageCoreNanoSeconds: 2,
+		},
+		"4a333": {
+			Timestamp:            time.Now(),
+			UsageCoreNanoSeconds: 3,
+		},
+		"4abcd": {
+			Timestamp:            time.Now(),
+			UsageCoreNanoSeconds: 4,
+		},
+	}
 	assert := assertlib.New(t)
 	s := NewStore(label.NewStore())
 
@@ -135,6 +155,19 @@ func TestSandboxStore(t *testing.T) {
 	sbNum := len(sandboxes) + 1
 	sbs := s.List()
 	assert.Len(sbs, sbNum)
+
+	t.Logf("should be able to update stats on container")
+	for id := range sandboxes {
+		err := s.UpdateContainerStats(id, stats[id])
+		assert.NoError(err)
+	}
+
+	// Validate stats were updated
+	sbs = s.List()
+	assert.Len(sbs, sbNum)
+	for _, sb := range sbs {
+		assert.Equal(stats[sb.ID], sb.Stats)
+	}
 
 	for testID, v := range sandboxes {
 		truncID := genTruncIndex(testID)
