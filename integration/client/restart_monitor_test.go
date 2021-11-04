@@ -156,13 +156,21 @@ version = 2
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer container.Delete(ctx, WithSnapshotCleanup)
+	defer func() {
+		if err := container.Delete(ctx, WithSnapshotCleanup); err != nil {
+			t.Logf("failed to delete container: %v", err)
+		}
+	}()
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer task.Delete(ctx, WithProcessKill)
+	defer func() {
+		if _, err := task.Delete(ctx, WithProcessKill); err != nil {
+			t.Logf("failed to delete task: %v", err)
+		}
+	}()
 
 	if err := task.Start(ctx); err != nil {
 		t.Fatal(err)
