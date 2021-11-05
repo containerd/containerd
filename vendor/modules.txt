@@ -295,7 +295,7 @@ github.com/moby/sys/mountinfo
 # github.com/moby/sys/signal v0.5.1-0.20210723232958-8a51b5cc8879
 ## explicit
 github.com/moby/sys/signal
-# github.com/moby/sys/symlink v0.1.0
+# github.com/moby/sys/symlink v0.2.0
 ## explicit
 github.com/moby/sys/symlink
 # github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd

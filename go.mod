@@ -40,7 +40,7 @@ require (
 	github.com/moby/locker v1.0.1
 	github.com/moby/sys/mountinfo v0.4.2-0.20211022201527-95edfa939201
 	github.com/moby/sys/signal v0.5.1-0.20210723232958-8a51b5cc8879
-	github.com/moby/sys/symlink v0.1.0
+	github.com/moby/sys/symlink v0.2.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.0.2-0.20210819154149-5ad6f50d6283
 	github.com/opencontainers/runc v1.0.2
