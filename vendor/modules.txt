@@ -452,7 +452,7 @@ golang.org/x/oauth2/internal
 ## explicit
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.0.0-20210915083310-ed5796bab164
+# golang.org/x/sys v0.0.0-20211025201205-69cdffdb9359
 ## explicit
 golang.org/x/sys/execabs
 golang.org/x/sys/internal/unsafeheader
