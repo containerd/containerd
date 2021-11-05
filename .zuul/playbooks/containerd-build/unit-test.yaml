@@ -2,7 +2,7 @@
   become: yes
   roles:
   - role: config-golang
-    go_version: '1.16.8'
+    go_version: '1.16.9'
     arch: arm64
   tasks:
   - name: Build and test containerd
