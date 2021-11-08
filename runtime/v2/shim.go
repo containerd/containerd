@@ -194,6 +194,8 @@ type ShimProcess interface {
 	ID() string
 	// Namespace of this shim.
 	Namespace() string
+	// Client returns the underlying TTRPC client for this shim.
+	Client() *ttrpc.Client
 }
 
 type shim struct {
@@ -241,6 +243,10 @@ var _ runtime.Task = &shimTask{}
 type shimTask struct {
 	*shim
 	task task.TaskService
+}
+
+func (s *shimTask) Client() *ttrpc.Client {
+	return s.client
 }
 
 func (s *shimTask) Shutdown(ctx context.Context) error {

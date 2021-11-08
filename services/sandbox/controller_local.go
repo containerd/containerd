@@ -15,15 +15,21 @@ package sandbox
 
 import (
 	"context"
+	"fmt"
 
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/runtime"
 	v2 "github.com/containerd/containerd/runtime/v2"
+	"github.com/containerd/containerd/runtime/v2/task"
+	proto "github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/containerd/services"
+	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 
@@ -77,25 +83,125 @@ type controllerLocal struct {
 var _ api.ControllerClient = (*controllerLocal)(nil)
 
 func (c *controllerLocal) Start(ctx context.Context, in *api.ControllerStartRequest, opts ...grpc.CallOption) (*api.ControllerStartResponse, error) {
-	panic("implement me")
+	if _, err := c.shims.Get(ctx, in.SandboxID); err == nil {
+		return nil, fmt.Errorf("sandbox %s already running: %w", in.SandboxID, errdefs.ErrAlreadyExists)
+	}
+
+	info, err := c.store.Get(ctx, in.SandboxID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query sandbox metadata from store: %w", err)
+	}
+
+	shim, err := c.shims.Start(ctx, in.SandboxID, runtime.CreateOpts{
+		Spec:           info.Spec,
+		RuntimeOptions: info.Runtime.Options,
+		Runtime:        info.Runtime.Name,
+		TaskOptions:    nil,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to start new sandbox: %w", err)
+	}
+
+	svc := task.NewSandboxClient(shim.Client())
+
+	_, err = svc.StartSandbox(ctx, &proto.StartSandboxRequest{
+		SandboxID:  in.SandboxID,
+		BundlePath: "",
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to start sandbox %s: %w", in.SandboxID, err)
+	}
+
+	return &api.ControllerStartResponse{}, nil
 }
 
 func (c *controllerLocal) Shutdown(ctx context.Context, in *api.ControllerShutdownRequest, opts ...grpc.CallOption) (*api.ControllerShutdownResponse, error) {
-	panic("implement me")
+	svc, err := c.getSandbox(ctx, in.SandboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := svc.StopSandbox(ctx, &proto.StopSandboxRequest{
+		SandboxID:   in.SandboxID,
+		TimeoutSecs: 0,
+	}); err != nil {
+		return nil, fmt.Errorf("failed to stop sandbox: %w", err)
+	}
+
+	if err := c.shims.Delete(ctx, in.SandboxID); err != nil {
+		return nil, fmt.Errorf("failed to delete sandbox shim: %w", err)
+	}
+
+	return &api.ControllerShutdownResponse{}, nil
 }
 
 func (c *controllerLocal) Pause(ctx context.Context, in *api.ControllerPauseRequest, opts ...grpc.CallOption) (*api.ControllerPauseResponse, error) {
-	panic("implement me")
+	svc, err := c.getSandbox(ctx, in.SandboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := svc.PauseSandbox(ctx, &proto.PauseSandboxRequest{
+		SandboxID: in.SandboxID,
+	}); err != nil {
+		return nil, errors.Wrapf(err, "failed to resume sandbox %s", in.SandboxID)
+	}
+
+	return &api.ControllerPauseResponse{}, nil
 }
 
 func (c *controllerLocal) Resume(ctx context.Context, in *api.ControllerResumeRequest, opts ...grpc.CallOption) (*api.ControllerResumeResponse, error) {
-	panic("implement me")
+	svc, err := c.getSandbox(ctx, in.SandboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := svc.ResumeSandbox(ctx, &proto.ResumeSandboxRequest{
+		SandboxID: in.SandboxID,
+	}); err != nil {
+		return nil, errors.Wrapf(err, "failed to resume sandbox %s", in.SandboxID)
+	}
+
+	return &api.ControllerResumeResponse{}, nil
 }
 
 func (c *controllerLocal) Ping(ctx context.Context, in *api.ControllerPingRequest, opts ...grpc.CallOption) (*api.ControllerPingResponse, error) {
-	panic("implement me")
+	svc, err := c.getSandbox(ctx, in.SandboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := svc.PingSandbox(ctx, &proto.PingRequest{
+		SandboxID: in.SandboxID,
+	}); err != nil {
+		return nil, err
+	}
+
+	return &api.ControllerPingResponse{}, nil
 }
 
 func (c *controllerLocal) Status(ctx context.Context, in *api.ControllerStatusRequest, opts ...grpc.CallOption) (*api.ControllerStatusResponse, error) {
-	panic("implement me")
+	svc, err := c.getSandbox(ctx, in.SandboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := svc.SandboxStatus(ctx, &proto.SandboxStatusRequest{SandboxID: in.SandboxID})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query sandbox %s status: %w", in.SandboxID, err)
+	}
+
+	return &api.ControllerStatusResponse{Status: resp.Status}, nil
+}
+
+func (c *controllerLocal) getSandbox(ctx context.Context, id string) (task.SandboxService, error) {
+	shim, err := c.shims.Get(ctx, id)
+	if err != nil {
+		return nil, errdefs.ErrNotFound
+	}
+
+	svc := task.NewSandboxClient(shim.Client())
+	return svc, nil
 }

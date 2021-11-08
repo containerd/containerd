@@ -324,7 +324,8 @@ func (m *ShimManager) Get(ctx context.Context, id string) (ShimProcess, error) {
 		return nil, err
 	}
 
-	return proc, nil
+	shimTask := proc.(*shimTask)
+	return shimTask, nil
 }
 
 // Delete a runtime task
