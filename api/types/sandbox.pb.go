@@ -30,14 +30,14 @@ var _ = time.Kitchen
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 // Sandbox represents a sandbox metadata object that keeps all info required by controller to
-// work with a particular instance. containerd keeps this in metadata store and sends it to a controller with
-// each request, so they can reflect sandbox state changes (by updating the corresponding fields).
+// work with a particular instance.
 type Sandbox struct {
 	// SandboxID is a unique instance identifier within namespace
 	SandboxID string `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
 	// Runtime specifies which runtime to use for executing this container.
 	Runtime Sandbox_Runtime `protobuf:"bytes,2,opt,name=runtime,proto3" json:"runtime"`
-	// Spec is sandbox configuration (kin of OCI runtime spec, but for VM)
+	// Spec is sandbox configuration (kin of OCI runtime spec), spec's data will be written to a config.json file in the
+	// bundle directory (similary to OCI spec).
 	Spec *types.Any `protobuf:"bytes,3,opt,name=spec,proto3" json:"spec,omitempty"`
 	// Labels provides an area to include arbitrary data on containers.
 	Labels map[string]string `protobuf:"bytes,4,rep,name=labels,proto3" json:"labels" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
@@ -87,7 +87,8 @@ var xxx_messageInfo_Sandbox proto.InternalMessageInfo
 type Sandbox_Runtime struct {
 	// Name is the name of the runtime.
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// Options specify additional runtime initialization options.
+	// Options specify additional runtime initialization options for the shim (this data will be available in StartShim).
+	// Typically this data expected to be runtime shim implementation specific.
 	Options              *types.Any `protobuf:"bytes,2,opt,name=options,proto3" json:"options,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}   `json:"-"`
 	XXX_unrecognized     []byte     `json:"-"`

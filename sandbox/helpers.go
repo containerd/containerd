@@ -32,6 +32,7 @@ func ToProto(s *Sandbox) types.Sandbox {
 		CreatedAt:  s.CreatedAt,
 		UpdatedAt:  s.UpdatedAt,
 		Extensions: s.Extensions,
+		Spec:       s.Spec,
 	}
 }
 

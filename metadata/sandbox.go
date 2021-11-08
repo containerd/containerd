@@ -18,11 +18,13 @@ package metadata
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
+	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/namespaces"
 	api "github.com/containerd/containerd/sandbox"
@@ -59,11 +61,11 @@ func (s *sandboxStore) Create(ctx context.Context, sandbox api.Sandbox) (api.San
 	if err := s.db.Update(func(tx *bbolt.Tx) error {
 		parent, err := createSandboxBucket(tx, ns)
 		if err != nil {
-			return err
+			return fmt.Errorf("create error: %w", err)
 		}
 
 		if err := s.write(parent, &sandbox, false); err != nil {
-			return err
+			return fmt.Errorf("write error: %w", err)
 		}
 
 		return nil
@@ -200,7 +202,7 @@ func (s *sandboxStore) List(ctx context.Context, fields ...string) ([]api.Sandbo
 	if err := view(ctx, s.db, func(tx *bbolt.Tx) error {
 		bucket := getSandboxBucket(tx, ns)
 		if bucket == nil {
-			return errors.Wrap(errdefs.ErrNotFound, "not sandbox buckets")
+			return errors.Wrap(errdefs.ErrNotFound, "no sandbox buckets")
 		}
 
 		if err := bucket.ForEach(func(k, v []byte) error {
@@ -354,8 +356,8 @@ func (s *sandboxStore) read(parent *bbolt.Bucket, id []byte) (api.Sandbox, error
 }
 
 func (s *sandboxStore) validate(new *api.Sandbox) error {
-	if new.ID == "" {
-		return errors.Wrap(errdefs.ErrInvalidArgument, "instance ID must not be empty")
+	if err := identifiers.Validate(new.ID); err != nil {
+		return errors.Wrap(err, "invalid sandbox ID")
 	}
 
 	if new.CreatedAt.IsZero() {
