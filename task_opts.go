@@ -45,6 +45,15 @@ func WithRootFS(mounts []mount.Mount) NewTaskOpts {
 	}
 }
 
+// WithRuntimePath will force task service to use a custom path to the runtime binary
+// instead of resolving it from runtime name.
+func WithRuntimePath(absRuntimePath string) NewTaskOpts {
+	return func(ctx context.Context, client *Client, info *TaskInfo) error {
+		info.runtime = absRuntimePath
+		return nil
+	}
+}
+
 // WithTaskCheckpoint allows a task to be created with live runtime and memory data from a
 // previous checkpoint. Additional software such as CRIU may be required to
 // restore a task from a checkpoint
