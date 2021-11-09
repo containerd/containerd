@@ -21,6 +21,7 @@ support to increase overall compatibility and stability.
 * **Add runtime label to metrics** ([#5744](https://github.com/containerd/containerd/pull/5744))
 * **Cleanup task delete logic in v2 shim** ([#5813](https://github.com/containerd/containerd/pull/5813))
 * **Add support for shim plugins** ([#5817](https://github.com/containerd/containerd/pull/5817))
+* **Split task manager into shim and task manager** ([#5918](https://github.com/containerd/containerd/pull/5918))
 * **Add runc shim support for core scheduling** ([#6011](https://github.com/containerd/containerd/pull/6011))
 * **Update shim client connect attempt to fail fast when shim errors** ([#6031](https://github.com/containerd/containerd/pull/6031))
 
@@ -35,6 +36,7 @@ support to increase overall compatibility and stability.
 * **Add support for CRI v1 and v1alpha in parallel** ([#5619](https://github.com/containerd/containerd/pull/5619))
 * **Add support for unified resources field for cgroups v2** ([#5627](https://github.com/containerd/containerd/pull/5627))
 * **Add IP preference configuration for reporting pod IP** ([#5964](https://github.com/containerd/containerd/pull/5964))
+* **Implement new CRI pod sandbox stats API** ([#6113](https://github.com/containerd/containerd/pull/6113))
 * **Add namespace to ttrpc and grpc plugin connections** ([#6130](https://github.com/containerd/containerd/pull/6130))
 
 #### Other
