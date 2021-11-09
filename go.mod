@@ -38,9 +38,9 @@ require (
 	github.com/imdario/mergo v0.3.12
 	github.com/klauspost/compress v1.11.13
 	github.com/moby/locker v1.0.1
-	github.com/moby/sys/mountinfo v0.4.2-0.20211022201527-95edfa939201
-	github.com/moby/sys/signal v0.5.1-0.20210723232958-8a51b5cc8879
-	github.com/moby/sys/symlink v0.1.0
+	github.com/moby/sys/mountinfo v0.5.0
+	github.com/moby/sys/signal v0.6.0
+	github.com/moby/sys/symlink v0.2.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.0.2-0.20210819154149-5ad6f50d6283
 	github.com/opencontainers/runc v1.0.2
@@ -63,7 +63,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.0.1
 	golang.org/x/net v0.0.0-20210825183410-e898025ed96a
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210915083310-ed5796bab164
+	golang.org/x/sys v0.0.0-20211025201205-69cdffdb9359
 	google.golang.org/grpc v1.41.0
 	google.golang.org/protobuf v1.27.1
 	gotest.tools/v3 v3.0.3

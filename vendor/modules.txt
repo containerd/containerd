@@ -289,13 +289,13 @@ github.com/moby/locker
 # github.com/moby/spdystream v0.2.0
 github.com/moby/spdystream
 github.com/moby/spdystream/spdy
-# github.com/moby/sys/mountinfo v0.4.2-0.20211022201527-95edfa939201
+# github.com/moby/sys/mountinfo v0.5.0
 ## explicit
 github.com/moby/sys/mountinfo
-# github.com/moby/sys/signal v0.5.1-0.20210723232958-8a51b5cc8879
+# github.com/moby/sys/signal v0.6.0
 ## explicit
 github.com/moby/sys/signal
-# github.com/moby/sys/symlink v0.1.0
+# github.com/moby/sys/symlink v0.2.0
 ## explicit
 github.com/moby/sys/symlink
 # github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
@@ -452,7 +452,7 @@ golang.org/x/oauth2/internal
 ## explicit
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.0.0-20210915083310-ed5796bab164
+# golang.org/x/sys v0.0.0-20211025201205-69cdffdb9359
 ## explicit
 golang.org/x/sys/execabs
 golang.org/x/sys/internal/unsafeheader
