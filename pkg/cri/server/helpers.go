@@ -110,11 +110,11 @@ func makeSandboxName(s *runtime.PodSandboxMetadata) string {
 // unique.
 func makeContainerName(c *runtime.ContainerMetadata, s *runtime.PodSandboxMetadata) string {
 	return strings.Join([]string{
-		c.Name,                       // 0
+		c.Name,                       // 0: container name
 		s.Name,                       // 1: pod name
 		s.Namespace,                  // 2: pod namespace
 		s.Uid,                        // 3: pod uid
-		fmt.Sprintf("%d", c.Attempt), // 4
+		fmt.Sprintf("%d", c.Attempt), // 4: attempt number of creating the container
 	}, nameDelimiter)
 }
 
