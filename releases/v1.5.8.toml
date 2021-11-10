@@ -1,0 +1,27 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.5.7"
+
+pre_release = false
+
+preface = """\
+The eighth patch release for containerd 1.5 contains a mitigation for [CVE-2021-41190](https://github.com/opencontainers/distribution-spec/security/advisories/GHSA-mc8v-mgrf-8f4m)
+as well as several fixes and updates.
+
+### Notable Updates
+* **Handle ambiguous OCI manifest parsing** ([GHSA-5j5w-g665-5m35](https://github.com/containerd/containerd/security/advisories/GHSA-5j5w-g665-5m35))
+* **Filter selinux xattr for image volumes in CRI plugin** ([#5104](https://github.com/containerd/containerd/pull/5104))
+* **Use DeactiveLayer to unlock layers that cannot be renamed in Windows snapshotter** ([#5422](https://github.com/containerd/containerd/pull/5422))
+* **Fix pull failure on unexpected EOF** ([#5921](https://github.com/containerd/containerd/pull/5921))
+* **Close task IO before waiting on delete** ([#5974](https://github.com/containerd/containerd/pull/5974))
+* **Log a warning for ignored invalid image labels rather than erroring** ([#6124](https://github.com/containerd/containerd/pull/6124))
+* **Update pull to handle of non-https urls in descriptors** ([#6221](https://github.com/containerd/containerd/pull/6221))
+
+
+See the changelog for complete list of changes"""
