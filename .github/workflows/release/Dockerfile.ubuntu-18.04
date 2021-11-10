@@ -12,81 +12,43 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+ARG UBUNTU_VERSION=18.04
+ARG BASE_IMAGE=ubuntu:${UBUNTU_VERSION}
 ARG GO_VERSION
 ARG GO_IMAGE=golang:${GO_VERSION}
 FROM --platform=$BUILDPLATFORM $GO_IMAGE AS go
+FROM --platform=$BUILDPLATFORM tonistiigi/xx@sha256:425941eb25cc113009b1c651bd275e04593cea12c48311fe8ace6ceeecdcc645 AS xx
 
-FROM --platform=$BUILDPLATFORM ubuntu:18.04 AS base
+FROM --platform=$BUILDPLATFORM ${BASE_IMAGE} AS base
+COPY --from=xx / /
 SHELL ["/bin/bash", "-xec"]
-# Ubuntu has entirely separate repos for non-amd64 architectures
-# Because of this we can't just add new arches, we need to update the repo list first
-RUN \
-		echo deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ bionic main multiverse restricted universe > /etc/apt/sources.list; \
-		echo deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ bionic-updates main multiverse restricted universe >> /etc/apt/sources.list; \
-		echo deb [arch=amd64] http://security.ubuntu.com/ubuntu/ bionic-security main multiverse restricted universe >> /etc/apt/sources.lis; \
-		echo deb [arch=arm64,armhf] http://ports.ubuntu.com/ubuntu-ports/ bionic main multiverse restricted universe >> /etc/apt/sources.list; \
-		echo deb [arch=arm64,armhf] http://ports.ubuntu.com/ubuntu-ports/ bionic-updates main multiverse restricted universe >> /etc/apt/sources.list
-RUN dpkg --add-architecture arm64
-RUN	apt-get update && apt-get install -y \
-	binutils-mingw-w64 \
-	crossbuild-essential-arm64 \
-	g++-mingw-w64-x86-64 \
-	git \
-	libseccomp-dev:amd64 \
-	libseccomp-dev:arm64 \
-	pkg-config
-ARG TARGETARCH
-ARG TARGETVARIANT
-ARG TARGETOS
-# btrfs-progs cannot have multiple arch versions installed at the same time
-# Unfortunately this is also means we can't share a build cache between arches beyond this point.
-#
-# Also note this won't work with 32bit arm versions, and likely some other things such as ppc.
-# For that we'd need to translate $TARGETARCH and $TARGETVARIANT into Ubuntu specific values.
-# Since we don't support these architectures right now this is good enough.
-RUN \
-	if [ "$TARGETOS" = "linux" ]; then \
-		apt-get update && \
-		apt-get install -y btrfs-progs:${TARGETARCH}; \
-	fi
+RUN	apt-get update && \
+	apt-get install -y git pkg-config
+ARG TARGETPLATFORM
+RUN xx-apt-get install -y libseccomp-dev btrfs-progs gcc
 ENV PATH=/usr/local/go/bin:$PATH
 ENV GOPATH=/go
 ENV CGO_ENABLED=1
 
-FROM base AS linux-arm64
-ENV CC=aarch64-linux-gnu-gcc
-RUN \
-	PKG_CONFIG_PATH="$(pkg-config --variable pc_path pkg-config)"; \
-    for i in $(find /usr/lib -name 'pkgconfig'); do \
-      PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:$i"; \
-    done; \
-    echo export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}" > /tmp/pkgconfig
-
-FROM base AS linux-amd64
-
-FROM base AS windows-amd64
-ENV CC=x86_64-w64-mingw32-gcc
+FROM base AS linux
+FROM base AS windows
 # Set variables used by cni script which would otherwise shell out to powershell
 ARG GATEWAY
-ENV GATEWAY=$GATEWAY
 ARG PREFIX_LEN
-ENV PREFIX_LEN=$PREFIX_LEN
 
-FROM ${TARGETOS}-${TARGETARCH}${TARGETVARIANT} AS target
-COPY . /go/src/github.com/containerd/containerd
+FROM ${TARGETOS} AS target
 WORKDIR /go/src/github.com/containerd/containerd
-ARG TARGETARCH
-ARG TARGETOS
-ENV GOARCH=$TARGETARCH
-ENV GOOS=$TARGETOS
-ENV OS=$TARGETOS
+COPY . .
+ARG TARGETPLATFORM
 ARG RELEASE_VER
 ENV VERSION=$RELEASE_VER
 RUN \
 	--mount=type=bind,from=go,source=/usr/local/go,target=/usr/local/go \
 	--mount=type=cache,target=/root/.cache/go-build \
-	[ -f /tmp/pkgconfig ] && . /tmp/pkgconfig; \
-	make release cri-release cri-cni-release
+	--mount=type=cache,target=/go/pkg \
+	export CC=$(xx-info)-gcc && xx-go --wrap && \
+	make release cri-release cri-cni-release && \
+	for f in $(find bin -executable -type f); do xx-verify $f; done
 
 FROM scratch AS release
 COPY --from=target /go/src/github.com/containerd/containerd/releases/ /
