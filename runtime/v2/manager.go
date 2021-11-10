@@ -34,7 +34,7 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
-	shim_binary "github.com/containerd/containerd/runtime/v2/shim"
+	shimbinary "github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/containerd/runtime/v2/task"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -304,7 +304,7 @@ func (m *ShimManager) resolveRuntimePath(runtime string) (string, error) {
 
 	// Preserve existing logic and resolve runtime path from runtime name.
 
-	name := shim_binary.BinaryName(runtime)
+	name := shimbinary.BinaryName(runtime)
 	if name == "" {
 		return "", fmt.Errorf("invalid runtime name %s, correct runtime name should be either format like `io.containerd.runc.v1` or a full path to the binary", runtime)
 	}
@@ -318,7 +318,7 @@ func (m *ShimManager) resolveRuntimePath(runtime string) (string, error) {
 		lerr    error
 	)
 
-	binaryPath := shim_binary.BinaryPath(runtime)
+	binaryPath := shimbinary.BinaryPath(runtime)
 	if _, serr := os.Stat(binaryPath); serr == nil {
 		cmdPath = binaryPath
 	}
