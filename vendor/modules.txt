@@ -124,7 +124,7 @@ github.com/containerd/imgcrypt/images/encryption
 ## explicit
 github.com/containerd/nri
 github.com/containerd/nri/types/v1
-# github.com/containerd/ttrpc v1.0.2
+# github.com/containerd/ttrpc v1.1.0
 ## explicit
 github.com/containerd/ttrpc
 github.com/containerd/ttrpc/plugin

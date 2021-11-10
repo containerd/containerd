@@ -3,7 +3,7 @@ module github.com/containerd/containerd/api
 go 1.16
 
 require (
-	github.com/containerd/ttrpc v1.0.2
+	github.com/containerd/ttrpc v1.1.0
 	github.com/containerd/typeurl v1.0.2
 	github.com/gogo/googleapis v1.4.0
 	github.com/gogo/protobuf v1.3.2
