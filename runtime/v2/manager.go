@@ -373,9 +373,22 @@ func (m *TaskManager) ID() string {
 
 // Create launches new shim instance and creates new task
 func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.CreateOpts) (runtime.Task, error) {
-	process, err := m.manager.Start(ctx, taskID, opts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to start shim: %w", err)
+	var (
+		process ShimProcess
+		err     error
+	)
+
+	if opts.SandboxID != "" {
+		// This container belongs to sandbox which supposed to be already started via sandbox API.
+		process, err = m.manager.Get(ctx, opts.SandboxID)
+		if err != nil {
+			return nil, fmt.Errorf("can't find sandbox %s", opts.SandboxID)
+		}
+	} else {
+		process, err = m.manager.Start(ctx, taskID, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to start shim: %w", err)
+		}
 	}
 
 	// Cast to shim task and call task service to create a new container task instance.

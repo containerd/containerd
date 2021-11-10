@@ -22,22 +22,22 @@ import (
 	"github.com/gogo/protobuf/types"
 )
 
-// Controller is an interface to manage a runtime sandbox instance (runtimes's SandboxManager)
-// SandboxRuntime is responsible for the sandbox instances lifecycle management.
+// Controller is an interface to manage sandboxes at runtime.
 // When running the traditional containerd shim, the workflow looks as follows:
 // For each new task we're about to run:
-// 	1. Invoke `shim_binary --start` to obtain `TaskService` address (printed in stdout)
-// 	2. Call TaskService.RunContainer(id=1)
-// 	3. Exec `shim_binary --delete` to stop shim
-// 	4. Exec `shim_binary --start` again to obtain another `TaskService` address
-// 	5. TaskService.RunContainer(id=2)
-// 	6. Exec `shim_binary --delete` to stop shim
+//  1. Invoke `shim_binary --start` to obtain `TaskService` address (printed in stdout)
+//  2. Call TaskService.RunContainer(id=1)
+//  3. Exec `shim_binary --delete` to stop shim
+//  4. Exec `shim_binary --start` again to obtain another `TaskService` address
+//  5. TaskService.RunContainer(id=2)
+//  6. Exec `shim_binary --delete` to stop shim
 //
-// When running in sandbox mode, shim must implement `SandboxService`. In sandbox mode shim lifetimes are managed manually.
-// 	1. Client calls `client.Controller.Start()` to launch new shim and create sandbox process
-// 	2. Run containers with `shim.TaskService.RunContainer(id=1)` and another one `shim.TaskService.RunContainer(id=2)`
-//	3. ... usual container lifecycle calls to `shim.TaskService`
-// 	4. Client calls shim to stop the sandbox with `client.SandboxService.Shutdown()`
+// When running in sandbox mode, shim must implement `SandboxService`.
+// In sandbox mode shim lifetimes are managed manually via sandbox API.
+//  1. Client calls `client.SandboxController.Start()` to launch new shim and create sandbox process
+//  2. Run containers with `shim.TaskService.RunContainer(id=1)` and another one `shim.TaskService.RunContainer(id=2)`
+//  3. ... usual container lifecycle calls to `shim.TaskService`
+//  4. Client calls shim to stop the sandbox with `client.SandboxService.Shutdown()`
 //  5. Shim implementation will perform cleanup similar to regular task service (e.g. shutdown, clean, and `shim_binary --delete`)
 type Controller interface {
 	// Start will start new sandbox instance.
