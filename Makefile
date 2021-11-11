@@ -30,7 +30,7 @@ MANDIR        ?= $(DATADIR)/man
 TEST_IMAGE_LIST ?=
 
 # Used to populate variables in version package.
-VERSION=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
+VERSION ?= $(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
 REVISION=$(shell git rev-parse HEAD)$(shell if ! git diff --no-ext-diff --quiet --exit-code; then echo .m; fi)
 PACKAGE=github.com/containerd/containerd
 SHIM_CGO_ENABLED ?= 0
@@ -270,6 +270,7 @@ endef
 install-man: man
 	@echo "$(WHALE) $@"
 	$(foreach manpage,$(addprefix man/,$(MANPAGES)), $(call installmanpage,$(manpage),$(subst .,,$(suffix $(manpage))),$(notdir $(manpage))))
+
 
 releases/$(RELEASE).tar.gz: $(BINARIES)
 	@echo "$(WHALE) $@"
