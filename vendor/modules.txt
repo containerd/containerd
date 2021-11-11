@@ -99,7 +99,7 @@ github.com/containerd/imgcrypt/images/encryption
 ## explicit
 github.com/containerd/nri
 github.com/containerd/nri/types/v1
-# github.com/containerd/ttrpc v1.0.2
+# github.com/containerd/ttrpc v1.1.0
 ## explicit
 github.com/containerd/ttrpc
 github.com/containerd/ttrpc/plugin
@@ -301,7 +301,6 @@ github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 github.com/prometheus/common/model
 # github.com/prometheus/procfs v0.6.0
-## explicit
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
