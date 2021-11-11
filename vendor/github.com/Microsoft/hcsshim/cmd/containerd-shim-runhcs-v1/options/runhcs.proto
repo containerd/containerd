@@ -93,6 +93,11 @@ message Options {
 	// logrus log levels: "trace", "debug", "info", "warn", "error", "fatal", "panic". This setting will override
 	// the `debug` field if both are specified, unless the level specified is also "debug", as these are equivalent.
 	string log_level = 16;
+
+	// io_retry_timeout_in_sec is the timeout in seconds for how long to try and reconnect to an upstream IO provider if a connection is lost.
+	// The typical example is if Containerd has restarted but is expected to come back online. A 0 for this field is interpreted as an infinite
+	// timeout.
+	int32 io_retry_timeout_in_sec = 17;
 }
 
 // ProcessDetails contains additional information about a process. This is the additional
