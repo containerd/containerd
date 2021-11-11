@@ -3,7 +3,7 @@ module github.com/containerd/containerd/integration/client
 go 1.15
 
 require (
-	github.com/Microsoft/hcsshim v0.8.21
+	github.com/Microsoft/hcsshim v0.8.23
 	github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1
 	github.com/containerd/cgroups v1.0.1
 	// the actual version of containerd is replaced with the code at the root of this repository
