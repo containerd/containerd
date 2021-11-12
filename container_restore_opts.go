@@ -46,7 +46,7 @@ func WithRestoreImage(ctx context.Context, id string, client *Client, checkpoint
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		name, ok := index.Annotations[checkpointImageNameLabel]
 		if !ok || name == "" {
-			return ErrRuntimeNameNotFoundInIndex
+			return ErrImageNameNotFoundInIndex
 		}
 		snapshotter, ok := index.Annotations[checkpointSnapshotterNameLabel]
 		if !ok || name == "" {
