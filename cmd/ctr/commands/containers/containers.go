@@ -20,8 +20,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
@@ -123,20 +125,72 @@ var listCommand = cli.Command{
 			return nil
 		}
 		w := tabwriter.NewWriter(os.Stdout, 4, 8, 4, ' ', 0)
-		fmt.Fprintln(w, "CONTAINER\tIMAGE\tRUNTIME\t")
+		fmt.Fprintln(w, "CONTAINER\tIMAGE\tKIND\t\tCREATED\tPODINFO\tCMD\t")
+
+		var cPrintArray cInfoPrintSlice
+		local, errLocal := time.LoadLocation("Local")
+		if errLocal != nil {
+			return errLocal
+		}
 		for _, c := range containers {
 			info, err := c.Info(ctx, containerd.WithoutRefreshedMetadata)
 			if err != nil {
 				return err
 			}
+			spec, err :=  c.Spec(ctx)
+			if err != nil {
+				return err
+			}
+			cmds := "-"
+			if len(spec.Process.Args) > 0 {
+				cmds = strings.Trim(strings.Join(spec.Process.Args, " "), " \t\r\n")
+			}
+			kind := "-"
+			if v, OK := info.Labels["io.cri-containerd.kind"]; OK {
+				kind = v
+			}
+			podName := "-"
+			if v, OK := info.Labels["io.kubernetes.pod.name"]; OK {
+				podName = v
+			}
+			podNS := "-"
+			if v, OK := info.Labels["io.kubernetes.pod.namespace"]; OK {
+				podNS = v
+			}
+			podUid := "-"
+			if v, OK := info.Labels["io.kubernetes.pod.uid"]; OK {
+				podUid = v
+			}
+			podInfoStr := podName + "|" + podNS + "|" + podUid
+
 			imageName := info.Image
 			if imageName == "" {
 				imageName = "-"
 			}
-			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t\n",
-				c.ID(),
-				imageName,
-				info.Runtime.Name,
+
+
+			cPrintInfo := &cInfoPrint{
+				id: c.ID(),
+				imageName: imageName,
+				kind: kind,
+				cmds: cmds,
+				podInfoStr: podInfoStr,
+				createTime: info.CreatedAt.In(local).Format("2006-01-02 15:04:05"),
+				createdAt: info.CreatedAt.UnixNano(),
+				runtime: info.Runtime.Name,
+			}
+			cPrintArray = append(cPrintArray, cPrintInfo)
+		}
+		sort.Sort(cPrintArray)
+		for _, c := range cPrintArray {
+			if _, err := fmt.Fprintf(w, "%s\t%-72s\t%-9s\t\t%s\t%s\t\"%s\"\t\n\n",
+				c.id,
+				c.imageName,
+				c.kind,
+				c.createTime,
+				c.podInfoStr,
+				c.cmds,
+				//c.runtime,
 			); err != nil {
 				return err
 			}
@@ -144,6 +198,23 @@ var listCommand = cli.Command{
 		return w.Flush()
 	},
 }
+
+type cInfoPrint struct {
+	id         string
+	imageName  string
+	kind       string
+	cmds       string
+	podInfoStr string
+	createTime string
+	createdAt  int64
+	runtime    string
+}
+
+type cInfoPrintSlice []*cInfoPrint
+
+func (s cInfoPrintSlice) Len() int { return len(s) }
+func (s cInfoPrintSlice) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s cInfoPrintSlice) Less(i, j int) bool { return s[i].createdAt > s[j].createdAt }
 
 var deleteCommand = cli.Command{
 	Name:      "delete",

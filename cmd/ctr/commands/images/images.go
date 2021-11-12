@@ -18,10 +18,12 @@ package images
 
 import (
 	"fmt"
+	"github.com/opencontainers/go-digest"
 	"os"
 	"sort"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/errdefs"
@@ -91,7 +93,14 @@ var listCommand = cli.Command{
 			return nil
 		}
 		tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
-		fmt.Fprintln(tw, "REF\tTYPE\tDIGEST\tSIZE\tPLATFORMS\tLABELS\t")
+		fmt.Fprintln(tw, "REF\tSIZE\tDIGEST\tPLATFORMS\tCREATED\t")
+
+		local, errLocal := time.LoadLocation("Local")
+		if errLocal != nil {
+			return errLocal
+		}
+		var imagePrintArray imagePrintSlice
+
 		for _, image := range imageList {
 			size, err := image.Size(ctx, cs, platforms.Default())
 			if err != nil {
@@ -115,28 +124,65 @@ var listCommand = cli.Command{
 				platformColumn = strings.Join(ps, ",")
 			}
 
-			labels := "-"
-			if len(image.Labels) > 0 {
-				var pairs []string
-				for k, v := range image.Labels {
-					pairs = append(pairs, fmt.Sprintf("%v=%v", k, v))
-				}
-				sort.Strings(pairs)
-				labels = strings.Join(pairs, ",")
-			}
+			//labels := "-"
+			//if len(image.Labels) > 0 {
+			//	var pairs []string
+			//	for k, v := range image.Labels {
+			//		pairs = append(pairs, fmt.Sprintf("%v=%v", k, v))
+			//	}
+			//	sort.Strings(pairs)
+			//	labels = strings.Join(pairs, ",")
+			//}
+			//
+			//urls := "-"
+			//if len(image.Target.URLs) >0 {
+			//	urls = "|"
+			//	for _, u := range image.Target.URLs {
+			//		urls += u + "|"
+			//	}
+			//}
 
-			fmt.Fprintf(tw, "%v\t%v\t%v\t%v\t%v\t%s\t\n",
-				image.Name,
-				image.Target.MediaType,
-				image.Target.Digest,
-				progress.Bytes(size),
-				platformColumn,
-				labels)
+			iPrint := &imagePrint{
+				imageName: image.Name,
+				digest: image.Target.Digest,
+				size: progress.Bytes(size),
+				platform: platformColumn,
+				createTime: image.CreatedAt.In(local).Format("2006-01-02 15:04:05"),
+				createdAt: image.CreatedAt.UnixNano(),
+			}
+			imagePrintArray = append(imagePrintArray, iPrint)
+		}
+
+		sort.Sort(imagePrintArray)
+		for _, i := range imagePrintArray {
+			fmt.Fprintf(tw, "%-130s\t%v\t%v\t%v\t%s\t\n\n",
+				i.imageName,
+				i.size,
+				i.digest,
+				i.platform,
+				i.createTime,
+			)
 		}
 
 		return tw.Flush()
 	},
 }
+
+
+type imagePrint struct {
+	imageName  string
+	digest     digest.Digest
+	size       progress.Bytes
+	platform   string
+	createTime string
+	createdAt  int64
+}
+
+type imagePrintSlice []*imagePrint
+
+func (s imagePrintSlice) Len() int { return len(s) }
+func (s imagePrintSlice) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s imagePrintSlice) Less(i, j int) bool { return s[i].createdAt > s[j].createdAt }
 
 var setLabelsCommand = cli.Command{
 	Name:        "label",
