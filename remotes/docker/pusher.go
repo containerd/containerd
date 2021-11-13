@@ -78,7 +78,7 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 		if status.Committed && status.Offset == status.Total {
 			return nil, errors.Wrapf(errdefs.ErrAlreadyExists, "ref %v", ref)
 		}
-		if unavailableOnFail {
+		if unavailableOnFail && status.ErrClosed == nil {
 			// Another push of this ref is happening elsewhere. The rest of function
 			// will continue only when `errdefs.IsNotFound(err) == true` (i.e. there
 			// is no actively-tracked ref already).
@@ -354,6 +354,12 @@ func (pw *pushWriter) Write(p []byte) (n int, err error) {
 }
 
 func (pw *pushWriter) Close() error {
+	status, err := pw.tracker.GetStatus(pw.ref)
+	if err == nil && !status.Committed {
+		// Closing an incomplete writer. Record this as an error so that following write can retry it.
+		status.ErrClosed = errors.New("closed incomplete writer")
+		pw.tracker.SetStatus(pw.ref, status)
+	}
 	return pw.pipe.Close()
 }
 

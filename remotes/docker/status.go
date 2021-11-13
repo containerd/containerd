@@ -31,6 +31,9 @@ type Status struct {
 
 	Committed bool
 
+	// ErrClosed contains error encountered on close.
+	ErrClosed error
+
 	// UploadUUID is used by the Docker registry to reference blob uploads
 	UploadUUID string
 }
