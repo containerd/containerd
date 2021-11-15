@@ -76,6 +76,9 @@ type Container struct {
 
 	// Extensions stores client-specified metadata
 	Extensions map[string]types.Any
+
+	// If container allowed only one attaching session, retruns its current status.
+	IsAttached bool
 }
 
 // RuntimeInfo holds runtime specific information

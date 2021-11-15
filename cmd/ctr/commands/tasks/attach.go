@@ -17,9 +17,14 @@
 package tasks
 
 import (
+	gocontext "context"
+	"errors"
+
 	"github.com/containerd/console"
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/containers"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -41,6 +46,13 @@ var attachCommand = cli.Command{
 		spec, err := container.Spec(ctx)
 		if err != nil {
 			return err
+		}
+		infos, err := container.Info(ctx)
+		if err != nil {
+			return err
+		}
+		if infos.IsAttached {
+			return errors.New("only one attach session is permitted, try again later")
 		}
 		var (
 			con console.Console
@@ -64,6 +76,13 @@ var attachCommand = cli.Command{
 			return err
 		}
 
+		if err := container.Update(ctx, func(ctx gocontext.Context, client *containerd.Client, c *containers.Container) error {
+			c.IsAttached = true
+			return nil
+		}); err != nil {
+			return err
+		}
+
 		if tty {
 			if err := HandleConsoleResize(ctx, task, con); err != nil {
 				logrus.WithError(err).Error("console resize")
@@ -77,6 +96,14 @@ var attachCommand = cli.Command{
 		code, _, err := ec.Result()
 		if err != nil {
 			return err
+		}
+		if infos.IsAttached {
+			if err := container.Update(ctx, func(ctx gocontext.Context, client *containerd.Client, c *containers.Container) error {
+				c.IsAttached = false
+				return nil
+			}); err != nil {
+				logrus.Error(err)
+			}
 		}
 		if code != 0 {
 			return cli.NewExitError("", int(code))
