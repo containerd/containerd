@@ -85,6 +85,7 @@ func openFile(name string, flag int, perm os.FileMode) (*os.File, error) {
 	}
 	// Call chmod to avoid permission mask
 	if err := os.Chmod(name, perm); err != nil {
+		f.Close()
 		return nil, err
 	}
 	return f, err
