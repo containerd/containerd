@@ -74,7 +74,7 @@ endif
 WHALE = "🇩"
 ONI = "👹"
 
-RELEASE=containerd-$(VERSION:v%=%).${GOOS}-${GOARCH}
+RELEASE=containerd-$(VERSION:v%=%)-${GOOS}-${GOARCH}
 CRIRELEASE=cri-containerd-$(VERSION:v%=%)-${GOOS}-${GOARCH}
 CRICNIRELEASE=cri-containerd-cni-$(VERSION:v%=%)-${GOOS}-${GOARCH}
 
