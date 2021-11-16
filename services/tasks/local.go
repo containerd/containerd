@@ -188,6 +188,9 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 		RuntimeOptions: container.Runtime.Options,
 		TaskOptions:    r.Options,
 	}
+	if r.RuntimePath != "" {
+		opts.Runtime = r.RuntimePath
+	}
 	for _, m := range r.Rootfs {
 		opts.Rootfs = append(opts.Rootfs, mount.Mount{
 			Type:    m.Type,

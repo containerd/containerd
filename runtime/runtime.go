@@ -46,7 +46,8 @@ type CreateOpts struct {
 	RuntimeOptions *types.Any
 	// TaskOptions received for the task
 	TaskOptions *types.Any
-	// Runtime to use
+	// Runtime name to use (e.g. `io.containerd.NAME.VERSION`).
+	// As an alternative full abs path to binary may be specified instead.
 	Runtime string
 }
 

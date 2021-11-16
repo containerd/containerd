@@ -24,7 +24,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/containerd/containerd/namespaces"
@@ -33,8 +32,6 @@ import (
 	"github.com/pkg/errors"
 	exec "golang.org/x/sys/execabs"
 )
-
-var runtimePaths sync.Map
 
 type CommandConfig struct {
 	Runtime      string
@@ -62,51 +59,7 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 		"-publish-binary", self,
 	}
 	args = append(args, config.Args...)
-	name := BinaryName(config.Runtime)
-	if name == "" {
-		return nil, fmt.Errorf("invalid runtime name %s, correct runtime name should format like io.containerd.runc.v1", config.Runtime)
-	}
-
-	var cmdPath string
-	cmdPathI, cmdPathFound := runtimePaths.Load(name)
-	if cmdPathFound {
-		cmdPath = cmdPathI.(string)
-	} else {
-		var lerr error
-		binaryPath := BinaryPath(config.Runtime)
-		if _, serr := os.Stat(binaryPath); serr == nil {
-			cmdPath = binaryPath
-		}
-
-		if cmdPath == "" {
-			if cmdPath, lerr = exec.LookPath(name); lerr != nil {
-				if eerr, ok := lerr.(*exec.Error); ok {
-					if eerr.Err == exec.ErrNotFound {
-						// Match the calling binaries (containerd) path and see
-						// if they are side by side. If so, execute the shim
-						// found there.
-						testPath := filepath.Join(filepath.Dir(self), name)
-						if _, serr := os.Stat(testPath); serr == nil {
-							cmdPath = testPath
-						}
-						if cmdPath == "" {
-							return nil, errors.Wrapf(os.ErrNotExist, "runtime %q binary not installed %q", config.Runtime, name)
-						}
-					}
-				}
-			}
-		}
-		cmdPath, err = filepath.Abs(cmdPath)
-		if err != nil {
-			return nil, err
-		}
-		if cmdPathI, cmdPathFound = runtimePaths.LoadOrStore(name, cmdPath); cmdPathFound {
-			// We didn't store cmdPath we loaded an already cached value. Use it.
-			cmdPath = cmdPathI.(string)
-		}
-	}
-
-	cmd := exec.CommandContext(ctx, cmdPath, args...)
+	cmd := exec.CommandContext(ctx, config.Runtime, args...)
 	cmd.Dir = config.Path
 	cmd.Env = append(
 		os.Environ(),

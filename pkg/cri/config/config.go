@@ -31,6 +31,10 @@ import (
 type Runtime struct {
 	// Type is the runtime type to use in containerd e.g. io.containerd.runtime.v1.linux
 	Type string `toml:"runtime_type" json:"runtimeType"`
+	// Path is an optional field that can be used to overwrite path to a shim runtime binary.
+	// When specified, containerd will ignore runtime name field when resolving shim location.
+	// Path must be abs.
+	Path string `toml:"runtime_path" json:"runtimePath"`
 	// Engine is the name of the runtime engine used by containerd.
 	// This only works for runtime type "io.containerd.runtime.v1.linux".
 	// DEPRECATED: use Options instead. Remove when shim v1 is deprecated.
