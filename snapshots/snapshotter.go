@@ -104,9 +104,29 @@ type Info struct {
 	//
 	// Note: only labels prefixed with `containerd.io/snapshot/` will be inherited by the
 	// snapshotter's `Prepare`, `View`, or `Commit` calls.
-	Labels  map[string]string `json:",omitempty"`
-	Created time.Time         `json:",omitempty"` // Created time
-	Updated time.Time         `json:",omitempty"` // Last update time
+	Labels map[string]string `json:",omitempty"`
+
+	// AuthConfig needed to pull an image from private registries.
+	AuthConfig AuthConfig
+
+	Created time.Time `json:",omitempty"` // Created time
+	Updated time.Time `json:",omitempty"` // Last update time
+}
+
+type AuthConfig struct {
+	// Username is the username to login the registry.
+	Username string `json:"username,omitempty"`
+	// Password is the password to login the registry.
+	Password string `json:"password,omitempty"`
+	// Auth is a base64 encoded string from the concatenation of the username,
+	// a colon, and the password.
+	Auth          string `json:"auth,omitempty"`
+	ServerAddress string `json:"server_address,omitempty"`
+	// IdentityToken is used to authenticate the user and get
+	// an access token for the registry.
+	IdentityToken string `json:"identitytoken"`
+	// RegistryToken is a bearer token to be sent to a registry
+	RegistryToken string `json:"registry_token,omitempty"`
 }
 
 // Usage defines statistics for disk resources consumed by the snapshot.
@@ -369,6 +389,22 @@ func WithLabels(labels map[string]string) Opt {
 
 		for k, v := range labels {
 			info.Labels[k] = v
+		}
+
+		return nil
+	}
+}
+
+// WithAuthConfig adds AuthConfig to a snapshot's Info
+func WithAuthConfig(username, password, auth, serverAddress, identityToken, registryToken string) Opt {
+	return func(info *Info) error {
+		info.AuthConfig = AuthConfig{
+			Username:      username,
+			Password:      password,
+			Auth:          auth,
+			ServerAddress: serverAddress,
+			IdentityToken: identityToken,
+			RegistryToken: registryToken,
 		}
 
 		return nil
