@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	mu       sync.Mutex
+	mu       sync.RWMutex
 	timeouts = make(map[string]time.Duration)
 
 	// DefaultTimeout of the timeout package
@@ -39,9 +39,9 @@ func Set(key string, t time.Duration) {
 
 // Get returns the timeout for the provided key
 func Get(key string) time.Duration {
-	mu.Lock()
+	mu.RLock()
 	t, ok := timeouts[key]
-	mu.Unlock()
+	mu.RUnlock()
 	if !ok {
 		t = DefaultTimeout
 	}
@@ -57,8 +57,8 @@ func WithContext(ctx context.Context, key string) (context.Context, func()) {
 // All returns all keys and their timeouts
 func All() map[string]time.Duration {
 	out := make(map[string]time.Duration)
-	mu.Lock()
-	defer mu.Unlock()
+	mu.RLock()
+	defer mu.RUnlock()
 	for k, v := range timeouts {
 		out[k] = v
 	}
