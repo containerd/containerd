@@ -17,33 +17,50 @@ all: build
 PROJ=gcr.io/k8s-cri-containerd
 VERSION=2.1
 IMAGE=$(PROJ)/volume-copy-up:$(VERSION)
+DOCKER_CERT_PATH ?= "$(HOME)/.docker"
+REMOTE_DOCKER_URL ?=
+DOCKER_REMOTE_ARGS ?=
+
+
+ifneq ($(REMOTE_DOCKER_URL),)
+	DOCKER_REMOTE_ARGS = --tlsverify --tlscacert "$(DOCKER_CERT_PATH)/ca.pem" \
+		--tlscert "$(DOCKER_CERT_PATH)/cert.pem" \
+		--tlskey "$(DOCKER_CERT_PATH)/key.pem" \
+		-H "$(REMOTE_DOCKER_URL)"
+endif
 
 # Operating systems supported: linux, windows
 OS ?= linux
 # Architectures supported: amd64, arm64
 ARCH ?= amd64
-# OS Version for the Windows images: 1809, 2004, 20H2
+# OS Version for the Windows images: 1809, 20H2, ltsc2022
 OSVERSION ?= 1809
 
 # The output type could either be docker (local), or registry.
 # If it is registry, it will also allow us to push the Windows images.
 OUTPUT_TYPE ?= docker
 
-ALL_OS = linux windows
+ALL_OS = linux
 ALL_ARCH.linux = amd64 arm64
 ALL_OS_ARCH.linux = $(foreach arch, ${ALL_ARCH.linux}, linux-$(arch))
-ALL_OSVERSIONS.windows := 1809 2004 20H2
+
+ifneq ($(REMOTE_DOCKER_URL),)
+ALL_OS += windows
+ALL_OSVERSIONS.windows := 1809 20H2 ltsc2022
 ALL_OS_ARCH.windows = $(foreach osversion, ${ALL_OSVERSIONS.windows}, windows-amd64-${osversion})
-ALL_OS_ARCH = $(foreach os, $(ALL_OS), ${ALL_OS_ARCH.${os}})
+BASE.windows := mcr.microsoft.com/windows/nanoserver
+endif
 
 BASE.linux.amd64 := busybox
 BASE.linux.arm64 := arm64v8/busybox
 BASE.linux := ${BASE.linux.${ARCH}}
-BASE.windows := mcr.microsoft.com/windows/nanoserver
 BASE := ${BASE.${OS}}
 
+ALL_OS_ARCH = $(foreach os, $(ALL_OS), ${ALL_OS_ARCH.${os}})
+
 configure-docker:
-	gcloud auth configure-docker
+	gcloud auth configure-docker --quiet
+	gcloud auth configure-docker --quiet $(shell echo $(PROJ) | cut -f 1 -d "/") || true
 
 setup-buildx:
 	docker buildx use img-builder || docker buildx create --name img-builder --use
@@ -67,9 +84,10 @@ container: .container-${OS}-$(ARCH)
 		-t $(IMAGE)-${OS}-${ARCH} --build-arg BASE=${BASE} .
 
 .container-windows-$(ARCH):
-	docker buildx build --pull --output=type=${OUTPUT_TYPE} --platform ${OS}/${ARCH} \
+	docker $(DOCKER_REMOTE_ARGS) build --isolation=hyperv --no-cache --pull \
 		-t $(IMAGE)-${OS}-${ARCH}-${OSVERSION} --build-arg BASE=${BASE}:${OSVERSION} \
 		-f Dockerfile_windows .
+	docker $(DOCKER_REMOTE_ARGS) push $(IMAGE)-${OS}-${ARCH}-${OSVERSION}
 
 # For Windows images, we also need to include the "os.version" in the manifest list images,
 # so the Windows node can pull the proper image it needs.
@@ -80,7 +98,8 @@ push-manifest:
 	set -x; \
 	for osversion in ${ALL_OSVERSIONS.windows}; do \
 		full_version=`docker manifest inspect ${BASE.windows}:$${osversion} | grep "os.version" | head -n 1 | awk -F\" '{print $$4}'` || true; \
-		docker manifest annotate --os windows --arch amd64 --os-version $${full_version} ${IMAGE} ${IMAGE}-windows-amd64-$${osversion}; \
+		docker manifest annotate --os windows --arch amd64 --os-version $${full_version} \
+		${IMAGE} ${IMAGE}-windows-amd64-$${osversion}; \
 	done
 	docker manifest push --purge ${IMAGE}
 

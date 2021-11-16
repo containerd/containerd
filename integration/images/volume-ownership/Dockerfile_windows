@@ -22,13 +22,15 @@ ENV BUSYBOX_EXES="[ [[ ar arch ash awk base64 basename bash bunzip2 bzcat bzip2 
 USER ContainerAdministrator
 WORKDIR C:/bin
 
+ADD tools/get_owner_windows.exe C:/bin/get_owner.exe
 RUN cmd.exe /c "@echo off && FOR %i in (%BUSYBOX_EXES%) do (mklink %i.exe busybox.exe)"
+
+RUN cmd.exe /c mkdir C:\volumes
 
 USER ContainerUser
 
-RUN cmd.exe /c mkdir C:\test_dir
-
-RUN /bin/sh.exe -c "echo test_content > /test_dir/test_file"
+RUN mkdir C:\volumes\test_dir
+RUN /bin/sh.exe -c "echo test_content > /volumes/test_dir/test_file"
 
 ENV PATH="C:\bin;C:\Windows\System32;C:\Windows;"
-VOLUME "C:/test_dir"
+VOLUME "C:/volumes/test_dir"
