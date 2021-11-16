@@ -2,17 +2,17 @@
 
 $PACKAGES= @{ mingw = "10.2.0"; git = ""; golang = "1.17.3"; make = ""; nssm = "" }
 
-write-host "Downloading chocolatey package"
+Write-Host "Downloading chocolatey package"
 curl.exe -L "https://packages.chocolatey.org/chocolatey.0.10.15.nupkg" -o 'c:\choco.zip'
 Expand-Archive "c:\choco.zip" -DestinationPath "c:\choco"
 
-write-host "Installing choco"
+Write-Host "Installing choco"
 & "c:\choco\tools\chocolateyInstall.ps1"
 
-write-host "Set choco.exe path."
+Write-Host "Set choco.exe path."
 $env:PATH+=";C:\ProgramData\chocolatey\bin"
 
-write-host "Install necessary packages"
+Write-Host "Install necessary packages"
 
 foreach ($package in $PACKAGES.Keys) {
     $command = "choco.exe install $package --yes"
@@ -23,12 +23,12 @@ foreach ($package in $PACKAGES.Keys) {
     Invoke-Expression $command
 }
 
-write-host "Set up environment."
+Write-Host "Set up environment."
 
 $path = ";c:\Program Files\Git\bin;c:\Program Files\Go\bin;c:\Users\azureuser\go\bin;c:\containerd\bin"
 $env:PATH+=$path
 
-write-host $env:PATH
+Write-Host $env:PATH
 
 [Environment]::SetEnvironmentVariable("PATH", $env:PATH, 'User')
 
