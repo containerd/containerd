@@ -25,7 +25,8 @@ foreach ($package in $PACKAGES.Keys) {
 
 Write-Host "Set up environment."
 
-$path = ";c:\Program Files\Git\bin;c:\Program Files\Go\bin;c:\Users\azureuser\go\bin;c:\containerd\bin"
+$userGoBin = "${env:HOME}\go\bin"
+$path = ";c:\Program Files\Git\bin;c:\Program Files\Go\bin;${userGoBin};c:\containerd\bin"
 $env:PATH+=$path
 
 Write-Host $env:PATH
@@ -42,4 +43,4 @@ go get -u github.com/jstemmer/go-junit-report
 $CRICTL_DOWNLOAD_URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.21.0/crictl-v1.21.0-windows-amd64.tar.gz"
 curl.exe -L $CRICTL_DOWNLOAD_URL -o c:\crictl.tar.gz
 tar -xvf c:\crictl.tar.gz
-mv crictl.exe c:\Users\azureuser\go\bin\crictl.exe # Move crictl somewhere in path
+mv crictl.exe "${userGoBin}\crictl.exe" # Move crictl somewhere in path
