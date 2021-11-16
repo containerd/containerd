@@ -2547,14 +2547,11 @@ func TestContainerPTY(t *testing.T) {
 func TestContainerAccessMount(t *testing.T) {
 	// The Linux busybox image has a www-data user.
 	username := "www-data"
-	isWindows := runtime.GOOS == "windows"
-	if isWindows {
+	if runtime.GOOS == "windows" {
 		username = "ContainerUser"
 	}
 
-	// FIXME(claudiub): Currently, this won't be able to pass on Windows. This should be removed once
-	// the issue is fixed.
-	checkContainerAccessMount(t, username, !isWindows)
+	checkContainerAccessMount(t, username, false)
 }
 
 func TestContainerAccessMountRoot(t *testing.T) {
@@ -2565,7 +2562,7 @@ func TestContainerAccessMountRoot(t *testing.T) {
 	checkContainerAccessMount(t, username, true)
 }
 
-func checkContainerAccessMount(t *testing.T, username string, shouldPass bool) {
+func checkContainerAccessMount(t *testing.T, username string, runsAsAdmin bool) {
 	t.Parallel()
 
 	client, err := newClient(t, address)
@@ -2585,14 +2582,23 @@ func checkContainerAccessMount(t *testing.T, username string, shouldPass bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		os.RemoveAll(tempDir)
-	}()
+
+	if !runsAsAdmin {
+		// If the container we're creating does not run as root/ContainerAdministrator
+		// then allow everyone to read the contents of the folder we'll be mounting as
+		// a volume. On linux, the lack of +x on the source folder, for "others" will mean
+		// we will not be able to enter the mount. On Windows, if we don't grant
+		// GENERIC_READ to "Everyone" an unprivileged user will not be able to read
+		// the contents of the volume mount
+		if err := grantReadToEveryone(tempDir); err != nil {
+			t.Fatal(err)
+		}
+	}
+	defer os.RemoveAll(tempDir)
 
 	const expectedStr = "Hello there."
 	tempFile := filepath.Join(tempDir, "hello.txt")
 	os.WriteFile(tempFile, []byte(expectedStr), 0644)
-
 	command := []string{"cat", "/greetings/hello.txt"}
 	destination := "/greetings"
 	if runtime.GOOS == "windows" {
@@ -2617,7 +2623,6 @@ func checkContainerAccessMount(t *testing.T, username string, shouldPass bool) {
 		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
-
 	stdout := bytes.NewBuffer(nil)
 	task, err := container.NewTask(ctx, cio.NewCreator(withByteBuffers(stdout)))
 	if err != nil {
@@ -2640,7 +2645,7 @@ func checkContainerAccessMount(t *testing.T, username string, shouldPass bool) {
 		t.Fatal(err)
 	}
 
-	if shouldPass && code != 0 {
+	if code != 0 {
 		t.Errorf("expected exec exit code 0 but received %d", code)
 	}
 	if _, err := task.Delete(ctx); err != nil {
@@ -2648,7 +2653,7 @@ func checkContainerAccessMount(t *testing.T, username string, shouldPass bool) {
 	}
 
 	stdoutStr := stdout.String()
-	if (shouldPass && !strings.Contains(stdoutStr, expectedStr)) || (!shouldPass && strings.Contains(stdoutStr, expectedStr)) {
-		t.Fatalf("process output does not match expectation: expected to pass: %t, ideal output: %q, actual output:\n\n %q", shouldPass, expectedStr, stdoutStr)
+	if stdoutStr != expectedStr {
+		t.Fatalf("process output does not match expectation: ideal output: %q, actual output: %q", expectedStr, stdoutStr)
 	}
 }
