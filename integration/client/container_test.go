@@ -2012,7 +2012,7 @@ func TestDaemonRestart(t *testing.T) {
 }
 
 type directIO struct {
-    cio.DirectIO
+	cio.DirectIO
 }
 
 // ioCreate returns IO available for use with task creation
