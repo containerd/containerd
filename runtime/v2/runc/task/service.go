@@ -17,7 +17,7 @@
    limitations under the License.
 */
 
-package tasks
+package task
 
 import (
 	"context"

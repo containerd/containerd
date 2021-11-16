@@ -24,7 +24,7 @@ import (
 
 	"github.com/containerd/containerd/pkg/shutdown"
 	"github.com/containerd/containerd/runtime/v2/runc/manager"
-	"github.com/containerd/containerd/runtime/v2/runc/tasks"
+	"github.com/containerd/containerd/runtime/v2/runc/task"
 	"github.com/containerd/containerd/runtime/v2/shim"
 	shimapi "github.com/containerd/containerd/runtime/v2/task"
 )
@@ -67,7 +67,7 @@ func New(ctx context.Context, id string, publisher shim.Publisher, fn func()) (s
 			return nil
 		})
 	}
-	ts, err := tasks.NewTaskService(ctx, publisher, sd)
+	ts, err := task.NewTaskService(ctx, publisher, sd)
 	if err != nil {
 		return nil, err
 	}
