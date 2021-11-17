@@ -64,6 +64,17 @@ version = 2
   # requires that all containers are deleted.
   netns_mounts_under_state_dir = false
 
+  # process_rlimit_no_file_soft sets the soft limit of maximum file descriptors each container process can use.
+  # process_rlimit_no_file_soft and process_rlimit_no_file_hard must be set together.
+  # Also note the soft limit must not be larger than the hard limit.
+  # If not specified containers inherit the limits, if any, from the containerd process.
+  process_rlimit_no_file_soft = 65536
+
+  # process_rlimit_no_file_hard sets the hard limit of maximum file descriptors each container process can use.
+  # process_rlimit_no_file_soft and process_rlimit_no_file_hard must be set together.
+  # If not specified containers inherit the limits, if any, from the containerd process.
+  process_rlimit_no_file_hard = 1048576
+
   # 'plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming' contains a x509 valid key pair to stream with tls.
   [plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming]
     # tls_cert_file is the filepath to the certificate paired with the "tls_key_file"
