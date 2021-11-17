@@ -144,12 +144,11 @@ func (c *defaultConverter) convertLayer(ctx context.Context, cs content.Store, d
 
 // convertManifest converts image manifests.
 //
-// - clears `.mediaType` if the target format is OCI
-//
+// - converts `.mediaType` if the target format is OCI
 // - records diff ID changes in c.diffIDMap
 func (c *defaultConverter) convertManifest(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
 	var (
-		manifest DualManifest
+		manifest ocispec.Manifest
 		modified bool
 	)
 	labels, err := readJSON(ctx, cs, &manifest, desc)
@@ -160,7 +159,7 @@ func (c *defaultConverter) convertManifest(ctx context.Context, cs content.Store
 		labels = make(map[string]string)
 	}
 	if images.IsDockerType(manifest.MediaType) && c.docker2oci {
-		manifest.MediaType = ""
+		manifest.MediaType = ConvertDockerMediaTypeToOCI(manifest.MediaType)
 		modified = true
 	}
 	var mu sync.Mutex
@@ -226,12 +225,11 @@ func (c *defaultConverter) convertManifest(ctx context.Context, cs content.Store
 
 // convertIndex converts image index.
 //
-// - clears `.mediaType` if the target format is OCI
-//
+// - converts `.mediaType` if the target format is OCI
 // - clears manifest entries that do not match c.platformMC
 func (c *defaultConverter) convertIndex(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
 	var (
-		index    DualIndex
+		index    ocispec.Index
 		modified bool
 	)
 	labels, err := readJSON(ctx, cs, &index, desc)
@@ -242,7 +240,7 @@ func (c *defaultConverter) convertIndex(ctx context.Context, cs content.Store, d
 		labels = make(map[string]string)
 	}
 	if images.IsDockerType(index.MediaType) && c.docker2oci {
-		index.MediaType = ""
+		index.MediaType = ConvertDockerMediaTypeToOCI(index.MediaType)
 		modified = true
 	}
 
@@ -381,22 +379,22 @@ func clearDockerV1DummyID(cfg DualConfig) (bool, error) {
 }
 
 // ObjectWithMediaType represents an object with a MediaType field
+// Deprecated
 type ObjectWithMediaType struct {
 	// MediaType appears on Docker manifests and manifest lists.
-	// MediaType does not appear on OCI manifests and index
 	MediaType string `json:"mediaType,omitempty"`
 }
 
 // DualManifest covers Docker manifest and OCI manifest
+// Deprecated: use github.com/opencontainers/image-spec/specs-go/v1.Manifest
 type DualManifest struct {
 	ocispec.Manifest
-	ObjectWithMediaType
 }
 
 // DualIndex covers Docker manifest list and OCI index
+// Deprecated: use github.com/opencontainers/image-spec/specs-go/v1.Index
 type DualIndex struct {
 	ocispec.Index
-	ObjectWithMediaType
 }
 
 // DualConfig covers Docker config (v1.0, v1.1, v1.2) and OCI config.
