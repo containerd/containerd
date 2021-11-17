@@ -17,6 +17,8 @@
 package server
 
 import (
+	"time"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
@@ -30,6 +32,7 @@ import (
 // RemovePodSandbox removes the sandbox. If there are running containers in the
 // sandbox, they should be forcibly removed.
 func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodSandboxRequest) (*runtime.RemovePodSandboxResponse, error) {
+	start := time.Now()
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
@@ -107,6 +110,8 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 
 	// Release the sandbox name reserved for the sandbox.
 	c.sandboxNameIndex.ReleaseByKey(id)
+
+	sandboxRemoveTimer.WithValues(sandbox.RuntimeHandler).UpdateSince(start)
 
 	return &runtime.RemovePodSandboxResponse{}, nil
 }

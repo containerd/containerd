@@ -54,6 +54,7 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 	// Stop all containers inside the sandbox. This terminates the container forcibly,
 	// and container may still be created, so production should not rely on this behavior.
 	// TODO(random-liu): Introduce a state in sandbox to avoid future container creation.
+	stop := time.Now()
 	containers := c.containerStore.List()
 	for _, container := range containers {
 		if container.SandboxID != id {
@@ -77,9 +78,11 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 			return errors.Wrapf(err, "failed to stop sandbox container %q in %q state", id, state)
 		}
 	}
+	sandboxRuntimeStopTimer.WithValues(sandbox.RuntimeHandler).UpdateSince(stop)
 
 	// Teardown network for sandbox.
 	if sandbox.NetNS != nil {
+		netStop := time.Now()
 		// Use empty netns path if netns is not available. This is defined in:
 		// https://github.com/containernetworking/cni/blob/v0.7.0-alpha1/SPEC.md
 		if closed, err := sandbox.NetNS.Closed(); err != nil {
@@ -93,6 +96,7 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 		if err := sandbox.NetNS.Remove(); err != nil {
 			return errors.Wrapf(err, "failed to remove network namespace for sandbox %q", id)
 		}
+		sandboxDeleteNetwork.UpdateSince(netStop)
 	}
 
 	log.G(ctx).Infof("TearDown network for sandbox %q successfully", id)
