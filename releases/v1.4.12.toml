@@ -1,0 +1,23 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.4.11"
+
+pre_release = false
+
+preface = """\
+The twelfth patch release for containerd 1.4 contains a few minor bug fixes
+and an update to mitigate [CVE-2021-41190](https://github.com/opencontainers/distribution-spec/security/advisories/GHSA-mc8v-mgrf-8f4m).
+
+### Notable Updates
+
+* **Handle ambiguous OCI manifest parsing** ([GHSA-5j5w-g665-5m35](https://github.com/containerd/containerd/security/advisories/GHSA-5j5w-g665-5m35))
+* **Update pull to try next mirror for non-404 errors** ([#5275](https://github.com/containerd/containerd/pull/5275))
+* **Update pull to handle of non-https urls in descriptors** ([#6221](https://github.com/containerd/containerd/pull/6221))
+
+See the changelog for complete list of changes"""
