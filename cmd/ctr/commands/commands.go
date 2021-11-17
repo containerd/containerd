@@ -185,6 +185,10 @@ var (
 			Name:  "apparmor-profile",
 			Usage: "enable AppArmor with an existing custom profile",
 		},
+		cli.StringFlag{
+			Name:  "landlock-profile",
+			Usage: "enable Landlock with an existing profile",
+		},
 	}
 )
 

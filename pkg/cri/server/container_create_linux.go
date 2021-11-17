@@ -25,6 +25,7 @@ import (
 
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd/contrib/apparmor"
+	"github.com/containerd/containerd/contrib/landlock"
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -354,6 +355,21 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 		specOpts = append(specOpts, apparmorSpecOpts)
 	}
 
+	// TODO: Add Landlock support in project k8s.io api.proto: securityContext.GetLandlock()
+	// This is a plug now; community discussion opened: https://github.com/containerd/containerd/issues/6056
+	var lsp *runtime.SecurityProfile = nil
+
+	landlockSpecOpts, err := generateLandlockSpecOpts(
+		lsp,
+		securityContext.GetPrivileged(),
+		c.landlockEnabled())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate landlock spec opts")
+	}
+	if landlockSpecOpts != nil {
+		specOpts = append(specOpts, landlockSpecOpts)
+	}
+
 	ssp := securityContext.GetSeccomp()
 	if ssp == nil {
 		ssp, err = generateSeccompSecurityProfile(
@@ -448,6 +464,47 @@ func (c *criService) generateSeccompSpecOpts(sp *runtime.SecurityProfile, privil
 		return seccomp.WithProfile(strings.TrimPrefix(sp.LocalhostRef, profileNamePrefix)), nil
 	default:
 		return nil, errors.New("seccomp unknown ProfileType")
+	}
+}
+
+// generateLandlockSpecOpts generates containerd SpecOpts for landlock.
+// Now this is a plug function, landlock support discussion is opened: https://github.com/containerd/containerd/issues/6056
+func generateLandlockSpecOpts(sp *runtime.SecurityProfile, privileged, landlockEnabled bool) (oci.SpecOpts, error) {
+	// TODO : Discuss with community if a priviledged container supports custom/default landlock profile
+	if privileged {
+		// Do not set landlock profile when container is privileged
+		return nil, nil
+	}
+	if !landlockEnabled {
+		if sp != nil {
+			if sp.ProfileType != runtime.SecurityProfile_Unconfined {
+				return nil, errors.New("landlock is not supported")
+			}
+		}
+		return nil, nil
+	}
+
+	if sp == nil {
+		return nil, nil
+	}
+
+	if sp.ProfileType != runtime.SecurityProfile_Localhost && sp.LocalhostRef != "" {
+		return nil, errors.New("landlock config invalid LocalhostRef must only be set if ProfileType is Localhost")
+	}
+	switch sp.ProfileType {
+	case runtime.SecurityProfile_Unconfined:
+		// Do not set landlock profile.
+		return nil, nil
+	case runtime.SecurityProfile_RuntimeDefault:
+		// TODO: Discuss a default landlock profile support with communitiy: https://github.com/containerd/containerd/issues/6056
+		// Now here is a plug function
+		return landlock.WithDefaultProfile(), nil
+	case runtime.SecurityProfile_Localhost:
+		// trimming the localhost/ prefix just in case even though it should not
+		// be necessary with the new SecurityProfile struct
+		return landlock.WithProfile(strings.TrimPrefix(sp.LocalhostRef, profileNamePrefix)), nil
+	default:
+		return nil, errors.New("landlock unknown ProfileType")
 	}
 }
 

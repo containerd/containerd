@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/apparmor"
 	"github.com/containerd/containerd/pkg/seccomp"
+	"github.com/containerd/containerd/pkg/landlock"
 	"github.com/containerd/containerd/pkg/seutil"
 	"github.com/moby/sys/mountinfo"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -146,6 +147,15 @@ func (c *criService) apparmorEnabled() bool {
 		return false
 	}
 	return apparmor.HostSupports()
+}
+
+// landlockEnabled returns true if landlock is enabled, supported by the host,
+// and not disabled manually
+func (c *criService) landlockEnabled() bool {
+	if c.config.DisableLandlock {
+		return false
+	}
+	return landlock.HostSupports()
 }
 
 func (c *criService) seccompEnabled() bool {
