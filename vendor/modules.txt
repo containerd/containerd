@@ -78,7 +78,7 @@ github.com/containerd/cgroups/v2/stats
 # github.com/containerd/console v1.0.3
 ## explicit
 github.com/containerd/console
-# github.com/containerd/containerd/api v1.6.0-beta.1 => ./api
+# github.com/containerd/containerd/api v1.6.0-beta.3 => ./api
 ## explicit
 github.com/containerd/containerd/api/events
 github.com/containerd/containerd/api/services/containers/v1
