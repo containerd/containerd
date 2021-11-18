@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
 	osinterface "github.com/containerd/containerd/pkg/os"
+	"github.com/containerd/containerd/pkg/userns"
 )
 
 func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
@@ -134,6 +135,19 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 
 	// Add sysctls
 	sysctls := config.GetLinux().GetSysctls()
+	if sysctls == nil {
+		sysctls = make(map[string]string)
+	}
+	_, ipUnprivilegedPortStart := sysctls["net.ipv4.ip_unprivileged_port_start"]
+	_, pingGroupRange := sysctls["net.ipv4.ping_group_range"]
+	if nsOptions.GetNetwork() != runtime.NamespaceMode_NODE {
+		if c.config.EnableUnprivilegedPorts && !ipUnprivilegedPortStart {
+			sysctls["net.ipv4.ip_unprivileged_port_start"] = "0"
+		}
+		if c.config.EnableUnprivilegedICMP && !pingGroupRange && !userns.RunningInUserNS() {
+			sysctls["net.ipv4.ping_group_range"] = "0 2147483647"
+		}
+	}
 	specOpts = append(specOpts, customopts.WithSysctls(sysctls))
 
 	// Note: LinuxSandboxSecurityContext does not currently provide an apparmor profile
