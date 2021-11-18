@@ -24,6 +24,7 @@ support to increase overall compatibility and stability.
 * **Split task manager into shim and task manager** ([#5918](https://github.com/containerd/containerd/pull/5918))
 * **Add runc shim support for core scheduling** ([#6011](https://github.com/containerd/containerd/pull/6011))
 * **Update shim client connect attempt to fail fast when shim errors** ([#6031](https://github.com/containerd/containerd/pull/6031))
+* **Add support for absolute path to shim binaries** ([#6206](https://github.com/containerd/containerd/pull/6206))
 
 #### Windows
 
@@ -37,7 +38,9 @@ support to increase overall compatibility and stability.
 * **Add support for unified resources field for cgroups v2** ([#5627](https://github.com/containerd/containerd/pull/5627))
 * **Add IP preference configuration for reporting pod IP** ([#5964](https://github.com/containerd/containerd/pull/5964))
 * **Implement new CRI pod sandbox stats API** ([#6113](https://github.com/containerd/containerd/pull/6113))
+* **Add sandbox and container latency metrics** ([#6111](https://github.com/containerd/containerd/pull/6111))
 * **Add namespace to ttrpc and grpc plugin connections** ([#6130](https://github.com/containerd/containerd/pull/6130))
+* **Add option to allow ping sockets and privileged ports with no capabilities** ([#6170](https://github.com/containerd/containerd/pull/6170))
 
 #### Other
 
