@@ -128,12 +128,11 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 		if len(copts.dialOptions) > 0 {
 			gopts = copts.dialOptions
 		}
+		gopts = append(gopts, grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(defaults.DefaultMaxRecvMsgSize),
+			grpc.MaxCallSendMsgSize(defaults.DefaultMaxSendMsgSize)))
 		if len(copts.callOptions) > 0 {
 			gopts = append(gopts, grpc.WithDefaultCallOptions(copts.callOptions...))
-		} else {
-			gopts = append(gopts, grpc.WithDefaultCallOptions(
-				grpc.MaxCallRecvMsgSize(defaults.DefaultMaxRecvMsgSize),
-				grpc.MaxCallSendMsgSize(defaults.DefaultMaxSendMsgSize)))
 		}
 		if copts.defaultns != "" {
 			unary, stream := newNSInterceptors(copts.defaultns)
