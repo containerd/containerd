@@ -44,7 +44,7 @@ func TestValidateMediaType(t *testing.T) {
 			b, err := json.Marshal(manifest)
 			require.NoError(t, err, "failed to marshal manifest")
 
-			err = validateMediaType(b, tc.mt)
+			err = ValidateMediaType(b, tc.mt)
 			if tc.index {
 				assert.Error(t, err, "manifest should not be a valid index")
 			} else {
@@ -58,7 +58,7 @@ func TestValidateMediaType(t *testing.T) {
 			b, err := json.Marshal(index)
 			require.NoError(t, err, "failed to marshal index")
 
-			err = validateMediaType(b, tc.mt)
+			err = ValidateMediaType(b, tc.mt)
 			if tc.index {
 				assert.NoError(t, err, "index should be valid")
 			} else {
@@ -97,7 +97,7 @@ func TestValidateMediaType(t *testing.T) {
 				b, err := json.Marshal(doc)
 				require.NoError(t, err, "failed to marshal document")
 
-				err = validateMediaType(b, tc.mt)
+				err = ValidateMediaType(b, tc.mt)
 				assert.NoError(t, err, "document should be valid")
 			})
 		}
@@ -109,7 +109,7 @@ func TestValidateMediaType(t *testing.T) {
 				b, err := json.Marshal(doc)
 				require.NoError(t, err, "failed to marshal document")
 
-				err = validateMediaType(b, tc.mt)
+				err = ValidateMediaType(b, tc.mt)
 				assert.Error(t, err, "document should not be valid")
 			})
 		}
@@ -121,7 +121,7 @@ func TestValidateMediaType(t *testing.T) {
 		b, err := json.Marshal(doc)
 		require.NoError(t, err, "failed to marshal document")
 
-		err = validateMediaType(b, "")
+		err = ValidateMediaType(b, "")
 		assert.Error(t, err, "document should not be valid")
 	})
 }

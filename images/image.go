@@ -155,7 +155,7 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 				return nil, err
 			}
 
-			if err := validateMediaType(p, desc.MediaType); err != nil {
+			if err := ValidateMediaType(p, desc.MediaType); err != nil {
 				return nil, errors.Wrapf(err, "manifest: invalid desc %s", desc.Digest)
 			}
 
@@ -199,7 +199,7 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 				return nil, err
 			}
 
-			if err := validateMediaType(p, desc.MediaType); err != nil {
+			if err := ValidateMediaType(p, desc.MediaType); err != nil {
 				return nil, errors.Wrapf(err, "manifest: invalid desc %s", desc.Digest)
 			}
 
@@ -345,7 +345,7 @@ func Children(ctx context.Context, provider content.Provider, desc ocispec.Descr
 			return nil, err
 		}
 
-		if err := validateMediaType(p, desc.MediaType); err != nil {
+		if err := ValidateMediaType(p, desc.MediaType); err != nil {
 			return nil, errors.Wrapf(err, "children: invalid desc %s", desc.Digest)
 		}
 
@@ -364,7 +364,7 @@ func Children(ctx context.Context, provider content.Provider, desc ocispec.Descr
 			return nil, err
 		}
 
-		if err := validateMediaType(p, desc.MediaType); err != nil {
+		if err := ValidateMediaType(p, desc.MediaType); err != nil {
 			return nil, errors.Wrapf(err, "children: invalid desc %s", desc.Digest)
 		}
 
@@ -395,10 +395,10 @@ type unknownDocument struct {
 	FSLayers  json.RawMessage `json:"fsLayers,omitempty"` // schema 1
 }
 
-// validateMediaType returns an error if the byte slice is invalid JSON or if
+// ValidateMediaType returns an error if the byte slice is invalid JSON or if
 // the media type identifies the blob as one format but it contains elements of
 // another format.
-func validateMediaType(b []byte, mt string) error {
+func ValidateMediaType(b []byte, mt string) error {
 	var doc unknownDocument
 	if err := json.Unmarshal(b, &doc); err != nil {
 		return err
