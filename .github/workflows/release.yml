@@ -130,6 +130,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fail_on_unmatched_files: true
+          name: containerd ${{ needs.check.outputs.stringver }}
           draft: false
           prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
           body_path: ./builds/containerd-release-notes/release-notes.md
