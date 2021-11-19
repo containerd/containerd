@@ -27,6 +27,7 @@ import (
 	"net/http/pprof"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -75,7 +76,28 @@ func CreateTopLevelDirectories(config *srvconfig.Config) error {
 		return err
 	}
 
-	return sys.MkdirAllWithACL(config.State, 0711)
+	if err := sys.MkdirAllWithACL(config.State, 0711); err != nil {
+		return err
+	}
+
+	if config.TempDir != "" {
+		if err := sys.MkdirAllWithACL(config.TempDir, 0711); err != nil {
+			return err
+		}
+		if runtime.GOOS == "windows" {
+			// On Windows, the Host Compute Service (vmcompute) will read the
+			// TEMP/TMP setting from the calling process when creating the
+			// tempdir to extract an image layer to. This allows the
+			// administrator to align the tempdir location with the same volume
+			// as the snapshot dir to avoid a copy operation when moving the
+			// extracted layer to the snapshot dir location.
+			os.Setenv("TEMP", config.TempDir)
+			os.Setenv("TMP", config.TempDir)
+		} else {
+			os.Setenv("TMPDIR", config.TempDir)
+		}
+	}
+	return nil
 }
 
 // New creates and initializes a new containerd server
