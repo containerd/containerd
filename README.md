@@ -325,7 +325,7 @@ copy of the license, titled CC-BY-4.0, at http://creativecommons.org/licenses/by
 
 ## Project details
 
-**containerd** is the primary open source project within the broader containerd GitHub repository.
+**containerd** is the primary open source project within the broader containerd GitHub organization.
 However, all projects within the repo have common maintainership, governance, and contributing
 guidelines which are stored in a `project` repository commonly for all containerd projects.
 
