@@ -368,7 +368,7 @@ func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 				return false, err
 			}
 			if len(stats) != 1 {
-				return false, errors.New("unexpected stats length")
+				return false, errors.Errorf("expected only one stat, but got %v", stats)
 			}
 			if stats[0].GetWritableLayer().GetUsedBytes().GetValue() != 0 {
 				return true, nil
