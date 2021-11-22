@@ -15,7 +15,7 @@ should have installed crictl for you. If not, get it from your release tarball.
 If you are a developer the current version of crictl is specified [here](/script/setup/critools-version).
 A helper command has been included to install the dependencies at the right version:
 ```console
-$ make install.deps
+$ make install-deps
 ```
 * Note: The file named `/etc/crictl.yaml` is used to configure crictl
 so you don't have to repeatedly specify the runtime sock used to connect crictl

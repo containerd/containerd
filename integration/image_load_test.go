@@ -58,7 +58,7 @@ func TestImageLoad(t *testing.T) {
 
 	t.Logf("load image in cri")
 	ctr, err := exec.LookPath("ctr")
-	require.NoError(t, err, "ctr should be installed, make sure you've run `make install.deps`")
+	require.NoError(t, err, "ctr should be installed, make sure you've run `make install-deps`")
 	output, err = exec.Command(ctr, "-address="+containerdEndpoint,
 		"-n=k8s.io", "images", "import", tar).CombinedOutput()
 	require.NoError(t, err, "output: %q", output)
