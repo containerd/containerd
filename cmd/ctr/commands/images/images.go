@@ -124,24 +124,6 @@ var listCommand = cli.Command{
 				platformColumn = strings.Join(ps, ",")
 			}
 
-			//labels := "-"
-			//if len(image.Labels) > 0 {
-			//	var pairs []string
-			//	for k, v := range image.Labels {
-			//		pairs = append(pairs, fmt.Sprintf("%v=%v", k, v))
-			//	}
-			//	sort.Strings(pairs)
-			//	labels = strings.Join(pairs, ",")
-			//}
-			//
-			//urls := "-"
-			//if len(image.Target.URLs) >0 {
-			//	urls = "|"
-			//	for _, u := range image.Target.URLs {
-			//		urls += u + "|"
-			//	}
-			//}
-
 			iPrint := &imagePrint{
 				imageName: image.Name,
 				digest: image.Target.Digest,
