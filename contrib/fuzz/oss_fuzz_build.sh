@@ -27,6 +27,10 @@ mv contrib/fuzz/docker_fuzzer.go remotes/docker/
 mv contrib/fuzz/container_fuzzer.go integration/client/
 
 
+# cri fuzzer
+mv contrib/fuzz/cri_fuzzer2.go pkg/cri/server/
+mv pkg/cri/server/service_test.go pkg/cri/server/service_fuzz.go
+compile_go_fuzzer github.com/containerd/containerd/pkg/cri/server FuzzCRI fuzz_cri
 # Change path of socket since OSS-fuzz does not grant access to /run
 sed -i 's/\/run\/containerd/\/tmp\/containerd/g' $SRC/containerd/defaults/defaults_unix.go
 
