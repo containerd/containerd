@@ -219,7 +219,7 @@ can be used and modified as necessary as a custom configuration.`
 			return ctx.Err()
 		case r := <-chsrv:
 			if r.err != nil {
-				return err
+				return r.err
 			}
 			server = r.s
 		}
