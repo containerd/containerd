@@ -332,7 +332,7 @@ func Check(ctx context.Context, provider content.Provider, image ocispec.Descrip
 
 	}
 
-	return true, required, present, missing, nil
+	return len(missing) == 0, required, present, missing, nil
 }
 
 // Children returns the immediate children of content described by the descriptor.
