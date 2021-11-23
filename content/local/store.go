@@ -592,6 +592,7 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 	}
 
 	if _, err := fp.Seek(offset, io.SeekStart); err != nil {
+		fp.Close()
 		return nil, errors.Wrap(err, "could not seek to current write offset")
 	}
 
