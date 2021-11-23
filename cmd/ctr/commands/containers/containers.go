@@ -157,11 +157,12 @@ var listCommand = cli.Command{
 			if v, OK := info.Labels["io.kubernetes.pod.namespace"]; OK {
 				podNS = v
 			}
-			podUid := "-"
+
+			podUID := "-"
 			if v, OK := info.Labels["io.kubernetes.pod.uid"]; OK {
-				podUid = v
+				podUID = v
 			}
-			podInfoStr := podName + "|" + podNS + "|" + podUid
+			podInfoStr := podName + "|" + podNS + "|" + podUID
 
 			imageName := info.Image
 			if imageName == "" {
