@@ -137,7 +137,7 @@ var listCommand = cli.Command{
 			if err != nil {
 				return err
 			}
-			spec, err :=  c.Spec(ctx)
+			spec, err := c.Spec(ctx)
 			if err != nil {
 				return err
 			}
@@ -168,16 +168,15 @@ var listCommand = cli.Command{
 				imageName = "-"
 			}
 
-
 			cPrintInfo := &cInfoPrint{
-				id: c.ID(),
-				imageName: imageName,
-				kind: kind,
-				cmds: cmds,
+				id:         c.ID(),
+				imageName:  imageName,
+				kind:       kind,
+				cmds:       cmds,
 				podInfoStr: podInfoStr,
 				createTime: info.CreatedAt.In(local).Format("2006-01-02 15:04:05"),
-				createdAt: info.CreatedAt.UnixNano(),
-				runtime: info.Runtime.Name,
+				createdAt:  info.CreatedAt.UnixNano(),
+				runtime:    info.Runtime.Name,
 			}
 			cPrintArray = append(cPrintArray, cPrintInfo)
 		}
@@ -212,8 +211,8 @@ type cInfoPrint struct {
 
 type cInfoPrintSlice []*cInfoPrint
 
-func (s cInfoPrintSlice) Len() int { return len(s) }
-func (s cInfoPrintSlice) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s cInfoPrintSlice) Len() int           { return len(s) }
+func (s cInfoPrintSlice) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 func (s cInfoPrintSlice) Less(i, j int) bool { return s[i].createdAt > s[j].createdAt }
 
 var deleteCommand = cli.Command{

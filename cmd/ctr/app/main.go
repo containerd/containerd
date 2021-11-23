@@ -95,7 +95,7 @@ containerd CLI
 		cli.StringFlag{
 			Name:   "namespace, n",
 			Usage:  "namespace to use with commands",
-			Value:  "k8s.io",
+			Value:  "namespaces.Default",
 			EnvVar: namespaces.NamespaceEnvVar,
 		},
 	}

@@ -125,12 +125,12 @@ var listCommand = cli.Command{
 			}
 
 			iPrint := &imagePrint{
-				imageName: image.Name,
-				digest: image.Target.Digest,
-				size: progress.Bytes(size),
-				platform: platformColumn,
+				imageName:  image.Name,
+				digest:     image.Target.Digest,
+				size:       progress.Bytes(size),
+				platform:   platformColumn,
 				createTime: image.CreatedAt.In(local).Format("2006-01-02 15:04:05"),
-				createdAt: image.CreatedAt.UnixNano(),
+				createdAt:  image.CreatedAt.UnixNano(),
 			}
 			imagePrintArray = append(imagePrintArray, iPrint)
 		}
@@ -150,7 +150,6 @@ var listCommand = cli.Command{
 	},
 }
 
-
 type imagePrint struct {
 	imageName  string
 	digest     digest.Digest
@@ -162,8 +161,8 @@ type imagePrint struct {
 
 type imagePrintSlice []*imagePrint
 
-func (s imagePrintSlice) Len() int { return len(s) }
-func (s imagePrintSlice) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s imagePrintSlice) Len() int           { return len(s) }
+func (s imagePrintSlice) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 func (s imagePrintSlice) Less(i, j int) bool { return s[i].createdAt > s[j].createdAt }
 
 var setLabelsCommand = cli.Command{
