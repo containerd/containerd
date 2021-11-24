@@ -1,11 +1,19 @@
-# Workflow intended to periodically test containerd integration tests
+# Workflow intended to run containerd integration tests on Windows.
 
-name: Windows Periodic Tests
+name: Windows Integration Tests
 
 on:
-  schedule:
-  - cron: "0 1 * * *"
   workflow_dispatch:
+  workflow_call:
+    secrets:
+      AZURE_SUB_ID:
+        required: true
+      AZURE_CREDS:
+        required: true
+      GCP_PROJECT_ID:
+        required: true
+      GCP_SA_KEY:
+        required: true
 
 env:
   AZURE_DEFAULT_LOCATION: westeurope
@@ -18,7 +26,6 @@ env:
 
 jobs:
   winIntegration:
-    if: github.repository == 'containerd/containerd'
     strategy:
       matrix:
         win_ver: [ltsc2019, sac2004, ltsc2022]
