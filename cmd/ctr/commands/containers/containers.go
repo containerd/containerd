@@ -149,20 +149,6 @@ var listCommand = cli.Command{
 			if v, OK := info.Labels["io.cri-containerd.kind"]; OK {
 				kind = v
 			}
-			podName := "-"
-			if v, OK := info.Labels["io.kubernetes.pod.name"]; OK {
-				podName = v
-			}
-			podNS := "-"
-			if v, OK := info.Labels["io.kubernetes.pod.namespace"]; OK {
-				podNS = v
-			}
-
-			podUID := "-"
-			if v, OK := info.Labels["io.kubernetes.pod.uid"]; OK {
-				podUID = v
-			}
-			podInfoStr := podName + "|" + podNS + "|" + podUID
 
 			imageName := info.Image
 			if imageName == "" {
@@ -174,7 +160,6 @@ var listCommand = cli.Command{
 				imageName:  imageName,
 				kind:       kind,
 				cmds:       cmds,
-				podInfoStr: podInfoStr,
 				createTime: info.CreatedAt.In(local).Format("2006-01-02 15:04:05"),
 				createdAt:  info.CreatedAt.UnixNano(),
 				runtime:    info.Runtime.Name,
