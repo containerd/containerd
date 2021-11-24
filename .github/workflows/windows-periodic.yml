@@ -18,6 +18,7 @@ env:
 
 jobs:
   winIntegration:
+    if: github.repository == 'containerd/containerd'
     strategy:
       matrix:
         win_ver: [ltsc2019, sac2004, ltsc2022]
