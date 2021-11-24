@@ -47,6 +47,7 @@ func FromProto(p *types.Sandbox) Sandbox {
 		ID:         p.SandboxID,
 		Labels:     p.Labels,
 		Runtime:    runtime,
+		Spec:       p.Spec,
 		CreatedAt:  p.CreatedAt,
 		UpdatedAt:  p.UpdatedAt,
 		Extensions: p.Extensions,

@@ -18,6 +18,7 @@ package containerd
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	api "github.com/containerd/containerd/sandbox"
@@ -36,8 +37,9 @@ type Sandbox interface {
 	Labels(ctx context.Context) (map[string]string, error)
 	// Start starts new sandbox instance
 	Start(ctx context.Context) error
-	// Shutdown will turn down existing sandbox instance
-	Shutdown(ctx context.Context) error
+	// Shutdown will turn down existing sandbox instance.
+	// If using force, the client will ignore shutdown errors.
+	Shutdown(ctx context.Context, force bool) error
 	// Pause will freeze running sandbox instance
 	Pause(ctx context.Context) error
 	// Resume will unfreeze previously paused sandbox instance
@@ -74,8 +76,23 @@ func (s *sandboxClient) Start(ctx context.Context) error {
 	return s.client.SandboxController().Start(ctx, s.ID())
 }
 
-func (s *sandboxClient) Shutdown(ctx context.Context) error {
-	return s.client.SandboxController().Shutdown(ctx, s.ID())
+func (s *sandboxClient) Shutdown(ctx context.Context, force bool) error {
+	var (
+		controller = s.client.SandboxController()
+		store      = s.client.SandboxStore()
+	)
+
+	err := controller.Shutdown(ctx, s.ID())
+	if err != nil && !force {
+		return fmt.Errorf("failed to shutdown sandbox: %w", err)
+	}
+
+	err = store.Delete(ctx, s.ID())
+	if err != nil {
+		return fmt.Errorf("failed to delete sandbox from metadata store: %w", err)
+	}
+
+	return nil
 }
 
 func (s *sandboxClient) Pause(ctx context.Context) error {
@@ -105,6 +122,10 @@ func (s *sandboxClient) Status(ctx context.Context, status interface{}) error {
 
 // NewSandbox creates new sandbox client
 func (c *Client) NewSandbox(ctx context.Context, sandboxID string, opts ...NewSandboxOpts) (Sandbox, error) {
+	if sandboxID == "" {
+		return nil, errors.New("sandbox ID must be specified")
+	}
+
 	newSandbox := api.Sandbox{
 		ID:        sandboxID,
 		CreatedAt: time.Now().UTC(),
@@ -147,6 +168,10 @@ type NewSandboxOpts func(ctx context.Context, client *Client, sandbox *api.Sandb
 // WithSandboxRuntime allows a user to specify the runtime to be used to run a sandbox
 func WithSandboxRuntime(name string, options interface{}) NewSandboxOpts {
 	return func(ctx context.Context, client *Client, s *api.Sandbox) error {
+		if options == nil {
+			options = &types.Empty{}
+		}
+
 		opts, err := typeurl.MarshalAny(options)
 		if err != nil {
 			return errors.Wrap(err, "failed to marshal sandbox runtime options")

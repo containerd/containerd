@@ -25,6 +25,8 @@ import (
 	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/typeurl"
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 const configFilename = "config.json"
@@ -43,7 +45,7 @@ func LoadBundle(ctx context.Context, root, id string) (*Bundle, error) {
 }
 
 // NewBundle returns a new bundle on disk
-func NewBundle(ctx context.Context, root, state, id string, spec []byte) (b *Bundle, err error) {
+func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b *Bundle, err error) {
 	if err := identifiers.Validate(id); err != nil {
 		return nil, fmt.Errorf("invalid task id %s: %w", id, err)
 	}
@@ -73,8 +75,10 @@ func NewBundle(ctx context.Context, root, state, id string, spec []byte) (b *Bun
 	if err := os.Mkdir(b.Path, 0700); err != nil {
 		return nil, err
 	}
-	if err := prepareBundleDirectoryPermissions(b.Path, spec); err != nil {
-		return nil, err
+	if typeurl.Is(spec, &specs.Spec{}) {
+		if err := prepareBundleDirectoryPermissions(b.Path, spec.GetValue()); err != nil {
+			return nil, err
+		}
 	}
 	paths = append(paths, b.Path)
 	// create working directory for the bundle
@@ -100,9 +104,14 @@ func NewBundle(ctx context.Context, root, state, id string, spec []byte) (b *Bun
 	if err := os.Symlink(work, filepath.Join(b.Path, "work")); err != nil {
 		return nil, err
 	}
-	// write the spec to the bundle
-	err = os.WriteFile(filepath.Join(b.Path, configFilename), spec, 0666)
-	return b, err
+	if spec := spec.GetValue(); spec != nil {
+		// write the spec to the bundle
+		err = os.WriteFile(filepath.Join(b.Path, configFilename), spec, 0666)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write %s", configFilename)
+		}
+	}
+	return b, nil
 }
 
 // Bundle represents an OCI bundle

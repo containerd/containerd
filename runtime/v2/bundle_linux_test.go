@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/testutil"
+	"github.com/containerd/typeurl"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -57,11 +58,11 @@ func TestNewBundle(t *testing.T) {
 					GIDMappings: []specs.LinuxIDMapping{{ContainerID: 0, HostID: usernsGID}},
 				}
 			}
-			specBytes, err := json.Marshal(&spec)
+			specAny, err := typeurl.MarshalAny(&spec)
 			require.NoError(t, err, "failed to marshal spec")
 
 			ctx := namespaces.WithNamespace(context.TODO(), namespaces.Default)
-			b, err := NewBundle(ctx, work, state, id, specBytes)
+			b, err := NewBundle(ctx, work, state, id, specAny)
 			require.NoError(t, err, "NewBundle should succeed")
 			require.NotNil(t, b, "bundle should not be nil")
 

@@ -202,7 +202,8 @@ func (s *sandboxStore) List(ctx context.Context, fields ...string) ([]api.Sandbo
 	if err := view(ctx, s.db, func(tx *bbolt.Tx) error {
 		bucket := getSandboxBucket(tx, ns)
 		if bucket == nil {
-			return errors.Wrap(errdefs.ErrNotFound, "no sandbox buckets")
+			// We haven't created any sandboxes yet, just return empty list
+			return nil
 		}
 
 		if err := bucket.ForEach(func(k, v []byte) error {
