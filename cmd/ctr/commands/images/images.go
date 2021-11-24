@@ -18,7 +18,6 @@ package images
 
 import (
 	"fmt"
-	"github.com/opencontainers/go-digest"
 	"os"
 	"sort"
 	"strings"
@@ -31,6 +30,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/progress"
 	"github.com/containerd/containerd/platforms"
+	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
