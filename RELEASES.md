@@ -100,7 +100,7 @@ The current state is available in the following tables:
 | [1.1](https://github.com/containerd/containerd/releases/tag/v1.1.8)  | End of Life | April 23, 2018  | October 23, 2019 |
 | [1.2](https://github.com/containerd/containerd/releases/tag/v1.2.13) | End of Life | October 24, 2018 | October 15, 2020 |
 | [1.3](https://github.com/containerd/containerd/releases/tag/v1.3.10) | End of Life | September 26, 2019  | March 4, 2021 |
-| [1.4](https://github.com/containerd/containerd/releases/tag/v1.4.4)  | Active   | August 17, 2020 | November 3, 2021 (Active), February 3, 2022 (Extended) |
+| [1.4](https://github.com/containerd/containerd/releases/tag/v1.4.4)  | Extended   | August 17, 2020 | November 3, 2021 (Active), February 3, 2022 (Extended) |
 | [1.5](https://github.com/containerd/containerd/releases/tag/v1.5.0)  | Active   | May 3, 2021  | max(May 3, 2022, release of 1.6.0 + 6 months) |
 | [1.6](https://github.com/containerd/containerd/milestone/34)         | Next   | TBD  | max(TBD+1 year, release of 1.7.0 or 2.0.0 + 6 months) |
 
@@ -190,7 +190,7 @@ containerd versions:
 
 | Component        | Status   | Stabilized Version | Links         |
 |------------------|----------|--------------------|---------------|
-| GRPC API         | Stable   | 1.0                | [api/](api) |
+| GRPC API         | Stable   | 1.0                | [gRPC API](#grpc-api) |
 | Metrics API      | Stable   | 1.0                | - |
 | Runtime Shim API | Stable   | 1.2                | - |
 | Daemon Config    | Stable   | 1.0			       | - |
@@ -214,7 +214,7 @@ version jump.
 To ensure compatibility, we have collected the entire GRPC API symbol set into
 a single file. At each _minor_ release of containerd, we will move the current
 `next.pb.txt` file to a file named for the minor version, such as `1.0.pb.txt`,
-enumerating the support services and messages. See [api/](api) for details.
+enumerating the support services and messages.
 
 Note that new services may be added in _minor_ releases. New service methods
 and new fields on messages may be added if they are optional.
