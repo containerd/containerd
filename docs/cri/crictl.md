@@ -17,6 +17,10 @@ A helper command has been included to install the dependencies at the right vers
 ```console
 $ make install-deps
 ```
+```make install-deps``` will install **libseccomp** package and **runc**,**cni** Component. On Linux system, you should install **build-essential** **gperf** package.
+```shell
+sudo apt install build-essential gperf -y
+```
 * Note: The file named `/etc/crictl.yaml` is used to configure crictl
 so you don't have to repeatedly specify the runtime sock used to connect crictl
 to the container runtime:
