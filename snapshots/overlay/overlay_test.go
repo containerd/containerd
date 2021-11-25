@@ -178,6 +178,9 @@ func testOverlayOverlayMount(t *testing.T, newSnapshotter testsuite.SnapshotterF
 	expected := []string{
 		"index=off",
 	}
+	if !supportsIndex() {
+		expected = expected[1:]
+	}
 	if userxattr, err := overlayutils.NeedsUserXAttr(root); err != nil {
 		t.Fatal(err)
 	} else if userxattr {
@@ -346,7 +349,11 @@ func testOverlayView(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 		t.Errorf("mount source should be overlay but received %q", m.Source)
 	}
 
+	supportsIndex := supportsIndex()
 	expectedOptions := 2
+	if !supportsIndex {
+		expectedOptions--
+	}
 	userxattr, err := overlayutils.NeedsUserXAttr(root)
 	if err != nil {
 		t.Fatal(err)
@@ -361,6 +368,9 @@ func testOverlayView(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	lowers := getParents(ctx, o, root, "/tmp/view2")
 	expected = fmt.Sprintf("lowerdir=%s:%s", lowers[0], lowers[1])
 	optIdx := 1
+	if !supportsIndex {
+		optIdx--
+	}
 	if userxattr {
 		optIdx++
 	}
