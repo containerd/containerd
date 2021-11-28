@@ -218,6 +218,24 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			)
 		}
 
+		if caps := context.StringSlice("cap-add"); len(caps) > 0 {
+			for _, cap := range caps {
+				if !strings.HasPrefix(cap, "CAP_") {
+					return nil, fmt.Errorf("capabilities must be specified with 'CAP_' prefix")
+				}
+			}
+			opts = append(opts, oci.WithAddedCapabilities(caps))
+		}
+
+		if caps := context.StringSlice("cap-drop"); len(caps) > 0 {
+			for _, cap := range caps {
+				if !strings.HasPrefix(cap, "CAP_") {
+					return nil, fmt.Errorf("capabilities must be specified with 'CAP_' prefix")
+				}
+			}
+			opts = append(opts, oci.WithDroppedCapabilities(caps))
+		}
+
 		seccompProfile := context.String("seccomp-profile")
 
 		if !context.Bool("seccomp") && seccompProfile != "" {
