@@ -114,6 +114,13 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 			runtime = container.Runtime.Name
 		}
 
+		runtime, err = m.resolveRuntimePath(runtime)
+		if err != nil {
+			bundle.Delete()
+			log.G(ctx).WithError(err).Error("failed to resolve runtime path")
+			continue
+		}
+
 		binaryCall := shimBinary(bundle,
 			shimBinaryConfig{
 				runtime:      runtime,
