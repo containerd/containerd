@@ -75,7 +75,7 @@ jobs:
         uses: azure/CLI@v1
         with:
           inlinescript: |
-            az group create -n ${{ matrix.AZURE_RESOURCE_GROUP }} -l ${{ env.AZURE_DEFAULT_LOCATION }} --tags creationTimestamp=$(date +%Y-%m-%dT%T%z)
+            az group create -n ${{ matrix.AZURE_RESOURCE_GROUP }} -l ${{ env.AZURE_DEFAULT_LOCATION }} --tags creationTimestamp=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
       - name: AZTestVMCreate
         uses: azure/CLI@v1
