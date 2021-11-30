@@ -43,7 +43,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
-	v2 "github.com/containerd/containerd/runtime/v2"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/typeurl"
@@ -111,7 +110,7 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 		store:      db.ContentStore(),
 		publisher:  ep.(events.Publisher),
 		monitor:    monitor.(runtime.TaskMonitor),
-		v2Runtime:  v2r.(*v2.TaskManager),
+		v2Runtime:  v2r.(runtime.PlatformRuntime),
 	}
 	for _, r := range runtimes {
 		tasks, err := r.Tasks(ic.Context, true)
@@ -139,7 +138,7 @@ type local struct {
 	publisher  events.Publisher
 
 	monitor   runtime.TaskMonitor
-	v2Runtime *v2.TaskManager
+	v2Runtime runtime.PlatformRuntime
 }
 
 func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.CallOption) (*api.CreateTaskResponse, error) {
