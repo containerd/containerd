@@ -1,0 +1,163 @@
+name: "Build volume test images"
+on:
+  workflow_dispatch:
+    inputs:
+      push_to_project:
+        description: "Project to build images for"
+        required: true
+        default: "gcr.io/k8s-cri-containerd"
+      azure_windows_image_id:
+        description: Windows image URN to deploy
+        required: true
+        default: MicrosoftWindowsServer:WindowsServer:2022-datacenter:20348.350.2111030009
+      azure_vm_size:
+        description: Windows image builder VM size
+        required: true
+        default: Standard_D2s_v3
+      azure_location:
+        description: The Azure region to deploy to
+        required: true
+        default: westeurope
+
+env:
+  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUB_ID }}
+  DEFAULT_ADMIN_USERNAME: azureuser
+  SSH_OPTS: "-o ServerAliveInterval=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+  AZURE_RESOURCE_GROUP: ctrd-test-image-build-${{ github.run_id }}
+
+jobs:
+  images:
+    name: "Build volume test images"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/github.com/containerd/containerd
+
+    steps:
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '1.17.3'
+
+      - uses: actions/checkout@v2
+        with:
+          path: src/github.com/containerd/containerd
+
+      - name: Set env
+        shell: bash
+        run: |
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+
+      - name: Install docker
+        shell: bash
+        run: |
+          sudo apt update
+          sudo apt install -y ca-certificates curl gnupg lsb-release
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg > /tmp/docker.gpg
+          sudo gpg --yes --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg /tmp/docker.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+          sudo apt update
+          sudo apt install -y docker-ce docker-ce-cli containerd.io jq
+          sudo adduser $USER docker
+
+      - name: Generate ssh key pair
+        run: |
+          mkdir -p $HOME/.ssh/
+          ssh-keygen -t rsa -b 4096 -C "ci@containerd.com" -f $HOME/.ssh/id_rsa -q -N ""
+          echo "SSH_PUB_KEY=$(cat ~/.ssh/id_rsa.pub)" >> $GITHUB_ENV
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDS }}
+
+      - name: Create Azure Resource Group
+        uses: azure/CLI@v1
+        with:
+          inlinescript: |
+            az group create -n ${{ env.AZURE_RESOURCE_GROUP }} -l ${{ github.event.inputs.azure_location }} --tags creationTimestamp=$(date +%Y-%m-%dT%T%z)
+
+      - name: Create Windows Helper VM
+        uses: azure/CLI@v1
+        with:
+          inlinescript: |
+            PASSWORD="$(/usr/bin/tr -dc "a-zA-Z0-9@#$%^&*()_+?><~\`;" < /dev/urandom | /usr/bin/head -c 24; echo '')"
+            az vm create -n WinDockerHelper \
+              --admin-username ${{ env.DEFAULT_ADMIN_USERNAME }} \
+              --public-ip-sku Basic \
+              --admin-password "::add-mask::$PASSWORD" \
+              --image ${{ github.event.inputs.azure_windows_image_id }} \
+              -g ${{ env.AZURE_RESOURCE_GROUP }} \
+              --size ${{ github.event.inputs.azure_vm_size }}
+            az vm open-port --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name WinDockerHelper --port 22 --priority 101
+            az vm open-port --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name WinDockerHelper --port 2376 --priority 102
+
+      - name: Prepare Windows image helper
+        uses: azure/CLI@v1
+        with:
+          inlinescript: |
+            # Installs Windows features, opens SSH and Docker port
+            az vm run-command invoke \
+              --command-id RunPowerShellScript \
+              -n WinDockerHelper \
+              -g ${{ env.AZURE_RESOURCE_GROUP }} \
+              --scripts @$GITHUB_WORKSPACE/src/github.com/containerd/containerd/script/setup/prepare_windows_docker_helper.ps1
+            # The prepare_windows_docker_helper.ps1 script reboots the server after enabling the Windows features
+            # Give it a chance to reboot. Running another run-command via azure CLI should work even without this
+            # sleep, but we want to avoid the possibility that it may run before the server reboots.
+            sleep 30
+            # Enable SSH and import public key
+            az vm run-command invoke  \
+              --command-id RunPowerShellScript \
+              -n WinDockerHelper \
+              -g ${{ env.AZURE_RESOURCE_GROUP }} \
+              --scripts @$GITHUB_WORKSPACE/src/github.com/containerd/containerd/script/setup/enable_ssh_windows.ps1 \
+              --parameters 'SSHPublicKey=${{ env.SSH_PUB_KEY }}'
+
+      - name: Get Windows Helper IPs
+        uses: azure/CLI@v1
+        with:
+          inlinescript: |
+            VM_DETAILS=$(az vm show -d -g ${{ env.AZURE_RESOURCE_GROUP }} -n WinDockerHelper -o json)
+            echo "PUBLIC_IP=$(echo $VM_DETAILS | jq -r .publicIps)" >> $GITHUB_ENV
+            echo "PRIVATE_IP=$(echo $VM_DETAILS | jq -r .privateIps)" >> $GITHUB_ENV
+
+      - name: Enable Docker TLS
+        shell: bash
+        run: |
+          scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} $GITHUB_WORKSPACE/src/github.com/containerd/containerd/script/setup/enable_docker_tls_on_windows.ps1  azureuser@${{ env.PUBLIC_IP }}:/enable_docker_tls_on_windows.ps1
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.PUBLIC_IP }} "powershell.exe -command { C:/enable_docker_tls_on_windows.ps1 -IPAddresses ${{ env.PUBLIC_IP }},${{ env.PRIVATE_IP }} }"
+
+      - name: Fetch client certificate and key
+        shell: bash
+        run: |
+          mkdir -p $HOME/.docker
+          scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.PUBLIC_IP }}:/Users/azureuser/.docker/ca.pem $HOME/.docker/ca.pem
+          scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.PUBLIC_IP }}:/Users/azureuser/.docker/cert.pem $HOME/.docker/cert.pem
+          scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.PUBLIC_IP }}:/Users/azureuser/.docker/key.pem $HOME/.docker/key.pem
+
+      - name: Setup gcloud SDK
+        uses: google-github-actions/setup-gcloud@master
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
+
+      - name: Build and push images
+        shell: bash
+        run: |
+          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up setup-buildx
+          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up configure-docker PROJ=${{ github.event.inputs.push_to_project }}
+
+          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up build-registry PROJ=${{ github.event.inputs.push_to_project }} REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
+          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up push-manifest PROJ=${{ github.event.inputs.push_to_project }} REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
+
+          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-ownership build-registry PROJ=${{ github.event.inputs.push_to_project }} REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
+          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-ownership push-manifest PROJ=${{ github.event.inputs.push_to_project }} REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
+
+      - name: Cleanup resources
+        if: always()
+        uses: azure/CLI@v1
+        with:
+          inlinescript: |
+            az group delete -g ${{ env.AZURE_RESOURCE_GROUP }} --yes
