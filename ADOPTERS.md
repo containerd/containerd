@@ -46,6 +46,10 @@ including the Balena project listed below.
 
 **_Inclavare Containers_** - [Inclavare Containers](https://github.com/alibaba/inclavare-containers) is an innovation of container runtime with the novel approach for launching protected containers in hardware-assisted Trusted Execution Environment (TEE) technology, aka Enclave, which can prevent the untrusted entity, such as Cloud Service Provider (CSP), from accessing the sensitive and confidential assets in use.
 
+**_VMware TKG_** - [Tanzu Kubernetes Grid](https://tanzu.vmware.com/kubernetes-grid) VMware's Multicloud Kubernetes offering uses containerd as the default CRI runtime.
+
+**_VMware TCE_** - [Tanzu Community Edition](https://github.com/vmware-tanzu/community-edition) VMware's fully-featured, easy to manage, Kubernetes platform for learners and users. It is a freely available, community supported, and open source distribution of VMware Tanzu. It uses containerd as the default CRI runtime.
+
 **_Other Projects_** - While the above list provides a cross-section of well known uses of containerd, the simplicity and clear API layer for containerd has inspired many smaller projects around providing simple container management platforms. Several examples of building higher layer functionality on top of the containerd base have come from various containerd community participants:
  - Michael Crosby's [boss](https://github.com/crosbymichael/boss) project,
  - Evan Hazlett's [stellar](https://github.com/ehazlett/stellar) project,
