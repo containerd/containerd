@@ -28,7 +28,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-var errNotADevice = errors.New("not a device node")
+// ErrNotADevice denotes that a file is not a valid linux device.
+var ErrNotADevice = errors.New("not a device node")
 
 // HostDevices returns all devices that can be found under /dev directory.
 func HostDevices() ([]specs.LinuxDevice, error) {
@@ -42,7 +43,7 @@ func getDevices(path, containerPath string) ([]specs.LinuxDevice, error) {
 	}
 
 	if !stat.IsDir() {
-		dev, err := deviceFromPath(path)
+		dev, err := DeviceFromPath(path)
 		if err != nil {
 			return nil, err
 		}
@@ -81,9 +82,9 @@ func getDevices(path, containerPath string) ([]specs.LinuxDevice, error) {
 		case f.Name() == "console":
 			continue
 		}
-		device, err := deviceFromPath(filepath.Join(path, f.Name()))
+		device, err := DeviceFromPath(filepath.Join(path, f.Name()))
 		if err != nil {
-			if err == errNotADevice {
+			if err == ErrNotADevice {
 				continue
 			}
 			if os.IsNotExist(err) {
@@ -110,7 +111,9 @@ const (
 	fifoDevice     = "p"
 )
 
-func deviceFromPath(path string) (*specs.LinuxDevice, error) {
+// DeviceFromPath takes the path to a device to look up the information about a
+// linux device and returns that information as a LinuxDevice struct.
+func DeviceFromPath(path string) (*specs.LinuxDevice, error) {
 	var stat unix.Stat_t
 	if err := unix.Lstat(path, &stat); err != nil {
 		return nil, err
@@ -135,7 +138,7 @@ func deviceFromPath(path string) (*specs.LinuxDevice, error) {
 	case unix.S_IFIFO:
 		devType = fifoDevice
 	default:
-		return nil, errNotADevice
+		return nil, ErrNotADevice
 	}
 	fm := os.FileMode(mode &^ unix.S_IFMT)
 	return &specs.LinuxDevice{
