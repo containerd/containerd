@@ -15,7 +15,7 @@
 #   limitations under the License.
 
 # This script is used to build and upload images in integration/images
-# directory to gcr.io/k8s-cri-containerd repository
+# directory to ghcr.io/containerd repository
 
 set -o xtrace
 set -o errexit
