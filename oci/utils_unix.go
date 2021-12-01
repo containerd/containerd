@@ -91,6 +91,9 @@ func getDevices(path, containerPath string) ([]specs.LinuxDevice, error) {
 			}
 			return nil, err
 		}
+		if device.Type == fifoDevice {
+			continue
+		}
 		if containerPath != "" {
 			device.Path = filepath.Join(containerPath, filepath.Base(f.Name()))
 		}
@@ -98,6 +101,14 @@ func getDevices(path, containerPath string) ([]specs.LinuxDevice, error) {
 	}
 	return out, nil
 }
+
+// TODO consider adding these consts to the OCI runtime-spec.
+const (
+	wildcardDevice = "a" //nolint // currently unused, but should be included when upstreaming to OCI runtime-spec.
+	blockDevice    = "b"
+	charDevice     = "c" // or "u"
+	fifoDevice     = "p"
+)
 
 func deviceFromPath(path string) (*specs.LinuxDevice, error) {
 	var stat unix.Stat_t
@@ -110,19 +121,21 @@ func deviceFromPath(path string) (*specs.LinuxDevice, error) {
 		major     = unix.Major(devNumber)
 		minor     = unix.Minor(devNumber)
 	)
-	if major == 0 {
-		return nil, errNotADevice
-	}
 
 	var (
 		devType string
 		mode    = stat.Mode
 	)
-	switch {
-	case mode&unix.S_IFBLK == unix.S_IFBLK:
-		devType = "b"
-	case mode&unix.S_IFCHR == unix.S_IFCHR:
-		devType = "c"
+
+	switch mode & unix.S_IFMT {
+	case unix.S_IFBLK:
+		devType = blockDevice
+	case unix.S_IFCHR:
+		devType = charDevice
+	case unix.S_IFIFO:
+		devType = fifoDevice
+	default:
+		return nil, errNotADevice
 	}
 	fm := os.FileMode(mode &^ unix.S_IFMT)
 	return &specs.LinuxDevice{
