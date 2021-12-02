@@ -17,11 +17,11 @@
 package server
 
 import (
-	"github.com/containerd/containerd/metadata"
 	"io"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/metadata"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"k8s.io/client-go/tools/remotecommand"
