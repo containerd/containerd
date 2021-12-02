@@ -22,6 +22,7 @@ package main
 import (
 	"context"
 
+	_ "github.com/containerd/containerd/runtime/v2/pause"
 	"github.com/containerd/containerd/runtime/v2/runc/manager"
 	_ "github.com/containerd/containerd/runtime/v2/runc/task/plugin"
 	"github.com/containerd/containerd/runtime/v2/shim"
