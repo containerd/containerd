@@ -19,6 +19,9 @@ on:
         required: true
         default: westeurope
 
+permissions:
+  packages: write
+
 env:
   AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUB_ID }}
   DEFAULT_ADMIN_USERNAME: azureuser
