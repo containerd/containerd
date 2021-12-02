@@ -41,12 +41,12 @@ func init() {
 		Type: plugin.ServicePlugin,
 		ID:   services.SandboxControllerService,
 		Requires: []plugin.Type{
-			plugin.RuntimeShimPlugin,
+			plugin.RuntimePluginV2,
 			plugin.MetadataPlugin,
 			plugin.EventPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			shimPlugin, err := ic.Get(plugin.RuntimeShimPlugin)
+			shimPlugin, err := ic.GetByID(plugin.RuntimePluginV2, "shim")
 			if err != nil {
 				return nil, err
 			}

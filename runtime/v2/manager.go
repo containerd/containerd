@@ -96,6 +96,24 @@ func init() {
 			return NewTaskManager(shimManager), nil
 		},
 	})
+
+	// Task manager uses shim manager as a dependency to manage shim instances.
+	// However, due to time limits and to avoid migration steps in 1.6 release,
+	// use the following workaround.
+	// This expected to be removed in 1.7.
+	plugin.Register(&plugin.Registration{
+		Type: plugin.RuntimePluginV2,
+		ID:   "shim",
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			taskManagerI, err := ic.GetByID(plugin.RuntimePluginV2, "task")
+			if err != nil {
+				return nil, err
+			}
+
+			taskManager := taskManagerI.(*TaskManager)
+			return taskManager.manager, nil
+		},
+	})
 }
 
 type ManagerConfig struct {
