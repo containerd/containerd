@@ -5,7 +5,7 @@ on:
       push_to_project:
         description: "Project to build images for"
         required: true
-        default: "gcr.io/k8s-cri-containerd"
+        default: "ghcr.io/containerd"
       azure_windows_image_id:
         description: Windows image URN to deploy
         required: true
@@ -139,13 +139,6 @@ jobs:
           scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.PUBLIC_IP }}:/Users/azureuser/.docker/cert.pem $HOME/.docker/cert.pem
           scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.PUBLIC_IP }}:/Users/azureuser/.docker/key.pem $HOME/.docker/key.pem
 
-      - name: Setup gcloud SDK
-        uses: google-github-actions/setup-gcloud@master
-        with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
-          export_default_credentials: true
-
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v1
         with:
@@ -157,7 +150,6 @@ jobs:
         shell: bash
         run: |
           make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up setup-buildx
-          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up configure-docker PROJ=${{ github.event.inputs.push_to_project }}
 
           make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up build-registry PROJ=${{ github.event.inputs.push_to_project }} REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
           make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up push-manifest PROJ=${{ github.event.inputs.push_to_project }} REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
