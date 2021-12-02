@@ -160,6 +160,7 @@ func containerToProto(container *containers.Container) containersapi.Container {
 		Snapshotter: container.Snapshotter,
 		SnapshotKey: container.SnapshotKey,
 		Extensions:  container.Extensions,
+		IsAttached:  container.IsAttached,
 	}
 }
 
@@ -182,6 +183,7 @@ func containerFromProto(containerpb *containersapi.Container) containers.Contain
 		CreatedAt:   containerpb.CreatedAt,
 		UpdatedAt:   containerpb.UpdatedAt,
 		Extensions:  containerpb.Extensions,
+		IsAttached:  containerpb.IsAttached,
 	}
 }
 

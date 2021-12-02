@@ -943,6 +943,13 @@ file {
       }
       json_name: "extensions"
     }
+    field {
+      name: "isAttached"
+      number: 11
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "isAttached"
+    }
     nested_type {
       name: "LabelsEntry"
       field {
