@@ -156,13 +156,21 @@ version = 2
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer container.Delete(ctx, WithSnapshotCleanup)
+	defer func() {
+		if err := container.Delete(ctx, WithSnapshotCleanup); err != nil {
+			t.Logf("failed to delete container: %v", err)
+		}
+	}()
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer task.Delete(ctx, WithProcessKill)
+	defer func() {
+		if _, err := task.Delete(ctx, WithProcessKill); err != nil {
+			t.Logf("failed to delete task: %v", err)
+		}
+	}()
 
 	if err := task.Start(ctx); err != nil {
 		t.Fatal(err)
@@ -173,10 +181,9 @@ version = 2
 	}
 
 	begin := time.Now()
+	lastCheck := begin
 
-	// The restart is "truly" expected after (interval + epsilon), but due to some flakiness in CI, we give it a bit extra time.
-	// Specifically, we give an extra "grace period" of (count / 2) seconds.
-	expected := begin.Add(interval).Add(epsilon * (count / 2))
+	expected := begin.Add(interval).Add(epsilon)
 
 	// Deadline determines when check for restart should be aborted.
 	deadline := begin.Add(interval).Add(epsilon * count)
@@ -188,24 +195,27 @@ version = 2
 			// temporarily removes the task before restarting.
 			t.Logf("%v: err=%v", now, err)
 		} else {
-			t.Logf("%v: status=%q", now, status)
+			t.Logf("%v: status=%q", now, status.Status)
 
 			if status.Status == Running {
 				break
 			}
 		}
-		if time.Now().After(deadline) {
-			t.Logf("%v: the task was not restarted", now)
+
+		// lastCheck represents the last time the status was seen as not running
+		lastCheck = now
+		if lastCheck.After(deadline) {
+			t.Logf("%v: the task was not restarted", lastCheck)
 			return
 		}
 		time.Sleep(epsilon)
 	}
 
-	now := time.Now()
-	if now.After(expected) {
-		t.Fatalf("%v: the task was restarted, but it must be before %v", now, expected)
+	// Use the last timestamp for when the process was seen as not running for the check
+	if lastCheck.After(expected) {
+		t.Fatalf("%v: the task was restarted, but it must be before %v", lastCheck, expected)
 	}
-	t.Logf("%v: the task was restarted before %v", now, expected)
+	t.Logf("%v: the task was restarted since %v", time.Now(), lastCheck)
 }
 
 // withRestartStatus is a copy of "github.com/containerd/containerd/runtime/restart".WithStatus.
