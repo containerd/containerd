@@ -53,13 +53,6 @@ func TestExportAndImport(t *testing.T) {
 // images remain sane, and that the Garbage Collector won't delete part of its
 // content.
 func TestExportAndImportMultiLayer(t *testing.T) {
-	// Skip this test on Windows for now. The image being used for this test was updated recently and the manifest no longer has an entry for
-	// Windows so this will fail.
-	//
-	// TODO(dcantah): Look into what happened to the image and revert this.
-	if runtime.GOOS == "windows" {
-		t.Skip("Skipped on Windows")
-	}
 	testExportImport(t, testMultiLayeredImage)
 }
 

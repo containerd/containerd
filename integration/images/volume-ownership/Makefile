@@ -14,7 +14,7 @@
 
 all: build
 
-PROJ=gcr.io/k8s-cri-containerd
+PROJ=ghcr.io/containerd
 VERSION=2.1
 IMAGE=$(PROJ)/volume-ownership:$(VERSION)
 DOCKER_CERT_PATH ?= "$(HOME)/.docker"
