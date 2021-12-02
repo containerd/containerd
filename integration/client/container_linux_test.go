@@ -430,7 +430,7 @@ func getLogDirPath(runtimeVersion, id string) string {
 	case "v1":
 		return filepath.Join(defaultRoot, plugin.RuntimeLinuxV1, testNamespace, id)
 	case "v2":
-		return filepath.Join(defaultState, "io.containerd.runtime-shim.v2.shim", testNamespace, id)
+		return filepath.Join(defaultState, "io.containerd.runtime.v2.task", testNamespace, id)
 	default:
 		panic(fmt.Errorf("Unsupported runtime version %s", runtimeVersion))
 	}

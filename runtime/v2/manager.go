@@ -50,8 +50,8 @@ type Config struct {
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type: plugin.RuntimeShimPlugin,
-		ID:   "shim",
+		Type: plugin.RuntimePluginV2,
+		ID:   "task",
 		Requires: []plugin.Type{
 			plugin.EventPlugin,
 			plugin.MetadataPlugin,
@@ -79,7 +79,7 @@ func init() {
 			cs := metadata.NewContainerStore(m.(*metadata.DB))
 			events := ep.(*exchange.Exchange)
 
-			return NewShimManager(ic.Context, &ManagerConfig{
+			shimManager, err := NewShimManager(ic.Context, &ManagerConfig{
 				Root:         ic.Root,
 				State:        ic.State,
 				Address:      ic.Address,
@@ -88,70 +88,13 @@ func init() {
 				Store:        cs,
 				SchedCore:    config.SchedCore,
 			})
-		},
-	})
-
-	plugin.Register(&plugin.Registration{
-		Type: plugin.RuntimePluginV2,
-		ID:   "task",
-		Requires: []plugin.Type{
-			plugin.RuntimeShimPlugin,
-		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			shimManagerInterface, err := ic.Get(plugin.RuntimeShimPlugin)
 			if err != nil {
 				return nil, err
-			}
-
-			shimManager := shimManagerInterface.(*ShimManager)
-
-			// From now on task manager works via shim manager, which has different home directory.
-			// Check if there are any leftovers from previous containerd versions and migrate home directory,
-			// so we can properly restore existing tasks as well.
-			if err := migrateTasks(ic, shimManager); err != nil {
-				log.G(ic.Context).WithError(err).Error("unable to migrate tasks")
 			}
 
 			return NewTaskManager(shimManager), nil
 		},
 	})
-}
-
-func migrateTasks(ic *plugin.InitContext, shimManager *ShimManager) error {
-	if !shimManager.shims.IsEmpty() {
-		return nil
-	}
-
-	// Rename below will fail is target directory exists.
-	// `Root` and `State` dirs expected to be empty at this point (we check that there are no shims loaded above).
-	// If for some they are not empty, these remove calls will fail (`os.Remove` requires a dir to be empty to succeed).
-	if err := os.Remove(shimManager.root); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove `root` dir: %w", err)
-	}
-
-	if err := os.Remove(shimManager.state); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove `state` dir: %w", err)
-	}
-
-	if err := os.Rename(ic.Root, shimManager.root); err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to migrate task `root` directory: %w", err)
-	}
-
-	if err := os.Rename(ic.State, shimManager.state); err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to migrate task `state` directory: %w", err)
-	}
-
-	if err := shimManager.loadExistingTasks(ic.Context); err != nil {
-		return fmt.Errorf("failed to load tasks after migration: %w", err)
-	}
-
-	return nil
 }
 
 type ManagerConfig struct {
@@ -209,7 +152,7 @@ type ShimManager struct {
 
 // ID of the shim manager
 func (m *ShimManager) ID() string {
-	return fmt.Sprintf("%s.%s", plugin.RuntimeShimPlugin, "shim")
+	return fmt.Sprintf("%s.%s", plugin.RuntimePluginV2, "shim")
 }
 
 // Start launches a new shim instance
