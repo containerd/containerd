@@ -17,6 +17,7 @@
 package io
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"strings"
@@ -36,7 +37,8 @@ func streamKey(id, name string, stream StreamType) string {
 
 // ContainerIO holds the container io.
 type ContainerIO struct {
-	id string
+	id         string
+	isAttached bool
 
 	fifos *cio.FIFOSet
 	*stdioPipes
@@ -45,6 +47,8 @@ type ContainerIO struct {
 	stderrGroup *cioutil.WriterGroup
 
 	closer *wgCloser
+
+	sync.Mutex
 }
 
 var _ cio.IO = &ContainerIO{}
@@ -135,6 +139,21 @@ func (c *ContainerIO) Pipe() {
 // Attach attaches container stdio.
 // TODO(random-liu): Use pools.Copy in docker to reduce memory usage?
 func (c *ContainerIO) Attach(opts AttachOptions) {
+	if c.isAttached && opts.EnableSingleAttach {
+		if opts.Stdout != nil {
+			io.Copy(opts.Stdout, bytes.NewBuffer([]byte("Only one attach session is permitted, try again later.")))
+		}
+		if opts.Stderr != nil {
+			io.Copy(opts.Stderr, bytes.NewBuffer([]byte("Only one attach session is permitted, try again later.")))
+		}
+
+		logrus.Infof("opts.EnableSingleAttach is %v, another attach stream exists", opts.EnableSingleAttach)
+		return
+	}
+	c.Lock()
+	c.isAttached = true
+	c.Unlock()
+
 	var wg sync.WaitGroup
 	key := util.GenerateID()
 	stdinKey := streamKey(c.id, "attach-"+key, Stdin)
@@ -182,6 +201,7 @@ func (c *ContainerIO) Attach(opts AttachOptions) {
 			stdinStreamRC.Close()
 		}
 		wg.Done()
+		c.isAttached = false
 	}
 
 	if opts.Stdout != nil {
