@@ -142,6 +142,14 @@ func TestUpdateContainerResources_MemorySwap(t *testing.T) {
 	baseSwapLimit := int64(200 * 1024 * 1024)
 	increasedSwapLimit := int64(256 * 1024 * 1024)
 
+	expectedBaseSwap := baseSwapLimit
+	expectedIncreasedSwap := increasedSwapLimit
+
+	if cgroups.Mode() == cgroups.Unified {
+		expectedBaseSwap = baseSwapLimit - memoryLimit
+		expectedIncreasedSwap = increasedSwapLimit - memoryLimit
+	}
+
 	t.Log("Create a container with memory limit but no swap")
 	cnConfig := ContainerConfig(
 		"container",
@@ -160,13 +168,7 @@ func TestUpdateContainerResources_MemorySwap(t *testing.T) {
 	spec, err := container.Spec(context.Background())
 	require.NoError(t, err)
 	checkMemoryLimit(t, spec, memoryLimit)
-	checkMemorySwapLimit(t, spec, &baseSwapLimit)
-
-	t.Log("Update container swap limit after created")
-	err = runtimeService.UpdateContainerResources(cn, &runtime.LinuxContainerResources{
-		MemorySwapLimitInBytes: baseSwapLimit,
-	}, nil)
-	require.NoError(t, err)
+	checkMemorySwapLimit(t, spec, &expectedBaseSwap)
 
 	t.Log("Check memory limit in container OCI spec")
 	spec, err = container.Spec(context.Background())
@@ -183,7 +185,7 @@ func TestUpdateContainerResources_MemorySwap(t *testing.T) {
 	memLimit := getCgroupMemoryLimitForTask(t, task)
 	swapLimit := getCgroupSwapLimitForTask(t, task)
 	assert.Equal(t, uint64(memoryLimit), memLimit)
-	assert.Equal(t, uint64(baseSwapLimit-memoryLimit), swapLimit)
+	assert.Equal(t, uint64(expectedBaseSwap), swapLimit)
 
 	t.Log("Update container memory limit after started")
 	err = runtimeService.UpdateContainerResources(cn, &runtime.LinuxContainerResources{
@@ -198,7 +200,7 @@ func TestUpdateContainerResources_MemorySwap(t *testing.T) {
 
 	t.Log("Check memory limit in cgroup")
 	swapLimit = getCgroupSwapLimitForTask(t, task)
-	assert.Equal(t, uint64(increasedSwapLimit-memoryLimit), swapLimit)
+	assert.Equal(t, uint64(expectedIncreasedSwap), swapLimit)
 }
 
 func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
