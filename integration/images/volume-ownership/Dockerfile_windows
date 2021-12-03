@@ -27,14 +27,13 @@ RUN cmd.exe /c "@echo off && FOR %i in (%BUSYBOX_EXES%) do (mklink %i.exe busybo
 
 USER ContainerUser
 
-RUN mkdir C:\volumes
 # Explicitly set full access rights for "CREATOR OWNER". While
 # this is set by default for Windows Server 2019, it seems that
 # on Windows Server 2022 it is not.
-RUN icacls C:\volumes /grant "CREATOR OWNER":(OI)(CI)(IO)F /T
-
-RUN mkdir C:\volumes\test_dir
-RUN /bin/sh.exe -c "echo test_content > /volumes/test_dir/test_file"
+RUN mkdir C:\volumes && \
+    icacls C:\volumes /grant "CREATOR OWNER":(OI)(CI)(IO)F /T && \
+    mkdir C:\volumes\test_dir && \
+    /bin/sh.exe -c "echo test_content > /volumes/test_dir/test_file"
 
 ENV PATH="C:\bin;C:\Windows\System32;C:\Windows;"
 VOLUME "C:/volumes/test_dir"
