@@ -51,8 +51,8 @@ func initImages(imageListFile string) {
 		BusyBox:          "docker.io/library/busybox:latest",
 		Pause:            "k8s.gcr.io/pause:3.6",
 		ResourceConsumer: "k8s.gcr.io/e2e-test-images/resource-consumer:1.9",
-		VolumeCopyUp:     "gcr.io/k8s-cri-containerd/volume-copy-up:2.0",
-		VolumeOwnership:  "gcr.io/k8s-cri-containerd/volume-ownership:2.0",
+		VolumeCopyUp:     "ghcr.io/containerd/volume-copy-up:2.1",
+		VolumeOwnership:  "ghcr.io/containerd/volume-ownership:2.1",
 	}
 
 	if imageListFile != "" {

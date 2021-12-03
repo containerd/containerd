@@ -114,7 +114,7 @@ func copyDirectory(dst, src string, inodes map[uint64]string, o *copyDirOpts) er
 		return fmt.Errorf("failed to read %s: %w", src, err)
 	}
 
-	if err := copyFileInfo(stat, dst); err != nil {
+	if err := copyFileInfo(stat, src, dst); err != nil {
 		return fmt.Errorf("failed to copy file info for %s: %w", dst, err)
 	}
 
@@ -160,7 +160,8 @@ func copyDirectory(dst, src string, inodes map[uint64]string, o *copyDirOpts) er
 			// TODO: Support pipes and sockets
 			return fmt.Errorf("unsupported mode %s: %w", fi.Mode(), err)
 		}
-		if err := copyFileInfo(fi, target); err != nil {
+
+		if err := copyFileInfo(fi, source, target); err != nil {
 			return fmt.Errorf("failed to copy file info: %w", err)
 		}
 

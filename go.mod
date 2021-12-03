@@ -4,14 +4,14 @@ go 1.16
 
 require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20210715213245-6c3934b029d8
-	github.com/Microsoft/go-winio v0.5.0
+	github.com/Microsoft/go-winio v0.5.1
 	github.com/Microsoft/hcsshim v0.9.1
 	github.com/containerd/aufs v1.0.0
 	github.com/containerd/btrfs v1.0.0
 	github.com/containerd/cgroups v1.0.2
 	github.com/containerd/console v1.0.3
 	github.com/containerd/containerd/api v1.6.0-beta.3
-	github.com/containerd/continuity v0.2.0
+	github.com/containerd/continuity v0.2.2-0.20211201162329-8e53e7cac79d
 	github.com/containerd/fifo v1.0.0
 	github.com/containerd/go-cni v1.1.1-0.20211026134925-aa8bf14323a5
 	github.com/containerd/go-runc v1.0.0

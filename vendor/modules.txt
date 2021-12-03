@@ -1,7 +1,7 @@
 # github.com/AdaLogics/go-fuzz-headers v0.0.0-20210715213245-6c3934b029d8
 ## explicit
 github.com/AdaLogics/go-fuzz-headers
-# github.com/Microsoft/go-winio v0.5.0
+# github.com/Microsoft/go-winio v0.5.1
 ## explicit
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/backuptar
@@ -95,7 +95,7 @@ github.com/containerd/containerd/api/services/ttrpc/events/v1
 github.com/containerd/containerd/api/services/version/v1
 github.com/containerd/containerd/api/types
 github.com/containerd/containerd/api/types/task
-# github.com/containerd/continuity v0.2.0
+# github.com/containerd/continuity v0.2.2-0.20211201162329-8e53e7cac79d
 ## explicit
 github.com/containerd/continuity
 github.com/containerd/continuity/devices
