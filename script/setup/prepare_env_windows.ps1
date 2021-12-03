@@ -37,7 +37,7 @@ Write-Host $env:PATH
 mkdir c:\Logs
 
 # Pull junit conversion tool
-go get -u github.com/jstemmer/go-junit-report
+go install github.com/jstemmer/go-junit-report@v0.9.1
 
 # Get critctl tool. Used for cri-integration tests
 $CRICTL_DOWNLOAD_URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.21.0/crictl-v1.21.0-windows-amd64.tar.gz"
