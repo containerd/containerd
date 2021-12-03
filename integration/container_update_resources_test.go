@@ -22,6 +22,7 @@ package integration
 import (
 	"bytes"
 	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
 
@@ -123,13 +124,28 @@ func isSwapLikelyEnabled() bool {
 
 	swapData = bytes.TrimSpace(swapData) // extra trailing \n
 	swapLines := strings.Split(string(swapData), "\n")
+
 	// If there is more than one line (table headers) in /proc/swaps, swap is enabled
-	return len(swapLines) > 1
+	if len(swapLines) <= 1 {
+		return false
+	}
+
+	// Linux Kernel's prior to 5.8 can disable swap accounting and is disabled
+	// by default on Ubuntu. Most systems that run with cgroupsv2 enabled likely
+	// have swap accounting enabled, here we assume that is true when running with
+	// cgroupsv2 and check on cgroupsv1.
+	if cgroups.Mode() == cgroups.Unified {
+		return true
+	}
+
+	_, err = os.Stat("/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes")
+	// Assume any error means this test can't run for now.
+	return err == nil
 }
 
 func TestUpdateContainerResources_MemorySwap(t *testing.T) {
 	if !isSwapLikelyEnabled() {
-		t.Skipf("Swap is not enabled, or /proc/swaps is not readable. Swap is required for this test")
+		t.Skipf("Swap or swap accounting are not enabled. Swap is required for this test")
 		return
 	}
 
