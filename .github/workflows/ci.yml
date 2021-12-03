@@ -2,11 +2,11 @@ name: CI
 on:
   push:
     branches:
-      - master
+      - main
       - 'release/**'
   pull_request:
     branches:
-      - master
+      - main
       - 'release/**'
 
 jobs:
@@ -96,7 +96,6 @@ jobs:
         shell: bash
         run: |
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
-          echo "GO111MODULE=off" >> $GITHUB_ENV
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - name: Install protobuf
@@ -128,11 +127,7 @@ jobs:
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - uses: actions/checkout@v2
-        with:
-          path: src/github.com/containerd/containerd
-
-      - run: GO111MODULE=on go get github.com/cpuguy83/go-md2man/v2@v2.0.1
-
+      - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.1
       - run: make man
         working-directory: src/github.com/containerd/containerd
 
