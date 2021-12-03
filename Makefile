@@ -159,7 +159,7 @@ generate: protos
 	@echo "$(WHALE) $@"
 	@PATH="${ROOTDIR}/bin:${PATH}" $(GO) generate -x ${PACKAGES}
 
-protos: bin/protoc-gen-gogoctrd ## generate protobuf
+protos: ## generate protobuf
 	@echo "$(WHALE) $@"
 	@find . -path ./vendor -prune -false -o -name '*.pb.go' | xargs rm
 	$(eval TMPDIR := $(shell mktemp -d))

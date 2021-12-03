@@ -1,6 +1,5 @@
-version = "unstable"
-generator = "gogoctrd"
-plugins = ["grpc", "fieldpath"]
+version = "2"
+generators = ["go", "go-grpc", "go-patch"]
 
 # Control protoc include paths. Below are usually some good defaults, but feel
 # free to try it without them if it works for your project.
@@ -22,14 +21,6 @@ plugins = ["grpc", "fieldpath"]
 # This section maps protobuf imports to Go packages. These will become
 # `-M` directives in the call to the go protobuf generator.
 [packages]
-  "gogoproto/gogo.proto" = "github.com/gogo/protobuf/gogoproto"
-  "google/protobuf/any.proto" = "github.com/gogo/protobuf/types"
-  "google/protobuf/empty.proto" = "github.com/gogo/protobuf/types"
-  "google/protobuf/descriptor.proto" = "github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
-  "google/protobuf/field_mask.proto" = "github.com/gogo/protobuf/types"
-  "google/protobuf/timestamp.proto" = "github.com/gogo/protobuf/types"
-  "google/protobuf/duration.proto" = "github.com/gogo/protobuf/types"
-  "google/rpc/status.proto" = "github.com/gogo/googleapis/google/rpc"
 
 [[overrides]]
 # enable ttrpc and disable fieldpath and grpc for the shim
@@ -42,7 +33,6 @@ prefix = "github.com/containerd/containerd/runtime/linux/runctypes"
 target = "runtime/linux/runctypes/next.pb.txt"
 ignore_files = [
 	"google/protobuf/descriptor.proto",
-	"gogoproto/gogo.proto"
 ]
 
 [[descriptors]]
@@ -50,5 +40,4 @@ prefix = "github.com/containerd/containerd/runtime/v2/runc/options"
 target = "runtime/v2/runc/options/next.pb.txt"
 ignore_files = [
 	"google/protobuf/descriptor.proto",
-	"gogoproto/gogo.proto"
 ]

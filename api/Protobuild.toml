@@ -1,5 +1,5 @@
-version = "unstable"
-generator = "gogoctrd"
+version = "2"
+generators = ["go", "go-grpc"]
 plugins = ["grpc", "fieldpath"]
 
 # Control protoc include paths. Below are usually some good defaults, but feel
