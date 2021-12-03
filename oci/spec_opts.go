@@ -1213,7 +1213,7 @@ func WithLinuxDevice(path, permissions string) SpecOpts {
 		setLinux(s)
 		setResources(s)
 
-		dev, err := deviceFromPath(path)
+		dev, err := DeviceFromPath(path)
 		if err != nil {
 			return err
 		}
