@@ -50,7 +50,7 @@ func TestVolumeCopyUp(t *testing.T) {
 	t.Logf("Start the container")
 	require.NoError(t, runtimeService.StartContainer(cn))
 
-	// gcr.io/k8s-cri-containerd/volume-copy-up:2.0 contains a test_dir
+	// ghcr.io/containerd/volume-copy-up:2.1 contains a test_dir
 	// volume, which contains a test_file with content "test_content".
 	t.Logf("Check whether volume contains the test file")
 	stdout, stderr, err := runtimeService.ExecSync(cn, []string{
@@ -109,7 +109,7 @@ func TestVolumeOwnership(t *testing.T) {
 	t.Logf("Start the container")
 	require.NoError(t, runtimeService.StartContainer(cn))
 
-	// gcr.io/k8s-cri-containerd/volume-ownership:2.0 contains a test_dir
+	// ghcr.io/containerd/volume-ownership:2.1 contains a test_dir
 	// volume, which is owned by nobody:nogroup.
 	t.Logf("Check ownership of test directory inside container")
 	stdout, stderr, err := runtimeService.ExecSync(cn, []string{

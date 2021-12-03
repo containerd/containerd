@@ -50,7 +50,7 @@ func initImages(imageListFile string) {
 		Alpine:           "docker.io/library/alpine:latest",
 		BusyBox:          "docker.io/library/busybox:latest",
 		Pause:            "k8s.gcr.io/pause:3.6",
-		ResourceConsumer: "k8s.gcr.io/e2e-test-images/resource-consumer:1.9",
+		ResourceConsumer: "k8s.gcr.io/e2e-test-images/resource-consumer:1.10",
 		VolumeCopyUp:     "ghcr.io/containerd/volume-copy-up:2.1",
 		VolumeOwnership:  "ghcr.io/containerd/volume-ownership:2.1",
 	}
