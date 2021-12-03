@@ -48,12 +48,14 @@ func TestDefault(t *testing.T) {
 }
 
 func TestMatchComparerMatch(t *testing.T) {
+	major, minor, build := windows.RtlGetNtVersionNumbers()
+	buildStr := fmt.Sprintf("%d.%d.%d", major, minor, build)
 	m := matchComparer{
 		defaults: Only(imagespec.Platform{
 			Architecture: "amd64",
 			OS:           "windows",
 		}),
-		osVersionPrefix: "10.0.17763",
+		osVersionPrefix: buildStr,
 	}
 	for _, test := range []struct {
 		platform imagespec.Platform
@@ -67,7 +69,7 @@ func TestMatchComparerMatch(t *testing.T) {
 			platform: imagespec.Platform{
 				Architecture: "amd64",
 				OS:           "windows",
-				OSVersion:    "10.0.17763.1",
+				OSVersion:    buildStr + ".1",
 			},
 			match: true,
 		},
@@ -75,7 +77,7 @@ func TestMatchComparerMatch(t *testing.T) {
 			platform: imagespec.Platform{
 				Architecture: "amd64",
 				OS:           "windows",
-				OSVersion:    "10.0.17763.2",
+				OSVersion:    buildStr + ".2",
 			},
 			match: true,
 		},
@@ -83,7 +85,8 @@ func TestMatchComparerMatch(t *testing.T) {
 			platform: imagespec.Platform{
 				Architecture: "amd64",
 				OS:           "windows",
-				OSVersion:    "10.0.17762.1",
+				// Use an nonexistent Windows build so we don't get a match. Ws2019's build is 17763/
+				OSVersion: "10.0.17762.1",
 			},
 			match: false,
 		},
@@ -91,7 +94,8 @@ func TestMatchComparerMatch(t *testing.T) {
 			platform: imagespec.Platform{
 				Architecture: "amd64",
 				OS:           "windows",
-				OSVersion:    "10.0.17764.1",
+				// Use an nonexistent Windows build so we don't get a match. Ws2019's build is 17763/
+				OSVersion: "10.0.17764.1",
 			},
 			match: false,
 		},

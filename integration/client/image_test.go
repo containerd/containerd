@@ -81,7 +81,7 @@ func TestImagePullWithDistSourceLabel(t *testing.T) {
 	var (
 		source   = "k8s.gcr.io"
 		repoName = "pause"
-		tag      = "3.5"
+		tag      = "3.6"
 	)
 
 	ctx, cancel := testContext(t)
