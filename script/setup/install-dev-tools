@@ -20,18 +20,14 @@
 #
 set -eu -o pipefail
 
-# change to tmp dir, otherwise `go get` will change go.mod
-cd "$GOPATH"
-
-# install the `protobuild` binary in $GOPATH/bin; requires module-aware install
-# to pin dependencies
-GO111MODULE=on go get github.com/stevvooe/protobuild@v0.1.0
+# install `protobuild` and other commands
+go install github.com/stevvooe/protobuild@v0.1.0
+go install github.com/cpuguy83/go-md2man/v2@v2.0.1
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.42.0
 
 # the following packages need to exist in $GOPATH so we can't use
 # go modules-aware mode of `go get` for these includes used during
 # proto building
+cd "$GOPATH"
 GO111MODULE=off go get -d github.com/gogo/googleapis || true
 GO111MODULE=off go get -d github.com/gogo/protobuf || true
-
-GO111MODULE=on go get github.com/cpuguy83/go-md2man/v2@v2.0.1
-GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.42.0
