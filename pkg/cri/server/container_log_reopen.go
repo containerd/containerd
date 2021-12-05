@@ -36,7 +36,7 @@ func (c *criService) ReopenContainerLog(ctx context.Context, r *runtime.ReopenCo
 	}
 
 	// Create new container logger and replace the existing ones.
-	stdoutWC, stderrWC, err := c.createContainerLoggers(container.LogPath, container.Config.GetTty())
+	/*stdoutWC, stderrWC, err := c.createContainerLoggers(container.LogPath, container.Config.GetTty())
 	if err != nil {
 		return nil, err
 	}
@@ -46,6 +46,6 @@ func (c *criService) ReopenContainerLog(ctx context.Context, r *runtime.ReopenCo
 	}
 	if oldStderrWC != nil {
 		oldStderrWC.Close()
-	}
+	}*/
 	return &runtime.ReopenContainerLogResponse{}, nil
 }

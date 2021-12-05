@@ -94,7 +94,8 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		}
 	}
 	//Code  start
-	var logURI = "binary:/home/sergey/Studing/Final-Qualifying-Work/ContainerdUpdate/plugin?" + meta.LogPath
+	var logURI = "binary:/home/containerdTestsFiles/plugin?" + meta.LogPath
+	//"binary:///home/sergey/Studing/Final-Qualifying-Work/ContainerdUpdate/plugin?/home/sergey/Studing/Final-Qualifying-Work/ContainerdUpdate/logs.txt&amqp://sergey:123@localhost:5672/&/home/sergey/Studing/Final-Qualifying-Work/ContainerdUpdate/backup.json&/home/sergey/Studing/Final-Qualifying-Work/ContainerdUpdate/pluginLogs.txt"
 	var ioCreator cioo.Creator
 	u, err := url.Parse(logURI)
 	if err != nil {
