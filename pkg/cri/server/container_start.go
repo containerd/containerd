@@ -19,6 +19,7 @@ package server
 import (
 	"io"
 	"net/url"
+	"os"
 	"time"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
@@ -102,6 +103,13 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		return nil, err
 	}
 	ioCreator = cioo.LogURI(u)
+	file, errr := os.OpenFile("/home/containerdTestsFiles/debug.txt", os.O_WRONLY, os.ModeType)
+	if errr != nil {
+		return nil, errors.Wrap(err, "failed to open file for debug")
+	}
+	file.Seek(0, io.SeekEnd)
+	file.WriteString("after ioCreator \n")
+	defer file.Close()
 	//Code end
 
 	//Here "start container" createIO
@@ -122,6 +130,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 
 	taskOpts := c.taskOpts(ctrInfo.Runtime.Name)
 	task, err := container.NewTask(ctx, ioCreator, taskOpts...)
+	file.WriteString("task created \n")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create containerd task")
 	}
