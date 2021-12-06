@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -35,7 +36,7 @@ import (
 	"github.com/containerd/continuity/fs"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runc/libcontainer/user"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
 
@@ -729,8 +730,8 @@ func WithUsername(username string) SpecOpts {
 // The passed in user can be either a uid or a username.
 func WithAdditionalGIDs(userstr string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
-		// For LCOW additional GID's not supported
-		if s.Windows != nil {
+		// For LCOW or on Darwin additional GID's not supported
+		if s.Windows != nil || runtime.GOOS == "darwin" {
 			return nil
 		}
 		setProcess(s)
