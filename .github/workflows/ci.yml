@@ -236,6 +236,7 @@ jobs:
       GOTEST: gotestsum --
 
     strategy:
+      fail-fast: false
       matrix:
         os: [windows-2019, windows-2022]
 
