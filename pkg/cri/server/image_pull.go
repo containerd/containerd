@@ -100,9 +100,10 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		log.G(ctx).Debugf("PullImage using normalized image ref: %q", ref)
 	}
 	var (
+		auth     = r.GetAuth()
 		resolver = docker.NewResolver(docker.ResolverOptions{
 			Headers: c.config.Registry.Headers,
-			Hosts:   c.registryHosts(ctx, r.GetAuth()),
+			Hosts:   c.registryHosts(ctx, auth),
 		})
 		isSchema1    bool
 		imageHandler containerdimages.HandlerFunc = func(_ context.Context,
@@ -127,7 +128,15 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
 	if !c.config.ContainerdConfig.DisableSnapshotAnnotations {
 		pullOpts = append(pullOpts,
-			containerd.WithImageHandlerWrapper(appendInfoHandlerWrapper(ref)))
+			containerd.WithImageHandlerWrapper(appendInfoHandlerWrapper(ref,
+				func() (string, string) {
+					getter := c.credentials(auth)
+					username, password, err := getter(distribution.Domain(namedRef))
+					if err != nil {
+						return "", ""
+					}
+					return username, password
+				})))
 	}
 
 	if c.config.ContainerdConfig.DiscardUnpackedLayers {
@@ -329,21 +338,40 @@ func hostDirFromRoots(roots []string) func(string) (string, error) {
 	}
 }
 
+type credsFunc func(host string) (string, string, error)
+
+// credentials returns a credentials getter to parse credentials in the order:
+// 1. runtime auth
+// 2. registry config for target host
+// 3. registry config for docker default host
+func (c *criService) credentials(auth *runtime.AuthConfig) credsFunc {
+	return func(host string) (string, string, error) {
+		hostauth := auth
+		if hostauth == nil {
+			config, found := c.config.Registry.Configs[host]
+			if !found {
+				defaultHost, err := docker.DefaultHost(host)
+				if err != nil {
+					return "", "", errors.Wrap(err, "get default host")
+				}
+				if defaultHost != host {
+					config = c.config.Registry.Configs[defaultHost]
+				}
+			}
+			if config.Auth != nil {
+				hostauth = toRuntimeAuthConfig(*config.Auth)
+			}
+		}
+		return ParseAuth(hostauth, host)
+	}
+}
+
 // registryHosts is the registry hosts to be used by the resolver.
 func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig) docker.RegistryHosts {
 	paths := filepath.SplitList(c.config.Registry.ConfigPath)
 	if len(paths) > 0 {
 		hostOptions := config.HostOptions{}
-		hostOptions.Credentials = func(host string) (string, string, error) {
-			hostauth := auth
-			if hostauth == nil {
-				config := c.config.Registry.Configs[host]
-				if config.Auth != nil {
-					hostauth = toRuntimeAuthConfig(*config.Auth)
-				}
-			}
-			return ParseAuth(hostauth, host)
-		}
+		hostOptions.Credentials = c.credentials(auth)
 		hostOptions.HostDir = hostDirFromRoots(paths)
 
 		return config.ConfigureHosts(ctx, hostOptions)
@@ -520,6 +548,11 @@ const (
 	// the target image and will be passed to snapshotters for preparing layers in
 	// parallel. Skipping some layers is allowed and only affects performance.
 	targetImageLayersLabel = "containerd.io/snapshot/cri.image-layers"
+	// targetImagePullUsername is a label which contains the username to pull an image.
+	// It might be empty in which case targetImagePullSecret can be an idnetify token.
+	targetImagePullUsername = "containerd.io/snapshot/cri.pull-username"
+	// targetImagePullPassword is a label which contains the password/secret to pull an image.
+	targetImagePullPassword = "containerd.io/snapshot/cri.pull-password"
 )
 
 // appendInfoHandlerWrapper makes a handler which appends some basic information
@@ -527,7 +560,7 @@ const (
 // These annotations will be passed to snapshotters as labels. These labels will be
 // used mainly by stargz-based snapshotters for querying image contents from the
 // registry.
-func appendInfoHandlerWrapper(ref string) func(f containerdimages.Handler) containerdimages.Handler {
+func appendInfoHandlerWrapper(ref string, creds func() (string, string)) func(f containerdimages.Handler) containerdimages.Handler {
 	return func(f containerdimages.Handler) containerdimages.Handler {
 		return containerdimages.HandlerFunc(func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 			children, err := f.Handle(ctx, desc)
@@ -536,6 +569,7 @@ func appendInfoHandlerWrapper(ref string) func(f containerdimages.Handler) conta
 			}
 			switch desc.MediaType {
 			case imagespec.MediaTypeImageManifest, containerdimages.MediaTypeDockerSchema2Manifest:
+				username, password := creds()
 				for i := range children {
 					c := &children[i]
 					if containerdimages.IsLayerType(c.MediaType) {
@@ -546,6 +580,12 @@ func appendInfoHandlerWrapper(ref string) func(f containerdimages.Handler) conta
 						c.Annotations[targetLayerDigestLabel] = c.Digest.String()
 						c.Annotations[targetImageLayersLabel] = getLayers(ctx, targetImageLayersLabel, children[i:], labels.Validate)
 						c.Annotations[targetManifestDigestLabel] = desc.Digest.String()
+						if len(username) > 0 {
+							c.Annotations[targetImagePullUsername] = username
+						}
+						if len(password) > 0 {
+							c.Annotations[targetImagePullPassword] = password
+						}
 					}
 				}
 			}
