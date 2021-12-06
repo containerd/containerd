@@ -1,6 +1,3 @@
-//go:build !linux && !darwin
-// +build !linux,!darwin
-
 /*
    Copyright The containerd Authors.
 
@@ -28,6 +25,14 @@ import (
 )
 
 func apply(ctx context.Context, mounts []mount.Mount, r io.Reader) error {
+	// We currently do not support mounts nor bind mounts on MacOS in the containerd daemon.
+	// Using this as an exception to enable native snapshotter and allow further research.
+	if len(mounts) == 1 && mounts[0].Type == "bind" {
+		path := mounts[0].Source
+		_, err := archive.Apply(ctx, path, r)
+		return err
+	}
+
 	return mount.WithTempMount(ctx, mounts, func(root string) error {
 		_, err := archive.Apply(ctx, root, r)
 		return err
