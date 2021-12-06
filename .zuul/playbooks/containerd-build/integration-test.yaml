@@ -2,7 +2,7 @@
   become: yes
   roles:
   - role: config-golang
-    go_version: '1.17.3'
+    go_version: '1.17.4'
     arch: arm64
   tasks:
   - name: Install pre-requisites
