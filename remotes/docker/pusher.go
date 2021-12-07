@@ -177,11 +177,9 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 			if err != nil {
 				return nil, err
 			}
-
+			defer resp.Body.Close()
 			if resp.StatusCode == http.StatusUnauthorized {
 				log.G(ctx).Debugf("failed to mount from repository %s", fromRepo)
-
-				resp.Body.Close()
 				resp = nil
 			}
 		}
@@ -191,9 +189,8 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 			if err != nil {
 				return nil, err
 			}
+			defer resp.Body.Close()
 		}
-		defer resp.Body.Close()
-
 		switch resp.StatusCode {
 		case http.StatusOK, http.StatusAccepted, http.StatusNoContent:
 		case http.StatusCreated:
@@ -283,7 +280,7 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 			pr.CloseWithError(err)
 			return
 		}
-
+		defer resp.Body.Close()
 		switch resp.StatusCode {
 		case http.StatusOK, http.StatusCreated, http.StatusNoContent:
 		default:
