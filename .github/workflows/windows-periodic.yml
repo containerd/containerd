@@ -162,7 +162,6 @@ jobs:
              ./script/setup/install-cni-windows
              mkdir /c/tmp
              export TEST_IMAGE_LIST=c:/repolist.toml
-             export CONTAINERD_ROOT=/c/ProgramData/containerd/root
              make cri-integration | tee c:/Logs/cri-integration.log
            EOF
            ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cat /c/Logs/cri-integration.log | go-junit-report.exe > c:/Logs/junit_01.xml' "

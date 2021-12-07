@@ -29,12 +29,15 @@ cd "${ROOT}"
 # FOCUS focuses the test to run.
 FOCUS=${FOCUS:-""}
 # REPORT_DIR is the the directory to store test logs.
-REPORT_DIR=${REPORT_DIR:-"/tmp/test-integration"}
+if [ $IS_WINDOWS -eq 0 ]; then
+  REPORT_DIR=${REPORT_DIR:-"/tmp/test-integration"}
+else
+  REPORT_DIR=${REPORT_DIR:-"C:/Windows/Temp/test-integration"}
+fi
 # RUNTIME is the runtime handler to use in the test.
 RUNTIME=${RUNTIME:-""}
 
 CRI_ROOT="${CONTAINERD_ROOT}/io.containerd.grpc.v1.cri"
-
 mkdir -p "${REPORT_DIR}"
 test_setup "${REPORT_DIR}"
 
