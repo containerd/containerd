@@ -18,13 +18,15 @@ package integration
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	goruntime "runtime"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	exec "golang.org/x/sys/execabs"
 )
 
 const (
@@ -69,12 +71,14 @@ func TestVolumeCopyUp(t *testing.T) {
 	assert.Equal(t, "test_content\n", string(stdout))
 
 	t.Logf("Check host path of the volume")
-	// Windows paths might have spaces in them (e.g.: Program Files), which would
-	// cause issues for this command. This will allow us to bypass them.
-	hostCmd := fmt.Sprintf("find '%s/containers/%s/volumes/' -type f -print0 | xargs -0 cat", *criRoot, cn)
-	output, err := exec.Command("sh", "-c", hostCmd).CombinedOutput()
+	volumePaths, err := getHostPathForVolumes(*criRoot, cn)
 	require.NoError(t, err)
-	assert.Equal(t, "test_content\n", string(output))
+	assert.Equal(t, len(volumePaths), 1, "expected exactly 1 volume")
+
+	testFilePath := filepath.Join(volumePaths[0], "test_file")
+	contents, err := ioutil.ReadFile(testFilePath)
+	require.NoError(t, err)
+	assert.Equal(t, "test_content\n", string(contents))
 
 	t.Logf("Update volume from inside the container")
 	_, _, err = runtimeService.ExecSync(cn, []string{
@@ -85,9 +89,9 @@ func TestVolumeCopyUp(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf("Check whether host path of the volume is updated")
-	output, err = exec.Command("sh", "-c", hostCmd).CombinedOutput()
+	contents, err = ioutil.ReadFile(testFilePath)
 	require.NoError(t, err)
-	assert.Equal(t, "new_content\n", string(output))
+	assert.Equal(t, "new_content\n", string(contents))
 }
 
 func TestVolumeOwnership(t *testing.T) {
@@ -140,7 +144,34 @@ func TestVolumeOwnership(t *testing.T) {
 	assert.Equal(t, expectedContainerOutput, string(stdout))
 
 	t.Logf("Check ownership of test directory on the host")
-	output, err := getVolumeHostPathOwnership(*criRoot, cn)
+	volumePaths, err := getHostPathForVolumes(*criRoot, cn)
+	require.NoError(t, err)
+	assert.Equal(t, len(volumePaths), 1, "expected exactly 1 volume")
+
+	output, err := getOwnership(volumePaths[0])
 	require.NoError(t, err)
 	assert.Equal(t, expectedHostOutput, output)
+}
+
+func getHostPathForVolumes(criRoot, containerID string) ([]string, error) {
+	hostPath := filepath.Join(criRoot, "containers", containerID, "volumes")
+	if _, err := os.Stat(hostPath); err != nil {
+		return nil, err
+	}
+
+	volumes, err := ioutil.ReadDir(hostPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(volumes) == 0 {
+		return []string{}, nil
+	}
+
+	volumePaths := make([]string, len(volumes))
+	for idx, volume := range volumes {
+		volumePaths[idx] = filepath.Join(hostPath, volume.Name())
+	}
+
+	return volumePaths, nil
 }

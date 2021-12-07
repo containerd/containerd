@@ -25,8 +25,8 @@ import (
 	exec "golang.org/x/sys/execabs"
 )
 
-func getVolumeHostPathOwnership(criRoot, containerID string) (string, error) {
-	hostCmd := fmt.Sprintf("find %s/containers/%s/volumes/* | xargs stat -c %%U:%%G", criRoot, containerID)
+func getOwnership(path string) (string, error) {
+	hostCmd := fmt.Sprintf("stat -c %%U:%%G '%s'", path)
 	output, err := exec.Command("sh", "-c", hostCmd).CombinedOutput()
 	if err != nil {
 		return "", err

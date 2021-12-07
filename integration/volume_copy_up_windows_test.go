@@ -20,31 +20,12 @@
 package integration
 
 import (
-	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-
 	"golang.org/x/sys/windows"
 )
 
-func getVolumeHostPathOwnership(criRoot, containerID string) (string, error) {
-	hostPath := fmt.Sprintf("%s/containers/%s/volumes/", criRoot, containerID)
-	if _, err := os.Stat(hostPath); err != nil {
-		return "", err
-	}
-
-	volumes, err := ioutil.ReadDir(hostPath)
-	if err != nil {
-		return "", err
-	}
-
-	if len(volumes) != 1 {
-		return "", fmt.Errorf("expected to find exactly 1 volume (got %d)", len(volumes))
-	}
-
+func getOwnership(path string) (string, error) {
 	secInfo, err := windows.GetNamedSecurityInfo(
-		filepath.Join(hostPath, volumes[0].Name()), windows.SE_FILE_OBJECT,
+		path, windows.SE_FILE_OBJECT,
 		windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION)
 
 	if err != nil {
