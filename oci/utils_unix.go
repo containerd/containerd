@@ -81,24 +81,25 @@ func getDevices(path, containerPath string) ([]specs.LinuxDevice, error) {
 			}
 		case f.Name() == "console":
 			continue
-		}
-		device, err := DeviceFromPath(filepath.Join(path, f.Name()))
-		if err != nil {
-			if err == ErrNotADevice {
+		default:
+			device, err := DeviceFromPath(filepath.Join(path, f.Name()))
+			if err != nil {
+				if err == ErrNotADevice {
+					continue
+				}
+				if os.IsNotExist(err) {
+					continue
+				}
+				return nil, err
+			}
+			if device.Type == fifoDevice {
 				continue
 			}
-			if os.IsNotExist(err) {
-				continue
+			if containerPath != "" {
+				device.Path = filepath.Join(containerPath, filepath.Base(f.Name()))
 			}
-			return nil, err
+			out = append(out, *device)
 		}
-		if device.Type == fifoDevice {
-			continue
-		}
-		if containerPath != "" {
-			device.Path = filepath.Join(containerPath, filepath.Base(f.Name()))
-		}
-		out = append(out, *device)
 	}
 	return out, nil
 }
