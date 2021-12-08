@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/testutil"
 	srvconfig "github.com/containerd/containerd/services/server/config"
+	"github.com/containerd/containerd/sys"
 	exec "golang.org/x/sys/execabs"
 )
 
@@ -97,21 +98,25 @@ func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, fun
 
 	cleanup := func() {
 		if err := client.Close(); err != nil {
-			t.Fatalf("failed to close client: %v", err)
+			t.Errorf("failed to close client: %v", err)
 		}
 		if err := ctrd.Stop(); err != nil {
 			if err := ctrd.Kill(); err != nil {
-				t.Fatalf("failed to signal containerd: %v", err)
+				t.Errorf("failed to signal containerd: %v", err)
 			}
 		}
 		if err := ctrd.Wait(); err != nil {
 			if _, ok := err.(*exec.ExitError); !ok {
-				t.Fatalf("failed to wait for: %v", err)
+				t.Errorf("failed to wait for: %v", err)
 			}
 		}
-		if err := os.RemoveAll(tempDir); err != nil {
-			t.Fatalf("failed to remove %s: %v", tempDir, err)
+		if err := sys.ForceRemoveAll(tempDir); err != nil {
+			t.Errorf("failed to remove %s: %v", tempDir, err)
 		}
+		if t.Failed() {
+			t.Log("Daemon output:\n", buf.String())
+		}
+
 		// cleaning config-specific resources is up to the caller
 	}
 	return client, &ctrd, cleanup
