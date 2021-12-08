@@ -18,6 +18,7 @@ package metadata
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/containerd/containerd/errdefs"
@@ -184,7 +185,7 @@ func (s *namespaceStore) listNs(namespace string) ([]string, error) {
 		if err := snbkt.ForEach(func(k, v []byte) error {
 			if v == nil {
 				if !isBucketEmpty(snbkt.Bucket(k)) {
-					out = append(out, "snapshot-"+string(k))
+					out = append(out, fmt.Sprintf("snapshots on %q snapshotter", k))
 				}
 			}
 			return nil
