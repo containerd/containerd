@@ -645,7 +645,11 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 		cbkt := sbkt.Bucket(bucketKeyChildren)
 		if cbkt != nil {
 			if child, _ := cbkt.Cursor().First(); child != nil {
-				return errors.Wrap(errdefs.ErrFailedPrecondition, "cannot remove snapshot with child")
+				b := bkt.Bucket(child)
+				if b != nil {
+					return errors.Wrapf(errdefs.ErrFailedPrecondition, "cannot remove snapshot with child %q", child)
+				}
+				// If the child doesn't have the corresponding bucket, ignore it.
 			}
 		}
 
