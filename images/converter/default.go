@@ -378,25 +378,6 @@ func clearDockerV1DummyID(cfg DualConfig) (bool, error) {
 	return modified, nil
 }
 
-// ObjectWithMediaType represents an object with a MediaType field
-// Deprecated
-type ObjectWithMediaType struct {
-	// MediaType appears on Docker manifests and manifest lists.
-	MediaType string `json:"mediaType,omitempty"`
-}
-
-// DualManifest covers Docker manifest and OCI manifest
-// Deprecated: use github.com/opencontainers/image-spec/specs-go/v1.Manifest
-type DualManifest struct {
-	ocispec.Manifest
-}
-
-// DualIndex covers Docker manifest list and OCI index
-// Deprecated: use github.com/opencontainers/image-spec/specs-go/v1.Index
-type DualIndex struct {
-	ocispec.Index
-}
-
 // DualConfig covers Docker config (v1.0, v1.1, v1.2) and OCI config.
 // Unmarshalled as map[string]*json.RawMessage to retain unknown fields on remarshalling.
 type DualConfig map[string]*json.RawMessage
