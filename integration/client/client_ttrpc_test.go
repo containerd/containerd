@@ -30,6 +30,9 @@ import (
 )
 
 func TestClientTTRPC_New(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
 	client, err := ttrpcutil.NewClient(address + ".ttrpc")
 	assert.NilError(t, err)
 
@@ -38,6 +41,9 @@ func TestClientTTRPC_New(t *testing.T) {
 }
 
 func TestClientTTRPC_Reconnect(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
 	client, err := ttrpcutil.NewClient(address + ".ttrpc")
 	assert.NilError(t, err)
 
@@ -63,6 +69,9 @@ func TestClientTTRPC_Reconnect(t *testing.T) {
 }
 
 func TestClientTTRPC_Close(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
 	client, err := ttrpcutil.NewClient(address + ".ttrpc")
 	assert.NilError(t, err)
 

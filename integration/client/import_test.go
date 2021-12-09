@@ -140,7 +140,7 @@ func TestImport(t *testing.T) {
 	ctx, cancel := testContext(t)
 	defer cancel()
 
-	client, err := New(address)
+	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
 	}
