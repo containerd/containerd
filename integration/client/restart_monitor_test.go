@@ -125,6 +125,13 @@ func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, fun
 // TestRestartMonitor tests restarting containers
 // with the restart monitor service plugin
 func TestRestartMonitor(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// This test on Windows encounters the following error in some environments:
+		// "The process cannot access the file because it is being used by another process. (0x20)"
+		// Skip this test until this error can be evaluated and the appropriate
+		// test fix or environment configuration can be determined.
+		t.Skip("Skipping flaky test on Windows")
+	}
 	const (
 		interval = 10 * time.Second
 		epsilon  = 1 * time.Second
