@@ -237,7 +237,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [windows-2019, windows-2022]
+        os: [windows-2019]
 
     defaults:
       run:
@@ -296,7 +296,6 @@ jobs:
       - name: Integration 2
         env:
           TESTFLAGS_PARALLEL: 1
-          EXTRA_TESTFLAGS: "-short"
           CGO_ENABLED: 1
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
         run: mingw32-make.exe integration
