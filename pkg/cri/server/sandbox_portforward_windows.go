@@ -26,13 +26,13 @@ import (
 	"k8s.io/utils/exec"
 
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-	"github.com/containerd/containerd/pkg/ioutil"
+	cioutil "github.com/containerd/containerd/pkg/ioutil"
 )
 
 func (c *criService) portForward(ctx context.Context, id string, port int32, stream io.ReadWriter) error {
-	stdout := ioutil.NewNopWriteCloser(stream)
+	stdout := cioutil.NewNopWriteCloser(stream)
 	stderrBuffer := new(bytes.Buffer)
-	stderr := ioutil.NewNopWriteCloser(stderrBuffer)
+	stderr := cioutil.NewNopWriteCloser(stderrBuffer)
 	// localhost is resolved to 127.0.0.1 in ipv4, and ::1 in ipv6.
 	// Explicitly using ipv4 IP address in here to avoid flakiness.
 	cmd := []string{"wincat.exe", "127.0.0.1", fmt.Sprint(port)}
