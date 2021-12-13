@@ -307,7 +307,7 @@ func (s *Snapshotter) removeDevice(ctx context.Context, key string) error {
 	deviceName := s.getDeviceName(snapID)
 	if !s.config.AsyncRemove {
 		if err := s.pool.RemoveDevice(ctx, deviceName); err != nil {
-			log.G(ctx).WithError(err).Errorf("failed to remove device")
+			log.G(ctx).WithError(err).Error("failed to remove device")
 			// Tell snapshot GC continue to collect other snapshots.
 			// Otherwise, one snapshot collection failure will stop
 			// the GC, and all snapshots won't be collected even though
@@ -318,7 +318,7 @@ func (s *Snapshotter) removeDevice(ctx context.Context, key string) error {
 		// The asynchronous cleanup will do the real device remove work.
 		log.G(ctx).WithField("device", deviceName).Debug("async remove")
 		if err := s.pool.MarkDeviceState(ctx, deviceName, Removed); err != nil {
-			log.G(ctx).WithError(err).Errorf("failed to mark device as removed")
+			log.G(ctx).WithError(err).Error("failed to mark device as removed")
 			return err
 		}
 	}
@@ -571,7 +571,7 @@ func (s *Snapshotter) Cleanup(ctx context.Context) error {
 		}
 		return nil
 	}); err != nil {
-		log.G(ctx).WithError(err).Errorf("failed to query devices from metastore")
+		log.G(ctx).WithError(err).Error("failed to query devices from metastore")
 		return err
 	}
 

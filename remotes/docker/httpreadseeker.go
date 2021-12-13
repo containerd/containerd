@@ -69,7 +69,7 @@ func (hrs *httpReadSeeker) Read(p []byte) (n int, err error) {
 		}
 		if hrs.rc != nil {
 			if clsErr := hrs.rc.Close(); clsErr != nil {
-				log.L.WithError(clsErr).Errorf("httpReadSeeker: failed to close ReadCloser")
+				log.L.WithError(clsErr).Error("httpReadSeeker: failed to close ReadCloser")
 			}
 			hrs.rc = nil
 		}
@@ -119,7 +119,7 @@ func (hrs *httpReadSeeker) Seek(offset int64, whence int) (int64, error) {
 	if abs != hrs.offset {
 		if hrs.rc != nil {
 			if err := hrs.rc.Close(); err != nil {
-				log.L.WithError(err).Errorf("Fetcher.Seek: failed to close ReadCloser")
+				log.L.WithError(err).Error("Fetcher.Seek: failed to close ReadCloser")
 			}
 
 			hrs.rc = nil
@@ -150,7 +150,7 @@ func (hrs *httpReadSeeker) reader() (io.Reader, error) {
 
 		if hrs.rc != nil {
 			if err := hrs.rc.Close(); err != nil {
-				log.L.WithError(err).Errorf("httpReadSeeker: failed to close ReadCloser")
+				log.L.WithError(err).Error("httpReadSeeker: failed to close ReadCloser")
 			}
 		}
 		hrs.rc = rc

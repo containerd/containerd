@@ -205,7 +205,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 				return nil, errors.Wrap(err, "failed to discard to offset")
 			}
 			if n != offset {
-				return nil, errors.Errorf("unable to discard to offset")
+				return nil, errors.New("unable to discard to offset")
 			}
 
 		}

@@ -234,7 +234,7 @@ func seekReader(r io.Reader, offset, size int64) (io.Reader, error) {
 		return nil, errors.Wrap(err, "failed to discard to offset")
 	}
 	if n != offset {
-		return nil, errors.Errorf("unable to discard to offset")
+		return nil, errors.New("unable to discard to offset")
 	}
 
 	return r, nil

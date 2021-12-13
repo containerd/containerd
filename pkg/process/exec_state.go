@@ -107,11 +107,11 @@ func (s *execRunningState) Resize(ws console.WinSize) error {
 }
 
 func (s *execRunningState) Start(ctx context.Context) error {
-	return errors.Errorf("cannot start a running process")
+	return errors.New("cannot start a running process")
 }
 
 func (s *execRunningState) Delete(ctx context.Context) error {
-	return errors.Errorf("cannot delete a running process")
+	return errors.New("cannot delete a running process")
 }
 
 func (s *execRunningState) Kill(ctx context.Context, sig uint32, all bool) error {
@@ -145,11 +145,11 @@ func (s *execStoppedState) transition(name string) error {
 }
 
 func (s *execStoppedState) Resize(ws console.WinSize) error {
-	return errors.Errorf("cannot resize a stopped container")
+	return errors.New("cannot resize a stopped container")
 }
 
 func (s *execStoppedState) Start(ctx context.Context) error {
-	return errors.Errorf("cannot start a stopped process")
+	return errors.New("cannot start a stopped process")
 }
 
 func (s *execStoppedState) Delete(ctx context.Context) error {

@@ -127,7 +127,7 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 	if _, err := os.Stat(target); err == nil {
 		// collision with the target file!
 		if err := os.RemoveAll(w.path); err != nil {
-			log.G(ctx).WithField("ref", w.ref).WithField("path", w.path).Errorf("failed to remove ingest directory")
+			log.G(ctx).WithField("ref", w.ref).WithField("path", w.path).Error("failed to remove ingest directory")
 		}
 		return errors.Wrapf(errdefs.ErrAlreadyExists, "content %v", dgst)
 	}
@@ -142,17 +142,17 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 
 	commitTime := time.Now()
 	if err := os.Chtimes(target, commitTime, commitTime); err != nil {
-		log.G(ctx).WithField("digest", dgst).Errorf("failed to change file time to commit time")
+		log.G(ctx).WithField("digest", dgst).Error("failed to change file time to commit time")
 	}
 
 	// clean up!!
 	if err := os.RemoveAll(w.path); err != nil {
-		log.G(ctx).WithField("ref", w.ref).WithField("path", w.path).Errorf("failed to remove ingest directory")
+		log.G(ctx).WithField("ref", w.ref).WithField("path", w.path).Error("failed to remove ingest directory")
 	}
 
 	if w.s.ls != nil && base.Labels != nil {
 		if err := w.s.ls.Set(dgst, base.Labels); err != nil {
-			log.G(ctx).WithField("digest", dgst).Errorf("failed to set labels")
+			log.G(ctx).WithField("digest", dgst).Error("failed to set labels")
 		}
 	}
 
@@ -165,7 +165,7 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 	// NOTE: Windows does not support this operation
 	if runtime.GOOS != "windows" {
 		if err := os.Chmod(target, (fi.Mode()&os.ModePerm)&^0333); err != nil {
-			log.G(ctx).WithField("ref", w.ref).Errorf("failed to make readonly")
+			log.G(ctx).WithField("ref", w.ref).Error("failed to make readonly")
 		}
 	}
 

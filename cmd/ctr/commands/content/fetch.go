@@ -280,7 +280,7 @@ outer:
 					info, err := cs.Info(ctx, j.Digest)
 					if err != nil {
 						if !errdefs.IsNotFound(err) {
-							log.G(ctx).WithError(err).Errorf("failed to get content info")
+							log.G(ctx).WithError(err).Error("failed to get content info")
 							continue outer
 						} else {
 							statuses[key] = StatusInfo{

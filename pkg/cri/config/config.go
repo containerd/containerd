@@ -394,7 +394,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 	useConfigPath := c.Registry.ConfigPath != ""
 	if len(c.Registry.Mirrors) > 0 {
 		if useConfigPath {
-			return errors.Errorf("`mirrors` cannot be set when `config_path` is provided")
+			return errors.New("`mirrors` cannot be set when `config_path` is provided")
 		}
 		log.G(ctx).Warning("`mirrors` is deprecated, please use `config_path` instead")
 	}
@@ -407,7 +407,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 	}
 	if hasDeprecatedTLS {
 		if useConfigPath {
-			return errors.Errorf("`configs.tls` cannot be set when `config_path` is provided")
+			return errors.New("`configs.tls` cannot be set when `config_path` is provided")
 		}
 		log.G(ctx).Warning("`configs.tls` is deprecated, please use `config_path` instead")
 	}

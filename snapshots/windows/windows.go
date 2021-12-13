@@ -276,7 +276,7 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 	if err := t.Commit(); err != nil {
 		if err1 := os.Rename(renamed, path); err1 != nil {
 			// May cause inconsistent data on disk
-			log.G(ctx).WithError(err1).WithField("path", renamed).Errorf("Failed to rename after failed commit")
+			log.G(ctx).WithError(err1).WithField("path", renamed).Error("Failed to rename after failed commit")
 		}
 		return errors.Wrap(err, "failed to commit")
 	}
