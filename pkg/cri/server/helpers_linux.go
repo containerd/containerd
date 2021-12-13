@@ -269,17 +269,10 @@ func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
 	if !isVMBasedRuntime(runtimeType) {
 		return nil
 	}
-	l, err := getKVMLabel(spec.Process.SelinuxLabel)
+	l, err := seutil.ChangeToKVM(spec.Process.SelinuxLabel)
 	if err != nil {
 		return errors.Wrap(err, "failed to get selinux kvm label")
 	}
 	spec.Process.SelinuxLabel = l
 	return nil
-}
-
-func getKVMLabel(l string) (string, error) {
-	if !seutil.HasType("container_kvm_t") {
-		return "", nil
-	}
-	return seutil.ChangeToKVM(l)
 }
