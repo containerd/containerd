@@ -23,6 +23,10 @@ env:
   DEFAULT_ADMIN_USERNAME: azureuser
   SSH_OPTS: "-o ServerAliveInterval=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
   REMOTE_VM_BIN_PATH: "c:\\containerd\\bin"
+  BUSYBOX_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/busybox:1.29-2"
+  RESOURCE_CONSUMER_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/resource-consumer:1.10"
+  WEBSERVER_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/nginx:1.14-2"
+
 
 jobs:
   winIntegration:
@@ -143,12 +147,15 @@ jobs:
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cd /c/containerd && (make integration | tee /c/Logs/integration.log)'"
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cat /c/Logs/integration.log | go-junit-report.exe > /c/Logs/junit_00.xml'"
 
-      # CRI-integration tests for Windows PR is not merged. TO DO (adelina-t): enable these when PR #5163 merges.
       - name: PrepareRepoList
         run: |
            ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh -c 'cat > c:/repolist.toml'" <<'EOF'
-               busybox = "k8s.gcr.io/e2e-test-images/busybox:1.29-2"
-               ResourceConsumer = "k8s.gcr.io/e2e-test-images/resource-consumer:1.10"
+               busybox = ${{ env.BUSYBOX_TESTING_IMAGE_REF }}
+               ResourceConsumer = ${{ env.RESOURCE_CONSUMER_TESTING_IMAGE_REF }}
+           EOF
+           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh -c 'cat > c:/cri-test-images.yaml'" <<'EOF'
+               defaultTestContainerImage: ${{ env.BUSYBOX_TESTING_IMAGE_REF }}
+               webServerTestImage: ${{ env.WEBSERVER_TESTING_IMAGE_REF }}
            EOF
 
       - name: RunCRIIntegrationTests
@@ -175,7 +182,7 @@ jobs:
       - name: RunCritest
         if: ${{ matrix.win_ver != 'ltsc2022' }}
         run: |
-          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "powershell.exe -command { Start-Process -FilePath C:\containerd\bin\containerd.exe -NoNewWindow -RedirectStandardError true -PassThru ; get-process | sls containerd ; start-sleep 5 ; c:\cri-tools\build\bin\critest.exe --runtime-endpoint=\"npipe:\\\\.\\pipe\\containerd-containerd\" --report-dir='c:\Logs' }"
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "powershell.exe -command { Start-Process -FilePath C:\containerd\bin\containerd.exe -NoNewWindow -RedirectStandardError true -PassThru ; get-process | sls containerd ; start-sleep 5 ; c:\cri-tools\build\bin\critest.exe --runtime-endpoint=\"npipe:\\\\.\\pipe\\containerd-containerd\" --test-images-file='c:\cri-test-images.yaml' --report-dir='c:\Logs' }"
 
       - name: PullLogsFromWinNode
         run: |
