@@ -81,7 +81,7 @@ func (c *criService) buildTaskMetricsRequest(
 ) (tasks.MetricsRequest, []containerstore.Container, error) {
 	var req tasks.MetricsRequest
 	if r.GetFilter() == nil {
-		return req, nil, nil
+		return req, c.containerStore.List(), nil
 	}
 	c.normalizeContainerStatsFilter(r.GetFilter())
 	var containers []containerstore.Container
