@@ -61,6 +61,14 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
+const (
+	boltOpenTimeout = "io.containerd.timeout.bolt.open"
+)
+
+func init() {
+	timeout.Set(boltOpenTimeout, 0) // set to 0 means to wait indefinitely for bolt.Open
+}
+
 // CreateTopLevelDirectories creates the top-level root and state directories.
 func CreateTopLevelDirectories(config *srvconfig.Config) error {
 	switch {
@@ -440,8 +448,21 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 
 			path := filepath.Join(ic.Root, "meta.db")
 			ic.Meta.Exports["path"] = path
-
-			db, err := bolt.Open(path, 0644, nil)
+			options := *bolt.DefaultOptions
+			options.Timeout = timeout.Get(boltOpenTimeout)
+			doneCh := make(chan struct{})
+			go func() {
+				t := time.NewTimer(10 * time.Second)
+				defer t.Stop()
+				select {
+				case <-t.C:
+					log.G(ctx).WithField("plugin", "bolt").Warn("waiting for response from boltdb open")
+				case <-doneCh:
+					return
+				}
+			}()
+			db, err := bolt.Open(path, 0644, &options)
+			close(doneCh)
 			if err != nil {
 				return nil, err
 			}
