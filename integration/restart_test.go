@@ -19,10 +19,11 @@ package integration
 import (
 	goruntime "runtime"
 	"sort"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
@@ -134,9 +135,21 @@ func TestContainerdRestart(t *testing.T) {
 			require.NoError(t, err)
 			task, err := cntr.Task(ctx, nil)
 			require.NoError(t, err)
-			_, err = task.Delete(ctx, containerd.WithProcessKill)
-			if err != nil {
-				require.True(t, errdefs.IsNotFound(err), "delete should return not found error but returned %v", err)
+
+			waitCh, err := task.Wait(ctx)
+			require.NoError(t, err)
+
+			// NOTE: CRI-plugin setups watcher for each container and
+			// cleanups container when the watcher returns exit event.
+			// We just need to kill that sandbox and wait for exit
+			// event from waitCh. If the sandbox container exits,
+			// the state of sandbox must be NOT_READY.
+			require.NoError(t, task.Kill(ctx, syscall.SIGKILL, containerd.WithKillAll))
+
+			select {
+			case <-waitCh:
+			case <-time.After(30 * time.Second):
+				t.Fatalf("expected to receive exit event in time, but timeout")
 			}
 		}
 	}
