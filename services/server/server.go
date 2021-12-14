@@ -359,7 +359,7 @@ func (s *Server) Stop() {
 		instance, err := p.Instance()
 		if err != nil {
 			log.L.WithError(err).WithField("id", p.Registration.URI()).
-				Errorf("could not get plugin instance")
+				Error("could not get plugin instance")
 			continue
 		}
 		closer, ok := instance.(io.Closer)
@@ -368,7 +368,7 @@ func (s *Server) Stop() {
 		}
 		if err := closer.Close(); err != nil {
 			log.L.WithError(err).WithField("id", p.Registration.URI()).
-				Errorf("failed to close plugin")
+				Error("failed to close plugin")
 		}
 	}
 }

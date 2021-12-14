@@ -141,7 +141,7 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opt
 	}
 
 	if mfsts == nil {
-		return ocispec.Descriptor{}, errors.Errorf("unrecognized image format")
+		return ocispec.Descriptor{}, errors.New("unrecognized image format")
 	}
 
 	for name, linkname := range symlinks {

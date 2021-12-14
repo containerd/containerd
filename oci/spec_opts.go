@@ -628,7 +628,7 @@ func WithUserID(uid uint32) SpecOpts {
 		setProcess(s)
 		if c.Snapshotter == "" && c.SnapshotKey == "" {
 			if !isRootfsAbs(s.Root.Path) {
-				return errors.Errorf("rootfs absolute path is required")
+				return errors.New("rootfs absolute path is required")
 			}
 			user, err := UserFromPath(s.Root.Path, func(u user.User) bool {
 				return u.Uid == int(uid)
@@ -645,10 +645,10 @@ func WithUserID(uid uint32) SpecOpts {
 
 		}
 		if c.Snapshotter == "" {
-			return errors.Errorf("no snapshotter set for container")
+			return errors.New("no snapshotter set for container")
 		}
 		if c.SnapshotKey == "" {
-			return errors.Errorf("rootfs snapshot not created for container")
+			return errors.New("rootfs snapshot not created for container")
 		}
 		snapshotter := client.SnapshotService(c.Snapshotter)
 		mounts, err := snapshotter.Mounts(ctx, c.SnapshotKey)
@@ -684,7 +684,7 @@ func WithUsername(username string) SpecOpts {
 		if s.Linux != nil {
 			if c.Snapshotter == "" && c.SnapshotKey == "" {
 				if !isRootfsAbs(s.Root.Path) {
-					return errors.Errorf("rootfs absolute path is required")
+					return errors.New("rootfs absolute path is required")
 				}
 				user, err := UserFromPath(s.Root.Path, func(u user.User) bool {
 					return u.Name == username
@@ -696,10 +696,10 @@ func WithUsername(username string) SpecOpts {
 				return nil
 			}
 			if c.Snapshotter == "" {
-				return errors.Errorf("no snapshotter set for container")
+				return errors.New("no snapshotter set for container")
 			}
 			if c.SnapshotKey == "" {
-				return errors.Errorf("rootfs snapshot not created for container")
+				return errors.New("rootfs snapshot not created for container")
 			}
 			snapshotter := client.SnapshotService(c.Snapshotter)
 			mounts, err := snapshotter.Mounts(ctx, c.SnapshotKey)
@@ -775,15 +775,15 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 		}
 		if c.Snapshotter == "" && c.SnapshotKey == "" {
 			if !isRootfsAbs(s.Root.Path) {
-				return errors.Errorf("rootfs absolute path is required")
+				return errors.New("rootfs absolute path is required")
 			}
 			return setAdditionalGids(s.Root.Path)
 		}
 		if c.Snapshotter == "" {
-			return errors.Errorf("no snapshotter set for container")
+			return errors.New("no snapshotter set for container")
 		}
 		if c.SnapshotKey == "" {
-			return errors.Errorf("rootfs snapshot not created for container")
+			return errors.New("rootfs snapshot not created for container")
 		}
 		snapshotter := client.SnapshotService(c.Snapshotter)
 		mounts, err := snapshotter.Mounts(ctx, c.SnapshotKey)

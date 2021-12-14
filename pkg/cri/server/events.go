@@ -272,7 +272,7 @@ func (em *eventMonitor) start() <-chan error {
 			case err := <-em.errCh:
 				// Close errCh in defer directly if there is no error.
 				if err != nil {
-					logrus.WithError(err).Errorf("Failed to handle event stream")
+					logrus.WithError(err).Error("Failed to handle event stream")
 					errCh <- err
 				}
 				return

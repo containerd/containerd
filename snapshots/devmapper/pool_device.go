@@ -48,7 +48,7 @@ func NewPoolDevice(ctx context.Context, config *Config) (*PoolDevice, error) {
 
 	version, err := dmsetup.Version()
 	if err != nil {
-		log.G(ctx).Errorf("dmsetup not available")
+		log.G(ctx).Error("dmsetup not available")
 		return nil, err
 	}
 
@@ -491,7 +491,7 @@ func (p *PoolDevice) GetUsage(deviceName string) (int64, error) {
 	}
 
 	if len(status.Params) == 0 {
-		return 0, errors.Errorf("failed to get the number of used blocks, unexpected output from dmsetup status")
+		return 0, errors.New("failed to get the number of used blocks, unexpected output from dmsetup status")
 	}
 
 	count, err := strconv.ParseInt(status.Params[0], 10, 64)

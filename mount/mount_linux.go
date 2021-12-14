@@ -63,7 +63,7 @@ func (m *Mount) Mount(target string) (err error) {
 
 	flags, data, losetup := parseMountOptions(options)
 	if len(data) > pagesize {
-		return errors.Errorf("mount options is too long")
+		return errors.New("mount options is too long")
 	}
 
 	// propagation types.

@@ -402,7 +402,7 @@ func (i *image) getLayers(ctx context.Context, platform platforms.MatchComparer,
 		return nil, errors.Wrap(err, "failed to resolve rootfs")
 	}
 	if len(diffIDs) != len(manifest.Layers) {
-		return nil, errors.Errorf("mismatched image rootfs and manifest layers")
+		return nil, errors.New("mismatched image rootfs and manifest layers")
 	}
 	layers := make([]rootfs.Layer, len(diffIDs))
 	for i := range diffIDs {

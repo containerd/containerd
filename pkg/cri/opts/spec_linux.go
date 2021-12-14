@@ -481,7 +481,7 @@ func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHu
 				}
 			} else {
 				if !tolerateMissingHugetlbController {
-					return errors.Errorf("huge pages limits are specified but hugetlb cgroup controller is missing. " +
+					return errors.New("huge pages limits are specified but hugetlb cgroup controller is missing. " +
 						"Please set tolerate_missing_hugetlb_controller to `true` to ignore this error")
 				}
 				logrus.Warn("hugetlb cgroup controller is absent. skipping huge pages limits")

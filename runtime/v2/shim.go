@@ -304,7 +304,7 @@ func (s *shimTask) delete(ctx context.Context, removeTask func(ctx context.Conte
 	}
 
 	if err := s.shim.delete(ctx); err != nil {
-		log.G(ctx).WithField("id", s.ID()).WithError(err).Errorf("failed to delete shim")
+		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete shim")
 	}
 
 	// remove self from the runtime task list

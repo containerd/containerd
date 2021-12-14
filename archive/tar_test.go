@@ -425,7 +425,7 @@ func TestBreakouts(t *testing.T) {
 					return errors.Wrap(err, "failed to read unbroken")
 				}
 				if len(b) > 0 {
-					return errors.Errorf("/etc/emptied: non-empty")
+					return errors.New("/etc/emptied: non-empty")
 				}
 				return nil
 			},
@@ -1215,7 +1215,7 @@ func fileEntry(name string, expected []byte, mode int) tarEntryValidator {
 			return errors.Errorf("wrong mode %o, expected %o", hdr.Mode, mode)
 		}
 		if !bytes.Equal(b, expected) {
-			return errors.Errorf("different file content")
+			return errors.New("different file content")
 		}
 		return nil
 	}

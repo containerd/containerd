@@ -43,7 +43,7 @@ func WithTempMount(ctx context.Context, mounts []Mount, f func(root string) erro
 	// For details, please refer to #1868 #1785.
 	defer func() {
 		if uerr = os.Remove(root); uerr != nil {
-			log.G(ctx).WithError(uerr).WithField("dir", root).Errorf("failed to remove mount temp dir")
+			log.G(ctx).WithError(uerr).WithField("dir", root).Error("failed to remove mount temp dir")
 		}
 	}()
 
