@@ -450,6 +450,7 @@ func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHu
 			q         = resources.GetCpuQuota()
 			shares    = uint64(resources.GetCpuShares())
 			limit     = resources.GetMemoryLimitInBytes()
+			swapLimit = resources.GetMemorySwapLimitInBytes()
 			hugepages = resources.GetHugepageLimits()
 		)
 
@@ -471,6 +472,10 @@ func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHu
 		if limit != 0 {
 			s.Linux.Resources.Memory.Limit = &limit
 		}
+		if swapLimit != 0 {
+			s.Linux.Resources.Memory.Swap = &swapLimit
+		}
+
 		if !disableHugetlbController {
 			if isHugetlbControllerPresent() {
 				for _, limit := range hugepages {
