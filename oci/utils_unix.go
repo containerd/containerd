@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/containerd/containerd/pkg/userns"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
@@ -30,6 +31,13 @@ import (
 
 // ErrNotADevice denotes that a file is not a valid linux device.
 var ErrNotADevice = errors.New("not a device node")
+
+// Testing dependencies
+var (
+	osReadDir              = os.ReadDir
+	usernsRunningInUserNS  = userns.RunningInUserNS
+	overrideDeviceFromPath func(path string) error
+)
 
 // HostDevices returns all devices that can be found under /dev directory.
 func HostDevices() ([]specs.LinuxDevice, error) {
@@ -53,7 +61,7 @@ func getDevices(path, containerPath string) ([]specs.LinuxDevice, error) {
 		return []specs.LinuxDevice{*dev}, nil
 	}
 
-	files, err := os.ReadDir(path)
+	files, err := osReadDir(path)
 	if err != nil {
 		return nil, err
 	}
@@ -73,6 +81,12 @@ func getDevices(path, containerPath string) ([]specs.LinuxDevice, error) {
 				}
 				sub, err := getDevices(filepath.Join(path, f.Name()), cp)
 				if err != nil {
+					if errors.Is(err, os.ErrPermission) && usernsRunningInUserNS() {
+						// ignore the "permission denied" error if running in userns.
+						// This allows rootless containers to use devices that are
+						// accessible, ignoring devices / subdirectories that are not.
+						continue
+					}
 					return nil, err
 				}
 
@@ -81,24 +95,31 @@ func getDevices(path, containerPath string) ([]specs.LinuxDevice, error) {
 			}
 		case f.Name() == "console":
 			continue
-		}
-		device, err := DeviceFromPath(filepath.Join(path, f.Name()))
-		if err != nil {
-			if err == ErrNotADevice {
+		default:
+			device, err := DeviceFromPath(filepath.Join(path, f.Name()))
+			if err != nil {
+				if err == ErrNotADevice {
+					continue
+				}
+				if os.IsNotExist(err) {
+					continue
+				}
+				if errors.Is(err, os.ErrPermission) && usernsRunningInUserNS() {
+					// ignore the "permission denied" error if running in userns.
+					// This allows rootless containers to use devices that are
+					// accessible, ignoring devices that are not.
+					continue
+				}
+				return nil, err
+			}
+			if device.Type == fifoDevice {
 				continue
 			}
-			if os.IsNotExist(err) {
-				continue
+			if containerPath != "" {
+				device.Path = filepath.Join(containerPath, filepath.Base(f.Name()))
 			}
-			return nil, err
+			out = append(out, *device)
 		}
-		if device.Type == fifoDevice {
-			continue
-		}
-		if containerPath != "" {
-			device.Path = filepath.Join(containerPath, filepath.Base(f.Name()))
-		}
-		out = append(out, *device)
 	}
 	return out, nil
 }
@@ -114,6 +135,12 @@ const (
 // DeviceFromPath takes the path to a device to look up the information about a
 // linux device and returns that information as a LinuxDevice struct.
 func DeviceFromPath(path string) (*specs.LinuxDevice, error) {
+	if overrideDeviceFromPath != nil {
+		if err := overrideDeviceFromPath(path); err != nil {
+			return nil, err
+		}
+	}
+
 	var stat unix.Stat_t
 	if err := unix.Lstat(path, &stat); err != nil {
 		return nil, err

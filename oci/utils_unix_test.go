@@ -19,7 +19,128 @@
 
 package oci
 
-import "testing"
+import (
+	"errors"
+	"fmt"
+	"os"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/containerd/pkg/userns"
+)
+
+func cleanupTest() {
+	overrideDeviceFromPath = nil
+	osReadDir = os.ReadDir
+	usernsRunningInUserNS = userns.RunningInUserNS
+}
+
+// Based on test from runc:
+// https://github.com/opencontainers/runc/blob/v1.0.0/libcontainer/devices/device_unix_test.go#L34-L47
+func TestHostDevicesOSReadDirFailure(t *testing.T) {
+	testError := fmt.Errorf("test error: %w", os.ErrPermission)
+
+	// Override os.ReadDir to inject error.
+	osReadDir = func(dirname string) ([]os.DirEntry, error) {
+		return nil, testError
+	}
+
+	// Override userns.RunningInUserNS to ensure not running in user namespace.
+	usernsRunningInUserNS = func() bool {
+		return false
+	}
+	defer cleanupTest()
+
+	_, err := HostDevices()
+	if !errors.Is(err, testError) {
+		t.Fatalf("Unexpected error %v, expected %v", err, testError)
+	}
+}
+
+// Based on test from runc:
+// https://github.com/opencontainers/runc/blob/v1.0.0/libcontainer/devices/device_unix_test.go#L34-L47
+func TestHostDevicesOSReadDirFailureInUserNS(t *testing.T) {
+	testError := fmt.Errorf("test error: %w", os.ErrPermission)
+
+	// Override os.ReadDir to inject error.
+	osReadDir = func(dirname string) ([]os.DirEntry, error) {
+		if dirname == "/dev" {
+			fi, err := os.Lstat("/dev/null")
+			if err != nil {
+				t.Fatalf("Unexpected error %v", err)
+			}
+
+			return []os.DirEntry{fileInfoToDirEntry(fi)}, nil
+		}
+		return nil, testError
+	}
+	// Override userns.RunningInUserNS to ensure running in user namespace.
+	usernsRunningInUserNS = func() bool {
+		return true
+	}
+	defer cleanupTest()
+
+	_, err := HostDevices()
+	if !errors.Is(err, nil) {
+		t.Fatalf("Unexpected error %v, expected %v", err, nil)
+	}
+}
+
+// Based on test from runc:
+// https://github.com/opencontainers/runc/blob/v1.0.0/libcontainer/devices/device_unix_test.go#L49-L74
+func TestHostDevicesDeviceFromPathFailure(t *testing.T) {
+	testError := fmt.Errorf("test error: %w", os.ErrPermission)
+
+	// Override DeviceFromPath to produce an os.ErrPermission on /dev/null.
+	overrideDeviceFromPath = func(path string) error {
+		if path == "/dev/null" {
+			return testError
+		}
+		return nil
+	}
+
+	// Override userns.RunningInUserNS to ensure not running in user namespace.
+	usernsRunningInUserNS = func() bool {
+		return false
+	}
+	defer cleanupTest()
+
+	d, err := HostDevices()
+	if !errors.Is(err, testError) {
+		t.Fatalf("Unexpected error %v, expected %v", err, testError)
+	}
+
+	assert.Equal(t, 0, len(d))
+}
+
+// Based on test from runc:
+// https://github.com/opencontainers/runc/blob/v1.0.0/libcontainer/devices/device_unix_test.go#L49-L74
+func TestHostDevicesDeviceFromPathFailureInUserNS(t *testing.T) {
+	testError := fmt.Errorf("test error: %w", os.ErrPermission)
+
+	// Override DeviceFromPath to produce an os.ErrPermission on all devices,
+	// except for /dev/null.
+	overrideDeviceFromPath = func(path string) error {
+		if path == "/dev/null" {
+			return nil
+		}
+		return testError
+	}
+
+	// Override userns.RunningInUserNS to ensure running in user namespace.
+	usernsRunningInUserNS = func() bool {
+		return true
+	}
+	defer cleanupTest()
+
+	d, err := HostDevices()
+	if !errors.Is(err, nil) {
+		t.Fatalf("Unexpected error %v, expected %v", err, nil)
+	}
+	assert.Equal(t, 1, len(d))
+	assert.Equal(t, d[0].Path, "/dev/null")
+}
 
 func TestHostDevicesAllValid(t *testing.T) {
 	devices, err := HostDevices()
