@@ -17,38 +17,8 @@
 package seutil
 
 import (
-	"bufio"
-	"os"
-
 	"github.com/opencontainers/selinux/go-selinux"
 )
-
-var seTypes map[string]struct{}
-
-const typePath = "/etc/selinux/targeted/contexts/customizable_types"
-
-func init() {
-	seTypes = make(map[string]struct{})
-	if !selinux.GetEnabled() {
-		return
-	}
-	f, err := os.Open(typePath)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-	s := bufio.NewScanner(f)
-	for s.Scan() {
-		seTypes[s.Text()] = struct{}{}
-	}
-}
-
-// HasType returns true if the underlying system has the
-// provided selinux type enabled.
-func HasType(name string) bool {
-	_, ok := seTypes[name]
-	return ok
-}
 
 // ChangeToKVM process label
 func ChangeToKVM(l string) (string, error) {
