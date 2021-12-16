@@ -29,6 +29,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const exporterPlugin = "otlp"
@@ -45,7 +46,7 @@ func init() {
 			}
 			dialOpts := []grpc.DialOption{grpc.WithBlock()}
 			if cfg.Insecure {
-				dialOpts = append(dialOpts, grpc.WithInsecure())
+				dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 			}
 
 			exp, err := otlptracegrpc.New(ic.Context,
