@@ -16,7 +16,7 @@ package otelgrpc
 
 // Version is the current release version of the gRPC instrumentation.
 func Version() string {
-	return "0.24.0"
+	return "0.27.0"
 	// This string is updated by the pre_release.sh script during release
 }
 
