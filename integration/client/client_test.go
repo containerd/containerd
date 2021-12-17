@@ -111,6 +111,10 @@ func TestMain(m *testing.M) {
 			fmt.Fprintf(os.Stderr, "%s: %s\n", err, buf.String())
 			os.Exit(1)
 		}
+	} else {
+		// Otherwise if no-daemon was specified we need to connect to an already running ctrd instance.
+		// Set the addr field on the daemon object so it knows what to try connecting to.
+		ctrd.addr = address
 	}
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 4*time.Second)
