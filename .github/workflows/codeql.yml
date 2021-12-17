@@ -2,11 +2,13 @@ name: "CodeQL Scan"
 
 on:
   push:
-  schedule:
-    - cron: '0 0 * * 0'
+    branches:
+      - main
+      - 'release/**'
   pull_request:
-    paths:
-      - '.github/workflows/codeql.yml'
+    branches:
+      - main
+      - 'release/**'
 
 jobs:
   CodeQL-Build:
@@ -22,6 +24,10 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
+    - uses: actions/setup-go@v2
+      with:
+        go-version: 1.17.5
+
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v1
@@ -29,21 +35,9 @@ jobs:
       # with:
       #   languages: go, javascript, csharp, python, cpp, java
 
-    # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).
-    # If this step fails, then you should remove it and run the build manually (see below).
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@v1
-
-    # ℹ️ Command-line programs to run using the OS shell.
-    # 📚 https://git.io/JvXDl
-
-    # ✏️ If the Autobuild fails above, remove it and uncomment the following three lines
-    #    and modify them (or add more) to build your code if your project
-    #    uses a compiled language
-
-    #- run: |
-    #   make bootstrap
-    #   make release
+    - run: |
+        sudo apt-get install -y libseccomp-dev libbtrfs-dev
+        make
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v1
