@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package retry
+// Package retry provides request retry functionality that can perform
+// configurable exponential backoff for transient errors and honor any
+// explicit throttle responses received.
+package retry // import "go.opentelemetry.io/otel/exporters/otlp/internal/retry"
 
 import (
 	"context"
@@ -54,8 +57,18 @@ type RequestFunc func(context.Context, func(context.Context) error) error
 
 // EvaluateFunc returns if an error is retry-able and if an explicit throttle
 // duration should be honored that was included in the error.
+//
+// The function must return true if the error argument is retry-able,
+// otherwise it must return false for the first return parameter.
+//
+// The function must return a non-zero time.Duration if the error contains
+// explicit throttle duration that should be honored, otherwise it must return
+// a zero valued time.Duration.
 type EvaluateFunc func(error) (bool, time.Duration)
 
+// RequestFunc returns a RequestFunc using the evaluate function to determine
+// if requests can be retried and based on the exponential backoff
+// configuration of c.
 func (c Config) RequestFunc(evaluate EvaluateFunc) RequestFunc {
 	if !c.Enabled {
 		return func(ctx context.Context, fn func(context.Context) error) error {
@@ -122,7 +135,14 @@ func wait(ctx context.Context, delay time.Duration) error {
 
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		// Handle the case where the timer and context deadline end
+		// simultaneously by prioritizing the timer expiration nil value
+		// response.
+		select {
+		case <-timer.C:
+		default:
+			return ctx.Err()
+		}
 	case <-timer.C:
 	}
 

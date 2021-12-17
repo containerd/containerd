@@ -66,6 +66,7 @@ import (
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
@@ -119,7 +120,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 		}
 		gopts := []grpc.DialOption{
 			grpc.WithBlock(),
-			grpc.WithInsecure(),
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.FailOnNonTempDialError(true),
 			grpc.WithConnectParams(connParams),
 			grpc.WithContextDialer(dialer.ContextDialer),

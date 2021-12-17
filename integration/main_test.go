@@ -43,6 +43,7 @@ import (
 	"github.com/stretchr/testify/require"
 	exec "golang.org/x/sys/execabs"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -405,7 +406,10 @@ func RawRuntimeClient() (runtime.RuntimeServiceClient, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithContextDialer(dialer))
+	conn, err := grpc.DialContext(ctx, addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithContextDialer(dialer),
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect cri endpoint")
 	}

@@ -28,6 +28,7 @@ require (
 	github.com/docker/go-units v0.4.0
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/fsnotify/fsnotify v1.4.9
+	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gogo/googleapis v1.4.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/go-cmp v0.5.6
@@ -56,15 +57,17 @@ require (
 	github.com/urfave/cli v1.22.2
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
 	go.etcd.io/bbolt v1.3.6
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.24.0
-	go.opentelemetry.io/otel v1.0.1
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.0.1
-	go.opentelemetry.io/otel/sdk v1.0.1
-	go.opentelemetry.io/otel/trace v1.0.1
-	golang.org/x/net v0.0.0-20210825183410-e898025ed96a
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.28.0
+	go.opentelemetry.io/otel v1.3.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.3.0
+	go.opentelemetry.io/otel/sdk v1.3.0
+	go.opentelemetry.io/otel/trace v1.3.0
+	golang.org/x/net v0.0.0-20211216030914-fe4d6282115f
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20211025201205-69cdffdb9359
-	google.golang.org/grpc v1.41.0
+	golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e
+	golang.org/x/text v0.3.7 // indirect
+	google.golang.org/genproto v0.0.0-20211208223120-3a66f561d7aa // indirect
+	google.golang.org/grpc v1.43.0
 	google.golang.org/protobuf v1.27.1
 	gotest.tools/v3 v3.0.3
 	k8s.io/api v0.22.0
@@ -73,7 +76,7 @@ require (
 	k8s.io/client-go v0.22.0
 	k8s.io/component-base v0.22.0
 	k8s.io/cri-api v0.23.0-alpha.4
-	k8s.io/klog/v2 v2.9.0
+	k8s.io/klog/v2 v2.20.0
 	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
 )
 

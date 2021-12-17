@@ -32,6 +32,7 @@ import (
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 var publishCommand = cli.Command{
@@ -99,7 +100,7 @@ func connect(address string, d func(gocontext.Context, string) (net.Conn, error)
 	}
 	gopts := []grpc.DialOption{
 		grpc.WithBlock(),
-		grpc.WithInsecure(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(d),
 		grpc.FailOnNonTempDialError(true),
 		grpc.WithConnectParams(connParams),
