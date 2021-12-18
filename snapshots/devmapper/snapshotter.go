@@ -403,6 +403,7 @@ func (s *Snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	}
 
 	if len(snap.ParentIDs) == 0 {
+		fsOptions := ""
 		deviceName := s.getDeviceName(snap.ID)
 		log.G(ctx).Debugf("creating new thin device '%s'", deviceName)
 
@@ -412,7 +413,14 @@ func (s *Snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			return nil, err
 		}
 
-		if err := mkfs(ctx, s.config.FileSystemType, dmsetup.GetFullDevicePath(deviceName)); err != nil {
+		if s.config.FileSystemType == fsTypeExt4 && s.config.FsOptions == "" {
+			// Explicitly disable lazy_itable_init and lazy_journal_init in order to enable lazy initialization.
+			fsOptions = "nodiscard,lazy_itable_init=0,lazy_journal_init=0"
+		} else {
+			fsOptions = s.config.FsOptions
+		}
+		log.G(ctx).Debugf("Creating file system of type: %s with options: %s for thin device %q", s.config.FileSystemType, fsOptions, deviceName)
+		if err := mkfs(ctx, s.config.FileSystemType, fsOptions, dmsetup.GetFullDevicePath(deviceName)); err != nil {
 			status, sErr := dmsetup.Status(s.pool.poolName)
 			if sErr != nil {
 				multierror.Append(err, sErr)
@@ -448,7 +456,7 @@ func (s *Snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 
 // mkfs creates filesystem on the given devmapper device based on type
 // specified in config.
-func mkfs(ctx context.Context, fs fsType, path string) error {
+func mkfs(ctx context.Context, fs fsType, fsOptions string, path string) error {
 	mkfsCommand := ""
 	var args []string
 
@@ -457,8 +465,7 @@ func mkfs(ctx context.Context, fs fsType, path string) error {
 		mkfsCommand = "mkfs.ext4"
 		args = []string{
 			"-E",
-			// We don't want any zeroing in advance when running mkfs on thin devices (see "man mkfs.ext4")
-			"nodiscard,lazy_itable_init=0,lazy_journal_init=0",
+			fsOptions,
 			path,
 		}
 	case fsTypeXFS:
