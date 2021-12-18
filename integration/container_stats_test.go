@@ -292,10 +292,14 @@ func TestContainerListStatsWithSandboxIdFilter(t *testing.T) {
 		if len(stats) != 3 {
 			return false, errors.New("unexpected stats length")
 		}
-		if stats[0].GetWritableLayer().GetUsedBytes().GetValue() != 0 {
-			return true, nil
+
+		for _, containerStats := range stats {
+			// Wait for stats on all containers, not just the first one in the list.
+			if containerStats.GetWritableLayer().GetUsedBytes().GetValue() == 0 {
+				return false, nil
+			}
 		}
-		return false, nil
+		return true, nil
 	}, time.Second, 45*time.Second))
 	// TODO(claudiub): Reduce the timer above to 30 seconds once Windows flakiness has been addressed.
 	t.Logf("Verify container stats for sandbox %q", sb)
