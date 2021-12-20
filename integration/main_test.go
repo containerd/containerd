@@ -364,7 +364,7 @@ func Randomize(str string) string {
 func KillProcess(name string) error {
 	var command []string
 	if goruntime.GOOS == "windows" {
-		command = []string{"tskill", strings.TrimSuffix(name, ".exe")}
+		command = []string{"taskkill", "/IM", name, "/F"}
 	} else {
 		command = []string{"pkill", "-x", fmt.Sprintf("^%s$", name)}
 	}
