@@ -107,13 +107,6 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 	if err := os.Mkdir(filepath.Join(root, "snapshots"), 0700); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
-
-	// figure out whether "index=off" option is recognized by the kernel
-	var indexOff bool
-	if _, err = os.Stat("/sys/module/overlay/parameters/index"); err == nil {
-		indexOff = true
-	}
-
 	// figure out whether "userxattr" option is recognized by the kernel && needed
 	userxattr, err := overlayutils.NeedsUserXAttr(root)
 	if err != nil {
@@ -125,7 +118,7 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		ms:            ms,
 		asyncRemove:   config.asyncRemove,
 		upperdirLabel: config.upperdirLabel,
-		indexOff:      indexOff,
+		indexOff:      supportsIndex(),
 		userxattr:     userxattr,
 	}, nil
 }
@@ -571,4 +564,12 @@ func (o *snapshotter) workPath(id string) string {
 // Close closes the snapshotter
 func (o *snapshotter) Close() error {
 	return o.ms.Close()
+}
+
+// supportsIndex checks whether the "index=off" option is supported by the kernel.
+func supportsIndex() bool {
+	if _, err := os.Stat("/sys/module/overlay/parameters/index"); err == nil {
+		return true
+	}
+	return false
 }
