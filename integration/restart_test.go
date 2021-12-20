@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
@@ -139,12 +140,26 @@ func TestContainerdRestart(t *testing.T) {
 			waitCh, err := task.Wait(ctx)
 			require.NoError(t, err)
 
-			// NOTE: CRI-plugin setups watcher for each container and
-			// cleanups container when the watcher returns exit event.
-			// We just need to kill that sandbox and wait for exit
-			// event from waitCh. If the sandbox container exits,
-			// the state of sandbox must be NOT_READY.
-			require.NoError(t, task.Kill(ctx, syscall.SIGKILL, containerd.WithKillAll))
+			err = task.Kill(ctx, syscall.SIGKILL, containerd.WithKillAll)
+			if goruntime.GOOS != "windows" {
+				// NOTE: CRI-plugin setups watcher for each container and
+				// cleanups container when the watcher returns exit event.
+				// We just need to kill that sandbox and wait for exit
+				// event from waitCh. If the sandbox container exits,
+				// the state of sandbox must be NOT_READY.
+				require.NoError(t, err)
+			} else {
+				// NOTE(gabriel-samfira): On Windows, the "notready-sandbox" array
+				// only has a container in the ContainerState_CONTAINER_CREATED
+				// state and a container in the ContainerState_CONTAINER_EXITED state.
+				// Sending a Kill() to a task that has already exited, or to a task that
+				// was never started (which is the case here), will always return an
+				// ErrorNotFound (at least on Windows). Given that in this sanbox, there
+				// will never be a running task, after we recover from a containerd restart
+				// we can expect an ErrorNotFound here every time.
+				// The waitCh channel should already be closed at this point.
+				assert.True(t, errdefs.IsNotFound(err), err)
+			}
 
 			select {
 			case <-waitCh:
