@@ -150,7 +150,10 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 		connector := func() (*grpc.ClientConn, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), copts.timeout)
 			defer cancel()
-			conn, err := grpc.DialContext(ctx, dialer.DialAddress(address), gopts...)
+			if !strings.HasPrefix(address, "tcp://") {
+				address = dialer.DialAddress(address)
+			}
+			conn, err := grpc.DialContext(ctx, address, gopts...)
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to dial %q", address)
 			}

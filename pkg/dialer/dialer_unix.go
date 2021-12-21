@@ -48,6 +48,10 @@ func isNoent(err error) bool {
 }
 
 func dialer(address string, timeout time.Duration) (net.Conn, error) {
-	address = strings.TrimPrefix(address, "unix://")
-	return net.DialTimeout("unix", address, timeout)
+	parts := strings.SplitN(address, "://", 2)
+	if len(parts) == 2 {
+		return net.DialTimeout(parts[0], parts[1], timeout)
+	} else {
+		return net.DialTimeout("unix", address, timeout)
+	}
 }
