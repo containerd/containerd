@@ -66,6 +66,8 @@ const (
 
 // Config for the tasks service plugin
 type Config struct {
+	// BlockIOConfigFile specifies the path to blockio configuration file
+	BlockIOConfigFile string `toml:"blockio_config_file" json:"blockioConfigFile"`
 	// RdtConfigFile specifies the path to RDT configuration file
 	RdtConfigFile string `toml:"rdt_config_file" json:"rdtConfigFile"`
 }
@@ -138,6 +140,9 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 		l.monitor.Monitor(t, nil)
 	}
 
+	if err := initBlockIO(config.BlockIOConfigFile); err != nil {
+		log.G(ic.Context).WithError(err).Errorf("blockio initialization failed")
+	}
 	if err := initRdt(config.RdtConfigFile); err != nil {
 		log.G(ic.Context).WithError(err).Errorf("RDT initialization failed")
 	}

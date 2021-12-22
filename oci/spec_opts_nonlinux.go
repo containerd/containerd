@@ -39,6 +39,14 @@ var WithAllKnownCapabilities = func(ctx context.Context, client Client, c *conta
 	return WithCapabilities(nil)(ctx, client, c, s)
 }
 
+// WithBlockIO sets the container's blkio parameters
+//nolint: deadcode, unused
+func WithBlockIO(blockio interface{}) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		return errors.New("blkio not supported")
+	}
+}
+
 // WithCPUShares sets the container's cpu shares
 //nolint: deadcode, unused
 func WithCPUShares(shares uint64) SpecOpts {

@@ -143,6 +143,14 @@ version = 2
     # default_runtime_name is the default runtime name to use.
     default_runtime_name = "runc"
 
+    # ignore_blockio_not_enabled_errors disables blockio related
+    # errors when blockio support has not been enabled. By default,
+    # trying to set the blockio class of a container via annotations
+    # produces an error if blockio hasn't been enabled.  This config
+    # option practically enables a "soft" mode for blockio where these
+    # errors are ignored and the container gets no blockio class.
+    ignore_blockio_not_enabled_errors = false
+
     # ignore_rdt_not_enabled_errors disables RDT related errors when RDT
     # support has not been enabled. Intel RDT is a technology for cache and
     # memory bandwidth management. By default, trying to set the RDT class of
