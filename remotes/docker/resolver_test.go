@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/containerd/remotes/docker/auth"
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -135,6 +136,31 @@ func TestRefreshTokenResolver(t *testing.T) {
 	}
 
 	runBasicTest(t, "testname", withTokenServer(th, creds))
+}
+
+func TestFetchRefreshToken(t *testing.T) {
+	f := func(t *testing.T, disablePOST bool) {
+		name := "testname"
+		if disablePOST {
+			name += "-disable-post"
+		}
+		var fetchedRefreshToken string
+		onFetchRefreshToken := func(ctx context.Context, refreshToken string, req *http.Request) {
+			fetchedRefreshToken = refreshToken
+		}
+		srv := newRefreshTokenServer(t, name, disablePOST, onFetchRefreshToken)
+		runBasicTest(t, name, srv.BasicTestFunc())
+		if fetchedRefreshToken != srv.RefreshToken {
+			t.Errorf("unexpected refresh token: got %q", fetchedRefreshToken)
+		}
+	}
+
+	t.Run("POST", func(t *testing.T) {
+		f(t, false)
+	})
+	t.Run("GET", func(t *testing.T) {
+		f(t, true)
+	})
 }
 
 func TestPostBasicAuthTokenResolver(t *testing.T) {
@@ -656,5 +682,133 @@ func (m testManifest) OCIManifest() []byte {
 func (m testManifest) RegisterHandler(r *http.ServeMux, name string) {
 	for _, c := range append(m.references, m.config) {
 		r.Handle(fmt.Sprintf("/v2/%s/blobs/%s", name, c.Digest()), c)
+	}
+}
+
+func newRefreshTokenServer(t testing.TB, name string, disablePOST bool, onFetchRefreshToken OnFetchRefreshToken) *refreshTokenServer {
+	return &refreshTokenServer{
+		T:                   t,
+		Name:                name,
+		DisablePOST:         disablePOST,
+		OnFetchRefreshToken: onFetchRefreshToken,
+		AccessToken:         "testAccessToken-" + name,
+		RefreshToken:        "testRefreshToken-" + name,
+		Username:            "testUser-" + name,
+		Password:            "testPassword-" + name,
+	}
+}
+
+type refreshTokenServer struct {
+	T                   testing.TB
+	Name                string
+	DisablePOST         bool
+	OnFetchRefreshToken OnFetchRefreshToken
+	AccessToken         string
+	RefreshToken        string
+	Username            string
+	Password            string
+}
+
+func (srv *refreshTokenServer) isValidAuthorizationHeader(s string) bool {
+	fields := strings.Fields(s)
+	return len(fields) == 2 && strings.ToLower(fields[0]) == "bearer" && (fields[1] == srv.RefreshToken || fields[1] == srv.AccessToken)
+}
+
+func (srv *refreshTokenServer) BasicTestFunc() func(h http.Handler) (string, ResolverOptions, func()) {
+	t := srv.T
+	return func(h http.Handler) (string, ResolverOptions, func()) {
+		wrapped := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/token" {
+				if !srv.isValidAuthorizationHeader(r.Header.Get("Authorization")) {
+					realm := fmt.Sprintf("https://%s/token", r.Host)
+					wwwAuthenticateHeader := fmt.Sprintf("Bearer realm=%q,service=registry,scope=\"repository:%s:pull\"", realm, srv.Name)
+					rw.Header().Set("WWW-Authenticate", wwwAuthenticateHeader)
+					rw.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+				h.ServeHTTP(rw, r)
+				return
+			}
+			switch r.Method {
+			case http.MethodGet: // https://docs.docker.com/registry/spec/auth/token/#requesting-a-token
+				u, p, ok := r.BasicAuth()
+				if !ok || u != srv.Username || p != srv.Password {
+					rw.WriteHeader(http.StatusForbidden)
+					return
+				}
+				var resp auth.FetchTokenResponse
+				resp.Token = srv.AccessToken
+				resp.AccessToken = srv.AccessToken // alias of Token
+				query := r.URL.Query()
+				switch query.Get("offline_token") {
+				case "true":
+					resp.RefreshToken = srv.RefreshToken
+				case "false", "":
+				default:
+					rw.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				b, err := json.Marshal(resp)
+				if err != nil {
+					rw.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				rw.WriteHeader(http.StatusOK)
+				rw.Header().Set("Content-Type", "application/json")
+				t.Logf("GET mode: returning JSON %q, for query %+v", string(b), query)
+				rw.Write(b)
+			case http.MethodPost: // https://docs.docker.com/registry/spec/auth/oauth/#getting-a-token
+				if srv.DisablePOST {
+					rw.WriteHeader(http.StatusMethodNotAllowed)
+					return
+				}
+				r.ParseForm()
+				pf := r.PostForm
+				if pf.Get("grant_type") != "password" {
+					rw.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				if pf.Get("username") != srv.Username || pf.Get("password") != srv.Password {
+					rw.WriteHeader(http.StatusForbidden)
+					return
+				}
+				var resp auth.OAuthTokenResponse
+				resp.AccessToken = srv.AccessToken
+				switch pf.Get("access_type") {
+				case "offline":
+					resp.RefreshToken = srv.RefreshToken
+				case "online", "":
+				default:
+					rw.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				b, err := json.Marshal(resp)
+				if err != nil {
+					rw.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				rw.WriteHeader(http.StatusOK)
+				rw.Header().Set("Content-Type", "application/json")
+				t.Logf("POST mode: returning JSON %q, for form %+v", string(b), pf)
+				rw.Write(b)
+			default:
+				rw.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+		})
+
+		base, options, close := tlsServer(wrapped)
+		authorizer := NewDockerAuthorizer(
+			WithAuthClient(options.Client),
+			WithAuthCreds(func(string) (string, string, error) {
+				return srv.Username, srv.Password, nil
+			}),
+			WithFetchRefreshToken(srv.OnFetchRefreshToken),
+		)
+		options.Hosts = ConfigureDefaultRegistries(
+			WithClient(options.Client),
+			WithAuthorizer(authorizer),
+		)
+		return base, options, close
 	}
 }
