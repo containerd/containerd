@@ -63,7 +63,8 @@ type HostOptions struct {
 	DefaultTLS    *tls.Config
 	DefaultScheme string
 	// UpdateClient will be called after creating http.Client object, so clients can provide extra configuration
-	UpdateClient UpdateClientFunc
+	UpdateClient   UpdateClientFunc
+	AuthorizerOpts []docker.AuthorizerOpt
 }
 
 // ConfigureHosts creates a registry hosts function from the provided
@@ -143,6 +144,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 		if options.Credentials != nil {
 			authOpts = append(authOpts, docker.WithAuthCreds(options.Credentials))
 		}
+		authOpts = append(authOpts, options.AuthorizerOpts...)
 		authorizer := docker.NewDockerAuthorizer(authOpts...)
 
 		rhosts := make([]docker.RegistryHost, len(hosts))
