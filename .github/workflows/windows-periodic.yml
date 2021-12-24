@@ -10,9 +10,9 @@ on:
         required: true
       AZURE_CREDS:
         required: true
-      GCP_PROJECT_ID:
+      GCP_SERVICE_ACCOUNT:
         required: true
-      GCP_SA_KEY:
+      GCP_WORKLOAD_IDENTITY_PROVIDER:
         required: true
 
 env:
@@ -30,6 +30,10 @@ env:
 
 jobs:
   winIntegration:
+    # NOTE: the following permissions are required by `google-github-actions/auth`:
+    permissions:
+      contents: 'read'
+      id-token: 'write'
     strategy:
       matrix:
         win_ver: [ltsc2019, ltsc2022]
@@ -197,16 +201,18 @@ jobs:
       - name: AssignGcpCreds
         id: AssignGcpCreds
         run: |
-          echo '::set-output name=GCP_PROJECT_ID::${{ secrets.GCP_PROJECT_ID }}'
-          echo '::set-output name=GCP_SA_KEY::${{ secrets.GCP_SA_KEY }}'
+          echo '::set-output name=GCP_SERVICE_ACCOUNT::${{ secrets.GCP_SERVICE_ACCOUNT }}'
+          echo '::set-output name=GCP_WORKLOAD_IDENTITY_PROVIDER::${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}'
 
-      - name: SetUpCloudSDK
-        if: steps.AssignGcpCreds.outputs.GCP_PROJECT_ID && steps.AssignGcpCreds.outputs.GCP_SA_KEY
-        uses: google-github-actions/setup-gcloud@master
+      - name: AuthGcp
+        uses: google-github-actions/auth@v0
+        if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
         with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
-          export_default_credentials: true
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: SetUpGcpSdk
+        uses: google-github-actions/setup-gcloud@master
 
       - name: UploadArtifacts
         if: steps.AssignGcpCreds.outputs.GCP_PROJECT_ID && steps.AssignGcpCreds.outputs.GCP_SA_KEY
