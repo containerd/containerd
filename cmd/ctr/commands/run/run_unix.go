@@ -79,10 +79,6 @@ var platformRunFlags = []cli.Flag{
 		Usage: "set the cpu shares",
 		Value: 1024,
 	},
-	cli.BoolFlag{
-		Name:  "cni",
-		Usage: "enable cni networking for the container",
-	},
 }
 
 // NewContainer creates a new container

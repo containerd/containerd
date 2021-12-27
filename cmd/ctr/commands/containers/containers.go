@@ -27,10 +27,12 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/cmd/ctr/commands/run"
+	"github.com/containerd/containerd/cmd/ctr/commands/tasks"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/typeurl"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -58,9 +60,10 @@ var createCommand = cli.Command{
 	Flags:     append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...), commands.ContainerFlags...),
 	Action: func(context *cli.Context) error {
 		var (
-			id     string
-			ref    string
-			config = context.IsSet("config")
+			id        string
+			ref       string
+			config    = context.IsSet("config")
+			enableCNI = context.Bool("cni")
 		)
 
 		if config {
@@ -83,6 +86,20 @@ var createCommand = cli.Command{
 			return err
 		}
 		defer cancel()
+		var network *tasks.Network
+		if enableCNI {
+			if network, err = tasks.SetupNetwork(ctx, id, context); err != nil {
+				log.G(ctx).WithError(err).Errorf("setupNetwork failed")
+				return err
+			}
+
+			defer func() {
+				if err != nil {
+					network.Teardown(ctx)
+				}
+			}()
+		}
+
 		_, err = run.NewContainer(ctx, client, context)
 		if err != nil {
 			return err
@@ -183,14 +200,38 @@ var deleteCommand = cli.Command{
 	},
 }
 
+func deleteNetwork(ctx context.Context, id string, spec *specs.Spec) error {
+	network, err := tasks.LoadNetworkFromContainer(ctx, id, spec)
+	if err != nil {
+		log.G(ctx).WithError(err).Errorf("unable to load network from task %v", id)
+	} else if network != nil {
+		if err = network.Teardown(ctx); err != nil {
+			log.G(ctx).WithError(err).Errorf("unable to remove network for task %v", id)
+		}
+	}
+
+	return err
+}
+
 func deleteContainer(ctx context.Context, client *containerd.Client, id string, opts ...containerd.DeleteOpts) error {
 	container, err := client.LoadContainer(ctx, id)
 	if err != nil {
 		return err
 	}
+	deleteContainerFunc := func(container containerd.Container) error {
+		spec, err := container.Spec(ctx)
+		if err != nil {
+			return err
+		}
+		err = container.Delete(ctx, opts...)
+		if errNetwork := deleteNetwork(ctx, container.ID(), spec); errNetwork != nil {
+			log.G(ctx).WithError(errNetwork).Errorf("deleteNetwork failed")
+		}
+		return err
+	}
 	task, err := container.Task(ctx, cio.Load)
 	if err != nil {
-		return container.Delete(ctx, opts...)
+		return deleteContainerFunc(container)
 	}
 	status, err := task.Status(ctx)
 	if err != nil {
@@ -200,7 +241,7 @@ func deleteContainer(ctx context.Context, client *containerd.Client, id string, 
 		if _, err := task.Delete(ctx); err != nil {
 			return err
 		}
-		return container.Delete(ctx, opts...)
+		return deleteContainerFunc(container)
 	}
 	return fmt.Errorf("cannot delete a non stopped container: %v", status)
 
