@@ -24,6 +24,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -45,8 +46,11 @@ const abstractSocketPrefix = "\x00"
 func TestFailFastWhenConnectShim(t *testing.T) {
 	t.Parallel()
 
-	t.Run("abstract-unix-socket-v1", testFailFastWhenConnectShim(true, v1shimcli.AnonDialer))
-	t.Run("abstract-unix-socket-v2", testFailFastWhenConnectShim(true, v2shimcli.AnonDialer))
+	// abstract Unix domain sockets are only for Linux.
+	if runtime.GOOS == "linux" {
+		t.Run("abstract-unix-socket-v1", testFailFastWhenConnectShim(true, v1shimcli.AnonDialer))
+		t.Run("abstract-unix-socket-v2", testFailFastWhenConnectShim(true, v2shimcli.AnonDialer))
+	}
 	t.Run("normal-unix-socket-v1", testFailFastWhenConnectShim(false, v1shimcli.AnonDialer))
 	t.Run("normal-unix-socket-v2", testFailFastWhenConnectShim(false, v2shimcli.AnonDialer))
 }
