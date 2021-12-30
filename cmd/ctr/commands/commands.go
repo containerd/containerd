@@ -193,6 +193,10 @@ var (
 			Name:  "apparmor-profile",
 			Usage: "enable AppArmor with an existing custom profile",
 		},
+		cli.BoolFlag{
+			Name:  "cni",
+			Usage: "enable cni networking for the container",
+		},
 	}
 )
 
