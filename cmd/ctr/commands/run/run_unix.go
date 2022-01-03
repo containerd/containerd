@@ -79,10 +79,6 @@ var platformRunFlags = []cli.Flag{
 		Usage: "set the cpu shares",
 		Value: 1024,
 	},
-	cli.BoolFlag{
-		Name:  "cni",
-		Usage: "enable cni networking for the container",
-	},
 }
 
 // NewContainer creates a new container
@@ -448,4 +444,8 @@ func validNamespace(ns string) bool {
 	default:
 		return false
 	}
+}
+
+func getNetNSPath(_ gocontext.Context, task containerd.Task) (string, error) {
+	return fmt.Sprintf("/proc/%d/ns/net", task.Pid()), nil
 }
