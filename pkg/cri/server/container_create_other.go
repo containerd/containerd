@@ -23,9 +23,11 @@ import (
 	"github.com/containerd/containerd/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/pkg/cri/config"
+	customopts "github.com/containerd/containerd/pkg/cri/opts"
 )
 
 // containerMounts sets up necessary container system file mounts
@@ -47,7 +49,17 @@ func (c *criService) containerSpec(
 	extraMounts []*runtime.Mount,
 	ociRuntime config.Runtime,
 ) (_ *runtimespec.Spec, retErr error) {
-	return c.runtimeSpec(id, ociRuntime.BaseRuntimeSpec)
+	specOpts := []oci.SpecOpts{}
+	ociHooksProfile := c.config.DefaultOCIHooks
+	hooks, err := c.generateOCIHooks(ociHooksProfile)
+	if err != nil { // TODO (mikebrow): clean up prototype
+		return nil, errors.Wrapf(err, "failed to generate OCI hooks %+v", ociHooksProfile)
+	}
+	if hooks != nil {
+		specOpts = append(specOpts, customopts.WithHooks(hooks))
+	}
+
+	return c.runtimeSpec(id, ociRuntime.BaseRuntimeSpec, specOpts...)
 }
 
 func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
