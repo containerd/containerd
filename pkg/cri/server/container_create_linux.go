@@ -256,6 +256,15 @@ func (c *criService) containerSpec(
 
 	supplementalGroups := securityContext.GetSupplementalGroups()
 
+	// Get RDT class
+	rdtClass, err := c.rdtClassFromAnnotations(config.GetMetadata().GetName(), config.Annotations, sandboxConfig.Annotations)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to set RDT class")
+	}
+	if rdtClass != "" {
+		specOpts = append(specOpts, oci.WithRdt(rdtClass, "", ""))
+	}
+
 	for pKey, pValue := range getPassthroughAnnotations(sandboxConfig.Annotations,
 		ociRuntime.PodAnnotations) {
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))

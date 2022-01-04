@@ -104,6 +104,12 @@ documentation.
   - **sched_core** Core scheduling is a feature that allows only trusted tasks
     to run concurrently on cpus sharing compute resources (eg: hyperthreads on
     a core). (Default: **false**)
+- **[plugins."io.containerd.service.v1.tasks-service"]** has one option:
+  - **rdt_config_file** (Linux only) specifies path to a configuration used for
+    configuring RDT (Default: **""**). Enables support for Intel RDT, a
+    technology for cache and memory bandwidth management.
+    See https://github.com/intel/goresctrl/blob/v0.2.0/doc/rdt.md#configuration
+    for details of the configuration file format.
 
 **oom_score**
 : The out of memory (OOM) score applied to the containerd daemon process (Default: 0)
@@ -193,6 +199,8 @@ imports = ["/etc/containerd/runtime_*.toml", "./debug.toml"]
   [plugins."io.containerd.runtime-shim.v2.shim"]
     platforms = ["linux/amd64"]
     sched_core = true
+  [plugins."io.containerd.service.v1.tasks-service"]
+    rdt_config_file = "/etc/rdt-config.yaml"
 ```
 
 ## BUGS

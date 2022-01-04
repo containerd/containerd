@@ -193,6 +193,10 @@ var (
 			Name:  "apparmor-profile",
 			Usage: "enable AppArmor with an existing custom profile",
 		},
+		cli.StringFlag{
+			Name:  "rdt-class",
+			Usage: "name of the RDT class to associate the container with. Specifies a Class of Service (CLOS) for cache and memory bandwidth management.",
+		},
 	}
 )
 
