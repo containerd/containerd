@@ -86,7 +86,7 @@ func (t *Task) Namespace() string {
 }
 
 // PID of the task
-func (t *Task) PID(_ctx context.Context) (uint32, error) {
+func (t *Task) PID(_ context.Context) (uint32, error) {
 	return uint32(t.pid), nil
 }
 
