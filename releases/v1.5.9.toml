@@ -1,0 +1,20 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.5.8"
+
+pre_release = false
+
+preface = """\
+The ninth patch release for containerd 1.5 is a security release to fix CVE-2021-43816.
+
+### Notable Updates
+* **Fix unprivileged pod using 'hostPath' bypassing SELinux labels** ([GHSA-mvff-h3cj-wj9c](https://github.com/containerd/containerd/security/advisories/GHSA-mvff-h3cj-wj9c))
+* **Fix setting the "container_kvm_t" SELinux label** ([#6381](https://github.com/containerd/containerd/pull/6381))
+
+See the changelog for complete list of changes"""
