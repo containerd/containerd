@@ -68,18 +68,20 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 		hostpath := c.getSandboxHostname(sandboxID)
 		if _, err := c.os.Stat(hostpath); err == nil {
 			mounts = append(mounts, &runtime.Mount{
-				ContainerPath: etcHostname,
-				HostPath:      hostpath,
-				Readonly:      securityContext.GetReadonlyRootfs(),
+				ContainerPath:  etcHostname,
+				HostPath:       hostpath,
+				Readonly:       securityContext.GetReadonlyRootfs(),
+				SelinuxRelabel: true,
 			})
 		}
 	}
 
 	if !isInCRIMounts(etcHosts, config.GetMounts()) {
 		mounts = append(mounts, &runtime.Mount{
-			ContainerPath: etcHosts,
-			HostPath:      c.getSandboxHosts(sandboxID),
-			Readonly:      securityContext.GetReadonlyRootfs(),
+			ContainerPath:  etcHosts,
+			HostPath:       c.getSandboxHosts(sandboxID),
+			Readonly:       securityContext.GetReadonlyRootfs(),
+			SelinuxRelabel: true,
 		})
 	}
 
@@ -87,9 +89,10 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 	// TODO: Need to figure out whether we should always mount it as read-only
 	if !isInCRIMounts(resolvConfPath, config.GetMounts()) {
 		mounts = append(mounts, &runtime.Mount{
-			ContainerPath: resolvConfPath,
-			HostPath:      c.getResolvPath(sandboxID),
-			Readonly:      securityContext.GetReadonlyRootfs(),
+			ContainerPath:  resolvConfPath,
+			HostPath:       c.getResolvPath(sandboxID),
+			Readonly:       securityContext.GetReadonlyRootfs(),
+			SelinuxRelabel: true,
 		})
 	}
 
@@ -192,7 +195,7 @@ func (c *criService) containerSpec(
 		}
 	}()
 
-	specOpts = append(specOpts, customopts.WithMounts(c.os, config, extraMounts, mountLabel), customopts.WithRelabeledContainerMounts(mountLabel))
+	specOpts = append(specOpts, customopts.WithMounts(c.os, config, extraMounts, mountLabel))
 
 	if !c.config.DisableProcMount {
 		// Change the default masked/readonly paths to empty slices
