@@ -21,7 +21,7 @@ support to increase overall compatibility and stability.
 * **Add runtime label to metrics** ([#5744](https://github.com/containerd/containerd/pull/5744))
 * **Cleanup task delete logic in v2 shim** ([#5813](https://github.com/containerd/containerd/pull/5813))
 * **Add support for shim plugins** ([#5817](https://github.com/containerd/containerd/pull/5817))
-* **Split task manager into shim and task manager** ([#5918](https://github.com/containerd/containerd/pull/5918))
+* **Decouple shim and task manager** ([#5918](https://github.com/containerd/containerd/pull/5918))
 * **Add runc shim support for core scheduling** ([#6011](https://github.com/containerd/containerd/pull/6011))
 * **Update shim client connect attempt to fail fast when shim errors** ([#6031](https://github.com/containerd/containerd/pull/6031))
 * **Add support for absolute path to shim binaries** ([#6206](https://github.com/containerd/containerd/pull/6206))
@@ -34,6 +34,7 @@ support to increase overall compatibility and stability.
 #### CRI
 
 * **Add CNI configuration based on runtime class** ([#4695](https://github.com/containerd/containerd/pull/4695))
+* **Add support for Intel RDT** ([#5439](https://github.com/containerd/containerd/pull/5439))
 * **Add support for CRI v1 and v1alpha in parallel** ([#5619](https://github.com/containerd/containerd/pull/5619))
 * **Add support for unified resources field for cgroups v2** ([#5627](https://github.com/containerd/containerd/pull/5627))
 * **Add IP preference configuration for reporting pod IP** ([#5964](https://github.com/containerd/containerd/pull/5964))
@@ -41,6 +42,7 @@ support to increase overall compatibility and stability.
 * **Add sandbox and container latency metrics** ([#6111](https://github.com/containerd/containerd/pull/6111))
 * **Add namespace to ttrpc and grpc plugin connections** ([#6130](https://github.com/containerd/containerd/pull/6130))
 * **Add option to allow ping sockets and privileged ports with no capabilities** ([#6170](https://github.com/containerd/containerd/pull/6170))
+* **Add support for configuring swap** ([#6320](https://github.com/containerd/containerd/pull/6320))
 
 #### Other
 
@@ -49,6 +51,7 @@ support to increase overall compatibility and stability.
 * **Add xfs support for devicemapper snapshotter** ([#5610](https://github.com/containerd/containerd/pull/5610))
 * **Add metric exposing build version and revision** ([#5965](https://github.com/containerd/containerd/pull/5965))
 * **Add OpenTelemetry trace injection to grpc client** ([#5992](https://github.com/containerd/containerd/pull/5992))
+* **Add support for custom fs options in devmapper snapshotter** ([#6122](https://github.com/containerd/containerd/pull/6122))
 
 #### Client
 
