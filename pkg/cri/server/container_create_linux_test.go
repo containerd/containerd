@@ -452,19 +452,22 @@ func TestContainerMounts(t *testing.T) {
 			},
 			expectedMounts: []*runtime.Mount{
 				{
-					ContainerPath: "/etc/hostname",
-					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"),
-					Readonly:      true,
+					ContainerPath:  "/etc/hostname",
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"),
+					Readonly:       true,
+					SelinuxRelabel: true,
 				},
 				{
-					ContainerPath: "/etc/hosts",
-					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
-					Readonly:      true,
+					ContainerPath:  "/etc/hosts",
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
+					Readonly:       true,
+					SelinuxRelabel: true,
 				},
 				{
-					ContainerPath: resolvConfPath,
-					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
-					Readonly:      true,
+					ContainerPath:  resolvConfPath,
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
+					Readonly:       true,
+					SelinuxRelabel: true,
 				},
 				{
 					ContainerPath:  "/dev/shm",
@@ -478,19 +481,22 @@ func TestContainerMounts(t *testing.T) {
 			securityContext: &runtime.LinuxContainerSecurityContext{},
 			expectedMounts: []*runtime.Mount{
 				{
-					ContainerPath: "/etc/hostname",
-					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"),
-					Readonly:      false,
+					ContainerPath:  "/etc/hostname",
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"),
+					Readonly:       false,
+					SelinuxRelabel: true,
 				},
 				{
-					ContainerPath: "/etc/hosts",
-					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
-					Readonly:      false,
+					ContainerPath:  "/etc/hosts",
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
+					Readonly:       false,
+					SelinuxRelabel: true,
 				},
 				{
-					ContainerPath: resolvConfPath,
-					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
-					Readonly:      false,
+					ContainerPath:  resolvConfPath,
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
+					Readonly:       false,
+					SelinuxRelabel: true,
 				},
 				{
 					ContainerPath:  "/dev/shm",
@@ -506,19 +512,22 @@ func TestContainerMounts(t *testing.T) {
 			},
 			expectedMounts: []*runtime.Mount{
 				{
-					ContainerPath: "/etc/hostname",
-					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"),
-					Readonly:      false,
+					ContainerPath:  "/etc/hostname",
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"),
+					Readonly:       false,
+					SelinuxRelabel: true,
 				},
 				{
-					ContainerPath: "/etc/hosts",
-					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
-					Readonly:      false,
+					ContainerPath:  "/etc/hosts",
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
+					Readonly:       false,
+					SelinuxRelabel: true,
 				},
 				{
-					ContainerPath: resolvConfPath,
-					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
-					Readonly:      false,
+					ContainerPath:  resolvConfPath,
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
+					Readonly:       false,
+					SelinuxRelabel: true,
 				},
 				{
 					ContainerPath: "/dev/shm",
@@ -557,14 +566,16 @@ func TestContainerMounts(t *testing.T) {
 			securityContext: &runtime.LinuxContainerSecurityContext{},
 			expectedMounts: []*runtime.Mount{
 				{
-					ContainerPath: "/etc/hosts",
-					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
-					Readonly:      false,
+					ContainerPath:  "/etc/hosts",
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
+					Readonly:       false,
+					SelinuxRelabel: true,
 				},
 				{
-					ContainerPath: resolvConfPath,
-					HostPath:      filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
-					Readonly:      false,
+					ContainerPath:  resolvConfPath,
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
+					Readonly:       false,
+					SelinuxRelabel: true,
 				},
 				{
 					ContainerPath:  "/dev/shm",
