@@ -301,6 +301,8 @@ type PluginConfig struct {
 	// and if it is not overwritten by PodSandboxConfig
 	// Note that currently default is set to disabled but target change it in future together with EnableUnprivilegedPorts
 	EnableUnprivilegedICMP bool `toml:"enable_unprivileged_icmp" json:"enableUnprivilegedICMP"`
+	// Only one attach session is permitted
+	EnableSingleAttach bool `toml:"enable_single_attach" json:"EnableSingleAttach"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming

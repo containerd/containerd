@@ -36,7 +36,8 @@ type AttachOptions struct {
 	Tty       bool
 	StdinOnce bool
 	// CloseStdin is the function to close container stdin.
-	CloseStdin func() error
+	CloseStdin         func() error
+	EnableSingleAttach bool
 }
 
 // StreamType is the type of the stream, stdout/stderr.

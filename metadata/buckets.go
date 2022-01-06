@@ -139,6 +139,7 @@ var (
 	bucketKeyRuntime     = []byte("runtime")
 	bucketKeyName        = []byte("name")
 	bucketKeyParent      = []byte("parent")
+	bucketKeyAttached    = []byte("bucketKeyAttached")
 	bucketKeyChildren    = []byte("children")
 	bucketKeyOptions     = []byte("options")
 	bucketKeySpec        = []byte("spec")

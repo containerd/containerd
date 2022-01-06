@@ -39,6 +39,8 @@ type containerStore struct {
 	db *DB
 }
 
+var EnableSingleAttach bool
+
 // NewContainerStore returns a Store backed by an underlying bolt DB
 func NewContainerStore(db *DB) containers.Store {
 	return &containerStore{
@@ -179,6 +181,9 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 		}
 		createdat := updated.CreatedAt
 		updated.ID = container.ID
+		if EnableSingleAttach {
+			updated.IsAttached = container.IsAttached
+		}
 
 		if len(fieldpaths) == 0 {
 			// only allow updates to these field on full replace.
@@ -317,6 +322,12 @@ func readContainer(container *containers.Container, bkt *bolt.Bucket) error {
 	}
 	container.Labels = labels
 
+	// If read bucketKeyAttached failed, container.IsAttached = false
+	bytesIsAttached := bkt.Get(bucketKeyAttached)
+	if string(bytesIsAttached) == "true" {
+		container.IsAttached = true
+	}
+
 	if err := boltutil.ReadTimestamps(bkt, &container.CreatedAt, &container.UpdatedAt); err != nil {
 		return err
 	}
@@ -370,6 +381,17 @@ func writeContainer(bkt *bolt.Bucket, container *containers.Container) error {
 	}
 
 	if err := boltutil.WriteAny(bkt, bucketKeySpec, container.Spec); err != nil {
+		return err
+	}
+
+	var bytesIsAttached []byte
+	if container.IsAttached {
+		bytesIsAttached = []byte("true")
+	} else {
+		bytesIsAttached = []byte("false")
+	}
+	err := bkt.Put(bucketKeyAttached, bytesIsAttached)
+	if err != nil {
 		return err
 	}
 

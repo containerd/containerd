@@ -21,6 +21,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/metadata"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"k8s.io/client-go/tools/remotecommand"
@@ -68,6 +69,7 @@ func (c *criService) attachContainer(ctx context.Context, id string, stdin io.Re
 		}
 	})
 
+	metadata.EnableSingleAttach = c.config.EnableSingleAttach
 	opts := cio.AttachOptions{
 		Stdin:     stdin,
 		Stdout:    stdout,
@@ -77,6 +79,7 @@ func (c *criService) attachContainer(ctx context.Context, id string, stdin io.Re
 		CloseStdin: func() error {
 			return task.CloseIO(ctx, containerd.WithStdinCloser)
 		},
+		EnableSingleAttach: c.config.EnableSingleAttach,
 	}
 	// TODO(random-liu): Figure out whether we need to support historical output.
 	cntr.IO.Attach(opts)
