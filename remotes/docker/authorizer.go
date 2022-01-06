@@ -37,10 +37,12 @@ type dockerAuthorizer struct {
 
 	client *http.Client
 	header http.Header
-	mu     sync.Mutex
+	mu     sync.RWMutex
 
 	// indexed by host name
 	handlers map[string]*authHandler
+
+	onFetchRefreshToken OnFetchRefreshToken
 }
 
 // NewAuthorizer creates a Docker authorizer using the provided function to
@@ -51,9 +53,10 @@ func NewAuthorizer(client *http.Client, f func(string) (string, string, error)) 
 }
 
 type authorizerConfig struct {
-	credentials func(string) (string, string, error)
-	client      *http.Client
-	header      http.Header
+	credentials         func(string) (string, string, error)
+	client              *http.Client
+	header              http.Header
+	onFetchRefreshToken OnFetchRefreshToken
 }
 
 // AuthorizerOpt configures an authorizer
@@ -80,6 +83,16 @@ func WithAuthHeader(hdr http.Header) AuthorizerOpt {
 	}
 }
 
+// OnFetchRefreshToken is called on fetching request token.
+type OnFetchRefreshToken func(ctx context.Context, refreshToken string, req *http.Request)
+
+// WithFetchRefreshToken enables fetching "refresh token" (aka "identity token", "offline token").
+func WithFetchRefreshToken(f OnFetchRefreshToken) AuthorizerOpt {
+	return func(opt *authorizerConfig) {
+		opt.onFetchRefreshToken = f
+	}
+}
+
 // NewDockerAuthorizer creates an authorizer using Docker's registry
 // authentication spec.
 // See https://docs.docker.com/registry/spec/auth/
@@ -94,10 +107,11 @@ func NewDockerAuthorizer(opts ...AuthorizerOpt) Authorizer {
 	}
 
 	return &dockerAuthorizer{
-		credentials: ao.credentials,
-		client:      ao.client,
-		header:      ao.header,
-		handlers:    make(map[string]*authHandler),
+		credentials:         ao.credentials,
+		client:              ao.client,
+		header:              ao.header,
+		handlers:            make(map[string]*authHandler),
+		onFetchRefreshToken: ao.onFetchRefreshToken,
 	}
 }
 
@@ -109,12 +123,21 @@ func (a *dockerAuthorizer) Authorize(ctx context.Context, req *http.Request) err
 		return nil
 	}
 
-	auth, err := ah.authorize(ctx)
+	auth, refreshToken, err := ah.authorize(ctx)
 	if err != nil {
 		return err
 	}
 
 	req.Header.Set("Authorization", auth)
+
+	if refreshToken != "" {
+		a.mu.RLock()
+		onFetchRefreshToken := a.onFetchRefreshToken
+		a.mu.RUnlock()
+		if onFetchRefreshToken != nil {
+			onFetchRefreshToken(ctx, refreshToken, req)
+		}
+	}
 	return nil
 }
 
@@ -161,6 +184,7 @@ func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.R
 			if err != nil {
 				return err
 			}
+			common.FetchRefreshToken = a.onFetchRefreshToken != nil
 
 			a.handlers[host] = newAuthHandler(a.client, a.header, c.Scheme, common)
 			return nil
@@ -187,8 +211,9 @@ func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.R
 // authResult is used to control limit rate.
 type authResult struct {
 	sync.WaitGroup
-	token string
-	err   error
+	token        string
+	refreshToken string
+	err          error
 }
 
 // authHandler is used to handle auth request per registry server.
@@ -220,29 +245,29 @@ func newAuthHandler(client *http.Client, hdr http.Header, scheme auth.Authentica
 	}
 }
 
-func (ah *authHandler) authorize(ctx context.Context) (string, error) {
+func (ah *authHandler) authorize(ctx context.Context) (string, string, error) {
 	switch ah.scheme {
 	case auth.BasicAuth:
 		return ah.doBasicAuth(ctx)
 	case auth.BearerAuth:
 		return ah.doBearerAuth(ctx)
 	default:
-		return "", errors.Wrapf(errdefs.ErrNotImplemented, "failed to find supported auth scheme: %s", string(ah.scheme))
+		return "", "", errors.Wrapf(errdefs.ErrNotImplemented, "failed to find supported auth scheme: %s", string(ah.scheme))
 	}
 }
 
-func (ah *authHandler) doBasicAuth(ctx context.Context) (string, error) {
+func (ah *authHandler) doBasicAuth(ctx context.Context) (string, string, error) {
 	username, secret := ah.common.Username, ah.common.Secret
 
 	if username == "" || secret == "" {
-		return "", fmt.Errorf("failed to handle basic auth because missing username or secret")
+		return "", "", fmt.Errorf("failed to handle basic auth because missing username or secret")
 	}
 
 	auth := base64.StdEncoding.EncodeToString([]byte(username + ":" + secret))
-	return fmt.Sprintf("Basic %s", auth), nil
+	return fmt.Sprintf("Basic %s", auth), "", nil
 }
 
-func (ah *authHandler) doBearerAuth(ctx context.Context) (token string, err error) {
+func (ah *authHandler) doBearerAuth(ctx context.Context) (token, refreshToken string, err error) {
 	// copy common tokenOptions
 	to := ah.common
 
@@ -255,7 +280,7 @@ func (ah *authHandler) doBearerAuth(ctx context.Context) (token string, err erro
 	if r, exist := ah.scopedTokens[scoped]; exist {
 		ah.Unlock()
 		r.Wait()
-		return r.token, r.err
+		return r.token, r.refreshToken, r.err
 	}
 
 	// only one fetch token job
@@ -266,7 +291,7 @@ func (ah *authHandler) doBearerAuth(ctx context.Context) (token string, err erro
 
 	defer func() {
 		token = fmt.Sprintf("Bearer %s", token)
-		r.token, r.err = token, err
+		r.token, r.refreshToken, r.err = token, refreshToken, err
 		r.Done()
 	}()
 
@@ -287,25 +312,25 @@ func (ah *authHandler) doBearerAuth(ctx context.Context) (token string, err erro
 				if (errStatus.StatusCode == 405 && to.Username != "") || errStatus.StatusCode == 404 || errStatus.StatusCode == 401 {
 					resp, err := auth.FetchToken(ctx, ah.client, ah.header, to)
 					if err != nil {
-						return "", err
+						return "", "", err
 					}
-					return resp.Token, nil
+					return resp.Token, resp.RefreshToken, nil
 				}
 				log.G(ctx).WithFields(logrus.Fields{
 					"status": errStatus.Status,
 					"body":   string(errStatus.Body),
 				}).Debugf("token request failed")
 			}
-			return "", err
+			return "", "", err
 		}
-		return resp.AccessToken, nil
+		return resp.AccessToken, resp.RefreshToken, nil
 	}
 	// do request anonymously
 	resp, err := auth.FetchToken(ctx, ah.client, ah.header, to)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to fetch anonymous token")
+		return "", "", errors.Wrap(err, "failed to fetch anonymous token")
 	}
-	return resp.Token, nil
+	return resp.Token, resp.RefreshToken, nil
 }
 
 func invalidAuthorization(c auth.Challenge, responses []*http.Response) error {
