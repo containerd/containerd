@@ -66,18 +66,17 @@ require (
 	golang.org/x/net v0.0.0-20211216030914-fe4d6282115f
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e
-	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20211208223120-3a66f561d7aa // indirect
 	google.golang.org/grpc v1.43.0
 	google.golang.org/protobuf v1.27.1
 	gotest.tools/v3 v3.0.3
-	k8s.io/api v0.22.0
-	k8s.io/apimachinery v0.22.1
-	k8s.io/apiserver v0.22.0
-	k8s.io/client-go v0.22.0
-	k8s.io/component-base v0.22.0
-	k8s.io/cri-api v0.23.0-alpha.4
-	k8s.io/klog/v2 v2.20.0
+	k8s.io/api v0.23.0
+	k8s.io/apimachinery v0.23.0
+	k8s.io/apiserver v0.23.0
+	k8s.io/client-go v0.23.0
+	k8s.io/component-base v0.23.0
+	k8s.io/cri-api v0.23.0
+	k8s.io/klog/v2 v2.30.0
 	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
 )
 
