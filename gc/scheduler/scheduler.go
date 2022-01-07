@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -25,7 +26,6 @@ import (
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
-	"github.com/pkg/errors"
 )
 
 // config configures the garbage collection policies.
@@ -117,7 +117,7 @@ func init() {
 
 			mdCollector, ok := md.(collector)
 			if !ok {
-				return nil, errors.Errorf("%s %T must implement collector", plugin.MetadataPlugin, md)
+				return nil, fmt.Errorf("%s %T must implement collector", plugin.MetadataPlugin, md)
 			}
 
 			m := newScheduler(mdCollector, ic.Config.(*config))

@@ -21,6 +21,7 @@ import (
 	gocontext "context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -34,7 +35,6 @@ import (
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/config"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
@@ -46,12 +46,12 @@ func passwordPrompt() (string, error) {
 	defer c.Reset()
 
 	if err := c.DisableEcho(); err != nil {
-		return "", errors.Wrap(err, "failed to disable echo")
+		return "", fmt.Errorf("failed to disable echo: %w", err)
 	}
 
 	line, _, err := bufio.NewReader(c).ReadLine()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to read line")
+		return "", fmt.Errorf("failed to read line: %w", err)
 	}
 	return string(line), nil
 }
@@ -126,7 +126,7 @@ func resolverDefaultTLS(clicontext *cli.Context) (*tls.Config, error) {
 	if tlsRootPath := clicontext.String("tlscacert"); tlsRootPath != "" {
 		tlsRootData, err := os.ReadFile(tlsRootPath)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to read %q", tlsRootPath)
+			return nil, fmt.Errorf("failed to read %q: %w", tlsRootPath, err)
 		}
 
 		config.RootCAs = x509.NewCertPool()
@@ -143,7 +143,7 @@ func resolverDefaultTLS(clicontext *cli.Context) (*tls.Config, error) {
 		}
 		keyPair, err := tls.LoadX509KeyPair(tlsCertPath, tlsKeyPath)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to load TLS client credentials (cert=%q, key=%q)", tlsCertPath, tlsKeyPath)
+			return nil, fmt.Errorf("failed to load TLS client credentials (cert=%q, key=%q): %w", tlsCertPath, tlsKeyPath, err)
 		}
 		config.Certificates = []tls.Certificate{keyPair}
 	}
@@ -161,7 +161,7 @@ type DebugTransport struct {
 func (t DebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	in, err := httputil.DumpRequest(req, true)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to dump request")
+		return nil, fmt.Errorf("failed to dump request: %w", err)
 	}
 
 	if _, err := t.writer.Write(in); err != nil {
@@ -175,7 +175,7 @@ func (t DebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	out, err := httputil.DumpResponse(resp, true)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to dump response")
+		return nil, fmt.Errorf("failed to dump response: %w", err)
 	}
 
 	if _, err := t.writer.Write(out); err != nil {

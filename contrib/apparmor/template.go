@@ -31,7 +31,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/pkg/errors"
 	exec "golang.org/x/sys/execabs"
 )
 
@@ -125,7 +124,7 @@ func loadData(name string) (*data, error) {
 	}
 	ver, err := getVersion()
 	if err != nil {
-		return nil, errors.Wrap(err, "get apparmor_parser version")
+		return nil, fmt.Errorf("get apparmor_parser version: %w", err)
 	}
 	p.Version = ver
 
@@ -152,7 +151,7 @@ func generate(p *data, o io.Writer) error {
 func load(path string) error {
 	out, err := aaParser("-Kr", path)
 	if err != nil {
-		return errors.Errorf("%s: %s", err, out)
+		return fmt.Errorf("%s: %s", err, out)
 	}
 	return nil
 }

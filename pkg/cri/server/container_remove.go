@@ -17,14 +17,14 @@
 package server
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -36,7 +36,7 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
-			return nil, errors.Wrapf(err, "an error occurred when try to find container %q", r.GetContainerId())
+			return nil, fmt.Errorf("an error occurred when try to find container %q: %w", r.GetContainerId(), err)
 		}
 		// Do not return error if container metadata doesn't exist.
 		log.G(ctx).Tracef("RemoveContainer called for container %q that does not exist", r.GetContainerId())
@@ -45,7 +45,7 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	id := container.ID
 	i, err := container.Container.Info(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "get container info")
+		return nil, fmt.Errorf("get container info: %w", err)
 	}
 
 	// Forcibly stop the containers if they are in running or unknown state
@@ -54,7 +54,7 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 		state == runtime.ContainerState_CONTAINER_UNKNOWN {
 		logrus.Infof("Forcibly stopping container %q", id)
 		if err := c.stopContainer(ctx, container, 0); err != nil {
-			return nil, errors.Wrapf(err, "failed to forcibly stop container %q", id)
+			return nil, fmt.Errorf("failed to forcibly stop container %q: %w", id, err)
 		}
 
 	}
@@ -62,7 +62,7 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	// Set removing state to prevent other start/remove operations against this container
 	// while it's being removed.
 	if err := setContainerRemoving(container); err != nil {
-		return nil, errors.Wrapf(err, "failed to set removing state for container %q", id)
+		return nil, fmt.Errorf("failed to set removing state for container %q: %w", id, err)
 	}
 	defer func() {
 		if retErr != nil {
@@ -81,25 +81,25 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	// Delete containerd container.
 	if err := container.Container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
 		if !errdefs.IsNotFound(err) {
-			return nil, errors.Wrapf(err, "failed to delete containerd container %q", id)
+			return nil, fmt.Errorf("failed to delete containerd container %q: %w", id, err)
 		}
 		log.G(ctx).Tracef("Remove called for containerd container %q that does not exist", id)
 	}
 
 	// Delete container checkpoint.
 	if err := container.Delete(); err != nil {
-		return nil, errors.Wrapf(err, "failed to delete container checkpoint for %q", id)
+		return nil, fmt.Errorf("failed to delete container checkpoint for %q: %w", id, err)
 	}
 
 	containerRootDir := c.getContainerRootDir(id)
 	if err := ensureRemoveAll(ctx, containerRootDir); err != nil {
-		return nil, errors.Wrapf(err, "failed to remove container root directory %q",
-			containerRootDir)
+		return nil, fmt.Errorf("failed to remove container root directory %q: %w",
+			containerRootDir, err)
 	}
 	volatileContainerRootDir := c.getVolatileContainerRootDir(id)
 	if err := ensureRemoveAll(ctx, volatileContainerRootDir); err != nil {
-		return nil, errors.Wrapf(err, "failed to remove volatile container root directory %q",
-			volatileContainerRootDir)
+		return nil, fmt.Errorf("failed to remove volatile container root directory %q: %w",
+			volatileContainerRootDir, err)
 	}
 
 	c.containerStore.Delete(id)

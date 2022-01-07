@@ -17,10 +17,10 @@
 package server
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/containernetworking/plugins/pkg/ns"
-	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -41,7 +41,7 @@ func (c *criService) podSandboxStats(
 	meta := sandbox.Metadata
 
 	if sandbox.Status.Get().State != sandboxstore.StateReady {
-		return nil, errors.Errorf("failed to get pod sandbox stats since sandbox container %q is not in ready state", meta.ID)
+		return nil, fmt.Errorf("failed to get pod sandbox stats since sandbox container %q is not in ready state", meta.ID)
 	}
 
 	var podSandboxStats runtime.PodSandboxStats
@@ -59,13 +59,13 @@ func (c *criService) podSandboxStats(
 
 		cpuStats, err := c.cpuContainerStats(meta.ID, true /* isSandbox */, stats, timestamp)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to obtain cpu stats")
+			return nil, fmt.Errorf("failed to obtain cpu stats: %w", err)
 		}
 		podSandboxStats.Linux.Cpu = cpuStats
 
 		memoryStats, err := c.memoryContainerStats(meta.ID, stats, timestamp)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to obtain memory stats")
+			return nil, fmt.Errorf("failed to obtain memory stats: %w", err)
 		}
 		podSandboxStats.Linux.Memory = memoryStats
 
@@ -113,7 +113,7 @@ func (c *criService) podSandboxStats(
 		listContainerStatsRequest := &runtime.ListContainerStatsRequest{Filter: &runtime.ContainerStatsFilter{PodSandboxId: meta.ID}}
 		resp, err := c.ListContainerStats(ctx, listContainerStatsRequest)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to obtain container stats during podSandboxStats call")
+			return nil, fmt.Errorf("failed to obtain container stats during podSandboxStats call: %w", err)
 		}
 		podSandboxStats.Linux.Containers = resp.GetStats()
 	}
@@ -146,29 +146,29 @@ func metricsForSandbox(sandbox sandboxstore.Sandbox) (interface{}, error) {
 	cgroupPath := sandbox.Config.GetLinux().GetCgroupParent()
 
 	if cgroupPath == "" {
-		return nil, errors.Errorf("failed to get cgroup metrics for sandbox %v because cgroupPath is empty", sandbox.ID)
+		return nil, fmt.Errorf("failed to get cgroup metrics for sandbox %v because cgroupPath is empty", sandbox.ID)
 	}
 
 	var statsx interface{}
 	if cgroups.Mode() == cgroups.Unified {
 		cg, err := cgroupsv2.LoadManager("/sys/fs/cgroup", cgroupPath)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to load sandbox cgroup: %v", cgroupPath)
+			return nil, fmt.Errorf("failed to load sandbox cgroup: %v: %w", cgroupPath, err)
 		}
 		stats, err := cg.Stat()
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get stats for cgroup: %v", cgroupPath)
+			return nil, fmt.Errorf("failed to get stats for cgroup: %v: %w", cgroupPath, err)
 		}
 		statsx = stats
 
 	} else {
 		control, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(cgroupPath))
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to load sandbox cgroup: %v", cgroupPath)
+			return nil, fmt.Errorf("failed to load sandbox cgroup %v: %w", cgroupPath, err)
 		}
 		stats, err := control.Stat(cgroups.IgnoreNotExist)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get stats for cgroup %v", cgroupPath)
+			return nil, fmt.Errorf("failed to get stats for cgroup %v: %w", cgroupPath, err)
 		}
 		statsx = stats
 	}

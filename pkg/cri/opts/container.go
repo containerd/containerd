@@ -18,6 +18,8 @@ package opts
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
@@ -30,7 +32,6 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/continuity/fs"
-	"github.com/pkg/errors"
 )
 
 // WithNewSnapshot wraps `containerd.WithNewSnapshot` so that if creating the
@@ -44,7 +45,7 @@ func WithNewSnapshot(id string, i containerd.Image, opts ...snapshots.Opt) conta
 			}
 
 			if err := i.Unpack(ctx, c.Snapshotter); err != nil {
-				return errors.Wrap(err, "error unpacking image")
+				return fmt.Errorf("error unpacking image: %w", err)
 			}
 			return f(ctx, client, c)
 		}
@@ -102,7 +103,7 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 		} else {
 			mountPaths = append(mountPaths, root)
 			if err := mount.All(mounts, root); err != nil {
-				return errors.Wrap(err, "failed to mount")
+				return fmt.Errorf("failed to mount: %w", err)
 			}
 			defer unmounter(root)
 		}
@@ -117,10 +118,10 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 						// Skip copying directory if it does not exist.
 						continue
 					}
-					return errors.Wrap(err, "stat volume in rootfs")
+					return fmt.Errorf("stat volume in rootfs: %w", err)
 				}
 				if err := copyExistingContents(src, host); err != nil {
-					return errors.Wrap(err, "taking runtime copy of volume")
+					return fmt.Errorf("taking runtime copy of volume: %w", err)
 				}
 			}
 		}
@@ -136,7 +137,7 @@ func copyExistingContents(source, destination string) error {
 		return err
 	}
 	if len(dstList) != 0 {
-		return errors.Errorf("volume at %q is not initially empty", destination)
+		return fmt.Errorf("volume at %q is not initially empty", destination)
 	}
 	return fs.CopyDir(destination, source, fs.WithXAttrExclude("security.selinux"))
 }

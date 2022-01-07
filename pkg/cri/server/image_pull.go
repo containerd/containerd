@@ -40,7 +40,6 @@ import (
 	"github.com/containerd/imgcrypt"
 	"github.com/containerd/imgcrypt/images/encryption"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -93,7 +92,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	imageRef := r.GetImage().GetImage()
 	namedRef, err := distribution.ParseDockerRef(imageRef)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse image reference %q", imageRef)
+		return nil, fmt.Errorf("failed to parse image reference %q: %w", imageRef, err)
 	}
 	ref := namedRef.String()
 	if ref != imageRef {
@@ -138,12 +137,12 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 
 	image, err := c.client.Pull(ctx, ref, pullOpts...)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to pull and unpack image %q", ref)
+		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
 	}
 
 	configDesc, err := image.Config(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "get image config descriptor")
+		return nil, fmt.Errorf("get image config descriptor: %w", err)
 	}
 	imageID := configDesc.Digest.String()
 
@@ -153,13 +152,13 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 			continue
 		}
 		if err := c.createImageReference(ctx, r, image.Target()); err != nil {
-			return nil, errors.Wrapf(err, "failed to create image reference %q", r)
+			return nil, fmt.Errorf("failed to create image reference %q: %w", r, err)
 		}
 		// Update image store to reflect the newest state in containerd.
 		// No need to use `updateImage`, because the image reference must
 		// have been managed by the cri plugin.
 		if err := c.imageStore.Update(ctx, r); err != nil {
-			return nil, errors.Wrapf(err, "failed to update image store %q", r)
+			return nil, fmt.Errorf("failed to update image store %q: %w", r, err)
 		}
 	}
 
@@ -182,7 +181,7 @@ func ParseAuth(auth *runtime.AuthConfig, host string) (string, string, error) {
 		// Do not return the auth info when server address doesn't match.
 		u, err := url.Parse(auth.ServerAddress)
 		if err != nil {
-			return "", "", errors.Wrap(err, "parse server address")
+			return "", "", fmt.Errorf("parse server address: %w", err)
 		}
 		if host != u.Host {
 			return "", "", nil
@@ -203,7 +202,7 @@ func ParseAuth(auth *runtime.AuthConfig, host string) (string, string, error) {
 		}
 		fields := strings.SplitN(string(decoded), ":", 2)
 		if len(fields) != 2 {
-			return "", "", errors.Errorf("invalid decoded auth: %q", decoded)
+			return "", "", fmt.Errorf("invalid decoded auth: %q", decoded)
 		}
 		user, passwd := fields[0], fields[1]
 		return user, strings.Trim(passwd, "\x00"), nil
@@ -243,31 +242,31 @@ func (c *criService) createImageReference(ctx context.Context, name string, desc
 func (c *criService) updateImage(ctx context.Context, r string) error {
 	img, err := c.client.GetImage(ctx, r)
 	if err != nil && !errdefs.IsNotFound(err) {
-		return errors.Wrap(err, "get image by reference")
+		return fmt.Errorf("get image by reference: %w", err)
 	}
 	if err == nil && img.Labels()[imageLabelKey] != imageLabelValue {
 		// Make sure the image has the image id as its unique
 		// identifier that references the image in its lifetime.
 		configDesc, err := img.Config(ctx)
 		if err != nil {
-			return errors.Wrap(err, "get image id")
+			return fmt.Errorf("get image id: %w", err)
 		}
 		id := configDesc.Digest.String()
 		if err := c.createImageReference(ctx, id, img.Target()); err != nil {
-			return errors.Wrapf(err, "create image id reference %q", id)
+			return fmt.Errorf("create image id reference %q: %w", id, err)
 		}
 		if err := c.imageStore.Update(ctx, id); err != nil {
-			return errors.Wrapf(err, "update image store for %q", id)
+			return fmt.Errorf("update image store for %q: %w", id, err)
 		}
 		// The image id is ready, add the label to mark the image as managed.
 		if err := c.createImageReference(ctx, r, img.Target()); err != nil {
-			return errors.Wrap(err, "create managed label")
+			return fmt.Errorf("create managed label: %w", err)
 		}
 	}
 	// If the image is not found, we should continue updating the cache,
 	// so that the image can be removed from the cache.
 	if err := c.imageStore.Update(ctx, r); err != nil {
-		return errors.Wrapf(err, "update image store for %q", r)
+		return fmt.Errorf("update image store for %q: %w", r, err)
 	}
 	return nil
 }
@@ -280,15 +279,15 @@ func (c *criService) getTLSConfig(registryTLSConfig criconfig.TLSConfig) (*tls.C
 		err       error
 	)
 	if registryTLSConfig.CertFile != "" && registryTLSConfig.KeyFile == "" {
-		return nil, errors.Errorf("cert file %q was specified, but no corresponding key file was specified", registryTLSConfig.CertFile)
+		return nil, fmt.Errorf("cert file %q was specified, but no corresponding key file was specified", registryTLSConfig.CertFile)
 	}
 	if registryTLSConfig.CertFile == "" && registryTLSConfig.KeyFile != "" {
-		return nil, errors.Errorf("key file %q was specified, but no corresponding cert file was specified", registryTLSConfig.KeyFile)
+		return nil, fmt.Errorf("key file %q was specified, but no corresponding cert file was specified", registryTLSConfig.KeyFile)
 	}
 	if registryTLSConfig.CertFile != "" && registryTLSConfig.KeyFile != "" {
 		cert, err = tls.LoadX509KeyPair(registryTLSConfig.CertFile, registryTLSConfig.KeyFile)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to load cert file")
+			return nil, fmt.Errorf("failed to load cert file: %w", err)
 		}
 		if len(cert.Certificate) != 0 {
 			tlsConfig.Certificates = []tls.Certificate{cert}
@@ -299,11 +298,11 @@ func (c *criService) getTLSConfig(registryTLSConfig criconfig.TLSConfig) (*tls.C
 	if registryTLSConfig.CAFile != "" {
 		caCertPool, err := x509.SystemCertPool()
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to get system cert pool")
+			return nil, fmt.Errorf("failed to get system cert pool: %w", err)
 		}
 		caCert, err := os.ReadFile(registryTLSConfig.CAFile)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to load CA file")
+			return nil, fmt.Errorf("failed to load CA file: %w", err)
 		}
 		caCertPool.AppendCertsFromPEM(caCert)
 		tlsConfig.RootCAs = caCertPool
@@ -354,12 +353,12 @@ func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig
 
 		endpoints, err := c.registryEndpoints(host)
 		if err != nil {
-			return nil, errors.Wrap(err, "get registry endpoints")
+			return nil, fmt.Errorf("get registry endpoints: %w", err)
 		}
 		for _, e := range endpoints {
 			u, err := url.Parse(e)
 			if err != nil {
-				return nil, errors.Wrapf(err, "parse registry endpoint %q from mirrors", e)
+				return nil, fmt.Errorf("parse registry endpoint %q from mirrors: %w", e, err)
 			}
 
 			var (
@@ -371,7 +370,7 @@ func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig
 			if config.TLS != nil {
 				transport.TLSClientConfig, err = c.getTLSConfig(*config.TLS)
 				if err != nil {
-					return nil, errors.Wrapf(err, "get TLSConfig for registry %q", e)
+					return nil, fmt.Errorf("get TLSConfig for registry %q: %w", e, err)
 				}
 			} else if isLocalHost(host) && u.Scheme == "http" {
 				// Skipping TLS verification for localhost
@@ -457,19 +456,19 @@ func (c *criService) registryEndpoints(host string) ([]string, error) {
 	}
 	defaultHost, err := docker.DefaultHost(host)
 	if err != nil {
-		return nil, errors.Wrap(err, "get default host")
+		return nil, fmt.Errorf("get default host: %w", err)
 	}
 	for i := range endpoints {
 		en, err := addDefaultScheme(endpoints[i])
 		if err != nil {
-			return nil, errors.Wrap(err, "parse endpoint url")
+			return nil, fmt.Errorf("parse endpoint url: %w", err)
 		}
 		endpoints[i] = en
 	}
 	for _, e := range endpoints {
 		u, err := url.Parse(e)
 		if err != nil {
-			return nil, errors.Wrap(err, "parse endpoint url")
+			return nil, fmt.Errorf("parse endpoint url: %w", err)
 		}
 		if u.Host == host {
 			// Do not add default if the endpoint already exists.

@@ -19,6 +19,7 @@ package containerd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -33,7 +34,6 @@ import (
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -399,7 +399,7 @@ func (i *image) getLayers(ctx context.Context, platform platforms.MatchComparer,
 	cs := i.ContentStore()
 	diffIDs, err := i.i.RootFS(ctx, cs, platform)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to resolve rootfs")
+		return nil, fmt.Errorf("failed to resolve rootfs: %w", err)
 	}
 	if len(diffIDs) != len(manifest.Layers) {
 		return nil, errors.New("mismatched image rootfs and manifest layers")

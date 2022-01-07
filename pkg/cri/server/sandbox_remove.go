@@ -17,13 +17,13 @@
 package server
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -36,8 +36,8 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
-			return nil, errors.Wrapf(err, "an error occurred when try to find sandbox %q",
-				r.GetPodSandboxId())
+			return nil, fmt.Errorf("an error occurred when try to find sandbox %q: %w",
+				r.GetPodSandboxId(), err)
 		}
 		// Do not return error if the id doesn't exist.
 		log.G(ctx).Tracef("RemovePodSandbox called for sandbox %q that does not exist",
@@ -52,16 +52,16 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	// This can happen if the task process associated with the Pod died or it was killed.
 	logrus.Infof("Forcibly stopping sandbox %q", id)
 	if err := c.stopPodSandbox(ctx, sandbox); err != nil {
-		return nil, errors.Wrapf(err, "failed to forcibly stop sandbox %q", id)
+		return nil, fmt.Errorf("failed to forcibly stop sandbox %q: %w", id, err)
 	}
 
 	// Return error if sandbox network namespace is not closed yet.
 	if sandbox.NetNS != nil {
 		nsPath := sandbox.NetNS.GetPath()
 		if closed, err := sandbox.NetNS.Closed(); err != nil {
-			return nil, errors.Wrapf(err, "failed to check sandbox network namespace %q closed", nsPath)
+			return nil, fmt.Errorf("failed to check sandbox network namespace %q closed: %w", nsPath, err)
 		} else if !closed {
-			return nil, errors.Errorf("sandbox network namespace %q is not fully closed", nsPath)
+			return nil, fmt.Errorf("sandbox network namespace %q is not fully closed", nsPath)
 		}
 	}
 
@@ -77,26 +77,26 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 		}
 		_, err = c.RemoveContainer(ctx, &runtime.RemoveContainerRequest{ContainerId: cntr.ID})
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to remove container %q", cntr.ID)
+			return nil, fmt.Errorf("failed to remove container %q: %w", cntr.ID, err)
 		}
 	}
 
 	// Cleanup the sandbox root directories.
 	sandboxRootDir := c.getSandboxRootDir(id)
 	if err := ensureRemoveAll(ctx, sandboxRootDir); err != nil {
-		return nil, errors.Wrapf(err, "failed to remove sandbox root directory %q",
-			sandboxRootDir)
+		return nil, fmt.Errorf("failed to remove sandbox root directory %q: %w",
+			sandboxRootDir, err)
 	}
 	volatileSandboxRootDir := c.getVolatileSandboxRootDir(id)
 	if err := ensureRemoveAll(ctx, volatileSandboxRootDir); err != nil {
-		return nil, errors.Wrapf(err, "failed to remove volatile sandbox root directory %q",
-			volatileSandboxRootDir)
+		return nil, fmt.Errorf("failed to remove volatile sandbox root directory %q: %w",
+			volatileSandboxRootDir, err)
 	}
 
 	// Delete sandbox container.
 	if err := sandbox.Container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
 		if !errdefs.IsNotFound(err) {
-			return nil, errors.Wrapf(err, "failed to delete sandbox container %q", id)
+			return nil, fmt.Errorf("failed to delete sandbox container %q: %w", id, err)
 		}
 		log.G(ctx).Tracef("Remove called for sandbox container %q that does not exist", id)
 	}

@@ -21,6 +21,7 @@ package shim
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -29,7 +30,6 @@ import (
 
 	"github.com/containerd/containerd/sys/reaper"
 	"github.com/containerd/fifo"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
@@ -60,7 +60,7 @@ func serveListener(path string) (net.Listener, error) {
 		path = "[inherited from parent]"
 	} else {
 		if len(path) > socketPathLimit {
-			return nil, errors.Errorf("%q: unix socket path too long (> %d)", path, socketPathLimit)
+			return nil, fmt.Errorf("%q: unix socket path too long (> %d)", path, socketPathLimit)
 		}
 		l, err = net.Listen("unix", path)
 	}

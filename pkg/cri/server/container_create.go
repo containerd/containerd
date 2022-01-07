@@ -17,6 +17,8 @@
 package server
 
 import (
+	"errors"
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -30,7 +32,6 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	selinux "github.com/opencontainers/selinux/go-selinux"
-	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -53,12 +54,12 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	sandboxConfig := r.GetSandboxConfig()
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to find sandbox id %q", r.GetPodSandboxId())
+		return nil, fmt.Errorf("failed to find sandbox id %q: %w", r.GetPodSandboxId(), err)
 	}
 	sandboxID := sandbox.ID
 	s, err := sandbox.Container.Task(ctx, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get sandbox container task")
+		return nil, fmt.Errorf("failed to get sandbox container task: %w", err)
 	}
 	sandboxPid := s.Pid()
 
@@ -74,7 +75,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	name := makeContainerName(metadata, sandboxConfig.GetMetadata())
 	log.G(ctx).Debugf("Generated id %q for container %q", id, name)
 	if err = c.containerNameIndex.Reserve(name, id); err != nil {
-		return nil, errors.Wrapf(err, "failed to reserve container name %q", name)
+		return nil, fmt.Errorf("failed to reserve container name %q: %w", name, err)
 	}
 	defer func() {
 		// Release the name if the function returns with an error.
@@ -95,25 +96,25 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	// been pulled before creating the container, so do not ensure the image.
 	image, err := c.localResolve(config.GetImage().GetImage())
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to resolve image %q", config.GetImage().GetImage())
+		return nil, fmt.Errorf("failed to resolve image %q: %w", config.GetImage().GetImage(), err)
 	}
 	containerdImage, err := c.toContainerdImage(ctx, image)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get image from containerd %q", image.ID)
+		return nil, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
 	}
 
 	start := time.Now()
 	// Run container using the same runtime with sandbox.
 	sandboxInfo, err := sandbox.Container.Info(ctx)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get sandbox %q info", sandboxID)
+		return nil, fmt.Errorf("failed to get sandbox %q info: %w", sandboxID, err)
 	}
 
 	// Create container root directory.
 	containerRootDir := c.getContainerRootDir(id)
 	if err = c.os.MkdirAll(containerRootDir, 0755); err != nil {
-		return nil, errors.Wrapf(err, "failed to create container root directory %q",
-			containerRootDir)
+		return nil, fmt.Errorf("failed to create container root directory %q: %w",
+			containerRootDir, err)
 	}
 	defer func() {
 		if retErr != nil {
@@ -126,8 +127,8 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}()
 	volatileContainerRootDir := c.getVolatileContainerRootDir(id)
 	if err = c.os.MkdirAll(volatileContainerRootDir, 0755); err != nil {
-		return nil, errors.Wrapf(err, "failed to create volatile container root directory %q",
-			volatileContainerRootDir)
+		return nil, fmt.Errorf("failed to create volatile container root directory %q: %w",
+			volatileContainerRootDir, err)
 	}
 	defer func() {
 		if retErr != nil {
@@ -152,14 +153,14 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	ociRuntime, err := c.getSandboxRuntime(sandboxConfig, sandbox.Metadata.RuntimeHandler)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get sandbox runtime")
+		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
 	log.G(ctx).Debugf("Use OCI runtime %+v for sandbox %q and container %q", ociRuntime, sandboxID, id)
 
 	spec, err := c.containerSpec(id, sandboxID, sandboxPid, sandbox.NetNSPath, containerName, containerdImage.Name(), config, sandboxConfig,
 		&image.ImageSpec.Config, append(mounts, volumeMounts...), ociRuntime)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to generate container %q spec", id)
+		return nil, fmt.Errorf("failed to generate container %q spec: %w", id, err)
 	}
 
 	meta.ProcessLabel = spec.Process.SelinuxLabel
@@ -216,7 +217,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	containerIO, err := cio.NewContainerIO(id,
 		cio.WithNewFIFOs(volatileContainerRootDir, config.GetTty(), config.GetStdin()))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create container io")
+		return nil, fmt.Errorf("failed to create container io: %w", err)
 	}
 	defer func() {
 		if retErr != nil {
@@ -228,14 +229,14 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	specOpts, err := c.containerSpecOpts(config, &image.ImageSpec.Config)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get container spec opts")
+		return nil, fmt.Errorf("failed to get container spec opts: %w", err)
 	}
 
 	containerLabels := buildLabels(config.Labels, image.ImageSpec.Config.Labels, containerKindContainer)
 
 	runtimeOptions, err := getRuntimeOptions(sandboxInfo)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get runtime options")
+		return nil, fmt.Errorf("failed to get runtime options: %w", err)
 	}
 	opts = append(opts,
 		containerd.WithSpec(spec, specOpts...),
@@ -244,7 +245,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		containerd.WithContainerExtension(containerMetadataExtension, &meta))
 	var cntr containerd.Container
 	if cntr, err = c.client.NewContainer(ctx, id, opts...); err != nil {
-		return nil, errors.Wrap(err, "failed to create containerd container")
+		return nil, fmt.Errorf("failed to create containerd container: %w", err)
 	}
 	defer func() {
 		if retErr != nil {
@@ -263,7 +264,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		containerstore.WithContainerIO(containerIO),
 	)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create internal container object for %q", id)
+		return nil, fmt.Errorf("failed to create internal container object for %q: %w", id, err)
 	}
 	defer func() {
 		if retErr != nil {
@@ -276,7 +277,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	// Add container into container store.
 	if err := c.containerStore.Add(container); err != nil {
-		return nil, errors.Wrapf(err, "failed to add container %q into store", id)
+		return nil, fmt.Errorf("failed to add container %q into store: %w", id, err)
 	}
 
 	containerCreateTimer.WithValues(ociRuntime.Type).UpdateSince(start)
@@ -321,19 +322,19 @@ func (c *criService) runtimeSpec(id string, baseSpecFile string, opts ...oci.Spe
 	if baseSpecFile != "" {
 		baseSpec, ok := c.baseOCISpecs[baseSpecFile]
 		if !ok {
-			return nil, errors.Errorf("can't find base OCI spec %q", baseSpecFile)
+			return nil, fmt.Errorf("can't find base OCI spec %q", baseSpecFile)
 		}
 
 		spec := oci.Spec{}
 		if err := util.DeepCopy(&spec, &baseSpec); err != nil {
-			return nil, errors.Wrap(err, "failed to clone OCI spec")
+			return nil, fmt.Errorf("failed to clone OCI spec: %w", err)
 		}
 
 		// Fix up cgroups path
 		applyOpts := append([]oci.SpecOpts{oci.WithNamespacedCgroup()}, opts...)
 
 		if err := oci.ApplyOpts(ctx, nil, container, &spec, applyOpts...); err != nil {
-			return nil, errors.Wrap(err, "failed to apply OCI options")
+			return nil, fmt.Errorf("failed to apply OCI options: %w", err)
 		}
 
 		return &spec, nil
@@ -341,7 +342,7 @@ func (c *criService) runtimeSpec(id string, baseSpecFile string, opts ...oci.Spe
 
 	spec, err := oci.GenerateSpec(ctx, nil, container, opts...)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate spec")
+		return nil, fmt.Errorf("failed to generate spec: %w", err)
 	}
 
 	return spec, nil

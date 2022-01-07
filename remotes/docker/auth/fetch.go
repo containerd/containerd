@@ -19,6 +19,8 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -27,7 +29,6 @@ import (
 	"github.com/containerd/containerd/log"
 	remoteserrors "github.com/containerd/containerd/remotes/errors"
 	"github.com/containerd/containerd/version"
-	"github.com/pkg/errors"
 	"golang.org/x/net/context/ctxhttp"
 )
 
@@ -46,7 +47,7 @@ func GenerateTokenOptions(ctx context.Context, host, username, secret string, c 
 
 	realmURL, err := url.Parse(realm)
 	if err != nil {
-		return TokenOptions{}, errors.Wrap(err, "invalid token auth challenge realm")
+		return TokenOptions{}, fmt.Errorf("invalid token auth challenge realm: %w", err)
 	}
 
 	to := TokenOptions{
@@ -133,18 +134,18 @@ func FetchTokenWithOAuth(ctx context.Context, client *http.Client, headers http.
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		return nil, errors.WithStack(remoteserrors.NewUnexpectedStatusErr(resp))
+		return nil, remoteserrors.NewUnexpectedStatusErr(resp)
 	}
 
 	decoder := json.NewDecoder(resp.Body)
 
 	var tr OAuthTokenResponse
 	if err = decoder.Decode(&tr); err != nil {
-		return nil, errors.Wrap(err, "unable to decode token response")
+		return nil, fmt.Errorf("unable to decode token response: %w", err)
 	}
 
 	if tr.AccessToken == "" {
-		return nil, errors.WithStack(ErrNoToken)
+		return nil, ErrNoToken
 	}
 
 	return &tr, nil
@@ -200,14 +201,14 @@ func FetchToken(ctx context.Context, client *http.Client, headers http.Header, t
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		return nil, errors.WithStack(remoteserrors.NewUnexpectedStatusErr(resp))
+		return nil, remoteserrors.NewUnexpectedStatusErr(resp)
 	}
 
 	decoder := json.NewDecoder(resp.Body)
 
 	var tr FetchTokenResponse
 	if err = decoder.Decode(&tr); err != nil {
-		return nil, errors.Wrap(err, "unable to decode token response")
+		return nil, fmt.Errorf("unable to decode token response: %w", err)
 	}
 
 	// `access_token` is equivalent to `token` and if both are specified
@@ -218,7 +219,7 @@ func FetchToken(ctx context.Context, client *http.Client, headers http.Header, t
 	}
 
 	if tr.Token == "" {
-		return nil, errors.WithStack(ErrNoToken)
+		return nil, ErrNoToken
 	}
 
 	return &tr, nil

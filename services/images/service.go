@@ -18,12 +18,12 @@ package images
 
 import (
 	"context"
+	"errors"
 
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
 	ptypes "github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 

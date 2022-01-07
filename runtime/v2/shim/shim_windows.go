@@ -18,12 +18,12 @@ package shim
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"os"
 
 	"github.com/containerd/ttrpc"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 

@@ -17,7 +17,8 @@
 package server
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
+
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -29,18 +30,18 @@ func (c *criService) PodSandboxStats(
 
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
-		return nil, errors.Wrapf(err, "an error occurred when trying to find sandbox %s", r.GetPodSandboxId())
+		return nil, fmt.Errorf("an error occurred when trying to find sandbox %s: %w", r.GetPodSandboxId(), err)
 	}
 
 	metrics, err := metricsForSandbox(sandbox)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed getting metrics for sandbox %s", r.GetPodSandboxId())
+		return nil, fmt.Errorf("failed getting metrics for sandbox %s: %w", r.GetPodSandboxId(), err)
 	}
 
 	podSandboxStats, err := c.podSandboxStats(ctx, sandbox, metrics)
 
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to decode pod sandbox metrics %s", r.GetPodSandboxId())
+		return nil, fmt.Errorf("failed to decode pod sandbox metrics %s: %w", r.GetPodSandboxId(), err)
 	}
 
 	return &runtime.PodSandboxStatsResponse{Stats: podSandboxStats}, nil

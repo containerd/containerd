@@ -40,7 +40,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -106,20 +105,20 @@ func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 	var config diff.ApplyConfig
 	for _, o := range opts {
 		if err := o(ctx, desc, &config); err != nil {
-			return emptyDesc, errors.Wrap(err, "failed to apply config opt")
+			return emptyDesc, fmt.Errorf("failed to apply config opt: %w", err)
 		}
 	}
 
 	ra, err := s.store.ReaderAt(ctx, desc)
 	if err != nil {
-		return emptyDesc, errors.Wrap(err, "failed to get reader from content store")
+		return emptyDesc, fmt.Errorf("failed to get reader from content store: %w", err)
 	}
 	defer ra.Close()
 
 	processor := diff.NewProcessorChain(desc.MediaType, content.NewReader(ra))
 	for {
 		if processor, err = diff.GetProcessor(ctx, processor, config.ProcessorPayloads); err != nil {
-			return emptyDesc, errors.Wrapf(err, "failed to get stream processor for %s", desc.MediaType)
+			return emptyDesc, fmt.Errorf("failed to get stream processor for %s: %w", desc.MediaType, err)
 		}
 		if processor.MediaType() == ocispec.MediaTypeImageLayer {
 			break
@@ -188,7 +187,7 @@ func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, op
 	case ocispec.MediaTypeImageLayerGzip:
 		isCompressed = true
 	default:
-		return emptyDesc, errors.Wrapf(errdefs.ErrNotImplemented, "unsupported diff media type: %v", config.MediaType)
+		return emptyDesc, fmt.Errorf("unsupported diff media type: %v: %w", config.MediaType, errdefs.ErrNotImplemented)
 	}
 
 	newReference := false
@@ -202,7 +201,7 @@ func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, op
 	}))
 
 	if err != nil {
-		return emptyDesc, errors.Wrap(err, "failed to open writer")
+		return emptyDesc, fmt.Errorf("failed to open writer: %w", err)
 	}
 
 	defer func() {
@@ -235,12 +234,12 @@ func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, op
 		var compressed io.WriteCloser
 		compressed, err = compression.CompressStream(cw, compression.Gzip)
 		if err != nil {
-			return emptyDesc, errors.Wrap(err, "failed to get compressed stream")
+			return emptyDesc, fmt.Errorf("failed to get compressed stream: %w", err)
 		}
 		err = archive.WriteDiff(ctx, io.MultiWriter(compressed, dgstr.Hash()), "", layers[0], archive.AsWindowsContainerLayerPair(), archive.WithParentLayers(layers[1:]))
 		compressed.Close()
 		if err != nil {
-			return emptyDesc, errors.Wrap(err, "failed to write compressed diff")
+			return emptyDesc, fmt.Errorf("failed to write compressed diff: %w", err)
 		}
 
 		if config.Labels == nil {
@@ -249,7 +248,7 @@ func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, op
 		config.Labels[uncompressed] = dgstr.Digest().String()
 	} else {
 		if err = archive.WriteDiff(ctx, cw, "", layers[0], archive.AsWindowsContainerLayerPair(), archive.WithParentLayers(layers[1:])); err != nil {
-			return emptyDesc, errors.Wrap(err, "failed to write diff")
+			return emptyDesc, fmt.Errorf("failed to write diff: %w", err)
 		}
 	}
 
@@ -261,13 +260,13 @@ func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, op
 	dgst := cw.Digest()
 	if err := cw.Commit(ctx, 0, dgst, commitopts...); err != nil {
 		if !errdefs.IsAlreadyExists(err) {
-			return emptyDesc, errors.Wrap(err, "failed to commit")
+			return emptyDesc, fmt.Errorf("failed to commit: %w", err)
 		}
 	}
 
 	info, err := s.store.Info(ctx, dgst)
 	if err != nil {
-		return emptyDesc, errors.Wrap(err, "failed to get info from content store")
+		return emptyDesc, fmt.Errorf("failed to get info from content store: %w", err)
 	}
 	if info.Labels == nil {
 		info.Labels = make(map[string]string)
@@ -276,7 +275,7 @@ func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, op
 	if _, ok := info.Labels[uncompressed]; !ok {
 		info.Labels[uncompressed] = config.Labels[uncompressed]
 		if _, err := s.store.Update(ctx, info, "labels."+uncompressed); err != nil {
-			return emptyDesc, errors.Wrap(err, "error setting uncompressed label")
+			return emptyDesc, fmt.Errorf("error setting uncompressed label: %w", err)
 		}
 	}
 
@@ -309,14 +308,14 @@ func (rc *readCounter) Read(p []byte) (n int, err error) {
 
 func mountsToLayerAndParents(mounts []mount.Mount) (string, []string, error) {
 	if len(mounts) != 1 {
-		return "", nil, errors.Wrap(errdefs.ErrInvalidArgument, "number of mounts should always be 1 for Windows layers")
+		return "", nil, fmt.Errorf("number of mounts should always be 1 for Windows layers: %w", errdefs.ErrInvalidArgument)
 	}
 	mnt := mounts[0]
 	if mnt.Type != "windows-layer" {
 		// This is a special case error. When this is received the diff service
 		// will attempt the next differ in the chain which for Windows is the
 		// lcow differ that we want.
-		return "", nil, errors.Wrapf(errdefs.ErrNotImplemented, "windowsDiff does not support layer type %s", mnt.Type)
+		return "", nil, fmt.Errorf("windowsDiff does not support layer type %s: %w", mnt.Type, errdefs.ErrNotImplemented)
 	}
 
 	parentLayerPaths, err := mnt.GetParentPaths()
@@ -335,39 +334,39 @@ func mountPairToLayerStack(lower, upper []mount.Mount) ([]string, error) {
 	// May return an ErrNotImplemented, which will fall back to LCOW
 	upperLayer, upperParentLayerPaths, err := mountsToLayerAndParents(upper)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Upper mount invalid")
+		return nil, fmt.Errorf("Upper mount invalid: %w", err)
 	}
 
 	// Trivial case, diff-against-nothing
 	if len(lower) == 0 {
 		if len(upperParentLayerPaths) != 0 {
-			return nil, errors.Wrap(errdefs.ErrInvalidArgument, "windowsDiff cannot diff a layer with parents against a null layer")
+			return nil, fmt.Errorf("windowsDiff cannot diff a layer with parents against a null layer: %w", errdefs.ErrInvalidArgument)
 		}
 		return []string{upperLayer}, nil
 	}
 
 	if len(upperParentLayerPaths) < 1 {
-		return nil, errors.Wrap(errdefs.ErrInvalidArgument, "windowsDiff cannot diff a layer with no parents against another layer")
+		return nil, fmt.Errorf("windowsDiff cannot diff a layer with no parents against another layer: %w", errdefs.ErrInvalidArgument)
 	}
 
 	lowerLayer, lowerParentLayerPaths, err := mountsToLayerAndParents(lower)
 	if errdefs.IsNotImplemented(err) {
 		// Upper was a windows-layer, lower is not. We can't handle that.
-		return nil, errors.Wrap(errdefs.ErrInvalidArgument, "windowsDiff cannot diff a windows-layer against a non-windows-layer")
+		return nil, fmt.Errorf("windowsDiff cannot diff a windows-layer against a non-windows-layer: %w", errdefs.ErrInvalidArgument)
 	} else if err != nil {
-		return nil, errors.Wrapf(err, "Lower mount invalid")
+		return nil, fmt.Errorf("Lower mount invalid: %w", err)
 	}
 
 	if upperParentLayerPaths[0] != lowerLayer {
-		return nil, errors.Wrap(errdefs.ErrInvalidArgument, "windowsDiff cannot diff a layer against a layer other than its own parent")
+		return nil, fmt.Errorf("windowsDiff cannot diff a layer against a layer other than its own parent: %w", errdefs.ErrInvalidArgument)
 	}
 
 	if len(upperParentLayerPaths) != len(lowerParentLayerPaths)+1 {
-		return nil, errors.Wrap(errdefs.ErrInvalidArgument, "windowsDiff cannot diff a layer against a layer with different parents")
+		return nil, fmt.Errorf("windowsDiff cannot diff a layer against a layer with different parents: %w", errdefs.ErrInvalidArgument)
 	}
 	for i, upperParent := range upperParentLayerPaths[1:] {
 		if upperParent != lowerParentLayerPaths[i] {
-			return nil, errors.Wrap(errdefs.ErrInvalidArgument, "windowsDiff cannot diff a layer against a layer with different parents")
+			return nil, fmt.Errorf("windowsDiff cannot diff a layer against a layer with different parents: %w", errdefs.ErrInvalidArgument)
 		}
 	}
 

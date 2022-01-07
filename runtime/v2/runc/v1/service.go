@@ -21,6 +21,7 @@ package v1
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -49,7 +50,6 @@ import (
 	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/proto"
 	ptypes "github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
@@ -79,7 +79,7 @@ func New(ctx context.Context, id string, publisher shim.Publisher, shutdown func
 	runcC.Monitor = reaper.Default
 	if err := s.initPlatform(); err != nil {
 		shutdown()
-		return nil, errors.Wrap(err, "failed to initialized platform behavior")
+		return nil, fmt.Errorf("failed to initialized platform behavior: %w", err)
 	}
 	go s.forward(ctx, publisher)
 	return s, nil
@@ -144,7 +144,7 @@ func (s *service) StartShim(ctx context.Context, opts shim.StartOpts) (_ string,
 			return "", err
 		}
 		if err := shim.RemoveSocket(address); err != nil {
-			return "", errors.Wrap(err, "remove already used socket")
+			return "", fmt.Errorf("remove already used socket: %w", err)
 		}
 		if socket, err = shim.NewSocket(address); err != nil {
 			return "", err
@@ -171,7 +171,7 @@ func (s *service) StartShim(ctx context.Context, opts shim.StartOpts) (_ string,
 	goruntime.LockOSThread()
 	if os.Getenv("SCHED_CORE") != "" {
 		if err := schedcore.Create(schedcore.ProcessGroup); err != nil {
-			return "", errors.Wrap(err, "enable sched core support")
+			return "", fmt.Errorf("enable sched core support: %w", err)
 		}
 	}
 
@@ -205,19 +205,19 @@ func (s *service) StartShim(ctx context.Context, opts shim.StartOpts) (_ string,
 				if opts.ShimCgroup != "" {
 					cg, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(opts.ShimCgroup))
 					if err != nil {
-						return "", errors.Wrapf(err, "failed to load cgroup %s", opts.ShimCgroup)
+						return "", fmt.Errorf("failed to load cgroup %s: %w", opts.ShimCgroup, err)
 					}
 					if err := cg.Add(cgroups.Process{
 						Pid: cmd.Process.Pid,
 					}); err != nil {
-						return "", errors.Wrapf(err, "failed to join cgroup %s", opts.ShimCgroup)
+						return "", fmt.Errorf("failed to join cgroup %s: %w", opts.ShimCgroup, err)
 					}
 				}
 			}
 		}
 	}
 	if err := shim.AdjustOOMScore(cmd.Process.Pid); err != nil {
-		return "", errors.Wrap(err, "failed to adjust OOM score for shim")
+		return "", fmt.Errorf("failed to adjust OOM score for shim: %w", err)
 	}
 	return address, nil
 }
@@ -502,7 +502,7 @@ func (s *service) Pids(ctx context.Context, r *taskAPI.PidsRequest) (*taskAPI.Pi
 				}
 				a, err := typeurl.MarshalAny(d)
 				if err != nil {
-					return nil, errors.Wrapf(err, "failed to marshal process %d info", pid)
+					return nil, fmt.Errorf("failed to marshal process %d info: %w", pid, err)
 				}
 				pInfo.Info = a
 				break

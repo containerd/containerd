@@ -17,8 +17,9 @@
 package server
 
 import (
+	"fmt"
+
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
-	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -28,20 +29,20 @@ import (
 func (c *criService) ContainerStats(ctx context.Context, in *runtime.ContainerStatsRequest) (*runtime.ContainerStatsResponse, error) {
 	cntr, err := c.containerStore.Get(in.GetContainerId())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to find container")
+		return nil, fmt.Errorf("failed to find container: %w", err)
 	}
 	request := &tasks.MetricsRequest{Filters: []string{"id==" + cntr.ID}}
 	resp, err := c.client.TaskService().Metrics(ctx, request)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to fetch metrics for task")
+		return nil, fmt.Errorf("failed to fetch metrics for task: %w", err)
 	}
 	if len(resp.Metrics) != 1 {
-		return nil, errors.Errorf("unexpected metrics response: %+v", resp.Metrics)
+		return nil, fmt.Errorf("unexpected metrics response: %+v", resp.Metrics)
 	}
 
 	cs, err := c.containerMetrics(cntr.Metadata, resp.Metrics[0])
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to decode container metrics")
+		return nil, fmt.Errorf("failed to decode container metrics: %w", err)
 	}
 	return &runtime.ContainerStatsResponse{Stats: cs}, nil
 }

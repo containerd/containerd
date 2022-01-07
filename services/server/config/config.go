@@ -17,12 +17,12 @@
 package config
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 
 	"github.com/imdario/mergo"
 	"github.com/pelletier/go-toml"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/containerd/containerd/errdefs"
@@ -104,17 +104,17 @@ func (c *Config) ValidateV2() error {
 	}
 	for _, p := range c.DisabledPlugins {
 		if len(strings.Split(p, ".")) < 4 {
-			return errors.Errorf("invalid disabled plugin URI %q expect io.containerd.x.vx", p)
+			return fmt.Errorf("invalid disabled plugin URI %q expect io.containerd.x.vx", p)
 		}
 	}
 	for _, p := range c.RequiredPlugins {
 		if len(strings.Split(p, ".")) < 4 {
-			return errors.Errorf("invalid required plugin URI %q expect io.containerd.x.vx", p)
+			return fmt.Errorf("invalid required plugin URI %q expect io.containerd.x.vx", p)
 		}
 	}
 	for p := range c.Plugins {
 		if len(strings.Split(p, ".")) < 4 {
-			return errors.Errorf("invalid plugin key URI %q expect io.containerd.x.vx", p)
+			return fmt.Errorf("invalid plugin key URI %q expect io.containerd.x.vx", p)
 		}
 	}
 	return nil
@@ -201,7 +201,7 @@ func (bc *BoltConfig) Validate() error {
 	case SharingPolicyShared, SharingPolicyIsolated:
 		return nil
 	default:
-		return errors.Wrapf(errdefs.ErrInvalidArgument, "unknown policy: %s", bc.ContentSharingPolicy)
+		return fmt.Errorf("unknown policy: %s: %w", bc.ContentSharingPolicy, errdefs.ErrInvalidArgument)
 	}
 }
 
@@ -224,7 +224,7 @@ func (c *Config) Decode(p *plugin.Registration) (interface{}, error) {
 // LoadConfig loads the containerd server config from the provided path
 func LoadConfig(path string, out *Config) error {
 	if out == nil {
-		return errors.Wrapf(errdefs.ErrInvalidArgument, "argument out must not be nil")
+		return fmt.Errorf("argument out must not be nil: %w", errdefs.ErrInvalidArgument)
 	}
 
 	var (
@@ -266,7 +266,7 @@ func LoadConfig(path string, out *Config) error {
 
 	err := out.ValidateV2()
 	if err != nil {
-		return errors.Wrapf(err, "failed to load TOML from %s", path)
+		return fmt.Errorf("failed to load TOML from %s: %w", path, err)
 	}
 	return nil
 }
@@ -277,11 +277,11 @@ func loadConfigFile(path string) (*Config, error) {
 
 	file, err := toml.LoadFile(path)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to load TOML: %s", path)
+		return nil, fmt.Errorf("failed to load TOML: %s: %w", path, err)
 	}
 
 	if err := file.Unmarshal(config); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal TOML")
+		return nil, fmt.Errorf("failed to unmarshal TOML: %w", err)
 	}
 
 	return config, nil

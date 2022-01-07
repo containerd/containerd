@@ -26,7 +26,6 @@ import (
 	"github.com/docker/go-units"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pelletier/go-toml"
-	"github.com/pkg/errors"
 )
 
 // Config represents device mapper configuration loaded from file.
@@ -68,11 +67,11 @@ func LoadConfig(path string) (*Config, error) {
 	config := Config{}
 	file, err := toml.LoadFile(path)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open devmapepr TOML: %s", path)
+		return nil, fmt.Errorf("failed to open devmapepr TOML: %s: %w", path, err)
 	}
 
 	if err := file.Unmarshal(&config); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal devmapper TOML")
+		return nil, fmt.Errorf("failed to unmarshal devmapper TOML: %w", err)
 	}
 
 	if err := config.parse(); err != nil {
@@ -89,7 +88,7 @@ func LoadConfig(path string) (*Config, error) {
 func (c *Config) parse() error {
 	baseImageSize, err := units.RAMInBytes(c.BaseImageSize)
 	if err != nil {
-		return errors.Wrapf(err, "failed to parse base image size: '%s'", c.BaseImageSize)
+		return fmt.Errorf("failed to parse base image size: '%s': %w", c.BaseImageSize, err)
 	}
 
 	if c.FileSystemType == "" {

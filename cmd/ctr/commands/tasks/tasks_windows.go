@@ -18,6 +18,7 @@ package tasks
 
 import (
 	gocontext "context"
+	"errors"
 	"net/url"
 	"time"
 
@@ -25,7 +26,6 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/log"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 

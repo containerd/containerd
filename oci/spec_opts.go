@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,7 +38,6 @@ import (
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runc/libcontainer/user"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 )
 
 // SpecOpts sets spec specific information to a newly generated OCI spec
@@ -138,7 +138,7 @@ func WithSpecFromBytes(p []byte) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		*s = Spec{} // make sure spec is cleared.
 		if err := json.Unmarshal(p, s); err != nil {
-			return errors.Wrapf(err, "decoding spec config file failed, current supported OCI runtime-spec : v%s", specs.Version)
+			return fmt.Errorf("decoding spec config file failed, current supported OCI runtime-spec : v%s: %w", specs.Version, err)
 		}
 		return nil
 	}
@@ -149,7 +149,7 @@ func WithSpecFromFile(filename string) SpecOpts {
 	return func(ctx context.Context, c Client, container *containers.Container, s *Spec) error {
 		p, err := os.ReadFile(filename)
 		if err != nil {
-			return errors.Wrap(err, "cannot load spec config file")
+			return fmt.Errorf("cannot load spec config file: %w", err)
 		}
 		return WithSpecFromBytes(p)(ctx, c, container, s)
 	}

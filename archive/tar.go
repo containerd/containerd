@@ -19,6 +19,8 @@ package archive
 import (
 	"archive/tar"
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -30,7 +32,6 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/continuity/fs"
-	"github.com/pkg/errors"
 )
 
 var bufPool = &sync.Pool{
@@ -76,7 +77,7 @@ func WriteDiff(ctx context.Context, w io.Writer, a, b string, opts ...WriteDiffO
 	var options WriteDiffOptions
 	for _, opt := range opts {
 		if err := opt(&options); err != nil {
-			return errors.Wrap(err, "failed to apply option")
+			return fmt.Errorf("failed to apply option: %w", err)
 		}
 	}
 	if options.writeDiffFunc == nil {
@@ -97,7 +98,7 @@ func writeDiffNaive(ctx context.Context, w io.Writer, a, b string, _ WriteDiffOp
 	cw := NewChangeWriter(w, b)
 	err := fs.Changes(ctx, a, b, cw.HandleChange)
 	if err != nil {
-		return errors.Wrap(err, "failed to create diff tar stream")
+		return fmt.Errorf("failed to create diff tar stream: %w", err)
 	}
 	return cw.Close()
 }
@@ -128,7 +129,7 @@ func Apply(ctx context.Context, root string, r io.Reader, opts ...ApplyOpt) (int
 	var options ApplyOptions
 	for _, opt := range opts {
 		if err := opt(&options); err != nil {
-			return 0, errors.Wrap(err, "failed to apply option")
+			return 0, fmt.Errorf("failed to apply option: %w", err)
 		}
 	}
 	if options.Filter == nil {
@@ -236,7 +237,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 		ppath, base := filepath.Split(hdr.Name)
 		ppath, err = fs.RootPath(root, ppath)
 		if err != nil {
-			return 0, errors.Wrap(err, "failed to get root path")
+			return 0, fmt.Errorf("failed to get root path: %w", err)
 		}
 
 		// Join to root before joining to parent path to ensure relative links are
@@ -266,7 +267,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 		}
 		writeFile, err := convertWhiteout(hdr, path)
 		if err != nil {
-			return 0, errors.Wrapf(err, "failed to convert whiteout file %q", hdr.Name)
+			return 0, fmt.Errorf("failed to convert whiteout file %q: %w", hdr.Name, err)
 		}
 		if !writeFile {
 			continue
@@ -373,7 +374,7 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 		return nil
 
 	default:
-		return errors.Errorf("unhandled tar header type %d\n", hdr.Typeflag)
+		return fmt.Errorf("unhandled tar header type %d", hdr.Typeflag)
 	}
 
 	// Lchown is not supported on Windows.
@@ -520,7 +521,7 @@ func (cw *ChangeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 			return err
 		}
 		if err := cw.tw.WriteHeader(hdr); err != nil {
-			return errors.Wrap(err, "failed to write whiteout header")
+			return fmt.Errorf("failed to write whiteout header: %w", err)
 		}
 	} else {
 		var (
@@ -555,12 +556,12 @@ func (cw *ChangeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 		if strings.HasPrefix(name, string(filepath.Separator)) {
 			name, err = filepath.Rel(string(filepath.Separator), name)
 			if err != nil {
-				return errors.Wrap(err, "failed to make path relative")
+				return fmt.Errorf("failed to make path relative: %w", err)
 			}
 		}
 		name, err = tarName(name)
 		if err != nil {
-			return errors.Wrap(err, "cannot canonicalize path")
+			return fmt.Errorf("cannot canonicalize path: %w", err)
 		}
 		// suffix with '/' for directories
 		if f.IsDir() && !strings.HasSuffix(name, "/") {
@@ -569,7 +570,7 @@ func (cw *ChangeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 		hdr.Name = name
 
 		if err := setHeaderForSpecialDevice(hdr, name, f); err != nil {
-			return errors.Wrap(err, "failed to set device headers")
+			return fmt.Errorf("failed to set device headers: %w", err)
 		}
 
 		// additionalLinks stores file names which must be linked to
@@ -597,7 +598,7 @@ func (cw *ChangeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 		}
 
 		if capability, err := getxattr(source, "security.capability"); err != nil {
-			return errors.Wrap(err, "failed to get capabilities xattr")
+			return fmt.Errorf("failed to get capabilities xattr: %w", err)
 		} else if len(capability) > 0 {
 			if hdr.PAXRecords == nil {
 				hdr.PAXRecords = map[string]string{}
@@ -609,19 +610,19 @@ func (cw *ChangeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 			return err
 		}
 		if err := cw.tw.WriteHeader(hdr); err != nil {
-			return errors.Wrap(err, "failed to write file header")
+			return fmt.Errorf("failed to write file header: %w", err)
 		}
 
 		if hdr.Typeflag == tar.TypeReg && hdr.Size > 0 {
 			file, err := open(source)
 			if err != nil {
-				return errors.Wrapf(err, "failed to open path: %v", source)
+				return fmt.Errorf("failed to open path: %v: %w", source, err)
 			}
 			defer file.Close()
 
 			n, err := copyBuffered(context.TODO(), cw.tw, file)
 			if err != nil {
-				return errors.Wrap(err, "failed to copy")
+				return fmt.Errorf("failed to copy: %w", err)
 			}
 			if n != hdr.Size {
 				return errors.New("short write copying file")
@@ -640,7 +641,7 @@ func (cw *ChangeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 					return err
 				}
 				if err := cw.tw.WriteHeader(hdr); err != nil {
-					return errors.Wrap(err, "failed to write file header")
+					return fmt.Errorf("failed to write file header: %w", err)
 				}
 			}
 		}
@@ -651,7 +652,7 @@ func (cw *ChangeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 // Close closes this writer.
 func (cw *ChangeWriter) Close() error {
 	if err := cw.tw.Close(); err != nil {
-		return errors.Wrap(err, "failed to close tar writer")
+		return fmt.Errorf("failed to close tar writer: %w", err)
 	}
 	return nil
 }
@@ -764,7 +765,7 @@ func validateWhiteout(path string) error {
 			dir += string(filepath.Separator)
 		}
 		if !strings.HasPrefix(originalPath, dir) {
-			return errors.Wrapf(errInvalidArchive, "invalid whiteout name: %v", base)
+			return fmt.Errorf("invalid whiteout name: %v: %w", base, errInvalidArchive)
 		}
 	}
 	return nil

@@ -18,6 +18,7 @@ package exchange
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -27,7 +28,6 @@ import (
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/typeurl"
-	"github.com/pkg/errors"
 )
 
 func TestExchangeBasic(t *testing.T) {

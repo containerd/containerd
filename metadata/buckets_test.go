@@ -17,13 +17,13 @@
 package metadata
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/containerd/containerd/labels"
 	digest "github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
 )
 

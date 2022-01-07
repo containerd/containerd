@@ -21,6 +21,7 @@ package linux
 
 import (
 	"context"
+	"errors"
 
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/api/types/task"
@@ -28,7 +29,6 @@ import (
 	"github.com/containerd/containerd/runtime"
 	shim "github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/ttrpc"
-	"github.com/pkg/errors"
 )
 
 // Process implements a linux process

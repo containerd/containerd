@@ -18,6 +18,7 @@ package apply
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"time"
 
@@ -27,7 +28,6 @@ import (
 	"github.com/containerd/containerd/mount"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -64,13 +64,13 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 	var config diff.ApplyConfig
 	for _, o := range opts {
 		if err := o(ctx, desc, &config); err != nil {
-			return emptyDesc, errors.Wrap(err, "failed to apply config opt")
+			return emptyDesc, fmt.Errorf("failed to apply config opt: %w", err)
 		}
 	}
 
 	ra, err := s.store.ReaderAt(ctx, desc)
 	if err != nil {
-		return emptyDesc, errors.Wrap(err, "failed to get reader from content store")
+		return emptyDesc, fmt.Errorf("failed to get reader from content store: %w", err)
 	}
 	defer ra.Close()
 
@@ -79,7 +79,7 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 	processors = append(processors, processor)
 	for {
 		if processor, err = diff.GetProcessor(ctx, processor, config.ProcessorPayloads); err != nil {
-			return emptyDesc, errors.Wrapf(err, "failed to get stream processor for %s", desc.MediaType)
+			return emptyDesc, fmt.Errorf("failed to get stream processor for %s: %w", desc.MediaType, err)
 		}
 		processors = append(processors, processor)
 		if processor.MediaType() == ocispec.MediaTypeImageLayer {

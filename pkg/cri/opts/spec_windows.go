@@ -18,6 +18,7 @@ package opts
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -26,7 +27,6 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	osinterface "github.com/containerd/containerd/pkg/os"
@@ -124,16 +124,16 @@ func WithWindowsMounts(osi osinterface.OS, config *runtime.ContainerConfig, extr
 					// the behavior with the Linux implementation, but it doesn't
 					// align with Docker's behavior on Windows.
 					if !os.IsNotExist(err) {
-						return errors.Wrapf(err, "failed to stat %q", src)
+						return fmt.Errorf("failed to stat %q: %w", src, err)
 					}
 					if err := osi.MkdirAll(src, 0755); err != nil {
-						return errors.Wrapf(err, "failed to mkdir %q", src)
+						return fmt.Errorf("failed to mkdir %q: %w", src, err)
 					}
 				}
 				var err error
 				src, err = osi.ResolveSymbolicLink(src)
 				if err != nil {
-					return errors.Wrapf(err, "failed to resolve symlink %q", src)
+					return fmt.Errorf("failed to resolve symlink %q: %w", src, err)
 				}
 				// hcsshim requires clean path, especially '/' -> '\'. Additionally,
 				// for the destination, absolute paths should have the C: prefix.

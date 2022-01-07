@@ -18,6 +18,8 @@ package server
 
 import (
 	"bufio"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strconv"
@@ -31,7 +33,6 @@ import (
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	selinux "github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
-	"github.com/pkg/errors"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/pkg/cri/annotations"
@@ -187,7 +188,7 @@ func (c *criService) containerSpec(
 
 	processLabel, mountLabel, err := label.InitLabels(labelOptions)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to init selinux options %+v", securityContext.GetSelinuxOptions())
+		return nil, fmt.Errorf("failed to init selinux options %+v: %w", securityContext.GetSelinuxOptions(), err)
 	}
 	defer func() {
 		if retErr != nil {
@@ -262,7 +263,7 @@ func (c *criService) containerSpec(
 	// Get RDT class
 	rdtClass, err := c.rdtClassFromAnnotations(config.GetMetadata().GetName(), config.Annotations, sandboxConfig.Annotations)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to set RDT class")
+		return nil, fmt.Errorf("failed to set RDT class: %w", err)
 	}
 	if rdtClass != "" {
 		specOpts = append(specOpts, oci.WithRdt(rdtClass, "", ""))
@@ -286,7 +287,7 @@ func (c *criService) containerSpec(
 	if nsOpts.GetPid() == runtime.NamespaceMode_TARGET {
 		targetContainer, err := c.validateTargetContainer(sandboxID, nsOpts.TargetId)
 		if err != nil {
-			return nil, errors.Wrapf(err, "invalid target container")
+			return nil, fmt.Errorf("invalid target container: %w", err)
 		}
 
 		status := targetContainer.Status.Get()
@@ -328,7 +329,7 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 		securityContext.GetRunAsUser(),
 		securityContext.GetRunAsGroup())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate user string")
+		return nil, fmt.Errorf("failed to generate user string: %w", err)
 	}
 	if userstr == "" {
 		// Lastly, since no user override was passed via CRI try to set via OCI
@@ -352,7 +353,7 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 	if asp == nil {
 		asp, err = generateApparmorSecurityProfile(securityContext.GetApparmorProfile()) //nolint:staticcheck // Deprecated but we don't want to remove yet
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to generate apparmor spec opts")
+			return nil, fmt.Errorf("failed to generate apparmor spec opts: %w", err)
 		}
 	}
 	apparmorSpecOpts, err := generateApparmorSpecOpts(
@@ -360,7 +361,7 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 		securityContext.GetPrivileged(),
 		c.apparmorEnabled())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate apparmor spec opts")
+		return nil, fmt.Errorf("failed to generate apparmor spec opts: %w", err)
 	}
 	if apparmorSpecOpts != nil {
 		specOpts = append(specOpts, apparmorSpecOpts)
@@ -372,7 +373,7 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 			securityContext.GetSeccompProfilePath(), //nolint:staticcheck // Deprecated but we don't want to remove yet
 			c.config.UnsetSeccompProfile)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to generate seccomp spec opts")
+			return nil, fmt.Errorf("failed to generate seccomp spec opts: %w", err)
 		}
 	}
 	seccompSpecOpts, err := c.generateSeccompSpecOpts(
@@ -380,7 +381,7 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 		securityContext.GetPrivileged(),
 		c.seccompEnabled())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate seccomp spec opts")
+		return nil, fmt.Errorf("failed to generate seccomp spec opts: %w", err)
 	}
 	if seccompSpecOpts != nil {
 		specOpts = append(specOpts, seccompSpecOpts)
@@ -417,7 +418,7 @@ func generateSecurityProfile(profilePath string) (*runtime.SecurityProfile, erro
 	default:
 		// Require and Trim default profile name prefix
 		if !strings.HasPrefix(profilePath, profileNamePrefix) {
-			return nil, errors.Errorf("invalid profile %q", profilePath)
+			return nil, fmt.Errorf("invalid profile %q", profilePath)
 		}
 		return &runtime.SecurityProfile{
 			ProfileType:  runtime.SecurityProfile_Localhost,
@@ -503,9 +504,9 @@ func generateApparmorSpecOpts(sp *runtime.SecurityProfile, privileged, apparmorE
 		appArmorProfile := strings.TrimPrefix(sp.LocalhostRef, profileNamePrefix)
 		if profileExists, err := appArmorProfileExists(appArmorProfile); !profileExists {
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to generate apparmor spec opts")
+				return nil, fmt.Errorf("failed to generate apparmor spec opts: %w", err)
 			}
-			return nil, errors.Errorf("apparmor profile not found %s", appArmorProfile)
+			return nil, fmt.Errorf("apparmor profile not found %s", appArmorProfile)
 		}
 		return apparmor.WithProfile(appArmorProfile), nil
 	default:
@@ -568,7 +569,7 @@ func generateUserString(username string, uid, gid *runtime.Int64Value) (string, 
 	}
 	if userstr == "" {
 		if groupstr != "" {
-			return "", errors.Errorf("user group %q is specified without user", groupstr)
+			return "", fmt.Errorf("user group %q is specified without user", groupstr)
 		}
 		return "", nil
 	}

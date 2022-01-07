@@ -17,10 +17,11 @@
 package tasks
 
 import (
+	"errors"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/moby/sys/signal"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 

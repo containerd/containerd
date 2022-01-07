@@ -21,6 +21,7 @@ package cio
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -28,7 +29,6 @@ import (
 	"syscall"
 
 	"github.com/containerd/fifo"
-	"github.com/pkg/errors"
 )
 
 // NewFIFOSetInDir returns a new FIFOSet with paths in a temporary directory under root
@@ -112,7 +112,7 @@ func openFifos(ctx context.Context, fifos *FIFOSet) (f pipes, retErr error) {
 
 	if fifos.Stdin != "" {
 		if f.Stdin, retErr = fifo.OpenFifo(ctx, fifos.Stdin, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); retErr != nil {
-			return f, errors.Wrapf(retErr, "failed to open stdin fifo")
+			return f, fmt.Errorf("failed to open stdin fifo: %w", retErr)
 		}
 		defer func() {
 			if retErr != nil && f.Stdin != nil {
@@ -122,7 +122,7 @@ func openFifos(ctx context.Context, fifos *FIFOSet) (f pipes, retErr error) {
 	}
 	if fifos.Stdout != "" {
 		if f.Stdout, retErr = fifo.OpenFifo(ctx, fifos.Stdout, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); retErr != nil {
-			return f, errors.Wrapf(retErr, "failed to open stdout fifo")
+			return f, fmt.Errorf("failed to open stdout fifo: %w", retErr)
 		}
 		defer func() {
 			if retErr != nil && f.Stdout != nil {
@@ -132,7 +132,7 @@ func openFifos(ctx context.Context, fifos *FIFOSet) (f pipes, retErr error) {
 	}
 	if !fifos.Terminal && fifos.Stderr != "" {
 		if f.Stderr, retErr = fifo.OpenFifo(ctx, fifos.Stderr, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); retErr != nil {
-			return f, errors.Wrapf(retErr, "failed to open stderr fifo")
+			return f, fmt.Errorf("failed to open stderr fifo: %w", retErr)
 		}
 	}
 	return f, nil

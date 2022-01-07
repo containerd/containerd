@@ -21,6 +21,7 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"net"
 	"os"
 	"path/filepath"
@@ -33,7 +34,6 @@ import (
 	v1shimcli "github.com/containerd/containerd/runtime/v1/shim/client"
 	v2shimcli "github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/ttrpc"
-	"github.com/pkg/errors"
 )
 
 const abstractSocketPrefix = "\x00"

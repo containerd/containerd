@@ -17,17 +17,17 @@
 package integration
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -77,10 +77,10 @@ func TestContainerdImage(t *testing.T) {
 		}
 		if len(img.RepoTags) != 1 {
 			// RepoTags must have been populated correctly.
-			return false, errors.Errorf("unexpected repotags: %+v", img.RepoTags)
+			return false, fmt.Errorf("unexpected repotags: %+v", img.RepoTags)
 		}
 		if img.RepoTags[0] != testImage {
-			return false, errors.Errorf("unexpected repotag %q", img.RepoTags[0])
+			return false, fmt.Errorf("unexpected repotag %q", img.RepoTags[0])
 		}
 		return true, nil
 	}

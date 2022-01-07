@@ -17,11 +17,12 @@
 package server
 
 import (
+	"fmt"
+
 	"github.com/containerd/containerd/pkg/cap"
 	"github.com/containerd/containerd/pkg/userns"
 	cni "github.com/containerd/go-cni"
 	"github.com/opencontainers/selinux/go-selinux"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -74,7 +75,7 @@ func (c *criService) initPlatform() (err error) {
 			cni.WithPluginMaxConfNum(max),
 			cni.WithPluginDir([]string{c.config.NetworkPluginBinDir}))
 		if err != nil {
-			return errors.Wrap(err, "failed to initialize cni")
+			return fmt.Errorf("failed to initialize cni: %w", err)
 		}
 		c.netPlugin[name] = i
 	}
@@ -82,7 +83,7 @@ func (c *criService) initPlatform() (err error) {
 	if c.allCaps == nil {
 		c.allCaps, err = cap.Current()
 		if err != nil {
-			return errors.Wrap(err, "failed to get caps")
+			return fmt.Errorf("failed to get caps: %w", err)
 		}
 	}
 

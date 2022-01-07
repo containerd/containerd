@@ -22,6 +22,8 @@ package btrfs
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,7 +36,6 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/testsuite"
 	"github.com/containerd/continuity/testutil/loopback"
-	"github.com/pkg/errors"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 )
@@ -66,7 +67,7 @@ func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshots.Snap
 
 		if out, err := exec.Command(mkbtrfs, loop.Device).CombinedOutput(); err != nil {
 			loop.Close()
-			return nil, nil, errors.Wrapf(err, "failed to make btrfs filesystem (out: %q)", out)
+			return nil, nil, fmt.Errorf("failed to make btrfs filesystem (out: %q): %w", out, err)
 		}
 		// sync after a mkfs on the loopback before trying to mount the device
 		unix.Sync()
@@ -75,7 +76,7 @@ func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshots.Snap
 		for i := 0; i < 5; i++ {
 			if out, err := exec.Command("mount", loop.Device, root).CombinedOutput(); err != nil {
 				loop.Close()
-				return nil, nil, errors.Wrapf(err, "failed to mount device %s (out: %q)", loop.Device, out)
+				return nil, nil, fmt.Errorf("failed to mount device %s (out: %q): %w", loop.Device, out, err)
 			}
 
 			if i > 0 {
@@ -95,7 +96,7 @@ func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshots.Snap
 			unix.Unmount(root, 0)
 		}
 		if snapshotter == nil {
-			return nil, nil, errors.Wrap(err, "failed to successfully create snapshotter after 5 attempts")
+			return nil, nil, fmt.Errorf("failed to successfully create snapshotter after 5 attempts: %w", err)
 		}
 
 		return snapshotter, func() error {
@@ -104,7 +105,7 @@ func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshots.Snap
 			}
 			err := mount.UnmountAll(root, unix.MNT_DETACH)
 			if cerr := loop.Close(); cerr != nil {
-				err = errors.Wrap(cerr, "device cleanup failed")
+				err = fmt.Errorf("device cleanup failed: %w", cerr)
 			}
 			return err
 		}, nil

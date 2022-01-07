@@ -34,7 +34,6 @@ import (
 	"github.com/containerd/containerd/pkg/testutil"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 )
 
@@ -712,35 +711,47 @@ func checkResume(rf func(context.Context, content.Writer, []byte, int64, int64, 
 
 func resumeTruncate(ctx context.Context, w content.Writer, b []byte, written, size int64, dgst digest.Digest) error {
 	if err := w.Truncate(0); err != nil {
-		return errors.Wrap(err, "truncate failed")
+		return fmt.Errorf("truncate failed: %w", err)
 	}
 
 	if _, err := io.CopyBuffer(w, bytes.NewReader(b), make([]byte, 1024)); err != nil {
-		return errors.Wrap(err, "write failed")
+		return fmt.Errorf("write failed: %w", err)
 	}
-
-	return errors.Wrap(w.Commit(ctx, size, dgst), "commit failed")
+	if err := w.Commit(ctx, size, dgst); err != nil {
+		return fmt.Errorf("commit failed: %w", err)
+	}
+	return nil
 }
 
 func resumeDiscard(ctx context.Context, w content.Writer, b []byte, written, size int64, dgst digest.Digest) error {
 	if _, err := io.CopyBuffer(w, bytes.NewReader(b[written:]), make([]byte, 1024)); err != nil {
-		return errors.Wrap(err, "write failed")
+		return fmt.Errorf("write failed: %w", err)
 	}
-	return errors.Wrap(w.Commit(ctx, size, dgst), "commit failed")
+	if err := w.Commit(ctx, size, dgst); err != nil {
+		return fmt.Errorf("commit failed: %w", err)
+
+	}
+	return nil
 }
 
 func resumeCopy(ctx context.Context, w content.Writer, b []byte, _, size int64, dgst digest.Digest) error {
 	r := struct {
 		io.Reader
 	}{bytes.NewReader(b)}
-	return errors.Wrap(content.Copy(ctx, w, r, size, dgst), "copy failed")
+	if err := content.Copy(ctx, w, r, size, dgst); err != nil {
+		return fmt.Errorf("copy failed: %w", err)
+	}
+	return nil
 }
 
 func resumeCopySeeker(ctx context.Context, w content.Writer, b []byte, _, size int64, dgst digest.Digest) error {
 	r := struct {
 		io.ReadSeeker
 	}{bytes.NewReader(b)}
-	return errors.Wrap(content.Copy(ctx, w, r, size, dgst), "copy failed")
+	if err := content.Copy(ctx, w, r, size, dgst); err != nil {
+		return fmt.Errorf("copy failed: %w", err)
+	}
+	return nil
 }
 
 func resumeCopyReaderAt(ctx context.Context, w content.Writer, b []byte, _, size int64, dgst digest.Digest) error {
@@ -751,7 +762,10 @@ func resumeCopyReaderAt(ctx context.Context, w content.Writer, b []byte, _, size
 	r := struct {
 		readerAt
 	}{bytes.NewReader(b)}
-	return errors.Wrap(content.Copy(ctx, w, r, size, dgst), "copy failed")
+	if err := content.Copy(ctx, w, r, size, dgst); err != nil {
+		return fmt.Errorf("copy failed: %w", err)
+	}
+	return nil
 }
 
 // checkSmallBlob tests reading a blob which is smaller than the read size.
@@ -1018,35 +1032,35 @@ func checkNewlyCreated(t *testing.T, w content.Writer, preStart, postStart, preU
 func checkInfo(ctx context.Context, cs content.Store, d digest.Digest, expected content.Info, c1, c2, u1, u2 time.Time) error {
 	info, err := cs.Info(ctx, d)
 	if err != nil {
-		return errors.Wrap(err, "failed to get info")
+		return fmt.Errorf("failed to get info: %w", err)
 	}
 
 	if info.Digest != d {
-		return errors.Errorf("unexpected info digest %s, expected %s", info.Digest, d)
+		return fmt.Errorf("unexpected info digest %s, expected %s", info.Digest, d)
 	}
 
 	if info.Size != expected.Size {
-		return errors.Errorf("unexpected info size %d, expected %d", info.Size, expected.Size)
+		return fmt.Errorf("unexpected info size %d, expected %d", info.Size, expected.Size)
 	}
 
 	if info.CreatedAt.After(c2) || info.CreatedAt.Before(c1) {
-		return errors.Errorf("unexpected created at time %s, expected between %s and %s", info.CreatedAt, c1, c2)
+		return fmt.Errorf("unexpected created at time %s, expected between %s and %s", info.CreatedAt, c1, c2)
 	}
 	// FIXME: broken on windows: unexpected updated at time 2017-11-14 13:43:22.178013 -0800 PST,
 	// expected between 2017-11-14 13:43:22.1790195 -0800 PST m=+1.022137300 and
 	// 2017-11-14 13:43:22.1790195 -0800 PST m=+1.022137300
 	if runtime.GOOS != "windows" && (info.UpdatedAt.After(u2) || info.UpdatedAt.Before(u1)) {
-		return errors.Errorf("unexpected updated at time %s, expected between %s and %s", info.UpdatedAt, u1, u2)
+		return fmt.Errorf("unexpected updated at time %s, expected between %s and %s", info.UpdatedAt, u1, u2)
 	}
 
 	if len(info.Labels) != len(expected.Labels) {
-		return errors.Errorf("mismatched number of labels\ngot:\n%#v\nexpected:\n%#v", info.Labels, expected.Labels)
+		return fmt.Errorf("mismatched number of labels\ngot:\n%#v\nexpected:\n%#v", info.Labels, expected.Labels)
 	}
 
 	for k, v := range expected.Labels {
 		actual := info.Labels[k]
 		if v != actual {
-			return errors.Errorf("unexpected value for label %q: %q, expected %q", k, actual, v)
+			return fmt.Errorf("unexpected value for label %q: %q, expected %q", k, actual, v)
 		}
 	}
 
@@ -1059,16 +1073,16 @@ func checkContent(ctx context.Context, cs content.Store, d digest.Digest, expect
 
 	b, err := content.ReadBlob(ctx, cs, ocispec.Descriptor{Digest: d})
 	if err != nil {
-		return errors.Wrap(err, "failed to read blob")
+		return fmt.Errorf("failed to read blob: %w", err)
 	}
 
 	if int64(len(b)) != expected.Size {
-		return errors.Errorf("wrong blob size %d, expected %d", len(b), expected.Size)
+		return fmt.Errorf("wrong blob size %d, expected %d", len(b), expected.Size)
 	}
 
 	actual := digest.FromBytes(b)
 	if actual != d {
-		return errors.Errorf("wrong digest %s, expected %s", actual, d)
+		return fmt.Errorf("wrong digest %s, expected %s", actual, d)
 	}
 
 	return nil

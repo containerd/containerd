@@ -18,6 +18,7 @@ package command
 
 import (
 	gocontext "context"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -28,7 +29,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
@@ -52,7 +52,7 @@ var publishCommand = cli.Command{
 		ctx := namespaces.WithNamespace(gocontext.Background(), context.String("namespace"))
 		topic := context.String("topic")
 		if topic == "" {
-			return errors.Wrap(errdefs.ErrInvalidArgument, "topic required to publish event")
+			return fmt.Errorf("topic required to publish event: %w", errdefs.ErrInvalidArgument)
 		}
 		payload, err := getEventPayload(os.Stdin)
 		if err != nil {
@@ -87,7 +87,7 @@ func getEventPayload(r io.Reader) (*types.Any, error) {
 func connectEvents(address string) (eventsapi.EventsClient, error) {
 	conn, err := connect(address, dialer.ContextDialer)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to dial %q", address)
+		return nil, fmt.Errorf("failed to dial %q: %w", address, err)
 	}
 	return eventsapi.NewEventsClient(conn), nil
 }
@@ -109,7 +109,7 @@ func connect(address string, d func(gocontext.Context, string) (net.Conn, error)
 	defer cancel()
 	conn, err := grpc.DialContext(ctx, dialer.DialAddress(address), gopts...)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to dial %q", address)
+		return nil, fmt.Errorf("failed to dial %q: %w", address, err)
 	}
 	return conn, nil
 }

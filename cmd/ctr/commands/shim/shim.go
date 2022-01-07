@@ -21,6 +21,7 @@ package shim
 
 import (
 	gocontext "context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -36,7 +37,6 @@ import (
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )

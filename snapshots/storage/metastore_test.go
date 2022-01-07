@@ -18,6 +18,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -26,7 +27,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/google/go-cmp/cmp"
-	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 )
@@ -147,31 +147,31 @@ func inWriteTransaction(fn testFunc) testFunc {
 // - "active-5": readonly active with parent "committed-2"
 func basePopulate(ctx context.Context, ms *MetaStore) error {
 	if _, err := CreateSnapshot(ctx, snapshots.KindActive, "committed-tmp-1", ""); err != nil {
-		return errors.Wrap(err, "failed to create active")
+		return fmt.Errorf("failed to create active: %w", err)
 	}
 	if _, err := CommitActive(ctx, "committed-tmp-1", "committed-1", snapshots.Usage{Size: 1}); err != nil {
-		return errors.Wrap(err, "failed to create active")
+		return fmt.Errorf("failed to create active: %w", err)
 	}
 	if _, err := CreateSnapshot(ctx, snapshots.KindActive, "committed-tmp-2", "committed-1"); err != nil {
-		return errors.Wrap(err, "failed to create active")
+		return fmt.Errorf("failed to create active: %w", err)
 	}
 	if _, err := CommitActive(ctx, "committed-tmp-2", "committed-2", snapshots.Usage{Size: 2}); err != nil {
-		return errors.Wrap(err, "failed to create active")
+		return fmt.Errorf("failed to create active: %w", err)
 	}
 	if _, err := CreateSnapshot(ctx, snapshots.KindActive, "active-1", ""); err != nil {
-		return errors.Wrap(err, "failed to create active")
+		return fmt.Errorf("failed to create active: %w", err)
 	}
 	if _, err := CreateSnapshot(ctx, snapshots.KindActive, "active-2", "committed-1"); err != nil {
-		return errors.Wrap(err, "failed to create active")
+		return fmt.Errorf("failed to create active: %w", err)
 	}
 	if _, err := CreateSnapshot(ctx, snapshots.KindActive, "active-3", "committed-2"); err != nil {
-		return errors.Wrap(err, "failed to create active")
+		return fmt.Errorf("failed to create active: %w", err)
 	}
 	if _, err := CreateSnapshot(ctx, snapshots.KindView, "view-1", ""); err != nil {
-		return errors.Wrap(err, "failed to create active")
+		return fmt.Errorf("failed to create active: %w", err)
 	}
 	if _, err := CreateSnapshot(ctx, snapshots.KindView, "view-2", "committed-2"); err != nil {
-		return errors.Wrap(err, "failed to create active")
+		return fmt.Errorf("failed to create active: %w", err)
 	}
 	return nil
 }
@@ -286,10 +286,10 @@ func testGetSnapshot(ctx context.Context, t *testing.T, ms *MetaStore) {
 	snapshotMap := map[string]Snapshot{}
 	populate := func(ctx context.Context, ms *MetaStore) error {
 		if _, err := CreateSnapshot(ctx, snapshots.KindActive, "committed-tmp-1", ""); err != nil {
-			return errors.Wrap(err, "failed to create active")
+			return fmt.Errorf("failed to create active: %w", err)
 		}
 		if _, err := CommitActive(ctx, "committed-tmp-1", "committed-1", snapshots.Usage{}); err != nil {
-			return errors.Wrap(err, "failed to create active")
+			return fmt.Errorf("failed to create active: %w", err)
 		}
 
 		for _, opts := range []struct {
@@ -318,7 +318,7 @@ func testGetSnapshot(ctx context.Context, t *testing.T, ms *MetaStore) {
 		} {
 			active, err := CreateSnapshot(ctx, opts.Kind, opts.Name, opts.Parent)
 			if err != nil {
-				return errors.Wrap(err, "failed to create active")
+				return fmt.Errorf("failed to create active: %w", err)
 			}
 			snapshotMap[opts.Name] = active
 		}

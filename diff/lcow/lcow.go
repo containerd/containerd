@@ -21,6 +21,7 @@ package lcow
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -38,7 +39,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -111,7 +111,7 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 	var config diff.ApplyConfig
 	for _, o := range opts {
 		if err := o(ctx, desc, &config); err != nil {
-			return emptyDesc, errors.Wrap(err, "failed to apply config opt")
+			return emptyDesc, fmt.Errorf("failed to apply config opt: %w", err)
 		}
 	}
 
@@ -122,14 +122,14 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 
 	ra, err := s.store.ReaderAt(ctx, desc)
 	if err != nil {
-		return emptyDesc, errors.Wrap(err, "failed to get reader from content store")
+		return emptyDesc, fmt.Errorf("failed to get reader from content store: %w", err)
 	}
 	defer ra.Close()
 
 	processor := diff.NewProcessorChain(desc.MediaType, content.NewReader(ra))
 	for {
 		if processor, err = diff.GetProcessor(ctx, processor, config.ProcessorPayloads); err != nil {
-			return emptyDesc, errors.Wrapf(err, "failed to get stream processor for %s", desc.MediaType)
+			return emptyDesc, fmt.Errorf("failed to get stream processor for %s: %w", desc.MediaType, err)
 		}
 		if processor.MediaType() == ocispec.MediaTypeImageLayer {
 			break
@@ -157,11 +157,11 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 
 	err = tar2ext4.Convert(rc, outFile, tar2ext4.ConvertWhiteout, tar2ext4.AppendVhdFooter, tar2ext4.MaximumDiskSize(maxLcowVhdSizeGB))
 	if err != nil {
-		return emptyDesc, errors.Wrapf(err, "failed to convert tar2ext4 vhd")
+		return emptyDesc, fmt.Errorf("failed to convert tar2ext4 vhd: %w", err)
 	}
 	err = outFile.Sync()
 	if err != nil {
-		return emptyDesc, errors.Wrapf(err, "failed to sync tar2ext4 vhd to disk")
+		return emptyDesc, fmt.Errorf("failed to sync tar2ext4 vhd to disk: %w", err)
 	}
 	outFile.Close()
 
@@ -172,7 +172,7 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 
 	err = security.GrantVmGroupAccess(layerPath)
 	if err != nil {
-		return emptyDesc, errors.Wrapf(err, "failed GrantVmGroupAccess on layer vhd: %v", layerPath)
+		return emptyDesc, fmt.Errorf("failed GrantVmGroupAccess on layer vhd: %v: %w", layerPath, err)
 	}
 
 	return ocispec.Descriptor{
@@ -185,7 +185,7 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 // Compare creates a diff between the given mounts and uploads the result
 // to the content store.
 func (s windowsLcowDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
-	return emptyDesc, errors.Wrap(errdefs.ErrNotImplemented, "windowsLcowDiff does not implement Compare method")
+	return emptyDesc, fmt.Errorf("windowsLcowDiff does not implement Compare method: %w", errdefs.ErrNotImplemented)
 }
 
 type readCounter struct {
@@ -201,11 +201,11 @@ func (rc *readCounter) Read(p []byte) (n int, err error) {
 
 func mountsToLayerAndParents(mounts []mount.Mount) (string, []string, error) {
 	if len(mounts) != 1 {
-		return "", nil, errors.Wrap(errdefs.ErrInvalidArgument, "number of mounts should always be 1 for Windows lcow-layers")
+		return "", nil, fmt.Errorf("number of mounts should always be 1 for Windows lcow-layers: %w", errdefs.ErrInvalidArgument)
 	}
 	mnt := mounts[0]
 	if mnt.Type != "lcow-layer" {
-		return "", nil, errors.Wrap(errdefs.ErrInvalidArgument, "mount layer type must be lcow-layer")
+		return "", nil, fmt.Errorf("mount layer type must be lcow-layer: %w", errdefs.ErrInvalidArgument)
 	}
 
 	parentLayerPaths, err := mnt.GetParentPaths()

@@ -17,10 +17,11 @@
 package server
 
 import (
+	"fmt"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 
-	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -38,7 +39,7 @@ func (c *criService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequ
 			// return empty without error when image not found.
 			return &runtime.RemoveImageResponse{}, nil
 		}
-		return nil, errors.Wrapf(err, "can not resolve %q locally", r.GetImage().GetImage())
+		return nil, fmt.Errorf("can not resolve %q locally: %w", r.GetImage().GetImage(), err)
 	}
 
 	// Remove all image references.
@@ -54,11 +55,11 @@ func (c *criService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequ
 		if err == nil || errdefs.IsNotFound(err) {
 			// Update image store to reflect the newest state in containerd.
 			if err := c.imageStore.Update(ctx, ref); err != nil {
-				return nil, errors.Wrapf(err, "failed to update image reference %q for %q", ref, image.ID)
+				return nil, fmt.Errorf("failed to update image reference %q for %q: %w", ref, image.ID, err)
 			}
 			continue
 		}
-		return nil, errors.Wrapf(err, "failed to delete image reference %q for %q", ref, image.ID)
+		return nil, fmt.Errorf("failed to delete image reference %q for %q: %w", ref, image.ID, err)
 	}
 	return &runtime.RemoveImageResponse{}, nil
 }

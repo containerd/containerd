@@ -42,7 +42,6 @@ import (
 	"github.com/containerd/containerd/mount"
 	cnins "github.com/containernetworking/plugins/pkg/ns"
 	"github.com/moby/sys/symlink"
-	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -54,7 +53,7 @@ import (
 func newNS(baseDir string) (nsPath string, err error) {
 	b := make([]byte, 16)
 	if _, err := rand.Reader.Read(b); err != nil {
-		return "", errors.Wrap(err, "failed to generate random netns name")
+		return "", fmt.Errorf("failed to generate random netns name: %w", err)
 	}
 
 	// Create the directory for mounting network namespaces
@@ -113,13 +112,13 @@ func newNS(baseDir string) (nsPath string, err error) {
 		// are no threads in the ns.
 		err = unix.Mount(getCurrentThreadNetNSPath(), nsPath, "none", unix.MS_BIND, "")
 		if err != nil {
-			err = errors.Wrapf(err, "failed to bind mount ns at %s", nsPath)
+			err = fmt.Errorf("failed to bind mount ns at %s: %w", nsPath, err)
 		}
 	})()
 	wg.Wait()
 
 	if err != nil {
-		return "", errors.Wrap(err, "failed to create namespace")
+		return "", fmt.Errorf("failed to create namespace: %w", err)
 	}
 
 	return nsPath, nil
@@ -131,17 +130,17 @@ func unmountNS(path string) error {
 		if os.IsNotExist(err) {
 			return nil
 		}
-		return errors.Wrap(err, "failed to stat netns")
+		return fmt.Errorf("failed to stat netns: %w", err)
 	}
 	path, err := symlink.FollowSymlinkInScope(path, "/")
 	if err != nil {
-		return errors.Wrap(err, "failed to follow symlink")
+		return fmt.Errorf("failed to follow symlink: %w", err)
 	}
 	if err := mount.Unmount(path, unix.MNT_DETACH); err != nil && !os.IsNotExist(err) {
-		return errors.Wrap(err, "failed to umount netns")
+		return fmt.Errorf("failed to umount netns: %w", err)
 	}
 	if err := os.RemoveAll(path); err != nil {
-		return errors.Wrap(err, "failed to remove netns")
+		return fmt.Errorf("failed to remove netns: %w", err)
 	}
 	return nil
 }
@@ -163,7 +162,7 @@ type NetNS struct {
 func NewNetNS(baseDir string) (*NetNS, error) {
 	path, err := newNS(baseDir)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to setup netns")
+		return nil, fmt.Errorf("failed to setup netns: %w", err)
 	}
 	return &NetNS{path: path}, nil
 }
@@ -190,14 +189,14 @@ func (n *NetNS) Closed() (bool, error) {
 		if _, ok := err.(cnins.NSPathNotNSErr); ok {
 			// The network namespace is not mounted, remove it.
 			if err := os.RemoveAll(n.path); err != nil {
-				return false, errors.Wrap(err, "remove netns")
+				return false, fmt.Errorf("remove netns: %w", err)
 			}
 			return true, nil
 		}
-		return false, errors.Wrap(err, "get netns fd")
+		return false, fmt.Errorf("get netns fd: %w", err)
 	}
 	if err := ns.Close(); err != nil {
-		return false, errors.Wrap(err, "close netns fd")
+		return false, fmt.Errorf("close netns fd: %w", err)
 	}
 	return false, nil
 }
@@ -211,7 +210,7 @@ func (n *NetNS) GetPath() string {
 func (n *NetNS) Do(f func(cnins.NetNS) error) error {
 	ns, err := cnins.GetNS(n.path)
 	if err != nil {
-		return errors.Wrap(err, "get netns fd")
+		return fmt.Errorf("get netns fd: %w", err)
 	}
 	defer ns.Close() // nolint: errcheck
 	return ns.Do(f)

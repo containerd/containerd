@@ -22,12 +22,12 @@ package apparmor
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 )
 
 // WithProfile sets the provided apparmor profile to the spec
@@ -76,7 +76,7 @@ func LoadDefaultProfile(name string) error {
 		return err
 	}
 	if err := load(path); err != nil {
-		return errors.Wrapf(err, "load apparmor profile %s", path)
+		return fmt.Errorf("load apparmor profile %s: %w", path, err)
 	}
 	return nil
 }

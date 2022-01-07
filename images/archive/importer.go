@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -35,7 +36,6 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 )
 
 type importOpts struct {
@@ -104,16 +104,16 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opt
 		hdrName := path.Clean(hdr.Name)
 		if hdrName == ocispec.ImageLayoutFile {
 			if err = onUntarJSON(tr, &ociLayout); err != nil {
-				return ocispec.Descriptor{}, errors.Wrapf(err, "untar oci layout %q", hdr.Name)
+				return ocispec.Descriptor{}, fmt.Errorf("untar oci layout %q: %w", hdr.Name, err)
 			}
 		} else if hdrName == "manifest.json" {
 			if err = onUntarJSON(tr, &mfsts); err != nil {
-				return ocispec.Descriptor{}, errors.Wrapf(err, "untar manifest %q", hdr.Name)
+				return ocispec.Descriptor{}, fmt.Errorf("untar manifest %q: %w", hdr.Name, err)
 			}
 		} else {
 			dgst, err := onUntarBlob(ctx, tr, store, hdr.Size, "tar-"+hdrName)
 			if err != nil {
-				return ocispec.Descriptor{}, errors.Wrapf(err, "failed to ingest %q", hdr.Name)
+				return ocispec.Descriptor{}, fmt.Errorf("failed to ingest %q: %w", hdr.Name, err)
 			}
 
 			blobs[hdrName] = ocispec.Descriptor{
@@ -128,12 +128,12 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opt
 	// as Docker v1.1 or v1.2.
 	if ociLayout.Version != "" {
 		if ociLayout.Version != ocispec.ImageLayoutVersion {
-			return ocispec.Descriptor{}, errors.Errorf("unsupported OCI version %s", ociLayout.Version)
+			return ocispec.Descriptor{}, fmt.Errorf("unsupported OCI version %s", ociLayout.Version)
 		}
 
 		idx, ok := blobs["index.json"]
 		if !ok {
-			return ocispec.Descriptor{}, errors.Errorf("missing index.json in OCI layout %s", ocispec.ImageLayoutVersion)
+			return ocispec.Descriptor{}, fmt.Errorf("missing index.json in OCI layout %s", ocispec.ImageLayoutVersion)
 		}
 
 		idx.MediaType = ocispec.MediaTypeImageIndex
@@ -147,7 +147,7 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opt
 	for name, linkname := range symlinks {
 		desc, ok := blobs[linkname]
 		if !ok {
-			return ocispec.Descriptor{}, errors.Errorf("no target for symlink layer from %q to %q", name, linkname)
+			return ocispec.Descriptor{}, fmt.Errorf("no target for symlink layer from %q to %q", name, linkname)
 		}
 		blobs[name] = desc
 	}
@@ -160,13 +160,13 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opt
 	for _, mfst := range mfsts {
 		config, ok := blobs[mfst.Config]
 		if !ok {
-			return ocispec.Descriptor{}, errors.Errorf("image config %q not found", mfst.Config)
+			return ocispec.Descriptor{}, fmt.Errorf("image config %q not found", mfst.Config)
 		}
 		config.MediaType = images.MediaTypeDockerSchema2Config
 
 		layers, err := resolveLayers(ctx, store, mfst.Layers, blobs, iopts.compress)
 		if err != nil {
-			return ocispec.Descriptor{}, errors.Wrap(err, "failed to resolve layers")
+			return ocispec.Descriptor{}, fmt.Errorf("failed to resolve layers: %w", err)
 		}
 
 		manifest := struct {
@@ -183,12 +183,12 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opt
 
 		desc, err := writeManifest(ctx, store, manifest, manifest.MediaType)
 		if err != nil {
-			return ocispec.Descriptor{}, errors.Wrap(err, "write docker manifest")
+			return ocispec.Descriptor{}, fmt.Errorf("write docker manifest: %w", err)
 		}
 
 		imgPlatforms, err := images.Platforms(ctx, store, desc)
 		if err != nil {
-			return ocispec.Descriptor{}, errors.Wrap(err, "unable to resolve platform")
+			return ocispec.Descriptor{}, fmt.Errorf("unable to resolve platform: %w", err)
 		}
 		if len(imgPlatforms) > 0 {
 			// Only one platform can be resolved from non-index manifest,
@@ -257,7 +257,7 @@ func resolveLayers(ctx context.Context, store content.Store, layerFiles []string
 	for i, f := range layerFiles {
 		desc, ok := blobs[f]
 		if !ok {
-			return nil, errors.Errorf("layer %q not found", f)
+			return nil, fmt.Errorf("layer %q not found", f)
 		}
 		layers[i] = desc
 		descs[desc.Digest] = &layers[i]
@@ -277,7 +277,7 @@ func resolveLayers(ctx context.Context, store content.Store, layerFiles []string
 		return nil
 	}, filters...)
 	if err != nil {
-		return nil, errors.Wrap(err, "failure checking for compressed blobs")
+		return nil, fmt.Errorf("failure checking for compressed blobs: %w", err)
 	}
 
 	for i, desc := range layers {
@@ -287,12 +287,12 @@ func resolveLayers(ctx context.Context, store content.Store, layerFiles []string
 		// Open blob, resolve media type
 		ra, err := store.ReaderAt(ctx, desc)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to open %q (%s)", layerFiles[i], desc.Digest)
+			return nil, fmt.Errorf("failed to open %q (%s): %w", layerFiles[i], desc.Digest, err)
 		}
 		s, err := compression.DecompressStream(content.NewReader(ra))
 		if err != nil {
 			ra.Close()
-			return nil, errors.Wrapf(err, "failed to detect compression for %q", layerFiles[i])
+			return nil, fmt.Errorf("failed to detect compression for %q: %w", layerFiles[i], err)
 		}
 		if s.GetCompression() == compression.Uncompressed {
 			if compress {
@@ -322,7 +322,7 @@ func resolveLayers(ctx context.Context, store content.Store, layerFiles []string
 func compressBlob(ctx context.Context, cs content.Store, r io.Reader, ref string, opts ...content.Opt) (desc ocispec.Descriptor, err error) {
 	w, err := content.OpenWriter(ctx, cs, content.WithRef(ref))
 	if err != nil {
-		return ocispec.Descriptor{}, errors.Wrap(err, "failed to open writer")
+		return ocispec.Descriptor{}, fmt.Errorf("failed to open writer: %w", err)
 	}
 
 	defer func() {
@@ -332,7 +332,7 @@ func compressBlob(ctx context.Context, cs content.Store, r io.Reader, ref string
 		}
 	}()
 	if err := w.Truncate(0); err != nil {
-		return ocispec.Descriptor{}, errors.Wrap(err, "failed to truncate writer")
+		return ocispec.Descriptor{}, fmt.Errorf("failed to truncate writer: %w", err)
 	}
 
 	cw, err := compression.CompressStream(w, compression.Gzip)
@@ -349,7 +349,7 @@ func compressBlob(ctx context.Context, cs content.Store, r io.Reader, ref string
 
 	cst, err := w.Status()
 	if err != nil {
-		return ocispec.Descriptor{}, errors.Wrap(err, "failed to get writer status")
+		return ocispec.Descriptor{}, fmt.Errorf("failed to get writer status: %w", err)
 	}
 
 	desc.Digest = w.Digest()
@@ -357,7 +357,7 @@ func compressBlob(ctx context.Context, cs content.Store, r io.Reader, ref string
 
 	if err := w.Commit(ctx, desc.Size, desc.Digest, opts...); err != nil {
 		if !errdefs.IsAlreadyExists(err) {
-			return ocispec.Descriptor{}, errors.Wrap(err, "failed to commit")
+			return ocispec.Descriptor{}, fmt.Errorf("failed to commit: %w", err)
 		}
 	}
 

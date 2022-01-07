@@ -21,6 +21,7 @@ package devmapper
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,7 +35,6 @@ import (
 	"github.com/containerd/containerd/snapshots/devmapper/dmsetup"
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	exec "golang.org/x/sys/execabs"
 )
@@ -76,12 +76,12 @@ func NewSnapshotter(ctx context.Context, config *Config) (*Snapshotter, error) {
 	var cleanupFn []closeFunc
 
 	if err := os.MkdirAll(config.RootPath, 0750); err != nil && !os.IsExist(err) {
-		return nil, errors.Wrapf(err, "failed to create root directory: %s", config.RootPath)
+		return nil, fmt.Errorf("failed to create root directory: %s: %w", config.RootPath, err)
 	}
 
 	store, err := storage.NewMetaStore(filepath.Join(config.RootPath, metadataFileName))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create metastore")
+		return nil, fmt.Errorf("failed to create metastore: %w", err)
 	}
 
 	cleanupFn = append(cleanupFn, store.Close)
@@ -481,7 +481,7 @@ func mkfs(ctx context.Context, fs fsType, fsOptions string, path string) error {
 	b, err := exec.Command(mkfsCommand, args...).CombinedOutput()
 	out := string(b)
 	if err != nil {
-		return errors.Wrapf(err, "%s couldn't initialize %q: %s", mkfsCommand, path, out)
+		return fmt.Errorf("%s couldn't initialize %q: %s: %w", mkfsCommand, path, out, err)
 	}
 
 	log.G(ctx).Debugf("mkfs:\n%s", out)
@@ -539,12 +539,12 @@ func (s *Snapshotter) withTransaction(ctx context.Context, writable bool, fn fun
 	if err != nil || !writable {
 		if terr := trans.Rollback(); terr != nil {
 			log.G(ctx).WithError(terr).Error("failed to rollback transaction")
-			result = multierror.Append(result, errors.Wrap(terr, "rollback failed"))
+			result = multierror.Append(result, fmt.Errorf("rollback failed: %w", terr))
 		}
 	} else {
 		if terr := trans.Commit(); terr != nil {
 			log.G(ctx).WithError(terr).Error("failed to commit transaction")
-			result = multierror.Append(result, errors.Wrap(terr, "commit failed"))
+			result = multierror.Append(result, fmt.Errorf("commit failed: %w", terr))
 		}
 	}
 

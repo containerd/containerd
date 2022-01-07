@@ -18,6 +18,7 @@ package events
 
 import (
 	"context"
+	"fmt"
 
 	api "github.com/containerd/containerd/api/services/events/v1"
 	apittrpc "github.com/containerd/containerd/api/services/ttrpc/events/v1"
@@ -27,7 +28,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/ttrpc"
 	ptypes "github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 
@@ -98,11 +98,11 @@ func (s *service) Subscribe(req *api.SubscribeRequest, srv api.Events_SubscribeS
 		select {
 		case ev := <-eventq:
 			if err := srv.Send(toProto(ev)); err != nil {
-				return errors.Wrapf(err, "failed sending event to subscriber")
+				return fmt.Errorf("failed sending event to subscriber: %w", err)
 			}
 		case err := <-errq:
 			if err != nil {
-				return errors.Wrapf(err, "subscription error")
+				return fmt.Errorf("subscription error: %w", err)
 			}
 
 			return nil
