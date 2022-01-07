@@ -19,7 +19,6 @@ package continuity
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"sort"
 
@@ -92,8 +91,7 @@ func BuildManifest(ctx Context) (*Manifest, error) {
 			if err == ErrNotFound {
 				return nil
 			}
-			log.Printf("error getting resource %q: %v", p, err)
-			return err
+			return fmt.Errorf("failed to get resource %q: %w", p, err)
 		}
 
 		// add to the hardlink manager

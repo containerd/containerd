@@ -1,5 +1,20 @@
 CHANGES
 
+v1.1.3:
+  - Release v1.1.3 addresses issue #62 due to re-tagging of v1.1.2
+  - docs: update referenced containerd project branch to main
+  - Update linter to match containerd repo
+  - Update CI golang version
+  - Updated to containerd 1.5.8
+
+v1.1.2:
+  - Decouple CreateCryptoConfig() from github.com/urfave/cli
+  - Updated to containerd 1.5.7
+  - Implemented ConvertFunc for image en- and decryption
+  - Replace pkg/errors with errors package
+  - Updated to ocicrypt 1.1.2
+  - Sync'ed ctr-enc with ctr of containerd-1.5.0
+
 v1.1.1:
   - rebased on ocicrypt 1.1.1
 

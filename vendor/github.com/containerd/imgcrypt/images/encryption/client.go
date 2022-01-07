@@ -18,6 +18,7 @@ package encryption
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
@@ -25,10 +26,10 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/imgcrypt"
 	"github.com/containerd/typeurl"
+
 	encconfig "github.com/containers/ocicrypt/config"
 	"github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 )
 
 // WithDecryptedUnpack allows to pass parameters the 'layertool' needs to the applier
@@ -40,7 +41,7 @@ func WithDecryptedUnpack(data *imgcrypt.Payload) diff.ApplyOpt {
 		data.Descriptor = desc
 		any, err := typeurl.MarshalAny(data)
 		if err != nil {
-			return errors.Wrapf(err, "failed to marshal payload")
+			return fmt.Errorf("failed to marshal payload: %w", err)
 		}
 
 		for _, id := range imgcrypt.PayloadToolIDs {

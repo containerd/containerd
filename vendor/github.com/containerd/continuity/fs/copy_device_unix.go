@@ -1,3 +1,6 @@
+//go:build openbsd || solaris || netbsd
+// +build openbsd solaris netbsd
+
 /*
    Copyright The containerd Authors.
 
@@ -14,31 +17,20 @@
    limitations under the License.
 */
 
-package imgcrypt
+package fs
 
 import (
-	"github.com/containerd/typeurl"
+	"errors"
+	"os"
+	"syscall"
 
-	encconfig "github.com/containers/ocicrypt/config"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sys/unix"
 )
 
-const (
-	PayloadURI = "io.containerd.ocicrypt.v1.Payload"
-)
-
-var PayloadToolIDs = []string{
-	"io.containerd.ocicrypt.decoder.v1.tar",
-	"io.containerd.ocicrypt.decoder.v1.tar.gzip",
-}
-
-func init() {
-	typeurl.Register(&Payload{}, PayloadURI)
-}
-
-// Payload holds data that the external layer decryption tool
-// needs for decrypting a layer
-type Payload struct {
-	DecryptConfig encconfig.DecryptConfig
-	Descriptor    ocispec.Descriptor
+func copyDevice(dst string, fi os.FileInfo) error {
+	st, ok := fi.Sys().(*syscall.Stat_t)
+	if !ok {
+		return errors.New("unsupported stat type")
+	}
+	return unix.Mknod(dst, uint32(fi.Mode()), int(st.Rdev))
 }

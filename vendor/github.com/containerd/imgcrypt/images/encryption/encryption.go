@@ -20,22 +20,22 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
 
-	"github.com/containerd/containerd/images"
-	"github.com/containers/ocicrypt"
-	encconfig "github.com/containers/ocicrypt/config"
-
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/images/converter"
 	"github.com/containerd/containerd/platforms"
-	encocispec "github.com/containers/ocicrypt/spec"
-	digest "github.com/opencontainers/go-digest"
-	specs "github.com/opencontainers/image-spec/specs-go"
-	"github.com/pkg/errors"
 
+	"github.com/containers/ocicrypt"
+	encconfig "github.com/containers/ocicrypt/config"
+	encocispec "github.com/containers/ocicrypt/spec"
+	"github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -116,7 +116,7 @@ func encryptLayer(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc 
 		newDesc.MediaType = encocispec.MediaTypeLayerEnc
 
 	default:
-		return ocispec.Descriptor{}, nil, nil, errors.Errorf("Encryption: unsupporter layer MediaType: %s\n", desc.MediaType)
+		return ocispec.Descriptor{}, nil, nil, fmt.Errorf("unsupporter layer MediaType: %s", desc.MediaType)
 	}
 
 	return newDesc, encLayerReader, encLayerFinalizer, nil
@@ -141,7 +141,7 @@ func DecryptLayer(dc *encconfig.DecryptConfig, dataReader io.Reader, desc ocispe
 	case encocispec.MediaTypeLayerEnc:
 		newDesc.MediaType = images.MediaTypeDockerSchema2Layer
 	default:
-		return ocispec.Descriptor{}, nil, "", errors.Errorf("Decryption: unsupporter layer MediaType: %s\n", desc.MediaType)
+		return ocispec.Descriptor{}, nil, "", fmt.Errorf("unsupporter layer MediaType: %s", desc.MediaType)
 	}
 	return newDesc, resultReader, layerDigest, nil
 }
@@ -166,7 +166,7 @@ func decryptLayer(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc 
 	case encocispec.MediaTypeLayerEnc:
 		newDesc.MediaType = images.MediaTypeDockerSchema2Layer
 	default:
-		return ocispec.Descriptor{}, nil, errors.Errorf("Decryption: unsupporter layer MediaType: %s\n", desc.MediaType)
+		return ocispec.Descriptor{}, nil, fmt.Errorf("unsupporter layer MediaType: %s", desc.MediaType)
 	}
 	return newDesc, resultReader, nil
 }
@@ -209,7 +209,7 @@ func cryptLayer(ctx context.Context, cs content.Store, desc ocispec.Descriptor, 
 
 		if haveDigest {
 			if err := content.WriteBlob(ctx, cs, ref, resultReader, newDesc); err != nil {
-				return ocispec.Descriptor{}, errors.Wrap(err, "failed to write config")
+				return ocispec.Descriptor{}, fmt.Errorf("failed to write config: %w", err)
 			}
 		} else {
 			newDesc.Digest, newDesc.Size, err = ingestReader(ctx, cs, ref, resultReader)
@@ -223,7 +223,7 @@ func cryptLayer(ctx context.Context, cs content.Store, desc ocispec.Descriptor, 
 	if encLayerFinalizer != nil {
 		annotations, err := encLayerFinalizer()
 		if err != nil {
-			return ocispec.Descriptor{}, errors.Wrap(err, "Error getting annotations from encLayer finalizer")
+			return ocispec.Descriptor{}, fmt.Errorf("error getting annotations from encLayer finalizer: %w", err)
 		}
 		for k, v := range annotations {
 			newDesc.Annotations[k] = v
@@ -235,22 +235,22 @@ func cryptLayer(ctx context.Context, cs content.Store, desc ocispec.Descriptor, 
 func ingestReader(ctx context.Context, cs content.Ingester, ref string, r io.Reader) (digest.Digest, int64, error) {
 	cw, err := content.OpenWriter(ctx, cs, content.WithRef(ref))
 	if err != nil {
-		return "", 0, errors.Wrap(err, "failed to open writer")
+		return "", 0, fmt.Errorf("failed to open writer: %w", err)
 	}
 	defer cw.Close()
 
 	if _, err := content.CopyReader(cw, r); err != nil {
-		return "", 0, errors.Wrap(err, "copy failed")
+		return "", 0, fmt.Errorf("copy failed: %w", err)
 	}
 
 	st, err := cw.Status()
 	if err != nil {
-		return "", 0, errors.Wrap(err, "failed to get state")
+		return "", 0, fmt.Errorf("failed to get state: %w", err)
 	}
 
 	if err := cw.Commit(ctx, st.Offset, ""); err != nil {
 		if !errdefs.IsAlreadyExists(err) {
-			return "", 0, errors.Wrapf(err, "failed commit on ref %q", ref)
+			return "", 0, fmt.Errorf("failed commit on ref %q: %w", ref, err)
 		}
 	}
 
@@ -304,7 +304,7 @@ func cryptChildren(ctx context.Context, cs content.Store, desc ocispec.Descripto
 			// never encrypt/decrypt
 			newLayers = append(newLayers, child)
 		default:
-			return ocispec.Descriptor{}, false, errors.Errorf("bad/unhandled MediaType %s in encryptChildren\n", child.MediaType)
+			return ocispec.Descriptor{}, false, fmt.Errorf("bad/unhandled MediaType %s in encryptChildren", child.MediaType)
 		}
 	}
 
@@ -319,7 +319,7 @@ func cryptChildren(ctx context.Context, cs content.Store, desc ocispec.Descripto
 
 		mb, err := json.MarshalIndent(newManifest, "", "   ")
 		if err != nil {
-			return ocispec.Descriptor{}, false, errors.Wrap(err, "failed to marshal image")
+			return ocispec.Descriptor{}, false, fmt.Errorf("failed to marshal image: %w", err)
 		}
 
 		newDesc := ocispec.Descriptor{
@@ -338,7 +338,7 @@ func cryptChildren(ctx context.Context, cs content.Store, desc ocispec.Descripto
 		ref := fmt.Sprintf("manifest-%s", newDesc.Digest.String())
 
 		if err := content.WriteBlob(ctx, cs, ref, bytes.NewReader(mb), newDesc, content.WithLabels(labels)); err != nil {
-			return ocispec.Descriptor{}, false, errors.Wrap(err, "failed to write config")
+			return ocispec.Descriptor{}, false, fmt.Errorf("failed to write config: %w", err)
 		}
 		return newDesc, true, nil
 	}
@@ -399,7 +399,7 @@ func cryptManifestList(ctx context.Context, cs content.Store, desc ocispec.Descr
 
 		mb, err := json.MarshalIndent(newIndex, "", "   ")
 		if err != nil {
-			return ocispec.Descriptor{}, false, errors.Wrap(err, "failed to marshal index")
+			return ocispec.Descriptor{}, false, fmt.Errorf("failed to marshal index: %w", err)
 		}
 
 		newDesc := ocispec.Descriptor{
@@ -416,7 +416,7 @@ func cryptManifestList(ctx context.Context, cs content.Store, desc ocispec.Descr
 		ref := fmt.Sprintf("index-%s", newDesc.Digest.String())
 
 		if err = content.WriteBlob(ctx, cs, ref, bytes.NewReader(mb), newDesc, content.WithLabels(labels)); err != nil {
-			return ocispec.Descriptor{}, false, errors.Wrap(err, "failed to write index")
+			return ocispec.Descriptor{}, false, fmt.Errorf("failed to write index: %w", err)
 		}
 		return newDesc, true, nil
 	}
@@ -428,7 +428,7 @@ func cryptManifestList(ctx context.Context, cs content.Store, desc ocispec.Descr
 // representing a manifest list or a single manifest
 func cryptImage(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter, cryptoOp cryptoOp) (ocispec.Descriptor, bool, error) {
 	if cc == nil {
-		return ocispec.Descriptor{}, false, errors.Wrapf(errdefs.ErrInvalidArgument, "CryptoConfig must not be nil")
+		return ocispec.Descriptor{}, false, errors.New("invalid argument: CryptoConfig must not be nil")
 	}
 	switch desc.MediaType {
 	case ocispec.MediaTypeImageIndex, images.MediaTypeDockerSchema2ManifestList:
@@ -436,7 +436,7 @@ func cryptImage(ctx context.Context, cs content.Store, desc ocispec.Descriptor, 
 	case ocispec.MediaTypeImageManifest, images.MediaTypeDockerSchema2Manifest:
 		return cryptManifest(ctx, cs, desc, cc, lf, cryptoOp)
 	default:
-		return ocispec.Descriptor{}, false, errors.Errorf("CryptImage: Unhandled media type: %s", desc.MediaType)
+		return ocispec.Descriptor{}, false, fmt.Errorf("unhandled media type: %s", desc.MediaType)
 	}
 }
 
@@ -448,6 +448,28 @@ func EncryptImage(ctx context.Context, cs content.Store, desc ocispec.Descriptor
 // DecryptImage decrypts an image; it accepts either an OCI descriptor representing a manifest list or a single manifest
 func DecryptImage(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter) (ocispec.Descriptor, bool, error) {
 	return cryptImage(ctx, cs, desc, cc, lf, cryptoOpDecrypt)
+}
+
+// GetImageEncryptConverter returns a converter function for image encryption
+func GetImageEncryptConverter(cc *encconfig.CryptoConfig, lf LayerFilter) converter.ConvertFunc {
+	return func(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
+		newDesc, _, err := EncryptImage(ctx, cs, desc, cc, lf)
+		if err != nil {
+			return nil, err
+		}
+		return &newDesc, nil
+	}
+}
+
+// GetImageDecryptConverter returns a converter function for image decryption
+func GetImageDecryptConverter(cc *encconfig.CryptoConfig, lf LayerFilter) converter.ConvertFunc {
+	return func(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
+		newDesc, _, err := DecryptImage(ctx, cs, desc, cc, lf)
+		if err != nil {
+			return nil, err
+		}
+		return &newDesc, nil
+	}
 }
 
 // CheckAuthorization checks whether a user has the right keys to be allowed to access an image (every layer)
@@ -462,7 +484,7 @@ func CheckAuthorization(ctx context.Context, cs content.Store, desc ocispec.Desc
 
 	_, _, err := cryptImage(ctx, cs, desc, &cc, lf, cryptoOpUnwrapOnly)
 	if err != nil {
-		return errors.Wrapf(err, "you are not authorized to use this image")
+		return fmt.Errorf("you are not authorized to use this image: %w", err)
 	}
 	return nil
 }

@@ -1,5 +1,5 @@
-//go:build openbsd || solaris
-// +build openbsd solaris
+//go:build linux || openbsd || solaris
+// +build linux openbsd solaris
 
 /*
    Copyright The containerd Authors.
@@ -20,22 +20,26 @@
 package fs
 
 import (
-	"errors"
-	"os"
 	"syscall"
-
-	"golang.org/x/sys/unix"
+	"time"
 )
 
-func copyDevice(dst string, fi os.FileInfo) error {
-	st, ok := fi.Sys().(*syscall.Stat_t)
-	if !ok {
-		return errors.New("unsupported stat type")
-	}
-	return unix.Mknod(dst, uint32(fi.Mode()), int(st.Rdev))
+// StatAtime returns the Atim
+func StatAtime(st *syscall.Stat_t) syscall.Timespec {
+	return st.Atim
 }
 
-func utimesNano(name string, atime, mtime syscall.Timespec) error {
-	timespec := []syscall.Timespec{atime, mtime}
-	return syscall.UtimesNano(name, timespec)
+// StatCtime returns the Ctim
+func StatCtime(st *syscall.Stat_t) syscall.Timespec {
+	return st.Ctim
+}
+
+// StatMtime returns the Mtim
+func StatMtime(st *syscall.Stat_t) syscall.Timespec {
+	return st.Mtim
+}
+
+// StatATimeAsTime returns st.Atim as a time.Time
+func StatATimeAsTime(st *syscall.Stat_t) time.Time {
+	return time.Unix(st.Atim.Unix())
 }
