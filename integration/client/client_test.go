@@ -190,7 +190,7 @@ func TestMain(m *testing.M) {
 			}
 		}
 		if err := syscall.Unmount(defaultRoot, syscall.MNT_FORCE); err != nil {
-			fmt.Fprintln(os.Stdout, "failed to  unmount test root dir", err)
+			fmt.Fprintln(os.Stderr, "failed to  unmount test root dir", err)
 		}
 		if err := sys.ForceRemoveAll(defaultRoot); err != nil {
 			fmt.Fprintln(os.Stderr, "failed to remove test root dir", err)
