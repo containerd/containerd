@@ -151,7 +151,7 @@ func generate(p *data, o io.Writer) error {
 func load(path string) error {
 	out, err := aaParser("-Kr", path)
 	if err != nil {
-		return fmt.Errorf("%s: %s", err, out)
+		return fmt.Errorf("parser error(%q): %w", strings.TrimSpace(out), err)
 	}
 	return nil
 }
@@ -164,10 +164,7 @@ func macroExists(m string) bool {
 
 func aaParser(args ...string) (string, error) {
 	out, err := exec.Command("apparmor_parser", args...).CombinedOutput()
-	if err != nil {
-		return "", err
-	}
-	return string(out), nil
+	return string(out), err
 }
 
 func getVersion() (int, error) {
