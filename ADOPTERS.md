@@ -12,7 +12,7 @@ including the Balena project listed below.
 
 **_[IBM Cloud Private (ICP)](https://www.ibm.com/cloud/private)_** - IBM's on-premises cloud offering has containerd as a "tech preview" CRI runtime for the Kubernetes offered within this product for the past two releases, and plans to fully migrate to containerd in a future release.
 
-**_[Google Cloud Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine/)_** - offers containerd as the CRI runtime in **beta** for recent versions of Kubernetes.
+**_[Google Cloud Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine/)_** - containerd has been offered in GKE since version 1.14 and has been the default runtime since version 1.19. It is also the only supported runtime for GKE Autopilot from the launch. [More details](https://cloud.google.com/kubernetes-engine/docs/concepts/using-containerd)
 
 **_[AWS Fargate](https://aws.amazon.com/fargate)_** - uses containerd + Firecracker (noted below) as the runtime and isolation technology for containers run in the Fargate platform. Fargate is a serverless, container-native compute offering from Amazon Web Services.
 
