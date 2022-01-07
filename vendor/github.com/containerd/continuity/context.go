@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -152,9 +151,7 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 	}
 
 	base.xattrs, err = c.resolveXAttrs(fp, fi, base)
-	if err == ErrNotSupported {
-		log.Printf("resolving xattrs on %s not supported", fp)
-	} else if err != nil {
+	if err != nil && err != ErrNotSupported {
 		return nil, err
 	}
 
@@ -192,8 +189,7 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 	if fi.Mode()&os.ModeDevice != 0 {
 		deviceDriver, ok := c.driver.(driverpkg.DeviceInfoDriver)
 		if !ok {
-			log.Printf("device extraction not supported %s", fp)
-			return nil, ErrNotSupported
+			return nil, fmt.Errorf("device extraction is not supported for %s: %w", fp, ErrNotSupported)
 		}
 
 		// character and block devices merely need to recover the
@@ -206,8 +202,7 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 		return newDevice(*base, base.paths, major, minor)
 	}
 
-	log.Printf("%q (%v) is not supported", fp, fi.Mode())
-	return nil, ErrNotFound
+	return nil, fmt.Errorf("%q (%v) is not supported: %w", fp, fi.Mode(), ErrNotFound)
 }
 
 func (c *context) verifyMetadata(resource, target Resource) error {
@@ -646,8 +641,7 @@ func (c *context) resolveXAttrs(fp string, fi os.FileInfo, base *resource) (map[
 	if fi.Mode().IsRegular() || fi.Mode().IsDir() {
 		xattrDriver, ok := c.driver.(driverpkg.XAttrDriver)
 		if !ok {
-			log.Println("xattr extraction not supported")
-			return nil, ErrNotSupported
+			return nil, fmt.Errorf("xattr extraction is not supported: %w", ErrNotSupported)
 		}
 
 		return xattrDriver.Getxattr(fp)
@@ -656,8 +650,7 @@ func (c *context) resolveXAttrs(fp string, fi os.FileInfo, base *resource) (map[
 	if fi.Mode()&os.ModeSymlink != 0 {
 		lxattrDriver, ok := c.driver.(driverpkg.LXAttrDriver)
 		if !ok {
-			log.Println("xattr extraction for symlinks not supported")
-			return nil, ErrNotSupported
+			return nil, fmt.Errorf("xattr extraction for symlinks is not supported: %w", ErrNotSupported)
 		}
 
 		return lxattrDriver.LGetxattr(fp)

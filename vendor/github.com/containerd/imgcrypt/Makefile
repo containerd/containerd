@@ -16,9 +16,14 @@
 # Base path used to install.
 DESTDIR ?= /usr/local
 
+VERSION=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
+
+CTR_LDFLAGS=-ldflags '-X github.com/containerd/containerd/version.Version=$(VERSION)'
 COMMANDS=ctd-decoder ctr-enc
+RELEASE_COMMANDS=ctd-decoder
 
 BINARIES=$(addprefix bin/,$(COMMANDS))
+RELEASE_BINARIES=$(addprefix bin/,$(RELEASE_COMMANDS))
 
 .PHONY: check build ctd-decoder
 
@@ -32,7 +37,7 @@ bin/ctd-decoder: cmd/ctd-decoder FORCE
 	go build -o $@ -v ./cmd/ctd-decoder/
 
 bin/ctr-enc: cmd/ctr FORCE
-	go build -o $@ -v ./cmd/ctr/
+	go build -o $@ ${CTR_LDFLAGS} -v ./cmd/ctr/
 
 check:
 	@echo "$@"
@@ -43,6 +48,11 @@ install:
 	@echo "$@"
 	@mkdir -p $(DESTDIR)/bin
 	@install $(BINARIES) $(DESTDIR)/bin
+
+containerd-release:
+	@echo "$@"
+	@mkdir -p $(DESTDIR)/bin
+	@install $(RELEASE_BINARIES) $(DESTDIR)/bin
 
 uninstall:
 	@echo "$@"
