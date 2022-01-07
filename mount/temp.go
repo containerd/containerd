@@ -32,7 +32,7 @@ var tempMountLocation = getTempDir()
 func WithTempMount(ctx context.Context, mounts []Mount, f func(root string) error) (err error) {
 	root, uerr := os.MkdirTemp(tempMountLocation, "containerd-mount")
 	if uerr != nil {
-		return fmt.Errorf("failed to create temp dir: %w", err)
+		return fmt.Errorf("failed to create temp dir: %w", uerr)
 	}
 	// We use Remove here instead of RemoveAll.
 	// The RemoveAll will delete the temp dir and all children it contains.

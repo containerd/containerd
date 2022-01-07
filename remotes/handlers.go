@@ -244,7 +244,7 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, st
 			if (manifestStack[i].MediaType == ocispec.MediaTypeImageIndex ||
 				manifestStack[i].MediaType == images.MediaTypeDockerSchema2ManifestList) &&
 				errors.Unwrap(err) != nil && strings.Contains(errors.Unwrap(err).Error(), "400 Bad Request") {
-				return fmt.Errorf("manifest list/index references to blobs and/or manifests are missing in your target registry: %w                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             ", err)
+				return fmt.Errorf("manifest list/index references to blobs and/or manifests are missing in your target registry: %w", err)
 			}
 			return err
 		}
