@@ -19,6 +19,7 @@ package shim
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -29,7 +30,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
 	exec "golang.org/x/sys/execabs"
 )
 

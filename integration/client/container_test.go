@@ -46,7 +46,6 @@ import (
 	"github.com/containerd/typeurl"
 	gogotypes "github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	exec "golang.org/x/sys/execabs"
 )
 
@@ -1903,7 +1902,7 @@ func TestRegressionIssue4769(t *testing.T) {
 	select {
 	case et := <-statusC:
 		if got := et.ExitCode(); got != 0 {
-			t.Fatal(errors.Errorf("expect zero exit status, but got %v", got))
+			t.Fatal(fmt.Errorf("expect zero exit status, but got %v", got))
 		}
 	case <-time.After(timeout):
 		t.Fatal(fmt.Errorf("failed to get exit event in time"))
@@ -1913,21 +1912,21 @@ func TestRegressionIssue4769(t *testing.T) {
 	select {
 	case et := <-eventStream:
 		if et.Event == nil {
-			t.Fatal(errors.Errorf("unexpected empty event: %+v", et))
+			t.Fatal(fmt.Errorf("unexpected empty event: %+v", et))
 		}
 
 		v, err := typeurl.UnmarshalAny(et.Event)
 		if err != nil {
-			t.Fatal(errors.Wrap(err, "failed to unmarshal event"))
+			t.Fatal(fmt.Errorf("failed to unmarshal event: %w", err))
 		}
 
 		if e, ok := v.(*apievents.TaskExit); !ok {
-			t.Fatal(errors.Errorf("unexpected event type: %+v", v))
+			t.Fatal(fmt.Errorf("unexpected event type: %+v", v))
 		} else if e.ExitStatus != 0 {
-			t.Fatal(errors.Errorf("expect zero exit status, but got %v", e.ExitStatus))
+			t.Fatal(fmt.Errorf("expect zero exit status, but got %v", e.ExitStatus))
 		}
 	case err := <-errC:
-		t.Fatal(errors.Wrap(err, "unexpected error from event service"))
+		t.Fatal(fmt.Errorf("unexpected error from event service: %w", err))
 
 	case <-time.After(timeout):
 		t.Fatal(fmt.Errorf("failed to get exit event in time"))
@@ -1940,9 +1939,9 @@ func TestRegressionIssue4769(t *testing.T) {
 	// check duplicate event should not show up
 	select {
 	case event := <-eventStream:
-		t.Fatal(errors.Errorf("unexpected exit event: %+v", event))
+		t.Fatal(fmt.Errorf("unexpected exit event: %+v", event))
 	case err := <-errC:
-		t.Fatal(errors.Wrap(err, "unexpected error from event service"))
+		t.Fatal(fmt.Errorf("unexpected error from event service: %w", err))
 	case <-time.After(timeout):
 	}
 }

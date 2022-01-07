@@ -17,6 +17,7 @@
 package server
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -24,7 +25,6 @@ import (
 	"text/template"
 
 	"github.com/containerd/containerd/log"
-	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -61,7 +61,7 @@ func (c *criService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateR
 	}
 	routes, err := getRoutes(cidrs)
 	if err != nil {
-		return nil, errors.Wrap(err, "get routes")
+		return nil, fmt.Errorf("get routes: %w", err)
 	}
 
 	confTemplate := c.config.NetworkPluginConfTemplate
@@ -85,15 +85,15 @@ func (c *criService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateR
 	// generate cni config file from the template with updated pod cidr.
 	t, err := template.ParseFiles(confTemplate)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse cni config template %q", confTemplate)
+		return nil, fmt.Errorf("failed to parse cni config template %q: %w", confTemplate, err)
 	}
 	if err := os.MkdirAll(c.config.NetworkPluginConfDir, 0755); err != nil {
-		return nil, errors.Wrapf(err, "failed to create cni config directory: %q", c.config.NetworkPluginConfDir)
+		return nil, fmt.Errorf("failed to create cni config directory: %q: %w", c.config.NetworkPluginConfDir, err)
 	}
 	confFile := filepath.Join(c.config.NetworkPluginConfDir, cniConfigFileName)
 	f, err := os.OpenFile(confFile, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open cni config file %q", confFile)
+		return nil, fmt.Errorf("failed to open cni config file %q: %w", confFile, err)
 	}
 	defer f.Close()
 	if err := t.Execute(f, cniConfigTemplate{
@@ -101,7 +101,7 @@ func (c *criService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateR
 		PodCIDRRanges: cidrs,
 		Routes:        routes,
 	}); err != nil {
-		return nil, errors.Wrapf(err, "failed to generate cni config file %q", confFile)
+		return nil, fmt.Errorf("failed to generate cni config file %q: %w", confFile, err)
 	}
 	return &runtime.UpdateRuntimeConfigResponse{}, nil
 }

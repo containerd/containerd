@@ -24,7 +24,6 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containernetworking/plugins/pkg/ns"
-	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -35,7 +34,7 @@ import (
 func (c *criService) portForward(ctx context.Context, id string, port int32, stream io.ReadWriteCloser) error {
 	s, err := c.sandboxStore.Get(id)
 	if err != nil {
-		return errors.Wrapf(err, "failed to find sandbox %q in store", id)
+		return fmt.Errorf("failed to find sandbox %q in store: %w", id, err)
 	}
 
 	var netNSDo func(func(ns.NetNS) error) error
@@ -45,9 +44,9 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 	hostNet := securityContext.GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE
 	if !hostNet {
 		if closed, err := s.NetNS.Closed(); err != nil {
-			return errors.Wrapf(err, "failed to check netwok namespace closed for sandbox %q", id)
+			return fmt.Errorf("failed to check netwok namespace closed for sandbox %q: %w", id, err)
 		} else if closed {
-			return errors.Errorf("network namespace for sandbox %q is closed", id)
+			return fmt.Errorf("network namespace for sandbox %q is closed", id)
 		}
 		netNSDo = s.NetNS.Do
 		netNSPath = s.NetNS.GetPath()
@@ -130,7 +129,7 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 	})
 
 	if err != nil {
-		return errors.Wrapf(err, "failed to execute portforward in network namespace %q", netNSPath)
+		return fmt.Errorf("failed to execute portforward in network namespace %q: %w", netNSPath, err)
 	}
 	log.G(ctx).Infof("Finish port forwarding for %q port %d", id, port)
 

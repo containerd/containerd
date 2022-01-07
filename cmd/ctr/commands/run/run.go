@@ -20,6 +20,7 @@ import (
 	"context"
 	gocontext "context"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -34,7 +35,6 @@ import (
 	"github.com/containerd/containerd/oci"
 	gocni "github.com/containerd/go-cni"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )

@@ -21,12 +21,13 @@ package devmapper
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"path/filepath"
 	"strconv"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/log"
@@ -72,7 +73,7 @@ func NewPoolDevice(ctx context.Context, config *Config) (*PoolDevice, error) {
 	// Make sure pool exists and available
 	poolPath := dmsetup.GetFullDevicePath(config.PoolName)
 	if _, err := dmsetup.Info(poolPath); err != nil {
-		return nil, errors.Wrapf(err, "failed to query pool %q", poolPath)
+		return nil, fmt.Errorf("failed to query pool %q: %w", poolPath, err)
 	}
 
 	poolDevice := &PoolDevice{
@@ -82,7 +83,7 @@ func NewPoolDevice(ctx context.Context, config *Config) (*PoolDevice, error) {
 	}
 
 	if err := poolDevice.ensureDeviceStates(ctx); err != nil {
-		return nil, errors.Wrap(err, "failed to check devices state")
+		return nil, fmt.Errorf("failed to check devices state: %w", err)
 	}
 
 	return poolDevice, nil
@@ -134,7 +135,7 @@ func (p *PoolDevice) ensureDeviceStates(ctx context.Context) error {
 		}
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "failed to query devices from metastore")
+		return fmt.Errorf("failed to query devices from metastore: %w", err)
 	}
 
 	var result *multierror.Error
@@ -175,7 +176,7 @@ func (p *PoolDevice) transition(ctx context.Context, deviceName string, tryingSt
 	})
 
 	if uerr != nil {
-		return errors.Wrapf(uerr, "failed to set device %q state to %q", deviceName, tryingState)
+		return fmt.Errorf("failed to set device %q state to %q: %w", deviceName, tryingState, uerr)
 	}
 
 	var result *multierror.Error
@@ -293,7 +294,7 @@ func (p *PoolDevice) createDevice(ctx context.Context, info *DeviceInfo) error {
 	if err := p.transition(ctx, info.Name, Creating, Created, func() error {
 		return dmsetup.CreateDevice(p.poolName, info.DeviceID)
 	}); err != nil {
-		return errors.Wrapf(err, "failed to create new thin device %q (dev: %d)", info.Name, info.DeviceID)
+		return fmt.Errorf("failed to create new thin device %q (dev: %d): %w", info.Name, info.DeviceID, err)
 	}
 
 	return nil
@@ -304,7 +305,7 @@ func (p *PoolDevice) activateDevice(ctx context.Context, info *DeviceInfo) error
 	if err := p.transition(ctx, info.Name, Activating, Activated, func() error {
 		return dmsetup.ActivateDevice(p.poolName, info.Name, info.DeviceID, info.Size, "")
 	}); err != nil {
-		return errors.Wrapf(err, "failed to activate new thin device %q (dev: %d)", info.Name, info.DeviceID)
+		return fmt.Errorf("failed to activate new thin device %q (dev: %d): %w", info.Name, info.DeviceID, err)
 	}
 
 	return nil
@@ -314,7 +315,7 @@ func (p *PoolDevice) activateDevice(ctx context.Context, info *DeviceInfo) error
 func (p *PoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName string, snapshotName string, virtualSizeBytes uint64) (retErr error) {
 	baseInfo, err := p.metadata.GetDevice(ctx, deviceName)
 	if err != nil {
-		return errors.Wrapf(err, "failed to query device metadata for %q", deviceName)
+		return fmt.Errorf("failed to query device metadata for %q: %w", deviceName, err)
 	}
 
 	snapInfo := &DeviceInfo{
@@ -386,12 +387,13 @@ func (p *PoolDevice) createSnapshot(ctx context.Context, baseInfo, snapInfo *Dev
 	if err := p.transition(ctx, snapInfo.Name, Creating, Created, func() error {
 		return dmsetup.CreateSnapshot(p.poolName, snapInfo.DeviceID, baseInfo.DeviceID)
 	}); err != nil {
-		return errors.Wrapf(err,
-			"failed to create snapshot %q (dev: %d) from %q (dev: %d)",
+		return fmt.Errorf(
+			"failed to create snapshot %q (dev: %d) from %q (dev: %d): %w",
 			snapInfo.Name,
 			snapInfo.DeviceID,
 			baseInfo.Name,
-			baseInfo.DeviceID)
+			baseInfo.DeviceID, err,
+		)
 	}
 
 	return nil
@@ -402,7 +404,7 @@ func (p *PoolDevice) SuspendDevice(ctx context.Context, deviceName string) error
 	if err := p.transition(ctx, deviceName, Suspending, Suspended, func() error {
 		return dmsetup.SuspendDevice(deviceName)
 	}); err != nil {
-		return errors.Wrapf(err, "failed to suspend device %q", deviceName)
+		return fmt.Errorf("failed to suspend device %q: %w", deviceName, err)
 	}
 
 	return nil
@@ -413,7 +415,7 @@ func (p *PoolDevice) ResumeDevice(ctx context.Context, deviceName string) error 
 	if err := p.transition(ctx, deviceName, Resuming, Resumed, func() error {
 		return dmsetup.ResumeDevice(deviceName)
 	}); err != nil {
-		return errors.Wrapf(err, "failed to resume device %q", deviceName)
+		return fmt.Errorf("failed to resume device %q: %w", deviceName, err)
 	}
 
 	return nil
@@ -446,13 +448,13 @@ func (p *PoolDevice) DeactivateDevice(ctx context.Context, deviceName string, de
 				}
 			}
 			if err := dmsetup.RemoveDevice(deviceName, opts...); err != nil {
-				return errors.Wrap(err, "failed to deactivate device")
+				return fmt.Errorf("failed to deactivate device: %w", err)
 			}
 
 			return nil
 		})
 	}); err != nil {
-		return errors.Wrapf(err, "failed to deactivate device %q", deviceName)
+		return fmt.Errorf("failed to deactivate device %q: %w", deviceName, err)
 	}
 
 	return nil
@@ -487,7 +489,7 @@ func (p *PoolDevice) IsLoaded(deviceName string) bool {
 func (p *PoolDevice) GetUsage(deviceName string) (int64, error) {
 	status, err := dmsetup.Status(deviceName)
 	if err != nil {
-		return 0, errors.Wrapf(err, "can't get status for device %q", deviceName)
+		return 0, fmt.Errorf("can't get status for device %q: %w", deviceName, err)
 	}
 
 	if len(status.Params) == 0 {
@@ -496,7 +498,7 @@ func (p *PoolDevice) GetUsage(deviceName string) (int64, error) {
 
 	count, err := strconv.ParseInt(status.Params[0], 10, 64)
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed to parse status params: %q", status.Params[0])
+		return 0, fmt.Errorf("failed to parse status params: %q: %w", status.Params[0], err)
 	}
 
 	return count * dmsetup.SectorSize, nil
@@ -506,7 +508,7 @@ func (p *PoolDevice) GetUsage(deviceName string) (int64, error) {
 func (p *PoolDevice) RemoveDevice(ctx context.Context, deviceName string) error {
 	info, err := p.metadata.GetDevice(ctx, deviceName)
 	if err != nil {
-		return errors.Wrapf(err, "can't query metadata for device %q", deviceName)
+		return fmt.Errorf("can't query metadata for device %q: %w", deviceName, err)
 	}
 
 	if err := p.DeactivateDevice(ctx, deviceName, false, true); err != nil {
@@ -519,7 +521,7 @@ func (p *PoolDevice) RemoveDevice(ctx context.Context, deviceName string) error 
 
 	// Remove record from meta store and free device ID
 	if err := p.metadata.RemoveDevice(ctx, deviceName); err != nil {
-		return errors.Wrapf(err, "can't remove device %q metadata from store after removal", deviceName)
+		return fmt.Errorf("can't remove device %q metadata from store after removal: %w", deviceName, err)
 	}
 
 	return nil
@@ -537,7 +539,7 @@ func (p *PoolDevice) deleteDevice(ctx context.Context, info *DeviceInfo) error {
 			return nil
 		})
 	}); err != nil {
-		return errors.Wrapf(err, "failed to delete device %q (dev id: %d)", info.Name, info.DeviceID)
+		return fmt.Errorf("failed to delete device %q (dev id: %d): %w", info.Name, info.DeviceID, err)
 	}
 
 	return nil
@@ -547,7 +549,7 @@ func (p *PoolDevice) deleteDevice(ctx context.Context, info *DeviceInfo) error {
 func (p *PoolDevice) RemovePool(ctx context.Context) error {
 	deviceNames, err := p.metadata.GetDeviceNames(ctx)
 	if err != nil {
-		return errors.Wrap(err, "can't query device names")
+		return fmt.Errorf("can't query device names: %w", err)
 	}
 
 	var result *multierror.Error
@@ -555,12 +557,12 @@ func (p *PoolDevice) RemovePool(ctx context.Context) error {
 	// Deactivate devices if any
 	for _, name := range deviceNames {
 		if err := p.DeactivateDevice(ctx, name, true, true); err != nil {
-			result = multierror.Append(result, errors.Wrapf(err, "failed to remove %q", name))
+			result = multierror.Append(result, fmt.Errorf("failed to remove %q: %w", name, err))
 		}
 	}
 
 	if err := dmsetup.RemoveDevice(p.poolName, dmsetup.RemoveWithForce, dmsetup.RemoveWithRetries, dmsetup.RemoveDeferred); err != nil {
-		result = multierror.Append(result, errors.Wrapf(err, "failed to remove pool %q", p.poolName))
+		result = multierror.Append(result, fmt.Errorf("failed to remove pool %q: %w", p.poolName, err))
 	}
 
 	return result.ErrorOrNil()

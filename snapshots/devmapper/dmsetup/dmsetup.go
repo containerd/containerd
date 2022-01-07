@@ -22,6 +22,7 @@
 package dmsetup
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -29,7 +30,6 @@ import (
 	"strings"
 
 	blkdiscard "github.com/containerd/containerd/snapshots/devmapper/blkdiscard"
-	"github.com/pkg/errors"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 )
@@ -101,7 +101,7 @@ const (
 func makeThinPoolMapping(dataFile, metaFile string, blockSizeSectors uint32) (string, error) {
 	dataDeviceSizeBytes, err := BlockDeviceSize(dataFile)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to get block device size: %s", dataFile)
+		return "", fmt.Errorf("failed to get block device size: %s: %w", dataFile, err)
 	}
 
 	// Thin-pool mapping target has the following format:
@@ -259,7 +259,7 @@ func Info(deviceName string) ([]*DeviceInfo, error) {
 			&info.EventNumber)
 
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse line %q", line)
+			return nil, fmt.Errorf("failed to parse line %q: %w", line, err)
 		}
 
 		// Parse attributes (see "man 8 dmsetup" for details)
@@ -309,17 +309,17 @@ func Status(deviceName string) (*DeviceStatus, error) {
 	const MinParseCount = 4
 	parts := strings.Split(output, " ")
 	if len(parts) < MinParseCount {
-		return nil, errors.Errorf("failed to parse output: %q", output)
+		return nil, fmt.Errorf("failed to parse output: %q", output)
 	}
 
 	status.Offset, err = strconv.ParseInt(parts[0], 10, 64)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse offset: %q", parts[0])
+		return nil, fmt.Errorf("failed to parse offset: %q: %w", parts[0], err)
 	}
 
 	status.Length, err = strconv.ParseInt(parts[1], 10, 64)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse length: %q", parts[1])
+		return nil, fmt.Errorf("failed to parse length: %q: %w", parts[1], err)
 	}
 
 	status.Target = parts[2]
@@ -347,7 +347,7 @@ func BlockDeviceSize(path string) (int64, error) {
 
 	size, err := f.Seek(0, io.SeekEnd)
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed to seek on %q", path)
+		return 0, fmt.Errorf("failed to seek on %q: %w", path, err)
 	}
 	return size, nil
 }
@@ -379,7 +379,7 @@ func dmsetup(args ...string) (string, error) {
 			return "", errno
 		}
 
-		return "", errors.Wrapf(err, "dmsetup %s\nerror: %s\n", strings.Join(args, " "), output)
+		return "", fmt.Errorf("dmsetup %s\nerror: %s\n: %w", strings.Join(args, " "), output, err)
 	}
 
 	output = strings.TrimSuffix(output, "\n")

@@ -27,7 +27,6 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/services/server"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	exec "golang.org/x/sys/execabs"
@@ -218,7 +217,7 @@ func registerUnregisterService(root string) (bool, error) {
 
 	if unregisterServiceFlag {
 		if registerServiceFlag {
-			return true, errors.Wrap(errdefs.ErrInvalidArgument, "--register-service and --unregister-service cannot be used together")
+			return true, fmt.Errorf("--register-service and --unregister-service cannot be used together: %w", errdefs.ErrInvalidArgument)
 		}
 		return true, unregisterService()
 	}
@@ -242,7 +241,7 @@ func registerUnregisterService(root string) (bool, error) {
 		// and we want to make sure stderr goes to the panic file.
 		r, _, err := allocConsole.Call()
 		if r == 0 && err != nil {
-			return true, fmt.Errorf("error allocating conhost: %s", err)
+			return true, fmt.Errorf("error allocating conhost: %w", err)
 		}
 
 		if err := initPanicFile(filepath.Join(root, "panic.log")); err != nil {
@@ -253,7 +252,7 @@ func registerUnregisterService(root string) (bool, error) {
 		if logFileFlag != "" {
 			f, err := os.OpenFile(logFileFlag, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {
-				return true, errors.Wrapf(err, "open log file %q", logFileFlag)
+				return true, fmt.Errorf("open log file %q: %w", logFileFlag, err)
 			}
 			logOutput = f
 		}

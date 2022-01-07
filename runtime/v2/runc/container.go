@@ -22,6 +22,7 @@ package runc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -37,7 +38,6 @@ import (
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/typeurl"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -45,7 +45,7 @@ import (
 func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTaskRequest) (_ *Container, retErr error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "create namespace")
+		return nil, fmt.Errorf("create namespace: %w", err)
 	}
 
 	var opts options.Options
@@ -110,7 +110,7 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 			Options: rm.Options,
 		}
 		if err := m.Mount(rootfs); err != nil {
-			return nil, errors.Wrapf(err, "failed to mount rootfs component %v", m)
+			return nil, fmt.Errorf("failed to mount rootfs component %v: %w", m, err)
 		}
 	}
 
@@ -300,13 +300,13 @@ func (c *Container) Process(id string) (process.Process, error) {
 	defer c.mu.Unlock()
 	if id == "" {
 		if c.process == nil {
-			return nil, errors.Wrapf(errdefs.ErrFailedPrecondition, "container must be created")
+			return nil, fmt.Errorf("container must be created: %w", errdefs.ErrFailedPrecondition)
 		}
 		return c.process, nil
 	}
 	p, ok := c.processes[id]
 	if !ok {
-		return nil, errors.Wrapf(errdefs.ErrNotFound, "process does not exist %s", id)
+		return nil, fmt.Errorf("process does not exist %s: %w", id, errdefs.ErrNotFound)
 	}
 	return p, nil
 }
@@ -453,7 +453,7 @@ func (c *Container) CloseIO(ctx context.Context, r *task.CloseIORequest) error {
 	}
 	if stdin := p.Stdin(); stdin != nil {
 		if err := stdin.Close(); err != nil {
-			return errors.Wrap(err, "close stdin")
+			return fmt.Errorf("close stdin: %w", err)
 		}
 	}
 	return nil

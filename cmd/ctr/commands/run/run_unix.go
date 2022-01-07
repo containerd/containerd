@@ -21,6 +21,7 @@ package run
 
 import (
 	gocontext "context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -39,7 +40,6 @@ import (
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -204,7 +204,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		if context.Bool("net-host") {
 			hostname, err := os.Hostname()
 			if err != nil {
-				return nil, errors.Wrap(err, "get hostname")
+				return nil, fmt.Errorf("get hostname: %w", err)
 			}
 			opts = append(opts,
 				oci.WithHostNamespace(specs.NetworkNamespace),
@@ -417,15 +417,15 @@ func parseIDMapping(mapping string) (specs.LinuxIDMapping, error) {
 	}
 	cID, err := strconv.ParseUint(parts[0], 0, 32)
 	if err != nil {
-		return specs.LinuxIDMapping{}, errors.Wrapf(err, "invalid container id for user namespace remapping")
+		return specs.LinuxIDMapping{}, fmt.Errorf("invalid container id for user namespace remapping: %w", err)
 	}
 	hID, err := strconv.ParseUint(parts[1], 0, 32)
 	if err != nil {
-		return specs.LinuxIDMapping{}, errors.Wrapf(err, "invalid host id for user namespace remapping")
+		return specs.LinuxIDMapping{}, fmt.Errorf("invalid host id for user namespace remapping: %w", err)
 	}
 	size, err := strconv.ParseUint(parts[2], 0, 32)
 	if err != nil {
-		return specs.LinuxIDMapping{}, errors.Wrapf(err, "invalid size for user namespace remapping")
+		return specs.LinuxIDMapping{}, fmt.Errorf("invalid size for user namespace remapping: %w", err)
 	}
 	return specs.LinuxIDMapping{
 		ContainerID: uint32(cID),

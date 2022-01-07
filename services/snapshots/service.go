@@ -18,6 +18,7 @@ package snapshots
 
 import (
 	"context"
+	"errors"
 
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/api/types"
@@ -28,7 +29,6 @@ import (
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/snapshots"
 	ptypes "github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 

@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 
 	"github.com/containerd/containerd/plugin"
-	"github.com/pkg/errors"
 )
 
 // Config for the opt manager
@@ -46,7 +45,7 @@ func init() {
 				return nil, err
 			}
 			if err := os.Setenv("PATH", fmt.Sprintf("%s%c%s", bin, os.PathListSeparator, os.Getenv("PATH"))); err != nil {
-				return nil, errors.Wrapf(err, "set binary image directory in path %s", bin)
+				return nil, fmt.Errorf("set binary image directory in path %s: %w", bin, err)
 			}
 
 			lib := filepath.Join(path, "lib")
@@ -54,7 +53,7 @@ func init() {
 				return nil, err
 			}
 			if err := os.Setenv("LD_LIBRARY_PATH", fmt.Sprintf("%s%c%s", lib, os.PathListSeparator, os.Getenv("LD_LIBRARY_PATH"))); err != nil {
-				return nil, errors.Wrapf(err, "set binary lib directory in path %s", lib)
+				return nil, fmt.Errorf("set binary lib directory in path %s: %w", lib, err)
 			}
 			return &manager{}, nil
 		},

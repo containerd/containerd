@@ -20,15 +20,15 @@
 package server
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
 // portForward uses netns to enter the sandbox namespace, and forwards a stream inside the
 // the namespace to a specific port. It keeps forwarding until it exits or client disconnect.
 func (c *criService) portForward(ctx context.Context, id string, port int32, stream io.ReadWriteCloser) error {
-	return errors.Wrap(errdefs.ErrNotImplemented, "port forward")
+	return fmt.Errorf("port forward: %w", errdefs.ErrNotImplemented)
 }

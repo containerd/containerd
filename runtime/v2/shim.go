@@ -18,6 +18,7 @@ package v2
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -39,7 +40,6 @@ import (
 	"github.com/containerd/ttrpc"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -85,7 +85,7 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ *shimTask,
 	}()
 	f, err := openShimLog(shimCtx, bundle, client.AnonReconnectDialer)
 	if err != nil {
-		return nil, errors.Wrap(err, "open shim log pipe when reload")
+		return nil, fmt.Errorf("open shim log pipe when reload: %w", err)
 	}
 	defer func() {
 		if err != nil {
@@ -394,7 +394,7 @@ func (s *shimTask) Kill(ctx context.Context, signal uint32, all bool) error {
 
 func (s *shimTask) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runtime.ExecProcess, error) {
 	if err := identifiers.Validate(id); err != nil {
-		return nil, errors.Wrapf(err, "invalid exec id %s", id)
+		return nil, fmt.Errorf("invalid exec id %s: %w", id, err)
 	}
 	request := &task.ExecProcessRequest{
 		ID:       s.ID(),

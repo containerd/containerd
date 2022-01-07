@@ -18,6 +18,7 @@ package snapshots
 
 import (
 	gocontext "context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -35,7 +36,6 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
@@ -262,7 +262,7 @@ var removeCommand = cli.Command{
 		for _, key := range context.Args() {
 			err = snapshotter.Remove(ctx, key)
 			if err != nil {
-				return errors.Wrapf(err, "failed to remove %q", key)
+				return fmt.Errorf("failed to remove %q: %w", key, err)
 			}
 		}
 

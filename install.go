@@ -19,6 +19,8 @@ package containerd
 import (
 	"archive/tar"
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -28,7 +30,6 @@ import (
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
-	"github.com/pkg/errors"
 )
 
 // Install a binary image into the opt service
@@ -82,7 +83,7 @@ func (c *Client) Install(ctx context.Context, image Image, opts ...InstallOpts) 
 			}
 			if result && !config.Replace {
 				if _, err := os.Lstat(filepath.Join(path, hdr.Name)); err == nil {
-					return false, errors.Errorf("cannot replace %s in %s", hdr.Name, path)
+					return false, fmt.Errorf("cannot replace %s in %s", hdr.Name, path)
 				}
 			}
 			return result, nil

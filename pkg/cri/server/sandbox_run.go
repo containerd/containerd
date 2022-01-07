@@ -18,6 +18,8 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"math"
 	"path/filepath"
 	goruntime "runtime"
@@ -34,7 +36,6 @@ import (
 	v1 "github.com/containerd/nri/types/v1"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -72,7 +73,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// Reserve the sandbox name to avoid concurrent `RunPodSandbox` request starting the
 	// same sandbox.
 	if err := c.sandboxNameIndex.Reserve(name, id); err != nil {
-		return nil, errors.Wrapf(err, "failed to reserve sandbox name %q", name)
+		return nil, fmt.Errorf("failed to reserve sandbox name %q: %w", name, err)
 	}
 	defer func() {
 		// Release the name if the function returns with an error.
@@ -97,16 +98,16 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// Ensure sandbox container image snapshot.
 	image, err := c.ensureImageExists(ctx, c.config.SandboxImage, config)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get sandbox image %q", c.config.SandboxImage)
+		return nil, fmt.Errorf("failed to get sandbox image %q: %w", c.config.SandboxImage, err)
 	}
 	containerdImage, err := c.toContainerdImage(ctx, *image)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get image from containerd %q", image.ID)
+		return nil, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
 	}
 
 	ociRuntime, err := c.getSandboxRuntime(config, r.GetRuntimeHandler())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get sandbox runtime")
+		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
 	log.G(ctx).WithField("podsandboxid", id).Debugf("use OCI runtime %+v", ociRuntime)
 
@@ -135,7 +136,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 		sandbox.NetNS, err = netns.NewNetNS(netnsMountDir)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to create network namespace for sandbox %q", id)
+			return nil, fmt.Errorf("failed to create network namespace for sandbox %q: %w", id, err)
 		}
 		sandbox.NetNSPath = sandbox.NetNS.GetPath()
 		defer func() {
@@ -163,7 +164,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// calls to network namespace of the pod to query the IP of the veth interface on every
 		// SandboxStatus request.
 		if err := c.setupPodNetwork(ctx, &sandbox); err != nil {
-			return nil, errors.Wrapf(err, "failed to setup network for sandbox %q", id)
+			return nil, fmt.Errorf("failed to setup network for sandbox %q: %w", id, err)
 		}
 		sandboxCreateNetworkTimer.UpdateSince(netStart)
 	}
@@ -175,7 +176,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// it safely.
 	spec, err := c.sandboxContainerSpec(id, config, &image.ImageSpec.Config, sandbox.NetNSPath, ociRuntime.PodAnnotations)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate sandbox container spec")
+		return nil, fmt.Errorf("failed to generate sandbox container spec: %w", err)
 	}
 	log.G(ctx).WithField("podsandboxid", id).Debugf("sandbox container spec: %#+v", spew.NewFormatter(spec))
 	sandbox.ProcessLabel = spec.Process.SelinuxLabel
@@ -199,14 +200,14 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// Generate spec options that will be applied to the spec later.
 	specOpts, err := c.sandboxContainerSpecOpts(config, &image.ImageSpec.Config)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate sanbdox container spec options")
+		return nil, fmt.Errorf("failed to generate sanbdox container spec options: %w", err)
 	}
 
 	sandboxLabels := buildLabels(config.Labels, image.ImageSpec.Config.Labels, containerKindSandbox)
 
 	runtimeOpts, err := generateRuntimeOptions(ociRuntime, c.config)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate runtime options")
+		return nil, fmt.Errorf("failed to generate runtime options: %w", err)
 	}
 	snapshotterOpt := snapshots.WithLabels(snapshots.FilterInheritedLabels(config.Annotations))
 	opts := []containerd.NewContainerOpts{
@@ -219,7 +220,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	container, err := c.client.NewContainer(ctx, id, opts...)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create containerd container")
+		return nil, fmt.Errorf("failed to create containerd container: %w", err)
 	}
 	defer func() {
 		if retErr != nil {
@@ -234,8 +235,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// Create sandbox container root directories.
 	sandboxRootDir := c.getSandboxRootDir(id)
 	if err := c.os.MkdirAll(sandboxRootDir, 0755); err != nil {
-		return nil, errors.Wrapf(err, "failed to create sandbox root directory %q",
-			sandboxRootDir)
+		return nil, fmt.Errorf("failed to create sandbox root directory %q: %w",
+			sandboxRootDir, err)
 	}
 	defer func() {
 		if retErr != nil {
@@ -248,8 +249,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}()
 	volatileSandboxRootDir := c.getVolatileSandboxRootDir(id)
 	if err := c.os.MkdirAll(volatileSandboxRootDir, 0755); err != nil {
-		return nil, errors.Wrapf(err, "failed to create volatile sandbox root directory %q",
-			volatileSandboxRootDir)
+		return nil, fmt.Errorf("failed to create volatile sandbox root directory %q: %w",
+			volatileSandboxRootDir, err)
 	}
 	defer func() {
 		if retErr != nil {
@@ -263,7 +264,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	// Setup files required for the sandbox.
 	if err = c.setupSandboxFiles(id, config); err != nil {
-		return nil, errors.Wrapf(err, "failed to setup sandbox files")
+		return nil, fmt.Errorf("failed to setup sandbox files: %w", err)
 	}
 	defer func() {
 		if retErr != nil {
@@ -277,7 +278,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// Update sandbox created timestamp.
 	info, err := container.Info(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get sandbox container info")
+		return nil, fmt.Errorf("failed to get sandbox container info: %w", err)
 	}
 
 	// Create sandbox task in containerd.
@@ -291,7 +292,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// We don't need stdio for sandbox container.
 	task, err := container.NewTask(ctx, containerdio.NullIO, taskOpts...)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create containerd task")
+		return nil, fmt.Errorf("failed to create containerd task: %w", err)
 	}
 	defer func() {
 		if retErr != nil {
@@ -307,12 +308,12 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// wait is a long running background request, no timeout needed.
 	exitCh, err := task.Wait(ctrdutil.NamespacedContext())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to wait for sandbox container task")
+		return nil, fmt.Errorf("failed to wait for sandbox container task: %w", err)
 	}
 
 	nric, err := nri.New()
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to create nri client")
+		return nil, fmt.Errorf("unable to create nri client: %w", err)
 	}
 	if nric != nil {
 		nriSB := &nri.Sandbox{
@@ -320,12 +321,12 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			Labels: config.Labels,
 		}
 		if _, err := nric.InvokeWithSandbox(ctx, task, v1.Create, nriSB); err != nil {
-			return nil, errors.Wrap(err, "nri invoke")
+			return nil, fmt.Errorf("nri invoke: %w", err)
 		}
 	}
 
 	if err := task.Start(ctx); err != nil {
-		return nil, errors.Wrapf(err, "failed to start sandbox container task %q", id)
+		return nil, fmt.Errorf("failed to start sandbox container task %q: %w", id, err)
 	}
 
 	if err := sandbox.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
@@ -335,14 +336,14 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		status.CreatedAt = info.CreatedAt
 		return status, nil
 	}); err != nil {
-		return nil, errors.Wrap(err, "failed to update sandbox status")
+		return nil, fmt.Errorf("failed to update sandbox status: %w", err)
 	}
 
 	// Add sandbox into sandbox store in INIT state.
 	sandbox.Container = container
 
 	if err := c.sandboxStore.Add(sandbox); err != nil {
-		return nil, errors.Wrapf(err, "failed to add sandbox %+v into store", sandbox)
+		return nil, fmt.Errorf("failed to add sandbox %+v into store: %w", sandbox, err)
 	}
 
 	// start the monitor after adding sandbox into the store, this ensures
@@ -386,7 +387,7 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 
 	opts, err := cniNamespaceOpts(id, config)
 	if err != nil {
-		return errors.Wrap(err, "get cni namespace options")
+		return fmt.Errorf("get cni namespace options: %w", err)
 	}
 	log.G(ctx).WithField("podsandboxid", id).Debugf("begin cni setup")
 	result, err := netPlugin.Setup(ctx, id, path, opts...)
@@ -400,7 +401,7 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		sandbox.CNIResult = result
 		return nil
 	}
-	return errors.Errorf("failed to find network info for sandbox %q", id)
+	return fmt.Errorf("failed to find network info for sandbox %q", id)
 }
 
 // cniNamespaceOpts get CNI namespace options from sandbox config.
@@ -448,7 +449,7 @@ func toCNILabels(id string, config *runtime.PodSandboxConfig) map[string]string 
 func toCNIBandWidth(annotations map[string]string) (*cni.BandWidth, error) {
 	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(annotations)
 	if err != nil {
-		return nil, errors.Wrap(err, "reading pod bandwidth annotations")
+		return nil, fmt.Errorf("reading pod bandwidth annotations: %w", err)
 	}
 
 	if ingress == nil && egress == nil {
@@ -590,7 +591,7 @@ func (c *criService) getSandboxRuntime(config *runtime.PodSandboxConfig, runtime
 
 	handler, ok := c.config.ContainerdConfig.Runtimes[runtimeHandler]
 	if !ok {
-		return criconfig.Runtime{}, errors.Errorf("no runtime for %q is configured", runtimeHandler)
+		return criconfig.Runtime{}, fmt.Errorf("no runtime for %q is configured", runtimeHandler)
 	}
 	return handler, nil
 }

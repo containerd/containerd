@@ -17,13 +17,13 @@
 package server
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/containerd/containerd/api/types"
 	v1 "github.com/containerd/containerd/metrics/types/v1"
 	v2 "github.com/containerd/containerd/metrics/types/v2"
 	"github.com/containerd/typeurl"
-	"github.com/pkg/errors"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
@@ -61,18 +61,18 @@ func (c *criService) containerMetrics(
 	if stats != nil {
 		s, err := typeurl.UnmarshalAny(stats.Data)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to extract container metrics")
+			return nil, fmt.Errorf("failed to extract container metrics: %w", err)
 		}
 
 		cpuStats, err := c.cpuContainerStats(meta.ID, false /* isSandbox */, s, stats.Timestamp)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to obtain cpu stats")
+			return nil, fmt.Errorf("failed to obtain cpu stats: %w", err)
 		}
 		cs.Cpu = cpuStats
 
 		memoryStats, err := c.memoryContainerStats(meta.ID, s, stats.Timestamp)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to obtain memory stats")
+			return nil, fmt.Errorf("failed to obtain memory stats: %w", err)
 		}
 		cs.Memory = memoryStats
 	}
@@ -86,13 +86,13 @@ func (c *criService) getUsageNanoCores(containerID string, isSandbox bool, curre
 	if isSandbox {
 		sandbox, err := c.sandboxStore.Get(containerID)
 		if err != nil {
-			return 0, errors.Wrapf(err, "failed to get sandbox container: %s", containerID)
+			return 0, fmt.Errorf("failed to get sandbox container: %s: %w", containerID, err)
 		}
 		oldStats = sandbox.Stats
 	} else {
 		container, err := c.containerStore.Get(containerID)
 		if err != nil {
-			return 0, errors.Wrapf(err, "failed to get container ID: %s", containerID)
+			return 0, fmt.Errorf("failed to get container ID: %s: %w", containerID, err)
 		}
 		oldStats = container.Stats
 	}
@@ -105,12 +105,12 @@ func (c *criService) getUsageNanoCores(containerID string, isSandbox bool, curre
 		if isSandbox {
 			err := c.sandboxStore.UpdateContainerStats(containerID, newStats)
 			if err != nil {
-				return 0, errors.Wrapf(err, "failed to update sandbox stats container ID: %s", containerID)
+				return 0, fmt.Errorf("failed to update sandbox stats container ID: %s: %w", containerID, err)
 			}
 		} else {
 			err := c.containerStore.UpdateContainerStats(containerID, newStats)
 			if err != nil {
-				return 0, errors.Wrapf(err, "failed to update container stats ID: %s", containerID)
+				return 0, fmt.Errorf("failed to update container stats ID: %s: %w", containerID, err)
 			}
 		}
 		return 0, nil
@@ -133,13 +133,13 @@ func (c *criService) getUsageNanoCores(containerID string, isSandbox bool, curre
 	if isSandbox {
 		err := c.sandboxStore.UpdateContainerStats(containerID, newStats)
 		if err != nil {
-			return 0, errors.Wrapf(err, "failed to update sandbox container stats: %s", containerID)
+			return 0, fmt.Errorf("failed to update sandbox container stats: %s: %w", containerID, err)
 		}
 
 	} else {
 		err := c.containerStore.UpdateContainerStats(containerID, newStats)
 		if err != nil {
-			return 0, errors.Wrapf(err, "failed to update container stats ID: %s", containerID)
+			return 0, fmt.Errorf("failed to update container stats ID: %s: %w", containerID, err)
 		}
 	}
 
@@ -204,7 +204,7 @@ func (c *criService) cpuContainerStats(ID string, isSandbox bool, stats interfac
 
 			usageNanoCores, err := c.getUsageNanoCores(ID, isSandbox, metrics.CPU.Usage.Total, timestamp)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to get usage nano cores, containerID: %s", ID)
+				return nil, fmt.Errorf("failed to get usage nano cores, containerID: %s: %w", ID, err)
 			}
 
 			return &runtime.CpuUsage{
@@ -220,7 +220,7 @@ func (c *criService) cpuContainerStats(ID string, isSandbox bool, stats interfac
 
 			usageNanoCores, err := c.getUsageNanoCores(ID, isSandbox, usageCoreNanoSeconds, timestamp)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to get usage nano cores, containerID: %s", ID)
+				return nil, fmt.Errorf("failed to get usage nano cores, containerID: %s: %w", ID, err)
 			}
 
 			return &runtime.CpuUsage{
@@ -230,7 +230,7 @@ func (c *criService) cpuContainerStats(ID string, isSandbox bool, stats interfac
 			}, nil
 		}
 	default:
-		return nil, errors.Errorf("unexpected metrics type: %v", metrics)
+		return nil, fmt.Errorf("unexpected metrics type: %v", metrics)
 	}
 	return nil, nil
 }
@@ -272,7 +272,7 @@ func (c *criService) memoryContainerStats(ID string, stats interface{}, timestam
 			}, nil
 		}
 	default:
-		return nil, errors.Errorf("unexpected metrics type: %v", metrics)
+		return nil, fmt.Errorf("unexpected metrics type: %v", metrics)
 	}
 	return nil, nil
 }

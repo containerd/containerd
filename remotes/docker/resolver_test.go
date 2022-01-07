@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -35,7 +36,6 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 )
 
 func TestHTTPResolver(t *testing.T) {
@@ -588,7 +588,7 @@ func testFetch(ctx context.Context, f remotes.Fetcher, desc ocispec.Descriptor) 
 	dgstr := desc.Digest.Algorithm().Digester()
 	io.Copy(dgstr.Hash(), r)
 	if dgstr.Digest() != desc.Digest {
-		return errors.Errorf("content mismatch: %s != %s", dgstr.Digest(), desc.Digest)
+		return fmt.Errorf("content mismatch: %s != %s", dgstr.Digest(), desc.Digest)
 	}
 
 	return nil
@@ -597,14 +597,14 @@ func testFetch(ctx context.Context, f remotes.Fetcher, desc ocispec.Descriptor) 
 func testocimanifest(ctx context.Context, f remotes.Fetcher, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 	r, err := f.Fetch(ctx, desc)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to fetch %s", desc.Digest)
+		return nil, fmt.Errorf("failed to fetch %s: %w", desc.Digest, err)
 	}
 	p, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
 	if dgst := desc.Digest.Algorithm().FromBytes(p); dgst != desc.Digest {
-		return nil, errors.Errorf("digest mismatch: %s != %s", dgst, desc.Digest)
+		return nil, fmt.Errorf("digest mismatch: %s != %s", dgst, desc.Digest)
 	}
 
 	var manifest ocispec.Manifest

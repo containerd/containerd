@@ -37,7 +37,6 @@ import (
 	shimbinary "github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/containerd/runtime/v2/task"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 )
 
 // Config for the v2 runtime
@@ -185,7 +184,7 @@ func (m *ShimManager) Start(ctx context.Context, id string, opts runtime.CreateO
 	}
 
 	if err := m.shims.Add(ctx, shimTask); err != nil {
-		return nil, errors.Wrap(err, "failed to add task")
+		return nil, fmt.Errorf("failed to add task: %w", err)
 	}
 
 	return shimTask, nil
@@ -224,7 +223,7 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 		m.shims.Delete(ctx, id)
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "start failed")
+		return nil, fmt.Errorf("start failed: %w", err)
 	}
 
 	return shim, nil
@@ -283,7 +282,7 @@ func (m *ShimManager) resolveRuntimePath(runtime string) (string, error) {
 						cmdPath = testPath
 					}
 					if cmdPath == "" {
-						return "", errors.Wrapf(os.ErrNotExist, "runtime %q binary not installed %q", runtime, name)
+						return "", fmt.Errorf("runtime %q binary not installed %q: %w", runtime, name, os.ErrNotExist)
 					}
 				}
 			}
@@ -368,7 +367,7 @@ func (m *TaskManager) ID() string {
 func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.CreateOpts) (runtime.Task, error) {
 	process, err := m.manager.Start(ctx, taskID, opts)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to start shim")
+		return nil, fmt.Errorf("failed to start shim: %w", err)
 	}
 
 	// Cast to shim task and call task service to create a new container task instance.
@@ -393,7 +392,7 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 			shim.Close()
 		}
 
-		return nil, errors.Wrap(err, "failed to create shim task")
+		return nil, fmt.Errorf("failed to create shim task: %w", err)
 	}
 
 	return t, nil

@@ -20,18 +20,19 @@
 package server
 
 import (
+	"fmt"
+
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/errdefs"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-	"github.com/pkg/errors"
 )
 
 func (c *criService) podSandboxStats(ctx context.Context, sandbox sandboxstore.Sandbox, stats interface{}) (*runtime.PodSandboxStats, error) {
-	return nil, errors.Wrap(errdefs.ErrNotImplemented, "pod sandbox stats not implemented")
+	return nil, fmt.Errorf("pod sandbox stats not implemented: %w", errdefs.ErrNotImplemented)
 }
 
 func metricsForSandbox(sandbox sandboxstore.Sandbox) (interface{}, error) {
-	return nil, errors.Wrap(errdefs.ErrNotImplemented, "metrics for sandbox not implemented")
+	return nil, fmt.Errorf("metrics for sandbox not implemented: %w", errdefs.ErrNotImplemented)
 }

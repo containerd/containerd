@@ -19,6 +19,7 @@ package docker
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -28,7 +29,6 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/remotes/docker/auth"
 	remoteerrors "github.com/containerd/containerd/remotes/errors"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -205,7 +205,7 @@ func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.R
 			}
 		}
 	}
-	return errors.Wrap(errdefs.ErrNotImplemented, "failed to find supported auth scheme")
+	return fmt.Errorf("failed to find supported auth scheme: %w", errdefs.ErrNotImplemented)
 }
 
 // authResult is used to control limit rate.
@@ -252,7 +252,7 @@ func (ah *authHandler) authorize(ctx context.Context) (string, string, error) {
 	case auth.BearerAuth:
 		return ah.doBearerAuth(ctx)
 	default:
-		return "", "", errors.Wrapf(errdefs.ErrNotImplemented, "failed to find supported auth scheme: %s", string(ah.scheme))
+		return "", "", fmt.Errorf("failed to find supported auth scheme: %s: %w", string(ah.scheme), errdefs.ErrNotImplemented)
 	}
 }
 
@@ -298,7 +298,9 @@ func (ah *authHandler) doBearerAuth(ctx context.Context) (token, refreshToken st
 	// fetch token for the resource scope
 	if to.Secret != "" {
 		defer func() {
-			err = errors.Wrap(err, "failed to fetch oauth token")
+			if err != nil {
+				err = fmt.Errorf("failed to fetch oauth token: %w", err)
+			}
 		}()
 		// credential information is provided, use oauth POST endpoint
 		// TODO: Allow setting client_id
@@ -328,7 +330,7 @@ func (ah *authHandler) doBearerAuth(ctx context.Context) (token, refreshToken st
 	// do request anonymously
 	resp, err := auth.FetchToken(ctx, ah.client, ah.header, to)
 	if err != nil {
-		return "", "", errors.Wrap(err, "failed to fetch anonymous token")
+		return "", "", fmt.Errorf("failed to fetch anonymous token: %w", err)
 	}
 	return resp.Token, resp.RefreshToken, nil
 }
@@ -344,7 +346,7 @@ func invalidAuthorization(c auth.Challenge, responses []*http.Response) error {
 		return nil
 	}
 
-	return errors.Wrapf(ErrInvalidAuthorization, "server message: %s", errStr)
+	return fmt.Errorf("server message: %s: %w", errStr, ErrInvalidAuthorization)
 }
 
 func sameRequest(r1, r2 *http.Request) bool {

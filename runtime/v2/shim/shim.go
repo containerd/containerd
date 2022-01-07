@@ -18,6 +18,7 @@ package shim
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -36,7 +37,6 @@ import (
 	"github.com/containerd/containerd/version"
 	"github.com/containerd/ttrpc"
 	"github.com/gogo/protobuf/proto"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -398,7 +398,7 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 
 		result := p.Init(initContext)
 		if err := initialized.Add(result); err != nil {
-			return errors.Wrapf(err, "could not add plugin result to plugin set")
+			return fmt.Errorf("could not add plugin result to plugin set: %w", err)
 		}
 
 		instance, err := result.Instance()
@@ -419,12 +419,12 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 
 	server, err := newServer()
 	if err != nil {
-		return errors.Wrap(err, "failed creating server")
+		return fmt.Errorf("failed creating server: %w", err)
 	}
 
 	for _, srv := range ttrpcServices {
 		if err := srv.RegisterTTRPC(server); err != nil {
-			return errors.Wrap(err, "failed to register service")
+			return fmt.Errorf("failed to register service: %w", err)
 		}
 	}
 

@@ -20,6 +20,8 @@ package config
 import (
 	"context"
 	"crypto/tls"
+	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -34,7 +36,6 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/pelletier/go-toml"
-	"github.com/pkg/errors"
 )
 
 // UpdateClientFunc is a function that lets you to amend http Client behavior used by registry clients.
@@ -166,17 +167,17 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 					if tlsConfig.RootCAs == nil {
 						rootPool, err := rootSystemPool()
 						if err != nil {
-							return nil, errors.Wrap(err, "unable to initialize cert pool")
+							return nil, fmt.Errorf("unable to initialize cert pool: %w", err)
 						}
 						tlsConfig.RootCAs = rootPool
 					}
 					for _, f := range host.caCerts {
 						data, err := os.ReadFile(f)
 						if err != nil {
-							return nil, errors.Wrapf(err, "unable to read CA cert %q", f)
+							return nil, fmt.Errorf("unable to read CA cert %q: %w", f, err)
 						}
 						if !tlsConfig.RootCAs.AppendCertsFromPEM(data) {
-							return nil, errors.Errorf("unable to load CA cert %q", f)
+							return nil, fmt.Errorf("unable to load CA cert %q", f)
 						}
 					}
 				}
@@ -185,13 +186,13 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 					for _, pair := range host.clientPairs {
 						certPEMBlock, err := os.ReadFile(pair[0])
 						if err != nil {
-							return nil, errors.Wrapf(err, "unable to read CERT file %q", pair[0])
+							return nil, fmt.Errorf("unable to read CERT file %q: %w", pair[0], err)
 						}
 						var keyPEMBlock []byte
 						if pair[1] != "" {
 							keyPEMBlock, err = os.ReadFile(pair[1])
 							if err != nil {
-								return nil, errors.Wrapf(err, "unable to read CERT file %q", pair[1])
+								return nil, fmt.Errorf("unable to read CERT file %q: %w", pair[1], err)
 							}
 						} else {
 							// Load key block from same PEM file
@@ -199,7 +200,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 						}
 						cert, err := tls.X509KeyPair(certPEMBlock, keyPEMBlock)
 						if err != nil {
-							return nil, errors.Wrap(err, "failed to load X509 key pair")
+							return nil, fmt.Errorf("failed to load X509 key pair: %w", err)
 						}
 
 						tlsConfig.Certificates = append(tlsConfig.Certificates, cert)
@@ -315,7 +316,7 @@ type hostFileConfig struct {
 func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
 	tree, err := toml.LoadBytes(b)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse TOML")
+		return nil, fmt.Errorf("failed to parse TOML: %w", err)
 	}
 
 	// HACK: we want to keep toml parsing structures private in this package, however go-toml ignores private embedded types.
@@ -377,7 +378,7 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 		}
 		u, err := url.Parse(server)
 		if err != nil {
-			return hostConfig{}, errors.Wrapf(err, "unable to parse server %v", server)
+			return hostConfig{}, fmt.Errorf("unable to parse server %v: %w", server, err)
 		}
 		result.scheme = u.Scheme
 		result.host = u.Host
@@ -404,7 +405,7 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 			case "push":
 				result.capabilities |= docker.HostCapabilityPush
 			default:
-				return hostConfig{}, errors.Errorf("unknown capability %v", c)
+				return hostConfig{}, fmt.Errorf("unknown capability %v", c)
 			}
 		}
 	} else {
@@ -423,7 +424,7 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 				return hostConfig{}, err
 			}
 		default:
-			return hostConfig{}, errors.Errorf("invalid type %v for \"ca\"", cert)
+			return hostConfig{}, fmt.Errorf("invalid type %v for \"ca\"", cert)
 		}
 	}
 
@@ -445,18 +446,18 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 						return hostConfig{}, err
 					}
 					if len(slice) != 2 {
-						return hostConfig{}, errors.Errorf("invalid pair %v for \"client\"", p)
+						return hostConfig{}, fmt.Errorf("invalid pair %v for \"client\"", p)
 					}
 
 					var pair [2]string
 					copy(pair[:], slice)
 					result.clientPairs = append(result.clientPairs, pair)
 				default:
-					return hostConfig{}, errors.Errorf("invalid type %T for \"client\"", p)
+					return hostConfig{}, fmt.Errorf("invalid type %T for \"client\"", p)
 				}
 			}
 		default:
-			return hostConfig{}, errors.Errorf("invalid type %v for \"client\"", client)
+			return hostConfig{}, fmt.Errorf("invalid type %v for \"client\"", client)
 		}
 	}
 
@@ -472,7 +473,7 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 					return hostConfig{}, err
 				}
 			default:
-				return hostConfig{}, errors.Errorf("invalid type %v for header %q", ty, key)
+				return hostConfig{}, fmt.Errorf("invalid type %v for header %q", ty, key)
 			}
 		}
 		result.header = header
@@ -508,7 +509,7 @@ func makeStringSlice(slice []interface{}, cb func(string) string) ([]string, err
 	for i, value := range slice {
 		str, ok := value.(string)
 		if !ok {
-			return nil, errors.Errorf("unable to cast %v to string", value)
+			return nil, fmt.Errorf("unable to cast %v to string", value)
 		}
 
 		if cb != nil {

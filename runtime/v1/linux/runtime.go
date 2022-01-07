@@ -21,6 +21,7 @@ package linux
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -48,7 +49,6 @@ import (
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
@@ -167,7 +167,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 	}
 
 	if err := identifiers.Validate(id); err != nil {
-		return nil, errors.Wrapf(err, "invalid task id")
+		return nil, fmt.Errorf("invalid task id: %w", err)
 	}
 
 	ropts, err := r.getRuncOptions(ctx, id)
@@ -450,7 +450,7 @@ func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, 
 	ctx = namespaces.WithNamespace(ctx, ns)
 	if err := r.terminate(ctx, bundle, ns, id); err != nil {
 		if r.config.ShimDebug {
-			return errors.Wrap(err, "failed to terminate task, leaving bundle for debugging")
+			return fmt.Errorf("failed to terminate task, leaving bundle for debugging: %w", err)
 		}
 		log.G(ctx).WithError(err).Warn("failed to terminate task")
 	}

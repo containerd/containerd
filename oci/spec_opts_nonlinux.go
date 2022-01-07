@@ -21,9 +21,9 @@ package oci
 
 import (
 	"context"
+	"errors"
 
 	"github.com/containerd/containerd/containers"
-	"github.com/pkg/errors"
 )
 
 // WithAllCurrentCapabilities propagates the effective capabilities of the caller process to the container process.

@@ -28,7 +28,6 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/userns"
 	"github.com/containerd/continuity/fs"
-	"github.com/pkg/errors"
 )
 
 // SupportsMultipleLowerDir checks if the system supports multiple lowerdirs,
@@ -63,7 +62,7 @@ func SupportsMultipleLowerDir(d string) error {
 	}
 	dest := filepath.Join(td, "merged")
 	if err := m.Mount(dest); err != nil {
-		return errors.Wrap(err, "failed to mount overlay")
+		return fmt.Errorf("failed to mount overlay: %w", err)
 	}
 	if err := mount.UnmountAll(dest, 0); err != nil {
 		log.L.WithError(err).Warnf("Failed to unmount check directory %v", dest)

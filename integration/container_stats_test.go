@@ -17,12 +17,12 @@
 package integration
 
 import (
+	"errors"
 	"fmt"
 	goruntime "runtime"
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -372,7 +372,7 @@ func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 				return false, err
 			}
 			if len(stats) != 1 {
-				return false, errors.Errorf("expected only one stat, but got %v", stats)
+				return false, fmt.Errorf("expected only one stat, but got %v", stats)
 			}
 			if stats[0].GetWritableLayer().GetUsedBytes().GetValue() != 0 {
 				return true, nil

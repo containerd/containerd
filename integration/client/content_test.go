@@ -27,7 +27,6 @@ import (
 	"github.com/containerd/containerd/content/testsuite"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/pkg/errors"
 )
 
 func newContentStore(ctx context.Context, root string) (context.Context, content.Store, func() error, error) {
@@ -59,7 +58,7 @@ func newContentStore(ctx context.Context, root string) (context.Context, content
 			}
 			for _, st := range statuses {
 				if err := cs.Abort(ctx, st.Ref); err != nil && !errdefs.IsNotFound(err) {
-					return errors.Wrapf(err, "failed to abort %s", st.Ref)
+					return fmt.Errorf("failed to abort %s: %w", st.Ref, err)
 				}
 			}
 			err = cs.Walk(ctx, func(info content.Info) error {

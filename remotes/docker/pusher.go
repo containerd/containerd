@@ -18,6 +18,8 @@ package docker
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -32,7 +34,6 @@ import (
 	remoteserrors "github.com/containerd/containerd/remotes/errors"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 )
 
 type dockerPusher struct {
@@ -55,7 +56,7 @@ func (p dockerPusher) Writer(ctx context.Context, opts ...content.WriterOpt) (co
 		}
 	}
 	if wOpts.Ref == "" {
-		return nil, errors.Wrap(errdefs.ErrInvalidArgument, "ref must not be empty")
+		return nil, fmt.Errorf("ref must not be empty: %w", errdefs.ErrInvalidArgument)
 	}
 	return p.push(ctx, wOpts.Desc, wOpts.Ref, true)
 }
@@ -76,22 +77,22 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 	status, err := p.tracker.GetStatus(ref)
 	if err == nil {
 		if status.Committed && status.Offset == status.Total {
-			return nil, errors.Wrapf(errdefs.ErrAlreadyExists, "ref %v", ref)
+			return nil, fmt.Errorf("ref %v: %w", ref, errdefs.ErrAlreadyExists)
 		}
 		if unavailableOnFail {
 			// Another push of this ref is happening elsewhere. The rest of function
 			// will continue only when `errdefs.IsNotFound(err) == true` (i.e. there
 			// is no actively-tracked ref already).
-			return nil, errors.Wrap(errdefs.ErrUnavailable, "push is on-going")
+			return nil, fmt.Errorf("push is on-going: %w", errdefs.ErrUnavailable)
 		}
 		// TODO: Handle incomplete status
 	} else if !errdefs.IsNotFound(err) {
-		return nil, errors.Wrap(err, "failed to get status")
+		return nil, fmt.Errorf("failed to get status: %w", err)
 	}
 
 	hosts := p.filterHosts(HostCapabilityPush)
 	if len(hosts) == 0 {
-		return nil, errors.Wrap(errdefs.ErrNotFound, "no push hosts")
+		return nil, fmt.Errorf("no push hosts: %w", errdefs.ErrNotFound)
 	}
 
 	var (
@@ -143,7 +144,7 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 					},
 				})
 				resp.Body.Close()
-				return nil, errors.Wrapf(errdefs.ErrAlreadyExists, "content %v on remote", desc.Digest)
+				return nil, fmt.Errorf("content %v on remote: %w", desc.Digest, errdefs.ErrAlreadyExists)
 			}
 		} else if resp.StatusCode != http.StatusNotFound {
 			err := remoteserrors.NewUnexpectedStatusErr(resp)
@@ -205,7 +206,7 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 					Offset: desc.Size,
 				},
 			})
-			return nil, errors.Wrapf(errdefs.ErrAlreadyExists, "content %v on remote", desc.Digest)
+			return nil, fmt.Errorf("content %v on remote: %w", desc.Digest, errdefs.ErrAlreadyExists)
 		default:
 			err := remoteserrors.NewUnexpectedStatusErr(resp)
 			log.G(ctx).WithField("resp", resp).WithField("body", string(err.(remoteserrors.ErrUnexpectedStatus).Body)).Debug("unexpected response")
@@ -221,7 +222,7 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 		if strings.HasPrefix(location, "/") {
 			lurl, err = url.Parse(lhost.Scheme + "://" + lhost.Host + location)
 			if err != nil {
-				return nil, errors.Wrapf(err, "unable to parse location %v", location)
+				return nil, fmt.Errorf("unable to parse location %v: %w", location, err)
 			}
 		} else {
 			if !strings.Contains(location, "://") {
@@ -229,7 +230,7 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 			}
 			lurl, err = url.Parse(location)
 			if err != nil {
-				return nil, errors.Wrapf(err, "unable to parse location %v", location)
+				return nil, fmt.Errorf("unable to parse location %v: %w", location, err)
 			}
 
 			if lurl.Host != lhost.Host || lhost.Scheme != lurl.Scheme {
@@ -374,7 +375,7 @@ func (pw *pushWriter) Digest() digest.Digest {
 func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
 	// Check whether read has already thrown an error
 	if _, err := pw.pipe.Write([]byte{}); err != nil && err != io.ErrClosedPipe {
-		return errors.Wrap(err, "pipe error before commit")
+		return fmt.Errorf("pipe error before commit: %w", err)
 	}
 
 	if err := pw.pipe.Close(); err != nil {
@@ -397,11 +398,11 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 
 	status, err := pw.tracker.GetStatus(pw.ref)
 	if err != nil {
-		return errors.Wrap(err, "failed to get status")
+		return fmt.Errorf("failed to get status: %w", err)
 	}
 
 	if size > 0 && size != status.Offset {
-		return errors.Errorf("unexpected size %d, expected %d", status.Offset, size)
+		return fmt.Errorf("unexpected size %d, expected %d", status.Offset, size)
 	}
 
 	if expected == "" {
@@ -410,11 +411,11 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 
 	actual, err := digest.Parse(resp.Header.Get("Docker-Content-Digest"))
 	if err != nil {
-		return errors.Wrap(err, "invalid content digest in response")
+		return fmt.Errorf("invalid content digest in response: %w", err)
 	}
 
 	if actual != expected {
-		return errors.Errorf("got digest %s, expected %s", actual, expected)
+		return fmt.Errorf("got digest %s, expected %s", actual, expected)
 	}
 
 	status.Committed = true

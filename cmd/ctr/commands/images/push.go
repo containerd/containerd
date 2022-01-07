@@ -18,6 +18,8 @@ package images
 
 import (
 	gocontext "context"
+	"errors"
+	"fmt"
 	"net/http/httptrace"
 	"os"
 	"sync"
@@ -35,7 +37,6 @@ import (
 	"github.com/containerd/containerd/remotes/docker"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"golang.org/x/sync/errgroup"
 )
@@ -88,7 +89,7 @@ var pushCommand = cli.Command{
 		if manifest := context.String("manifest"); manifest != "" {
 			desc.Digest, err = digest.Parse(manifest)
 			if err != nil {
-				return errors.Wrap(err, "invalid manifest digest")
+				return fmt.Errorf("invalid manifest digest: %w", err)
 			}
 			desc.MediaType = context.String("manifest-type")
 		} else {
@@ -97,14 +98,14 @@ var pushCommand = cli.Command{
 			}
 			img, err := client.ImageService().Get(ctx, local)
 			if err != nil {
-				return errors.Wrap(err, "unable to resolve image to manifest")
+				return fmt.Errorf("unable to resolve image to manifest: %w", err)
 			}
 			desc = img.Target
 
 			if pss := context.StringSlice("platform"); len(pss) == 1 {
 				p, err := platforms.Parse(pss[0])
 				if err != nil {
-					return errors.Wrapf(err, "invalid platform %q", pss[0])
+					return fmt.Errorf("invalid platform %q: %w", pss[0], err)
 				}
 
 				cs := client.ContentStore()
@@ -113,7 +114,7 @@ var pushCommand = cli.Command{
 					for _, manifest := range manifests {
 						if manifest.Platform != nil && matcher.Match(*manifest.Platform) {
 							if _, err := images.Children(ctx, cs, manifest); err != nil {
-								return errors.Wrap(err, "no matching manifest")
+								return fmt.Errorf("no matching manifest: %w", err)
 							}
 							desc = manifest
 							break

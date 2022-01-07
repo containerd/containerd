@@ -17,8 +17,9 @@
 package server
 
 import (
+	"fmt"
+
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -34,13 +35,13 @@ func updateOCIResource(ctx context.Context, spec *runtimespec.Spec, r *runtime.U
 	// Copy to make sure old spec is not changed.
 	var cloned runtimespec.Spec
 	if err := util.DeepCopy(&cloned, spec); err != nil {
-		return nil, errors.Wrap(err, "failed to deep copy")
+		return nil, fmt.Errorf("failed to deep copy: %w", err)
 	}
 	if cloned.Linux == nil {
 		cloned.Linux = &runtimespec.Linux{}
 	}
 	if err := opts.WithResources(r.GetLinux(), config.TolerateMissingHugetlbController, config.DisableHugetlbController)(ctx, nil, nil, &cloned); err != nil {
-		return nil, errors.Wrap(err, "unable to set linux container resources")
+		return nil, fmt.Errorf("unable to set linux container resources: %w", err)
 	}
 	return &cloned, nil
 }

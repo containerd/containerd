@@ -17,6 +17,7 @@
 package sys
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -27,7 +28,6 @@ import (
 	"unsafe"
 
 	"github.com/Microsoft/hcsshim"
-	"github.com/pkg/errors"
 	"golang.org/x/sys/windows"
 )
 
@@ -268,7 +268,7 @@ func ForceRemoveAll(path string) error {
 	snapshotDir := filepath.Join(path, snapshotPlugin, "snapshots")
 	if stat, err := os.Stat(snapshotDir); err == nil && stat.IsDir() {
 		if err := cleanupWCOWLayers(snapshotDir); err != nil {
-			return errors.Wrapf(err, "failed to cleanup WCOW layers in %s", snapshotDir)
+			return fmt.Errorf("failed to cleanup WCOW layers in %s: %w", snapshotDir, err)
 		}
 	}
 
@@ -329,16 +329,16 @@ func cleanupWCOWLayer(layerPath string) error {
 	// ERROR_FLT_INSTANCE_NOT_FOUND is returned if the layer is currently activated but not prepared.
 	if err := hcsshim.UnprepareLayer(info, filepath.Base(layerPath)); err != nil {
 		if hcserror, ok := err.(*hcsshim.HcsError); !ok || (hcserror.Err != windows.ERROR_DEV_NOT_EXIST && hcserror.Err != syscall.Errno(windows.ERROR_FLT_INSTANCE_NOT_FOUND)) {
-			return errors.Wrapf(err, "failed to unprepare %s", layerPath)
+			return fmt.Errorf("failed to unprepare %s: %w", layerPath, err)
 		}
 	}
 
 	if err := hcsshim.DeactivateLayer(info, filepath.Base(layerPath)); err != nil {
-		return errors.Wrapf(err, "failed to deactivate %s", layerPath)
+		return fmt.Errorf("failed to deactivate %s: %w", layerPath, err)
 	}
 
 	if err := hcsshim.DestroyLayer(info, filepath.Base(layerPath)); err != nil {
-		return errors.Wrapf(err, "failed to destroy %s", layerPath)
+		return fmt.Errorf("failed to destroy %s: %w", layerPath, err)
 	}
 
 	return nil

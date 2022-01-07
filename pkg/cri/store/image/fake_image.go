@@ -16,7 +16,7 @@
 
 package image
 
-import "github.com/pkg/errors"
+import "fmt"
 
 // NewFakeStore returns an image store with predefined images.
 // Update is not allowed for this fake store.
@@ -27,7 +27,7 @@ func NewFakeStore(images []Image) (*Store, error) {
 			s.refCache[ref] = i.ID
 		}
 		if err := s.store.add(i); err != nil {
-			return nil, errors.Wrapf(err, "add image %+v", i)
+			return nil, fmt.Errorf("add image %+v: %w", i, err)
 		}
 	}
 	return s, nil

@@ -21,14 +21,13 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	"golang.org/x/sync/errgroup"
 
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
@@ -39,7 +38,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -158,12 +157,12 @@ func (c *Converter) Convert(ctx context.Context, opts ...ConvertOpt) (ocispec.De
 
 	history, diffIDs, err := c.schema1ManifestHistory()
 	if err != nil {
-		return ocispec.Descriptor{}, errors.Wrap(err, "schema 1 conversion failed")
+		return ocispec.Descriptor{}, fmt.Errorf("schema 1 conversion failed: %w", err)
 	}
 
 	var img ocispec.Image
 	if err := json.Unmarshal([]byte(c.pulledManifest.History[0].V1Compatibility), &img); err != nil {
-		return ocispec.Descriptor{}, errors.Wrap(err, "failed to unmarshal image from schema 1 history")
+		return ocispec.Descriptor{}, fmt.Errorf("failed to unmarshal image from schema 1 history: %w", err)
 	}
 
 	img.History = history
@@ -174,7 +173,7 @@ func (c *Converter) Convert(ctx context.Context, opts ...ConvertOpt) (ocispec.De
 
 	b, err := json.MarshalIndent(img, "", "   ")
 	if err != nil {
-		return ocispec.Descriptor{}, errors.Wrap(err, "failed to marshal image")
+		return ocispec.Descriptor{}, fmt.Errorf("failed to marshal image: %w", err)
 	}
 
 	config := ocispec.Descriptor{
@@ -198,7 +197,7 @@ func (c *Converter) Convert(ctx context.Context, opts ...ConvertOpt) (ocispec.De
 
 	mb, err := json.MarshalIndent(manifest, "", "   ")
 	if err != nil {
-		return ocispec.Descriptor{}, errors.Wrap(err, "failed to marshal image")
+		return ocispec.Descriptor{}, fmt.Errorf("failed to marshal image: %w", err)
 	}
 
 	desc := ocispec.Descriptor{
@@ -215,12 +214,12 @@ func (c *Converter) Convert(ctx context.Context, opts ...ConvertOpt) (ocispec.De
 
 	ref := remotes.MakeRefKey(ctx, desc)
 	if err := content.WriteBlob(ctx, c.contentStore, ref, bytes.NewReader(mb), desc, content.WithLabels(labels)); err != nil {
-		return ocispec.Descriptor{}, errors.Wrap(err, "failed to write image manifest")
+		return ocispec.Descriptor{}, fmt.Errorf("failed to write image manifest: %w", err)
 	}
 
 	ref = remotes.MakeRefKey(ctx, config)
 	if err := content.WriteBlob(ctx, c.contentStore, ref, bytes.NewReader(b), config); err != nil {
-		return ocispec.Descriptor{}, errors.Wrap(err, "failed to write image config")
+		return ocispec.Descriptor{}, fmt.Errorf("failed to write image config: %w", err)
 	}
 
 	return desc, nil
@@ -349,7 +348,7 @@ func (c *Converter) fetchBlob(ctx context.Context, desc ocispec.Descriptor) erro
 	if desc.Size == -1 {
 		info, err := c.contentStore.Info(ctx, desc.Digest)
 		if err != nil {
-			return errors.Wrap(err, "failed to get blob info")
+			return fmt.Errorf("failed to get blob info: %w", err)
 		}
 		desc.Size = info.Size
 	}
@@ -370,7 +369,7 @@ func (c *Converter) fetchBlob(ctx context.Context, desc ocispec.Descriptor) erro
 	}
 
 	if _, err := c.contentStore.Update(ctx, cinfo, "labels.containerd.io/uncompressed", fmt.Sprintf("labels.%s", labelDockerSchema1EmptyLayer)); err != nil {
-		return errors.Wrap(err, "failed to update uncompressed label")
+		return fmt.Errorf("failed to update uncompressed label: %w", err)
 	}
 
 	c.mu.Lock()
@@ -384,7 +383,7 @@ func (c *Converter) fetchBlob(ctx context.Context, desc ocispec.Descriptor) erro
 func (c *Converter) reuseLabelBlobState(ctx context.Context, desc ocispec.Descriptor) (bool, error) {
 	cinfo, err := c.contentStore.Info(ctx, desc.Digest)
 	if err != nil {
-		return false, errors.Wrap(err, "failed to get blob info")
+		return false, fmt.Errorf("failed to get blob info: %w", err)
 	}
 	desc.Size = cinfo.Size
 
@@ -441,7 +440,7 @@ func (c *Converter) schema1ManifestHistory() ([]ocispec.History, []digest.Digest
 	for i := range m.History {
 		var h v1History
 		if err := json.Unmarshal([]byte(m.History[i].V1Compatibility), &h); err != nil {
-			return nil, nil, errors.Wrap(err, "failed to unmarshal history")
+			return nil, nil, fmt.Errorf("failed to unmarshal history: %w", err)
 		}
 
 		blobSum := m.FSLayers[i].BlobSum
@@ -553,7 +552,7 @@ func stripSignature(b []byte) ([]byte, error) {
 	}
 	pb, err := joseBase64UrlDecode(sig.Signatures[0].Protected)
 	if err != nil {
-		return nil, errors.Wrapf(err, "could not decode %s", sig.Signatures[0].Protected)
+		return nil, fmt.Errorf("could not decode %s: %w", sig.Signatures[0].Protected, err)
 	}
 
 	var protected protectedBlock
@@ -567,7 +566,7 @@ func stripSignature(b []byte) ([]byte, error) {
 
 	tail, err := joseBase64UrlDecode(protected.Tail)
 	if err != nil {
-		return nil, errors.Wrap(err, "invalid tail base 64 value")
+		return nil, fmt.Errorf("invalid tail base 64 value: %w", err)
 	}
 
 	return append(b[:protected.Length], tail...), nil

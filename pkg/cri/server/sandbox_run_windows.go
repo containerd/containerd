@@ -17,13 +17,13 @@
 package server
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/pkg/cri/annotations"
@@ -43,7 +43,7 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 
 	if len(imageConfig.Entrypoint) == 0 && len(imageConfig.Cmd) == 0 {
 		// Pause image must have entrypoint or cmd.
-		return nil, errors.Errorf("invalid empty entrypoint and cmd in image config %+v", imageConfig)
+		return nil, fmt.Errorf("invalid empty entrypoint and cmd in image config %+v", imageConfig)
 	}
 	specOpts = append(specOpts, oci.WithProcessArgs(append(imageConfig.Entrypoint, imageConfig.Cmd...)...))
 

@@ -17,8 +17,9 @@
 package server
 
 import (
+	"fmt"
+
 	cni "github.com/containerd/go-cni"
-	"github.com/pkg/errors"
 )
 
 // windowsNetworkAttachCount is the minimum number of networks the PodSandbox
@@ -54,7 +55,7 @@ func (c *criService) initPlatform() error {
 			cni.WithPluginMaxConfNum(max),
 			cni.WithPluginDir([]string{c.config.NetworkPluginBinDir}))
 		if err != nil {
-			return errors.Wrap(err, "failed to initialize cni")
+			return fmt.Errorf("failed to initialize cni: %w", err)
 		}
 		c.netPlugin[name] = i
 	}

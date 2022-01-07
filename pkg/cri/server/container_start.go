@@ -17,6 +17,8 @@
 package server
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"time"
 
@@ -26,7 +28,6 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/nri"
 	v1 "github.com/containerd/nri/types/v1"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -43,12 +44,12 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	start := time.Now()
 	cntr, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
-		return nil, errors.Wrapf(err, "an error occurred when try to find container %q", r.GetContainerId())
+		return nil, fmt.Errorf("an error occurred when try to find container %q: %w", r.GetContainerId(), err)
 	}
 
 	info, err := cntr.Container.Info(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "get container info")
+		return nil, fmt.Errorf("get container info: %w", err)
 	}
 
 	id := cntr.ID
@@ -59,7 +60,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	// Set starting state to prevent other start/remove operations against this container
 	// while it's being started.
 	if err := setContainerStarting(cntr); err != nil {
-		return nil, errors.Wrapf(err, "failed to set starting state for container %q", id)
+		return nil, fmt.Errorf("failed to set starting state for container %q: %w", id, err)
 	}
 	defer func() {
 		if retErr != nil {
@@ -83,11 +84,11 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	// Get sandbox config from sandbox store.
 	sandbox, err := c.sandboxStore.Get(meta.SandboxID)
 	if err != nil {
-		return nil, errors.Wrapf(err, "sandbox %q not found", meta.SandboxID)
+		return nil, fmt.Errorf("sandbox %q not found: %w", meta.SandboxID, err)
 	}
 	sandboxID := meta.SandboxID
 	if sandbox.Status.Get().State != sandboxstore.StateReady {
-		return nil, errors.Errorf("sandbox container %q is not running", sandboxID)
+		return nil, fmt.Errorf("sandbox container %q is not running", sandboxID)
 	}
 
 	// Recheck target container validity in Linux namespace options.
@@ -96,7 +97,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		if nsOpts.GetPid() == runtime.NamespaceMode_TARGET {
 			_, err := c.validateTargetContainer(sandboxID, nsOpts.TargetId)
 			if err != nil {
-				return nil, errors.Wrap(err, "invalid target container")
+				return nil, fmt.Errorf("invalid target container: %w", err)
 			}
 		}
 	}
@@ -104,7 +105,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	ioCreation := func(id string) (_ containerdio.IO, err error) {
 		stdoutWC, stderrWC, err := c.createContainerLoggers(meta.LogPath, config.GetTty())
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to create container loggers")
+			return nil, fmt.Errorf("failed to create container loggers: %w", err)
 		}
 		cntr.IO.AddOutput("log", stdoutWC, stderrWC)
 		cntr.IO.Pipe()
@@ -113,12 +114,12 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 
 	ctrInfo, err := container.Info(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get container info")
+		return nil, fmt.Errorf("failed to get container info: %w", err)
 	}
 
 	ociRuntime, err := c.getSandboxRuntime(sandbox.Config, sandbox.Metadata.RuntimeHandler)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get sandbox runtime")
+		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
 
 	taskOpts := c.taskOpts(ctrInfo.Runtime.Name)
@@ -127,7 +128,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	}
 	task, err := container.NewTask(ctx, ioCreation, taskOpts...)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create containerd task")
+		return nil, fmt.Errorf("failed to create containerd task: %w", err)
 	}
 	defer func() {
 		if retErr != nil {
@@ -143,7 +144,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	// wait is a long running background request, no timeout needed.
 	exitCh, err := task.Wait(ctrdutil.NamespacedContext())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to wait for containerd task")
+		return nil, fmt.Errorf("failed to wait for containerd task: %w", err)
 	}
 	nric, err := nri.New()
 	if err != nil {
@@ -155,13 +156,13 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 			Labels: sandbox.Config.Labels,
 		}
 		if _, err := nric.InvokeWithSandbox(ctx, task, v1.Create, nriSB); err != nil {
-			return nil, errors.Wrap(err, "nri invoke")
+			return nil, fmt.Errorf("nri invoke: %w", err)
 		}
 	}
 
 	// Start containerd task.
 	if err := task.Start(ctx); err != nil {
-		return nil, errors.Wrapf(err, "failed to start containerd task %q", id)
+		return nil, fmt.Errorf("failed to start containerd task %q: %w", id, err)
 	}
 
 	// Update container start timestamp.
@@ -170,7 +171,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		status.StartedAt = time.Now().UnixNano()
 		return status, nil
 	}); err != nil {
-		return nil, errors.Wrapf(err, "failed to update container %q state", id)
+		return nil, fmt.Errorf("failed to update container %q state: %w", id, err)
 	}
 
 	// It handles the TaskExit event and update container state after this.
@@ -187,7 +188,7 @@ func setContainerStarting(container containerstore.Container) error {
 	return container.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
 		// Return error if container is not in created state.
 		if status.State() != runtime.ContainerState_CONTAINER_CREATED {
-			return status, errors.Errorf("container is in %s state", criContainerStateToString(status.State()))
+			return status, fmt.Errorf("container is in %s state", criContainerStateToString(status.State()))
 		}
 		// Do not start the container when there is a removal in progress.
 		if status.Removing {
@@ -216,7 +217,7 @@ func (c *criService) createContainerLoggers(logPath string, tty bool) (stdout io
 		// Only generate container log when log path is specified.
 		f, err := openLogFile(logPath)
 		if err != nil {
-			return nil, nil, errors.Wrap(err, "failed to create and open log file")
+			return nil, nil, fmt.Errorf("failed to create and open log file: %w", err)
 		}
 		defer func() {
 			if err != nil {

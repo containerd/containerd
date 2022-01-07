@@ -18,6 +18,7 @@ package cri
 
 import (
 	"flag"
+	"fmt"
 	"path/filepath"
 
 	"github.com/containerd/containerd"
@@ -35,7 +36,6 @@ import (
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/snapshots"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/klog/v2"
 
@@ -44,7 +44,6 @@ import (
 	"github.com/containerd/containerd/pkg/cri/server"
 )
 
-// TODO(random-liu): Use github.com/pkg/errors for our errors.
 // Register CRI service plugin
 func init() {
 	config := criconfig.DefaultConfig()
@@ -66,7 +65,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	ctx := ic.Context
 	pluginConfig := ic.Config.(*criconfig.PluginConfig)
 	if err := criconfig.ValidatePluginConfig(ctx, pluginConfig); err != nil {
-		return nil, errors.Wrap(err, "invalid plugin config")
+		return nil, fmt.Errorf("invalid plugin config: %w", err)
 	}
 
 	c := criconfig.Config{
@@ -79,12 +78,12 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	log.G(ctx).Infof("Start cri plugin with config %+v", c)
 
 	if err := setGLogLevel(); err != nil {
-		return nil, errors.Wrap(err, "failed to set glog level")
+		return nil, fmt.Errorf("failed to set glog level: %w", err)
 	}
 
 	servicesOpts, err := getServicesOpts(ic)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get services")
+		return nil, fmt.Errorf("failed to get services: %w", err)
 	}
 
 	log.G(ctx).Info("Connect containerd service")
@@ -95,12 +94,12 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		containerd.WithServices(servicesOpts...),
 	)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create containerd client")
+		return nil, fmt.Errorf("failed to create containerd client: %w", err)
 	}
 
 	s, err := server.NewCRIService(c, client)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create CRI service")
+		return nil, fmt.Errorf("failed to create CRI service: %w", err)
 	}
 
 	go func() {
@@ -116,12 +115,12 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 func getServicesOpts(ic *plugin.InitContext) ([]containerd.ServicesOpt, error) {
 	plugins, err := ic.GetByType(plugin.ServicePlugin)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get service plugin")
+		return nil, fmt.Errorf("failed to get service plugin: %w", err)
 	}
 
 	ep, err := ic.Get(plugin.EventPlugin)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get event plugin")
+		return nil, fmt.Errorf("failed to get event plugin: %w", err)
 	}
 
 	opts := []containerd.ServicesOpt{
@@ -158,14 +157,14 @@ func getServicesOpts(ic *plugin.InitContext) ([]containerd.ServicesOpt, error) {
 	} {
 		p := plugins[s]
 		if p == nil {
-			return nil, errors.Errorf("service %q not found", s)
+			return nil, fmt.Errorf("service %q not found", s)
 		}
 		i, err := p.Instance()
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get instance of service %q", s)
+			return nil, fmt.Errorf("failed to get instance of service %q: %w", s, err)
 		}
 		if i == nil {
-			return nil, errors.Errorf("instance of service %q not found", s)
+			return nil, fmt.Errorf("instance of service %q not found", s)
 		}
 		opts = append(opts, fn(i))
 	}

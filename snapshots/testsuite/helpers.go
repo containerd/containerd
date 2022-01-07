@@ -25,22 +25,21 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/continuity/fs/fstest"
-	"github.com/pkg/errors"
 )
 
 func applyToMounts(m []mount.Mount, work string, a fstest.Applier) (err error) {
 	td, err := os.MkdirTemp(work, "prepare")
 	if err != nil {
-		return errors.Wrap(err, "failed to create temp dir")
+		return fmt.Errorf("failed to create temp dir: %w", err)
 	}
 	defer os.RemoveAll(td)
 
 	if err := mount.All(m, td); err != nil {
-		return errors.Wrap(err, "failed to mount")
+		return fmt.Errorf("failed to mount: %w", err)
 	}
 	defer func() {
-		if err1 := mount.UnmountAll(td, umountflags); err == nil {
-			err = errors.Wrap(err1, "failed to unmount")
+		if err1 := mount.UnmountAll(td, umountflags); err1 != nil && err == nil {
+			err = fmt.Errorf("failed to unmount: %w", err1)
 		}
 	}()
 
@@ -55,15 +54,15 @@ func createSnapshot(ctx context.Context, sn snapshots.Snapshotter, parent, work 
 
 	m, err := sn.Prepare(ctx, prepare, parent, opt)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to prepare snapshot")
+		return "", fmt.Errorf("failed to prepare snapshot: %w", err)
 	}
 
 	if err := applyToMounts(m, work, a); err != nil {
-		return "", errors.Wrap(err, "failed to apply")
+		return "", fmt.Errorf("failed to apply: %w", err)
 	}
 
 	if err := sn.Commit(ctx, n, prepare, opt); err != nil {
-		return "", errors.Wrap(err, "failed to commit")
+		return "", fmt.Errorf("failed to commit: %w", err)
 	}
 
 	return n, nil
@@ -72,36 +71,36 @@ func createSnapshot(ctx context.Context, sn snapshots.Snapshotter, parent, work 
 func checkSnapshot(ctx context.Context, sn snapshots.Snapshotter, work, name, check string) (err error) {
 	td, err := os.MkdirTemp(work, "check")
 	if err != nil {
-		return errors.Wrap(err, "failed to create temp dir")
+		return fmt.Errorf("failed to create temp dir: %w", err)
 	}
 	defer func() {
-		if err1 := os.RemoveAll(td); err == nil {
-			err = errors.Wrapf(err1, "failed to remove temporary directory %s", td)
+		if err1 := os.RemoveAll(td); err1 != nil && err == nil {
+			err = fmt.Errorf("failed to remove temporary directory %s: %w", td, err1)
 		}
 	}()
 
 	view := fmt.Sprintf("%s-view", name)
 	m, err := sn.View(ctx, view, name, opt)
 	if err != nil {
-		return errors.Wrap(err, "failed to create view")
+		return fmt.Errorf("failed to create view: %w", err)
 	}
 	defer func() {
-		if err1 := sn.Remove(ctx, view); err == nil {
-			err = errors.Wrap(err1, "failed to remove view")
+		if err1 := sn.Remove(ctx, view); err1 != nil && err == nil {
+			err = fmt.Errorf("failed to remove view: %w", err1)
 		}
 	}()
 
 	if err := mount.All(m, td); err != nil {
-		return errors.Wrap(err, "failed to mount")
+		return fmt.Errorf("failed to mount: %w", err)
 	}
 	defer func() {
-		if err1 := mount.UnmountAll(td, umountflags); err == nil {
-			err = errors.Wrap(err1, "failed to unmount view")
+		if err1 := mount.UnmountAll(td, umountflags); err1 != nil && err == nil {
+			err = fmt.Errorf("failed to unmount view: %w", err1)
 		}
 	}()
 
 	if err := fstest.CheckDirectoryEqual(check, td); err != nil {
-		return errors.Wrap(err, "check directory failed")
+		return fmt.Errorf("check directory failed: %w", err)
 	}
 
 	return nil
@@ -113,7 +112,7 @@ func checkSnapshot(ctx context.Context, sn snapshots.Snapshotter, work, name, ch
 func checkSnapshots(ctx context.Context, sn snapshots.Snapshotter, work string, as ...fstest.Applier) error {
 	td, err := os.MkdirTemp(work, "flat")
 	if err != nil {
-		return errors.Wrap(err, "failed to create temp dir")
+		return fmt.Errorf("failed to create temp dir: %w", err)
 	}
 	defer os.RemoveAll(td)
 
@@ -121,15 +120,15 @@ func checkSnapshots(ctx context.Context, sn snapshots.Snapshotter, work string, 
 	for i, a := range as {
 		s, err := createSnapshot(ctx, sn, parentID, work, a)
 		if err != nil {
-			return errors.Wrapf(err, "failed to create snapshot %d", i+1)
+			return fmt.Errorf("failed to create snapshot %d: %w", i+1, err)
 		}
 
 		if err := a.Apply(td); err != nil {
-			return errors.Wrapf(err, "failed to apply to check directory on %d", i+1)
+			return fmt.Errorf("failed to apply to check directory on %d: %w", i+1, err)
 		}
 
 		if err := checkSnapshot(ctx, sn, work, s, td); err != nil {
-			return errors.Wrapf(err, "snapshot check failed on snapshot %d", i+1)
+			return fmt.Errorf("snapshot check failed on snapshot %d: %w", i+1, err)
 		}
 
 		parentID = s
@@ -141,28 +140,28 @@ func checkSnapshots(ctx context.Context, sn snapshots.Snapshotter, work string, 
 // checkInfo checks that the infos are the same
 func checkInfo(si1, si2 snapshots.Info) error {
 	if si1.Kind != si2.Kind {
-		return errors.Errorf("Expected kind %v, got %v", si1.Kind, si2.Kind)
+		return fmt.Errorf("Expected kind %v, got %v", si1.Kind, si2.Kind)
 	}
 	if si1.Name != si2.Name {
-		return errors.Errorf("Expected name %v, got %v", si1.Name, si2.Name)
+		return fmt.Errorf("Expected name %v, got %v", si1.Name, si2.Name)
 	}
 	if si1.Parent != si2.Parent {
-		return errors.Errorf("Expected Parent %v, got %v", si1.Parent, si2.Parent)
+		return fmt.Errorf("Expected Parent %v, got %v", si1.Parent, si2.Parent)
 	}
 	if len(si1.Labels) != len(si2.Labels) {
-		return errors.Errorf("Expected %d labels, got %d", len(si1.Labels), len(si2.Labels))
+		return fmt.Errorf("Expected %d labels, got %d", len(si1.Labels), len(si2.Labels))
 	}
 	for k, l1 := range si1.Labels {
 		l2 := si2.Labels[k]
 		if l1 != l2 {
-			return errors.Errorf("Expected label %v, got %v", l1, l2)
+			return fmt.Errorf("Expected label %v, got %v", l1, l2)
 		}
 	}
 	if si1.Created != si2.Created {
-		return errors.Errorf("Expected Created %v, got %v", si1.Created, si2.Created)
+		return fmt.Errorf("Expected Created %v, got %v", si1.Created, si2.Created)
 	}
 	if si1.Updated != si2.Updated {
-		return errors.Errorf("Expected Updated %v, got %v", si1.Updated, si2.Updated)
+		return fmt.Errorf("Expected Updated %v, got %v", si1.Updated, si2.Updated)
 	}
 
 	return nil

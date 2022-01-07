@@ -21,6 +21,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -40,7 +41,6 @@ import (
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/ttrpc"
 	ptypes "github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
@@ -60,7 +60,7 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 				return nil, nil, err
 			}
 			if err := RemoveSocket(address); err != nil {
-				return nil, nil, errors.Wrap(err, "remove already used socket")
+				return nil, nil, fmt.Errorf("remove already used socket: %w", err)
 			}
 			if socket, err = newSocket(address); err != nil {
 				return nil, nil, err
@@ -69,7 +69,7 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 
 		f, err := socket.File()
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "failed to get fd for socket %s", address)
+			return nil, nil, fmt.Errorf("failed to get fd for socket %s: %w", address, err)
 		}
 		defer f.Close()
 
@@ -77,12 +77,12 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 		stderrCopy := io.Discard
 		stdoutLog, err := v1.OpenShimStdoutLog(ctx, config.WorkDir)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "failed to create stdout log")
+			return nil, nil, fmt.Errorf("failed to create stdout log: %w", err)
 		}
 
 		stderrLog, err := v1.OpenShimStderrLog(ctx, config.WorkDir)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "failed to create stderr log")
+			return nil, nil, fmt.Errorf("failed to create stderr log: %w", err)
 		}
 		if debug {
 			stdoutCopy = os.Stdout
@@ -97,7 +97,7 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 			return nil, nil, err
 		}
 		if err := cmd.Start(); err != nil {
-			return nil, nil, errors.Wrapf(err, "failed to start shim")
+			return nil, nil, fmt.Errorf("failed to start shim: %w", err)
 		}
 		defer func() {
 			if err != nil {
@@ -143,14 +143,14 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 		}
 		c, clo, err := WithConnect(address, func() {})(ctx, config)
 		if err != nil {
-			return nil, nil, errors.Wrap(err, "failed to connect")
+			return nil, nil, fmt.Errorf("failed to connect: %w", err)
 		}
 		return c, clo, nil
 	}
 }
 
 func eaddrinuse(err error) bool {
-	cause := errors.Cause(err)
+	cause := errors.Unwrap(err)
 	netErr, ok := cause.(*net.OpError)
 	if !ok {
 		return false
@@ -176,11 +176,11 @@ func setupOOMScore(shimPid int) error {
 	pid := os.Getpid()
 	score, err := sys.GetOOMScoreAdj(pid)
 	if err != nil {
-		return errors.Wrap(err, "get daemon OOM score")
+		return fmt.Errorf("get daemon OOM score: %w", err)
 	}
 	shimScore := score + 1
 	if err := sys.AdjustOOMScore(shimPid, shimScore); err != nil {
-		return errors.Wrap(err, "set shim OOM score")
+		return fmt.Errorf("set shim OOM score: %w", err)
 	}
 	return nil
 }
@@ -264,7 +264,7 @@ func (s socket) path() string {
 
 func newSocket(address string) (*net.UnixListener, error) {
 	if len(address) > socketPathLimit {
-		return nil, errors.Errorf("%q: unix socket path too long (> %d)", address, socketPathLimit)
+		return nil, fmt.Errorf("%q: unix socket path too long (> %d)", address, socketPathLimit)
 	}
 	var (
 		sock = socket(address)
@@ -272,12 +272,12 @@ func newSocket(address string) (*net.UnixListener, error) {
 	)
 	if !sock.isAbstract() {
 		if err := os.MkdirAll(filepath.Dir(path), 0600); err != nil {
-			return nil, errors.Wrapf(err, "%s", path)
+			return nil, fmt.Errorf("%s: %w", path, err)
 		}
 	}
 	l, err := net.Listen("unix", path)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to listen to unix socket %q (abstract: %t)", address, sock.isAbstract())
+		return nil, fmt.Errorf("failed to listen to unix socket %q (abstract: %t): %w", address, sock.isAbstract(), err)
 	}
 	if err := os.Chmod(path, 0600); err != nil {
 		l.Close()

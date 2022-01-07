@@ -19,6 +19,7 @@ package metadata
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -33,7 +34,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -81,7 +81,7 @@ func (cs *contentStore) Info(ctx context.Context, dgst digest.Digest) (content.I
 			bkt = getShareableBucket(tx, dgst)
 		}
 		if bkt == nil {
-			return errors.Wrapf(errdefs.ErrNotFound, "content digest %v", dgst)
+			return fmt.Errorf("content digest %v: %w", dgst, errdefs.ErrNotFound)
 		}
 
 		info.Digest = dgst
@@ -112,10 +112,10 @@ func (cs *contentStore) Update(ctx context.Context, info content.Info, fieldpath
 			bkt = getShareableBucket(tx, info.Digest)
 		}
 		if bkt == nil {
-			return errors.Wrapf(errdefs.ErrNotFound, "content digest %v", info.Digest)
+			return fmt.Errorf("content digest %v: %w", info.Digest, errdefs.ErrNotFound)
 		}
 		if err := readInfo(&updated, bkt); err != nil {
-			return errors.Wrapf(err, "info %q", info.Digest)
+			return fmt.Errorf("info %q: %w", info.Digest, err)
 		}
 
 		if len(fieldpaths) > 0 {
@@ -134,7 +134,7 @@ func (cs *contentStore) Update(ctx context.Context, info content.Info, fieldpath
 				case "labels":
 					updated.Labels = info.Labels
 				default:
-					return errors.Wrapf(errdefs.ErrInvalidArgument, "cannot update %q field on content info %q", path, info.Digest)
+					return fmt.Errorf("cannot update %q field on content info %q: %w", path, info.Digest, errdefs.ErrInvalidArgument)
 				}
 			}
 		} else {
@@ -218,7 +218,7 @@ func (cs *contentStore) Delete(ctx context.Context, dgst digest.Digest) error {
 	return update(ctx, cs.db, func(tx *bolt.Tx) error {
 		bkt := getBlobBucket(tx, ns, dgst)
 		if bkt == nil {
-			return errors.Wrapf(errdefs.ErrNotFound, "content digest %v", dgst)
+			return fmt.Errorf("content digest %v: %w", dgst, errdefs.ErrNotFound)
 		}
 
 		if err := getBlobsBucket(tx, ns).DeleteBucket([]byte(dgst.String())); err != nil {
@@ -307,7 +307,7 @@ func (cs *contentStore) Status(ctx context.Context, ref string) (content.Status,
 	if err := view(ctx, cs.db, func(tx *bolt.Tx) error {
 		bref = getRef(tx, ns, ref)
 		if bref == "" {
-			return errors.Wrapf(errdefs.ErrNotFound, "reference %v", ref)
+			return fmt.Errorf("reference %v: %w", ref, errdefs.ErrNotFound)
 		}
 
 		return nil
@@ -335,15 +335,15 @@ func (cs *contentStore) Abort(ctx context.Context, ref string) error {
 	return update(ctx, cs.db, func(tx *bolt.Tx) error {
 		ibkt := getIngestsBucket(tx, ns)
 		if ibkt == nil {
-			return errors.Wrapf(errdefs.ErrNotFound, "reference %v", ref)
+			return fmt.Errorf("reference %v: %w", ref, errdefs.ErrNotFound)
 		}
 		bkt := ibkt.Bucket([]byte(ref))
 		if bkt == nil {
-			return errors.Wrapf(errdefs.ErrNotFound, "reference %v", ref)
+			return fmt.Errorf("reference %v: %w", ref, errdefs.ErrNotFound)
 		}
 		bref := string(bkt.Get(bucketKeyRef))
 		if bref == "" {
-			return errors.Wrapf(errdefs.ErrNotFound, "reference %v", ref)
+			return fmt.Errorf("reference %v: %w", ref, errdefs.ErrNotFound)
 		}
 		expected := string(bkt.Get(bucketKeyExpected))
 		if err := ibkt.DeleteBucket([]byte(ref)); err != nil {
@@ -374,7 +374,7 @@ func (cs *contentStore) Writer(ctx context.Context, opts ...content.WriterOpt) (
 	// TODO(AkihiroSuda): we could create a random string or one calculated based on the context
 	// https://github.com/containerd/containerd/issues/2129#issuecomment-380255019
 	if wOpts.Ref == "" {
-		return nil, errors.Wrap(errdefs.ErrInvalidArgument, "ref must not be empty")
+		return nil, fmt.Errorf("ref must not be empty: %w", errdefs.ErrInvalidArgument)
 	}
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
@@ -397,7 +397,7 @@ func (cs *contentStore) Writer(ctx context.Context, opts ...content.WriterOpt) (
 				// Add content to lease to prevent other reference removals
 				// from effecting this object during a provided lease
 				if err := addContentLease(ctx, tx, wOpts.Desc.Digest); err != nil {
-					return errors.Wrap(err, "unable to lease content")
+					return fmt.Errorf("unable to lease content: %w", err)
 				}
 				// Return error outside of transaction to ensure
 				// commit succeeds with the lease.
@@ -473,7 +473,7 @@ func (cs *contentStore) Writer(ctx context.Context, opts ...content.WriterOpt) (
 		return nil, err
 	}
 	if exists {
-		return nil, errors.Wrapf(errdefs.ErrAlreadyExists, "content %v", wOpts.Desc.Digest)
+		return nil, fmt.Errorf("content %v: %w", wOpts.Desc.Digest, errdefs.ErrAlreadyExists)
 	}
 
 	return &namespacedWriter{
@@ -626,10 +626,10 @@ func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64,
 	var actual digest.Digest
 	if nw.w == nil {
 		if size != 0 && size != nw.desc.Size {
-			return "", errors.Wrapf(errdefs.ErrFailedPrecondition, "%q failed size validation: %v != %v", nw.ref, nw.desc.Size, size)
+			return "", fmt.Errorf("%q failed size validation: %v != %v: %w", nw.ref, nw.desc.Size, size, errdefs.ErrFailedPrecondition)
 		}
 		if expected != "" && expected != nw.desc.Digest {
-			return "", errors.Wrapf(errdefs.ErrFailedPrecondition, "%q unexpected digest", nw.ref)
+			return "", fmt.Errorf("%q unexpected digest: %w", nw.ref, errdefs.ErrFailedPrecondition)
 		}
 		size = nw.desc.Size
 		actual = nw.desc.Digest
@@ -641,7 +641,7 @@ func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64,
 		}
 		if size != 0 && size != status.Offset {
 			nw.w.Close()
-			return "", errors.Wrapf(errdefs.ErrFailedPrecondition, "%q failed size validation: %v != %v", nw.ref, status.Offset, size)
+			return "", fmt.Errorf("%q failed size validation: %v != %v: %w", nw.ref, status.Offset, size, errdefs.ErrFailedPrecondition)
 		}
 		size = status.Offset
 
@@ -654,7 +654,7 @@ func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64,
 	bkt, err := createBlobBucket(tx, nw.namespace, actual)
 	if err != nil {
 		if err == bolt.ErrBucketExists {
-			return actual, errors.Wrapf(errdefs.ErrAlreadyExists, "content %v", actual)
+			return actual, fmt.Errorf("content %v: %w", actual, errdefs.ErrAlreadyExists)
 		}
 		return "", err
 	}
@@ -711,7 +711,7 @@ func (cs *contentStore) checkAccess(ctx context.Context, dgst digest.Digest) err
 			bkt = getShareableBucket(tx, dgst)
 		}
 		if bkt == nil {
-			return errors.Wrapf(errdefs.ErrNotFound, "content digest %v", dgst)
+			return fmt.Errorf("content digest %v: %w", dgst, errdefs.ErrNotFound)
 		}
 		return nil
 	})
@@ -720,7 +720,7 @@ func (cs *contentStore) checkAccess(ctx context.Context, dgst digest.Digest) err
 func validateInfo(info *content.Info) error {
 	for k, v := range info.Labels {
 		if err := labels.Validate(k, v); err != nil {
-			return errors.Wrapf(err, "info.Labels")
+			return fmt.Errorf("info.Labels: %w", err)
 		}
 	}
 
@@ -751,7 +751,7 @@ func writeInfo(info *content.Info, bkt *bolt.Bucket) error {
 	}
 
 	if err := boltutil.WriteLabels(bkt, info.Labels); err != nil {
-		return errors.Wrapf(err, "writing labels for info %v", info.Digest)
+		return fmt.Errorf("writing labels for info %v: %w", info.Digest, err)
 	}
 
 	// Write size

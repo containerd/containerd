@@ -18,6 +18,7 @@ package metadata
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,7 +35,6 @@ import (
 	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -639,7 +639,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				if testcase.createerr == nil {
 					t.Fatalf("unexpected error: %v", err)
 				} else {
-					t.Fatalf("cause of %v (cause: %v) != %v", err, errors.Cause(err), testcase.createerr)
+					t.Fatalf("cause of %v (cause: %v) != %v", err, errors.Unwrap(err), testcase.createerr)
 				}
 			} else if testcase.createerr != nil {
 				return
@@ -661,7 +661,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				if testcase.cause == nil {
 					t.Fatalf("unexpected error: %v", err)
 				} else {
-					t.Fatalf("cause of %v (cause: %v) != %v", err, errors.Cause(err), testcase.cause)
+					t.Fatalf("cause of %v (cause: %v) != %v", err, errors.Unwrap(err), testcase.cause)
 				}
 			} else if testcase.cause != nil {
 				return

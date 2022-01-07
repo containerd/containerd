@@ -18,6 +18,7 @@ package server
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"syscall"
 	"time"
@@ -27,7 +28,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
-	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"k8s.io/client-go/tools/remotecommand"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -49,7 +49,7 @@ func (c *criService) ExecSync(ctx context.Context, r *runtime.ExecSyncRequest) (
 		timeout: time.Duration(r.GetTimeout()) * time.Second,
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to exec in container")
+		return nil, fmt.Errorf("failed to exec in container: %w", err)
 	}
 
 	return &runtime.ExecSyncResponse{
@@ -79,18 +79,18 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 
 	spec, err := container.Spec(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get container spec")
+		return nil, fmt.Errorf("failed to get container spec: %w", err)
 	}
 	task, err := container.Task(ctx, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load task")
+		return nil, fmt.Errorf("failed to load task: %w", err)
 	}
 	pspec := spec.Process
 
 	pspec.Terminal = opts.tty
 	if opts.tty {
 		if err := oci.WithEnv([]string{"TERM=xterm"})(ctx, nil, nil, spec); err != nil {
-			return nil, errors.Wrap(err, "add TERM env var to spec")
+			return nil, fmt.Errorf("add TERM env var to spec: %w", err)
 		}
 	}
 
@@ -114,7 +114,7 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 		},
 	)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create exec %q", execID)
+		return nil, fmt.Errorf("failed to create exec %q: %w", execID, err)
 	}
 	defer func() {
 		deferCtx, deferCancel := ctrdutil.DeferContext()
@@ -126,10 +126,10 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 
 	exitCh, err := process.Wait(ctx)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to wait for process %q", execID)
+		return nil, fmt.Errorf("failed to wait for process %q: %w", execID, err)
 	}
 	if err := process.Start(ctx); err != nil {
-		return nil, errors.Wrapf(err, "failed to start exec %q", execID)
+		return nil, fmt.Errorf("failed to start exec %q: %w", execID, err)
 	}
 
 	handleResizing(ctx, opts.resize, func(size remotecommand.TerminalSize) {
@@ -160,7 +160,7 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 	case <-execCtx.Done():
 		// Ignore the not found error because the process may exit itself before killing.
 		if err := process.Kill(ctx, syscall.SIGKILL); err != nil && !errdefs.IsNotFound(err) {
-			return nil, errors.Wrapf(err, "failed to kill exec %q", execID)
+			return nil, fmt.Errorf("failed to kill exec %q: %w", execID, err)
 		}
 		// Wait for the process to be killed.
 		exitRes := <-exitCh
@@ -168,12 +168,12 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 			execID, exitRes.ExitCode(), exitRes.Error())
 		<-attachDone
 		log.G(ctx).Debugf("Stream pipe for exec process %q done", execID)
-		return nil, errors.Wrapf(execCtx.Err(), "timeout %v exceeded", opts.timeout)
+		return nil, fmt.Errorf("timeout %v exceeded: %w", opts.timeout, execCtx.Err())
 	case exitRes := <-exitCh:
 		code, _, err := exitRes.Result()
 		log.G(ctx).Debugf("Exec process %q exits with exit code %d and error %v", execID, code, err)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed while waiting for exec %q", execID)
+			return nil, fmt.Errorf("failed while waiting for exec %q: %w", execID, err)
 		}
 		<-attachDone
 		log.G(ctx).Debugf("Stream pipe for exec process %q done", execID)
@@ -198,13 +198,13 @@ func (c *criService) execInContainer(ctx context.Context, id string, opts execOp
 	cntr, err := c.containerStore.Get(id)
 
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to find container %q in store", id)
+		return nil, fmt.Errorf("failed to find container %q in store: %w", id, err)
 	}
 	id = cntr.ID
 
 	state := cntr.Status.Get().State()
 	if state != runtime.ContainerState_CONTAINER_RUNNING {
-		return nil, errors.Errorf("container is in %s state", criContainerStateToString(state))
+		return nil, fmt.Errorf("container is in %s state", criContainerStateToString(state))
 	}
 
 	return c.execInternal(ctx, cntr.Container, id, opts)

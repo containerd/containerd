@@ -21,6 +21,7 @@ package task
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"sync"
 
@@ -47,7 +48,6 @@ import (
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -82,7 +82,7 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 	go s.processExits()
 	runcC.Monitor = reaper.Default
 	if err := s.initPlatform(); err != nil {
-		return nil, errors.Wrap(err, "failed to initialized platform behavior")
+		return nil, fmt.Errorf("failed to initialized platform behavior: %w", err)
 	}
 	go s.forward(ctx, publisher)
 	sd.RegisterCallback(func(context.Context) error {
@@ -377,7 +377,7 @@ func (s *service) Pids(ctx context.Context, r *taskAPI.PidsRequest) (*taskAPI.Pi
 				}
 				a, err := typeurl.MarshalAny(d)
 				if err != nil {
-					return nil, errors.Wrapf(err, "failed to marshal process %d info", pid)
+					return nil, fmt.Errorf("failed to marshal process %d info: %w", pid, err)
 				}
 				pInfo.Info = a
 				break

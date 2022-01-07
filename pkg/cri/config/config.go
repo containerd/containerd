@@ -18,12 +18,13 @@ package config
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/url"
 	"time"
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
-	"github.com/pkg/errors"
 )
 
 // Runtime struct to contain the type(ID), engine, and root variables for a default runtime
@@ -346,7 +347,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 	if c.ContainerdConfig.UntrustedWorkloadRuntime.Type != "" {
 		log.G(ctx).Warning("`untrusted_workload_runtime` is deprecated, please use `untrusted` runtime in `runtimes` instead")
 		if _, ok := c.ContainerdConfig.Runtimes[RuntimeUntrusted]; ok {
-			return errors.Errorf("conflicting definitions: configuration includes both `untrusted_workload_runtime` and `runtimes[%q]`", RuntimeUntrusted)
+			return fmt.Errorf("conflicting definitions: configuration includes both `untrusted_workload_runtime` and `runtimes[%q]`", RuntimeUntrusted)
 		}
 		c.ContainerdConfig.Runtimes[RuntimeUntrusted] = c.ContainerdConfig.UntrustedWorkloadRuntime
 	}
@@ -363,19 +364,19 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 		return errors.New("`default_runtime_name` is empty")
 	}
 	if _, ok := c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName]; !ok {
-		return errors.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", c.ContainerdConfig.DefaultRuntimeName)
+		return fmt.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", c.ContainerdConfig.DefaultRuntimeName)
 	}
 
 	// Validation for deprecated runtime options.
 	if c.SystemdCgroup {
 		if c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName].Type != plugin.RuntimeLinuxV1 {
-			return errors.Errorf("`systemd_cgroup` only works for runtime %s", plugin.RuntimeLinuxV1)
+			return fmt.Errorf("`systemd_cgroup` only works for runtime %s", plugin.RuntimeLinuxV1)
 		}
 		log.G(ctx).Warning("`systemd_cgroup` is deprecated, please use runtime `options` instead")
 	}
 	if c.NoPivot {
 		if c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName].Type != plugin.RuntimeLinuxV1 {
-			return errors.Errorf("`no_pivot` only works for runtime %s", plugin.RuntimeLinuxV1)
+			return fmt.Errorf("`no_pivot` only works for runtime %s", plugin.RuntimeLinuxV1)
 		}
 		// NoPivot can't be deprecated yet, because there is no alternative config option
 		// for `io.containerd.runtime.v1.linux`.
@@ -383,13 +384,13 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 	for _, r := range c.ContainerdConfig.Runtimes {
 		if r.Engine != "" {
 			if r.Type != plugin.RuntimeLinuxV1 {
-				return errors.Errorf("`runtime_engine` only works for runtime %s", plugin.RuntimeLinuxV1)
+				return fmt.Errorf("`runtime_engine` only works for runtime %s", plugin.RuntimeLinuxV1)
 			}
 			log.G(ctx).Warning("`runtime_engine` is deprecated, please use runtime `options` instead")
 		}
 		if r.Root != "" {
 			if r.Type != plugin.RuntimeLinuxV1 {
-				return errors.Errorf("`runtime_root` only works for runtime %s", plugin.RuntimeLinuxV1)
+				return fmt.Errorf("`runtime_root` only works for runtime %s", plugin.RuntimeLinuxV1)
 			}
 			log.G(ctx).Warning("`runtime_root` is deprecated, please use runtime `options` instead")
 		}
@@ -425,7 +426,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 			auth := auth
 			u, err := url.Parse(endpoint)
 			if err != nil {
-				return errors.Wrapf(err, "failed to parse registry url %q from `registry.auths`", endpoint)
+				return fmt.Errorf("failed to parse registry url %q from `registry.auths`: %w", endpoint, err)
 			}
 			if u.Scheme != "" {
 				// Do not include the scheme in the new registry config.
@@ -441,7 +442,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 	// Validation for stream_idle_timeout
 	if c.StreamIdleTimeout != "" {
 		if _, err := time.ParseDuration(c.StreamIdleTimeout); err != nil {
-			return errors.Wrap(err, "invalid stream idle timeout")
+			return fmt.Errorf("invalid stream idle timeout: %w", err)
 		}
 	}
 	return nil

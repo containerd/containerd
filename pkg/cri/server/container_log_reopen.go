@@ -17,7 +17,9 @@
 package server
 
 import (
-	"github.com/pkg/errors"
+	"errors"
+	"fmt"
+
 	"golang.org/x/net/context"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -28,7 +30,7 @@ import (
 func (c *criService) ReopenContainerLog(ctx context.Context, r *runtime.ReopenContainerLogRequest) (*runtime.ReopenContainerLogResponse, error) {
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
-		return nil, errors.Wrapf(err, "an error occurred when try to find container %q", r.GetContainerId())
+		return nil, fmt.Errorf("an error occurred when try to find container %q: %w", r.GetContainerId(), err)
 	}
 
 	if container.Status.Get().State() != runtime.ContainerState_CONTAINER_RUNNING {

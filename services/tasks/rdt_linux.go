@@ -20,10 +20,11 @@
 package tasks
 
 import (
+	"fmt"
+
 	"github.com/containerd/containerd/log"
 
 	"github.com/intel/goresctrl/pkg/rdt"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -44,7 +45,7 @@ func initRdt(configFilePath string) error {
 	}
 
 	if err := rdt.Initialize(ResctrlPrefix); err != nil {
-		return errors.Wrap(err, "RDT not enabled")
+		return fmt.Errorf("RDT not enabled: %w", err)
 	}
 
 	if err := rdt.SetConfigFromFile(configFilePath, true); err != nil {

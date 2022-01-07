@@ -20,7 +20,9 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"expvar"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -53,7 +55,6 @@ import (
 	metrics "github.com/docker/go-metrics"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
@@ -117,7 +118,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 	for key, sec := range config.Timeouts {
 		d, err := time.ParseDuration(sec)
 		if err != nil {
-			return nil, errors.Errorf("unable to parse %s into a time duration", sec)
+			return nil, fmt.Errorf("unable to parse %s into a time duration", sec)
 		}
 		timeout.Set(key, d)
 	}
@@ -165,7 +166,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			caCertPool := x509.NewCertPool()
 			caCert, err := os.ReadFile(config.GRPC.TCPTLSCA)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to load CA file")
+				return nil, fmt.Errorf("failed to load CA file: %w", err)
 			}
 			caCertPool.AppendCertsFromPEM(caCert)
 			tlsConfig.ClientCAs = caCertPool
@@ -241,7 +242,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		}
 		result := p.Init(initContext)
 		if err := initialized.Add(result); err != nil {
-			return nil, errors.Wrapf(err, "could not add plugin result to plugin set")
+			return nil, fmt.Errorf("could not add plugin result to plugin set: %w", err)
 		}
 
 		instance, err := result.Instance()
@@ -252,7 +253,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 				log.G(ctx).WithError(err).Warnf("failed to load plugin %s", id)
 			}
 			if _, ok := required[reqID]; ok {
-				return nil, errors.Wrapf(err, "load required plugin %s", id)
+				return nil, fmt.Errorf("load required plugin %s: %w", id, err)
 			}
 			continue
 		}
@@ -276,7 +277,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		for id := range required {
 			missing = append(missing, id)
 		}
-		return nil, errors.Errorf("required plugin %s not included", missing)
+		return nil, fmt.Errorf("required plugin %s not included", missing)
 	}
 
 	// register services after all plugins have been initialized
@@ -560,7 +561,7 @@ func (pc *proxyClients) getClient(address string) (*grpc.ClientConn, error) {
 
 	conn, err := grpc.Dial(dialer.DialAddress(address), gopts...)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to dial %q", address)
+		return nil, fmt.Errorf("failed to dial %q: %w", address, err)
 	}
 
 	pc.clients[address] = conn

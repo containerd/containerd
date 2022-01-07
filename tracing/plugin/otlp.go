@@ -17,11 +17,11 @@
 package plugin
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
-	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
@@ -42,7 +42,7 @@ func init() {
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			cfg := ic.Config.(*OTLPConfig)
 			if cfg.Endpoint == "" {
-				return nil, errors.Wrap(plugin.ErrSkipPlugin, "otlp endpoint not set")
+				return nil, fmt.Errorf("otlp endpoint not set: %w", plugin.ErrSkipPlugin)
 			}
 			dialOpts := []grpc.DialOption{grpc.WithBlock()}
 			if cfg.Insecure {
@@ -54,7 +54,7 @@ func init() {
 				otlptracegrpc.WithDialOption(dialOpts...),
 			)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to create otlp exporter")
+				return nil, fmt.Errorf("failed to create otlp exporter: %w", err)
 			}
 			return sdktrace.NewBatchSpanProcessor(exp), nil
 		},
@@ -103,7 +103,7 @@ func newTracer(ic *plugin.InitContext) (io.Closer, error) {
 		),
 	)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create resource")
+		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
 
 	opts := []sdktrace.TracerProviderOption{
@@ -113,7 +113,7 @@ func newTracer(ic *plugin.InitContext) (io.Closer, error) {
 
 	ls, err := ic.GetByType(plugin.TracingProcessorPlugin)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get tracing processors")
+		return nil, fmt.Errorf("failed to get tracing processors: %w", err)
 	}
 
 	procs := make([]sdktrace.SpanProcessor, 0, len(ls))

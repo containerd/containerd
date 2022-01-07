@@ -31,7 +31,6 @@ import (
 	"time"
 
 	"github.com/containerd/continuity/fs/fstest"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"gotest.tools/v3/assert"
 
@@ -287,7 +286,7 @@ func updateFile(name string) applierFn {
 		path := filepath.Join(root, name)
 		file, err := os.OpenFile(path, os.O_WRONLY, 0600)
 		if err != nil {
-			return errors.Wrapf(err, "failed to open %q", path)
+			return fmt.Errorf("failed to open %q: %w", path, err)
 		}
 
 		info, err := file.Stat()
@@ -305,7 +304,7 @@ func updateFile(name string) applierFn {
 		}
 
 		if _, err := file.WriteAt(buf, offset); err != nil {
-			return errors.Wrapf(err, "failed to write %q at offset %d", path, offset)
+			return fmt.Errorf("failed to write %q at offset %d: %w", path, offset, err)
 		}
 
 		return file.Close()

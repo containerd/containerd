@@ -17,6 +17,8 @@
 package server
 
 import (
+	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -30,9 +32,7 @@ import (
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/typeurl"
-
 	gogotypes "github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/utils/clock"
@@ -141,7 +141,7 @@ func (em *eventMonitor) startSandboxExitMonitor(ctx context.Context, id string, 
 					}
 					return nil
 				} else if !errdefs.IsNotFound(err) {
-					return errors.Wrapf(err, "failed to get sandbox %s", e.ID)
+					return fmt.Errorf("failed to get sandbox %s: %w", e.ID, err)
 				}
 				return nil
 			}()
@@ -192,7 +192,7 @@ func (em *eventMonitor) startContainerExitMonitor(ctx context.Context, id string
 					}
 					return nil
 				} else if !errdefs.IsNotFound(err) {
-					return errors.Wrapf(err, "failed to get container %s", e.ID)
+					return fmt.Errorf("failed to get container %s: %w", e.ID, err)
 				}
 				return nil
 			}()
@@ -211,7 +211,7 @@ func convertEvent(e *gogotypes.Any) (string, interface{}, error) {
 	id := ""
 	evt, err := typeurl.UnmarshalAny(e)
 	if err != nil {
-		return "", nil, errors.Wrap(err, "failed to unmarshalany")
+		return "", nil, fmt.Errorf("failed to unmarshalany: %w", err)
 	}
 
 	switch e := evt.(type) {
@@ -314,20 +314,20 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 		cntr, err := em.c.containerStore.Get(e.ID)
 		if err == nil {
 			if err := handleContainerExit(ctx, e, cntr); err != nil {
-				return errors.Wrap(err, "failed to handle container TaskExit event")
+				return fmt.Errorf("failed to handle container TaskExit event: %w", err)
 			}
 			return nil
 		} else if !errdefs.IsNotFound(err) {
-			return errors.Wrap(err, "can't find container for TaskExit event")
+			return fmt.Errorf("can't find container for TaskExit event: %w", err)
 		}
 		sb, err := em.c.sandboxStore.Get(e.ID)
 		if err == nil {
 			if err := handleSandboxExit(ctx, e, sb); err != nil {
-				return errors.Wrap(err, "failed to handle sandbox TaskExit event")
+				return fmt.Errorf("failed to handle sandbox TaskExit event: %w", err)
 			}
 			return nil
 		} else if !errdefs.IsNotFound(err) {
-			return errors.Wrap(err, "can't find sandbox for TaskExit event")
+			return fmt.Errorf("can't find sandbox for TaskExit event: %w", err)
 		}
 		return nil
 	case *eventtypes.TaskOOM:
@@ -336,7 +336,7 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 		cntr, err := em.c.containerStore.Get(e.ContainerID)
 		if err != nil {
 			if !errdefs.IsNotFound(err) {
-				return errors.Wrap(err, "can't find container for TaskOOM event")
+				return fmt.Errorf("can't find container for TaskOOM event: %w", err)
 			}
 			return nil
 		}
@@ -345,7 +345,7 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 			return status, nil
 		})
 		if err != nil {
-			return errors.Wrap(err, "failed to update container status for TaskOOM event")
+			return fmt.Errorf("failed to update container status for TaskOOM event: %w", err)
 		}
 	case *eventtypes.ImageCreate:
 		logrus.Infof("ImageCreate event %+v", e)
@@ -380,13 +380,13 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 	)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
-			return errors.Wrapf(err, "failed to load task for container")
+			return fmt.Errorf("failed to load task for container: %w", err)
 		}
 	} else {
 		// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
 		if _, err = task.Delete(ctx, WithNRISandboxDelete(cntr.SandboxID), containerd.WithProcessKill); err != nil {
 			if !errdefs.IsNotFound(err) {
-				return errors.Wrap(err, "failed to stop container")
+				return fmt.Errorf("failed to stop container: %w", err)
 			}
 			// Move on to make sure container status is updated.
 		}
@@ -407,7 +407,7 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 		return status, nil
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed to update container state")
+		return fmt.Errorf("failed to update container state: %w", err)
 	}
 	// Using channel to propagate the information of container stop
 	cntr.Stop()
@@ -420,13 +420,13 @@ func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxst
 	task, err := sb.Container.Task(ctx, nil)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
-			return errors.Wrap(err, "failed to load task for sandbox")
+			return fmt.Errorf("failed to load task for sandbox: %w", err)
 		}
 	} else {
 		// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
 		if _, err = task.Delete(ctx, WithNRISandboxDelete(sb.ID), containerd.WithProcessKill); err != nil {
 			if !errdefs.IsNotFound(err) {
-				return errors.Wrap(err, "failed to stop sandbox")
+				return fmt.Errorf("failed to stop sandbox: %w", err)
 			}
 			// Move on to make sure container status is updated.
 		}
@@ -437,7 +437,7 @@ func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxst
 		return status, nil
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed to update sandbox state")
+		return fmt.Errorf("failed to update sandbox state: %w", err)
 	}
 	// Using channel to propagate the information of sandbox stop
 	sb.Stop()

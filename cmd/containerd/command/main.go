@@ -37,7 +37,6 @@ import (
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/containerd/tracing"
 	"github.com/containerd/containerd/version"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc/grpclog"
@@ -155,7 +154,7 @@ can be used and modified as necessary as a custom configuration.`
 
 		// cleanup temp mounts
 		if err := mount.SetTempMountLocation(filepath.Join(config.Root, "tmpmounts")); err != nil {
-			return errors.Wrap(err, "creating temp mount location")
+			return fmt.Errorf("creating temp mount location: %w", err)
 		}
 		// unmount all temp mounts on boot for the server
 		warnings, err := mount.CleanupTempMounts(0)
@@ -167,7 +166,7 @@ can be used and modified as necessary as a custom configuration.`
 		}
 
 		if config.GRPC.Address == "" {
-			return errors.Wrap(errdefs.ErrInvalidArgument, "grpc address cannot be empty")
+			return fmt.Errorf("grpc address cannot be empty: %w", errdefs.ErrInvalidArgument)
 		}
 		if config.TTRPC.Address == "" {
 			// If TTRPC was not explicitly configured, use defaults based on GRPC.
@@ -235,11 +234,11 @@ can be used and modified as necessary as a custom configuration.`
 			var l net.Listener
 			if isLocalAddress(config.Debug.Address) {
 				if l, err = sys.GetLocalListener(config.Debug.Address, config.Debug.UID, config.Debug.GID); err != nil {
-					return errors.Wrapf(err, "failed to get listener for debug endpoint")
+					return fmt.Errorf("failed to get listener for debug endpoint: %w", err)
 				}
 			} else {
 				if l, err = net.Listen("tcp", config.Debug.Address); err != nil {
-					return errors.Wrapf(err, "failed to get listener for debug endpoint")
+					return fmt.Errorf("failed to get listener for debug endpoint: %w", err)
 				}
 			}
 			serve(ctx, l, server.ServeDebug)
@@ -247,28 +246,28 @@ can be used and modified as necessary as a custom configuration.`
 		if config.Metrics.Address != "" {
 			l, err := net.Listen("tcp", config.Metrics.Address)
 			if err != nil {
-				return errors.Wrapf(err, "failed to get listener for metrics endpoint")
+				return fmt.Errorf("failed to get listener for metrics endpoint: %w", err)
 			}
 			serve(ctx, l, server.ServeMetrics)
 		}
 		// setup the ttrpc endpoint
 		tl, err := sys.GetLocalListener(config.TTRPC.Address, config.TTRPC.UID, config.TTRPC.GID)
 		if err != nil {
-			return errors.Wrapf(err, "failed to get listener for main ttrpc endpoint")
+			return fmt.Errorf("failed to get listener for main ttrpc endpoint: %w", err)
 		}
 		serve(ctx, tl, server.ServeTTRPC)
 
 		if config.GRPC.TCPAddress != "" {
 			l, err := net.Listen("tcp", config.GRPC.TCPAddress)
 			if err != nil {
-				return errors.Wrapf(err, "failed to get listener for TCP grpc endpoint")
+				return fmt.Errorf("failed to get listener for TCP grpc endpoint: %w", err)
 			}
 			serve(ctx, l, server.ServeTCP)
 		}
 		// setup the main grpc endpoint
 		l, err := sys.GetLocalListener(config.GRPC.Address, config.GRPC.UID, config.GRPC.GID)
 		if err != nil {
-			return errors.Wrapf(err, "failed to get listener for main endpoint")
+			return fmt.Errorf("failed to get listener for main endpoint: %w", err)
 		}
 		serve(ctx, l, server.ServeGRPC)
 
@@ -364,7 +363,7 @@ func setLogFormat(config *srvconfig.Config) error {
 			TimestampFormat: log.RFC3339NanoFixed,
 		})
 	default:
-		return errors.Errorf("unknown log format: %s", f)
+		return fmt.Errorf("unknown log format: %s", f)
 	}
 
 	return nil

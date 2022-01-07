@@ -61,7 +61,6 @@ import (
 	ptypes "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
@@ -152,7 +151,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 			defer cancel()
 			conn, err := grpc.DialContext(ctx, dialer.DialAddress(address), gopts...)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to dial %q", address)
+				return nil, fmt.Errorf("failed to dial %q: %w", address, err)
 			}
 			return conn, nil
 		}
@@ -163,7 +162,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 		c.conn, c.connector = conn, connector
 	}
 	if copts.services == nil && c.conn == nil {
-		return nil, errors.Wrap(errdefs.ErrUnavailable, "no grpc connection or services is available")
+		return nil, fmt.Errorf("no grpc connection or services is available: %w", errdefs.ErrUnavailable)
 	}
 
 	// check namespace labels for default runtime
@@ -223,7 +222,7 @@ type Client struct {
 // Reconnect re-establishes the GRPC connection to the containerd daemon
 func (c *Client) Reconnect() error {
 	if c.connector == nil {
-		return errors.Wrap(errdefs.ErrUnavailable, "unable to reconnect to containerd, no connector available")
+		return fmt.Errorf("unable to reconnect to containerd, no connector available: %w", errdefs.ErrUnavailable)
 	}
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
@@ -251,7 +250,7 @@ func (c *Client) IsServing(ctx context.Context) (bool, error) {
 	c.connMu.Lock()
 	if c.conn == nil {
 		c.connMu.Unlock()
-		return false, errors.Wrap(errdefs.ErrUnavailable, "no grpc connection available")
+		return false, fmt.Errorf("no grpc connection available: %w", errdefs.ErrUnavailable)
 	}
 	c.connMu.Unlock()
 	r, err := c.HealthService().Check(ctx, &grpc_health_v1.HealthCheckRequest{}, grpc.WaitForReady(true))
@@ -393,7 +392,7 @@ func (c *Client) Fetch(ctx context.Context, ref string, opts ...RemoteOpt) (imag
 	}
 
 	if fetchCtx.Unpack {
-		return images.Image{}, errors.Wrap(errdefs.ErrNotImplemented, "unpack on fetch not supported, try pull")
+		return images.Image{}, fmt.Errorf("unpack on fetch not supported, try pull: %w", errdefs.ErrNotImplemented)
 	}
 
 	if fetchCtx.PlatformMatcher == nil {
@@ -404,7 +403,7 @@ func (c *Client) Fetch(ctx context.Context, ref string, opts ...RemoteOpt) (imag
 			for _, s := range fetchCtx.Platforms {
 				p, err := platforms.Parse(s)
 				if err != nil {
-					return images.Image{}, errors.Wrapf(err, "invalid platform %s", s)
+					return images.Image{}, fmt.Errorf("invalid platform %s: %w", s, err)
 				}
 				ps = append(ps, p)
 			}
@@ -440,7 +439,7 @@ func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, 
 			for _, platform := range pushCtx.Platforms {
 				p, err := platforms.Parse(platform)
 				if err != nil {
-					return errors.Wrapf(err, "invalid platform %s", platform)
+					return fmt.Errorf("invalid platform %s: %w", platform, err)
 				}
 				ps = append(ps, p)
 			}
@@ -723,7 +722,7 @@ func (c *Client) Version(ctx context.Context) (Version, error) {
 	c.connMu.Lock()
 	if c.conn == nil {
 		c.connMu.Unlock()
-		return Version{}, errors.Wrap(errdefs.ErrUnavailable, "no grpc connection available")
+		return Version{}, fmt.Errorf("no grpc connection available: %w", errdefs.ErrUnavailable)
 	}
 	c.connMu.Unlock()
 	response, err := c.VersionService().Version(ctx, &ptypes.Empty{})
@@ -746,7 +745,7 @@ func (c *Client) Server(ctx context.Context) (ServerInfo, error) {
 	c.connMu.Lock()
 	if c.conn == nil {
 		c.connMu.Unlock()
-		return ServerInfo{}, errors.Wrap(errdefs.ErrUnavailable, "no grpc connection available")
+		return ServerInfo{}, fmt.Errorf("no grpc connection available: %w", errdefs.ErrUnavailable)
 	}
 	c.connMu.Unlock()
 
@@ -784,7 +783,7 @@ func (c *Client) getSnapshotter(ctx context.Context, name string) (snapshots.Sna
 
 	s := c.SnapshotService(name)
 	if s == nil {
-		return nil, errors.Wrapf(errdefs.ErrNotFound, "snapshotter %s was not found", name)
+		return nil, fmt.Errorf("snapshotter %s was not found: %w", name, errdefs.ErrNotFound)
 	}
 
 	return s, nil
