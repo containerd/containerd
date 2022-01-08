@@ -212,6 +212,9 @@ func seekReader(r io.Reader, offset, size int64) (io.Reader, error) {
 	if ok {
 		nn, err := seeker.Seek(offset, io.SeekStart)
 		if nn != offset {
+			if err == nil {
+				err = fmt.Errorf("unexpected seek location without seek error")
+			}
 			return nil, fmt.Errorf("failed to seek to offset %v: %w", offset, err)
 		}
 

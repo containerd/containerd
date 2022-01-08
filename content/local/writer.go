@@ -103,7 +103,7 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 		return fmt.Errorf("stat on ingest file failed: %w", err)
 	}
 	if closeErr != nil {
-		return fmt.Errorf("failed to close ingest file: %w", err)
+		return fmt.Errorf("failed to close ingest file: %w", closeErr)
 	}
 
 	if size > 0 && size != fi.Size() {
