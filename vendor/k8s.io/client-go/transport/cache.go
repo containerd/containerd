@@ -99,7 +99,9 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 	// TODO(jackkleeman): We can also add rotation here when config.HasCertCallback() is true
 	if config.TLS.ReloadTLSFiles {
 		dynamicCertDialer := certRotatingDialer(tlsConfig.GetClientCertificate, dial)
-		tlsConfig.GetClientCertificate = dynamicCertDialer.GetClientCertificate
+		if tlsConfig != nil {
+			tlsConfig.GetClientCertificate = dynamicCertDialer.GetClientCertificate
+		}
 		dial = dynamicCertDialer.connDialer.DialContext
 		go dynamicCertDialer.Run(wait.NeverStop)
 	}
