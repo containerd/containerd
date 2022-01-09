@@ -72,7 +72,7 @@ func (in *instrumentedService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	log.G(ctx).Infof("RunPodsandbox for %+v", r.GetConfig().GetMetadata())
+	log.G(ctx).Infof("RunPodSandbox for %+v", r.GetConfig().GetMetadata())
 	defer func() {
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("RunPodSandbox for %+v failed, error", r.GetConfig().GetMetadata())
@@ -88,7 +88,7 @@ func (in *instrumentedAlphaService) RunPodSandbox(ctx context.Context, r *runtim
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	log.G(ctx).Infof("RunPodsandbox for %+v", r.GetConfig().GetMetadata())
+	log.G(ctx).Infof("RunPodSandbox for %+v", r.GetConfig().GetMetadata())
 	defer func() {
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("RunPodSandbox for %+v failed, error", r.GetConfig().GetMetadata())
