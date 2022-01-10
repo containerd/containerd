@@ -30,7 +30,7 @@ if [ "${CONTAINERD_CGROUPV2:-"false"}"  == "true" ]; then
     OS_ID="$(. /etc/os-release && echo "$ID")"
   fi
   if [ "${OS_ID}" = "cos" ]; then
-    if ! grep -q 'systemd.unified_cgroup_hierarchy=true' /proc/cmdline; then
+    if ! grep -q 'systemd.unified_cgroup_hierarchy=true' /proc/cmdline && [ "$(stat -fc %T /sys/fs/cgroup/)" != "cgroup2fs" ]; then
       echo "Setting up cgroupv2"
 
       mount_path="/tmp/esp"
