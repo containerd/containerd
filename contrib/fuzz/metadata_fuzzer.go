@@ -60,6 +60,13 @@ func testEnv() (context.Context, *bolt.DB, func(), error) {
 }
 
 func FuzzImageStore(data []byte) int {
+	imageStoreOptions := map[int]string{
+		0: "Create",
+		1: "List",
+		2: "Update",
+		3: "Delete",
+	}
+
 	ctx, db, cancel, err := testEnv()
 	if err != nil {
 		return 0
@@ -77,27 +84,28 @@ func FuzzImageStore(data []byte) int {
 		if err != nil {
 			return 0
 		}
-		if opType%1 == 0 {
+		switch imageStoreOptions[opType%len(imageStoreOptions)] {
+		case "Create":
 			i := images.Image{}
 			err := f.GenerateStruct(&i)
 			if err != nil {
 				return 0
 			}
 			_, _ = store.Create(ctx, i)
-		} else if opType%2 == 0 {
+		case "List":
 			newFs, err := f.GetString()
 			if err != nil {
 				return 0
 			}
 			_, _ = store.List(ctx, newFs)
-		} else if opType%3 == 0 {
+		case "Update":
 			i := images.Image{}
 			err := f.GenerateStruct(&i)
 			if err != nil {
 				return 0
 			}
 			_, _ = store.Update(ctx, i)
-		} else if opType%4 == 0 {
+		case "Delete":
 			name, err := f.GetString()
 			if err != nil {
 				return 0
@@ -109,6 +117,14 @@ func FuzzImageStore(data []byte) int {
 }
 
 func FuzzLeaseManager(data []byte) int {
+	leaseManagerOptions := map[int]string{
+		0: "Create",
+		1: "List",
+		2: "AddResource",
+		3: "Delete",
+		4: "DeleteResource",
+		5: "ListResources",
+	}
 	ctx, db, cancel, err := testEnv()
 	if err != nil {
 		return 0
@@ -127,7 +143,8 @@ func FuzzLeaseManager(data []byte) int {
 		if err != nil {
 			return 0
 		}
-		if opType%1 == 0 {
+		switch leaseManagerOptions[opType%len(leaseManagerOptions)] {
+		case "Create":
 			err := db.Update(func(tx *bolt.Tx) error {
 				sm := make(map[string]string)
 				err2 := f.FuzzMap(&sm)
@@ -140,9 +157,9 @@ func FuzzLeaseManager(data []byte) int {
 			if err != nil {
 				return 0
 			}
-		} else if opType%2 == 0 {
+		case "List":
 			_, _ = lm.List(ctx)
-		} else if opType%3 == 0 {
+		case "AddResource":
 			l := leases.Lease{}
 			err := f.GenerateStruct(&l)
 			if err != nil {
@@ -157,14 +174,14 @@ func FuzzLeaseManager(data []byte) int {
 				_ = lm.AddResource(metadata.WithTransactionContext(ctx, tx), l, r)
 				return nil
 			})
-		} else if opType%4 == 0 {
+		case "Delete":
 			l := leases.Lease{}
 			err = f.GenerateStruct(&l)
 			if err != nil {
 				return 0
 			}
 			_ = lm.Delete(ctx, l)
-		} else if opType%5 == 0 {
+		case "DeleteResource":
 			l := leases.Lease{}
 			err := f.GenerateStruct(&l)
 			if err != nil {
@@ -176,7 +193,7 @@ func FuzzLeaseManager(data []byte) int {
 				return 0
 			}
 			_ = lm.DeleteResource(ctx, l, r)
-		} else if opType%6 == 0 {
+		case "ListResources":
 			l := leases.Lease{}
 			err := f.GenerateStruct(&l)
 			if err != nil {
@@ -189,6 +206,13 @@ func FuzzLeaseManager(data []byte) int {
 }
 
 func FuzzContainerStore(data []byte) int {
+	containerStoreOptions := map[int]string{
+		0: "Create",
+		1: "List",
+		2: "Delete",
+		3: "Update",
+		4: "Get",
+	}
 	ctx, db, cancel, err := testEnv()
 	if err != nil {
 		return 0
@@ -208,7 +232,8 @@ func FuzzContainerStore(data []byte) int {
 		if err != nil {
 			return 0
 		}
-		if opType%1 == 0 {
+		switch containerStoreOptions[opType%len(containerStoreOptions)] {
+		case "Create":
 			err := f.GenerateStruct(&c)
 			if err != nil {
 				return 0
@@ -217,25 +242,25 @@ func FuzzContainerStore(data []byte) int {
 				_, _ = store.Create(metadata.WithTransactionContext(ctx, tx), c)
 				return nil
 			})
-		} else if opType%2 == 0 {
+		case "List":
 			filt, err := f.GetString()
 			if err != nil {
 				return 0
 			}
 			_, _ = store.List(ctx, filt)
-		} else if opType%3 == 0 {
+		case "Delete":
 			id, err := f.GetString()
 			if err != nil {
 				return 0
 			}
 			_ = store.Delete(ctx, id)
-		} else if opType%4 == 0 {
+		case "Update":
 			fieldpaths, err := f.GetString()
 			if err != nil {
 				return 0
 			}
 			_, _ = store.Update(ctx, c, fieldpaths)
-		} else if opType%5 == 0 {
+		case "Get":
 			id, err := f.GetString()
 			if err != nil {
 				return 0
@@ -310,6 +335,16 @@ func testDB(opt ...testOpt) (context.Context, *metadata.DB, func(), error) {
 }
 
 func FuzzContentStore(data []byte) int {
+	contentStoreOptions := map[int]string{
+		0: "Info",
+		1: "Update",
+		2: "Walk",
+		3: "Delete",
+		4: "ListStatuses",
+		5: "Status",
+		6: "Abort",
+		7: "Commit",
+	}
 	ctx, db, cancel, err := testDB()
 	defer cancel()
 	if err != nil {
@@ -328,7 +363,8 @@ func FuzzContentStore(data []byte) int {
 		if err != nil {
 			return 0
 		}
-		if opType%1 == 0 {
+		switch contentStoreOptions[opType%len(contentStoreOptions)] {
+		case "Info":
 			blob, err := f.GetBytes()
 			if err != nil {
 				return 0
@@ -339,19 +375,19 @@ func FuzzContentStore(data []byte) int {
 				return 0
 			}
 			_, _ = cs.Info(ctx, dgst)
-		} else if opType%2 == 0 {
+		case "Update":
 			info := content.Info{}
 			err = f.GenerateStruct(&info)
 			if err != nil {
 				return 0
 			}
 			_, _ = cs.Update(ctx, info)
-		} else if opType%3 == 0 {
+		case "Walk":
 			walkFn := func(info content.Info) error {
 				return nil
 			}
 			_ = cs.Walk(ctx, walkFn)
-		} else if opType%4 == 0 {
+		case "Delete":
 			blob, err := f.GetBytes()
 			if err != nil {
 				return 0
@@ -362,21 +398,21 @@ func FuzzContentStore(data []byte) int {
 				return 0
 			}
 			_ = cs.Delete(ctx, dgst)
-		} else if opType%5 == 0 {
+		case "ListStatuses":
 			_, _ = cs.ListStatuses(ctx)
-		} else if opType%6 == 0 {
+		case "Status":
 			ref, err := f.GetString()
 			if err != nil {
 				return 0
 			}
 			_, _ = cs.Status(ctx, ref)
-		} else if opType%7 == 0 {
+		case "Abort":
 			ref, err := f.GetString()
 			if err != nil {
 				return 0
 			}
 			_ = cs.Abort(ctx, ref)
-		} else if opType%8 == 0 {
+		case "Commit":
 			desc := ocispec.Descriptor{}
 			err = f.GenerateStruct(&desc)
 			if err != nil {
