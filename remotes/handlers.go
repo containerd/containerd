@@ -253,6 +253,43 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, st
 	return nil
 }
 
+// SkipNonDistributableBlobs returns a handler that skips blobs that have a media type that is "non-distributeable".
+// An example of this kind of content would be a Windows base layer, which is not supposed to be redistributed.
+//
+// This is based on the media type of the content:
+// 	- application/vnd.oci.image.layer.nondistributable
+// 	- application/vnd.docker.image.rootfs.foreign
+func SkipNonDistributableBlobs(f images.HandlerFunc) images.HandlerFunc {
+	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		if images.IsNonDistributable(desc.MediaType) {
+			log.G(ctx).WithField("digest", desc.Digest).WithField("mediatype", desc.MediaType).Debug("Skipping non-distributable blob")
+			return nil, images.ErrSkipDesc
+		}
+
+		if images.IsLayerType(desc.MediaType) {
+			return nil, nil
+		}
+
+		children, err := f(ctx, desc)
+		if err != nil {
+			return nil, err
+		}
+		if len(children) == 0 {
+			return nil, nil
+		}
+
+		out := make([]ocispec.Descriptor, 0, len(children))
+		for _, child := range children {
+			if !images.IsNonDistributable(child.MediaType) {
+				out = append(out, child)
+			} else {
+				log.G(ctx).WithField("digest", child.Digest).WithField("mediatype", child.MediaType).Debug("Skipping non-distributable blob")
+			}
+		}
+		return out, nil
+	}
+}
+
 // FilterManifestByPlatformHandler allows Handler to handle non-target
 // platform's manifest and configuration data.
 func FilterManifestByPlatformHandler(f images.HandlerFunc, m platforms.Matcher) images.HandlerFunc {
