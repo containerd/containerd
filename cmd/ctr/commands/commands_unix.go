@@ -38,6 +38,12 @@ func init() {
 		Name:  "cpu-period",
 		Usage: "Limit CPU CFS period",
 	}, cli.StringFlag{
+		Name:  "cpuset-cpus",
+		Usage: "CPUs in which to allow execution (0-3, 0,1)",
+	}, cli.StringFlag{
+		Name:  "cpuset-mems",
+		Usage: "Memory nodes (MEMs) in which to allow execution (0-3, 0,1). Only effective on NUMA systems",
+	}, cli.StringFlag{
 		Name:  "rootfs-propagation",
 		Usage: "set the propagation of the container rootfs",
 	})

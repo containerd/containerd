@@ -277,7 +277,14 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			}
 			opts = append(opts, oci.WithCPUCFS(quota, period))
 		}
-
+		cpusetCpus := context.String("cpuset-cpus")
+		if cpusetCpus != "" {
+			opts = append(opts, oci.WithCPUs(cpusetCpus))
+		}
+		cpusetMems := context.String("cpuset-mems")
+		if cpusetCpus != "" {
+			opts = append(opts, oci.WithCPUsMems(cpusetMems))
+		}
 		joinNs := context.StringSlice("with-ns")
 		for _, ns := range joinNs {
 			parts := strings.Split(ns, ":")
