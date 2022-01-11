@@ -18,7 +18,6 @@ package integration
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
@@ -76,7 +75,7 @@ func TestVolumeCopyUp(t *testing.T) {
 	assert.Equal(t, len(volumePaths), 1, "expected exactly 1 volume")
 
 	testFilePath := filepath.Join(volumePaths[0], "test_file")
-	contents, err := ioutil.ReadFile(testFilePath)
+	contents, err := os.ReadFile(testFilePath)
 	require.NoError(t, err)
 	assert.Equal(t, "test_content\n", string(contents))
 
@@ -89,7 +88,7 @@ func TestVolumeCopyUp(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf("Check whether host path of the volume is updated")
-	contents, err = ioutil.ReadFile(testFilePath)
+	contents, err = os.ReadFile(testFilePath)
 	require.NoError(t, err)
 	assert.Equal(t, "new_content\n", string(contents))
 }
@@ -159,7 +158,7 @@ func getHostPathForVolumes(criRoot, containerID string) ([]string, error) {
 		return nil, err
 	}
 
-	volumes, err := ioutil.ReadDir(hostPath)
+	volumes, err := os.ReadDir(hostPath)
 	if err != nil {
 		return nil, err
 	}

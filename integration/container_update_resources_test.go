@@ -21,7 +21,6 @@ package integration
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -116,7 +115,7 @@ func getCgroupMemoryLimitForTask(t *testing.T, task containerd.Task) uint64 {
 func isSwapLikelyEnabled() bool {
 	// Check whether swap is enabled.
 	swapFile := "/proc/swaps"
-	swapData, err := ioutil.ReadFile(swapFile)
+	swapData, err := os.ReadFile(swapFile)
 	if err != nil {
 		// We can't read the file or it doesn't exist, assume we don't have swap.
 		return false

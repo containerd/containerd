@@ -20,7 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
@@ -196,7 +196,7 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ str
 	}()
 	// make sure to wait after start
 	go cmd.Wait()
-	if data, err := ioutil.ReadAll(os.Stdin); err == nil {
+	if data, err := io.ReadAll(os.Stdin); err == nil {
 		if len(data) > 0 {
 			var any ptypes.Any
 			if err := proto.Unmarshal(data, &any); err != nil {
