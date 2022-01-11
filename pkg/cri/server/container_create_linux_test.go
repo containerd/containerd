@@ -43,7 +43,6 @@ import (
 	"github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/opts"
 	"github.com/containerd/containerd/pkg/cri/util"
-	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	ostesting "github.com/containerd/containerd/pkg/os/testing"
 )
 
@@ -1107,7 +1106,7 @@ func TestMaskedAndReadonlyPaths(t *testing.T) {
 	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
 
-	defaultSpec, err := oci.GenerateSpec(ctrdutil.NamespacedContext(), nil, &containers.Container{ID: testID})
+	defaultSpec, err := oci.GenerateSpec(util.NamespacedContext(), nil, &containers.Container{ID: testID})
 	require.NoError(t, err)
 
 	for desc, test := range map[string]struct {

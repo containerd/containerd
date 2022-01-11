@@ -116,7 +116,7 @@ func parseEndpoint(endpoint string) (string, string, error) {
 		}
 		return "npipe", fmt.Sprintf("//%s%s", host, u.Path), nil
 	} else if u.Scheme == "" {
-		return "", "", fmt.Errorf("Using %q as endpoint is deprecated, please consider using full url format", endpoint)
+		return "", "", fmt.Errorf("using %q as endpoint is deprecated, please consider using full url format", endpoint)
 	} else {
 		return u.Scheme, "", fmt.Errorf("protocol %q not supported", u.Scheme)
 	}
@@ -124,7 +124,7 @@ func parseEndpoint(endpoint string) (string, string, error) {
 
 // LocalEndpoint empty implementation
 func LocalEndpoint(path, file string) (string, error) {
-	return "", fmt.Errorf("LocalEndpoints are unsupported in this build")
+	return "", fmt.Errorf("local endpoints are unsupported in this build")
 }
 
 var tickCount = syscall.NewLazyDLL("kernel32.dll").NewProc("GetTickCount64")

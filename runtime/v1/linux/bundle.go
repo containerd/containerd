@@ -184,7 +184,7 @@ func (b *bundle) Delete() error {
 	if err2 == nil {
 		return err
 	}
-	return fmt.Errorf("Failed to remove both bundle and workdir locations: %v: %w", err2, err)
+	return fmt.Errorf("failed to remove both bundle and workdir locations: %v: %w", err2, err)
 }
 
 func (b *bundle) legacyShimAddress(namespace string) string {

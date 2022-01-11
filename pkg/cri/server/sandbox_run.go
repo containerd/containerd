@@ -31,7 +31,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/snapshots"
-	cni "github.com/containerd/go-cni"
+	"github.com/containerd/go-cni"
 	"github.com/containerd/nri"
 	v1 "github.com/containerd/nri/types/v1"
 	"github.com/containerd/typeurl"
@@ -46,9 +46,8 @@ import (
 	"github.com/containerd/containerd/pkg/cri/server/bandwidth"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	"github.com/containerd/containerd/pkg/cri/util"
-	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/pkg/netns"
-	selinux "github.com/opencontainers/selinux/go-selinux"
+	"github.com/opencontainers/selinux/go-selinux"
 )
 
 func init() {
@@ -141,7 +140,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		sandbox.NetNSPath = sandbox.NetNS.GetPath()
 		defer func() {
 			if retErr != nil {
-				deferCtx, deferCancel := ctrdutil.DeferContext()
+				deferCtx, deferCancel := util.DeferContext()
 				defer deferCancel()
 				// Teardown network if an error is returned.
 				if err := c.teardownPodNetwork(deferCtx, sandbox); err != nil {
@@ -224,7 +223,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 	defer func() {
 		if retErr != nil {
-			deferCtx, deferCancel := ctrdutil.DeferContext()
+			deferCtx, deferCancel := util.DeferContext()
 			defer deferCancel()
 			if err := container.Delete(deferCtx, containerd.WithSnapshotCleanup); err != nil {
 				log.G(ctx).WithError(err).Errorf("Failed to delete containerd container %q", id)
@@ -296,7 +295,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 	defer func() {
 		if retErr != nil {
-			deferCtx, deferCancel := ctrdutil.DeferContext()
+			deferCtx, deferCancel := util.DeferContext()
 			defer deferCancel()
 			// Cleanup the sandbox container if an error is returned.
 			if _, err := task.Delete(deferCtx, WithNRISandboxDelete(id), containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
@@ -306,7 +305,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}()
 
 	// wait is a long running background request, no timeout needed.
-	exitCh, err := task.Wait(ctrdutil.NamespacedContext())
+	exitCh, err := task.Wait(util.NamespacedContext())
 	if err != nil {
 		return nil, fmt.Errorf("failed to wait for sandbox container task: %w", err)
 	}

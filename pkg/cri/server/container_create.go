@@ -31,7 +31,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	selinux "github.com/opencontainers/selinux/go-selinux"
+	"github.com/opencontainers/selinux/go-selinux"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -39,7 +39,6 @@ import (
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	"github.com/containerd/containerd/pkg/cri/util"
-	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 )
 
 func init() {
@@ -249,7 +248,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 	defer func() {
 		if retErr != nil {
-			deferCtx, deferCancel := ctrdutil.DeferContext()
+			deferCtx, deferCancel := util.DeferContext()
 			defer deferCancel()
 			if err := cntr.Delete(deferCtx, containerd.WithSnapshotCleanup); err != nil {
 				log.G(ctx).WithError(err).Errorf("Failed to delete containerd container %q", id)
@@ -316,7 +315,7 @@ func (c *criService) volumeMounts(containerRootDir string, criMounts []*runtime.
 // runtimeSpec returns a default runtime spec used in cri-containerd.
 func (c *criService) runtimeSpec(id string, baseSpecFile string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
 	// GenerateSpec needs namespace.
-	ctx := ctrdutil.NamespacedContext()
+	ctx := util.NamespacedContext()
 	container := &containers.Container{ID: id}
 
 	if baseSpecFile != "" {

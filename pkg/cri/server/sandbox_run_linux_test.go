@@ -28,7 +28,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	"github.com/containerd/containerd/pkg/cri/opts"
@@ -177,7 +176,7 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 		},
 		"sandbox sizing annotations should be set if LinuxContainerResources were provided": {
 			configChange: func(c *runtime.PodSandboxConfig) {
-				c.Linux.Resources = &v1.LinuxContainerResources{
+				c.Linux.Resources = &runtime.LinuxContainerResources{
 					CpuPeriod:          100,
 					CpuQuota:           200,
 					CpuShares:          5000,
@@ -217,7 +216,7 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 		},
 		"sandbox sizing annotations are zero if the resources are set to 0": {
 			configChange: func(c *runtime.PodSandboxConfig) {
-				c.Linux.Resources = &v1.LinuxContainerResources{}
+				c.Linux.Resources = &runtime.LinuxContainerResources{}
 			},
 			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
 				value, ok := spec.Annotations[annotations.SandboxCPUPeriod]

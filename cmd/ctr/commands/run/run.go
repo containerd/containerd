@@ -18,7 +18,6 @@ package run
 
 import (
 	"context"
-	gocontext "context"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -34,15 +33,15 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	gocni "github.com/containerd/go-cni"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
-func withMounts(context *cli.Context) oci.SpecOpts {
-	return func(ctx gocontext.Context, client oci.Client, container *containers.Container, s *specs.Spec) error {
+func withMounts(cliContext *cli.Context) oci.SpecOpts {
+	return func(ctx context.Context, client oci.Client, container *containers.Container, s *specs.Spec) error {
 		mounts := make([]specs.Mount, 0)
-		for _, mount := range context.StringSlice("mount") {
+		for _, mount := range cliContext.StringSlice("mount") {
 			m, err := parseMountFlag(mount)
 			if err != nil {
 				return err
