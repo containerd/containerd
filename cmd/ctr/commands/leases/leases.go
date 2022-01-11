@@ -158,7 +158,7 @@ var createCommand = cli.Command{
 
 var deleteCommand = cli.Command{
 	Name:        "delete",
-	Aliases:     []string{"rm"},
+	Aliases:     []string{"del", "remove", "rm"},
 	Usage:       "delete a lease",
 	ArgsUsage:   "[flags] <lease id> ...",
 	Description: "delete a lease",

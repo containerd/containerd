@@ -30,7 +30,7 @@ var deleteCommand = cli.Command{
 	Name:      "delete",
 	Usage:     "delete one or more tasks",
 	ArgsUsage: "CONTAINER [CONTAINER, ...]",
-	Aliases:   []string{"rm"},
+	Aliases:   []string{"del", "remove", "rm"},
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "force, f",

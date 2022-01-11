@@ -148,7 +148,7 @@ var deleteCommand = cli.Command{
 	Name:      "delete",
 	Usage:     "delete one or more existing containers",
 	ArgsUsage: "[flags] CONTAINER [CONTAINER, ...]",
-	Aliases:   []string{"del", "rm"},
+	Aliases:   []string{"del", "remove", "rm"},
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "keep-snapshot",
