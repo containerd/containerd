@@ -68,6 +68,9 @@ var pushCommand = cli.Command{
 	}, cli.IntFlag{
 		Name:  "max-concurrent-uploaded-layers",
 		Usage: "Set the max concurrent uploaded layers for each push",
+	}, cli.BoolFlag{
+		Name:  "allow-non-distributable-blobs",
+		Usage: "Allow pushing blobs that are marked as non-distributable",
 	}),
 	Action: func(context *cli.Context) error {
 		var (
@@ -144,13 +147,21 @@ var pushCommand = cli.Command{
 			log.G(ctx).WithField("image", ref).WithField("digest", desc.Digest).Debug("pushing")
 
 			jobHandler := images.HandlerFunc(func(ctx gocontext.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+				if !context.Bool("allow-non-distributable-blobs") && images.IsNonDistributable(desc.MediaType) {
+					return nil, nil
+				}
 				ongoing.add(remotes.MakeRefKey(ctx, desc))
 				return nil, nil
 			})
 
+			handler := jobHandler
+			if !context.Bool("allow-non-distributable-blobs") {
+				handler = remotes.SkipNonDistributableBlobs(handler)
+			}
+
 			ropts := []containerd.RemoteOpt{
 				containerd.WithResolver(resolver),
-				containerd.WithImageHandler(jobHandler),
+				containerd.WithImageHandler(handler),
 			}
 
 			if context.IsSet("max-concurrent-uploaded-layers") {
