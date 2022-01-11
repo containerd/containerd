@@ -11,6 +11,10 @@ linters:
     - vet
     - unused
     - misspell
+    - exportloopref # Checks for pointers to enclosing loop variables
+    - importas # Enforces consistent import aliases
+    - stylecheck # Stylecheck is a replacement for golint
+    - bidichk # Checks for dangerous unicode character sequence
   disable:
     - errcheck
 
