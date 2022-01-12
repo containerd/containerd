@@ -10,9 +10,9 @@ on:
         required: true
       AZURE_CREDS:
         required: true
-      GCP_PROJECT_ID:
+      GCP_SERVICE_ACCOUNT:
         required: true
-      GCP_SA_KEY:
+      GCP_WORKLOAD_IDENTITY_PROVIDER:
         required: true
 
 env:
@@ -30,6 +30,10 @@ env:
 
 jobs:
   winIntegration:
+    # NOTE: the following permissions are required by `google-github-actions/auth`:
+    permissions:
+      contents: 'read'
+      id-token: 'write'
     strategy:
       matrix:
         win_ver: [ltsc2019, ltsc2022]
@@ -37,11 +41,11 @@ jobs:
         - win_ver: ltsc2019
           AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2019-Datacenter-with-Containers-smalldisk:17763.1935.2105080716"
           AZURE_RESOURCE_GROUP: ctrd-integration-ltsc2019-${{ github.run_id }}
-          GOOGLE_BUCKET: "gs://containerd-integration/logs/windows-ltsc2019/"
+          GOOGLE_BUCKET: "containerd-integration/logs/windows-ltsc2019/"
         - win_ver: ltsc2022
           AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2022-datacenter-smalldisk-g2:20348.169.2108120020"
           AZURE_RESOURCE_GROUP: ctrd-integration-ltsc2022-${{ github.run_id }}
-          GOOGLE_BUCKET: "gs://containerd-integration/logs/windows-ltsc2022/"
+          GOOGLE_BUCKET: "containerd-integration/logs/windows-ltsc2022/"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -192,27 +196,36 @@ jobs:
       - name: FinishJob
         run: |
           jq -n --arg result SUCCESS --arg timestamp $(date +%s) '$timestamp|tonumber|{timestamp:.,$result}' > ${{ env.LOGS_DIR }}/finished.json
-          echo "${{ env.STARTED_TIME }}" > $HOME/latest-build.txt
+          echo "${{ env.STARTED_TIME }}" > ${{ github.workspace }}/latest-build.txt
 
       - name: AssignGcpCreds
         id: AssignGcpCreds
         run: |
-          echo '::set-output name=GCP_PROJECT_ID::${{ secrets.GCP_PROJECT_ID }}'
-          echo '::set-output name=GCP_SA_KEY::${{ secrets.GCP_SA_KEY }}'
+          echo '::set-output name=GCP_SERVICE_ACCOUNT::${{ secrets.GCP_SERVICE_ACCOUNT }}'
+          echo '::set-output name=GCP_WORKLOAD_IDENTITY_PROVIDER::${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}'
 
-      - name: SetUpCloudSDK
-        if: steps.AssignGcpCreds.outputs.GCP_PROJECT_ID && steps.AssignGcpCreds.outputs.GCP_SA_KEY
-        uses: google-github-actions/setup-gcloud@master
+      - name: AuthGcp
+        uses: google-github-actions/auth@v0
+        if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
         with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
-          export_default_credentials: true
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
 
-      - name: UploadArtifacts
-        if: steps.AssignGcpCreds.outputs.GCP_PROJECT_ID && steps.AssignGcpCreds.outputs.GCP_SA_KEY
-        run: |
-          gsutil cp -r ${{ env.LOGS_DIR }} ${{ matrix.GOOGLE_BUCKET }}
-          gsutil cp $HOME/latest-build.txt ${{ matrix.GOOGLE_BUCKET }}
+      - name: UploadJobReport
+        uses: google-github-actions/upload-cloud-storage@v0
+        if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
+        with:
+          path: ${{ github.workspace }}/latest-build.txt
+          destination: ${{ matrix.GOOGLE_BUCKET }}
+          parent: false
+
+      - name: UploadLogsDir
+        uses: google-github-actions/upload-cloud-storage@v0
+        if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
+        with:
+          path: ${{ env.LOGS_DIR }}
+          destination: ${{ matrix.GOOGLE_BUCKET }}${{ env.STARTED_TIME}}
+          parent: false
 
       - name: ResourceCleanup
         uses: azure/CLI@v1
