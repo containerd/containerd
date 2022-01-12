@@ -69,6 +69,43 @@ func TestContainerStats(t *testing.T) {
 	testStats(t, s, containerConfig)
 }
 
+func TestContainerStatsDoesNotErrorOnStoppingContainer(t *testing.T) {
+	t.Logf("Create a pod config and run sandbox container")
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "stats")
+
+	EnsureImageExists(t, pauseImage)
+
+	t.Logf("Create a container config and run container in a pod")
+	containerConfig := ContainerConfig(
+		"container1",
+		pauseImage,
+		WithTestLabels(),
+		WithTestAnnotations(),
+	)
+	cn, err := runtimeService.CreateContainer(sb, containerConfig, sbConfig)
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, runtimeService.RemoveContainer(cn))
+	}()
+	require.NoError(t, runtimeService.StartContainer(cn))
+
+	t.Logf("Verify that there are no errors when collecting stats from a stopping container.")
+	go func() {
+		// This checks that list stats works as expected in situations where the container is
+		// in the process of being stopped. An issue popped up on Windows, where querying stats
+		// of a container in the process of being stopped, would yield nil stats and nil error.
+		// We run StopContainer() in a goroutine to test the case where we may be interrupted
+		// mid query.
+		assert.NoError(t, runtimeService.StopContainer(cn, 10))
+	}()
+
+	for i := 0; i < 50; i++ {
+		_, err = runtimeService.ListContainerStats(&runtime.ContainerStatsFilter{})
+		assert.NoError(t, err)
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
 // Test to verify if the consumed stats are correct.
 func TestContainerConsumedStats(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
