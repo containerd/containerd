@@ -41,7 +41,7 @@ OSVERSION ?= 1809
 OUTPUT_TYPE ?= docker
 
 ALL_OS = linux
-ALL_ARCH.linux = amd64 arm64
+ALL_ARCH.linux = amd64 arm64 ppc64le
 ALL_OS_ARCH.linux = $(foreach arch, ${ALL_ARCH.linux}, linux-$(arch))
 
 ifneq ($(REMOTE_DOCKER_URL),)
@@ -53,6 +53,7 @@ endif
 
 BASE.linux.amd64 := busybox
 BASE.linux.arm64 := arm64v8/busybox
+BASE.linux.ppc64le := busybox
 BASE.linux := ${BASE.linux.${ARCH}}
 BASE := ${BASE.${OS}}
 
