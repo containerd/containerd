@@ -248,8 +248,8 @@ var usageCommand = cli.Command{
 }
 
 var removeCommand = cli.Command{
-	Name:      "remove",
-	Aliases:   []string{"rm"},
+	Name:      "delete",
+	Aliases:   []string{"del", "remove", "rm"},
 	ArgsUsage: "<key> [<key>, ...]",
 	Usage:     "remove snapshots",
 	Action: func(context *cli.Context) error {

@@ -311,8 +311,8 @@ var checkCommand = cli.Command{
 }
 
 var removeCommand = cli.Command{
-	Name:        "remove",
-	Aliases:     []string{"rm"},
+	Name:        "delete",
+	Aliases:     []string{"del", "remove", "rm"},
 	Usage:       "remove one or more images by reference",
 	ArgsUsage:   "[flags] <ref> [<ref>, ...]",
 	Description: "remove one or more images by reference",
