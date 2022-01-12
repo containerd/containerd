@@ -77,10 +77,6 @@ func (cs *contentStore) Info(ctx context.Context, dgst digest.Digest) (content.I
 	if err := view(ctx, cs.db, func(tx *bolt.Tx) error {
 		bkt := getBlobBucket(tx, ns, dgst)
 		if bkt == nil {
-			// try to find shareable bkt before erroring
-			bkt = getShareableBucket(tx, dgst)
-		}
-		if bkt == nil {
 			return fmt.Errorf("content digest %v: %w", dgst, errdefs.ErrNotFound)
 		}
 
@@ -108,12 +104,9 @@ func (cs *contentStore) Update(ctx context.Context, info content.Info, fieldpath
 	if err := update(ctx, cs.db, func(tx *bolt.Tx) error {
 		bkt := getBlobBucket(tx, ns, info.Digest)
 		if bkt == nil {
-			// try to find a shareable bkt before erroring
-			bkt = getShareableBucket(tx, info.Digest)
-		}
-		if bkt == nil {
 			return fmt.Errorf("content digest %v: %w", info.Digest, errdefs.ErrNotFound)
 		}
+
 		if err := readInfo(&updated, bkt); err != nil {
 			return fmt.Errorf("info %q: %w", info.Digest, err)
 		}
@@ -706,10 +699,6 @@ func (cs *contentStore) checkAccess(ctx context.Context, dgst digest.Digest) err
 
 	return view(ctx, cs.db, func(tx *bolt.Tx) error {
 		bkt := getBlobBucket(tx, ns, dgst)
-		if bkt == nil {
-			// try to find shareable bkt before erroring
-			bkt = getShareableBucket(tx, dgst)
-		}
 		if bkt == nil {
 			return fmt.Errorf("content digest %v: %w", dgst, errdefs.ErrNotFound)
 		}
