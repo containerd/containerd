@@ -52,25 +52,25 @@ var (
 	// that may be part of image names. This is purposely a subset of what is
 	// allowed by DNS to ensure backwards compatibility with Docker image
 	// names.
-	DomainRegexp = re(domain)
+	DomainRegexp = regexp.MustCompile(domain)
 
 	tag = `[\w][\w.-]{0,127}`
 	// TagRegexp matches valid tag names. From docker/docker:graph/tags.go.
-	TagRegexp = re(tag)
+	TagRegexp = regexp.MustCompile(tag)
 
 	anchoredTag = anchored(tag)
 	// anchoredTagRegexp matches valid tag names, anchored at the start and
 	// end of the matched string.
-	anchoredTagRegexp = re(anchoredTag)
+	anchoredTagRegexp = regexp.MustCompile(anchoredTag)
 
 	digestPat = `[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}`
 	// DigestRegexp matches valid digests.
-	DigestRegexp = re(digestPat)
+	DigestRegexp = regexp.MustCompile(digestPat)
 
 	anchoredDigest = anchored(digestPat)
 	// anchoredDigestRegexp matches valid digests, anchored at the start and
 	// end of the matched string.
-	anchoredDigestRegexp = re(anchoredDigest)
+	anchoredDigestRegexp = regexp.MustCompile(anchoredDigest)
 
 	namePat = expression(
 		optional(domain, literal(`/`)),
@@ -79,7 +79,7 @@ var (
 	// NameRegexp is the format for the name component of references. The
 	// regexp has capturing groups for the domain and name part omitting
 	// the separating forward slash from either.
-	NameRegexp = re(namePat)
+	NameRegexp = regexp.MustCompile(namePat)
 
 	anchoredName = anchored(
 		optional(capture(domain), literal(`/`)),
@@ -87,7 +87,7 @@ var (
 			optional(repeated(literal(`/`), nameComponent))))
 	// anchoredNameRegexp is used to parse a name value, capturing the
 	// domain and trailing components.
-	anchoredNameRegexp = re(anchoredName)
+	anchoredNameRegexp = regexp.MustCompile(anchoredName)
 
 	referencePat = anchored(capture(namePat),
 		optional(literal(":"), capture(tag)),
@@ -95,33 +95,30 @@ var (
 	// ReferenceRegexp is the full supported format of a reference. The regexp
 	// is anchored and has capturing groups for name, tag, and digest
 	// components.
-	ReferenceRegexp = re(referencePat)
+	ReferenceRegexp = regexp.MustCompile(referencePat)
 
 	identifier = `([a-f0-9]{64})`
 	// IdentifierRegexp is the format for string identifier used as a
 	// content addressable identifier using sha256. These identifiers
 	// are like digests without the algorithm, since sha256 is used.
-	IdentifierRegexp = re(identifier)
+	IdentifierRegexp = regexp.MustCompile(identifier)
 
 	shortIdentifier = `([a-f0-9]{6,64})`
 	// ShortIdentifierRegexp is the format used to represent a prefix
 	// of an identifier. A prefix may be used to match a sha256 identifier
 	// within a list of trusted identifiers.
-	ShortIdentifierRegexp = re(shortIdentifier)
+	ShortIdentifierRegexp = regexp.MustCompile(shortIdentifier)
 
 	anchoredIdentifier = anchored(identifier)
 	// anchoredIdentifierRegexp is used to check or match an
 	// identifier value, anchored at start and end of string.
-	anchoredIdentifierRegexp = re(anchoredIdentifier)
+	anchoredIdentifierRegexp = regexp.MustCompile(anchoredIdentifier)
 )
-
-// re compiles the string to a regular expression.
-var re = regexp.MustCompile
 
 // literal compiles s into a literal regular expression, escaping any regexp
 // reserved characters.
 func literal(s string) string {
-	re := re(regexp.QuoteMeta(s))
+	re := regexp.MustCompile(regexp.QuoteMeta(s))
 
 	if _, complete := re.LiteralPrefix(); !complete {
 		panic("must be a literal")
