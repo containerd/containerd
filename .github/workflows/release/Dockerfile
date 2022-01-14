@@ -25,7 +25,7 @@ SHELL ["/bin/bash", "-xec"]
 RUN	apt-get update && \
 	apt-get install -y git pkg-config
 ARG TARGETPLATFORM
-RUN xx-apt-get install -y libseccomp-dev btrfs-progs gcc
+RUN xx-apt-get install -y --allow-downgrades libseccomp-dev=2.3.* libseccomp2=2.3.* btrfs-progs gcc
 ENV PATH=/usr/local/go/bin:$PATH
 ENV GOPATH=/go
 ENV CGO_ENABLED=1
