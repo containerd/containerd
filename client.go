@@ -61,7 +61,6 @@ import (
 	ptypes "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
@@ -136,16 +135,10 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 		}
 		if copts.defaultns != "" {
 			unary, stream := newNSInterceptors(copts.defaultns)
-			gopts = append(gopts,
-				grpc.WithChainUnaryInterceptor(unary, otelgrpc.UnaryClientInterceptor()),
-				grpc.WithChainStreamInterceptor(stream, otelgrpc.StreamClientInterceptor()),
-			)
-		} else {
-			gopts = append(gopts,
-				grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
-				grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
-			)
+			gopts = append(gopts, grpc.WithChainUnaryInterceptor(unary))
+			gopts = append(gopts, grpc.WithChainStreamInterceptor(stream))
 		}
+
 		connector := func() (*grpc.ClientConn, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), copts.timeout)
 			defer cancel()
