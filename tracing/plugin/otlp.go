@@ -17,8 +17,10 @@
 package plugin
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
@@ -29,12 +31,13 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 const exporterPlugin = "otlp"
 
 func init() {
+	const timeout = 5 * time.Second
+
 	plugin.Register(&plugin.Registration{
 		ID:     exporterPlugin,
 		Type:   plugin.TracingProcessorPlugin,
@@ -44,15 +47,22 @@ func init() {
 			if cfg.Endpoint == "" {
 				return nil, fmt.Errorf("otlp endpoint not set: %w", plugin.ErrSkipPlugin)
 			}
-			dialOpts := []grpc.DialOption{grpc.WithBlock()}
+
+			opts := []otlptracegrpc.Option{
+				otlptracegrpc.WithEndpoint(cfg.Endpoint),
+				otlptracegrpc.WithDialOption(
+					grpc.WithBlock(),
+					grpc.WithReturnConnectionError(),
+				),
+			}
 			if cfg.Insecure {
-				dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+				opts = append(opts, otlptracegrpc.WithInsecure())
 			}
 
-			exp, err := otlptracegrpc.New(ic.Context,
-				otlptracegrpc.WithEndpoint(cfg.Endpoint),
-				otlptracegrpc.WithDialOption(dialOpts...),
-			)
+			ctx, cancel := context.WithTimeout(ic.Context, timeout)
+			defer cancel()
+
+			exp, err := otlptracegrpc.New(ctx, opts...)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create otlp exporter: %w", err)
 			}
@@ -63,7 +73,7 @@ func init() {
 		ID:       "tracing",
 		Type:     plugin.InternalPlugin,
 		Requires: []plugin.Type{plugin.TracingProcessorPlugin},
-		Config:   &TraceConfig{ServiceName: "containerd"},
+		Config:   &TraceConfig{ServiceName: "containerd", TraceSamplingRatio: 1.0},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			return newTracer(ic)
 		},
