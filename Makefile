@@ -417,7 +417,6 @@ vendor: ## ensure all the go.mod/go.sum files are up-to-date including vendor/ d
 	@$(GO) mod tidy
 	@$(GO) mod vendor
 	@$(GO) mod verify
-	@(cd ${ROOTDIR}/api && ${GO} mod tidy)
 	@(cd ${ROOTDIR}/integration/client && ${GO} mod tidy)
 
 verify-vendor: ## verify if all the go.mod/go.sum files are up-to-date
@@ -425,11 +424,9 @@ verify-vendor: ## verify if all the go.mod/go.sum files are up-to-date
 	$(eval TMPDIR := $(shell mktemp -d))
 	@cp -R ${ROOTDIR} ${TMPDIR}
 	@(cd ${TMPDIR}/containerd && ${GO} mod tidy)
-	@(cd ${TMPDIR}/containerd/api && ${GO} mod tidy)
 	@(cd ${TMPDIR}/containerd/integration/client && ${GO} mod tidy)
 	@diff -r -u -q ${ROOTDIR} ${TMPDIR}/containerd
 	@rm -rf ${TMPDIR}
-	@${ROOTDIR}/script/verify-go-modules.sh api
 	@${ROOTDIR}/script/verify-go-modules.sh integration/client
 
 
