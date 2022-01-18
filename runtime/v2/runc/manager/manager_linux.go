@@ -270,8 +270,13 @@ func (manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
 	if err := mount.UnmountAll(filepath.Join(path, "rootfs"), 0); err != nil {
 		log.G(ctx).WithError(err).Warn("failed to cleanup rootfs mount")
 	}
+	pid, err := runcC.ReadPidFile(filepath.Join(path, process.InitPidFile))
+	if err != nil {
+		log.G(ctx).WithError(err).Warn("failed to read init pid file")
+	}
 	return shim.StopStatus{
 		ExitedAt:   time.Now(),
 		ExitStatus: 128 + int(unix.SIGKILL),
+		Pid:        pid,
 	}, nil
 }
