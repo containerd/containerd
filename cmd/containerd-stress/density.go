@@ -75,9 +75,6 @@ var densityCommand = cli.Command{
 		s := make(chan os.Signal, 1)
 		signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
 
-		if err != nil {
-			return err
-		}
 		var (
 			pids  []uint32
 			count = cliContext.Int("count")
