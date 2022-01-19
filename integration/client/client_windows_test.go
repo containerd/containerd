@@ -57,18 +57,14 @@ func init() {
 		testImage = "mcr.microsoft.com/windows/nanoserver:2004"
 	case osversion.V20H2:
 		testImage = "mcr.microsoft.com/windows/nanoserver:20H2"
-	case 20348:
-		// 20348 is Windows server 2022's build number.
-		//
-		// TODO(dcantah): Use the hardcoded number until there's an hcsshim release with this build
-		// number included.
+	case osversion.V21H2Server:
 		testImage = "mcr.microsoft.com/windows/nanoserver:ltsc2022"
 	default:
 		// Due to some efforts in improving down-level compatibility for Windows containers (see
 		// https://techcommunity.microsoft.com/t5/containers/windows-server-2022-and-beyond-for-containers/ba-p/2712487)
-		// the ltsc2022 image should continue to work on builds ws2022 and onwards (Winodws 11 for example). With this in mind,
+		// the ltsc2022 image should continue to work on builds ws2022 and onwards (Windows 11 for example). With this in mind,
 		// if there's no mapping for the host build just use the Windows Server 2022 image.
-		if b > 20348 {
+		if b > osversion.V21H2Server {
 			testImage = "mcr.microsoft.com/windows/nanoserver:ltsc2022"
 			return
 		}
