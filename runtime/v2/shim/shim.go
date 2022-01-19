@@ -214,7 +214,7 @@ func run(id string, initFunc Init, config Config) error {
 			"pid":       os.Getpid(),
 			"namespace": namespaceFlag,
 		})
-		go handleSignals(ctx, logger, signals)
+		go reap(ctx, logger, signals)
 		response, err := service.Cleanup(ctx)
 		if err != nil {
 			return err
@@ -310,7 +310,9 @@ func (s *Client) Serve() error {
 			dumpStacks(logger)
 		}
 	}()
-	return handleSignals(s.context, logger, s.signals)
+	ctx, cancel := context.WithCancel(s.context)
+	go handleExitSignals(ctx, logger, cancel)
+	return reap(ctx, logger, s.signals)
 }
 
 // serve serves the ttrpc API over a unix socket at the provided path
