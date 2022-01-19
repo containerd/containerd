@@ -20,6 +20,14 @@ import (
 	"github.com/containerd/containerd/reference/docker"
 )
 
+// sandboxImage label defined here to avoid cyclic imports as they are used in both image store and cri server.
+const (
+	// sandboxImageLabelKey is the label value indicating the image is sandbox image
+	sandboxImageLabelKey = "io.cri-containerd" + ".image.kind"
+	// sandboxImageLabelValue is the label value indicating the image is sandbox image
+	sandboxImageLabelValue = "sandbox"
+)
+
 // NormalizeImageRef normalizes the image reference following the docker convention. This is added
 // mainly for backward compatibility.
 // The reference returned can only be either tagged or digested. For reference contains both tag
@@ -30,4 +38,9 @@ import (
 // Deprecated: use github.com/containerd/containerd/reference/docker.ParseDockerRef() instead
 func NormalizeImageRef(ref string) (docker.Named, error) {
 	return docker.ParseDockerRef(ref)
+}
+
+// GetSandboxImageLabels returns label applied on sandbox image
+func GetSandboxImageLabels() (string, string) {
+	return sandboxImageLabelKey, sandboxImageLabelValue
 }

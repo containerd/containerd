@@ -26,7 +26,6 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/pkg/cri/util"
-
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/go-digest/digestset"
 	imageidentity "github.com/opencontainers/image-spec/identity"
@@ -46,6 +45,8 @@ type Image struct {
 	Size int64
 	// ImageSpec is the oci image structure which describes basic information about the image.
 	ImageSpec imagespec.Image
+	// Pinned Sandbox image to prevent it from garbage collection
+	Pinned bool
 }
 
 // Store stores all images.
@@ -143,13 +144,20 @@ func getImage(ctx context.Context, i containerd.Image) (*Image, error) {
 		return nil, fmt.Errorf("unmarshal image config %s: %w", rb, err)
 	}
 
-	return &Image{
+	image := &Image{
 		ID:         id,
 		References: []string{i.Name()},
 		ChainID:    chainID.String(),
 		Size:       size,
 		ImageSpec:  ociimage,
-	}, nil
+	}
+
+	sandboxImageLabelKey, sandboxImageLabelValue := util.GetSandboxImageLabels()
+	if i.Labels()[sandboxImageLabelKey] == sandboxImageLabelValue {
+		image.Pinned = true
+	}
+
+	return image, nil
 }
 
 // Resolve resolves a image reference to image id.

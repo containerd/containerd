@@ -29,6 +29,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
+	"github.com/containerd/containerd/pkg/cri/util"
 )
 
 func TestParseAuth(t *testing.T) {
@@ -374,6 +375,38 @@ func TestImageLayersLabel(t *testing.T) {
 			gotS := getLayers(context.Background(), sampleKey, sampleLayers, sampleValidate)
 			got := len(strings.Split(gotS, ","))
 			assert.Equal(t, tt.wantNum, got)
+		})
+	}
+}
+
+func TestImageGetLabels(t *testing.T) {
+	sandboxImage := "k8s.gcr.io/pause"
+	criService := newTestCRIService()
+	criService.config.SandboxImage = sandboxImage
+	sandboxImageLabelKey, sandboxImageLabelValue := util.GetSandboxImageLabels()
+
+	tests := []struct {
+		name          string
+		expectedLabel map[string]string
+		imageName     string
+	}{
+		{
+			name:          "sandbox image labels should get added",
+			expectedLabel: map[string]string{imageLabelKey: imageLabelValue, sandboxImageLabelKey: sandboxImageLabelValue},
+			imageName:     sandboxImage,
+		},
+		{
+			name:          "sandbox image labels should not get added",
+			expectedLabel: map[string]string{imageLabelKey: imageLabelValue},
+			imageName:     "k8s.gcr.io/random",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			labels := criService.getLabels(tt.imageName)
+			assert.Equal(t, tt.expectedLabel, labels)
+
 		})
 	}
 }

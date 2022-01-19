@@ -44,6 +44,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
+	"github.com/containerd/containerd/pkg/cri/util"
 )
 
 // For image management:
@@ -113,12 +114,14 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		}
 	)
 
+	labels := c.getLabels(ref)
+
 	pullOpts := []containerd.RemoteOpt{
 		containerd.WithSchema1Conversion,
 		containerd.WithResolver(resolver),
 		containerd.WithPullSnapshotter(c.config.ContainerdConfig.Snapshotter),
 		containerd.WithPullUnpack,
-		containerd.WithPullLabel(imageLabelKey, imageLabelValue),
+		containerd.WithPullLabels(labels),
 		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
 		containerd.WithImageHandler(imageHandler),
 	}
@@ -151,7 +154,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		if r == "" {
 			continue
 		}
-		if err := c.createImageReference(ctx, r, image.Target()); err != nil {
+		if err := c.createImageReference(ctx, r, image.Target(), labels); err != nil {
 			return nil, fmt.Errorf("failed to create image reference %q: %w", r, err)
 		}
 		// Update image store to reflect the newest state in containerd.
@@ -212,16 +215,28 @@ func ParseAuth(auth *runtime.AuthConfig, host string) (string, string, error) {
 	return "", "", nil
 }
 
+// getLabels get image labels to be added on CRI image
+func (c *criService) getLabels(name string) map[string]string {
+	labels := map[string]string{imageLabelKey: imageLabelValue}
+	// Adding sandbox image label to containerd store to avoid
+	// new CRI field "Pinned" in containerd image store
+	if c.config.SandboxImage == name {
+		sandboxImageLabelKey, sandboxImageLabelValue := util.GetSandboxImageLabels()
+		labels[sandboxImageLabelKey] = sandboxImageLabelValue
+	}
+	return labels
+}
+
 // createImageReference creates image reference inside containerd image store.
 // Note that because create and update are not finished in one transaction, there could be race. E.g.
 // the image reference is deleted by someone else after create returns already exists, but before update
 // happens.
-func (c *criService) createImageReference(ctx context.Context, name string, desc imagespec.Descriptor) error {
+func (c *criService) createImageReference(ctx context.Context, name string, desc imagespec.Descriptor, labels map[string]string) error {
 	img := containerdimages.Image{
 		Name:   name,
 		Target: desc,
 		// Add a label to indicate that the image is managed by the cri plugin.
-		Labels: map[string]string{imageLabelKey: imageLabelValue},
+		Labels: labels,
 	}
 	// TODO(random-liu): Figure out which is the more performant sequence create then update or
 	// update then create.
@@ -252,14 +267,15 @@ func (c *criService) updateImage(ctx context.Context, r string) error {
 			return fmt.Errorf("get image id: %w", err)
 		}
 		id := configDesc.Digest.String()
-		if err := c.createImageReference(ctx, id, img.Target()); err != nil {
+		labels := c.getLabels(id)
+		if err := c.createImageReference(ctx, id, img.Target(), labels); err != nil {
 			return fmt.Errorf("create image id reference %q: %w", id, err)
 		}
 		if err := c.imageStore.Update(ctx, id); err != nil {
 			return fmt.Errorf("update image store for %q: %w", id, err)
 		}
 		// The image id is ready, add the label to mark the image as managed.
-		if err := c.createImageReference(ctx, r, img.Target()); err != nil {
+		if err := c.createImageReference(ctx, r, img.Target(), labels); err != nil {
 			return fmt.Errorf("create managed label: %w", err)
 		}
 	}
