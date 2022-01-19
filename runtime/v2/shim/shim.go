@@ -305,7 +305,7 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 			"pid":       os.Getpid(),
 			"namespace": namespaceFlag,
 		})
-		go handleSignals(ctx, logger, signals)
+		go reap(ctx, logger, signals)
 		ss, err := manager.Stop(ctx, id)
 		if err != nil {
 			return err
@@ -428,7 +428,7 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 		}
 	}
 
-	if err := serve(ctx, server, signals); err != nil {
+	if err := serve(ctx, server, signals, sd.Shutdown); err != nil {
 		if err != shutdown.ErrShutdown {
 			return err
 		}
@@ -450,7 +450,7 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 
 // serve serves the ttrpc API over a unix socket in the current working directory
 // and blocks until the context is canceled
-func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal) error {
+func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal, shutdown func()) error {
 	dump := make(chan os.Signal, 32)
 	setupDumpStacks(dump)
 
@@ -480,7 +480,9 @@ func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal) er
 			dumpStacks(logger)
 		}
 	}()
-	return handleSignals(ctx, logger, signals)
+
+	go handleExitSignals(ctx, logger, shutdown)
+	return reap(ctx, logger, signals)
 }
 
 func dumpStacks(logger *logrus.Entry) {
