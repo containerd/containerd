@@ -82,8 +82,6 @@ type Config struct {
 type ImpersonationConfig struct {
 	// UserName matches user.Info.GetName()
 	UserName string
-	// UID matches user.Info.GetUID()
-	UID string
 	// Groups matches user.Info.GetGroups()
 	Groups []string
 	// Extra matches user.Info.GetExtra()

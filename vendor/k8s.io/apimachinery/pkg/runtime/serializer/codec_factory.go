@@ -40,7 +40,6 @@ type serializerType struct {
 
 	Serializer       runtime.Serializer
 	PrettySerializer runtime.Serializer
-	StrictSerializer runtime.Serializer
 
 	AcceptStreamContentTypes []string
 	StreamContentType        string
@@ -71,19 +70,9 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, option
 		)
 	}
 
-	strictJSONSerializer := json.NewSerializerWithOptions(
-		mf, scheme, scheme,
-		json.SerializerOptions{Yaml: false, Pretty: false, Strict: true},
-	)
-	jsonSerializerType.StrictSerializer = strictJSONSerializer
-
 	yamlSerializer := json.NewSerializerWithOptions(
 		mf, scheme, scheme,
 		json.SerializerOptions{Yaml: true, Pretty: false, Strict: options.Strict},
-	)
-	strictYAMLSerializer := json.NewSerializerWithOptions(
-		mf, scheme, scheme,
-		json.SerializerOptions{Yaml: true, Pretty: false, Strict: true},
 	)
 	protoSerializer := protobuf.NewSerializer(scheme, scheme)
 	protoRawSerializer := protobuf.NewRawSerializer(scheme, scheme)
@@ -96,16 +85,12 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, option
 			FileExtensions:     []string{"yaml"},
 			EncodesAsText:      true,
 			Serializer:         yamlSerializer,
-			StrictSerializer:   strictYAMLSerializer,
 		},
 		{
 			AcceptContentTypes: []string{runtime.ContentTypeProtobuf},
 			ContentType:        runtime.ContentTypeProtobuf,
 			FileExtensions:     []string{"pb"},
 			Serializer:         protoSerializer,
-			// note, strict decoding is unsupported for protobuf,
-			// fall back to regular serializing
-			StrictSerializer: protoSerializer,
 
 			Framer:           protobuf.LengthDelimitedFramer,
 			StreamSerializer: protoRawSerializer,
@@ -202,7 +187,6 @@ func newCodecFactory(scheme *runtime.Scheme, serializers []serializerType) Codec
 				EncodesAsText:    d.EncodesAsText,
 				Serializer:       d.Serializer,
 				PrettySerializer: d.PrettySerializer,
-				StrictSerializer: d.StrictSerializer,
 			}
 
 			mediaType, _, err := mime.ParseMediaType(info.MediaType)

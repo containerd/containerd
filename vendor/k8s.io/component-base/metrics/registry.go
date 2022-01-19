@@ -274,7 +274,7 @@ func (kr *kubeRegistry) enableHiddenCollectors() {
 		cs = append(cs, c)
 	}
 
-	kr.hiddenCollectors = make(map[string]Registerable)
+	kr.hiddenCollectors = nil
 	kr.hiddenCollectorsLock.Unlock()
 	kr.MustRegister(cs...)
 }

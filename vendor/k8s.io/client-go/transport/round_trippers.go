@@ -17,12 +17,9 @@ limitations under the License.
 package transport
 
 import (
-	"crypto/tls"
 	"fmt"
 	"net/http"
-	"net/http/httptrace"
 	"strings"
-	"sync"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -60,7 +57,6 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 		rt = NewUserAgentRoundTripper(config.UserAgent, rt)
 	}
 	if len(config.Impersonate.UserName) > 0 ||
-		len(config.Impersonate.UID) > 0 ||
 		len(config.Impersonate.Groups) > 0 ||
 		len(config.Impersonate.Extra) > 0 {
 		rt = NewImpersonatingRoundTripper(config.Impersonate, rt)
@@ -72,7 +68,7 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 func DebugWrappers(rt http.RoundTripper) http.RoundTripper {
 	switch {
 	case bool(klog.V(9).Enabled()):
-		rt = NewDebuggingRoundTripper(rt, DebugCurlCommand, DebugDetailedTiming, DebugResponseHeaders)
+		rt = NewDebuggingRoundTripper(rt, DebugCurlCommand, DebugURLTiming, DebugResponseHeaders)
 	case bool(klog.V(8).Enabled()):
 		rt = NewDebuggingRoundTripper(rt, DebugJustURL, DebugRequestHeaders, DebugResponseStatus, DebugResponseHeaders)
 	case bool(klog.V(7).Enabled()):
@@ -91,8 +87,6 @@ type authProxyRoundTripper struct {
 
 	rt http.RoundTripper
 }
-
-var _ utilnet.RoundTripperWrapper = &authProxyRoundTripper{}
 
 // NewAuthProxyRoundTripper provides a roundtripper which will add auth proxy fields to requests for
 // authentication terminating proxy cases
@@ -152,8 +146,6 @@ type userAgentRoundTripper struct {
 	rt    http.RoundTripper
 }
 
-var _ utilnet.RoundTripperWrapper = &userAgentRoundTripper{}
-
 // NewUserAgentRoundTripper will add User-Agent header to a request unless it has already been set.
 func NewUserAgentRoundTripper(agent string, rt http.RoundTripper) http.RoundTripper {
 	return &userAgentRoundTripper{agent, rt}
@@ -179,8 +171,6 @@ type basicAuthRoundTripper struct {
 	password string `datapolicy:"password"`
 	rt       http.RoundTripper
 }
-
-var _ utilnet.RoundTripperWrapper = &basicAuthRoundTripper{}
 
 // NewBasicAuthRoundTripper will apply a BASIC auth authorization header to a
 // request unless it has already been set.
@@ -209,9 +199,6 @@ const (
 	// ImpersonateUserHeader is used to impersonate a particular user during an API server request
 	ImpersonateUserHeader = "Impersonate-User"
 
-	// ImpersonateUIDHeader is used to impersonate a particular UID during an API server request
-	ImpersonateUIDHeader = "Impersonate-Uid"
-
 	// ImpersonateGroupHeader is used to impersonate a particular group during an API server request.
 	// It can be repeated multiplied times for multiple groups.
 	ImpersonateGroupHeader = "Impersonate-Group"
@@ -231,8 +218,6 @@ type impersonatingRoundTripper struct {
 	delegate    http.RoundTripper
 }
 
-var _ utilnet.RoundTripperWrapper = &impersonatingRoundTripper{}
-
 // NewImpersonatingRoundTripper will add an Act-As header to a request unless it has already been set.
 func NewImpersonatingRoundTripper(impersonate ImpersonationConfig, delegate http.RoundTripper) http.RoundTripper {
 	return &impersonatingRoundTripper{impersonate, delegate}
@@ -245,9 +230,7 @@ func (rt *impersonatingRoundTripper) RoundTrip(req *http.Request) (*http.Respons
 	}
 	req = utilnet.CloneRequest(req)
 	req.Header.Set(ImpersonateUserHeader, rt.impersonate.UserName)
-	if rt.impersonate.UID != "" {
-		req.Header.Set(ImpersonateUIDHeader, rt.impersonate.UID)
-	}
+
 	for _, group := range rt.impersonate.Groups {
 		req.Header.Add(ImpersonateGroupHeader, group)
 	}
@@ -271,8 +254,6 @@ type bearerAuthRoundTripper struct {
 	source oauth2.TokenSource
 	rt     http.RoundTripper
 }
-
-var _ utilnet.RoundTripperWrapper = &bearerAuthRoundTripper{}
 
 // NewBearerAuthRoundTripper adds the provided bearer token to a request
 // unless the authorization header has already been set.
@@ -333,14 +314,6 @@ type requestInfo struct {
 	ResponseHeaders http.Header
 	ResponseErr     error
 
-	muTrace          sync.Mutex // Protect trace fields
-	DNSLookup        time.Duration
-	Dialing          time.Duration
-	GetConnection    time.Duration
-	TLSHandshake     time.Duration
-	ServerProcessing time.Duration
-	ConnectionReused bool
-
 	Duration time.Duration
 }
 
@@ -383,8 +356,6 @@ type debuggingRoundTripper struct {
 	levels                map[DebugLevel]bool
 }
 
-var _ utilnet.RoundTripperWrapper = &debuggingRoundTripper{}
-
 // DebugLevel is used to enable debugging of certain
 // HTTP requests and responses fields via the debuggingRoundTripper.
 type DebugLevel int
@@ -403,8 +374,6 @@ const (
 	DebugResponseStatus
 	// DebugResponseHeaders will add to the debug output the HTTP response headers.
 	DebugResponseHeaders
-	// DebugDetailedTiming will add to the debug output the duration of the HTTP requests events.
-	DebugDetailedTiming
 )
 
 // NewDebuggingRoundTripper allows to display in the logs output debug information
@@ -476,74 +445,6 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 	}
 
 	startTime := time.Now()
-
-	if rt.levels[DebugDetailedTiming] {
-		var getConn, dnsStart, dialStart, tlsStart, serverStart time.Time
-		var host string
-		trace := &httptrace.ClientTrace{
-			// DNS
-			DNSStart: func(info httptrace.DNSStartInfo) {
-				reqInfo.muTrace.Lock()
-				defer reqInfo.muTrace.Unlock()
-				dnsStart = time.Now()
-				host = info.Host
-			},
-			DNSDone: func(info httptrace.DNSDoneInfo) {
-				reqInfo.muTrace.Lock()
-				defer reqInfo.muTrace.Unlock()
-				reqInfo.DNSLookup = time.Now().Sub(dnsStart)
-				klog.Infof("HTTP Trace: DNS Lookup for %s resolved to %v", host, info.Addrs)
-			},
-			// Dial
-			ConnectStart: func(network, addr string) {
-				reqInfo.muTrace.Lock()
-				defer reqInfo.muTrace.Unlock()
-				dialStart = time.Now()
-			},
-			ConnectDone: func(network, addr string, err error) {
-				reqInfo.muTrace.Lock()
-				defer reqInfo.muTrace.Unlock()
-				reqInfo.Dialing = time.Now().Sub(dialStart)
-				if err != nil {
-					klog.Infof("HTTP Trace: Dial to %s:%s failed: %v", network, addr, err)
-				} else {
-					klog.Infof("HTTP Trace: Dial to %s:%s succeed", network, addr)
-				}
-			},
-			// TLS
-			TLSHandshakeStart: func() {
-				tlsStart = time.Now()
-			},
-			TLSHandshakeDone: func(_ tls.ConnectionState, _ error) {
-				reqInfo.muTrace.Lock()
-				defer reqInfo.muTrace.Unlock()
-				reqInfo.TLSHandshake = time.Now().Sub(tlsStart)
-			},
-			// Connection (it can be DNS + Dial or just the time to get one from the connection pool)
-			GetConn: func(hostPort string) {
-				getConn = time.Now()
-			},
-			GotConn: func(info httptrace.GotConnInfo) {
-				reqInfo.muTrace.Lock()
-				defer reqInfo.muTrace.Unlock()
-				reqInfo.GetConnection = time.Now().Sub(getConn)
-				reqInfo.ConnectionReused = info.Reused
-			},
-			// Server Processing (time since we wrote the request until first byte is received)
-			WroteRequest: func(info httptrace.WroteRequestInfo) {
-				reqInfo.muTrace.Lock()
-				defer reqInfo.muTrace.Unlock()
-				serverStart = time.Now()
-			},
-			GotFirstResponseByte: func() {
-				reqInfo.muTrace.Lock()
-				defer reqInfo.muTrace.Unlock()
-				reqInfo.ServerProcessing = time.Now().Sub(serverStart)
-			},
-		}
-		req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
-	}
-
 	response, err := rt.delegatedRoundTripper.RoundTrip(req)
 	reqInfo.Duration = time.Since(startTime)
 
@@ -552,24 +453,6 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 	if rt.levels[DebugURLTiming] {
 		klog.Infof("%s %s %s in %d milliseconds", reqInfo.RequestVerb, reqInfo.RequestURL, reqInfo.ResponseStatus, reqInfo.Duration.Nanoseconds()/int64(time.Millisecond))
 	}
-	if rt.levels[DebugDetailedTiming] {
-		stats := ""
-		if !reqInfo.ConnectionReused {
-			stats += fmt.Sprintf(`DNSLookup %d ms Dial %d ms TLSHandshake %d ms`,
-				reqInfo.DNSLookup.Nanoseconds()/int64(time.Millisecond),
-				reqInfo.Dialing.Nanoseconds()/int64(time.Millisecond),
-				reqInfo.TLSHandshake.Nanoseconds()/int64(time.Millisecond),
-			)
-		} else {
-			stats += fmt.Sprintf(`GetConnection %d ms`, reqInfo.GetConnection.Nanoseconds()/int64(time.Millisecond))
-		}
-		if reqInfo.ServerProcessing != 0 {
-			stats += fmt.Sprintf(` ServerProcessing %d ms`, reqInfo.ServerProcessing.Nanoseconds()/int64(time.Millisecond))
-		}
-		stats += fmt.Sprintf(` Duration %d ms`, reqInfo.Duration.Nanoseconds()/int64(time.Millisecond))
-		klog.Infof("HTTP Statistics: %s", stats)
-	}
-
 	if rt.levels[DebugResponseStatus] {
 		klog.Infof("Response Status: %s in %d milliseconds", reqInfo.ResponseStatus, reqInfo.Duration.Nanoseconds()/int64(time.Millisecond))
 	}
