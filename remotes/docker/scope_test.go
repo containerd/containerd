@@ -65,6 +65,11 @@ func TestGetTokenScopes(t *testing.T) {
 	}{
 		{
 			scopesInCtx:  []string{},
+			commonScopes: []string{},
+			expected:     []string{},
+		},
+		{
+			scopesInCtx:  []string{},
 			commonScopes: []string{"repository:foo/bar:pull"},
 			expected:     []string{"repository:foo/bar:pull"},
 		},
