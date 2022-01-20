@@ -25,6 +25,7 @@ support to increase overall compatibility and stability.
 * **Add runc shim support for core scheduling** ([#6011](https://github.com/containerd/containerd/pull/6011))
 * **Update shim client connect attempt to fail fast when shim errors** ([#6031](https://github.com/containerd/containerd/pull/6031))
 * **Add support for absolute path to shim binaries** ([#6206](https://github.com/containerd/containerd/pull/6206))
+* **Update runc to v1.1.0** ([#6375](https://github.com/containerd/containerd/pull/6375))
 
 #### Windows
 
@@ -46,12 +47,11 @@ support to increase overall compatibility and stability.
 
 #### Other
 
-* **Add a shared namespace label for cross-namespace content sharing** ([#5043](https://github.com/containerd/containerd/pull/5043))
 * **Add support for client TLS Auth for grpc** ([#5606](https://github.com/containerd/containerd/pull/5606))
 * **Add xfs support for devicemapper snapshotter** ([#5610](https://github.com/containerd/containerd/pull/5610))
 * **Add metric exposing build version and revision** ([#5965](https://github.com/containerd/containerd/pull/5965))
-* **Add OpenTelemetry trace injection to grpc client** ([#5992](https://github.com/containerd/containerd/pull/5992))
 * **Add support for custom fs options in devmapper snapshotter** ([#6122](https://github.com/containerd/containerd/pull/6122))
+* **Update introspection service to show GRPC plugins** ([#6432](https://github.com/containerd/containerd/pull/6432))
 
 #### Client
 
