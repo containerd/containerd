@@ -1946,6 +1946,67 @@ func TestRegressionIssue4769(t *testing.T) {
 	}
 }
 
+// TestRegressionIssue6429 should not send exit event out if command is not found.
+//
+// Issue: https://github.com/containerd/containerd/issues/6429.
+func TestRegressionIssue6429(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" {
+		t.Skip("Test relies on runc")
+	}
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	// use unique namespace to get unique task events
+	id := t.Name()
+	ns := fmt.Sprintf("%s-%s", testNamespace, id)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ctx = namespaces.WithNamespace(ctx, ns)
+	ctx = logtest.WithT(ctx, t)
+
+	image, err := client.Pull(ctx, testImage, WithPullUnpack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.ImageService().Delete(ctx, testImage, images.SynchronousDelete())
+
+	container, err := client.NewContainer(ctx, id,
+		WithNewSnapshot(id, image),
+		WithNewSpec(oci.WithImageConfig(image), withProcessArgs("notfound404")),
+		WithRuntime(client.Runtime(), nil),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	eventStream, errC := client.EventService().Subscribe(ctx, "namespace=="+ns+",topic~=|^/tasks/exit|")
+
+	if _, err := container.NewTask(ctx, empty()); err == nil {
+		t.Fatalf("expected error but got nil")
+	}
+
+	var timeout = 10 * time.Second
+
+	// start to check events
+	select {
+	case et := <-eventStream:
+		t.Fatal(fmt.Errorf("unexpected task exit event: %+v", et))
+	case err := <-errC:
+		t.Fatal(fmt.Errorf("unexpected error from event service: %w", err))
+
+	case <-time.After(timeout):
+	}
+}
+
 func TestDaemonRestart(t *testing.T) {
 	client, err := newClient(t, address)
 	if err != nil {

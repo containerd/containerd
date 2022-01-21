@@ -375,13 +375,13 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 	shim := process.(*shimTask)
 	t, err := shim.Create(ctx, opts)
 	if err != nil {
+		// NOTE: ctx contains required namespace information.
+		m.manager.shims.Delete(ctx, taskID)
+
 		dctx, cancel := timeout.WithContext(context.Background(), cleanupTimeout)
 		defer cancel()
 
-		_, errShim := shim.delete(dctx, func(ctx context.Context, id string) {
-			m.manager.shims.Delete(ctx, id)
-		})
-
+		_, errShim := shim.delete(dctx, func(context.Context, string) {})
 		if errShim != nil {
 			if errdefs.IsDeadlineExceeded(errShim) {
 				dctx, cancel = timeout.WithContext(context.Background(), cleanupTimeout)
