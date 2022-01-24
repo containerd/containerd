@@ -790,6 +790,7 @@ func validateSnapshot(info *snapshots.Info) error {
 	return nil
 }
 
+// garbageCollect removes all snapshots that are no longer used.
 func (s *snapshotter) garbageCollect(ctx context.Context) (d time.Duration, err error) {
 	s.l.Lock()
 	t1 := time.Now()

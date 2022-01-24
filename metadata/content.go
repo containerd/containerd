@@ -772,6 +772,7 @@ func writeExpireAt(expire time.Time, bkt *bolt.Bucket) error {
 	return bkt.Put(bucketKeyExpireAt, expireAt)
 }
 
+// garbageCollect removes all contents that are no longer used.
 func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, err error) {
 	cs.l.Lock()
 	t1 := time.Now()
