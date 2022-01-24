@@ -45,7 +45,7 @@ func TestDefaultHosts(t *testing.T) {
 				{
 					Scheme:       "https",
 					Host:         "registry-1.docker.io",
-					Path:         "/v2",
+					Path:         "/v2/",
 					Capabilities: allCaps,
 				},
 			},

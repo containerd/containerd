@@ -107,7 +107,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 					hosts[len(hosts)-1].scheme = "https"
 				}
 			}
-			hosts[len(hosts)-1].path = "/v2"
+			hosts[len(hosts)-1].path = "/v2/"
 			hosts[len(hosts)-1].capabilities = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush
 		}
 
