@@ -85,13 +85,25 @@ jobs:
         uses: azure/CLI@v1
         with:
           inlinescript: |
-            az vm create -n winTestVM --admin-username ${{ env.DEFAULT_ADMIN_USERNAME }} --admin-password ${{ env.PASSWORD }} --image ${{ matrix.AZURE_IMG }} -g ${{ matrix.AZURE_RESOURCE_GROUP }} --nsg-rule SSH --size ${{ env.AZURE_DEFAULT_VM_SIZE }}
+            DETAILS=$(az vm create -n winTestVM --admin-username ${{ env.DEFAULT_ADMIN_USERNAME }} --admin-password ${{ env.PASSWORD }} --image ${{ matrix.AZURE_IMG }} -g ${{ matrix.AZURE_RESOURCE_GROUP }} --nsg-rule SSH --size ${{ env.AZURE_DEFAULT_VM_SIZE }} --public-ip-sku Standard -o json)
+            PUB_IP=$(echo $DETAILS | jq -r .publicIpAddress)
+            if [ "$PUB_IP" == "null" ]
+            then
+                RETRY=0
+                while [ "$PUB_IP" == "null" ] || [ $RETRY -le 5 ]
+                do
+                    sleep 5
+                    PUB_IP=$(az vm show -d -g ${{ matrix.AZURE_RESOURCE_GROUP }} -n winTestVM -o json --query publicIps | jq -r)
+                    RETRY=$(( $RETRY + 1 ))
+                done
+            fi
 
-      - name: GetAZVMPublicIP
-        uses: azure/CLI@v1
-        with:
-          inlinescript: |
-            echo "VM_PUB_IP=$(az network public-ip list -g ${{ matrix.AZURE_RESOURCE_GROUP }} | jq '.[0]["ipAddress"]' | tr -d '\"')" >> $GITHUB_ENV
+            if [ "$PUB_IP" == "null" ]
+            then
+                echo "failed to fetch public IP"
+                exit 1
+            fi
+            echo "VM_PUB_IP=$PUB_IP" >> $GITHUB_ENV
 
       - name: EnableAZVMSSH
         uses: azure/CLI@v1
@@ -153,14 +165,18 @@ jobs:
 
       - name: PrepareRepoList
         run: |
-           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh -c 'cat > c:/repolist.toml'" <<'EOF'
-               busybox = ${{ env.BUSYBOX_TESTING_IMAGE_REF }}
-               ResourceConsumer = ${{ env.RESOURCE_CONSUMER_TESTING_IMAGE_REF }}
-           EOF
-           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh -c 'cat > c:/cri-test-images.yaml'" <<'EOF'
-               defaultTestContainerImage: ${{ env.BUSYBOX_TESTING_IMAGE_REF }}
-               webServerTestImage: ${{ env.WEBSERVER_TESTING_IMAGE_REF }}
-           EOF
+            cat > repolist.toml << EOF
+            busybox = "${{ env.BUSYBOX_TESTING_IMAGE_REF }}"
+            ResourceConsumer = "${{ env.RESOURCE_CONSUMER_TESTING_IMAGE_REF }}"
+            EOF
+
+            cat > cri-test-images.yaml << EOF
+            defaultTestContainerImage: ${{ env.BUSYBOX_TESTING_IMAGE_REF }}
+            webServerTestImage: ${{ env.WEBSERVER_TESTING_IMAGE_REF }}
+            EOF
+
+            scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} repolist.toml azureuser@${{ env.VM_PUB_IP }}:c:/repolist.toml
+            scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} cri-test-images.yaml azureuser@${{ env.VM_PUB_IP }}:c:/cri-test-images.yaml
 
       - name: RunCRIIntegrationTests
         run: |
@@ -228,6 +244,7 @@ jobs:
           parent: false
 
       - name: ResourceCleanup
+        if: always()
         uses: azure/CLI@v1
         with:
           inlinescript: |
