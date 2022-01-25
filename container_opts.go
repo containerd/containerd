@@ -22,10 +22,12 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/snapshots"
@@ -323,4 +325,38 @@ func WithSpec(s *oci.Spec, opts ...oci.SpecOpts) NewContainerOpts {
 // WithoutRefreshedMetadata will use the current metadata attached to the container object
 func WithoutRefreshedMetadata(i *InfoConfig) {
 	i.Refresh = false
+}
+
+// WithCDI updates OCI spec with CDI content
+func WithCDI(s *oci.Spec, annotations map[string]string) NewContainerOpts {
+	return func(ctx context.Context, _ *Client, c *containers.Container) error {
+		// TODO: Once CRI is extended with native CDI support this will need to be updated...
+		_, cdiDevices, err := cdi.ParseAnnotations(annotations)
+		if err != nil {
+			return fmt.Errorf("failed to parse CDI device annotations: %w", err)
+		}
+		if cdiDevices == nil {
+			return nil
+		}
+
+		registry := cdi.GetRegistry()
+		if err = registry.Refresh(); err != nil {
+			// We don't consider registry refresh failure a fatal error.
+			// For instance, a dynamically generated invalid CDI Spec file for
+			// any particular vendor shouldn't prevent injection of devices of
+			// different vendors. CDI itself knows better and it will fail the
+			// injection if necessary.
+			log.G(ctx).Warnf("CDI registry refresh failed: %v", err)
+		}
+
+		if _, err := registry.InjectDevices(s, cdiDevices...); err != nil {
+			return fmt.Errorf("CDI device injection failed: %w", err)
+		}
+
+		// One crucial thing to keep in mind is that CDI device injection
+		// might add OCI Spec environment variables, hooks, and mounts as
+		// well. Therefore it is important that none of the corresponding
+		// OCI Spec fields are reset up in the call stack once we return.
+		return nil
+	}
 }
