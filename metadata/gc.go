@@ -58,6 +58,8 @@ var (
 	labelGCFlat       = []byte("containerd.io/gc.flat")
 )
 
+// scanRoots sends the given channel "root" resources that are certainly used.
+// The caller could look the references of the resources to find all resources that are used.
 func scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
 	v1bkt := tx.Bucket(bucketKeyVersion)
 	if v1bkt == nil {
@@ -276,6 +278,7 @@ func scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
 	return cerr
 }
 
+// references finds the resources that are reachable from the given node.
 func references(ctx context.Context, tx *bolt.Tx, node gc.Node, fn func(gc.Node)) error {
 	switch node.Type {
 	case ResourceContent:
@@ -328,6 +331,7 @@ func references(ctx context.Context, tx *bolt.Tx, node gc.Node, fn func(gc.Node)
 	return nil
 }
 
+// scanAll finds all resources regardless whether the resources are used or not.
 func scanAll(ctx context.Context, tx *bolt.Tx, fn func(ctx context.Context, n gc.Node) error) error {
 	v1bkt := tx.Bucket(bucketKeyVersion)
 	if v1bkt == nil {
@@ -408,6 +412,7 @@ func scanAll(ctx context.Context, tx *bolt.Tx, fn func(ctx context.Context, n gc
 	return nil
 }
 
+// remove all buckets for the given node.
 func remove(ctx context.Context, tx *bolt.Tx, node gc.Node) error {
 	v1bkt := tx.Bucket(bucketKeyVersion)
 	if v1bkt == nil {

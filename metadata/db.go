@@ -277,7 +277,7 @@ func (s GCStats) Elapsed() time.Duration {
 	return s.MetaD
 }
 
-// GarbageCollect starts garbage collection
+// GarbageCollect removes resources (snapshots, contents, ...) that are no longer used.
 func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 	m.wlock.Lock()
 	t1 := time.Now()
@@ -363,6 +363,7 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 	return stats, err
 }
 
+// getMarked returns all resources that are used.
 func (m *DB) getMarked(ctx context.Context) (map[gc.Node]struct{}, error) {
 	var marked map[gc.Node]struct{}
 	if err := m.db.View(func(tx *bolt.Tx) error {
