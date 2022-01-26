@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/content/local"
 	"github.com/containerd/containerd/content/testsuite"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/namespaces"
 	digest "github.com/opencontainers/go-digest"
@@ -52,9 +53,18 @@ func createContentStore(ctx context.Context, root string, opts ...DBOpt) (contex
 		count uint64
 		name  = testsuite.Name(ctx)
 	)
-	wrap := func(ctx context.Context) (context.Context, func(context.Context) error, error) {
+	wrap := func(ctx context.Context, sharedNS bool) (context.Context, func(context.Context) error, error) {
 		n := atomic.AddUint64(&count, 1)
-		return namespaces.WithNamespace(ctx, fmt.Sprintf("%s-n%d", name, n)), func(context.Context) error {
+		ctx2 := namespaces.WithNamespace(ctx, fmt.Sprintf("%s-n%d", name, n))
+		if sharedNS {
+			db.Update(func(tx *bolt.Tx) error {
+				if ns, err := namespaces.NamespaceRequired(ctx2); err == nil {
+					return NewNamespaceStore(tx).SetLabel(ctx2, ns, labels.LabelSharedNamespace, "true")
+				}
+				return err
+			})
+		}
+		return ctx2, func(context.Context) error {
 			return nil
 		}, nil
 	}
@@ -75,6 +85,10 @@ func TestContent(t *testing.T) {
 	testsuite.ContentSuite(t, "metadata", createContentStoreWithPolicy())
 	testsuite.ContentCrossNSSharedSuite(t, "metadata", createContentStoreWithPolicy())
 	testsuite.ContentCrossNSIsolatedSuite(
+		t, "metadata", createContentStoreWithPolicy([]DBOpt{
+			WithPolicyIsolated,
+		}...))
+	testsuite.ContentSharedNSIsolatedSuite(
 		t, "metadata", createContentStoreWithPolicy([]DBOpt{
 			WithPolicyIsolated,
 		}...))
