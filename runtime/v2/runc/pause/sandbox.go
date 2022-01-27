@@ -22,6 +22,7 @@ package pause
 import (
 	"context"
 
+	"github.com/containerd/containerd/pkg/shutdown"
 	"github.com/containerd/ttrpc"
 	log "github.com/sirupsen/logrus"
 
@@ -33,14 +34,26 @@ func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.TTRPCPlugin,
 		ID:   "pause",
+		Requires: []plugin.Type{
+			plugin.InternalPlugin,
+		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			return &pauseService{}, nil
+			ss, err := ic.GetByID(plugin.InternalPlugin, "shutdown")
+			if err != nil {
+				return nil, err
+			}
+
+			return &pauseService{
+				shutdown: ss.(shutdown.Service),
+			}, nil
 		},
 	})
 }
 
 // pauseService is an extension for task v2 runtime to support Pod "pause" containers via sandbox API.
-type pauseService struct{}
+type pauseService struct {
+	shutdown shutdown.Service
+}
 
 var _ api.SandboxService = (*pauseService)(nil)
 
@@ -56,6 +69,7 @@ func (p *pauseService) StartSandbox(ctx context.Context, req *api.StartSandboxRe
 
 func (p *pauseService) StopSandbox(ctx context.Context, req *api.StopSandboxRequest) (*api.StopSandboxResponse, error) {
 	log.Debugf("stop sandbox request: %+v", req)
+	p.shutdown.Shutdown()
 	return &api.StopSandboxResponse{}, nil
 }
 

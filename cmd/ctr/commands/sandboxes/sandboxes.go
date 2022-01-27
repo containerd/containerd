@@ -148,6 +148,8 @@ var removeCommand = cli.Command{
 		}
 		defer cancel()
 
+		force := context.Bool("force")
+
 		for _, id := range context.Args() {
 			sandbox, err := client.LoadSandbox(ctx, id)
 			if err != nil {
@@ -155,7 +157,15 @@ var removeCommand = cli.Command{
 				continue
 			}
 
-			err = sandbox.Shutdown(ctx, context.Bool("force"))
+			err = sandbox.Stop(ctx)
+			if err != nil {
+				log.G(ctx).WithError(err).Errorf("failed to stop sandbox %s", id)
+				if !force {
+					continue
+				}
+			}
+
+			err = sandbox.Delete(ctx)
 			if err != nil {
 				log.G(ctx).WithError(err).Errorf("failed to shutdown sandbox %s", id)
 				continue

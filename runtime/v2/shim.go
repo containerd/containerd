@@ -277,7 +277,7 @@ func (s *shimTask) PID(ctx context.Context) (uint32, error) {
 	return response.TaskPid, nil
 }
 
-func (s *shimTask) delete(ctx context.Context, removeTask func(ctx context.Context, id string)) (*runtime.Exit, error) {
+func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(ctx context.Context, id string)) (*runtime.Exit, error) {
 	response, shimErr := s.task.Delete(ctx, &task.DeleteRequest{
 		ID: s.ID(),
 	})
@@ -305,8 +305,12 @@ func (s *shimTask) delete(ctx context.Context, removeTask func(ctx context.Conte
 		removeTask(ctx, s.ID())
 	}
 
-	if err := s.waitShutdown(ctx); err != nil {
-		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim task")
+	// Don't shutdown sandbox as there may be other containers running.
+	// Let controller decide when to shutdown.
+	if !sandboxed {
+		if err := s.waitShutdown(ctx); err != nil {
+			log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim task")
+		}
 	}
 
 	if err := s.shim.delete(ctx); err != nil {

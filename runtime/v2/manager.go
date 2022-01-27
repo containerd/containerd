@@ -186,6 +186,40 @@ func (m *ShimManager) Start(ctx context.Context, id string, opts runtime.CreateO
 		}
 	}()
 
+	// This container belongs to sandbox which supposed to be already started via sandbox API.
+	if opts.SandboxID != "" {
+		process, err := m.Get(ctx, opts.SandboxID)
+		if err != nil {
+			return nil, fmt.Errorf("can't find sandbox %s", opts.SandboxID)
+		}
+
+		// Write sandbox ID this task belongs to.
+		if err := os.WriteFile(filepath.Join(bundle.Path, "sandbox"), []byte(opts.SandboxID), 0600); err != nil {
+			return nil, err
+		}
+
+		address, err := shimbinary.ReadAddress(filepath.Join(m.state, process.Namespace(), opts.SandboxID, "address"))
+		if err != nil {
+			return nil, fmt.Errorf("failed to get socket address for sandbox %q: %w", opts.SandboxID, err)
+		}
+
+		// Use sandbox's socket address to handle task requests for this container.
+		if err := shimbinary.WriteAddress(filepath.Join(bundle.Path, "address"), address); err != nil {
+			return nil, err
+		}
+
+		shim, err := loadShim(ctx, bundle, func() {})
+		if err != nil {
+			return nil, fmt.Errorf("failed to load sandbox task %q: %w", opts.SandboxID, err)
+		}
+
+		if err := m.shims.Add(ctx, shim); err != nil {
+			return nil, err
+		}
+
+		return shim, nil
+	}
+
 	shim, err := m.startShim(ctx, bundle, id, opts)
 	if err != nil {
 		return nil, err
@@ -391,22 +425,9 @@ func (m *TaskManager) ID() string {
 
 // Create launches new shim instance and creates new task
 func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.CreateOpts) (runtime.Task, error) {
-	var (
-		process ShimProcess
-		err     error
-	)
-
-	if opts.SandboxID != "" {
-		// This container belongs to sandbox which supposed to be already started via sandbox API.
-		process, err = m.manager.Get(ctx, opts.SandboxID)
-		if err != nil {
-			return nil, fmt.Errorf("can't find sandbox %s", opts.SandboxID)
-		}
-	} else {
-		process, err = m.manager.Start(ctx, taskID, opts)
-		if err != nil {
-			return nil, fmt.Errorf("failed to start shim: %w", err)
-		}
+	process, err := m.manager.Start(ctx, taskID, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start shim: %w", err)
 	}
 
 	// Cast to shim task and call task service to create a new container task instance.
@@ -420,7 +441,8 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 		dctx, cancel := timeout.WithContext(context.Background(), cleanupTimeout)
 		defer cancel()
 
-		_, errShim := shim.delete(dctx, func(context.Context, string) {})
+		sandboxed := opts.SandboxID != ""
+		_, errShim := shim.delete(dctx, sandboxed, func(context.Context, string) {})
 		if errShim != nil {
 			if errdefs.IsDeadlineExceeded(errShim) {
 				dctx, cancel = timeout.WithContext(context.Background(), cleanupTimeout)
@@ -454,8 +476,14 @@ func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit,
 		return nil, err
 	}
 
+	container, err := m.manager.containers.Get(ctx, taskID)
+	if err != nil {
+		return nil, err
+	}
+
+	sandboxed := container.SandboxID != ""
 	shimTask := item.(*shimTask)
-	exit, err := shimTask.delete(ctx, func(ctx context.Context, id string) {
+	exit, err := shimTask.delete(ctx, sandboxed, func(ctx context.Context, id string) {
 		m.manager.shims.Delete(ctx, id)
 	})
 

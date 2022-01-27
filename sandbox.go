@@ -18,9 +18,10 @@ package containerd
 
 import (
 	"context"
-	"fmt"
 	"time"
 
+	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/oci"
 	api "github.com/containerd/containerd/sandbox"
 	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/types"
@@ -37,9 +38,10 @@ type Sandbox interface {
 	Labels(ctx context.Context) (map[string]string, error)
 	// Start starts new sandbox instance
 	Start(ctx context.Context) error
-	// Shutdown will turn down existing sandbox instance.
-	// If using force, the client will ignore shutdown errors.
-	Shutdown(ctx context.Context, force bool) error
+	// Stop sends stop request to the shim instance.
+	Stop(ctx context.Context) error
+	// Delete removes sandbox from the metadata store.
+	Delete(ctx context.Context) error
 	// Pause will freeze running sandbox instance
 	Pause(ctx context.Context) error
 	// Resume will unfreeze previously paused sandbox instance
@@ -76,23 +78,12 @@ func (s *sandboxClient) Start(ctx context.Context) error {
 	return s.client.SandboxController().Start(ctx, s.ID())
 }
 
-func (s *sandboxClient) Shutdown(ctx context.Context, force bool) error {
-	var (
-		controller = s.client.SandboxController()
-		store      = s.client.SandboxStore()
-	)
+func (s *sandboxClient) Stop(ctx context.Context) error {
+	return s.client.SandboxController().Shutdown(ctx, s.ID())
+}
 
-	err := controller.Shutdown(ctx, s.ID())
-	if err != nil && !force {
-		return fmt.Errorf("failed to shutdown sandbox: %w", err)
-	}
-
-	err = store.Delete(ctx, s.ID())
-	if err != nil {
-		return fmt.Errorf("failed to delete sandbox from metadata store: %w", err)
-	}
-
-	return nil
+func (s *sandboxClient) Delete(ctx context.Context) error {
+	return s.client.SandboxStore().Delete(ctx, s.ID())
 }
 
 func (s *sandboxClient) Pause(ctx context.Context) error {
@@ -187,9 +178,15 @@ func WithSandboxRuntime(name string, options interface{}) NewSandboxOpts {
 }
 
 // WithSandboxSpec will provide the sandbox runtime spec
-func WithSandboxSpec(spec interface{}) NewSandboxOpts {
+func WithSandboxSpec(s *oci.Spec, opts ...oci.SpecOpts) NewSandboxOpts {
 	return func(ctx context.Context, client *Client, sandbox *api.Sandbox) error {
-		spec, err := typeurl.MarshalAny(spec)
+		c := &containers.Container{ID: sandbox.ID}
+
+		if err := oci.ApplyOpts(ctx, client, c, s, opts...); err != nil {
+			return err
+		}
+
+		spec, err := typeurl.MarshalAny(s)
 		if err != nil {
 			return errors.Wrap(err, "failed to marshal spec")
 		}

@@ -109,8 +109,7 @@ func (c *controllerLocal) Start(ctx context.Context, in *api.ControllerStartRequ
 	svc := task.NewSandboxClient(shim.Client())
 
 	_, err = svc.StartSandbox(ctx, &proto.StartSandboxRequest{
-		SandboxID:  in.SandboxID,
-		BundlePath: "",
+		SandboxID: in.SandboxID,
 	})
 
 	if err != nil {

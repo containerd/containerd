@@ -81,10 +81,12 @@ type Container struct {
 	// that should be unique against other extensions. When updating extension
 	// data, one should only update the specified extension using field paths
 	// to select a specific map key.
-	Extensions           map[string]types.Any `protobuf:"bytes,10,rep,name=extensions,proto3" json:"extensions" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
-	XXX_unrecognized     []byte               `json:"-"`
-	XXX_sizecache        int32                `json:"-"`
+	Extensions map[string]types.Any `protobuf:"bytes,10,rep,name=extensions,proto3" json:"extensions" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	// Sandbox ID this container belongs to.
+	Sandbox              string   `protobuf:"bytes,11,opt,name=sandbox,proto3" json:"sandbox,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
 func (m *Container) Reset()      { *m = Container{} }
@@ -960,6 +962,13 @@ func (m *Container) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i -= len(m.XXX_unrecognized)
 		copy(dAtA[i:], m.XXX_unrecognized)
 	}
+	if len(m.Sandbox) > 0 {
+		i -= len(m.Sandbox)
+		copy(dAtA[i:], m.Sandbox)
+		i = encodeVarintContainers(dAtA, i, uint64(len(m.Sandbox)))
+		i--
+		dAtA[i] = 0x5a
+	}
 	if len(m.Extensions) > 0 {
 		for k := range m.Extensions {
 			v := m.Extensions[k]
@@ -1563,6 +1572,10 @@ func (m *Container) Size() (n int) {
 			n += mapEntrySize + 1 + sovContainers(uint64(mapEntrySize))
 		}
 	}
+	l = len(m.Sandbox)
+	if l > 0 {
+		n += 1 + l + sovContainers(uint64(l))
+	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
 	}
@@ -1788,6 +1801,7 @@ func (this *Container) String() string {
 		`CreatedAt:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.CreatedAt), "Timestamp", "types.Timestamp", 1), `&`, ``, 1) + `,`,
 		`UpdatedAt:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.UpdatedAt), "Timestamp", "types.Timestamp", 1), `&`, ``, 1) + `,`,
 		`Extensions:` + mapStringForExtensions + `,`,
+		`Sandbox:` + fmt.Sprintf("%v", this.Sandbox) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -2479,6 +2493,38 @@ func (m *Container) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.Extensions[mapkey] = *mapvalue
+			iNdEx = postIndex
+		case 11:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Sandbox", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowContainers
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthContainers
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthContainers
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Sandbox = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

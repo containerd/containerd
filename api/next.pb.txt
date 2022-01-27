@@ -928,6 +928,13 @@ file {
       }
       json_name: "extensions"
     }
+    field {
+      name: "sandbox"
+      number: 11
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandbox"
+    }
     nested_type {
       name: "LabelsEntry"
       field {
