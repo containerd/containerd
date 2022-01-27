@@ -33,6 +33,26 @@ func TestOnly(t *testing.T) {
 					"linux/386",
 				},
 				false: {
+					"linux/amd64/v2",
+					"linux/arm/v7",
+					"linux/arm64",
+					"windows/amd64",
+					"windows/arm",
+				},
+			},
+		},
+		{
+			platform: "linux/amd64/v2",
+			matches: map[bool][]string{
+				true: {
+					"linux/amd64",
+					"linux/amd64/v1",
+					"linux/amd64/v2",
+					"linux/386",
+				},
+				false: {
+					"linux/amd64/v3",
+					"linux/amd64/v4",
 					"linux/arm/v7",
 					"linux/arm64",
 					"windows/amd64",
