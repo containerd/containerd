@@ -31,9 +31,7 @@ import (
 )
 
 func TestAdditionalGids(t *testing.T) {
-	testPodLogDir, err := os.MkdirTemp("/tmp", "additional-gids")
-	require.NoError(t, err)
-	defer os.RemoveAll(testPodLogDir)
+	testPodLogDir := t.TempDir()
 
 	t.Log("Create a sandbox with log directory")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "additional-gids",
