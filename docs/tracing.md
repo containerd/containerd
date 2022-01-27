@@ -77,7 +77,7 @@ func clientWithTrace() error {
     }
     defer cancel()
 
-    span, ctx := tracing.StartSpan(ctx, "OPERATION NAME")
+    ctx, span := tracing.StartSpan(ctx, "OPERATION NAME")
     defer span.End()
     ...
 }
