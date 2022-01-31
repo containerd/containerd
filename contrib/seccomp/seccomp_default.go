@@ -128,6 +128,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"ftruncate64",
 				"futex",
 				"futex_time64",
+				"futex_waitv",
 				"futimesat",
 				"getcpu",
 				"getcwd",
