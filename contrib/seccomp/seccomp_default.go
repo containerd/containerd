@@ -252,6 +252,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"preadv",
 				"preadv2",
 				"prlimit64",
+				"process_mrelease",
 				"pselect6",
 				"pselect6_time64",
 				"pwrite64",
