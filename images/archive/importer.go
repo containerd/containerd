@@ -269,9 +269,13 @@ func resolveLayers(ctx context.Context, store content.Store, layerFiles []string
 		if ok {
 			desc := descs[digest.Digest(dgst)]
 			if desc != nil {
-				desc.MediaType = images.MediaTypeDockerSchema2LayerGzip
 				desc.Digest = info.Digest
 				desc.Size = info.Size
+				mediaType, err := detectLayerMediaType(ctx, store, *desc)
+				if err != nil {
+					return fmt.Errorf("failed to detect media type of layer: %w", err)
+				}
+				desc.MediaType = mediaType
 			}
 		}
 		return nil
@@ -380,4 +384,30 @@ func writeManifest(ctx context.Context, cs content.Ingester, manifest interface{
 	}
 
 	return desc, nil
+}
+
+func detectLayerMediaType(ctx context.Context, store content.Store, desc ocispec.Descriptor) (string, error) {
+	var mediaType string
+	// need to parse existing blob to use the proper media type
+	bytes := make([]byte, 10)
+	ra, err := store.ReaderAt(ctx, desc)
+	if err != nil {
+		return "", fmt.Errorf("failed to read content store to detect layer media type: %w", err)
+	}
+	defer ra.Close()
+	_, err = ra.ReadAt(bytes, 0)
+	if err != nil && err != io.EOF {
+		return "", fmt.Errorf("failed to read header bytes from layer to detect media type: %w", err)
+	}
+	if err == io.EOF {
+		// in the case of an empty layer then the media type should be uncompressed
+		return images.MediaTypeDockerSchema2Layer, nil
+	}
+	switch c := compression.DetectCompression(bytes); c {
+	case compression.Uncompressed:
+		mediaType = images.MediaTypeDockerSchema2Layer
+	default:
+		mediaType = images.MediaTypeDockerSchema2LayerGzip
+	}
+	return mediaType, nil
 }
