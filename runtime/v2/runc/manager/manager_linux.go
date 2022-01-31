@@ -261,7 +261,7 @@ func (manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
 		root = opts.Root
 	}
 
-	r := process.NewRunc(root, path, ns, runtime, "", false)
+	r := process.NewRunc(root, path, ns, runtime, false)
 	if err := r.Delete(ctx, id, &runcC.DeleteOpts{
 		Force: true,
 	}); err != nil {

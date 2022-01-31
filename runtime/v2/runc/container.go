@@ -210,7 +210,7 @@ func WriteRuntime(path, runtime string) error {
 
 func newInit(ctx context.Context, path, workDir, namespace string, platform stdio.Platform,
 	r *process.CreateConfig, options *options.Options, rootfs string) (*process.Init, error) {
-	runtime := process.NewRunc(options.Root, path, namespace, options.BinaryName, options.CriuPath, options.SystemdCgroup)
+	runtime := process.NewRunc(options.Root, path, namespace, options.BinaryName, options.SystemdCgroup)
 	p := process.New(r.ID, runtime, stdio.Stdio{
 		Stdin:    r.Stdin,
 		Stdout:   r.Stdout,

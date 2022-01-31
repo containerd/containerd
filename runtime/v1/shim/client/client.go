@@ -197,9 +197,6 @@ func newCommand(binary, daemonAddress string, debug bool, config shim.Config, so
 		"-containerd-binary", selfExe,
 	}
 
-	if config.Criu != "" {
-		args = append(args, "-criu-path", config.Criu)
-	}
 	if config.RuntimeRoot != "" {
 		args = append(args, "-runtime-root", config.RuntimeRoot)
 	}

@@ -62,9 +62,15 @@ var (
 
 // Config contains shim specific configuration
 type Config struct {
-	Path          string
-	Namespace     string
-	WorkDir       string
+	Path      string
+	Namespace string
+	WorkDir   string
+	// Criu is the path to the criu binary used for checkpoint and restore.
+	//
+	// Deprecated: runc option --criu is now ignored (with a warning), and the
+	// option will be removed entirely in a future release. Users who need a non-
+	// standard criu binary should rely on the standard way of looking up binaries
+	// in $PATH.
 	Criu          string
 	RuntimeRoot   string
 	SystemdCgroup bool
@@ -172,7 +178,6 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (_ *
 		s.config.WorkDir,
 		s.config.RuntimeRoot,
 		s.config.Namespace,
-		s.config.Criu,
 		s.config.SystemdCgroup,
 		s.platform,
 		config,
@@ -637,7 +642,7 @@ func getTopic(ctx context.Context, e interface{}) string {
 	return runtime.TaskUnknownTopic
 }
 
-func newInit(ctx context.Context, path, workDir, runtimeRoot, namespace, criu string, systemdCgroup bool, platform stdio.Platform, r *process.CreateConfig, rootfs string) (*process.Init, error) {
+func newInit(ctx context.Context, path, workDir, runtimeRoot, namespace string, systemdCgroup bool, platform stdio.Platform, r *process.CreateConfig, rootfs string) (*process.Init, error) {
 	var options runctypes.CreateOptions
 	if r.Options != nil {
 		v, err := typeurl.UnmarshalAny(r.Options)
@@ -647,7 +652,7 @@ func newInit(ctx context.Context, path, workDir, runtimeRoot, namespace, criu st
 		options = *v.(*runctypes.CreateOptions)
 	}
 
-	runtime := process.NewRunc(runtimeRoot, path, namespace, r.Runtime, criu, systemdCgroup)
+	runtime := process.NewRunc(runtimeRoot, path, namespace, r.Runtime, systemdCgroup)
 	p := process.New(r.ID, runtime, stdio.Stdio{
 		Stdin:    r.Stdin,
 		Stdout:   r.Stdout,
