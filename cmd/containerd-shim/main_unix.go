@@ -42,6 +42,7 @@ import (
 	"github.com/containerd/containerd/runtime/v1/shim"
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/containerd/sys/reaper"
+	"github.com/containerd/containerd/version"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
@@ -52,6 +53,7 @@ import (
 
 var (
 	debugFlag            bool
+	versionFlag          bool
 	namespaceFlag        string
 	socketFlag           string
 	addressFlag          string
@@ -68,8 +70,9 @@ var (
 	}
 )
 
-func init() {
+func parseFlags() {
 	flag.BoolVar(&debugFlag, "debug", false, "enable debug output in logs")
+	flag.BoolVar(&versionFlag, "v", false, "show the shim version and exit")
 	flag.StringVar(&namespaceFlag, "namespace", "", "namespace that owns the shim")
 	flag.StringVar(&socketFlag, "socket", "", "socket path to serve")
 	flag.StringVar(&addressFlag, "address", "", "grpc address back to main containerd")
@@ -83,22 +86,35 @@ func init() {
 	flag.Parse()
 }
 
-func main() {
+func setRuntime() {
 	debug.SetGCPercent(40)
 	go func() {
 		for range time.Tick(30 * time.Second) {
 			debug.FreeOSMemory()
 		}
 	}()
-
-	if debugFlag {
-		logrus.SetLevel(logrus.DebugLevel)
-	}
-
 	if os.Getenv("GOMAXPROCS") == "" {
 		// If GOMAXPROCS hasn't been set, we default to a value of 2 to reduce
 		// the number of Go stacks present in the shim.
 		runtime.GOMAXPROCS(2)
+	}
+}
+
+func main() {
+	parseFlags()
+	if versionFlag {
+		fmt.Println("containerd-shim")
+		fmt.Println("  Version: ", version.Version)
+		fmt.Println("  Revision:", version.Revision)
+		fmt.Println("  Go version:", version.GoVersion)
+		fmt.Println("")
+		return
+	}
+
+	setRuntime()
+
+	if debugFlag {
+		logrus.SetLevel(logrus.DebugLevel)
 	}
 
 	stdout, stderr, err := openStdioKeepAlivePipes(workdirFlag)
