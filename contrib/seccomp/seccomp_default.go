@@ -537,6 +537,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 					"fspick",
 					"lookup_dcookie",
 					"mount",
+					"mount_setattr",
 					"move_mount",
 					"name_to_handle_at",
 					"open_tree",
