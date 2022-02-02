@@ -27,6 +27,8 @@ The following configuration flags are supported:
 * `base_image_size` - defines how much space to allocate when creating the base device
 * `async_remove` - flag to async remove device using snapshot GC's cleanup callback
 * `discard_blocks` - whether to discard blocks when removing a device. This is especially useful for returning disk space to the filesystem when using loopback devices.
+* `fs_type` - defines the file system to use for snapshot device mount. Valid values are `ext4` and `xfs`. Defaults to `ext4` if unspecified.
+* `fs_options` - optionally defines the file system options. This is currently only applicable to `ext4` file system.
 
 Pool name and base image size are required snapshotter parameters.
 
