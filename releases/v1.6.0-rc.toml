@@ -21,6 +21,7 @@ support to increase overall compatibility and stability.
 * **Add runtime label to metrics** ([#5744](https://github.com/containerd/containerd/pull/5744))
 * **Cleanup task delete logic in v2 shim** ([#5813](https://github.com/containerd/containerd/pull/5813))
 * **Add support for shim plugins** ([#5817](https://github.com/containerd/containerd/pull/5817))
+* **Handle sigint and sigterm in shimv2** ([#5828](https://github.com/containerd/containerd/pull/5828))
 * **Decouple shim and task manager** ([#5918](https://github.com/containerd/containerd/pull/5918))
 * **Add runc shim support for core scheduling** ([#6011](https://github.com/containerd/containerd/pull/6011))
 * **Update shim client connect attempt to fail fast when shim errors** ([#6031](https://github.com/containerd/containerd/pull/6031))
