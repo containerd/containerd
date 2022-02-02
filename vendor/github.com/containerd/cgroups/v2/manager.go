@@ -560,6 +560,22 @@ func (c *Manager) freeze(path string, state State) error {
 	}
 }
 
+func (c *Manager) isCgroupEmpty() bool {
+	// In case of any error we return true so that we exit and don't leak resources
+	out := make(map[string]interface{})
+	if err := readKVStatsFile(c.path, "cgroup.events", out); err != nil {
+		return true
+	}
+	if v, ok := out["populated"]; ok {
+		populated, ok := v.(uint64)
+		if !ok {
+			return true
+		}
+		return populated == 0
+	}
+	return true
+}
+
 // MemoryEventFD returns inotify file descriptor and 'memory.events' inotify watch descriptor
 func (c *Manager) MemoryEventFD() (int, uint32, error) {
 	fpath := filepath.Join(c.path, "memory.events")
@@ -568,9 +584,15 @@ func (c *Manager) MemoryEventFD() (int, uint32, error) {
 		return 0, 0, errors.New("failed to create inotify fd")
 	}
 	wd, err := syscall.InotifyAddWatch(fd, fpath, unix.IN_MODIFY)
-	if wd < 0 {
+	if err != nil {
 		syscall.Close(fd)
-		return 0, 0, fmt.Errorf("failed to add inotify watch for %q", fpath)
+		return 0, 0, fmt.Errorf("failed to add inotify watch for %q: %w", fpath, err)
+	}
+	// monitor to detect process exit/cgroup deletion
+	evpath := filepath.Join(c.path, "cgroup.events")
+	if _, err = syscall.InotifyAddWatch(fd, evpath, unix.IN_MODIFY); err != nil {
+		syscall.Close(fd)
+		return 0, 0, fmt.Errorf("failed to add inotify watch for %q: %w", evpath, err)
 	}
 
 	return fd, uint32(wd), nil
@@ -578,22 +600,56 @@ func (c *Manager) MemoryEventFD() (int, uint32, error) {
 
 func (c *Manager) EventChan() (<-chan Event, <-chan error) {
 	ec := make(chan Event)
-	errCh := make(chan error)
+	errCh := make(chan error, 1)
 	go c.waitForEvents(ec, errCh)
 
-	return ec, nil
+	return ec, errCh
+}
+
+func parseMemoryEvents(out map[string]interface{}) (Event, error) {
+	e := Event{}
+	if v, ok := out["high"]; ok {
+		e.High, ok = v.(uint64)
+		if !ok {
+			return Event{}, fmt.Errorf("cannot convert high to uint64: %+v", v)
+		}
+	}
+	if v, ok := out["low"]; ok {
+		e.Low, ok = v.(uint64)
+		if !ok {
+			return Event{}, fmt.Errorf("cannot convert low to uint64: %+v", v)
+		}
+	}
+	if v, ok := out["max"]; ok {
+		e.Max, ok = v.(uint64)
+		if !ok {
+			return Event{}, fmt.Errorf("cannot convert max to uint64: %+v", v)
+		}
+	}
+	if v, ok := out["oom"]; ok {
+		e.OOM, ok = v.(uint64)
+		if !ok {
+			return Event{}, fmt.Errorf("cannot convert oom to uint64: %+v", v)
+		}
+	}
+	if v, ok := out["oom_kill"]; ok {
+		e.OOMKill, ok = v.(uint64)
+		if !ok {
+			return Event{}, fmt.Errorf("cannot convert oom_kill to uint64: %+v", v)
+		}
+	}
+	return e, nil
 }
 
 func (c *Manager) waitForEvents(ec chan<- Event, errCh chan<- error) {
-	fd, wd, err := c.MemoryEventFD()
+	defer close(errCh)
 
-	defer syscall.InotifyRmWatch(fd, wd)
-	defer syscall.Close(fd)
-
+	fd, _, err := c.MemoryEventFD()
 	if err != nil {
 		errCh <- err
 		return
 	}
+	defer syscall.Close(fd)
 
 	for {
 		buffer := make([]byte, syscall.SizeofInotifyEvent*10)
@@ -604,46 +660,20 @@ func (c *Manager) waitForEvents(ec chan<- Event, errCh chan<- error) {
 		}
 		if bytesRead >= syscall.SizeofInotifyEvent {
 			out := make(map[string]interface{})
-			if err := readKVStatsFile(c.path, "memory.events", out); err == nil {
-				e := Event{}
-				if v, ok := out["high"]; ok {
-					e.High, ok = v.(uint64)
-					if !ok {
-						errCh <- fmt.Errorf("cannot convert high to uint64: %+v", v)
-						return
-					}
+			if err := readKVStatsFile(c.path, "memory.events", out); err != nil {
+				// When cgroup is deleted read may return -ENODEV instead of -ENOENT from open.
+				if _, statErr := os.Lstat(filepath.Join(c.path, "memory.events")); !os.IsNotExist(statErr) {
+					errCh <- err
 				}
-				if v, ok := out["low"]; ok {
-					e.Low, ok = v.(uint64)
-					if !ok {
-						errCh <- fmt.Errorf("cannot convert low to uint64: %+v", v)
-						return
-					}
-				}
-				if v, ok := out["max"]; ok {
-					e.Max, ok = v.(uint64)
-					if !ok {
-						errCh <- fmt.Errorf("cannot convert max to uint64: %+v", v)
-						return
-					}
-				}
-				if v, ok := out["oom"]; ok {
-					e.OOM, ok = v.(uint64)
-					if !ok {
-						errCh <- fmt.Errorf("cannot convert oom to uint64: %+v", v)
-						return
-					}
-				}
-				if v, ok := out["oom_kill"]; ok {
-					e.OOMKill, ok = v.(uint64)
-					if !ok {
-						errCh <- fmt.Errorf("cannot convert oom_kill to uint64: %+v", v)
-						return
-					}
-				}
-				ec <- e
-			} else {
+				return
+			}
+			e, err := parseMemoryEvents(out)
+			if err != nil {
 				errCh <- err
+				return
+			}
+			ec <- e
+			if c.isCgroupEmpty() {
 				return
 			}
 		}
@@ -658,7 +688,7 @@ func setDevices(path string, devices []specs.LinuxDeviceCgroup) error {
 	if err != nil {
 		return err
 	}
-	dirFD, err := unix.Open(path, unix.O_DIRECTORY|unix.O_RDONLY, 0600)
+	dirFD, err := unix.Open(path, unix.O_DIRECTORY|unix.O_RDONLY|unix.O_CLOEXEC, 0600)
 	if err != nil {
 		return fmt.Errorf("cannot get dir FD for %s", path)
 	}
