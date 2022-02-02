@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseSelector(t *testing.T) {
@@ -363,4 +364,8 @@ func TestParseSelectorInvalid(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNormalize(t *testing.T) {
+	require.Equal(t, DefaultSpec(), Normalize(DefaultSpec()))
 }
