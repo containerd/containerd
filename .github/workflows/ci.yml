@@ -146,6 +146,29 @@ jobs:
         with:
           go-version: '1.17.5'
       - uses: actions/checkout@v2
+      - env:
+          GOOS: ${{matrix.goos}}
+          GOARCH: ${{matrix.goarch}}
+          GOARM: ${{matrix.goarm}}
+          GOPROXY: direct
+        run: sudo -E PATH=$PATH script/setup/install-gotestsum
+      - name: Unit tests
+        env:
+          GOOS: ${{matrix.goos}}
+          GOARCH: ${{matrix.goarch}}
+          GOARM: ${{matrix.goarm}}
+          GOPROXY: direct
+          GOTEST: gotestsum --
+          GOTESTSUM_JUNITFILE: "${{ github.workspace }}/${{ matrix.goos }}-test-${{matrix.goarch}}${{matrix.goarm}}-junit.xml"
+        run: |
+          make test
+          sudo -E PATH=$PATH make root-test
+      - uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: TestResults
+          path: |
+            ${{github.workspace}}/*-junit.xml
       - run: |
           set -e -x
 
