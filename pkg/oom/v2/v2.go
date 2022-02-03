@@ -102,10 +102,13 @@ func (w *watcher) Add(id string, cgx interface{}) error {
 				i.ev = ev
 				w.itemCh <- i
 			case err := <-errCh:
-				i.err = err
-				w.itemCh <- i
-				// we no longer get any event/err when we got an err
-				logrus.WithError(err).Warn("error from *cgroupsv2.Manager.EventChan")
+				// channel is closed when cgroup gets deleted
+				if err != nil {
+					i.err = err
+					w.itemCh <- i
+					// we no longer get any event/err when we got an err
+					logrus.WithError(err).Warn("error from *cgroupsv2.Manager.EventChan")
+				}
 				return
 			}
 		}
