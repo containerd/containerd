@@ -24,6 +24,10 @@ jobs:
         os: [ubuntu-18.04, macos-10.15, windows-2019]
 
     steps:
+      - uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+
       - uses: actions/checkout@v2
         with:
           path: src/github.com/containerd/containerd
@@ -36,9 +40,10 @@ jobs:
 
       - uses: golangci/golangci-lint-action@v2
         with:
-          version: v1.36.0
+          version: v1.42.0
           working-directory: src/github.com/containerd/containerd
           args: --timeout=5m
+          skip-go-installation: true
 
   #
   # Project checks
@@ -127,7 +132,7 @@ jobs:
         with:
           path: src/github.com/containerd/containerd
 
-      - run: GO111MODULE=on go get github.com/cpuguy83/go-md2man/v2@v2.0.0
+      - run: GO111MODULE=on go get github.com/cpuguy83/go-md2man/v2@v2.0.1
 
       - run: make man
         working-directory: src/github.com/containerd/containerd
