@@ -260,6 +260,10 @@ PASS
 ok  	github.com/containerd/containerd	4.778s
 ```
 
+> *Note*: in order to run `sudo go` you need to
+> - either keep user PATH environment variable. ex: `sudo "PATH=$PATH" env go test <args>`
+> - or use `go test -exec` ex: `go test -exec sudo -v -run "TestTarWithXattr" ./archive/ -test.root`
+
 ## Additional tools
 
 ### containerd-stress
