@@ -28,7 +28,6 @@ import (
 
 	"github.com/containerd/containerd/log"
 	remoteserrors "github.com/containerd/containerd/remotes/errors"
-	"github.com/containerd/containerd/version"
 	"golang.org/x/net/context/ctxhttp"
 )
 
@@ -124,7 +123,8 @@ func FetchTokenWithOAuth(ctx context.Context, client *http.Client, headers http.
 		req.Header[k] = append(req.Header[k], v...)
 	}
 	if len(req.Header.Get("User-Agent")) == 0 {
-		req.Header.Set("User-Agent", "containerd/"+version.Version)
+		// This is marked for deprecation following v1.6.1
+		req.Header.Set("User-Agent", "containerd/v1.6.0-or-later")
 	}
 
 	resp, err := ctxhttp.Do(ctx, client, req)
@@ -171,7 +171,8 @@ func FetchToken(ctx context.Context, client *http.Client, headers http.Header, t
 		req.Header[k] = append(req.Header[k], v...)
 	}
 	if len(req.Header.Get("User-Agent")) == 0 {
-		req.Header.Set("User-Agent", "containerd/"+version.Version)
+		// This is marked for deprecation following v1.6.1
+		req.Header.Set("User-Agent", "containerd/v1.6.0-or-later")
 	}
 
 	reqParams := req.URL.Query()
