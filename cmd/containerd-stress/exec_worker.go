@@ -63,6 +63,12 @@ func (w *execWorker) exec(ctx, tctx context.Context) {
 		logrus.WithError(err).Error("wait exec container's task")
 		return
 	}
+
+	if err := task.Start(ctx); err != nil {
+		logrus.WithError(err).Error("exec container start failure")
+		return
+	}
+
 	spec, err := c.Spec(ctx)
 	if err != nil {
 		logrus.WithError(err).Error("failed to get spec")
