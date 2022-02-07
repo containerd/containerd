@@ -35,9 +35,10 @@ import (
 type dockerAuthorizer struct {
 	credentials func(string) (string, string, error)
 
-	client *http.Client
-	header http.Header
-	mu     sync.RWMutex
+	client   *http.Client
+	header   http.Header
+	mu       sync.RWMutex
+	clientID string
 
 	// indexed by host name
 	handlers map[string]*authHandler
@@ -57,6 +58,7 @@ type authorizerConfig struct {
 	client              *http.Client
 	header              http.Header
 	onFetchRefreshToken OnFetchRefreshToken
+	clientID            string
 }
 
 // AuthorizerOpt configures an authorizer
@@ -93,6 +95,13 @@ func WithFetchRefreshToken(f OnFetchRefreshToken) AuthorizerOpt {
 	}
 }
 
+// WithOAuthClientID provides the client id to the authorizer
+func WithOAuthClientID(clientID string) AuthorizerOpt {
+	return func(opt *authorizerConfig) {
+		opt.clientID = clientID
+	}
+}
+
 // NewDockerAuthorizer creates an authorizer using Docker's registry
 // authentication spec.
 // See https://docs.docker.com/registry/spec/auth/
@@ -105,6 +114,9 @@ func NewDockerAuthorizer(opts ...AuthorizerOpt) Authorizer {
 	if ao.client == nil {
 		ao.client = http.DefaultClient
 	}
+	if ao.clientID == "" {
+		ao.clientID = "containerd-client"
+	}
 
 	return &dockerAuthorizer{
 		credentials:         ao.credentials,
@@ -112,6 +124,7 @@ func NewDockerAuthorizer(opts ...AuthorizerOpt) Authorizer {
 		header:              ao.header,
 		handlers:            make(map[string]*authHandler),
 		onFetchRefreshToken: ao.onFetchRefreshToken,
+		clientID:            ao.clientID,
 	}
 }
 
@@ -186,7 +199,7 @@ func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.R
 			}
 			common.FetchRefreshToken = a.onFetchRefreshToken != nil
 
-			a.handlers[host] = newAuthHandler(a.client, a.header, c.Scheme, common)
+			a.handlers[host] = newAuthHandler(a.client, a.header, c.Scheme, common, a.clientID)
 			return nil
 		} else if c.Scheme == auth.BasicAuth && a.credentials != nil {
 			username, secret, err := a.credentials(host)
@@ -200,7 +213,7 @@ func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.R
 					Secret:   secret,
 				}
 
-				a.handlers[host] = newAuthHandler(a.client, a.header, c.Scheme, common)
+				a.handlers[host] = newAuthHandler(a.client, a.header, c.Scheme, common, a.clientID)
 				return nil
 			}
 		}
@@ -233,15 +246,19 @@ type authHandler struct {
 	// scopedTokens caches token indexed by scopes, which used in
 	// bearer auth case
 	scopedTokens map[string]*authResult
+
+	// client_id when fetch token.
+	clientID string
 }
 
-func newAuthHandler(client *http.Client, hdr http.Header, scheme auth.AuthenticationScheme, opts auth.TokenOptions) *authHandler {
+func newAuthHandler(client *http.Client, hdr http.Header, scheme auth.AuthenticationScheme, opts auth.TokenOptions, clientID string) *authHandler {
 	return &authHandler{
 		header:       hdr,
 		client:       client,
 		scheme:       scheme,
 		common:       opts,
 		scopedTokens: map[string]*authResult{},
+		clientID:     clientID,
 	}
 }
 
@@ -303,8 +320,7 @@ func (ah *authHandler) doBearerAuth(ctx context.Context) (token, refreshToken st
 			}
 		}()
 		// credential information is provided, use oauth POST endpoint
-		// TODO: Allow setting client_id
-		resp, err := auth.FetchTokenWithOAuth(ctx, ah.client, ah.header, "containerd-client", to)
+		resp, err := auth.FetchTokenWithOAuth(ctx, ah.client, ah.header, ah.clientID, to)
 		if err != nil {
 			var errStatus remoteerrors.ErrUnexpectedStatus
 			if errors.As(err, &errStatus) {
