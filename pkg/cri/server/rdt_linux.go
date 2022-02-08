@@ -31,17 +31,21 @@ import (
 // container and returns its effective RDT class.
 func (c *criService) rdtClassFromAnnotations(containerName string, containerAnnotations, podAnnotations map[string]string) (string, error) {
 	cls, err := rdt.ContainerClassFromAnnotations(containerName, containerAnnotations, podAnnotations)
+
+	if err == nil {
+		// Our internal check that RDT has been enabled
+		if cls != "" && !tasks.RdtEnabled() {
+			err = fmt.Errorf("RDT disabled, refusing to set RDT class of container %q to %q", containerName, cls)
+		}
+	}
+
 	if err != nil {
+		if !tasks.RdtEnabled() && c.config.ContainerdConfig.IgnoreRdtNotEnabledErrors {
+			logrus.Debugf("continuing create container %s, ignoring rdt not enabled (%v)", containerName, err)
+			return "", nil
+		}
 		return "", err
 	}
 
-	if cls != "" && !tasks.RdtEnabled() {
-		if c.config.ContainerdConfig.IgnoreRdtNotEnabledErrors {
-			cls = ""
-			logrus.Debugf("continuing create container %s, ignoring rdt not enabled (%v)", containerName, err)
-		} else {
-			return "", fmt.Errorf("RDT disabled, refusing to set RDT class of container %q to %q", containerName, cls)
-		}
-	}
 	return cls, nil
 }
