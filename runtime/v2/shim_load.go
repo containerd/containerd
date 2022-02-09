@@ -89,32 +89,17 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 			continue
 		}
 
-		var (
-			runtime string
-		)
-
-		// If we're on 1.6+ and specified custom path to the runtime binary, path will be saved in 'runtime' file.
-		if data, err := os.ReadFile(filepath.Join(bundle.Path, "runtime")); err == nil {
-			runtime = string(data)
-		} else if err != nil && !os.IsNotExist(err) {
-			log.G(ctx).WithError(err).Error("failed to read `runtime` path from bundle")
-		}
-
-		// Query runtime name from metadata store
-		if runtime == "" {
-			container, err := m.containers.Get(ctx, id)
-			if err != nil {
-				log.G(ctx).WithError(err).Errorf("loading container %s", id)
-				if err := mount.UnmountAll(filepath.Join(bundle.Path, "rootfs"), 0); err != nil {
-					log.G(ctx).WithError(err).Errorf("failed to unmount of rootfs %s", id)
-				}
-				bundle.Delete()
-				continue
+		container, err := m.containers.Get(ctx, id)
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("loading container %s", id)
+			if err := mount.UnmountAll(filepath.Join(bundle.Path, "rootfs"), 0); err != nil {
+				log.G(ctx).WithError(err).Errorf("failed to unmount of rootfs %s", id)
 			}
-			runtime = container.Runtime.Name
+			bundle.Delete()
+			continue
 		}
 
-		runtime, err = m.resolveRuntimePath(runtime)
+		runtime, err := m.resolveRuntimePath(container.Runtime.Name)
 		if err != nil {
 			bundle.Delete()
 			log.G(ctx).WithError(err).Error("failed to resolve runtime path")
