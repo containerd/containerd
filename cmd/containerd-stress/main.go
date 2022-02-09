@@ -36,8 +36,6 @@ import (
 	"github.com/urfave/cli"
 )
 
-const imageName = "docker.io/library/alpine:latest"
-
 var (
 	ct              metrics.LabeledTimer
 	execTimer       metrics.LabeledTimer
@@ -136,6 +134,11 @@ func main() {
 			Name:  "exec",
 			Usage: "add execs to the stress tests",
 		},
+		cli.StringFlag{
+			Name:  "image,i",
+			Value: "docker.io/library/alpine:latest",
+			Usage: "image to be utilized for testing",
+		},
 		cli.BoolFlag{
 			Name:  "json,j",
 			Usage: "output results in json format",
@@ -173,6 +176,7 @@ func main() {
 			Duration:    context.GlobalDuration("duration"),
 			Concurrency: context.GlobalInt("concurrent"),
 			Exec:        context.GlobalBool("exec"),
+			Image:       context.GlobalString("image"),
 			JSON:        context.GlobalBool("json"),
 			Metrics:     context.GlobalString("metrics"),
 			Runtime:     context.GlobalString("runtime"),
@@ -194,6 +198,7 @@ type config struct {
 	Duration    time.Duration
 	Address     string
 	Exec        bool
+	Image       string
 	JSON        bool
 	Metrics     string
 	Runtime     string
@@ -228,8 +233,8 @@ func test(c config) error {
 	if err := cleanup(ctx, client); err != nil {
 		return err
 	}
-	logrus.Infof("pulling %s", imageName)
-	image, err := client.Pull(ctx, imageName, containerd.WithPullUnpack, containerd.WithPullSnapshotter(c.Snapshotter))
+	logrus.Infof("pulling %s", c.Image)
+	image, err := client.Pull(ctx, c.Image, containerd.WithPullUnpack, containerd.WithPullSnapshotter(c.Snapshotter))
 	if err != nil {
 		return err
 	}
