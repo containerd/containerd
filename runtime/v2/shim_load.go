@@ -93,8 +93,8 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 			runtime string
 		)
 
-		// If we're on 1.6+ and specified custom path to the runtime binary, path will be saved in 'runtime' file.
-		if data, err := os.ReadFile(filepath.Join(bundle.Path, "runtime")); err == nil {
+		// If we're on 1.6+ and specified custom path to the runtime binary, path will be saved in 'shim-binary-path' file.
+		if data, err := os.ReadFile(filepath.Join(bundle.Path, "shim-binary-path")); err == nil {
 			runtime = string(data)
 		} else if err != nil && !os.IsNotExist(err) {
 			log.G(ctx).WithError(err).Error("failed to read `runtime` path from bundle")

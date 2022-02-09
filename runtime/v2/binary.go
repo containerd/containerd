@@ -129,7 +129,7 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 		f.Close()
 	}
 	// Save runtime binary path for restore.
-	if err := os.WriteFile(filepath.Join(b.bundle.Path, "runtime"), []byte(b.runtime), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(b.bundle.Path, "shim-binary-path"), []byte(b.runtime), 0600); err != nil {
 		return nil, err
 	}
 	client := ttrpc.NewClient(conn, ttrpc.WithOnClose(onCloseWithShimLog))
