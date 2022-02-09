@@ -70,7 +70,7 @@ func serveListener(path string) (net.Listener, error) {
 	return l, nil
 }
 
-func handleSignals(ctx context.Context, logger *logrus.Entry, signals chan os.Signal) error {
+func reap(ctx context.Context, logger *logrus.Entry, signals chan os.Signal) error {
 	logger.Info("starting signal loop")
 
 	for {
@@ -78,6 +78,8 @@ func handleSignals(ctx context.Context, logger *logrus.Entry, signals chan os.Si
 		case <-ctx.Done():
 			return ctx.Err()
 		case s := <-signals:
+			// Exit signals are handled separately from this loop
+			// They get registered with this channel so that we can ignore such signals for short-running actions (e.g. `delete`)
 			switch s {
 			case unix.SIGCHLD:
 				if err := reaper.Reap(); err != nil {
@@ -85,6 +87,22 @@ func handleSignals(ctx context.Context, logger *logrus.Entry, signals chan os.Si
 				}
 			case unix.SIGPIPE:
 			}
+		}
+	}
+}
+
+func handleExitSignals(ctx context.Context, logger *logrus.Entry, cancel context.CancelFunc) {
+	ch := make(chan os.Signal, 32)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+
+	for {
+		select {
+		case s := <-ch:
+			logger.WithField("signal", s).Debugf("Caught exit signal")
+			cancel()
+			return
+		case <-ctx.Done():
+			return
 		}
 	}
 }
