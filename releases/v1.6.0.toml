@@ -8,7 +8,7 @@ match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
 # previous release
 previous = "v1.5.0"
 
-pre_release = true
+pre_release = false
 
 preface = """\
 The seventh major release of containerd includes many improvements and added
@@ -58,5 +58,21 @@ support to increase overall compatibility and stability.
 
 * **Allow WithServices to use custom implementations** ([#5709](https://github.com/containerd/containerd/pull/5709))
 * **Support custom compressor for walking differ** ([#5735](https://github.com/containerd/containerd/pull/5735))
+
+### Release Updates
+
+#### containerd/CNI/runc/critools tar bundle
+
+The tar bundles released as `cri-containerd-*.tar.gz` contain a build of runc
+linked with a newer version of libseccomp. This dynamically-linked build of runc
+was built on Ubuntu 18.04 and will not work on some other distributions, such as
+RHEL 7 and Debian 10. Users of such distributions may get a statically-linked
+runc binary from https://github.com/opencontainers/runc/releases or build runc
+for their own environment.
+
+> **_Deprecation_** These tar bundles are now deprecated and will be removed or
+> replaced in containerd 2.0. Projects relying on these tar bundles should use
+> the `containerd-*.tar.gz` bundles or work with the containerd community on a
+> suitable replacement in containerd 2.0.
 
 See the changelog for complete list of changes"""

@@ -100,21 +100,23 @@ The current state is available in the following tables:
 | [1.1](https://github.com/containerd/containerd/releases/tag/v1.1.8)  | End of Life | April 23, 2018  | October 23, 2019 |
 | [1.2](https://github.com/containerd/containerd/releases/tag/v1.2.13) | End of Life | October 24, 2018 | October 15, 2020 |
 | [1.3](https://github.com/containerd/containerd/releases/tag/v1.3.10) | End of Life | September 26, 2019  | March 4, 2021 |
-| [1.4](https://github.com/containerd/containerd/releases/tag/v1.4.12) | Extended   | August 17, 2020 | November 3, 2021 (Active), March 3, 2022 (Extended) |
-| [1.5](https://github.com/containerd/containerd/releases/tag/v1.5.9)  | Active   | May 3, 2021  | max(May 3, 2022, release of 1.6.0 + 6 months) |
-| [1.6](https://github.com/containerd/containerd/milestone/34)         | Next   | TBD  | max(TBD+1 year, release of 1.7.0 or 2.0.0 + 6 months) |
+| [1.4](https://github.com/containerd/containerd/releases/tag/v1.4.12) | Extended   | August 17, 2020 | March 3, 2022 (Extended) |
+| [1.5](https://github.com/containerd/containerd/releases/tag/v1.5.9)  | Active   | May 3, 2021  | October 28, 2022 |
+| [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.0)  | Active   | February 15, 2022  | max(February 15, 2023 or release of 1.7.0 + 6 months) |
+| [1.7](https://github.com/containerd/containerd/milestone/42)         | Next   | TBD  | TBD |
 
 Note that branches and release from before 1.0 may not follow these rules.
 
-| CRI-Containerd Version | Containerd Version | Kubernetes Version | CRI Version |
-|------------------------|--------------------|--------------------|-------------|
-| v1.0.0-alpha.x   |                    | 1.7, 1.8    | v1alpha1 |
-| v1.0.0-beta.x    |                    | 1.9         | v1alpha1 |
-| End-Of-Life      | v1.1 (End-Of-Life) | 1.10+       | v1alpha2 |
-|                  | v1.2 (End-Of-Life) | 1.10+       | v1alpha2 |
-|                  | v1.3 (End-Of-Life) | 1.12+       | v1alpha2 |
-|                  | v1.4               | 1.19+       | v1alpha2 |
-|                  | v1.5               | 1.20+       | v1alpha2 |
+| CRI-Containerd Version | Containerd Version | Kubernetes Version | CRI Version  |
+|------------------------|--------------------|--------------------|--------------|
+| v1.0.0-alpha.x         |                    | 1.7, 1.8           | v1alpha1     |
+| v1.0.0-beta.x          |                    | 1.9                | v1alpha1     |
+| End-Of-Life            | v1.1 (End-Of-Life) | 1.10+              | v1alpha2     |
+|                        | v1.2 (End-Of-Life) | 1.10+              | v1alpha2     |
+|                        | v1.3 (End-Of-Life) | 1.12+              | v1alpha2     |
+|                        | v1.4               | 1.19+              | v1alpha2     |
+|                        | v1.5               | 1.20+              | v1alpha2     |
+|                        | v1.6               | 1.23+              | v1, v1alpha2 |
 
 **Note:** The support table above specifies the Kubernetes Version that was supported at time of release of the containerd - cri integration and Kubernetes only supports n-3 minor release versions.
 
@@ -193,9 +195,9 @@ containerd versions:
 | GRPC API         | Stable   | 1.0                | [gRPC API](#grpc-api) |
 | Metrics API      | Stable   | 1.0                | - |
 | Runtime Shim API | Stable   | 1.2                | - |
-| Daemon Config    | Stable   | 1.0			       | - |
+| Daemon Config    | Stable   | 1.0                | - |
+| CRI GRPC API     | Stable   | 1.6 (_CRI v1_)     | [cri-api](https://github.com/kubernetes/cri-api/tree/master/pkg/apis/runtime/v1) |
 | Go client API    | Unstable | _future_           | [godoc](https://godoc.org/github.com/containerd/containerd) |
-| CRI GRPC API     | Unstable | v1alpha2 _current_ | [cri-api](https://github.com/kubernetes/cri-api/tree/master/pkg/apis/runtime/v1alpha2) |
 | `ctr` tool       | Unstable | Out of scope       | - |
 
 From the version stated in the above table, that component must adhere to the
@@ -334,9 +336,10 @@ against total impact.
 
 The deprecated features are shown in the following table:
 
-| Component                                                            | Deprecation release | Target release for removal | Recommendation                |
-|----------------------------------------------------------------------|---------------------|----------------------------|-------------------------------|
-| Runtime V1 API and implementation (`io.containerd.runtime.v1.linux`) | containerd v1.4     | containerd v2.0            | Use `io.containerd.runc.v2`   |
-| Runc V1 implementation of Runtime V2 (`io.containerd.runc.v1`)       | containerd v1.4     | containerd v2.0            | Use `io.containerd.runc.v2`   |
-| config.toml `version = 1`                                            | containerd v1.5     | containerd v2.0            | Use config.toml `version = 2` |
-| Built-in `aufs` snapshotter                                          | containerd v1.5     | containerd v2.0            | Use `overlayfs` snapshotter   |
+| Component                                                            | Deprecation release | Target release for removal | Recommendation                    |
+|----------------------------------------------------------------------|---------------------|----------------------------|-----------------------------------|
+| Runtime V1 API and implementation (`io.containerd.runtime.v1.linux`) | containerd v1.4     | containerd v2.0            | Use `io.containerd.runc.v2`       |
+| Runc V1 implementation of Runtime V2 (`io.containerd.runc.v1`)       | containerd v1.4     | containerd v2.0            | Use `io.containerd.runc.v2`       |
+| config.toml `version = 1`                                            | containerd v1.5     | containerd v2.0            | Use config.toml `version = 2`     |
+| Built-in `aufs` snapshotter                                          | containerd v1.5     | containerd v2.0            | Use `overlayfs` snapshotter       |
+| `cri-containerd-*.tar.gz` release bundles                            | containerd v1.6     | containerd v2.0            | Use `containerd-*.tar.gz` bundles |
