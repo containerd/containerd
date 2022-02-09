@@ -108,15 +108,21 @@ func (c *controllerLocal) Start(ctx context.Context, in *api.ControllerStartRequ
 
 	svc := task.NewSandboxClient(shim.Client())
 
-	_, err = svc.StartSandbox(ctx, &proto.StartSandboxRequest{
-		SandboxID: in.SandboxID,
+	resp, err := svc.StartSandbox(ctx, &proto.StartSandboxRequest{
+		SandboxID:  in.SandboxID,
+		BundlePath: shim.Bundle(),
+		Rootfs:     in.Rootfs,
+		Options:    in.Options,
 	})
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to start sandbox %s: %w", in.SandboxID, err)
 	}
 
-	return &api.ControllerStartResponse{}, nil
+	return &api.ControllerStartResponse{
+		SandboxID: in.SandboxID,
+		Pid:       resp.Pid,
+	}, nil
 }
 
 func (c *controllerLocal) Shutdown(ctx context.Context, in *api.ControllerShutdownRequest, opts ...grpc.CallOption) (*api.ControllerShutdownResponse, error) {
@@ -127,7 +133,7 @@ func (c *controllerLocal) Shutdown(ctx context.Context, in *api.ControllerShutdo
 
 	if _, err := svc.StopSandbox(ctx, &proto.StopSandboxRequest{
 		SandboxID:   in.SandboxID,
-		TimeoutSecs: 0,
+		TimeoutSecs: in.TimeoutSecs,
 	}); err != nil {
 		return nil, fmt.Errorf("failed to stop sandbox: %w", err)
 	}
@@ -137,6 +143,26 @@ func (c *controllerLocal) Shutdown(ctx context.Context, in *api.ControllerShutdo
 	}
 
 	return &api.ControllerShutdownResponse{}, nil
+}
+
+func (c *controllerLocal) Wait(ctx context.Context, in *api.ControllerWaitRequest, opts ...grpc.CallOption) (*api.ControllerWaitResponse, error) {
+	svc, err := c.getSandbox(ctx, in.SandboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := svc.WaitSandbox(ctx, &proto.WaitSandboxRequest{
+		SandboxID: in.SandboxID,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to wait sandbox %s: %w", in.SandboxID, err)
+	}
+
+	return &api.ControllerWaitResponse{
+		ExitStatus: resp.ExitStatus,
+		ExitedAt:   resp.ExitedAt,
+	}, nil
 }
 
 func (c *controllerLocal) Pause(ctx context.Context, in *api.ControllerPauseRequest, opts ...grpc.CallOption) (*api.ControllerPauseResponse, error) {
@@ -195,7 +221,14 @@ func (c *controllerLocal) Status(ctx context.Context, in *api.ControllerStatusRe
 		return nil, fmt.Errorf("failed to query sandbox %s status: %w", in.SandboxID, err)
 	}
 
-	return &api.ControllerStatusResponse{Status: resp.Status}, nil
+	return &api.ControllerStatusResponse{
+		ID:         resp.ID,
+		Pid:        resp.Pid,
+		State:      resp.State,
+		ExitStatus: resp.ExitStatus,
+		ExitedAt:   resp.ExitedAt,
+		Extra:      resp.Extra,
+	}, nil
 }
 
 func (c *controllerLocal) getSandbox(ctx context.Context, id string) (task.SandboxService, error) {

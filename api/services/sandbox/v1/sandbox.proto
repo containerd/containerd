@@ -25,9 +25,12 @@ syntax = "proto3";
 // See proposal and discussion here: https://github.com/containerd/containerd/issues/4131
 package containerd.services.sandbox.v1;
 
-import weak "gogoproto/gogo.proto";
 import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+import weak "gogoproto/gogo.proto";
+
 import "github.com/containerd/containerd/api/types/sandbox.proto";
+import "github.com/containerd/containerd/api/types/mount.proto";
 
 option go_package = "github.com/containerd/containerd/api/services/sandbox/v1;sandbox";
 
@@ -85,6 +88,7 @@ message StoreGetResponse {
 service Controller {
 	rpc Start(ControllerStartRequest) returns (ControllerStartResponse);
 	rpc Shutdown(ControllerShutdownRequest) returns (ControllerShutdownResponse);
+	rpc Wait(ControllerWaitRequest) returns (ControllerWaitResponse);
 	rpc Pause(ControllerPauseRequest) returns (ControllerPauseResponse);
 	rpc Resume(ControllerResumeRequest) returns (ControllerResumeResponse);
 	rpc Ping(ControllerPingRequest) returns (ControllerPingResponse);
@@ -93,17 +97,30 @@ service Controller {
 
 message ControllerStartRequest {
 	string sandbox_id = 1;
-	google.protobuf.Any spec = 4;
+	repeated containerd.types.Mount rootfs = 2;
+	google.protobuf.Any options = 3;
 }
 
 message ControllerStartResponse {
+	string sandbox_id = 1;
+	uint32 pid = 2;
 }
 
 message ControllerShutdownRequest {
 	string sandbox_id = 1;
+	uint32 timeout_secs = 2;
 }
 
 message ControllerShutdownResponse {}
+
+message ControllerWaitRequest {
+	string sandbox_id = 1;
+}
+
+message ControllerWaitResponse {
+	uint32 exit_status = 1;
+	google.protobuf.Timestamp exited_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}
 
 message ControllerPauseRequest {
 	string sandbox_id = 1;
@@ -128,5 +145,10 @@ message ControllerStatusRequest {
 }
 
 message ControllerStatusResponse {
-	google.protobuf.Any status = 1;
+	string id = 1;
+	uint32 pid = 2;
+	string state = 3;
+	uint32 exit_status = 4;
+	google.protobuf.Timestamp exited_at = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Any extra = 6;
 }

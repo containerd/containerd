@@ -73,6 +73,12 @@ func (p *pauseService) StopSandbox(ctx context.Context, req *api.StopSandboxRequ
 	return &api.StopSandboxResponse{}, nil
 }
 
+func (p *pauseService) WaitSandbox(ctx context.Context, req *api.WaitSandboxRequest) (*api.WaitSandboxResponse, error) {
+	return &api.WaitSandboxResponse{
+		ExitStatus: 0,
+	}, nil
+}
+
 func (p *pauseService) UpdateSandbox(ctx context.Context, req *api.UpdateSandboxRequest) (*api.UpdateSandboxResponse, error) {
 	log.Debugf("update sandbox request: %+v", req)
 	return &api.UpdateSandboxResponse{}, nil

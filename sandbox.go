@@ -18,6 +18,7 @@ package containerd
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/containerd/containerd/containers"
@@ -32,6 +33,8 @@ import (
 type Sandbox interface {
 	// ID is a sandbox identifier
 	ID() string
+	// PID returns sandbox's process PID or error if its not yet started.
+	PID() (uint32, error)
 	// NewContainer creates new container that will belong to this sandbox
 	NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error)
 	// Labels returns the labels set on the sandbox
@@ -40,25 +43,34 @@ type Sandbox interface {
 	Start(ctx context.Context) error
 	// Stop sends stop request to the shim instance.
 	Stop(ctx context.Context) error
+	// Wait blocks until sandbox process exits.
+	Wait(ctx context.Context) (<-chan ExitStatus, error)
 	// Delete removes sandbox from the metadata store.
 	Delete(ctx context.Context) error
 	// Pause will freeze running sandbox instance
 	Pause(ctx context.Context) error
 	// Resume will unfreeze previously paused sandbox instance
 	Resume(ctx context.Context) error
-	// Status will return current sandbox status (provided by shim runtime)
-	Status(ctx context.Context, status interface{}) error
 	// Ping will check whether existing sandbox instance alive
 	Ping(ctx context.Context) error
 }
 
 type sandboxClient struct {
+	pid      *uint32
 	client   *Client
 	metadata api.Sandbox
 }
 
 func (s *sandboxClient) ID() string {
 	return s.metadata.ID
+}
+
+func (s *sandboxClient) PID() (uint32, error) {
+	if s.pid == nil {
+		return 0, fmt.Errorf("sandbox not started")
+	}
+
+	return *s.pid, nil
 }
 
 func (s *sandboxClient) NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error) {
@@ -75,7 +87,36 @@ func (s *sandboxClient) Labels(ctx context.Context) (map[string]string, error) {
 }
 
 func (s *sandboxClient) Start(ctx context.Context) error {
-	return s.client.SandboxController().Start(ctx, s.ID())
+	pid, err := s.client.SandboxController().Start(ctx, s.ID())
+	if err != nil {
+		return err
+	}
+
+	s.pid = &pid
+	return nil
+}
+
+func (s *sandboxClient) Wait(ctx context.Context) (<-chan ExitStatus, error) {
+	c := make(chan ExitStatus, 1)
+	go func() {
+		defer close(c)
+
+		resp, err := s.client.SandboxController().Wait(ctx, s.ID())
+		if err != nil {
+			c <- ExitStatus{
+				code: UnknownExitStatus,
+				err:  err,
+			}
+			return
+		}
+
+		c <- ExitStatus{
+			code:     resp.ExitStatus,
+			exitedAt: resp.ExitedAt,
+		}
+	}()
+
+	return c, nil
 }
 
 func (s *sandboxClient) Stop(ctx context.Context) error {
@@ -96,19 +137,6 @@ func (s *sandboxClient) Resume(ctx context.Context) error {
 
 func (s *sandboxClient) Ping(ctx context.Context) error {
 	return s.client.SandboxController().Ping(ctx, s.ID())
-}
-
-func (s *sandboxClient) Status(ctx context.Context, status interface{}) error {
-	any, err := s.client.SandboxController().Status(ctx, s.ID())
-	if err != nil {
-		return err
-	}
-
-	if err := typeurl.UnmarshalTo(any, status); err != nil {
-		return errors.Wrap(err, "failed to unmarshal sandbox status")
-	}
-
-	return nil
 }
 
 // NewSandbox creates new sandbox client
@@ -135,6 +163,7 @@ func (c *Client) NewSandbox(ctx context.Context, sandboxID string, opts ...NewSa
 	}
 
 	return &sandboxClient{
+		pid:      nil, // Not yet started
 		client:   c,
 		metadata: metadata,
 	}, nil
@@ -147,7 +176,13 @@ func (c *Client) LoadSandbox(ctx context.Context, id string) (Sandbox, error) {
 		return nil, err
 	}
 
+	status, err := c.SandboxController().Status(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load sandbox %s, status request failed: %w", id, err)
+	}
+
 	return &sandboxClient{
+		pid:      &status.Pid,
 		client:   c,
 		metadata: sandbox,
 	}, nil

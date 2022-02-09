@@ -19,7 +19,7 @@ package sandbox
 import (
 	"context"
 
-	"github.com/gogo/protobuf/types"
+	"github.com/containerd/containerd/api/services/sandbox/v1"
 )
 
 // Controller is an interface to manage sandboxes at runtime.
@@ -44,9 +44,11 @@ type Controller interface {
 	// containerd will run new shim runtime instance and will invoke Start to create a sandbox process.
 	// This routine must be invoked before scheduling containers on this instance.
 	// Once started clients may run containers via Task service (additionally specifying sandbox id the container will belong to).
-	Start(ctx context.Context, sandboxID string) error
+	Start(ctx context.Context, sandboxID string) (uint32, error)
 	// Shutdown deletes and cleans all tasks and sandbox instance.
 	Shutdown(ctx context.Context, sandboxID string) error
+	// Wait blocks until sandbox process exits.
+	Wait(ctx context.Context, sandboxID string) (*sandbox.ControllerWaitResponse, error)
 	// Pause will freeze running sandbox instance.
 	// Shim implementations may return ErrNotImplemented if this is out of scope of a given sandbox.
 	Pause(ctx context.Context, sandboxID string) error
@@ -57,5 +59,5 @@ type Controller interface {
 	Ping(ctx context.Context, sandboxID string) error
 	// Status will query sandbox process status. It is heavier than Ping call and must be used whenever you need to
 	// gather metadata about current sandbox state (status, uptime, resource use, etc).
-	Status(ctx context.Context, sandboxID string) (*types.Any, error)
+	Status(ctx context.Context, sandboxID string) (*sandbox.ControllerStatusResponse, error)
 }

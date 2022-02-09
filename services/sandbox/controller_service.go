@@ -78,6 +78,11 @@ func (s *controllerService) Shutdown(ctx context.Context, req *api.ControllerShu
 	return s.local.Shutdown(ctx, req)
 }
 
+func (s *controllerService) Wait(ctx context.Context, req *api.ControllerWaitRequest) (*api.ControllerWaitResponse, error) {
+	log.G(ctx).WithField("req", req).Debug("wait sandbox")
+	return s.local.Wait(ctx, req)
+}
+
 func (s *controllerService) Pause(ctx context.Context, req *api.ControllerPauseRequest) (*api.ControllerPauseResponse, error) {
 	log.G(ctx).WithField("req", req).Debug("pause sandbox")
 	return s.local.Pause(ctx, req)

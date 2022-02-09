@@ -6,21 +6,25 @@ package task
 import (
 	context "context"
 	fmt "fmt"
+	types "github.com/containerd/containerd/api/types"
 	github_com_containerd_ttrpc "github.com/containerd/ttrpc"
 	proto "github.com/gogo/protobuf/proto"
 	github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
-	types "github.com/gogo/protobuf/types"
+	github_com_gogo_protobuf_types "github.com/gogo/protobuf/types"
+	types1 "github.com/gogo/protobuf/types"
 	io "io"
 	math "math"
 	math_bits "math/bits"
 	reflect "reflect"
 	strings "strings"
+	time "time"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
+var _ = time.Kitchen
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -29,11 +33,13 @@ var _ = math.Inf
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 type StartSandboxRequest struct {
-	SandboxID            string   `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
-	BundlePath           string   `protobuf:"bytes,2,opt,name=bundle_path,json=bundlePath,proto3" json:"bundle_path,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
+	SandboxID            string         `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
+	BundlePath           string         `protobuf:"bytes,2,opt,name=bundle_path,json=bundlePath,proto3" json:"bundle_path,omitempty"`
+	Rootfs               []*types.Mount `protobuf:"bytes,3,rep,name=rootfs,proto3" json:"rootfs,omitempty"`
+	Options              *types1.Any    `protobuf:"bytes,4,opt,name=options,proto3" json:"options,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}       `json:"-"`
+	XXX_unrecognized     []byte         `json:"-"`
+	XXX_sizecache        int32          `json:"-"`
 }
 
 func (m *StartSandboxRequest) Reset()      { *m = StartSandboxRequest{} }
@@ -69,7 +75,7 @@ func (m *StartSandboxRequest) XXX_DiscardUnknown() {
 var xxx_messageInfo_StartSandboxRequest proto.InternalMessageInfo
 
 type StartSandboxResponse struct {
-	Pid                  string   `protobuf:"bytes,1,opt,name=pid,proto3" json:"pid,omitempty"`
+	Pid                  uint32   `protobuf:"varint,1,opt,name=pid,proto3" json:"pid,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -187,7 +193,7 @@ var xxx_messageInfo_StopSandboxResponse proto.InternalMessageInfo
 
 type UpdateSandboxRequest struct {
 	SandboxID            string            `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
-	Resources            *types.Any        `protobuf:"bytes,2,opt,name=resources,proto3" json:"resources,omitempty"`
+	Resources            *types1.Any       `protobuf:"bytes,2,opt,name=resources,proto3" json:"resources,omitempty"`
 	Annotations          map[string]string `protobuf:"bytes,3,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
 	XXX_unrecognized     []byte            `json:"-"`
@@ -226,6 +232,85 @@ func (m *UpdateSandboxRequest) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_UpdateSandboxRequest proto.InternalMessageInfo
 
+type WaitSandboxRequest struct {
+	SandboxID            string   `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *WaitSandboxRequest) Reset()      { *m = WaitSandboxRequest{} }
+func (*WaitSandboxRequest) ProtoMessage() {}
+func (*WaitSandboxRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_1a2e6d1f55947a07, []int{5}
+}
+func (m *WaitSandboxRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *WaitSandboxRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_WaitSandboxRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *WaitSandboxRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WaitSandboxRequest.Merge(m, src)
+}
+func (m *WaitSandboxRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *WaitSandboxRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_WaitSandboxRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_WaitSandboxRequest proto.InternalMessageInfo
+
+type WaitSandboxResponse struct {
+	ExitStatus           uint32    `protobuf:"varint,1,opt,name=exit_status,json=exitStatus,proto3" json:"exit_status,omitempty"`
+	ExitedAt             time.Time `protobuf:"bytes,2,opt,name=exited_at,json=exitedAt,proto3,stdtime" json:"exited_at"`
+	XXX_NoUnkeyedLiteral struct{}  `json:"-"`
+	XXX_unrecognized     []byte    `json:"-"`
+	XXX_sizecache        int32     `json:"-"`
+}
+
+func (m *WaitSandboxResponse) Reset()      { *m = WaitSandboxResponse{} }
+func (*WaitSandboxResponse) ProtoMessage() {}
+func (*WaitSandboxResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_1a2e6d1f55947a07, []int{6}
+}
+func (m *WaitSandboxResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *WaitSandboxResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_WaitSandboxResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *WaitSandboxResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WaitSandboxResponse.Merge(m, src)
+}
+func (m *WaitSandboxResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *WaitSandboxResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_WaitSandboxResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_WaitSandboxResponse proto.InternalMessageInfo
+
 type UpdateSandboxResponse struct {
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
@@ -235,7 +320,7 @@ type UpdateSandboxResponse struct {
 func (m *UpdateSandboxResponse) Reset()      { *m = UpdateSandboxResponse{} }
 func (*UpdateSandboxResponse) ProtoMessage() {}
 func (*UpdateSandboxResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_1a2e6d1f55947a07, []int{5}
+	return fileDescriptor_1a2e6d1f55947a07, []int{7}
 }
 func (m *UpdateSandboxResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -274,7 +359,7 @@ type SandboxStatusRequest struct {
 func (m *SandboxStatusRequest) Reset()      { *m = SandboxStatusRequest{} }
 func (*SandboxStatusRequest) ProtoMessage() {}
 func (*SandboxStatusRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_1a2e6d1f55947a07, []int{6}
+	return fileDescriptor_1a2e6d1f55947a07, []int{8}
 }
 func (m *SandboxStatusRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -313,7 +398,7 @@ type PauseSandboxRequest struct {
 func (m *PauseSandboxRequest) Reset()      { *m = PauseSandboxRequest{} }
 func (*PauseSandboxRequest) ProtoMessage() {}
 func (*PauseSandboxRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_1a2e6d1f55947a07, []int{7}
+	return fileDescriptor_1a2e6d1f55947a07, []int{9}
 }
 func (m *PauseSandboxRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -351,7 +436,7 @@ type PauseSandboxResponse struct {
 func (m *PauseSandboxResponse) Reset()      { *m = PauseSandboxResponse{} }
 func (*PauseSandboxResponse) ProtoMessage() {}
 func (*PauseSandboxResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_1a2e6d1f55947a07, []int{8}
+	return fileDescriptor_1a2e6d1f55947a07, []int{10}
 }
 func (m *PauseSandboxResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -390,7 +475,7 @@ type ResumeSandboxRequest struct {
 func (m *ResumeSandboxRequest) Reset()      { *m = ResumeSandboxRequest{} }
 func (*ResumeSandboxRequest) ProtoMessage() {}
 func (*ResumeSandboxRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_1a2e6d1f55947a07, []int{9}
+	return fileDescriptor_1a2e6d1f55947a07, []int{11}
 }
 func (m *ResumeSandboxRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -428,7 +513,7 @@ type ResumeSandboxResponse struct {
 func (m *ResumeSandboxResponse) Reset()      { *m = ResumeSandboxResponse{} }
 func (*ResumeSandboxResponse) ProtoMessage() {}
 func (*ResumeSandboxResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_1a2e6d1f55947a07, []int{10}
+	return fileDescriptor_1a2e6d1f55947a07, []int{12}
 }
 func (m *ResumeSandboxResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -458,16 +543,21 @@ func (m *ResumeSandboxResponse) XXX_DiscardUnknown() {
 var xxx_messageInfo_ResumeSandboxResponse proto.InternalMessageInfo
 
 type SandboxStatusResponse struct {
-	Status               *types.Any `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}   `json:"-"`
-	XXX_unrecognized     []byte     `json:"-"`
-	XXX_sizecache        int32      `json:"-"`
+	ID                   string      `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Pid                  uint32      `protobuf:"varint,2,opt,name=pid,proto3" json:"pid,omitempty"`
+	State                string      `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
+	ExitStatus           uint32      `protobuf:"varint,4,opt,name=exit_status,json=exitStatus,proto3" json:"exit_status,omitempty"`
+	ExitedAt             time.Time   `protobuf:"bytes,5,opt,name=exited_at,json=exitedAt,proto3,stdtime" json:"exited_at"`
+	Extra                *types1.Any `protobuf:"bytes,6,opt,name=extra,proto3" json:"extra,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}    `json:"-"`
+	XXX_unrecognized     []byte      `json:"-"`
+	XXX_sizecache        int32       `json:"-"`
 }
 
 func (m *SandboxStatusResponse) Reset()      { *m = SandboxStatusResponse{} }
 func (*SandboxStatusResponse) ProtoMessage() {}
 func (*SandboxStatusResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_1a2e6d1f55947a07, []int{11}
+	return fileDescriptor_1a2e6d1f55947a07, []int{13}
 }
 func (m *SandboxStatusResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -506,7 +596,7 @@ type PingRequest struct {
 func (m *PingRequest) Reset()      { *m = PingRequest{} }
 func (*PingRequest) ProtoMessage() {}
 func (*PingRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_1a2e6d1f55947a07, []int{12}
+	return fileDescriptor_1a2e6d1f55947a07, []int{14}
 }
 func (m *PingRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -544,7 +634,7 @@ type PingResponse struct {
 func (m *PingResponse) Reset()      { *m = PingResponse{} }
 func (*PingResponse) ProtoMessage() {}
 func (*PingResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_1a2e6d1f55947a07, []int{13}
+	return fileDescriptor_1a2e6d1f55947a07, []int{15}
 }
 func (m *PingResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -580,6 +670,8 @@ func init() {
 	proto.RegisterType((*StopSandboxResponse)(nil), "containerd.task.v2.StopSandboxResponse")
 	proto.RegisterType((*UpdateSandboxRequest)(nil), "containerd.task.v2.UpdateSandboxRequest")
 	proto.RegisterMapType((map[string]string)(nil), "containerd.task.v2.UpdateSandboxRequest.AnnotationsEntry")
+	proto.RegisterType((*WaitSandboxRequest)(nil), "containerd.task.v2.WaitSandboxRequest")
+	proto.RegisterType((*WaitSandboxResponse)(nil), "containerd.task.v2.WaitSandboxResponse")
 	proto.RegisterType((*UpdateSandboxResponse)(nil), "containerd.task.v2.UpdateSandboxResponse")
 	proto.RegisterType((*SandboxStatusRequest)(nil), "containerd.task.v2.SandboxStatusRequest")
 	proto.RegisterType((*PauseSandboxRequest)(nil), "containerd.task.v2.PauseSandboxRequest")
@@ -596,44 +688,57 @@ func init() {
 }
 
 var fileDescriptor_1a2e6d1f55947a07 = []byte{
-	// 588 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x54, 0x4d, 0x6f, 0xda, 0x40,
-	0x10, 0x8d, 0x41, 0x49, 0xc5, 0x18, 0xaa, 0x68, 0x63, 0x1a, 0xea, 0x83, 0xa1, 0x3e, 0x34, 0x54,
-	0x8a, 0x6c, 0xc9, 0xbd, 0xf4, 0x43, 0x8a, 0x94, 0x34, 0x39, 0xe4, 0x86, 0x8c, 0x7a, 0xaa, 0x54,
-	0xb4, 0xe0, 0x2d, 0x58, 0xc0, 0xae, 0xeb, 0x5d, 0xa3, 0x72, 0xeb, 0x9f, 0xe8, 0x2f, 0xe9, 0x9f,
-	0xc8, 0xb1, 0xc7, 0x9e, 0xaa, 0x86, 0x5f, 0x52, 0x99, 0x5d, 0x84, 0xa1, 0x1b, 0x25, 0x0a, 0xb7,
-	0x65, 0x79, 0xfb, 0xde, 0xcc, 0x9b, 0x37, 0x86, 0xb3, 0x61, 0x2c, 0x46, 0x59, 0xdf, 0x1b, 0xb0,
-	0xa9, 0x3f, 0x60, 0x54, 0xe0, 0x98, 0x92, 0x34, 0x2a, 0x1e, 0xd3, 0x8c, 0x8a, 0x78, 0x4a, 0xfc,
-	0x59, 0xe0, 0x0b, 0xcc, 0xc7, 0x3e, 0xc7, 0x34, 0xea, 0xb3, 0x6f, 0x5e, 0x92, 0x32, 0xc1, 0x10,
-	0x5a, 0x23, 0xbd, 0xfc, 0x6f, 0x6f, 0x16, 0xd8, 0xcf, 0x87, 0x8c, 0x0d, 0x27, 0xc4, 0x5f, 0x22,
-	0xfa, 0xd9, 0x17, 0x1f, 0xd3, 0xb9, 0x84, 0xbb, 0x11, 0x1c, 0x75, 0x05, 0x4e, 0x45, 0x57, 0x92,
-	0x84, 0xe4, 0x6b, 0x46, 0xb8, 0x40, 0xa7, 0x00, 0x8a, 0xb6, 0x17, 0x47, 0x0d, 0xa3, 0x65, 0xb4,
-	0x2b, 0x17, 0xb5, 0xc5, 0x9f, 0x66, 0x45, 0xe1, 0xae, 0x2f, 0xc3, 0x8a, 0x02, 0x5c, 0x47, 0xa8,
-	0x09, 0x66, 0x3f, 0xa3, 0xd1, 0x84, 0xf4, 0x12, 0x2c, 0x46, 0x8d, 0x52, 0x0e, 0x0f, 0x41, 0x5e,
-	0x75, 0xb0, 0x18, 0xb9, 0x6d, 0xb0, 0x36, 0x55, 0x78, 0xc2, 0x28, 0x27, 0xe8, 0x10, 0xca, 0xc9,
-	0x8a, 0x3f, 0xcc, 0x8f, 0x2e, 0x01, 0xd4, 0x15, 0x2c, 0xd9, 0xa9, 0x9c, 0x17, 0x50, 0xcd, 0x0d,
-	0x62, 0x99, 0xe8, 0x71, 0x32, 0xe0, 0xcb, 0x7a, 0x6a, 0xa1, 0xa9, 0xee, 0xba, 0x64, 0xc0, 0xdd,
-	0x7a, 0xde, 0x76, 0x41, 0x46, 0xd6, 0xe3, 0xfe, 0x28, 0x81, 0xf5, 0x31, 0x89, 0xb0, 0x20, 0x3b,
-	0x15, 0x10, 0x40, 0x25, 0x25, 0x9c, 0x65, 0xe9, 0x80, 0x48, 0x75, 0x33, 0xb0, 0x3c, 0x39, 0x03,
-	0x6f, 0x35, 0x03, 0xef, 0x9c, 0xce, 0xc3, 0x35, 0x0c, 0x7d, 0x02, 0x13, 0x53, 0xca, 0x04, 0x16,
-	0x31, 0xa3, 0xbc, 0x51, 0x6e, 0x95, 0xdb, 0x66, 0xf0, 0xd6, 0xfb, 0x7f, 0x9a, 0x9e, 0xae, 0x40,
-	0xef, 0x7c, 0xfd, 0xf6, 0x8a, 0x8a, 0x74, 0x1e, 0x16, 0xd9, 0xec, 0x33, 0x38, 0xdc, 0x06, 0xe4,
-	0xde, 0x8f, 0xc9, 0x7c, 0xe5, 0xfd, 0x98, 0xcc, 0x91, 0x05, 0xfb, 0x33, 0x3c, 0xc9, 0x88, 0x1a,
-	0xa0, 0xfc, 0xf1, 0xae, 0xf4, 0xc6, 0x70, 0x8f, 0xa1, 0xbe, 0xa5, 0xaa, 0x0c, 0xbb, 0x04, 0x4b,
-	0x5d, 0x75, 0x05, 0x16, 0x19, 0x7f, 0x94, 0x5f, 0xee, 0x07, 0x38, 0xea, 0xe0, 0x8c, 0xef, 0x64,
-	0xba, 0xfb, 0x0c, 0xac, 0x4d, 0x92, 0x75, 0x89, 0x21, 0xe1, 0xd9, 0x74, 0x37, 0xf6, 0x63, 0xa8,
-	0x6f, 0xb1, 0x28, 0xfa, 0x2b, 0xa8, 0x6f, 0x39, 0xa0, 0xb2, 0x7d, 0x0a, 0x07, 0x7c, 0x79, 0xb3,
-	0xe4, 0xbe, 0x2b, 0x01, 0x0a, 0xe3, 0xbe, 0x07, 0xb3, 0x13, 0xd3, 0xe1, 0xe3, 0x8a, 0x7b, 0x0a,
-	0x55, 0xf9, 0x58, 0x4a, 0x07, 0x3f, 0xf7, 0xe1, 0x89, 0x02, 0x22, 0x0c, 0xd5, 0xe2, 0xea, 0xa1,
-	0x13, 0x5d, 0xa4, 0x34, 0x9f, 0x00, 0xbb, 0x7d, 0x3f, 0x50, 0x75, 0xfa, 0x19, 0xcc, 0xc2, 0x32,
-	0xa1, 0x97, 0xfa, 0x87, 0xdb, 0x4b, 0x6d, 0x9f, 0xdc, 0x8b, 0x53, 0xfc, 0x11, 0xd4, 0x36, 0xd2,
-	0x87, 0xda, 0x0f, 0x5d, 0x0b, 0xfb, 0xd5, 0x03, 0x90, 0x4a, 0x05, 0x43, 0xb5, 0x98, 0x1f, 0xbd,
-	0x51, 0x9a, 0x98, 0xea, 0x8d, 0xd2, 0x45, 0x31, 0x6f, 0x64, 0x23, 0x44, 0xfa, 0x46, 0x74, 0x69,
-	0xd5, 0x37, 0xa2, 0x4d, 0x64, 0xae, 0xb2, 0x91, 0x48, 0xbd, 0x8a, 0x6e, 0x6d, 0xf5, 0x2a, 0xfa,
-	0x78, 0x77, 0x64, 0x60, 0x57, 0x9d, 0x34, 0xb5, 0x26, 0xac, 0x13, 0x6d, 0xb7, 0xee, 0x06, 0x48,
-	0xc6, 0x8b, 0xc6, 0xcd, 0xad, 0xb3, 0xf7, 0xfb, 0xd6, 0xd9, 0xfb, 0xbe, 0x70, 0x8c, 0x9b, 0x85,
-	0x63, 0xfc, 0x5a, 0x38, 0xc6, 0xdf, 0x85, 0x63, 0xf4, 0x0f, 0x96, 0x2b, 0xf3, 0xfa, 0x5f, 0x00,
-	0x00, 0x00, 0xff, 0xff, 0xb3, 0x37, 0xc5, 0x44, 0x1c, 0x07, 0x00, 0x00,
+	// 790 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x54, 0x4f, 0x6b, 0xfb, 0x46,
+	0x10, 0x8d, 0xe4, 0xc4, 0x89, 0x47, 0x76, 0x09, 0x1b, 0x3b, 0x71, 0x75, 0xb0, 0x5c, 0x1d, 0x1a,
+	0xb7, 0x14, 0x09, 0x5c, 0x28, 0xfd, 0x03, 0x01, 0xbb, 0xe9, 0x21, 0x87, 0x82, 0x91, 0x5b, 0x5a,
+	0x28, 0xd4, 0xac, 0xad, 0x8d, 0x23, 0x12, 0x6b, 0x55, 0xed, 0x2a, 0xc4, 0xb7, 0x7e, 0x84, 0x42,
+	0xe9, 0x47, 0x2a, 0xe4, 0xd8, 0x63, 0x4f, 0x69, 0xe3, 0xcb, 0xef, 0x6b, 0xfc, 0x58, 0xef, 0x3a,
+	0x96, 0x9d, 0xcd, 0x1f, 0xe2, 0xdb, 0x6a, 0xf5, 0xf6, 0xcd, 0xcc, 0x9b, 0x79, 0x03, 0x27, 0xe3,
+	0x88, 0x5f, 0x64, 0x43, 0x6f, 0x44, 0x27, 0xfe, 0x88, 0xc6, 0x1c, 0x47, 0x31, 0x49, 0xc3, 0xfc,
+	0x31, 0xcd, 0x62, 0x1e, 0x4d, 0x88, 0x7f, 0xdd, 0xf6, 0x39, 0x66, 0x97, 0x3e, 0xc3, 0x71, 0x38,
+	0xa4, 0x37, 0x5e, 0x92, 0x52, 0x4e, 0x11, 0x5a, 0x22, 0x3d, 0xf1, 0xdb, 0xbb, 0x6e, 0xdb, 0x1f,
+	0x8e, 0x29, 0x1d, 0x5f, 0x11, 0x7f, 0x8e, 0x18, 0x66, 0xe7, 0x3e, 0x8e, 0xa7, 0x12, 0x6e, 0x3b,
+	0xeb, 0xbf, 0x04, 0x35, 0xe3, 0x78, 0x92, 0x28, 0x40, 0x75, 0x4c, 0xc7, 0x74, 0x7e, 0xf4, 0xc5,
+	0x49, 0xdd, 0x7e, 0xf1, 0x62, 0x96, 0x38, 0x89, 0x7c, 0x3e, 0x4d, 0x08, 0xf3, 0x27, 0x34, 0x8b,
+	0xb9, 0x7c, 0xe7, 0xfe, 0x6d, 0xc0, 0x41, 0x9f, 0xe3, 0x94, 0xf7, 0x65, 0xd2, 0x01, 0xf9, 0x2d,
+	0x23, 0x8c, 0xa3, 0xcf, 0x00, 0x54, 0x19, 0x83, 0x28, 0xac, 0x1b, 0x4d, 0xa3, 0x55, 0xea, 0x56,
+	0x66, 0x77, 0x4e, 0x49, 0xe1, 0xce, 0x4e, 0x83, 0x92, 0x02, 0x9c, 0x85, 0xc8, 0x01, 0x6b, 0x98,
+	0xc5, 0xe1, 0x15, 0x19, 0x24, 0x98, 0x5f, 0xd4, 0x4d, 0x01, 0x0f, 0x40, 0x5e, 0xf5, 0x30, 0xbf,
+	0x40, 0x3e, 0x14, 0x53, 0x4a, 0xf9, 0x39, 0xab, 0x17, 0x9a, 0x85, 0x96, 0xd5, 0x3e, 0xf2, 0xf2,
+	0xaa, 0x88, 0xac, 0xbc, 0xef, 0x45, 0x56, 0x81, 0x82, 0x21, 0x0f, 0x76, 0x69, 0xc2, 0x23, 0x1a,
+	0xb3, 0xfa, 0x76, 0xd3, 0x68, 0x59, 0xed, 0xaa, 0x27, 0x85, 0xf1, 0x16, 0xc2, 0x78, 0x9d, 0x78,
+	0x1a, 0x2c, 0x40, 0x6e, 0x0b, 0xaa, 0xab, 0x65, 0xb0, 0x84, 0xc6, 0x8c, 0xa0, 0x7d, 0x28, 0x24,
+	0xaa, 0x80, 0x4a, 0x20, 0x8e, 0x2e, 0x01, 0xd4, 0xe7, 0x34, 0xd9, 0xa8, 0xde, 0x8f, 0xa0, 0x2c,
+	0xda, 0x42, 0x33, 0x3e, 0x60, 0x64, 0xc4, 0xe6, 0x05, 0x57, 0x02, 0x4b, 0xdd, 0xf5, 0xc9, 0x88,
+	0xb9, 0x35, 0xa1, 0x6b, 0x2e, 0x8c, 0xcc, 0xc7, 0xfd, 0xcb, 0x84, 0xea, 0x8f, 0x49, 0x88, 0x39,
+	0xd9, 0x28, 0x81, 0x36, 0x94, 0x52, 0xc2, 0x68, 0x96, 0x8e, 0x88, 0x8c, 0xfe, 0x94, 0x40, 0x4b,
+	0x18, 0xfa, 0x05, 0x2c, 0x1c, 0xc7, 0x94, 0x63, 0x29, 0xab, 0x6c, 0xc4, 0x57, 0xde, 0xe3, 0xf1,
+	0xf4, 0x74, 0x09, 0x7a, 0x9d, 0xe5, 0xdb, 0xef, 0x62, 0x9e, 0x4e, 0x83, 0x3c, 0x9b, 0x7d, 0x02,
+	0xfb, 0xeb, 0x00, 0xa1, 0xfd, 0x25, 0x99, 0xca, 0x5a, 0x02, 0x71, 0x44, 0x55, 0xd8, 0xb9, 0xc6,
+	0x57, 0x19, 0x51, 0x13, 0x22, 0x3f, 0xbe, 0x36, 0xbf, 0x34, 0xdc, 0x2e, 0xa0, 0x9f, 0x70, 0xb4,
+	0xd1, 0x14, 0xba, 0x53, 0x38, 0x58, 0xe1, 0x50, 0x23, 0xe0, 0x80, 0x45, 0x6e, 0x22, 0x3e, 0x60,
+	0x1c, 0xf3, 0x8c, 0xa9, 0x51, 0x00, 0x71, 0xd5, 0x9f, 0xdf, 0xa0, 0x0e, 0x94, 0xc4, 0x17, 0x09,
+	0x07, 0x98, 0x2b, 0x31, 0xed, 0x47, 0x62, 0xfe, 0xb0, 0xb0, 0x61, 0x77, 0xef, 0xf6, 0xce, 0xd9,
+	0xfa, 0xe3, 0x3f, 0xc7, 0x08, 0xf6, 0xe4, 0xb3, 0x0e, 0x77, 0x8f, 0xa0, 0xb6, 0x26, 0x9a, 0xea,
+	0xf7, 0x29, 0x54, 0xd5, 0x95, 0x0c, 0xf6, 0xb6, 0xca, 0xbe, 0x85, 0x83, 0x1e, 0xce, 0xd8, 0x46,
+	0x33, 0xe3, 0x1e, 0x42, 0x75, 0x95, 0x64, 0x99, 0x62, 0x40, 0x58, 0x36, 0xd9, 0x8c, 0xfd, 0x08,
+	0x6a, 0x6b, 0x2c, 0x8a, 0xfe, 0x9d, 0x01, 0xb5, 0x35, 0x09, 0x54, 0x63, 0x0e, 0xc1, 0x7c, 0x20,
+	0x2e, 0xce, 0xee, 0x1c, 0xf3, 0xec, 0x34, 0x30, 0xa3, 0x70, 0xe1, 0x59, 0xf3, 0xc1, 0xb3, 0x62,
+	0x6e, 0x44, 0xf7, 0x48, 0xbd, 0x20, 0xe7, 0x66, 0xfe, 0xb1, 0xde, 0xd8, 0xed, 0xe7, 0x1b, 0xbb,
+	0xf3, 0x96, 0xc6, 0xa2, 0x4f, 0x61, 0x87, 0xdc, 0xf0, 0x14, 0xd7, 0x8b, 0xcf, 0x98, 0x4c, 0x42,
+	0xdc, 0x6f, 0xc0, 0xea, 0x45, 0xf1, 0xf8, 0x6d, 0xfa, 0x7d, 0x00, 0x65, 0xf9, 0x58, 0x8a, 0xd3,
+	0xfe, 0xb3, 0x08, 0xbb, 0x0a, 0x88, 0x30, 0x94, 0xf3, 0xcb, 0x0d, 0x1d, 0xeb, 0x4c, 0xab, 0xd9,
+	0xe2, 0x76, 0xeb, 0x65, 0xa0, 0xea, 0xc5, 0xaf, 0x60, 0xe5, 0xd6, 0x15, 0xfa, 0x58, 0xff, 0x70,
+	0x7d, 0x6d, 0xda, 0xc7, 0x2f, 0xe2, 0x96, 0xfc, 0x39, 0x6f, 0xea, 0xf9, 0x1f, 0x2f, 0x00, 0x3d,
+	0xbf, 0xce, 0xe4, 0x21, 0x54, 0x56, 0x0c, 0x88, 0x5a, 0xaf, 0x5d, 0x6c, 0xf6, 0x27, 0xaf, 0x40,
+	0xaa, 0x28, 0x18, 0xca, 0x79, 0x0b, 0xe9, 0x1b, 0xa1, 0x71, 0xaa, 0xbe, 0x11, 0x3a, 0x37, 0x8a,
+	0x42, 0x56, 0x7c, 0xa4, 0x2f, 0x44, 0x67, 0x58, 0x7d, 0x21, 0x5a, 0x53, 0x8a, 0x28, 0x2b, 0x9e,
+	0xd4, 0x47, 0xd1, 0x6d, 0x2e, 0x7d, 0x14, 0xbd, 0xc1, 0x7b, 0xd2, 0x10, 0x8b, 0x4a, 0x1c, 0xad,
+	0x08, 0x4b, 0xc7, 0xd8, 0xcd, 0xa7, 0x01, 0x92, 0xb1, 0x5b, 0xbf, 0xbd, 0x6f, 0x6c, 0xfd, 0x7b,
+	0xdf, 0xd8, 0xfa, 0x7d, 0xd6, 0x30, 0x6e, 0x67, 0x0d, 0xe3, 0x9f, 0x59, 0xc3, 0xf8, 0x7f, 0xd6,
+	0x30, 0x7e, 0x36, 0x87, 0xc5, 0xb9, 0x27, 0x3f, 0x7f, 0x1f, 0x00, 0x00, 0xff, 0xff, 0x6e, 0x96,
+	0x09, 0x90, 0xb1, 0x09, 0x00, 0x00,
 }
 
 func (m *StartSandboxRequest) Marshal() (dAtA []byte, err error) {
@@ -659,6 +764,32 @@ func (m *StartSandboxRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	if m.XXX_unrecognized != nil {
 		i -= len(m.XXX_unrecognized)
 		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	if m.Options != nil {
+		{
+			size, err := m.Options.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintSandbox(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x22
+	}
+	if len(m.Rootfs) > 0 {
+		for iNdEx := len(m.Rootfs) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Rootfs[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintSandbox(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x1a
+		}
 	}
 	if len(m.BundlePath) > 0 {
 		i -= len(m.BundlePath)
@@ -701,12 +832,10 @@ func (m *StartSandboxResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i -= len(m.XXX_unrecognized)
 		copy(dAtA[i:], m.XXX_unrecognized)
 	}
-	if len(m.Pid) > 0 {
-		i -= len(m.Pid)
-		copy(dAtA[i:], m.Pid)
-		i = encodeVarintSandbox(dAtA, i, uint64(len(m.Pid)))
+	if m.Pid != 0 {
+		i = encodeVarintSandbox(dAtA, i, uint64(m.Pid))
 		i--
-		dAtA[i] = 0xa
+		dAtA[i] = 0x8
 	}
 	return len(dAtA) - i, nil
 }
@@ -838,6 +967,80 @@ func (m *UpdateSandboxRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i = encodeVarintSandbox(dAtA, i, uint64(len(m.SandboxID)))
 		i--
 		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *WaitSandboxRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *WaitSandboxRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *WaitSandboxRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	if len(m.SandboxID) > 0 {
+		i -= len(m.SandboxID)
+		copy(dAtA[i:], m.SandboxID)
+		i = encodeVarintSandbox(dAtA, i, uint64(len(m.SandboxID)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *WaitSandboxResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *WaitSandboxResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *WaitSandboxResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	n3, err3 := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.ExitedAt, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdTime(m.ExitedAt):])
+	if err3 != nil {
+		return 0, err3
+	}
+	i -= n3
+	i = encodeVarintSandbox(dAtA, i, uint64(n3))
+	i--
+	dAtA[i] = 0x12
+	if m.ExitStatus != 0 {
+		i = encodeVarintSandbox(dAtA, i, uint64(m.ExitStatus))
+		i--
+		dAtA[i] = 0x8
 	}
 	return len(dAtA) - i, nil
 }
@@ -1049,15 +1252,47 @@ func (m *SandboxStatusResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i -= len(m.XXX_unrecognized)
 		copy(dAtA[i:], m.XXX_unrecognized)
 	}
-	if m.Status != nil {
+	if m.Extra != nil {
 		{
-			size, err := m.Status.MarshalToSizedBuffer(dAtA[:i])
+			size, err := m.Extra.MarshalToSizedBuffer(dAtA[:i])
 			if err != nil {
 				return 0, err
 			}
 			i -= size
 			i = encodeVarintSandbox(dAtA, i, uint64(size))
 		}
+		i--
+		dAtA[i] = 0x32
+	}
+	n5, err5 := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.ExitedAt, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdTime(m.ExitedAt):])
+	if err5 != nil {
+		return 0, err5
+	}
+	i -= n5
+	i = encodeVarintSandbox(dAtA, i, uint64(n5))
+	i--
+	dAtA[i] = 0x2a
+	if m.ExitStatus != 0 {
+		i = encodeVarintSandbox(dAtA, i, uint64(m.ExitStatus))
+		i--
+		dAtA[i] = 0x20
+	}
+	if len(m.State) > 0 {
+		i -= len(m.State)
+		copy(dAtA[i:], m.State)
+		i = encodeVarintSandbox(dAtA, i, uint64(len(m.State)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if m.Pid != 0 {
+		i = encodeVarintSandbox(dAtA, i, uint64(m.Pid))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.ID) > 0 {
+		i -= len(m.ID)
+		copy(dAtA[i:], m.ID)
+		i = encodeVarintSandbox(dAtA, i, uint64(len(m.ID)))
 		i--
 		dAtA[i] = 0xa
 	}
@@ -1150,6 +1385,16 @@ func (m *StartSandboxRequest) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovSandbox(uint64(l))
 	}
+	if len(m.Rootfs) > 0 {
+		for _, e := range m.Rootfs {
+			l = e.Size()
+			n += 1 + l + sovSandbox(uint64(l))
+		}
+	}
+	if m.Options != nil {
+		l = m.Options.Size()
+		n += 1 + l + sovSandbox(uint64(l))
+	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
 	}
@@ -1162,9 +1407,8 @@ func (m *StartSandboxResponse) Size() (n int) {
 	}
 	var l int
 	_ = l
-	l = len(m.Pid)
-	if l > 0 {
-		n += 1 + l + sovSandbox(uint64(l))
+	if m.Pid != 0 {
+		n += 1 + sovSandbox(uint64(m.Pid))
 	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
@@ -1225,6 +1469,39 @@ func (m *UpdateSandboxRequest) Size() (n int) {
 			n += mapEntrySize + 1 + sovSandbox(uint64(mapEntrySize))
 		}
 	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *WaitSandboxRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.SandboxID)
+	if l > 0 {
+		n += 1 + l + sovSandbox(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *WaitSandboxResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.ExitStatus != 0 {
+		n += 1 + sovSandbox(uint64(m.ExitStatus))
+	}
+	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.ExitedAt)
+	n += 1 + l + sovSandbox(uint64(l))
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
 	}
@@ -1321,8 +1598,24 @@ func (m *SandboxStatusResponse) Size() (n int) {
 	}
 	var l int
 	_ = l
-	if m.Status != nil {
-		l = m.Status.Size()
+	l = len(m.ID)
+	if l > 0 {
+		n += 1 + l + sovSandbox(uint64(l))
+	}
+	if m.Pid != 0 {
+		n += 1 + sovSandbox(uint64(m.Pid))
+	}
+	l = len(m.State)
+	if l > 0 {
+		n += 1 + l + sovSandbox(uint64(l))
+	}
+	if m.ExitStatus != 0 {
+		n += 1 + sovSandbox(uint64(m.ExitStatus))
+	}
+	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.ExitedAt)
+	n += 1 + l + sovSandbox(uint64(l))
+	if m.Extra != nil {
+		l = m.Extra.Size()
 		n += 1 + l + sovSandbox(uint64(l))
 	}
 	if m.XXX_unrecognized != nil {
@@ -1369,9 +1662,16 @@ func (this *StartSandboxRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
+	repeatedStringForRootfs := "[]*Mount{"
+	for _, f := range this.Rootfs {
+		repeatedStringForRootfs += strings.Replace(fmt.Sprintf("%v", f), "Mount", "types.Mount", 1) + ","
+	}
+	repeatedStringForRootfs += "}"
 	s := strings.Join([]string{`&StartSandboxRequest{`,
 		`SandboxID:` + fmt.Sprintf("%v", this.SandboxID) + `,`,
 		`BundlePath:` + fmt.Sprintf("%v", this.BundlePath) + `,`,
+		`Rootfs:` + repeatedStringForRootfs + `,`,
+		`Options:` + strings.Replace(fmt.Sprintf("%v", this.Options), "Any", "types1.Any", 1) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -1426,8 +1726,31 @@ func (this *UpdateSandboxRequest) String() string {
 	mapStringForAnnotations += "}"
 	s := strings.Join([]string{`&UpdateSandboxRequest{`,
 		`SandboxID:` + fmt.Sprintf("%v", this.SandboxID) + `,`,
-		`Resources:` + strings.Replace(fmt.Sprintf("%v", this.Resources), "Any", "types.Any", 1) + `,`,
+		`Resources:` + strings.Replace(fmt.Sprintf("%v", this.Resources), "Any", "types1.Any", 1) + `,`,
 		`Annotations:` + mapStringForAnnotations + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *WaitSandboxRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&WaitSandboxRequest{`,
+		`SandboxID:` + fmt.Sprintf("%v", this.SandboxID) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *WaitSandboxResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&WaitSandboxResponse{`,
+		`ExitStatus:` + fmt.Sprintf("%v", this.ExitStatus) + `,`,
+		`ExitedAt:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ExitedAt), "Timestamp", "types1.Timestamp", 1), `&`, ``, 1) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -1501,7 +1824,12 @@ func (this *SandboxStatusResponse) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&SandboxStatusResponse{`,
-		`Status:` + strings.Replace(fmt.Sprintf("%v", this.Status), "Any", "types.Any", 1) + `,`,
+		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
+		`Pid:` + fmt.Sprintf("%v", this.Pid) + `,`,
+		`State:` + fmt.Sprintf("%v", this.State) + `,`,
+		`ExitStatus:` + fmt.Sprintf("%v", this.ExitStatus) + `,`,
+		`ExitedAt:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ExitedAt), "Timestamp", "types1.Timestamp", 1), `&`, ``, 1) + `,`,
+		`Extra:` + strings.Replace(fmt.Sprintf("%v", this.Extra), "Any", "types1.Any", 1) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -1540,6 +1868,7 @@ func valueToStringSandbox(v interface{}) string {
 type SandboxService interface {
 	StartSandbox(ctx context.Context, req *StartSandboxRequest) (*StartSandboxResponse, error)
 	StopSandbox(ctx context.Context, req *StopSandboxRequest) (*StopSandboxResponse, error)
+	WaitSandbox(ctx context.Context, req *WaitSandboxRequest) (*WaitSandboxResponse, error)
 	UpdateSandbox(ctx context.Context, req *UpdateSandboxRequest) (*UpdateSandboxResponse, error)
 	PauseSandbox(ctx context.Context, req *PauseSandboxRequest) (*PauseSandboxResponse, error)
 	ResumeSandbox(ctx context.Context, req *ResumeSandboxRequest) (*ResumeSandboxResponse, error)
@@ -1562,6 +1891,13 @@ func RegisterSandboxService(srv *github_com_containerd_ttrpc.Server, svc Sandbox
 				return nil, err
 			}
 			return svc.StopSandbox(ctx, &req)
+		},
+		"WaitSandbox": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+			var req WaitSandboxRequest
+			if err := unmarshal(&req); err != nil {
+				return nil, err
+			}
+			return svc.WaitSandbox(ctx, &req)
 		},
 		"UpdateSandbox": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
 			var req UpdateSandboxRequest
@@ -1622,6 +1958,14 @@ func (c *sandboxClient) StartSandbox(ctx context.Context, req *StartSandboxReque
 func (c *sandboxClient) StopSandbox(ctx context.Context, req *StopSandboxRequest) (*StopSandboxResponse, error) {
 	var resp StopSandboxResponse
 	if err := c.client.Call(ctx, "containerd.task.v2.Sandbox", "StopSandbox", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *sandboxClient) WaitSandbox(ctx context.Context, req *WaitSandboxRequest) (*WaitSandboxResponse, error) {
+	var resp WaitSandboxResponse
+	if err := c.client.Call(ctx, "containerd.task.v2.Sandbox", "WaitSandbox", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -1759,6 +2103,76 @@ func (m *StartSandboxRequest) Unmarshal(dAtA []byte) error {
 			}
 			m.BundlePath = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Rootfs", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Rootfs = append(m.Rootfs, &types.Mount{})
+			if err := m.Rootfs[len(m.Rootfs)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Options", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Options == nil {
+				m.Options = &types1.Any{}
+			}
+			if err := m.Options.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipSandbox(dAtA[iNdEx:])
@@ -1811,10 +2225,10 @@ func (m *StartSandboxResponse) Unmarshal(dAtA []byte) error {
 		}
 		switch fieldNum {
 		case 1:
-			if wireType != 2 {
+			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Pid", wireType)
 			}
-			var stringLen uint64
+			m.Pid = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowSandbox
@@ -1824,24 +2238,11 @@ func (m *StartSandboxResponse) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
+				m.Pid |= uint32(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthSandbox
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthSandbox
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Pid = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipSandbox(dAtA[iNdEx:])
@@ -2108,7 +2509,7 @@ func (m *UpdateSandboxRequest) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.Resources == nil {
-				m.Resources = &types.Any{}
+				m.Resources = &types1.Any{}
 			}
 			if err := m.Resources.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
@@ -2240,6 +2641,192 @@ func (m *UpdateSandboxRequest) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.Annotations[mapkey] = mapvalue
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipSandbox(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *WaitSandboxRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowSandbox
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: WaitSandboxRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: WaitSandboxRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SandboxID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SandboxID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipSandbox(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *WaitSandboxResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowSandbox
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: WaitSandboxResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: WaitSandboxResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExitStatus", wireType)
+			}
+			m.ExitStatus = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ExitStatus |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExitedAt", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := github_com_gogo_protobuf_types.StdTimeUnmarshal(&m.ExitedAt, dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -2696,7 +3283,109 @@ func (m *SandboxStatusResponse) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Pid", wireType)
+			}
+			m.Pid = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Pid |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field State", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.State = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExitStatus", wireType)
+			}
+			m.ExitStatus = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ExitStatus |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExitedAt", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -2723,10 +3412,43 @@ func (m *SandboxStatusResponse) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.Status == nil {
-				m.Status = &types.Any{}
+			if err := github_com_gogo_protobuf_types.StdTimeUnmarshal(&m.ExitedAt, dAtA[iNdEx:postIndex]); err != nil {
+				return err
 			}
-			if err := m.Status.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Extra", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Extra == nil {
+				m.Extra = &types1.Any{}
+			}
+			if err := m.Extra.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

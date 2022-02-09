@@ -3085,9 +3085,11 @@ file {
 file {
   name: "github.com/containerd/containerd/api/services/sandbox/v1/sandbox.proto"
   package: "containerd.services.sandbox.v1"
-  dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/any.proto"
+  dependency: "google/protobuf/timestamp.proto"
+  dependency: "gogoproto/gogo.proto"
   dependency: "github.com/containerd/containerd/api/types/sandbox.proto"
+  dependency: "github.com/containerd/containerd/api/types/mount.proto"
   message_type {
     name: "StoreCreateRequest"
     field {
@@ -3219,16 +3221,38 @@ file {
       json_name: "sandboxId"
     }
     field {
-      name: "spec"
-      number: 4
+      name: "rootfs"
+      number: 2
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Mount"
+      json_name: "rootfs"
+    }
+    field {
+      name: "options"
+      number: 3
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Any"
-      json_name: "spec"
+      json_name: "options"
     }
   }
   message_type {
     name: "ControllerStartResponse"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+    field {
+      name: "pid"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "pid"
+    }
   }
   message_type {
     name: "ControllerShutdownRequest"
@@ -3239,9 +3263,48 @@ file {
       type: TYPE_STRING
       json_name: "sandboxId"
     }
+    field {
+      name: "timeout_secs"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "timeoutSecs"
+    }
   }
   message_type {
     name: "ControllerShutdownResponse"
+  }
+  message_type {
+    name: "ControllerWaitRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+  }
+  message_type {
+    name: "ControllerWaitResponse"
+    field {
+      name: "exit_status"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "exitStatus"
+    }
+    field {
+      name: "exited_at"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      options {
+        65001: 0
+        65010: 1
+      }
+      json_name: "exitedAt"
+    }
   }
   message_type {
     name: "ControllerPauseRequest"
@@ -3295,12 +3358,52 @@ file {
   message_type {
     name: "ControllerStatusResponse"
     field {
-      name: "status"
+      name: "id"
       number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "pid"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "pid"
+    }
+    field {
+      name: "state"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "state"
+    }
+    field {
+      name: "exit_status"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "exitStatus"
+    }
+    field {
+      name: "exited_at"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      options {
+        65001: 0
+        65010: 1
+      }
+      json_name: "exitedAt"
+    }
+    field {
+      name: "extra"
+      number: 6
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Any"
-      json_name: "status"
+      json_name: "extra"
     }
   }
   service {
@@ -3344,6 +3447,11 @@ file {
       output_type: ".containerd.services.sandbox.v1.ControllerShutdownResponse"
     }
     method {
+      name: "Wait"
+      input_type: ".containerd.services.sandbox.v1.ControllerWaitRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerWaitResponse"
+    }
+    method {
       name: "Pause"
       input_type: ".containerd.services.sandbox.v1.ControllerPauseRequest"
       output_type: ".containerd.services.sandbox.v1.ControllerPauseResponse"
@@ -3367,7 +3475,7 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/sandbox/v1;sandbox"
   }
-  weak_dependency: 0
+  weak_dependency: 2
   syntax: "proto3"
 }
 file {

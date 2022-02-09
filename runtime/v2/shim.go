@@ -194,6 +194,8 @@ type ShimProcess interface {
 	ID() string
 	// Namespace of this shim.
 	Namespace() string
+	// Bundle is a file system path to shim's bundle.
+	Bundle() string
 	// Client returns the underlying TTRPC client for this shim.
 	Client() *ttrpc.Client
 }
@@ -210,6 +212,10 @@ func (s *shim) ID() string {
 
 func (s *shim) Namespace() string {
 	return s.bundle.Namespace
+}
+
+func (s *shim) Bundle() string {
+	return s.bundle.Path
 }
 
 func (s *shim) Close() error {

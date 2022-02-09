@@ -16,6 +16,7 @@ import (
 	fmt "fmt"
 	types "github.com/containerd/containerd/api/types"
 	proto "github.com/gogo/protobuf/proto"
+	github_com_gogo_protobuf_types "github.com/gogo/protobuf/types"
 	types1 "github.com/gogo/protobuf/types"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
@@ -25,12 +26,14 @@ import (
 	math_bits "math/bits"
 	reflect "reflect"
 	strings "strings"
+	time "time"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
+var _ = time.Kitchen
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -429,11 +432,12 @@ func (m *StoreGetResponse) XXX_DiscardUnknown() {
 var xxx_messageInfo_StoreGetResponse proto.InternalMessageInfo
 
 type ControllerStartRequest struct {
-	SandboxID            string      `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
-	Spec                 *types1.Any `protobuf:"bytes,4,opt,name=spec,proto3" json:"spec,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}    `json:"-"`
-	XXX_unrecognized     []byte      `json:"-"`
-	XXX_sizecache        int32       `json:"-"`
+	SandboxID            string         `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
+	Rootfs               []*types.Mount `protobuf:"bytes,2,rep,name=rootfs,proto3" json:"rootfs,omitempty"`
+	Options              *types1.Any    `protobuf:"bytes,3,opt,name=options,proto3" json:"options,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}       `json:"-"`
+	XXX_unrecognized     []byte         `json:"-"`
+	XXX_sizecache        int32          `json:"-"`
 }
 
 func (m *ControllerStartRequest) Reset()      { *m = ControllerStartRequest{} }
@@ -469,6 +473,8 @@ func (m *ControllerStartRequest) XXX_DiscardUnknown() {
 var xxx_messageInfo_ControllerStartRequest proto.InternalMessageInfo
 
 type ControllerStartResponse struct {
+	SandboxID            string   `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
+	Pid                  uint32   `protobuf:"varint,2,opt,name=pid,proto3" json:"pid,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -508,6 +514,7 @@ var xxx_messageInfo_ControllerStartResponse proto.InternalMessageInfo
 
 type ControllerShutdownRequest struct {
 	SandboxID            string   `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
+	TimeoutSecs          uint32   `protobuf:"varint,2,opt,name=timeout_secs,json=timeoutSecs,proto3" json:"timeout_secs,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -583,6 +590,85 @@ func (m *ControllerShutdownResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_ControllerShutdownResponse proto.InternalMessageInfo
 
+type ControllerWaitRequest struct {
+	SandboxID            string   `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ControllerWaitRequest) Reset()      { *m = ControllerWaitRequest{} }
+func (*ControllerWaitRequest) ProtoMessage() {}
+func (*ControllerWaitRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_d6eb1ebcbc2879f1, []int{14}
+}
+func (m *ControllerWaitRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ControllerWaitRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ControllerWaitRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *ControllerWaitRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ControllerWaitRequest.Merge(m, src)
+}
+func (m *ControllerWaitRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *ControllerWaitRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_ControllerWaitRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ControllerWaitRequest proto.InternalMessageInfo
+
+type ControllerWaitResponse struct {
+	ExitStatus           uint32    `protobuf:"varint,1,opt,name=exit_status,json=exitStatus,proto3" json:"exit_status,omitempty"`
+	ExitedAt             time.Time `protobuf:"bytes,2,opt,name=exited_at,json=exitedAt,proto3,stdtime" json:"exited_at"`
+	XXX_NoUnkeyedLiteral struct{}  `json:"-"`
+	XXX_unrecognized     []byte    `json:"-"`
+	XXX_sizecache        int32     `json:"-"`
+}
+
+func (m *ControllerWaitResponse) Reset()      { *m = ControllerWaitResponse{} }
+func (*ControllerWaitResponse) ProtoMessage() {}
+func (*ControllerWaitResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_d6eb1ebcbc2879f1, []int{15}
+}
+func (m *ControllerWaitResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ControllerWaitResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ControllerWaitResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *ControllerWaitResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ControllerWaitResponse.Merge(m, src)
+}
+func (m *ControllerWaitResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *ControllerWaitResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_ControllerWaitResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ControllerWaitResponse proto.InternalMessageInfo
+
 type ControllerPauseRequest struct {
 	SandboxID            string   `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -593,7 +679,7 @@ type ControllerPauseRequest struct {
 func (m *ControllerPauseRequest) Reset()      { *m = ControllerPauseRequest{} }
 func (*ControllerPauseRequest) ProtoMessage() {}
 func (*ControllerPauseRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_d6eb1ebcbc2879f1, []int{14}
+	return fileDescriptor_d6eb1ebcbc2879f1, []int{16}
 }
 func (m *ControllerPauseRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -631,7 +717,7 @@ type ControllerPauseResponse struct {
 func (m *ControllerPauseResponse) Reset()      { *m = ControllerPauseResponse{} }
 func (*ControllerPauseResponse) ProtoMessage() {}
 func (*ControllerPauseResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_d6eb1ebcbc2879f1, []int{15}
+	return fileDescriptor_d6eb1ebcbc2879f1, []int{17}
 }
 func (m *ControllerPauseResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -670,7 +756,7 @@ type ControllerResumeRequest struct {
 func (m *ControllerResumeRequest) Reset()      { *m = ControllerResumeRequest{} }
 func (*ControllerResumeRequest) ProtoMessage() {}
 func (*ControllerResumeRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_d6eb1ebcbc2879f1, []int{16}
+	return fileDescriptor_d6eb1ebcbc2879f1, []int{18}
 }
 func (m *ControllerResumeRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -708,7 +794,7 @@ type ControllerResumeResponse struct {
 func (m *ControllerResumeResponse) Reset()      { *m = ControllerResumeResponse{} }
 func (*ControllerResumeResponse) ProtoMessage() {}
 func (*ControllerResumeResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_d6eb1ebcbc2879f1, []int{17}
+	return fileDescriptor_d6eb1ebcbc2879f1, []int{19}
 }
 func (m *ControllerResumeResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -747,7 +833,7 @@ type ControllerPingRequest struct {
 func (m *ControllerPingRequest) Reset()      { *m = ControllerPingRequest{} }
 func (*ControllerPingRequest) ProtoMessage() {}
 func (*ControllerPingRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_d6eb1ebcbc2879f1, []int{18}
+	return fileDescriptor_d6eb1ebcbc2879f1, []int{20}
 }
 func (m *ControllerPingRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -785,7 +871,7 @@ type ControllerPingResponse struct {
 func (m *ControllerPingResponse) Reset()      { *m = ControllerPingResponse{} }
 func (*ControllerPingResponse) ProtoMessage() {}
 func (*ControllerPingResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_d6eb1ebcbc2879f1, []int{19}
+	return fileDescriptor_d6eb1ebcbc2879f1, []int{21}
 }
 func (m *ControllerPingResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -824,7 +910,7 @@ type ControllerStatusRequest struct {
 func (m *ControllerStatusRequest) Reset()      { *m = ControllerStatusRequest{} }
 func (*ControllerStatusRequest) ProtoMessage() {}
 func (*ControllerStatusRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_d6eb1ebcbc2879f1, []int{20}
+	return fileDescriptor_d6eb1ebcbc2879f1, []int{22}
 }
 func (m *ControllerStatusRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -854,7 +940,12 @@ func (m *ControllerStatusRequest) XXX_DiscardUnknown() {
 var xxx_messageInfo_ControllerStatusRequest proto.InternalMessageInfo
 
 type ControllerStatusResponse struct {
-	Status               *types1.Any `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	ID                   string      `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Pid                  uint32      `protobuf:"varint,2,opt,name=pid,proto3" json:"pid,omitempty"`
+	State                string      `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
+	ExitStatus           uint32      `protobuf:"varint,4,opt,name=exit_status,json=exitStatus,proto3" json:"exit_status,omitempty"`
+	ExitedAt             time.Time   `protobuf:"bytes,5,opt,name=exited_at,json=exitedAt,proto3,stdtime" json:"exited_at"`
+	Extra                *types1.Any `protobuf:"bytes,6,opt,name=extra,proto3" json:"extra,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}    `json:"-"`
 	XXX_unrecognized     []byte      `json:"-"`
 	XXX_sizecache        int32       `json:"-"`
@@ -863,7 +954,7 @@ type ControllerStatusResponse struct {
 func (m *ControllerStatusResponse) Reset()      { *m = ControllerStatusResponse{} }
 func (*ControllerStatusResponse) ProtoMessage() {}
 func (*ControllerStatusResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_d6eb1ebcbc2879f1, []int{21}
+	return fileDescriptor_d6eb1ebcbc2879f1, []int{23}
 }
 func (m *ControllerStatusResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -907,6 +998,8 @@ func init() {
 	proto.RegisterType((*ControllerStartResponse)(nil), "containerd.services.sandbox.v1.ControllerStartResponse")
 	proto.RegisterType((*ControllerShutdownRequest)(nil), "containerd.services.sandbox.v1.ControllerShutdownRequest")
 	proto.RegisterType((*ControllerShutdownResponse)(nil), "containerd.services.sandbox.v1.ControllerShutdownResponse")
+	proto.RegisterType((*ControllerWaitRequest)(nil), "containerd.services.sandbox.v1.ControllerWaitRequest")
+	proto.RegisterType((*ControllerWaitResponse)(nil), "containerd.services.sandbox.v1.ControllerWaitResponse")
 	proto.RegisterType((*ControllerPauseRequest)(nil), "containerd.services.sandbox.v1.ControllerPauseRequest")
 	proto.RegisterType((*ControllerPauseResponse)(nil), "containerd.services.sandbox.v1.ControllerPauseResponse")
 	proto.RegisterType((*ControllerResumeRequest)(nil), "containerd.services.sandbox.v1.ControllerResumeRequest")
@@ -922,53 +1015,67 @@ func init() {
 }
 
 var fileDescriptor_d6eb1ebcbc2879f1 = []byte{
-	// 730 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x56, 0x4d, 0x4f, 0xd4, 0x40,
-	0x18, 0xde, 0xca, 0x52, 0xdc, 0xd7, 0x18, 0x75, 0x04, 0xec, 0x36, 0xa6, 0x90, 0x9e, 0x38, 0x90,
-	0x16, 0x96, 0x88, 0xa0, 0x07, 0x75, 0x41, 0x16, 0x12, 0x13, 0xc9, 0x6e, 0x4c, 0x0c, 0x17, 0xd3,
-	0xdd, 0x0e, 0xa5, 0xb1, 0x74, 0xba, 0x9d, 0x29, 0x42, 0xbc, 0xe8, 0xaf, 0xf2, 0x2f, 0x70, 0xf4,
-	0xe8, 0x89, 0xc8, 0xfe, 0x07, 0xef, 0x66, 0xa7, 0x53, 0xda, 0xca, 0x46, 0xdb, 0xe2, 0x6d, 0xba,
-	0x7d, 0xde, 0xe7, 0x63, 0x78, 0xf7, 0x61, 0x61, 0xc7, 0x71, 0xd9, 0x51, 0xd4, 0x37, 0x06, 0xe4,
-	0xd8, 0x1c, 0x10, 0x9f, 0x59, 0xae, 0x8f, 0x43, 0x3b, 0x7b, 0xb4, 0x02, 0xd7, 0xa4, 0x38, 0x3c,
-	0x71, 0x07, 0x98, 0x9a, 0xd4, 0xf2, 0xed, 0x3e, 0x39, 0x35, 0x4f, 0x56, 0x93, 0xa3, 0x11, 0x84,
-	0x84, 0x11, 0xa4, 0xa5, 0x13, 0x46, 0x82, 0x36, 0x12, 0xc8, 0xc9, 0xaa, 0x3a, 0xeb, 0x10, 0x87,
-	0x70, 0xa8, 0x39, 0x3e, 0xc5, 0x53, 0x6a, 0xd3, 0x21, 0xc4, 0xf1, 0xb0, 0xc9, 0x9f, 0xfa, 0xd1,
-	0xa1, 0x69, 0xf9, 0x67, 0xe2, 0xd5, 0x46, 0x21, 0x63, 0xec, 0x2c, 0x48, 0x5d, 0xc5, 0x93, 0xfa,
-	0x5b, 0x40, 0x3d, 0x46, 0x42, 0xbc, 0x15, 0x62, 0x8b, 0xe1, 0x2e, 0x1e, 0x46, 0x98, 0x32, 0xb4,
-	0x09, 0x33, 0x02, 0xa6, 0x48, 0x8b, 0xd2, 0xd2, 0x9d, 0x56, 0xd3, 0xc8, 0x58, 0xe6, 0x3c, 0x46,
-	0x2f, 0x06, 0xb4, 0xeb, 0xe7, 0x17, 0x0b, 0xb5, 0x6e, 0x82, 0xd7, 0xf7, 0xe1, 0x61, 0x8e, 0x90,
-	0x06, 0xc4, 0xa7, 0xf8, 0x26, 0x8c, 0x8e, 0xb0, 0xf8, 0x2e, 0xb0, 0xff, 0x8b, 0x45, 0x34, 0x0f,
-	0xf2, 0xa1, 0x8b, 0x3d, 0x9b, 0x2a, 0xb7, 0x16, 0xa7, 0x96, 0x1a, 0x5d, 0xf1, 0x74, 0x65, 0x3d,
-	0x11, 0xba, 0xb9, 0xf5, 0xb6, 0xb0, 0xbe, 0x8d, 0x3d, 0x9c, 0x5a, 0x5f, 0x06, 0x10, 0x80, 0x0f,
-	0xae, 0xcd, 0x39, 0x1b, 0xed, 0xbb, 0xa3, 0x8b, 0x85, 0x86, 0x60, 0xd9, 0xdb, 0xee, 0x36, 0x04,
-	0x60, 0xcf, 0xd6, 0xe7, 0x84, 0xab, 0x84, 0x23, 0x76, 0xa5, 0x2f, 0xc3, 0x7d, 0xfe, 0xf1, 0x1b,
-	0x97, 0xb2, 0x84, 0x58, 0x81, 0x99, 0x43, 0xd7, 0x63, 0x38, 0xa4, 0x8a, 0xc4, 0x93, 0x25, 0x8f,
-	0xfa, 0x2e, 0x3c, 0xc8, 0xa0, 0x45, 0xb0, 0x35, 0xa8, 0x7b, 0x2e, 0x65, 0x1c, 0x5b, 0x20, 0x15,
-	0x07, 0xeb, 0x2f, 0xe0, 0x1e, 0x67, 0xea, 0x60, 0x56, 0x2d, 0x4f, 0x47, 0x18, 0xe7, 0x04, 0x57,
-	0x4e, 0x0a, 0x5f, 0x71, 0x7a, 0xb9, 0x01, 0xcc, 0x6f, 0x11, 0x9f, 0x85, 0xc4, 0xf3, 0x70, 0xd8,
-	0x63, 0x56, 0x58, 0xcd, 0x10, 0x5a, 0x82, 0x3a, 0x0d, 0xf0, 0x40, 0xa9, 0x73, 0xe5, 0x59, 0x23,
-	0xfe, 0x9a, 0x19, 0xc9, 0xd7, 0xcc, 0x78, 0xe5, 0x9f, 0x75, 0x39, 0x42, 0x6f, 0xc2, 0xa3, 0x6b,
-	0x8a, 0xe2, 0xcf, 0xb1, 0x07, 0xcd, 0xcc, 0xab, 0xa3, 0x88, 0xd9, 0xe4, 0x93, 0x5f, 0xed, 0x82,
-	0x1e, 0x83, 0x3a, 0x89, 0x4a, 0x08, 0xed, 0x64, 0x53, 0xef, 0x5b, 0x11, 0xad, 0xb8, 0x56, 0xb9,
-	0x2c, 0x82, 0x47, 0x48, 0x74, 0xb2, 0xaf, 0xba, 0x98, 0x46, 0xc7, 0x15, 0x35, 0x54, 0x50, 0xae,
-	0x13, 0x09, 0x91, 0xd7, 0x30, 0x97, 0xd1, 0x77, 0x7d, 0xa7, 0x9a, 0x84, 0x92, 0xbb, 0x0e, 0x4e,
-	0x33, 0x29, 0x45, 0x8f, 0x59, 0x2c, 0xa2, 0xd5, 0x24, 0x76, 0xb3, 0x29, 0x12, 0x22, 0xb1, 0xb8,
-	0xcb, 0x20, 0x53, 0xfe, 0x89, 0xd8, 0xdb, 0xc9, 0xdb, 0x23, 0x30, 0xad, 0x6f, 0x75, 0x98, 0xe6,
-	0xbb, 0x8f, 0x86, 0x20, 0xc7, 0x05, 0x89, 0x5a, 0xc6, 0xdf, 0xff, 0x19, 0x18, 0xd7, 0xeb, 0x59,
-	0x5d, 0x2b, 0x35, 0x23, 0xac, 0x0e, 0x41, 0x8e, 0x8b, 0xad, 0xa0, 0x64, 0xae, 0x6e, 0x0b, 0x4a,
-	0xfe, 0xd1, 0x9c, 0x43, 0x90, 0xe3, 0xd6, 0x2a, 0x28, 0x99, 0xab, 0xc9, 0x82, 0x92, 0xf9, 0x5a,
-	0x44, 0x1f, 0xa1, 0x3e, 0xee, 0x38, 0xb4, 0x52, 0x68, 0x38, 0x53, 0x9e, 0xea, 0x6a, 0x89, 0x09,
-	0x21, 0x76, 0x04, 0x53, 0x1d, 0xcc, 0x90, 0x59, 0x68, 0x32, 0x2d, 0x4c, 0x75, 0xa5, 0xf8, 0x40,
-	0xac, 0xd4, 0xfa, 0x35, 0x0d, 0x90, 0x2e, 0x21, 0x3a, 0x1d, 0xef, 0x91, 0x15, 0x32, 0xb4, 0xfe,
-	0x2f, 0xa6, 0xc9, 0x0d, 0xa9, 0x3e, 0x2d, 0x3d, 0x27, 0x22, 0x7f, 0x95, 0xe0, 0x76, 0xd2, 0x49,
-	0x68, 0xb3, 0x04, 0x4b, 0xbe, 0x12, 0xd5, 0x67, 0x55, 0x46, 0x85, 0x87, 0x53, 0x98, 0xe6, 0x85,
-	0x55, 0x26, 0x7d, 0xb6, 0x29, 0xcb, 0xa4, 0xcf, 0x35, 0x23, 0xfa, 0x0c, 0x72, 0x5c, 0x63, 0xa8,
-	0x04, 0x45, 0xae, 0x41, 0xd5, 0x8d, 0xf2, 0x83, 0x42, 0x3c, 0x82, 0xfa, 0xb8, 0xe0, 0xd0, 0x93,
-	0x12, 0xee, 0xd3, 0x5e, 0x55, 0xd7, 0xcb, 0x8e, 0xa5, 0x99, 0xe3, 0xd2, 0x43, 0xe5, 0x96, 0x26,
-	0xed, 0xdb, 0x32, 0x99, 0xf3, 0xfd, 0xda, 0x3e, 0x38, 0xbf, 0xd4, 0x6a, 0x3f, 0x2e, 0xb5, 0xda,
-	0x97, 0x91, 0x26, 0x9d, 0x8f, 0x34, 0xe9, 0xfb, 0x48, 0x93, 0x7e, 0x8e, 0x34, 0xe9, 0xe0, 0x65,
-	0xd5, 0xdf, 0xe2, 0xcf, 0xc5, 0xf1, 0x7d, 0xad, 0x2f, 0xf3, 0x96, 0x5e, 0xfb, 0x1d, 0x00, 0x00,
-	0xff, 0xff, 0x94, 0xa8, 0x1b, 0x82, 0xd8, 0x0b, 0x00, 0x00,
+	// 946 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x57, 0x41, 0x6f, 0xe3, 0x44,
+	0x14, 0xae, 0xd3, 0xc4, 0x6d, 0x5e, 0xa8, 0x58, 0x86, 0x6e, 0xd7, 0xb5, 0x50, 0x52, 0x7c, 0xaa,
+	0xd0, 0xca, 0xde, 0xa6, 0xa2, 0xec, 0xc2, 0x01, 0x9a, 0x2d, 0x5b, 0x2a, 0x81, 0xa8, 0x1c, 0x10,
+	0xb0, 0x97, 0xca, 0x8d, 0xa7, 0xa9, 0x45, 0xe2, 0x71, 0x3c, 0xe3, 0x92, 0x0a, 0x0e, 0xf0, 0x0f,
+	0xf8, 0x17, 0xfc, 0x04, 0xfe, 0x42, 0x8f, 0x1c, 0x39, 0x15, 0x36, 0x47, 0xc4, 0x8f, 0x40, 0x9e,
+	0x19, 0xd7, 0x76, 0x13, 0x15, 0xdb, 0xdd, 0xdb, 0xcc, 0xf8, 0xbd, 0xef, 0x7d, 0xef, 0xcd, 0x9b,
+	0xf7, 0x25, 0xf0, 0x62, 0xe8, 0xb1, 0xf3, 0xe8, 0xd4, 0x1c, 0x90, 0xb1, 0x35, 0x20, 0x3e, 0x73,
+	0x3c, 0x1f, 0x87, 0x6e, 0x76, 0xe9, 0x04, 0x9e, 0x45, 0x71, 0x78, 0xe1, 0x0d, 0x30, 0xb5, 0xa8,
+	0xe3, 0xbb, 0xa7, 0x64, 0x6a, 0x5d, 0xec, 0x24, 0x4b, 0x33, 0x08, 0x09, 0x23, 0xa8, 0x9d, 0x7a,
+	0x98, 0x89, 0xb5, 0x99, 0x98, 0x5c, 0xec, 0xe8, 0x9b, 0x43, 0x42, 0x86, 0x23, 0x6c, 0x71, 0xeb,
+	0xd3, 0xe8, 0xcc, 0x72, 0xfc, 0x4b, 0xe1, 0xaa, 0x77, 0x6e, 0x7f, 0x62, 0xde, 0x18, 0x53, 0xe6,
+	0x8c, 0x03, 0x69, 0xb0, 0x3e, 0x24, 0x43, 0xc2, 0x97, 0x56, 0xbc, 0x92, 0xa7, 0x4f, 0x0b, 0x31,
+	0x67, 0x97, 0x41, 0x4a, 0x5b, 0x7a, 0xee, 0x95, 0xf0, 0x1c, 0x93, 0xc8, 0x67, 0xc2, 0xcf, 0xf8,
+	0x12, 0x50, 0x9f, 0x91, 0x10, 0x3f, 0x0f, 0xb1, 0xc3, 0xb0, 0x8d, 0x27, 0x11, 0xa6, 0x0c, 0x3d,
+	0x83, 0x15, 0x09, 0xaf, 0x29, 0x5b, 0xca, 0x76, 0xab, 0xbb, 0x69, 0x66, 0x6a, 0xc1, 0x51, 0xcc,
+	0xbe, 0x30, 0xe8, 0xd5, 0xaf, 0xae, 0x3b, 0x4b, 0x76, 0x62, 0x6f, 0x1c, 0xc3, 0xdb, 0x39, 0x40,
+	0x1a, 0x10, 0x9f, 0xe2, 0xfb, 0x20, 0x0e, 0x25, 0xc5, 0xaf, 0x03, 0xf7, 0xb5, 0x50, 0x44, 0x1b,
+	0xa0, 0x9e, 0x79, 0x78, 0xe4, 0x52, 0xad, 0xb6, 0xb5, 0xbc, 0xdd, 0xb4, 0xe5, 0xee, 0x86, 0x7a,
+	0x12, 0xe8, 0xfe, 0xd4, 0x7b, 0x92, 0xfa, 0x01, 0x1e, 0xe1, 0x94, 0xfa, 0x63, 0x00, 0x69, 0x70,
+	0xe2, 0xb9, 0x1c, 0xb3, 0xd9, 0x5b, 0x9b, 0x5d, 0x77, 0x9a, 0x12, 0xe5, 0xe8, 0xc0, 0x6e, 0x4a,
+	0x83, 0x23, 0xd7, 0x78, 0x28, 0x59, 0x25, 0x18, 0x82, 0x95, 0xf1, 0x18, 0x1e, 0xf0, 0xe3, 0xcf,
+	0x3d, 0xca, 0x12, 0x60, 0x0d, 0x56, 0xce, 0xbc, 0x11, 0xc3, 0x21, 0xd5, 0x14, 0x9e, 0x59, 0xb2,
+	0x35, 0x3e, 0x83, 0xb7, 0x32, 0xd6, 0x32, 0xb1, 0x5d, 0xa8, 0x8f, 0x3c, 0xca, 0xb8, 0x6d, 0x81,
+	0xac, 0xb8, 0xb1, 0xf1, 0x31, 0xbc, 0xc9, 0x91, 0x0e, 0x31, 0xab, 0x96, 0xcf, 0xa1, 0x24, 0xce,
+	0x01, 0x6e, 0x98, 0x14, 0x2e, 0x71, 0x5a, 0xdc, 0xdf, 0x14, 0xd8, 0x78, 0x4e, 0x7c, 0x16, 0x92,
+	0xd1, 0x08, 0x87, 0x7d, 0xe6, 0x84, 0xd5, 0x18, 0x21, 0x0b, 0xd4, 0x90, 0x10, 0x76, 0x26, 0xfa,
+	0xa1, 0xd5, 0x7d, 0x34, 0x1f, 0xfc, 0x8b, 0xf8, 0xc9, 0xd8, 0xd2, 0x0c, 0x99, 0xb0, 0x42, 0x02,
+	0xe6, 0x11, 0x9f, 0x6a, 0xcb, 0x9c, 0xee, 0xba, 0x29, 0xde, 0xbb, 0x99, 0xbc, 0x77, 0x73, 0xdf,
+	0xbf, 0xb4, 0x13, 0x23, 0xe3, 0x3b, 0x78, 0x34, 0x47, 0x54, 0x66, 0x5e, 0x8e, 0xe9, 0x03, 0x58,
+	0x0e, 0x3c, 0x57, 0xab, 0x6d, 0x29, 0xdb, 0x6b, 0x76, 0xbc, 0x34, 0x46, 0xb0, 0x99, 0x81, 0x3e,
+	0x8f, 0x98, 0x4b, 0x7e, 0xf0, 0xab, 0x95, 0xe1, 0x5d, 0x78, 0x23, 0x9e, 0x52, 0x24, 0x62, 0x27,
+	0x14, 0x0f, 0xa8, 0x8c, 0xd2, 0x92, 0x67, 0x7d, 0x3c, 0xa0, 0xc6, 0x3b, 0xa0, 0x2f, 0x8a, 0x26,
+	0x5b, 0xf2, 0x53, 0x78, 0x98, 0x7e, 0xfd, 0xc6, 0xf1, 0x2a, 0x36, 0xc8, 0x4f, 0xd9, 0x6b, 0x15,
+	0x30, 0xb2, 0x58, 0x1d, 0x68, 0xe1, 0xa9, 0xc7, 0x4e, 0x28, 0x73, 0x58, 0x44, 0x39, 0xd0, 0x9a,
+	0x0d, 0xf1, 0x51, 0x9f, 0x9f, 0xa0, 0x7d, 0x68, 0xc6, 0x3b, 0xec, 0x9e, 0x38, 0x8c, 0xf3, 0x6f,
+	0x75, 0xf5, 0xb9, 0xab, 0xf9, 0x2a, 0x19, 0xc5, 0xbd, 0xd5, 0xb8, 0xaf, 0x7f, 0xfd, 0xab, 0xa3,
+	0xd8, 0xab, 0xc2, 0x6d, 0x9f, 0x19, 0x2f, 0xb2, 0xd1, 0x8f, 0x9d, 0x88, 0x56, 0x7c, 0xb6, 0x9b,
+	0xd9, 0x3b, 0x97, 0x38, 0xb2, 0x4e, 0x87, 0xd9, 0x4f, 0x36, 0xa6, 0xd1, 0xb8, 0x62, 0x0c, 0x1d,
+	0xb4, 0x79, 0xa0, 0x45, 0x97, 0x71, 0xec, 0xf9, 0xc3, 0x6a, 0x21, 0xb4, 0x5c, 0x39, 0x38, 0xcc,
+	0xa2, 0x2c, 0x44, 0xfd, 0xab, 0x85, 0xf8, 0x47, 0xc9, 0xa6, 0x91, 0x20, 0xc9, 0x2b, 0xdf, 0x80,
+	0xda, 0x0d, 0x84, 0x3a, 0xbb, 0xee, 0xd4, 0x8e, 0x0e, 0xec, 0x9a, 0xb7, 0xe0, 0x25, 0xa0, 0x75,
+	0x68, 0xc4, 0x7d, 0x81, 0xf9, 0x93, 0x6c, 0xda, 0x62, 0x73, 0xbb, 0x65, 0xea, 0x77, 0xb7, 0x4c,
+	0xa3, 0x4a, 0xcb, 0xa0, 0xf7, 0xa0, 0x81, 0xa7, 0x2c, 0x74, 0x34, 0xf5, 0x8e, 0x61, 0x20, 0x4c,
+	0xba, 0xbf, 0xd7, 0xa1, 0xc1, 0xc7, 0x1f, 0x9a, 0x80, 0x2a, 0x34, 0x12, 0x75, 0xcd, 0xbb, 0x7f,
+	0x68, 0x98, 0xf3, 0x0a, 0xad, 0xef, 0x96, 0xf2, 0x91, 0xc5, 0x9c, 0x80, 0x2a, 0xb4, 0xad, 0x60,
+	0xc8, 0x9c, 0xe2, 0x16, 0x0c, 0x79, 0x4b, 0x3c, 0x27, 0xa0, 0x0a, 0xe1, 0x2a, 0x18, 0x32, 0xa7,
+	0x94, 0x05, 0x43, 0xe6, 0x95, 0x11, 0x7d, 0x0f, 0xf5, 0x58, 0xe6, 0xd0, 0x93, 0x42, 0xce, 0x19,
+	0xfd, 0xd4, 0x77, 0x4a, 0x78, 0xc8, 0x60, 0xe7, 0xb0, 0x7c, 0x88, 0x19, 0xb2, 0x0a, 0x79, 0xa6,
+	0x9a, 0xa9, 0x3f, 0x29, 0xee, 0x20, 0x22, 0x75, 0xff, 0x55, 0x01, 0xd2, 0x67, 0x82, 0xa6, 0x71,
+	0x1f, 0x39, 0x21, 0x43, 0x7b, 0xff, 0x87, 0xb4, 0x58, 0x23, 0xf5, 0x0f, 0x4a, 0xfb, 0xc9, 0x94,
+	0x7f, 0x51, 0x60, 0x35, 0x99, 0xfd, 0xe8, 0x59, 0x09, 0x94, 0xbc, 0x3a, 0xe9, 0x1f, 0x56, 0x71,
+	0x95, 0x1c, 0x22, 0xa8, 0xc7, 0xca, 0x80, 0xde, 0x2f, 0x8e, 0x91, 0x11, 0x24, 0x7d, 0xaf, 0xac,
+	0x9b, 0x0c, 0x3b, 0x85, 0x06, 0x1f, 0xe5, 0x65, 0x8a, 0x9e, 0xd5, 0x90, 0x32, 0x45, 0xcf, 0x69,
+	0x06, 0xfa, 0x11, 0x54, 0x31, 0xe0, 0x51, 0x09, 0x88, 0x9c, 0xb6, 0xe8, 0x4f, 0xcb, 0x3b, 0xa6,
+	0xd5, 0x8e, 0x47, 0x7f, 0x99, 0x6a, 0x67, 0x14, 0xa7, 0x4c, 0xb5, 0xb3, 0x0a, 0x13, 0xe7, 0x2c,
+	0x87, 0x74, 0xb9, 0x5e, 0x4d, 0x95, 0xa8, 0x4c, 0xce, 0x79, 0xe1, 0xe9, 0xbd, 0xbc, 0x7a, 0xd5,
+	0x5e, 0xfa, 0xf3, 0x55, 0x7b, 0xe9, 0xe7, 0x59, 0x5b, 0xb9, 0x9a, 0xb5, 0x95, 0x3f, 0x66, 0x6d,
+	0xe5, 0xef, 0x59, 0x5b, 0x79, 0xf9, 0x49, 0xd5, 0xbf, 0x97, 0x1f, 0xc9, 0xe5, 0xb7, 0xb5, 0x53,
+	0x95, 0x6b, 0xc3, 0xee, 0x7f, 0x01, 0x00, 0x00, 0xff, 0xff, 0x89, 0x0a, 0xdb, 0xe4, 0xab, 0x0e,
+	0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -1201,6 +1308,7 @@ var _Store_serviceDesc = grpc.ServiceDesc{
 type ControllerClient interface {
 	Start(ctx context.Context, in *ControllerStartRequest, opts ...grpc.CallOption) (*ControllerStartResponse, error)
 	Shutdown(ctx context.Context, in *ControllerShutdownRequest, opts ...grpc.CallOption) (*ControllerShutdownResponse, error)
+	Wait(ctx context.Context, in *ControllerWaitRequest, opts ...grpc.CallOption) (*ControllerWaitResponse, error)
 	Pause(ctx context.Context, in *ControllerPauseRequest, opts ...grpc.CallOption) (*ControllerPauseResponse, error)
 	Resume(ctx context.Context, in *ControllerResumeRequest, opts ...grpc.CallOption) (*ControllerResumeResponse, error)
 	Ping(ctx context.Context, in *ControllerPingRequest, opts ...grpc.CallOption) (*ControllerPingResponse, error)
@@ -1227,6 +1335,15 @@ func (c *controllerClient) Start(ctx context.Context, in *ControllerStartRequest
 func (c *controllerClient) Shutdown(ctx context.Context, in *ControllerShutdownRequest, opts ...grpc.CallOption) (*ControllerShutdownResponse, error) {
 	out := new(ControllerShutdownResponse)
 	err := c.cc.Invoke(ctx, "/containerd.services.sandbox.v1.Controller/Shutdown", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *controllerClient) Wait(ctx context.Context, in *ControllerWaitRequest, opts ...grpc.CallOption) (*ControllerWaitResponse, error) {
+	out := new(ControllerWaitResponse)
+	err := c.cc.Invoke(ctx, "/containerd.services.sandbox.v1.Controller/Wait", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1273,6 +1390,7 @@ func (c *controllerClient) Status(ctx context.Context, in *ControllerStatusReque
 type ControllerServer interface {
 	Start(context.Context, *ControllerStartRequest) (*ControllerStartResponse, error)
 	Shutdown(context.Context, *ControllerShutdownRequest) (*ControllerShutdownResponse, error)
+	Wait(context.Context, *ControllerWaitRequest) (*ControllerWaitResponse, error)
 	Pause(context.Context, *ControllerPauseRequest) (*ControllerPauseResponse, error)
 	Resume(context.Context, *ControllerResumeRequest) (*ControllerResumeResponse, error)
 	Ping(context.Context, *ControllerPingRequest) (*ControllerPingResponse, error)
@@ -1288,6 +1406,9 @@ func (*UnimplementedControllerServer) Start(ctx context.Context, req *Controller
 }
 func (*UnimplementedControllerServer) Shutdown(ctx context.Context, req *ControllerShutdownRequest) (*ControllerShutdownResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Shutdown not implemented")
+}
+func (*UnimplementedControllerServer) Wait(ctx context.Context, req *ControllerWaitRequest) (*ControllerWaitResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Wait not implemented")
 }
 func (*UnimplementedControllerServer) Pause(ctx context.Context, req *ControllerPauseRequest) (*ControllerPauseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Pause not implemented")
@@ -1338,6 +1459,24 @@ func _Controller_Shutdown_Handler(srv interface{}, ctx context.Context, dec func
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ControllerServer).Shutdown(ctx, req.(*ControllerShutdownRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Controller_Wait_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ControllerWaitRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControllerServer).Wait(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.services.sandbox.v1.Controller/Wait",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControllerServer).Wait(ctx, req.(*ControllerWaitRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1425,6 +1564,10 @@ var _Controller_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Shutdown",
 			Handler:    _Controller_Shutdown_Handler,
+		},
+		{
+			MethodName: "Wait",
+			Handler:    _Controller_Wait_Handler,
 		},
 		{
 			MethodName: "Pause",
@@ -1839,9 +1982,9 @@ func (m *ControllerStartRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) 
 		i -= len(m.XXX_unrecognized)
 		copy(dAtA[i:], m.XXX_unrecognized)
 	}
-	if m.Spec != nil {
+	if m.Options != nil {
 		{
-			size, err := m.Spec.MarshalToSizedBuffer(dAtA[:i])
+			size, err := m.Options.MarshalToSizedBuffer(dAtA[:i])
 			if err != nil {
 				return 0, err
 			}
@@ -1849,7 +1992,21 @@ func (m *ControllerStartRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) 
 			i = encodeVarintSandbox(dAtA, i, uint64(size))
 		}
 		i--
-		dAtA[i] = 0x22
+		dAtA[i] = 0x1a
+	}
+	if len(m.Rootfs) > 0 {
+		for iNdEx := len(m.Rootfs) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Rootfs[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintSandbox(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+		}
 	}
 	if len(m.SandboxID) > 0 {
 		i -= len(m.SandboxID)
@@ -1885,6 +2042,18 @@ func (m *ControllerStartResponse) MarshalToSizedBuffer(dAtA []byte) (int, error)
 		i -= len(m.XXX_unrecognized)
 		copy(dAtA[i:], m.XXX_unrecognized)
 	}
+	if m.Pid != 0 {
+		i = encodeVarintSandbox(dAtA, i, uint64(m.Pid))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.SandboxID) > 0 {
+		i -= len(m.SandboxID)
+		copy(dAtA[i:], m.SandboxID)
+		i = encodeVarintSandbox(dAtA, i, uint64(len(m.SandboxID)))
+		i--
+		dAtA[i] = 0xa
+	}
 	return len(dAtA) - i, nil
 }
 
@@ -1911,6 +2080,11 @@ func (m *ControllerShutdownRequest) MarshalToSizedBuffer(dAtA []byte) (int, erro
 	if m.XXX_unrecognized != nil {
 		i -= len(m.XXX_unrecognized)
 		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	if m.TimeoutSecs != 0 {
+		i = encodeVarintSandbox(dAtA, i, uint64(m.TimeoutSecs))
+		i--
+		dAtA[i] = 0x10
 	}
 	if len(m.SandboxID) > 0 {
 		i -= len(m.SandboxID)
@@ -1945,6 +2119,80 @@ func (m *ControllerShutdownResponse) MarshalToSizedBuffer(dAtA []byte) (int, err
 	if m.XXX_unrecognized != nil {
 		i -= len(m.XXX_unrecognized)
 		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *ControllerWaitRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ControllerWaitRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ControllerWaitRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	if len(m.SandboxID) > 0 {
+		i -= len(m.SandboxID)
+		copy(dAtA[i:], m.SandboxID)
+		i = encodeVarintSandbox(dAtA, i, uint64(len(m.SandboxID)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *ControllerWaitResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ControllerWaitResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ControllerWaitResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	n7, err7 := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.ExitedAt, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdTime(m.ExitedAt):])
+	if err7 != nil {
+		return 0, err7
+	}
+	i -= n7
+	i = encodeVarintSandbox(dAtA, i, uint64(n7))
+	i--
+	dAtA[i] = 0x12
+	if m.ExitStatus != 0 {
+		i = encodeVarintSandbox(dAtA, i, uint64(m.ExitStatus))
+		i--
+		dAtA[i] = 0x8
 	}
 	return len(dAtA) - i, nil
 }
@@ -2190,15 +2438,47 @@ func (m *ControllerStatusResponse) MarshalToSizedBuffer(dAtA []byte) (int, error
 		i -= len(m.XXX_unrecognized)
 		copy(dAtA[i:], m.XXX_unrecognized)
 	}
-	if m.Status != nil {
+	if m.Extra != nil {
 		{
-			size, err := m.Status.MarshalToSizedBuffer(dAtA[:i])
+			size, err := m.Extra.MarshalToSizedBuffer(dAtA[:i])
 			if err != nil {
 				return 0, err
 			}
 			i -= size
 			i = encodeVarintSandbox(dAtA, i, uint64(size))
 		}
+		i--
+		dAtA[i] = 0x32
+	}
+	n9, err9 := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.ExitedAt, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdTime(m.ExitedAt):])
+	if err9 != nil {
+		return 0, err9
+	}
+	i -= n9
+	i = encodeVarintSandbox(dAtA, i, uint64(n9))
+	i--
+	dAtA[i] = 0x2a
+	if m.ExitStatus != 0 {
+		i = encodeVarintSandbox(dAtA, i, uint64(m.ExitStatus))
+		i--
+		dAtA[i] = 0x20
+	}
+	if len(m.State) > 0 {
+		i -= len(m.State)
+		copy(dAtA[i:], m.State)
+		i = encodeVarintSandbox(dAtA, i, uint64(len(m.State)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if m.Pid != 0 {
+		i = encodeVarintSandbox(dAtA, i, uint64(m.Pid))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.ID) > 0 {
+		i -= len(m.ID)
+		copy(dAtA[i:], m.ID)
+		i = encodeVarintSandbox(dAtA, i, uint64(len(m.ID)))
 		i--
 		dAtA[i] = 0xa
 	}
@@ -2384,8 +2664,14 @@ func (m *ControllerStartRequest) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovSandbox(uint64(l))
 	}
-	if m.Spec != nil {
-		l = m.Spec.Size()
+	if len(m.Rootfs) > 0 {
+		for _, e := range m.Rootfs {
+			l = e.Size()
+			n += 1 + l + sovSandbox(uint64(l))
+		}
+	}
+	if m.Options != nil {
+		l = m.Options.Size()
 		n += 1 + l + sovSandbox(uint64(l))
 	}
 	if m.XXX_unrecognized != nil {
@@ -2400,6 +2686,13 @@ func (m *ControllerStartResponse) Size() (n int) {
 	}
 	var l int
 	_ = l
+	l = len(m.SandboxID)
+	if l > 0 {
+		n += 1 + l + sovSandbox(uint64(l))
+	}
+	if m.Pid != 0 {
+		n += 1 + sovSandbox(uint64(m.Pid))
+	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
 	}
@@ -2416,6 +2709,9 @@ func (m *ControllerShutdownRequest) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovSandbox(uint64(l))
 	}
+	if m.TimeoutSecs != 0 {
+		n += 1 + sovSandbox(uint64(m.TimeoutSecs))
+	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
 	}
@@ -2428,6 +2724,39 @@ func (m *ControllerShutdownResponse) Size() (n int) {
 	}
 	var l int
 	_ = l
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *ControllerWaitRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.SandboxID)
+	if l > 0 {
+		n += 1 + l + sovSandbox(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *ControllerWaitResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.ExitStatus != 0 {
+		n += 1 + sovSandbox(uint64(m.ExitStatus))
+	}
+	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.ExitedAt)
+	n += 1 + l + sovSandbox(uint64(l))
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
 	}
@@ -2540,8 +2869,24 @@ func (m *ControllerStatusResponse) Size() (n int) {
 	}
 	var l int
 	_ = l
-	if m.Status != nil {
-		l = m.Status.Size()
+	l = len(m.ID)
+	if l > 0 {
+		n += 1 + l + sovSandbox(uint64(l))
+	}
+	if m.Pid != 0 {
+		n += 1 + sovSandbox(uint64(m.Pid))
+	}
+	l = len(m.State)
+	if l > 0 {
+		n += 1 + l + sovSandbox(uint64(l))
+	}
+	if m.ExitStatus != 0 {
+		n += 1 + sovSandbox(uint64(m.ExitStatus))
+	}
+	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.ExitedAt)
+	n += 1 + l + sovSandbox(uint64(l))
+	if m.Extra != nil {
+		l = m.Extra.Size()
 		n += 1 + l + sovSandbox(uint64(l))
 	}
 	if m.XXX_unrecognized != nil {
@@ -2675,9 +3020,15 @@ func (this *ControllerStartRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
+	repeatedStringForRootfs := "[]*Mount{"
+	for _, f := range this.Rootfs {
+		repeatedStringForRootfs += strings.Replace(fmt.Sprintf("%v", f), "Mount", "types.Mount", 1) + ","
+	}
+	repeatedStringForRootfs += "}"
 	s := strings.Join([]string{`&ControllerStartRequest{`,
 		`SandboxID:` + fmt.Sprintf("%v", this.SandboxID) + `,`,
-		`Spec:` + strings.Replace(fmt.Sprintf("%v", this.Spec), "Any", "types1.Any", 1) + `,`,
+		`Rootfs:` + repeatedStringForRootfs + `,`,
+		`Options:` + strings.Replace(fmt.Sprintf("%v", this.Options), "Any", "types1.Any", 1) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -2688,6 +3039,8 @@ func (this *ControllerStartResponse) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&ControllerStartResponse{`,
+		`SandboxID:` + fmt.Sprintf("%v", this.SandboxID) + `,`,
+		`Pid:` + fmt.Sprintf("%v", this.Pid) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -2699,6 +3052,7 @@ func (this *ControllerShutdownRequest) String() string {
 	}
 	s := strings.Join([]string{`&ControllerShutdownRequest{`,
 		`SandboxID:` + fmt.Sprintf("%v", this.SandboxID) + `,`,
+		`TimeoutSecs:` + fmt.Sprintf("%v", this.TimeoutSecs) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -2709,6 +3063,29 @@ func (this *ControllerShutdownResponse) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&ControllerShutdownResponse{`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ControllerWaitRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ControllerWaitRequest{`,
+		`SandboxID:` + fmt.Sprintf("%v", this.SandboxID) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ControllerWaitResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ControllerWaitResponse{`,
+		`ExitStatus:` + fmt.Sprintf("%v", this.ExitStatus) + `,`,
+		`ExitedAt:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ExitedAt), "Timestamp", "types1.Timestamp", 1), `&`, ``, 1) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -2793,7 +3170,12 @@ func (this *ControllerStatusResponse) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&ControllerStatusResponse{`,
-		`Status:` + strings.Replace(fmt.Sprintf("%v", this.Status), "Any", "types1.Any", 1) + `,`,
+		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
+		`Pid:` + fmt.Sprintf("%v", this.Pid) + `,`,
+		`State:` + fmt.Sprintf("%v", this.State) + `,`,
+		`ExitStatus:` + fmt.Sprintf("%v", this.ExitStatus) + `,`,
+		`ExitedAt:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ExitedAt), "Timestamp", "types1.Timestamp", 1), `&`, ``, 1) + `,`,
+		`Extra:` + strings.Replace(fmt.Sprintf("%v", this.Extra), "Any", "types1.Any", 1) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -3708,9 +4090,9 @@ func (m *ControllerStartRequest) Unmarshal(dAtA []byte) error {
 			}
 			m.SandboxID = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 4:
+		case 2:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Spec", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Rootfs", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -3737,10 +4119,44 @@ func (m *ControllerStartRequest) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.Spec == nil {
-				m.Spec = &types1.Any{}
+			m.Rootfs = append(m.Rootfs, &types.Mount{})
+			if err := m.Rootfs[len(m.Rootfs)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
 			}
-			if err := m.Spec.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Options", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Options == nil {
+				m.Options = &types1.Any{}
+			}
+			if err := m.Options.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -3795,6 +4211,57 @@ func (m *ControllerStartResponse) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: ControllerStartResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SandboxID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SandboxID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Pid", wireType)
+			}
+			m.Pid = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Pid |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipSandbox(dAtA[iNdEx:])
@@ -3878,6 +4345,25 @@ func (m *ControllerShutdownRequest) Unmarshal(dAtA []byte) error {
 			}
 			m.SandboxID = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TimeoutSecs", wireType)
+			}
+			m.TimeoutSecs = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.TimeoutSecs |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipSandbox(dAtA[iNdEx:])
@@ -3929,6 +4415,192 @@ func (m *ControllerShutdownResponse) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: ControllerShutdownResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipSandbox(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ControllerWaitRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowSandbox
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ControllerWaitRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ControllerWaitRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SandboxID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SandboxID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipSandbox(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ControllerWaitResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowSandbox
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ControllerWaitResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ControllerWaitResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExitStatus", wireType)
+			}
+			m.ExitStatus = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ExitStatus |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExitedAt", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := github_com_gogo_protobuf_types.StdTimeUnmarshal(&m.ExitedAt, dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipSandbox(dAtA[iNdEx:])
@@ -4467,7 +5139,109 @@ func (m *ControllerStatusResponse) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Pid", wireType)
+			}
+			m.Pid = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Pid |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field State", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.State = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExitStatus", wireType)
+			}
+			m.ExitStatus = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ExitStatus |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExitedAt", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -4494,10 +5268,43 @@ func (m *ControllerStatusResponse) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.Status == nil {
-				m.Status = &types1.Any{}
+			if err := github_com_gogo_protobuf_types.StdTimeUnmarshal(&m.ExitedAt, dAtA[iNdEx:postIndex]); err != nil {
+				return err
 			}
-			if err := m.Status.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Extra", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowSandbox
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthSandbox
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Extra == nil {
+				m.Extra = &types1.Any{}
+			}
+			if err := m.Extra.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

@@ -19,6 +19,10 @@ syntax = "proto3";
 package containerd.task.v2;
 
 import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+import weak "gogoproto/gogo.proto";
+
+import "github.com/containerd/containerd/api/types/mount.proto";
 
 // Sandbox is an optional interface that shim may implement to support sandboxes environments.
 // A typical example of sandbox is microVM or pause container - an entity that groups containers and/or
@@ -29,6 +33,9 @@ service Sandbox {
 
 	// StopSandbox will stop existing sandbox instance
 	rpc StopSandbox(StopSandboxRequest) returns (StopSandboxResponse);
+
+	// WaitSandbox blocks until sanbox exits.
+	rpc WaitSandbox(WaitSandboxRequest) returns (WaitSandboxResponse);
 
 	// Update can be used to amend the state of currently running sandbox instance (depending on
 	// implementation this can be used to resize/reacquire needed resources like RAM/CPU).
@@ -50,10 +57,12 @@ service Sandbox {
 message StartSandboxRequest {
 	string sandbox_id = 1;
 	string bundle_path = 2;
+	repeated containerd.types.Mount rootfs = 3;
+	google.protobuf.Any options = 4;
 }
 
 message StartSandboxResponse {
-	string pid = 1;
+	uint32 pid = 1;
 }
 
 message StopSandboxRequest {
@@ -67,6 +76,15 @@ message UpdateSandboxRequest {
 	string sandbox_id = 1;
 	google.protobuf.Any resources = 2;
 	map<string, string> annotations = 3;
+}
+
+message WaitSandboxRequest {
+	string sandbox_id = 1;
+}
+
+message WaitSandboxResponse {
+	uint32 exit_status = 1;
+	google.protobuf.Timestamp exited_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message UpdateSandboxResponse {}
@@ -88,7 +106,12 @@ message ResumeSandboxRequest {
 message ResumeSandboxResponse {}
 
 message SandboxStatusResponse {
-	google.protobuf.Any status = 1;
+	string id = 1;
+	uint32 pid = 2;
+	string state = 3;
+	uint32 exit_status = 4;
+	google.protobuf.Timestamp exited_at = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Any extra = 6;
 }
 
 message PingRequest {
