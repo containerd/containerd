@@ -8,7 +8,7 @@ match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
 # previous release
 previous = "v1.5.0"
 
-pre_release = false
+pre_release = true
 
 preface = """\
 The seventh major release of containerd includes many improvements and added
