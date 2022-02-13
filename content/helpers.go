@@ -26,15 +26,45 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-var bufPool = sync.Pool{
-	New: func() interface{} {
-		buffer := make([]byte, 1<<20)
-		return &buffer
-	},
+var (
+	bufPool = sync.Pool{
+		New: func() interface{} {
+			buffer := make([]byte, 1<<20)
+			return &buffer
+		},
+	}
+
+	nsRefLocks = newKmutex()
+)
+
+type contentWriterWrapper struct {
+	Writer
+
+	nsRef      string
+	unlockOnce sync.Once
+}
+
+func (w *contentWriterWrapper) Close() error {
+	defer w.unlockRef()
+
+	return w.Writer.Close()
+}
+
+func (w *contentWriterWrapper) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...Opt) error {
+	defer w.unlockRef()
+
+	return w.Writer.Commit(ctx, size, expected, opts...)
+}
+
+func (w *contentWriterWrapper) unlockRef() {
+	w.unlockOnce.Do(func() {
+		nsRefLocks.unlock(w.nsRef)
+	})
 }
 
 // NewReader returns a io.Reader from a ReaderAt
@@ -89,12 +119,68 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, desc o
 
 // OpenWriter opens a new writer for the given reference, retrying if the writer
 // is locked until the reference is available or returns an error.
-func OpenWriter(ctx context.Context, cs Ingester, opts ...WriterOpt) (Writer, error) {
+func OpenWriter(ctx context.Context, cs Ingester, opts ...WriterOpt) (_ Writer, retErr error) {
+	// If the client sets default namespace by gRPC Interceptor, there is
+	// no way to get the default namespace currently. The nsRefLocks is
+	// used to lock ref in "${Namespace}::${Ref}" format. So if we can't
+	// get namespace from context, we should just call open writer with
+	// backoff retry.
+	//
+	// Maybe we can define DefaultNamespace() method in each resource
+	// interface on client side. Therefore we can rollback to default
+	// namespace like this:
+	//
+	// if defaultNsFn, ok := cs.(interface{DefaultNamespace()}); ok {
+	//	...
+	// }
+	//
+	// Ref: https://github.com/containerd/containerd/issues/6039
+	ns, ok := namespaces.Namespace(ctx)
+	if !ok || ns == "" {
+		return openWriter(ctx, cs, opts...)
+	}
+
+	wOpt := &WriterOpts{}
+	for _, o := range opts {
+		o(wOpt)
+	}
+
+	ref := wOpt.Ref
+	if ref == "" {
+		return nil, fmt.Errorf("ref must not be empty: %w", errdefs.ErrInvalidArgument)
+	}
+
+	ref = makeNsRefKey(ns, ref)
+	if err := nsRefLocks.lock(ctx, ref); err != nil {
+		return nil, err
+	}
+	defer func() {
+		if retErr != nil {
+			nsRefLocks.unlock(ref)
+		}
+	}()
+
+	// Even if the lock has been hold, the lock is on one client side and it
+	// still receives unavailable error when other client already holds the
+	// reference in the content backend. We still needs backoff retry here.
+	cw, err := openWriter(ctx, cs, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return &contentWriterWrapper{
+		Writer: cw,
+		nsRef:  ref,
+	}, nil
+}
+
+func openWriter(ctx context.Context, cs Ingester, opts ...WriterOpt) (Writer, error) {
 	var (
 		cw    Writer
 		err   error
 		retry = 16
 	)
+
 	for {
 		cw, err = cs.Writer(ctx, opts...)
 		if err != nil {
@@ -105,7 +191,6 @@ func OpenWriter(ctx context.Context, cs Ingester, opts ...WriterOpt) (Writer, er
 			// TODO: Check status to determine if the writer is active,
 			// continue waiting while active, otherwise return lock
 			// error or abort. Requires asserting for an ingest manager
-
 			select {
 			case <-time.After(time.Millisecond * time.Duration(rand.Intn(retry))):
 				if retry < 2048 {
@@ -116,12 +201,10 @@ func OpenWriter(ctx context.Context, cs Ingester, opts ...WriterOpt) (Writer, er
 				// Propagate lock error
 				return nil, err
 			}
-
 		}
 		break
 	}
-
-	return cw, err
+	return cw, nil
 }
 
 // Copy copies data with the expected digest from the reader into the
@@ -287,4 +370,8 @@ func copyWithBuffer(dst io.Writer, src io.Reader) (written int64, err error) {
 		}
 	}
 	return
+}
+
+func makeNsRefKey(ns string, ref string) string {
+	return ns + "::" + ref
 }
