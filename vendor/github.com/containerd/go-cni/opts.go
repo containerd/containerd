@@ -18,10 +18,13 @@ package cni
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 
 	cnilibrary "github.com/containernetworking/cni/libcni"
+	"github.com/containernetworking/cni/pkg/invoke"
+	"github.com/containernetworking/cni/pkg/version"
 )
 
 // Opt sets options for a CNI instance
@@ -41,7 +44,13 @@ func WithInterfacePrefix(prefix string) Opt {
 func WithPluginDir(dirs []string) Opt {
 	return func(c *libcni) error {
 		c.pluginDirs = dirs
-		c.cniConfig = &cnilibrary.CNIConfig{Path: dirs}
+		c.cniConfig = cnilibrary.NewCNIConfig(
+			dirs,
+			&invoke.DefaultExec{
+				RawExec:       &invoke.RawExec{Stderr: os.Stderr},
+				PluginDecoder: version.PluginDecoder{},
+			},
+		)
 		return nil
 	}
 }
