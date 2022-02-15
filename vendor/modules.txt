@@ -169,7 +169,7 @@ github.com/docker/go-units
 ## explicit
 github.com/emicklei/go-restful
 github.com/emicklei/go-restful/log
-# github.com/fsnotify/fsnotify v1.4.9
+# github.com/fsnotify/fsnotify v1.5.1
 ## explicit
 github.com/fsnotify/fsnotify
 # github.com/go-logr/logr v1.2.2

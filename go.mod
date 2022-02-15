@@ -27,7 +27,7 @@ require (
 	github.com/docker/go-metrics v0.0.1
 	github.com/docker/go-units v0.4.0
 	github.com/emicklei/go-restful v2.9.5+incompatible
-	github.com/fsnotify/fsnotify v1.4.9
+	github.com/fsnotify/fsnotify v1.5.1
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gogo/googleapis v1.4.0
 	github.com/gogo/protobuf v1.3.2
