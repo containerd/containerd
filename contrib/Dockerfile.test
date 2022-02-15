@@ -10,7 +10,7 @@
 #
 # docker build -t containerd-test --build-arg RUNC_VERSION=v1.0.0-rc94 -f Dockerfile.test ../
 
-ARG GOLANG_VERSION=1.17.5
+ARG GOLANG_VERSION=1.17.7
 ARG GOLANG_IMAGE=golang
 
 FROM ${GOLANG_IMAGE}:${GOLANG_VERSION} AS golang
