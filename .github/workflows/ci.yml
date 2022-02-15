@@ -20,7 +20,7 @@ jobs:
 
     strategy:
       matrix:
-        go-version: [1.17.5]
+        go-version: [1.17.7]
         os: [ubuntu-18.04, macos-10.15, windows-2019]
 
     steps:
@@ -46,7 +46,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.5'
+          go-version: '1.17.7'
 
       - uses: actions/checkout@v2
         with:
@@ -78,7 +78,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.5'
+          go-version: '1.17.7'
 
       - uses: actions/checkout@v2
         with:
@@ -110,7 +110,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.5'
+          go-version: '1.17.7'
       - uses: actions/checkout@v2
       - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.1
       - run: make man
@@ -144,7 +144,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.5'
+          go-version: '1.17.7'
       - uses: actions/checkout@v2
       - run: |
           set -e -x
@@ -201,7 +201,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-18.04, macos-10.15, windows-2019, windows-2022]
-        go-version: ['1.16.13', '1.17.5']
+        go-version: ['1.16.14', '1.17.7']
 
     steps:
       - uses: actions/setup-go@v2
@@ -248,7 +248,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.5'
+          go-version: '1.17.7'
 
       - uses: actions/checkout@v2
         with:
@@ -330,7 +330,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.5'
+          go-version: '1.17.7'
 
       - uses: actions/checkout@v2
 
@@ -449,7 +449,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.5'
+          go-version: '1.17.7'
       - uses: actions/checkout@v2
       - run: sudo -E PATH=$PATH script/setup/install-gotestsum
       - name: Tests
