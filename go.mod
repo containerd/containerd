@@ -42,7 +42,7 @@ require (
 	github.com/klauspost/compress v1.11.13
 	github.com/moby/locker v1.0.1
 	github.com/moby/sys/mountinfo v0.6.0
-	github.com/moby/sys/signal v0.6.0
+	github.com/moby/sys/signal v0.7.0
 	github.com/moby/sys/symlink v0.2.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.0.2-0.20211117181255-693428a734f5
