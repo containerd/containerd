@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package containerd.linux.runc;
 
-import weak "gogoproto/gogo.proto";
+import "gogoproto/gogo.proto";
 
 option go_package = "github.com/containerd/containerd/runtime/linux/runctypes;runctypes";
 
