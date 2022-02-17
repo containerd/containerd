@@ -395,6 +395,15 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		return err
 	}
 	logDebugCNIResult(ctx, id, result)
+	// DisableCheck is handled in libcni CheckNetworkList
+	err = netPlugin.Check(ctx, id, path, opts...)
+
+	log.G(ctx).WithField("podsandboxid", id).Debugf("cni check completed")
+
+	if err != nil {
+		return err
+	}
+
 	// Check if the default interface has IP config
 	if configs, ok := result.Interfaces[defaultIfName]; ok && len(configs.IPConfigs) > 0 {
 		sandbox.IP, sandbox.AdditionalIPs = selectPodIPs(ctx, configs.IPConfigs, c.config.IPPreference)
