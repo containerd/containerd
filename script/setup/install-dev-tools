@@ -24,6 +24,7 @@ set -eu -o pipefail
 go install github.com/stevvooe/protobuild@v0.1.0
 go install github.com/cpuguy83/go-md2man/v2@v2.0.1
 go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.42.0
+go install github.com/containerd/ttrpc/cmd/protoc-gen-gogottrpc@v1.1.0
 
 # the following packages need to exist in $GOPATH so we can't use
 # go modules-aware mode of `go get` for these includes used during

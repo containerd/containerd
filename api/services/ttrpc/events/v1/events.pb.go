@@ -7,7 +7,6 @@ import (
 	context "context"
 	fmt "fmt"
 	github_com_containerd_ttrpc "github.com/containerd/ttrpc"
-	github_com_containerd_typeurl "github.com/containerd/typeurl"
 	proto "github.com/gogo/protobuf/proto"
 	github_com_gogo_protobuf_types "github.com/gogo/protobuf/types"
 	types "github.com/gogo/protobuf/types"
@@ -150,33 +149,6 @@ var fileDescriptor_19f98672016720b5 = []byte{
 	0x00, 0x00, 0xff, 0xff, 0xd4, 0x90, 0xbd, 0x09, 0x04, 0x03, 0x00, 0x00,
 }
 
-// Field returns the value for the given fieldpath as a string, if defined.
-// If the value is not defined, the second value will be false.
-func (m *Envelope) Field(fieldpath []string) (string, bool) {
-	if len(fieldpath) == 0 {
-		return "", false
-	}
-
-	switch fieldpath[0] {
-	// unhandled: timestamp
-	case "namespace":
-		return string(m.Namespace), len(m.Namespace) > 0
-	case "topic":
-		return string(m.Topic), len(m.Topic) > 0
-	case "event":
-		decoded, err := github_com_containerd_typeurl.UnmarshalAny(m.Event)
-		if err != nil {
-			return "", false
-		}
-
-		adaptor, ok := decoded.(interface{ Field([]string) (string, bool) })
-		if !ok {
-			return "", false
-		}
-		return adaptor.Field(fieldpath[1:])
-	}
-	return "", false
-}
 func (m *ForwardRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)

@@ -6,7 +6,6 @@ package events
 import (
 	context "context"
 	fmt "fmt"
-	github_com_containerd_typeurl "github.com/containerd/typeurl"
 	proto "github.com/gogo/protobuf/proto"
 	github_com_gogo_protobuf_types "github.com/gogo/protobuf/types"
 	types "github.com/gogo/protobuf/types"
@@ -236,34 +235,6 @@ var fileDescriptor_43fcd20dc1642376 = []byte{
 	0x7e, 0xac, 0x5c, 0xf4, 0xf6, 0xc9, 0x7f, 0xfe, 0xd7, 0x8f, 0xab, 0x6a, 0xda, 0x9a, 0xa2, 0xf0,
 	0xa0, 0x1c, 0xeb, 0xe1, 0xcf, 0x00, 0x00, 0x00, 0xff, 0xff, 0xe6, 0xbf, 0x19, 0xa6, 0x24, 0x04,
 	0x00, 0x00,
-}
-
-// Field returns the value for the given fieldpath as a string, if defined.
-// If the value is not defined, the second value will be false.
-func (m *Envelope) Field(fieldpath []string) (string, bool) {
-	if len(fieldpath) == 0 {
-		return "", false
-	}
-
-	switch fieldpath[0] {
-	// unhandled: timestamp
-	case "namespace":
-		return string(m.Namespace), len(m.Namespace) > 0
-	case "topic":
-		return string(m.Topic), len(m.Topic) > 0
-	case "event":
-		decoded, err := github_com_containerd_typeurl.UnmarshalAny(m.Event)
-		if err != nil {
-			return "", false
-		}
-
-		adaptor, ok := decoded.(interface{ Field([]string) (string, bool) })
-		if !ok {
-			return "", false
-		}
-		return adaptor.Field(fieldpath[1:])
-	}
-	return "", false
 }
 
 // Reference imports to suppress errors if they are not otherwise used.

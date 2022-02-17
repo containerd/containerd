@@ -179,63 +179,6 @@ var fileDescriptor_6cd45d1d5adffe29 = []byte{
 	0x00, 0x50, 0x87, 0x59, 0x83, 0x02, 0x00, 0x00,
 }
 
-// Field returns the value for the given fieldpath as a string, if defined.
-// If the value is not defined, the second value will be false.
-func (m *NamespaceCreate) Field(fieldpath []string) (string, bool) {
-	if len(fieldpath) == 0 {
-		return "", false
-	}
-
-	switch fieldpath[0] {
-	case "name":
-		return string(m.Name), len(m.Name) > 0
-	case "labels":
-		// Labels fields have been special-cased by name. If this breaks,
-		// add better special casing to fieldpath plugin.
-		if len(m.Labels) == 0 {
-			return "", false
-		}
-		value, ok := m.Labels[strings.Join(fieldpath[1:], ".")]
-		return value, ok
-	}
-	return "", false
-}
-
-// Field returns the value for the given fieldpath as a string, if defined.
-// If the value is not defined, the second value will be false.
-func (m *NamespaceUpdate) Field(fieldpath []string) (string, bool) {
-	if len(fieldpath) == 0 {
-		return "", false
-	}
-
-	switch fieldpath[0] {
-	case "name":
-		return string(m.Name), len(m.Name) > 0
-	case "labels":
-		// Labels fields have been special-cased by name. If this breaks,
-		// add better special casing to fieldpath plugin.
-		if len(m.Labels) == 0 {
-			return "", false
-		}
-		value, ok := m.Labels[strings.Join(fieldpath[1:], ".")]
-		return value, ok
-	}
-	return "", false
-}
-
-// Field returns the value for the given fieldpath as a string, if defined.
-// If the value is not defined, the second value will be false.
-func (m *NamespaceDelete) Field(fieldpath []string) (string, bool) {
-	if len(fieldpath) == 0 {
-		return "", false
-	}
-
-	switch fieldpath[0] {
-	case "name":
-		return string(m.Name), len(m.Name) > 0
-	}
-	return "", false
-}
 func (m *NamespaceCreate) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)

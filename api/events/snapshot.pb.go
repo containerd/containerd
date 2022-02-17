@@ -172,51 +172,6 @@ var fileDescriptor_bd6c184d3d9aa5f2 = []byte{
 	0x00, 0xff, 0xff, 0x69, 0x66, 0xa9, 0x2a, 0x86, 0x01, 0x00, 0x00,
 }
 
-// Field returns the value for the given fieldpath as a string, if defined.
-// If the value is not defined, the second value will be false.
-func (m *SnapshotPrepare) Field(fieldpath []string) (string, bool) {
-	if len(fieldpath) == 0 {
-		return "", false
-	}
-
-	switch fieldpath[0] {
-	case "key":
-		return string(m.Key), len(m.Key) > 0
-	case "parent":
-		return string(m.Parent), len(m.Parent) > 0
-	}
-	return "", false
-}
-
-// Field returns the value for the given fieldpath as a string, if defined.
-// If the value is not defined, the second value will be false.
-func (m *SnapshotCommit) Field(fieldpath []string) (string, bool) {
-	if len(fieldpath) == 0 {
-		return "", false
-	}
-
-	switch fieldpath[0] {
-	case "key":
-		return string(m.Key), len(m.Key) > 0
-	case "name":
-		return string(m.Name), len(m.Name) > 0
-	}
-	return "", false
-}
-
-// Field returns the value for the given fieldpath as a string, if defined.
-// If the value is not defined, the second value will be false.
-func (m *SnapshotRemove) Field(fieldpath []string) (string, bool) {
-	if len(fieldpath) == 0 {
-		return "", false
-	}
-
-	switch fieldpath[0] {
-	case "key":
-		return string(m.Key), len(m.Key) > 0
-	}
-	return "", false
-}
 func (m *SnapshotPrepare) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)

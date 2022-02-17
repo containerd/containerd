@@ -91,19 +91,6 @@ var fileDescriptor_dfb34b8b808e2ecd = []byte{
 	0x61, 0x01, 0x00, 0x00,
 }
 
-// Field returns the value for the given fieldpath as a string, if defined.
-// If the value is not defined, the second value will be false.
-func (m *ContentDelete) Field(fieldpath []string) (string, bool) {
-	if len(fieldpath) == 0 {
-		return "", false
-	}
-
-	switch fieldpath[0] {
-	case "digest":
-		return string(m.Digest), len(m.Digest) > 0
-	}
-	return "", false
-}
 func (m *ContentDelete) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
