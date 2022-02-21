@@ -1507,7 +1507,7 @@ func writeFilesToTempDir(tmpDirPattern string, content []string) (string, error)
 		}
 	}
 
-	return dir, cdi.GetRegistry(cdi.WithSpecDirs(dir)).Refresh()
+	return dir, nil
 }
 
 func TestCDIInjections(t *testing.T) {
@@ -1619,7 +1619,7 @@ containerEdits:
 		}
 		require.NoError(t, err)
 
-		injectFun := containerd.WithCDI(spec, test.annotations)
+		injectFun := containerd.WithCDI(spec, test.annotations, []string{cdiDir})
 		err = injectFun(nil, nil, nil)
 		assert.Equal(t, test.expectError, err != nil)
 

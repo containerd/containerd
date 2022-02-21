@@ -328,7 +328,7 @@ func WithoutRefreshedMetadata(i *InfoConfig) {
 }
 
 // WithCDI updates OCI spec with CDI content
-func WithCDI(s *oci.Spec, annotations map[string]string) NewContainerOpts {
+func WithCDI(s *oci.Spec, annotations map[string]string, cdiSpecDirs []string) NewContainerOpts {
 	return func(ctx context.Context, _ *Client, c *containers.Container) error {
 		// TODO: Once CRI is extended with native CDI support this will need to be updated...
 		_, cdiDevices, err := cdi.ParseAnnotations(annotations)
@@ -339,7 +339,7 @@ func WithCDI(s *oci.Spec, annotations map[string]string) NewContainerOpts {
 			return nil
 		}
 
-		registry := cdi.GetRegistry()
+		registry := cdi.GetRegistry(cdi.WithSpecDirs(cdiSpecDirs...))
 		if err = registry.Refresh(); err != nil {
 			// We don't consider registry refresh failure a fatal error.
 			// For instance, a dynamically generated invalid CDI Spec file for

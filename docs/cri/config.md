@@ -120,6 +120,14 @@ version = 2
   # Note that currently default is set to disabled but target change it in future together with enable_unprivileged_ports
   enable_unprivileged_icmp = false
 
+  # enable_cdi enables support of the Container Device Interface (CDI)
+	# For more details about CDI and the syntax of CDI Spec files please refer to
+	# https://github.com/container-orchestrated-devices/container-device-interface.
+	enable_cdi = false
+
+  # cdi_spec_dirs is the list of directories to scan for CDI spec files
+	cdi_spec_dirs = ["/etc/cdi", "/var/run/cdi"]
+
   # 'plugins."io.containerd.grpc.v1.cri".containerd' contains config related to containerd
   [plugins."io.containerd.grpc.v1.cri".containerd]
 

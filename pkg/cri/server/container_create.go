@@ -238,8 +238,12 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err != nil {
 		return nil, fmt.Errorf("failed to get runtime options: %w", err)
 	}
+
+	if c.config.EnableCDI {
+		opts = append(opts, containerd.WithCDI(spec, config.Annotations, c.config.CDISpecDirs))
+	}
+
 	opts = append(opts,
-		containerd.WithCDI(spec, config.Annotations),
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithRuntime(sandboxInfo.Runtime.Name, runtimeOptions),
 		containerd.WithContainerLabels(containerLabels),
