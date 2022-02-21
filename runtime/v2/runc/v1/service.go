@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -247,9 +248,16 @@ func (s *service) Cleanup(ctx context.Context) (*taskAPI.DeleteResponse, error) 
 	if err := mount.UnmountAll(filepath.Join(path, "rootfs"), 0); err != nil {
 		logrus.WithError(err).Warn("failed to cleanup rootfs mount")
 	}
+
+	pid, err := runcC.ReadPidFile(filepath.Join(path, process.InitPidFile))
+	if err != nil {
+		logrus.WithError(err).Warn("failed to read init pid file")
+	}
+
 	return &taskAPI.DeleteResponse{
 		ExitedAt:   time.Now(),
 		ExitStatus: 128 + uint32(unix.SIGKILL),
+		Pid:        uint32(pid),
 	}, nil
 }
 
