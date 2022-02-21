@@ -17,11 +17,11 @@
 package server
 
 import (
+	"context"
 	"errors"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtime_alpha "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 

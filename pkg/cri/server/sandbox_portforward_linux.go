@@ -17,6 +17,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -24,7 +25,6 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containernetworking/plugins/pkg/ns"
-	"golang.org/x/net/context"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )

@@ -17,6 +17,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"sync/atomic"
 	"syscall"
@@ -29,7 +30,6 @@ import (
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 
 	"github.com/moby/sys/signal"
-	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 

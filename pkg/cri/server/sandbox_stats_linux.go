@@ -17,11 +17,11 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/containernetworking/plugins/pkg/ns"
-	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/cgroups"

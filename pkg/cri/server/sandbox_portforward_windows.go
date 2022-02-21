@@ -18,10 +18,10 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 
-	"golang.org/x/net/context"
 	"k8s.io/utils/exec"
 
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
