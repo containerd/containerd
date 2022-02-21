@@ -1,3 +1,6 @@
+//go:build linux && gc
+// +build linux,gc
+
 /*
    Copyright The containerd Authors.
 
