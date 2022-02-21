@@ -20,11 +20,11 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"io"
 
 	"github.com/containerd/containerd/errdefs"
-	"golang.org/x/net/context"
 )
 
 // portForward uses netns to enter the sandbox namespace, and forwards a stream inside the

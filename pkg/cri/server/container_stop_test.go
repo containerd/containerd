@@ -17,11 +17,11 @@
 package server
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/context"
 
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 )

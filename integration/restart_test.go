@@ -17,6 +17,7 @@
 package integration
 
 import (
+	"context"
 	goruntime "runtime"
 	"sort"
 	"syscall"
@@ -27,7 +28,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 

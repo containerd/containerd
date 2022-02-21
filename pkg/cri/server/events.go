@@ -17,6 +17,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -34,7 +35,6 @@ import (
 	"github.com/containerd/typeurl"
 	gogotypes "github.com/gogo/protobuf/types"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 	"k8s.io/utils/clock"
 )
 

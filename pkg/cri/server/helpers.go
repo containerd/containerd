@@ -17,6 +17,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"path/filepath"
@@ -42,7 +43,6 @@ import (
 	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/pelletier/go-toml"
-	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
