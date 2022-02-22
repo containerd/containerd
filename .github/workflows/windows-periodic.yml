@@ -78,12 +78,14 @@ jobs:
       - name: AZResourceGroupCreate
         uses: azure/CLI@v1
         with:
+          azcliversion: 2.33.1
           inlinescript: |
             az group create -n ${{ matrix.AZURE_RESOURCE_GROUP }} -l ${{ env.AZURE_DEFAULT_LOCATION }} --tags creationTimestamp=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
       - name: AZTestVMCreate
         uses: azure/CLI@v1
         with:
+          azcliversion: 2.33.1
           inlinescript: |
             DETAILS=$(az vm create -n winTestVM --admin-username ${{ env.DEFAULT_ADMIN_USERNAME }} --admin-password ${{ env.PASSWORD }} --image ${{ matrix.AZURE_IMG }} -g ${{ matrix.AZURE_RESOURCE_GROUP }} --nsg-rule SSH --size ${{ env.AZURE_DEFAULT_VM_SIZE }} --public-ip-sku Standard -o json)
             PUB_IP=$(echo $DETAILS | jq -r .publicIpAddress)
@@ -108,6 +110,7 @@ jobs:
       - name: EnableAZVMSSH
         uses: azure/CLI@v1
         with:
+          azcliversion: 2.33.1
           inlinescript: |
             az vm run-command invoke  --command-id RunPowerShellScript -n winTestVM -g ${{ matrix.AZURE_RESOURCE_GROUP }} --scripts @$GITHUB_WORKSPACE/script/setup/enable_ssh_windows.ps1 --parameters 'SSHPublicKey=${{ env.SSH_PUB_KEY }}'
 
@@ -247,5 +250,6 @@ jobs:
         if: always()
         uses: azure/CLI@v1
         with:
+          azcliversion: 2.33.1
           inlinescript: |
             az group delete -g ${{ matrix.AZURE_RESOURCE_GROUP }} --yes
