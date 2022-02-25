@@ -345,8 +345,6 @@ github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
 # github.com/russross/blackfriday/v2 v2.0.1
 github.com/russross/blackfriday/v2
-# github.com/satori/go.uuid v1.2.0
-## explicit
 # github.com/shurcooL/sanitized_anchor_name v1.0.0
 github.com/shurcooL/sanitized_anchor_name
 # github.com/sirupsen/logrus v1.8.1
@@ -360,9 +358,9 @@ github.com/stefanberger/go-pkcs11uri
 ## explicit
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
-# github.com/tchap/go-patricia v2.2.6+incompatible
+# github.com/tchap/go-patricia/v2 v2.3.1
 ## explicit
-github.com/tchap/go-patricia/patricia
+github.com/tchap/go-patricia/v2/patricia
 # github.com/urfave/cli v1.22.2 => github.com/urfave/cli v1.22.1
 ## explicit
 github.com/urfave/cli
