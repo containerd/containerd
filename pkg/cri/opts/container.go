@@ -69,6 +69,12 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 		if err != nil {
 			return err
 		}
+		// Since only read is needed, append ReadOnly mount option to prevent linux kernel
+		// from syncing whole filesystem in umount syscall.
+		if len(mounts) == 1 && mounts[0].Type == "overlay" {
+			mounts[0].Options = append(mounts[0].Options, "ro")
+		}
+
 		root, err := os.MkdirTemp("", "ctd-volume")
 		if err != nil {
 			return err
