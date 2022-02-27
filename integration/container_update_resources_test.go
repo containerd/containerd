@@ -260,11 +260,8 @@ func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Check memory limit in cgroup")
-	cgroup, err := cgroups.Load(cgroups.V1, cgroups.PidPath(int(task.Pid())))
-	require.NoError(t, err)
-	stat, err := cgroup.Stat(cgroups.IgnoreNotExist)
-	require.NoError(t, err)
-	assert.Equal(t, uint64(400*1024*1024), stat.Memory.Usage.Limit)
+	memLimit := getCgroupMemoryLimitForTask(t, task)
+	assert.Equal(t, uint64(400*1024*1024), memLimit)
 
 	t.Log("Update container memory limit after started")
 	err = runtimeService.UpdateContainerResources(cn, &runtime.LinuxContainerResources{
@@ -278,7 +275,6 @@ func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
 	checkMemoryLimit(t, spec, 800*1024*1024)
 
 	t.Log("Check memory limit in cgroup")
-	stat, err = cgroup.Stat(cgroups.IgnoreNotExist)
-	require.NoError(t, err)
-	assert.Equal(t, uint64(800*1024*1024), stat.Memory.Usage.Limit)
+	memLimit = getCgroupMemoryLimitForTask(t, task)
+	assert.Equal(t, uint64(800*1024*1024), memLimit)
 }
