@@ -33,7 +33,7 @@ import (
 	"github.com/containerd/containerd"
 	cri "github.com/containerd/containerd/integration/cri-api/pkg/apis"
 	"github.com/containerd/containerd/integration/remote"
-	dialer "github.com/containerd/containerd/integration/util"
+	dialer "github.com/containerd/containerd/integration/remote/util"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/pkg/cri/server"
