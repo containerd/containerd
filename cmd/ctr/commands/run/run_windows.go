@@ -36,6 +36,10 @@ var platformRunFlags = []cli.Flag{
 		Name:  "isolated",
 		Usage: "run the container with vm isolation",
 	},
+	cli.StringFlag{
+		Name:  "user",
+		Usage: "run the container as the specified user",
+	},
 }
 
 // NewContainer creates a new container
@@ -103,6 +107,9 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		}
 		if cwd := context.String("cwd"); cwd != "" {
 			opts = append(opts, oci.WithProcessCwd(cwd))
+		}
+		if user := context.String("user"); user != "" {
+			opts = append(opts, oci.WithUsername(user))
 		}
 		if context.Bool("tty") {
 			opts = append(opts, oci.WithTTY)
