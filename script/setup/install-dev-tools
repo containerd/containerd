@@ -21,7 +21,7 @@
 set -eu -o pipefail
 
 # install `protobuild` and other commands
-go install github.com/stevvooe/protobuild@v0.1.0
+go install github.com/containerd/protobuild@7e5ee24bc1f70e9e289fef15e2631eb3491320bf
 go install github.com/cpuguy83/go-md2man/v2@v2.0.1
 go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.42.0
 

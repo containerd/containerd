@@ -181,8 +181,8 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       options {
-        65001: 0
         65003: "github.com/opencontainers/go-digest.Digest"
+        65001: 0
       }
       json_name: "digest"
     }
@@ -622,8 +622,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "exitedAt"
     }
@@ -703,8 +703,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "exitedAt"
     }
@@ -915,8 +915,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "createdAt"
     }
@@ -927,8 +927,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "updatedAt"
     }
@@ -1191,8 +1191,8 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       options {
-        65001: 0
         65003: "github.com/opencontainers/go-digest.Digest"
+        65001: 0
       }
       json_name: "digest"
     }
@@ -1210,8 +1210,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "createdAt"
     }
@@ -1222,8 +1222,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "updatedAt"
     }
@@ -1264,8 +1264,8 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       options {
-        65001: 0
         65003: "github.com/opencontainers/go-digest.Digest"
+        65001: 0
       }
       json_name: "digest"
     }
@@ -1352,8 +1352,8 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       options {
-        65001: 0
         65003: "github.com/opencontainers/go-digest.Digest"
+        65001: 0
       }
       json_name: "digest"
     }
@@ -1366,8 +1366,8 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       options {
-        65001: 0
         65003: "github.com/opencontainers/go-digest.Digest"
+        65001: 0
       }
       json_name: "digest"
     }
@@ -1412,8 +1412,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "startedAt"
     }
@@ -1424,8 +1424,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "updatedAt"
     }
@@ -1456,8 +1456,8 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       options {
-        65001: 0
         65003: "github.com/opencontainers/go-digest.Digest"
+        65001: 0
       }
       json_name: "expected"
     }
@@ -1537,8 +1537,8 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       options {
-        65001: 0
         65003: "github.com/opencontainers/go-digest.Digest"
+        65001: 0
       }
       json_name: "expected"
     }
@@ -1602,8 +1602,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "startedAt"
     }
@@ -1614,8 +1614,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "updatedAt"
     }
@@ -1639,8 +1639,8 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       options {
-        65001: 0
         65003: "github.com/opencontainers/go-digest.Digest"
+        65001: 0
       }
       json_name: "digest"
     }
@@ -1760,8 +1760,8 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       options {
-        65001: 0
         65003: "github.com/opencontainers/go-digest.Digest"
+        65001: 0
       }
       json_name: "digest"
     }
@@ -2020,8 +2020,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "timestamp"
     }
@@ -2120,8 +2120,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "createdAt"
     }
@@ -2132,8 +2132,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "updatedAt"
     }
@@ -2557,8 +2557,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "createdAt"
     }
@@ -3279,8 +3279,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "createdAt"
     }
@@ -3291,8 +3291,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "updatedAt"
     }
@@ -3567,8 +3567,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "timestamp"
     }
@@ -3673,8 +3673,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "exitedAt"
     }
@@ -3913,8 +3913,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "exitedAt"
     }
@@ -4183,8 +4183,8 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       options {
-        65001: 0
         65003: "github.com/opencontainers/go-digest.Digest"
+        65001: 0
       }
       json_name: "parentCheckpoint"
     }
@@ -4308,8 +4308,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "exitedAt"
     }
@@ -4436,8 +4436,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "timestamp"
     }
