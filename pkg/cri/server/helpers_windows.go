@@ -22,7 +22,14 @@ import (
 	"path/filepath"
 	"syscall"
 
+	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
+	runtimeoptions "github.com/containerd/containerd/pkg/runtimeoptions/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
+)
+
+const (
+	// runtimeRunhcsV1 is the runtime type for runhcs.
+	runtimeRunhcsV1 = "io.containerd.runhcs.v1"
 )
 
 // openLogFile opens/creates a container log file.
@@ -165,4 +172,14 @@ func ensureRemoveAll(_ context.Context, dir string) error {
 
 func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
 	return nil
+}
+
+// getRuntimeOptionsType gets empty runtime options by the runtime type name.
+func getRuntimeOptionsType(t string) interface{} {
+	switch t {
+	case runtimeRunhcsV1:
+		return &runhcsoptions.Options{}
+	default:
+		return &runtimeoptions.Options{}
+	}
 }
