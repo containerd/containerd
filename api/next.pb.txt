@@ -164,8 +164,6 @@ file {
     go_package: "github.com/containerd/containerd/api/events;events"
     63300: 1
   }
-  weak_dependency: 1
-  weak_dependency: 2
   syntax: "proto3"
 }
 file {
@@ -191,8 +189,6 @@ file {
     go_package: "github.com/containerd/containerd/api/events;events"
     63300: 1
   }
-  weak_dependency: 0
-  weak_dependency: 1
   syntax: "proto3"
 }
 file {
@@ -289,7 +285,6 @@ file {
     go_package: "github.com/containerd/containerd/api/events;events"
     63300: 1
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -387,8 +382,6 @@ file {
     go_package: "github.com/containerd/containerd/api/events;events"
     63300: 1
   }
-  weak_dependency: 0
-  weak_dependency: 1
   syntax: "proto3"
 }
 file {
@@ -443,7 +436,6 @@ file {
     go_package: "github.com/containerd/containerd/api/events;events"
     63300: 1
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -515,7 +507,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/types;types"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -801,8 +792,6 @@ file {
     go_package: "github.com/containerd/containerd/api/events;events"
     63300: 1
   }
-  weak_dependency: 0
-  weak_dependency: 3
   syntax: "proto3"
 }
 file {
@@ -1173,7 +1162,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/containers/v1;containers"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -1738,7 +1726,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/content/v1;content"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -1804,7 +1791,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/types;types"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -1961,7 +1947,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/diff/v1;diff"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -2073,8 +2058,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/events/v1;events"
   }
-  weak_dependency: 0
-  weak_dependency: 1
   syntax: "proto3"
 }
 file {
@@ -2315,7 +2298,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/images/v1;images"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -2352,7 +2334,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/types;types"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -2532,7 +2513,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/introspection/v1;introspection"
   }
-  weak_dependency: 3
   syntax: "proto3"
 }
 file {
@@ -2797,7 +2777,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/leases/v1;leases"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -2997,7 +2976,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/namespaces/v1;namespaces"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -3549,7 +3527,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/snapshots/v1;snapshots"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -3591,7 +3568,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/types;types"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -3746,7 +3722,6 @@ file {
       62023: "Status"
     }
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -4405,7 +4380,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/tasks/v1;tasks"
   }
-  weak_dependency: 2
   syntax: "proto3"
 }
 file {
@@ -4478,8 +4452,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/ttrpc/events/v1;events"
   }
-  weak_dependency: 0
-  weak_dependency: 1
   syntax: "proto3"
 }
 file {
@@ -4515,6 +4487,5 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/version/v1;version"
   }
-  weak_dependency: 1
   syntax: "proto3"
 }
