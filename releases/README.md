@@ -57,4 +57,6 @@
 4. Update [`config.toml`](https://github.com/containerd/containerd.io/blob/f827d53826a426cb48f24cc08e43cc8722ad6d01/config.toml#L35) with latest release in the [containerd/containerd.io project](https://github.com/containerd/containerd.io); open PR to
    force website downloads update.
 
-5. Promote on Slack, Twitter, mailing lists, etc
+5. Update Kubernetes test infrastructure to test against any new release branches, see example from https://github.com/kubernetes/test-infra/pull/25476
+
+6. Promote on Slack, Twitter, mailing lists, etc
