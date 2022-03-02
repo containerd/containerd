@@ -31,7 +31,7 @@ import (
 )
 
 func TestPodDualStack(t *testing.T) {
-	testPodLogDir, err := os.MkdirTemp("/tmp", "dualstack")
+	testPodLogDir, err := os.MkdirTemp("", "dualstack")
 	require.NoError(t, err)
 	defer os.RemoveAll(testPodLogDir)
 
