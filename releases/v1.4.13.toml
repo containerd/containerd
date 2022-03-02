@@ -1,0 +1,21 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.4.12"
+
+pre_release = false
+
+preface = """\
+The thirteenth patch release for containerd 1.4 is a security release to address
+[CVE-2022-23648](https://github.com/containerd/containerd/security/advisories/GHSA-crp2-qrr5-8pq7).
+
+### Notable Updates
+
+* **Use fs.RootPath when mounting volumes** ([GHSA-crp2-qrr5-8pq7](https://github.com/containerd/containerd/security/advisories/GHSA-crp2-qrr5-8pq7))
+
+See the changelog for complete list of changes"""
