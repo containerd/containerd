@@ -1,0 +1,25 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.5.9"
+
+pre_release = false
+
+preface = """\
+The tenth patch release for containerd 1.5 includes a fix for
+[CVE-2022-23648](https://github.com/containerd/containerd/security/advisories/GHSA-crp2-qrr5-8pq7)
+and other issues.
+
+### Notable Updates
+
+* **Use fs.RootPath when mounting volumes** ([GHSA-crp2-qrr5-8pq7](https://github.com/containerd/containerd/security/advisories/GHSA-crp2-qrr5-8pq7))
+* **Return init pid when clean dead shim in runc.v1/v2 shims** ([#6570](https://github.com/containerd/containerd/pull/6570))
+* **Handle sigint/sigterm in shimv2** ([#6509](https://github.com/containerd/containerd/pull/6509))
+* **Use readonly mount to read user/group info** ([#6503](https://github.com/containerd/containerd/pull/6503))
+
+See the changelog for complete list of changes"""
