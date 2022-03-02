@@ -30,7 +30,7 @@ import (
 )
 
 func TestContainerLogWithoutTailingNewLine(t *testing.T) {
-	testPodLogDir, err := os.MkdirTemp("/tmp", "container-log-without-tailing-newline")
+	testPodLogDir, err := os.MkdirTemp("", "container-log-without-tailing-newline")
 	require.NoError(t, err)
 	defer os.RemoveAll(testPodLogDir)
 
@@ -80,7 +80,7 @@ func TestContainerLogWithoutTailingNewLine(t *testing.T) {
 }
 
 func TestLongContainerLog(t *testing.T) {
-	testPodLogDir, err := os.MkdirTemp("/tmp", "long-container-log")
+	testPodLogDir, err := os.MkdirTemp("", "long-container-log")
 	require.NoError(t, err)
 	defer os.RemoveAll(testPodLogDir)
 

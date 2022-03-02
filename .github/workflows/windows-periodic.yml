@@ -183,7 +183,6 @@ jobs:
            ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -s" <<EOF
              cd c:/containerd
              ./script/setup/install-cni-windows
-             mkdir /c/tmp
              export TEST_IMAGE_LIST=c:/repolist.toml
              make cri-integration | tee c:/Logs/cri-integration.log
            EOF
