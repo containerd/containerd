@@ -112,7 +112,10 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 			// The volume may have been defined with a C: prefix, which we can't use here.
 			volume = strings.TrimPrefix(volume, "C:")
 			for _, mountPath := range mountPaths {
-				src := filepath.Join(mountPath, volume)
+				src, err := fs.RootPath(mountPath, volume)
+				if err != nil {
+					return fmt.Errorf("rootpath on mountPath %s, volume %s: %w", mountPath, volume, err)
+				}
 				if _, err := os.Stat(src); err != nil {
 					if os.IsNotExist(err) {
 						// Skip copying directory if it does not exist.
