@@ -20,7 +20,6 @@ import (
 	"context"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
@@ -89,7 +88,10 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 		}()
 
 		for host, volume := range volumeMounts {
-			src := filepath.Join(root, volume)
+			src, err := fs.RootPath(root, volume)
+			if err != nil {
+				return errors.Wrapf(err, "rootpath on root %s, volume %s", root, volume)
+			}
 			if _, err := os.Stat(src); err != nil {
 				if os.IsNotExist(err) {
 					// Skip copying directory if it does not exist.
