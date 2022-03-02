@@ -230,7 +230,7 @@ jobs:
   integration-windows:
     name: Windows Integration
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 35
+    timeout-minutes: 50
     needs: [project, linters, protos, man]
     env:
       GOTEST: gotestsum --
@@ -280,6 +280,25 @@ jobs:
           git checkout "${SHIM_COMMIT}"
           GO111MODULE=on go build -mod=vendor -o "${bindir}/integration/client/containerd-shim-runhcs-v1.exe" ./cmd/containerd-shim-runhcs-v1
 
+      - run: script/setup/install-cni-windows
+
+      - env:
+          TEST_IMAGE_LIST: ${{github.workspace}}/repolist.toml
+          BUSYBOX_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/busybox:1.29-2"
+          RESOURCE_CONSUMER_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/resource-consumer:1.10"
+        run: |
+            cat > "${{ env.TEST_IMAGE_LIST }}" << EOF
+            busybox = "${{ env.BUSYBOX_TESTING_IMAGE_REF }}"
+            ResourceConsumer = "${{ env.RESOURCE_CONSUMER_TESTING_IMAGE_REF }}"
+            EOF
+
+      - name: Set env for prepare_env_windows.ps1
+        shell: bash
+        run: echo "HOME=${USERPROFILE}" >> $GITHUB_ENV
+
+      - shell: powershell
+        run: script/setup/prepare_env_windows.ps1
+
       - run: script/setup/install-gotestsum
       - name: Tests
         env:
@@ -301,6 +320,12 @@ jobs:
           CGO_ENABLED: 1
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
         run: mingw32-make.exe integration
+
+      - name: CRI Integration Test
+        env:
+          TEST_IMAGE_LIST: ${{github.workspace}}/repolist.toml
+        run: |
+          make cri-integration
       - uses: actions/upload-artifact@v2
         if: always()
         with:
