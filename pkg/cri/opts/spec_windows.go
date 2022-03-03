@@ -230,3 +230,34 @@ func WithWindowsCredentialSpec(credentialSpec string) oci.SpecOpts {
 		return nil
 	}
 }
+
+// WithDevices sets the provided devices onto the container spec
+func WithDevices(config *runtime.ContainerConfig) oci.SpecOpts {
+	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
+		for _, device := range config.GetDevices() {
+			if device.ContainerPath != "" {
+				return fmt.Errorf("unexpected ContainerPath %s, must be empty", device.ContainerPath)
+			}
+
+			if device.Permissions != "" {
+				return fmt.Errorf("unexpected Permissions %s, must be empty", device.Permissions)
+			}
+
+			hostPath := device.HostPath
+			if strings.HasPrefix(hostPath, "class/") {
+				hostPath = strings.Replace(hostPath, "class/", "class://", 1)
+			}
+
+			splitParts := strings.SplitN(hostPath, "://", 2)
+			if len(splitParts) != 2 {
+				return fmt.Errorf("unrecognised HostPath format %v, must match IDType://ID", device.HostPath)
+			}
+
+			o := oci.WithWindowsDevice(splitParts[0], splitParts[1])
+			if err := o(ctx, client, c, s); err != nil {
+				return fmt.Errorf("failed adding device with HostPath %v: %w", device.HostPath, err)
+			}
+		}
+		return nil
+	}
+}
