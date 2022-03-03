@@ -233,35 +233,16 @@ to load.
 #### Configuration
 
 Plugins are configured using the `[plugins]` section of containerd's config.
-Every plugin can have its own section using the pattern `[plugins.<plugin id>]`.
+Every plugin can have its own section using the pattern `[plugins."<plugin type>.<plugin id>"]`.
 
 example configuration
 ```
+version = 2
+
 [plugins]
-  [plugins.cgroups]
+  [plugins."io.containerd.monitor.v1.cgroups"]
     no_prometheus = false
-  [plugins.cri]
-    stream_server_address = ""
-    stream_server_port = "10010"
-    enable_selinux = false
-    sandbox_image = "k8s.gcr.io/pause:3.6"
-    stats_collect_period = 10
-    systemd_cgroup = false
-    [plugins.cri.containerd]
-      snapshotter = "overlayfs"
-      [plugins.cri.containerd.default_runtime]
-        runtime_type = "io.containerd.runtime.v1.linux"
-        runtime_engine = ""
-        runtime_root = ""
-      [plugins.cri.containerd.untrusted_workload_runtime]
-        runtime_type = ""
-        runtime_engine = ""
-        runtime_root = ""
-    [plugins.cri.cni]
-      bin_dir = "/opt/cni/bin"
-      conf_dir = "/etc/cni/net.d"
-    [plugins.cri.registry]
-      [plugins.cri.registry.mirrors]
-        [plugins.cri.registry.mirrors."docker.io"]
-          endpoint = ["https://registry-1.docker.io"]
 ```
+
+To see full configuration example run `containerd config default`.
+If you want to get the configuration combined with your configuration, run `containerd config dump`.
