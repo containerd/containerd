@@ -16,6 +16,14 @@
 
 package commands
 
+import (
+	"context"
+	"fmt"
+
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/namespaces"
+)
+
 // IntToInt32Array converts an array of int's to int32's
 func IntToInt32Array(in []int) []int32 {
 	var ret []int32
@@ -25,3 +33,14 @@ func IntToInt32Array(in []int) []int32 {
 	}
 	return ret
 }
+
+//Generate ID and pass it to CNI plugin
+func FullID(ctx context.Context, c containerd.Container) string {
+	id := c.ID()
+	ns, ok := namespaces.Namespace(ctx)
+	if !ok {
+		return id
+	}
+	return fmt.Sprintf("%s-%s", ns, id)
+}
+

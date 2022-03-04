@@ -19,6 +19,7 @@ package tasks
 import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	gocni "github.com/containerd/go-cni"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -91,6 +92,15 @@ var killCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+        
+		network, err := gocni.New(gocni.WithDefaultConf)
+		if err != nil {
+			return err
+		}
+		if err := network.Remove(ctx, commands.FullID(ctx, container), ""); err != nil {
+			return err
+		}
+	
 		return task.Kill(ctx, signal, opts...)
 	},
 }
