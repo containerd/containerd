@@ -100,7 +100,7 @@ The current state is available in the following tables:
 | [1.1](https://github.com/containerd/containerd/releases/tag/v1.1.8)  | End of Life | April 23, 2018  | October 23, 2019 |
 | [1.2](https://github.com/containerd/containerd/releases/tag/v1.2.13) | End of Life | October 24, 2018 | October 15, 2020 |
 | [1.3](https://github.com/containerd/containerd/releases/tag/v1.3.10) | End of Life | September 26, 2019  | March 4, 2021 |
-| [1.4](https://github.com/containerd/containerd/releases/tag/v1.4.13) | Extended   | August 17, 2020 | March 3, 2022 (Extended) |
+| [1.4](https://github.com/containerd/containerd/releases/tag/v1.4.13) | End of Life | August 17, 2020 | March 3, 2022 |
 | [1.5](https://github.com/containerd/containerd/releases/tag/v1.5.10) | Active   | May 3, 2021  | October 28, 2022 |
 | [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.1)  | Active   | February 15, 2022  | max(February 15, 2023 or release of 1.7.0 + 6 months) |
 | [1.7](https://github.com/containerd/containerd/milestone/42)         | Next   | TBD  | TBD |
@@ -114,7 +114,7 @@ Note that branches and release from before 1.0 may not follow these rules.
 | End-Of-Life            | v1.1 (End-Of-Life) | 1.10+              | v1alpha2     |
 |                        | v1.2 (End-Of-Life) | 1.10+              | v1alpha2     |
 |                        | v1.3 (End-Of-Life) | 1.12+              | v1alpha2     |
-|                        | v1.4               | 1.19+              | v1alpha2     |
+|                        | v1.4 (End-of-Life) | 1.19+              | v1alpha2     |
 |                        | v1.5               | 1.20+              | v1alpha2     |
 |                        | v1.6               | 1.23+              | v1, v1alpha2 |
 
