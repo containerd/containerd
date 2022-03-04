@@ -92,7 +92,7 @@ var killCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-        
+
 		network, err := gocni.New(gocni.WithDefaultConf)
 		if err != nil {
 			return err
@@ -100,7 +100,7 @@ var killCommand = cli.Command{
 		if err := network.Remove(ctx, commands.FullID(ctx, container), ""); err != nil {
 			return err
 		}
-	
+
 		return task.Kill(ctx, signal, opts...)
 	},
 }

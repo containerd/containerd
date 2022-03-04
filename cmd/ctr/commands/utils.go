@@ -43,4 +43,3 @@ func FullID(ctx context.Context, c containerd.Container) string {
 	}
 	return fmt.Sprintf("%s-%s", ns, id)
 }
-
