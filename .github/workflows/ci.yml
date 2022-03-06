@@ -230,7 +230,7 @@ jobs:
   integration-windows:
     name: Windows Integration
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 55
+    timeout-minutes: 50
     needs: [project, linters, protos, man]
     env:
       GOTEST: gotestsum --
@@ -306,12 +306,14 @@ jobs:
             webServerTestImage: ${{ env.WEBSERVER_TESTING_IMAGE_REF }}
             EOF
 
-      - name: Set env for prepare_env_windows.ps1
-        shell: bash
-        run: echo "HOME=${USERPROFILE}" >> $GITHUB_ENV
-
-      - shell: powershell
-        run: script/setup/prepare_env_windows.ps1
+      - name: Get crictl tool
+        shell: powershell
+        run: |
+          # Get critctl tool. Used for cri-integration tests
+          $CRICTL_DOWNLOAD_URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.21.0/crictl-v1.21.0-windows-amd64.tar.gz"
+          curl.exe -L $CRICTL_DOWNLOAD_URL -o c:\crictl.tar.gz
+          tar -xvf c:\crictl.tar.gz
+          mv crictl.exe "${{ github.workspace }}/bin/crictl.exe" # Move crictl somewhere in path
 
       - run: script/setup/install-gotestsum
       - name: Tests
