@@ -26,7 +26,7 @@ import (
 	"text/template"
 
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 var ociHook = cli.Command{
@@ -43,7 +43,7 @@ var ociHook = cli.Command{
 		}
 		var (
 			ctx  = newTemplateContext(state, spec)
-			args = []string(context.Args())
+			args = context.Args().Slice()
 			env  = os.Environ()
 		)
 		if err := newList(&args).render(ctx); err != nil {

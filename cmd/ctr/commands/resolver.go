@@ -35,7 +35,7 @@ import (
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/config"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 // PushTracker returns a new InMemoryTracker which tracks the ref status

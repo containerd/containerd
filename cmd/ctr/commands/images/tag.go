@@ -21,7 +21,7 @@ import (
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 var tagCommand = cli.Command{
@@ -30,7 +30,7 @@ var tagCommand = cli.Command{
 	ArgsUsage:   "[flags] <source_ref> <target_ref> [<target_ref>, ...]",
 	Description: `Tag an image for use in containerd.`,
 	Flags: []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "force",
 			Usage: "force target_ref to be created, regardless if it already exists",
 		},
@@ -64,7 +64,7 @@ var tagCommand = cli.Command{
 			return err
 		}
 		// Support multiple references for one command run
-		for _, targetRef := range context.Args()[1:] {
+		for _, targetRef := range context.Args().Slice()[1:] {
 			image.Name = targetRef
 			// Attempt to create the image first
 			if _, err = imageService.Create(ctx, image); err != nil {

@@ -38,7 +38,7 @@ import (
 	"github.com/containerd/containerd/tracing"
 	"github.com/containerd/containerd/version"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 	"google.golang.org/grpc/grpclog"
 )
 
@@ -79,33 +79,36 @@ at the default file location. The *containerd config* command can be used to
 generate the default configuration for containerd. The output of that command
 can be used and modified as necessary as a custom configuration.`
 	app.Flags = []cli.Flag{
-		cli.StringFlag{
-			Name:  "config,c",
-			Usage: "path to the configuration file",
-			Value: filepath.Join(defaults.DefaultConfigDir, "config.toml"),
+		&cli.StringFlag{
+			Name:    "config",
+			Aliases: []string{"c"},
+			Usage:   "path to the configuration file",
+			Value:   filepath.Join(defaults.DefaultConfigDir, "config.toml"),
 		},
-		cli.StringFlag{
-			Name:  "log-level,l",
-			Usage: "set the logging level [trace, debug, info, warn, error, fatal, panic]",
+		&cli.StringFlag{
+			Name:    "log-level",
+			Aliases: []string{"l"},
+			Usage:   "set the logging level [trace, debug, info, warn, error, fatal, panic]",
 		},
-		cli.StringFlag{
-			Name:  "address,a",
-			Usage: "address for containerd's GRPC server",
+		&cli.StringFlag{
+			Name:    "address",
+			Aliases: []string{"a"},
+			Usage:   "address for containerd's GRPC server",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "root",
 			Usage: "containerd root directory",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "state",
 			Usage: "containerd state directory",
 		},
 	}
 	app.Flags = append(app.Flags, serviceFlags()...)
-	app.Commands = []cli.Command{
-		configCommand,
-		publishCommand,
-		ociHook,
+	app.Commands = []*cli.Command{
+		&configCommand,
+		&publishCommand,
+		&ociHook,
 	}
 	app.Action = func(context *cli.Context) error {
 		var (
@@ -120,9 +123,9 @@ can be used and modified as necessary as a custom configuration.`
 
 		// Only try to load the config if it either exists, or the user explicitly
 		// told us to load this path.
-		configPath := context.GlobalString("config")
+		configPath := context.String("config")
 		_, err := os.Stat(configPath)
-		if !os.IsNotExist(err) || context.GlobalIsSet("config") {
+		if !os.IsNotExist(err) || context.IsSet("config") {
 			if err := srvconfig.LoadConfig(configPath, config); err != nil {
 				return err
 			}
@@ -321,7 +324,7 @@ func applyFlags(context *cli.Context, config *srvconfig.Config) error {
 			d:    &config.GRPC.Address,
 		},
 	} {
-		if s := context.GlobalString(v.name); s != "" {
+		if s := context.String(v.name); s != "" {
 			*v.d = s
 		}
 	}
@@ -332,7 +335,7 @@ func applyFlags(context *cli.Context, config *srvconfig.Config) error {
 }
 
 func setLogLevel(context *cli.Context, config *srvconfig.Config) error {
-	l := context.GlobalString("log-level")
+	l := context.String("log-level")
 	if l == "" {
 		l = config.Debug.Level
 	}

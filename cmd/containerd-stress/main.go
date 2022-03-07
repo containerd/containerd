@@ -33,7 +33,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	metrics "github.com/docker/go-metrics"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 var (
@@ -111,76 +111,82 @@ func main() {
 	app.Name = "containerd-stress"
 	app.Description = "stress test a containerd daemon"
 	app.Flags = []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "debug",
 			Usage: "set debug output in the logs",
 		},
-		cli.StringFlag{
-			Name:  "address,a",
-			Value: "/run/containerd/containerd.sock",
-			Usage: "path to the containerd socket",
+		&cli.StringFlag{
+			Name:    "address",
+			Aliases: []string{"a"},
+			Value:   "/run/containerd/containerd.sock",
+			Usage:   "path to the containerd socket",
 		},
-		cli.IntFlag{
-			Name:  "concurrent,c",
-			Value: 1,
-			Usage: "set the concurrency of the stress test",
+		&cli.IntFlag{
+			Name:    "concurrent",
+			Aliases: []string{"c"},
+			Value:   1,
+			Usage:   "set the concurrency of the stress test",
 		},
-		cli.DurationFlag{
-			Name:  "duration,d",
-			Value: 1 * time.Minute,
-			Usage: "set the duration of the stress test",
+		&cli.DurationFlag{
+			Name:    "duration",
+			Aliases: []string{"d"},
+			Value:   1 * time.Minute,
+			Usage:   "set the duration of the stress test",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "exec",
 			Usage: "add execs to the stress tests",
 		},
-		cli.StringFlag{
-			Name:  "image,i",
-			Value: "docker.io/library/alpine:latest",
-			Usage: "image to be utilized for testing",
+		&cli.StringFlag{
+			Name:    "image",
+			Aliases: []string{"i"},
+			Value:   "docker.io/library/alpine:latest",
+			Usage:   "image to be utilized for testing",
 		},
-		cli.BoolFlag{
-			Name:  "json,j",
-			Usage: "output results in json format",
+		&cli.BoolFlag{
+			Name:    "json",
+			Aliases: []string{"j"},
+			Usage:   "output results in json format",
 		},
-		cli.StringFlag{
-			Name:  "metrics,m",
-			Usage: "address to serve the metrics API",
+		&cli.StringFlag{
+			Name:    "metrics",
+			Aliases: []string{"m"},
+			Usage:   "address to serve the metrics API",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "runtime",
 			Usage: "set the runtime to stress test",
 			Value: plugin.RuntimeRuncV2,
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "snapshotter",
 			Usage: "set the snapshotter to use",
 			Value: "overlayfs",
 		},
 	}
 	app.Before = func(context *cli.Context) error {
-		if context.GlobalBool("json") {
+		if context.Bool("json") {
 			logrus.SetLevel(logrus.WarnLevel)
 		}
-		if context.GlobalBool("debug") {
+		if context.Bool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
 		}
 		return nil
 	}
-	app.Commands = []cli.Command{
-		densityCommand,
+	app.Commands = []*cli.Command{
+		&densityCommand,
 	}
 	app.Action = func(context *cli.Context) error {
 		config := config{
-			Address:     context.GlobalString("address"),
-			Duration:    context.GlobalDuration("duration"),
-			Concurrency: context.GlobalInt("concurrent"),
-			Exec:        context.GlobalBool("exec"),
-			Image:       context.GlobalString("image"),
-			JSON:        context.GlobalBool("json"),
-			Metrics:     context.GlobalString("metrics"),
-			Runtime:     context.GlobalString("runtime"),
-			Snapshotter: context.GlobalString("snapshotter"),
+			Address:     context.String("address"),
+			Duration:    context.Duration("duration"),
+			Concurrency: context.Int("concurrent"),
+			Exec:        context.Bool("exec"),
+			Image:       context.String("image"),
+			JSON:        context.Bool("json"),
+			Metrics:     context.String("metrics"),
+			Runtime:     context.String("runtime"),
+			Snapshotter: context.String("snapshotter"),
 		}
 		if config.Metrics != "" {
 			return serve(config)

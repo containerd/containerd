@@ -23,7 +23,7 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/log"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 var deleteCommand = cli.Command{
@@ -32,11 +32,12 @@ var deleteCommand = cli.Command{
 	ArgsUsage: "CONTAINER [CONTAINER, ...]",
 	Aliases:   []string{"del", "remove", "rm"},
 	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "force, f",
-			Usage: "force delete task process",
+		&cli.BoolFlag{
+			Name:    "force",
+			Aliases: []string{"f"},
+			Usage:   "force delete task process",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "exec-id",
 			Usage: "process ID to kill",
 		},
@@ -70,10 +71,10 @@ var deleteCommand = cli.Command{
 				return err
 			}
 			if ec := status.ExitCode(); ec != 0 {
-				return cli.NewExitError("", int(ec))
+				return cli.Exit("", int(ec))
 			}
 		} else {
-			for _, target := range context.Args() {
+			for _, target := range context.Args().Slice() {
 				task, err := loadTask(ctx, client, target)
 				if err != nil {
 					if exitErr == nil {

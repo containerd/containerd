@@ -38,11 +38,11 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/version"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 	"google.golang.org/grpc/grpclog"
 )
 
-var extraCmds = []cli.Command{}
+var extraCmds = []*cli.Command{}
 
 func init() {
 	// Discard grpc logs so that they don't mess with our stdio
@@ -74,49 +74,51 @@ containerd CLI
 `
 	app.EnableBashCompletion = true
 	app.Flags = []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "debug",
 			Usage: "enable debug output in logs",
 		},
-		cli.StringFlag{
-			Name:   "address, a",
-			Usage:  "address for containerd's GRPC server",
-			Value:  defaults.DefaultAddress,
-			EnvVar: "CONTAINERD_ADDRESS",
+		&cli.StringFlag{
+			Name:    "address",
+			Aliases: []string{"a"},
+			Usage:   "address for containerd's GRPC server",
+			Value:   defaults.DefaultAddress,
+			EnvVars: []string{"CONTAINERD_ADDRESS"},
 		},
-		cli.DurationFlag{
+		&cli.DurationFlag{
 			Name:  "timeout",
 			Usage: "total timeout for ctr commands",
 		},
-		cli.DurationFlag{
+		&cli.DurationFlag{
 			Name:  "connect-timeout",
 			Usage: "timeout for connecting to containerd",
 		},
-		cli.StringFlag{
-			Name:   "namespace, n",
-			Usage:  "namespace to use with commands",
-			Value:  namespaces.Default,
-			EnvVar: namespaces.NamespaceEnvVar,
+		&cli.StringFlag{
+			Name:    "namespace",
+			Aliases: []string{"n"},
+			Usage:   "namespace to use with commands",
+			Value:   namespaces.Default,
+			EnvVars: []string{namespaces.NamespaceEnvVar},
 		},
 	}
-	app.Commands = append([]cli.Command{
-		plugins.Command,
-		versionCmd.Command,
-		containers.Command,
-		content.Command,
-		events.Command,
-		images.Command,
-		leases.Command,
-		namespacesCmd.Command,
-		pprof.Command,
-		run.Command,
-		snapshots.Command,
-		tasks.Command,
-		install.Command,
-		ociCmd.Command,
+	app.Commands = append([]*cli.Command{
+		&plugins.Command,
+		&versionCmd.Command,
+		&containers.Command,
+		&content.Command,
+		&events.Command,
+		&images.Command,
+		&leases.Command,
+		&namespacesCmd.Command,
+		&pprof.Command,
+		&run.Command,
+		&snapshots.Command,
+		&tasks.Command,
+		&install.Command,
+		&ociCmd.Command,
 	}, extraCmds...)
 	app.Before = func(context *cli.Context) error {
-		if context.GlobalBool("debug") {
+		if context.Bool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
 		}
 		return nil

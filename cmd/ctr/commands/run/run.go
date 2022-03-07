@@ -36,7 +36,7 @@ import (
 	gocni "github.com/containerd/go-cni"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 func withMounts(context *cli.Context) oci.SpecOpts {
@@ -90,40 +90,40 @@ func parseMountFlag(m string) (specs.Mount, error) {
 
 // Command runs a container
 var Command = cli.Command{
-	Name:           "run",
-	Usage:          "run a container",
-	ArgsUsage:      "[flags] Image|RootFS ID [COMMAND] [ARG...]",
-	SkipArgReorder: true,
+	Name:      "run",
+	Usage:     "run a container",
+	ArgsUsage: "[flags] Image|RootFS ID [COMMAND] [ARG...]",
 	Flags: append([]cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "rm",
 			Usage: "remove the container after running",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "null-io",
 			Usage: "send all IO to /dev/null",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "log-uri",
 			Usage: "log uri",
 		},
-		cli.BoolFlag{
-			Name:  "detach,d",
-			Usage: "detach from the task after it has started execution",
+		&cli.BoolFlag{
+			Name:    "detach",
+			Aliases: []string{"d"},
+			Usage:   "detach from the task after it has started execution",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "fifo-dir",
 			Usage: "directory used for storing IO FIFOs",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "cgroup",
 			Usage: "cgroup path (To disable use of cgroup, set to \"\" explicitly)",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "platform",
 			Usage: "run image for specific platform",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "cni",
 			Usage: "enable cni networking for the container",
 		},
@@ -245,7 +245,7 @@ var Command = cli.Command{
 			return err
 		}
 		if code != 0 {
-			return cli.NewExitError("", int(code))
+			return cli.Exit("", int(code))
 		}
 		return nil
 	},

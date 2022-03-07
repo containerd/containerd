@@ -37,7 +37,7 @@ import (
 	"github.com/containerd/containerd/remotes"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 var fetchCommand = cli.Command{
@@ -59,19 +59,19 @@ content and snapshots ready for a direct use via the 'ctr run'.
 
 Most of this is experimental and there are few leaps to make this work.`,
 	Flags: append(commands.RegistryFlags, commands.LabelFlag,
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "platform",
 			Usage: "Pull content from a specific platform",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "all-platforms",
 			Usage: "pull content from all platforms",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "all-metadata",
 			Usage: "Pull metadata for all platforms",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "metadata-only",
 			Usage: "Pull all metadata including manifests and configs",
 		},
@@ -126,7 +126,7 @@ func NewFetchConfig(ctx context.Context, clicontext *cli.Context) (*FetchConfig,
 		Labels:    clicontext.StringSlice("label"),
 		TraceHTTP: clicontext.Bool("http-trace"),
 	}
-	if !clicontext.GlobalBool("debug") {
+	if !clicontext.Bool("debug") {
 		config.ProgressOutput = os.Stdout
 	}
 	if !clicontext.Bool("all-platforms") {

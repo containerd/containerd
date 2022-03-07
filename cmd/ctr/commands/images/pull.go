@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 var pullCommand = cli.Command{
@@ -45,24 +45,24 @@ command. As part of this process, we do the following:
 3. Register metadata for the image.
 `,
 	Flags: append(append(commands.RegistryFlags, append(commands.SnapshotterFlags, commands.LabelFlag)...),
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "platform",
 			Usage: "Pull content from a specific platform",
 			Value: &cli.StringSlice{},
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "all-platforms",
 			Usage: "pull content and metadata from all platforms",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "all-metadata",
 			Usage: "Pull metadata for all platforms",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "print-chainid",
 			Usage: "Print the resulting image's chain ID",
 		},
-		cli.IntFlag{
+		&cli.IntFlag{
 			Name:  "max-concurrent-downloads",
 			Usage: "Set the max concurrent downloads for each pull",
 		},

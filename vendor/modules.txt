@@ -361,9 +361,9 @@ github.com/stretchr/testify/require
 # github.com/tchap/go-patricia/v2 v2.3.1
 ## explicit
 github.com/tchap/go-patricia/v2/patricia
-# github.com/urfave/cli v1.22.2 => github.com/urfave/cli v1.22.1
+# github.com/urfave/cli/v2 v2.3.0
 ## explicit
-github.com/urfave/cli
+github.com/urfave/cli/v2
 # github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
 ## explicit
 github.com/vishvananda/netlink
@@ -709,5 +709,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 sigs.k8s.io/yaml
 # github.com/containerd/containerd => ./.empty-mod/
 # github.com/gogo/googleapis => github.com/gogo/googleapis v1.3.2
-# github.com/urfave/cli => github.com/urfave/cli v1.22.1
 # google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200224152610-e50cd9704f63

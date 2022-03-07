@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/typeurl"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 
 	// Register grpc event types
 	_ "github.com/containerd/containerd/api/events"
@@ -42,7 +42,7 @@ var Command = cli.Command{
 		}
 		defer cancel()
 		eventsClient := client.EventService()
-		eventsCh, errCh := eventsClient.Subscribe(ctx, context.Args()...)
+		eventsCh, errCh := eventsClient.Subscribe(ctx, context.Args().Slice()...)
 		for {
 			var e *events.Envelope
 			select {

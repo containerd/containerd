@@ -19,7 +19,7 @@ package oci
 import (
 	"fmt"
 
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/containers"
@@ -30,8 +30,8 @@ import (
 var Command = cli.Command{
 	Name:  "oci",
 	Usage: "OCI tools",
-	Subcommands: []cli.Command{
-		defaultSpecCommand,
+	Subcommands: []*cli.Command{
+		&defaultSpecCommand,
 	},
 }
 

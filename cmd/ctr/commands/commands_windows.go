@@ -17,11 +17,11 @@
 package commands
 
 import (
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 func init() {
-	ContainerFlags = append(ContainerFlags, cli.Uint64Flag{
+	ContainerFlags = append(ContainerFlags, &cli.Uint64Flag{
 		Name:  "cpu-count",
 		Usage: "number of CPUs available to the container",
 	})

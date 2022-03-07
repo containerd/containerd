@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 var checkpointCommand = cli.Command{
@@ -33,15 +33,15 @@ var checkpointCommand = cli.Command{
 	Usage:     "checkpoint a container",
 	ArgsUsage: "[flags] CONTAINER",
 	Flags: []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "exit",
 			Usage: "stop the container after the checkpoint",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "image-path",
 			Usage: "path to criu image files",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "work-path",
 			Usage: "path to criu work files and logs",
 		},

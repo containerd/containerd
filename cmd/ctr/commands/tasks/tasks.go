@@ -19,7 +19,7 @@ package tasks
 import (
 	gocontext "context"
 
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 type resizer interface {
@@ -31,16 +31,16 @@ var Command = cli.Command{
 	Name:    "tasks",
 	Usage:   "manage tasks",
 	Aliases: []string{"t", "task"},
-	Subcommands: []cli.Command{
-		attachCommand,
-		checkpointCommand,
-		deleteCommand,
-		execCommand,
-		listCommand,
-		killCommand,
-		pauseCommand,
-		psCommand,
-		resumeCommand,
-		startCommand,
+	Subcommands: []*cli.Command{
+		&attachCommand,
+		&checkpointCommand,
+		&deleteCommand,
+		&execCommand,
+		&listCommand,
+		&killCommand,
+		&pauseCommand,
+		&psCommand,
+		&resumeCommand,
+		&startCommand,
 	},
 }

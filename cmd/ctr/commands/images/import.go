@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 var importCommand = cli.Command{
@@ -52,36 +52,36 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 "foo/bar:latest" and "foo/bar@sha256:deadbeef" images in the containerd store.
 `,
 	Flags: append([]cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "base-name",
 			Value: "",
 			Usage: "base image name for added images, when provided only images with this name prefix are imported",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "digests",
 			Usage: "whether to create digest images (default: false)",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "skip-digest-for-named",
 			Usage: "skip applying --digests option to images named in the importing tar (use it in conjunction with --digests)",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "index-name",
 			Usage: "image name to keep index as, by default index is discarded",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "all-platforms",
 			Usage: "imports content for all platforms, false by default",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "platform",
 			Usage: "imports content for specific platform",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "no-unpack",
 			Usage: "skip unpacking the images, false by default",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "compress-blobs",
 			Usage: "compress uncompressed blobs when creating manifest (Docker format only)",
 		},

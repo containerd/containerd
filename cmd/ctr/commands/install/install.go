@@ -19,7 +19,7 @@ package install
 import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 // Command to install binary packages
@@ -29,15 +29,17 @@ var Command = cli.Command{
 	ArgsUsage:   "<ref>",
 	Description: "install a new package",
 	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "libs,l",
-			Usage: "install libs from the image",
+		&cli.BoolFlag{
+			Name:    "libs",
+			Aliases: []string{"l"},
+			Usage:   "install libs from the image",
 		},
-		cli.BoolFlag{
-			Name:  "replace,r",
-			Usage: "replace any binaries or libs in the opt directory",
+		&cli.BoolFlag{
+			Name:    "replace",
+			Aliases: []string{"r"},
+			Usage:   "replace any binaries or libs in the opt directory",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "path",
 			Usage: "set an optional install path other than the managed opt directory",
 		},

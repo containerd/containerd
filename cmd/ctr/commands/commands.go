@@ -24,71 +24,73 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/defaults"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 var (
 	// SnapshotterFlags are cli flags specifying snapshotter names
 	SnapshotterFlags = []cli.Flag{
-		cli.StringFlag{
-			Name:   "snapshotter",
-			Usage:  "snapshotter name. Empty value stands for the default value.",
-			EnvVar: "CONTAINERD_SNAPSHOTTER",
+		&cli.StringFlag{
+			Name:    "snapshotter",
+			Usage:   "snapshotter name. Empty value stands for the default value.",
+			EnvVars: []string{"CONTAINERD_SNAPSHOTTER"},
 		},
 	}
 
 	// SnapshotterLabels are cli flags specifying labels which will be add to the new snapshot for container.
-	SnapshotterLabels = cli.StringSliceFlag{
+	SnapshotterLabels = &cli.StringSliceFlag{
 		Name:  "snapshotter-label",
 		Usage: "labels added to the new snapshot for this container.",
 	}
 
 	// LabelFlag is a cli flag specifying labels
-	LabelFlag = cli.StringSliceFlag{
+	LabelFlag = &cli.StringSliceFlag{
 		Name:  "label",
 		Usage: "labels to attach to the image",
 	}
 
 	// RegistryFlags are cli flags specifying registry options
 	RegistryFlags = []cli.Flag{
-		cli.BoolFlag{
-			Name:  "skip-verify,k",
-			Usage: "skip SSL certificate validation",
+		&cli.BoolFlag{
+			Name:    "skip-verify",
+			Aliases: []string{"k"},
+			Usage:   "skip SSL certificate validation",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "plain-http",
 			Usage: "allow connections using plain HTTP",
 		},
-		cli.StringFlag{
-			Name:  "user,u",
-			Usage: "user[:password] Registry user and password",
+		&cli.StringFlag{
+			Name:    "user",
+			Aliases: []string{"u"},
+			Usage:   "user[:password] Registry user and password",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "refresh",
 			Usage: "refresh token for authorization server",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name: "hosts-dir",
 			// compatible with "/etc/docker/certs.d"
 			Usage: "Custom hosts configuration directory",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "tlscacert",
 			Usage: "path to TLS root CA",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "tlscert",
 			Usage: "path to TLS client certificate",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "tlskey",
 			Usage: "path to TLS client key",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "http-dump",
 			Usage: "dump all HTTP request/responses when interacting with container registry",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "http-trace",
 			Usage: "enable HTTP tracing for registry interactions",
 		},
@@ -96,104 +98,106 @@ var (
 
 	// ContainerFlags are cli flags specifying container options
 	ContainerFlags = []cli.Flag{
-		cli.StringFlag{
-			Name:  "config,c",
-			Usage: "path to the runtime-specific spec config file",
+		&cli.StringFlag{
+			Name:    "config",
+			Aliases: []string{"c"},
+			Usage:   "path to the runtime-specific spec config file",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "cwd",
 			Usage: "specify the working directory of the process",
 		},
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "env",
 			Usage: "specify additional container environment variables (e.g. FOO=bar)",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "env-file",
 			Usage: "specify additional container environment variables in a file(e.g. FOO=bar, one per line)",
 		},
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "label",
 			Usage: "specify additional labels (e.g. foo=bar)",
 		},
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "mount",
 			Usage: "specify additional container mount (e.g. type=bind,src=/tmp,dst=/host,options=rbind:ro)",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "net-host",
 			Usage: "enable host networking for the container",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "privileged",
 			Usage: "run privileged container",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "read-only",
 			Usage: "set the containers filesystem as readonly",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "runtime",
 			Usage: "runtime name",
 			Value: defaults.DefaultRuntime,
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "runtime-config-path",
 			Usage: "optional runtime config path",
 		},
-		cli.BoolFlag{
-			Name:  "tty,t",
-			Usage: "allocate a TTY for the container",
+		&cli.BoolFlag{
+			Name:    "tty",
+			Aliases: []string{"t"},
+			Usage:   "allocate a TTY for the container",
 		},
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "with-ns",
 			Usage: "specify existing Linux namespaces to join at container runtime (format '<nstype>:<path>')",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "pid-file",
 			Usage: "file path to write the task's pid",
 		},
-		cli.IntSliceFlag{
+		&cli.IntSliceFlag{
 			Name:  "gpus",
 			Usage: "add gpus to the container",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "allow-new-privs",
 			Usage: "turn off OCI spec's NoNewPrivileges feature flag",
 		},
-		cli.Uint64Flag{
+		&cli.Uint64Flag{
 			Name:  "memory-limit",
 			Usage: "memory limit (in bytes) for the container",
 		},
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "device",
 			Usage: "file path to a device to add to the container; or a path to a directory tree of devices to add to the container",
 		},
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "cap-add",
 			Usage: "add Linux capabilities (Set capabilities with 'CAP_' prefix)",
 		},
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "cap-drop",
 			Usage: "drop Linux capabilities (Set capabilities with 'CAP_' prefix)",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "seccomp",
 			Usage: "enable the default seccomp profile",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "seccomp-profile",
 			Usage: "file path to custom seccomp profile. seccomp must be set to true, before using seccomp-profile",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "apparmor-default-profile",
 			Usage: "enable AppArmor with the default profile with the specified name, e.g. \"cri-containerd.apparmor.d\"",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "apparmor-profile",
 			Usage: "enable AppArmor with an existing custom profile",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "rdt-class",
 			Usage: "name of the RDT class to associate the container with. Specifies a Class of Service (CLOS) for cache and memory bandwidth management.",
 		},

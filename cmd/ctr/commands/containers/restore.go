@@ -23,7 +23,7 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 var restoreCommand = cli.Command{
@@ -31,11 +31,11 @@ var restoreCommand = cli.Command{
 	Usage:     "restore a container from checkpoint",
 	ArgsUsage: "CONTAINER REF",
 	Flags: []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "rw",
 			Usage: "restore the rw layer from the checkpoint",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "live",
 			Usage: "restore the runtime and memory data from the checkpoint",
 		},

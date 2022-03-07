@@ -29,7 +29,7 @@ import (
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pelletier/go-toml"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 // Config is a wrapper of server config for printing out.
@@ -95,7 +95,7 @@ func outputConfig(cfg *srvconfig.Config) error {
 var configCommand = cli.Command{
 	Name:  "config",
 	Usage: "information on the containerd config",
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		{
 			Name:  "default",
 			Usage: "see the output of the default config",
@@ -108,7 +108,7 @@ var configCommand = cli.Command{
 			Usage: "see the output of the final main config with imported in subconfig files",
 			Action: func(context *cli.Context) error {
 				config := defaultConfig()
-				if err := srvconfig.LoadConfig(context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
+				if err := srvconfig.LoadConfig(context.String("config"), config); err != nil && !os.IsNotExist(err) {
 					return err
 				}
 

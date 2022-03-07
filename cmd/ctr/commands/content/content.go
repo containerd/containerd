@@ -32,7 +32,7 @@ import (
 	units "github.com/docker/go-units"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 	exec "golang.org/x/sys/execabs"
 )
 
@@ -42,17 +42,17 @@ var (
 		Name:  "content",
 		Usage: "manage content",
 		Subcommands: cli.Commands{
-			activeIngestCommand,
-			deleteCommand,
-			editCommand,
-			fetchCommand,
-			fetchObjectCommand,
-			getCommand,
-			ingestCommand,
-			listCommand,
-			pushObjectCommand,
-			setLabelsCommand,
-			pruneCommand,
+			&activeIngestCommand,
+			&deleteCommand,
+			&editCommand,
+			&fetchCommand,
+			&fetchObjectCommand,
+			&getCommand,
+			&ingestCommand,
+			&listCommand,
+			&pushObjectCommand,
+			&setLabelsCommand,
+			&pruneCommand,
 		},
 	}
 
@@ -91,11 +91,11 @@ var (
 		ArgsUsage:   "[flags] <key>",
 		Description: "ingest objects into the local content store",
 		Flags: []cli.Flag{
-			cli.Int64Flag{
+			&cli.Int64Flag{
 				Name:  "expected-size",
 				Usage: "validate against provided size",
 			},
-			cli.StringFlag{
+			&cli.StringFlag{
 				Name:  "expected-digest",
 				Usage: "verify content against expected digest",
 			},
@@ -133,12 +133,13 @@ var (
 		ArgsUsage:   "[flags] [<regexp>]",
 		Description: "display the ongoing transfers",
 		Flags: []cli.Flag{
-			cli.DurationFlag{
-				Name:   "timeout, t",
-				Usage:  "total timeout for fetch",
-				EnvVar: "CONTAINERD_FETCH_TIMEOUT",
+			&cli.DurationFlag{
+				Name:    "timeout",
+				Aliases: []string{"t"},
+				Usage:   "total timeout for fetch",
+				EnvVars: []string{"CONTAINERD_FETCH_TIMEOUT"},
 			},
-			cli.StringFlag{
+			&cli.StringFlag{
 				Name:  "root",
 				Usage: "path to content store root",
 				Value: "/tmp/content", // TODO(stevvooe): for now, just use the PWD/.content
@@ -176,15 +177,16 @@ var (
 		ArgsUsage:   "[flags]",
 		Description: "list blobs in the content store",
 		Flags: []cli.Flag{
-			cli.BoolFlag{
-				Name:  "quiet, q",
-				Usage: "print only the blob digest",
+			&cli.BoolFlag{
+				Name:    "quiet",
+				Aliases: []string{"q"},
+				Usage:   "print only the blob digest",
 			},
 		},
 		Action: func(context *cli.Context) error {
 			var (
 				quiet = context.Bool("quiet")
-				args  = []string(context.Args())
+				args  = context.Args().Slice()
 			)
 			client, ctx, cancel, err := commands.NewClient(context)
 			if err != nil {
@@ -288,14 +290,14 @@ var (
 		ArgsUsage:   "[flags] <digest>",
 		Description: "edit a blob and return a new digest",
 		Flags: []cli.Flag{
-			cli.StringFlag{
+			&cli.StringFlag{
 				Name:  "validate",
 				Usage: "validate the result against a format (json, mediatype, etc.)",
 			},
-			cli.StringFlag{
-				Name:   "editor",
-				Usage:  "select editor (vim, emacs, etc.)",
-				EnvVar: "EDITOR",
+			&cli.StringFlag{
+				Name:    "editor",
+				Usage:   "select editor (vim, emacs, etc.)",
+				EnvVars: []string{"EDITOR"},
 			},
 		},
 		Action: func(context *cli.Context) error {
@@ -360,7 +362,7 @@ var (
 	blobs are printed to stdout.`,
 		Action: func(context *cli.Context) error {
 			var (
-				args      = []string(context.Args())
+				args      = context.Args().Slice()
 				exitError error
 			)
 			client, ctx, cancel, err := commands.NewClient(context)

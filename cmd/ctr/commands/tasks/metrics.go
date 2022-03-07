@@ -28,13 +28,13 @@ import (
 	v2 "github.com/containerd/cgroups/v2/stats"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/typeurl"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 func init() {
 	// metricsCommand is only added on Linux as github.com/containerd/cgroups
 	// does not compile on darwin or windows
-	Command.Subcommands = append(Command.Subcommands, metricsCommand)
+	Command.Subcommands = append(Command.Subcommands, &metricsCommand)
 }
 
 const (
@@ -49,7 +49,7 @@ var metricsCommand = cli.Command{
 	ArgsUsage: "CONTAINER",
 	Aliases:   []string{"metric"},
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  formatFlag,
 			Usage: `"table" or "json"`,
 			Value: formatTable,

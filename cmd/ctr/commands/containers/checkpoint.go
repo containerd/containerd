@@ -23,7 +23,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 var checkpointCommand = cli.Command{
@@ -31,15 +31,15 @@ var checkpointCommand = cli.Command{
 	Usage:     "checkpoint a container",
 	ArgsUsage: "CONTAINER REF",
 	Flags: []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "rw",
 			Usage: "include the rw layer in the checkpoint",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "image",
 			Usage: "include the image in the checkpoint",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "task",
 			Usage: "checkpoint container task",
 		},

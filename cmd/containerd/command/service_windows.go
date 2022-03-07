@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/services/server"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
@@ -56,25 +56,25 @@ const defaultServiceName = "containerd"
 // as a Windows service under control of SCM.
 func serviceFlags() []cli.Flag {
 	return []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "service-name",
 			Usage: "Set the Windows service name",
 			Value: defaultServiceName,
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "register-service",
 			Usage: "Register the service and exit",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "unregister-service",
 			Usage: "Unregister the service and exit",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:   "run-service",
 			Usage:  "",
 			Hidden: true,
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "log-file",
 			Usage: "Path to the containerd log file",
 		},
@@ -83,7 +83,7 @@ func serviceFlags() []cli.Flag {
 
 // applyPlatformFlags applies platform-specific flags.
 func applyPlatformFlags(context *cli.Context) {
-	serviceNameFlag = context.GlobalString("service-name")
+	serviceNameFlag = context.String("service-name")
 	if serviceNameFlag == "" {
 		serviceNameFlag = defaultServiceName
 	}
@@ -104,9 +104,9 @@ func applyPlatformFlags(context *cli.Context) {
 			d:    &runServiceFlag,
 		},
 	} {
-		*v.d = context.GlobalBool(v.name)
+		*v.d = context.Bool(v.name)
 	}
-	logFileFlag = context.GlobalString("log-file")
+	logFileFlag = context.String("log-file")
 }
 
 type handler struct {

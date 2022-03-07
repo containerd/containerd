@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/containerd/platforms"
 	pluginutils "github.com/containerd/containerd/plugin"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 	"google.golang.org/grpc/codes"
 )
 
@@ -37,8 +37,8 @@ var Command = cli.Command{
 	Name:    "plugins",
 	Aliases: []string{"plugin"},
 	Usage:   "provides information about containerd plugins",
-	Subcommands: []cli.Command{
-		listCommand,
+	Subcommands: []*cli.Command{
+		&listCommand,
 	},
 }
 
@@ -47,13 +47,15 @@ var listCommand = cli.Command{
 	Aliases: []string{"ls"},
 	Usage:   "lists containerd plugins",
 	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "quiet,q",
-			Usage: "print only the plugin ids",
+		&cli.BoolFlag{
+			Name:    "quiet",
+			Aliases: []string{"q"},
+			Usage:   "print only the plugin ids",
 		},
-		cli.BoolFlag{
-			Name:  "detailed,d",
-			Usage: "print detailed information about each plugin",
+		&cli.BoolFlag{
+			Name:    "detailed",
+			Aliases: []string{"d"},
+			Usage:   "print detailed information about each plugin",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -67,7 +69,7 @@ var listCommand = cli.Command{
 		}
 		defer cancel()
 		ps := client.IntrospectionService()
-		response, err := ps.Plugins(ctx, context.Args())
+		response, err := ps.Plugins(ctx, context.Args().Slice())
 		if err != nil {
 			return err
 		}

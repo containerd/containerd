@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/defaults"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 type pprofDialer struct {
@@ -37,19 +37,20 @@ var Command = cli.Command{
 	Name:  "pprof",
 	Usage: "provide golang pprof outputs for containerd",
 	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "debug-socket, d",
-			Usage: "socket path for containerd's debug server",
-			Value: defaults.DefaultDebugAddress,
+		&cli.StringFlag{
+			Name:    "debug-socket",
+			Aliases: []string{"d"},
+			Usage:   "socket path for containerd's debug server",
+			Value:   defaults.DefaultDebugAddress,
 		},
 	},
-	Subcommands: []cli.Command{
-		pprofBlockCommand,
-		pprofGoroutinesCommand,
-		pprofHeapCommand,
-		pprofProfileCommand,
-		pprofThreadcreateCommand,
-		pprofTraceCommand,
+	Subcommands: []*cli.Command{
+		&pprofBlockCommand,
+		&pprofGoroutinesCommand,
+		&pprofHeapCommand,
+		&pprofProfileCommand,
+		&pprofThreadcreateCommand,
+		&pprofTraceCommand,
 	},
 }
 
@@ -89,10 +90,11 @@ var pprofProfileCommand = cli.Command{
 	Name:  "profile",
 	Usage: "CPU profile",
 	Flags: []cli.Flag{
-		cli.DurationFlag{
-			Name:  "seconds,s",
-			Usage: "duration for collection (seconds)",
-			Value: 30 * time.Second,
+		&cli.DurationFlag{
+			Name:    "seconds",
+			Aliases: []string{"s"},
+			Usage:   "duration for collection (seconds)",
+			Value:   30 * time.Second,
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -113,10 +115,11 @@ var pprofTraceCommand = cli.Command{
 	Name:  "trace",
 	Usage: "collect execution trace",
 	Flags: []cli.Flag{
-		cli.DurationFlag{
-			Name:  "seconds,s",
-			Usage: "trace time (seconds)",
-			Value: 5 * time.Second,
+		&cli.DurationFlag{
+			Name:    "seconds",
+			Aliases: []string{"s"},
+			Usage:   "trace time (seconds)",
+			Value:   5 * time.Second,
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -167,7 +170,7 @@ var pprofThreadcreateCommand = cli.Command{
 }
 
 func getPProfClient(context *cli.Context) *http.Client {
-	dialer := getPProfDialer(context.GlobalString("debug-socket"))
+	dialer := getPProfDialer(context.String("debug-socket"))
 
 	tr := &http.Transport{
 		Dial: dialer.pprofDial,

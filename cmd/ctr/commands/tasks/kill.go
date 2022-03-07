@@ -22,7 +22,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/moby/sys/signal"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 const defaultSignal = "SIGTERM"
@@ -32,18 +32,20 @@ var killCommand = cli.Command{
 	Usage:     "signal a container (default: SIGTERM)",
 	ArgsUsage: "[flags] CONTAINER",
 	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "signal, s",
-			Value: "",
-			Usage: "signal to send to the container",
+		&cli.StringFlag{
+			Name:    "signal",
+			Aliases: []string{"s"},
+			Value:   "",
+			Usage:   "signal to send to the container",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "exec-id",
 			Usage: "process ID to kill",
 		},
-		cli.BoolFlag{
-			Name:  "all, a",
-			Usage: "send signal to all processes inside the container",
+		&cli.BoolFlag{
+			Name:    "all",
+			Aliases: []string{"a"},
+			Usage:   "send signal to all processes inside the container",
 		},
 	},
 	Action: func(context *cli.Context) error {

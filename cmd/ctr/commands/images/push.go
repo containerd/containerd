@@ -37,7 +37,7 @@ import (
 	"github.com/containerd/containerd/remotes/docker"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -54,21 +54,21 @@ var pushCommand = cli.Command{
 	creating the associated configuration, and creating the manifest
 	which references those resources.
 `,
-	Flags: append(commands.RegistryFlags, cli.StringFlag{
+	Flags: append(commands.RegistryFlags, &cli.StringFlag{
 		Name:  "manifest",
 		Usage: "digest of manifest",
-	}, cli.StringFlag{
+	}, &cli.StringFlag{
 		Name:  "manifest-type",
 		Usage: "media type of manifest digest",
 		Value: ocispec.MediaTypeImageManifest,
-	}, cli.StringSliceFlag{
+	}, &cli.StringSliceFlag{
 		Name:  "platform",
 		Usage: "push content from a specific platform",
 		Value: &cli.StringSlice{},
-	}, cli.IntFlag{
+	}, &cli.IntFlag{
 		Name:  "max-concurrent-uploaded-layers",
 		Usage: "Set the max concurrent uploaded layers for each push",
-	}, cli.BoolFlag{
+	}, &cli.BoolFlag{
 		Name:  "allow-non-distributable-blobs",
 		Usage: "Allow pushing blobs that are marked as non-distributable",
 	}),
@@ -76,7 +76,7 @@ var pushCommand = cli.Command{
 		var (
 			ref   = context.Args().First()
 			local = context.Args().Get(1)
-			debug = context.GlobalBool("debug")
+			debug = context.Bool("debug")
 			desc  ocispec.Descriptor
 		)
 		if ref == "" {

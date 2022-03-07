@@ -38,25 +38,26 @@ import (
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 var fifoFlags = []cli.Flag{
-	cli.StringFlag{
+	&cli.StringFlag{
 		Name:  "stdin",
 		Usage: "specify the path to the stdin fifo",
 	},
-	cli.StringFlag{
+	&cli.StringFlag{
 		Name:  "stdout",
 		Usage: "specify the path to the stdout fifo",
 	},
-	cli.StringFlag{
+	&cli.StringFlag{
 		Name:  "stderr",
 		Usage: "specify the path to the stderr fifo",
 	},
-	cli.BoolFlag{
-		Name:  "tty,t",
-		Usage: "enable tty support",
+	&cli.BoolFlag{
+		Name:    "tty",
+		Aliases: []string{"t"},
+		Usage:   "enable tty support",
 	},
 }
 
@@ -65,16 +66,16 @@ var Command = cli.Command{
 	Name:  "shim",
 	Usage: "interact with a shim directly",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "id",
 			Usage: "container id",
 		},
 	},
-	Subcommands: []cli.Command{
-		deleteCommand,
-		execCommand,
-		startCommand,
-		stateCommand,
+	Subcommands: []*cli.Command{
+		&deleteCommand,
+		&execCommand,
+		&startCommand,
+		&stateCommand,
 	},
 }
 
@@ -121,7 +122,7 @@ var stateCommand = cli.Command{
 			return err
 		}
 		r, err := service.State(gocontext.Background(), &task.StateRequest{
-			ID: context.GlobalString("id"),
+			ID: context.String("id"),
 		})
 		if err != nil {
 			return err
@@ -135,20 +136,22 @@ var execCommand = cli.Command{
 	Name:  "exec",
 	Usage: "exec a new process in the task's container",
 	Flags: append(fifoFlags,
-		cli.BoolFlag{
-			Name:  "attach,a",
-			Usage: "stay attached to the container and open the fifos",
+		&cli.BoolFlag{
+			Name:    "attach",
+			Aliases: []string{"a"},
+			Usage:   "stay attached to the container and open the fifos",
 		},
-		cli.StringSliceFlag{
-			Name:  "env,e",
-			Usage: "add environment vars",
-			Value: &cli.StringSlice{},
+		&cli.StringSliceFlag{
+			Name:    "env",
+			Aliases: []string{"e"},
+			Usage:   "add environment vars",
+			Value:   &cli.StringSlice{},
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "cwd",
 			Usage: "current working directory",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "spec",
 			Usage: "runtime spec",
 		},
@@ -231,18 +234,18 @@ var execCommand = cli.Command{
 }
 
 func getTaskService(context *cli.Context) (task.TaskService, error) {
-	id := context.GlobalString("id")
+	id := context.String("id")
 	if id == "" {
 		return nil, fmt.Errorf("container id must be specified")
 	}
-	ns := context.GlobalString("namespace")
+	ns := context.String("namespace")
 
 	// /containerd-shim/ns/id/shim.sock is the old way to generate shim socket,
 	// compatible it
 	s1 := filepath.Join(string(filepath.Separator), "containerd-shim", ns, id, "shim.sock")
 	// this should not error, ctr always get a default ns
 	ctx := namespaces.WithNamespace(gocontext.Background(), ns)
-	s2, _ := shim.SocketAddress(ctx, context.GlobalString("address"), id)
+	s2, _ := shim.SocketAddress(ctx, context.String("address"), id)
 	s2 = strings.TrimPrefix(s2, "unix://")
 
 	for _, socket := range []string{s2, "\x00" + s1} {

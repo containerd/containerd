@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 var mountCommand = cli.Command{
@@ -39,11 +39,11 @@ var mountCommand = cli.Command{
 When you are done, use the unmount command.
 `,
 	Flags: append(append(commands.RegistryFlags, append(commands.SnapshotterFlags, commands.LabelFlag)...),
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "rw",
 			Usage: "Enable write support on the mount",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "platform",
 			Usage: "Mount the image for the specified platform",
 			Value: platforms.DefaultString(),
@@ -67,7 +67,7 @@ When you are done, use the unmount command.
 		}
 		defer cancel()
 
-		snapshotter := context.GlobalString("snapshotter")
+		snapshotter := context.String("snapshotter")
 		if snapshotter == "" {
 			snapshotter = containerd.DefaultSnapshotter
 		}

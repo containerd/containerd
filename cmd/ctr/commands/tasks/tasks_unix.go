@@ -30,12 +30,12 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/log"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 	"golang.org/x/sys/unix"
 )
 
 func init() {
-	startCommand.Flags = append(startCommand.Flags, cli.BoolFlag{
+	startCommand.Flags = append(startCommand.Flags, &cli.BoolFlag{
 		Name:  "no-pivot",
 		Usage: "disable use of pivot-root (linux only)",
 	})

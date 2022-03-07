@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/images/converter/uncompress"
 	"github.com/containerd/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 var convertCommand = cli.Command{
@@ -41,21 +41,21 @@ When '--all-platforms' is given all images in a manifest list must be available.
 `,
 	Flags: []cli.Flag{
 		// generic flags
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "uncompress",
 			Usage: "convert tar.gz layers to uncompressed tar layers",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "oci",
 			Usage: "convert Docker media types to OCI media types",
 		},
 		// platform flags
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "platform",
 			Usage: "Pull content from a specific platform",
 			Value: &cli.StringSlice{},
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "all-platforms",
 			Usage: "exports content from all platforms",
 		},

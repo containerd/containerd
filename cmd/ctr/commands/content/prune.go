@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 const (
@@ -35,11 +35,11 @@ const (
 )
 
 var pruneFlags = []cli.Flag{
-	cli.BoolFlag{
+	&cli.BoolFlag{
 		Name:  "async",
 		Usage: "allow garbage collection to cleanup asynchronously",
 	},
-	cli.BoolFlag{
+	&cli.BoolFlag{
 		Name:  "dry",
 		Usage: "just show updates without applying (enables debug logging)",
 	},
@@ -49,7 +49,7 @@ var pruneCommand = cli.Command{
 	Name:  "prune",
 	Usage: "prunes content from the content store",
 	Subcommands: cli.Commands{
-		pruneReferencesCommand,
+		&pruneReferencesCommand,
 	},
 }
 

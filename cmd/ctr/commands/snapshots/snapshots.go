@@ -36,7 +36,7 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 // Command is the cli command for managing snapshots
@@ -46,18 +46,18 @@ var Command = cli.Command{
 	Usage:   "manage snapshots",
 	Flags:   commands.SnapshotterFlags,
 	Subcommands: cli.Commands{
-		commitCommand,
-		diffCommand,
-		infoCommand,
-		listCommand,
-		mountCommand,
-		prepareCommand,
-		removeCommand,
-		setLabelCommand,
-		treeCommand,
-		unpackCommand,
-		usageCommand,
-		viewCommand,
+		&commitCommand,
+		&diffCommand,
+		&infoCommand,
+		&listCommand,
+		&mountCommand,
+		&prepareCommand,
+		&removeCommand,
+		&setLabelCommand,
+		&treeCommand,
+		&unpackCommand,
+		&usageCommand,
+		&viewCommand,
 	},
 }
 
@@ -72,7 +72,7 @@ var listCommand = cli.Command{
 		}
 		defer cancel()
 		var (
-			snapshotter = client.SnapshotService(context.GlobalString("snapshotter"))
+			snapshotter = client.SnapshotService(context.String("snapshotter"))
 			tw          = tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
 		)
 		fmt.Fprintln(tw, "KEY\tPARENT\tKIND\t")
@@ -95,16 +95,16 @@ var diffCommand = cli.Command{
 	Usage:     "get the diff of two snapshots. the default second snapshot is the first snapshot's parent.",
 	ArgsUsage: "[flags] <idA> [<idB>]",
 	Flags: append([]cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "media-type",
 			Usage: "media type to use for creating diff",
 			Value: ocispec.MediaTypeImageLayerGzip,
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "ref",
 			Usage: "content upload reference to use",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "keep",
 			Usage: "keep diff content. up to creator to delete it.",
 		},
@@ -131,7 +131,7 @@ var diffCommand = cli.Command{
 
 		var desc ocispec.Descriptor
 		labels := commands.LabelArgs(context.StringSlice("label"))
-		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
+		snapshotter := client.SnapshotService(context.String("snapshotter"))
 
 		if context.Bool("keep") {
 			labels["containerd.io/gc.root"] = time.Now().UTC().Format(time.RFC3339)
@@ -196,7 +196,7 @@ var usageCommand = cli.Command{
 	Usage:     "usage snapshots",
 	ArgsUsage: "[flags] [<key>, ...]",
 	Flags: []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "b",
 			Usage: "display size in bytes",
 		},
@@ -218,7 +218,7 @@ var usageCommand = cli.Command{
 		}
 		defer cancel()
 		var (
-			snapshotter = client.SnapshotService(context.GlobalString("snapshotter"))
+			snapshotter = client.SnapshotService(context.String("snapshotter"))
 			tw          = tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
 		)
 		fmt.Fprintln(tw, "KEY\tSIZE\tINODES\t")
@@ -234,7 +234,7 @@ var usageCommand = cli.Command{
 				return err
 			}
 		} else {
-			for _, id := range context.Args() {
+			for _, id := range context.Args().Slice() {
 				usage, err := snapshotter.Usage(ctx, id)
 				if err != nil {
 					return err
@@ -258,8 +258,8 @@ var removeCommand = cli.Command{
 			return err
 		}
 		defer cancel()
-		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
-		for _, key := range context.Args() {
+		snapshotter := client.SnapshotService(context.String("snapshotter"))
+		for _, key := range context.Args().Slice() {
 			err = snapshotter.Remove(ctx, key)
 			if err != nil {
 				return fmt.Errorf("failed to remove %q: %w", key, err)
@@ -275,11 +275,12 @@ var prepareCommand = cli.Command{
 	Usage:     "prepare a snapshot from a committed snapshot",
 	ArgsUsage: "[flags] <key> [<parent>]",
 	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "target, t",
-			Usage: "mount target path, will print mount, if provided",
+		&cli.StringFlag{
+			Name:    "target",
+			Aliases: []string{"t"},
+			Usage:   "mount target path, will print mount, if provided",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "mounts",
 			Usage: "Print out snapshot mounts as JSON",
 		},
@@ -299,7 +300,7 @@ var prepareCommand = cli.Command{
 		}
 		defer cancel()
 
-		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
+		snapshotter := client.SnapshotService(context.String("snapshotter"))
 		labels := map[string]string{
 			"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
 		}
@@ -326,11 +327,12 @@ var viewCommand = cli.Command{
 	Usage:     "create a read-only snapshot from a committed snapshot",
 	ArgsUsage: "[flags] <key> [<parent>]",
 	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "target, t",
-			Usage: "mount target path, will print mount, if provided",
+		&cli.StringFlag{
+			Name:    "target",
+			Aliases: []string{"t"},
+			Usage:   "mount target path, will print mount, if provided",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "mounts",
 			Usage: "Print out snapshot mounts as JSON",
 		},
@@ -350,7 +352,7 @@ var viewCommand = cli.Command{
 		}
 		defer cancel()
 
-		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
+		snapshotter := client.SnapshotService(context.String("snapshotter"))
 		mounts, err := snapshotter.View(ctx, key, parent)
 		if err != nil {
 			return err
@@ -386,7 +388,7 @@ var mountCommand = cli.Command{
 			return err
 		}
 		defer cancel()
-		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
+		snapshotter := client.SnapshotService(context.String("snapshotter"))
 		mounts, err := snapshotter.Mounts(ctx, key)
 		if err != nil {
 			return err
@@ -415,7 +417,7 @@ var commitCommand = cli.Command{
 			return err
 		}
 		defer cancel()
-		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
+		snapshotter := client.SnapshotService(context.String("snapshotter"))
 		labels := map[string]string{
 			"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
 		}
@@ -433,7 +435,7 @@ var treeCommand = cli.Command{
 		}
 		defer cancel()
 		var (
-			snapshotter = client.SnapshotService(context.GlobalString("snapshotter"))
+			snapshotter = client.SnapshotService(context.String("snapshotter"))
 			tree        = newSnapshotTree()
 		)
 
@@ -466,7 +468,7 @@ var infoCommand = cli.Command{
 			return err
 		}
 		defer cancel()
-		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
+		snapshotter := client.SnapshotService(context.String("snapshotter"))
 		info, err := snapshotter.Stat(ctx, key)
 		if err != nil {
 			return err
@@ -491,7 +493,7 @@ var setLabelCommand = cli.Command{
 		}
 		defer cancel()
 
-		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
+		snapshotter := client.SnapshotService(context.String("snapshotter"))
 
 		info := snapshots.Info{
 			Name:   key,

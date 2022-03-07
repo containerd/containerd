@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 // Command is the cli command for managing namespaces
@@ -36,10 +36,10 @@ var Command = cli.Command{
 	Aliases: []string{"namespace", "ns"},
 	Usage:   "manage namespaces",
 	Subcommands: cli.Commands{
-		createCommand,
-		listCommand,
-		removeCommand,
-		setLabelsCommand,
+		&createCommand,
+		&listCommand,
+		&removeCommand,
+		&setLabelsCommand,
 	},
 }
 
@@ -96,9 +96,10 @@ var listCommand = cli.Command{
 	ArgsUsage:   "[flags]",
 	Description: "list namespaces",
 	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "quiet, q",
-			Usage: "print only the namespace name",
+		&cli.BoolFlag{
+			Name:    "quiet",
+			Aliases: []string{"q"},
+			Usage:   "print only the namespace name",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -148,9 +149,10 @@ var removeCommand = cli.Command{
 	ArgsUsage:   "<name> [<name>, ...]",
 	Description: "remove one or more namespaces. for now, the namespace must be empty",
 	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "cgroup,c",
-			Usage: "delete the namespace's cgroup",
+		&cli.BoolFlag{
+			Name:    "cgroup",
+			Aliases: []string{"c"},
+			Usage:   "delete the namespace's cgroup",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -163,7 +165,7 @@ var removeCommand = cli.Command{
 
 		opts := deleteOpts(context)
 		namespaces := client.NamespaceService()
-		for _, target := range context.Args() {
+		for _, target := range context.Args().Slice() {
 			if err := namespaces.Delete(ctx, target, opts...); err != nil {
 				if !errdefs.IsNotFound(err) {
 					if exitErr == nil {

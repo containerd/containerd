@@ -21,7 +21,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 // AppContext returns the context for a command. Should only be called once per
@@ -32,8 +32,8 @@ import (
 func AppContext(context *cli.Context) (gocontext.Context, gocontext.CancelFunc) {
 	var (
 		ctx       = gocontext.Background()
-		timeout   = context.GlobalDuration("timeout")
-		namespace = context.GlobalString("namespace")
+		timeout   = context.Duration("timeout")
+		namespace = context.String("namespace")
 		cancel    gocontext.CancelFunc
 	)
 	ctx = namespaces.WithNamespace(ctx, namespace)
@@ -47,9 +47,9 @@ func AppContext(context *cli.Context) (gocontext.Context, gocontext.CancelFunc) 
 
 // NewClient returns a new containerd client
 func NewClient(context *cli.Context, opts ...containerd.ClientOpt) (*containerd.Client, gocontext.Context, gocontext.CancelFunc, error) {
-	timeoutOpt := containerd.WithTimeout(context.GlobalDuration("connect-timeout"))
+	timeoutOpt := containerd.WithTimeout(context.Duration("connect-timeout"))
 	opts = append(opts, timeoutOpt)
-	client, err := containerd.New(context.GlobalString("address"), opts...)
+	client, err := containerd.New(context.String("address"), opts...)
 	if err != nil {
 		return nil, nil, nil, err
 	}

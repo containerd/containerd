@@ -29,7 +29,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/gogo/protobuf/types"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/credentials/insecure"
@@ -39,11 +39,11 @@ var publishCommand = cli.Command{
 	Name:  "publish",
 	Usage: "binary to publish events to containerd",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "namespace",
 			Usage: "namespace to publish to",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "topic",
 			Usage: "topic of the event",
 		},
@@ -58,7 +58,7 @@ var publishCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		client, err := connectEvents(context.GlobalString("address"))
+		client, err := connectEvents(context.String("address"))
 		if err != nil {
 			return err
 		}
