@@ -31,7 +31,7 @@ import (
 )
 
 func TestAdditionalGids(t *testing.T) {
-	testPodLogDir, err := os.MkdirTemp("/tmp", "additional-gids")
+	testPodLogDir, err := os.MkdirTemp("", "additional-gids")
 	require.NoError(t, err)
 	defer os.RemoveAll(testPodLogDir)
 

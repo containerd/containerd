@@ -230,7 +230,7 @@ jobs:
   integration-windows:
     name: Windows Integration
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 35
+    timeout-minutes: 50
     needs: [project, linters, protos, man]
     env:
       GOTEST: gotestsum --
@@ -259,11 +259,17 @@ jobs:
           repository: Microsoft/hcsshim
           path: src/github.com/Microsoft/hcsshim
 
+      - uses: actions/checkout@v2
+        with:
+          repository: kubernetes-sigs/cri-tools
+          path: src/github.com/kubernetes-sigs/cri-tools
+
       - name: Set env
         run: |
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
           echo "${{ github.workspace }}/src/github.com/containerd/containerd/bin" >> $GITHUB_PATH
+          echo "${{ github.workspace }}/src/github.com/kubernetes-sigs/cri-tools/build/bin" >> $GITHUB_PATH
 
       - run: script/setup/install-dev-tools
 
@@ -279,6 +285,35 @@ jobs:
           git fetch --tags origin "${SHIM_COMMIT}"
           git checkout "${SHIM_COMMIT}"
           GO111MODULE=on go build -mod=vendor -o "${bindir}/integration/client/containerd-shim-runhcs-v1.exe" ./cmd/containerd-shim-runhcs-v1
+          cd ../../kubernetes-sigs/cri-tools
+          make critest
+
+      - run: script/setup/install-cni-windows
+
+      - env:
+          TEST_IMAGE_LIST: ${{github.workspace}}/repolist.toml
+          CRI_TEST_IMAGES: ${{github.workspace}}/cri-test-images.yaml
+          BUSYBOX_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/busybox:1.29-2"
+          RESOURCE_CONSUMER_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/resource-consumer:1.10"
+          WEBSERVER_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/nginx:1.14-2"
+        run: |
+            cat > "${{ env.TEST_IMAGE_LIST }}" << EOF
+            busybox = "${{ env.BUSYBOX_TESTING_IMAGE_REF }}"
+            ResourceConsumer = "${{ env.RESOURCE_CONSUMER_TESTING_IMAGE_REF }}"
+            EOF
+            cat > "${{ env.CRI_TEST_IMAGES }}" << EOF
+            defaultTestContainerImage: ${{ env.BUSYBOX_TESTING_IMAGE_REF }}
+            webServerTestImage: ${{ env.WEBSERVER_TESTING_IMAGE_REF }}
+            EOF
+
+      - name: Get crictl tool
+        shell: powershell
+        run: |
+          # Get critctl tool. Used for cri-integration tests
+          $CRICTL_DOWNLOAD_URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.21.0/crictl-v1.21.0-windows-amd64.tar.gz"
+          curl.exe -L $CRICTL_DOWNLOAD_URL -o c:\crictl.tar.gz
+          tar -xvf c:\crictl.tar.gz
+          mv crictl.exe "${{ github.workspace }}/bin/crictl.exe" # Move crictl somewhere in path
 
       - run: script/setup/install-gotestsum
       - name: Tests
@@ -301,6 +336,22 @@ jobs:
           CGO_ENABLED: 1
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
         run: mingw32-make.exe integration
+
+      - name: CRI Integration Test
+        env:
+          TEST_IMAGE_LIST: ${{github.workspace}}/repolist.toml
+        run: |
+          make cri-integration
+
+      - name: cri-tools critest
+        env:
+          CRI_TEST_IMAGES: ${{github.workspace}}/cri-test-images.yaml
+        shell: powershell
+        run: |
+          Start-Process -FilePath containerd.exe -NoNewWindow -RedirectStandardError true -PassThru
+          get-process | sls containerd
+          start-sleep 5
+          critest.exe --runtime-endpoint=npipe://.//pipe//containerd-containerd --test-images-file='${{env.CRI_TEST_IMAGES}}' --report-dir='${{github.workspace}}/critestreport'
       - uses: actions/upload-artifact@v2
         if: always()
         with:
