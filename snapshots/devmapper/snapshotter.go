@@ -504,6 +504,8 @@ func (s *Snapshotter) buildMounts(ctx context.Context, snap storage.Snapshot, fi
 	if fileSystemType == "" {
 		log.G(ctx).Error("File system type cannot be empty")
 		return nil
+	} else if fileSystemType == fsTypeXFS {
+		options = append(options, "nouuid")
 	}
 	if snap.Kind != snapshots.KindActive {
 		options = append(options, "ro")
