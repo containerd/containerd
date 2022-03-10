@@ -21,6 +21,8 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"io/ioutil"
+	"os"
 
 	"math/rand"
 	"reflect"
@@ -74,18 +76,30 @@ func testExportImport(t *testing.T, imageName string) {
 		t.Fatal(err)
 	}
 
-	wb := bytes.NewBuffer(nil)
-	err = client.Export(ctx, wb, archive.WithPlatform(platforms.Default()), archive.WithImage(client.ImageService(), imageName))
+	dstFile, err := ioutil.TempFile("", "export-import-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		dstFile.Close()
+		os.Remove(dstFile.Name())
+	}()
+
+	err = client.Export(ctx, dstFile, archive.WithPlatform(platforms.Default()), archive.WithImage(client.ImageService(), imageName))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	client.ImageService().Delete(ctx, imageName)
 
+	// Seek to beginning of file in preparation for Import()
+	dstFile.Seek(0, 0)
+
 	opts := []ImportOpt{
 		WithImageRefTranslator(archive.AddRefPrefix("foo/bar")),
 	}
-	imgrecs, err := client.Import(ctx, bytes.NewReader(wb.Bytes()), opts...)
+
+	imgrecs, err := client.Import(ctx, dstFile, opts...)
 	if err != nil {
 		t.Fatalf("Import failed: %+v", err)
 	}
