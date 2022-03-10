@@ -19,6 +19,7 @@ package run
 import (
 	gocontext "context"
 	"errors"
+	"strings"
 
 	"github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	"github.com/containerd/console"
@@ -141,6 +142,16 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		ccount := context.Uint64("cpu-count")
 		if ccount != 0 {
 			opts = append(opts, oci.WithWindowsCPUCount(ccount))
+		}
+		for _, dev := range context.StringSlice("device") {
+			parts := strings.Split(dev, "://")
+			if len(parts) != 2 {
+				return nil, errors.New("devices must be in the format IDType://ID")
+			}
+			if parts[0] == "" {
+				return nil, errors.New("devices must have a non-empty IDType")
+			}
+			opts = append(opts, oci.WithWindowsDevice(parts[0], parts[1]))
 		}
 	}
 
