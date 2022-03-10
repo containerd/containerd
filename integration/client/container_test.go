@@ -2036,7 +2036,12 @@ func TestDaemonRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer task.Delete(ctx)
+
+	defer func() {
+		if _, err := task.Delete(ctx, WithProcessKill); err != nil {
+			t.Logf("failed to delete task: %v", err)
+		}
+	}()
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
@@ -2058,7 +2063,10 @@ func TestDaemonRestart(t *testing.T) {
 		t.Errorf(`first task.Wait() should have failed with "transport is closing"`)
 	}
 
-	waitCtx, waitCancel := context.WithTimeout(ctx, 2*time.Second)
+	// NOTE(gabriel-samfira): Windows needs a bit more time to restart.
+	// Increase timeout from 2 seconds to 10 seconds to avoid deadline
+	// exceeded errors.
+	waitCtx, waitCancel := context.WithTimeout(ctx, 10*time.Second)
 	serving, err := client.IsServing(waitCtx)
 	waitCancel()
 	if !serving {
@@ -2479,8 +2487,8 @@ func TestContainerUsername(t *testing.T) {
 	}
 	<-statusC
 	if _, err := task.Delete(ctx); err != nil {
-                t.Fatal(err)
-        }
+		t.Fatal(err)
+	}
 
 	output := strings.TrimSuffix(buf.String(), newLine)
 	if output != expectedOutput {
