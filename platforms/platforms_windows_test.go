@@ -22,6 +22,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNormalize(t *testing.T) {
+func TestNormalizeWindows(t *testing.T) {
 	require.Equal(t, DefaultSpec(), Normalize(DefaultSpec()))
 }

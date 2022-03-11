@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseSelector(t *testing.T) {
@@ -362,5 +363,85 @@ func TestParseSelectorInvalid(t *testing.T) {
 				t.Fatalf("should have received an error")
 			}
 		})
+	}
+}
+
+func TestNormalize(t *testing.T) {
+	cases := []struct {
+		inputs   []specs.Platform
+		expected specs.Platform
+	}{
+		{
+			// Only OS is filled, but why?
+			inputs: []specs.Platform{
+				{OS: "", Architecture: ""},
+			},
+			expected: specs.Platform{OS: runtime.GOOS, Architecture: ""},
+		},
+		{
+			// Okay to have unknown values.
+			inputs: []specs.Platform{
+				{OS: "foo", Architecture: "bar", Variant: "baz"},
+				{OS: "Foo", Architecture: "Bar", Variant: "Baz"},
+			},
+			expected: specs.Platform{OS: "foo", Architecture: "bar", Variant: "baz"},
+		},
+		{
+			expected: specs.Platform{OS: "darwin", Architecture: "amd64"},
+			inputs: []specs.Platform{
+				// macos -> darwin conversion.
+				{OS: "macos", Architecture: "amd64"},
+			},
+		},
+		{
+			expected: specs.Platform{OS: "linux", Architecture: "amd64"},
+			inputs: []specs.Platform{
+				// No variants in x86-64.
+				{OS: "linux", Architecture: "amd64", Variant: "v1"},
+				{OS: "linux", Architecture: "x86_64"},
+			},
+		},
+		{
+			expected: specs.Platform{OS: "linux", Architecture: "arm", Variant: "v5"},
+			inputs: []specs.Platform{
+				{OS: "linux", Architecture: "arm", Variant: "5"},
+			},
+		},
+		{
+			expected: specs.Platform{OS: "linux", Architecture: "arm", Variant: "v6"},
+			inputs: []specs.Platform{
+				{OS: "linux", Architecture: "armel"},
+				{OS: "linux", Architecture: "arm", Variant: "6"},
+			},
+		},
+		{
+			expected: specs.Platform{OS: "linux", Architecture: "arm", Variant: "v7"},
+			inputs: []specs.Platform{
+				{OS: "linux", Architecture: "armhf"},
+				{OS: "linux", Architecture: "arm"},
+				{OS: "linux", Architecture: "arm", Variant: "7"},
+			},
+		},
+		{
+			expected: specs.Platform{OS: "linux", Architecture: "arm", Variant: "v8"},
+			inputs: []specs.Platform{
+				{OS: "linux", Architecture: "arm", Variant: "8"},
+				{OS: "linux", Architecture: "arm", Variant: "v8"},
+			},
+		},
+		{
+			expected: specs.Platform{OS: "linux", Architecture: "arm64"},
+			inputs: []specs.Platform{
+				{OS: "linux", Architecture: "aarch64"},
+				{OS: "linux", Architecture: "arm64", Variant: "8"},
+				{OS: "linux", Architecture: "arm64", Variant: "v8"},
+			},
+		},
+	}
+	for _, tc := range cases {
+		require.Equal(t, tc.expected, Normalize(tc.expected))
+		for _, input := range tc.inputs {
+			require.Equal(t, tc.expected, Normalize(input))
+		}
 	}
 }
