@@ -1367,3 +1367,17 @@ func tryReadonlyMounts(mounts []mount.Mount) []mount.Mount {
 	}
 	return mounts
 }
+
+// WithWindowsDevice adds a device exposed to a Windows (WCOW or LCOW) Container
+func WithWindowsDevice(idType, id string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		if idType == "" {
+			return errors.New("missing idType")
+		}
+		if s.Windows == nil {
+			s.Windows = &specs.Windows{}
+		}
+		s.Windows.Devices = append(s.Windows.Devices, specs.WindowsDevice{IDType: idType, ID: id})
+		return nil
+	}
+}

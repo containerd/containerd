@@ -76,7 +76,7 @@ func (c *criService) containerSpec(
 		oci.WithHostname(sandboxConfig.GetHostname()),
 	)
 
-	specOpts = append(specOpts, customopts.WithWindowsMounts(c.os, config, extraMounts))
+	specOpts = append(specOpts, customopts.WithWindowsMounts(c.os, config, extraMounts), customopts.WithDevices(config))
 
 	// Start with the image config user and override below if RunAsUsername is not "".
 	username := imageConfig.User

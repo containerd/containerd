@@ -30,6 +30,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/containerd/containerd/content"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -702,5 +705,77 @@ func TestWithoutMounts(t *testing.T) {
 
 	if !reflect.DeepEqual(expected, s.Mounts) {
 		t.Fatalf("expected %+v, got %+v", expected, s.Mounts)
+	}
+}
+
+func TestWithWindowsDevice(t *testing.T) {
+	testcases := []struct {
+		name   string
+		idType string
+		id     string
+
+		expectError            bool
+		expectedWindowsDevices []specs.WindowsDevice
+	}{
+		{
+			name:        "empty_idType_and_id",
+			idType:      "",
+			id:          "",
+			expectError: true,
+		},
+		{
+			name:        "empty_idType",
+			idType:      "",
+			id:          "5B45201D-F2F2-4F3B-85BB-30FF1F953599",
+			expectError: true,
+		},
+		{
+			name:   "empty_id",
+			idType: "class",
+			id:     "",
+
+			expectError:            false,
+			expectedWindowsDevices: []specs.WindowsDevice{{ID: "", IDType: "class"}},
+		},
+		{
+			name:   "idType_and_id",
+			idType: "class",
+			id:     "5B45201D-F2F2-4F3B-85BB-30FF1F953599",
+
+			expectError:            false,
+			expectedWindowsDevices: []specs.WindowsDevice{{ID: "5B45201D-F2F2-4F3B-85BB-30FF1F953599", IDType: "class"}},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := Spec{
+				Version: specs.Version,
+				Root:    &specs.Root{},
+				Windows: &specs.Windows{},
+			}
+
+			opts := []SpecOpts{
+				WithWindowsDevice(tc.idType, tc.id),
+			}
+
+			for _, opt := range opts {
+				if err := opt(nil, nil, nil, &spec); err != nil {
+					if tc.expectError {
+						assert.Error(t, err)
+					} else {
+						require.NoError(t, err)
+					}
+				}
+			}
+
+			if len(tc.expectedWindowsDevices) != 0 {
+				require.NotNil(t, spec.Windows)
+				require.NotNil(t, spec.Windows.Devices)
+				assert.ElementsMatch(t, spec.Windows.Devices, tc.expectedWindowsDevices)
+			} else if spec.Windows != nil && spec.Windows.Devices != nil {
+				assert.ElementsMatch(t, spec.Windows.Devices, tc.expectedWindowsDevices)
+			}
+		})
 	}
 }

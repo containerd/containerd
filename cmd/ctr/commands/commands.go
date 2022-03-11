@@ -166,10 +166,6 @@ var (
 			Usage: "memory limit (in bytes) for the container",
 		},
 		cli.StringSliceFlag{
-			Name:  "device",
-			Usage: "file path to a device to add to the container; or a path to a directory tree of devices to add to the container",
-		},
-		cli.StringSliceFlag{
 			Name:  "cap-add",
 			Usage: "add Linux capabilities (Set capabilities with 'CAP_' prefix)",
 		},
