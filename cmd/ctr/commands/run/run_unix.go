@@ -39,10 +39,16 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/typeurl"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
+
+func init() {
+	typeurl.Register(&commands.NetworkMetaData{},
+		"github.com/containerd/containerd/cmd/ctr/commands", "NetworkMetaData")
+}
 
 var platformRunFlags = []cli.Flag{
 	cli.StringFlag{
@@ -214,6 +220,10 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			)
 		}
 
+		if context.Bool("cni") {
+			cniMeta := &commands.NetworkMetaData{EnableCni: true}
+			cOpts = append(cOpts, containerd.WithContainerExtension(commands.CtrCniMetadataExtension, cniMeta))
+		}
 		if caps := context.StringSlice("cap-add"); len(caps) > 0 {
 			for _, cap := range caps {
 				if !strings.HasPrefix(cap, "CAP_") {
