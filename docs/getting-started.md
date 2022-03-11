@@ -16,7 +16,7 @@ You can download one of the latest builds for containerd on the [github releases
 If you are using systemd, we have a `containerd.service` file at the root of the repository that you can use.
 
 The daemon also uses a configuration file located in `/etc/containerd/config.toml` for specifying daemon level options.
-A sample configuration file can be found [here](containerd/docs/man/containerd-config.toml.5.md)
+A sample configuration file can be found [here](/docs/man/containerd-config.toml.5.md).
 
 The default configuration can be generated via `containerd config default > /etc/containerd/config.toml`.
 
