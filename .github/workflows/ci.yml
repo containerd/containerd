@@ -38,12 +38,11 @@ jobs:
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
-      - uses: golangci/golangci-lint-action@v2
+      - uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.42.0
+          version: v1.44.2
           working-directory: src/github.com/containerd/containerd
           args: --timeout=5m
-          skip-go-installation: true
 
   #
   # Project checks
