@@ -46,38 +46,13 @@ func TestSnapshotterSuite(t *testing.T) {
 	logrus.SetLevel(logrus.DebugLevel)
 
 	snapshotterFn := func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
-		// Create loopback devices for each test case
-		_, loopDataDevice := createLoopbackDevice(t, root)
-		_, loopMetaDevice := createLoopbackDevice(t, root)
-
 		poolName := fmt.Sprintf("containerd-snapshotter-suite-pool-%d", time.Now().Nanosecond())
-		err := dmsetup.CreatePool(poolName, loopDataDevice, loopMetaDevice, 64*1024/dmsetup.SectorSize)
-		assert.NilError(t, err, "failed to create pool %q", poolName)
-
 		config := &Config{
 			RootPath:      root,
 			PoolName:      poolName,
 			BaseImageSize: "16Mb",
 		}
-
-		snap, err := NewSnapshotter(context.Background(), config)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// Remove device mapper pool and detach loop devices after test completes
-		removePool := func() error {
-			result := multierror.Append(
-				snap.pool.RemovePool(ctx),
-				mount.DetachLoopDevice(loopDataDevice, loopMetaDevice))
-
-			return result.ErrorOrNil()
-		}
-
-		// Pool cleanup should be called before closing metadata store (as we need to retrieve device names)
-		snap.cleanupFn = append([]closeFunc{removePool}, snap.cleanupFn...)
-
-		return snap, snap.Close, nil
+		return createSnapshotter(ctx, t, config)
 	}
 
 	testsuite.SnapshotterSuite(t, "devmapper", snapshotterFn)
@@ -164,4 +139,86 @@ func TestMkfsXfsNonDefault(t *testing.T) {
 	ctx := context.Background()
 	err := mkfs(ctx, "xfs", "noquota", "")
 	assert.ErrorContains(t, err, `mkfs.xfs couldn't initialize ""`)
+}
+
+func TestMultipleXfsMounts(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	logrus.SetLevel(logrus.DebugLevel)
+
+	ctx := context.Background()
+	ctx = namespaces.WithNamespace(ctx, "testsuite")
+	tempDir, err := os.MkdirTemp("", "snapshot-suite-usage")
+	assert.NilError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	poolName := fmt.Sprintf("containerd-snapshotter-suite-pool-%d", time.Now().Nanosecond())
+	config := &Config{
+		RootPath:       tempDir,
+		PoolName:       poolName,
+		BaseImageSize:  "16Mb",
+		FileSystemType: "xfs",
+	}
+	snapshotter, closer, err := createSnapshotter(ctx, t, config)
+	assert.NilError(t, err)
+	defer closer()
+
+	var (
+		sizeBytes   int64 = 1048576 // 1MB
+		baseApplier       = fstest.Apply(fstest.CreateRandomFile("/a", 12345679, sizeBytes, 0777))
+	)
+
+	// Create base layer
+	mounts, err := snapshotter.Prepare(ctx, "prepare-1", "")
+	assert.NilError(t, err)
+
+	root1, _ := os.MkdirTemp(os.TempDir(), "containerd-mount")
+	defer func() {
+		mount.UnmountAll(root1, 0)
+		os.Remove(root1)
+	}()
+	err = mount.All(mounts, root1)
+	assert.NilError(t, err)
+	baseApplier.Apply(root1)
+	snapshotter.Commit(ctx, "layer-1", "prepare-1")
+
+	// Create one child layer
+	mounts, err = snapshotter.Prepare(ctx, "prepare-2", "layer-1")
+	assert.NilError(t, err)
+
+	root2, _ := os.MkdirTemp(os.TempDir(), "containerd-mount")
+	defer func() {
+		mount.UnmountAll(root2, 0)
+		os.Remove(root2)
+	}()
+	err = mount.All(mounts, root2)
+	assert.NilError(t, err)
+}
+
+func createSnapshotter(ctx context.Context, t *testing.T, config *Config) (snapshots.Snapshotter, func() error, error) {
+	// Create loopback devices for each test case
+	_, loopDataDevice := createLoopbackDevice(t, config.RootPath)
+	_, loopMetaDevice := createLoopbackDevice(t, config.RootPath)
+
+	err := dmsetup.CreatePool(config.PoolName, loopDataDevice, loopMetaDevice, 64*1024/dmsetup.SectorSize)
+	assert.NilError(t, err, "failed to create pool %q", config.PoolName)
+
+	snap, err := NewSnapshotter(ctx, config)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Remove device mapper pool and detach loop devices after test completes
+	removePool := func() error {
+		result := multierror.Append(
+			snap.pool.RemovePool(ctx),
+			mount.DetachLoopDevice(loopDataDevice, loopMetaDevice))
+
+		return result.ErrorOrNil()
+	}
+
+	// Pool cleanup should be called before closing metadata store (as we need to retrieve device names)
+	snap.cleanupFn = append([]closeFunc{removePool}, snap.cleanupFn...)
+
+	return snap, snap.Close, nil
 }
