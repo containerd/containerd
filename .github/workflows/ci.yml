@@ -29,11 +29,10 @@ jobs:
           go-version: ${{ matrix.go-version }}
 
       - uses: actions/checkout@v2
-      - uses: golangci/golangci-lint-action@v2
+      - uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.42.0
+          version: v1.44.2
           args: --timeout=5m
-          skip-go-installation: true
 
   #
   # Project checks
