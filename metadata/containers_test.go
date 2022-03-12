@@ -152,6 +152,7 @@ func TestContainersList(t *testing.T) {
 			}
 
 			for _, result := range results {
+				result := result
 				checkContainersEqual(t, &result, testset[result.ID], "list results did not match")
 			}
 		})

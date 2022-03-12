@@ -129,6 +129,7 @@ func TestImagesList(t *testing.T) {
 			}
 
 			for _, result := range results {
+				result := result
 				checkImagesEqual(t, &result, testset[result.Name], "list results did not match")
 			}
 		})
