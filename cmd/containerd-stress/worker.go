@@ -67,7 +67,7 @@ func (w *worker) run(ctx, tctx context.Context) {
 			}
 			continue
 		}
-		// only log times are success so we don't scew the results from failures that go really fast
+		// only log times are success so we don't skew the results from failures that go really fast
 		ct.WithValues(w.commit).UpdateSince(start)
 	}
 }
