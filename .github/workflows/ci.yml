@@ -29,11 +29,10 @@ jobs:
           go-version: ${{ matrix.go-version }}
 
       - uses: actions/checkout@v2
-      - uses: golangci/golangci-lint-action@v2
+      - uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.42.0
+          version: v1.44.2
           args: --timeout=5m
-          skip-go-installation: true
 
   #
   # Project checks
@@ -256,11 +255,6 @@ jobs:
 
       - uses: actions/checkout@v2
         with:
-          repository: Microsoft/hcsshim
-          path: src/github.com/Microsoft/hcsshim
-
-      - uses: actions/checkout@v2
-        with:
           repository: kubernetes-sigs/cri-tools
           path: src/github.com/kubernetes-sigs/cri-tools
 
@@ -279,12 +273,6 @@ jobs:
         run: |
           set -o xtrace
           mingw32-make.exe binaries
-          bindir="$(pwd)"
-          SHIM_COMMIT=$(grep 'Microsoft/hcsshim ' go.mod | awk '{print $2}')
-          cd ../../Microsoft/hcsshim
-          git fetch --tags origin "${SHIM_COMMIT}"
-          git checkout "${SHIM_COMMIT}"
-          GO111MODULE=on go build -mod=vendor -o "${bindir}/integration/client/containerd-shim-runhcs-v1.exe" ./cmd/containerd-shim-runhcs-v1
           cd ../../kubernetes-sigs/cri-tools
           make critest
 

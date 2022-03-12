@@ -297,6 +297,15 @@ func WithSupplementalGroups(gids []int64) ContainerOpts { //nolint:unused
 	}
 }
 
+// WithDevice adds a device mount.
+func WithDevice(containerPath, hostPath, permissions string) ContainerOpts { //nolint:unused
+	return func(c *runtime.ContainerConfig) {
+		c.Devices = append(c.Devices, &runtime.Device{
+			ContainerPath: containerPath, HostPath: hostPath, Permissions: permissions,
+		})
+	}
+}
+
 // ContainerConfig creates a container config given a name and image name
 // and additional container config options
 func ContainerConfig(name, image string, opts ...ContainerOpts) *runtime.ContainerConfig {

@@ -14,18 +14,14 @@
    limitations under the License.
 */
 
-package commands
+package platforms
 
 import (
-	"github.com/urfave/cli"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
-func init() {
-	ContainerFlags = append(ContainerFlags, cli.Uint64Flag{
-		Name:  "cpu-count",
-		Usage: "number of CPUs available to the container",
-	}, cli.StringSliceFlag{
-		Name:  "device",
-		Usage: "identifier of a device to add to the container  (e.g. class://5B45201D-F2F2-4F3B-85BB-30FF1F953599)",
-	})
+func TestNormalize(t *testing.T) {
+	require.Equal(t, DefaultSpec(), Normalize(DefaultSpec()))
 }

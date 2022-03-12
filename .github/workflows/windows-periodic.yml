@@ -150,13 +150,6 @@ jobs:
         run: |
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "git clone http://github.com/containerd/containerd c:\\containerd "
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "cd c:\containerd ; make binaries"
-          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "git clone http://github.com/Microsoft/hcsshim c:\containerd\hcsshim "
-
-          # Get shim commit from containerd local repo
-          SHIM_COMMIT=$(grep 'Microsoft/hcsshim' go.mod | awk '{ print $2 }');
-
-          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "cd c:\containerd\hcsshim; git fetch --tags origin $SHIM_COMMIT ; \
-                            git checkout $SHIM_COMMIT ; go build -mod=vendor -o ${{ env.REMOTE_VM_BIN_PATH }}\containerd-shim-runhcs-v1.exe .\cmd\containerd-shim-runhcs-v1"
 
       - name: RunIntegrationTests
         run: |
