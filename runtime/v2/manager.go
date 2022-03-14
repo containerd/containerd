@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/containerd/containerd/containers"
@@ -242,6 +243,11 @@ func (m *ShimManager) resolveRuntimePath(runtime string) (string, error) {
 		}
 
 		return runtime, nil
+	}
+
+	// Check if relative path to runtime binary provided
+	if strings.Contains(runtime, "/") {
+		return "", fmt.Errorf("invalid runtime name %s, correct runtime name should be either format like `io.containerd.runc.v1` or a full path to the binary", runtime)
 	}
 
 	// Preserve existing logic and resolve runtime path from runtime name.

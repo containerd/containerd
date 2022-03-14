@@ -134,7 +134,7 @@ var (
 		},
 		cli.StringFlag{
 			Name:  "runtime",
-			Usage: "runtime name",
+			Usage: "runtime name or absolute path to runtime binary",
 			Value: defaults.DefaultRuntime,
 		},
 		cli.StringFlag{

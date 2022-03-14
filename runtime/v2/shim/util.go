@@ -85,7 +85,7 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 func BinaryName(runtime string) string {
 	// runtime name should format like $prefix.name.version
 	parts := strings.Split(runtime, ".")
-	if len(parts) < 2 {
+	if len(parts) < 2 || parts[0] == "" {
 		return ""
 	}
 
