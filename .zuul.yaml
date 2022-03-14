@@ -14,7 +14,6 @@
       Containerd build in openlab cluster.
     run: .zuul/playbooks/containerd-build/run.yaml
     nodeset: ubuntu-xenial-arm64-openlab
-    voting: false
 
 - job:
     name: containerd-test-arm64
@@ -23,7 +22,6 @@
       Containerd unit tests in openlab cluster.
     run: .zuul/playbooks/containerd-build/unit-test.yaml
     nodeset: ubuntu-xenial-arm64-openlab
-    voting: false
 
 - job:
     name: containerd-integration-test-arm64
@@ -32,4 +30,3 @@
       Containerd unit tests in openlab cluster.
     run: .zuul/playbooks/containerd-build/integration-test.yaml
     nodeset: ubuntu-xenial-arm64-openlab
-    voting: false
