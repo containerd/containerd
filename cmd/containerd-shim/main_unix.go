@@ -76,7 +76,7 @@ func parseFlags() {
 	flag.StringVar(&namespaceFlag, "namespace", "", "namespace that owns the shim")
 	flag.StringVar(&socketFlag, "socket", "", "socket path to serve")
 	flag.StringVar(&addressFlag, "address", "", "grpc address back to main containerd")
-	flag.StringVar(&workdirFlag, "workdir", "", "path used to storge large temporary data")
+	flag.StringVar(&workdirFlag, "workdir", "", "path used to storage large temporary data")
 	flag.StringVar(&runtimeRootFlag, "runtime-root", process.RuncRoot, "root directory for the runtime")
 	flag.StringVar(&criuFlag, "criu", "", "path to criu binary")
 	flag.BoolVar(&systemdCgroupFlag, "systemd-cgroup", false, "set runtime to use systemd-cgroup")

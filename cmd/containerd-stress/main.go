@@ -104,7 +104,7 @@ type result struct {
 }
 
 func main() {
-	// morr power!
+	// more power!
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	app := cli.NewApp()
