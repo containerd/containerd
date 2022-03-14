@@ -28,7 +28,6 @@ import (
 	"testing"
 
 	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
@@ -1619,8 +1618,8 @@ containerEdits:
 		}
 		require.NoError(t, err)
 
-		injectFun := containerd.WithCDI(spec, test.annotations, []string{cdiDir})
-		err = injectFun(nil, nil, nil)
+		injectFun := oci.WithCDI(test.annotations, []string{cdiDir})
+		err = injectFun(nil, nil, nil, spec)
 		assert.Equal(t, test.expectError, err != nil)
 
 		if err != nil {
