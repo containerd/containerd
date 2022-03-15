@@ -73,10 +73,15 @@ func ContentCrossNSIsolatedSuite(t *testing.T, name string, storeFn StoreInitFn)
 	t.Run("CrossNamespaceIsolate", makeTest(t, name, storeFn, checkCrossNSIsolate))
 }
 
+// ContentSharedNSIsolatedSuite runs a test suite for shared namespaces under isolated content policy
+func ContentSharedNSIsolatedSuite(t *testing.T, name string, storeFn StoreInitFn) {
+	t.Run("SharedNamespaceIsolate", makeTest(t, name, storeFn, checkSharedNSIsolate))
+}
+
 // ContextWrapper is used to decorate new context used inside the test
 // before using the context on the content store.
 // This can be used to support leasing and multiple namespaces tests.
-type ContextWrapper func(ctx context.Context) (context.Context, func(context.Context) error, error)
+type ContextWrapper func(ctx context.Context, sharedNS bool) (context.Context, func(context.Context) error, error)
 
 type wrapperKey struct{}
 
@@ -121,7 +126,7 @@ func makeTest(t *testing.T, name string, storeFn func(ctx context.Context, root 
 		w, ok := ctx.Value(wrapperKey{}).(ContextWrapper)
 		if ok {
 			var done func(context.Context) error
-			ctx, done, err = w(ctx)
+			ctx, done, err = w(ctx, false)
 			if err != nil {
 				t.Fatalf("Error wrapping context: %+v", err)
 			}
@@ -824,7 +829,7 @@ func checkCrossNSShare(ctx context.Context, t *testing.T, cs content.Store) {
 		t.Fatal(err)
 	}
 
-	ctx2, done, err := wrap(context.Background())
+	ctx2, done, err := wrap(context.Background(), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -876,7 +881,7 @@ func checkCrossNSAppend(ctx context.Context, t *testing.T, cs content.Store) {
 		t.Fatal(err)
 	}
 
-	ctx2, done, err := wrap(context.Background())
+	ctx2, done, err := wrap(context.Background(), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -945,7 +950,7 @@ func checkCrossNSIsolate(ctx context.Context, t *testing.T, cs content.Store) {
 	}
 	t2 := time.Now()
 
-	ctx2, done, err := wrap(context.Background())
+	ctx2, done, err := wrap(context.Background(), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -960,6 +965,64 @@ func checkCrossNSIsolate(ctx context.Context, t *testing.T, cs content.Store) {
 	t4 := time.Now()
 
 	checkNewlyCreated(t, w, t1, t2, t3, t4)
+}
+
+func checkSharedNSIsolate(ctx context.Context, t *testing.T, cs content.Store) {
+	wrap, ok := ctx.Value(wrapperKey{}).(ContextWrapper)
+	if !ok {
+		t.Skip("multiple contexts not supported")
+	}
+
+	ctx1, done1, err := wrap(context.Background(), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer done1(ctx1)
+
+	var size int64 = 1000
+	b, d := createContent(size)
+	ref := fmt.Sprintf("ref-%d", size)
+	t1 := time.Now()
+
+	if err := content.WriteBlob(ctx1, cs, ref, bytes.NewReader(b), ocispec.Descriptor{Size: size, Digest: d}); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx2, done2, err := wrap(context.Background(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer done2(ctx2)
+
+	w, err := cs.Writer(ctx2, content.WithRef(ref), content.WithDescriptor(ocispec.Descriptor{Size: size, Digest: d}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	t2 := time.Now()
+
+	checkStatus(t, w, content.Status{
+		Ref:    ref,
+		Offset: size,
+		Total:  size,
+	}, d, t1, t2, t1, t2)
+
+	if err := w.Commit(ctx2, size, d); err != nil {
+		t.Fatal(err)
+	}
+	t3 := time.Now()
+
+	info := content.Info{
+		Digest: d,
+		Size:   size,
+	}
+	if err := checkContent(ctx1, cs, d, info, t1, t3, t1, t3); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := checkContent(ctx2, cs, d, info, t1, t3, t1, t3); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func checkStatus(t *testing.T, w content.Writer, expected content.Status, d digest.Digest, preStart, postStart, preUpdate, postUpdate time.Time) {

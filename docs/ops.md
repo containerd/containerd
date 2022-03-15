@@ -232,3 +232,7 @@ The default is "shared". While this is largely the most desired policy, one can 
 [plugins.bolt]
 	content_sharing_policy = "isolated"
 ```
+
+In "isolated" mode, it is also possible to share only the contents of a specific namespace by adding the label `containerd.io/namespace.shareable=true` to that namespace.
+This will make its blobs available in all other namespaces even if the content sharing policy is set to "isolated".
+If the label value is set to anything other than `true`, the namespace content will not be shared.
