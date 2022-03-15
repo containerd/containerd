@@ -23,7 +23,6 @@ import (
 	"context"
 	_ "crypto/sha256"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -61,11 +60,7 @@ func TestSnapshotterSuite(t *testing.T) {
 	ctx = namespaces.WithNamespace(ctx, "testsuite")
 
 	t.Run("DevMapperUsage", func(t *testing.T) {
-		tempDir, err := os.MkdirTemp("", "snapshot-suite-usage")
-		assert.NilError(t, err)
-		defer os.RemoveAll(tempDir)
-
-		snapshotter, closer, err := snapshotterFn(ctx, tempDir)
+		snapshotter, closer, err := snapshotterFn(ctx, t.TempDir())
 		assert.NilError(t, err)
 		defer closer()
 
@@ -148,13 +143,10 @@ func TestMultipleXfsMounts(t *testing.T) {
 
 	ctx := context.Background()
 	ctx = namespaces.WithNamespace(ctx, "testsuite")
-	tempDir, err := os.MkdirTemp("", "snapshot-suite-usage")
-	assert.NilError(t, err)
-	defer os.RemoveAll(tempDir)
 
 	poolName := fmt.Sprintf("containerd-snapshotter-suite-pool-%d", time.Now().Nanosecond())
 	config := &Config{
-		RootPath:       tempDir,
+		RootPath:       t.TempDir(),
 		PoolName:       poolName,
 		BaseImageSize:  "16Mb",
 		FileSystemType: "xfs",
@@ -172,10 +164,9 @@ func TestMultipleXfsMounts(t *testing.T) {
 	mounts, err := snapshotter.Prepare(ctx, "prepare-1", "")
 	assert.NilError(t, err)
 
-	root1, _ := os.MkdirTemp(os.TempDir(), "containerd-mount")
+	root1 := t.TempDir()
 	defer func() {
 		mount.UnmountAll(root1, 0)
-		os.Remove(root1)
 	}()
 	err = mount.All(mounts, root1)
 	assert.NilError(t, err)
@@ -186,10 +177,9 @@ func TestMultipleXfsMounts(t *testing.T) {
 	mounts, err = snapshotter.Prepare(ctx, "prepare-2", "layer-1")
 	assert.NilError(t, err)
 
-	root2, _ := os.MkdirTemp(os.TempDir(), "containerd-mount")
+	root2 := t.TempDir()
 	defer func() {
 		mount.UnmountAll(root2, 0)
-		os.Remove(root2)
 	}()
 	err = mount.All(mounts, root2)
 	assert.NilError(t, err)

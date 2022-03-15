@@ -122,10 +122,7 @@ func TestCompressDecompressUncompressed(t *testing.T) {
 
 func TestDetectPigz(t *testing.T) {
 	// Create fake PATH with unpigz executable, make sure detectPigz can find it
-	tempPath, err := os.MkdirTemp("", "containerd_temp_")
-	if err != nil {
-		t.Fatal(err)
-	}
+	tempPath := t.TempDir()
 
 	filename := "unpigz"
 	if runtime.GOOS == "windows" {
@@ -137,8 +134,6 @@ func TestDetectPigz(t *testing.T) {
 	if err := os.WriteFile(fullPath, []byte(""), 0111); err != nil {
 		t.Fatal(err)
 	}
-
-	defer os.RemoveAll(tempPath)
 
 	oldPath := os.Getenv("PATH")
 	os.Setenv("PATH", tempPath)

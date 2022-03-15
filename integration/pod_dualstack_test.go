@@ -31,9 +31,7 @@ import (
 )
 
 func TestPodDualStack(t *testing.T) {
-	testPodLogDir, err := os.MkdirTemp("", "dualstack")
-	require.NoError(t, err)
-	defer os.RemoveAll(testPodLogDir)
+	testPodLogDir := t.TempDir()
 
 	t.Log("Create a sandbox")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "dualstack", WithPodLogDirectory(testPodLogDir))

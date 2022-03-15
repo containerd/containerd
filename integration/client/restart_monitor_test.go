@@ -49,22 +49,14 @@ func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, fun
 		buf               = bytes.NewBuffer(nil)
 	)
 
-	tempDir, err := os.MkdirTemp("", "containerd-test-new-daemon-with-config")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err != nil {
-			os.RemoveAll(tempDir)
-		}
-	}()
+	tempDir := t.TempDir()
 
 	configTOMLFile := filepath.Join(tempDir, "config.toml")
-	if err = os.WriteFile(configTOMLFile, []byte(configTOML), 0600); err != nil {
+	if err := os.WriteFile(configTOMLFile, []byte(configTOML), 0600); err != nil {
 		t.Fatal(err)
 	}
 
-	if err = srvconfig.LoadConfig(configTOMLFile, &configTOMLDecoded); err != nil {
+	if err := srvconfig.LoadConfig(configTOMLFile, &configTOMLDecoded); err != nil {
 		t.Fatal(err)
 	}
 
@@ -83,7 +75,7 @@ func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, fun
 	if configTOMLDecoded.State == "" {
 		args = append(args, "--state", filepath.Join(tempDir, "state"))
 	}
-	if err = ctrd.start("containerd", address, args, buf, buf); err != nil {
+	if err := ctrd.start("containerd", address, args, buf, buf); err != nil {
 		t.Fatalf("%v: %s", err, buf.String())
 	}
 

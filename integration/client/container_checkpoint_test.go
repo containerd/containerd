@@ -455,11 +455,7 @@ func TestCheckpointRestoreWithImagePath(t *testing.T) {
 	}
 
 	// create image path store criu image files
-	crDir, err := os.MkdirTemp("", "test-cr")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(crDir)
+	crDir := t.TempDir()
 	imagePath := filepath.Join(crDir, "cr")
 	// checkpoint task
 	if _, err := task.Checkpoint(ctx, WithCheckpointImagePath(imagePath)); err != nil {

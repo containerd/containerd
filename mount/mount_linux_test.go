@@ -104,15 +104,7 @@ func TestFUSEHelper(t *testing.T) {
 	if err != nil {
 		t.Skip("fuse-overlayfs not installed")
 	}
-	td, err := os.MkdirTemp("", "fuse")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := os.RemoveAll(td); err != nil {
-			t.Fatal(err)
-		}
-	}()
+	td := t.TempDir()
 
 	for _, dir := range []string{"lower1", "lower2", "upper", "work", "merged"} {
 		if err := os.Mkdir(filepath.Join(td, dir), 0755); err != nil {

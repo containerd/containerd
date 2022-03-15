@@ -208,11 +208,7 @@ ca = "/etc/path/default"
 }
 
 func TestLoadCertFiles(t *testing.T) {
-	dir, err := os.MkdirTemp("", t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	type testCase struct {
 		input hostConfig

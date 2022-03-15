@@ -36,11 +36,7 @@ import (
 func TestOverlayApply(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	base, err := os.MkdirTemp("", "test-ovl-diff-apply-")
-	if err != nil {
-		t.Fatalf("unable to create temp dir: %+v", err)
-	}
-	defer os.RemoveAll(base)
+	base := t.TempDir()
 
 	if err := overlayutils.Supported(base); err != nil {
 		t.Skipf("skipping because overlay is not supported %v", err)
@@ -55,11 +51,7 @@ func TestOverlayApply(t *testing.T) {
 func TestOverlayApplyNoParents(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	base, err := os.MkdirTemp("", "test-ovl-diff-apply-")
-	if err != nil {
-		t.Fatalf("unable to create temp dir: %+v", err)
-	}
-	defer os.RemoveAll(base)
+	base := t.TempDir()
 
 	if err := overlayutils.Supported(base); err != nil {
 		t.Skipf("skipping because overlay is not supported %v", err)
