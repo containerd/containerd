@@ -20,7 +20,6 @@
 package overlayutils
 
 import (
-	"os"
 	"testing"
 
 	"github.com/containerd/containerd/pkg/testutil"
@@ -30,11 +29,7 @@ import (
 
 func testOverlaySupported(t testing.TB, expected bool, mkfs ...string) {
 	testutil.RequiresRoot(t)
-	mnt, err := os.MkdirTemp("", "containerd-fs-test-supports-overlay")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(mnt)
+	mnt := t.TempDir()
 
 	loop, err := loopback.New(100 << 20) // 100 MB
 	if err != nil {

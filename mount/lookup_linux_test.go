@@ -41,11 +41,7 @@ func checkLookup(t *testing.T, fsType, mntPoint, dir string) {
 
 func testLookup(t *testing.T, fsType string) {
 	testutil.RequiresRoot(t)
-	mnt, err := os.MkdirTemp("", "containerd-mountinfo-test-lookup")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(mnt)
+	mnt := t.TempDir()
 
 	loop, err := loopback.New(100 << 20) // 100 MB
 	if err != nil {
@@ -68,11 +64,7 @@ func testLookup(t *testing.T, fsType string) {
 	assert.Check(t, strings.HasPrefix(loop.Device, "/dev/loop"))
 	checkLookup(t, fsType, mnt, mnt)
 
-	newMnt, err := os.MkdirTemp("", "containerd-mountinfo-test-newMnt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(newMnt)
+	newMnt := t.TempDir()
 
 	if out, err := exec.Command("mount", "--bind", mnt, newMnt).CombinedOutput(); err != nil {
 		t.Fatalf("could not mount %s to %s: %v (out: %q)", mnt, newMnt, err, string(out))
@@ -99,21 +91,10 @@ func TestLookupWithXFS(t *testing.T) {
 }
 
 func TestLookupWithOverlay(t *testing.T) {
-	lower, err := os.MkdirTemp("", "containerd-mountinfo-test-lower")
-	assert.NilError(t, err)
-	defer os.RemoveAll(lower)
-
-	upper, err := os.MkdirTemp("", "containerd-mountinfo-test-upper")
-	assert.NilError(t, err)
-	defer os.RemoveAll(upper)
-
-	work, err := os.MkdirTemp("", "containerd-mountinfo-test-work")
-	assert.NilError(t, err)
-	defer os.RemoveAll(work)
-
-	overlay, err := os.MkdirTemp("", "containerd-mountinfo-test-overlay")
-	assert.NilError(t, err)
-	defer os.RemoveAll(overlay)
+	lower := t.TempDir()
+	upper := t.TempDir()
+	work := t.TempDir()
+	overlay := t.TempDir()
 
 	if out, err := exec.Command("mount", "-t", "overlay", "overlay", "-o", fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s",
 		lower, upper, work), overlay).CombinedOutput(); err != nil {
@@ -123,7 +104,7 @@ func TestLookupWithOverlay(t *testing.T) {
 	defer testutil.Unmount(t, overlay)
 
 	testdir := filepath.Join(overlay, "testdir")
-	err = os.Mkdir(testdir, 0777)
+	err := os.Mkdir(testdir, 0777)
 	assert.NilError(t, err)
 
 	testfile := filepath.Join(overlay, "testfile")

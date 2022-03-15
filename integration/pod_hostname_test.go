@@ -64,9 +64,7 @@ func TestPodHostname(t *testing.T) {
 			if test.needsHostNetwork && goruntime.GOOS == "windows" {
 				t.Skip("Skipped on Windows.")
 			}
-			testPodLogDir, err := os.MkdirTemp("", "hostname")
-			require.NoError(t, err)
-			defer os.RemoveAll(testPodLogDir)
+			testPodLogDir := t.TempDir()
 
 			opts := append(test.opts, WithPodLogDirectory(testPodLogDir))
 			t.Log("Create a sandbox with hostname")

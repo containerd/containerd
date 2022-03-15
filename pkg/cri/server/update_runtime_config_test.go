@@ -93,11 +93,9 @@ func TestUpdateRuntimeConfig(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			testDir, err := os.MkdirTemp(os.TempDir(), "test-runtime-config")
-			require.NoError(t, err)
-			defer os.RemoveAll(testDir)
+			testDir := t.TempDir()
 			templateName := filepath.Join(testDir, "template")
-			err = os.WriteFile(templateName, []byte(testTemplate), 0666)
+			err := os.WriteFile(templateName, []byte(testTemplate), 0666)
 			require.NoError(t, err)
 			confDir := filepath.Join(testDir, "net.d")
 			confName := filepath.Join(confDir, cniConfigFileName)

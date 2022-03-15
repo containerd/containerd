@@ -61,12 +61,10 @@ func TestMergeConfigs(t *testing.T) {
 }
 
 func TestResolveImports(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "containerd_")
-	assert.NilError(t, err)
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
 	for _, filename := range []string{"config_1.toml", "config_2.toml", "test.toml"} {
-		err = os.WriteFile(filepath.Join(tempDir, filename), []byte(""), 0600)
+		err := os.WriteFile(filepath.Join(tempDir, filename), []byte(""), 0600)
 		assert.NilError(t, err)
 	}
 
@@ -95,12 +93,10 @@ root = "/var/lib/containerd"
 	accepts = ["application/vnd.docker.image.rootfs.diff.tar.gzip"]
 	path = "unpigz"
 `
-	tempDir, err := os.MkdirTemp("", "containerd_")
-	assert.NilError(t, err)
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
 	path := filepath.Join(tempDir, "config.toml")
-	err = os.WriteFile(path, []byte(data), 0600)
+	err := os.WriteFile(path, []byte(data), 0600)
 	assert.NilError(t, err)
 
 	var out Config
@@ -127,11 +123,9 @@ imports = ["data2.toml"]
 disabled_plugins = ["io.containerd.v1.xyz"]
 `
 
-	tempDir, err := os.MkdirTemp("", "containerd_")
-	assert.NilError(t, err)
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
-	err = os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0600)
+	err := os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0600)
 	assert.NilError(t, err)
 
 	err = os.WriteFile(filepath.Join(tempDir, "data2.toml"), []byte(data2), 0600)
@@ -157,11 +151,9 @@ imports = ["data2.toml", "data1.toml"]
 disabled_plugins = ["io.containerd.v1.xyz"]
 imports = ["data1.toml", "data2.toml"]
 `
-	tempDir, err := os.MkdirTemp("", "containerd_")
-	assert.NilError(t, err)
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
-	err = os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0600)
+	err := os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0600)
 	assert.NilError(t, err)
 
 	err = os.WriteFile(filepath.Join(tempDir, "data2.toml"), []byte(data2), 0600)
@@ -189,12 +181,10 @@ version = 2
   shim_debug = true
 `
 
-	tempDir, err := os.MkdirTemp("", "containerd_")
-	assert.NilError(t, err)
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
 	path := filepath.Join(tempDir, "config.toml")
-	err = os.WriteFile(path, []byte(data), 0600)
+	err := os.WriteFile(path, []byte(data), 0600)
 	assert.NilError(t, err)
 
 	var out Config
@@ -215,12 +205,8 @@ func TestDecodePluginInV1Config(t *testing.T) {
   shim_debug = true
 `
 
-	tempDir, err := os.MkdirTemp("", "containerd_")
-	assert.NilError(t, err)
-	defer os.RemoveAll(tempDir)
-
-	path := filepath.Join(tempDir, "config.toml")
-	err = os.WriteFile(path, []byte(data), 0600)
+	path := filepath.Join(t.TempDir(), "config.toml")
+	err := os.WriteFile(path, []byte(data), 0600)
 	assert.NilError(t, err)
 
 	var out Config

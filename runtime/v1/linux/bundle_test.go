@@ -48,9 +48,7 @@ func TestNewBundle(t *testing.T) {
 
 	for i, tc := range tests {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			dir, err := os.MkdirTemp("", "test-new-bundle")
-			require.NoError(t, err, "failed to create test directory")
-			defer os.RemoveAll(dir)
+			dir := t.TempDir()
 			work := filepath.Join(dir, "work")
 			state := filepath.Join(dir, "state")
 			id := fmt.Sprintf("new-bundle-%d", i)

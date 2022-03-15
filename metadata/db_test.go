@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"os"
 	"path/filepath"
 	"runtime/pprof"
 	"strings"
@@ -73,10 +72,7 @@ func testDB(t *testing.T, opt ...testOpt) (context.Context, *DB, func()) {
 		o(&topts)
 	}
 
-	dirname, err := os.MkdirTemp("", strings.Replace(t.Name(), "/", "_", -1)+"-")
-	if err != nil {
-		t.Fatal(err)
-	}
+	dirname := t.TempDir()
 
 	snapshotter, err := native.NewSnapshotter(filepath.Join(dirname, "native"))
 	if err != nil {
@@ -112,9 +108,6 @@ func testDB(t *testing.T, opt ...testOpt) (context.Context, *DB, func()) {
 
 	return ctx, db, func() {
 		bdb.Close()
-		if err := os.RemoveAll(dirname); err != nil {
-			t.Log("failed removing temp dir", err)
-		}
 		cancel()
 	}
 }
@@ -764,10 +757,7 @@ type testLease struct {
 }
 
 func newStores(t testing.TB) (*DB, content.Store, snapshots.Snapshotter, func()) {
-	td, err := os.MkdirTemp("", "gc-test-")
-	if err != nil {
-		t.Fatal(err)
-	}
+	td := t.TempDir()
 	db, err := bolt.Open(filepath.Join(td, "meta.db"), 0644, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -786,6 +776,7 @@ func newStores(t testing.TB) (*DB, content.Store, snapshots.Snapshotter, func())
 	mdb := NewDB(db, lcs, map[string]snapshots.Snapshotter{"native": nsn})
 
 	return mdb, mdb.ContentStore(), mdb.Snapshotter("native"), func() {
-		os.RemoveAll(td)
+		nsn.Close()
+		db.Close()
 	}
 }
