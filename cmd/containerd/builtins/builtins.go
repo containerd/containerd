@@ -25,6 +25,7 @@ import (
 	_ "github.com/containerd/containerd/metadata/plugin"
 	_ "github.com/containerd/containerd/pkg/nri/plugin"
 	_ "github.com/containerd/containerd/plugins/streaming"
+	_ "github.com/containerd/containerd/plugins/transfer"
 	_ "github.com/containerd/containerd/runtime/restart/monitor"
 	_ "github.com/containerd/containerd/runtime/v2"
 	_ "github.com/containerd/containerd/services/containers"
@@ -41,5 +42,6 @@ import (
 	_ "github.com/containerd/containerd/services/snapshots"
 	_ "github.com/containerd/containerd/services/streaming"
 	_ "github.com/containerd/containerd/services/tasks"
+	_ "github.com/containerd/containerd/services/transfer"
 	_ "github.com/containerd/containerd/services/version"
 )

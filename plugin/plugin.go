@@ -84,6 +84,8 @@ const (
 	TracingProcessorPlugin Type = "io.containerd.tracing.processor.v1"
 	// NRIApiPlugin implements the NRI adaptation interface for containerd.
 	NRIApiPlugin Type = "io.containerd.nri.v1"
+	// TransferPlugin implements a transfer service
+	TransferPlugin Type = "io.containerd.transfer.v1"
 )
 
 const (
