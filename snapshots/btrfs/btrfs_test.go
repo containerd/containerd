@@ -121,10 +121,6 @@ func TestBtrfsMounts(t *testing.T) {
 	testutil.RequiresRoot(t)
 	ctx := context.Background()
 
-	// create temporary directory for mount point
-	mountPoint := t.TempDir()
-	t.Log("temporary mount point created", mountPoint)
-
 	root := t.TempDir()
 
 	b, c, err := boltSnapshotter(t)(ctx, root)
