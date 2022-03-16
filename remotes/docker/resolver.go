@@ -610,7 +610,7 @@ func (r *request) retryRequest(ctx context.Context, responses []*http.Response) 
 		}
 
 		return false, nil
-	case http.StatusMethodNotAllowed:
+	case http.StatusMethodNotAllowed, http.StatusForbidden:
 		// Support registries which have not properly implemented the HEAD method for
 		// manifests endpoint
 		if r.method == http.MethodHead && strings.Contains(r.path, "/manifests/") {
