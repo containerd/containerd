@@ -17,15 +17,49 @@
 package tasks
 
 import (
+	"context"
 	"errors"
+	"fmt"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	gocni "github.com/containerd/go-cni"
+	"github.com/containerd/typeurl"
 	"github.com/moby/sys/signal"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
 const defaultSignal = "SIGTERM"
+
+func RemoveCniNetworkIfExist(ctx context.Context, container containerd.Container) error {
+	exts, err := container.Extensions(ctx)
+	if err != nil {
+		return err
+	}
+	networkMeta, ok := exts[commands.CtrCniMetadataExtension]
+	if !ok {
+		return nil
+	}
+
+	data, err := typeurl.UnmarshalAny(&networkMeta)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal cni metadata extension  %s", commands.CtrCniMetadataExtension)
+	}
+	networkMetaData := data.(*commands.NetworkMetaData)
+
+	var network gocni.CNI
+	if networkMetaData.EnableCni {
+		if network, err = gocni.New(gocni.WithDefaultConf); err != nil {
+			return err
+		}
+		if err := network.Remove(ctx, commands.FullID(ctx, container), ""); err != nil {
+			logrus.WithError(err).Error("network remove error")
+			return err
+		}
+	}
+	return nil
+}
 
 var killCommand = cli.Command{
 	Name:      "kill",
@@ -90,6 +124,10 @@ var killCommand = cli.Command{
 			}
 		}
 		task, err := container.Task(ctx, nil)
+		if err != nil {
+			return err
+		}
+		err = RemoveCniNetworkIfExist(ctx, container)
 		if err != nil {
 			return err
 		}
