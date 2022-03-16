@@ -30,9 +30,7 @@ import (
 )
 
 func TestContainerLogWithoutTailingNewLine(t *testing.T) {
-	testPodLogDir, err := os.MkdirTemp("", "container-log-without-tailing-newline")
-	require.NoError(t, err)
-	defer os.RemoveAll(testPodLogDir)
+	testPodLogDir := t.TempDir()
 
 	t.Log("Create a sandbox with log directory")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "container-log-without-tailing-newline",
@@ -80,9 +78,7 @@ func TestContainerLogWithoutTailingNewLine(t *testing.T) {
 }
 
 func TestLongContainerLog(t *testing.T) {
-	testPodLogDir, err := os.MkdirTemp("", "long-container-log")
-	require.NoError(t, err)
-	defer os.RemoveAll(testPodLogDir)
+	testPodLogDir := t.TempDir()
 
 	t.Log("Create a sandbox with log directory")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "long-container-log",

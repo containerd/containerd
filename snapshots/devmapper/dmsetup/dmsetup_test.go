@@ -43,19 +43,13 @@ const (
 func TestDMSetup(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	tempDir, err := os.MkdirTemp("", "dmsetup-tests-")
-	assert.NilError(t, err, "failed to make temp dir for tests")
-
-	defer func() {
-		err := os.RemoveAll(tempDir)
-		assert.NilError(t, err)
-	}()
+	tempDir := t.TempDir()
 
 	dataImage, loopDataDevice := createLoopbackDevice(t, tempDir)
 	metaImage, loopMetaDevice := createLoopbackDevice(t, tempDir)
 
 	defer func() {
-		err = mount.DetachLoopDevice(loopDataDevice, loopMetaDevice)
+		err := mount.DetachLoopDevice(loopDataDevice, loopMetaDevice)
 		assert.NilError(t, err, "failed to detach loop devices for data image: %s and meta image: %s", dataImage, metaImage)
 	}()
 
@@ -87,7 +81,7 @@ func TestDMSetup(t *testing.T) {
 	t.Run("RemoveDevice", testRemoveDevice)
 
 	t.Run("RemovePool", func(t *testing.T) {
-		err = RemoveDevice(testPoolName, RemoveWithForce, RemoveWithRetries)
+		err := RemoveDevice(testPoolName, RemoveWithForce, RemoveWithRetries)
 		assert.NilError(t, err, "failed to remove thin-pool")
 	})
 

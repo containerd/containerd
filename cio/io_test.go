@@ -49,9 +49,7 @@ func TestNewFIFOSetInDir(t *testing.T) {
 		t.Skip("NewFIFOSetInDir has different behaviour on windows")
 	}
 
-	root, err := os.MkdirTemp("", "test-new-fifo-set")
-	assert.NilError(t, err)
-	defer os.RemoveAll(root)
+	root := t.TempDir()
 
 	fifos, err := NewFIFOSetInDir(root, "theid", true)
 	assert.NilError(t, err)

@@ -23,6 +23,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	_ "crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -30,8 +31,6 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
-
-	_ "crypto/sha256"
 
 	"github.com/containerd/containerd/archive/tartest"
 	"github.com/containerd/containerd/pkg/testutil"
@@ -58,7 +57,7 @@ var baseApplier = fstest.Apply(
 func TestUnpack(t *testing.T) {
 	requireTar(t)
 
-	if err := testApply(baseApplier); err != nil {
+	if err := testApply(t, baseApplier); err != nil {
 		t.Fatalf("Test apply failed: %+v", err)
 	}
 }
@@ -66,7 +65,7 @@ func TestUnpack(t *testing.T) {
 func TestBaseDiff(t *testing.T) {
 	requireTar(t)
 
-	if err := testBaseDiff(baseApplier); err != nil {
+	if err := testBaseDiff(t, baseApplier); err != nil {
 		t.Fatalf("Test base diff failed: %+v", err)
 	}
 }
@@ -102,7 +101,7 @@ func TestRelativeSymlinks(t *testing.T) {
 	}
 
 	for _, bo := range breakoutLinks {
-		if err := testDiffApply(bo); err != nil {
+		if err := testDiffApply(t, bo); err != nil {
 			t.Fatalf("Test apply failed: %+v", err)
 		}
 	}
@@ -179,7 +178,7 @@ func TestSymlinks(t *testing.T) {
 	}
 
 	for i, l := range links {
-		if err := testDiffApply(l[0], l[1]); err != nil {
+		if err := testDiffApply(t, l[0], l[1]); err != nil {
 			t.Fatalf("Test[%d] apply failed: %+v", i+1, err)
 		}
 	}
@@ -243,11 +242,7 @@ func TestBreakouts(t *testing.T) {
 		return nil
 	}
 	errFileDiff := errors.New("files differ")
-	td, err := os.MkdirTemp("", "test-breakouts-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(td)
+	td := t.TempDir()
 
 	isSymlinkFile := func(f string) func(string) error {
 		return func(root string) error {
@@ -841,17 +836,9 @@ func TestApplyTar(t *testing.T) {
 	}
 }
 
-func testApply(a fstest.Applier) error {
-	td, err := os.MkdirTemp("", "test-apply-")
-	if err != nil {
-		return fmt.Errorf("failed to create temp dir: %w", err)
-	}
-	defer os.RemoveAll(td)
-	dest, err := os.MkdirTemp("", "test-apply-dest-")
-	if err != nil {
-		return fmt.Errorf("failed to create temp dir: %w", err)
-	}
-	defer os.RemoveAll(dest)
+func testApply(t *testing.T, a fstest.Applier) error {
+	td := t.TempDir()
+	dest := t.TempDir()
 
 	if err := a.Apply(td); err != nil {
 		return fmt.Errorf("failed to apply filesystem changes: %w", err)
@@ -882,17 +869,9 @@ func testApply(a fstest.Applier) error {
 	return fstest.CheckDirectoryEqual(td, dest)
 }
 
-func testBaseDiff(a fstest.Applier) error {
-	td, err := os.MkdirTemp("", "test-base-diff-")
-	if err != nil {
-		return fmt.Errorf("failed to create temp dir: %w", err)
-	}
-	defer os.RemoveAll(td)
-	dest, err := os.MkdirTemp("", "test-base-diff-dest-")
-	if err != nil {
-		return fmt.Errorf("failed to create temp dir: %w", err)
-	}
-	defer os.RemoveAll(dest)
+func testBaseDiff(t *testing.T, a fstest.Applier) error {
+	td := t.TempDir()
+	dest := t.TempDir()
 
 	if err := a.Apply(td); err != nil {
 		return fmt.Errorf("failed to apply filesystem changes: %w", err)
@@ -909,17 +888,9 @@ func testBaseDiff(a fstest.Applier) error {
 	return fstest.CheckDirectoryEqual(td, dest)
 }
 
-func testDiffApply(appliers ...fstest.Applier) error {
-	td, err := os.MkdirTemp("", "test-diff-apply-")
-	if err != nil {
-		return fmt.Errorf("failed to create temp dir: %w", err)
-	}
-	defer os.RemoveAll(td)
-	dest, err := os.MkdirTemp("", "test-diff-apply-dest-")
-	if err != nil {
-		return fmt.Errorf("failed to create temp dir: %w", err)
-	}
-	defer os.RemoveAll(dest)
+func testDiffApply(t *testing.T, appliers ...fstest.Applier) error {
+	td := t.TempDir()
+	dest := t.TempDir()
 
 	for _, a := range appliers {
 		if err := a.Apply(td); err != nil {
@@ -950,11 +921,7 @@ func testDiffApply(appliers ...fstest.Applier) error {
 
 func makeWriterToTarTest(wt tartest.WriterToTar, a fstest.Applier, validate func(string) error, applyErr error) func(*testing.T) {
 	return func(t *testing.T) {
-		td, err := os.MkdirTemp("", "test-writer-to-tar-")
-		if err != nil {
-			t.Fatalf("Failed to create temp dir: %v", err)
-		}
-		defer os.RemoveAll(td)
+		td := t.TempDir()
 
 		if a != nil {
 			if err := a.Apply(td); err != nil {
@@ -1254,20 +1221,12 @@ func whiteoutEntry(name string) tarEntryValidator {
 
 func makeDiffTarTest(validators []tarEntryValidator, a, b fstest.Applier) func(*testing.T) {
 	return func(t *testing.T) {
-		ad, err := os.MkdirTemp("", "test-make-diff-tar-")
-		if err != nil {
-			t.Fatalf("failed to create temp dir: %v", err)
-		}
-		defer os.RemoveAll(ad)
+		ad := t.TempDir()
 		if err := a.Apply(ad); err != nil {
 			t.Fatalf("failed to apply a: %v", err)
 		}
 
-		bd, err := os.MkdirTemp("", "test-make-diff-tar-")
-		if err != nil {
-			t.Fatalf("failed to create temp dir: %v", err)
-		}
-		defer os.RemoveAll(bd)
+		bd := t.TempDir()
 		if err := fs.CopyDir(bd, ad); err != nil {
 			t.Fatalf("failed to copy dir: %v", err)
 		}

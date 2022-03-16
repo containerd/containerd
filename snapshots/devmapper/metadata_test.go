@@ -22,7 +22,6 @@ package devmapper
 import (
 	"context"
 	"errors"
-	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -37,8 +36,8 @@ var (
 )
 
 func TestPoolMetadata_AddDevice(t *testing.T) {
-	tempDir, store := createStore(t)
-	defer cleanupStore(t, tempDir, store)
+	store := createStore(t)
+	defer cleanupStore(t, store)
 
 	expected := &DeviceInfo{
 		Name:       "test2",
@@ -62,8 +61,8 @@ func TestPoolMetadata_AddDevice(t *testing.T) {
 }
 
 func TestPoolMetadata_AddDeviceRollback(t *testing.T) {
-	tempDir, store := createStore(t)
-	defer cleanupStore(t, tempDir, store)
+	store := createStore(t)
+	defer cleanupStore(t, store)
 
 	err := store.AddDevice(testCtx, &DeviceInfo{Name: ""})
 	assert.Assert(t, err != nil)
@@ -73,8 +72,8 @@ func TestPoolMetadata_AddDeviceRollback(t *testing.T) {
 }
 
 func TestPoolMetadata_AddDeviceDuplicate(t *testing.T) {
-	tempDir, store := createStore(t)
-	defer cleanupStore(t, tempDir, store)
+	store := createStore(t)
+	defer cleanupStore(t, store)
 
 	err := store.AddDevice(testCtx, &DeviceInfo{Name: "test"})
 	assert.NilError(t, err)
@@ -84,8 +83,8 @@ func TestPoolMetadata_AddDeviceDuplicate(t *testing.T) {
 }
 
 func TestPoolMetadata_ReuseDeviceID(t *testing.T) {
-	tempDir, store := createStore(t)
-	defer cleanupStore(t, tempDir, store)
+	store := createStore(t)
+	defer cleanupStore(t, store)
 
 	info1 := &DeviceInfo{Name: "test1"}
 	err := store.AddDevice(testCtx, info1)
@@ -109,8 +108,8 @@ func TestPoolMetadata_ReuseDeviceID(t *testing.T) {
 }
 
 func TestPoolMetadata_RemoveDevice(t *testing.T) {
-	tempDir, store := createStore(t)
-	defer cleanupStore(t, tempDir, store)
+	store := createStore(t)
+	defer cleanupStore(t, store)
 
 	err := store.AddDevice(testCtx, &DeviceInfo{Name: "test"})
 	assert.NilError(t, err)
@@ -123,8 +122,8 @@ func TestPoolMetadata_RemoveDevice(t *testing.T) {
 }
 
 func TestPoolMetadata_UpdateDevice(t *testing.T) {
-	tempDir, store := createStore(t)
-	defer cleanupStore(t, tempDir, store)
+	store := createStore(t)
+	defer cleanupStore(t, store)
 
 	oldInfo := &DeviceInfo{
 		Name:       "test1",
@@ -155,8 +154,8 @@ func TestPoolMetadata_UpdateDevice(t *testing.T) {
 }
 
 func TestPoolMetadata_MarkFaulty(t *testing.T) {
-	tempDir, store := createStore(t)
-	defer cleanupStore(t, tempDir, store)
+	store := createStore(t)
+	defer cleanupStore(t, store)
 
 	info := &DeviceInfo{Name: "test"}
 	err := store.AddDevice(testCtx, info)
@@ -182,8 +181,8 @@ func TestPoolMetadata_MarkFaulty(t *testing.T) {
 }
 
 func TestPoolMetadata_WalkDevices(t *testing.T) {
-	tempDir, store := createStore(t)
-	defer cleanupStore(t, tempDir, store)
+	store := createStore(t)
+	defer cleanupStore(t, store)
 
 	err := store.AddDevice(testCtx, &DeviceInfo{Name: "device1", DeviceID: 1, State: Created})
 	assert.NilError(t, err)
@@ -214,8 +213,8 @@ func TestPoolMetadata_WalkDevices(t *testing.T) {
 }
 
 func TestPoolMetadata_GetDeviceNames(t *testing.T) {
-	tempDir, store := createStore(t)
-	defer cleanupStore(t, tempDir, store)
+	store := createStore(t)
+	defer cleanupStore(t, store)
 
 	err := store.AddDevice(testCtx, &DeviceInfo{Name: "test1"})
 	assert.NilError(t, err)
@@ -231,21 +230,15 @@ func TestPoolMetadata_GetDeviceNames(t *testing.T) {
 	assert.Equal(t, "test2", names[1])
 }
 
-func createStore(t *testing.T) (tempDir string, store *PoolMetadata) {
-	tempDir, err := os.MkdirTemp("", "pool-metadata-")
-	assert.NilError(t, err, "couldn't create temp directory for metadata tests")
-
-	path := filepath.Join(tempDir, "test.db")
+func createStore(t *testing.T) (store *PoolMetadata) {
+	path := filepath.Join(t.TempDir(), "test.db")
 	metadata, err := NewPoolMetadata(path)
 	assert.NilError(t, err)
 
-	return tempDir, metadata
+	return metadata
 }
 
-func cleanupStore(t *testing.T, tempDir string, store *PoolMetadata) {
+func cleanupStore(t *testing.T, store *PoolMetadata) {
 	err := store.Close()
 	assert.NilError(t, err, "failed to close metadata store")
-
-	err = os.RemoveAll(tempDir)
-	assert.NilError(t, err, "failed to cleanup temp directory")
 }

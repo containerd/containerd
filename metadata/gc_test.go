@@ -20,7 +20,6 @@ import (
 	"context"
 	"io"
 	"math/rand"
-	"os"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -42,7 +41,7 @@ func TestResourceMax(t *testing.T) {
 }
 
 func TestGCRoots(t *testing.T) {
-	db, cleanup, err := newDatabase()
+	db, cleanup, err := newDatabase(t)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +162,7 @@ func TestGCRoots(t *testing.T) {
 }
 
 func TestGCRemove(t *testing.T) {
-	db, cleanup, err := newDatabase()
+	db, cleanup, err := newDatabase(t)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +255,7 @@ func TestGCRemove(t *testing.T) {
 }
 
 func TestGCRefs(t *testing.T) {
-	db, cleanup, err := newDatabase()
+	db, cleanup, err := newDatabase(t)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -387,21 +386,16 @@ func TestGCRefs(t *testing.T) {
 	}
 }
 
-func newDatabase() (*bolt.DB, func(), error) {
-	td, err := os.MkdirTemp("", "gc-roots-")
-	if err != nil {
-		return nil, nil, err
-	}
+func newDatabase(t testing.TB) (*bolt.DB, func(), error) {
+	td := t.TempDir()
 
 	db, err := bolt.Open(filepath.Join(td, "test.db"), 0777, nil)
 	if err != nil {
-		os.RemoveAll(td)
 		return nil, nil, err
 	}
 
 	return db, func() {
 		db.Close()
-		os.RemoveAll(td)
 	}, nil
 }
 
