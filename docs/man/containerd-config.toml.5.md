@@ -63,7 +63,9 @@ config as version 1 has been deprecated.
 - **address** (Default: "/run/containerd/debug.sock")
 - **uid** (Default: 0)
 - **gid** (Default: 0)
-- **level** (Default: "info") sets the debug log level
+- **level** (Default: "info") sets the debug log level. Supported levels are:
+  "trace", "debug", "info", "warn", "error", "fatal", "panic"
+- **format** (Default: "text") sets log format. Supported formats are "text" and "json"
 
 **[metrics]**
 : Section to enable and configure a metrics listener. Contains two properties:
