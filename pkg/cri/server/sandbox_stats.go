@@ -34,13 +34,12 @@ func (c *criService) PodSandboxStats(
 	}
 
 	metrics, err := metricsForSandbox(sandbox)
-	if err != nil {
+	if err != nil { //nolint:staticcheck // Ignore SA4023 as some platforms always return nil (unimplemented metrics)
 		return nil, fmt.Errorf("failed getting metrics for sandbox %s: %w", r.GetPodSandboxId(), err)
 	}
 
 	podSandboxStats, err := c.podSandboxStats(ctx, sandbox, metrics)
-
-	if err != nil {
+	if err != nil { //nolint:staticcheck // Ignore SA4023 as some platforms always return nil (unimplemented metrics)
 		return nil, fmt.Errorf("failed to decode pod sandbox metrics %s: %w", r.GetPodSandboxId(), err)
 	}
 
