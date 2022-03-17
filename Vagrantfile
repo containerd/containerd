@@ -317,6 +317,7 @@ EOF
         if [[ $selinux == Enforcing ]]; then
             setenforce 0
         fi
+        modprobe overlay
         systemctl enable --now ${GOPATH}/src/github.com/containerd/containerd/containerd.service
         if [[ $selinux == Enforcing ]]; then
             setenforce 1
