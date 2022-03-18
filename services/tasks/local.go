@@ -47,6 +47,7 @@ import (
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -173,7 +174,7 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 		}
 		reader, err := l.store.ReaderAt(ctx, ocispec.Descriptor{
 			MediaType:   r.Checkpoint.MediaType,
-			Digest:      r.Checkpoint.Digest,
+			Digest:      digest.Digest(r.Checkpoint.Digest),
 			Size:        r.Checkpoint.Size_,
 			Annotations: r.Checkpoint.Annotations,
 		})
@@ -688,7 +689,7 @@ func (l *local) writeContent(ctx context.Context, mediaType, ref string, r io.Re
 	}
 	return &types.Descriptor{
 		MediaType:   mediaType,
-		Digest:      writer.Digest(),
+		Digest:      writer.Digest().String(),
 		Size_:       size,
 		Annotations: make(map[string]string),
 	}, nil

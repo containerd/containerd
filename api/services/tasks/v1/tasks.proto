@@ -195,7 +195,7 @@ message ListPidsResponse {
 
 message CheckpointTaskRequest {
 	string container_id = 1;
-	string parent_checkpoint = 2 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
+	string parent_checkpoint = 2;
 	google.protobuf.Any options = 3;
 }
 

@@ -25,5 +25,5 @@ option go_package = "github.com/containerd/containerd/api/events;events";
 option (containerd.plugin.fieldpath_all) = true;
 
 message ContentDelete {
-	string digest = 1 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
+	string digest = 1;
 }

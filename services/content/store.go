@@ -71,6 +71,6 @@ func (s *store) Delete(ctx context.Context, dgst digest.Digest) error {
 	}
 	// TODO: Consider whether we should return error here.
 	return s.publisher.Publish(ctx, "/content/delete", &eventstypes.ContentDelete{
-		Digest: dgst,
+		Digest: dgst.String(),
 	})
 }

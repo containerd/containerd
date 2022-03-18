@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -88,7 +89,7 @@ func (r *diffRemote) Compare(ctx context.Context, a, b []mount.Mount, opts ...di
 func toDescriptor(d *types.Descriptor) ocispec.Descriptor {
 	return ocispec.Descriptor{
 		MediaType:   d.MediaType,
-		Digest:      d.Digest,
+		Digest:      digest.Digest(d.Digest),
 		Size:        d.Size_,
 		Annotations: d.Annotations,
 	}
@@ -97,7 +98,7 @@ func toDescriptor(d *types.Descriptor) ocispec.Descriptor {
 func fromDescriptor(d ocispec.Descriptor) *types.Descriptor {
 	return &types.Descriptor{
 		MediaType:   d.MediaType,
-		Digest:      d.Digest,
+		Digest:      d.Digest.String(),
 		Size_:       d.Size,
 		Annotations: d.Annotations,
 	}

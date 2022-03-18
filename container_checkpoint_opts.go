@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl"
+	"github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -72,7 +73,7 @@ func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Conta
 		index.Manifests = append(index.Manifests, imagespec.Descriptor{
 			MediaType:   d.MediaType,
 			Size:        d.Size_,
-			Digest:      d.Digest,
+			Digest:      digest.Digest(d.Digest),
 			Platform:    &platformSpec,
 			Annotations: d.Annotations,
 		})
