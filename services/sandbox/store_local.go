@@ -95,8 +95,8 @@ func (s *sandboxLocal) List(ctx context.Context, in *api.StoreListRequest, _ ...
 	}
 
 	list := make([]types.Sandbox, len(resp))
-	for i, item := range resp {
-		list[i] = sandbox.ToProto(&item)
+	for i := range resp {
+		list[i] = sandbox.ToProto(&resp[i])
 	}
 
 	return &api.StoreListResponse{List: list}, nil

@@ -79,8 +79,8 @@ func (s *remoteSandboxStore) List(ctx context.Context, filters ...string) ([]sb.
 	}
 
 	out := make([]sb.Sandbox, len(resp.List))
-	for i, s := range resp.List {
-		out[i] = sb.FromProto(&s)
+	for i := range resp.List {
+		out[i] = sb.FromProto(&resp.List[i])
 	}
 
 	return out, nil
