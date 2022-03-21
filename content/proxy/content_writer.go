@@ -54,7 +54,7 @@ func (rw *remoteWriter) send(req *contentapi.WriteContentRequest) (*contentapi.W
 
 func (rw *remoteWriter) Status() (content.Status, error) {
 	resp, err := rw.send(&contentapi.WriteContentRequest{
-		Action: contentapi.WriteActionStat,
+		Action: contentapi.WriteAction_STAT,
 	})
 	if err != nil {
 		return content.Status{}, fmt.Errorf("error getting writer status: %w", errdefs.FromGRPC(err))
@@ -77,7 +77,7 @@ func (rw *remoteWriter) Write(p []byte) (n int, err error) {
 	offset := rw.offset
 
 	resp, err := rw.send(&contentapi.WriteContentRequest{
-		Action: contentapi.WriteActionWrite,
+		Action: contentapi.WriteAction_WRITE,
 		Offset: offset,
 		Data:   p,
 	})
@@ -112,7 +112,7 @@ func (rw *remoteWriter) Commit(ctx context.Context, size int64, expected digest.
 		}
 	}
 	resp, err := rw.send(&contentapi.WriteContentRequest{
-		Action:   contentapi.WriteActionCommit,
+		Action:   contentapi.WriteAction_COMMIT,
 		Total:    size,
 		Offset:   rw.offset,
 		Expected: expected.String(),

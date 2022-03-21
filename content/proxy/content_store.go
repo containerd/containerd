@@ -197,7 +197,7 @@ func (pcs *proxyContentStore) negotiate(ctx context.Context, ref string, size in
 	}
 
 	if err := wrclient.Send(&contentapi.WriteContentRequest{
-		Action:   contentapi.WriteActionStat,
+		Action:   contentapi.WriteAction_STAT,
 		Ref:      ref,
 		Total:    size,
 		Expected: expected.String(),

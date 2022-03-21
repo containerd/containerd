@@ -27,7 +27,6 @@ import (
 
 	"github.com/containerd/cgroups"
 	eventstypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/identifiers"
@@ -166,22 +165,9 @@ func (t *Task) State(ctx context.Context) (runtime.State, error) {
 		}
 		return runtime.State{}, errdefs.ErrNotFound
 	}
-	var status runtime.Status
-	switch response.Status {
-	case task.StatusCreated:
-		status = runtime.CreatedStatus
-	case task.StatusRunning:
-		status = runtime.RunningStatus
-	case task.StatusStopped:
-		status = runtime.StoppedStatus
-	case task.StatusPaused:
-		status = runtime.PausedStatus
-	case task.StatusPausing:
-		status = runtime.PausingStatus
-	}
 	return runtime.State{
 		Pid:        response.Pid,
-		Status:     status,
+		Status:     statusFromProto(response.Status),
 		Stdin:      response.Stdin,
 		Stdout:     response.Stdout,
 		Stderr:     response.Stderr,

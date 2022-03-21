@@ -396,7 +396,7 @@ func (c *container) loadTask(ctx context.Context, ioAttach cio.Attach) (Task, er
 		return nil, err
 	}
 	var i cio.IO
-	if ioAttach != nil && response.Process.Status != tasktypes.StatusUnknown {
+	if ioAttach != nil && response.Process.Status != tasktypes.Status_UNKNOWN {
 		// Do not attach IO for task in unknown state, because there
 		// are no fifo paths anyway.
 		if i, err = attachExistingIO(response, ioAttach); err != nil {

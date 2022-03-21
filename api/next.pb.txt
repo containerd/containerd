@@ -1616,27 +1616,14 @@ file {
     value {
       name: "STAT"
       number: 0
-      options {
-        66001: "WriteActionStat"
-      }
     }
     value {
       name: "WRITE"
       number: 1
-      options {
-        66001: "WriteActionWrite"
-      }
     }
     value {
       name: "COMMIT"
       number: 2
-      options {
-        66001: "WriteActionCommit"
-      }
-    }
-    options {
-      62001: 0
-      62023: "WriteAction"
     }
   }
   service {
@@ -3404,34 +3391,18 @@ file {
     value {
       name: "UNKNOWN"
       number: 0
-      options {
-        66001: "KindUnknown"
-      }
     }
     value {
       name: "VIEW"
       number: 1
-      options {
-        66001: "KindView"
-      }
     }
     value {
       name: "ACTIVE"
       number: 2
-      options {
-        66001: "KindActive"
-      }
     }
     value {
       name: "COMMITTED"
       number: 3
-      options {
-        66001: "KindCommitted"
-      }
-    }
-    options {
-      62001: 0
-      62023: "Kind"
     }
   }
   service {
@@ -3642,48 +3613,26 @@ file {
     value {
       name: "UNKNOWN"
       number: 0
-      options {
-        66001: "StatusUnknown"
-      }
     }
     value {
       name: "CREATED"
       number: 1
-      options {
-        66001: "StatusCreated"
-      }
     }
     value {
       name: "RUNNING"
       number: 2
-      options {
-        66001: "StatusRunning"
-      }
     }
     value {
       name: "STOPPED"
       number: 3
-      options {
-        66001: "StatusStopped"
-      }
     }
     value {
       name: "PAUSED"
       number: 4
-      options {
-        66001: "StatusPaused"
-      }
     }
     value {
       name: "PAUSING"
       number: 5
-      options {
-        66001: "StatusPausing"
-      }
-    }
-    options {
-      62001: 0
-      62023: "Status"
     }
   }
   syntax: "proto3"

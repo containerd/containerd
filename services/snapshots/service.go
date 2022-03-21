@@ -276,12 +276,12 @@ func (s *service) Cleanup(ctx context.Context, cr *snapshotsapi.CleanupRequest) 
 
 func fromKind(kind snapshots.Kind) snapshotsapi.Kind {
 	if kind == snapshots.KindActive {
-		return snapshotsapi.KindActive
+		return snapshotsapi.Kind_ACTIVE
 	}
 	if kind == snapshots.KindView {
-		return snapshotsapi.KindView
+		return snapshotsapi.Kind_VIEW
 	}
-	return snapshotsapi.KindCommitted
+	return snapshotsapi.Kind_COMMITTED
 }
 
 func fromInfo(info snapshots.Info) snapshotsapi.Info {
@@ -326,10 +326,10 @@ func toInfo(info snapshotsapi.Info) snapshots.Info {
 }
 
 func toKind(kind snapshotsapi.Kind) snapshots.Kind {
-	if kind == snapshotsapi.KindActive {
+	if kind == snapshotsapi.Kind_ACTIVE {
 		return snapshots.KindActive
 	}
-	if kind == snapshotsapi.KindView {
+	if kind == snapshotsapi.Kind_VIEW {
 		return snapshots.KindView
 	}
 	return snapshots.KindCommitted
