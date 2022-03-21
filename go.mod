@@ -1,6 +1,6 @@
 module github.com/containerd/containerd
 
-go 1.17
+go 1.18
 
 require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20210715213245-6c3934b029d8
