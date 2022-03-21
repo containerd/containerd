@@ -45,7 +45,7 @@ func (rw *remoteWriter) send(req *contentapi.WriteContentRequest) (*contentapi.W
 	if err == nil {
 		// try to keep these in sync
 		if resp.Digest != "" {
-			rw.digest = resp.Digest
+			rw.digest = digest.Digest(resp.Digest)
 		}
 	}
 
@@ -92,7 +92,7 @@ func (rw *remoteWriter) Write(p []byte) (n int, err error) {
 
 	rw.offset += int64(n)
 	if resp.Digest != "" {
-		rw.digest = resp.Digest
+		rw.digest = digest.Digest(resp.Digest)
 	}
 	return
 }
@@ -115,7 +115,7 @@ func (rw *remoteWriter) Commit(ctx context.Context, size int64, expected digest.
 		Action:   contentapi.WriteActionCommit,
 		Total:    size,
 		Offset:   rw.offset,
-		Expected: expected,
+		Expected: expected.String(),
 		Labels:   base.Labels,
 	})
 	if err != nil {
@@ -126,11 +126,12 @@ func (rw *remoteWriter) Commit(ctx context.Context, size int64, expected digest.
 		return fmt.Errorf("unexpected size: %v != %v", resp.Offset, size)
 	}
 
-	if expected != "" && resp.Digest != expected {
+	actual := digest.Digest(resp.Digest)
+	if expected != "" && actual != expected {
 		return fmt.Errorf("unexpected digest: %v != %v", resp.Digest, expected)
 	}
 
-	rw.digest = resp.Digest
+	rw.digest = actual
 	rw.offset = resp.Offset
 	return nil
 }

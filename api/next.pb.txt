@@ -178,10 +178,6 @@ file {
       number: 1
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65003: "github.com/opencontainers/go-digest.Digest"
-        65001: 0
-      }
       json_name: "digest"
     }
   }
@@ -1178,10 +1174,6 @@ file {
       number: 1
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65003: "github.com/opencontainers/go-digest.Digest"
-        65001: 0
-      }
       json_name: "digest"
     }
     field {
@@ -1251,10 +1243,6 @@ file {
       number: 1
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65003: "github.com/opencontainers/go-digest.Digest"
-        65001: 0
-      }
       json_name: "digest"
     }
   }
@@ -1339,10 +1327,6 @@ file {
       number: 1
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65003: "github.com/opencontainers/go-digest.Digest"
-        65001: 0
-      }
       json_name: "digest"
     }
   }
@@ -1353,10 +1337,6 @@ file {
       number: 1
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65003: "github.com/opencontainers/go-digest.Digest"
-        65001: 0
-      }
       json_name: "digest"
     }
     field {
@@ -1443,10 +1423,6 @@ file {
       number: 6
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65003: "github.com/opencontainers/go-digest.Digest"
-        65001: 0
-      }
       json_name: "expected"
     }
   }
@@ -1524,10 +1500,6 @@ file {
       number: 4
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65003: "github.com/opencontainers/go-digest.Digest"
-        65001: 0
-      }
       json_name: "expected"
     }
     field {
@@ -1626,10 +1598,6 @@ file {
       number: 6
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65003: "github.com/opencontainers/go-digest.Digest"
-        65001: 0
-      }
       json_name: "digest"
     }
   }
@@ -1746,10 +1714,6 @@ file {
       number: 2
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65003: "github.com/opencontainers/go-digest.Digest"
-        65001: 0
-      }
       json_name: "digest"
     }
     field {
@@ -4157,10 +4121,6 @@ file {
       number: 2
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65003: "github.com/opencontainers/go-digest.Digest"
-        65001: 0
-      }
       json_name: "parentCheckpoint"
     }
     field {

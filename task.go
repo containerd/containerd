@@ -444,7 +444,7 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 	if i.Name == "" {
 		i.Name = fmt.Sprintf(checkpointNameFormat, t.id, time.Now().Format(checkpointDateFormat))
 	}
-	request.ParentCheckpoint = i.ParentCheckpoint
+	request.ParentCheckpoint = i.ParentCheckpoint.String()
 	if i.Options != nil {
 		any, err := typeurl.MarshalAny(i.Options)
 		if err != nil {
@@ -604,7 +604,7 @@ func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tas
 		index.Manifests = append(index.Manifests, v1.Descriptor{
 			MediaType: d.MediaType,
 			Size:      d.Size_,
-			Digest:    d.Digest,
+			Digest:    digest.Digest(d.Digest),
 			Platform: &v1.Platform{
 				OS:           goruntime.GOOS,
 				Architecture: goruntime.GOARCH,

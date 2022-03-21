@@ -42,7 +42,7 @@ func NewContentStore(client contentapi.ContentClient) content.Store {
 
 func (pcs *proxyContentStore) Info(ctx context.Context, dgst digest.Digest) (content.Info, error) {
 	resp, err := pcs.client.Info(ctx, &contentapi.InfoRequest{
-		Digest: dgst,
+		Digest: dgst.String(),
 	})
 	if err != nil {
 		return content.Info{}, errdefs.FromGRPC(err)
@@ -81,7 +81,7 @@ func (pcs *proxyContentStore) Walk(ctx context.Context, fn content.WalkFunc, fil
 
 func (pcs *proxyContentStore) Delete(ctx context.Context, dgst digest.Digest) error {
 	if _, err := pcs.client.Delete(ctx, &contentapi.DeleteContentRequest{
-		Digest: dgst,
+		Digest: dgst.String(),
 	}); err != nil {
 		return errdefs.FromGRPC(err)
 	}
@@ -119,7 +119,7 @@ func (pcs *proxyContentStore) Status(ctx context.Context, ref string) (content.S
 		UpdatedAt: status.UpdatedAt,
 		Offset:    status.Offset,
 		Total:     status.Total,
-		Expected:  status.Expected,
+		Expected:  digest.Digest(status.Expected),
 	}, nil
 }
 
@@ -152,7 +152,7 @@ func (pcs *proxyContentStore) ListStatuses(ctx context.Context, filters ...strin
 			UpdatedAt: status.UpdatedAt,
 			Offset:    status.Offset,
 			Total:     status.Total,
-			Expected:  status.Expected,
+			Expected:  digest.Digest(status.Expected),
 		})
 	}
 
@@ -200,7 +200,7 @@ func (pcs *proxyContentStore) negotiate(ctx context.Context, ref string, size in
 		Action:   contentapi.WriteActionStat,
 		Ref:      ref,
 		Total:    size,
-		Expected: expected,
+		Expected: expected.String(),
 	}); err != nil {
 		return nil, 0, err
 	}
@@ -215,7 +215,7 @@ func (pcs *proxyContentStore) negotiate(ctx context.Context, ref string, size in
 
 func infoToGRPC(info content.Info) contentapi.Info {
 	return contentapi.Info{
-		Digest:    info.Digest,
+		Digest:    info.Digest.String(),
 		Size_:     info.Size,
 		CreatedAt: info.CreatedAt,
 		UpdatedAt: info.UpdatedAt,
@@ -225,7 +225,7 @@ func infoToGRPC(info content.Info) contentapi.Info {
 
 func infoFromGRPC(info contentapi.Info) content.Info {
 	return content.Info{
-		Digest:    info.Digest,
+		Digest:    digest.Digest(info.Digest),
 		Size:      info.Size_,
 		CreatedAt: info.CreatedAt,
 		UpdatedAt: info.UpdatedAt,

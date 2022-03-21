@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"google.golang.org/grpc"
 )
@@ -170,7 +171,7 @@ func toMounts(apim []*types.Mount) []mount.Mount {
 func toDescriptor(d *types.Descriptor) ocispec.Descriptor {
 	return ocispec.Descriptor{
 		MediaType:   d.MediaType,
-		Digest:      d.Digest,
+		Digest:      digest.Digest(d.Digest),
 		Size:        d.Size_,
 		Annotations: d.Annotations,
 	}
@@ -179,7 +180,7 @@ func toDescriptor(d *types.Descriptor) ocispec.Descriptor {
 func fromDescriptor(d ocispec.Descriptor) *types.Descriptor {
 	return &types.Descriptor{
 		MediaType:   d.MediaType,
-		Digest:      d.Digest,
+		Digest:      d.Digest.String(),
 		Size_:       d.Size,
 		Annotations: d.Annotations,
 	}

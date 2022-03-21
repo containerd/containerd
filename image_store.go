@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	ptypes "github.com/gogo/protobuf/types"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -140,7 +141,7 @@ func descFromProto(desc *types.Descriptor) ocispec.Descriptor {
 	return ocispec.Descriptor{
 		MediaType:   desc.MediaType,
 		Size:        desc.Size_,
-		Digest:      desc.Digest,
+		Digest:      digest.Digest(desc.Digest),
 		Annotations: desc.Annotations,
 	}
 }
@@ -149,7 +150,7 @@ func descToProto(desc *ocispec.Descriptor) types.Descriptor {
 	return types.Descriptor{
 		MediaType:   desc.MediaType,
 		Size_:       desc.Size,
-		Digest:      desc.Digest,
+		Digest:      desc.Digest.String(),
 		Annotations: desc.Annotations,
 	}
 }
