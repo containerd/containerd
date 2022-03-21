@@ -204,10 +204,11 @@ func TestMatchComparerMatch_LCOW(t *testing.T) {
 }
 
 func TestMatchComparerLess(t *testing.T) {
-	ubr := GetCurrentWindowsUpdateBuildRevision()
+	ubr := GetHostWindowsUpdateBuildRevision()
 	m := windowsmatcher{
 		Platform:        DefaultSpec(),
 		osVersionPrefix: "10.0.17763",
+		osUBR:           ubr,
 		defaultMatcher: &matcher{
 			Platform: Normalize(DefaultSpec()),
 		},

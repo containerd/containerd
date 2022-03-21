@@ -18,15 +18,12 @@ package platforms
 
 import (
 	"fmt"
-	"log"
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sys/windows"
-	"golang.org/x/sys/windows/registry"
 )
 
 // DefaultSpec returns the current platform's default platform specification.
@@ -44,6 +41,7 @@ func DefaultSpec() specs.Platform {
 type windowsmatcher struct {
 	specs.Platform
 	osVersionPrefix string
+	osUBR           int
 	defaultMatcher  Matcher
 }
 
@@ -66,7 +64,7 @@ func (m windowsmatcher) Less(p1, p2 specs.Platform) bool {
 	m1, m2 := m.Match(p1), m.Match(p2)
 	if m1 && m2 {
 		r1, r2 := revision(p1.OSVersion), revision(p2.OSVersion)
-		mubr1, mubr2 := r1 == GetCurrentWindowsUpdateBuildRevision(), r2 == GetCurrentWindowsUpdateBuildRevision()
+		mubr1, mubr2 := r1 == m.osUBR, r2 == m.osUBR
 		if mubr1 || mubr2 {
 			return mubr1 && !mubr2
 		}
@@ -98,28 +96,4 @@ func prefix(v string) string {
 // Default returns the current platform's default platform specification.
 func Default() MatchComparer {
 	return Only(DefaultSpec())
-}
-
-var (
-	ubr  int
-	once sync.Once
-)
-
-func GetCurrentWindowsUpdateBuildRevision() int {
-	once.Do(func() {
-		ubr = 0
-		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion`, registry.QUERY_VALUE)
-		if err != nil {
-			log.Printf("can't open windows host UBR registry path: %v", err)
-			return
-		}
-		defer k.Close()
-		d, _, err := k.GetIntegerValue("UBR")
-		if err != nil {
-			log.Printf("can't read windows host UBR: %v", err)
-			return
-		}
-		ubr = int(d)
-	})
-	return ubr
 }
