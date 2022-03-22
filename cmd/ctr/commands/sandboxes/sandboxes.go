@@ -38,7 +38,6 @@ var Command = cli.Command{
 		runCommand,
 		listCommand,
 		removeCommand,
-		pingCommand,
 	},
 }
 
@@ -172,33 +171,6 @@ var removeCommand = cli.Command{
 			}
 
 			log.G(ctx).Infof("deleted: %s", id)
-		}
-
-		return nil
-	},
-}
-
-var pingCommand = cli.Command{
-	Name:      "ping",
-	ArgsUsage: "<id> [<id>, ...]",
-	Usage:     "ping sandbox",
-	Action: func(context *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(context)
-		if err != nil {
-			return err
-		}
-		defer cancel()
-
-		for _, id := range context.Args() {
-			sandbox, err := client.LoadSandbox(ctx, id)
-			if err != nil {
-				return fmt.Errorf("failed to load sandbox %s: %w", id, err)
-			}
-
-			err = sandbox.Ping(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to ping %s: %w", id, err)
-			}
 		}
 
 		return nil

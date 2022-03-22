@@ -89,9 +89,6 @@ service Controller {
 	rpc Start(ControllerStartRequest) returns (ControllerStartResponse);
 	rpc Shutdown(ControllerShutdownRequest) returns (ControllerShutdownResponse);
 	rpc Wait(ControllerWaitRequest) returns (ControllerWaitResponse);
-	rpc Pause(ControllerPauseRequest) returns (ControllerPauseResponse);
-	rpc Resume(ControllerResumeRequest) returns (ControllerResumeResponse);
-	rpc Ping(ControllerPingRequest) returns (ControllerPingResponse);
 	rpc Status(ControllerStatusRequest) returns (ControllerStatusResponse);
 }
 
@@ -121,24 +118,6 @@ message ControllerWaitResponse {
 	uint32 exit_status = 1;
 	google.protobuf.Timestamp exited_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
-
-message ControllerPauseRequest {
-	string sandbox_id = 1;
-}
-
-message ControllerPauseResponse {}
-
-message ControllerResumeRequest {
-	string sandbox_id = 1;
-}
-
-message ControllerResumeResponse {}
-
-message ControllerPingRequest {
-	string sandbox_id = 1;
-}
-
-message ControllerPingResponse {}
 
 message ControllerStatusRequest {
 	string sandbox_id = 1;

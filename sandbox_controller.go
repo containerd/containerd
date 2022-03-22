@@ -63,32 +63,6 @@ func (s *sandboxRemoteController) Wait(ctx context.Context, sandboxID string) (*
 	return resp, nil
 }
 
-func (s *sandboxRemoteController) Pause(ctx context.Context, sandboxID string) error {
-	_, err := s.client.Pause(ctx, &api.ControllerPauseRequest{SandboxID: sandboxID})
-	if err != nil {
-		return errdefs.FromGRPC(err)
-	}
-
-	return nil
-}
-
-func (s *sandboxRemoteController) Resume(ctx context.Context, sandboxID string) error {
-	_, err := s.client.Resume(ctx, &api.ControllerResumeRequest{SandboxID: sandboxID})
-	if err != nil {
-		return errdefs.FromGRPC(err)
-	}
-
-	return nil
-}
-
-func (s *sandboxRemoteController) Ping(ctx context.Context, sandboxID string) error {
-	if _, err := s.client.Ping(ctx, &api.ControllerPingRequest{SandboxID: sandboxID}); err != nil {
-		return errdefs.FromGRPC(err)
-	}
-
-	return nil
-}
-
 func (s *sandboxRemoteController) Status(ctx context.Context, sandboxID string) (*api.ControllerStatusResponse, error) {
 	resp, err := s.client.Status(ctx, &api.ControllerStatusRequest{SandboxID: sandboxID})
 	if err != nil {

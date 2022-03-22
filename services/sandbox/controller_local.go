@@ -32,7 +32,6 @@ import (
 	proto "github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/containerd/services"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 
@@ -163,51 +162,6 @@ func (c *controllerLocal) Wait(ctx context.Context, in *api.ControllerWaitReques
 		ExitStatus: resp.ExitStatus,
 		ExitedAt:   resp.ExitedAt,
 	}, nil
-}
-
-func (c *controllerLocal) Pause(ctx context.Context, in *api.ControllerPauseRequest, opts ...grpc.CallOption) (*api.ControllerPauseResponse, error) {
-	svc, err := c.getSandbox(ctx, in.SandboxID)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := svc.PauseSandbox(ctx, &proto.PauseSandboxRequest{
-		SandboxID: in.SandboxID,
-	}); err != nil {
-		return nil, errors.Wrapf(err, "failed to resume sandbox %s", in.SandboxID)
-	}
-
-	return &api.ControllerPauseResponse{}, nil
-}
-
-func (c *controllerLocal) Resume(ctx context.Context, in *api.ControllerResumeRequest, opts ...grpc.CallOption) (*api.ControllerResumeResponse, error) {
-	svc, err := c.getSandbox(ctx, in.SandboxID)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := svc.ResumeSandbox(ctx, &proto.ResumeSandboxRequest{
-		SandboxID: in.SandboxID,
-	}); err != nil {
-		return nil, errors.Wrapf(err, "failed to resume sandbox %s", in.SandboxID)
-	}
-
-	return &api.ControllerResumeResponse{}, nil
-}
-
-func (c *controllerLocal) Ping(ctx context.Context, in *api.ControllerPingRequest, opts ...grpc.CallOption) (*api.ControllerPingResponse, error) {
-	svc, err := c.getSandbox(ctx, in.SandboxID)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := svc.PingSandbox(ctx, &proto.PingRequest{
-		SandboxID: in.SandboxID,
-	}); err != nil {
-		return nil, err
-	}
-
-	return &api.ControllerPingResponse{}, nil
 }
 
 func (c *controllerLocal) Status(ctx context.Context, in *api.ControllerStatusRequest, opts ...grpc.CallOption) (*api.ControllerStatusResponse, error) {

@@ -83,20 +83,6 @@ func (s *controllerService) Wait(ctx context.Context, req *api.ControllerWaitReq
 	return s.local.Wait(ctx, req)
 }
 
-func (s *controllerService) Pause(ctx context.Context, req *api.ControllerPauseRequest) (*api.ControllerPauseResponse, error) {
-	log.G(ctx).WithField("req", req).Debug("pause sandbox")
-	return s.local.Pause(ctx, req)
-}
-
-func (s *controllerService) Resume(ctx context.Context, req *api.ControllerResumeRequest) (*api.ControllerResumeResponse, error) {
-	log.G(ctx).WithField("req", req).Debug("resume sandbox")
-	return s.local.Resume(ctx, req)
-}
-
-func (s *controllerService) Ping(ctx context.Context, req *api.ControllerPingRequest) (*api.ControllerPingResponse, error) {
-	return s.local.Ping(ctx, req)
-}
-
 func (s *controllerService) Status(ctx context.Context, req *api.ControllerStatusRequest) (*api.ControllerStatusResponse, error) {
 	log.G(ctx).WithField("req", req).Debug("sandbox status")
 	return s.local.Status(ctx, req)

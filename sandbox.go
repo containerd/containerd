@@ -47,12 +47,6 @@ type Sandbox interface {
 	Wait(ctx context.Context) (<-chan ExitStatus, error)
 	// Delete removes sandbox from the metadata store.
 	Delete(ctx context.Context) error
-	// Pause will freeze running sandbox instance
-	Pause(ctx context.Context) error
-	// Resume will unfreeze previously paused sandbox instance
-	Resume(ctx context.Context) error
-	// Ping will check whether existing sandbox instance alive
-	Ping(ctx context.Context) error
 }
 
 type sandboxClient struct {
@@ -125,18 +119,6 @@ func (s *sandboxClient) Stop(ctx context.Context) error {
 
 func (s *sandboxClient) Delete(ctx context.Context) error {
 	return s.client.SandboxStore().Delete(ctx, s.ID())
-}
-
-func (s *sandboxClient) Pause(ctx context.Context) error {
-	return s.client.SandboxController().Pause(ctx, s.ID())
-}
-
-func (s *sandboxClient) Resume(ctx context.Context) error {
-	return s.client.SandboxController().Resume(ctx, s.ID())
-}
-
-func (s *sandboxClient) Ping(ctx context.Context) error {
-	return s.client.SandboxController().Ping(ctx, s.ID())
 }
 
 // NewSandbox creates new sandbox client

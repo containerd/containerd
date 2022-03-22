@@ -3307,45 +3307,6 @@ file {
     }
   }
   message_type {
-    name: "ControllerPauseRequest"
-    field {
-      name: "sandbox_id"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "sandboxId"
-    }
-  }
-  message_type {
-    name: "ControllerPauseResponse"
-  }
-  message_type {
-    name: "ControllerResumeRequest"
-    field {
-      name: "sandbox_id"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "sandboxId"
-    }
-  }
-  message_type {
-    name: "ControllerResumeResponse"
-  }
-  message_type {
-    name: "ControllerPingRequest"
-    field {
-      name: "sandbox_id"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "sandboxId"
-    }
-  }
-  message_type {
-    name: "ControllerPingResponse"
-  }
-  message_type {
     name: "ControllerStatusRequest"
     field {
       name: "sandbox_id"
@@ -3450,21 +3411,6 @@ file {
       name: "Wait"
       input_type: ".containerd.services.sandbox.v1.ControllerWaitRequest"
       output_type: ".containerd.services.sandbox.v1.ControllerWaitResponse"
-    }
-    method {
-      name: "Pause"
-      input_type: ".containerd.services.sandbox.v1.ControllerPauseRequest"
-      output_type: ".containerd.services.sandbox.v1.ControllerPauseResponse"
-    }
-    method {
-      name: "Resume"
-      input_type: ".containerd.services.sandbox.v1.ControllerResumeRequest"
-      output_type: ".containerd.services.sandbox.v1.ControllerResumeResponse"
-    }
-    method {
-      name: "Ping"
-      input_type: ".containerd.services.sandbox.v1.ControllerPingRequest"
-      output_type: ".containerd.services.sandbox.v1.ControllerPingResponse"
     }
     method {
       name: "Status"

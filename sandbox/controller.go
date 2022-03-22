@@ -49,14 +49,6 @@ type Controller interface {
 	Shutdown(ctx context.Context, sandboxID string) error
 	// Wait blocks until sandbox process exits.
 	Wait(ctx context.Context, sandboxID string) (*sandbox.ControllerWaitResponse, error)
-	// Pause will freeze running sandbox instance.
-	// Shim implementations may return ErrNotImplemented if this is out of scope of a given sandbox.
-	Pause(ctx context.Context, sandboxID string) error
-	// Resume will unfreeze previously paused sandbox instance
-	Resume(ctx context.Context, sandboxID string) error
-	// Ping is a lightweight API call to check whether sandbox instance is still alive (e.g. quick livability check).
-	// This should not involve any complex logic and containerd will not debug log it as it might be called quite often.
-	Ping(ctx context.Context, sandboxID string) error
 	// Status will query sandbox process status. It is heavier than Ping call and must be used whenever you need to
 	// gather metadata about current sandbox state (status, uptime, resource use, etc).
 	Status(ctx context.Context, sandboxID string) (*sandbox.ControllerStatusResponse, error)
