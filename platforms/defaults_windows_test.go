@@ -30,10 +30,11 @@ import (
 
 func TestDefault(t *testing.T) {
 	major, minor, build := windows.RtlGetNtVersionNumbers()
+	ubr := getHostWindowsUpdateBuildRevision()
 	expected := imagespec.Platform{
 		OS:           runtime.GOOS,
 		Architecture: runtime.GOARCH,
-		OSVersion:    fmt.Sprintf("%d.%d.%d", major, minor, build),
+		OSVersion:    fmt.Sprintf("%d.%d.%d.%d", major, minor, build, ubr),
 		Variant:      cpuVariant(),
 	}
 	p := DefaultSpec()
@@ -77,6 +78,7 @@ func TestMatchComparerMatch_WCOW(t *testing.T) {
 	m := windowsmatcher{
 		Platform:        DefaultSpec(),
 		osVersionPrefix: buildStr,
+		osUBR:           getHostWindowsUpdateBuildRevision(),
 		defaultMatcher: &matcher{
 			Platform: Normalize(DefaultSpec()),
 		},
@@ -204,7 +206,7 @@ func TestMatchComparerMatch_LCOW(t *testing.T) {
 }
 
 func TestMatchComparerLess(t *testing.T) {
-	ubr := GetHostWindowsUpdateBuildRevision()
+	ubr := getHostWindowsUpdateBuildRevision()
 	m := windowsmatcher{
 		Platform:        DefaultSpec(),
 		osVersionPrefix: "10.0.17763",
