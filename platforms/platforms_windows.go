@@ -20,13 +20,15 @@ import (
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-// NewMatcher returns a Windows matcher that will match on osVersionPrefix if
+// NewMatcher returns a Windows matcher that will match on osVersionPrefix and oxUBR if
 // the platform is Windows otherwise use the default matcher
 func newDefaultMatcher(platform specs.Platform) Matcher {
 	prefix := prefix(platform.OSVersion)
+	ubr := revision(platform.OSVersion)
 	return windowsmatcher{
 		Platform:        platform,
 		osVersionPrefix: prefix,
+		osUBR:           ubr,
 		defaultMatcher: &matcher{
 			Platform: Normalize(platform),
 		},
