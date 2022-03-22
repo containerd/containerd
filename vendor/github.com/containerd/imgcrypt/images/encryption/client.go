@@ -28,7 +28,6 @@ import (
 	"github.com/containerd/typeurl"
 
 	encconfig "github.com/containers/ocicrypt/config"
-	"github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -36,7 +35,7 @@ import (
 func WithDecryptedUnpack(data *imgcrypt.Payload) diff.ApplyOpt {
 	return func(_ context.Context, desc ocispec.Descriptor, c *diff.ApplyConfig) error {
 		if c.ProcessorPayloads == nil {
-			c.ProcessorPayloads = make(map[string]*types.Any)
+			c.ProcessorPayloads = make(anyMap)
 		}
 		data.Descriptor = desc
 		any, err := typeurl.MarshalAny(data)
@@ -44,8 +43,10 @@ func WithDecryptedUnpack(data *imgcrypt.Payload) diff.ApplyOpt {
 			return fmt.Errorf("failed to marshal payload: %w", err)
 		}
 
+		pbany := fromAny(any)
+
 		for _, id := range imgcrypt.PayloadToolIDs {
-			c.ProcessorPayloads[id] = any
+			c.ProcessorPayloads[id] = pbany
 		}
 		return nil
 	}
