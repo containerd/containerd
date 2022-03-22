@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/timeout"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/runtime"
 	client "github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/containerd/runtime/v2/task"
@@ -323,7 +324,7 @@ func (s *shimTask) delete(ctx context.Context, removeTask func(ctx context.Conte
 
 func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime.Task, error) {
 	topts := opts.TaskOptions
-	if topts == nil {
+	if topts == nil || topts.GetValue() == nil {
 		topts = opts.RuntimeOptions
 	}
 	request := &task.CreateTaskRequest{
@@ -334,7 +335,7 @@ func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime
 		Stderr:     opts.IO.Stderr,
 		Terminal:   opts.IO.Terminal,
 		Checkpoint: opts.Checkpoint,
-		Options:    topts,
+		Options:    protobuf.FromAny(topts),
 	}
 	for _, m := range opts.Rootfs {
 		request.Rootfs = append(request.Rootfs, &types.Mount{

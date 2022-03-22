@@ -49,12 +49,14 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 	}
 
 	var opts options.Options
-	if r.Options != nil && r.Options.GetTypeUrl() != "" {
+	if r.Options.GetValue() != nil {
 		v, err := typeurl.UnmarshalAny(r.Options)
 		if err != nil {
 			return nil, err
 		}
-		opts = *v.(*options.Options)
+		if v != nil {
+			opts = *v.(*options.Options)
+		}
 	}
 
 	var mounts []process.Mount

@@ -41,6 +41,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
@@ -462,7 +463,7 @@ func (l *local) ListPids(ctx context.Context, r *api.ListPidsRequest, _ ...grpc.
 			Pid: p.Pid,
 		}
 		if p.Info != nil {
-			a, err := typeurl.MarshalAny(p.Info)
+			a, err := protobuf.MarshalAnyToProto(p.Info)
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal process %d info: %w", p.Pid, err)
 			}
@@ -577,7 +578,7 @@ func (l *local) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest, _ 
 		return nil, err
 	}
 	// write the config to the content store
-	data, err := container.Spec.Marshal()
+	data, err := protobuf.FromAny(container.Spec).Marshal()
 	if err != nil {
 		return nil, err
 	}

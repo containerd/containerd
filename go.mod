@@ -17,7 +17,7 @@ require (
 	github.com/containerd/imgcrypt v1.1.4-0.20220322210345-7eff50ecc4f6
 	github.com/containerd/nri v0.1.0
 	github.com/containerd/ttrpc v1.1.0
-	github.com/containerd/typeurl v1.0.2
+	github.com/containerd/typeurl v1.0.3-0.20220324183432-6193a0e03259
 	github.com/containerd/zfs v1.0.0
 	github.com/containernetworking/plugins v1.0.1
 	github.com/coreos/go-systemd/v22 v22.3.2

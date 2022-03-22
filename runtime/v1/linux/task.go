@@ -31,11 +31,11 @@ import (
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/v1/shim/client"
 	"github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/ttrpc"
-	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/types"
 )
 
@@ -326,7 +326,7 @@ func (t *Task) Stats(ctx context.Context) (*types.Any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return typeurl.MarshalAny(stats)
+	return protobuf.MarshalAnyToProto(stats)
 }
 
 // Cgroup returns the underlying cgroup for a linux task

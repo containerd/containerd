@@ -33,7 +33,6 @@ import (
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/typeurl"
-	gogotypes "github.com/gogo/protobuf/types"
 	"github.com/sirupsen/logrus"
 	"k8s.io/utils/clock"
 )
@@ -207,7 +206,7 @@ func (em *eventMonitor) startContainerExitMonitor(ctx context.Context, id string
 	return stopCh
 }
 
-func convertEvent(e *gogotypes.Any) (string, interface{}, error) {
+func convertEvent(e typeurl.Any) (string, interface{}, error) {
 	id := ""
 	evt, err := typeurl.UnmarshalAny(e)
 	if err != nil {

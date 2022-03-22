@@ -38,6 +38,7 @@ import (
 	"github.com/containerd/containerd/pkg/shutdown"
 	"github.com/containerd/containerd/pkg/stdio"
 	"github.com/containerd/containerd/pkg/userns"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/runtime/v2/runc"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/runtime/v2/shim"
@@ -375,7 +376,7 @@ func (s *service) Pids(ctx context.Context, r *taskAPI.PidsRequest) (*taskAPI.Pi
 				d := &options.ProcessDetails{
 					ExecID: p.ID(),
 				}
-				a, err := typeurl.MarshalAny(d)
+				a, err := protobuf.MarshalAnyToProto(d)
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal process %d info: %w", pid, err)
 				}
@@ -503,7 +504,7 @@ func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.
 		return nil, err
 	}
 	return &taskAPI.StatsResponse{
-		Stats: data,
+		Stats: protobuf.FromAny(data),
 	}, nil
 }
 

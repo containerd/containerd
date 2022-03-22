@@ -374,10 +374,11 @@ func getRuntimeOptionsType(t string) interface{} {
 
 // getRuntimeOptions get runtime options from container metadata.
 func getRuntimeOptions(c containers.Container) (interface{}, error) {
-	if c.Runtime.Options == nil {
+	from := c.Runtime.Options
+	if from == nil || from.GetValue() == nil {
 		return nil, nil
 	}
-	opts, err := typeurl.UnmarshalAny(c.Runtime.Options)
+	opts, err := typeurl.UnmarshalAny(from)
 	if err != nil {
 		return nil, err
 	}

@@ -1440,11 +1440,11 @@ func TestContainerExtensions(t *testing.T) {
 		if len(cExts) != 1 {
 			t.Errorf("expected 1 container extension")
 		}
-		if cExts["hello"].TypeUrl != ext.TypeUrl {
-			t.Errorf("got unexpected type url for extension: %s", cExts["hello"].TypeUrl)
+		if actual := cExts["hello"].GetTypeUrl(); actual != ext.TypeUrl {
+			t.Errorf("got unexpected type url for extension: %s", actual)
 		}
-		if !bytes.Equal(cExts["hello"].Value, ext.Value) {
-			t.Errorf("expected extension value %q, got: %q", ext.Value, cExts["hello"].Value)
+		if actual := cExts["hello"].GetValue(); !bytes.Equal(actual, ext.Value) {
+			t.Errorf("expected extension value %q, got: %q", ext.Value, actual)
 		}
 	}
 

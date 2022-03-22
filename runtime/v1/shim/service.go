@@ -37,6 +37,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/process"
 	"github.com/containerd/containerd/pkg/stdio"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
@@ -417,7 +418,7 @@ func (s *Service) ListPids(ctx context.Context, r *shimapi.ListPidsRequest) (*sh
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal process %d info: %w", pid, err)
 				}
-				pInfo.Info = a
+				pInfo.Info = protobuf.FromAny(a)
 				break
 			}
 		}
