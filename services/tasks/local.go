@@ -333,18 +333,18 @@ func getProcessState(ctx context.Context, p runtime.Process) (*task.Process, err
 		}
 		log.G(ctx).WithError(err).Errorf("get state for %s", p.ID())
 	}
-	status := task.StatusUnknown
+	status := task.Status_UNKNOWN
 	switch state.Status {
 	case runtime.CreatedStatus:
-		status = task.StatusCreated
+		status = task.Status_CREATED
 	case runtime.RunningStatus:
-		status = task.StatusRunning
+		status = task.Status_RUNNING
 	case runtime.StoppedStatus:
-		status = task.StatusStopped
+		status = task.Status_STOPPED
 	case runtime.PausedStatus:
-		status = task.StatusPaused
+		status = task.Status_PAUSED
 	case runtime.PausingStatus:
-		status = task.StatusPausing
+		status = task.Status_PAUSING
 	default:
 		log.G(ctx).WithField("status", state.Status).Warn("unknown status")
 	}

@@ -373,12 +373,12 @@ func (s *service) Write(session api.Content_WriteServer) (err error) {
 		}
 
 		switch req.Action {
-		case api.WriteActionStat:
+		case api.WriteAction_STAT:
 			msg.Digest = wr.Digest().String()
 			msg.StartedAt = ws.StartedAt
 			msg.UpdatedAt = ws.UpdatedAt
 			msg.Total = total
-		case api.WriteActionWrite, api.WriteActionCommit:
+		case api.WriteAction_WRITE, api.WriteAction_COMMIT:
 			if req.Offset > 0 {
 				// validate the offset if provided
 				if req.Offset != ws.Offset {
@@ -411,7 +411,7 @@ func (s *service) Write(session api.Content_WriteServer) (err error) {
 				msg.Offset += int64(n)
 			}
 
-			if req.Action == api.WriteActionCommit {
+			if req.Action == api.WriteAction_COMMIT {
 				var opts []content.Opt
 				if req.Labels != nil {
 					opts = append(opts, content.WithLabels(req.Labels))
@@ -428,7 +428,7 @@ func (s *service) Write(session api.Content_WriteServer) (err error) {
 			return err
 		}
 
-		if req.Action == api.WriteActionCommit {
+		if req.Action == api.WriteAction_COMMIT {
 			return nil
 		}
 

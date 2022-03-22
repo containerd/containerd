@@ -101,13 +101,10 @@ message StatSnapshotRequest {
 }
 
 enum Kind {
-	option (gogoproto.goproto_enum_prefix) = false;
-	option (gogoproto.enum_customname) = "Kind";
-
-	UNKNOWN = 0 [(gogoproto.enumvalue_customname) = "KindUnknown"];
-	VIEW = 1 [(gogoproto.enumvalue_customname) = "KindView"];
-	ACTIVE = 2 [(gogoproto.enumvalue_customname) = "KindActive"];
-	COMMITTED = 3 [(gogoproto.enumvalue_customname) = "KindCommitted"];
+	UNKNOWN = 0;
+	VIEW = 1;
+	ACTIVE = 2;
+	COMMITTED = 3;
 }
 
 message Info {

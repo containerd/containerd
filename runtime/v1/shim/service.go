@@ -314,18 +314,18 @@ func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.
 	if err != nil {
 		return nil, err
 	}
-	status := task.StatusUnknown
+	status := task.Status_UNKNOWN
 	switch st {
 	case "created":
-		status = task.StatusCreated
+		status = task.Status_CREATED
 	case "running":
-		status = task.StatusRunning
+		status = task.Status_RUNNING
 	case "stopped":
-		status = task.StatusStopped
+		status = task.Status_STOPPED
 	case "paused":
-		status = task.StatusPaused
+		status = task.Status_PAUSED
 	case "pausing":
-		status = task.StatusPausing
+		status = task.Status_PAUSING
 	}
 	sio := p.Stdio()
 	return &shimapi.StateResponse{

@@ -206,12 +206,9 @@ message ListStatusesResponse {
 
 // WriteAction defines the behavior of a WriteRequest.
 enum WriteAction {
-	option (gogoproto.goproto_enum_prefix) = false;
-	option (gogoproto.enum_customname) = "WriteAction";
-
 	// WriteActionStat instructs the writer to return the current status while
 	// holding the lock on the write.
-	STAT = 0 [(gogoproto.enumvalue_customname) = "WriteActionStat"];
+	STAT = 0;
 
 	// WriteActionWrite sets the action for the write request to write data.
 	//
@@ -219,7 +216,7 @@ enum WriteAction {
 	// transaction will be left open for further writes.
 	//
 	// This is the default.
-	WRITE = 1 [(gogoproto.enumvalue_customname) = "WriteActionWrite"];
+	WRITE = 1;
 
 	// WriteActionCommit will write any outstanding data in the message and
 	// commit the write, storing it under the digest.
@@ -228,7 +225,7 @@ enum WriteAction {
 	// commit it.
 	//
 	// This action will always terminate the write.
-	COMMIT = 2 [(gogoproto.enumvalue_customname) = "WriteActionCommit"];
+	COMMIT = 2;
 }
 
 // WriteContentRequest writes data to the request ref at offset.
