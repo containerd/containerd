@@ -150,11 +150,17 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 
 	id, _, _, err := storage.GetInfo(ctx, key)
 	if err != nil {
+		if rerr := t.Rollback(); rerr != nil {
+			log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
+		}
 		return err
 	}
 
 	usage, err := fs.DiskUsage(ctx, o.getSnapshotDir(id))
 	if err != nil {
+		if rerr := t.Rollback(); rerr != nil {
+			log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
+		}
 		return err
 	}
 
@@ -281,6 +287,9 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 				fs.WithXAttrErrorHandler(xattrErrorHandler),
 			}
 			if err := fs.CopyDir(td, parent, copyDirOpts...); err != nil {
+				if rerr := t.Rollback(); rerr != nil {
+					log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
+				}
 				return nil, fmt.Errorf("copying of parent failed: %w", err)
 			}
 		}
