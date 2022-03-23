@@ -169,7 +169,7 @@ func setLogger(ctx context.Context, id string) (context.Context, error) {
 		l.Logger.SetLevel(logrus.DebugLevel)
 	}
 	f, err := openLog(ctx, id)
-	if err != nil {
+	if err != nil { //nolint:staticcheck // Ignore SA4023 as some platforms always return error
 		return ctx, err
 	}
 	l.Logger.SetOutput(f)
@@ -255,12 +255,12 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 	setRuntime()
 
 	signals, err := setupSignals(config)
-	if err != nil {
+	if err != nil { //nolint:staticcheck // Ignore SA4023 as some platforms always return error
 		return err
 	}
 
 	if !config.NoSubreaper {
-		if err := subreaper(); err != nil {
+		if err := subreaper(); err != nil { //nolint:staticcheck // Ignore SA4023 as some platforms always return error
 			return err
 		}
 	}
@@ -418,7 +418,7 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 	}
 
 	server, err := newServer()
-	if err != nil {
+	if err != nil { //nolint:staticcheck // Ignore SA4023 as some platforms always return error
 		return fmt.Errorf("failed creating server: %w", err)
 	}
 
@@ -428,7 +428,7 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 		}
 	}
 
-	if err := serve(ctx, server, signals, sd.Shutdown); err != nil {
+	if err := serve(ctx, server, signals, sd.Shutdown); err != nil { //nolint:staticcheck // Ignore SA4023 as some platforms always return error
 		if err != shutdown.ErrShutdown {
 			return err
 		}
@@ -460,7 +460,7 @@ func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal, sh
 	}
 
 	l, err := serveListener(socketFlag)
-	if err != nil {
+	if err != nil { //nolint:staticcheck // Ignore SA4023 as some platforms always return error
 		return err
 	}
 	go func() {
