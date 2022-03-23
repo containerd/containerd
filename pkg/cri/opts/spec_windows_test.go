@@ -18,11 +18,14 @@ package opts
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
+	osinterface "github.com/containerd/containerd/pkg/os"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -213,5 +216,33 @@ func TestWithDevices(t *testing.T) {
 				assert.Empty(t, spec.Linux.Devices)
 			}
 		})
+	}
+}
+
+func TestDriveMounts(t *testing.T) {
+	tests := []struct {
+		mnt                   *runtime.Mount
+		expectedContainerPath string
+		expectedError         error
+	}{
+		{&runtime.Mount{HostPath: `C:\`, ContainerPath: `D:\foo`}, `D:\foo`, nil},
+		{&runtime.Mount{HostPath: `C:\`, ContainerPath: `D:\`}, `D:\`, nil},
+		{&runtime.Mount{HostPath: `C:\`, ContainerPath: `D:`}, `D:`, nil},
+		{&runtime.Mount{HostPath: `\\.\pipe\a_fake_pipe_name_that_shouldnt_exist`, ContainerPath: `\\.\pipe\foo`}, `\\.\pipe\foo`, nil},
+		// If `C:\` is passed as container path it should continue and forward that to HCS and fail
+		// to align with docker's behavior.
+		{&runtime.Mount{HostPath: `C:\`, ContainerPath: `C:\`}, `C:\`, nil},
+
+		// If `C:` is passed we can detect and fail immediately.
+		{&runtime.Mount{HostPath: `C:\`, ContainerPath: `C:`}, ``, fmt.Errorf("destination path can not be C drive")},
+	}
+	var realOS osinterface.RealOS
+	for _, test := range tests {
+		parsedMount, err := parseMount(realOS, test.mnt)
+		if err != nil && !strings.EqualFold(err.Error(), test.expectedError.Error()) {
+			t.Fatalf("expected err: %s, got %s instead", test.expectedError, err)
+		} else if err == nil && test.expectedContainerPath != parsedMount.Destination {
+			t.Fatalf("expected container path: %s, got %s instead", test.expectedContainerPath, parsedMount.Destination)
+		}
 	}
 }
