@@ -2479,8 +2479,8 @@ func TestContainerUsername(t *testing.T) {
 	}
 	<-statusC
 	if _, err := task.Delete(ctx); err != nil {
-                t.Fatal(err)
-        }
+		t.Fatal(err)
+	}
 
 	output := strings.TrimSuffix(buf.String(), newLine)
 	if output != expectedOutput {
