@@ -31,7 +31,6 @@ replace (
 	// Replace rules below must be kept in sync with the main go.mod file at the
 	// root, because that's the actual version expected by the "containerd/containerd"
 	// dependency above.
-	github.com/gogo/googleapis => github.com/gogo/googleapis v1.3.2
 	// urfave/cli must be <= v1.22.1 due to a regression: https://github.com/urfave/cli/issues/1092
 	github.com/urfave/cli => github.com/urfave/cli v1.22.1
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200224152610-e50cd9704f63
