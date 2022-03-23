@@ -370,7 +370,7 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 		return nil
 
 	default:
-		return errors.Errorf("unhandled tar header type %d\n", hdr.Typeflag)
+		return errors.Errorf("unhandled tar header type %d", hdr.Typeflag)
 	}
 
 	// Lchown is not supported on Windows.
