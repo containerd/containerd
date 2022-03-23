@@ -78,7 +78,7 @@ func parseFlags() {
 	flag.StringVar(&addressFlag, "address", "", "grpc address back to main containerd")
 	flag.StringVar(&workdirFlag, "workdir", "", "path used to storage large temporary data")
 	flag.StringVar(&runtimeRootFlag, "runtime-root", process.RuncRoot, "root directory for the runtime")
-	flag.StringVar(&criuFlag, "criu", "", "path to criu binary")
+	flag.StringVar(&criuFlag, "criu", "", "path to criu binary (deprecated: do not use)")
 	flag.BoolVar(&systemdCgroupFlag, "systemd-cgroup", false, "set runtime to use systemd-cgroup")
 	// currently, the `containerd publish` utility is embedded in the daemon binary.
 	// The daemon invokes `containerd-shim -containerd-binary ...` with its own os.Executable() path.
@@ -176,7 +176,6 @@ func executeShim() error {
 			Path:          path,
 			Namespace:     namespaceFlag,
 			WorkDir:       workdirFlag,
-			Criu:          criuFlag,
 			SystemdCgroup: systemdCgroupFlag,
 			RuntimeRoot:   runtimeRootFlag,
 		},

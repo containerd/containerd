@@ -250,7 +250,7 @@ func (s *service) Cleanup(ctx context.Context) (*taskAPI.DeleteResponse, error) 
 		root = opts.Root
 	}
 
-	r := process.NewRunc(root, path, ns, runtime, "", false)
+	r := process.NewRunc(root, path, ns, runtime, false)
 	if err := r.Delete(ctx, s.id, &runcC.DeleteOpts{
 		Force: true,
 	}); err != nil {

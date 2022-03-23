@@ -23,6 +23,9 @@ file {
       number: 3
       label: LABEL_OPTIONAL
       type: TYPE_STRING
+      options {
+        deprecated: true
+      }
       json_name: "criuPath"
     }
     field {
