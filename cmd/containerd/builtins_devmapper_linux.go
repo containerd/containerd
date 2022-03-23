@@ -1,3 +1,4 @@
+//go:build !no_devmapper
 // +build !no_devmapper
 
 /*

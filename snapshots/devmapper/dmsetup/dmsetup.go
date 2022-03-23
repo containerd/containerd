@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -354,7 +355,7 @@ func dmsetup(args ...string) (string, error) {
 			return "", errno
 		}
 
-		return "", errors.Wrapf(err, "dmsetup %s\nerror: %s\n", strings.Join(args, " "), output)
+		return "", errors.Wrapf(err, "dmsetup %s, error: %s", strings.Join(args, " "), output)
 	}
 
 	output = strings.TrimSuffix(output, "\n")

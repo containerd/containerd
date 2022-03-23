@@ -20,7 +20,7 @@ jobs:
 
     strategy:
       matrix:
-        go-version: [1.16.15]
+        go-version: [1.17.8]
         os: [ubuntu-18.04, macos-10.15, windows-2019]
 
     steps:
@@ -38,12 +38,11 @@ jobs:
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
-      - uses: golangci/golangci-lint-action@v2
+      - uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.42.0
+          version: v1.44.2
           working-directory: src/github.com/containerd/containerd
           args: --timeout=5m
-          skip-go-installation: true
 
   #
   # Project checks
@@ -56,7 +55,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.15'
+          go-version: '1.17.8'
 
       - shell: bash
         run: |
@@ -87,7 +86,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.15'
+          go-version: '1.17.8'
 
       - uses: actions/checkout@v2
         with:
@@ -120,7 +119,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.15'
+          go-version: '1.17.8'
 
       - name: Set env
         shell: bash
@@ -166,7 +165,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.15'
+          go-version: '1.17.8'
       - name: Set env
         shell: bash
         run: |
@@ -231,7 +230,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-18.04, macos-10.15, windows-2019]
-        go-version: ['1.16.15']
+        go-version: ['1.17.8']
         include:
           # Go 1.13.x is still used by Docker/Moby
           - go-version: '1.13.x'
@@ -277,7 +276,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.15'
+          go-version: '1.17.8'
 
       - uses: actions/checkout@v2
         with:
@@ -358,7 +357,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.15'
+          go-version: '1.17.8'
 
       - uses: actions/checkout@v2
         with:
@@ -510,7 +509,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.15'
+          go-version: '1.17.8'
       - uses: actions/checkout@v2
         with:
           path: src/github.com/containerd/containerd
