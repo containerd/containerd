@@ -51,7 +51,6 @@ require (
 	github.com/opencontainers/selinux v1.10.0
 	github.com/pelletier/go-toml v1.9.3
 	github.com/prometheus/client_golang v1.11.0
-	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
 	github.com/tchap/go-patricia v2.2.6+incompatible
@@ -87,9 +86,6 @@ require (
 
 // When updating replace rules, make sure to also update the rules in integration/client/go.mod and api/go.mod
 replace (
-	// prevent transitional dependencies due to containerd having a circular
-	// dependency on itself through plugins. see .empty-mod/go.mod for details
-	github.com/containerd/containerd => ./.empty-mod/
 	github.com/gogo/googleapis => github.com/gogo/googleapis v1.3.2
 	// urfave/cli must be <= v1.22.1 due to a regression: https://github.com/urfave/cli/issues/1092
 	github.com/urfave/cli => github.com/urfave/cli v1.22.1
