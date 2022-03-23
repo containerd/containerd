@@ -255,15 +255,14 @@ func TestContainerCapabilities(t *testing.T) {
 		for _, include := range test.includes {
 			assert.Contains(t, spec.Process.Capabilities.Bounding, include)
 			assert.Contains(t, spec.Process.Capabilities.Effective, include)
-			assert.Contains(t, spec.Process.Capabilities.Inheritable, include)
 			assert.Contains(t, spec.Process.Capabilities.Permitted, include)
 		}
 		for _, exclude := range test.excludes {
 			assert.NotContains(t, spec.Process.Capabilities.Bounding, exclude)
 			assert.NotContains(t, spec.Process.Capabilities.Effective, exclude)
-			assert.NotContains(t, spec.Process.Capabilities.Inheritable, exclude)
 			assert.NotContains(t, spec.Process.Capabilities.Permitted, exclude)
 		}
+		assert.Empty(t, spec.Process.Capabilities.Inheritable)
 		assert.Empty(t, spec.Process.Capabilities.Ambient)
 	}
 }
