@@ -39,7 +39,6 @@ func TestAddCaps(t *testing.T) {
 		s.Process.Capabilities.Bounding,
 		s.Process.Capabilities.Effective,
 		s.Process.Capabilities.Permitted,
-		s.Process.Capabilities.Inheritable,
 	} {
 		if !capsContain(cl, "CAP_CHOWN") {
 			t.Errorf("cap list %d does not contain added cap", i)
@@ -63,7 +62,6 @@ func TestDropCaps(t *testing.T) {
 		s.Process.Capabilities.Bounding,
 		s.Process.Capabilities.Effective,
 		s.Process.Capabilities.Permitted,
-		s.Process.Capabilities.Inheritable,
 	} {
 		if capsContain(cl, "CAP_CHOWN") {
 			t.Errorf("cap list %d contains dropped cap", i)
@@ -82,7 +80,6 @@ func TestDropCaps(t *testing.T) {
 		s.Process.Capabilities.Bounding,
 		s.Process.Capabilities.Effective,
 		s.Process.Capabilities.Permitted,
-		s.Process.Capabilities.Inheritable,
 	} {
 		if capsContain(cl, "CAP_FOWNER") {
 			t.Errorf("cap list %d contains dropped cap", i)
@@ -103,7 +100,6 @@ func TestDropCaps(t *testing.T) {
 		s.Process.Capabilities.Bounding,
 		s.Process.Capabilities.Effective,
 		s.Process.Capabilities.Permitted,
-		s.Process.Capabilities.Inheritable,
 	} {
 		if len(cl) != 0 {
 			t.Errorf("cap list %d is not empty", i)
