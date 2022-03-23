@@ -1,3 +1,4 @@
+//go:build (linux && !no_cri) || (windows && !no_cri)
 // +build linux,!no_cri windows,!no_cri
 
 /*
