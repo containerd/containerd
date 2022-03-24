@@ -98,7 +98,7 @@ github.com/containerd/continuity/testutil/loopback
 # github.com/containerd/fifo v1.0.0
 ## explicit; go 1.13
 github.com/containerd/fifo
-# github.com/containerd/go-cni v1.1.3
+# github.com/containerd/go-cni v1.1.4
 ## explicit; go 1.13
 github.com/containerd/go-cni
 # github.com/containerd/go-runc v1.0.0
@@ -135,8 +135,8 @@ github.com/containernetworking/cni/pkg/types/create
 github.com/containernetworking/cni/pkg/types/internal
 github.com/containernetworking/cni/pkg/utils
 github.com/containernetworking/cni/pkg/version
-# github.com/containernetworking/plugins v1.0.1
-## explicit; go 1.16
+# github.com/containernetworking/plugins v1.1.1
+## explicit; go 1.17
 github.com/containernetworking/plugins/pkg/ns
 # github.com/containers/ocicrypt v1.1.2
 ## explicit; go 1.12
