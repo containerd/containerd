@@ -58,7 +58,7 @@ func (c *criService) toCRIContainerStats(
 	containerStats := new(runtime.ListContainerStatsResponse)
 	for _, cntr := range containers {
 		cs, err := c.containerMetrics(cntr.Metadata, statsMap[cntr.ID])
-		if err != nil {
+		if err != nil { //nolint:staticcheck // Ignore SA4023 as some platforms always return nil (metrics unimplemented)
 			return nil, fmt.Errorf("failed to decode container metrics for %q: %w", cntr.ID, err)
 		}
 		containerStats.Stats = append(containerStats.Stats, cs)
