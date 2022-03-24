@@ -87,7 +87,7 @@ func WithMinNetworkCount(count int) Opt {
 // network config.
 func WithLoNetwork(c *libcni) error {
 	loConfig, _ := cnilibrary.ConfListFromBytes([]byte(`{
-"cniVersion": "0.3.1",
+"cniVersion": "1.0.0",
 "name": "cni-loopback",
 "plugins": [{
   "type": "loopback"
