@@ -1,0 +1,21 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.6.1"
+
+pre_release = false
+
+preface = """\
+The second patch release for containerd 1.6 includes a fix for
+[CVE-2022-24769](https://github.com/containerd/containerd/security/advisories/GHSA-c9cp-9c75-9v8c).
+
+### Notable Updates
+
+* **Fix the inheritable capability defaults** ([GHSA-c9cp-9c75-9v8c](https://github.com/containerd/containerd/security/advisories/GHSA-c9cp-9c75-9v8c))
+
+See the changelog for complete list of changes"""
