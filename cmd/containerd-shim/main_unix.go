@@ -38,13 +38,13 @@ import (
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/process"
+	"github.com/containerd/containerd/protobuf"
 	shimlog "github.com/containerd/containerd/runtime/v1"
 	"github.com/containerd/containerd/runtime/v1/shim"
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/containerd/sys/reaper"
 	"github.com/containerd/containerd/version"
 	"github.com/containerd/ttrpc"
-	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/sirupsen/logrus"
 	exec "golang.org/x/sys/execabs"
@@ -301,7 +301,7 @@ type remoteEventsPublisher struct {
 
 func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event events.Event) error {
 	ns, _ := namespaces.Namespace(ctx)
-	encoded, err := typeurl.MarshalAny(event)
+	encoded, err := protobuf.MarshalAnyToProto(event)
 	if err != nil {
 		return err
 	}

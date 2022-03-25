@@ -38,6 +38,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
@@ -346,7 +347,7 @@ func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreat
 			i.Close()
 		}
 	}()
-	any, err := typeurl.MarshalAny(spec)
+	any, err := protobuf.MarshalAnyToProto(spec)
 	if err != nil {
 		return nil, err
 	}
@@ -446,7 +447,7 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 	}
 	request.ParentCheckpoint = i.ParentCheckpoint.String()
 	if i.Options != nil {
-		any, err := typeurl.MarshalAny(i.Options)
+		any, err := protobuf.MarshalAnyToProto(i.Options)
 		if err != nil {
 			return nil, err
 		}
@@ -535,7 +536,7 @@ func (t *task) Update(ctx context.Context, opts ...UpdateTaskOpts) error {
 		if err != nil {
 			return err
 		}
-		request.Resources = any
+		request.Resources = protobuf.FromAny(any)
 	}
 	if i.Annotations != nil {
 		request.Annotations = i.Annotations

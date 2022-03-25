@@ -32,10 +32,10 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/fifo"
 	"github.com/containerd/typeurl"
-	prototypes "github.com/gogo/protobuf/types"
 	ver "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/selinux/go-selinux/label"
@@ -74,7 +74,7 @@ type Container interface {
 	// SetLabels sets the provided labels for the container and returns the final label set
 	SetLabels(context.Context, map[string]string) (map[string]string, error)
 	// Extensions returns the extensions set on the container
-	Extensions(context.Context) (map[string]prototypes.Any, error)
+	Extensions(context.Context) (map[string]typeurl.Any, error)
 	// Update a container
 	Update(context.Context, ...UpdateContainerOpts) error
 	// Checkpoint creates a checkpoint image of the current container
@@ -120,7 +120,7 @@ func (c *container) Info(ctx context.Context, opts ...InfoOpts) (containers.Cont
 	return c.metadata, nil
 }
 
-func (c *container) Extensions(ctx context.Context) (map[string]prototypes.Any, error) {
+func (c *container) Extensions(ctx context.Context) (map[string]typeurl.Any, error) {
 	r, err := c.get(ctx)
 	if err != nil {
 		return nil, err
@@ -163,7 +163,7 @@ func (c *container) Spec(ctx context.Context) (*oci.Spec, error) {
 		return nil, err
 	}
 	var s oci.Spec
-	if err := json.Unmarshal(r.Spec.Value, &s); err != nil {
+	if err := json.Unmarshal(r.Spec.GetValue(), &s); err != nil {
 		return nil, err
 	}
 	return &s, nil
@@ -284,7 +284,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 		if err != nil {
 			return nil, err
 		}
-		request.Options = any
+		request.Options = protobuf.FromAny(any)
 	}
 	t := &task{
 		client: c.client,

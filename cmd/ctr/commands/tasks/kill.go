@@ -42,7 +42,7 @@ func RemoveCniNetworkIfExist(ctx context.Context, container containerd.Container
 		return nil
 	}
 
-	data, err := typeurl.UnmarshalAny(&networkMeta)
+	data, err := typeurl.UnmarshalAny(networkMeta)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal cni metadata extension  %s", commands.CtrCniMetadataExtension)
 	}

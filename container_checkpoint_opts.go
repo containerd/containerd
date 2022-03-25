@@ -28,9 +28,9 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
-	"github.com/containerd/typeurl"
 	"github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -57,7 +57,7 @@ func WithCheckpointImage(ctx context.Context, client *Client, c *containers.Cont
 
 // WithCheckpointTask includes the running task
 func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
-	any, err := typeurl.MarshalAny(copts)
+	any, err := protobuf.MarshalAnyToProto(copts)
 	if err != nil {
 		return nil
 	}
@@ -98,8 +98,8 @@ func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Conta
 
 // WithCheckpointRuntime includes the container runtime info
 func WithCheckpointRuntime(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
-	if c.Runtime.Options != nil {
-		data, err := c.Runtime.Options.Marshal()
+	if c.Runtime.Options != nil && c.Runtime.Options.GetValue() != nil {
+		data, err := protobuf.FromAny(c.Runtime.Options).Marshal()
 		if err != nil {
 			return err
 		}

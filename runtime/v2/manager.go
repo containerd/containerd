@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/runtime"
 	shimbinary "github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/containerd/runtime/v2/task"
@@ -157,7 +158,7 @@ func (m *ShimManager) ID() string {
 
 // Start launches a new shim instance
 func (m *ShimManager) Start(ctx context.Context, id string, opts runtime.CreateOpts) (_ ShimProcess, retErr error) {
-	bundle, err := NewBundle(ctx, m.root, m.state, id, opts.Spec.Value)
+	bundle, err := NewBundle(ctx, m.root, m.state, id, opts.Spec.GetValue())
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +199,7 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 	}
 
 	topts := opts.TaskOptions
-	if topts == nil {
+	if topts == nil || topts.GetValue() == nil {
 		topts = opts.RuntimeOptions
 	}
 
@@ -213,7 +214,7 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 		ttrpcAddress: m.containerdTTRPCAddress,
 		schedCore:    m.schedCore,
 	})
-	shim, err := b.Start(ctx, topts, func() {
+	shim, err := b.Start(ctx, protobuf.FromAny(topts), func() {
 		log.G(ctx).WithField("id", id).Info("shim disconnected")
 
 		cleanupAfterDeadShim(context.Background(), id, ns, m.shims, m.events, b)

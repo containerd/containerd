@@ -30,10 +30,13 @@ import (
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/types"
+	"github.com/google/go-cmp/cmp"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	bolt "go.etcd.io/bbolt"
+	"gotest.tools/v3/assert"
 )
 
 func init() {
@@ -47,7 +50,7 @@ func TestContainersList(t *testing.T) {
 	store := NewContainerStore(NewDB(db, nil, nil))
 
 	spec := &specs.Spec{}
-	encoded, err := typeurl.MarshalAny(spec)
+	encoded, err := protobuf.MarshalAnyToProto(spec)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,13 +182,13 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 	store := NewContainerStore(NewDB(db, nil, nil))
 
 	spec := &specs.Spec{}
-	encoded, err := typeurl.MarshalAny(spec)
+	encoded, err := protobuf.MarshalAnyToProto(spec)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	spec.Annotations = map[string]string{"updated": "true"}
-	encodedUpdated, err := typeurl.MarshalAny(spec)
+	encodedUpdated, err := protobuf.MarshalAnyToProto(spec)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -467,8 +470,8 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("hello"),
 					},
@@ -479,8 +482,8 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("world"),
 					},
@@ -491,8 +494,8 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("world"),
 					},
@@ -506,8 +509,8 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("hello"),
 					},
@@ -518,8 +521,8 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("world"),
 					},
@@ -531,8 +534,8 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("hello"),
 					},
@@ -546,8 +549,8 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("hello"),
 					},
@@ -557,8 +560,8 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Labels: map[string]string{
 					"foo": "one",
 				},
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("world"),
 					},
@@ -570,8 +573,8 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("world"),
 					},
@@ -585,21 +588,21 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				Extensions: map[string]types.Any{
+				Extensions: map[string]typeurl.Any{
 					// leaves hello in place.
-					"hello": {
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("hello"),
 					},
 				},
 			},
 			input: containers.Container{
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("universe"), // this will be ignored
 					},
-					"bar": {
+					"bar": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("foo"), // this will be added
 					},
@@ -611,12 +614,12 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("hello"), // remains as world
 					},
-					"bar": {
+					"bar": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("foo"), // this will be added
 					},
@@ -702,10 +705,26 @@ func checkContainerTimestamps(t *testing.T, c *containers.Container, now time.Ti
 	}
 }
 
-func checkContainersEqual(t *testing.T, a, b *containers.Container, format string, args ...interface{}) {
-	if !reflect.DeepEqual(a, b) {
-		t.Fatalf("containers not equal \n\t%v != \n\t%v: "+format, append([]interface{}{a, b}, args...)...)
+// isNil returns true if the given parameter is nil or typed nil.
+func isNil(x interface{}) bool {
+	if x == nil {
+		return true
 	}
+	v := reflect.ValueOf(x)
+	return v.Kind() == reflect.Ptr && v.IsNil()
+}
+
+func checkContainersEqual(t *testing.T, a, b *containers.Container, format string, args ...interface{}) {
+	// Ignore the difference of nil and typed nil.
+	opt := cmp.FilterValues(
+		func(x, y interface{}) bool {
+			return isNil(x) && isNil(y)
+		},
+		cmp.Comparer(func(_, _ interface{}) bool {
+			return true
+		}),
+	)
+	assert.DeepEqual(t, a, b, opt)
 }
 
 func testEnv(t *testing.T) (context.Context, *bolt.DB, func()) {
