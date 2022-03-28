@@ -441,9 +441,8 @@ func (c *criService) loadImages(ctx context.Context, cImages []containerd.Image)
 		unpacked, err := i.IsUnpacked(ctx, snapshotter)
 		if err != nil {
 			log.G(ctx).WithError(err).Warnf("Failed to check whether image is unpacked for image %s", i.Name())
-			continue
 		}
-		if !unpacked {
+		if err == nil && !unpacked {
 			log.G(ctx).Warnf("The image %s is not unpacked.", i.Name())
 			// TODO(random-liu): Consider whether we should try unpack here.
 		}
