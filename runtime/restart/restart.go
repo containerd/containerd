@@ -31,11 +31,15 @@ package restart
 
 import (
 	"context"
+	"fmt"
 	"net/url"
+	"strconv"
+	"strings"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -44,11 +48,105 @@ const (
 	// LogURILabel sets the restart log uri label for a container
 	LogURILabel = "containerd.io/restart.loguri"
 
+	// PolicyLabel sets the restart policy label for a container
+	PolicyLabel = "containerd.io/restart.policy"
+	// CountLabel sets the restart count label for a container
+	CountLabel = "containerd.io/restart.count"
+	// ExplicitlyStoppedLabel sets the restart explicitly stopped label for a container
+	ExplicitlyStoppedLabel = "containerd.io/restart.explicitly-stopped"
+
 	// LogPathLabel sets the restart log path label for a container
 	//
 	// Deprecated(in release 1.5): use LogURILabel
 	LogPathLabel = "containerd.io/restart.logpath"
 )
+
+// Policy represents the restart policies of a container.
+type Policy struct {
+	name              string
+	maximumRetryCount int
+}
+
+// NewPolicy creates a restart policy with the specified name.
+// supports the following restart policies:
+// - no, Do not restart the container.
+// - always, Always restart the container regardless of the exit status.
+// - on-failure[:max-retries], Restart only if the container exits with a non-zero exit status.
+// - unless-stopped, Always restart the container unless it is stopped.
+func NewPolicy(policy string) (*Policy, error) {
+	policySlice := strings.Split(policy, ":")
+	var (
+		err        error
+		retryCount int
+	)
+	switch policySlice[0] {
+	case "", "no", "always", "unless-stopped":
+		policy = policySlice[0]
+		if policy == "" {
+			policy = "always"
+		}
+		if len(policySlice) > 1 {
+			return nil, fmt.Errorf("restart policy %q not support max retry count", policySlice[0])
+		}
+	case "on-failure":
+		policy = policySlice[0]
+		if len(policySlice) > 1 {
+			retryCount, err = strconv.Atoi(policySlice[1])
+			if err != nil {
+				return nil, fmt.Errorf("invalid max retry count: %s", policySlice[1])
+			}
+		}
+	default:
+		return nil, fmt.Errorf("restart policy %q not supported", policy)
+	}
+	return &Policy{
+		name:              policy,
+		maximumRetryCount: retryCount,
+	}, nil
+}
+
+func (rp *Policy) String() string {
+	if rp.maximumRetryCount > 0 {
+		return fmt.Sprintf("%s:%d", rp.name, rp.maximumRetryCount)
+	}
+	return rp.name
+}
+
+func (rp *Policy) Name() string {
+	return rp.name
+}
+
+func (rp *Policy) MaximumRetryCount() int {
+	return rp.maximumRetryCount
+}
+
+// Reconcile reconciles the restart policy of a container.
+func Reconcile(status containerd.Status, labels map[string]string) bool {
+	rp, err := NewPolicy(labels[PolicyLabel])
+	if err != nil {
+		logrus.WithError(err).Error("policy reconcile")
+		return false
+	}
+	switch rp.Name() {
+	case "", "always":
+		return true
+	case "on-failure":
+		restartCount, err := strconv.Atoi(labels[CountLabel])
+		if err != nil && labels[CountLabel] != "" {
+			logrus.WithError(err).Error("policy reconcile")
+			return false
+		}
+		if status.ExitStatus != 0 && (rp.maximumRetryCount == 0 || restartCount < rp.maximumRetryCount) {
+			return true
+		}
+	case "unless-stopped":
+		explicitlyStopped, _ := strconv.ParseBool(labels[ExplicitlyStoppedLabel])
+		if !explicitlyStopped {
+			return true
+		}
+	}
+	return false
+}
 
 // WithLogURI sets the specified log uri for a container.
 func WithLogURI(uri *url.URL) func(context.Context, *containerd.Client, *containers.Container) error {
@@ -110,12 +208,22 @@ func WithStatus(status containerd.ProcessStatus) func(context.Context, *containe
 	}
 }
 
+// WithPolicy sets the restart policy for a container
+func WithPolicy(policy *Policy) func(context.Context, *containerd.Client, *containers.Container) error {
+	return func(_ context.Context, _ *containerd.Client, c *containers.Container) error {
+		ensureLabels(c)
+		c.Labels[PolicyLabel] = policy.String()
+		return nil
+	}
+}
+
 // WithNoRestarts clears any restart information from the container
 func WithNoRestarts(_ context.Context, _ *containerd.Client, c *containers.Container) error {
 	if c.Labels == nil {
 		return nil
 	}
 	delete(c.Labels, StatusLabel)
+	delete(c.Labels, PolicyLabel)
 	delete(c.Labels, LogPathLabel)
 	delete(c.Labels, LogURILabel)
 	return nil
