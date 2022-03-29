@@ -8,9 +8,18 @@ Before sending pull requests you should at least make sure your changes have pas
 Follow the [building](../../BUILDING.md) instructions.
 
 ## CRI Integration Test
-* Run CRI integration test:
+* Run all CRI integration tests:
 ```bash
 make cri-integration
+```
+* Run specific CRI integration tests: use the `FOCUS` parameter to specify the test case.
+```bash
+# run CRI integration tests that match the test string <TEST_NAME>
+FOCUS=<TEST_NAME> make cri-integration
+```
+Example:
+```bash
+FOCUS=TestContainerListStats make cri-integration
 ```
 ## CRI Validation Test
 [CRI validation test](https://github.com/kubernetes-sigs/cri-tools/blob/master/docs/validation.md) is a test framework for validating that a Container Runtime Interface (CRI) implementation such as containerd with the `cri` plugin meets all the requirements necessary to manage pod sandboxes, containers, images etc.
