@@ -499,6 +499,13 @@ file {
       type: TYPE_STRING
       json_name: "options"
     }
+    field {
+      name: "meta_datas"
+      number: 5
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "metaDatas"
+    }
   }
   options {
     go_package: "github.com/containerd/containerd/api/types;types"

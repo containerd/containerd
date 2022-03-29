@@ -206,9 +206,10 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 	}
 	for _, m := range r.Rootfs {
 		opts.Rootfs = append(opts.Rootfs, mount.Mount{
-			Type:    m.Type,
-			Source:  m.Source,
-			Options: m.Options,
+			Type:      m.Type,
+			Source:    m.Source,
+			Options:   m.Options,
+			MetaDatas: m.MetaDatas,
 		})
 	}
 	if strings.HasPrefix(container.Runtime.Name, "io.containerd.runtime.v1.") {

@@ -249,9 +249,10 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 	}
 	for _, m := range opts.Rootfs {
 		sopts.Rootfs = append(sopts.Rootfs, &types.Mount{
-			Type:    m.Type,
-			Source:  m.Source,
-			Options: m.Options,
+			Type:      m.Type,
+			Source:    m.Source,
+			Options:   m.Options,
+			MetaDatas: m.MetaDatas,
 		})
 	}
 	cr, err := s.Create(ctx, sopts)

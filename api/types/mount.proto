@@ -42,4 +42,9 @@ message Mount {
 
 	// Options specifies zero or more fstab style mount options.
 	repeated string options = 4;
+
+	// MetaDatas specifies zero or more meta data of this mount, for example,
+	// it can be used to pass information from remote-snapshotter to runtimes.
+	// And it is recommended to use a common prefix just like io.katacontainers.someopt=foo.
+	repeated string meta_datas = 5;
 }

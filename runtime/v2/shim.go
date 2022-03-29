@@ -339,9 +339,10 @@ func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime
 	}
 	for _, m := range opts.Rootfs {
 		request.Rootfs = append(request.Rootfs, &types.Mount{
-			Type:    m.Type,
-			Source:  m.Source,
-			Options: m.Options,
+			Type:      m.Type,
+			Source:    m.Source,
+			Options:   m.Options,
+			MetaDatas: m.MetaDatas,
 		})
 	}
 

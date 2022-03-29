@@ -201,9 +201,10 @@ func fromMounts(mounts []mount.Mount) []*types.Mount {
 	out := make([]*types.Mount, len(mounts))
 	for i, m := range mounts {
 		out[i] = &types.Mount{
-			Type:    m.Type,
-			Source:  m.Source,
-			Options: m.Options,
+			Type:      m.Type,
+			Source:    m.Source,
+			Options:   m.Options,
+			MetaDatas: m.MetaDatas,
 		}
 	}
 	return out

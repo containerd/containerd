@@ -223,9 +223,10 @@ func toMounts(mm []*types.Mount) []mount.Mount {
 	mounts := make([]mount.Mount, len(mm))
 	for i, m := range mm {
 		mounts[i] = mount.Mount{
-			Type:    m.Type,
-			Source:  m.Source,
-			Options: m.Options,
+			Type:      m.Type,
+			Source:    m.Source,
+			Options:   m.Options,
+			MetaDatas: m.MetaDatas,
 		}
 	}
 	return mounts

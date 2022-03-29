@@ -27,6 +27,10 @@ type Mount struct {
 	// Options contains zero or more fstab-style mount options. Typically,
 	// these are platform specific.
 	Options []string
+	// MetaDatas specifies zero or more meta data of this mount, for example,
+	// it can be used to pass information from remote-snapshotter to runtimes.
+	// And it is recommended to use a common prefix just like io.katacontainers.someopt=foo.
+	MetaDatas []string
 }
 
 // All mounts all the provided mounts to the provided target
