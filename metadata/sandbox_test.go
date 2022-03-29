@@ -21,7 +21,9 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/protobuf"
 	api "github.com/containerd/containerd/sandbox"
+	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/types"
 )
 
@@ -35,9 +37,9 @@ func TestSandboxCreate(t *testing.T) {
 		ID:     "1",
 		Labels: map[string]string{"a": "1", "b": "2"},
 		Spec:   &types.Any{TypeUrl: "1", Value: []byte{1, 2, 3}},
-		Extensions: map[string]types.Any{
-			"ext1": {TypeUrl: "url/1", Value: []byte{1, 2, 3}},
-			"ext2": {TypeUrl: "url/2", Value: []byte{3, 2, 1}},
+		Extensions: map[string]typeurl.Any{
+			"ext1": &types.Any{TypeUrl: "url/1", Value: []byte{1, 2, 3}},
+			"ext2": &types.Any{TypeUrl: "url/2", Value: []byte{3, 2, 1}},
 		},
 		Runtime: api.RuntimeOpts{
 			Name:    "test",
@@ -91,8 +93,8 @@ func TestSandboxUpdate(t *testing.T) {
 		ID:     "2",
 		Labels: map[string]string{"lbl1": "existing"},
 		Spec:   &types.Any{TypeUrl: "1", Value: []byte{1}}, // will replace
-		Extensions: map[string]types.Any{
-			"ext2": {TypeUrl: "url2", Value: []byte{4, 5, 6}}, // will append `ext1`
+		Extensions: map[string]typeurl.Any{
+			"ext2": &types.Any{TypeUrl: "url2", Value: []byte{4, 5, 6}}, // will append `ext1`
 		},
 		Runtime: api.RuntimeOpts{Name: "test"}, // no change
 	}); err != nil {
@@ -105,8 +107,8 @@ func TestSandboxUpdate(t *testing.T) {
 		ID:     "2",
 		Labels: map[string]string{"lbl1": "new"},
 		Spec:   &expectedSpec,
-		Extensions: map[string]types.Any{
-			"ext1": {TypeUrl: "url1", Value: []byte{1, 2}},
+		Extensions: map[string]typeurl.Any{
+			"ext1": &types.Any{TypeUrl: "url1", Value: []byte{1, 2}},
 		},
 	}, "labels.lbl1", "extensions.ext1", "spec")
 	if err != nil {
@@ -119,9 +121,9 @@ func TestSandboxUpdate(t *testing.T) {
 		Labels: map[string]string{
 			"lbl1": "new",
 		},
-		Extensions: map[string]types.Any{
-			"ext1": {TypeUrl: "url1", Value: []byte{1, 2}},
-			"ext2": {TypeUrl: "url2", Value: []byte{4, 5, 6}},
+		Extensions: map[string]typeurl.Any{
+			"ext1": &types.Any{TypeUrl: "url1", Value: []byte{1, 2}},
+			"ext2": &types.Any{TypeUrl: "url2", Value: []byte{4, 5, 6}},
 		},
 		Runtime: api.RuntimeOpts{Name: "test"},
 	}
@@ -154,14 +156,14 @@ func TestSandboxList(t *testing.T) {
 			ID:         "1",
 			Labels:     map[string]string{"test": "1"},
 			Spec:       &types.Any{TypeUrl: "1", Value: []byte{1, 2, 3}},
-			Extensions: map[string]types.Any{"ext": {}},
+			Extensions: map[string]typeurl.Any{"ext": &types.Any{}},
 			Runtime:    api.RuntimeOpts{Name: "test"},
 		},
 		{
 			ID:     "2",
 			Labels: map[string]string{"test": "2"},
 			Spec:   &types.Any{TypeUrl: "2", Value: []byte{3, 2, 1}},
-			Extensions: map[string]types.Any{"ext": {
+			Extensions: map[string]typeurl.Any{"ext": &types.Any{
 				TypeUrl: "test",
 				Value:   []byte{9},
 			}},
@@ -201,14 +203,14 @@ func TestSandboxListWithFilter(t *testing.T) {
 			ID:         "1",
 			Labels:     map[string]string{"test": "1"},
 			Spec:       &types.Any{TypeUrl: "1", Value: []byte{1, 2, 3}},
-			Extensions: map[string]types.Any{"ext": {}},
+			Extensions: map[string]typeurl.Any{"ext": &types.Any{}},
 			Runtime:    api.RuntimeOpts{Name: "test"},
 		},
 		{
 			ID:     "2",
 			Labels: map[string]string{"test": "2"},
 			Spec:   &types.Any{TypeUrl: "2", Value: []byte{3, 2, 1}},
-			Extensions: map[string]types.Any{"ext": {
+			Extensions: map[string]typeurl.Any{"ext": &types.Any{
 				TypeUrl: "test",
 				Value:   []byte{9},
 			}},
@@ -284,7 +286,7 @@ func assertEqualInstances(t *testing.T, x, y api.Sandbox) {
 		t.Fatalf("runtime names are not equal: %q != %q", x.Runtime.Name, y.Runtime.Name)
 	}
 
-	if !reflect.DeepEqual(x.Runtime.Options, y.Runtime.Options) {
+	if !reflect.DeepEqual(protobuf.FromAny(x.Runtime.Options), protobuf.FromAny(y.Runtime.Options)) {
 		t.Fatalf("runtime options are not equal: %+v != %+v", x.Runtime.Options, y.Runtime.Options)
 	}
 }

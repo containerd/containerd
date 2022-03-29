@@ -18,38 +18,51 @@ package sandbox
 
 import (
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/typeurl"
+	gogo_types "github.com/gogo/protobuf/types"
 )
 
 // ToProto will map Sandbox struct to it's protobuf definition
-func ToProto(s *Sandbox) types.Sandbox {
+func ToProto(sandbox *Sandbox) types.Sandbox {
+	extensions := make(map[string]gogo_types.Any)
+	for k, v := range sandbox.Extensions {
+		extensions[k] = *protobuf.FromAny(v)
+	}
 	return types.Sandbox{
-		SandboxID: s.ID,
+		SandboxID: sandbox.ID,
 		Runtime: types.Sandbox_Runtime{
-			Name:    s.Runtime.Name,
-			Options: s.Runtime.Options,
+			Name:    sandbox.Runtime.Name,
+			Options: protobuf.FromAny(sandbox.Runtime.Options),
 		},
-		Labels:     s.Labels,
-		CreatedAt:  s.CreatedAt,
-		UpdatedAt:  s.UpdatedAt,
-		Extensions: s.Extensions,
-		Spec:       s.Spec,
+		Labels:     sandbox.Labels,
+		CreatedAt:  sandbox.CreatedAt,
+		UpdatedAt:  sandbox.UpdatedAt,
+		Extensions: extensions,
+		Spec:       protobuf.FromAny(sandbox.Spec),
 	}
 }
 
 // FromProto map protobuf sandbox definition to Sandbox struct
-func FromProto(p *types.Sandbox) Sandbox {
+func FromProto(sandboxpb *types.Sandbox) Sandbox {
 	runtime := RuntimeOpts{
-		Name:    p.Runtime.Name,
-		Options: p.Runtime.Options,
+		Name:    sandboxpb.Runtime.Name,
+		Options: sandboxpb.Runtime.Options,
+	}
+
+	extensions := make(map[string]typeurl.Any)
+	for k, v := range sandboxpb.Extensions {
+		v := v
+		extensions[k] = &v
 	}
 
 	return Sandbox{
-		ID:         p.SandboxID,
-		Labels:     p.Labels,
+		ID:         sandboxpb.SandboxID,
+		Labels:     sandboxpb.Labels,
 		Runtime:    runtime,
-		Spec:       p.Spec,
-		CreatedAt:  p.CreatedAt,
-		UpdatedAt:  p.UpdatedAt,
-		Extensions: p.Extensions,
+		Spec:       sandboxpb.Spec,
+		CreatedAt:  sandboxpb.CreatedAt,
+		UpdatedAt:  sandboxpb.UpdatedAt,
+		Extensions: extensions,
 	}
 }

@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/namespaces"
 	api "github.com/containerd/containerd/sandbox"
-	"github.com/gogo/protobuf/types"
+	"github.com/containerd/typeurl"
 	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
 )
@@ -114,7 +114,7 @@ func (s *sandboxStore) Update(ctx context.Context, sandbox api.Sandbox, fieldpat
 				continue
 			} else if strings.HasPrefix(path, "extensions.") {
 				if updated.Extensions == nil {
-					updated.Extensions = map[string]types.Any{}
+					updated.Extensions = map[string]typeurl.Any{}
 				}
 
 				key := strings.TrimPrefix(path, "extensions.")

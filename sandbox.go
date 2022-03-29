@@ -217,7 +217,7 @@ func WithSandboxSpec(s *oci.Spec, opts ...oci.SpecOpts) NewSandboxOpts {
 func WithSandboxExtension(name string, ext interface{}) NewSandboxOpts {
 	return func(ctx context.Context, client *Client, s *api.Sandbox) error {
 		if s.Extensions == nil {
-			s.Extensions = make(map[string]types.Any)
+			s.Extensions = make(map[string]typeurl.Any)
 		}
 
 		any, err := typeurl.MarshalAny(ext)
@@ -225,7 +225,7 @@ func WithSandboxExtension(name string, ext interface{}) NewSandboxOpts {
 			return errors.Wrap(err, "failed to marshal sandbox extension")
 		}
 
-		s.Extensions[name] = *any
+		s.Extensions[name] = any
 		return err
 	}
 }

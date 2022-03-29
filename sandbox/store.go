@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/gogo/protobuf/types"
+	"github.com/containerd/typeurl"
 )
 
 // Sandbox is an object stored in metadata database
@@ -32,19 +32,19 @@ type Sandbox struct {
 	// Runtime shim to use for this sandbox
 	Runtime RuntimeOpts
 	// Spec carries the runtime specification used to implement the sandbox
-	Spec *types.Any
+	Spec typeurl.Any
 	// CreatedAt is the time at which the sandbox was created
 	CreatedAt time.Time
 	// UpdatedAt is the time at which the sandbox was updated
 	UpdatedAt time.Time
 	// Extensions stores client-specified metadata
-	Extensions map[string]types.Any
+	Extensions map[string]typeurl.Any
 }
 
 // RuntimeOpts holds runtime specific information
 type RuntimeOpts struct {
 	Name    string
-	Options *types.Any
+	Options typeurl.Any
 }
 
 // Store is a storage interface for sandbox metadata objects
