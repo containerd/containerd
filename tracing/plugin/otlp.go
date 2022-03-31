@@ -25,6 +25,8 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/tracing"
+	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -59,6 +61,9 @@ func init() {
 			return newTracer(ic)
 		},
 	})
+
+	// Register logging hook for tracing
+	logrus.StandardLogger().AddHook(tracing.NewLogrusHook())
 }
 
 // OTLPConfig holds the configurations for the built-in otlp span processor
