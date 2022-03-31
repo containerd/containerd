@@ -1,7 +1,7 @@
 # Getting started with containerd
 
 There are many different ways to use containerd.
-If you are a developer working on containerd you can use the `ctr` tool to quickly test features and functionality without writing extra code.
+If you are a developer working on containerd you can use the [ctr CLI utility](cli.md) to quickly test features and functionality without writing extra code.
 However, if you want to integrate containerd into your project we have an easy to use client package that allows you to work with containerd.
 
 In this guide we will pull and run a redis server with containerd using the client package.
