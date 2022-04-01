@@ -135,9 +135,7 @@ func TestDetectPigz(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	oldPath := os.Getenv("PATH")
-	os.Setenv("PATH", tempPath)
-	defer os.Setenv("PATH", oldPath)
+	t.Setenv("PATH", tempPath)
 
 	if pigzPath := detectPigz(); pigzPath == "" {
 		t.Fatal("failed to detect pigz path")
@@ -145,8 +143,7 @@ func TestDetectPigz(t *testing.T) {
 		t.Fatalf("wrong pigz found: %s != %s", pigzPath, fullPath)
 	}
 
-	os.Setenv(disablePigzEnv, "1")
-	defer os.Unsetenv(disablePigzEnv)
+	t.Setenv(disablePigzEnv, "1")
 
 	if pigzPath := detectPigz(); pigzPath != "" {
 		t.Fatalf("disable via %s doesn't work", disablePigzEnv)
