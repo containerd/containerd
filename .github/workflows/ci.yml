@@ -464,17 +464,20 @@ jobs:
           path: |
             *-junit.xml
 
-  cgroup2:
-    name: CGroupsV2 - SELinux enforced
+  vagrant:
+    name: Vagrant
     # nested virtualization is only available on macOS hosts
     runs-on: macos-10.15
     timeout-minutes: 45
     needs: [project, linters, protos, man]
     strategy:
+      fail-fast: false
       matrix:
         # Currently crun is disabled to decrease CI flakiness.
         # We can enable crun again when we get a better CI infra.
         runc: [runc]
+        # Fedora is for testing cgroup v2 functionality, Rocky Linux is for testing on an enterprise-grade environment
+        box: ["fedora/35-cloud-base", "rockylinux/8"]
     env:
       GOTEST: gotestsum --
     steps:
@@ -487,7 +490,13 @@ jobs:
           key: vagrant-${{ hashFiles('Vagrantfile*') }}
 
       - name: Vagrant start
+        env:
+          BOX: ${{ matrix.box }}
         run: |
+          if [ "$BOX" = "rockylinux/8" ]; then
+            # The latest version 5.0.0 seems 404 (as of March 30, 2022)
+            export BOX_VERSION="4.0.0"
+          fi
           # Retry if it fails (download.fedoraproject.org returns 404 sometimes)
           vagrant up || vagrant up
 
@@ -520,7 +529,8 @@ jobs:
       - uses: actions/upload-artifact@v2
         if: always()
         with:
-          name:  TestResults cgroup2 ${{ matrix.runtime }} ${{matrix.runc}}
+          # ${{ matrix.box }} cannot be used here due to character limitation
+          name:  TestResults vagrant ${{ github.run_id }} ${{ matrix.runtime }} ${{matrix.runc}}
           path: |
             ${{github.workspace}}/*-junit.xml
             ${{github.workspace}}/critestreport/*
