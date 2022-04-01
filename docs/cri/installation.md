@@ -1,3 +1,14 @@
+This documentation was merged into [`../getting-started.md`](../getting-started.md).
+Please update your bookmark.
+
+
+- - -
+<!-- TODO: remove in containerd 2.0 -->
+<details>
+<summary>Show the original content (<strong>DEPRECATED</strong>)</summary>
+
+<p>
+
 # Install Containerd with Release Tarball
 This document provides the steps to install `containerd` and its dependencies with the release tarball, and bring up a Kubernetes cluster using kubeadm.
 
@@ -130,3 +141,6 @@ systemctl daemon-reload
 Now you should have properly installed all required binaries and dependencies on each of your node.
 
 The next step is to use kubeadm to bring up the Kubernetes cluster. It is the same with [the ansible installer](../../contrib/ansible). Please follow the steps 2-4 [here](../../contrib/ansible/README.md#step-2).
+
+</p>
+</details>
