@@ -18,7 +18,6 @@ package namespaces
 
 import (
 	"context"
-	"os"
 	"testing"
 )
 
@@ -47,9 +46,6 @@ func TestContext(t *testing.T) {
 }
 
 func TestNamespaceFromEnv(t *testing.T) {
-	oldenv := os.Getenv(NamespaceEnvVar)
-	defer os.Setenv(NamespaceEnvVar, oldenv) // restore old env var
-
 	ctx := context.Background()
 	namespace, ok := Namespace(ctx)
 	if ok {
@@ -61,7 +57,7 @@ func TestNamespaceFromEnv(t *testing.T) {
 	}
 
 	expected := "test-namespace"
-	os.Setenv(NamespaceEnvVar, expected)
+	t.Setenv(NamespaceEnvVar, expected)
 	nctx := NamespaceFromEnv(ctx)
 
 	namespace, ok = Namespace(nctx)
