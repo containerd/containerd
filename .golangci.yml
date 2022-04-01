@@ -12,6 +12,8 @@ linters:
     - unused
     - misspell
     - gosec
+    - exportloopref # Checks for pointers to enclosing loop variables
+    - tenv # Detects using os.Setenv instead of t.Setenv since Go 1.17
   disable:
     - errcheck
 
@@ -38,6 +40,10 @@ run:
   timeout: 8m
   skip-dirs:
     - api
+    - cluster
     - design
     - docs
     - docs/man
+    - releases
+    - reports
+    - test # e2e scripts
