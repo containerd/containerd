@@ -217,10 +217,12 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		return nil, fmt.Errorf("failed to update container %q state: %w", id, err)
 	}
 
-	containerDir := c.getContainerRootDir(container.ID())
-	_, err = containerstore.LoadStatus(containerDir, cntr.ID)
-	if err != nil {
-		return nil, err
+	if exitedContainer {
+		containerDir := c.getContainerRootDir(container.ID())
+		_, err = containerstore.LoadStatus(containerDir, cntr.ID)
+		if err != nil {
+			return nil, err
+		}
 	}
 	// It handles the TaskExit event and update container state after this.
 	c.eventMonitor.startContainerExitMonitor(context.Background(), id, task.Pid(), exitCh)
