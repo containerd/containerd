@@ -32,9 +32,9 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/pkg/testutil"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"gotest.tools/v3/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -271,7 +271,7 @@ func checkResumeWriter(ctx context.Context, t *testing.T, cs content.Store) {
 	}
 
 	checkStatus(t, w1, expected, dgstFirst, preStart, postStart, preUpdate, postUpdate)
-	assert.NilError(t, w1.Close(), "close first writer")
+	assert.Nil(t, w1.Close(), "close first writer")
 
 	w2, err := cs.Writer(ctx, content.WithRef(ref), content.WithDescriptor(ocispec.Descriptor{Size: 256, Digest: dgst}))
 	if err != nil {
@@ -295,7 +295,7 @@ func checkResumeWriter(ctx context.Context, t *testing.T, cs content.Store) {
 	}
 	postCommit := time.Now()
 
-	assert.NilError(t, w2.Close(), "close second writer")
+	assert.Nil(t, w2.Close(), "close second writer")
 	info := content.Info{
 		Digest: dgst,
 		Size:   256,

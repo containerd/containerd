@@ -27,7 +27,7 @@ import (
 	"net/url"
 	"testing"
 
-	"gotest.tools/v3/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFetcherOpen(t *testing.T) {

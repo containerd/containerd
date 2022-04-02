@@ -34,9 +34,9 @@ import (
 	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/types"
 	"github.com/google/go-cmp/cmp"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/stretchr/testify/assert"
 	bolt "go.etcd.io/bbolt"
-	"gotest.tools/v3/assert"
 )
 
 func init() {
@@ -724,7 +724,8 @@ func checkContainersEqual(t *testing.T, a, b *containers.Container, format strin
 			return true
 		}),
 	)
-	assert.DeepEqual(t, a, b, opt)
+
+	assert.True(t, cmp.Equal(a, b, opt))
 }
 
 func testEnv(t *testing.T) (context.Context, *bolt.DB, func()) {
