@@ -320,7 +320,7 @@ github.com/modern-go/reflect2
 ## explicit; go 1.13
 github.com/opencontainers/go-digest
 github.com/opencontainers/go-digest/digestset
-# github.com/opencontainers/image-spec v1.0.2 => github.com/opencontainers/image-spec v1.0.2-0.20211117181255-693428a734f5
+# github.com/opencontainers/image-spec v1.0.3-0.20211202183452-c5a74bcca799
 ## explicit
 github.com/opencontainers/image-spec/identity
 github.com/opencontainers/image-spec/specs-go
@@ -748,6 +748,5 @@ sigs.k8s.io/structured-merge-diff/v4/value
 ## explicit; go 1.12
 sigs.k8s.io/yaml
 # github.com/gogo/googleapis => github.com/gogo/googleapis v1.3.2
-# github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.2-0.20211117181255-693428a734f5
 # github.com/urfave/cli => github.com/urfave/cli v1.22.1
 # google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200224152610-e50cd9704f63
