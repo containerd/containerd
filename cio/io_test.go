@@ -32,9 +32,7 @@ import (
 	"testing"
 
 	"github.com/containerd/fifo"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	"gotest.tools/v3/assert"
-	is "gotest.tools/v3/assert/cmp"
+	"github.com/stretchr/testify/assert"
 )
 
 func assertHasPrefix(t *testing.T, s, prefix string) {
@@ -52,7 +50,7 @@ func TestNewFIFOSetInDir(t *testing.T) {
 	root := t.TempDir()
 
 	fifos, err := NewFIFOSetInDir(root, "theid", true)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	dir := filepath.Dir(fifos.Stdin)
 	assertHasPrefix(t, dir, root)
@@ -64,19 +62,18 @@ func TestNewFIFOSetInDir(t *testing.T) {
 			Terminal: true,
 		},
 	}
-	assert.Assert(t, is.DeepEqual(fifos, expected, cmpFIFOSet))
+
+	assert.Equal(t, fifos.Config, expected.Config)
 
 	files, err := os.ReadDir(root)
-	assert.NilError(t, err)
-	assert.Check(t, is.Len(files, 1))
+	assert.NoError(t, err)
+	assert.Len(t, files, 1)
 
-	assert.NilError(t, fifos.Close())
+	assert.Nil(t, fifos.Close())
 	files, err = os.ReadDir(root)
-	assert.NilError(t, err)
-	assert.Check(t, is.Len(files, 0))
+	assert.NoError(t, err)
+	assert.Len(t, files, 0)
 }
-
-var cmpFIFOSet = cmpopts.IgnoreUnexported(FIFOSet{})
 
 func TestNewAttach(t *testing.T) {
 	if runtime.GOOS == "windows" {
@@ -97,25 +94,25 @@ func TestNewAttach(t *testing.T) {
 	attacher := NewAttach(withBytesBuffers)
 
 	fifos, err := NewFIFOSetInDir("", "theid", false)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	attachedFifos, err := attacher(fifos)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 	defer attachedFifos.Close()
 
 	producers := setupFIFOProducers(t, attachedFifos.Config())
 	initProducers(t, producers, expectedStdout, expectedStderr)
 
 	actualStdin, err := io.ReadAll(producers.Stdin)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	attachedFifos.Wait()
 	attachedFifos.Cancel()
-	assert.NilError(t, attachedFifos.Close())
+	assert.Nil(t, attachedFifos.Close())
 
-	assert.Check(t, is.Equal(expectedStdout, stdout.String()))
-	assert.Check(t, is.Equal(expectedStderr, stderr.String()))
-	assert.Check(t, is.Equal(expectedStdin, string(actualStdin)))
+	assert.Equal(t, expectedStdout, stdout.String())
+	assert.Equal(t, expectedStderr, stderr.String())
+	assert.Equal(t, expectedStdin, string(actualStdin))
 }
 
 type producers struct {
@@ -132,41 +129,41 @@ func setupFIFOProducers(t *testing.T, fifos Config) producers {
 	)
 
 	pipes.Stdin, err = fifo.OpenFifo(ctx, fifos.Stdin, syscall.O_RDONLY, 0)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	pipes.Stdout, err = fifo.OpenFifo(ctx, fifos.Stdout, syscall.O_WRONLY, 0)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	pipes.Stderr, err = fifo.OpenFifo(ctx, fifos.Stderr, syscall.O_WRONLY, 0)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	return pipes
 }
 
 func initProducers(t *testing.T, producers producers, stdout, stderr string) {
 	_, err := producers.Stdout.Write([]byte(stdout))
-	assert.NilError(t, err)
-	assert.NilError(t, producers.Stdout.Close())
+	assert.NoError(t, err)
+	assert.Nil(t, producers.Stdout.Close())
 
 	_, err = producers.Stderr.Write([]byte(stderr))
-	assert.NilError(t, err)
-	assert.NilError(t, producers.Stderr.Close())
+	assert.NoError(t, err)
+	assert.Nil(t, producers.Stderr.Close())
 }
 
 func TestBinaryIOArgs(t *testing.T) {
 	res, err := BinaryIO("/file.bin", map[string]string{"id": "1"})("")
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "binary:///file.bin?id=1", res.Config().Stdout)
 	assert.Equal(t, "binary:///file.bin?id=1", res.Config().Stderr)
 }
 
 func TestBinaryIOAbsolutePath(t *testing.T) {
 	res, err := BinaryIO("/full/path/bin", nil)("!")
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	// Test parse back
 	parsed, err := url.Parse(res.Config().Stdout)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "binary", parsed.Scheme)
 	assert.Equal(t, "/full/path/bin", parsed.Path)
 }
@@ -178,13 +175,13 @@ func TestBinaryIOFailOnRelativePath(t *testing.T) {
 
 func TestLogFileAbsolutePath(t *testing.T) {
 	res, err := LogFile("/full/path/file.txt")("!")
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "file:///full/path/file.txt", res.Config().Stdout)
 	assert.Equal(t, "file:///full/path/file.txt", res.Config().Stderr)
 
 	// Test parse back
 	parsed, err := url.Parse(res.Config().Stdout)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "file", parsed.Scheme)
 	assert.Equal(t, "/full/path/file.txt", parsed.Path)
 }

@@ -39,7 +39,7 @@ import (
 
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"gotest.tools/v3/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 type memoryLabelStore struct {
@@ -351,7 +351,7 @@ func checkWrite(ctx context.Context, t checker, cs content.Store, dgst digest.Di
 
 func TestWriterTruncateRecoversFromIncompleteWrite(t *testing.T) {
 	cs, err := NewStore(t.TempDir())
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -362,26 +362,26 @@ func TestWriterTruncateRecoversFromIncompleteWrite(t *testing.T) {
 	setupIncompleteWrite(ctx, t, cs, ref, total)
 
 	writer, err := cs.Writer(ctx, content.WithRef(ref), content.WithDescriptor(ocispec.Descriptor{Size: total}))
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
-	assert.NilError(t, writer.Truncate(0))
+	assert.Nil(t, writer.Truncate(0))
 
 	_, err = writer.Write(contentB)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	dgst := digest.FromBytes(contentB)
 	err = writer.Commit(ctx, total, dgst)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 }
 
 func setupIncompleteWrite(ctx context.Context, t *testing.T, cs content.Store, ref string, total int64) {
 	writer, err := cs.Writer(ctx, content.WithRef(ref), content.WithDescriptor(ocispec.Descriptor{Size: total}))
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	_, err = writer.Write([]byte("bad data"))
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
-	assert.NilError(t, writer.Close())
+	assert.Nil(t, writer.Close())
 }
 
 func TestWriteReadEmptyFileTimestamp(t *testing.T) {
