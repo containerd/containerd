@@ -46,6 +46,10 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find container %q: %w", r.GetContainerId(), err)
 	}
+	var exitedContainer bool
+	if cntr.Status.Get().State() == runtime.ContainerState_CONTAINER_EXITED {
+		exitedContainer = true
+	}
 
 	info, err := cntr.Container.Info(ctx)
 	if err != nil {
@@ -112,6 +116,32 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		return cntr.IO, nil
 	}
 
+	exitedIOCreation := func(id string) (_ containerdio.IO, err error) {
+		stdoutWC, stderrWC, err := c.createContainerLoggers(meta.LogPath, meta.Config.GetTty())
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			if err != nil {
+				if stdoutWC != nil {
+					stdoutWC.Close()
+				}
+				if stderrWC != nil {
+					stderrWC.Close()
+				}
+			}
+		}()
+		volatileContainerRootDir := c.getVolatileContainerRootDir(id)
+		containerIO, err := cio.NewContainerIO(id,
+			cio.WithNewFIFOs(volatileContainerRootDir, config.GetTty(), config.GetStdin()))
+		if err != nil {
+			return nil, err
+		}
+		containerIO.AddOutput("log", stdoutWC, stderrWC)
+		containerIO.Pipe()
+		return containerIO, nil
+	}
+
 	ctrInfo, err := container.Info(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container info: %w", err)
@@ -126,9 +156,18 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	if ociRuntime.Path != "" {
 		taskOpts = append(taskOpts, containerd.WithRuntimePath(ociRuntime.Path))
 	}
-	task, err := container.NewTask(ctx, ioCreation, taskOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create containerd task: %w", err)
+
+	var task containerd.Task
+	if exitedContainer {
+		task, err = container.NewTask(ctx, exitedIOCreation, taskOpts...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create containerd task: %w", err)
+		}
+	} else {
+		task, err = container.NewTask(ctx, ioCreation, taskOpts...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create containerd task: %w", err)
+		}
 	}
 	defer func() {
 		if retErr != nil {
@@ -169,11 +208,20 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	if err := cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
 		status.Pid = task.Pid()
 		status.StartedAt = time.Now().UnixNano()
+		if exitedContainer {
+			status.ExitCode = 0
+			status.FinishedAt = 0
+		}
 		return status, nil
 	}); err != nil {
 		return nil, fmt.Errorf("failed to update container %q state: %w", id, err)
 	}
 
+	containerDir := c.getContainerRootDir(container.ID())
+	_, err = containerstore.LoadStatus(containerDir, cntr.ID)
+	if err != nil {
+		return nil, err
+	}
 	// It handles the TaskExit event and update container state after this.
 	c.eventMonitor.startContainerExitMonitor(context.Background(), id, task.Pid(), exitCh)
 
@@ -187,7 +235,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 func setContainerStarting(container containerstore.Container) error {
 	return container.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
 		// Return error if container is not in created state.
-		if status.State() != runtime.ContainerState_CONTAINER_CREATED {
+		if status.State() != runtime.ContainerState_CONTAINER_CREATED && status.State() != runtime.ContainerState_CONTAINER_EXITED {
 			return status, fmt.Errorf("container is in %s state", criContainerStateToString(status.State()))
 		}
 		// Do not start the container when there is a removal in progress.
