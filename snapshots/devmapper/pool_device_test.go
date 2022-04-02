@@ -32,8 +32,8 @@ import (
 	"github.com/containerd/containerd/snapshots/devmapper/dmsetup"
 	"github.com/docker/go-units"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	exec "golang.org/x/sys/execabs"
-	"gotest.tools/v3/assert"
 )
 
 const (
@@ -68,12 +68,12 @@ func TestPoolDevice(t *testing.T) {
 
 	poolName := fmt.Sprintf("test-pool-device-%d", time.Now().Nanosecond())
 	err := dmsetup.CreatePool(poolName, loopDataDevice, loopMetaDevice, 64*1024/dmsetup.SectorSize)
-	assert.NilError(t, err, "failed to create pool %q", poolName)
+	assert.Nil(t, err, "failed to create pool %q", poolName)
 
 	defer func() {
 		// Detach loop devices and remove images
 		err := mount.DetachLoopDevice(loopDataDevice, loopMetaDevice)
-		assert.NilError(t, err)
+		assert.NoError(t, err)
 	}()
 
 	config := &Config{
@@ -85,12 +85,12 @@ func TestPoolDevice(t *testing.T) {
 	}
 
 	pool, err := NewPoolDevice(ctx, config)
-	assert.NilError(t, err, "can't create device pool")
-	assert.Assert(t, pool != nil)
+	assert.Nil(t, err, "can't create device pool")
+	assert.True(t, pool != nil)
 
 	defer func() {
 		err := pool.RemovePool(ctx)
-		assert.NilError(t, err, "can't close device pool")
+		assert.Nil(t, err, "can't close device pool")
 	}()
 
 	// Create thin devices
@@ -108,7 +108,7 @@ func TestPoolDevice(t *testing.T) {
 		// Write v1 test file on 'thin-1' device
 		thin1TestFilePath := filepath.Join(thin1MountPath, "TEST")
 		err := os.WriteFile(thin1TestFilePath, []byte("test file (v1)"), 0700)
-		assert.NilError(t, err, "failed to write test file v1 on '%s' volume", thinDevice1)
+		assert.Nil(t, err, "failed to write test file v1 on '%s' volume", thinDevice1)
 
 		return nil
 	})
@@ -122,24 +122,24 @@ func TestPoolDevice(t *testing.T) {
 	err = mount.WithTempMount(ctx, getMounts(thinDevice1), func(thin1MountPath string) error {
 		thin1TestFilePath := filepath.Join(thin1MountPath, "TEST")
 		err = os.WriteFile(thin1TestFilePath, []byte("test file (v2)"), 0700)
-		assert.NilError(t, err, "failed to write test file v2 on 'thin-1' volume after taking snapshot")
+		assert.Nil(t, err, "failed to write test file v2 on 'thin-1' volume after taking snapshot")
 
 		return nil
 	})
 
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	// Mount 'snap-1' and make sure TEST file is v1
 	err = mount.WithTempMount(ctx, getMounts(snapDevice1), func(snap1MountPath string) error {
 		// Read test file from snapshot device and make sure it's v1
 		fileData, err := os.ReadFile(filepath.Join(snap1MountPath, "TEST"))
-		assert.NilError(t, err, "couldn't read test file from '%s' device", snapDevice1)
+		assert.Nil(t, err, "couldn't read test file from '%s' device", snapDevice1)
 		assert.Equal(t, "test file (v1)", string(fileData), "test file content is invalid on snapshot")
 
 		return nil
 	})
 
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	t.Run("DeactivateDevice", func(t *testing.T) {
 		testDeactivateThinDevice(t, pool)
@@ -157,17 +157,17 @@ func TestPoolDevice(t *testing.T) {
 		snapDevice := "snap2"
 
 		err := pool.CreateSnapshotDevice(ctx, thinDevice1, snapDevice, device1Size)
-		assert.NilError(t, err)
+		assert.NoError(t, err)
 
 		info, err := pool.metadata.GetDevice(ctx, snapDevice)
-		assert.NilError(t, err)
+		assert.NoError(t, err)
 
 		// Simulate a case that the device cannot be activated.
 		err = pool.DeactivateDevice(ctx, info.Name, false, false)
-		assert.NilError(t, err)
+		assert.NoError(t, err)
 
 		err = pool.rollbackActivate(ctx, info, err)
-		assert.NilError(t, err)
+		assert.NoError(t, err)
 	})
 }
 
@@ -176,16 +176,16 @@ func TestPoolDeviceMarkFaulty(t *testing.T) {
 	defer cleanupStore(t, store)
 
 	err := store.AddDevice(testCtx, &DeviceInfo{Name: "1", State: Unknown})
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	// Note: do not use 'Activated' here because pool.ensureDeviceStates() will
 	// try to activate the real dm device, which will fail on a faked device.
 	err = store.AddDevice(testCtx, &DeviceInfo{Name: "2", State: Deactivated})
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	pool := &PoolDevice{metadata: store}
 	err = pool.ensureDeviceStates(testCtx)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	called := 0
 	err = pool.metadata.WalkDevices(testCtx, func(info *DeviceInfo) error {
@@ -204,7 +204,7 @@ func TestPoolDeviceMarkFaulty(t *testing.T) {
 
 		return nil
 	})
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, 2, called)
 }
 
@@ -212,24 +212,24 @@ func testCreateThinDevice(t *testing.T, pool *PoolDevice) {
 	ctx := context.Background()
 
 	err := pool.CreateThinDevice(ctx, thinDevice1, device1Size)
-	assert.NilError(t, err, "can't create first thin device")
+	assert.Nil(t, err, "can't create first thin device")
 
 	err = pool.CreateThinDevice(ctx, thinDevice1, device1Size)
-	assert.Assert(t, err != nil, "device pool allows duplicated device names")
+	assert.True(t, err != nil, "device pool allows duplicated device names")
 
 	err = pool.CreateThinDevice(ctx, thinDevice2, device2Size)
-	assert.NilError(t, err, "can't create second thin device")
+	assert.Nil(t, err, "can't create second thin device")
 
 	deviceInfo1, err := pool.metadata.GetDevice(ctx, thinDevice1)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	deviceInfo2, err := pool.metadata.GetDevice(ctx, thinDevice2)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
-	assert.Assert(t, deviceInfo1.DeviceID != deviceInfo2.DeviceID, "assigned device ids should be different")
+	assert.True(t, deviceInfo1.DeviceID != deviceInfo2.DeviceID, "assigned device ids should be different")
 
 	usage, err := pool.GetUsage(thinDevice1)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, usage, int64(0))
 }
 
@@ -242,16 +242,16 @@ func testMakeFileSystem(t *testing.T, pool *PoolDevice) {
 	}
 
 	output, err := exec.Command("mkfs.ext4", args...).CombinedOutput()
-	assert.NilError(t, err, "failed to make filesystem on '%s': %s", thinDevice1, string(output))
+	assert.Nil(t, err, "failed to make filesystem on '%s': %s", thinDevice1, string(output))
 
 	usage, err := pool.GetUsage(thinDevice1)
-	assert.NilError(t, err)
-	assert.Assert(t, usage > 0)
+	assert.NoError(t, err)
+	assert.True(t, usage > 0)
 }
 
 func testCreateSnapshot(t *testing.T, pool *PoolDevice) {
 	err := pool.CreateSnapshotDevice(context.Background(), thinDevice1, snapDevice1, device1Size)
-	assert.NilError(t, err, "failed to create snapshot from '%s' volume", thinDevice1)
+	assert.Nil(t, err, "failed to create snapshot from '%s' volume", thinDevice1)
 }
 
 func testDeactivateThinDevice(t *testing.T, pool *PoolDevice) {
@@ -261,21 +261,21 @@ func testDeactivateThinDevice(t *testing.T, pool *PoolDevice) {
 	}
 
 	for _, deviceName := range deviceList {
-		assert.Assert(t, pool.IsActivated(deviceName))
+		assert.True(t, pool.IsActivated(deviceName))
 
 		err := pool.DeactivateDevice(context.Background(), deviceName, false, true)
-		assert.NilError(t, err, "failed to remove '%s'", deviceName)
+		assert.Nil(t, err, "failed to remove '%s'", deviceName)
 
-		assert.Assert(t, !pool.IsActivated(deviceName))
+		assert.False(t, pool.IsActivated(deviceName))
 	}
 }
 
 func testRemoveThinDevice(t *testing.T, pool *PoolDevice) {
 	err := pool.RemoveDevice(testCtx, thinDevice1)
-	assert.NilError(t, err, "should delete thin device from pool")
+	assert.Nil(t, err, "should delete thin device from pool")
 
 	err = pool.RemoveDevice(testCtx, thinDevice2)
-	assert.NilError(t, err, "should delete thin device from pool")
+	assert.Nil(t, err, "should delete thin device from pool")
 }
 
 func getMounts(thinDeviceName string) []mount.Mount {
@@ -289,21 +289,21 @@ func getMounts(thinDeviceName string) []mount.Mount {
 
 func createLoopbackDevice(t *testing.T, dir string) (string, string) {
 	file, err := os.CreateTemp(dir, testsPrefix)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	size, err := units.RAMInBytes("128Mb")
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	err = file.Truncate(size)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	err = file.Close()
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	imagePath := file.Name()
 
 	loopDevice, err := mount.AttachLoopDevice(imagePath)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	return imagePath, loopDevice
 }

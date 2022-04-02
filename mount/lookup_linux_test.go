@@ -27,14 +27,14 @@ import (
 	// so we use continuity/testutil instead.
 	"github.com/containerd/continuity/testutil"
 	"github.com/containerd/continuity/testutil/loopback"
+	"github.com/stretchr/testify/assert"
 	exec "golang.org/x/sys/execabs"
-	"gotest.tools/v3/assert"
 )
 
 func checkLookup(t *testing.T, fsType, mntPoint, dir string) {
 	t.Helper()
 	info, err := Lookup(dir)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, fsType, info.FSType)
 	assert.Equal(t, mntPoint, info.Mountpoint)
 }
@@ -61,7 +61,7 @@ func testLookup(t *testing.T, fsType string) {
 		testutil.Unmount(t, mnt)
 		loop.Close()
 	}()
-	assert.Check(t, strings.HasPrefix(loop.Device, "/dev/loop"))
+	assert.True(t, strings.HasPrefix(loop.Device, "/dev/loop"))
 	checkLookup(t, fsType, mnt, mnt)
 
 	newMnt := t.TempDir()
@@ -105,11 +105,11 @@ func TestLookupWithOverlay(t *testing.T) {
 
 	testdir := filepath.Join(overlay, "testdir")
 	err := os.Mkdir(testdir, 0777)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	testfile := filepath.Join(overlay, "testfile")
 	_, err = os.Create(testfile)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	checkLookup(t, "overlay", overlay, testdir)
 	checkLookup(t, "overlay", overlay, testfile)

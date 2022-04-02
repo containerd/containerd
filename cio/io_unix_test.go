@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gotest.tools/v3/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestOpenFifos(t *testing.T) {
@@ -53,7 +53,7 @@ func TestOpenFifos(t *testing.T) {
 	}
 	for _, scenario := range scenarios {
 		_, err := openFifos(context.Background(), scenario)
-		assert.Assert(t, err != nil, scenario)
+		assert.Error(t, err, scenario)
 	}
 }
 
