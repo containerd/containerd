@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/cri/streaming"
+	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/plugin"
 	cni "github.com/containerd/go-cni"
 	"github.com/sirupsen/logrus"
@@ -113,6 +114,10 @@ type criService struct {
 	// allCaps is the list of the capabilities.
 	// When nil, parsed from CapEff of /proc/self/status.
 	allCaps []string // nolint
+	// unpackDuplicationSuppressor is used to make sure that there is only
+	// one in-flight fetch request or unpack handler for a given descriptor's
+	// or chain ID.
+	unpackDuplicationSuppressor kmutex.KeyedLocker
 }
 
 // NewCRIService returns a new instance of CRIService
@@ -120,17 +125,18 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 	var err error
 	labels := label.NewStore()
 	c := &criService{
-		config:             config,
-		client:             client,
-		os:                 osinterface.RealOS{},
-		sandboxStore:       sandboxstore.NewStore(labels),
-		containerStore:     containerstore.NewStore(labels),
-		imageStore:         imagestore.NewStore(client),
-		snapshotStore:      snapshotstore.NewStore(),
-		sandboxNameIndex:   registrar.NewRegistrar(),
-		containerNameIndex: registrar.NewRegistrar(),
-		initialized:        atomic.NewBool(false),
-		netPlugin:          make(map[string]cni.CNI),
+		config:                      config,
+		client:                      client,
+		os:                          osinterface.RealOS{},
+		sandboxStore:                sandboxstore.NewStore(labels),
+		containerStore:              containerstore.NewStore(labels),
+		imageStore:                  imagestore.NewStore(client),
+		snapshotStore:               snapshotstore.NewStore(),
+		sandboxNameIndex:            registrar.NewRegistrar(),
+		containerNameIndex:          registrar.NewRegistrar(),
+		initialized:                 atomic.NewBool(false),
+		netPlugin:                   make(map[string]cni.CNI),
+		unpackDuplicationSuppressor: kmutex.New(),
 	}
 
 	if client.SnapshotService(c.config.ContainerdConfig.Snapshotter) == nil {

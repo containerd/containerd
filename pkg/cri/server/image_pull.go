@@ -121,6 +121,9 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		containerd.WithPullLabel(imageLabelKey, imageLabelValue),
 		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
 		containerd.WithImageHandler(imageHandler),
+		containerd.WithUnpackOpts([]containerd.UnpackOpt{
+			containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
+		}),
 	}
 
 	pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
