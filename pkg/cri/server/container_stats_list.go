@@ -67,26 +67,26 @@ func (c *criService) toCRIContainerStats(
 }
 
 func (c *criService) normalizeContainerStatsFilter(filter *runtime.ContainerStatsFilter) {
-	if cntr, err := c.containerStore.Get(filter.GetId()); err == nil {
+	if cntr, err := c.ContainerStore.Get(filter.GetId()); err == nil {
 		filter.Id = cntr.ID
 	}
-	if sb, err := c.sandboxStore.Get(filter.GetPodSandboxId()); err == nil {
+	if sb, err := c.SandboxStore.Get(filter.GetPodSandboxId()); err == nil {
 		filter.PodSandboxId = sb.ID
 	}
 }
 
 // buildTaskMetricsRequest constructs a tasks.MetricsRequest based on
-// the information in the stats request and the containerStore
+// the information in the stats request and the ContainerStore
 func (c *criService) buildTaskMetricsRequest(
 	r *runtime.ListContainerStatsRequest,
 ) (tasks.MetricsRequest, []containerstore.Container, error) {
 	var req tasks.MetricsRequest
 	if r.GetFilter() == nil {
-		return req, c.containerStore.List(), nil
+		return req, c.ContainerStore.List(), nil
 	}
 	c.normalizeContainerStatsFilter(r.GetFilter())
 	var containers []containerstore.Container
-	for _, cntr := range c.containerStore.List() {
+	for _, cntr := range c.ContainerStore.List() {
 		if r.GetFilter().GetId() != "" && cntr.ID != r.GetFilter().GetId() {
 			continue
 		}

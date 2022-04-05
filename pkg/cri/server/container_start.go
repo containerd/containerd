@@ -42,7 +42,7 @@ import (
 // StartContainer starts the container.
 func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContainerRequest) (retRes *runtime.StartContainerResponse, retErr error) {
 	start := time.Now()
-	cntr, err := c.containerStore.Get(r.GetContainerId())
+	cntr, err := c.ContainerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find container %q: %w", r.GetContainerId(), err)
 	}
@@ -82,7 +82,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	}()
 
 	// Get sandbox config from sandbox store.
-	sandbox, err := c.sandboxStore.Get(meta.SandboxID)
+	sandbox, err := c.SandboxStore.Get(meta.SandboxID)
 	if err != nil {
 		return nil, fmt.Errorf("sandbox %q not found: %w", meta.SandboxID, err)
 	}

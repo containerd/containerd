@@ -25,7 +25,7 @@ import (
 
 // Exec prepares a streaming endpoint to execute a command in the container, and returns the address.
 func (c *criService) Exec(ctx context.Context, r *runtime.ExecRequest) (*runtime.ExecResponse, error) {
-	cntr, err := c.containerStore.Get(r.GetContainerId())
+	cntr, err := c.ContainerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to find container %q in store: %w", r.GetContainerId(), err)
 	}

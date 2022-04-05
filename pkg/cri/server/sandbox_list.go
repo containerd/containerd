@@ -29,7 +29,7 @@ import (
 func (c *criService) ListPodSandbox(ctx context.Context, r *runtime.ListPodSandboxRequest) (*runtime.ListPodSandboxResponse, error) {
 	start := time.Now()
 	// List all sandboxes from store.
-	sandboxesInStore := c.sandboxStore.List()
+	sandboxesInStore := c.SandboxStore.List()
 	var sandboxes []*runtime.PodSandbox
 	for _, sandboxInStore := range sandboxesInStore {
 		sandboxes = append(sandboxes, toCRISandbox(
@@ -63,13 +63,13 @@ func toCRISandbox(meta sandboxstore.Metadata, status sandboxstore.Status) *runti
 }
 
 func (c *criService) normalizePodSandboxFilter(filter *runtime.PodSandboxFilter) {
-	if sb, err := c.sandboxStore.Get(filter.GetId()); err == nil {
+	if sb, err := c.SandboxStore.Get(filter.GetId()); err == nil {
 		filter.Id = sb.ID
 	}
 }
 
 func (c *criService) normalizePodSandboxStatsFilter(filter *runtime.PodSandboxStatsFilter) {
-	if sb, err := c.sandboxStore.Get(filter.GetId()); err == nil {
+	if sb, err := c.SandboxStore.Get(filter.GetId()); err == nil {
 		filter.Id = sb.ID
 	}
 }

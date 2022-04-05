@@ -28,7 +28,7 @@ func (c *criService) PodSandboxStats(
 	r *runtime.PodSandboxStatsRequest,
 ) (*runtime.PodSandboxStatsResponse, error) {
 
-	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
+	sandbox, err := c.SandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when trying to find sandbox %s: %w", r.GetPodSandboxId(), err)
 	}

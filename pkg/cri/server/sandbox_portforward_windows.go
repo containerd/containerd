@@ -44,7 +44,7 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 
 func (c *criService) execInSandbox(ctx context.Context, sandboxID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser) error {
 	// Get sandbox from our sandbox store.
-	sb, err := c.sandboxStore.Get(sandboxID)
+	sb, err := c.SandboxStore.Get(sandboxID)
 	if err != nil {
 		return fmt.Errorf("failed to find sandbox %q in store: %w", sandboxID, err)
 	}

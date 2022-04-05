@@ -275,14 +275,14 @@ func TestListContainers(t *testing.T) {
 
 	// Inject test sandbox metadata
 	for _, sb := range sandboxesInStore {
-		assert.NoError(t, c.sandboxStore.Add(sb))
+		assert.NoError(t, c.SandboxStore.Add(sb))
 	}
 
 	// Inject test container metadata
 	for _, cntr := range containersInStore {
 		container, err := cntr.toContainer()
 		assert.NoError(t, err)
-		assert.NoError(t, c.containerStore.Add(container))
+		assert.NoError(t, c.ContainerStore.Add(container))
 	}
 
 	for testdesc, testdata := range map[string]struct {

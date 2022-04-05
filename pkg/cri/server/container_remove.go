@@ -33,7 +33,7 @@ import (
 // RemoveContainer removes the container.
 func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveContainerRequest) (_ *runtime.RemoveContainerResponse, retErr error) {
 	start := time.Now()
-	container, err := c.containerStore.Get(r.GetContainerId())
+	container, err := c.ContainerStore.Get(r.GetContainerId())
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("an error occurred when try to find container %q: %w", r.GetContainerId(), err)
@@ -102,9 +102,9 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 			volatileContainerRootDir, err)
 	}
 
-	c.containerStore.Delete(id)
+	c.ContainerStore.Delete(id)
 
-	c.containerNameIndex.ReleaseByKey(id)
+	c.ContainerNameIndex.ReleaseByKey(id)
 
 	containerRemoveTimer.WithValues(i.Runtime.Name).UpdateSince(start)
 
