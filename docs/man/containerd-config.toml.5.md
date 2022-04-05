@@ -1,4 +1,4 @@
-# /etc/containerd/config.toml 5 08/08/2018
+# /etc/containerd/config.toml 5 04/05/2022
 
 ## NAME
 
@@ -87,15 +87,15 @@ The following plugins are enabled by default and their settings are shown below.
 Plugins that are not enabled by default will provide their own configuration values
 documentation.
 
-- **[plugins.cgroup]** has one option __no_prometheus__ (Default: **false**)
-- **[plugins.diff]** has one option __default__, a list by default set to **["walking"]**
+- **[plugins."io.containerd.monitor.v1.cgroups"]** has one option __no_prometheus__ (Default: **false**)
+- **[plugins."io.containerd.service.v1.diff-service"]** has one option __default__, a list by default set to **["walking"]**
 - **[plugins."io.containerd.gc.v1.scheduler"]** has several options that perform advanced tuning for the scheduler:
   - **pause_threshold** is the maximum amount of time GC should be scheduled (Default: **0.02**),
   - **deletion_threshold** guarantees GC is scheduled after n number of deletions (Default: **0** [not triggered]),
   - **mutation_threshold** guarantees GC is scheduled after n number of database mutations (Default: **100**),
   - **schedule_delay** defines the delay after trigger event before scheduling a GC (Default **"0ms"** [immediate]),
   - **startup_delay** defines the delay after startup before scheduling a GC (Default **"100ms"**)
-- **[plugins."io.containerd.runtime-shim.v2.shim"]** specifies options for configuring the runtime shim:
+- **[plugins."io.containerd.runtime.v2.task"]** specifies options for configuring the runtime shim:
   - **platforms** specifies the list of supported platforms
   - **sched_core** Core scheduling is a feature that allows only trusted tasks
     to run concurrently on cpus sharing compute resources (eg: hyperthreads on
@@ -152,6 +152,8 @@ the main config.
 The following is a complete **config.toml** default configuration example:
 
 ```
+version = 2
+
 root = "/var/lib/containerd"
 state = "/run/containerd"
 oom_score = 0
@@ -176,17 +178,17 @@ imports = ["/etc/containerd/runtime_*.toml", "./debug.toml"]
   path = ""
 
 [plugins]
-  [plugins.cgroups]
+  [[plugins."io.containerd.monitor.v1.cgroups"]
     no_prometheus = false
-  [plugins.diff]
+  [plugins."io.containerd.service.v1.diff-service"]
     default = ["walking"]
-  [plugins.scheduler]
+  [plugins."io.containerd.gc.v1.scheduler"]
     pause_threshold = 0.02
     deletion_threshold = 0
     mutation_threshold = 100
     schedule_delay = 0
     startup_delay = "100ms"
-  [plugins."io.containerd.runtime-shim.v2.shim"]
+  [plugins."io.containerd.runtime.v2.task"]
     platforms = ["linux/amd64"]
     sched_core = true
   [plugins."io.containerd.service.v1.tasks-service"]
