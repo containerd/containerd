@@ -105,7 +105,7 @@ The `containerd.io` package contains runc too, but does not contain CNI plugins.
 
 To install containerd and its dependencies from the source, see [`BUILDING.md`](/BUILDING.md).
 
-## Interacting containerd with CLI
+## Interacting with containerd via CLI
 
 There are several command line interface (CLI) projects for interacting with containerd:
 
