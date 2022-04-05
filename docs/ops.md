@@ -102,7 +102,7 @@ containerd itself does not actually have any persistent data that it needs to st
 │   └── ingest
 ├── io.containerd.metadata.v1.bolt
 │   └── meta.db
-├── io.containerd.runtime.v1.linux
+├── io.containerd.runtime.v2.task
 │   ├── default
 │   └── example
 ├── io.containerd.snapshotter.v1.btrfs
@@ -118,7 +118,7 @@ Sockets, pids, runtime state, mount points, and other plugin data that must not 
 /run/containerd
 ├── containerd.sock
 ├── debug.sock
-├── io.containerd.runtime.v1.linux
+├── io.containerd.runtime.v2.task
 │   └── default
 │       └── redis
 │           ├── config.json
@@ -197,23 +197,6 @@ In the config file you can specify plugin level options for the set of plugins t
 You will have to read the plugin specific docs to find the options that your plugin accepts.
 
 See [containerd's Plugin documentation](./PLUGINS.md)
-
-### Linux Runtime Plugin
-
-The linux runtime allows a few options to be set to configure the shim and the runtime that you are using.
-
-```toml
-[plugins.linux]
-	# shim binary name/path
-	shim = ""
-	# runtime binary name/path
-	runtime = "runc"
-	# do not use a shim when starting containers, saves on memory but
-	# live restore is not supported
-	no_shim = false
-	# display shim logs in the containerd daemon's log output
-	shim_debug = true
-```
 
 ### Bolt Metadata Plugin
 

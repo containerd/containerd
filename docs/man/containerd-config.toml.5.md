@@ -89,12 +89,6 @@ documentation.
 
 - **[plugins.cgroup]** has one option __no_prometheus__ (Default: **false**)
 - **[plugins.diff]** has one option __default__, a list by default set to **["walking"]**
-- **[plugins.linux]** has several options for configuring the runtime, shim, and related options:
-  - **shim** specifies the shim binary (Default: **"containerd-shim"**),
-  - **runtime** is the OCI compliant runtime binary (Default: **"runc"**),
-  - **runtime_root** is the root directory used by the runtime (Default: **""**),
-  - **no_shim** specifies whether to use a shim or not (Default: **false**),
-  - **shim_debug** turns on debugging for the shim (Default: **false**)
 - **[plugins."io.containerd.gc.v1.scheduler"]** has several options that perform advanced tuning for the scheduler:
   - **pause_threshold** is the maximum amount of time GC should be scheduled (Default: **0.02**),
   - **deletion_threshold** guarantees GC is scheduled after n number of deletions (Default: **0** [not triggered]),
@@ -186,12 +180,6 @@ imports = ["/etc/containerd/runtime_*.toml", "./debug.toml"]
     no_prometheus = false
   [plugins.diff]
     default = ["walking"]
-  [plugins.linux]
-    shim = "containerd-shim"
-    runtime = "runc"
-    runtime_root = ""
-    no_shim = false
-    shim_debug = false
   [plugins.scheduler]
     pause_threshold = 0.02
     deletion_threshold = 0
