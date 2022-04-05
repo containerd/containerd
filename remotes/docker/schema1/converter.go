@@ -436,7 +436,7 @@ func (c *Converter) schema1ManifestHistory() ([]ocispec.History, []digest.Digest
 	}
 
 	history := make([]ocispec.History, len(m.History))
-	diffIDs := []digest.Digest{}
+	diffIDs := make([]digest.Digest, 0, len(m.History))
 	for i := range m.History {
 		var h v1History
 		if err := json.Unmarshal([]byte(m.History[i].V1Compatibility), &h); err != nil {
