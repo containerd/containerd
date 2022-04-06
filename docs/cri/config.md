@@ -6,7 +6,104 @@ path: `/etc/containerd/config.toml`).
 See [here](https://github.com/containerd/containerd/blob/main/docs/ops.md)
 for more information about containerd config.
 
+Note that the `[plugins."io.containerd.grpc.v1.cri"]` section is specific to CRI,
+and not recognized by other containerd clients such as `ctr`, `nerdctl`, and Docker/Moby.
+
+## Basic configuration
+### Cgroup Driver
+While containerd and Kubernetes use the legacy `cgroupfs` driver for managing cgroups by default,
+it is recommended to use the `systemd` driver on systemd-based hosts for compliance of
+[the "single-writer" rule](https://systemd.io/CGROUP_DELEGATION/) of cgroups.
+
+To configure containerd to use the `systemd` driver, set the following option in `/etc/containerd/config.toml`:
+```toml
+version = 2
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+  SystemdCgroup = true
+```
+
+In addition to containerd, you have to configure the `KubeletConfiguration` to use the "systemd" cgroup driver.
+The `KubeletConfiguration` is typically located at `/var/lib/kubelet/config.yaml`:
+```yaml
+kind: KubeletConfiguration
+apiVersion: kubelet.config.k8s.io/v1beta1
+cgroupDriver: "systemd"
+```
+
+kubeadm users should also see [the kubeadm documentation](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/configure-cgroup-driver/).
+
+### Snapshotter
+
+The default snapshotter is set to `overlayfs` (akin to Docker's `overlay2` storage driver):
+```toml
+version = 2
+[plugins."io.containerd.grpc.v1.cri".containerd]
+  snapshotter = "overlayfs"
+```
+
+See [here](https://github.com/containerd/containerd/blob/main/docs/snapshotters) for other supported snapshotters.
+
+### Runtime classes
+
+The following example registers custom runtimes into containerd:
+```toml
+version = 2
+[plugins."io.containerd.grpc.v1.cri".containerd]
+  default_runtime_name = "crun"
+  [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
+    # crun: https://github.com/containers/crun
+    [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.crun]
+      runtime_type = "io.containerd.runc.v2"
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.crun.options]
+        BinaryName = "/usr/local/bin/crun"
+    # gVisor: https://gvisor.dev/
+    [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.gvisor]
+      runtime_type = "io.containerd.runsc.v1"
+    # Kata Containers: https://katacontainers.io/
+    [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.kata]
+      runtime_type = "io.containerd.kata.v2"
+```
+
+In addition, you have to install the following `RuntimeClass` resources into the cluster
+with the `cluster-admin` role:
+
+```yaml
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: crun
+handler: crun
+---
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: gvisor
+handler: gvisor
+---
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: kata
+handler: kata
+```
+
+To apply a runtime class to a pod, set `.spec.runtimeClassName`:
+
+```yaml
+apiVersion: v1
+kind: Pod
+spec:
+  runtimeClassName: crun
+```
+
+See also [the Kubernetes documentation](https://kubernetes.io/docs/concepts/containers/runtime-class/).
+
+## Full configuration
 The explanation and default value of each configuration item are as follows:
+<details>
+
+<p>
+
 ```toml
 # Use config version 2 to enable new configuration fields.
 # Config file is parsed as version 1 by default.
@@ -324,6 +421,9 @@ version = 2
     config_path = ""
 ```
 
+</p>
+</details>
+
 ## Registry Configuration
 
 Here is a simple example for a default registry hosts configuration. Set
@@ -343,6 +443,18 @@ server = "https://docker.io"
 [host."https://registry-1.docker.io"]
   capabilities = ["pull", "resolve"]
 ```
+
+To specify a custom certificate:
+
+```
+$ cat /etc/containerd/certs.d/192.168.12.34:5000/hosts.toml
+server = "https://192.168.12.34:5000"
+
+[host."https://192.168.12.34:5000"]
+  ca = "/path/to/ca.crt"
+```
+
+See [`docs/hosts.md`](https://github.com/containerd/containerd/blob/main/docs/hosts.md) for the further information.
 
 ## Untrusted Workload
 
