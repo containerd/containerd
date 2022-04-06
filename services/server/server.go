@@ -450,8 +450,16 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 
 			path := filepath.Join(ic.Root, "meta.db")
 			ic.Meta.Exports["path"] = path
+
 			options := *bolt.DefaultOptions
+			// Reading bbolt's freelist sometimes fails when the file has a data corruption.
+			// Disabling freelist sync reduces the chance of the breakage.
+			// https://github.com/etcd-io/bbolt/pull/1
+			// https://github.com/etcd-io/bbolt/pull/6
+			options.NoFreelistSync = true
+			// Without the timeout, bbolt.Open would block indefinitely due to flock(2).
 			options.Timeout = timeout.Get(boltOpenTimeout)
+
 			doneCh := make(chan struct{})
 			go func() {
 				t := time.NewTimer(10 * time.Second)
