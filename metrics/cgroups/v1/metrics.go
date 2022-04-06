@@ -26,9 +26,11 @@ import (
 
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd/log"
+	cmetrics "github.com/containerd/containerd/metrics"
 	"github.com/containerd/containerd/metrics/cgroups/common"
 	v1 "github.com/containerd/containerd/metrics/types/v1"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/typeurl"
 	"github.com/docker/go-metrics"
 	"github.com/prometheus/client_golang/prometheus"
@@ -136,13 +138,17 @@ func (c *Collector) collect(entry entry, ch chan<- prometheus.Metric, block bool
 	if wg != nil {
 		defer wg.Done()
 	}
+
 	t := entry.task
-	ctx := namespaces.WithNamespace(context.Background(), t.Namespace())
-	stats, err := t.Stats(ctx)
+	ctx, cancel := timeout.WithContext(context.Background(), cmetrics.ShimStatsRequestTimeout)
+	stats, err := t.Stats(namespaces.WithNamespace(ctx, t.Namespace()))
+	cancel()
+
 	if err != nil {
 		log.L.WithError(err).Errorf("stat task %s", t.ID())
 		return
 	}
+
 	data, err := typeurl.UnmarshalAny(stats)
 	if err != nil {
 		log.L.WithError(err).Errorf("unmarshal stats for %s", t.ID())
