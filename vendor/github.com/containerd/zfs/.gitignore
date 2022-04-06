@@ -1,4 +1,0 @@
-*.test
-
-# Support running go modules in vendor mode for local development
-/vendor/
