@@ -400,7 +400,7 @@ jobs:
         env:
           CGO_ENABLED: 1
         run: |
-          make binaries GO_BUILD_FLAGS="-mod=vendor"
+          make binaries
           sudo -E PATH=$PATH make install
 
       - run: sudo -E PATH=$PATH script/setup/install-gotestsum
