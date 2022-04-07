@@ -31,6 +31,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 )
@@ -47,7 +48,11 @@ func init() {
 			if cfg.Endpoint == "" {
 				return nil, fmt.Errorf("no OpenTelemetry endpoint: %w", plugin.ErrSkipPlugin)
 			}
-			return newExporter(ic.Context, cfg)
+			exp, err := newExporter(ic.Context, cfg)
+			if err != nil {
+				return nil, err
+			}
+			return trace.NewBatchSpanProcessor(exp), nil
 		},
 	})
 	plugin.Register(&plugin.Registration{
