@@ -52,6 +52,8 @@ including the Balena project listed below.
 
 **_[Talos Linux](https://www.talos.dev/)_** - Talos Linux is Linux designed for Kubernetes – secure, immutable, and minimal. Talos Linux is using containerd as the core system runtime and CRI implementation.
 
+**_Deckhouse_** - [Deckhouse Kubernetes Platform](https://deckhouse.io/) from Flant allows you to manage Kubernetes clusters anywhere in a fully automatic and uniform fashion. It uses containerd as the default CRI runtime.
+
 **_Other Projects_** - While the above list provides a cross-section of well known uses of containerd, the simplicity and clear API layer for containerd has inspired many smaller projects around providing simple container management platforms. Several examples of building higher layer functionality on top of the containerd base have come from various containerd community participants:
  - Michael Crosby's [boss](https://github.com/crosbymichael/boss) project,
  - Evan Hazlett's [stellar](https://github.com/ehazlett/stellar) project,
