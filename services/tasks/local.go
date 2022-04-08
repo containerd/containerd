@@ -553,7 +553,7 @@ func (l *local) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest, _ 
 	checkpointImageExists := false
 	if image == "" {
 		checkpointImageExists = true
-		image, err = os.MkdirTemp(os.Getenv("XDG_RUNTIME_DIR"), "ctd-checkpoint")
+		image, err = os.MkdirTemp(os.Getenv("XDG_RUNTIME_DIR"), "ctrd-checkpoint")
 		if err != nil {
 			return nil, errdefs.ToGRPC(err)
 		}
