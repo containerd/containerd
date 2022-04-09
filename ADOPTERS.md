@@ -36,7 +36,7 @@ including the Balena project listed below.
 
 **_BuildKit_** - The Moby project's [BuildKit](https://github.com/moby/buildkit) can use either runC or containerd as build execution backends for building container images. BuildKit support has also been built into the Docker engine in recent releases, making BuildKit provide the backend to the `docker build` command.
 
-**_[Azure Kubernetes Service (AKS)](https://azure.microsoft.com/services/kubernetes-service)_** - Microsoft's managed Kubernetes offering uses containerd for Linux nodes running v1.19 or greater. Containerd for Windows nodes is currently in public preview. [More Details](https://docs.microsoft.com/azure/aks/cluster-configuration#container-runtime-configuration)
+**_[Azure Kubernetes Service (AKS)](https://azure.microsoft.com/services/kubernetes-service)_** - Microsoft's managed Kubernetes offering uses containerd for Linux nodes running v1.19 and greater, and Windows nodes running 1.20 and greater. [More Details](https://docs.microsoft.com/azure/aks/cluster-configuration#container-runtime-configuration)
 
 **_Amazon Firecracker_** - The AWS [Firecracker VMM project](http://firecracker-microvm.io/) has extended containerd with a new snapshotter and v2 shim to allow containerd to drive virtualized container processes via their VMM implementation. More details on their containerd integration are available in [their GitHub project](https://github.com/firecracker-microvm/firecracker-containerd).
 
