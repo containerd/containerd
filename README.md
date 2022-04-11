@@ -13,7 +13,7 @@ containerd is a member of CNCF with ['graduated'](https://landscape.cncf.io/?sel
 
 containerd is designed to be embedded into a larger system, rather than being used directly by developers or end-users.
 
-![architecture](design/architecture.png)
+![architecture](docs/historical/design/architecture.png)
 
 ## Now Recruiting
 
