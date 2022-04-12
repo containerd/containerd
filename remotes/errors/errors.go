@@ -33,6 +33,9 @@ type ErrUnexpectedStatus struct {
 }
 
 func (e ErrUnexpectedStatus) Error() string {
+	if e.StatusCode == 403 {
+		return fmt.Sprintf("unexpected status: %s, error: %s", e.Status, e.Body)
+	}
 	return fmt.Sprintf("unexpected status: %s", e.Status)
 }
 
