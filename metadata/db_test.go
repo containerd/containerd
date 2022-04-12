@@ -406,9 +406,45 @@ func TestMetadataCollector(t *testing.T) {
 					Type: "snapshots/native",
 				},
 			}, false, "containerd.io/gc.flat", time.Now().String()),
+
+			// Test Collectible Resource
+			blob(bytesFor(11), false, "containerd.io/gc.ref.test", "test1"),
+			blob(bytesFor(12), true, "containerd.io/gc.ref.test", "test2"),
+			lease("lease-3", []leases.Resource{
+				{
+					ID:   digestFor(11).String(),
+					Type: "content",
+				},
+			}, false),
 		}
-		remaining []gc.Node
+
+		testResource = gc.ResourceType(0x10)
+
+		remaining = []gc.Node{
+			gcnode(testResource, "test", "test1"),
+			gcnode(testResource, "test", "test3"),
+			gcnode(testResource, "test", "test4"),
+		}
+
+		collector = &testCollector{
+			all: []gc.Node{
+				gcnode(testResource, "random", "test1"),
+				gcnode(testResource, "test", "test1"),
+				gcnode(testResource, "test", "test2"),
+				gcnode(testResource, "test", "test3"),
+				gcnode(testResource, "test", "test4"),
+			},
+			active: []gc.Node{
+				gcnode(testResource, "test", "test4"),
+			},
+			leased: map[string][]gc.Node{
+				"lease-3": {
+					gcnode(testResource, "test", "test3"),
+				},
+			},
+		}
 	)
+	mdb.RegisterCollectibleResource(testResource, collector)
 
 	if err := mdb.Update(func(tx *bolt.Tx) error {
 		for _, obj := range objects {
@@ -436,7 +472,8 @@ func TestMetadataCollector(t *testing.T) {
 			actual = append(actual, node)
 			return nil
 		}
-		return scanAll(ctx, tx, scanFn)
+		cc := startGCContext(ctx, mdb.collectors)
+		return cc.scanAll(ctx, tx, scanFn)
 	}); err != nil {
 		t.Fatal(err)
 	}
