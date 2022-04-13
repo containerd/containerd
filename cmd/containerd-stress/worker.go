@@ -29,7 +29,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type worker struct {
+type ctrWorker struct {
 	id       int
 	wg       *sync.WaitGroup
 	count    int
@@ -41,7 +41,7 @@ type worker struct {
 	snapshotter string
 }
 
-func (w *worker) run(ctx, tctx context.Context) {
+func (w *ctrWorker) run(ctx, tctx context.Context) {
 	defer func() {
 		w.wg.Done()
 		logrus.Infof("worker %d finished", w.id)
@@ -72,7 +72,23 @@ func (w *worker) run(ctx, tctx context.Context) {
 	}
 }
 
-func (w *worker) runContainer(ctx context.Context, id string) (err error) {
+func (w *ctrWorker) incCount() {
+	w.count++
+}
+
+func (w *ctrWorker) getCount() int {
+	return w.count
+}
+
+func (w *ctrWorker) incFailures() {
+	w.failures++
+}
+
+func (w *ctrWorker) getFailures() int {
+	return w.failures
+}
+
+func (w *ctrWorker) runContainer(ctx context.Context, id string) (err error) {
 	// fix up cgroups path for a default config
 	c, err := w.client.NewContainer(ctx, id,
 		containerd.WithSnapshotter(w.snapshotter),
@@ -115,6 +131,6 @@ func (w *worker) runContainer(ctx context.Context, id string) (err error) {
 	return nil
 }
 
-func (w *worker) getID() string {
+func (w *ctrWorker) getID() string {
 	return fmt.Sprintf("%d-%d", w.id, w.count)
 }

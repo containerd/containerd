@@ -31,7 +31,7 @@ import (
 )
 
 type execWorker struct {
-	worker
+	ctrWorker
 }
 
 func (w *execWorker) exec(ctx, tctx context.Context) {
