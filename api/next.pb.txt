@@ -4973,6 +4973,36 @@ file {
   syntax: "proto3"
 }
 file {
+  name: "github.com/containerd/containerd/api/services/streaming/v1/streaming.proto"
+  package: "containerd.services.streaming.v1"
+  dependency: "gogoproto/gogo.proto"
+  dependency: "google/protobuf/any.proto"
+  message_type {
+    name: "StreamInit"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+  }
+  service {
+    name: "Streaming"
+    method {
+      name: "Stream"
+      input_type: ".google.protobuf.Any"
+      output_type: ".google.protobuf.Any"
+      client_streaming: true
+      server_streaming: true
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/services/streaming/v1;streaming"
+  }
+  syntax: "proto3"
+}
+file {
   name: "github.com/containerd/containerd/api/types/metrics.proto"
   package: "containerd.types"
   dependency: "google/protobuf/any.proto"

@@ -46,6 +46,8 @@ const (
 	ResourceIngest
 	// resourceEnd is the end of specified resource types
 	resourceEnd
+	// ResourceStream specifies a stream
+	ResourceStream
 )
 
 const (
