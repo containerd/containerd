@@ -83,6 +83,10 @@ func setResources(s *Spec) {
 			s.Linux.Resources = &specs.LinuxResources{}
 		}
 	}
+}
+
+// nolint
+func setResourcesWindows(s *Spec) {
 	if s.Windows != nil {
 		if s.Windows.Resources == nil {
 			s.Windows.Resources = &specs.WindowsResources{}
@@ -98,6 +102,11 @@ func setCPU(s *Spec) {
 			s.Linux.Resources.CPU = &specs.LinuxCPU{}
 		}
 	}
+}
+
+// nolint
+func setCPUWindows(s *Spec) {
+	setResourcesWindows(s)
 	if s.Windows != nil {
 		if s.Windows.Resources.CPU == nil {
 			s.Windows.Resources.CPU = &specs.WindowsCPUResources{}
