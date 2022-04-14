@@ -53,8 +53,10 @@ import (
 // path to the network namespace.
 func newNS(baseDir string) (nsPath string, err error) {
 	b := make([]byte, 16)
-	if _, err := rand.Reader.Read(b); err != nil {
-		return "", errors.Wrap(err, "failed to generate random netns name")
+
+	_, err = rand.Read(b)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random netns name: %w", err)
 	}
 
 	// Create the directory for mounting network namespaces
@@ -64,10 +66,10 @@ func newNS(baseDir string) (nsPath string, err error) {
 		return "", err
 	}
 
-	// create an empty file at the mount point
+	// create an empty file at the mount point and fail if it already exists
 	nsName := fmt.Sprintf("cni-%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 	nsPath = path.Join(baseDir, nsName)
-	mountPointFd, err := os.Create(nsPath)
+	mountPointFd, err := os.OpenFile(nsPath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
 		return "", err
 	}
