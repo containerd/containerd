@@ -24,6 +24,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/containerd/containerd/contrib/seccomp/kernelversion"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -465,6 +466,18 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 		DefaultAction: specs.ActErrno,
 		Architectures: arches(),
 		Syscalls:      syscalls,
+	}
+
+	// include by kernel version
+	if ok, err := kernelversion.GreaterEqualThan(
+		kernelversion.KernelVersion{Kernel: 4, Major: 8}); err == nil {
+		if ok {
+			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+				Names:  []string{"ptrace"},
+				Action: specs.ActAllow,
+				Args:   []specs.LinuxSeccompArg{},
+			})
+		}
 	}
 
 	// include by arch
