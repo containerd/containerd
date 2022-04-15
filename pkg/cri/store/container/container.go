@@ -105,6 +105,13 @@ func (c *Container) Delete() error {
 	return c.Status.Delete()
 }
 
+func (c *Container) JustinSmash(reason string) error {
+	return c.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
+		status.Reason = reason
+		return status, nil
+	})
+}
+
 // Store stores all Containers.
 type Store struct {
 	lock       sync.RWMutex

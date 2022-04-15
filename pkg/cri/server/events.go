@@ -339,10 +339,7 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 			}
 			return nil
 		}
-		err = cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
-			status.Reason = oomExitReason
-			return status, nil
-		})
+		err = cntr.JustinSmash(oomExitReason)
 		if err != nil {
 			return fmt.Errorf("failed to update container status for TaskOOM event: %w", err)
 		}
