@@ -40,8 +40,8 @@ const (
 	thinDevice1 = "thin-1"
 	thinDevice2 = "thin-2"
 	snapDevice1 = "snap-1"
-	device1Size = 100000
-	device2Size = 200000
+	device1Size = 1000000
+	device2Size = 2000000
 	testsPrefix = "devmapper-snapshotter-tests-"
 )
 
