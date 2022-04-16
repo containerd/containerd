@@ -23,7 +23,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	cio "github.com/containerd/containerd/pkg/cri/io"
 	"github.com/containerd/containerd/pkg/cri/store"
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	"github.com/containerd/containerd/pkg/cri/store/label"
 	"github.com/containerd/containerd/pkg/cri/store/stats"
 	"github.com/containerd/containerd/pkg/cri/store/truncindex"
@@ -107,7 +106,7 @@ func (c *Container) Delete() error {
 }
 
 func (c *Container) JustinSmash(reason string) error {
-	return c.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
+	return c.Status.UpdateSync(func(status Status) (Status, error) {
 		status.Reason = reason
 		return status, nil
 	})
