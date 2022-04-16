@@ -55,7 +55,8 @@ func newTestCRIService() *criService {
 			RootDir:  testRootDir,
 			StateDir: testStateDir,
 			PluginConfig: criconfig.PluginConfig{
-				SandboxImage: testSandboxImage,
+				SandboxImage:                     testSandboxImage,
+				TolerateMissingHugetlbController: true,
 			},
 		},
 		imageFSPath:        testImageFSPath,

@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/mount"
-	"github.com/gogo/protobuf/types"
+	"github.com/containerd/typeurl"
 )
 
 // IO holds process IO information
@@ -35,7 +35,7 @@ type IO struct {
 // CreateOpts contains task creation data
 type CreateOpts struct {
 	// Spec is the OCI runtime spec
-	Spec *types.Any
+	Spec typeurl.Any
 	// Rootfs mounts to perform to gain access to the container's filesystem
 	Rootfs []mount.Mount
 	// IO for the container's main process
@@ -43,9 +43,9 @@ type CreateOpts struct {
 	// Checkpoint digest to restore container state
 	Checkpoint string
 	// RuntimeOptions for the runtime
-	RuntimeOptions *types.Any
+	RuntimeOptions typeurl.Any
 	// TaskOptions received for the task
-	TaskOptions *types.Any
+	TaskOptions typeurl.Any
 	// Runtime name to use (e.g. `io.containerd.NAME.VERSION`).
 	// As an alternative full abs path to binary may be specified instead.
 	Runtime string

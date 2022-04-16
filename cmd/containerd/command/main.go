@@ -35,7 +35,6 @@ import (
 	"github.com/containerd/containerd/services/server"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/containerd/containerd/sys"
-	"github.com/containerd/containerd/tracing"
 	"github.com/containerd/containerd/version"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -302,7 +301,6 @@ func applyFlags(context *cli.Context, config *srvconfig.Config) error {
 	if err := setLogFormat(config); err != nil {
 		return err
 	}
-	setLogHooks()
 
 	for _, v := range []struct {
 		name string
@@ -323,6 +321,13 @@ func applyFlags(context *cli.Context, config *srvconfig.Config) error {
 	} {
 		if s := context.GlobalString(v.name); s != "" {
 			*v.d = s
+			if v.name == "root" || v.name == "state" {
+				absPath, err := filepath.Abs(s)
+				if err != nil {
+					return err
+				}
+				*v.d = absPath
+			}
 		}
 	}
 
@@ -367,10 +372,6 @@ func setLogFormat(config *srvconfig.Config) error {
 	}
 
 	return nil
-}
-
-func setLogHooks() {
-	logrus.StandardLogger().AddHook(tracing.NewLogrusHook())
 }
 
 func dumpStacks(writeToFile bool) {

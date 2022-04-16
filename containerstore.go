@@ -24,6 +24,8 @@ import (
 	containersapi "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/typeurl"
 	ptypes "github.com/gogo/protobuf/types"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -148,18 +150,22 @@ func (r *remoteContainers) Delete(ctx context.Context, id string) error {
 }
 
 func containerToProto(container *containers.Container) containersapi.Container {
+	extensions := make(map[string]ptypes.Any)
+	for k, v := range container.Extensions {
+		extensions[k] = *protobuf.FromAny(v)
+	}
 	return containersapi.Container{
 		ID:     container.ID,
 		Labels: container.Labels,
 		Image:  container.Image,
 		Runtime: &containersapi.Container_Runtime{
 			Name:    container.Runtime.Name,
-			Options: container.Runtime.Options,
+			Options: protobuf.FromAny(container.Runtime.Options),
 		},
-		Spec:        container.Spec,
+		Spec:        protobuf.FromAny(container.Spec),
 		Snapshotter: container.Snapshotter,
 		SnapshotKey: container.SnapshotKey,
-		Extensions:  container.Extensions,
+		Extensions:  extensions,
 	}
 }
 
@@ -171,6 +177,11 @@ func containerFromProto(containerpb *containersapi.Container) containers.Contain
 			Options: containerpb.Runtime.Options,
 		}
 	}
+	extensions := make(map[string]typeurl.Any)
+	for k, v := range containerpb.Extensions {
+		v := v
+		extensions[k] = &v
+	}
 	return containers.Container{
 		ID:          containerpb.ID,
 		Labels:      containerpb.Labels,
@@ -181,7 +192,7 @@ func containerFromProto(containerpb *containersapi.Container) containers.Contain
 		SnapshotKey: containerpb.SnapshotKey,
 		CreatedAt:   containerpb.CreatedAt,
 		UpdatedAt:   containerpb.UpdatedAt,
-		Extensions:  containerpb.Extensions,
+		Extensions:  extensions,
 	}
 }
 
@@ -189,6 +200,7 @@ func containersFromProto(containerspb []containersapi.Container) []containers.Co
 	var containers []containers.Container
 
 	for _, container := range containerspb {
+		container := container
 		containers = append(containers, containerFromProto(&container))
 	}
 

@@ -17,12 +17,10 @@
 package integration
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	exec "golang.org/x/sys/execabs"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -40,12 +38,9 @@ func TestImageLoad(t *testing.T) {
 	output, err := exec.Command("docker", "pull", testImage).CombinedOutput()
 	require.NoError(t, err, "output: %q", output)
 	// os.CreateTemp also opens a file, which might prevent us from overwriting that file with docker save.
-	tarDir, err := os.MkdirTemp("", "image-load")
+	tarDir := t.TempDir()
 	tar := filepath.Join(tarDir, "image.tar")
 	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, os.RemoveAll(tarDir))
-	}()
 	output, err = exec.Command("docker", "save", testImage, "-o", tar).CombinedOutput()
 	require.NoError(t, err, "output: %q", output)
 

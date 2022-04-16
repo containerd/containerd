@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
@@ -32,6 +33,8 @@ import (
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
+	"github.com/containerd/typeurl"
+	"github.com/gogo/protobuf/types"
 
 	imagedigest "github.com/opencontainers/go-digest"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -492,10 +495,7 @@ func TestEnsureRemoveAllNotExist(t *testing.T) {
 }
 
 func TestEnsureRemoveAllWithDir(t *testing.T) {
-	dir, err := os.MkdirTemp("", "test-ensure-removeall-with-dir")
-	if err != nil {
-		t.Fatal(err)
-	}
+	dir := t.TempDir()
 	if err := ensureRemoveAll(context.Background(), dir); err != nil {
 		t.Fatal(err)
 	}
@@ -601,4 +601,14 @@ func TestValidateTargetContainer(t *testing.T) {
 		})
 	}
 
+}
+
+func TestGetRuntimeOptions(t *testing.T) {
+	_, err := getRuntimeOptions(containers.Container{})
+	require.NoError(t, err)
+
+	var pbany *types.Any               // This is nil.
+	var typeurlAny typeurl.Any = pbany // This is typed nil.
+	_, err = getRuntimeOptions(containers.Container{Runtime: containers.RuntimeInfo{Options: typeurlAny}})
+	require.NoError(t, err)
 }

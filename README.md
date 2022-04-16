@@ -1,4 +1,5 @@
-![containerd banner](https://raw.githubusercontent.com/cncf/artwork/master/projects/containerd/horizontal/color/containerd-horizontal-color.png)
+![containerd banner light mode](https://raw.githubusercontent.com/cncf/artwork/master/projects/containerd/horizontal/color/containerd-horizontal-color.png#gh-light-mode-only)
+![containerd banner dark mode](https://raw.githubusercontent.com/cncf/artwork/master/projects/containerd/horizontal/white/containerd-horizontal-white.png#gh-dark-mode-only)
 
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/containerd/containerd)](https://pkg.go.dev/github.com/containerd/containerd)
 [![Build Status](https://github.com/containerd/containerd/workflows/CI/badge.svg)](https://github.com/containerd/containerd/actions?query=workflow%3ACI)
@@ -8,11 +9,11 @@
 
 containerd is an industry-standard container runtime with an emphasis on simplicity, robustness and portability. It is available as a daemon for Linux and Windows, which can manage the complete container lifecycle of its host system: image transfer and storage, container execution and supervision, low-level storage and network attachments, etc.
 
-containerd is a member of CNCF with ['graduated'](https://landscape.cncf.io/selected=containerd) status.
+containerd is a member of CNCF with ['graduated'](https://landscape.cncf.io/?selected=containerd) status.
 
 containerd is designed to be embedded into a larger system, rather than being used directly by developers or end-users.
 
-![architecture](design/architecture.png)
+![architecture](docs/historical/design/architecture.png)
 
 ## Now Recruiting
 

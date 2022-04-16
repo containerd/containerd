@@ -70,7 +70,7 @@ func WithTaskCheckpoint(im Image) NewTaskOpts {
 				info.Checkpoint = &types.Descriptor{
 					MediaType:   m.MediaType,
 					Size_:       m.Size,
-					Digest:      m.Digest,
+					Digest:      m.Digest.String(),
 					Annotations: m.Annotations,
 				}
 				return nil

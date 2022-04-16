@@ -45,7 +45,6 @@ func TestGenerateSpec(t *testing.T) {
 		for _, cl := range [][]string{
 			s.Process.Capabilities.Bounding,
 			s.Process.Capabilities.Permitted,
-			s.Process.Capabilities.Inheritable,
 			s.Process.Capabilities.Effective,
 		} {
 			for i := 0; i < len(defaults); i++ {
@@ -193,8 +192,8 @@ func TestWithCapabilities(t *testing.T) {
 	if len(s.Process.Capabilities.Permitted) != 1 || s.Process.Capabilities.Permitted[0] != "CAP_SYS_ADMIN" {
 		t.Error("Unexpected capabilities set")
 	}
-	if len(s.Process.Capabilities.Inheritable) != 1 || s.Process.Capabilities.Inheritable[0] != "CAP_SYS_ADMIN" {
-		t.Error("Unexpected capabilities set")
+	if len(s.Process.Capabilities.Inheritable) != 0 {
+		t.Errorf("Unexpected capabilities set: length is non zero (%d)", len(s.Process.Capabilities.Inheritable))
 	}
 }
 

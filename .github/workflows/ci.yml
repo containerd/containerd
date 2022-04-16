@@ -20,7 +20,7 @@ jobs:
 
     strategy:
       matrix:
-        go-version: [1.17.5]
+        go-version: [1.18.0]
         os: [ubuntu-18.04, macos-10.15, windows-2019]
 
     steps:
@@ -29,11 +29,11 @@ jobs:
           go-version: ${{ matrix.go-version }}
 
       - uses: actions/checkout@v2
-      - uses: golangci/golangci-lint-action@v2
+      - uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.42.0
+          version: v1.45.0
+          skip-cache: true
           args: --timeout=5m
-          skip-go-installation: true
 
   #
   # Project checks
@@ -46,7 +46,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.5'
+          go-version: '1.18.0'
 
       - uses: actions/checkout@v2
         with:
@@ -78,7 +78,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.5'
+          go-version: '1.18.0'
 
       - uses: actions/checkout@v2
         with:
@@ -110,7 +110,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.5'
+          go-version: '1.18.0'
       - uses: actions/checkout@v2
       - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.1
       - run: make man
@@ -144,7 +144,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.5'
+          go-version: '1.18.0'
       - uses: actions/checkout@v2
       - run: |
           set -e -x
@@ -201,8 +201,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-18.04, macos-10.15, windows-2019, windows-2022]
-        go-version: ['1.16.13', '1.17.5']
-
+        go-version: ['1.17.8', '1.18.0']
     steps:
       - uses: actions/setup-go@v2
         with:
@@ -230,7 +229,7 @@ jobs:
   integration-windows:
     name: Windows Integration
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 35
+    timeout-minutes: 50
     needs: [project, linters, protos, man]
     env:
       GOTEST: gotestsum --
@@ -248,7 +247,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.5'
+          go-version: '1.18.0'
 
       - uses: actions/checkout@v2
         with:
@@ -256,14 +255,15 @@ jobs:
 
       - uses: actions/checkout@v2
         with:
-          repository: Microsoft/hcsshim
-          path: src/github.com/Microsoft/hcsshim
+          repository: kubernetes-sigs/cri-tools
+          path: src/github.com/kubernetes-sigs/cri-tools
 
       - name: Set env
         run: |
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
           echo "${{ github.workspace }}/src/github.com/containerd/containerd/bin" >> $GITHUB_PATH
+          echo "${{ github.workspace }}/src/github.com/kubernetes-sigs/cri-tools/build/bin" >> $GITHUB_PATH
 
       - run: script/setup/install-dev-tools
 
@@ -273,12 +273,35 @@ jobs:
         run: |
           set -o xtrace
           mingw32-make.exe binaries
-          bindir="$(pwd)"
-          SHIM_COMMIT=$(grep 'Microsoft/hcsshim ' go.mod | awk '{print $2}')
-          cd ../../Microsoft/hcsshim
-          git fetch --tags origin "${SHIM_COMMIT}"
-          git checkout "${SHIM_COMMIT}"
-          GO111MODULE=on go build -mod=vendor -o "${bindir}/integration/client/containerd-shim-runhcs-v1.exe" ./cmd/containerd-shim-runhcs-v1
+          cd ../../kubernetes-sigs/cri-tools
+          make critest
+
+      - run: script/setup/install-cni-windows
+
+      - env:
+          TEST_IMAGE_LIST: ${{github.workspace}}/repolist.toml
+          CRI_TEST_IMAGES: ${{github.workspace}}/cri-test-images.yaml
+          BUSYBOX_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/busybox:1.29-2"
+          RESOURCE_CONSUMER_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/resource-consumer:1.10"
+          WEBSERVER_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/nginx:1.14-2"
+        run: |
+            cat > "${{ env.TEST_IMAGE_LIST }}" << EOF
+            busybox = "${{ env.BUSYBOX_TESTING_IMAGE_REF }}"
+            ResourceConsumer = "${{ env.RESOURCE_CONSUMER_TESTING_IMAGE_REF }}"
+            EOF
+            cat > "${{ env.CRI_TEST_IMAGES }}" << EOF
+            defaultTestContainerImage: ${{ env.BUSYBOX_TESTING_IMAGE_REF }}
+            webServerTestImage: ${{ env.WEBSERVER_TESTING_IMAGE_REF }}
+            EOF
+
+      - name: Get crictl tool
+        shell: powershell
+        run: |
+          # Get critctl tool. Used for cri-integration tests
+          $CRICTL_DOWNLOAD_URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.21.0/crictl-v1.21.0-windows-amd64.tar.gz"
+          curl.exe -L $CRICTL_DOWNLOAD_URL -o c:\crictl.tar.gz
+          tar -xvf c:\crictl.tar.gz
+          mv crictl.exe "${{ github.workspace }}/bin/crictl.exe" # Move crictl somewhere in path
 
       - run: script/setup/install-gotestsum
       - name: Tests
@@ -301,6 +324,28 @@ jobs:
           CGO_ENABLED: 1
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
         run: mingw32-make.exe integration
+
+      - name: CRI Integration Test
+        env:
+          TEST_IMAGE_LIST: ${{github.workspace}}/repolist.toml
+        run: |
+          make cri-integration
+
+      - name: cri-tools critest
+        env:
+          CRI_TEST_IMAGES: ${{github.workspace}}/cri-test-images.yaml
+        shell: powershell
+        run: |
+          Start-Process -FilePath containerd.exe -NoNewWindow -RedirectStandardError true -PassThru
+          get-process | sls containerd
+          start-sleep 5
+          # This test is exceedingly flaky only on ws2022 so skip for now to keep CI happy.
+          # Info: https://github.com/containerd/containerd/issues/6652
+          if( '${{ matrix.os }}' -eq 'windows-2022' )
+          {
+            $skip = "-ginkgo.skip=runtime should support exec with tty=true and stdin=true"
+          }
+          critest.exe --runtime-endpoint=npipe://.//pipe//containerd-containerd --test-images-file='${{env.CRI_TEST_IMAGES}}' --report-dir='${{github.workspace}}/critestreport' $skip
       - uses: actions/upload-artifact@v2
         if: always()
         with:
@@ -330,7 +375,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.5'
+          go-version: '1.18.0'
 
       - uses: actions/checkout@v2
 
@@ -449,7 +494,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.5'
+          go-version: '1.18.0'
       - uses: actions/checkout@v2
       - run: sudo -E PATH=$PATH script/setup/install-gotestsum
       - name: Tests
@@ -464,17 +509,20 @@ jobs:
           path: |
             *-junit.xml
 
-  cgroup2:
-    name: CGroupsV2 - SELinux enforced
+  vagrant:
+    name: Vagrant
     # nested virtualization is only available on macOS hosts
     runs-on: macos-10.15
     timeout-minutes: 45
     needs: [project, linters, protos, man]
     strategy:
+      fail-fast: false
       matrix:
         # Currently crun is disabled to decrease CI flakiness.
         # We can enable crun again when we get a better CI infra.
         runc: [runc]
+        # Fedora is for testing cgroup v2 functionality, Rocky Linux is for testing on an enterprise-grade environment
+        box: ["fedora/35-cloud-base", "rockylinux/8"]
     env:
       GOTEST: gotestsum --
     steps:
@@ -487,7 +535,13 @@ jobs:
           key: vagrant-${{ hashFiles('Vagrantfile*') }}
 
       - name: Vagrant start
+        env:
+          BOX: ${{ matrix.box }}
         run: |
+          if [ "$BOX" = "rockylinux/8" ]; then
+            # The latest version 5.0.0 seems 404 (as of March 30, 2022)
+            export BOX_VERSION="4.0.0"
+          fi
           # Retry if it fails (download.fedoraproject.org returns 404 sometimes)
           vagrant up || vagrant up
 
@@ -520,7 +574,8 @@ jobs:
       - uses: actions/upload-artifact@v2
         if: always()
         with:
-          name:  TestResults cgroup2 ${{ matrix.runtime }} ${{matrix.runc}}
+          # ${{ matrix.box }} cannot be used here due to character limitation
+          name:  TestResults vagrant ${{ github.run_id }} ${{ matrix.runtime }} ${{matrix.runc}}
           path: |
             ${{github.workspace}}/*-junit.xml
             ${{github.workspace}}/critestreport/*

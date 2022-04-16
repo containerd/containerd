@@ -11,17 +11,39 @@ linters:
     - vet
     - unused
     - misspell
+    - gosec
+    - exportloopref # Checks for pointers to enclosing loop variables
+    - tenv # Detects using os.Setenv instead of t.Setenv since Go 1.17
   disable:
     - errcheck
 
 issues:
   include:
     - EXC0002
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters-settings:
+  gosec:
+    # The following issues surfaced when `gosec` linter
+    # was enabled. They are temporarily excluded to unblock
+    # the existing workflow, but still to be addressed by
+    # by future works.
+    excludes:
+      - G204
+      - G305
+      - G306
+      - G402
+      - G404
 
 run:
   timeout: 8m
   skip-dirs:
     - api
+    - cluster
     - design
     - docs
     - docs/man
+    - releases
+    - reports
+    - test # e2e scripts

@@ -26,8 +26,7 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/opencontainers/go-digest"
-	"gotest.tools/v3/assert"
-	is "gotest.tools/v3/assert/cmp"
+	"github.com/stretchr/testify/assert"
 )
 
 type copySource struct {
@@ -81,9 +80,9 @@ func TestCopy(t *testing.T) {
 				testcase.source.size,
 				testcase.source.digest)
 
-			assert.NilError(t, err)
-			assert.Check(t, is.Equal(testcase.source.digest, testcase.writer.committedDigest))
-			assert.Check(t, is.Equal(testcase.expected, testcase.writer.String()))
+			assert.NoError(t, err)
+			assert.Equal(t, testcase.source.digest, testcase.writer.committedDigest)
+			assert.Equal(t, testcase.expected, testcase.writer.String())
 		})
 	}
 }

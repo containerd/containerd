@@ -56,6 +56,23 @@ func (p *Process) Kill(ctx context.Context, signal uint32, _ bool) error {
 	return err
 }
 
+func statusFromProto(from task.Status) runtime.Status {
+	var status runtime.Status
+	switch from {
+	case task.Status_CREATED:
+		status = runtime.CreatedStatus
+	case task.Status_RUNNING:
+		status = runtime.RunningStatus
+	case task.Status_STOPPED:
+		status = runtime.StoppedStatus
+	case task.Status_PAUSED:
+		status = runtime.PausedStatus
+	case task.Status_PAUSING:
+		status = runtime.PausingStatus
+	}
+	return status
+}
+
 // State of process
 func (p *Process) State(ctx context.Context) (runtime.State, error) {
 	// use the container status for the status of the process
@@ -72,22 +89,9 @@ func (p *Process) State(ctx context.Context) (runtime.State, error) {
 		// the connection differently if this causes problems.
 		return runtime.State{}, errdefs.ErrNotFound
 	}
-	var status runtime.Status
-	switch response.Status {
-	case task.StatusCreated:
-		status = runtime.CreatedStatus
-	case task.StatusRunning:
-		status = runtime.RunningStatus
-	case task.StatusStopped:
-		status = runtime.StoppedStatus
-	case task.StatusPaused:
-		status = runtime.PausedStatus
-	case task.StatusPausing:
-		status = runtime.PausingStatus
-	}
 	return runtime.State{
 		Pid:        response.Pid,
-		Status:     status,
+		Status:     statusFromProto(response.Status),
 		Stdin:      response.Stdin,
 		Stdout:     response.Stdout,
 		Stderr:     response.Stderr,

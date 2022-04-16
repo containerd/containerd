@@ -52,6 +52,7 @@ var densityCommand = cli.Command{
 			Duration:    cliContext.GlobalDuration("duration"),
 			Concurrency: cliContext.GlobalInt("concurrent"),
 			Exec:        cliContext.GlobalBool("exec"),
+			Image:       cliContext.GlobalString("image"),
 			JSON:        cliContext.GlobalBool("json"),
 			Metrics:     cliContext.GlobalString("metrics"),
 			Snapshotter: cliContext.GlobalString("snapshotter"),
@@ -65,8 +66,8 @@ var densityCommand = cli.Command{
 		if err := cleanup(ctx, client); err != nil {
 			return err
 		}
-		logrus.Infof("pulling %s", imageName)
-		image, err := client.Pull(ctx, imageName, containerd.WithPullUnpack, containerd.WithPullSnapshotter(config.Snapshotter))
+		logrus.Infof("pulling %s", config.Image)
+		image, err := client.Pull(ctx, config.Image, containerd.WithPullUnpack, containerd.WithPullSnapshotter(config.Snapshotter))
 		if err != nil {
 			return err
 		}

@@ -27,9 +27,9 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/typeurl"
-	"github.com/gogo/protobuf/types"
 	"github.com/opencontainers/image-spec/identity"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -57,7 +57,7 @@ type InfoConfig struct {
 func WithRuntime(name string, options interface{}) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		var (
-			any *types.Any
+			any typeurl.Any
 			err error
 		)
 		if options != nil {
@@ -288,9 +288,9 @@ func WithContainerExtension(name string, extension interface{}) NewContainerOpts
 		}
 
 		if c.Extensions == nil {
-			c.Extensions = make(map[string]types.Any)
+			c.Extensions = make(map[string]typeurl.Any)
 		}
-		c.Extensions[name] = *any
+		c.Extensions[name] = any
 		return nil
 	}
 }
@@ -315,7 +315,7 @@ func WithSpec(s *oci.Spec, opts ...oci.SpecOpts) NewContainerOpts {
 		}
 
 		var err error
-		c.Spec, err = typeurl.MarshalAny(s)
+		c.Spec, err = protobuf.MarshalAnyToProto(s)
 		return err
 	}
 }

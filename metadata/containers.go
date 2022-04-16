@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
 	bolt "go.etcd.io/bbolt"
@@ -211,7 +212,7 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 
 			if strings.HasPrefix(path, "extensions.") {
 				if updated.Extensions == nil {
-					updated.Extensions = map[string]types.Any{}
+					updated.Extensions = map[string]typeurl.Any{}
 				}
 				key := strings.TrimPrefix(path, "extensions.")
 				updated.Extensions[key] = container.Extensions[key]

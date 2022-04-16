@@ -20,12 +20,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
@@ -255,15 +257,14 @@ func TestContainerCapabilities(t *testing.T) {
 		for _, include := range test.includes {
 			assert.Contains(t, spec.Process.Capabilities.Bounding, include)
 			assert.Contains(t, spec.Process.Capabilities.Effective, include)
-			assert.Contains(t, spec.Process.Capabilities.Inheritable, include)
 			assert.Contains(t, spec.Process.Capabilities.Permitted, include)
 		}
 		for _, exclude := range test.excludes {
 			assert.NotContains(t, spec.Process.Capabilities.Bounding, exclude)
 			assert.NotContains(t, spec.Process.Capabilities.Effective, exclude)
-			assert.NotContains(t, spec.Process.Capabilities.Inheritable, exclude)
 			assert.NotContains(t, spec.Process.Capabilities.Permitted, exclude)
 		}
+		assert.Empty(t, spec.Process.Capabilities.Inheritable)
 		assert.Empty(t, spec.Process.Capabilities.Ambient)
 	}
 }
@@ -1485,4 +1486,153 @@ func TestBaseOCISpec(t *testing.T) {
 	assert.Len(t, spec.Process.Capabilities.Permitted, 1)
 
 	assert.Equal(t, *spec.Linux.Resources.Memory.Limit, containerConfig.Linux.Resources.MemoryLimitInBytes)
+}
+
+func writeFilesToTempDir(tmpDirPattern string, content []string) (string, error) {
+	if len(content) == 0 {
+		return "", nil
+	}
+
+	dir, err := ioutil.TempDir("", tmpDirPattern)
+	if err != nil {
+		return "", err
+	}
+
+	for idx, data := range content {
+		file := filepath.Join(dir, fmt.Sprintf("spec-%d.yaml", idx))
+		err := ioutil.WriteFile(file, []byte(data), 0644)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return dir, nil
+}
+
+func TestCDIInjections(t *testing.T) {
+	testID := "test-id"
+	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
+	testPid := uint32(1234)
+	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	ociRuntime := config.Runtime{}
+	c := newTestCRIService()
+
+	for _, test := range []struct {
+		description   string
+		cdiSpecFiles  []string
+		annotations   map[string]string
+		expectError   bool
+		expectDevices []runtimespec.LinuxDevice
+		expectEnv     []string
+	}{
+		{description: "expect no CDI error for nil annotations"},
+		{description: "expect no CDI error for empty annotations",
+			annotations: map[string]string{},
+		},
+		{description: "expect CDI error for invalid CDI device reference in annotations",
+			annotations: map[string]string{
+				cdi.AnnotationPrefix + "devices": "foobar",
+			},
+			expectError: true,
+		},
+		{description: "expect CDI error for unresolvable devices",
+			annotations: map[string]string{
+				cdi.AnnotationPrefix + "vendor1_devices": "vendor1.com/device=no-such-dev",
+			},
+			expectError: true,
+		},
+		{description: "expect properly injected resolvable CDI devices",
+			cdiSpecFiles: []string{
+				`
+cdiVersion: "0.2.0"
+kind: "vendor1.com/device"
+devices:
+  - name: foo
+    containerEdits:
+      deviceNodes:
+        - path: /dev/loop8
+          type: b
+          major: 7
+          minor: 8
+      env:
+        - FOO=injected
+containerEdits:
+  env:
+    - "VENDOR1=present"
+`,
+				`
+cdiVersion: "0.2.0"
+kind: "vendor2.com/device"
+devices:
+  - name: bar
+    containerEdits:
+      deviceNodes:
+        - path: /dev/loop9
+          type: b
+          major: 7
+          minor: 9
+      env:
+        - BAR=injected
+containerEdits:
+  env:
+    - "VENDOR2=present"
+`,
+			},
+			annotations: map[string]string{
+				cdi.AnnotationPrefix + "vendor1_devices": "vendor1.com/device=foo",
+				cdi.AnnotationPrefix + "vendor2_devices": "vendor2.com/device=bar",
+			},
+			expectDevices: []runtimespec.LinuxDevice{
+				{
+					Path:  "/dev/loop8",
+					Type:  "b",
+					Major: 7,
+					Minor: 8,
+				},
+				{
+					Path:  "/dev/loop9",
+					Type:  "b",
+					Major: 7,
+					Minor: 9,
+				},
+			},
+			expectEnv: []string{
+				"FOO=injected",
+				"VENDOR1=present",
+				"BAR=injected",
+				"VENDOR2=present",
+			},
+		},
+	} {
+		t.Logf("TestCase %q", test.description)
+
+		spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+		require.NoError(t, err)
+
+		specCheck(t, testID, testSandboxID, testPid, spec)
+
+		cdiDir, err := writeFilesToTempDir("containerd-test-CDI-injections-", test.cdiSpecFiles)
+		if cdiDir != "" {
+			defer os.RemoveAll(cdiDir)
+		}
+		require.NoError(t, err)
+
+		injectFun := oci.WithCDI(test.annotations, []string{cdiDir})
+		err = injectFun(nil, nil, nil, spec)
+		assert.Equal(t, test.expectError, err != nil)
+
+		if err != nil {
+			if test.expectEnv != nil {
+				for _, expectedEnv := range test.expectEnv {
+					assert.Contains(t, spec.Process.Env, expectedEnv)
+				}
+			}
+			if test.expectDevices != nil {
+				for _, expectedDev := range test.expectDevices {
+					assert.Contains(t, spec.Linux.Devices, expectedDev)
+				}
+			}
+		}
+	}
 }

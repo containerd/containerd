@@ -18,7 +18,6 @@ package shim
 
 import (
 	"context"
-	"os"
 	"runtime"
 	"testing"
 )
@@ -27,7 +26,7 @@ func TestRuntimeWithEmptyMaxEnvProcs(t *testing.T) {
 	var oldGoMaxProcs = runtime.GOMAXPROCS(0)
 	defer runtime.GOMAXPROCS(oldGoMaxProcs)
 
-	os.Setenv("GOMAXPROCS", "")
+	t.Setenv("GOMAXPROCS", "")
 	setRuntime()
 
 	var currentGoMaxProcs = runtime.GOMAXPROCS(0)
@@ -37,7 +36,7 @@ func TestRuntimeWithEmptyMaxEnvProcs(t *testing.T) {
 }
 
 func TestRuntimeWithNonEmptyMaxEnvProcs(t *testing.T) {
-	os.Setenv("GOMAXPROCS", "not_empty")
+	t.Setenv("GOMAXPROCS", "not_empty")
 	setRuntime()
 	var oldGoMaxProcs2 = runtime.GOMAXPROCS(0)
 	if oldGoMaxProcs2 != runtime.NumCPU() {

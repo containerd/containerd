@@ -24,13 +24,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/go-units"
-	"golang.org/x/sys/unix"
-	"gotest.tools/v3/assert"
-	is "gotest.tools/v3/assert/cmp"
-
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/testutil"
+	"github.com/docker/go-units"
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -43,36 +41,30 @@ const (
 func TestDMSetup(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	tempDir, err := os.MkdirTemp("", "dmsetup-tests-")
-	assert.NilError(t, err, "failed to make temp dir for tests")
-
-	defer func() {
-		err := os.RemoveAll(tempDir)
-		assert.NilError(t, err)
-	}()
+	tempDir := t.TempDir()
 
 	dataImage, loopDataDevice := createLoopbackDevice(t, tempDir)
 	metaImage, loopMetaDevice := createLoopbackDevice(t, tempDir)
 
 	defer func() {
-		err = mount.DetachLoopDevice(loopDataDevice, loopMetaDevice)
-		assert.NilError(t, err, "failed to detach loop devices for data image: %s and meta image: %s", dataImage, metaImage)
+		err := mount.DetachLoopDevice(loopDataDevice, loopMetaDevice)
+		assert.Nil(t, err, "failed to detach loop devices for data image: %s and meta image: %s", dataImage, metaImage)
 	}()
 
 	t.Run("CreatePool", func(t *testing.T) {
 		err := CreatePool(testPoolName, loopDataDevice, loopMetaDevice, 128)
-		assert.NilError(t, err, "failed to create thin-pool with %s %s", loopDataDevice, loopMetaDevice)
+		assert.Nil(t, err, "failed to create thin-pool with %s %s", loopDataDevice, loopMetaDevice)
 
 		table, err := Table(testPoolName)
 		t.Logf("table: %s", table)
-		assert.NilError(t, err)
-		assert.Assert(t, strings.HasPrefix(table, "0 32768 thin-pool"))
-		assert.Assert(t, strings.HasSuffix(table, "128 32768 1 skip_block_zeroing"))
+		assert.NoError(t, err)
+		assert.True(t, strings.HasPrefix(table, "0 32768 thin-pool"))
+		assert.True(t, strings.HasSuffix(table, "128 32768 1 skip_block_zeroing"))
 	})
 
 	t.Run("ReloadPool", func(t *testing.T) {
 		err := ReloadPool(testPoolName, loopDataDevice, loopMetaDevice, 256)
-		assert.NilError(t, err, "failed to reload thin-pool")
+		assert.Nil(t, err, "failed to reload thin-pool")
 	})
 
 	t.Run("CreateDevice", testCreateDevice)
@@ -87,8 +79,8 @@ func TestDMSetup(t *testing.T) {
 	t.Run("RemoveDevice", testRemoveDevice)
 
 	t.Run("RemovePool", func(t *testing.T) {
-		err = RemoveDevice(testPoolName, RemoveWithForce, RemoveWithRetries)
-		assert.NilError(t, err, "failed to remove thin-pool")
+		err := RemoveDevice(testPoolName, RemoveWithForce, RemoveWithRetries)
+		assert.Nil(t, err, "failed to remove thin-pool")
 	})
 
 	t.Run("Version", testVersion)
@@ -96,116 +88,116 @@ func TestDMSetup(t *testing.T) {
 
 func testCreateDevice(t *testing.T) {
 	err := CreateDevice(testPoolName, deviceID)
-	assert.NilError(t, err, "failed to create test device")
+	assert.Nil(t, err, "failed to create test device")
 
 	err = CreateDevice(testPoolName, deviceID)
-	assert.Assert(t, err == unix.EEXIST)
+	assert.True(t, err == unix.EEXIST)
 
 	infos, err := Info(testPoolName)
-	assert.NilError(t, err)
-	assert.Assert(t, is.Len(infos, 1), "got unexpected number of device infos")
+	assert.NoError(t, err)
+	assert.Len(t, infos, 1, "got unexpected number of device infos")
 }
 
 func testCreateSnapshot(t *testing.T) {
 	err := CreateSnapshot(testPoolName, snapshotID, deviceID)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 }
 
 func testDeleteSnapshot(t *testing.T) {
 	err := DeleteDevice(testPoolName, snapshotID)
-	assert.NilError(t, err, "failed to send delete message")
+	assert.Nil(t, err, "failed to send delete message")
 
 	err = DeleteDevice(testPoolName, snapshotID)
-	assert.Assert(t, err == unix.ENODATA)
+	assert.Equal(t, err, unix.ENODATA)
 }
 
 func testActivateDevice(t *testing.T) {
 	err := ActivateDevice(testPoolName, testDeviceName, 1, 1024, "")
-	assert.NilError(t, err, "failed to activate device")
+	assert.Nil(t, err, "failed to activate device")
 
 	err = ActivateDevice(testPoolName, testDeviceName, 1, 1024, "")
 	assert.Equal(t, err, unix.EBUSY)
 
 	if _, err := os.Stat("/dev/mapper/" + testDeviceName); err != nil && !os.IsExist(err) {
-		assert.NilError(t, err, "failed to stat device")
+		assert.Nil(t, err, "failed to stat device")
 	}
 
 	list, err := Info(testPoolName)
-	assert.NilError(t, err)
-	assert.Assert(t, is.Len(list, 1))
+	assert.NoError(t, err)
+	assert.Len(t, list, 1)
 
 	info := list[0]
 	assert.Equal(t, testPoolName, info.Name)
-	assert.Assert(t, info.TableLive)
+	assert.True(t, info.TableLive)
 }
 
 func testDeviceStatus(t *testing.T) {
 	status, err := Status(testDeviceName)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	assert.Equal(t, int64(0), status.Offset)
 	assert.Equal(t, int64(2), status.Length)
 	assert.Equal(t, "thin", status.Target)
-	assert.DeepEqual(t, status.Params, []string{"0", "-"})
+	assert.Equal(t, status.Params, []string{"0", "-"})
 }
 
 func testSuspendResumeDevice(t *testing.T) {
 	err := SuspendDevice(testDeviceName)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	err = SuspendDevice(testDeviceName)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	list, err := Info(testDeviceName)
-	assert.NilError(t, err)
-	assert.Assert(t, is.Len(list, 1))
+	assert.NoError(t, err)
+	assert.Len(t, list, 1)
 
 	info := list[0]
-	assert.Assert(t, info.Suspended)
+	assert.True(t, info.Suspended)
 
 	err = ResumeDevice(testDeviceName)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	err = ResumeDevice(testDeviceName)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 }
 
 func testDiscardBlocks(t *testing.T) {
 	err := DiscardBlocks(testDeviceName)
-	assert.NilError(t, err, "failed to discard blocks")
+	assert.Nil(t, err, "failed to discard blocks")
 }
 
 func testRemoveDevice(t *testing.T) {
 	err := RemoveDevice(testPoolName)
-	assert.Assert(t, err == unix.EBUSY, "removing thin-pool with dependencies shouldn't be allowed")
+	assert.Equal(t, err, unix.EBUSY, "removing thin-pool with dependencies shouldn't be allowed")
 
 	err = RemoveDevice(testDeviceName, RemoveWithRetries)
-	assert.NilError(t, err, "failed to remove thin-device")
+	assert.Nil(t, err, "failed to remove thin-device")
 }
 
 func testVersion(t *testing.T) {
 	version, err := Version()
-	assert.NilError(t, err)
-	assert.Assert(t, version != "")
+	assert.NoError(t, err)
+	assert.NotEmpty(t, version)
 }
 
 func createLoopbackDevice(t *testing.T, dir string) (string, string) {
 	file, err := os.CreateTemp(dir, "dmsetup-tests-")
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	size, err := units.RAMInBytes("16Mb")
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	err = file.Truncate(size)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	err = file.Close()
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	imagePath := file.Name()
 
 	loopDevice, err := mount.AttachLoopDevice(imagePath)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	return imagePath, loopDevice
 }
