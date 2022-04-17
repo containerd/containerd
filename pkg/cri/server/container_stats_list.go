@@ -36,6 +36,9 @@ func (c *criService) ListContainerStats(
 	if err != nil {
 		return nil, fmt.Errorf("failed to build metrics request: %w", err)
 	}
+	if c.client == nil {
+		return nil, fmt.Errorf("failed to fetch metrics for tasks: no client found")
+	}
 	resp, err := c.client.TaskService().Metrics(ctx, &request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch metrics for tasks: %w", err)
