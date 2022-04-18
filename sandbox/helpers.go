@@ -36,8 +36,8 @@ func ToProto(sandbox *Sandbox) types.Sandbox {
 			Options: protobuf.FromAny(sandbox.Runtime.Options),
 		},
 		Labels:     sandbox.Labels,
-		CreatedAt:  sandbox.CreatedAt,
-		UpdatedAt:  sandbox.UpdatedAt,
+		CreatedAt:  protobuf.ToTimestamp(sandbox.CreatedAt),
+		UpdatedAt:  protobuf.ToTimestamp(sandbox.UpdatedAt),
 		Extensions: extensions,
 		Spec:       protobuf.FromAny(sandbox.Spec),
 	}
@@ -61,8 +61,8 @@ func FromProto(sandboxpb *types.Sandbox) Sandbox {
 		Labels:     sandboxpb.Labels,
 		Runtime:    runtime,
 		Spec:       sandboxpb.Spec,
-		CreatedAt:  sandboxpb.CreatedAt,
-		UpdatedAt:  sandboxpb.UpdatedAt,
+		CreatedAt:  protobuf.FromTimestamp(sandboxpb.CreatedAt),
+		UpdatedAt:  protobuf.FromTimestamp(sandboxpb.UpdatedAt),
 		Extensions: extensions,
 	}
 }

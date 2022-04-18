@@ -298,7 +298,7 @@ func (l *local) Delete(ctx context.Context, r *api.DeleteTaskRequest, _ ...grpc.
 
 	return &api.DeleteResponse{
 		ExitStatus: exit.Status,
-		ExitedAt:   exit.Timestamp,
+		ExitedAt:   protobuf.ToTimestamp(exit.Timestamp),
 		Pid:        exit.Pid,
 	}, nil
 }
@@ -319,7 +319,7 @@ func (l *local) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest, 
 	return &api.DeleteResponse{
 		ID:         r.ExecID,
 		ExitStatus: exit.Status,
-		ExitedAt:   exit.Timestamp,
+		ExitedAt:   protobuf.ToTimestamp(exit.Timestamp),
 		Pid:        exit.Pid,
 	}, nil
 }
@@ -359,7 +359,7 @@ func getProcessState(ctx context.Context, p runtime.Process) (*task.Process, err
 		Stderr:     state.Stderr,
 		Terminal:   state.Terminal,
 		ExitStatus: state.ExitStatus,
-		ExitedAt:   state.ExitedAt,
+		ExitedAt:   protobuf.ToTimestamp(state.ExitedAt),
 	}, nil
 }
 
@@ -640,7 +640,7 @@ func (l *local) Wait(ctx context.Context, r *api.WaitRequest, _ ...grpc.CallOpti
 	}
 	return &api.WaitResponse{
 		ExitStatus: exit.Status,
-		ExitedAt:   exit.Timestamp,
+		ExitedAt:   protobuf.ToTimestamp(exit.Timestamp),
 	}, nil
 }
 
@@ -669,7 +669,7 @@ func getTasksMetrics(ctx context.Context, filter filters.Filter, tasks []runtime
 			continue
 		}
 		r.Metrics = append(r.Metrics, &types.Metric{
-			Timestamp: collected,
+			Timestamp: protobuf.ToTimestamp(collected),
 			ID:        tk.ID(),
 			Data:      stats,
 		})

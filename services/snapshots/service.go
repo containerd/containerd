@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/snapshots"
 	ptypes "github.com/gogo/protobuf/types"
@@ -289,8 +290,8 @@ func fromInfo(info snapshots.Info) snapshotsapi.Info {
 		Name:      info.Name,
 		Parent:    info.Parent,
 		Kind:      fromKind(info.Kind),
-		CreatedAt: info.Created,
-		UpdatedAt: info.Updated,
+		CreatedAt: protobuf.ToTimestamp(info.Created),
+		UpdatedAt: protobuf.ToTimestamp(info.Updated),
 		Labels:    info.Labels,
 	}
 }
@@ -319,8 +320,8 @@ func toInfo(info snapshotsapi.Info) snapshots.Info {
 		Name:    info.Name,
 		Parent:  info.Parent,
 		Kind:    toKind(info.Kind),
-		Created: info.CreatedAt,
-		Updated: info.UpdatedAt,
+		Created: protobuf.FromTimestamp(info.CreatedAt),
+		Updated: protobuf.FromTimestamp(info.UpdatedAt),
 		Labels:  info.Labels,
 	}
 }

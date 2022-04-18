@@ -52,7 +52,7 @@ service Leases {
 message Lease {
 	string id = 1;
 
-	google.protobuf.Timestamp created_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp created_at = 2;
 
 	map<string, string> labels = 3;
 }

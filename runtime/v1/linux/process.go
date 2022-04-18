@@ -26,6 +26,7 @@ import (
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/runtime"
 	shim "github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/ttrpc"
@@ -150,7 +151,7 @@ func (p *Process) Wait(ctx context.Context) (*runtime.Exit, error) {
 		return nil, err
 	}
 	return &runtime.Exit{
-		Timestamp: r.ExitedAt,
+		Timestamp: protobuf.FromTimestamp(r.ExitedAt),
 		Status:    r.ExitStatus,
 	}, nil
 }
@@ -165,7 +166,7 @@ func (p *Process) Delete(ctx context.Context) (*runtime.Exit, error) {
 	}
 	return &runtime.Exit{
 		Status:    r.ExitStatus,
-		Timestamp: r.ExitedAt,
+		Timestamp: protobuf.FromTimestamp(r.ExitedAt),
 		Pid:       r.Pid,
 	}, nil
 }

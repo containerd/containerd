@@ -41,7 +41,7 @@ message ForwardRequest {
 
 message Envelope {
 	option (containerd.plugin.fieldpath) = true;
-	google.protobuf.Timestamp timestamp = 1 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp timestamp = 1;
 	string namespace = 2;
 	string topic = 3;
 	google.protobuf.Any event = 4;

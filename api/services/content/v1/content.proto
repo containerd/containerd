@@ -98,10 +98,10 @@ message Info {
 	int64 size = 2;
 
 	// CreatedAt provides the time at which the blob was committed.
-	google.protobuf.Timestamp created_at = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp created_at = 3;
 
 	// UpdatedAt provides the time the info was last updated.
-	google.protobuf.Timestamp updated_at = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp updated_at = 4;
 
 	// Labels are arbitrary data on snapshots.
 	//
@@ -179,8 +179,8 @@ message ReadContentResponse {
 }
 
 message Status {
-	google.protobuf.Timestamp started_at = 1 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-	google.protobuf.Timestamp updated_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp started_at = 1;
+	google.protobuf.Timestamp updated_at = 2;
 	string ref = 3;
 	int64 offset = 4;
 	int64 total = 5;
@@ -301,13 +301,13 @@ message WriteContentResponse {
 	//
 	// This must be set for stat and commit write actions. All other write
 	// actions may omit this.
-	google.protobuf.Timestamp started_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp started_at = 2;
 
 	// UpdatedAt provides the last time of a successful write.
 	//
 	// This must be set for stat and commit write actions. All other write
 	// actions may omit this.
-	google.protobuf.Timestamp updated_at = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp updated_at = 3;
 
 	// Offset is the current committed size for the write.
 	int64 offset = 4;

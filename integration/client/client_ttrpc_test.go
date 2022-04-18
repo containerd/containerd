@@ -24,6 +24,7 @@ import (
 	v1 "github.com/containerd/containerd/api/services/ttrpc/events/v1"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/ttrpcutil"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/ttrpc"
 	"github.com/gogo/protobuf/types"
 	"github.com/stretchr/testify/assert"
@@ -56,7 +57,7 @@ func TestClientTTRPC_Reconnect(t *testing.T) {
 	// Send test request to make sure its alive after reconnect
 	_, err = service.Forward(context.Background(), &v1.ForwardRequest{
 		Envelope: &v1.Envelope{
-			Timestamp: time.Now(),
+			Timestamp: protobuf.ToTimestamp(time.Now()),
 			Namespace: namespaces.Default,
 			Topic:     "/test",
 			Event:     &types.Any{},

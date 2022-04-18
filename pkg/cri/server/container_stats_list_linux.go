@@ -23,6 +23,7 @@ import (
 	"github.com/containerd/containerd/api/types"
 	v1 "github.com/containerd/containerd/metrics/types/v1"
 	v2 "github.com/containerd/containerd/metrics/types/v2"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/typeurl"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -64,13 +65,13 @@ func (c *criService) containerMetrics(
 			return nil, fmt.Errorf("failed to extract container metrics: %w", err)
 		}
 
-		cpuStats, err := c.cpuContainerStats(meta.ID, false /* isSandbox */, s, stats.Timestamp)
+		cpuStats, err := c.cpuContainerStats(meta.ID, false /* isSandbox */, s, protobuf.FromTimestamp(stats.Timestamp))
 		if err != nil {
 			return nil, fmt.Errorf("failed to obtain cpu stats: %w", err)
 		}
 		cs.Cpu = cpuStats
 
-		memoryStats, err := c.memoryContainerStats(meta.ID, s, stats.Timestamp)
+		memoryStats, err := c.memoryContainerStats(meta.ID, s, protobuf.FromTimestamp(stats.Timestamp))
 		if err != nil {
 			return nil, fmt.Errorf("failed to obtain memory stats: %w", err)
 		}

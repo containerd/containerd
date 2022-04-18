@@ -113,10 +113,10 @@ message Info {
 	Kind kind = 3;
 
 	// CreatedAt provides the time at which the snapshot was created.
-	google.protobuf.Timestamp created_at = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp created_at = 4;
 
 	// UpdatedAt provides the time the info was last updated.
-	google.protobuf.Timestamp updated_at = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp updated_at = 5;
 
 	// Labels are arbitrary data on snapshots.
 	//

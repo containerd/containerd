@@ -608,10 +608,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "exitedAt"
     }
     field {
@@ -689,10 +685,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "exitedAt"
     }
   }
@@ -899,10 +891,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "createdAt"
     }
     field {
@@ -911,10 +899,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "updatedAt"
     }
     field {
@@ -1196,10 +1180,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "createdAt"
     }
     field {
@@ -1208,10 +1188,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "updatedAt"
     }
     field {
@@ -1386,10 +1362,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "startedAt"
     }
     field {
@@ -1398,10 +1370,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "updatedAt"
     }
     field {
@@ -1568,10 +1536,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "startedAt"
     }
     field {
@@ -1580,10 +1544,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "updatedAt"
     }
     field {
@@ -1962,10 +1922,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "timestamp"
     }
     field {
@@ -2060,10 +2016,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "createdAt"
     }
     field {
@@ -2072,10 +2024,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "updatedAt"
     }
     nested_type {
@@ -2494,10 +2442,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "createdAt"
     }
     field {
@@ -2987,10 +2931,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "createdAt"
     }
     field {
@@ -2999,10 +2939,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "updatedAt"
     }
     field {
@@ -3299,10 +3235,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "exitedAt"
     }
   }
@@ -3352,10 +3284,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "exitedAt"
     }
     field {
@@ -3702,10 +3630,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "createdAt"
     }
     field {
@@ -3714,10 +3638,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "updatedAt"
     }
     field {
@@ -3973,10 +3893,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "timestamp"
     }
     field {
@@ -4078,10 +3994,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "exitedAt"
     }
   }
@@ -4295,10 +4207,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "exitedAt"
     }
   }
@@ -4686,10 +4594,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "exitedAt"
     }
   }
@@ -4813,10 +4717,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
-      options {
-        65010: 1
-        65001: 0
-      }
       json_name: "timestamp"
     }
     field {

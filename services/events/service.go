@@ -113,7 +113,7 @@ func (s *service) Subscribe(req *api.SubscribeRequest, srv api.Events_SubscribeS
 
 func toProto(env *events.Envelope) *api.Envelope {
 	return &api.Envelope{
-		Timestamp: env.Timestamp,
+		Timestamp: protobuf.ToTimestamp(env.Timestamp),
 		Namespace: env.Namespace,
 		Topic:     env.Topic,
 		Event:     protobuf.FromAny(env.Event),
@@ -122,7 +122,7 @@ func toProto(env *events.Envelope) *api.Envelope {
 
 func fromProto(env *api.Envelope) *events.Envelope {
 	return &events.Envelope{
-		Timestamp: env.Timestamp,
+		Timestamp: protobuf.FromTimestamp(env.Timestamp),
 		Namespace: env.Namespace,
 		Topic:     env.Topic,
 		Event:     env.Event,

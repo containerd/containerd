@@ -23,6 +23,7 @@ import (
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/protobuf"
 	api "github.com/containerd/containerd/sandbox"
 	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/types"
@@ -106,7 +107,7 @@ func (s *sandboxClient) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 
 		c <- ExitStatus{
 			code:     resp.ExitStatus,
-			exitedAt: resp.ExitedAt,
+			exitedAt: protobuf.FromTimestamp(resp.ExitedAt),
 		}
 	}()
 

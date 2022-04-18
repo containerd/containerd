@@ -265,7 +265,7 @@ func (s *service) Cleanup(ctx context.Context) (*taskAPI.DeleteResponse, error) 
 	}
 
 	return &taskAPI.DeleteResponse{
-		ExitedAt:   time.Now(),
+		ExitedAt:   protobuf.ToTimestamp(time.Now()),
 		ExitStatus: 128 + uint32(unix.SIGKILL),
 		Pid:        uint32(pid),
 	}, nil
@@ -361,12 +361,12 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAP
 			ContainerID: container.ID,
 			Pid:         uint32(p.Pid()),
 			ExitStatus:  uint32(p.ExitStatus()),
-			ExitedAt:    p.ExitedAt(),
+			ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
 		})
 	}
 	return &taskAPI.DeleteResponse{
 		ExitStatus: uint32(p.ExitStatus()),
-		ExitedAt:   p.ExitedAt(),
+		ExitedAt:   protobuf.ToTimestamp(p.ExitedAt()),
 		Pid:        uint32(p.Pid()),
 	}, nil
 }
@@ -440,7 +440,7 @@ func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.
 		Stderr:     sio.Stderr,
 		Terminal:   sio.Terminal,
 		ExitStatus: uint32(p.ExitStatus()),
-		ExitedAt:   p.ExitedAt(),
+		ExitedAt:   protobuf.ToTimestamp(p.ExitedAt()),
 	}, nil
 }
 
@@ -571,7 +571,7 @@ func (s *service) Wait(ctx context.Context, r *taskAPI.WaitRequest) (*taskAPI.Wa
 
 	return &taskAPI.WaitResponse{
 		ExitStatus: uint32(p.ExitStatus()),
-		ExitedAt:   p.ExitedAt(),
+		ExitedAt:   protobuf.ToTimestamp(p.ExitedAt()),
 	}, nil
 }
 
@@ -659,7 +659,7 @@ func (s *service) checkProcesses(e runcC.Exit) {
 				ID:          p.ID(),
 				Pid:         uint32(e.Pid),
 				ExitStatus:  uint32(e.Status),
-				ExitedAt:    p.ExitedAt(),
+				ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
 			})
 			return
 		}

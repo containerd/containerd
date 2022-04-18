@@ -23,6 +23,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/gogo/protobuf/types"
 	"google.golang.org/grpc"
 )
@@ -156,6 +157,6 @@ func leaseToGRPC(l leases.Lease) *api.Lease {
 	return &api.Lease{
 		ID:        l.ID,
 		Labels:    l.Labels,
-		CreatedAt: l.CreatedAt,
+		CreatedAt: protobuf.ToTimestamp(l.CreatedAt),
 	}
 }

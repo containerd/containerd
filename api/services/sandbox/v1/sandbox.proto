@@ -116,7 +116,7 @@ message ControllerWaitRequest {
 
 message ControllerWaitResponse {
 	uint32 exit_status = 1;
-	google.protobuf.Timestamp exited_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp exited_at = 2;
 }
 
 message ControllerStatusRequest {
@@ -128,6 +128,6 @@ message ControllerStatusResponse {
 	uint32 pid = 2;
 	string state = 3;
 	uint32 exit_status = 4;
-	google.protobuf.Timestamp exited_at = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp exited_at = 5;
 	google.protobuf.Any extra = 6;
 }

@@ -116,7 +116,7 @@ func (l *RemoteEventsPublisher) Publish(ctx context.Context, topic string, event
 	}
 	i := &item{
 		ev: &v1.Envelope{
-			Timestamp: time.Now(),
+			Timestamp: protobuf.ToTimestamp(time.Now()),
 			Namespace: ns,
 			Topic:     topic,
 			Event:     any,

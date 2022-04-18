@@ -24,6 +24,7 @@ import (
 	contentapi "github.com/containerd/containerd/api/services/content/v1"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/protobuf"
 	digest "github.com/opencontainers/go-digest"
 )
 
@@ -64,8 +65,8 @@ func (rw *remoteWriter) Status() (content.Status, error) {
 		Ref:       rw.ref,
 		Offset:    resp.Offset,
 		Total:     resp.Total,
-		StartedAt: resp.StartedAt,
-		UpdatedAt: resp.UpdatedAt,
+		StartedAt: protobuf.FromTimestamp(resp.StartedAt),
+		UpdatedAt: protobuf.FromTimestamp(resp.UpdatedAt),
 	}, nil
 }
 

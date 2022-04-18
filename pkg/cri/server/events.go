@@ -32,6 +32,7 @@ import (
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/typeurl"
 	"github.com/sirupsen/logrus"
 	"k8s.io/utils/clock"
@@ -123,7 +124,7 @@ func (em *eventMonitor) startSandboxExitMonitor(ctx context.Context, id string, 
 				ID:          id,
 				Pid:         pid,
 				ExitStatus:  exitStatus,
-				ExitedAt:    exitedAt,
+				ExitedAt:    protobuf.ToTimestamp(exitedAt),
 			}
 
 			logrus.Debugf("received exit event %+v", e)
@@ -174,7 +175,7 @@ func (em *eventMonitor) startContainerExitMonitor(ctx context.Context, id string
 				ID:          id,
 				Pid:         pid,
 				ExitStatus:  exitStatus,
-				ExitedAt:    exitedAt,
+				ExitedAt:    protobuf.ToTimestamp(exitedAt),
 			}
 
 			logrus.Debugf("received exit event %+v", e)
@@ -393,7 +394,7 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 	err = cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
 		if status.FinishedAt == 0 {
 			status.Pid = 0
-			status.FinishedAt = e.ExitedAt.UnixNano()
+			status.FinishedAt = protobuf.FromTimestamp(e.ExitedAt).UnixNano()
 			status.ExitCode = int32(e.ExitStatus)
 		}
 
