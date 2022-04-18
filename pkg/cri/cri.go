@@ -113,18 +113,25 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 
 // getServicesOpts get service options from plugin context.
 func getServicesOpts(ic *plugin.InitContext) ([]containerd.ServicesOpt, error) {
+	var opts []containerd.ServicesOpt
+	for t, fn := range map[plugin.Type]func(interface{}) containerd.ServicesOpt{
+		plugin.EventPlugin: func(i interface{}) containerd.ServicesOpt {
+			return containerd.WithEventService(i.(containerd.EventService))
+		},
+		plugin.LeasePlugin: func(i interface{}) containerd.ServicesOpt {
+			return containerd.WithLeasesService(i.(leases.Manager))
+		},
+	} {
+		i, err := ic.Get(t)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get %q plugin: %w", t, err)
+		}
+		opts = append(opts, fn(i))
+	}
+
 	plugins, err := ic.GetByType(plugin.ServicePlugin)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get service plugin: %w", err)
-	}
-
-	ep, err := ic.Get(plugin.EventPlugin)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get event plugin: %w", err)
-	}
-
-	opts := []containerd.ServicesOpt{
-		containerd.WithEventService(ep.(containerd.EventService)),
 	}
 	for s, fn := range map[string]func(interface{}) containerd.ServicesOpt{
 		services.ContentService: func(s interface{}) containerd.ServicesOpt {
@@ -147,9 +154,6 @@ func getServicesOpts(ic *plugin.InitContext) ([]containerd.ServicesOpt, error) {
 		},
 		services.NamespacesService: func(s interface{}) containerd.ServicesOpt {
 			return containerd.WithNamespaceClient(s.(namespaces.NamespacesClient))
-		},
-		services.LeasesService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithLeasesService(s.(leases.Manager))
 		},
 		services.IntrospectionService: func(s interface{}) containerd.ServicesOpt {
 			return containerd.WithIntrospectionClient(s.(introspectionapi.IntrospectionClient))

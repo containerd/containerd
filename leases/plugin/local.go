@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package leases
+package plugin
 
 import (
 	"context"
@@ -23,15 +23,15 @@ import (
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/services"
 )
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type: plugin.ServicePlugin,
-		ID:   services.LeasesService,
+		Type: plugin.LeasePlugin,
+		ID:   "manager",
 		Requires: []plugin.Type{
 			plugin.MetadataPlugin,
+			plugin.GCPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			m, err := ic.Get(plugin.MetadataPlugin)
