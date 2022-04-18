@@ -253,13 +253,13 @@ mandir:
 # Kept for backwards compatibility
 genman: man/containerd.8 man/ctr.8
 
-man/containerd.8: FORCE
+man/containerd.8: bin/gen-manpages FORCE
 	@echo "$(WHALE) $@"
-	$(GO) run -mod=readonly ${GO_TAGS} cmd/gen-manpages/main.go $(@F) $(@D)
+	$< $(@F) $(@D)
 
-man/ctr.8: FORCE
+man/ctr.8: bin/gen-manpages FORCE
 	@echo "$(WHALE) $@"
-	$(GO) run -mod=readonly ${GO_TAGS} cmd/gen-manpages/main.go $(@F) $(@D)
+	$< $(@F) $(@D)
 
 man/%: docs/man/%.md FORCE
 	@echo "$(WHALE) $@"
