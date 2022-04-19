@@ -18,13 +18,13 @@
 package proto
 
 import (
-	gogo "github.com/gogo/protobuf/proto"
+	google "google.golang.org/protobuf/proto"
 )
 
-func Marshal(input gogo.Message) ([]byte, error) {
-	return gogo.Marshal(input)
+func Marshal(input google.Message) ([]byte, error) {
+	return google.Marshal(input)
 }
 
-func Unmarshal(input []byte, output gogo.Message) error {
-	return gogo.Unmarshal(input, output)
+func Unmarshal(input []byte, output google.Message) error {
+	return google.Unmarshal(input, output)
 }

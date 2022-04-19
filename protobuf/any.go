@@ -17,28 +17,28 @@
 package protobuf
 
 import (
-	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/typeurl"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // FromAny converts typeurl.Any to github.com/containerd/containerd/protobuf/types.Any.
-func FromAny(from typeurl.Any) *types.Any {
+func FromAny(from typeurl.Any) *anypb.Any {
 	if from == nil {
 		return nil
 	}
 
-	if pbany, ok := from.(*types.Any); ok {
+	if pbany, ok := from.(*anypb.Any); ok {
 		return pbany
 	}
 
-	return &types.Any{
+	return &anypb.Any{
 		TypeUrl: from.GetTypeUrl(),
 		Value:   from.GetValue(),
 	}
 }
 
 // FromAny converts an arbitrary interface to github.com/containerd/containerd/protobuf/types.Any.
-func MarshalAnyToProto(from interface{}) (*types.Any, error) {
+func MarshalAnyToProto(from interface{}) (*anypb.Any, error) {
 	any, err := typeurl.MarshalAny(from)
 	if err != nil {
 		return nil, err

@@ -36,7 +36,7 @@ func (c *criService) ListContainerStats(
 	if err != nil {
 		return nil, fmt.Errorf("failed to build metrics request: %w", err)
 	}
-	resp, err := c.client.TaskService().Metrics(ctx, &request)
+	resp, err := c.client.TaskService().Metrics(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch metrics for tasks: %w", err)
 	}
@@ -79,8 +79,8 @@ func (c *criService) normalizeContainerStatsFilter(filter *runtime.ContainerStat
 // the information in the stats request and the containerStore
 func (c *criService) buildTaskMetricsRequest(
 	r *runtime.ListContainerStatsRequest,
-) (tasks.MetricsRequest, []containerstore.Container, error) {
-	var req tasks.MetricsRequest
+) (*tasks.MetricsRequest, []containerstore.Container, error) {
+	req := &tasks.MetricsRequest{}
 	if r.GetFilter() == nil {
 		return req, c.containerStore.List(), nil
 	}
