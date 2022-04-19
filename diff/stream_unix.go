@@ -28,8 +28,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/gogo/protobuf/proto"
-	"github.com/gogo/protobuf/types"
+	"github.com/containerd/containerd/protobuf/proto"
+	"github.com/containerd/containerd/protobuf/types"
 	exec "golang.org/x/sys/execabs"
 )
 

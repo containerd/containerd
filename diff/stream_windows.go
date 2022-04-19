@@ -27,8 +27,8 @@ import (
 	"sync"
 
 	winio "github.com/Microsoft/go-winio"
-	"github.com/gogo/protobuf/proto"
-	"github.com/gogo/protobuf/types"
+	"github.com/containerd/containerd/protobuf/proto"
+	"github.com/containerd/containerd/protobuf/types"
 	"github.com/sirupsen/logrus"
 	exec "golang.org/x/sys/execabs"
 )

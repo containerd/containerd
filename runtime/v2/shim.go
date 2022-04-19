@@ -34,11 +34,11 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/protobuf"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime"
 	client "github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/ttrpc"
-	ptypes "github.com/gogo/protobuf/types"
 	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
 )

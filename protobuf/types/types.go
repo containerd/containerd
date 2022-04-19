@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -17,17 +14,13 @@
    limitations under the License.
 */
 
-package common
+// Package types provides convinient aliases that make google.golang.org/protobuf migration easier.
+package types
 
 import (
-	"context"
-
-	"github.com/containerd/containerd/protobuf/types"
+	gogo "github.com/gogo/protobuf/types"
 )
 
-// Statable type that returns cgroup metrics
-type Statable interface {
-	ID() string
-	Namespace() string
-	Stats(context.Context) (*types.Any, error)
-}
+type Empty = gogo.Empty
+type Any = gogo.Any
+type FieldMask = gogo.FieldMask

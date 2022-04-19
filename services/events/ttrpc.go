@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/protobuf"
-	ptypes "github.com/gogo/protobuf/types"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 )
 
 type ttrpcService struct {

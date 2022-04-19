@@ -20,8 +20,8 @@ import (
 	api "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/typeurl"
-	"github.com/gogo/protobuf/types"
 )
 
 func containersToProto(containers []containers.Container) []api.Container {

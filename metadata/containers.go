@@ -30,9 +30,9 @@ import (
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/protobuf/proto"
+	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/typeurl"
-	"github.com/gogo/protobuf/proto"
-	"github.com/gogo/protobuf/types"
 	bolt "go.etcd.io/bbolt"
 )
 

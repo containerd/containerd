@@ -39,6 +39,7 @@ import (
 	"github.com/containerd/containerd/pkg/stdio"
 	"github.com/containerd/containerd/pkg/userns"
 	"github.com/containerd/containerd/protobuf"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime/v2/runc"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/runtime/v2/shim"
@@ -48,7 +49,6 @@ import (
 	runcC "github.com/containerd/go-runc"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl"
-	ptypes "github.com/gogo/protobuf/types"
 	"github.com/sirupsen/logrus"
 )
 

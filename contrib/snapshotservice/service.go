@@ -24,8 +24,8 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/protobuf"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/snapshots"
-	ptypes "github.com/gogo/protobuf/types"
 )
 
 var empty = &ptypes.Empty{}

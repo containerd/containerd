@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/protobuf"
-	protobuftypes "github.com/gogo/protobuf/types"
+	protobuftypes "github.com/containerd/containerd/protobuf/types"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )

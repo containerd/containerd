@@ -27,8 +27,8 @@ import (
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/ttrpc"
-	ptypes "github.com/gogo/protobuf/types"
 	"google.golang.org/grpc"
 )
 

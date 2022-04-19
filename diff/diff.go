@@ -21,7 +21,7 @@ import (
 	"io"
 
 	"github.com/containerd/containerd/mount"
-	"github.com/gogo/protobuf/types"
+	"github.com/containerd/containerd/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 

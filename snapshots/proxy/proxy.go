@@ -25,8 +25,8 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/protobuf"
+	protobuftypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/snapshots"
-	protobuftypes "github.com/gogo/protobuf/types"
 )
 
 // NewSnapshotter returns a new Snapshotter which communicates over a GRPC

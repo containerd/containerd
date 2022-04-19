@@ -24,9 +24,9 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/protobuf/types"
 	api "github.com/containerd/containerd/sandbox"
 	"github.com/containerd/typeurl"
-	"github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 )
 
