@@ -23,7 +23,7 @@ import (
 	api "github.com/containerd/containerd/api/services/namespaces/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/gogo/protobuf/types"
+	"github.com/containerd/containerd/protobuf/types"
 )
 
 // NewNamespaceStoreFromClient returns a new namespace store

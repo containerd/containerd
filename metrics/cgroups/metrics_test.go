@@ -35,8 +35,8 @@ import (
 	"github.com/containerd/containerd/protobuf"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/containerd/containerd/protobuf/types"
 	metrics "github.com/docker/go-metrics"
-	"github.com/gogo/protobuf/types"
 )
 
 // TestRegressionIssue6772 should not have dead-lock when Collect and Add run

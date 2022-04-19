@@ -25,8 +25,8 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/ttrpcutil"
 	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/ttrpc"
-	"github.com/gogo/protobuf/types"
 	"github.com/stretchr/testify/assert"
 )
 

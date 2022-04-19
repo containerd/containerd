@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -17,17 +14,17 @@
    limitations under the License.
 */
 
-package common
+// Package proto provides convinient aliases that make google.golang.org/protobuf migration easier.
+package proto
 
 import (
-	"context"
-
-	"github.com/containerd/containerd/protobuf/types"
+	gogo "github.com/gogo/protobuf/proto"
 )
 
-// Statable type that returns cgroup metrics
-type Statable interface {
-	ID() string
-	Namespace() string
-	Stats(context.Context) (*types.Any, error)
+func Marshal(input gogo.Message) ([]byte, error) {
+	return gogo.Marshal(input)
+}
+
+func Unmarshal(input []byte, output gogo.Message) error {
+	return gogo.Unmarshal(input, output)
 }

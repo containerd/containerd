@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/dialer"
-	"github.com/gogo/protobuf/types"
+	"github.com/containerd/containerd/protobuf/types"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"

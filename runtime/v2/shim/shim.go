@@ -35,10 +35,10 @@ import (
 	"github.com/containerd/containerd/pkg/shutdown"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/protobuf/proto"
 	shimapi "github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/containerd/version"
 	"github.com/containerd/ttrpc"
-	"github.com/gogo/protobuf/proto"
 	"github.com/sirupsen/logrus"
 )
 

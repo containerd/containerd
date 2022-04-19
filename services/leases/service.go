@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf"
-	ptypes "github.com/gogo/protobuf/types"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 	"google.golang.org/grpc"
 )
 

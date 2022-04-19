@@ -24,9 +24,9 @@ import (
 	"os"
 
 	"github.com/containerd/containerd/errdefs"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime/v2/shim"
 	taskAPI "github.com/containerd/containerd/runtime/v2/task"
-	ptypes "github.com/gogo/protobuf/types"
 )
 
 var (

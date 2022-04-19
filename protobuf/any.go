@@ -17,11 +17,11 @@
 package protobuf
 
 import (
+	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/typeurl"
-	"github.com/gogo/protobuf/types"
 )
 
-// FromAny converts typeurl.Any to github.com/gogo/protobuf/types.Any.
+// FromAny converts typeurl.Any to github.com/containerd/containerd/protobuf/types.Any.
 func FromAny(from typeurl.Any) *types.Any {
 	if from == nil {
 		return nil
@@ -37,7 +37,7 @@ func FromAny(from typeurl.Any) *types.Any {
 	}
 }
 
-// FromAny converts an arbitrary interface to github.com/gogo/protobuf/types.Any.
+// FromAny converts an arbitrary interface to github.com/containerd/containerd/protobuf/types.Any.
 func MarshalAnyToProto(from interface{}) (*types.Any, error) {
 	any, err := typeurl.MarshalAny(from)
 	if err != nil {

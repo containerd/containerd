@@ -32,11 +32,11 @@ import (
 	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/v1/shim/client"
 	"github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/ttrpc"
-	"github.com/gogo/protobuf/types"
 )
 
 // Task on a linux based system
