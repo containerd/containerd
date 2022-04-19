@@ -19,20 +19,24 @@ package client
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"syscall"
 	"testing"
 	"time"
 
 	. "github.com/containerd/containerd"
-	"github.com/containerd/containerd/containers"
+	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/testutil"
+	"github.com/containerd/containerd/runtime/restart"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/containerd/containerd/sys"
+	"github.com/containerd/typeurl"
 	exec "golang.org/x/sys/execabs"
 )
 
@@ -148,7 +152,7 @@ version = 2
 			oci.WithImageConfig(image),
 			longCommand,
 		),
-		withRestartStatus(Running),
+		restart.WithStatus(Running),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -229,14 +233,115 @@ version = 2
 	t.Logf("%v: the task was restarted since %v", time.Now(), lastCheck)
 }
 
-// withRestartStatus is a copy of "github.com/containerd/containerd/runtime/restart".WithStatus.
-// This copy is needed because `go test` refuses circular imports.
-func withRestartStatus(status ProcessStatus) func(context.Context, *Client, *containers.Container) error {
-	return func(_ context.Context, _ *Client, c *containers.Container) error {
-		if c.Labels == nil {
-			c.Labels = make(map[string]string)
-		}
-		c.Labels["containerd.io/restart.status"] = string(status)
-		return nil
+func TestRestartMonitorWithOnFailurePolicy(t *testing.T) {
+	const (
+		interval = 5 * time.Second
+	)
+	configTOML := fmt.Sprintf(`
+version = 2
+[plugins]
+  [plugins."io.containerd.internal.v1.restart"]
+	  interval = "%s"
+`, interval.String())
+	client, _, cleanup := newDaemonWithConfig(t, configTOML)
+	defer cleanup()
+
+	var (
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err := client.Pull(ctx, testImage, WithPullUnpack)
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	policy, _ := restart.NewPolicy("on-failure:1")
+	container, err := client.NewContainer(ctx, id,
+		WithNewSnapshot(id, image),
+		WithNewSpec(
+			oci.WithImageConfig(image),
+			// always exited with 1
+			withExitStatus(1),
+		),
+		restart.WithStatus(Running),
+		restart.WithPolicy(policy),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := container.Delete(ctx, WithSnapshotCleanup); err != nil {
+			t.Logf("failed to delete container: %v", err)
+		}
+	}()
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if _, err := task.Delete(ctx, WithProcessKill); err != nil {
+			t.Logf("failed to delete task: %v", err)
+		}
+	}()
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	statusCh, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eventCh, eventErrCh := client.Subscribe(ctx, `topic=="/tasks/create"`)
+
+	select {
+	case <-statusCh:
+	case <-time.After(30 * time.Second):
+		t.Fatal("should receive exit event in time")
+	}
+
+	select {
+	case e := <-eventCh:
+		cid, err := convertTaskCreateEvent(e.Event)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cid != id {
+			t.Fatalf("expected task id = %s, but got %s", id, cid)
+		}
+	case err := <-eventErrCh:
+		t.Fatalf("unexpected error from event channel: %v", err)
+	case <-time.After(1 * time.Minute):
+		t.Fatal("should receive create event in time")
+	}
+
+	labels, err := container.Labels(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	restartCount, _ := strconv.Atoi(labels[restart.CountLabel])
+	if restartCount != 1 {
+		t.Fatalf("expected restart count to be 1, got %d", restartCount)
+	}
+}
+
+func convertTaskCreateEvent(e typeurl.Any) (string, error) {
+	id := ""
+
+	evt, err := typeurl.UnmarshalAny(e)
+	if err != nil {
+		return "", fmt.Errorf("failed to unmarshalany: %w", err)
+	}
+
+	switch e := evt.(type) {
+	case *eventtypes.TaskCreate:
+		id = e.ContainerID
+	default:
+		return "", errors.New("unsupported event")
+	}
+	return id, nil
 }

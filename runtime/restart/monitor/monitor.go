@@ -19,6 +19,7 @@ package monitor
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -72,6 +73,7 @@ func init() {
 			},
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			ic.Meta.Capabilities = []string{"no", "always", "on-failure", "unless-stopped"}
 			opts, err := getServicesOpts(ic)
 			if err != nil {
 				return nil, err
@@ -217,15 +219,29 @@ func (m *monitor) monitor(ctx context.Context) ([]change, error) {
 			return nil, err
 		}
 		desiredStatus := containerd.ProcessStatus(labels[restart.StatusLabel])
-		if m.isSameStatus(ctx, desiredStatus, c) {
+		task, err := c.Task(ctx, nil)
+		if err != nil && desiredStatus == containerd.Stopped {
 			continue
 		}
+		status, err := task.Status(ctx)
+		if err != nil && desiredStatus == containerd.Stopped {
+			continue
+		}
+		if desiredStatus == status.Status {
+			continue
+		}
+
 		switch desiredStatus {
 		case containerd.Running:
+			if !restart.Reconcile(status, labels) {
+				continue
+			}
+			restartCount, _ := strconv.Atoi(labels[restart.CountLabel])
 			changes = append(changes, &startChange{
 				container: c,
 				logPath:   labels[restart.LogPathLabel],
 				logURI:    labels[restart.LogURILabel],
+				count:     restartCount + 1,
 			})
 		case containerd.Stopped:
 			changes = append(changes, &stopChange{
@@ -234,16 +250,4 @@ func (m *monitor) monitor(ctx context.Context) ([]change, error) {
 		}
 	}
 	return changes, nil
-}
-
-func (m *monitor) isSameStatus(ctx context.Context, desired containerd.ProcessStatus, container containerd.Container) bool {
-	task, err := container.Task(ctx, nil)
-	if err != nil {
-		return desired == containerd.Stopped
-	}
-	state, err := task.Status(ctx)
-	if err != nil {
-		return desired == containerd.Stopped
-	}
-	return desired == state.Status
 }
