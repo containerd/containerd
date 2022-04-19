@@ -145,6 +145,9 @@ func NewUnpacker(ctx context.Context, cs content.Store, opts ...UnpackerOpt) (*U
 			return nil, err
 		}
 	}
+	if len(u.platforms) == 0 {
+		return nil, fmt.Errorf("no unpack platforms defined: %w", errdefs.ErrInvalidArgument)
+	}
 	return u, nil
 }
 
