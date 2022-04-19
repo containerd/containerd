@@ -17,8 +17,15 @@
 package metrics
 
 import (
+	"time"
+
+	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/version"
 	goMetrics "github.com/docker/go-metrics"
+)
+
+const (
+	ShimStatsRequestTimeout = "io.containerd.timeout.metrics.shimstats"
 )
 
 func init() {
@@ -26,4 +33,5 @@ func init() {
 	c := ns.NewLabeledCounter("build_info", "containerd build information", "version", "revision")
 	c.WithValues(version.Version, version.Revision).Inc()
 	goMetrics.Register(ns)
+	timeout.Set(ShimStatsRequestTimeout, 2*time.Second)
 }
