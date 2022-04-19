@@ -23,6 +23,7 @@ import (
 	contentapi "github.com/containerd/containerd/api/services/content/v1"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/protobuf"
 	protobuftypes "github.com/gogo/protobuf/types"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -115,8 +116,8 @@ func (pcs *proxyContentStore) Status(ctx context.Context, ref string) (content.S
 	status := resp.Status
 	return content.Status{
 		Ref:       status.Ref,
-		StartedAt: status.StartedAt,
-		UpdatedAt: status.UpdatedAt,
+		StartedAt: protobuf.FromTimestamp(status.StartedAt),
+		UpdatedAt: protobuf.FromTimestamp(status.UpdatedAt),
 		Offset:    status.Offset,
 		Total:     status.Total,
 		Expected:  digest.Digest(status.Expected),
@@ -148,8 +149,8 @@ func (pcs *proxyContentStore) ListStatuses(ctx context.Context, filters ...strin
 	for _, status := range resp.Statuses {
 		statuses = append(statuses, content.Status{
 			Ref:       status.Ref,
-			StartedAt: status.StartedAt,
-			UpdatedAt: status.UpdatedAt,
+			StartedAt: protobuf.FromTimestamp(status.StartedAt),
+			UpdatedAt: protobuf.FromTimestamp(status.UpdatedAt),
 			Offset:    status.Offset,
 			Total:     status.Total,
 			Expected:  digest.Digest(status.Expected),
@@ -217,8 +218,8 @@ func infoToGRPC(info content.Info) contentapi.Info {
 	return contentapi.Info{
 		Digest:    info.Digest.String(),
 		Size_:     info.Size,
-		CreatedAt: info.CreatedAt,
-		UpdatedAt: info.UpdatedAt,
+		CreatedAt: protobuf.ToTimestamp(info.CreatedAt),
+		UpdatedAt: protobuf.ToTimestamp(info.UpdatedAt),
 		Labels:    info.Labels,
 	}
 }
@@ -227,8 +228,8 @@ func infoFromGRPC(info contentapi.Info) content.Info {
 	return content.Info{
 		Digest:    digest.Digest(info.Digest),
 		Size:      info.Size_,
-		CreatedAt: info.CreatedAt,
-		UpdatedAt: info.UpdatedAt,
+		CreatedAt: protobuf.FromTimestamp(info.CreatedAt),
+		UpdatedAt: protobuf.FromTimestamp(info.UpdatedAt),
 		Labels:    info.Labels,
 	}
 }

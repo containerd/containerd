@@ -463,7 +463,7 @@ func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, 
 		ID:          id,
 		Pid:         uint32(pid),
 		ExitStatus:  128 + uint32(unix.SIGKILL),
-		ExitedAt:    exitedAt,
+		ExitedAt:    protobuf.ToTimestamp(exitedAt),
 	})
 
 	r.tasks.Delete(ctx, id)
@@ -479,7 +479,7 @@ func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, 
 		ContainerID: id,
 		Pid:         uint32(pid),
 		ExitStatus:  128 + uint32(unix.SIGKILL),
-		ExitedAt:    exitedAt,
+		ExitedAt:    protobuf.ToTimestamp(exitedAt),
 	})
 
 	return nil

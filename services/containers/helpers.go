@@ -51,8 +51,8 @@ func containerToProto(container *containers.Container) api.Container {
 		Spec:        protobuf.FromAny(container.Spec),
 		Snapshotter: container.Snapshotter,
 		SnapshotKey: container.SnapshotKey,
-		CreatedAt:   container.CreatedAt,
-		UpdatedAt:   container.UpdatedAt,
+		CreatedAt:   protobuf.ToTimestamp(container.CreatedAt),
+		UpdatedAt:   protobuf.ToTimestamp(container.UpdatedAt),
 		Extensions:  extensions,
 		Sandbox:     container.SandboxID,
 	}

@@ -20,6 +20,7 @@ import (
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -40,8 +41,8 @@ func imageToProto(image *images.Image) imagesapi.Image {
 		Name:      image.Name,
 		Labels:    image.Labels,
 		Target:    descToProto(&image.Target),
-		CreatedAt: image.CreatedAt,
-		UpdatedAt: image.UpdatedAt,
+		CreatedAt: protobuf.ToTimestamp(image.CreatedAt),
+		UpdatedAt: protobuf.ToTimestamp(image.UpdatedAt),
 	}
 }
 
@@ -50,8 +51,8 @@ func imageFromProto(imagepb *imagesapi.Image) images.Image {
 		Name:      imagepb.Name,
 		Labels:    imagepb.Labels,
 		Target:    descFromProto(&imagepb.Target),
-		CreatedAt: imagepb.CreatedAt,
-		UpdatedAt: imagepb.UpdatedAt,
+		CreatedAt: protobuf.FromTimestamp(imagepb.CreatedAt),
+		UpdatedAt: protobuf.FromTimestamp(imagepb.UpdatedAt),
 	}
 }
 

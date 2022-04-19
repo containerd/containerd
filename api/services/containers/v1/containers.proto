@@ -99,10 +99,10 @@ message Container {
 	string snapshot_key = 7;
 
 	// CreatedAt is the time the container was first created.
-	google.protobuf.Timestamp created_at = 8 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp created_at = 8;
 
 	// UpdatedAt is the last time the container was mutated.
-	google.protobuf.Timestamp updated_at = 9 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp updated_at = 9;
 
 	// Extensions allow clients to provide zero or more blobs that are directly
 	// associated with the container. One may provide protobuf, json, or other

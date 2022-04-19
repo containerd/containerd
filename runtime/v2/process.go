@@ -22,6 +22,7 @@ import (
 
 	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/ttrpc"
@@ -84,7 +85,7 @@ func (p *process) State(ctx context.Context) (runtime.State, error) {
 		Stderr:     response.Stderr,
 		Terminal:   response.Terminal,
 		ExitStatus: response.ExitStatus,
-		ExitedAt:   response.ExitedAt,
+		ExitedAt:   protobuf.FromTimestamp(response.ExitedAt),
 	}, nil
 }
 
@@ -137,7 +138,7 @@ func (p *process) Wait(ctx context.Context) (*runtime.Exit, error) {
 		return nil, errdefs.FromGRPC(err)
 	}
 	return &runtime.Exit{
-		Timestamp: response.ExitedAt,
+		Timestamp: protobuf.FromTimestamp(response.ExitedAt),
 		Status:    response.ExitStatus,
 	}, nil
 }
@@ -152,7 +153,7 @@ func (p *process) Delete(ctx context.Context) (*runtime.Exit, error) {
 	}
 	return &runtime.Exit{
 		Status:    response.ExitStatus,
-		Timestamp: response.ExitedAt,
+		Timestamp: protobuf.FromTimestamp(response.ExitedAt),
 		Pid:       response.Pid,
 	}, nil
 }

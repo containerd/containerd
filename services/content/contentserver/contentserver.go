@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/gogo/protobuf/types"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -103,7 +104,7 @@ func (s *service) List(req *api.ListContentRequest, session api.Content_ListServ
 		buffer = append(buffer, api.Info{
 			Digest:    info.Digest.String(),
 			Size_:     info.Size,
-			CreatedAt: info.CreatedAt,
+			CreatedAt: protobuf.ToTimestamp(info.CreatedAt),
 			Labels:    info.Labels,
 		})
 
@@ -220,8 +221,8 @@ func (s *service) Status(ctx context.Context, req *api.StatusRequest) (*api.Stat
 
 	var resp api.StatusResponse
 	resp.Status = &api.Status{
-		StartedAt: status.StartedAt,
-		UpdatedAt: status.UpdatedAt,
+		StartedAt: protobuf.ToTimestamp(status.StartedAt),
+		UpdatedAt: protobuf.ToTimestamp(status.UpdatedAt),
 		Ref:       status.Ref,
 		Offset:    status.Offset,
 		Total:     status.Total,
@@ -240,8 +241,8 @@ func (s *service) ListStatuses(ctx context.Context, req *api.ListStatusesRequest
 	var resp api.ListStatusesResponse
 	for _, status := range statuses {
 		resp.Statuses = append(resp.Statuses, api.Status{
-			StartedAt: status.StartedAt,
-			UpdatedAt: status.UpdatedAt,
+			StartedAt: protobuf.ToTimestamp(status.StartedAt),
+			UpdatedAt: protobuf.ToTimestamp(status.UpdatedAt),
 			Ref:       status.Ref,
 			Offset:    status.Offset,
 			Total:     status.Total,
@@ -375,8 +376,8 @@ func (s *service) Write(session api.Content_WriteServer) (err error) {
 		switch req.Action {
 		case api.WriteAction_STAT:
 			msg.Digest = wr.Digest().String()
-			msg.StartedAt = ws.StartedAt
-			msg.UpdatedAt = ws.UpdatedAt
+			msg.StartedAt = protobuf.ToTimestamp(ws.StartedAt)
+			msg.UpdatedAt = protobuf.ToTimestamp(ws.UpdatedAt)
 			msg.Total = total
 		case api.WriteAction_WRITE, api.WriteAction_COMMIT:
 			if req.Offset > 0 {
@@ -455,8 +456,8 @@ func infoToGRPC(info content.Info) api.Info {
 	return api.Info{
 		Digest:    info.Digest.String(),
 		Size_:     info.Size,
-		CreatedAt: info.CreatedAt,
-		UpdatedAt: info.UpdatedAt,
+		CreatedAt: protobuf.ToTimestamp(info.CreatedAt),
+		UpdatedAt: protobuf.ToTimestamp(info.UpdatedAt),
 		Labels:    info.Labels,
 	}
 }
@@ -465,8 +466,8 @@ func infoFromGRPC(info api.Info) content.Info {
 	return content.Info{
 		Digest:    digest.Digest(info.Digest),
 		Size:      info.Size_,
-		CreatedAt: info.CreatedAt,
-		UpdatedAt: info.UpdatedAt,
+		CreatedAt: protobuf.FromTimestamp(info.CreatedAt),
+		UpdatedAt: protobuf.FromTimestamp(info.UpdatedAt),
 		Labels:    info.Labels,
 	}
 }

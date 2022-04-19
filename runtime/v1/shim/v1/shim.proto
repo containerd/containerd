@@ -88,7 +88,7 @@ message CreateTaskResponse {
 message DeleteResponse {
 	uint32 pid = 1;
 	uint32 exit_status = 2;
-	google.protobuf.Timestamp exited_at = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp exited_at = 3;
 }
 
 message DeleteProcessRequest {
@@ -127,7 +127,7 @@ message StateResponse {
 	string stderr = 7;
 	bool terminal = 8;
 	uint32 exit_status = 9;
-	google.protobuf.Timestamp exited_at = 10 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp exited_at = 10;
 }
 
 message KillRequest {
@@ -177,5 +177,5 @@ message WaitRequest {
 
 message WaitResponse {
 	uint32 exit_status = 1;
-	google.protobuf.Timestamp exited_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp exited_at = 2;
 }

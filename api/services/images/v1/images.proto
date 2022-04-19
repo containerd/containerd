@@ -74,10 +74,10 @@ message Image {
 	containerd.types.Descriptor target = 3 [(gogoproto.nullable) = false];
 
 	// CreatedAt is the time the image was first created.
-	google.protobuf.Timestamp created_at = 7 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp created_at = 7;
 
 	// UpdatedAt is the last time the image was mutated.
-	google.protobuf.Timestamp updated_at = 8 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp updated_at = 8;
 }
 
 message GetImageRequest {

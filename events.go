@@ -63,7 +63,7 @@ func (e *eventRemote) Publish(ctx context.Context, topic string, event events.Ev
 func (e *eventRemote) Forward(ctx context.Context, envelope *events.Envelope) error {
 	req := &eventsapi.ForwardRequest{
 		Envelope: &eventsapi.Envelope{
-			Timestamp: envelope.Timestamp,
+			Timestamp: protobuf.ToTimestamp(envelope.Timestamp),
 			Namespace: envelope.Namespace,
 			Topic:     envelope.Topic,
 			Event:     protobuf.FromAny(envelope.Event),
@@ -105,7 +105,7 @@ func (e *eventRemote) Subscribe(ctx context.Context, filters ...string) (ch <-ch
 
 			select {
 			case evq <- &events.Envelope{
-				Timestamp: ev.Timestamp,
+				Timestamp: protobuf.FromTimestamp(ev.Timestamp),
 				Namespace: ev.Namespace,
 				Topic:     ev.Topic,
 				Event:     ev.Event,

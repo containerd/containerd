@@ -26,6 +26,7 @@ import (
 	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/protobuf"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
@@ -196,6 +197,6 @@ func cleanupUnknownSandbox(ctx context.Context, id string, sandbox sandboxstore.
 		ID:          id,
 		Pid:         0,
 		ExitStatus:  unknownExitCode,
-		ExitedAt:    time.Now(),
+		ExitedAt:    protobuf.ToTimestamp(time.Now()),
 	}, sandbox)
 }

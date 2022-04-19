@@ -175,14 +175,14 @@ func cleanupAfterDeadShim(ctx context.Context, id, ns string, rt *runtime.TaskLi
 		ID:          id,
 		Pid:         pid,
 		ExitStatus:  exitStatus,
-		ExitedAt:    exitedAt,
+		ExitedAt:    protobuf.ToTimestamp(exitedAt),
 	})
 
 	events.Publish(ctx, runtime.TaskDeleteEventTopic, &eventstypes.TaskDelete{
 		ContainerID: id,
 		Pid:         pid,
 		ExitStatus:  exitStatus,
-		ExitedAt:    exitedAt,
+		ExitedAt:    protobuf.ToTimestamp(exitedAt),
 	})
 }
 
@@ -333,7 +333,7 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 
 	return &runtime.Exit{
 		Status:    response.ExitStatus,
-		Timestamp: response.ExitedAt,
+		Timestamp: protobuf.FromTimestamp(response.ExitedAt),
 		Pid:       response.Pid,
 	}, nil
 }
@@ -483,7 +483,7 @@ func (s *shimTask) Wait(ctx context.Context) (*runtime.Exit, error) {
 	}
 	return &runtime.Exit{
 		Pid:       taskPid,
-		Timestamp: response.ExitedAt,
+		Timestamp: protobuf.FromTimestamp(response.ExitedAt),
 		Status:    response.ExitStatus,
 	}, nil
 }
@@ -550,6 +550,6 @@ func (s *shimTask) State(ctx context.Context) (runtime.State, error) {
 		Stderr:     response.Stderr,
 		Terminal:   response.Terminal,
 		ExitStatus: response.ExitStatus,
-		ExitedAt:   response.ExitedAt,
+		ExitedAt:   protobuf.FromTimestamp(response.ExitedAt),
 	}, nil
 }
