@@ -1,0 +1,121 @@
+/*
+	Copyright The containerd Authors.
+
+	Licensed under the Apache License, Version 2.0 (the "License");
+	you may not use this file except in compliance with the License.
+	You may obtain a copy of the License at
+
+		http://www.apache.org/licenses/LICENSE-2.0
+
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	limitations under the License.
+*/
+
+syntax = "proto3";
+
+package containerd.task.v2;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+import weak "gogoproto/gogo.proto";
+
+import "github.com/containerd/containerd/api/types/mount.proto";
+
+// Sandbox is an optional interface that shim may implement to support sandboxes environments.
+// A typical example of sandbox is microVM or pause container - an entity that groups containers and/or
+// holds resources relevant for this group.
+service Sandbox {
+	// StartSandbox will create/start a new sandbox instance
+	rpc StartSandbox(StartSandboxRequest) returns (StartSandboxResponse);
+
+	// StopSandbox will stop existing sandbox instance
+	rpc StopSandbox(StopSandboxRequest) returns (StopSandboxResponse);
+
+	// WaitSandbox blocks until sanbox exits.
+	rpc WaitSandbox(WaitSandboxRequest) returns (WaitSandboxResponse);
+
+	// Update can be used to amend the state of currently running sandbox instance (depending on
+	// implementation this can be used to resize/reacquire needed resources like RAM/CPU).
+	rpc UpdateSandbox(UpdateSandboxRequest) returns (UpdateSandboxResponse);
+
+	// PauseSandbox will suspend currently running sandbox instance.
+	rpc PauseSandbox(PauseSandboxRequest) returns (PauseSandboxResponse);
+
+	// ResumeSandbox will resuyme previously suspended sandbox instance.
+	rpc ResumeSandbox(ResumeSandboxRequest) returns (ResumeSandboxResponse);
+
+	// SandboxStatus will return current status of the running sandbox instance
+	rpc SandboxStatus(SandboxStatusRequest) returns (SandboxStatusResponse);
+
+	// PingSandbox is a lightweight API call to check whether sandbox alive.
+	rpc PingSandbox(PingRequest) returns (PingResponse);
+}
+
+message StartSandboxRequest {
+	string sandbox_id = 1;
+	string bundle_path = 2;
+	repeated containerd.types.Mount rootfs = 3;
+	google.protobuf.Any options = 4;
+}
+
+message StartSandboxResponse {
+	uint32 pid = 1;
+}
+
+message StopSandboxRequest {
+	string sandbox_id = 1;
+	uint32 timeout_secs = 2;
+}
+
+message StopSandboxResponse {}
+
+message UpdateSandboxRequest {
+	string sandbox_id = 1;
+	google.protobuf.Any resources = 2;
+	map<string, string> annotations = 3;
+}
+
+message WaitSandboxRequest {
+	string sandbox_id = 1;
+}
+
+message WaitSandboxResponse {
+	uint32 exit_status = 1;
+	google.protobuf.Timestamp exited_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}
+
+message UpdateSandboxResponse {}
+
+message SandboxStatusRequest {
+	string sandbox_id = 1;
+}
+
+message PauseSandboxRequest {
+	string sandbox_id = 1;
+}
+
+message PauseSandboxResponse {}
+
+message ResumeSandboxRequest {
+	string sandbox_id = 1;
+}
+
+message ResumeSandboxResponse {}
+
+message SandboxStatusResponse {
+	string id = 1;
+	uint32 pid = 2;
+	string state = 3;
+	uint32 exit_status = 4;
+	google.protobuf.Timestamp exited_at = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Any extra = 6;
+}
+
+message PingRequest {
+	string sandbox_id = 1;
+}
+
+message PingResponse {}

@@ -114,6 +114,9 @@ message Container {
 	// data, one should only update the specified extension using field paths
 	// to select a specific map key.
 	map<string, google.protobuf.Any> extensions = 10 [(gogoproto.nullable) = false];
+
+	// Sandbox ID this container belongs to.
+	string sandbox = 11;
 }
 
 message GetContainerRequest {

@@ -194,6 +194,10 @@ type ShimProcess interface {
 	ID() string
 	// Namespace of this shim.
 	Namespace() string
+	// Bundle is a file system path to shim's bundle.
+	Bundle() string
+	// Client returns the underlying TTRPC client for this shim.
+	Client() *ttrpc.Client
 }
 
 type shim struct {
@@ -208,6 +212,10 @@ func (s *shim) ID() string {
 
 func (s *shim) Namespace() string {
 	return s.bundle.Namespace
+}
+
+func (s *shim) Bundle() string {
+	return s.bundle.Path
 }
 
 func (s *shim) Close() error {
@@ -243,6 +251,10 @@ type shimTask struct {
 	task task.TaskService
 }
 
+func (s *shimTask) Client() *ttrpc.Client {
+	return s.client
+}
+
 func (s *shimTask) Shutdown(ctx context.Context) error {
 	_, err := s.task.Shutdown(ctx, &task.ShutdownRequest{
 		ID: s.ID(),
@@ -271,7 +283,7 @@ func (s *shimTask) PID(ctx context.Context) (uint32, error) {
 	return response.TaskPid, nil
 }
 
-func (s *shimTask) delete(ctx context.Context, removeTask func(ctx context.Context, id string)) (*runtime.Exit, error) {
+func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(ctx context.Context, id string)) (*runtime.Exit, error) {
 	response, shimErr := s.task.Delete(ctx, &task.DeleteRequest{
 		ID: s.ID(),
 	})
@@ -299,8 +311,12 @@ func (s *shimTask) delete(ctx context.Context, removeTask func(ctx context.Conte
 		removeTask(ctx, s.ID())
 	}
 
-	if err := s.waitShutdown(ctx); err != nil {
-		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim task")
+	// Don't shutdown sandbox as there may be other containers running.
+	// Let controller decide when to shutdown.
+	if !sandboxed {
+		if err := s.waitShutdown(ctx); err != nil {
+			log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim task")
+		}
 	}
 
 	if err := s.shim.delete(ctx); err != nil {

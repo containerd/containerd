@@ -74,6 +74,15 @@ func WithRuntime(name string, options interface{}) NewContainerOpts {
 	}
 }
 
+// WithSandbox joins the container to a container group (aka sandbox) from the given ID
+// Note: shim runtime must support sandboxes environments.
+func WithSandbox(sandboxID string) NewContainerOpts {
+	return func(ctx context.Context, client *Client, c *containers.Container) error {
+		c.SandboxID = sandboxID
+		return nil
+	}
+}
+
 // WithImage sets the provided image as the base for the container
 func WithImage(i Image) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {

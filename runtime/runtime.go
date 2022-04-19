@@ -49,6 +49,8 @@ type CreateOpts struct {
 	// Runtime name to use (e.g. `io.containerd.NAME.VERSION`).
 	// As an alternative full abs path to binary may be specified instead.
 	Runtime string
+	// SandboxID is an optional ID of sandbox this container belongs to
+	SandboxID string
 }
 
 // Exit information for a process

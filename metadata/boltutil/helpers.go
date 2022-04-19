@@ -213,11 +213,11 @@ func WriteAny(bkt *bolt.Bucket, name []byte, any typeurl.Any) error {
 
 	data, err := proto.Marshal(pbany)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal: %w", err)
 	}
 
 	if err := bkt.Put(name, data); err != nil {
-		return err
+		return fmt.Errorf("put failed: %w", err)
 	}
 
 	return nil
