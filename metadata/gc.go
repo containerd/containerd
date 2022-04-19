@@ -44,6 +44,8 @@ const (
 	ResourceLease
 	// ResourceIngest specifies a content ingest
 	ResourceIngest
+	// resourceEnd is the end of specified resource types
+	resourceEnd
 )
 
 const (

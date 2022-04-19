@@ -280,6 +280,12 @@ func (m *DB) RegisterMutationCallback(fn func(bool)) {
 // - Collectible Resources must track whether the resource is active and/or
 //   lease membership.
 func (m *DB) RegisterCollectibleResource(t gc.ResourceType, c Collector) {
+	if t < resourceEnd {
+		panic("cannot re-register metadata resource")
+	} else if t >= gc.ResourceMax {
+		panic("resource type greater than max")
+	}
+
 	m.wlock.Lock()
 	defer m.wlock.Unlock()
 
@@ -287,15 +293,10 @@ func (m *DB) RegisterCollectibleResource(t gc.ResourceType, c Collector) {
 		m.collectors = map[gc.ResourceType]Collector{}
 	}
 
-	switch t {
-	case ResourceContainer:
-		panic("cannot re-register metadata resource")
-	default:
-		if _, ok := m.collectors[t]; ok {
-			panic("cannot register collectible type twice")
-		}
-		m.collectors[t] = c
+	if _, ok := m.collectors[t]; ok {
+		panic("cannot register collectible type twice")
 	}
+	m.collectors[t] = c
 }
 
 // GCStats holds the duration for the different phases of the garbage collector
