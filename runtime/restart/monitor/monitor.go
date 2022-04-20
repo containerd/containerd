@@ -232,14 +232,17 @@ func (m *monitor) monitor(ctx context.Context) ([]change, error) {
 			}
 		}
 
-		// Task or Status return error, only desired to stop
+		// Task or Status return error, only desired to running
 		if err != nil {
 			logrus.WithError(err).Error("monitor")
-			if desiredStatus != containerd.Stopped {
+			if desiredStatus == containerd.Stopped {
 				continue
 			}
 		}
 
+		// Known issue:
+		// The status may be empty when task failed but was deleted,
+		// which will result in an `on-failure` restart policy reconcile error.
 		switch desiredStatus {
 		case containerd.Running:
 			if !restart.Reconcile(status, labels) {
