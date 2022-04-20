@@ -52,18 +52,17 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 	return newHTTPReadSeeker(desc.Size, func(offset int64) (io.ReadCloser, error) {
 		// firstly try fetch via external urls
 		for _, us := range desc.URLs {
-			ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", us))
-
 			u, err := url.Parse(us)
 			if err != nil {
-				log.G(ctx).WithError(err).Debug("failed to parse")
+				log.G(ctx).WithError(err).Debugf("failed to parse %q", us)
 				continue
 			}
 			if u.Scheme != "http" && u.Scheme != "https" {
 				log.G(ctx).Debug("non-http(s) alternative url is unsupported")
 				continue
 			}
-			log.G(ctx).Debug("trying alternative url")
+			ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", u))
+			log.G(ctx).Info("request")
 
 			// Try this first, parse it
 			host := RegistryHost{
