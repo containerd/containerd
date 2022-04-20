@@ -24,8 +24,8 @@ import (
 	"github.com/containerd/typeurl"
 )
 
-func containersToProto(containers []containers.Container) []api.Container {
-	var containerspb []api.Container
+func containersToProto(containers []containers.Container) []*api.Container {
+	var containerspb []*api.Container
 
 	for _, image := range containers {
 		image := image
@@ -35,12 +35,12 @@ func containersToProto(containers []containers.Container) []api.Container {
 	return containerspb
 }
 
-func containerToProto(container *containers.Container) api.Container {
-	extensions := make(map[string]types.Any)
+func containerToProto(container *containers.Container) *api.Container {
+	extensions := make(map[string]*types.Any)
 	for k, v := range container.Extensions {
-		extensions[k] = *protobuf.FromAny(v)
+		extensions[k] = protobuf.FromAny(v)
 	}
-	return api.Container{
+	return &api.Container{
 		ID:     container.ID,
 		Labels: container.Labels,
 		Image:  container.Image,
@@ -69,7 +69,7 @@ func containerFromProto(containerpb *api.Container) containers.Container {
 	extensions := make(map[string]typeurl.Any)
 	for k, v := range containerpb.Extensions {
 		v := v
-		extensions[k] = &v
+		extensions[k] = v
 	}
 	return containers.Container{
 		ID:          containerpb.ID,

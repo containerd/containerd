@@ -125,12 +125,12 @@ message Info {
 }
 
 message StatSnapshotResponse {
-	Info info = 1 [(gogoproto.nullable) = false];
+	Info info = 1;
 }
 
 message UpdateSnapshotRequest {
 	string snapshotter = 1;
-	Info info = 2 [(gogoproto.nullable) = false];
+	Info info = 2;
 
 	// UpdateMask specifies which fields to perform the update on. If empty,
 	// the operation applies to all fields.
@@ -142,7 +142,7 @@ message UpdateSnapshotRequest {
 }
 
 message UpdateSnapshotResponse {
-	Info info = 1 [(gogoproto.nullable) = false];
+	Info info = 1;
 }
 
 message ListSnapshotsRequest{
@@ -162,7 +162,7 @@ message ListSnapshotsRequest{
 }
 
 message ListSnapshotsResponse {
-	repeated Info info = 1 [(gogoproto.nullable) = false];
+	repeated Info info = 1;
 }
 
 message UsageRequest {

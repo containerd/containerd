@@ -168,6 +168,7 @@ protos: bin/protoc-gen-gogoctrd ## generate protobuf
 	@(PATH="${ROOTDIR}/bin:${PATH}" protobuild --quiet ${NON_API_PACKAGES})
 	@mv ${TMPDIR}/vendor ${ROOTDIR}
 	@rm -rf ${TMPDIR}
+	go-fix-acronym -w -a '(Io|Uuid|Os)$$' $(shell find api -name '*.pb.go')
 
 check-protos: protos ## check if protobufs needs to be generated again
 	@echo "$(WHALE) $@"
@@ -185,8 +186,6 @@ proto-fmt: ## check format of proto files
 	@echo "$(WHALE) $@"
 	@test -z "$$(find . -path ./vendor -prune -o -path ./protobuf/google/rpc -prune -o -name '*.proto' -type f -exec grep -Hn -e "^ " {} \; | tee /dev/stderr)" || \
 		(echo "$(ONI) please indent proto files with tabs only" && false)
-	@test -z "$$(find . -path ./vendor -prune -o -name '*.proto' -type f -exec grep -Hn "Meta meta = " {} \; | grep -v '(gogoproto.nullable) = false' | tee /dev/stderr)" || \
-		(echo "$(ONI) meta fields in proto files must have option (gogoproto.nullable) = false" && false)
 
 build: ## build the go packages
 	@echo "$(WHALE) $@"

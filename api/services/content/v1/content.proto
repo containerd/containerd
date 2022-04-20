@@ -114,11 +114,11 @@ message InfoRequest {
 }
 
 message InfoResponse {
-	Info info = 1 [(gogoproto.nullable) = false];
+	Info info = 1;
 }
 
 message UpdateRequest {
-	Info info = 1 [(gogoproto.nullable) = false];
+	Info info = 1;
 
 	// UpdateMask specifies which fields to perform the update on. If empty,
 	// the operation applies to all fields.
@@ -130,7 +130,7 @@ message UpdateRequest {
 }
 
 message UpdateResponse {
-	Info info = 1 [(gogoproto.nullable) = false];
+	Info info = 1;
 }
 
 message ListContentRequest {
@@ -148,7 +148,7 @@ message ListContentRequest {
 }
 
 message ListContentResponse {
-	repeated Info info = 1 [(gogoproto.nullable) = false];
+	repeated Info info = 1;
 }
 
 message DeleteContentRequest {
@@ -201,7 +201,7 @@ message ListStatusesRequest {
 }
 
 message ListStatusesResponse {
-	repeated Status statuses = 1 [(gogoproto.nullable) = false];
+	repeated Status statuses = 1;
 }
 
 // WriteAction defines the behavior of a WriteRequest.

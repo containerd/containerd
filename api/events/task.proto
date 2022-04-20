@@ -30,7 +30,7 @@ message TaskCreate {
 	string container_id = 1;
 	string bundle = 2;
 	repeated containerd.types.Mount rootfs = 3;
-	TaskIO io = 4 [(gogoproto.customname) = "IO"];
+	TaskIO io = 4;
 	string checkpoint = 5;
 	uint32 pid = 6;
 }

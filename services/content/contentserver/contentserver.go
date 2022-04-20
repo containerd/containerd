@@ -91,8 +91,8 @@ func (s *service) Update(ctx context.Context, req *api.UpdateRequest) (*api.Upda
 
 func (s *service) List(req *api.ListContentRequest, session api.Content_ListServer) error {
 	var (
-		buffer    []api.Info
-		sendBlock = func(block []api.Info) error {
+		buffer    []*api.Info
+		sendBlock = func(block []*api.Info) error {
 			// send last block
 			return session.Send(&api.ListContentResponse{
 				Info: block,
@@ -101,7 +101,7 @@ func (s *service) List(req *api.ListContentRequest, session api.Content_ListServ
 	)
 
 	if err := s.store.Walk(session.Context(), func(info content.Info) error {
-		buffer = append(buffer, api.Info{
+		buffer = append(buffer, &api.Info{
 			Digest:    info.Digest.String(),
 			Size_:     info.Size,
 			CreatedAt: protobuf.ToTimestamp(info.CreatedAt),
@@ -240,7 +240,7 @@ func (s *service) ListStatuses(ctx context.Context, req *api.ListStatusesRequest
 
 	var resp api.ListStatusesResponse
 	for _, status := range statuses {
-		resp.Statuses = append(resp.Statuses, api.Status{
+		resp.Statuses = append(resp.Statuses, &api.Status{
 			StartedAt: protobuf.ToTimestamp(status.StartedAt),
 			UpdatedAt: protobuf.ToTimestamp(status.UpdatedAt),
 			Ref:       status.Ref,
@@ -452,8 +452,8 @@ func (s *service) Abort(ctx context.Context, req *api.AbortRequest) (*ptypes.Emp
 	return &ptypes.Empty{}, nil
 }
 
-func infoToGRPC(info content.Info) api.Info {
-	return api.Info{
+func infoToGRPC(info content.Info) *api.Info {
+	return &api.Info{
 		Digest:    info.Digest.String(),
 		Size_:     info.Size,
 		CreatedAt: protobuf.ToTimestamp(info.CreatedAt),
@@ -462,7 +462,7 @@ func infoToGRPC(info content.Info) api.Info {
 	}
 }
 
-func infoFromGRPC(info api.Info) content.Info {
+func infoFromGRPC(info *api.Info) content.Info {
 	return content.Info{
 		Digest:    digest.Digest(info.Digest),
 		Size:      info.Size_,

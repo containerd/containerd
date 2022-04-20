@@ -24,14 +24,14 @@ import (
 )
 
 // ToProto will map Sandbox struct to it's protobuf definition
-func ToProto(sandbox *Sandbox) types.Sandbox {
-	extensions := make(map[string]gogo_types.Any)
+func ToProto(sandbox *Sandbox) *types.Sandbox {
+	extensions := make(map[string]*gogo_types.Any)
 	for k, v := range sandbox.Extensions {
-		extensions[k] = *protobuf.FromAny(v)
+		extensions[k] = protobuf.FromAny(v)
 	}
-	return types.Sandbox{
+	return &types.Sandbox{
 		SandboxID: sandbox.ID,
-		Runtime: types.Sandbox_Runtime{
+		Runtime: &types.Sandbox_Runtime{
 			Name:    sandbox.Runtime.Name,
 			Options: protobuf.FromAny(sandbox.Runtime.Options),
 		},
@@ -53,7 +53,7 @@ func FromProto(sandboxpb *types.Sandbox) Sandbox {
 	extensions := make(map[string]typeurl.Any)
 	for k, v := range sandboxpb.Extensions {
 		v := v
-		extensions[k] = &v
+		extensions[k] = v
 	}
 
 	return Sandbox{

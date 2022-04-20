@@ -44,7 +44,7 @@ func (s *remoteSandboxStore) Create(ctx context.Context, sandbox sb.Sandbox) (sb
 		return sb.Sandbox{}, errdefs.FromGRPC(err)
 	}
 
-	return sb.FromProto(&resp.Sandbox), nil
+	return sb.FromProto(resp.Sandbox), nil
 }
 
 func (s *remoteSandboxStore) Update(ctx context.Context, sandbox sb.Sandbox, fieldpaths ...string) (sb.Sandbox, error) {
@@ -56,7 +56,7 @@ func (s *remoteSandboxStore) Update(ctx context.Context, sandbox sb.Sandbox, fie
 		return sb.Sandbox{}, errdefs.FromGRPC(err)
 	}
 
-	return sb.FromProto(&resp.Sandbox), nil
+	return sb.FromProto(resp.Sandbox), nil
 }
 
 func (s *remoteSandboxStore) Get(ctx context.Context, id string) (sb.Sandbox, error) {
@@ -80,7 +80,7 @@ func (s *remoteSandboxStore) List(ctx context.Context, filters ...string) ([]sb.
 
 	out := make([]sb.Sandbox, len(resp.List))
 	for i := range resp.List {
-		out[i] = sb.FromProto(&resp.List[i])
+		out[i] = sb.FromProto(resp.List[i])
 	}
 
 	return out, nil

@@ -202,7 +202,7 @@ func toKind(kind snapshotsapi.Kind) snapshots.Kind {
 	return snapshots.KindCommitted
 }
 
-func toInfo(info snapshotsapi.Info) snapshots.Info {
+func toInfo(info *snapshotsapi.Info) snapshots.Info {
 	return snapshots.Info{
 		Name:    info.Name,
 		Parent:  info.Parent,
@@ -242,8 +242,8 @@ func fromKind(kind snapshots.Kind) snapshotsapi.Kind {
 	return snapshotsapi.Kind_COMMITTED
 }
 
-func fromInfo(info snapshots.Info) snapshotsapi.Info {
-	return snapshotsapi.Info{
+func fromInfo(info snapshots.Info) *snapshotsapi.Info {
+	return &snapshotsapi.Info{
 		Name:      info.Name,
 		Parent:    info.Parent,
 		Kind:      fromKind(info.Kind),

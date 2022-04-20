@@ -209,8 +209,8 @@ func (s *service) List(sr *snapshotsapi.ListSnapshotsRequest, ss snapshotsapi.Sn
 	}
 
 	var (
-		buffer    []snapshotsapi.Info
-		sendBlock = func(block []snapshotsapi.Info) error {
+		buffer    []*snapshotsapi.Info
+		sendBlock = func(block []*snapshotsapi.Info) error {
 			return ss.Send(&snapshotsapi.ListSnapshotsResponse{
 				Info: block,
 			})
@@ -285,8 +285,8 @@ func fromKind(kind snapshots.Kind) snapshotsapi.Kind {
 	return snapshotsapi.Kind_COMMITTED
 }
 
-func fromInfo(info snapshots.Info) snapshotsapi.Info {
-	return snapshotsapi.Info{
+func fromInfo(info snapshots.Info) *snapshotsapi.Info {
+	return &snapshotsapi.Info{
 		Name:      info.Name,
 		Parent:    info.Parent,
 		Kind:      fromKind(info.Kind),
@@ -315,7 +315,7 @@ func fromMounts(mounts []mount.Mount) []*types.Mount {
 	return out
 }
 
-func toInfo(info snapshotsapi.Info) snapshots.Info {
+func toInfo(info *snapshotsapi.Info) snapshots.Info {
 	return snapshots.Info{
 		Name:    info.Name,
 		Parent:  info.Parent,

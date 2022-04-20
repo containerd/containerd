@@ -57,7 +57,7 @@ message Plugin {
 	//
 	// If the plugin prefers certain platforms over others, they should be
 	// listed from most to least preferred.
-	repeated types.Platform platforms = 4 [(gogoproto.nullable) = false];
+	repeated types.Platform platforms = 4;
 
 	// Exports allows plugins to provide values about state or configuration to
 	// interested parties.
@@ -96,9 +96,9 @@ message PluginsRequest {
 }
 
 message PluginsResponse {
-	repeated Plugin plugins = 1 [(gogoproto.nullable) = false];
+	repeated Plugin plugins = 1;
 }
 
 message ServerResponse {
-	string uuid = 1 [(gogoproto.customname) = "UUID"];
+	string uuid = 1;
 }
