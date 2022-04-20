@@ -5,15 +5,6 @@ package runtimeoptions.v1;
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
-option (gogoproto.goproto_stringer_all) = false;
-option (gogoproto.stringer_all) =  true;
-option (gogoproto.goproto_getters_all) = true;
-option (gogoproto.marshaler_all) = true;
-option (gogoproto.sizer_all) = true;
-option (gogoproto.unmarshaler_all) = true;
-option (gogoproto.goproto_unrecognized_all) = false;
-
-
 option go_package = "github.com/containerd/containerd/pkg/runtimeoptions/v1;runtimeoptions_v1";
 
 message Options {

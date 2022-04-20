@@ -74,14 +74,13 @@ func (l *Local) Plugins(ctx context.Context, req *api.PluginsRequest, _ ...grpc.
 		return nil, errdefs.ToGRPCf(errdefs.ErrInvalidArgument, err.Error())
 	}
 
-	var plugins []api.Plugin
+	var plugins []*api.Plugin
 	allPlugins := l.getPlugins()
 	for _, p := range allPlugins {
-		if !filter.Match(adaptPlugin(p)) {
-			continue
+		p := p
+		if filter.Match(adaptPlugin(p)) {
+			plugins = append(plugins, &p)
 		}
-
-		plugins = append(plugins, p)
 	}
 
 	return &api.PluginsResponse{
@@ -178,9 +177,9 @@ func adaptPlugin(o interface{}) filters.Adaptor {
 func pluginsToPB(plugins []*plugin.Plugin) []api.Plugin {
 	var pluginsPB []api.Plugin
 	for _, p := range plugins {
-		var platforms []types.Platform
+		var platforms []*types.Platform
 		for _, p := range p.Meta.Platforms {
-			platforms = append(platforms, types.Platform{
+			platforms = append(platforms, &types.Platform{
 				OS:           p.OS,
 				Architecture: p.Architecture,
 				Variant:      p.Variant,

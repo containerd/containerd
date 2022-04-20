@@ -79,7 +79,7 @@ func (l *local) Get(ctx context.Context, req *api.GetNamespaceRequest, _ ...grpc
 			return errdefs.ToGRPC(err)
 		}
 
-		resp.Namespace = api.Namespace{
+		resp.Namespace = &api.Namespace{
 			Name:   req.Name,
 			Labels: labels,
 		}
@@ -105,7 +105,7 @@ func (l *local) List(ctx context.Context, req *api.ListNamespacesRequest, _ ...g
 				return errdefs.ToGRPC(err)
 			}
 
-			resp.Namespaces = append(resp.Namespaces, api.Namespace{
+			resp.Namespaces = append(resp.Namespaces, &api.Namespace{
 				Name:   namespace,
 				Labels: labels,
 			})

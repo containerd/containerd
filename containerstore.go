@@ -52,7 +52,7 @@ func (r *remoteContainers) Get(ctx context.Context, id string) (containers.Conta
 		return containers.Container{}, errdefs.FromGRPC(err)
 	}
 
-	return containerFromProto(&resp.Container), nil
+	return containerFromProto(resp.Container), nil
 }
 
 func (r *remoteContainers) List(ctx context.Context, filters ...string) ([]containers.Container, error) {
@@ -116,7 +116,7 @@ func (r *remoteContainers) Create(ctx context.Context, container containers.Cont
 		return containers.Container{}, errdefs.FromGRPC(err)
 	}
 
-	return containerFromProto(&created.Container), nil
+	return containerFromProto(created.Container), nil
 
 }
 
@@ -136,7 +136,7 @@ func (r *remoteContainers) Update(ctx context.Context, container containers.Cont
 		return containers.Container{}, errdefs.FromGRPC(err)
 	}
 
-	return containerFromProto(&updated.Container), nil
+	return containerFromProto(updated.Container), nil
 
 }
 
@@ -149,12 +149,12 @@ func (r *remoteContainers) Delete(ctx context.Context, id string) error {
 
 }
 
-func containerToProto(container *containers.Container) containersapi.Container {
-	extensions := make(map[string]ptypes.Any)
+func containerToProto(container *containers.Container) *containersapi.Container {
+	extensions := make(map[string]*ptypes.Any)
 	for k, v := range container.Extensions {
-		extensions[k] = *protobuf.FromAny(v)
+		extensions[k] = protobuf.FromAny(v)
 	}
-	return containersapi.Container{
+	return &containersapi.Container{
 		ID:     container.ID,
 		Labels: container.Labels,
 		Image:  container.Image,
@@ -181,7 +181,7 @@ func containerFromProto(containerpb *containersapi.Container) containers.Contain
 	extensions := make(map[string]typeurl.Any)
 	for k, v := range containerpb.Extensions {
 		v := v
-		extensions[k] = &v
+		extensions[k] = v
 	}
 	return containers.Container{
 		ID:          containerpb.ID,
@@ -198,12 +198,12 @@ func containerFromProto(containerpb *containersapi.Container) containers.Contain
 	}
 }
 
-func containersFromProto(containerspb []containersapi.Container) []containers.Container {
+func containersFromProto(containerspb []*containersapi.Container) []containers.Container {
 	var containers []containers.Container
 
 	for _, container := range containerspb {
 		container := container
-		containers = append(containers, containerFromProto(&container))
+		containers = append(containers, containerFromProto(container))
 	}
 
 	return containers

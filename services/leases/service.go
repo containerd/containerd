@@ -141,9 +141,9 @@ func (s *service) ListResources(ctx context.Context, r *api.ListResourcesRequest
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	apiResources := make([]api.Resource, 0, len(rs))
+	apiResources := make([]*api.Resource, 0, len(rs))
 	for _, i := range rs {
-		apiResources = append(apiResources, api.Resource{
+		apiResources = append(apiResources, &api.Resource{
 			ID:   i.ID,
 			Type: i.Type,
 		})

@@ -46,20 +46,20 @@ service Store {
 }
 
 message StoreCreateRequest {
-	containerd.types.Sandbox sandbox = 1 [(gogoproto.nullable) = false];
+	containerd.types.Sandbox sandbox = 1;
 }
 
 message StoreCreateResponse {
-	containerd.types.Sandbox sandbox = 1 [(gogoproto.nullable) = false];
+	containerd.types.Sandbox sandbox = 1;
 }
 
 message StoreUpdateRequest {
-	containerd.types.Sandbox sandbox = 1 [(gogoproto.nullable) = false];
+	containerd.types.Sandbox sandbox = 1;
 	repeated string fields = 2;
 }
 
 message StoreUpdateResponse {
-	containerd.types.Sandbox sandbox = 1 [(gogoproto.nullable) = false];
+	containerd.types.Sandbox sandbox = 1;
 }
 
 message StoreDeleteRequest {
@@ -73,7 +73,7 @@ message StoreListRequest {
 }
 
 message StoreListResponse {
-	repeated containerd.types.Sandbox list = 1 [(gogoproto.nullable) = false];
+	repeated containerd.types.Sandbox list = 1;
 }
 
 message StoreGetRequest {

@@ -126,7 +126,7 @@ func (pcs *proxyContentStore) Status(ctx context.Context, ref string) (content.S
 
 func (pcs *proxyContentStore) Update(ctx context.Context, info content.Info, fieldpaths ...string) (content.Info, error) {
 	resp, err := pcs.client.Update(ctx, &contentapi.UpdateRequest{
-		Info: infoToGRPC(info),
+		Info: infoToGRPC(&info),
 		UpdateMask: &protobuftypes.FieldMask{
 			Paths: fieldpaths,
 		},
@@ -214,8 +214,8 @@ func (pcs *proxyContentStore) negotiate(ctx context.Context, ref string, size in
 	return wrclient, resp.Offset, nil
 }
 
-func infoToGRPC(info content.Info) contentapi.Info {
-	return contentapi.Info{
+func infoToGRPC(info *content.Info) *contentapi.Info {
+	return &contentapi.Info{
 		Digest:    info.Digest.String(),
 		Size_:     info.Size,
 		CreatedAt: protobuf.ToTimestamp(info.CreatedAt),
@@ -224,7 +224,7 @@ func infoToGRPC(info content.Info) contentapi.Info {
 	}
 }
 
-func infoFromGRPC(info contentapi.Info) content.Info {
+func infoFromGRPC(info *contentapi.Info) content.Info {
 	return content.Info{
 		Digest:    digest.Digest(info.Digest),
 		Size:      info.Size_,

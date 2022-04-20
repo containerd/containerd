@@ -117,7 +117,7 @@ func (l *local) Create(ctx context.Context, req *api.CreateContainerRequest, _ .
 	var resp api.CreateContainerResponse
 
 	if err := l.withStoreUpdate(ctx, func(ctx context.Context) error {
-		container := containerFromProto(&req.Container)
+		container := containerFromProto(req.Container)
 
 		created, err := l.Store.Create(ctx, container)
 		if err != nil {
@@ -150,7 +150,7 @@ func (l *local) Update(ctx context.Context, req *api.UpdateContainerRequest, _ .
 	}
 	var (
 		resp      api.UpdateContainerResponse
-		container = containerFromProto(&req.Container)
+		container = containerFromProto(req.Container)
 	)
 
 	if err := l.withStoreUpdate(ctx, func(ctx context.Context) error {
@@ -214,7 +214,7 @@ func (l *local) withStoreUpdate(ctx context.Context, fn func(ctx context.Context
 
 type localStream struct {
 	ctx        context.Context
-	containers []api.Container
+	containers []*api.Container
 	i          int
 }
 
@@ -225,7 +225,7 @@ func (s *localStream) Recv() (*api.ListContainerMessage, error) {
 	c := s.containers[s.i]
 	s.i++
 	return &api.ListContainerMessage{
-		Container: &c,
+		Container: c,
 	}, nil
 }
 

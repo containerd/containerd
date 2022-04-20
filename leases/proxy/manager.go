@@ -96,7 +96,7 @@ func (pm *proxyManager) List(ctx context.Context, filters ...string) ([]leases.L
 func (pm *proxyManager) AddResource(ctx context.Context, lease leases.Lease, r leases.Resource) error {
 	_, err := pm.client.AddResource(ctx, &leasesapi.AddResourceRequest{
 		ID: lease.ID,
-		Resource: leasesapi.Resource{
+		Resource: &leasesapi.Resource{
 			ID:   r.ID,
 			Type: r.Type,
 		},
@@ -107,7 +107,7 @@ func (pm *proxyManager) AddResource(ctx context.Context, lease leases.Lease, r l
 func (pm *proxyManager) DeleteResource(ctx context.Context, lease leases.Lease, r leases.Resource) error {
 	_, err := pm.client.DeleteResource(ctx, &leasesapi.DeleteResourceRequest{
 		ID: lease.ID,
-		Resource: leasesapi.Resource{
+		Resource: &leasesapi.Resource{
 			ID:   r.ID,
 			Type: r.Type,
 		},

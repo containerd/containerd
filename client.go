@@ -841,7 +841,7 @@ func (c *Client) GetSnapshotterSupportedPlatforms(ctx context.Context, snapshott
 	return platforms.Any(snPlatforms...), nil
 }
 
-func toPlatforms(pt []apitypes.Platform) []ocispec.Platform {
+func toPlatforms(pt []*apitypes.Platform) []ocispec.Platform {
 	platforms := make([]ocispec.Platform, len(pt))
 	for i, p := range pt {
 		platforms[i] = ocispec.Platform{

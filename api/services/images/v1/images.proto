@@ -71,7 +71,7 @@ message Image {
 	map<string, string> labels = 2;
 
 	// Target describes the content entry point of the image.
-	containerd.types.Descriptor target = 3 [(gogoproto.nullable) = false];
+	containerd.types.Descriptor target = 3;
 
 	// CreatedAt is the time the image was first created.
 	google.protobuf.Timestamp created_at = 7;
@@ -89,18 +89,18 @@ message GetImageResponse {
 }
 
 message CreateImageRequest {
-	Image image = 1 [(gogoproto.nullable) = false];
+	Image image = 1;
 }
 
 message CreateImageResponse {
-	Image image = 1 [(gogoproto.nullable) = false];
+	Image image = 1;
 }
 
 message UpdateImageRequest {
 	// Image provides a full or partial image for update.
 	//
 	// The name field must be set or an error will be returned.
-	Image image = 1 [(gogoproto.nullable) = false];
+	Image image = 1;
 
 	// UpdateMask specifies which fields to perform the update on. If empty,
 	// the operation applies to all fields.
@@ -108,7 +108,7 @@ message UpdateImageRequest {
 }
 
 message UpdateImageResponse {
-	Image image = 1 [(gogoproto.nullable) = false];
+	Image image = 1;
 }
 
 message ListImagesRequest {
@@ -126,7 +126,7 @@ message ListImagesRequest {
 }
 
 message ListImagesResponse {
-	repeated Image images = 1 [(gogoproto.nullable) = false];
+	repeated Image images = 1;
 }
 
 message DeleteImageRequest {

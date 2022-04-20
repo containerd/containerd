@@ -61,7 +61,7 @@ type sandboxLocal struct {
 var _ = (api.StoreClient)(&sandboxLocal{})
 
 func (s *sandboxLocal) Create(ctx context.Context, in *api.StoreCreateRequest, _ ...grpc.CallOption) (*api.StoreCreateResponse, error) {
-	sb, err := s.store.Create(ctx, sandbox.FromProto(&in.Sandbox))
+	sb, err := s.store.Create(ctx, sandbox.FromProto(in.Sandbox))
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -70,7 +70,7 @@ func (s *sandboxLocal) Create(ctx context.Context, in *api.StoreCreateRequest, _
 }
 
 func (s *sandboxLocal) Update(ctx context.Context, in *api.StoreUpdateRequest, _ ...grpc.CallOption) (*api.StoreUpdateResponse, error) {
-	sb, err := s.store.Update(ctx, sandbox.FromProto(&in.Sandbox), in.Fields...)
+	sb, err := s.store.Update(ctx, sandbox.FromProto(in.Sandbox), in.Fields...)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -85,7 +85,7 @@ func (s *sandboxLocal) Get(ctx context.Context, in *api.StoreGetRequest, _ ...gr
 	}
 
 	desc := sandbox.ToProto(&resp)
-	return &api.StoreGetResponse{Sandbox: &desc}, nil
+	return &api.StoreGetResponse{Sandbox: desc}, nil
 }
 
 func (s *sandboxLocal) List(ctx context.Context, in *api.StoreListRequest, _ ...grpc.CallOption) (*api.StoreListResponse, error) {
@@ -94,7 +94,7 @@ func (s *sandboxLocal) List(ctx context.Context, in *api.StoreListRequest, _ ...
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	list := make([]types.Sandbox, len(resp))
+	list := make([]*types.Sandbox, len(resp))
 	for i := range resp {
 		list[i] = sandbox.ToProto(&resp[i])
 	}

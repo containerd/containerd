@@ -542,9 +542,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.events.TaskIO"
-      options {
-        65004: "IO"
-      }
       json_name: "io"
     }
     field {
@@ -2043,9 +2040,6 @@ file {
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
       type_name: ".containerd.services.containers.v1.Container.ExtensionsEntry"
-      options {
-        65001: 0
-      }
       json_name: "extensions"
     }
     field {
@@ -2133,9 +2127,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.containers.v1.Container"
-      options {
-        65001: 0
-      }
       json_name: "container"
     }
   }
@@ -2157,9 +2148,6 @@ file {
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
       type_name: ".containerd.services.containers.v1.Container"
-      options {
-        65001: 0
-      }
       json_name: "containers"
     }
   }
@@ -2171,9 +2159,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.containers.v1.Container"
-      options {
-        65001: 0
-      }
       json_name: "container"
     }
   }
@@ -2185,9 +2170,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.containers.v1.Container"
-      options {
-        65001: 0
-      }
       json_name: "container"
     }
   }
@@ -2199,9 +2181,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.containers.v1.Container"
-      options {
-        65001: 0
-      }
       json_name: "container"
     }
     field {
@@ -2221,9 +2200,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.containers.v1.Container"
-      options {
-        65001: 0
-      }
       json_name: "container"
     }
   }
@@ -2373,9 +2349,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.content.v1.Info"
-      options {
-        65001: 0
-      }
       json_name: "info"
     }
   }
@@ -2387,9 +2360,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.content.v1.Info"
-      options {
-        65001: 0
-      }
       json_name: "info"
     }
     field {
@@ -2409,9 +2379,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.content.v1.Info"
-      options {
-        65001: 0
-      }
       json_name: "info"
     }
   }
@@ -2433,9 +2400,6 @@ file {
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
       type_name: ".containerd.services.content.v1.Info"
-      options {
-        65001: 0
-      }
       json_name: "info"
     }
   }
@@ -2576,9 +2540,6 @@ file {
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
       type_name: ".containerd.services.content.v1.Status"
-      options {
-        65001: 0
-      }
       json_name: "statuses"
     }
   }
@@ -3141,9 +3102,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.types.Descriptor"
-      options {
-        65001: 0
-      }
       json_name: "target"
     }
     field {
@@ -3212,9 +3170,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.images.v1.Image"
-      options {
-        65001: 0
-      }
       json_name: "image"
     }
   }
@@ -3226,9 +3181,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.images.v1.Image"
-      options {
-        65001: 0
-      }
       json_name: "image"
     }
   }
@@ -3240,9 +3192,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.images.v1.Image"
-      options {
-        65001: 0
-      }
       json_name: "image"
     }
     field {
@@ -3262,9 +3211,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.images.v1.Image"
-      options {
-        65001: 0
-      }
       json_name: "image"
     }
   }
@@ -3286,9 +3232,6 @@ file {
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
       type_name: ".containerd.services.images.v1.Image"
-      options {
-        65001: 0
-      }
       json_name: "images"
     }
   }
@@ -3353,9 +3296,6 @@ file {
       number: 1
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65004: "OS"
-      }
       json_name: "os"
     }
     field {
@@ -3453,9 +3393,6 @@ file {
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
       type_name: ".containerd.types.Platform"
-      options {
-        65001: 0
-      }
       json_name: "platforms"
     }
     field {
@@ -3520,9 +3457,6 @@ file {
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
       type_name: ".containerd.services.introspection.v1.Plugin"
-      options {
-        65001: 0
-      }
       json_name: "plugins"
     }
   }
@@ -3533,9 +3467,6 @@ file {
       number: 1
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65004: "UUID"
-      }
       json_name: "uuid"
     }
   }
@@ -3728,9 +3659,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.leases.v1.Resource"
-      options {
-        65001: 0
-      }
       json_name: "resource"
     }
   }
@@ -3749,9 +3677,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.leases.v1.Resource"
-      options {
-        65001: 0
-      }
       json_name: "resource"
     }
   }
@@ -3773,9 +3698,6 @@ file {
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
       type_name: ".containerd.services.leases.v1.Resource"
-      options {
-        65001: 0
-      }
       json_name: "resources"
     }
   }
@@ -3879,9 +3801,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.namespaces.v1.Namespace"
-      options {
-        65001: 0
-      }
       json_name: "namespace"
     }
   }
@@ -3903,9 +3822,6 @@ file {
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
       type_name: ".containerd.services.namespaces.v1.Namespace"
-      options {
-        65001: 0
-      }
       json_name: "namespaces"
     }
   }
@@ -3917,9 +3833,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.namespaces.v1.Namespace"
-      options {
-        65001: 0
-      }
       json_name: "namespace"
     }
   }
@@ -3931,9 +3844,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.namespaces.v1.Namespace"
-      options {
-        65001: 0
-      }
       json_name: "namespace"
     }
   }
@@ -3945,9 +3855,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.namespaces.v1.Namespace"
-      options {
-        65001: 0
-      }
       json_name: "namespace"
     }
     field {
@@ -3967,9 +3874,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.namespaces.v1.Namespace"
-      options {
-        65001: 0
-      }
       json_name: "namespace"
     }
   }
@@ -4037,9 +3941,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.types.Sandbox.Runtime"
-      options {
-        65001: 0
-      }
       json_name: "runtime"
     }
     field {
@@ -4056,9 +3957,6 @@ file {
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
       type_name: ".containerd.types.Sandbox.LabelsEntry"
-      options {
-        65001: 0
-      }
       json_name: "labels"
     }
     field {
@@ -4083,9 +3981,6 @@ file {
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
       type_name: ".containerd.types.Sandbox.ExtensionsEntry"
-      options {
-        65001: 0
-      }
       json_name: "extensions"
     }
     nested_type {
@@ -4170,9 +4065,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.types.Sandbox"
-      options {
-        65001: 0
-      }
       json_name: "sandbox"
     }
   }
@@ -4184,9 +4076,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.types.Sandbox"
-      options {
-        65001: 0
-      }
       json_name: "sandbox"
     }
   }
@@ -4198,9 +4087,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.types.Sandbox"
-      options {
-        65001: 0
-      }
       json_name: "sandbox"
     }
     field {
@@ -4219,9 +4105,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.types.Sandbox"
-      options {
-        65001: 0
-      }
       json_name: "sandbox"
     }
   }
@@ -4256,9 +4139,6 @@ file {
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
       type_name: ".containerd.types.Sandbox"
-      options {
-        65001: 0
-      }
       json_name: "list"
     }
   }
@@ -4813,9 +4693,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.snapshots.v1.Info"
-      options {
-        65001: 0
-      }
       json_name: "info"
     }
   }
@@ -4834,9 +4711,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.snapshots.v1.Info"
-      options {
-        65001: 0
-      }
       json_name: "info"
     }
     field {
@@ -4856,9 +4730,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.services.snapshots.v1.Info"
-      options {
-        65001: 0
-      }
       json_name: "info"
     }
   }
@@ -4887,9 +4758,6 @@ file {
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
       type_name: ".containerd.services.snapshots.v1.Info"
-      options {
-        65001: 0
-      }
       json_name: "info"
     }
   }
