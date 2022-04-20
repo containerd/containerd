@@ -18,8 +18,6 @@ package encryption
 
 import "github.com/gogo/protobuf/types"
 
-type anyMap map[string]*types.Any
-
 type any interface {
 	GetTypeUrl() string
 	GetValue() []byte

@@ -27,8 +27,9 @@ import (
 	"sync"
 
 	winio "github.com/Microsoft/go-winio"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/protobuf/proto"
-	"github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/typeurl"
 	"github.com/sirupsen/logrus"
 	exec "golang.org/x/sys/execabs"
 )
@@ -36,13 +37,14 @@ import (
 const processorPipe = "STREAM_PROCESSOR_PIPE"
 
 // NewBinaryProcessor returns a binary processor for use with processing content streams
-func NewBinaryProcessor(ctx context.Context, imt, rmt string, stream StreamProcessor, name string, args, env []string, payload *types.Any) (StreamProcessor, error) {
+func NewBinaryProcessor(ctx context.Context, imt, rmt string, stream StreamProcessor, name string, args, env []string, payload typeurl.Any) (StreamProcessor, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, env...)
 
 	if payload != nil {
-		data, err := proto.Marshal(payload)
+		pb := protobuf.FromAny(payload)
+		data, err := proto.Marshal(pb)
 		if err != nil {
 			return nil, err
 		}

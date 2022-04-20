@@ -24,6 +24,8 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/protobuf"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -53,10 +55,16 @@ func (r *diffRemote) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 			return ocispec.Descriptor{}, err
 		}
 	}
+
+	payloads := make(map[string]*ptypes.Any)
+	for k, v := range config.ProcessorPayloads {
+		payloads[k] = protobuf.FromAny(v)
+	}
+
 	req := &diffapi.ApplyRequest{
 		Diff:     fromDescriptor(desc),
 		Mounts:   fromMounts(mounts),
-		Payloads: config.ProcessorPayloads,
+		Payloads: payloads,
 	}
 	resp, err := r.client.Apply(ctx, req)
 	if err != nil {

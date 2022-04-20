@@ -1,5 +1,3 @@
-# cloud.google.com/go v0.81.0
-## explicit; go 1.11
 # github.com/AdaLogics/go-fuzz-headers v0.0.0-20210715213245-6c3934b029d8
 ## explicit; go 1.13
 github.com/AdaLogics/go-fuzz-headers
@@ -109,7 +107,7 @@ github.com/containerd/go-cni
 # github.com/containerd/go-runc v1.0.0
 ## explicit; go 1.13
 github.com/containerd/go-runc
-# github.com/containerd/imgcrypt v1.1.4-0.20220322210345-7eff50ecc4f6
+# github.com/containerd/imgcrypt v1.1.5-0.20220421044638-8ba028dca028
 ## explicit; go 1.16
 github.com/containerd/imgcrypt
 github.com/containerd/imgcrypt/images/encryption
