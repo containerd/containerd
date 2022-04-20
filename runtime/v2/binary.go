@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime"
 	client "github.com/containerd/containerd/runtime/v2/shim"
@@ -185,7 +186,7 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 		log.G(ctx).Warnf("cleanup warnings %s", s)
 	}
 	var response task.DeleteResponse
-	if err := response.Unmarshal(out.Bytes()); err != nil {
+	if err := proto.Unmarshal(out.Bytes(), &response); err != nil {
 		return nil, err
 	}
 	if err := b.bundle.Delete(); err != nil {
