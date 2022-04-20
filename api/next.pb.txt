@@ -1221,7 +1221,7 @@ file {
 }
 file {
   name: "github.com/containerd/containerd/api/runtime/task/v2/shim.proto"
-  package: "containerd.runtime.task.v2"
+  package: "containerd.task.v2"
   dependency: "google/protobuf/any.proto"
   dependency: "google/protobuf/empty.proto"
   dependency: "gogoproto/gogo.proto"
@@ -1664,7 +1664,7 @@ file {
       number: 3
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
-      type_name: ".containerd.runtime.task.v2.UpdateTaskRequest.AnnotationsEntry"
+      type_name: ".containerd.task.v2.UpdateTaskRequest.AnnotationsEntry"
       json_name: "annotations"
     }
     nested_type {
@@ -1846,87 +1846,87 @@ file {
     name: "Task"
     method {
       name: "State"
-      input_type: ".containerd.runtime.task.v2.StateRequest"
-      output_type: ".containerd.runtime.task.v2.StateResponse"
+      input_type: ".containerd.task.v2.StateRequest"
+      output_type: ".containerd.task.v2.StateResponse"
     }
     method {
       name: "Create"
-      input_type: ".containerd.runtime.task.v2.CreateTaskRequest"
-      output_type: ".containerd.runtime.task.v2.CreateTaskResponse"
+      input_type: ".containerd.task.v2.CreateTaskRequest"
+      output_type: ".containerd.task.v2.CreateTaskResponse"
     }
     method {
       name: "Start"
-      input_type: ".containerd.runtime.task.v2.StartRequest"
-      output_type: ".containerd.runtime.task.v2.StartResponse"
+      input_type: ".containerd.task.v2.StartRequest"
+      output_type: ".containerd.task.v2.StartResponse"
     }
     method {
       name: "Delete"
-      input_type: ".containerd.runtime.task.v2.DeleteRequest"
-      output_type: ".containerd.runtime.task.v2.DeleteResponse"
+      input_type: ".containerd.task.v2.DeleteRequest"
+      output_type: ".containerd.task.v2.DeleteResponse"
     }
     method {
       name: "Pids"
-      input_type: ".containerd.runtime.task.v2.PidsRequest"
-      output_type: ".containerd.runtime.task.v2.PidsResponse"
+      input_type: ".containerd.task.v2.PidsRequest"
+      output_type: ".containerd.task.v2.PidsResponse"
     }
     method {
       name: "Pause"
-      input_type: ".containerd.runtime.task.v2.PauseRequest"
+      input_type: ".containerd.task.v2.PauseRequest"
       output_type: ".google.protobuf.Empty"
     }
     method {
       name: "Resume"
-      input_type: ".containerd.runtime.task.v2.ResumeRequest"
+      input_type: ".containerd.task.v2.ResumeRequest"
       output_type: ".google.protobuf.Empty"
     }
     method {
       name: "Checkpoint"
-      input_type: ".containerd.runtime.task.v2.CheckpointTaskRequest"
+      input_type: ".containerd.task.v2.CheckpointTaskRequest"
       output_type: ".google.protobuf.Empty"
     }
     method {
       name: "Kill"
-      input_type: ".containerd.runtime.task.v2.KillRequest"
+      input_type: ".containerd.task.v2.KillRequest"
       output_type: ".google.protobuf.Empty"
     }
     method {
       name: "Exec"
-      input_type: ".containerd.runtime.task.v2.ExecProcessRequest"
+      input_type: ".containerd.task.v2.ExecProcessRequest"
       output_type: ".google.protobuf.Empty"
     }
     method {
       name: "ResizePty"
-      input_type: ".containerd.runtime.task.v2.ResizePtyRequest"
+      input_type: ".containerd.task.v2.ResizePtyRequest"
       output_type: ".google.protobuf.Empty"
     }
     method {
       name: "CloseIO"
-      input_type: ".containerd.runtime.task.v2.CloseIORequest"
+      input_type: ".containerd.task.v2.CloseIORequest"
       output_type: ".google.protobuf.Empty"
     }
     method {
       name: "Update"
-      input_type: ".containerd.runtime.task.v2.UpdateTaskRequest"
+      input_type: ".containerd.task.v2.UpdateTaskRequest"
       output_type: ".google.protobuf.Empty"
     }
     method {
       name: "Wait"
-      input_type: ".containerd.runtime.task.v2.WaitRequest"
-      output_type: ".containerd.runtime.task.v2.WaitResponse"
+      input_type: ".containerd.task.v2.WaitRequest"
+      output_type: ".containerd.task.v2.WaitResponse"
     }
     method {
       name: "Stats"
-      input_type: ".containerd.runtime.task.v2.StatsRequest"
-      output_type: ".containerd.runtime.task.v2.StatsResponse"
+      input_type: ".containerd.task.v2.StatsRequest"
+      output_type: ".containerd.task.v2.StatsResponse"
     }
     method {
       name: "Connect"
-      input_type: ".containerd.runtime.task.v2.ConnectRequest"
-      output_type: ".containerd.runtime.task.v2.ConnectResponse"
+      input_type: ".containerd.task.v2.ConnectRequest"
+      output_type: ".containerd.task.v2.ConnectResponse"
     }
     method {
       name: "Shutdown"
-      input_type: ".containerd.runtime.task.v2.ShutdownRequest"
+      input_type: ".containerd.task.v2.ShutdownRequest"
       output_type: ".google.protobuf.Empty"
     }
   }
