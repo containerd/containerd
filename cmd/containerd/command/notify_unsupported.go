@@ -1,5 +1,5 @@
-//go:build !linux
-// +build !linux
+//go:build !linux || no_systemd
+// +build !linux no_systemd
 
 /*
    Copyright The containerd Authors.
