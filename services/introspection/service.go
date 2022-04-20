@@ -62,6 +62,7 @@ func init() {
 
 type server struct {
 	local api.IntrospectionClient
+	api.UnimplementedIntrospectionServer
 }
 
 var _ = (api.IntrospectionServer)(&server{})

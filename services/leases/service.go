@@ -47,6 +47,7 @@ func init() {
 
 type service struct {
 	lm leases.Manager
+	api.UnimplementedLeasesServer
 }
 
 func (s *service) Register(server *grpc.Server) error {

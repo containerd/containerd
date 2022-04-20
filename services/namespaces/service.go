@@ -54,6 +54,7 @@ func init() {
 
 type service struct {
 	local api.NamespacesClient
+	api.UnimplementedNamespacesServer
 }
 
 var _ api.NamespacesServer = &service{}

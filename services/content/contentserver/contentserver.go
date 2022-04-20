@@ -38,6 +38,7 @@ import (
 
 type service struct {
 	store content.Store
+	api.UnimplementedContentServer
 }
 
 var bufPool = sync.Pool{

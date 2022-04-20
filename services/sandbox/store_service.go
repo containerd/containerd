@@ -55,6 +55,7 @@ func init() {
 
 type sandboxService struct {
 	local api.StoreClient
+	api.UnimplementedStoreServer
 }
 
 var _ api.StoreServer = (*sandboxService)(nil)
