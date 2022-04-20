@@ -217,7 +217,7 @@ func (pcs *proxyContentStore) negotiate(ctx context.Context, ref string, size in
 func infoToGRPC(info *content.Info) *contentapi.Info {
 	return &contentapi.Info{
 		Digest:    info.Digest.String(),
-		Size_:     info.Size,
+		Size:      info.Size,
 		CreatedAt: protobuf.ToTimestamp(info.CreatedAt),
 		UpdatedAt: protobuf.ToTimestamp(info.UpdatedAt),
 		Labels:    info.Labels,
@@ -227,7 +227,7 @@ func infoToGRPC(info *content.Info) *contentapi.Info {
 func infoFromGRPC(info *contentapi.Info) content.Info {
 	return content.Info{
 		Digest:    digest.Digest(info.Digest),
-		Size:      info.Size_,
+		Size:      info.Size,
 		CreatedAt: protobuf.FromTimestamp(info.CreatedAt),
 		UpdatedAt: protobuf.FromTimestamp(info.UpdatedAt),
 		Labels:    info.Labels,

@@ -177,7 +177,7 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 		reader, err := l.store.ReaderAt(ctx, ocispec.Descriptor{
 			MediaType:   r.Checkpoint.MediaType,
 			Digest:      digest.Digest(r.Checkpoint.Digest),
-			Size:        r.Checkpoint.Size_,
+			Size:        r.Checkpoint.Size,
 			Annotations: r.Checkpoint.Annotations,
 		})
 		if err != nil {
@@ -694,7 +694,7 @@ func (l *local) writeContent(ctx context.Context, mediaType, ref string, r io.Re
 	return &types.Descriptor{
 		MediaType:   mediaType,
 		Digest:      writer.Digest().String(),
-		Size_:       size,
+		Size:        size,
 		Annotations: make(map[string]string),
 	}, nil
 }

@@ -59,7 +59,7 @@ func imageFromProto(imagepb *imagesapi.Image) images.Image {
 func descFromProto(desc *types.Descriptor) ocispec.Descriptor {
 	return ocispec.Descriptor{
 		MediaType:   desc.MediaType,
-		Size:        desc.Size_,
+		Size:        desc.Size,
 		Digest:      digest.Digest(desc.Digest),
 		Annotations: desc.Annotations,
 	}
@@ -68,7 +68,7 @@ func descFromProto(desc *types.Descriptor) ocispec.Descriptor {
 func descToProto(desc *ocispec.Descriptor) *types.Descriptor {
 	return &types.Descriptor{
 		MediaType:   desc.MediaType,
-		Size_:       desc.Size,
+		Size:        desc.Size,
 		Digest:      desc.Digest.String(),
 		Annotations: desc.Annotations,
 	}
