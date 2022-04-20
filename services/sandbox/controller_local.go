@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	runtimeAPI "github.com/containerd/containerd/api/runtime/sandbox/v1"
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
@@ -28,8 +29,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
 	v2 "github.com/containerd/containerd/runtime/v2"
-	"github.com/containerd/containerd/runtime/v2/task"
-	proto "github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/containerd/services"
 	"google.golang.org/grpc"
@@ -105,9 +104,9 @@ func (c *controllerLocal) Start(ctx context.Context, in *api.ControllerStartRequ
 		return nil, fmt.Errorf("failed to start new sandbox: %w", err)
 	}
 
-	svc := task.NewSandboxClient(shim.Client())
+	svc := runtimeAPI.NewSandboxClient(shim.Client())
 
-	resp, err := svc.StartSandbox(ctx, &proto.StartSandboxRequest{
+	resp, err := svc.StartSandbox(ctx, &runtimeAPI.StartSandboxRequest{
 		SandboxID:  in.SandboxID,
 		BundlePath: shim.Bundle(),
 		Rootfs:     in.Rootfs,
@@ -130,7 +129,7 @@ func (c *controllerLocal) Shutdown(ctx context.Context, in *api.ControllerShutdo
 		return nil, err
 	}
 
-	if _, err := svc.StopSandbox(ctx, &proto.StopSandboxRequest{
+	if _, err := svc.StopSandbox(ctx, &runtimeAPI.StopSandboxRequest{
 		SandboxID:   in.SandboxID,
 		TimeoutSecs: in.TimeoutSecs,
 	}); err != nil {
@@ -150,7 +149,7 @@ func (c *controllerLocal) Wait(ctx context.Context, in *api.ControllerWaitReques
 		return nil, err
 	}
 
-	resp, err := svc.WaitSandbox(ctx, &proto.WaitSandboxRequest{
+	resp, err := svc.WaitSandbox(ctx, &runtimeAPI.WaitSandboxRequest{
 		SandboxID: in.SandboxID,
 	})
 
@@ -170,7 +169,7 @@ func (c *controllerLocal) Status(ctx context.Context, in *api.ControllerStatusRe
 		return nil, err
 	}
 
-	resp, err := svc.SandboxStatus(ctx, &proto.SandboxStatusRequest{SandboxID: in.SandboxID})
+	resp, err := svc.SandboxStatus(ctx, &runtimeAPI.SandboxStatusRequest{SandboxID: in.SandboxID})
 	if err != nil {
 		return nil, fmt.Errorf("failed to query sandbox %s status: %w", in.SandboxID, err)
 	}
@@ -185,12 +184,12 @@ func (c *controllerLocal) Status(ctx context.Context, in *api.ControllerStatusRe
 	}, nil
 }
 
-func (c *controllerLocal) getSandbox(ctx context.Context, id string) (task.SandboxService, error) {
+func (c *controllerLocal) getSandbox(ctx context.Context, id string) (runtimeAPI.SandboxService, error) {
 	shim, err := c.shims.Get(ctx, id)
 	if err != nil {
 		return nil, errdefs.ErrNotFound
 	}
 
-	svc := task.NewSandboxClient(shim.Client())
+	svc := runtimeAPI.NewSandboxClient(shim.Client())
 	return svc, nil
 }
