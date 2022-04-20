@@ -214,21 +214,30 @@ func (m *monitor) monitor(ctx context.Context) ([]change, error) {
 	}
 	var changes []change
 	for _, c := range containers {
+		var (
+			task   containerd.Task
+			status containerd.Status
+			err    error
+		)
 		labels, err := c.Labels(ctx)
 		if err != nil {
 			return nil, err
 		}
 		desiredStatus := containerd.ProcessStatus(labels[restart.StatusLabel])
-		task, err := c.Task(ctx, nil)
-		if err != nil && desiredStatus == containerd.Stopped {
-			continue
+		if task, err = c.Task(ctx, nil); err == nil {
+			if status, err = task.Status(ctx); err == nil {
+				if desiredStatus == status.Status {
+					continue
+				}
+			}
 		}
-		status, err := task.Status(ctx)
-		if err != nil && desiredStatus == containerd.Stopped {
-			continue
-		}
-		if desiredStatus == status.Status {
-			continue
+
+		// Task or Status return error, only desired to stop
+		if err != nil {
+			logrus.WithError(err).Error("monitor")
+			if desiredStatus != containerd.Stopped {
+				continue
+			}
 		}
 
 		switch desiredStatus {
