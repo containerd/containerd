@@ -58,3 +58,11 @@ ppc64le)
 	;;
 esac
 rm -rf "$PROTOBUF_DIR"
+
+# Download status.proto. grpc repos' one seems copied from
+# https://github.com/googleapis/googleapis/blob/master/google/rpc/status.proto,
+# but we use grpc's since the repos has tags/releases.
+mkdir -p /usr/local/include/google/rpc
+curl \
+	-L https://raw.githubusercontent.com/grpc/grpc/v1.45.2/src/proto/grpc/status/status.proto \
+	-o /usr/local/include/google/rpc/status.proto

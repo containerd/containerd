@@ -1,6 +1,5 @@
-version = "1"
-generator = "gogoctrd"
-plugins = ["grpc", "fieldpath"]
+version = "2"
+generators = ["go", "go-grpc"]
 
 # Control protoc include paths. Below are usually some good defaults, but feel
 # free to try it without them if it works for your project.
@@ -12,7 +11,7 @@ plugins = ["grpc", "fieldpath"]
   # Paths that should be treated as include roots in relation to the vendor
   # directory. These will be calculated with the vendor directory nearest the
   # target package.
-  packages = ["github.com/gogo/protobuf", "github.com/gogo/googleapis"]
+  packages = ["github.com/gogo/protobuf"]
 
   # Paths that will be added untouched to the end of the includes. We use
   # `/usr/local/include` to pickup the common install location of protobuf.
@@ -22,22 +21,15 @@ plugins = ["grpc", "fieldpath"]
 # This section maps protobuf imports to Go packages. These will become
 # `-M` directives in the call to the go protobuf generator.
 [packages]
-  "gogoproto/gogo.proto" = "github.com/gogo/protobuf/gogoproto"
-  "google/protobuf/any.proto" = "github.com/gogo/protobuf/types"
-  "google/protobuf/empty.proto" = "github.com/gogo/protobuf/types"
-  "google/protobuf/descriptor.proto" = "github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
-  "google/protobuf/field_mask.proto" = "github.com/gogo/protobuf/types"
-  "google/protobuf/timestamp.proto" = "github.com/gogo/protobuf/types"
-  "google/protobuf/duration.proto" = "github.com/gogo/protobuf/types"
-  "google/rpc/status.proto" = "github.com/gogo/googleapis/google/rpc"
+  "google/rpc/status.proto" = "google.golang.org/genproto/googleapis/rpc/status"
 
 [[overrides]]
 prefixes = ["github.com/containerd/containerd/api/events"]
-plugins = ["fieldpath"] # disable grpc for this package
+generators = ["go", "go-ttrpc", "go-fieldpath"]
 
 [[overrides]]
 prefixes = ["github.com/containerd/containerd/api/services/ttrpc/events/v1"]
-plugins = ["ttrpc", "fieldpath"]
+generators = ["go", "go-ttrpc", "go-fieldpath"]
 
 [[overrides]]
 # enable ttrpc and disable fieldpath and grpc for the shim
@@ -46,7 +38,7 @@ prefixes = [
   "github.com/containerd/containerd/api/runtime/task/v2",
   "github.com/containerd/containerd/api/runtime/sandbox/v1",
 ]
-plugins = ["ttrpc"]
+generators = ["go", "go-ttrpc"]
 
 # Aggregrate the API descriptors to lock down API changes.
 [[descriptors]]
