@@ -175,7 +175,11 @@ func (s *Store) Delete(id string) {
 		// So we need to return if there are error.
 		return
 	}
-	s.labels.Release(s.containers[id].ProcessLabel)
+	c := s.containers[id]
+	if c.IO != nil {
+		c.IO.Close()
+	}
+	s.labels.Release(c.ProcessLabel)
 	s.idIndex.Delete(id) // nolint: errcheck
 	delete(s.containers, id)
 }
