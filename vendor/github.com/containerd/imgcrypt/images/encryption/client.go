@@ -34,19 +34,14 @@ import (
 // WithDecryptedUnpack allows to pass parameters the 'layertool' needs to the applier
 func WithDecryptedUnpack(data *imgcrypt.Payload) diff.ApplyOpt {
 	return func(_ context.Context, desc ocispec.Descriptor, c *diff.ApplyConfig) error {
-		if c.ProcessorPayloads == nil {
-			c.ProcessorPayloads = make(anyMap)
-		}
 		data.Descriptor = desc
 		any, err := typeurl.MarshalAny(data)
 		if err != nil {
 			return fmt.Errorf("failed to marshal payload: %w", err)
 		}
 
-		pbany := fromAny(any)
-
 		for _, id := range imgcrypt.PayloadToolIDs {
-			c.ProcessorPayloads[id] = pbany
+			setProcessorPayload(c, id, any)
 		}
 		return nil
 	}

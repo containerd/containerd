@@ -21,7 +21,7 @@ import (
 	"io"
 
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/typeurl"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -62,7 +62,7 @@ type Comparer interface {
 // ApplyConfig is used to hold parameters needed for a apply operation
 type ApplyConfig struct {
 	// ProcessorPayloads specifies the payload sent to various processors
-	ProcessorPayloads map[string]*types.Any
+	ProcessorPayloads map[string]typeurl.Any
 }
 
 // ApplyOpt is used to configure an Apply operation
@@ -114,7 +114,7 @@ func WithLabels(labels map[string]string) Opt {
 }
 
 // WithPayloads sets the apply processor payloads to the config
-func WithPayloads(payloads map[string]*types.Any) ApplyOpt {
+func WithPayloads(payloads map[string]typeurl.Any) ApplyOpt {
 	return func(_ context.Context, _ ocispec.Descriptor, c *ApplyConfig) error {
 		c.ProcessorPayloads = payloads
 		return nil

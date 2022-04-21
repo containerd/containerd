@@ -15,7 +15,7 @@ require (
 	github.com/containerd/fifo v1.0.0
 	github.com/containerd/go-cni v1.1.4
 	github.com/containerd/go-runc v1.0.0
-	github.com/containerd/imgcrypt v1.1.4-0.20220322210345-7eff50ecc4f6
+	github.com/containerd/imgcrypt v1.1.5-0.20220421044638-8ba028dca028
 	github.com/containerd/nri v0.1.0
 	github.com/containerd/ttrpc v1.1.0
 	github.com/containerd/typeurl v1.0.3-0.20220324183432-6193a0e03259
@@ -78,7 +78,6 @@ require (
 )
 
 require (
-	cloud.google.com/go v0.81.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cenkalti/backoff/v4 v4.1.2 // indirect
