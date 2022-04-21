@@ -32,9 +32,9 @@ require (
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/godbus/dbus/v5 v5.0.6 // indirect
-	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/google/uuid v1.2.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -72,6 +72,8 @@ replace (
 	// in the "require" section above are still taken into account for version
 	// resolution if newer.
 	github.com/containerd/containerd => ../../
+
+	github.com/containerd/typeurl => github.com/kzys/typeurl v1.0.3-0.20220421192127-bac36d33562a
 
 	// Replace rules below must be kept in sync with the main go.mod file at the
 	// root, because that's the actual version expected by the "containerd/containerd"
