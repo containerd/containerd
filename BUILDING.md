@@ -101,6 +101,7 @@ make generate
 > *Note*: Several build tags are currently available:
 > * `no_cri`: A build tag disables building Kubernetes [CRI](http://blog.kubernetes.io/2016/12/container-runtime-interface-cri-in-kubernetes.html) support into containerd.
 > See [here](https://github.com/containerd/cri-containerd#build-tags) for build tags of CRI plugin.
+> * `no_systemd`: Disable systemd notifications via [sd_notify](https://www.freedesktop.org/software/systemd/man/sd_notify.html) on Linux.
 > * snapshotters (alphabetical order)
 >   * `no_aufs`: A build tag disables building the aufs snapshot driver.
 >   * `no_btrfs`: A build tag disables building the Btrfs snapshot driver.
