@@ -151,8 +151,9 @@ github.com/containerd/imgcrypt v1.1.5-0.20220421044638-8ba028dca028/go.mod h1:Lo
 github.com/containerd/nri v0.1.0/go.mod h1:lmxnXF6oMkbqs39FiCt1s0R2HSMhcLel9vNL3m4AaeY=
 github.com/containerd/stargz-snapshotter/estargz v0.4.1/go.mod h1:x7Q9dg9QYb4+ELgxmo4gBUeJB0tl5dqH1Sdz0nJU1QM=
 github.com/containerd/ttrpc v1.0.2/go.mod h1:UAxOpgT9ziI0gJrmKvgcZivgxOp8iFPSk8httJEt98Y=
-github.com/containerd/ttrpc v1.1.0 h1:GbtyLRxb0gOLR0TYQWt3O6B0NvT8tMdorEHqIQo/lWI=
 github.com/containerd/ttrpc v1.1.0/go.mod h1:XX4ZTnoOId4HklF4edwc4DcqskFZuvXB1Evzy5KFQpQ=
+github.com/containerd/ttrpc v1.1.1-0.20220420014843-944ef4a40df3 h1:BhCp66ofL8oYcdelc3CBXc2/Pfvvgx+s+mrp9TvNgn8=
+github.com/containerd/ttrpc v1.1.1-0.20220420014843-944ef4a40df3/go.mod h1:YYyNVhZrTMiaf51Vj6WhAJqJw+vl/nzABhj8pWrzle4=
 github.com/containerd/typeurl v1.0.1/go.mod h1:TB1hUtrpaiO88KEK56ijojHS1+NeF0izUACaJW2mdXg=
 github.com/containerd/typeurl v1.0.2/go.mod h1:9trJWW2sRlGub4wZJRTW83VtbOLS6hwcDZXTn6oPz9s=
 github.com/containerd/typeurl v1.0.3-0.20220324183432-6193a0e03259 h1:bJv9qgjarrsdd4XIIczeRdYXON88Fgn3GdXVfnQjcSo=
