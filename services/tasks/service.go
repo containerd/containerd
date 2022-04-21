@@ -58,6 +58,7 @@ func init() {
 
 type service struct {
 	local api.TasksClient
+	api.UnimplementedTasksServer
 }
 
 func (s *service) Register(server *grpc.Server) error {

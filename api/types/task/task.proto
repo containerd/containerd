@@ -22,6 +22,8 @@ import "gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/any.proto";
 
+option go_package = "github.com/containerd/containerd/api/types/task";
+
 enum Status {
 	UNKNOWN = 0;
 	CREATED = 1;

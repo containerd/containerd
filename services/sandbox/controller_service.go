@@ -59,6 +59,7 @@ func init() {
 
 type controllerService struct {
 	local api.ControllerClient
+	api.UnimplementedControllerServer
 }
 
 var _ api.ControllerServer = (*controllerService)(nil)

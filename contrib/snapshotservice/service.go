@@ -32,6 +32,7 @@ var empty = &ptypes.Empty{}
 
 type service struct {
 	sn snapshots.Snapshotter
+	snapshotsapi.UnimplementedSnapshotsServer
 }
 
 // FromSnapshotter returns a Snapshot API server from a containerd snapshotter

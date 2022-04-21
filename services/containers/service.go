@@ -55,6 +55,7 @@ func init() {
 
 type service struct {
 	local api.ContainersClient
+	api.UnimplementedContainersServer
 }
 
 var _ api.ContainersServer = &service{}

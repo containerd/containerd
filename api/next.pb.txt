@@ -48,6 +48,9 @@ file {
     type: TYPE_BOOL
     json_name: "fieldpath"
   }
+  options {
+    go_package: "github.com/containerd/containerd/protobuf/plugin"
+  }
 }
 file {
   name: "github.com/containerd/containerd/api/events/container.proto"
@@ -1213,6 +1216,9 @@ file {
       name: "PAUSING"
       number: 5
     }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/types/task"
   }
   syntax: "proto3"
 }

@@ -41,6 +41,7 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 }
 
 type service struct {
+	api.UnimplementedVersionServer
 }
 
 func (s *service) Register(server *grpc.Server) error {

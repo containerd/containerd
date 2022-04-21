@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/dialer"
+	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/containerd/protobuf/types"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
@@ -78,7 +79,7 @@ func getEventPayload(r io.Reader) (*types.Any, error) {
 		return nil, err
 	}
 	var any types.Any
-	if err := any.Unmarshal(data); err != nil {
+	if err := proto.Unmarshal(data, &any); err != nil {
 		return nil, err
 	}
 	return &any, nil
