@@ -9,7 +9,7 @@ require (
 	github.com/containerd/containerd v1.6.2 // see replace; the actual version of containerd is replaced with the code at the root of this repository
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/ttrpc v1.1.1-0.20220420014843-944ef4a40df3
-	github.com/containerd/typeurl v1.0.3-0.20220324183432-6193a0e03259
+	github.com/containerd/typeurl v1.0.3-0.20220422153119-7f6e6d160d67
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.0.3-0.20220303224323-02efb9a75ee1
