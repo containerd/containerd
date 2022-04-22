@@ -4975,7 +4975,6 @@ file {
 file {
   name: "github.com/containerd/containerd/api/services/streaming/v1/streaming.proto"
   package: "containerd.services.streaming.v1"
-  dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/any.proto"
   message_type {
     name: "StreamInit"
@@ -5680,6 +5679,53 @@ file {
   }
   options {
     go_package: "github.com/containerd/containerd/api/services/tasks/v1;tasks"
+  }
+  syntax: "proto3"
+}
+file {
+  name: "github.com/containerd/containerd/api/services/transfer/v1/transfer.proto"
+  package: "containerd.services.transfer.v1"
+  dependency: "google/protobuf/any.proto"
+  dependency: "google/protobuf/empty.proto"
+  message_type {
+    name: "TransferRequest"
+    field {
+      name: "source"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "source"
+    }
+    field {
+      name: "destination"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "destination"
+    }
+  }
+  message_type {
+    name: "TransferOptions"
+    field {
+      name: "progress_stream"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "progressStream"
+    }
+  }
+  service {
+    name: "Transfer"
+    method {
+      name: "Transfer"
+      input_type: ".containerd.services.transfer.v1.TransferRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/services/transfer/v1;transfer"
   }
   syntax: "proto3"
 }
