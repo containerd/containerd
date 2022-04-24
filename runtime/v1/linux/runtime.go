@@ -104,10 +104,10 @@ type Config struct {
 func New(ic *plugin.InitContext) (interface{}, error) {
 	ic.Meta.Platforms = []ocispec.Platform{platforms.DefaultSpec()}
 
-	if err := os.MkdirAll(ic.Root, 0711); err != nil {
+	if err := os.MkdirAll(ic.Root, 0700); err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(ic.State, 0711); err != nil {
+	if err := os.MkdirAll(ic.State, 0700); err != nil {
 		return nil, err
 	}
 	m, err := ic.Get(plugin.MetadataPlugin)

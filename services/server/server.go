@@ -406,7 +406,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 			ContentSharingPolicy: srvconfig.SharingPolicyShared,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			if err := os.MkdirAll(ic.Root, 0711); err != nil {
+			if err := os.MkdirAll(ic.Root, 0700); err != nil {
 				return nil, err
 			}
 			cs, err := ic.Get(plugin.ContentPlugin)
