@@ -129,7 +129,7 @@ type ManagerConfig struct {
 // NewShimManager creates a manager for v2 shims
 func NewShimManager(ctx context.Context, config *ManagerConfig) (*ShimManager, error) {
 	for _, d := range []string{config.Root, config.State} {
-		if err := os.MkdirAll(d, 0711); err != nil {
+		if err := os.MkdirAll(d, 0700); err != nil {
 			return nil, err
 		}
 	}
