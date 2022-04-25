@@ -311,7 +311,7 @@ func Check(ctx context.Context, provider content.Provider, image ocispec.Descrip
 		return false, nil, nil, nil, fmt.Errorf("failed to check image %v: %w", image.Digest, err)
 	}
 
-	// TODO(stevvooe): It is possible that referenced conponents could have
+	// TODO(stevvooe): It is possible that referenced components could have
 	// children, but this is rare. For now, we ignore this and only verify
 	// that manifest components are present.
 	required = append([]ocispec.Descriptor{mfst.Config}, mfst.Layers...)
