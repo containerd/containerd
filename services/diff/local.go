@@ -165,9 +165,10 @@ func toMounts(apim []*types.Mount) []mount.Mount {
 	mounts := make([]mount.Mount, len(apim))
 	for i, m := range apim {
 		mounts[i] = mount.Mount{
-			Type:    m.Type,
-			Source:  m.Source,
-			Options: m.Options,
+			Type:      m.Type,
+			Source:    m.Source,
+			Options:   m.Options,
+			MetaDatas: m.MetaDatas,
 		}
 	}
 	return mounts

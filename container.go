@@ -256,9 +256,10 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 				}
 			}
 			request.Rootfs = append(request.Rootfs, &types.Mount{
-				Type:    m.Type,
-				Source:  m.Source,
-				Options: m.Options,
+				Type:      m.Type,
+				Source:    m.Source,
+				Options:   m.Options,
+				MetaDatas: m.MetaDatas,
 			})
 		}
 	}
@@ -273,9 +274,10 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 	if info.RootFS != nil {
 		for _, m := range info.RootFS {
 			request.Rootfs = append(request.Rootfs, &types.Mount{
-				Type:    m.Type,
-				Source:  m.Source,
-				Options: m.Options,
+				Type:      m.Type,
+				Source:    m.Source,
+				Options:   m.Options,
+				MetaDatas: m.MetaDatas,
 			})
 		}
 	}
