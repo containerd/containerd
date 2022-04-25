@@ -1,0 +1,27 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.6.2"
+
+pre_release = false
+
+preface = """\
+The third patch release for containerd 1.6 includes various fixes and updates.
+
+### Notable Updates
+
+* **Fix panic when configuring tracing plugin** ([#6853](https://github.com/containerd/containerd/pull/6853))
+* **Improve image pull performance in CRI plugin** ([#6816](https://github.com/containerd/containerd/pull/6816))
+* **Check for duplicate nspath** ([#6813](https://github.com/containerd/containerd/pull/6813))
+* **Fix deadlock in cgroup metrics collector** ([#6801](https://github.com/containerd/containerd/pull/6801))
+* **Mount devmapper xfs file system with "nouuid" option** ([#6731](https://github.com/containerd/containerd/pull/6731))
+* **Make the temp mount as ready only in container WithVolumes** ([#6730](https://github.com/containerd/containerd/pull/6730))
+* **Fix deadlock from leaving transaction open in native snapshotter** ([#6727](https://github.com/containerd/containerd/pull/6727))
+* **Monitor OOMKill events to prevent missing container events** ([#6734](https://github.com/containerd/containerd/pull/6734))
+
+See the changelog for complete list of changes"""
