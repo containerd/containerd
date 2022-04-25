@@ -406,7 +406,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 			log.G(ctx).Warning("`runtime_root` is deprecated, please use runtime `options` instead")
 		}
 		if !r.PrivilegedWithoutHostDevices && r.PrivilegedWithoutHostDevicesAllDevicesAllowed {
-			return errors.Errorf("`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled")
+			return errors.New("`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled")
 		}
 	}
 
