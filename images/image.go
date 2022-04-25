@@ -138,7 +138,7 @@ type platformManifest struct {
 // TODO(stevvooe): This violates the current platform agnostic approach to this
 // package by returning a specific manifest type. We'll need to refactor this
 // to return a manifest descriptor or decide that we want to bring the API in
-// this direction because this abstraction is not needed.`
+// this direction because this abstraction is not needed.
 func Manifest(ctx context.Context, provider content.Provider, image ocispec.Descriptor, platform platforms.MatchComparer) (ocispec.Manifest, error) {
 	var (
 		limit    = 1
