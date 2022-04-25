@@ -104,7 +104,7 @@ func (s *service) List(req *api.ListContentRequest, session api.Content_ListServ
 	if err := s.store.Walk(session.Context(), func(info content.Info) error {
 		buffer = append(buffer, &api.Info{
 			Digest:    info.Digest.String(),
-			Size_:     info.Size,
+			Size:      info.Size,
 			CreatedAt: protobuf.ToTimestamp(info.CreatedAt),
 			Labels:    info.Labels,
 		})
@@ -167,7 +167,7 @@ func (s *service) Read(req *api.ReadContentRequest, session api.Content_ReadServ
 		offset = req.Offset
 		// size is read size, not the expected size of the blob (oi.Size), which the caller might not be aware of.
 		// offset+size can be larger than oi.Size.
-		size = req.Size_
+		size = req.Size
 
 		// TODO(stevvooe): Using the global buffer pool. At 32KB, it is probably
 		// little inefficient for work over a fast network. We can tune this later.
@@ -456,7 +456,7 @@ func (s *service) Abort(ctx context.Context, req *api.AbortRequest) (*ptypes.Emp
 func infoToGRPC(info content.Info) *api.Info {
 	return &api.Info{
 		Digest:    info.Digest.String(),
-		Size_:     info.Size,
+		Size:      info.Size,
 		CreatedAt: protobuf.ToTimestamp(info.CreatedAt),
 		UpdatedAt: protobuf.ToTimestamp(info.UpdatedAt),
 		Labels:    info.Labels,
@@ -466,7 +466,7 @@ func infoToGRPC(info content.Info) *api.Info {
 func infoFromGRPC(info *api.Info) content.Info {
 	return content.Info{
 		Digest:    digest.Digest(info.Digest),
-		Size:      info.Size_,
+		Size:      info.Size,
 		CreatedAt: protobuf.FromTimestamp(info.CreatedAt),
 		UpdatedAt: protobuf.FromTimestamp(info.UpdatedAt),
 		Labels:    info.Labels,

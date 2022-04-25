@@ -98,7 +98,7 @@ func toDescriptor(d *types.Descriptor) ocispec.Descriptor {
 	return ocispec.Descriptor{
 		MediaType:   d.MediaType,
 		Digest:      digest.Digest(d.Digest),
-		Size:        d.Size_,
+		Size:        d.Size,
 		Annotations: d.Annotations,
 	}
 }
@@ -107,7 +107,7 @@ func fromDescriptor(d ocispec.Descriptor) *types.Descriptor {
 	return &types.Descriptor{
 		MediaType:   d.MediaType,
 		Digest:      d.Digest.String(),
-		Size_:       d.Size,
+		Size:        d.Size,
 		Annotations: d.Annotations,
 	}
 }

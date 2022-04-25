@@ -3357,8 +3357,7 @@ file {
     java_package: "com.google.rpc"
     java_outer_classname: "StatusProto"
     java_multiple_files: true
-    go_package: "rpc"
-    cc_enable_arenas: true
+    go_package: "google.golang.org/genproto/googleapis/rpc/status;status"
     objc_class_prefix: "RPC"
   }
   syntax: "proto3"

@@ -48,14 +48,14 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		return nil, fmt.Errorf("create namespace: %w", err)
 	}
 
-	var opts options.Options
+	opts := &options.Options{}
 	if r.Options.GetValue() != nil {
 		v, err := typeurl.UnmarshalAny(r.Options)
 		if err != nil {
 			return nil, err
 		}
 		if v != nil {
-			opts = *v.(*options.Options)
+			opts = v.(*options.Options)
 		}
 	}
 
@@ -123,7 +123,7 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		ns,
 		platform,
 		config,
-		&opts,
+		opts,
 		rootfs,
 	)
 	if err != nil {
@@ -188,7 +188,7 @@ func ReadOptions(path string) (*options.Options, error) {
 }
 
 // WriteOptions writes the options information into the path
-func WriteOptions(path string, opts options.Options) error {
+func WriteOptions(path string, opts *options.Options) error {
 	data, err := json.Marshal(opts)
 	if err != nil {
 		return err
@@ -467,13 +467,13 @@ func (c *Container) Checkpoint(ctx context.Context, r *task.CheckpointTaskReques
 	if err != nil {
 		return err
 	}
-	var opts options.CheckpointOptions
+	var opts *options.CheckpointOptions
 	if r.Options != nil {
 		v, err := typeurl.UnmarshalAny(r.Options)
 		if err != nil {
 			return err
 		}
-		opts = *v.(*options.CheckpointOptions)
+		opts = v.(*options.CheckpointOptions)
 	}
 	return p.(*process.Init).Checkpoint(ctx, &process.CheckpointConfig{
 		Path:                     r.Path,

@@ -159,7 +159,7 @@ generate: protos
 	@echo "$(WHALE) $@"
 	@PATH="${ROOTDIR}/bin:${PATH}" $(GO) generate -x ${PACKAGES}
 
-protos: bin/protoc-gen-gogoctrd ## generate protobuf
+protos: bin/protoc-gen-go-fieldpath
 	@echo "$(WHALE) $@"
 	@find . -path ./vendor -prune -false -o -name '*.pb.go' | xargs rm
 	$(eval TMPDIR := $(shell mktemp -d))
@@ -168,7 +168,7 @@ protos: bin/protoc-gen-gogoctrd ## generate protobuf
 	@(PATH="${ROOTDIR}/bin:${PATH}" protobuild --quiet ${NON_API_PACKAGES})
 	@mv ${TMPDIR}/vendor ${ROOTDIR}
 	@rm -rf ${TMPDIR}
-	go-fix-acronym -w -a '(Io|Uuid|Os)$$' $(shell find api -name '*.pb.go')
+	go-fix-acronym -w -a '(Id|Io|Uuid|Os)$$' $(shell find api/ runtime/ -name '*.pb.go')
 
 check-protos: protos ## check if protobufs needs to be generated again
 	@echo "$(WHALE) $@"

@@ -604,7 +604,7 @@ func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tas
 	for _, d := range response.Descriptors {
 		index.Manifests = append(index.Manifests, v1.Descriptor{
 			MediaType: d.MediaType,
-			Size:      d.Size_,
+			Size:      d.Size,
 			Digest:    digest.Digest(d.Digest),
 			Platform: &v1.Platform{
 				OS:           goruntime.GOOS,

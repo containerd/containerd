@@ -18,9 +18,11 @@
 package types
 
 import (
-	gogo "github.com/gogo/protobuf/types"
+	"google.golang.org/genproto/protobuf/field_mask"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-type Empty = gogo.Empty
-type Any = gogo.Any
-type FieldMask = gogo.FieldMask
+type Empty = emptypb.Empty
+type Any = anypb.Any
+type FieldMask = field_mask.FieldMask

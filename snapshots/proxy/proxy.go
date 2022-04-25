@@ -216,7 +216,7 @@ func toInfo(info *snapshotsapi.Info) snapshots.Info {
 func toUsage(resp *snapshotsapi.UsageResponse) snapshots.Usage {
 	return snapshots.Usage{
 		Inodes: resp.Inodes,
-		Size:   resp.Size_,
+		Size:   resp.Size,
 	}
 }
 

@@ -25,6 +25,9 @@ go install github.com/containerd/protobuild@v0.2.0
 go install github.com/containerd/protobuild/cmd/go-fix-acronym@v0.2.0
 go install github.com/cpuguy83/go-md2man/v2@v2.0.1
 go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.42.0
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.26
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
+go install github.com/containerd/ttrpc/cmd/protoc-gen-go-ttrpc@944ef4a40df3446714a823207972b7d9858ffac5
 
 # the following packages need to exist in $GOPATH so we can't use
 # go modules-aware mode of `go get` for these includes used during

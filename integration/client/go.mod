@@ -8,8 +8,8 @@ require (
 	github.com/containerd/cgroups v1.0.3
 	github.com/containerd/containerd v1.6.2 // see replace; the actual version of containerd is replaced with the code at the root of this repository
 	github.com/containerd/go-runc v1.0.0
-	github.com/containerd/ttrpc v1.1.0
-	github.com/containerd/typeurl v1.0.3-0.20220324183432-6193a0e03259
+	github.com/containerd/ttrpc v1.1.1-0.20220420014843-944ef4a40df3
+	github.com/containerd/typeurl v1.0.3-0.20220422153119-7f6e6d160d67
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.0.3-0.20220303224323-02efb9a75ee1
@@ -32,9 +32,9 @@ require (
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/godbus/dbus/v5 v5.0.6 // indirect
-	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/google/uuid v1.2.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -72,6 +72,8 @@ replace (
 	// in the "require" section above are still taken into account for version
 	// resolution if newer.
 	github.com/containerd/containerd => ../../
+
+	github.com/containerd/typeurl => github.com/kzys/typeurl v1.0.3-0.20220421192127-bac36d33562a
 
 	// Replace rules below must be kept in sync with the main go.mod file at the
 	// root, because that's the actual version expected by the "containerd/containerd"

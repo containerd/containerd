@@ -26,6 +26,7 @@ import (
 
 	gogoproto "github.com/gogo/protobuf/proto"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
 var (
@@ -242,7 +243,12 @@ func getTypeByUrl(url string) (urlType, error) {
 			isProto: true,
 		}, nil
 	}
-	return urlType{}, fmt.Errorf("type with url %s: %w", url, ErrNotFound)
+	mt, err := protoregistry.GlobalTypes.FindMessageByURL(url)
+	if err != nil {
+		return urlType{}, fmt.Errorf("type with url %s: %w", url, ErrNotFound)
+	}
+	empty := mt.New().Interface()
+	return urlType{t: reflect.TypeOf(empty).Elem(), isProto: true}, nil
 }
 
 func tryDereference(v interface{}) reflect.Type {

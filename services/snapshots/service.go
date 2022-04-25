@@ -300,7 +300,7 @@ func fromInfo(info snapshots.Info) *snapshotsapi.Info {
 func fromUsage(usage snapshots.Usage) *snapshotsapi.UsageResponse {
 	return &snapshotsapi.UsageResponse{
 		Inodes: usage.Inodes,
-		Size_:  usage.Size,
+		Size:   usage.Size,
 	}
 }
 

@@ -449,13 +449,13 @@ func (s *Service) Checkpoint(ctx context.Context, r *shimapi.CheckpointTaskReque
 	if err != nil {
 		return nil, err
 	}
-	var options runctypes.CheckpointOptions
+	var options *runctypes.CheckpointOptions
 	if r.Options != nil {
 		v, err := typeurl.UnmarshalAny(r.Options)
 		if err != nil {
 			return nil, err
 		}
-		options = *v.(*runctypes.CheckpointOptions)
+		options = v.(*runctypes.CheckpointOptions)
 	}
 	if err := p.(*process.Init).Checkpoint(ctx, &process.CheckpointConfig{
 		Path:                     r.Path,
@@ -644,13 +644,13 @@ func getTopic(ctx context.Context, e interface{}) string {
 }
 
 func newInit(ctx context.Context, path, workDir, runtimeRoot, namespace string, systemdCgroup bool, platform stdio.Platform, r *process.CreateConfig, rootfs string) (*process.Init, error) {
-	var options runctypes.CreateOptions
+	options := &runctypes.CreateOptions{}
 	if r.Options != nil {
 		v, err := typeurl.UnmarshalAny(r.Options)
 		if err != nil {
 			return nil, err
 		}
-		options = *v.(*runctypes.CreateOptions)
+		options = v.(*runctypes.CreateOptions)
 	}
 
 	runtime := process.NewRunc(runtimeRoot, path, namespace, r.Runtime, systemdCgroup)

@@ -73,7 +73,7 @@ func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Conta
 		platformSpec := platforms.DefaultSpec()
 		index.Manifests = append(index.Manifests, imagespec.Descriptor{
 			MediaType:   d.MediaType,
-			Size:        d.Size_,
+			Size:        d.Size,
 			Digest:      digest.Digest(d.Digest),
 			Platform:    &platformSpec,
 			Annotations: d.Annotations,

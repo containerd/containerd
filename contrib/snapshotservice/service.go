@@ -161,7 +161,7 @@ func (s service) Usage(ctx context.Context, ur *snapshotsapi.UsageRequest) (*sna
 
 	return &snapshotsapi.UsageResponse{
 		Inodes: usage.Inodes,
-		Size_:  usage.Size,
+		Size:   usage.Size,
 	}, nil
 }
 
