@@ -1392,29 +1392,46 @@ func TestPrivilegedDevices(t *testing.T) {
 	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
 
 	for desc, test := range map[string]struct {
-		privileged                   bool
-		privilegedWithoutHostDevices bool
-		expectHostDevices            bool
+		privileged                                    bool
+		privilegedWithoutHostDevices                  bool
+		privilegedWithoutHostDevicesAllDevicesAllowed bool
+		expectHostDevices                             bool
+		expectAllDevicesAllowed                       bool
 	}{
 		"expect no host devices when privileged is false": {
 			privileged:                   false,
 			privilegedWithoutHostDevices: false,
-			expectHostDevices:            false,
+			privilegedWithoutHostDevicesAllDevicesAllowed: false,
+			expectHostDevices:       false,
+			expectAllDevicesAllowed: false,
 		},
 		"expect no host devices when privileged is false and privilegedWithoutHostDevices is true": {
 			privileged:                   false,
 			privilegedWithoutHostDevices: true,
-			expectHostDevices:            false,
+			privilegedWithoutHostDevicesAllDevicesAllowed: false,
+			expectHostDevices:       false,
+			expectAllDevicesAllowed: false,
 		},
-		"expect host devices when privileged is true": {
+		"expect host devices and all device allowlist when privileged is true": {
 			privileged:                   true,
 			privilegedWithoutHostDevices: false,
-			expectHostDevices:            true,
+			privilegedWithoutHostDevicesAllDevicesAllowed: false,
+			expectHostDevices:       true,
+			expectAllDevicesAllowed: true,
 		},
 		"expect no host devices when privileged is true and privilegedWithoutHostDevices is true": {
 			privileged:                   true,
 			privilegedWithoutHostDevices: true,
-			expectHostDevices:            false,
+			privilegedWithoutHostDevicesAllDevicesAllowed: false,
+			expectHostDevices:       false,
+			expectAllDevicesAllowed: false,
+		},
+		"expect host devices and all devices allowlist when privileged is true and privilegedWithoutHostDevices is true and privilegedWithoutHostDevicesAllDevicesAllowed is true": {
+			privileged:                   true,
+			privilegedWithoutHostDevices: true,
+			privilegedWithoutHostDevicesAllDevicesAllowed: true,
+			expectHostDevices:       false,
+			expectAllDevicesAllowed: true,
 		},
 	} {
 		t.Logf("TestCase %q", desc)
@@ -1423,7 +1440,8 @@ func TestPrivilegedDevices(t *testing.T) {
 		sandboxConfig.Linux.SecurityContext.Privileged = test.privileged
 
 		ociRuntime := config.Runtime{
-			PrivilegedWithoutHostDevices: test.privilegedWithoutHostDevices,
+			PrivilegedWithoutHostDevices:                  test.privilegedWithoutHostDevices,
+			PrivilegedWithoutHostDevicesAllDevicesAllowed: test.privilegedWithoutHostDevicesAllDevicesAllowed,
 		}
 		spec, err := c.containerSpec(t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 		assert.NoError(t, err)
@@ -1443,6 +1461,11 @@ func TestPrivilegedDevices(t *testing.T) {
 		} else {
 			assert.Empty(t, spec.Linux.Devices)
 		}
+
+		assert.Len(t, spec.Linux.Resources.Devices, 1)
+		assert.Equal(t, spec.Linux.Resources.Devices[0].Allow, test.expectAllDevicesAllowed)
+		assert.Equal(t, spec.Linux.Resources.Devices[0].Access, "rwm")
+
 	}
 }
 
