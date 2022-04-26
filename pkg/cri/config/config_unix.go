@@ -20,6 +20,8 @@
 package config
 
 import (
+	"time"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/pkg/cri/streaming"
 	"github.com/pelletier/go-toml"
@@ -104,7 +106,8 @@ func DefaultConfig() PluginConfig {
 		ImageDecryption: ImageDecryption{
 			KeyModel: KeyModelNode,
 		},
-		EnableCDI:   false,
-		CDISpecDirs: []string{"/etc/cdi", "/var/run/cdi"},
+		EnableCDI:                false,
+		CDISpecDirs:              []string{"/etc/cdi", "/var/run/cdi"},
+		ImagePullProgressTimeout: time.Minute.String(),
 	}
 }

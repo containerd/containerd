@@ -313,6 +313,14 @@ type PluginConfig struct {
 	EnableCDI bool `toml:"enable_cdi" json:"enableCDI"`
 	// CDISpecDirs is the list of directories to scan for Container Device Interface Specifications
 	CDISpecDirs []string `toml:"cdi_spec_dirs" json:"cdiSpecDirs"`
+	// ImagePullProgressTimeout is the maximum duration that there is no
+	// image data read from image registry in the open connection. It will
+	// be reset whatever a new byte has been read. If timeout, the image
+	// pulling will be cancelled. A zero value means there is no timeout.
+	//
+	// The string is in the golang duration format, see:
+	//   https://golang.org/pkg/time/#ParseDuration
+	ImagePullProgressTimeout string `toml:"image_pull_progress_timeout" json:"imagePullProgressTimeout"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
@@ -457,6 +465,13 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 	if c.StreamIdleTimeout != "" {
 		if _, err := time.ParseDuration(c.StreamIdleTimeout); err != nil {
 			return fmt.Errorf("invalid stream idle timeout: %w", err)
+		}
+	}
+
+	// Validation for image_pull_progress_timeout
+	if c.ImagePullProgressTimeout != "" {
+		if _, err := time.ParseDuration(c.ImagePullProgressTimeout); err != nil {
+			return fmt.Errorf("invalid image pull progress timeout: %w", err)
 		}
 	}
 	return nil
