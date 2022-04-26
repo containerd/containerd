@@ -35,7 +35,7 @@ import (
 )
 
 // WithNewSnapshot wraps `containerd.WithNewSnapshot` so that if creating the
-// snapshot fails we make sure the image is actually unpacked and and retry.
+// snapshot fails we make sure the image is actually unpacked and retry.
 func WithNewSnapshot(id string, i containerd.Image, opts ...snapshots.Opt) containerd.NewContainerOpts {
 	f := containerd.WithNewSnapshot(id, i, opts...)
 	return func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
