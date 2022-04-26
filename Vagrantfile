@@ -19,16 +19,22 @@
 Vagrant.configure("2") do |config|
   config.vm.box = ENV["BOX"] || "fedora/35-cloud-base"
   config.vm.box_version = ENV["BOX_VERSION"]
+
   memory = 4096
   cpus = 2
+  disk_size = 60
   config.vm.provider :virtualbox do |v|
     v.memory = memory
     v.cpus = cpus
+    v.disk :disk, size: "#{disk_size}GB", primary: true
   end
   config.vm.provider :libvirt do |v|
     v.memory = memory
     v.cpus = cpus
+    v.machine_virtual_size = disk_size
   end
+
+  config.vm.provision 'shell', path: 'script/resize-vagrant-root.sh'
 
   # Disabled by default. To run:
   #   vagrant up --provision-with=upgrade-packages
