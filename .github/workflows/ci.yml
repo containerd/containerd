@@ -133,6 +133,8 @@ jobs:
           - goos: linux
             goarch: arm
             goarm: "5"
+          - goos: linux
+            goarch: ppc64le
           - goos: freebsd
             goarch: amd64
           - goos: freebsd
@@ -170,6 +172,11 @@ jobs:
             packages+=" crossbuild-essential-arm64"
             echo "CGO_ENABLED=1" >> $GITHUB_ENV
             echo "CC=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+            ;;
+          linux/ppc64le)
+            packages+=" crossbuild-essential-ppc64el"
+            echo "CGO_ENABLED=1" >> $GITHUB_ENV
+            echo "CC=powerpc64le-linux-gnu-gcc" >> $GITHUB_ENV
             ;;
           windows/arm/v7)
             echo "CGO_ENABLED=0" >> $GITHUB_ENV
