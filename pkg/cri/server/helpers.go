@@ -17,6 +17,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"path/filepath"
@@ -42,7 +43,6 @@ import (
 	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/pelletier/go-toml"
-	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -374,10 +374,11 @@ func getRuntimeOptionsType(t string) interface{} {
 
 // getRuntimeOptions get runtime options from container metadata.
 func getRuntimeOptions(c containers.Container) (interface{}, error) {
-	if c.Runtime.Options == nil {
+	from := c.Runtime.Options
+	if from == nil || from.GetValue() == nil {
 		return nil, nil
 	}
-	opts, err := typeurl.UnmarshalAny(c.Runtime.Options)
+	opts, err := typeurl.UnmarshalAny(from)
 	if err != nil {
 		return nil, err
 	}

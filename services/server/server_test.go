@@ -20,8 +20,7 @@ import (
 	"testing"
 
 	srvconfig "github.com/containerd/containerd/services/server/config"
-	"gotest.tools/v3/assert"
-	is "gotest.tools/v3/assert/cmp"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCreateTopLevelDirectoriesErrorsWithSamePathForRootAndState(t *testing.T) {
@@ -30,7 +29,7 @@ func TestCreateTopLevelDirectoriesErrorsWithSamePathForRootAndState(t *testing.T
 		Root:  path,
 		State: path,
 	})
-	assert.Check(t, is.Error(err, "root and state must be different paths"))
+	assert.EqualError(t, err, "root and state must be different paths")
 }
 
 func TestCreateTopLevelDirectoriesWithEmptyStatePath(t *testing.T) {
@@ -40,7 +39,7 @@ func TestCreateTopLevelDirectoriesWithEmptyStatePath(t *testing.T) {
 		Root:  rootPath,
 		State: statePath,
 	})
-	assert.Check(t, is.Error(err, "state must be specified"))
+	assert.EqualError(t, err, "state must be specified")
 }
 
 func TestCreateTopLevelDirectoriesWithEmptyRootPath(t *testing.T) {
@@ -50,5 +49,5 @@ func TestCreateTopLevelDirectoriesWithEmptyRootPath(t *testing.T) {
 		Root:  rootPath,
 		State: statePath,
 	})
-	assert.Check(t, is.Error(err, "root must be specified"))
+	assert.EqualError(t, err, "root must be specified")
 }

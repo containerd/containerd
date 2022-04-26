@@ -17,6 +17,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -24,7 +25,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
@@ -93,11 +93,9 @@ func TestUpdateRuntimeConfig(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			testDir, err := os.MkdirTemp(os.TempDir(), "test-runtime-config")
-			require.NoError(t, err)
-			defer os.RemoveAll(testDir)
+			testDir := t.TempDir()
 			templateName := filepath.Join(testDir, "template")
-			err = os.WriteFile(templateName, []byte(testTemplate), 0666)
+			err := os.WriteFile(templateName, []byte(testTemplate), 0666)
 			require.NoError(t, err)
 			confDir := filepath.Join(testDir, "net.d")
 			confName := filepath.Join(confDir, cniConfigFileName)

@@ -19,6 +19,7 @@ package integration
 import (
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"testing"
 	"time"
 
@@ -82,13 +83,8 @@ func TestContainerSymlinkVolumes(t *testing.T) {
 	} {
 		testCase := testCase // capture range variable
 		t.Run(name, func(t *testing.T) {
-			testPodLogDir, err := os.MkdirTemp("", "symlink-test")
-			require.NoError(t, err)
-			defer os.RemoveAll(testPodLogDir)
-
-			testVolDir, err := os.MkdirTemp("", "symlink-test-vol")
-			require.NoError(t, err)
-			defer os.RemoveAll(testVolDir)
+			testPodLogDir := t.TempDir()
+			testVolDir := t.TempDir()
 
 			content := "hello there\n"
 			regularFile, err := createRegularFile(testVolDir, content)
@@ -103,9 +99,14 @@ func TestContainerSymlinkVolumes(t *testing.T) {
 			)
 
 			var (
-				testImage     = GetImage(BusyBox)
-				containerName = "test-container"
+				testImage          = GetImage(BusyBox)
+				containerName      = "test-container"
+				containerMountPath = "/mounted_file"
 			)
+
+			if goruntime.GOOS == "windows" {
+				containerMountPath = filepath.Clean("C:" + containerMountPath)
+			}
 
 			EnsureImageExists(t, testImage)
 
@@ -113,9 +114,9 @@ func TestContainerSymlinkVolumes(t *testing.T) {
 			cnConfig := ContainerConfig(
 				containerName,
 				testImage,
-				WithCommand("cat", "/mounted_file"),
+				WithCommand("cat", containerMountPath),
 				WithLogPath(containerName),
-				WithVolumeMount(file, "/mounted_file"),
+				WithVolumeMount(file, containerMountPath),
 			)
 
 			cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)

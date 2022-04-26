@@ -69,6 +69,12 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 		if err != nil {
 			return err
 		}
+		// Since only read is needed, append ReadOnly mount option to prevent linux kernel
+		// from syncing whole filesystem in umount syscall.
+		if len(mounts) == 1 && mounts[0].Type == "overlay" {
+			mounts[0].Options = append(mounts[0].Options, "ro")
+		}
+
 		root, err := os.MkdirTemp("", "ctd-volume")
 		if err != nil {
 			return err
@@ -112,7 +118,10 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 			// The volume may have been defined with a C: prefix, which we can't use here.
 			volume = strings.TrimPrefix(volume, "C:")
 			for _, mountPath := range mountPaths {
-				src := filepath.Join(mountPath, volume)
+				src, err := fs.RootPath(mountPath, volume)
+				if err != nil {
+					return fmt.Errorf("rootpath on mountPath %s, volume %s: %w", mountPath, volume, err)
+				}
 				if _, err := os.Stat(src); err != nil {
 					if os.IsNotExist(err) {
 						// Skip copying directory if it does not exist.

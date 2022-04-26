@@ -18,7 +18,7 @@ package cni
 
 type NamespaceOpts func(s *Namespace) error
 
-// Capabilities
+// WithCapabilityPortMap adds support for port mappings
 func WithCapabilityPortMap(portMapping []PortMapping) NamespaceOpts {
 	return func(c *Namespace) error {
 		c.capabilityArgs["portMappings"] = portMapping
@@ -26,6 +26,7 @@ func WithCapabilityPortMap(portMapping []PortMapping) NamespaceOpts {
 	}
 }
 
+// WithCapabilityIPRanges adds support for ip ranges
 func WithCapabilityIPRanges(ipRanges []IPRanges) NamespaceOpts {
 	return func(c *Namespace) error {
 		c.capabilityArgs["ipRanges"] = ipRanges
@@ -33,8 +34,7 @@ func WithCapabilityIPRanges(ipRanges []IPRanges) NamespaceOpts {
 	}
 }
 
-// WithCapabilityBandWitdh adds support for traffic shaping:
-// https://github.com/heptio/cni-plugins/tree/master/plugins/meta/bandwidth
+// WithCapabilityBandWitdh adds support for bandwidth limits
 func WithCapabilityBandWidth(bandWidth BandWidth) NamespaceOpts {
 	return func(c *Namespace) error {
 		c.capabilityArgs["bandwidth"] = bandWidth
@@ -50,6 +50,8 @@ func WithCapabilityDNS(dns DNS) NamespaceOpts {
 	}
 }
 
+// WithCapability support well-known capabilities
+// https://www.cni.dev/docs/conventions/#well-known-capabilities
 func WithCapability(name string, capability interface{}) NamespaceOpts {
 	return func(c *Namespace) error {
 		c.capabilityArgs[name] = capability

@@ -1,4 +1,4 @@
-version = "unstable"
+version = "1"
 generator = "gogoctrd"
 plugins = ["grpc", "fieldpath"]
 

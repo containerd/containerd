@@ -214,7 +214,7 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 		t.Logf("TestCase %q", desc)
 		config := criconfig.Config{
 			PluginConfig: criconfig.PluginConfig{
-				TolerateMissingHugetlbController: false,
+				TolerateMissingHugetlbController: true,
 				DisableHugetlbController:         false,
 			},
 		}

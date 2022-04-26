@@ -40,5 +40,8 @@ func init() {
 	}, cli.StringFlag{
 		Name:  "rootfs-propagation",
 		Usage: "set the propagation of the container rootfs",
+	}, cli.StringSliceFlag{
+		Name:  "device",
+		Usage: "file path to a device to add to the container; or a path to a directory tree of devices to add to the container",
 	})
 }

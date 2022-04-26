@@ -33,7 +33,7 @@ import (
 	"github.com/containerd/containerd"
 	cri "github.com/containerd/containerd/integration/cri-api/pkg/apis"
 	"github.com/containerd/containerd/integration/remote"
-	dialer "github.com/containerd/containerd/integration/util"
+	dialer "github.com/containerd/containerd/integration/remote/util"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/pkg/cri/server"
@@ -294,6 +294,15 @@ func WithSupplementalGroups(gids []int64) ContainerOpts { //nolint:unused
 			c.Linux.SecurityContext = &runtime.LinuxContainerSecurityContext{}
 		}
 		c.Linux.SecurityContext.SupplementalGroups = gids
+	}
+}
+
+// WithDevice adds a device mount.
+func WithDevice(containerPath, hostPath, permissions string) ContainerOpts { //nolint:unused
+	return func(c *runtime.ContainerConfig) {
+		c.Devices = append(c.Devices, &runtime.Device{
+			ContainerPath: containerPath, HostPath: hostPath, Permissions: permissions,
+		})
 	}
 }
 

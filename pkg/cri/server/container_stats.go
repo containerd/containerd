@@ -17,10 +17,10 @@
 package server
 
 import (
+	"context"
 	"fmt"
 
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
-	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -41,7 +41,7 @@ func (c *criService) ContainerStats(ctx context.Context, in *runtime.ContainerSt
 	}
 
 	cs, err := c.containerMetrics(cntr.Metadata, resp.Metrics[0])
-	if err != nil {
+	if err != nil { //nolint:staticcheck // Ignore SA4023 as some platforms always return nil (stats unimplemented)
 		return nil, fmt.Errorf("failed to decode container metrics: %w", err)
 	}
 	return &runtime.ContainerStatsResponse{Stats: cs}, nil

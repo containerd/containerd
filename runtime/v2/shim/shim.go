@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"strings"
@@ -240,7 +241,7 @@ func RunManager(ctx context.Context, manager Manager, opts ...BinaryOpts) {
 func run(ctx context.Context, manager Manager, initFunc Init, name string, config Config) error {
 	parseFlags()
 	if versionFlag {
-		fmt.Printf("%s:\n", os.Args[0])
+		fmt.Printf("%s:\n", filepath.Base(os.Args[0]))
 		fmt.Println("  Version: ", version.Version)
 		fmt.Println("  Revision:", version.Revision)
 		fmt.Println("  Go version:", version.GoVersion)

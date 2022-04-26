@@ -49,22 +49,14 @@ func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, fun
 		buf               = bytes.NewBuffer(nil)
 	)
 
-	tempDir, err := os.MkdirTemp("", "containerd-test-new-daemon-with-config")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err != nil {
-			os.RemoveAll(tempDir)
-		}
-	}()
+	tempDir := t.TempDir()
 
 	configTOMLFile := filepath.Join(tempDir, "config.toml")
-	if err = os.WriteFile(configTOMLFile, []byte(configTOML), 0600); err != nil {
+	if err := os.WriteFile(configTOMLFile, []byte(configTOML), 0600); err != nil {
 		t.Fatal(err)
 	}
 
-	if err = srvconfig.LoadConfig(configTOMLFile, &configTOMLDecoded); err != nil {
+	if err := srvconfig.LoadConfig(configTOMLFile, &configTOMLDecoded); err != nil {
 		t.Fatal(err)
 	}
 
@@ -83,7 +75,7 @@ func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, fun
 	if configTOMLDecoded.State == "" {
 		args = append(args, "--state", filepath.Join(tempDir, "state"))
 	}
-	if err = ctrd.start("containerd", address, args, buf, buf); err != nil {
+	if err := ctrd.start("containerd", address, args, buf, buf); err != nil {
 		t.Fatalf("%v: %s", err, buf.String())
 	}
 
@@ -125,13 +117,6 @@ func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, fun
 // TestRestartMonitor tests restarting containers
 // with the restart monitor service plugin
 func TestRestartMonitor(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		// This test on Windows encounters the following error in some environments:
-		// "The process cannot access the file because it is being used by another process. (0x20)"
-		// Skip this test until this error can be evaluated and the appropriate
-		// test fix or environment configuration can be determined.
-		t.Skip("Skipping flaky test on Windows")
-	}
 	const (
 		interval = 10 * time.Second
 		epsilon  = 1 * time.Second
@@ -188,8 +173,22 @@ version = 2
 		t.Fatal(err)
 	}
 
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
 		t.Fatal(err)
+	}
+
+	// Wait for task exit. If the task takes longer to exit, we risc
+	// wrongfully determining that the task has been restarted when we
+	// check the status in the for loop bellow and find that it's still
+	// running.
+	select {
+	case <-statusC:
+	case <-time.After(30 * time.Second):
 	}
 
 	begin := time.Now()

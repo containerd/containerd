@@ -49,12 +49,14 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 	}
 
 	var opts options.Options
-	if r.Options != nil && r.Options.GetTypeUrl() != "" {
+	if r.Options.GetValue() != nil {
 		v, err := typeurl.UnmarshalAny(r.Options)
 		if err != nil {
 			return nil, err
 		}
-		opts = *v.(*options.Options)
+		if v != nil {
+			opts = *v.(*options.Options)
+		}
 	}
 
 	var mounts []process.Mount
@@ -210,7 +212,7 @@ func WriteRuntime(path, runtime string) error {
 
 func newInit(ctx context.Context, path, workDir, namespace string, platform stdio.Platform,
 	r *process.CreateConfig, options *options.Options, rootfs string) (*process.Init, error) {
-	runtime := process.NewRunc(options.Root, path, namespace, options.BinaryName, options.CriuPath, options.SystemdCgroup)
+	runtime := process.NewRunc(options.Root, path, namespace, options.BinaryName, options.SystemdCgroup)
 	p := process.New(r.ID, runtime, stdio.Stdio{
 		Stdin:    r.Stdin,
 		Stdout:   r.Stdout,

@@ -20,6 +20,7 @@
 package server
 
 import (
+	"context"
 	gocontext "context"
 	"fmt"
 
@@ -29,7 +30,6 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/typeurl"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"

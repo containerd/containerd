@@ -114,9 +114,7 @@ func TestStatus(t *testing.T) {
 	assert := assertlib.New(t)
 	require := requirelib.New(t)
 
-	tempDir, err := os.MkdirTemp(os.TempDir(), "status-test")
-	require.NoError(err)
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 	statusFile := filepath.Join(tempDir, "status")
 
 	t.Logf("simple store and get")

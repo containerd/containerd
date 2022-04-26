@@ -43,6 +43,11 @@ func (f *FakeCNIPlugin) Remove(ctx context.Context, id, path string, opts ...cni
 	return nil
 }
 
+// Check the network of PodSandbox.
+func (f *FakeCNIPlugin) Check(ctx context.Context, id, path string, opts ...cni.NamespaceOpts) error {
+	return nil
+}
+
 // Status get the status of the plugin.
 func (f *FakeCNIPlugin) Status() error {
 	return f.StatusErr

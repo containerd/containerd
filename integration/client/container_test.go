@@ -1440,11 +1440,11 @@ func TestContainerExtensions(t *testing.T) {
 		if len(cExts) != 1 {
 			t.Errorf("expected 1 container extension")
 		}
-		if cExts["hello"].TypeUrl != ext.TypeUrl {
-			t.Errorf("got unexpected type url for extension: %s", cExts["hello"].TypeUrl)
+		if actual := cExts["hello"].GetTypeUrl(); actual != ext.TypeUrl {
+			t.Errorf("got unexpected type url for extension: %s", actual)
 		}
-		if !bytes.Equal(cExts["hello"].Value, ext.Value) {
-			t.Errorf("expected extension value %q, got: %q", ext.Value, cExts["hello"].Value)
+		if actual := cExts["hello"].GetValue(); !bytes.Equal(actual, ext.Value) {
+			t.Errorf("expected extension value %q, got: %q", ext.Value, actual)
 		}
 	}
 
@@ -2036,7 +2036,12 @@ func TestDaemonRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer task.Delete(ctx)
+
+	defer func() {
+		if _, err := task.Delete(ctx, WithProcessKill); err != nil {
+			t.Logf("failed to delete task: %v", err)
+		}
+	}()
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
@@ -2058,7 +2063,10 @@ func TestDaemonRestart(t *testing.T) {
 		t.Errorf(`first task.Wait() should have failed with "transport is closing"`)
 	}
 
-	waitCtx, waitCancel := context.WithTimeout(ctx, 2*time.Second)
+	// NOTE(gabriel-samfira): Windows needs a bit more time to restart.
+	// Increase timeout from 2 seconds to 10 seconds to avoid deadline
+	// exceeded errors.
+	waitCtx, waitCancel := context.WithTimeout(ctx, 10*time.Second)
 	serving, err := client.IsServing(waitCtx)
 	waitCancel()
 	if !serving {
@@ -2417,4 +2425,128 @@ func TestTaskSpec(t *testing.T) {
 		t.Fatal(err)
 	}
 	<-statusC
+}
+
+func TestContainerUsername(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	username := "www-data"
+	command := []string{
+		"id", "-u",
+	}
+	expectedOutput := "33"
+	if runtime.GOOS == "windows" {
+		username = "ContainerUser"
+		command = []string{
+			"echo", `%USERNAME%`,
+		}
+		expectedOutput = "ContainerUser"
+	}
+
+	// the www-data user in the busybox image has a uid of 33
+	container, err := client.NewContainer(ctx, id,
+		WithNewSnapshot(id, image),
+		WithNewSpec(oci.WithImageConfig(image), oci.WithUsername(username), withProcessArgs(command...)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	buf := bytes.NewBuffer(nil)
+	task, err := container.NewTask(ctx, cio.NewCreator(withByteBuffers(buf)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	<-statusC
+	if _, err := task.Delete(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	output := strings.TrimSuffix(buf.String(), newLine)
+	if output != expectedOutput {
+		t.Errorf("expected %s uid to be %s but received %q", username, expectedOutput, buf.String())
+	}
+}
+
+func TestContainerPTY(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithTTY, withProcessArgs("echo", "hello")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	buf := bytes.NewBuffer(nil)
+	task, err := container.NewTask(ctx, cio.NewCreator(withByteBuffers(buf), withProcessTTY()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	<-statusC
+
+	if _, err := task.Delete(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	out := buf.String()
+	if !strings.ContainsAny(fmt.Sprintf("%#q", out), `\x00`) {
+		t.Fatal(`expected \x00 in output`)
+	}
 }

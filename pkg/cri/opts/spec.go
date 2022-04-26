@@ -63,7 +63,9 @@ func WithProcessArgs(config *runtime.ContainerConfig, image *imagespec.ImageConf
 				args = append([]string{}, image.Cmd...)
 			}
 			if command == nil {
-				command = append([]string{}, image.Entrypoint...)
+				if !(len(image.Entrypoint) == 1 && image.Entrypoint[0] == "") {
+					command = append([]string{}, image.Entrypoint...)
+				}
 			}
 		}
 		if len(command) == 0 && len(args) == 0 {

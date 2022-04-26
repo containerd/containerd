@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/ttrpc"
 	ptypes "github.com/gogo/protobuf/types"
 	"google.golang.org/grpc"
@@ -115,7 +116,7 @@ func toProto(env *events.Envelope) *api.Envelope {
 		Timestamp: env.Timestamp,
 		Namespace: env.Namespace,
 		Topic:     env.Topic,
-		Event:     env.Event,
+		Event:     protobuf.FromAny(env.Event),
 	}
 }
 

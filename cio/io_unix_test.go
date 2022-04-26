@@ -21,12 +21,10 @@ package cio
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"path/filepath"
 	"testing"
 
-	"gotest.tools/v3/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestOpenFifos(t *testing.T) {
@@ -55,7 +53,7 @@ func TestOpenFifos(t *testing.T) {
 	}
 	for _, scenario := range scenarios {
 		_, err := openFifos(context.Background(), scenario)
-		assert.Assert(t, err != nil, scenario)
+		assert.Error(t, err, scenario)
 	}
 }
 
@@ -65,11 +63,7 @@ func TestOpenFifosWithTerminal(t *testing.T) {
 	var ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 
-	ioFifoDir, err := os.MkdirTemp("", fmt.Sprintf("cio-%s", t.Name()))
-	if err != nil {
-		t.Fatalf("unexpected error during creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(ioFifoDir)
+	ioFifoDir := t.TempDir()
 
 	cfg := Config{
 		Stdout: filepath.Join(ioFifoDir, "test-stdout"),

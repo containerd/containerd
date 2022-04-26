@@ -48,6 +48,23 @@ func (p *process) Kill(ctx context.Context, signal uint32, _ bool) error {
 	return nil
 }
 
+func statusFromProto(from tasktypes.Status) runtime.Status {
+	var status runtime.Status
+	switch from {
+	case tasktypes.Status_CREATED:
+		status = runtime.CreatedStatus
+	case tasktypes.Status_RUNNING:
+		status = runtime.RunningStatus
+	case tasktypes.Status_STOPPED:
+		status = runtime.StoppedStatus
+	case tasktypes.Status_PAUSED:
+		status = runtime.PausedStatus
+	case tasktypes.Status_PAUSING:
+		status = runtime.PausingStatus
+	}
+	return status
+}
+
 func (p *process) State(ctx context.Context) (runtime.State, error) {
 	response, err := p.shim.task.State(ctx, &task.StateRequest{
 		ID:     p.shim.ID(),
@@ -59,22 +76,9 @@ func (p *process) State(ctx context.Context) (runtime.State, error) {
 		}
 		return runtime.State{}, errdefs.ErrNotFound
 	}
-	var status runtime.Status
-	switch response.Status {
-	case tasktypes.StatusCreated:
-		status = runtime.CreatedStatus
-	case tasktypes.StatusRunning:
-		status = runtime.RunningStatus
-	case tasktypes.StatusStopped:
-		status = runtime.StoppedStatus
-	case tasktypes.StatusPaused:
-		status = runtime.PausedStatus
-	case tasktypes.StatusPausing:
-		status = runtime.PausingStatus
-	}
 	return runtime.State{
 		Pid:        response.Pid,
-		Status:     status,
+		Status:     statusFromProto(response.Status),
 		Stdin:      response.Stdin,
 		Stdout:     response.Stdout,
 		Stderr:     response.Stderr,

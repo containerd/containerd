@@ -221,9 +221,7 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ str
 						if err != nil {
 							return "", fmt.Errorf("failed to load cgroup %s: %w", opts.ShimCgroup, err)
 						}
-						if err := cg.Add(cgroups.Process{
-							Pid: cmd.Process.Pid,
-						}); err != nil {
+						if err := cg.AddProc(uint64(cmd.Process.Pid)); err != nil {
 							return "", fmt.Errorf("failed to join cgroup %s: %w", opts.ShimCgroup, err)
 						}
 					}
@@ -261,7 +259,7 @@ func (manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
 		root = opts.Root
 	}
 
-	r := process.NewRunc(root, path, ns, runtime, "", false)
+	r := process.NewRunc(root, path, ns, runtime, false)
 	if err := r.Delete(ctx, id, &runcC.DeleteOpts{
 		Force: true,
 	}); err != nil {
@@ -270,8 +268,13 @@ func (manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
 	if err := mount.UnmountAll(filepath.Join(path, "rootfs"), 0); err != nil {
 		log.G(ctx).WithError(err).Warn("failed to cleanup rootfs mount")
 	}
+	pid, err := runcC.ReadPidFile(filepath.Join(path, process.InitPidFile))
+	if err != nil {
+		log.G(ctx).WithError(err).Warn("failed to read init pid file")
+	}
 	return shim.StopStatus{
 		ExitedAt:   time.Now(),
 		ExitStatus: 128 + int(unix.SIGKILL),
+		Pid:        pid,
 	}, nil
 }

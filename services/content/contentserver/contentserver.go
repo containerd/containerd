@@ -57,11 +57,12 @@ func (s *service) Register(server *grpc.Server) error {
 }
 
 func (s *service) Info(ctx context.Context, req *api.InfoRequest) (*api.InfoResponse, error) {
-	if err := req.Digest.Validate(); err != nil {
+	dg, err := digest.Parse(req.Digest)
+	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%q failed validation", req.Digest)
 	}
 
-	bi, err := s.store.Info(ctx, req.Digest)
+	bi, err := s.store.Info(ctx, dg)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -72,7 +73,8 @@ func (s *service) Info(ctx context.Context, req *api.InfoRequest) (*api.InfoResp
 }
 
 func (s *service) Update(ctx context.Context, req *api.UpdateRequest) (*api.UpdateResponse, error) {
-	if err := req.Info.Digest.Validate(); err != nil {
+	_, err := digest.Parse(req.Info.Digest)
+	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%q failed validation", req.Info.Digest)
 	}
 
@@ -99,7 +101,7 @@ func (s *service) List(req *api.ListContentRequest, session api.Content_ListServ
 
 	if err := s.store.Walk(session.Context(), func(info content.Info) error {
 		buffer = append(buffer, api.Info{
-			Digest:    info.Digest,
+			Digest:    info.Digest.String(),
 			Size_:     info.Size,
 			CreatedAt: info.CreatedAt,
 			Labels:    info.Labels,
@@ -130,11 +132,12 @@ func (s *service) List(req *api.ListContentRequest, session api.Content_ListServ
 
 func (s *service) Delete(ctx context.Context, req *api.DeleteContentRequest) (*ptypes.Empty, error) {
 	log.G(ctx).WithField("digest", req.Digest).Debugf("delete content")
-	if err := req.Digest.Validate(); err != nil {
+	dg, err := digest.Parse(req.Digest)
+	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
 
-	if err := s.store.Delete(ctx, req.Digest); err != nil {
+	if err := s.store.Delete(ctx, dg); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 
@@ -142,16 +145,17 @@ func (s *service) Delete(ctx context.Context, req *api.DeleteContentRequest) (*p
 }
 
 func (s *service) Read(req *api.ReadContentRequest, session api.Content_ReadServer) error {
-	if err := req.Digest.Validate(); err != nil {
+	dg, err := digest.Parse(req.Digest)
+	if err != nil {
 		return status.Errorf(codes.InvalidArgument, "%v: %v", req.Digest, err)
 	}
 
-	oi, err := s.store.Info(session.Context(), req.Digest)
+	oi, err := s.store.Info(session.Context(), dg)
 	if err != nil {
 		return errdefs.ToGRPC(err)
 	}
 
-	ra, err := s.store.ReaderAt(session.Context(), ocispec.Descriptor{Digest: req.Digest})
+	ra, err := s.store.ReaderAt(session.Context(), ocispec.Descriptor{Digest: dg})
 	if err != nil {
 		return errdefs.ToGRPC(err)
 	}
@@ -221,7 +225,7 @@ func (s *service) Status(ctx context.Context, req *api.StatusRequest) (*api.Stat
 		Ref:       status.Ref,
 		Offset:    status.Offset,
 		Total:     status.Total,
-		Expected:  status.Expected,
+		Expected:  status.Expected.String(),
 	}
 
 	return &resp, nil
@@ -241,7 +245,7 @@ func (s *service) ListStatuses(ctx context.Context, req *api.ListStatusesRequest
 			Ref:       status.Ref,
 			Offset:    status.Offset,
 			Total:     status.Total,
-			Expected:  status.Expected,
+			Expected:  status.Expected.String(),
 		})
 	}
 
@@ -293,7 +297,7 @@ func (s *service) Write(session api.Content_WriteServer) (err error) {
 		"ref": ref,
 	}
 	total = req.Total
-	expected = req.Expected
+	expected = digest.Digest(req.Expected)
 	if total > 0 {
 		fields["total"] = total
 	}
@@ -341,12 +345,13 @@ func (s *service) Write(session api.Content_WriteServer) (err error) {
 		// Supporting these two paths is quite awkward but it lets both API
 		// users use the same writer style for each with a minimum of overhead.
 		if req.Expected != "" {
-			if expected != "" && expected != req.Expected {
-				log.G(ctx).Debugf("commit digest differs from writer digest: %v != %v", req.Expected, expected)
+			dg := digest.Digest(req.Expected)
+			if expected != "" && expected != dg {
+				log.G(ctx).Debugf("commit digest differs from writer digest: %v != %v", dg, expected)
 			}
-			expected = req.Expected
+			expected = dg
 
-			if _, err := s.store.Info(session.Context(), req.Expected); err == nil {
+			if _, err := s.store.Info(session.Context(), dg); err == nil {
 				if err := wr.Close(); err != nil {
 					log.G(ctx).WithError(err).Error("failed to close writer")
 				}
@@ -368,12 +373,12 @@ func (s *service) Write(session api.Content_WriteServer) (err error) {
 		}
 
 		switch req.Action {
-		case api.WriteActionStat:
-			msg.Digest = wr.Digest()
+		case api.WriteAction_STAT:
+			msg.Digest = wr.Digest().String()
 			msg.StartedAt = ws.StartedAt
 			msg.UpdatedAt = ws.UpdatedAt
 			msg.Total = total
-		case api.WriteActionWrite, api.WriteActionCommit:
+		case api.WriteAction_WRITE, api.WriteAction_COMMIT:
 			if req.Offset > 0 {
 				// validate the offset if provided
 				if req.Offset != ws.Offset {
@@ -406,7 +411,7 @@ func (s *service) Write(session api.Content_WriteServer) (err error) {
 				msg.Offset += int64(n)
 			}
 
-			if req.Action == api.WriteActionCommit {
+			if req.Action == api.WriteAction_COMMIT {
 				var opts []content.Opt
 				if req.Labels != nil {
 					opts = append(opts, content.WithLabels(req.Labels))
@@ -416,14 +421,14 @@ func (s *service) Write(session api.Content_WriteServer) (err error) {
 				}
 			}
 
-			msg.Digest = wr.Digest()
+			msg.Digest = wr.Digest().String()
 		}
 
 		if err := session.Send(&msg); err != nil {
 			return err
 		}
 
-		if req.Action == api.WriteActionCommit {
+		if req.Action == api.WriteAction_COMMIT {
 			return nil
 		}
 
@@ -448,7 +453,7 @@ func (s *service) Abort(ctx context.Context, req *api.AbortRequest) (*ptypes.Emp
 
 func infoToGRPC(info content.Info) api.Info {
 	return api.Info{
-		Digest:    info.Digest,
+		Digest:    info.Digest.String(),
 		Size_:     info.Size,
 		CreatedAt: info.CreatedAt,
 		UpdatedAt: info.UpdatedAt,
@@ -458,7 +463,7 @@ func infoToGRPC(info content.Info) api.Info {
 
 func infoFromGRPC(info api.Info) content.Info {
 	return content.Info{
-		Digest:    info.Digest,
+		Digest:    digest.Digest(info.Digest),
 		Size:      info.Size_,
 		CreatedAt: info.CreatedAt,
 		UpdatedAt: info.UpdatedAt,

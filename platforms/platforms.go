@@ -136,9 +136,7 @@ type Matcher interface {
 //
 // Applications should opt to use `Match` over directly parsing specifiers.
 func NewMatcher(platform specs.Platform) Matcher {
-	return &matcher{
-		Platform: Normalize(platform),
-	}
+	return newDefaultMatcher(platform)
 }
 
 type matcher struct {
@@ -257,5 +255,6 @@ func Format(platform specs.Platform) string {
 func Normalize(platform specs.Platform) specs.Platform {
 	platform.OS = normalizeOS(platform.OS)
 	platform.Architecture, platform.Variant = normalizeArch(platform.Architecture, platform.Variant)
+
 	return platform
 }

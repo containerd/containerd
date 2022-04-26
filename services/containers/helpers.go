@@ -19,12 +19,16 @@ package containers
 import (
 	api "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/typeurl"
+	"github.com/gogo/protobuf/types"
 )
 
 func containersToProto(containers []containers.Container) []api.Container {
 	var containerspb []api.Container
 
 	for _, image := range containers {
+		image := image
 		containerspb = append(containerspb, containerToProto(&image))
 	}
 
@@ -32,20 +36,24 @@ func containersToProto(containers []containers.Container) []api.Container {
 }
 
 func containerToProto(container *containers.Container) api.Container {
+	extensions := make(map[string]types.Any)
+	for k, v := range container.Extensions {
+		extensions[k] = *protobuf.FromAny(v)
+	}
 	return api.Container{
 		ID:     container.ID,
 		Labels: container.Labels,
 		Image:  container.Image,
 		Runtime: &api.Container_Runtime{
 			Name:    container.Runtime.Name,
-			Options: container.Runtime.Options,
+			Options: protobuf.FromAny(container.Runtime.Options),
 		},
-		Spec:        container.Spec,
+		Spec:        protobuf.FromAny(container.Spec),
 		Snapshotter: container.Snapshotter,
 		SnapshotKey: container.SnapshotKey,
 		CreatedAt:   container.CreatedAt,
 		UpdatedAt:   container.UpdatedAt,
-		Extensions:  container.Extensions,
+		Extensions:  extensions,
 	}
 }
 
@@ -57,6 +65,11 @@ func containerFromProto(containerpb *api.Container) containers.Container {
 			Options: containerpb.Runtime.Options,
 		}
 	}
+	extensions := make(map[string]typeurl.Any)
+	for k, v := range containerpb.Extensions {
+		v := v
+		extensions[k] = &v
+	}
 	return containers.Container{
 		ID:          containerpb.ID,
 		Labels:      containerpb.Labels,
@@ -65,6 +78,6 @@ func containerFromProto(containerpb *api.Container) containers.Container {
 		Spec:        containerpb.Spec,
 		Snapshotter: containerpb.Snapshotter,
 		SnapshotKey: containerpb.SnapshotKey,
-		Extensions:  containerpb.Extensions,
+		Extensions:  extensions,
 	}
 }

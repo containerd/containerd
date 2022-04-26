@@ -126,8 +126,16 @@ else
 
   # TODO(random-liu): Put version into the metadata instead of
   # deciding it in cloud init. This may cause issue to reboot test.
-  version=$(curl -f --ipv4 --retry 6 --retry-delay 3 --silent --show-error \
-    https://storage.googleapis.com/${deploy_path}/latest)
+  if [ $(uname -m) == "aarch64" ]; then
+    version=$(curl -f --ipv4 --retry 6 --retry-delay 3 --silent --show-error \
+      -H "Accept: application/vnd.github.v3+json" \
+      "https://api.github.com/repos/containerd/containerd/releases/latest" \
+      | jq -r .tag_name \
+      | sed "s:v::g")
+  else
+    version=$(curl -f --ipv4 --retry 6 --retry-delay 3 --silent --show-error \
+      https://storage.googleapis.com/${deploy_path}/latest)
+  fi
 fi
 
 TARBALL_GCS_NAME="${pkg_prefix}-${version}.linux-amd64.tar.gz"
@@ -148,7 +156,12 @@ if [ -z "${version}" ]; then
     exit 1
   fi
 else
-  if is_preloaded "${TARBALL_GCS_NAME}" "${tar_sha1}"; then
+  if [ $(uname -m) == "aarch64" ]; then
+    curl -f --ipv4 -Lo "${TARBALL}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 \
+	"https://github.com/containerd/containerd/releases/download/v${version}/cri-containerd-${version}-linux-arm64.tar.gz"
+    tar xvf "${TARBALL}"
+    rm -f "${TARBALL}"
+  elif is_preloaded "${TARBALL_GCS_NAME}" "${tar_sha1}"; then
     echo "${TARBALL_GCS_NAME} is preloaded"
   else
     # Download and untar the release tar ball.

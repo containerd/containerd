@@ -36,7 +36,7 @@ func (ra *remoteReaderAt) Size() int64 {
 
 func (ra *remoteReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
 	rr := &contentapi.ReadContentRequest{
-		Digest: ra.digest,
+		Digest: ra.digest.String(),
 		Offset: off,
 		Size_:  int64(len(p)),
 	}

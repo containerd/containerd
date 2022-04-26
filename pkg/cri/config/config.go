@@ -302,6 +302,13 @@ type PluginConfig struct {
 	// and if it is not overwritten by PodSandboxConfig
 	// Note that currently default is set to disabled but target change it in future together with EnableUnprivilegedPorts
 	EnableUnprivilegedICMP bool `toml:"enable_unprivileged_icmp" json:"enableUnprivilegedICMP"`
+	// EnableCDI indicates to enable injection of the Container Device Interface Specifications
+	// into the OCI config
+	// For more details about CDI and the syntax of CDI Spec files please refer to
+	// https://github.com/container-orchestrated-devices/container-device-interface.
+	EnableCDI bool `toml:"enable_cdi" json:"enableCDI"`
+	// CDISpecDirs is the list of directories to scan for Container Device Interface Specifications
+	CDISpecDirs []string `toml:"cdi_spec_dirs" json:"cdiSpecDirs"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming

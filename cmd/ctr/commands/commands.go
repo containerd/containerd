@@ -134,7 +134,7 @@ var (
 		},
 		cli.StringFlag{
 			Name:  "runtime",
-			Usage: "runtime name",
+			Usage: "runtime name or absolute path to runtime binary",
 			Value: defaults.DefaultRuntime,
 		},
 		cli.StringFlag{
@@ -164,10 +164,6 @@ var (
 		cli.Uint64Flag{
 			Name:  "memory-limit",
 			Usage: "memory limit (in bytes) for the container",
-		},
-		cli.StringSliceFlag{
-			Name:  "device",
-			Usage: "file path to a device to add to the container; or a path to a directory tree of devices to add to the container",
 		},
 		cli.StringSliceFlag{
 			Name:  "cap-add",

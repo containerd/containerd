@@ -164,8 +164,6 @@ file {
     go_package: "github.com/containerd/containerd/api/events;events"
     63300: 1
   }
-  weak_dependency: 1
-  weak_dependency: 2
   syntax: "proto3"
 }
 file {
@@ -180,10 +178,6 @@ file {
       number: 1
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65001: 0
-        65003: "github.com/opencontainers/go-digest.Digest"
-      }
       json_name: "digest"
     }
   }
@@ -191,8 +185,6 @@ file {
     go_package: "github.com/containerd/containerd/api/events;events"
     63300: 1
   }
-  weak_dependency: 0
-  weak_dependency: 1
   syntax: "proto3"
 }
 file {
@@ -289,7 +281,6 @@ file {
     go_package: "github.com/containerd/containerd/api/events;events"
     63300: 1
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -387,8 +378,6 @@ file {
     go_package: "github.com/containerd/containerd/api/events;events"
     63300: 1
   }
-  weak_dependency: 0
-  weak_dependency: 1
   syntax: "proto3"
 }
 file {
@@ -443,7 +432,6 @@ file {
     go_package: "github.com/containerd/containerd/api/events;events"
     63300: 1
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -515,7 +503,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/types;types"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -622,8 +609,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "exitedAt"
     }
@@ -703,8 +690,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "exitedAt"
     }
@@ -801,8 +788,6 @@ file {
     go_package: "github.com/containerd/containerd/api/events;events"
     63300: 1
   }
-  weak_dependency: 0
-  weak_dependency: 3
   syntax: "proto3"
 }
 file {
@@ -915,8 +900,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "createdAt"
     }
@@ -927,8 +912,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "updatedAt"
     }
@@ -1173,7 +1158,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/containers/v1;containers"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -1190,10 +1174,6 @@ file {
       number: 1
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65001: 0
-        65003: "github.com/opencontainers/go-digest.Digest"
-      }
       json_name: "digest"
     }
     field {
@@ -1210,8 +1190,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "createdAt"
     }
@@ -1222,8 +1202,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "updatedAt"
     }
@@ -1263,10 +1243,6 @@ file {
       number: 1
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65001: 0
-        65003: "github.com/opencontainers/go-digest.Digest"
-      }
       json_name: "digest"
     }
   }
@@ -1351,10 +1327,6 @@ file {
       number: 1
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65001: 0
-        65003: "github.com/opencontainers/go-digest.Digest"
-      }
       json_name: "digest"
     }
   }
@@ -1365,10 +1337,6 @@ file {
       number: 1
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65001: 0
-        65003: "github.com/opencontainers/go-digest.Digest"
-      }
       json_name: "digest"
     }
     field {
@@ -1412,8 +1380,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "startedAt"
     }
@@ -1424,8 +1392,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "updatedAt"
     }
@@ -1455,10 +1423,6 @@ file {
       number: 6
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65001: 0
-        65003: "github.com/opencontainers/go-digest.Digest"
-      }
       json_name: "expected"
     }
   }
@@ -1536,10 +1500,6 @@ file {
       number: 4
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65001: 0
-        65003: "github.com/opencontainers/go-digest.Digest"
-      }
       json_name: "expected"
     }
     field {
@@ -1602,8 +1562,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "startedAt"
     }
@@ -1614,8 +1574,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "updatedAt"
     }
@@ -1638,10 +1598,6 @@ file {
       number: 6
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65001: 0
-        65003: "github.com/opencontainers/go-digest.Digest"
-      }
       json_name: "digest"
     }
   }
@@ -1660,27 +1616,14 @@ file {
     value {
       name: "STAT"
       number: 0
-      options {
-        66001: "WriteActionStat"
-      }
     }
     value {
       name: "WRITE"
       number: 1
-      options {
-        66001: "WriteActionWrite"
-      }
     }
     value {
       name: "COMMIT"
       number: 2
-      options {
-        66001: "WriteActionCommit"
-      }
-    }
-    options {
-      62001: 0
-      62023: "WriteAction"
     }
   }
   service {
@@ -1738,7 +1681,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/content/v1;content"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -1759,10 +1701,6 @@ file {
       number: 2
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65001: 0
-        65003: "github.com/opencontainers/go-digest.Digest"
-      }
       json_name: "digest"
     }
     field {
@@ -1804,7 +1742,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/types;types"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -1961,7 +1898,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/diff/v1;diff"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -2020,8 +1956,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "timestamp"
     }
@@ -2073,8 +2009,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/events/v1;events"
   }
-  weak_dependency: 0
-  weak_dependency: 1
   syntax: "proto3"
 }
 file {
@@ -2120,8 +2054,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "createdAt"
     }
@@ -2132,8 +2066,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "updatedAt"
     }
@@ -2315,7 +2249,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/images/v1;images"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -2352,7 +2285,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/types;types"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -2532,7 +2464,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/introspection/v1;introspection"
   }
-  weak_dependency: 3
   syntax: "proto3"
 }
 file {
@@ -2557,8 +2488,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "createdAt"
     }
@@ -2797,7 +2728,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/leases/v1;leases"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -2997,7 +2927,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/namespaces/v1;namespaces"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -3279,8 +3208,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "createdAt"
     }
@@ -3291,8 +3220,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "updatedAt"
     }
@@ -3462,34 +3391,18 @@ file {
     value {
       name: "UNKNOWN"
       number: 0
-      options {
-        66001: "KindUnknown"
-      }
     }
     value {
       name: "VIEW"
       number: 1
-      options {
-        66001: "KindView"
-      }
     }
     value {
       name: "ACTIVE"
       number: 2
-      options {
-        66001: "KindActive"
-      }
     }
     value {
       name: "COMMITTED"
       number: 3
-      options {
-        66001: "KindCommitted"
-      }
-    }
-    options {
-      62001: 0
-      62023: "Kind"
     }
   }
   service {
@@ -3549,7 +3462,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/snapshots/v1;snapshots"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -3567,8 +3479,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "timestamp"
     }
@@ -3591,7 +3503,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/types;types"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -3673,8 +3584,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "exitedAt"
     }
@@ -3702,51 +3613,28 @@ file {
     value {
       name: "UNKNOWN"
       number: 0
-      options {
-        66001: "StatusUnknown"
-      }
     }
     value {
       name: "CREATED"
       number: 1
-      options {
-        66001: "StatusCreated"
-      }
     }
     value {
       name: "RUNNING"
       number: 2
-      options {
-        66001: "StatusRunning"
-      }
     }
     value {
       name: "STOPPED"
       number: 3
-      options {
-        66001: "StatusStopped"
-      }
     }
     value {
       name: "PAUSED"
       number: 4
-      options {
-        66001: "StatusPaused"
-      }
     }
     value {
       name: "PAUSING"
       number: 5
-      options {
-        66001: "StatusPausing"
-      }
-    }
-    options {
-      62001: 0
-      62023: "Status"
     }
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -3913,8 +3801,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "exitedAt"
     }
@@ -4182,10 +4070,6 @@ file {
       number: 2
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      options {
-        65001: 0
-        65003: "github.com/opencontainers/go-digest.Digest"
-      }
       json_name: "parentCheckpoint"
     }
     field {
@@ -4308,8 +4192,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "exitedAt"
     }
@@ -4405,7 +4289,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/tasks/v1;tasks"
   }
-  weak_dependency: 2
   syntax: "proto3"
 }
 file {
@@ -4436,8 +4319,8 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       options {
-        65001: 0
         65010: 1
+        65001: 0
       }
       json_name: "timestamp"
     }
@@ -4478,8 +4361,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/ttrpc/events/v1;events"
   }
-  weak_dependency: 0
-  weak_dependency: 1
   syntax: "proto3"
 }
 file {
@@ -4515,6 +4396,5 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/version/v1;version"
   }
-  weak_dependency: 1
   syntax: "proto3"
 }

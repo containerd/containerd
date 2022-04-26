@@ -1,6 +1,11 @@
 # Prepare windows environment for building and running containerd tests
 
-$PACKAGES= @{ mingw = "10.2.0"; git = ""; golang = "1.17.5"; make = ""; nssm = "" }
+# Disable Windows Defender real time monitoring. Real time monitoring consumes a lot of
+# CPU and slows down tests as images are unarchived, and is not really needed in a short
+# lived test environment.
+Set-MpPreference -DisableRealtimeMonitoring:$true
+
+$PACKAGES= @{ mingw = "10.2.0"; git = ""; golang = "1.18"; make = ""; nssm = "" }
 
 Write-Host "Downloading chocolatey package"
 curl.exe -L "https://packages.chocolatey.org/chocolatey.0.10.15.nupkg" -o 'c:\choco.zip'
