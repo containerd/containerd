@@ -73,8 +73,6 @@ replace (
 	// resolution if newer.
 	github.com/containerd/containerd => ../../
 
-	github.com/containerd/typeurl => github.com/kzys/typeurl v1.0.3-0.20220421192127-bac36d33562a
-
 	// Replace rules below must be kept in sync with the main go.mod file at the
 	// root, because that's the actual version expected by the "containerd/containerd"
 	// dependency above.
