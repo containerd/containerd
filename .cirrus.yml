@@ -32,7 +32,7 @@ task:
 
   vagrant_cache:
     folder: /root/.vagrant.d
-    fingerprint_script: uname -a; cat Vagrantfile
+    fingerprint_script: uname --kernel-release --kernel-version && cat Vagrantfile
 
   vagrant_up_script: |
     vagrant up --no-tty
