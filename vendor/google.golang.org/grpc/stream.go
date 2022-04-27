@@ -36,6 +36,7 @@ import (
 	"google.golang.org/grpc/internal/channelz"
 	"google.golang.org/grpc/internal/grpcrand"
 	"google.golang.org/grpc/internal/grpcutil"
+	imetadata "google.golang.org/grpc/internal/metadata"
 	iresolver "google.golang.org/grpc/internal/resolver"
 	"google.golang.org/grpc/internal/serviceconfig"
 	"google.golang.org/grpc/internal/transport"
@@ -46,10 +47,12 @@ import (
 )
 
 // StreamHandler defines the handler called by gRPC server to complete the
-// execution of a streaming RPC. If a StreamHandler returns an error, it
-// should be produced by the status package, or else gRPC will use
-// codes.Unknown as the status code and err.Error() as the status message
-// of the RPC.
+// execution of a streaming RPC.
+//
+// If a StreamHandler returns an error, it should either be produced by the
+// status package, or be one of the context errors. Otherwise, gRPC will use
+// codes.Unknown as the status code and err.Error() as the status message of the
+// RPC.
 type StreamHandler func(srv interface{}, stream ServerStream) error
 
 // StreamDesc represents a streaming RPC service's method specification.  Used
@@ -164,6 +167,11 @@ func NewClientStream(ctx context.Context, desc *StreamDesc, cc *ClientConn, meth
 }
 
 func newClientStream(ctx context.Context, desc *StreamDesc, cc *ClientConn, method string, opts ...CallOption) (_ ClientStream, err error) {
+	if md, _, ok := metadata.FromOutgoingContextRaw(ctx); ok {
+		if err := imetadata.Validate(md); err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
 	if channelz.IsOn() {
 		cc.incrCallsStarted()
 		defer func() {
@@ -454,7 +462,7 @@ type clientStream struct {
 
 	retryThrottler *retryThrottler // The throttler active when the RPC began.
 
-	binlog *binarylog.MethodLogger // Binary logger, can be nil.
+	binlog binarylog.MethodLogger // Binary logger, can be nil.
 	// serverHeaderBinlogged is a boolean for whether server header has been
 	// logged. Server header will be logged when the first time one of those
 	// happens: stream.Header(), stream.Recv().
@@ -1426,7 +1434,7 @@ type serverStream struct {
 
 	statsHandler stats.Handler
 
-	binlog *binarylog.MethodLogger
+	binlog binarylog.MethodLogger
 	// serverHeaderBinlogged indicates whether server header has been logged. It
 	// will happen when one of the following two happens: stream.SendHeader(),
 	// stream.Send().
@@ -1446,11 +1454,20 @@ func (ss *serverStream) SetHeader(md metadata.MD) error {
 	if md.Len() == 0 {
 		return nil
 	}
+	err := imetadata.Validate(md)
+	if err != nil {
+		return status.Error(codes.Internal, err.Error())
+	}
 	return ss.s.SetHeader(md)
 }
 
 func (ss *serverStream) SendHeader(md metadata.MD) error {
-	err := ss.t.WriteHeader(ss.s, md)
+	err := imetadata.Validate(md)
+	if err != nil {
+		return status.Error(codes.Internal, err.Error())
+	}
+
+	err = ss.t.WriteHeader(ss.s, md)
 	if ss.binlog != nil && !ss.serverHeaderBinlogged {
 		h, _ := ss.s.Header()
 		ss.binlog.Log(&binarylog.ServerHeader{
@@ -1464,6 +1481,9 @@ func (ss *serverStream) SendHeader(md metadata.MD) error {
 func (ss *serverStream) SetTrailer(md metadata.MD) {
 	if md.Len() == 0 {
 		return
+	}
+	if err := imetadata.Validate(md); err != nil {
+		logger.Errorf("stream: failed to validate md when setting trailer, err: %v", err)
 	}
 	ss.s.SetTrailer(md)
 }
