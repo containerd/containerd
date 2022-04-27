@@ -20,7 +20,6 @@ package containerd.runtime.sandbox.v1;
 
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
-import weak "gogoproto/gogo.proto";
 
 import "github.com/containerd/containerd/api/types/mount.proto";
 

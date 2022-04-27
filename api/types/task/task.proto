@@ -18,7 +18,6 @@ syntax = "proto3";
 
 package containerd.v1.types;
 
-import "gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/any.proto";
 
