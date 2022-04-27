@@ -1,7 +1,6 @@
 file {
   name: "github.com/containerd/containerd/runtime/v2/runc/options/oci.proto"
   package: "containerd.runc.v1"
-  dependency: "gogoproto/gogo.proto"
   message_type {
     name: "Options"
     field {

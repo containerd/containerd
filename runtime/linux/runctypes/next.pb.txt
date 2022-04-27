@@ -1,7 +1,6 @@
 file {
   name: "github.com/containerd/containerd/runtime/linux/runctypes/runc.proto"
   package: "containerd.linux.runc"
-  dependency: "gogoproto/gogo.proto"
   message_type {
     name: "RuncOptions"
     field {

@@ -5,11 +5,11 @@ package events
 import (
 	context "context"
 	ttrpc "github.com/containerd/ttrpc"
-	empty "github.com/golang/protobuf/ptypes/empty"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 type EventsService interface {
-	Forward(context.Context, *ForwardRequest) (*empty.Empty, error)
+	Forward(context.Context, *ForwardRequest) (*emptypb.Empty, error)
 }
 
 func RegisterEventsService(srv *ttrpc.Server, svc EventsService) {
@@ -36,8 +36,8 @@ func NewEventsClient(client *ttrpc.Client) EventsService {
 	}
 }
 
-func (c *eventsClient) Forward(ctx context.Context, req *ForwardRequest) (*empty.Empty, error) {
-	var resp empty.Empty
+func (c *eventsClient) Forward(ctx context.Context, req *ForwardRequest) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.services.events.ttrpc.v1.Events", "Forward", req, &resp); err != nil {
 		return nil, err
 	}

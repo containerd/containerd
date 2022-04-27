@@ -5,25 +5,25 @@ package shim
 import (
 	context "context"
 	ttrpc "github.com/containerd/ttrpc"
-	empty "github.com/golang/protobuf/ptypes/empty"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 type ShimService interface {
 	State(context.Context, *StateRequest) (*StateResponse, error)
 	Create(context.Context, *CreateTaskRequest) (*CreateTaskResponse, error)
 	Start(context.Context, *StartRequest) (*StartResponse, error)
-	Delete(context.Context, *empty.Empty) (*DeleteResponse, error)
+	Delete(context.Context, *emptypb.Empty) (*DeleteResponse, error)
 	DeleteProcess(context.Context, *DeleteProcessRequest) (*DeleteResponse, error)
 	ListPids(context.Context, *ListPidsRequest) (*ListPidsResponse, error)
-	Pause(context.Context, *empty.Empty) (*empty.Empty, error)
-	Resume(context.Context, *empty.Empty) (*empty.Empty, error)
-	Checkpoint(context.Context, *CheckpointTaskRequest) (*empty.Empty, error)
-	Kill(context.Context, *KillRequest) (*empty.Empty, error)
-	Exec(context.Context, *ExecProcessRequest) (*empty.Empty, error)
-	ResizePty(context.Context, *ResizePtyRequest) (*empty.Empty, error)
-	CloseIO(context.Context, *CloseIORequest) (*empty.Empty, error)
-	ShimInfo(context.Context, *empty.Empty) (*ShimInfoResponse, error)
-	Update(context.Context, *UpdateTaskRequest) (*empty.Empty, error)
+	Pause(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
+	Resume(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
+	Checkpoint(context.Context, *CheckpointTaskRequest) (*emptypb.Empty, error)
+	Kill(context.Context, *KillRequest) (*emptypb.Empty, error)
+	Exec(context.Context, *ExecProcessRequest) (*emptypb.Empty, error)
+	ResizePty(context.Context, *ResizePtyRequest) (*emptypb.Empty, error)
+	CloseIO(context.Context, *CloseIORequest) (*emptypb.Empty, error)
+	ShimInfo(context.Context, *emptypb.Empty) (*ShimInfoResponse, error)
+	Update(context.Context, *UpdateTaskRequest) (*emptypb.Empty, error)
 	Wait(context.Context, *WaitRequest) (*WaitResponse, error)
 }
 
@@ -52,7 +52,7 @@ func RegisterShimService(srv *ttrpc.Server, svc ShimService) {
 				return svc.Start(ctx, &req)
 			},
 			"Delete": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
-				var req empty.Empty
+				var req emptypb.Empty
 				if err := unmarshal(&req); err != nil {
 					return nil, err
 				}
@@ -73,14 +73,14 @@ func RegisterShimService(srv *ttrpc.Server, svc ShimService) {
 				return svc.ListPids(ctx, &req)
 			},
 			"Pause": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
-				var req empty.Empty
+				var req emptypb.Empty
 				if err := unmarshal(&req); err != nil {
 					return nil, err
 				}
 				return svc.Pause(ctx, &req)
 			},
 			"Resume": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
-				var req empty.Empty
+				var req emptypb.Empty
 				if err := unmarshal(&req); err != nil {
 					return nil, err
 				}
@@ -122,7 +122,7 @@ func RegisterShimService(srv *ttrpc.Server, svc ShimService) {
 				return svc.CloseIO(ctx, &req)
 			},
 			"ShimInfo": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
-				var req empty.Empty
+				var req emptypb.Empty
 				if err := unmarshal(&req); err != nil {
 					return nil, err
 				}
@@ -180,7 +180,7 @@ func (c *shimClient) Start(ctx context.Context, req *StartRequest) (*StartRespon
 	return &resp, nil
 }
 
-func (c *shimClient) Delete(ctx context.Context, req *empty.Empty) (*DeleteResponse, error) {
+func (c *shimClient) Delete(ctx context.Context, req *emptypb.Empty) (*DeleteResponse, error) {
 	var resp DeleteResponse
 	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "Delete", req, &resp); err != nil {
 		return nil, err
@@ -204,63 +204,63 @@ func (c *shimClient) ListPids(ctx context.Context, req *ListPidsRequest) (*ListP
 	return &resp, nil
 }
 
-func (c *shimClient) Pause(ctx context.Context, req *empty.Empty) (*empty.Empty, error) {
-	var resp empty.Empty
+func (c *shimClient) Pause(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "Pause", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *shimClient) Resume(ctx context.Context, req *empty.Empty) (*empty.Empty, error) {
-	var resp empty.Empty
+func (c *shimClient) Resume(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "Resume", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *shimClient) Checkpoint(ctx context.Context, req *CheckpointTaskRequest) (*empty.Empty, error) {
-	var resp empty.Empty
+func (c *shimClient) Checkpoint(ctx context.Context, req *CheckpointTaskRequest) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "Checkpoint", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *shimClient) Kill(ctx context.Context, req *KillRequest) (*empty.Empty, error) {
-	var resp empty.Empty
+func (c *shimClient) Kill(ctx context.Context, req *KillRequest) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "Kill", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *shimClient) Exec(ctx context.Context, req *ExecProcessRequest) (*empty.Empty, error) {
-	var resp empty.Empty
+func (c *shimClient) Exec(ctx context.Context, req *ExecProcessRequest) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "Exec", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *shimClient) ResizePty(ctx context.Context, req *ResizePtyRequest) (*empty.Empty, error) {
-	var resp empty.Empty
+func (c *shimClient) ResizePty(ctx context.Context, req *ResizePtyRequest) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "ResizePty", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *shimClient) CloseIO(ctx context.Context, req *CloseIORequest) (*empty.Empty, error) {
-	var resp empty.Empty
+func (c *shimClient) CloseIO(ctx context.Context, req *CloseIORequest) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "CloseIO", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *shimClient) ShimInfo(ctx context.Context, req *empty.Empty) (*ShimInfoResponse, error) {
+func (c *shimClient) ShimInfo(ctx context.Context, req *emptypb.Empty) (*ShimInfoResponse, error) {
 	var resp ShimInfoResponse
 	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "ShimInfo", req, &resp); err != nil {
 		return nil, err
@@ -268,8 +268,8 @@ func (c *shimClient) ShimInfo(ctx context.Context, req *empty.Empty) (*ShimInfoR
 	return &resp, nil
 }
 
-func (c *shimClient) Update(ctx context.Context, req *UpdateTaskRequest) (*empty.Empty, error) {
-	var resp empty.Empty
+func (c *shimClient) Update(ctx context.Context, req *UpdateTaskRequest) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.runtime.linux.shim.v1.Shim", "Update", req, &resp); err != nil {
 		return nil, err
 	}
