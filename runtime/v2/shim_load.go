@@ -18,9 +18,11 @@ package v2
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
@@ -139,7 +141,26 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 			cleanupAfterDeadShim(ctx, id, ns, m.shims, m.events, binaryCall)
 			continue
 		}
-		m.shims.Add(ctx, shim)
+
+		// There are 3 possibilities for the loaded shim here:
+		// 1. It could be a shim that is running a task.
+		// 2. It could be a sandbox shim.
+		// 3. Or it could be a shim that was created for running a task but
+		// something happened (probably a containerd crash) and the task was never
+		// created. This shim process should be cleaned up here. Look at
+		// containerd/containerd#6860 for further details.
+
+		_, sgetErr := m.sandboxStore.Get(ctx, id)
+		pInfo, pidErr := shim.Pids(ctx)
+		if sgetErr != nil && errors.Is(sgetErr, errdefs.ErrNotFound) && (len(pInfo) == 0 || errors.Is(pidErr, errdefs.ErrNotFound)) {
+			log.G(ctx).WithField("id", id).Info("cleaning leaked shim process")
+			// We are unable to get Pids from the shim and it's not a sandbox
+			// shim. We should clean it up her.
+			// No need to do anything for removeTask since we never added this shim.
+			shim.delete(ctx, false, func(ctx context.Context, id string) {})
+		} else {
+			m.shims.Add(ctx, shim)
+		}
 	}
 	return nil
 }
