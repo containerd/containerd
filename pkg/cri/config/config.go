@@ -321,6 +321,9 @@ type PluginConfig struct {
 	// The string is in the golang duration format, see:
 	//   https://golang.org/pkg/time/#ParseDuration
 	ImagePullProgressTimeout string `toml:"image_pull_progress_timeout" json:"imagePullProgressTimeout"`
+	// AutoUnpackOnRecovery indicates to automatically unpack images that are not already
+	// unpacked when images are reloaded during the recovery process. (default is `false`)
+	AutoUnpackOnRecovery bool `toml:"auto_unpack_on_recovery" json:"auto_unpack_on_recovery"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming

@@ -218,12 +218,24 @@ version = 2
   enable_unprivileged_icmp = false
 
   # enable_cdi enables support of the Container Device Interface (CDI)
-	# For more details about CDI and the syntax of CDI Spec files please refer to
-	# https://github.com/container-orchestrated-devices/container-device-interface.
-	enable_cdi = false
+  # For more details about CDI and the syntax of CDI Spec files please refer to
+  # https://github.com/container-orchestrated-devices/container-device-interface.
+  enable_cdi = false
 
   # cdi_spec_dirs is the list of directories to scan for CDI spec files
-	cdi_spec_dirs = ["/etc/cdi", "/var/run/cdi"]
+  cdi_spec_dirs = ["/etc/cdi", "/var/run/cdi"]
+
+  # image_pull_progress_timeout is the maximum duration that there is no
+  # image data read from image registry in the open connection. It will
+  # be reset whatever a new byte has been read. If timeout, the image
+  # pulling will be cancelled. A zero value means there is no timeout.
+  # This config is a string value in the golang duration format,
+  # see: https://golang.org/pkg/time/#ParseDuration
+  image_pull_progress_timeout = "1m0s"
+
+  # auto_unpack_on_recovery indicates to automatically unpack images that are not already
+  # unpacked when images are reloaded during the recovery process. (default is `false`)
+  auto_unpack_on_recovery = false
 
   # 'plugins."io.containerd.grpc.v1.cri".containerd' contains config related to containerd
   [plugins."io.containerd.grpc.v1.cri".containerd]

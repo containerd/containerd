@@ -468,8 +468,14 @@ func (c *criService) loadImages(ctx context.Context, cImages []containerd.Image)
 				return
 			}
 			if !unpacked {
-				log.G(ctx).Warnf("The image %s is not unpacked.", i.Name())
-				// TODO(random-liu): Consider whether we should try unpack here.
+				if c.config.AutoUnpackOnRecovery {
+					log.G(ctx).Debugf("Image %q is not unpacked, unpacking it now", i.Name())
+					if err := i.Unpack(ctx, snapshotter); err != nil {
+						log.G(ctx).WithError(err).Errorf("Failed to unpack image %q", i.Name())
+					}
+				} else {
+					log.G(ctx).Warnf("The image %s is not unpacked.", i.Name())
+				}
 			}
 			if err := c.updateImage(ctx, i.Name()); err != nil {
 				log.G(ctx).WithError(err).Warnf("Failed to update reference for image %q", i.Name())

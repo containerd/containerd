@@ -109,5 +109,6 @@ func DefaultConfig() PluginConfig {
 		EnableCDI:                false,
 		CDISpecDirs:              []string{"/etc/cdi", "/var/run/cdi"},
 		ImagePullProgressTimeout: time.Minute.String(),
+		AutoUnpackOnRecovery:     false,
 	}
 }
