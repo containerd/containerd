@@ -215,8 +215,8 @@ func (m *DB) ContentStore() content.Store {
 	return m.cs
 }
 
-// Snapshotter returns a namespaced content store for
-// the requested snapshotter name proxied to a snapshotter.
+// Snapshotter returns a snapshotter for the requested snapshotter name
+// proxied to a snapshotter.
 func (m *DB) Snapshotter(name string) snapshots.Snapshotter {
 	sn, ok := m.ss[name]
 	if !ok {
