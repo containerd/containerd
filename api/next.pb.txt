@@ -22,7 +22,7 @@ file {
     java_package: "com.google.protobuf"
     java_outer_classname: "AnyProto"
     java_multiple_files: true
-    go_package: "github.com/golang/protobuf/ptypes/any"
+    go_package: "google.golang.org/protobuf/types/known/anypb"
     objc_class_prefix: "GPB"
     csharp_namespace: "Google.Protobuf.WellKnownTypes"
   }
@@ -56,7 +56,6 @@ file {
   name: "github.com/containerd/containerd/api/events/container.proto"
   package: "containerd.events"
   dependency: "google/protobuf/any.proto"
-  dependency: "gogoproto/gogo.proto"
   dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
   message_type {
     name: "ContainerCreate"
@@ -172,7 +171,6 @@ file {
 file {
   name: "github.com/containerd/containerd/api/events/content.proto"
   package: "containerd.events"
-  dependency: "gogoproto/gogo.proto"
   dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
   message_type {
     name: "ContentDelete"
@@ -289,7 +287,6 @@ file {
 file {
   name: "github.com/containerd/containerd/api/events/namespace.proto"
   package: "containerd.events"
-  dependency: "gogoproto/gogo.proto"
   dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
   message_type {
     name: "NamespaceCreate"
@@ -461,7 +458,7 @@ file {
     java_package: "com.google.protobuf"
     java_outer_classname: "TimestampProto"
     java_multiple_files: true
-    go_package: "github.com/golang/protobuf/ptypes/timestamp"
+    go_package: "google.golang.org/protobuf/types/known/timestamppb"
     cc_enable_arenas: true
     objc_class_prefix: "GPB"
     csharp_namespace: "Google.Protobuf.WellKnownTypes"
@@ -471,7 +468,6 @@ file {
 file {
   name: "github.com/containerd/containerd/api/types/mount.proto"
   package: "containerd.types"
-  dependency: "gogoproto/gogo.proto"
   message_type {
     name: "Mount"
     field {
@@ -511,7 +507,6 @@ file {
 file {
   name: "github.com/containerd/containerd/api/events/task.proto"
   package: "containerd.events"
-  dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/timestamp.proto"
   dependency: "github.com/containerd/containerd/api/types/mount.proto"
   dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
@@ -787,7 +782,6 @@ file {
   package: "containerd.runtime.sandbox.v1"
   dependency: "google/protobuf/any.proto"
   dependency: "google/protobuf/timestamp.proto"
-  dependency: "gogoproto/gogo.proto"
   dependency: "github.com/containerd/containerd/api/types/mount.proto"
   message_type {
     name: "StartSandboxRequest"
@@ -1071,7 +1065,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/runtime/sandbox/v1;sandbox"
   }
-  weak_dependency: 2
   syntax: "proto3"
 }
 file {
@@ -1084,7 +1077,7 @@ file {
     java_package: "com.google.protobuf"
     java_outer_classname: "EmptyProto"
     java_multiple_files: true
-    go_package: "github.com/golang/protobuf/ptypes/empty"
+    go_package: "google.golang.org/protobuf/types/known/emptypb"
     cc_enable_arenas: true
     objc_class_prefix: "GPB"
     csharp_namespace: "Google.Protobuf.WellKnownTypes"
@@ -1094,7 +1087,6 @@ file {
 file {
   name: "github.com/containerd/containerd/api/types/task/task.proto"
   package: "containerd.v1.types"
-  dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/timestamp.proto"
   dependency: "google/protobuf/any.proto"
   message_type {
@@ -1227,7 +1219,6 @@ file {
   package: "containerd.task.v2"
   dependency: "google/protobuf/any.proto"
   dependency: "google/protobuf/empty.proto"
-  dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/timestamp.proto"
   dependency: "github.com/containerd/containerd/api/types/mount.proto"
   dependency: "github.com/containerd/containerd/api/types/task/task.proto"
@@ -1955,7 +1946,7 @@ file {
     java_package: "com.google.protobuf"
     java_outer_classname: "FieldMaskProto"
     java_multiple_files: true
-    go_package: "google.golang.org/genproto/protobuf/field_mask;field_mask"
+    go_package: "google.golang.org/protobuf/types/known/fieldmaskpb"
     cc_enable_arenas: true
     objc_class_prefix: "GPB"
     csharp_namespace: "Google.Protobuf.WellKnownTypes"
@@ -1965,7 +1956,6 @@ file {
 file {
   name: "github.com/containerd/containerd/api/services/containers/v1/containers.proto"
   package: "containerd.services.containers.v1"
-  dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/any.proto"
   dependency: "google/protobuf/empty.proto"
   dependency: "google/protobuf/field_mask.proto"
@@ -2272,7 +2262,6 @@ file {
 file {
   name: "github.com/containerd/containerd/api/services/content/v1/content.proto"
   package: "containerd.services.content.v1"
-  dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/field_mask.proto"
   dependency: "google/protobuf/timestamp.proto"
   dependency: "google/protobuf/empty.proto"
@@ -2756,7 +2745,6 @@ file {
 file {
   name: "github.com/containerd/containerd/api/types/descriptor.proto"
   package: "containerd.types"
-  dependency: "gogoproto/gogo.proto"
   message_type {
     name: "Descriptor"
     field {
@@ -2817,7 +2805,6 @@ file {
 file {
   name: "github.com/containerd/containerd/api/services/diff/v1/diff.proto"
   package: "containerd.services.diff.v1"
-  dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/any.proto"
   dependency: "github.com/containerd/containerd/api/types/mount.proto"
   dependency: "github.com/containerd/containerd/api/types/descriptor.proto"
@@ -2974,7 +2961,6 @@ file {
   name: "github.com/containerd/containerd/api/services/events/v1/events.proto"
   package: "containerd.services.events.v1"
   dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
-  dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/any.proto"
   dependency: "google/protobuf/empty.proto"
   dependency: "google/protobuf/timestamp.proto"
@@ -3080,7 +3066,6 @@ file {
 file {
   name: "github.com/containerd/containerd/api/services/images/v1/images.proto"
   package: "containerd.services.images.v1"
-  dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/empty.proto"
   dependency: "google/protobuf/field_mask.proto"
   dependency: "google/protobuf/timestamp.proto"
@@ -3294,7 +3279,6 @@ file {
 file {
   name: "github.com/containerd/containerd/api/types/platform.proto"
   package: "containerd.types"
-  dependency: "gogoproto/gogo.proto"
   message_type {
     name: "Platform"
     field {
@@ -3368,7 +3352,6 @@ file {
   dependency: "github.com/containerd/containerd/api/types/platform.proto"
   dependency: "google/rpc/status.proto"
   dependency: "google/protobuf/empty.proto"
-  dependency: "gogoproto/gogo.proto"
   message_type {
     name: "Plugin"
     field {
@@ -3496,7 +3479,6 @@ file {
 file {
   name: "github.com/containerd/containerd/api/services/leases/v1/leases.proto"
   package: "containerd.services.leases.v1"
-  dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/empty.proto"
   dependency: "google/protobuf/timestamp.proto"
   message_type {
@@ -3747,7 +3729,6 @@ file {
 file {
   name: "github.com/containerd/containerd/api/services/namespaces/v1/namespace.proto"
   package: "containerd.services.namespaces.v1"
-  dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/empty.proto"
   dependency: "google/protobuf/field_mask.proto"
   message_type {
@@ -3928,7 +3909,6 @@ file {
 file {
   name: "github.com/containerd/containerd/api/types/sandbox.proto"
   package: "containerd.types"
-  dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/any.proto"
   dependency: "google/protobuf/timestamp.proto"
   message_type {
@@ -4051,7 +4031,6 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/types;types"
   }
-  weak_dependency: 0
   syntax: "proto3"
 }
 file {
@@ -4059,7 +4038,6 @@ file {
   package: "containerd.services.sandbox.v1"
   dependency: "google/protobuf/any.proto"
   dependency: "google/protobuf/timestamp.proto"
-  dependency: "gogoproto/gogo.proto"
   dependency: "github.com/containerd/containerd/api/types/sandbox.proto"
   dependency: "github.com/containerd/containerd/api/types/mount.proto"
   message_type {
@@ -4370,13 +4348,11 @@ file {
   options {
     go_package: "github.com/containerd/containerd/api/services/sandbox/v1;sandbox"
   }
-  weak_dependency: 2
   syntax: "proto3"
 }
 file {
   name: "github.com/containerd/containerd/api/services/snapshots/v1/snapshots.proto"
   package: "containerd.services.snapshots.v1"
-  dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/empty.proto"
   dependency: "google/protobuf/field_mask.proto"
   dependency: "google/protobuf/timestamp.proto"
@@ -4891,7 +4867,6 @@ file {
 file {
   name: "github.com/containerd/containerd/api/types/metrics.proto"
   package: "containerd.types"
-  dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/any.proto"
   dependency: "google/protobuf/timestamp.proto"
   message_type {
@@ -4930,7 +4905,6 @@ file {
   package: "containerd.services.tasks.v1"
   dependency: "google/protobuf/empty.proto"
   dependency: "google/protobuf/any.proto"
-  dependency: "gogoproto/gogo.proto"
   dependency: "github.com/containerd/containerd/api/types/mount.proto"
   dependency: "github.com/containerd/containerd/api/types/metrics.proto"
   dependency: "github.com/containerd/containerd/api/types/descriptor.proto"
@@ -5575,7 +5549,6 @@ file {
   name: "github.com/containerd/containerd/api/services/ttrpc/events/v1/events.proto"
   package: "containerd.services.events.ttrpc.v1"
   dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
-  dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/any.proto"
   dependency: "google/protobuf/empty.proto"
   dependency: "google/protobuf/timestamp.proto"
@@ -5643,7 +5616,6 @@ file {
   name: "github.com/containerd/containerd/api/services/version/v1/version.proto"
   package: "containerd.services.version.v1"
   dependency: "google/protobuf/empty.proto"
-  dependency: "gogoproto/gogo.proto"
   message_type {
     name: "VersionResponse"
     field {

@@ -5,7 +5,7 @@ package task
 import (
 	context "context"
 	ttrpc "github.com/containerd/ttrpc"
-	empty "github.com/golang/protobuf/ptypes/empty"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 type TaskService interface {
@@ -14,18 +14,18 @@ type TaskService interface {
 	Start(context.Context, *StartRequest) (*StartResponse, error)
 	Delete(context.Context, *DeleteRequest) (*DeleteResponse, error)
 	Pids(context.Context, *PidsRequest) (*PidsResponse, error)
-	Pause(context.Context, *PauseRequest) (*empty.Empty, error)
-	Resume(context.Context, *ResumeRequest) (*empty.Empty, error)
-	Checkpoint(context.Context, *CheckpointTaskRequest) (*empty.Empty, error)
-	Kill(context.Context, *KillRequest) (*empty.Empty, error)
-	Exec(context.Context, *ExecProcessRequest) (*empty.Empty, error)
-	ResizePty(context.Context, *ResizePtyRequest) (*empty.Empty, error)
-	CloseIO(context.Context, *CloseIORequest) (*empty.Empty, error)
-	Update(context.Context, *UpdateTaskRequest) (*empty.Empty, error)
+	Pause(context.Context, *PauseRequest) (*emptypb.Empty, error)
+	Resume(context.Context, *ResumeRequest) (*emptypb.Empty, error)
+	Checkpoint(context.Context, *CheckpointTaskRequest) (*emptypb.Empty, error)
+	Kill(context.Context, *KillRequest) (*emptypb.Empty, error)
+	Exec(context.Context, *ExecProcessRequest) (*emptypb.Empty, error)
+	ResizePty(context.Context, *ResizePtyRequest) (*emptypb.Empty, error)
+	CloseIO(context.Context, *CloseIORequest) (*emptypb.Empty, error)
+	Update(context.Context, *UpdateTaskRequest) (*emptypb.Empty, error)
 	Wait(context.Context, *WaitRequest) (*WaitResponse, error)
 	Stats(context.Context, *StatsRequest) (*StatsResponse, error)
 	Connect(context.Context, *ConnectRequest) (*ConnectResponse, error)
-	Shutdown(context.Context, *ShutdownRequest) (*empty.Empty, error)
+	Shutdown(context.Context, *ShutdownRequest) (*emptypb.Empty, error)
 }
 
 func RegisterTaskService(srv *ttrpc.Server, svc TaskService) {
@@ -204,64 +204,64 @@ func (c *taskClient) Pids(ctx context.Context, req *PidsRequest) (*PidsResponse,
 	return &resp, nil
 }
 
-func (c *taskClient) Pause(ctx context.Context, req *PauseRequest) (*empty.Empty, error) {
-	var resp empty.Empty
+func (c *taskClient) Pause(ctx context.Context, req *PauseRequest) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.task.v2.Task", "Pause", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *taskClient) Resume(ctx context.Context, req *ResumeRequest) (*empty.Empty, error) {
-	var resp empty.Empty
+func (c *taskClient) Resume(ctx context.Context, req *ResumeRequest) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.task.v2.Task", "Resume", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *taskClient) Checkpoint(ctx context.Context, req *CheckpointTaskRequest) (*empty.Empty, error) {
-	var resp empty.Empty
+func (c *taskClient) Checkpoint(ctx context.Context, req *CheckpointTaskRequest) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.task.v2.Task", "Checkpoint", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *taskClient) Kill(ctx context.Context, req *KillRequest) (*empty.Empty, error) {
-	var resp empty.Empty
+func (c *taskClient) Kill(ctx context.Context, req *KillRequest) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.task.v2.Task", "Kill", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *taskClient) Exec(ctx context.Context, req *ExecProcessRequest) (*empty.Empty, error) {
-	var resp empty.Empty
+func (c *taskClient) Exec(ctx context.Context, req *ExecProcessRequest) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.task.v2.Task", "Exec", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *taskClient) ResizePty(ctx context.Context, req *ResizePtyRequest) (*empty.Empty, error) {
-	var resp empty.Empty
+func (c *taskClient) ResizePty(ctx context.Context, req *ResizePtyRequest) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.task.v2.Task", "ResizePty", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *taskClient) CloseIO(ctx context.Context, req *CloseIORequest) (*empty.Empty, error) {
-	var resp empty.Empty
+func (c *taskClient) CloseIO(ctx context.Context, req *CloseIORequest) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.task.v2.Task", "CloseIO", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *taskClient) Update(ctx context.Context, req *UpdateTaskRequest) (*empty.Empty, error) {
-	var resp empty.Empty
+func (c *taskClient) Update(ctx context.Context, req *UpdateTaskRequest) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.task.v2.Task", "Update", req, &resp); err != nil {
 		return nil, err
 	}
@@ -292,8 +292,8 @@ func (c *taskClient) Connect(ctx context.Context, req *ConnectRequest) (*Connect
 	return &resp, nil
 }
 
-func (c *taskClient) Shutdown(ctx context.Context, req *ShutdownRequest) (*empty.Empty, error) {
-	var resp empty.Empty
+func (c *taskClient) Shutdown(ctx context.Context, req *ShutdownRequest) (*emptypb.Empty, error) {
+	var resp emptypb.Empty
 	if err := c.client.Call(ctx, "containerd.task.v2.Task", "Shutdown", req, &resp); err != nil {
 		return nil, err
 	}

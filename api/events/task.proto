@@ -18,7 +18,6 @@ syntax = "proto3";
 
 package containerd.events;
 
-import "gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
 import "github.com/containerd/containerd/api/types/mount.proto";
 import "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto";

@@ -20,7 +20,6 @@ package containerd.task.v2;
 
 import "google/protobuf/any.proto";
 import "google/protobuf/empty.proto";
-import "gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
 import "github.com/containerd/containerd/api/types/mount.proto";
 import "github.com/containerd/containerd/api/types/task/task.proto";
