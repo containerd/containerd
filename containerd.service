@@ -16,6 +16,7 @@
 Description=containerd container runtime
 Documentation=https://containerd.io
 After=network.target local-fs.target
+Before=kubelet.service
 
 [Service]
 ExecStartPre=-/sbin/modprobe overlay
