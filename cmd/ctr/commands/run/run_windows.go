@@ -143,6 +143,14 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		if ccount != 0 {
 			opts = append(opts, oci.WithWindowsCPUCount(ccount))
 		}
+		cshares := context.Uint64("cpu-shares")
+		if cshares != 0 {
+			opts = append(opts, oci.WithWindowsCPUShares(uint16(cshares)))
+		}
+		cmax := context.Uint64("cpu-max")
+		if cmax != 0 {
+			opts = append(opts, oci.WithWindowsCPUMaximum(uint16(cmax)))
+		}
 		for _, dev := range context.StringSlice("device") {
 			parts := strings.Split(dev, "://")
 			if len(parts) != 2 {

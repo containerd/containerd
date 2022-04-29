@@ -31,13 +31,28 @@ import (
 // `count` specified.
 func WithWindowsCPUCount(count uint64) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
-		if s.Windows.Resources == nil {
-			s.Windows.Resources = &specs.WindowsResources{}
-		}
-		if s.Windows.Resources.CPU == nil {
-			s.Windows.Resources.CPU = &specs.WindowsCPUResources{}
-		}
+		setCPUWindows(s)
 		s.Windows.Resources.CPU.Count = &count
+		return nil
+	}
+}
+
+// WithWindowsCPUShares sets the `Windows.Resources.CPU.Shares` section to the
+// `shares` specified.
+func WithWindowsCPUShares(shares uint16) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setCPUWindows(s)
+		s.Windows.Resources.CPU.Shares = &shares
+		return nil
+	}
+}
+
+// WithWindowsCPUMaximum sets the `Windows.Resources.CPU.Maximum` section to the
+// `max` specified.
+func WithWindowsCPUMaximum(max uint16) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setCPUWindows(s)
+		s.Windows.Resources.CPU.Maximum = &max
 		return nil
 	}
 }
