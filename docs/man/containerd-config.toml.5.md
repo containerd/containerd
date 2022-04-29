@@ -100,12 +100,16 @@ documentation.
   - **sched_core** Core scheduling is a feature that allows only trusted tasks
     to run concurrently on cpus sharing compute resources (eg: hyperthreads on
     a core). (Default: **false**)
-- **[plugins."io.containerd.service.v1.tasks-service"]** has one option:
-  - **rdt_config_file** (Linux only) specifies path to a configuration used for
-    configuring RDT (Default: **""**). Enables support for Intel RDT, a
-    technology for cache and memory bandwidth management.
-    See https://github.com/intel/goresctrl/blob/v0.2.0/doc/rdt.md#configuration
-    for details of the configuration file format.
+- **[plugins."io.containerd.service.v1.tasks-service"]** has performance options:
+  - **blockio_config_file** (Linux only) specifies path to blockio class definitions
+    (Default: **""**). Controls I/O scheduler priority and bandwidth throttling.
+    See [blockio configuration](https://github.com/intel/goresctrl/blob/main/doc/blockio.md#configuration)
+    for details of the file format.
+  - **rdt_config_file** (Linux only) specifies path to a configuration used for configuring
+    RDT (Default: **""**). Enables support for Intel RDT, a technology
+    for cache and memory bandwidth management.
+    See [RDT configuration](https://github.com/intel/goresctrl/blob/main/doc/rdt.md#configuration)
+    for details of the file format.
 
 **oom_score**
 : The out of memory (OOM) score applied to the containerd daemon process (Default: 0)
@@ -192,7 +196,8 @@ imports = ["/etc/containerd/runtime_*.toml", "./debug.toml"]
     platforms = ["linux/amd64"]
     sched_core = true
   [plugins."io.containerd.service.v1.tasks-service"]
-    rdt_config_file = "/etc/rdt-config.yaml"
+    blockio_config_file = ""
+    rdt_config_file = ""
 ```
 
 ## BUGS

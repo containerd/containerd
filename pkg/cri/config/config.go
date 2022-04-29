@@ -103,6 +103,11 @@ type ContainerdConfig struct {
 	// layers to the snapshotter.
 	DiscardUnpackedLayers bool `toml:"discard_unpacked_layers" json:"discardUnpackedLayers"`
 
+	// IgnoreBlockIONotEnabledErrors is a boolean flag to ignore
+	// blockio related errors when blockio support has not been
+	// enabled.
+	IgnoreBlockIONotEnabledErrors bool `toml:"ignore_blockio_not_enabled_errors" json:"ignoreBlockIONotEnabledErrors"`
+
 	// IgnoreRdtNotEnabledErrors is a boolean flag to ignore RDT related errors
 	// when RDT support has not been enabled.
 	IgnoreRdtNotEnabledErrors bool `toml:"ignore_rdt_not_enabled_errors" json:"ignoreRdtNotEnabledErrors"`

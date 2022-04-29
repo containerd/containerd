@@ -87,6 +87,15 @@ func WithPidsLimit(limit int64) SpecOpts {
 	}
 }
 
+// WithBlockIO sets the container's blkio parameters
+func WithBlockIO(blockio *specs.LinuxBlockIO) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		setResources(s)
+		s.Linux.Resources.BlockIO = blockio
+		return nil
+	}
+}
+
 // WithCPUShares sets the container's cpu shares
 func WithCPUShares(shares uint64) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
