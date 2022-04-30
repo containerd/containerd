@@ -45,7 +45,7 @@ PLAY RECAP *********************************************************************
 ```
 
 ## Step 2:
-Use [kubeadm](https://kubernetes.io/docs/setup/independent/install-kubeadm/) to bring up a Kubernetes Cluster. Depending on what third-party provider you choose, you might have to set the ```--pod-network-cidr``` to something provider-specific.
+Use [kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/) to bring up a Kubernetes Cluster. Depending on what third-party provider you choose, you might have to set the ```--pod-network-cidr``` to something provider-specific.
 Initialize the cluster from one of the nodes (Note: This node will be the master node):
 ```console
 $sudo kubeadm init --skip-preflight-checks
@@ -117,6 +117,6 @@ Run 'kubectl get nodes' on the master to see this machine join.
 At the end of Step 3 you should have a kubernetes cluster up and running and ready for deployment.
 
 ## Step 4:
-Please follow the instructions [here](https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/#pod-network) to deploy CNI network plugins and start a demo app.
+Please follow the instructions [here](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#pod-network) to deploy CNI network plugins and start a demo app.
 
 We are constantly striving to improve the installer. Please feel free to open issues and provide suggestions to make the installer fast and easy to use. We are open to receiving help in validating and improving the installer on different distros.
