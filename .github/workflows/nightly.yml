@@ -36,12 +36,13 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo add-apt-repository "deb [arch=arm64,s390x,ppc64el] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -sc) main" || true
-          sudo add-apt-repository "deb [arch=arm64,s390x,ppc64el] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -sc)-updates main" || true
+          sudo add-apt-repository "deb [arch=arm64,s390x,ppc64el,riscv64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -sc) main" || true
+          sudo add-apt-repository "deb [arch=arm64,s390x,ppc64el,riscv64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -sc)-updates main" || true
 
           sudo dpkg --add-architecture arm64
           sudo dpkg --add-architecture s390x
           sudo dpkg --add-architecture ppc64el
+          sudo dpkg --add-architecture riscv64
 
           sudo apt-get update || true
 
@@ -49,14 +50,17 @@ jobs:
             crossbuild-essential-arm64 \
             crossbuild-essential-s390x \
             crossbuild-essential-ppc64el \
+            crossbuild-essential-riscv64 \
             libseccomp-dev:amd64 \
             libseccomp-dev:arm64 \
             libseccomp-dev:s390x \
             libseccomp-dev:ppc64el \
+            libseccomp-dev:riscv64 \
             libbtrfs-dev:amd64 \
             libbtrfs-dev:arm64 \
             libbtrfs-dev:s390x \
-            libbtrfs-dev:ppc64el
+            libbtrfs-dev:ppc64el \
+            libbtrfs-dev:riscv64
 
       - name: Build amd64
         env:
@@ -96,6 +100,16 @@ jobs:
           make binaries
           mv bin bin_ppc64le
 
+      - name: Build riscv64
+        env:
+          GOOS: linux
+          GOARCH: riscv64
+          CGO_ENABLED: 1
+          CC: riscv64-linux-gnu-gcc
+        run: |
+          make binaries
+          mv bin bin_riscv64
+
       #
       # Upload
       #
@@ -123,6 +137,12 @@ jobs:
         with:
           name: linux_ppc64le
           path: src/github.com/containerd/containerd/bin_ppc64le
+
+      - name: Upload artifacts (linux_riscv64)
+        uses: actions/upload-artifact@v1
+        with:
+          name: linux_riscv64
+          path: src/github.com/containerd/containerd/bin_riscv64
 
   windows:
     name: Windows
