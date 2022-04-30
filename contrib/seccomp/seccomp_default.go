@@ -44,6 +44,9 @@ func arches() []specs.Arch {
 		return []specs.Arch{specs.ArchMIPSEL, specs.ArchMIPSEL64, specs.ArchMIPSEL64N32}
 	case "s390x":
 		return []specs.Arch{specs.ArchS390, specs.ArchS390X}
+	case "riscv64":
+		// ArchRISCV32 (SCMP_ARCH_RISCV32) does not exist
+		return []specs.Arch{specs.ArchRISCV64}
 	default:
 		return []specs.Arch{}
 	}
@@ -527,6 +530,14 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"s390_pci_mmio_read",
 				"s390_pci_mmio_write",
 				"s390_runtime_instr",
+			},
+			Action: specs.ActAllow,
+			Args:   []specs.LinuxSeccompArg{},
+		})
+	case "riscv64":
+		s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			Names: []string{
+				"riscv_flush_icache",
 			},
 			Action: specs.ActAllow,
 			Args:   []specs.LinuxSeccompArg{},
