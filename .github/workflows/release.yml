@@ -60,6 +60,7 @@ jobs:
           - linux/amd64
           - linux/arm64
           - linux/ppc64le
+          - linux/riscv64
           - windows/amd64
     steps:
       - name: Install Go
