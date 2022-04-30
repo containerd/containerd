@@ -1117,7 +1117,6 @@ func TestContainerKillInitPidHost(t *testing.T) {
 }
 
 func TestUserNamespaces(t *testing.T) {
-	t.Parallel()
 	t.Run("WritableRootFS", func(t *testing.T) { testUserNamespaces(t, false) })
 	// see #1373 and runc#1572
 	t.Run("ReadonlyRootFS", func(t *testing.T) { testUserNamespaces(t, true) })
