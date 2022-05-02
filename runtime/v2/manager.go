@@ -38,6 +38,7 @@ import (
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/runtime"
 	shimbinary "github.com/containerd/containerd/runtime/v2/shim"
+	"github.com/containerd/containerd/sandbox"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -78,6 +79,7 @@ func init() {
 				return nil, err
 			}
 			cs := metadata.NewContainerStore(m.(*metadata.DB))
+			ss := metadata.NewSandboxStore(m.(*metadata.DB))
 			events := ep.(*exchange.Exchange)
 
 			shimManager, err := NewShimManager(ic.Context, &ManagerConfig{
@@ -88,6 +90,7 @@ func init() {
 				Events:       events,
 				Store:        cs,
 				SchedCore:    config.SchedCore,
+				SandboxStore: ss,
 			})
 			if err != nil {
 				return nil, err
@@ -124,6 +127,7 @@ type ManagerConfig struct {
 	Address      string
 	TTRPCAddress string
 	SchedCore    bool
+	SandboxStore sandbox.Store
 }
 
 // NewShimManager creates a manager for v2 shims
@@ -143,6 +147,7 @@ func NewShimManager(ctx context.Context, config *ManagerConfig) (*ShimManager, e
 		events:                 config.Events,
 		containers:             config.Store,
 		schedCore:              config.SchedCore,
+		sandboxStore:           config.SandboxStore,
 	}
 
 	if err := m.loadExistingTasks(ctx); err != nil {
@@ -167,6 +172,7 @@ type ShimManager struct {
 	containers             containers.Store
 	// runtimePaths is a cache of `runtime names` -> `resolved fs path`
 	runtimePaths sync.Map
+	sandboxStore sandbox.Store
 }
 
 // ID of the shim manager
