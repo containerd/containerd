@@ -190,7 +190,7 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 		containerd.WithPullLabels(labels),
 		containerd.WithResolver(config.Resolver),
 		containerd.WithImageHandler(h),
-		containerd.WithSchema1Conversion,
+		containerd.WithSchema1Conversion, //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 	}
 	opts = append(opts, config.RemoteOpts...)
 

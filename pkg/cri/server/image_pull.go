@@ -127,7 +127,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	)
 
 	pullOpts := []containerd.RemoteOpt{
-		containerd.WithSchema1Conversion,
+		containerd.WithSchema1Conversion, //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 		containerd.WithResolver(resolver),
 		containerd.WithPullSnapshotter(c.config.ContainerdConfig.Snapshotter),
 		containerd.WithPullUnpack,

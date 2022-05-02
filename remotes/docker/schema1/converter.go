@@ -14,6 +14,9 @@
    limitations under the License.
 */
 
+// Package schema1 provides a converter to fetch an image formatted in Docker Image Manifest v2, Schema 1.
+//
+// Deprecated: use images formatted in Docker Image Manifest v2, Schema 2, or OCI Image Spec v1.
 package schema1
 
 import (

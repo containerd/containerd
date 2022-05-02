@@ -348,6 +348,8 @@ type RemoteContext struct {
 	// ConvertSchema1 is whether to convert Docker registry schema 1
 	// manifests. If this option is false then any image which resolves
 	// to schema 1 will return an error since schema 1 is not supported.
+	//
+	// Deprecated: use Schema 2 or OCI images.
 	ConvertSchema1 bool
 
 	// Platforms defines which platforms to handle when doing the image operation.
