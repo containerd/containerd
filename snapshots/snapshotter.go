@@ -122,7 +122,7 @@ type Usage struct {
 func (u *Usage) Add(other Usage) {
 	u.Size += other.Size
 
-	// TODO(stevvooe): assumes independent inodes, but provides and upper
+	// TODO(stevvooe): assumes independent inodes, but provides an upper
 	// bound. This should be pretty close, assuming the inodes for a
 	// snapshot are roughly unique to it. Don't trust this assumption.
 	u.Inodes += other.Inodes
@@ -267,12 +267,12 @@ type Snapshotter interface {
 	// The running time of this call for active snapshots is dependent on
 	// implementation, but may be proportional to the size of the resource.
 	// Callers should take this into consideration. Implementations should
-	// attempt to honer context cancellation and avoid taking locks when making
+	// attempt to honor context cancellation and avoid taking locks when making
 	// the calculation.
 	Usage(ctx context.Context, key string) (Usage, error)
 
 	// Mounts returns the mounts for the active snapshot transaction identified
-	// by key. Can be called on an read-write or readonly transaction. This is
+	// by key. Can be called on a read-write or readonly transaction. This is
 	// available only for active snapshots.
 	//
 	// This can be used to recover mounts after calling View or Prepare.
@@ -298,7 +298,7 @@ type Snapshotter interface {
 	// committed back to the snapshot snapshotter. View returns a readonly view on
 	// the parent, with the active snapshot being tracked by the given key.
 	//
-	// This method operates identically to Prepare, except that Mounts returned
+	// This method operates identically to Prepare, except the mounts returned
 	// may have the readonly flag set. Any modifications to the underlying
 	// filesystem will be ignored. Implementations may perform this in a more
 	// efficient manner that differs from what would be attempted with
