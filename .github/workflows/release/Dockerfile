@@ -12,20 +12,20 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-ARG UBUNTU_VERSION=18.04
+ARG UBUNTU_VERSION=22.04
 ARG BASE_IMAGE=ubuntu:${UBUNTU_VERSION}
 ARG GO_VERSION
 ARG GO_IMAGE=golang:${GO_VERSION}
 FROM --platform=$BUILDPLATFORM $GO_IMAGE AS go
-FROM --platform=$BUILDPLATFORM tonistiigi/xx@sha256:425941eb25cc113009b1c651bd275e04593cea12c48311fe8ace6ceeecdcc645 AS xx
+FROM --platform=$BUILDPLATFORM tonistiigi/xx:1.1.0@sha256:76a8510b1798f66fcc87e7ec2f4684aa1b16756df2a397ec307b9efb6023f6c5 AS xx
 
 FROM --platform=$BUILDPLATFORM ${BASE_IMAGE} AS base
 COPY --from=xx / /
 SHELL ["/bin/bash", "-xec"]
 RUN	apt-get update && \
-	apt-get install -y git pkg-config
+	apt-get install -y dpkg-dev git make pkg-config
 ARG TARGETPLATFORM
-RUN xx-apt-get install -y libseccomp-dev btrfs-progs gcc
+RUN xx-apt-get install -y libseccomp-dev libbtrfs-dev gcc
 ENV PATH=/usr/local/go/bin:$PATH
 ENV GOPATH=/go
 ENV CGO_ENABLED=1
