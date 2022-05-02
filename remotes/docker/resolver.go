@@ -31,7 +31,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/reference"
 	"github.com/containerd/containerd/remotes"
-	"github.com/containerd/containerd/remotes/docker/schema1"
+	"github.com/containerd/containerd/remotes/docker/schema1" //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 	remoteerrors "github.com/containerd/containerd/remotes/errors"
 	"github.com/containerd/containerd/version"
 	digest "github.com/opencontainers/go-digest"
