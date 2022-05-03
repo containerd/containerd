@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -122,10 +123,9 @@ func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, fun
 // with the restart monitor service plugin
 func TestRestartMonitor(t *testing.T) {
 	const (
-		interval = 10 * time.Second
-		epsilon  = 1 * time.Second
-		count    = 20
+		interval = 5 * time.Second
 	)
+
 	configTOML := fmt.Sprintf(`
 version = 2
 [plugins]
@@ -135,13 +135,36 @@ version = 2
 	client, _, cleanup := newDaemonWithConfig(t, configTOML)
 	defer cleanup()
 
+	ctx, cancel := testContext(t)
+	defer cancel()
+
+	_, err := client.Pull(ctx, testImage, WithPullUnpack)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("Always", func(t *testing.T) {
+		testRestartMonitorAlways(t, client, interval)
+	})
+	t.Run("Failure Policy", func(t *testing.T) {
+		testRestartMonitorWithOnFailurePolicy(t, client, interval)
+	})
+}
+
+// testRestartMonitorAlways restarts its container always.
+func testRestartMonitorAlways(t *testing.T, client *Client, interval time.Duration) {
+	const (
+		epsilon = 1 * time.Second
+		count   = 20
+	)
+
 	var (
 		ctx, cancel = testContext(t)
-		id          = t.Name()
+		id          = strings.ReplaceAll(t.Name(), "/", "_")
 	)
 	defer cancel()
 
-	image, err := client.Pull(ctx, testImage, WithPullUnpack)
+	image, err := client.GetImage(ctx, testImage)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,26 +256,15 @@ version = 2
 	t.Logf("%v: the task was restarted since %v", time.Now(), lastCheck)
 }
 
-func TestRestartMonitorWithOnFailurePolicy(t *testing.T) {
-	const (
-		interval = 5 * time.Second
-	)
-	configTOML := fmt.Sprintf(`
-version = 2
-[plugins]
-  [plugins."io.containerd.internal.v1.restart"]
-	  interval = "%s"
-`, interval.String())
-	client, _, cleanup := newDaemonWithConfig(t, configTOML)
-	defer cleanup()
-
+// testRestartMonitorWithOnFailurePolicy restarts its container with `on-failure:1`
+func testRestartMonitorWithOnFailurePolicy(t *testing.T, client *Client, interval time.Duration) {
 	var (
 		ctx, cancel = testContext(t)
-		id          = t.Name()
+		id          = strings.ReplaceAll(t.Name(), "/", "_")
 	)
 	defer cancel()
 
-	image, err := client.Pull(ctx, testImage, WithPullUnpack)
+	image, err := client.GetImage(ctx, testImage)
 	if err != nil {
 		t.Fatal(err)
 	}
