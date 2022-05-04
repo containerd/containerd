@@ -73,6 +73,38 @@ type HostOptions struct {
 // certificate files laid out in the Docker specific layout.
 // If a `HostDir` function is not required, defaults are used.
 func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHosts {
+	var defaultTLSConfig *tls.Config
+	if options.DefaultTLS != nil {
+		defaultTLSConfig = options.DefaultTLS
+	} else {
+		defaultTLSConfig = &tls.Config{}
+	}
+
+	// Sharing the transport to reuse TCP connections.
+	defaultTransport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:       30 * time.Second,
+			KeepAlive:     30 * time.Second,
+			FallbackDelay: 300 * time.Millisecond,
+		}).DialContext,
+		MaxIdleConns:          10,
+		IdleConnTimeout:       30 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		TLSClientConfig:       defaultTLSConfig,
+		ExpectContinueTimeout: 5 * time.Second,
+	}
+
+	defaultClient := &http.Client{Transport: defaultTransport}
+	defaultAuthOpts := []docker.AuthorizerOpt{}
+	if options.Credentials != nil {
+		defaultAuthOpts = append(defaultAuthOpts, docker.WithAuthCreds(options.Credentials))
+	}
+	defaultAuthOpts = append(defaultAuthOpts, options.AuthorizerOpts...)
+
+	// Sharing the authorizer to to avoid getting Unauthorized repeatedly from known hosts.
+	defaultAuthorizer := docker.NewDockerAuthorizer(defaultAuthOpts...)
+
 	return func(host string) ([]docker.RegistryHost, error) {
 		var hosts []hostConfig
 		if options.HostDir != nil {
@@ -111,42 +143,20 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			hosts[len(hosts)-1].capabilities = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush
 		}
 
-		var defaultTLSConfig *tls.Config
-		if options.DefaultTLS != nil {
-			defaultTLSConfig = options.DefaultTLS
+		var (
+			client     *http.Client
+			authorizer docker.Authorizer
+		)
+		if options.UpdateClient == nil {
+			client = defaultClient
+			authorizer = defaultAuthorizer
 		} else {
-			defaultTLSConfig = &tls.Config{}
-		}
-
-		defaultTransport := &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			DialContext: (&net.Dialer{
-				Timeout:       30 * time.Second,
-				KeepAlive:     30 * time.Second,
-				FallbackDelay: 300 * time.Millisecond,
-			}).DialContext,
-			MaxIdleConns:          10,
-			IdleConnTimeout:       30 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			TLSClientConfig:       defaultTLSConfig,
-			ExpectContinueTimeout: 5 * time.Second,
-		}
-
-		client := &http.Client{
-			Transport: defaultTransport,
-		}
-		if options.UpdateClient != nil {
+			client = &http.Client{Transport: defaultTransport}
 			if err := options.UpdateClient(client); err != nil {
 				return nil, err
 			}
+			authorizer = docker.NewDockerAuthorizer(append(defaultAuthOpts, docker.WithAuthClient(client))...)
 		}
-
-		authOpts := []docker.AuthorizerOpt{docker.WithAuthClient(client)}
-		if options.Credentials != nil {
-			authOpts = append(authOpts, docker.WithAuthCreds(options.Credentials))
-		}
-		authOpts = append(authOpts, options.AuthorizerOpts...)
-		authorizer := docker.NewDockerAuthorizer(authOpts...)
 
 		rhosts := make([]docker.RegistryHost, len(hosts))
 		for i, host := range hosts {
@@ -207,6 +217,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 					}
 				}
 
+				// Both http.Client and docker.Authorizer have to be initialized since we have a new http.Transport.
 				c := *client
 				c.Transport = tr
 				if options.UpdateClient != nil {
@@ -214,9 +225,8 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 						return nil, err
 					}
 				}
-
 				rhosts[i].Client = &c
-				rhosts[i].Authorizer = docker.NewDockerAuthorizer(append(authOpts, docker.WithAuthClient(&c))...)
+				rhosts[i].Authorizer = docker.NewDockerAuthorizer(append(defaultAuthOpts, docker.WithAuthClient(&c))...)
 			} else {
 				rhosts[i].Client = client
 				rhosts[i].Authorizer = authorizer
