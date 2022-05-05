@@ -105,7 +105,27 @@ The current state is available in the following tables:
 | [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.4)  | Active   | February 15, 2022  | max(February 15, 2023 or release of 1.7.0 + 6 months) |
 | [1.7](https://github.com/containerd/containerd/milestone/42)         | Next   | TBD  | TBD |
 
-Note that branches and release from before 1.0 may not follow these rules.
+
+### Kubernetes Support
+
+The Kubernetes version matrix represents the versions of containerd which are
+recommended for a Kubernetes release. Any actively supported version of
+containerd may receive patches to fix bugs encountered in any version of
+Kubernetes, however, our recommendation is based on which versions have been
+the most thoroughly tested. See the [Kubernetes test grid](https://testgrid.k8s.io/sig-node-containerd)
+for the list of actively tested versions. Kubernetes only supports n-3 minor
+release versions and containerd will ensure there is always a supported version
+of containerd for every supported version of Kubernetes.
+
+| Kubernetes Version | containerd Version | CRI Version  |
+|--------------------|--------------------|--------------|
+| 1.20               | 1.5                | v1alpha2     |
+| 1.21               | 1.5                | v1alpha2     |
+| 1.22               | 1.5.5+             | v1alpha2     |
+| 1.23               | 1.6.0+, 1,5.8+     | v1, v1alpha2 |
+| 1.24               | 1.6.4+, 1.5.11+    | v1, v1alpha2 |
+
+Deprecated containerd and kubernetes versions
 
 | CRI-Containerd Version | Containerd Version | Kubernetes Version | CRI Version  |
 |------------------------|--------------------|--------------------|--------------|
@@ -115,12 +135,6 @@ Note that branches and release from before 1.0 may not follow these rules.
 |                        | v1.2 (End-Of-Life) | 1.10+              | v1alpha2     |
 |                        | v1.3 (End-Of-Life) | 1.12+              | v1alpha2     |
 |                        | v1.4 (End-of-Life) | 1.19+              | v1alpha2     |
-|                        | v1.5               | 1.20+              | v1alpha2     |
-|                        | v1.6               | 1.23+              | v1, v1alpha2 |
-
-**Note:** The support table above specifies the Kubernetes Version that was supported at time of release of the containerd - cri integration and Kubernetes only supports n-3 minor release versions.
-
-These tables should be updated as part of the release preparation process.
 
 ### Backporting
 
