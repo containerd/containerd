@@ -270,7 +270,7 @@ EOF
         fi
         trap cleanup EXIT
         ctr version
-        critest --parallel=$(nproc) --report-dir="${REPORT_DIR}" --ginkgo.skip='HostIpc is true'
+        critest --parallel=$(nproc) --ginkgo.skip='HostIpc is true' --report-dir="${REPORT_DIR}"
     SHELL
   end
 
