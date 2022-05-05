@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/pkg/cri/annotations"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 )
 
@@ -374,6 +375,67 @@ func TestImageLayersLabel(t *testing.T) {
 			gotS := getLayers(context.Background(), sampleKey, sampleLayers, sampleValidate)
 			got := len(strings.Split(gotS, ","))
 			assert.Equal(t, tt.wantNum, got)
+		})
+	}
+}
+
+func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
+	defaultSnashotter := "native"
+	runtimeSnapshotter := "devmapper"
+	tests := []struct {
+		desc              string
+		podSandboxConfig  *runtime.PodSandboxConfig
+		expectSnapshotter string
+		expectErr         error
+	}{
+		{
+			desc:              "should return default snapshotter for nil podSandboxConfig",
+			expectSnapshotter: defaultSnashotter,
+		},
+		{
+			desc:              "should return default snapshotter for nil podSandboxConfig.Annotations",
+			podSandboxConfig:  &runtime.PodSandboxConfig{},
+			expectSnapshotter: defaultSnashotter,
+		},
+		{
+			desc: "should return default snapshotter for empty podSandboxConfig.Annotations",
+			podSandboxConfig: &runtime.PodSandboxConfig{
+				Annotations: make(map[string]string),
+			},
+			expectSnapshotter: defaultSnashotter,
+		},
+		{
+			desc: "should return error for runtime not found",
+			podSandboxConfig: &runtime.PodSandboxConfig{
+				Annotations: map[string]string{
+					annotations.RuntimeHandler: "runtime-not-exists",
+				},
+			},
+			expectErr:         fmt.Errorf(`experimental: failed to get sandbox runtime for runtime-not-exists, err: no runtime for "runtime-not-exists" is configured`),
+			expectSnapshotter: "",
+		},
+		{
+			desc: "should return snapshotter provided in podSandboxConfig.Annotations",
+			podSandboxConfig: &runtime.PodSandboxConfig{
+				Annotations: map[string]string{
+					annotations.RuntimeHandler: "exiting-runtime",
+				},
+			},
+			expectSnapshotter: runtimeSnapshotter,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			cri := newTestCRIService()
+			cri.config.ContainerdConfig.Snapshotter = defaultSnashotter
+			cri.config.ContainerdConfig.Runtimes = make(map[string]criconfig.Runtime)
+			cri.config.ContainerdConfig.Runtimes["exiting-runtime"] = criconfig.Runtime{
+				Snapshotter: runtimeSnapshotter,
+			}
+			snapshotter, err := cri.snapshotterFromPodSandboxConfig(context.Background(), "test-image", tt.podSandboxConfig)
+			assert.Equal(t, tt.expectSnapshotter, snapshotter)
+			assert.Equal(t, tt.expectErr, err)
 		})
 	}
 }

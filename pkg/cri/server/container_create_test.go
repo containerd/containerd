@@ -22,13 +22,13 @@ import (
 	goruntime "runtime"
 	"testing"
 
-	"github.com/containerd/containerd/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/pkg/cri/opts"
@@ -415,4 +415,36 @@ func TestBaseRuntimeSpec(t *testing.T) {
 	assert.Equal(t, c.baseOCISpecs["/etc/containerd/cri-base.json"].Hostname, "old")
 
 	assert.Equal(t, filepath.Join("/", constants.K8sContainerdNamespace, "id1"), out.Linux.CgroupsPath)
+}
+
+func TestRuntimeSnapshotter(t *testing.T) {
+	defaultRuntime := config.Runtime{
+		Snapshotter: "",
+	}
+
+	fooRuntime := config.Runtime{
+		Snapshotter: "devmapper",
+	}
+
+	for desc, test := range map[string]struct {
+		runtime           config.Runtime
+		expectSnapshotter string
+	}{
+		"should return default snapshotter when runtime.Snapshotter is not set": {
+			runtime:           defaultRuntime,
+			expectSnapshotter: config.DefaultConfig().Snapshotter,
+		},
+		"should return overridden snapshotter when runtime.Snapshotter is set": {
+			runtime:           fooRuntime,
+			expectSnapshotter: "devmapper",
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			cri := newTestCRIService()
+			cri.config = config.Config{
+				PluginConfig: config.DefaultConfig(),
+			}
+			assert.Equal(t, test.expectSnapshotter, cri.runtimeSnapshotter(context.Background(), test.runtime))
+		})
+	}
 }
