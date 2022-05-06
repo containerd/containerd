@@ -8,7 +8,7 @@ in a devicemapper thin pool.
 To make it work you need to prepare `thin-pool` in advance and update containerd's configuration file.
 This file is typically located at `/etc/containerd/config.toml`.
 
-Here's minimal sample entry that can be made in the configuration file:
+Here's a minimal sample entry that can be made in the configuration file:
 
 ```toml
 version = 2
@@ -91,10 +91,10 @@ sudo dmsetup create "${POOL_NAME}" \
 
 cat << EOF
 #
-# Add this to your config.toml configuration file and restart containerd daemon
+# Add this to your config.toml configuration file and restart the containerd daemon
 #
 [plugins]
-  [plugins.devmapper]
+  [plugins."io.containerd.snapshotter.v1.devmapper"]
     pool_name = "${POOL_NAME}"
     root_path = "${DATA_DIR}"
     base_image_size = "10GB"
@@ -102,19 +102,19 @@ cat << EOF
 EOF
 ```
 
-Use `dmsetup` to verify that the thin-pool created successfully:
+Use `dmsetup` to verify that the thin-pool was created successfully:
 ```bash
 sudo dmsetup ls
 devpool	(253:0)
 ```
 
-Once configured and restarted `containerd`, you'll see the following output:
+Once `containerd` is configured and restarted, you'll see the following output:
 ```
 INFO[2020-03-17T20:24:45.532604888Z] loading plugin "io.containerd.snapshotter.v1.devmapper"...  type=io.containerd.snapshotter.v1
 INFO[2020-03-17T20:24:45.532672738Z] initializing pool device "dev-pool"
 ```
 
-Another way to setup a thin-pool is via [container-storage-setup](https://github.com/projectatomic/container-storage-setup)
+Another way to setup a thin-pool is via the [container-storage-setup](https://github.com/projectatomic/container-storage-setup)
 tool (formerly known as `docker-storage-setup`). It is a script to configure CoW file systems like devicemapper:
 
 ```bash
