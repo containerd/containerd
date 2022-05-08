@@ -48,9 +48,8 @@ import (
 // Some of the following functions are migrated from
 // https://github.com/containernetworking/plugins/blob/master/pkg/testutils/netns_linux.go
 
-// newNS creates a new persistent (bind-mounted) network namespace and returns the
-// path to the network namespace.
-func newNS(baseDir string) (nsPath string, err error) {
+// newNSMountpoint creates a path for mouting netns.
+func newNSMountpoint(baseDir string) (nsPath string, err error) {
 	b := make([]byte, 16)
 
 	_, err = rand.Read(b)
@@ -74,6 +73,16 @@ func newNS(baseDir string) (nsPath string, err error) {
 	}
 	mountPointFd.Close()
 
+	return nsPath, nil
+}
+
+// newNS creates a new persistent (bind-mounted) network namespace and returns the
+// path to the network namespace.
+func newNS(baseDir string) (nsPath string, err error) {
+	nsPath, e := newNSMountpoint(baseDir)
+	if err != nil {
+		return "", e
+	}
 	defer func() {
 		// Ensure the mount point is cleaned up on errors
 		if err != nil {
@@ -167,6 +176,30 @@ func NewNetNS(baseDir string) (*NetNS, error) {
 		return nil, fmt.Errorf("failed to setup netns: %w", err)
 	}
 	return &NetNS{path: path}, nil
+}
+
+// CloneNetNs clones a network namespace
+func CloneNetNS(baseDir, srcPath string) (*NetNS, error) {
+	nsPath, err := newNSMountpoint(baseDir)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		// Ensure the mount point is cleaned up on errors
+		if err != nil {
+			os.RemoveAll(nsPath) // nolint: errcheck
+		}
+	}()
+
+	// bind mount the netns from the current thread (from /proc) onto the
+	// mount point. This causes the namespace to persist, even when there
+	// are no threads in the ns.
+	err = unix.Mount(srcPath, nsPath, "none", unix.MS_BIND, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to bind mount ns at %s: %w", nsPath, err)
+	}
+
+	return &NetNS{path: nsPath}, nil
 }
 
 // LoadNetNS loads existing network namespace.
