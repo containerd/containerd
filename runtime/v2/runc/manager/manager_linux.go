@@ -69,7 +69,7 @@ type manager struct {
 	name string
 }
 
-func newCommand(ctx context.Context, id, containerdBinary, containerdAddress, containerdTTRPCAddress string) (*exec.Cmd, error) {
+func newCommand(ctx context.Context, id, containerdBinary, containerdAddress, containerdTTRPCAddress string, debug bool) (*exec.Cmd, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -86,6 +86,9 @@ func newCommand(ctx context.Context, id, containerdBinary, containerdAddress, co
 		"-namespace", ns,
 		"-id", id,
 		"-address", containerdAddress,
+	}
+	if debug {
+		args = append(args, "-debug")
 	}
 	cmd := exec.Command(self, args...)
 	cmd.Dir = cwd
@@ -114,7 +117,7 @@ func (m manager) Name() string {
 }
 
 func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ string, retErr error) {
-	cmd, err := newCommand(ctx, id, opts.ContainerdBinary, opts.Address, opts.TTRPCAddress)
+	cmd, err := newCommand(ctx, id, opts.ContainerdBinary, opts.Address, opts.TTRPCAddress, opts.Debug)
 	if err != nil {
 		return "", err
 	}

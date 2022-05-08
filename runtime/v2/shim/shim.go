@@ -54,6 +54,7 @@ type StartOpts struct {
 	ContainerdBinary string
 	Address          string
 	TTRPCAddress     string
+	Debug            bool
 }
 
 type StopStatus struct {
@@ -329,6 +330,7 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 			ContainerdBinary: containerdBinaryFlag,
 			Address:          addressFlag,
 			TTRPCAddress:     ttrpcAddress,
+			Debug:            debugFlag,
 		}
 
 		address, err := manager.Start(ctx, id, opts)
