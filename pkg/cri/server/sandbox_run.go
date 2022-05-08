@@ -124,24 +124,12 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		podNetwork = false
 	}
 
-	if podNetwork {
-		var cancel context.CancelFunc
-		if cancel, err = c.createPodNetwork(ctx, &sandbox, id); err != nil {
-			return nil, err
-		}
-		defer func() {
-			if retErr != nil {
-				cancel()
-			}
-		}()
-	}
-
 	runtimeStart := time.Now()
 	// Create sandbox container.
 	// NOTE: sandboxContainerSpec SHOULD NOT have side
 	// effect, e.g. accessing/creating files, so that we can test
 	// it safely.
-	spec, err := c.sandboxContainerSpec(id, config, &image.ImageSpec.Config, sandbox.NetNSPath, ociRuntime.PodAnnotations)
+	spec, err := c.sandboxContainerSpec(id, config, &image.ImageSpec.Config, ociRuntime.PodAnnotations)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox container spec: %w", err)
 	}
@@ -296,6 +284,18 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, fmt.Errorf("failed to start sandbox container task %q: %w", id, err)
 	}
 
+	if podNetwork {
+		var cancel context.CancelFunc
+		if cancel, err = c.createPodNetwork(ctx, &sandbox, id, task.Pid()); err != nil {
+			return nil, err
+		}
+		defer func() {
+			if retErr != nil {
+				cancel()
+			}
+		}()
+	}
+
 	if err := sandbox.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
 		// Set the pod sandbox as ready after successfully start sandbox container.
 		status.Pid = task.Pid()
@@ -340,7 +340,7 @@ func (c *criService) getNetworkPlugin(runtimeClass string) cni.CNI {
 	return i
 }
 
-func (c *criService) createPodNetwork(ctx context.Context, sandbox *sandboxstore.Sandbox, id string) (cancel context.CancelFunc, retErr error) {
+func (c *criService) createPodNetwork(ctx context.Context, sandbox *sandboxstore.Sandbox, id string, pid uint32) (cancel context.CancelFunc, retErr error) {
 	netStart := time.Now()
 	// If it is not in host network namespace then create a namespace and set the sandbox
 	// handle. NetNSPath in sandbox metadata and NetNS is non empty only for non host network
@@ -350,7 +350,8 @@ func (c *criService) createPodNetwork(ctx context.Context, sandbox *sandboxstore
 	if c.config.NetNSMountsUnderStateDir {
 		netnsMountDir = filepath.Join(c.config.StateDir, "netns")
 	}
-	sandbox.NetNS, retErr = netns.NewNetNS(netnsMountDir)
+	srcNetnsPath := fmt.Sprintf("/proc/%v/ns/net", pid)
+	sandbox.NetNS, retErr = netns.CloneNetNS(netnsMountDir, srcNetnsPath)
 	if retErr != nil {
 		return nil, fmt.Errorf("failed to create network namespace for sandbox %q: %w", id, retErr)
 	}
