@@ -205,7 +205,7 @@ jobs:
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "powershell.exe -command { C:\containerd\bin\containerd.exe --log-level=debug --log-file=C:/logs/containerd.log --service-name containerd --register-service ; Set-Service containerd -StartupType Automatic; Start-Service containerd }"
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -s" <<EOF
             sleep 5
-            c:/cri-tools/build/bin/critest.exe $SKIP --runtime-endpoint='npipe://./pipe/containerd-containerd' --test-images-file='c:/cri-test-images.yaml' --report-dir='c:/Logs' | tee c:/Logs/critest.log
+            c:/cri-tools/build/bin/critest.exe $SKIP --runtime-endpoint='npipe://./pipe/containerd-containerd' --test-images-file='c:/cri-test-images.yaml' --report-dir='c:/Logs' -ginkgo.junit-report="C:\Logs\junit_critest.xml" | tee c:/Logs/critest.log
           EOF
 
       - name: PullLogsFromWinNode
