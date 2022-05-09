@@ -101,6 +101,8 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	if nsOptions.GetIpc() == runtime.NamespaceMode_NODE {
 		sandboxDevShm = devShm
 	}
+	// Remove the default /dev/shm mount from defaultMounts, it is added in oci/mounts.go.
+	specOpts = append(specOpts, oci.WithoutMounts(devShm))
 	specOpts = append(specOpts, oci.WithMounts([]runtimespec.Mount{
 		{
 			Source:      sandboxDevShm,
