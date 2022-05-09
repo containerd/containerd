@@ -107,6 +107,7 @@ EOF
 GOPATH=\\$HOME/go
 PATH=\\$GOPATH/bin:\\$PATH
 export GOPATH PATH
+git config --global --add safe.directory /vagrant
 EOF
     source /etc/profile.d/sh.local
     SHELL
