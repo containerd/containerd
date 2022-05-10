@@ -40,7 +40,6 @@ import (
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	"github.com/containerd/containerd/pkg/cri/util"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
-	"github.com/containerd/containerd/snapshots"
 )
 
 func init() {
@@ -184,7 +183,9 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	log.G(ctx).Debugf("Container %q spec: %#+v", id, spew.NewFormatter(spec))
 
-	snapshotterOpt := snapshots.WithLabels(snapshots.FilterInheritedLabels(config.Annotations))
+	// Grab any platform specific snapshotter opts.
+	sOpts := snapshotterOpts(c.config.ContainerdConfig.Snapshotter, config)
+
 	// Set snapshotter before any other options.
 	opts := []containerd.NewContainerOpts{
 		containerd.WithSnapshotter(c.runtimeSnapshotter(ctx, ociRuntime)),
@@ -193,7 +194,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		// the runtime (runc) a chance to modify (e.g. to create mount
 		// points corresponding to spec.Mounts) before making the
 		// rootfs readonly (requested by spec.Root.Readonly).
-		customopts.WithNewSnapshot(id, containerdImage, snapshotterOpt),
+		customopts.WithNewSnapshot(id, containerdImage, sOpts...),
 	}
 	if len(volumeMounts) > 0 {
 		mountMap := make(map[string]string)
