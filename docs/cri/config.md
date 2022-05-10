@@ -174,6 +174,11 @@ version = 2
   # limit.
   max_container_log_line_size = 16384
 
+  # log_read_buf_bytes is the size of the CRI logger read buffer in bytes.
+  # This buffer is used while redirecting container logs into a log file and
+  # has a minimum size of 4096 bytes.
+  log_read_buf_bytes = 4096
+
   # disable_cgroup indicates to disable the cgroup support.
   # This is useful when the daemon does not have permission to access cgroup.
   disable_cgroup = false

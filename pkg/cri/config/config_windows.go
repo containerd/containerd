@@ -56,6 +56,7 @@ func DefaultConfig() PluginConfig {
 		SandboxImage:              "k8s.gcr.io/pause:3.6",
 		StatsCollectPeriod:        10,
 		MaxContainerLogLineSize:   16 * 1024,
+		LogReadBufBytes:           4096,
 		MaxConcurrentDownloads:    3,
 		IgnoreImageDefinedVolumes: false,
 		// TODO(windows): Add platform specific config, so that most common defaults can be shared.
