@@ -1192,17 +1192,10 @@ func WithDefaultUnixDevices(_ context.Context, _ Client, _ *containers.Container
 			Allow:  true,
 		},
 		{
+			// "dev/ptmx"
 			Type:   "c",
 			Major:  intptr(5),
 			Minor:  intptr(2),
-			Access: rwm,
-			Allow:  true,
-		},
-		{
-			// tuntap
-			Type:   "c",
-			Major:  intptr(10),
-			Minor:  intptr(200),
 			Access: rwm,
 			Allow:  true,
 		},
