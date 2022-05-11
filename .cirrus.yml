@@ -23,7 +23,7 @@ task:
     # By default, Cirrus CI doesn't have HOME defined
     HOME: /root
     matrix:
-      BOX: fedora/35-cloud-base
+      BOX: fedora/36-cloud-base
       BOX: rockylinux/8
   install_libvirt_vagrant_script: |
     apt-get update
