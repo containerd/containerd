@@ -110,9 +110,22 @@ To install containerd and its dependencies from the source, see [`BUILDING.md`](
 From a PowerShell session run the following commands:
 
 ```PowerShell
-# Download and extract desired containerd Windows binaries
-$Version=1.6.2
+# Download desired containerd Windows binaries
+$Version="1.6.4"
 curl.exe -L https://github.com/containerd/containerd/releases/download/v$Version/containerd-$Version-windows-amd64.tar.gz -o containerd-windows-amd64.tar.gz
+curl.exe -L https://github.com/containerd/containerd/releases/download/v$Version/containerd-$Version-windows-amd64.tar.gz.sha256sum -o containerd-windows-amd64.tar.gz.sha256sum
+
+# Verify signature
+$hash="$(Get-FileHash ".\containerd-windows-amd64.tar.gz" | Select-Object -ExpandProperty "Hash")  containerd-$Version-windows-amd64.tar.gz"
+$expectedHash=$(Get-Content ".\containerd-windows-amd64.tar.gz.sha256sum")
+if ($hash -ne $expectedHash) {
+    Write-Error "Hash verification failed.
+    Expected: $expectedHash
+      Actual: $hash"
+    exit 1
+}
+
+# Extract
 tar.exe xvf .\containerd-windows-amd64.tar.gz
 
 # Copy and configure
