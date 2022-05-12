@@ -18,6 +18,7 @@ package containerd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -27,7 +28,6 @@ import (
 	"github.com/containerd/containerd/protobuf/types"
 	api "github.com/containerd/containerd/sandbox"
 	"github.com/containerd/typeurl"
-	"github.com/pkg/errors"
 )
 
 // Sandbox is a high level client to containerd's sandboxes.
@@ -183,7 +183,7 @@ func WithSandboxRuntime(name string, options interface{}) NewSandboxOpts {
 
 		opts, err := typeurl.MarshalAny(options)
 		if err != nil {
-			return errors.Wrap(err, "failed to marshal sandbox runtime options")
+			return fmt.Errorf("failed to marshal sandbox runtime options: %w", err)
 		}
 
 		s.Runtime = api.RuntimeOpts{
@@ -206,7 +206,7 @@ func WithSandboxSpec(s *oci.Spec, opts ...oci.SpecOpts) NewSandboxOpts {
 
 		spec, err := typeurl.MarshalAny(s)
 		if err != nil {
-			return errors.Wrap(err, "failed to marshal spec")
+			return fmt.Errorf("failed to marshal spec: %w", err)
 		}
 
 		sandbox.Spec = spec
@@ -223,7 +223,7 @@ func WithSandboxExtension(name string, ext interface{}) NewSandboxOpts {
 
 		any, err := typeurl.MarshalAny(ext)
 		if err != nil {
-			return errors.Wrap(err, "failed to marshal sandbox extension")
+			return fmt.Errorf("failed to marshal sandbox extension: %w", err)
 		}
 
 		s.Extensions[name] = any
