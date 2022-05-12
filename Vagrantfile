@@ -271,8 +271,7 @@ EOF
         fi
         trap cleanup EXIT
         ctr version
-        # TODO run in parallel, see https://github.com/containerd/containerd/issues/6903
-        critest --ginkgo.skip='HostIpc is true' --report-dir="${REPORT_DIR}"
+        critest --parallel=$[$(nproc)+2] --ginkgo.skip='HostIpc is true' --report-dir="${REPORT_DIR}"
     SHELL
   end
 
