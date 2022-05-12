@@ -273,3 +273,14 @@ func throttleDelay(status *status.Status) time.Duration {
 	}
 	return 0
 }
+
+// MarshalLog is the marshaling function used by the logging system to represent this Client.
+func (c *client) MarshalLog() interface{} {
+	return struct {
+		Type     string
+		Endpoint string
+	}{
+		Type:     "otlphttpgrpc",
+		Endpoint: c.endpoint,
+	}
+}
