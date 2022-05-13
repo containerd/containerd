@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	_ "crypto/sha256" // required by go-digest
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -39,37 +40,106 @@ type copySource struct {
 func TestCopy(t *testing.T) {
 	defaultSource := newCopySource("this is the source to copy")
 
+	cf1 := func(buf *bytes.Buffer, st Status) commitFunction {
+		i := 0
+		return func() error {
+			// function resets the first time
+			if i == 0 {
+				// this is the case where, the pipewriter to which the data was being written has
+				// changed. which means we need to clear the buffer
+				i++
+				buf.Reset()
+				st.Offset = 0
+				return ErrReset
+			}
+			return nil
+		}
+	}
+
+	cf2 := func(buf *bytes.Buffer, st Status) commitFunction {
+		i := 0
+		return func() error {
+			// function resets for more than the maxReset value
+			if i < maxResets+1 {
+				// this is the case where, the pipewriter to which the data was being written has
+				// changed. which means we need to clear the buffer
+				i++
+				buf.Reset()
+				st.Offset = 0
+				return ErrReset
+			}
+			return nil
+		}
+	}
+
+	s1 := Status{}
+	s2 := Status{}
+	b1 := bytes.Buffer{}
+	b2 := bytes.Buffer{}
+
 	var testcases = []struct {
-		name     string
-		source   copySource
-		writer   fakeWriter
-		expected string
+		name        string
+		source      copySource
+		writer      fakeWriter
+		expected    string
+		expectedErr error
 	}{
 		{
-			name:     "copy no offset",
-			source:   defaultSource,
-			writer:   fakeWriter{},
+			name:   "copy no offset",
+			source: defaultSource,
+			writer: fakeWriter{
+				Buffer: &bytes.Buffer{},
+			},
 			expected: "this is the source to copy",
 		},
 		{
-			name:     "copy with offset from seeker",
-			source:   defaultSource,
-			writer:   fakeWriter{status: Status{Offset: 8}},
+			name:   "copy with offset from seeker",
+			source: defaultSource,
+			writer: fakeWriter{
+				Buffer: &bytes.Buffer{},
+				status: Status{Offset: 8},
+			},
 			expected: "the source to copy",
 		},
 		{
-			name:     "copy with offset from unseekable source",
-			source:   copySource{reader: bytes.NewBufferString("foobar"), size: 6},
-			writer:   fakeWriter{status: Status{Offset: 3}},
+			name:   "copy with offset from unseekable source",
+			source: copySource{reader: bytes.NewBufferString("foobar"), size: 6},
+			writer: fakeWriter{
+				Buffer: &bytes.Buffer{},
+				status: Status{Offset: 3},
+			},
 			expected: "bar",
 		},
 		{
 			name:   "commit already exists",
 			source: newCopySource("this already exists"),
-			writer: fakeWriter{commitFunc: func() error {
-				return errdefs.ErrAlreadyExists
-			}},
+			writer: fakeWriter{
+				Buffer: &bytes.Buffer{},
+				commitFunc: func() error {
+					return errdefs.ErrAlreadyExists
+				}},
 			expected: "this already exists",
+		},
+		{
+			name:   "commit fails first time with ErrReset",
+			source: newCopySource("content to copy"),
+			writer: fakeWriter{
+				Buffer:     &b1,
+				status:     s1,
+				commitFunc: cf1(&b1, s1),
+			},
+			expected: "content to copy",
+		},
+		{
+			name:   "write fails more than maxReset times due to reset",
+			source: newCopySource("content to copy"),
+			writer: fakeWriter{
+				Buffer:     &b2,
+				status:     s2,
+				commitFunc: cf2(&b2, s2),
+			},
+			expected:    "",
+			expectedErr: fmt.Errorf("failed to copy after %d retries", maxResets),
 		},
 	}
 
@@ -80,6 +150,12 @@ func TestCopy(t *testing.T) {
 				testcase.source.reader,
 				testcase.source.size,
 				testcase.source.digest)
+
+			// if an error is expected then further comparisons are not required
+			if testcase.expectedErr != nil {
+				assert.Check(t, is.Equal(testcase.expectedErr.Error(), err.Error()))
+				return
+			}
 
 			assert.NilError(t, err)
 			assert.Check(t, is.Equal(testcase.source.digest, testcase.writer.committedDigest))
@@ -96,11 +172,13 @@ func newCopySource(raw string) copySource {
 	}
 }
 
+type commitFunction func() error
+
 type fakeWriter struct {
-	bytes.Buffer
+	*bytes.Buffer
 	committedDigest digest.Digest
 	status          Status
-	commitFunc      func() error
+	commitFunc      commitFunction
 }
 
 func (f *fakeWriter) Close() error {

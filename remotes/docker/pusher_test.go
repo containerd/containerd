@@ -18,6 +18,7 @@ package docker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -29,8 +30,11 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/content"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/remotes"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetManifestPath(t *testing.T) {
@@ -81,6 +85,60 @@ func TestPusherErrClosedRetry(t *testing.T) {
 	}
 }
 
+// TestPusherErrReset tests the push method if the request needs to be retried
+// i.e when ErrReset occurs
+func TestPusherErrReset(t *testing.T) {
+	p, reg, done := samplePusher(t)
+	defer done()
+
+	p.object = "latest@sha256:55d31f3af94c797b65b310569803cacc1c9f4a34bf61afcdc8138f89345c8308"
+
+	reg.uploadable = true
+	reg.putHandlerFunc = func() func(w http.ResponseWriter, r *http.Request) bool {
+		// sets whether the request should timeout so that a reset error can occur and
+		// request will be retried
+		shouldTimeout := true
+		return func(w http.ResponseWriter, r *http.Request) bool {
+			if shouldTimeout {
+				shouldTimeout = !shouldTimeout
+				w.WriteHeader(http.StatusRequestTimeout)
+				return true
+			}
+			return false
+		}
+	}()
+
+	ct := []byte("manifest-content")
+
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageManifest,
+		Digest:    digest.FromBytes(ct),
+		Size:      int64(len(ct)),
+	}
+
+	w, err := p.push(context.Background(), desc, remotes.MakeRefKey(context.Background(), desc), false)
+	assert.Equal(t, err, nil, "no error should be there")
+
+	w.Write(ct)
+
+	pw, _ := w.(*pushWriter)
+
+	select {
+	case p := <-pw.pipeC:
+		p.Write(ct)
+	case e := <-pw.errC:
+		assert.Failf(t, "error: %v while retrying request", e.Error())
+	}
+
+	select {
+	case resp := <-pw.respC:
+		assert.Equalf(t, resp.StatusCode, http.StatusCreated,
+			"201 should be the response code when uploading new content")
+	case <-pw.errC:
+		assert.Fail(t, "should not give error")
+	}
+}
+
 func tryUpload(ctx context.Context, t *testing.T, p dockerPusher, layerContent []byte) error {
 	desc := ocispec.Descriptor{
 		MediaType: ocispec.MediaTypeImageLayerGzip,
@@ -99,7 +157,9 @@ func tryUpload(ctx context.Context, t *testing.T, p dockerPusher, layerContent [
 }
 
 func samplePusher(t *testing.T) (dockerPusher, *uploadableMockRegistry, func()) {
-	reg := &uploadableMockRegistry{}
+	reg := &uploadableMockRegistry{
+		availableContents: make([]string, 0),
+	}
 	s := httptest.NewServer(reg)
 	u, err := url.Parse(s.URL)
 	if err != nil {
@@ -124,40 +184,203 @@ func samplePusher(t *testing.T) (dockerPusher, *uploadableMockRegistry, func()) 
 }
 
 var manifestRegexp = regexp.MustCompile(`/([a-z0-9]+)/manifests/(.*)`)
-var blobUploadRegexp = regexp.MustCompile(`/([a-z0-9]+)/blobs/uploads/`)
+var blobUploadRegexp = regexp.MustCompile(`/([a-z0-9]+)/blobs/uploads/(.*)`)
 
 // uploadableMockRegistry provides minimal registry APIs which are enough to serve requests from dockerPusher.
 type uploadableMockRegistry struct {
-	uploadable bool
+	availableContents []string
+	uploadable        bool
+	putHandlerFunc    func(w http.ResponseWriter, r *http.Request) bool
 }
 
 func (u *uploadableMockRegistry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "POST" {
+	if r.Method == http.MethodPut && u.putHandlerFunc != nil {
+		// if true return the response witout calling default handler
+		if u.putHandlerFunc(w, r) {
+			return
+		}
+	}
+	u.defaultHandler(w, r)
+}
+
+func (u *uploadableMockRegistry) defaultHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
 		if matches := blobUploadRegexp.FindStringSubmatch(r.URL.Path); len(matches) != 0 {
 			if u.uploadable {
 				w.Header().Set("Location", "/upload")
 			} else {
 				w.Header().Set("Location", "/cannotupload")
 			}
-			w.WriteHeader(202)
+			dgstr := digest.Canonical.Digester()
+			if _, err := io.Copy(dgstr.Hash(), r.Body); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			u.availableContents = append(u.availableContents, dgstr.Digest().String())
+			w.WriteHeader(http.StatusAccepted)
 			return
 		}
-	} else if r.Method == "PUT" {
+	} else if r.Method == http.MethodPut {
 		mfstMatches := manifestRegexp.FindStringSubmatch(r.URL.Path)
 		if len(mfstMatches) != 0 || strings.HasPrefix(r.URL.Path, "/upload") {
 			dgstr := digest.Canonical.Digester()
 			if _, err := io.Copy(dgstr.Hash(), r.Body); err != nil {
-				w.WriteHeader(500)
+				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
+			u.availableContents = append(u.availableContents, dgstr.Digest().String())
 			w.Header().Set("Docker-Content-Digest", dgstr.Digest().String())
-			w.WriteHeader(201)
+			w.WriteHeader(http.StatusCreated)
 			return
 		} else if r.URL.Path == "/cannotupload" {
-			w.WriteHeader(500)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+	} else if r.Method == http.MethodHead {
+		var content string
+		// check for both manifest and blob paths
+		if manifestMatch := manifestRegexp.FindStringSubmatch(r.URL.Path); len(manifestMatch) == 3 {
+			content = manifestMatch[2]
+		} else if blobMatch := blobUploadRegexp.FindStringSubmatch(r.URL.Path); len(blobMatch) == 3 {
+			content = blobMatch[2]
+		}
+		// if content is not found or if the path is not manifest or blob
+		// we return 404
+		if u.isContentAlreadyExist(content) {
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+		return
 	}
 	fmt.Println(r)
-	w.WriteHeader(404)
+	w.WriteHeader(http.StatusNotFound)
+}
+
+// checks if the content is already present in the registry
+func (u *uploadableMockRegistry) isContentAlreadyExist(c string) bool {
+	for _, ct := range u.availableContents {
+		if ct == c {
+			return true
+		}
+	}
+	return false
+}
+
+func Test_dockerPusher_push(t *testing.T) {
+
+	p, reg, done := samplePusher(t)
+	defer done()
+
+	reg.uploadable = true
+
+	manifestContent := []byte("manifest-content")
+	manifestContentDigest := digest.FromBytes(manifestContent)
+	layerContent := []byte("layer-content")
+	layerContentDigest := digest.FromBytes(layerContent)
+
+	// using a random object here
+	baseObject := "latest@sha256:55d31f3af94c797b65b310569803cacc1c9f4a34bf61afcdc8138f89345c8308"
+
+	type args struct {
+		content           []byte
+		mediatype         string
+		ref               string
+		unavailableOnFail bool
+	}
+	tests := []struct {
+		name             string
+		dp               dockerPusher
+		dockerBaseObject string
+		args             args
+		checkerFunc      func(writer pushWriter) bool
+		wantErr          error
+	}{
+		{
+			name:             "when a manifest is pushed",
+			dp:               p,
+			dockerBaseObject: baseObject,
+			args: args{
+				content:           manifestContent,
+				mediatype:         ocispec.MediaTypeImageManifest,
+				ref:               fmt.Sprintf("manifest-%s", manifestContentDigest.String()),
+				unavailableOnFail: false,
+			},
+			checkerFunc: func(writer pushWriter) bool {
+				select {
+				case resp := <-writer.respC:
+					// 201 should be the response code when uploading a new manifest
+					return resp.StatusCode == http.StatusCreated
+				case <-writer.errC:
+					return false
+				}
+			},
+			wantErr: nil,
+		},
+		{
+			name:             "trying to push content that already exists",
+			dp:               p,
+			dockerBaseObject: baseObject,
+			args: args{
+				content:           manifestContent,
+				mediatype:         ocispec.MediaTypeImageManifest,
+				ref:               fmt.Sprintf("manifest-%s", manifestContentDigest.String()),
+				unavailableOnFail: false,
+			},
+			wantErr: fmt.Errorf("content %v on remote: %w", digest.FromBytes(manifestContent), errdefs.ErrAlreadyExists),
+		},
+		{
+			name: "trying to push a blob layer",
+			dp:   p,
+			// Not needed to set the base object as it is used to generate path only in case of manifests
+			// dockerBaseObject:
+			args: args{
+				content:           layerContent,
+				mediatype:         ocispec.MediaTypeImageLayer,
+				ref:               fmt.Sprintf("layer-%s", layerContentDigest.String()),
+				unavailableOnFail: false,
+			},
+			checkerFunc: func(writer pushWriter) bool {
+				select {
+				case resp := <-writer.respC:
+					// 201 should be the response code when uploading a new blob
+					return resp.StatusCode == http.StatusCreated
+				case <-writer.errC:
+					return false
+				}
+			},
+			wantErr: nil,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			desc := ocispec.Descriptor{
+				MediaType: test.args.mediatype,
+				Digest:    digest.FromBytes(test.args.content),
+				Size:      int64(len(test.args.content)),
+			}
+
+			test.dp.object = test.dockerBaseObject
+
+			got, err := test.dp.push(context.Background(), desc, test.args.ref, test.args.unavailableOnFail)
+
+			assert.Equal(t, test.wantErr, err)
+			// if an error is expected, further comparisons are not required.
+			if test.wantErr != nil {
+				return
+			}
+
+			// write the content to the writer, this will be done when a Read() is called on the body of the request
+			got.Write(test.args.content)
+
+			pw, ok := got.(*pushWriter)
+			if !ok {
+				assert.Errorf(t, errors.New("unable to cast content.Writer to pushWriter"), "got %v instead of pushwriter", got)
+			}
+
+			// test whether a proper response has been received after the push operation
+			assert.True(t, test.checkerFunc(*pw))
+
+		})
+	}
 }
