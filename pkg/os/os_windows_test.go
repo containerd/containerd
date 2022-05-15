@@ -18,10 +18,8 @@ package os
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -30,29 +28,10 @@ import (
 	"github.com/Microsoft/hcsshim/computestorage"
 	"github.com/Microsoft/hcsshim/osversion"
 	"golang.org/x/sys/windows"
-	"golang.org/x/sys/windows/registry"
 )
 
-// Getting build number via osversion.Build() requires the program to be properly manifested, which
-// requires importing `github.com/Microsoft/hcsshim/test/functional/manifest`, which is a dependency
-// we want to avoid here. Instead, since this is just test code, simply parse the build number from
-// the registry.
-func getWindowsBuildNumber() (int, error) {
-	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion`, registry.QUERY_VALUE)
-	if err != nil {
-		return 0, fmt.Errorf("read CurrentVersion reg key: %s", err)
-	}
-	defer k.Close()
-	buildNumStr, _, err := k.GetStringValue("CurrentBuild")
-	if err != nil {
-		return 0, fmt.Errorf("read CurrentBuild reg value: %s", err)
-	}
-	buildNum, err := strconv.Atoi(buildNumStr)
-	if err != nil {
-		return 0, err
-	}
-	return buildNum, nil
-}
+// Needed to make hscshim APIs work correctly. See #6896
+//go:generate go run github.com/tc-hib/go-winres@v0.3.0 make --no-suffix --arch amd64 --out rsrc_windows_amd64_test.syso
 
 func makeSymlink(t *testing.T, oldName string, newName string) {
 	if err := os.Symlink(oldName, newName); err != nil {
@@ -101,10 +80,7 @@ func formatVHD(vhdHandle windows.Handle) error {
 	// Pre-19H1 HcsFormatWritableLayerVhd expects a disk handle.
 	// On newer builds it expects a VHD handle instead.
 	// Open a handle to the VHD's disk object if needed.
-	build, err := getWindowsBuildNumber()
-	if err != nil {
-		return err
-	}
+	build := osversion.Build()
 	if build < osversion.V19H1 {
 		diskPath, err := vhd.GetVirtualDiskPhysicalPath(syscall.Handle(h))
 		if err != nil {

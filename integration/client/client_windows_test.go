@@ -22,8 +22,10 @@ import (
 	"path/filepath"
 
 	"github.com/Microsoft/hcsshim/osversion"
-	_ "github.com/Microsoft/hcsshim/test/functional/manifest" // For rsrc_amd64.syso
 )
+
+// Needed to make hscshim APIs work correctly. See #6896
+//go:generate go run github.com/tc-hib/go-winres@v0.3.0 make --no-suffix --arch amd64 --out rsrc_windows_amd64_test.syso
 
 const (
 	defaultAddress = `\\.\pipe\containerd-containerd-test`
