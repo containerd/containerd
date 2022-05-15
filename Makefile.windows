@@ -29,4 +29,5 @@ $(WINDOWS_SHIM): script/setup/install-runhcs-shim go.mod
 	DESTDIR=$(CURDIR)/bin $<
 
 bin/%.exe: cmd/% FORCE
+	go generate ./$</...
 	$(BUILD_BINARY)
