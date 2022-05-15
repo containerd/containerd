@@ -31,7 +31,7 @@ import (
 )
 
 // Needed to make hscshim APIs work correctly. See #6896
-//go:generate go run github.com/tc-hib/go-winres@v0.3.0 make --no-suffix --arch amd64 --out rsrc_windows_amd64_test.syso
+//go:generate go-winres make --no-suffix --arch amd64 --out rsrc_windows_amd64_test.syso
 
 func makeSymlink(t *testing.T, oldName string, newName string) {
 	if err := os.Symlink(oldName, newName); err != nil {

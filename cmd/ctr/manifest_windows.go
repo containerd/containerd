@@ -17,4 +17,4 @@
 package main
 
 // Needed to make hscshim APIs work correctly. See #6896
-//go:generate go run github.com/tc-hib/go-winres@v0.3.0 make --product-version=git-tag  --file-version=git-tag
+//go:generate go-winres make --product-version=git-tag  --file-version=git-tag
