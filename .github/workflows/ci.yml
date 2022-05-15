@@ -363,7 +363,7 @@ jobs:
       - uses: actions/upload-artifact@v2
         if: always()
         with:
-          name: TestResults Windows
+          name: TestResults ${{ matrix.os }}
           path: |
             ${{github.workspace}}/*-junit.xml
 
