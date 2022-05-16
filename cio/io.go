@@ -357,3 +357,10 @@ func Load(set *FIFOSet) (IO, error) {
 func (p *pipes) closers() []io.Closer {
 	return []io.Closer{p.Stdin, p.Stdout, p.Stderr}
 }
+
+func Copy(to io.Writer, from io.Reader) (nw int64, err error) {
+	buffer := bufPool.Get().(*[]byte)
+	nw, err = io.CopyBuffer(to, from, *buffer)
+	bufPool.Put(buffer)
+	return
+}
