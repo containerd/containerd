@@ -110,16 +110,18 @@ func BenchmarkContainerStart(b *testing.B) {
 	// reset the timer before starting tasks
 	b.ResetTimer()
 	for _, c := range containers {
-		task, err := c.NewTask(ctx, empty())
-		if err != nil {
-			b.Error(err)
-			return
-		}
-		defer task.Delete(ctx)
-		if err := task.Start(ctx); err != nil {
-			b.Error(err)
-			return
-		}
+		func() {
+			task, err := c.NewTask(ctx, empty())
+			if err != nil {
+				b.Error(err)
+				return
+			}
+			defer task.Delete(ctx)
+			if err := task.Start(ctx); err != nil {
+				b.Error(err)
+				return
+			}
+		}()
 	}
 	b.StopTimer()
 }
