@@ -38,14 +38,48 @@ import (
 	cioutil "github.com/containerd/containerd/pkg/ioutil"
 )
 
+type cappedWriter struct {
+	w      io.WriteCloser
+	remain int
+}
+
+var errNoRemain = errors.New("no more space to write")
+
+func (cw *cappedWriter) Write(p []byte) (int, error) {
+	if cw.remain <= 0 {
+		return 0, errNoRemain
+	}
+
+	end := cw.remain
+	if end > len(p) {
+		end = len(p)
+	}
+	written, err := cw.w.Write(p[0:end])
+	cw.remain -= written
+
+	if err != nil {
+		return written, err
+	}
+	if written < len(p) {
+		return written, errNoRemain
+	}
+	return written, nil
+}
+
+func (cw *cappedWriter) Close() error {
+	return cw.w.Close()
+}
+
 // ExecSync executes a command in the container, and returns the stdout output.
 // If command exits with a non-zero exit code, an error is returned.
 func (c *criService) ExecSync(ctx context.Context, r *runtime.ExecSyncRequest) (*runtime.ExecSyncResponse, error) {
+	const maxStreamSize = 1024 * 1024 * 16
+
 	var stdout, stderr bytes.Buffer
 	exitCode, err := c.execInContainer(ctx, r.GetContainerId(), execOptions{
 		cmd:     r.GetCmd(),
-		stdout:  cioutil.NewNopWriteCloser(&stdout),
-		stderr:  cioutil.NewNopWriteCloser(&stderr),
+		stdout:  &cappedWriter{w: cioutil.NewNopWriteCloser(&stdout), remain: maxStreamSize},
+		stderr:  &cappedWriter{w: cioutil.NewNopWriteCloser(&stderr), remain: maxStreamSize},
 		timeout: time.Duration(r.GetTimeout()) * time.Second,
 	})
 	if err != nil {
