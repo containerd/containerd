@@ -111,7 +111,7 @@ From a PowerShell session run the following commands:
 
 ```PowerShell
 # Download and extract desired containerd Windows binaries
-$Version=1.6.2
+$Version="1.6.2"
 curl.exe -L https://github.com/containerd/containerd/releases/download/v$Version/containerd-$Version-windows-amd64.tar.gz -o containerd-windows-amd64.tar.gz
 tar.exe xvf .\containerd-windows-amd64.tar.gz
 
