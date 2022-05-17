@@ -311,7 +311,7 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 					c.eventMonitor.startContainerExitMonitor(context.Background(), id, status.Pid, exitCh)
 				}
 			case containerd.Stopped:
-				// Task is stopped. Updata status and delete the task.
+				// Task is stopped. Update status and delete the task.
 				if _, err := t.Delete(ctx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
 					return fmt.Errorf("failed to delete task: %w", err)
 				}
