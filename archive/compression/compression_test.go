@@ -40,7 +40,7 @@ func TestMain(m *testing.M) {
 // generateData generates data that composed of 2 random parts
 // and single zero-filled part within them.
 // Typically, the compression ratio would be about 67%.
-func generateData(t *testing.T, size int) []byte {
+func generateData(t testing.TB, size int) []byte {
 	part0 := size / 3             // random
 	part2 := size / 3             // random
 	part1 := size - part0 - part2 // zero-filled
@@ -56,8 +56,8 @@ func generateData(t *testing.T, size int) []byte {
 	return append(part0Data, append(part1Data, part2Data...)...)
 }
 
-func testCompressDecompress(t *testing.T, size int, compression Compression) DecompressReadCloser {
-	orig := generateData(t, size)
+func testCompress(t testing.TB, orig []byte, compression Compression) []byte {
+	size := len(orig)
 	var b bytes.Buffer
 	compressor, err := CompressStream(&b, compression)
 	if err != nil {
@@ -67,14 +67,11 @@ func testCompressDecompress(t *testing.T, size int, compression Compression) Dec
 		t.Fatal(err)
 	}
 	compressor.Close()
-	compressed := b.Bytes()
-	t.Logf("compressed %d bytes to %d bytes (%.2f%%)",
-		len(orig), len(compressed), 100.0*float32(len(compressed))/float32(len(orig)))
-	if compared := bytes.Compare(orig, compressed); (compression == Uncompressed && compared != 0) ||
-		(compression != Uncompressed && compared == 0) {
-		t.Fatal("strange compressed data")
-	}
 
+	return b.Bytes()
+}
+
+func testDecompress(t testing.TB, compressed []byte) ([]byte, DecompressReadCloser) {
 	decompressor, err := DecompressStream(bytes.NewReader(compressed))
 	if err != nil {
 		t.Fatal(err)
@@ -83,6 +80,20 @@ func testCompressDecompress(t *testing.T, size int, compression Compression) Dec
 	if err != nil {
 		t.Fatal(err)
 	}
+	return decompressed, decompressor
+}
+
+func testCompressDecompress(t testing.TB, size int, compression Compression) DecompressReadCloser {
+	orig := generateData(t, size)
+	compressed := testCompress(t, orig, compression)
+	t.Logf("compressed %d bytes to %d bytes (%.2f%%)",
+		len(orig), len(compressed), 100.0*float32(len(compressed))/float32(len(orig)))
+	if compared := bytes.Compare(orig, compressed); (compression == Uncompressed && compared != 0) ||
+		(compression != Uncompressed && compared == 0) {
+		t.Fatal("strange compressed data")
+	}
+
+	decompressed, decompressor := testDecompress(t, compressed)
 	if !bytes.Equal(orig, decompressed) {
 		t.Fatal("strange decompressed data")
 	}
