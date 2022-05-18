@@ -28,7 +28,7 @@ import (
 )
 
 // Runtime struct to contain the type(ID), engine, and root variables for a default runtime
-// and a runtime for untrusted worload.
+// and a runtime for untrusted workload.
 type Runtime struct {
 	// Type is the runtime type to use in containerd e.g. io.containerd.runtime.v1.linux
 	Type string `toml:"runtime_type" json:"runtimeType"`

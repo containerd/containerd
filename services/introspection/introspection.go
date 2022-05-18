@@ -25,7 +25,7 @@ import (
 	ptypes "github.com/containerd/containerd/protobuf/types"
 )
 
-// Service defines the instrospection service interface
+// Service defines the introspection service interface
 type Service interface {
 	Plugins(context.Context, []string) (*api.PluginsResponse, error)
 	Server(context.Context, *ptypes.Empty) (*api.ServerResponse, error)
