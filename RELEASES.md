@@ -209,7 +209,7 @@ containerd versions:
 | GRPC API         | Stable   | 1.0                | [gRPC API](#grpc-api) |
 | Metrics API      | Stable   | 1.0                | - |
 | Runtime Shim API | Stable   | 1.2                | - |
-| Daemon Config    | Stable   | 1.0                | - |
+| Daemon Config    | Stable   | 1.5 (_Config v2_)  | [man page](https://github.com/containerd/containerd/blob/main/docs/man/containerd-config.toml.5.md) |
 | CRI GRPC API     | Stable   | 1.6 (_CRI v1_)     | [cri-api](https://github.com/kubernetes/cri-api/tree/master/pkg/apis/runtime/v1) |
 | Go client API    | Unstable | _future_           | [godoc](https://godoc.org/github.com/containerd/containerd) |
 | `ctr` tool       | Unstable | Out of scope       | - |
