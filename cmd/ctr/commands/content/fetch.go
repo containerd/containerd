@@ -65,7 +65,7 @@ Most of this is experimental and there are few leaps to make this work.`,
 		},
 		cli.BoolFlag{
 			Name:  "all-platforms",
-			Usage: "pull content from all platforms",
+			Usage: "Pull content from all platforms",
 		},
 		cli.BoolFlag{
 			Name:  "all-metadata",
