@@ -24,6 +24,8 @@ ns, ok := namespaces.Namespace(ctx)
 
 Because the client calls containerd's gRPC API to interact with the daemon, all API calls require a context with a namespace set.
 
+> Note that a namespace cannot be named `"version"` ([#6944](https://github.com/containerd/containerd/issues/6944)).
+
 ## How low level is the implementation?
 
 Namespaces are passed through the containerd API to the underlying plugins providing functionality.
