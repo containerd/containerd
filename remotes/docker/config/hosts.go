@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/internal"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/pelletier/go-toml"
@@ -115,7 +116,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 		if options.DefaultTLS != nil {
 			defaultTLSConfig = options.DefaultTLS
 		} else {
-			defaultTLSConfig = &tls.Config{}
+			defaultTLSConfig = internal.TLSConfig()
 		}
 
 		defaultTransport := &http.Transport{

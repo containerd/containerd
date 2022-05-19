@@ -33,7 +33,6 @@ linters-settings:
       - G204
       - G305
       - G306
-      - G402
       - G404
 
 run:

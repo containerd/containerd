@@ -33,6 +33,7 @@ import (
 	k8scert "k8s.io/client-go/util/cert"
 	"k8s.io/utils/exec"
 
+	"github.com/containerd/containerd/internal"
 	"github.com/containerd/containerd/pkg/cri/streaming"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 )
@@ -95,9 +96,11 @@ func newStreamServer(c *criService, addr, port, streamIdleTimeout string) (strea
 		if err != nil {
 			return nil, fmt.Errorf("failed to load x509 key pair for stream server: %w", err)
 		}
-		config.TLSConfig = &tls.Config{
-			Certificates: []tls.Certificate{tlsCert},
-		}
+
+		tlsConfig := internal.TLSConfig()
+		tlsConfig.Certificates = []tls.Certificate{tlsCert}
+		config.TLSConfig = tlsConfig
+
 		return streaming.NewServer(config, run)
 	case selfSignTLS:
 		tlsCert, err := newTLSCert()
@@ -106,7 +109,7 @@ func newStreamServer(c *criService, addr, port, streamIdleTimeout string) (strea
 		}
 		config.TLSConfig = &tls.Config{
 			Certificates:       []tls.Certificate{tlsCert},
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: true, // nolint:gosec
 		}
 		return streaming.NewServer(config, run)
 	case withoutTLS:

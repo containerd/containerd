@@ -31,6 +31,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/internal"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker/auth"
 	digest "github.com/opencontainers/go-digest"
@@ -255,6 +256,16 @@ func TestHostFailureFallbackResolver(t *testing.T) {
 	runBasicTest(t, "testname", sf)
 }
 
+func tlsConfig(tlsCert tls.Certificate) *tls.Config {
+	capool := x509.NewCertPool()
+	cert, _ := x509.ParseCertificate(tlsCert.Certificate[0])
+	capool.AddCert(cert)
+
+	config := internal.TLSConfig()
+	config.RootCAs = capool
+	return config
+}
+
 func TestHostTLSFailureFallbackResolver(t *testing.T) {
 	sf := func(h http.Handler) (string, ResolverOptions, func()) {
 		// Start up two servers
@@ -265,18 +276,9 @@ func TestHostTLSFailureFallbackResolver(t *testing.T) {
 		tlsServer.StartTLS()
 		httpsBase := tlsServer.URL[8:] // strip "https://"
 
-		capool := x509.NewCertPool()
-		cert, _ := x509.ParseCertificate(tlsServer.TLS.Certificates[0].Certificate[0])
-		capool.AddCert(cert)
-
 		client := &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					RootCAs: capool,
-				},
-			},
+			Transport: &http.Transport{TLSClientConfig: tlsConfig(tlsServer.TLS.Certificates[0])},
 		}
-
 		options := ResolverOptions{}
 		createHost := func(host string) RegistryHost {
 			return RegistryHost{
@@ -493,15 +495,9 @@ func tlsServer(h http.Handler) (string, ResolverOptions, func()) {
 	s := httptest.NewUnstartedServer(h)
 	s.StartTLS()
 
-	capool := x509.NewCertPool()
-	cert, _ := x509.ParseCertificate(s.TLS.Certificates[0].Certificate[0])
-	capool.AddCert(cert)
-
 	client := &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				RootCAs: capool,
-			},
+			TLSClientConfig: tlsConfig(s.TLS.Certificates[0]),
 		},
 	}
 	options := ResolverOptions{

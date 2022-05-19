@@ -31,6 +31,7 @@ import (
 	"strings"
 
 	"github.com/containerd/console"
+	"github.com/containerd/containerd/internal"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
@@ -117,8 +118,7 @@ func GetResolver(ctx gocontext.Context, clicontext *cli.Context) (remotes.Resolv
 }
 
 func resolverDefaultTLS(clicontext *cli.Context) (*tls.Config, error) {
-	config := &tls.Config{}
-
+	config := internal.TLSConfig()
 	if clicontext.Bool("skip-verify") {
 		config.InsecureSkipVerify = true
 	}

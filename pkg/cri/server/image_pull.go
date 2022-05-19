@@ -36,6 +36,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/internal"
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/log"
 	distribution "github.com/containerd/containerd/reference/docker"
@@ -292,7 +293,7 @@ func (c *criService) updateImage(ctx context.Context, r string) error {
 // getTLSConfig returns a TLSConfig configured with a CA/Cert/Key specified by registryTLSConfig
 func (c *criService) getTLSConfig(registryTLSConfig criconfig.TLSConfig) (*tls.Config, error) {
 	var (
-		tlsConfig = &tls.Config{}
+		tlsConfig = internal.TLSConfig()
 		cert      tls.Certificate
 		err       error
 	)
@@ -395,7 +396,7 @@ func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig
 			} else if isLocalHost(host) && u.Scheme == "http" {
 				// Skipping TLS verification for localhost
 				transport.TLSClientConfig = &tls.Config{
-					InsecureSkipVerify: true,
+					InsecureSkipVerify: true, // nolint:gosec
 				}
 			}
 

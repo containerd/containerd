@@ -42,6 +42,7 @@ import (
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/events/exchange"
+	"github.com/containerd/containerd/internal"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/pkg/dialer"
@@ -160,7 +161,8 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		if err != nil {
 			return nil, err
 		}
-		tlsConfig := &tls.Config{Certificates: []tls.Certificate{tlsCert}}
+		tlsConfig := internal.TLSConfig()
+		tlsConfig.Certificates = []tls.Certificate{tlsCert}
 
 		if config.GRPC.TCPTLSCA != "" {
 			caCertPool := x509.NewCertPool()
