@@ -44,10 +44,15 @@
 //
 // Below is the current database schema. This should be updated each time
 // the structure is changed in addition to adding a migration and incrementing
-// the database version. Note that `╘══*...*` refers to maps with arbitrary
-// keys.
-//  ├──version : <varint>                        - Latest version, see migrations
+// the database version.
+// Notes:
+//  * `╘══*...*` refers to maps with arbitrary keys
+//  * `version` is a key to a numeric value identifying the minor revisions
+//    of schema version
+//  * a namespace in a schema bucket cannot be named "version"
+//
 //  └──v1                                        - Schema version bucket
+//     ├──version : <varint>                     - Latest version, see migrations
 //     ╘══*namespace*
 //        ├──labels
 //        │  ╘══*key* : <string>                 - Label value
