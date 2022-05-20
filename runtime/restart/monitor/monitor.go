@@ -83,7 +83,8 @@ type change interface {
 }
 
 type monitor struct {
-	client *containerd.Client
+	client         *containerd.Client
+	reconcileTimes uint64
 }
 
 func (m *monitor) run(interval time.Duration) {
@@ -99,6 +100,12 @@ func (m *monitor) run(interval time.Duration) {
 }
 
 func (m *monitor) reconcile(ctx context.Context) error {
+
+	//if m.reconcileTimes value is 1 means reconcile run at first time
+	//else if m.reconcileTimes >= 2 means reconcile run more than twice
+	if m.reconcileTimes < 2 {
+		m.reconcileTimes++
+	}
 	ns, err := m.client.NamespaceService().List(ctx)
 	if err != nil {
 		return err
@@ -149,6 +156,30 @@ func (m *monitor) monitor(ctx context.Context) ([]change, error) {
 		if err != nil {
 			return nil, err
 		}
+		//restart unrunning container if container's  restart strategy is restart=always
+		if m.reconcileTimes == 1 {
+			rp, err := restart.NewPolicy(labels[restart.PolicyLabel])
+			if err != nil {
+				return nil, err
+			}
+			task, err := c.Task(ctx, nil)
+			if err != nil {
+				return nil, err
+			}
+			status, err := task.Status(ctx)
+			if err != nil {
+				return nil, err
+			}
+			if rp.Name() == "always" &&
+				status.Status == containerd.Stopped ||
+				status.Status == containerd.Created ||
+				status.Status == containerd.Unknown {
+				if err := updateContainerStoppedLabel(ctx, c, false); err != nil {
+					return nil, err
+				}
+			}
+		}
+
 		desiredStatus := containerd.ProcessStatus(labels[restart.StatusLabel])
 		if task, err = c.Task(ctx, nil); err == nil {
 			if status, err = task.Status(ctx); err == nil {
@@ -188,4 +219,11 @@ func (m *monitor) monitor(ctx context.Context) ([]change, error) {
 		}
 	}
 	return changes, nil
+}
+
+func updateContainerStoppedLabel(ctx context.Context, container containerd.Container, stopped bool) error {
+	opt := containerd.WithAdditionalContainerLabels(map[string]string{
+		restart.ExplicitlyStoppedLabel: strconv.FormatBool(stopped),
+	})
+	return container.Update(ctx, containerd.UpdateContainerOpts(opt))
 }

@@ -122,13 +122,17 @@ func (rp *Policy) MaximumRetryCount() int {
 
 // Reconcile reconciles the restart policy of a container.
 func Reconcile(status containerd.Status, labels map[string]string) bool {
+	explicitlyStopped, _ := strconv.ParseBool(labels[ExplicitlyStoppedLabel])
+	if explicitlyStopped {
+		return false
+	}
 	rp, err := NewPolicy(labels[PolicyLabel])
 	if err != nil {
 		logrus.WithError(err).Error("policy reconcile")
 		return false
 	}
 	switch rp.Name() {
-	case "", "always":
+	case "always", "unless-stopped":
 		return true
 	case "on-failure":
 		restartCount, err := strconv.Atoi(labels[CountLabel])
@@ -137,11 +141,6 @@ func Reconcile(status containerd.Status, labels map[string]string) bool {
 			return false
 		}
 		if status.ExitStatus != 0 && (rp.maximumRetryCount == 0 || restartCount < rp.maximumRetryCount) {
-			return true
-		}
-	case "unless-stopped":
-		explicitlyStopped, _ := strconv.ParseBool(labels[ExplicitlyStoppedLabel])
-		if !explicitlyStopped {
 			return true
 		}
 	}
