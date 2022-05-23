@@ -5830,3 +5830,251 @@ file {
   }
   syntax: "proto3"
 }
+file {
+  name: "github.com/containerd/containerd/api/types/transfer/imagestore.proto"
+  package: "containerd.v1.types"
+  message_type {
+    name: "ImageStoreDestination"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "labels"
+      number: 2
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.v1.types.ImageStoreDestination.LabelsEntry"
+      json_name: "labels"
+    }
+    field {
+      name: "platforms"
+      number: 3
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "platforms"
+    }
+    field {
+      name: "all_metadata"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "allMetadata"
+    }
+    field {
+      name: "manifest_limit"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "manifestLimit"
+    }
+    field {
+      name: "unpack_platforms"
+      number: 6
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "unpackPlatforms"
+    }
+    nested_type {
+      name: "LabelsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/types/transfer"
+  }
+  syntax: "proto3"
+}
+file {
+  name: "github.com/containerd/containerd/api/types/transfer/registry.proto"
+  package: "containerd.v1.types"
+  dependency: "google/protobuf/timestamp.proto"
+  message_type {
+    name: "OCIRegistry"
+    field {
+      name: "reference"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "reference"
+    }
+    field {
+      name: "resolver"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.v1.types.RegistryResolver"
+      json_name: "resolver"
+    }
+  }
+  message_type {
+    name: "RegistryResolver"
+    field {
+      name: "auth_stream"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "authStream"
+    }
+    field {
+      name: "headers"
+      number: 2
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.v1.types.RegistryResolver.HeadersEntry"
+      json_name: "headers"
+    }
+    nested_type {
+      name: "HeadersEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
+  }
+  message_type {
+    name: "AuthRequest"
+    field {
+      name: "host"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "host"
+    }
+    field {
+      name: "wwwauthenticate"
+      number: 2
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "wwwauthenticate"
+    }
+  }
+  message_type {
+    name: "AuthResponse"
+    field {
+      name: "authType"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_ENUM
+      type_name: ".containerd.v1.types.AuthType"
+      json_name: "authType"
+    }
+    field {
+      name: "secret"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "secret"
+    }
+    field {
+      name: "username"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "username"
+    }
+    field {
+      name: "expire_at"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      json_name: "expireAt"
+    }
+  }
+  enum_type {
+    name: "AuthType"
+    value {
+      name: "NONE"
+      number: 0
+    }
+    value {
+      name: "CREDENTIALS"
+      number: 1
+    }
+    value {
+      name: "REFRESH"
+      number: 2
+    }
+    value {
+      name: "HEADER"
+      number: 3
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/types/transfer"
+  }
+  syntax: "proto3"
+}
+file {
+  name: "github.com/containerd/containerd/api/types/transfer/streaming.proto"
+  package: "containerd.v1.types"
+  dependency: "google/protobuf/timestamp.proto"
+  message_type {
+    name: "Progress"
+    field {
+      name: "reference"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "reference"
+    }
+    field {
+      name: "status"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "status"
+    }
+    field {
+      name: "offset"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_INT64
+      json_name: "offset"
+    }
+    field {
+      name: "total"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_INT64
+      json_name: "total"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/types/transfer"
+  }
+  syntax: "proto3"
+}
