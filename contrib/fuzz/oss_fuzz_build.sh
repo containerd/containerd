@@ -13,11 +13,24 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
-
 set -o nounset
 set -o pipefail
 set -o errexit
 set -x
+
+apt-get update && apt-get install -y wget
+cd $SRC
+wget https://go.dev/dl/go1.18.2.linux-amd64.tar.gz
+
+mkdir temp-go
+rm -rf /root/.go/*
+tar -C temp-go/ -xzf go1.18.2.linux-amd64.tar.gz
+mv temp-go/go/* /root/.go/
+cd $SRC/containerd
+
+go mod tidy
+rm vendor/github.com/cilium/ebpf/internal/btf/fuzz.go
+rm /root/go/pkg/mod/github.com/cilium/ebpf@v0.7.0/internal/btf/fuzz.go
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 cd ../../
@@ -25,6 +38,8 @@ cd ../../
 # Move all fuzzers that don't have the "fuzz" package out of this dir
 mv contrib/fuzz/docker_fuzzer.go remotes/docker/
 mv contrib/fuzz/container_fuzzer.go integration/client/
+
+rm -r vendor
 
 
 # Change path of socket since OSS-fuzz does not grant access to /run
@@ -51,9 +66,12 @@ compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzContainerdIm
 mv $SRC/cmd-containerd-backup $SRC/containerd/cmd/containerd
 
 # Compile more fuzzers
+mv $SRC/containerd/filters/filter_test.go $SRC/containerd/filters/filter_test_fuzz.go
+go get github.com/AdamKorcz/go-118-fuzz-build/utils
+compile_native_go_fuzzer github.com/containerd/containerd/filters FuzzFiltersParse fuzz_filters_parse
+
 compile_go_fuzzer github.com/containerd/containerd/remotes/docker FuzzFetcher fuzz_fetcher
 compile_go_fuzzer github.com/containerd/containerd/remotes/docker FuzzParseDockerRef fuzz_parse_docker_ref
-compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzFiltersParse fuzz_filters_parse
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzPlatformsParse fuzz_platforms_parse
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzApply fuzz_apply
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzImportIndex fuzz_import_index
