@@ -76,6 +76,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.EventPlugin,
 			plugin.MetadataPlugin,
+			plugin.TaskMonitorPlugin,
 		},
 		Config: &Config{
 			Shim:    defaultShim,
@@ -120,12 +121,18 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		return nil, err
 	}
 
+	taskMonitor, err := ic.Get(plugin.TaskMonitorPlugin)
+	if err != nil {
+		return nil, err
+	}
+
 	cfg := ic.Config.(*Config)
 	r := &Runtime{
 		root:       ic.Root,
 		state:      ic.State,
 		tasks:      runtime.NewTaskList(),
 		containers: metadata.NewContainerStore(m.(*metadata.DB)),
+		monitor:    taskMonitor.(runtime.TaskMonitor),
 		address:    ic.Address,
 		events:     ep.(*exchange.Exchange),
 		config:     cfg,
@@ -151,6 +158,7 @@ type Runtime struct {
 	tasks      *runtime.TaskList
 	containers containers.Store
 	events     *exchange.Exchange
+	monitor    runtime.TaskMonitor
 
 	config *Config
 }
@@ -202,7 +210,11 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 		exitHandler := func() {
 			log.G(ctx).WithField("id", id).Info("shim reaped")
 
-			if _, err := r.tasks.Get(ctx, id); err != nil {
+			if task, err := r.tasks.Get(ctx, id); err == nil {
+				if err := r.monitor.Stop(task); err != nil {
+					log.G(ctx).Errorf("Failed to remove task %q from monitor list", id)
+				}
+			} else {
 				// Task was never started or was already successfully deleted
 				return
 			}
