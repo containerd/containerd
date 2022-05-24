@@ -160,10 +160,6 @@ func (o *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 		return snapshots.Info{}, err
 	}
 
-	if err := t.Commit(); err != nil {
-		return snapshots.Info{}, err
-	}
-
 	if o.upperdirLabel {
 		id, _, _, err := storage.GetInfo(ctx, info.Name)
 		if err != nil {
@@ -173,6 +169,10 @@ func (o *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 			info.Labels = make(map[string]string)
 		}
 		info.Labels[upperdirKey] = o.upperPath(id)
+	}
+
+	if err := t.Commit(); err != nil {
+		return snapshots.Info{}, err
 	}
 
 	return info, nil
