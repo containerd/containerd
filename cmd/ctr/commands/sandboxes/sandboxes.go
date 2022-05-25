@@ -17,6 +17,7 @@
 package sandboxes
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -54,10 +55,23 @@ var runCommand = cli.Command{
 		},
 	},
 	Action: func(context *cli.Context) error {
+		if context.NArg() != 2 {
+			return cli.ShowSubcommandHelp(context)
+		}
 		var (
-			id      = context.Args().Get(0)
+			id      = context.Args().Get(1)
 			runtime = context.String("runtime")
 		)
+
+		spec, err := os.ReadFile(context.Args().First())
+		if err != nil {
+			return fmt.Errorf("Failed to read sandbox config: %w", err)
+		}
+
+		ociSpec := oci.Spec{}
+		if err = json.Unmarshal(spec, &ociSpec); err != nil {
+			return fmt.Errorf("Failed to parse sandbox config: %w", err)
+		}
 
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -67,7 +81,7 @@ var runCommand = cli.Command{
 
 		sandbox, err := client.NewSandbox(ctx, id,
 			containerd.WithSandboxRuntime(runtime, nil),
-			containerd.WithSandboxSpec(&oci.Spec{}),
+			containerd.WithSandboxSpec(&ociSpec),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create new sandbox: %w", err)
