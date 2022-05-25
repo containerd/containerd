@@ -36,6 +36,7 @@ import (
 
 	"github.com/containerd/imgcrypt"
 	"github.com/containerd/imgcrypt/images/encryption"
+	"github.com/containerd/ttrpc"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -45,6 +46,8 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
+	"github.com/containerd/containerd/pkg/cri/server/imageverifier/v1"
+	"github.com/containerd/containerd/pkg/dialer"
 	snpkg "github.com/containerd/containerd/pkg/snapshotters"
 	distribution "github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/remotes/docker"
@@ -145,6 +148,18 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	)
 
 	defer pcancel()
+
+	if vAddr := c.config.ImageVerification.Address; vAddr != "" {
+		vctx, vcancel := context.WithTimeout(pctx, 1*time.Second)
+		defer vcancel()
+		conn, err := dialer.ContextDialer(vctx, "unix://"+vAddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect to image verification plugin: %w", err)
+		}
+		client := imageverifier.NewImageVerifierClient(ttrpc.NewClient(conn))
+		resolver = NewVerifyingResolver(resolver, client)
+	}
+
 	snapshotter, err := c.snapshotterFromPodSandboxConfig(ctx, ref, r.SandboxConfig)
 	if err != nil {
 		return nil, err

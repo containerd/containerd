@@ -429,6 +429,16 @@ version = 2
     # * Containerd imgcrypt: https://github.com/containerd/imgcrypt
     key_model = "node"
 
+  # 'plugins."io.containerd.grpc.v1.cri".image_verification' contains config related
+  # to handling runtime verification of container images.
+  [plugins."io.containerd.grpc.v1.cri".image_verification]
+    # address specifies address of the TTRPC plugin handing image verification
+    # requests.
+    #
+    # Omission of this field defaults to the empty string "", which disables
+    # image verification.
+    address = ""
+
   # 'plugins."io.containerd.grpc.v1.cri".registry' contains config related to
   # the registry
   [plugins."io.containerd.grpc.v1.cri".registry]

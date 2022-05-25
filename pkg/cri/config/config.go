@@ -243,6 +243,17 @@ type ImageDecryption struct {
 	KeyModel string `toml:"key_model" json:"keyModel"`
 }
 
+// ImageVerification contains configuration related to runtime verification of
+// container images.
+type ImageVerification struct {
+	// Address specifies address of the TTRPC plugin handing image verification
+	// requests.
+	//
+	// Details of field usage can be found in:
+	// https://github.com/containerd/containerd/tree/main/docs/cri/config.md
+	Address string `toml:"address" json:"address"`
+}
+
 // PluginConfig contains toml config related to CRI plugin,
 // it is a subset of Config.
 type PluginConfig struct {
@@ -254,6 +265,8 @@ type PluginConfig struct {
 	Registry Registry `toml:"registry" json:"registry"`
 	// ImageDecryption contains config related to handling decryption of encrypted container images
 	ImageDecryption `toml:"image_decryption" json:"imageDecryption"`
+	// ImageVerification contains config related to runtime verification of container images
+	ImageVerification `toml:"image_verification" json:"imageVerification"`
 	// DisableTCPService disables serving CRI on the TCP server.
 	DisableTCPService bool `toml:"disable_tcp_service" json:"disableTCPService"`
 	// StreamServerAddress is the ip address streaming server is listening on.
