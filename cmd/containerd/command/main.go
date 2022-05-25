@@ -248,6 +248,11 @@ can be used and modified as necessary as a custom configuration.`
 				return fmt.Errorf("failed to get listener for metrics endpoint: %w", err)
 			}
 			serve(ctx, l, server.ServeMetrics)
+		} else {
+			log.G(ctx).Infof("Metrics endpoint does not listen by default,and the metrics address needs to be specified in the Containerd configuration file to enable it")
+		}
+		if !config.Metrics.GRPCHistogram {
+			log.G(ctx).Infof("gRPC histogram metrics are disabled by default. To turn it on,set grpc_histogram to be true and specify the metrics address in the Containerd configuration file")
 		}
 		// setup the ttrpc endpoint
 		tl, err := sys.GetLocalListener(config.TTRPC.Address, config.TTRPC.UID, config.TTRPC.GID)

@@ -130,17 +130,17 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		diff.RegisterProcessor(diff.BinaryHandler(id, p.Returns, p.Accepts, p.Path, p.Args, p.Env))
 	}
 
-	serverOpts := []grpc.ServerOption{
-		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
+	var serverOpts []grpc.ServerOption
+	if config.Metrics.Address != "" {
+		serverOpts = append(serverOpts, grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
 			otelgrpc.StreamServerInterceptor(),
 			grpc.StreamServerInterceptor(grpc_prometheus.StreamServerInterceptor),
 			streamNamespaceInterceptor,
-		)),
-		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
+		)), grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
 			otelgrpc.UnaryServerInterceptor(),
 			grpc.UnaryServerInterceptor(grpc_prometheus.UnaryServerInterceptor),
 			unaryNamespaceInterceptor,
-		)),
+		)))
 	}
 	if config.GRPC.MaxRecvMsgSize > 0 {
 		serverOpts = append(serverOpts, grpc.MaxRecvMsgSize(config.GRPC.MaxRecvMsgSize))
@@ -310,14 +310,17 @@ type Server struct {
 
 // ServeGRPC provides the containerd grpc APIs on the provided listener
 func (s *Server) ServeGRPC(l net.Listener) error {
-	if s.config.Metrics.GRPCHistogram {
-		// enable grpc time histograms to measure rpc latencies
-		grpc_prometheus.EnableHandlingTimeHistogram()
+	if s.config.Metrics.Address != "" {
+		if s.config.Metrics.GRPCHistogram {
+			// enable grpc time histograms to measure rpc latencies
+			grpc_prometheus.EnableHandlingTimeHistogram()
+		}
+
+		// before we start serving the grpc API register the grpc_prometheus metrics
+		// handler.  This needs to be the last service registered so that it can collect
+		// metrics for every other service
+		grpc_prometheus.Register(s.grpcServer)
 	}
-	// before we start serving the grpc API register the grpc_prometheus metrics
-	// handler.  This needs to be the last service registered so that it can collect
-	// metrics for every other service
-	grpc_prometheus.Register(s.grpcServer)
 	return trapClosedConnErr(s.grpcServer.Serve(l))
 }
 
@@ -335,7 +338,9 @@ func (s *Server) ServeMetrics(l net.Listener) error {
 
 // ServeTCP allows services to serve over tcp
 func (s *Server) ServeTCP(l net.Listener) error {
-	grpc_prometheus.Register(s.tcpServer)
+	if s.config.Metrics.Address != "" {
+		grpc_prometheus.Register(s.tcpServer)
+	}
 	return trapClosedConnErr(s.tcpServer.Serve(l))
 }
 
