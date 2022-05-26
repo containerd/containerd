@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/store"
 	"github.com/containerd/containerd/pkg/cri/store/label"
 	"github.com/containerd/containerd/pkg/cri/store/stats"
-	"github.com/containerd/containerd/pkg/cri/store/truncindex"
+	"github.com/containerd/containerd/pkg/truncindex"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
