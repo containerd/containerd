@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/pkg/cri/util"
+	"github.com/containerd/containerd/reference"
 
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/go-digest/digestset"
@@ -205,7 +206,7 @@ func (s *store) add(img Image) error {
 		return nil
 	}
 	// Or else, merge and sort the references.
-	i.References = sortReferences(util.MergeStringSlices(i.References, img.References))
+	i.References = reference.Sort(util.MergeStringSlices(i.References, img.References))
 	s.images[img.ID] = i
 	return nil
 }

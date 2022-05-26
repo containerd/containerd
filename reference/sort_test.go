@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package image
+package reference
 
 import (
 	"io"
@@ -68,7 +68,7 @@ func TestReferenceSorting(t *testing.T) {
 			expected: []string{r2("name-1", "tag"), r2("name-2", "tag"), r2("name-3", "tag")},
 		},
 	} {
-		sorted := sortReferences(tc.unsorted)
+		sorted := Sort(tc.unsorted)
 		if len(sorted) != len(tc.expected) {
 			t.Errorf("[%d]: Mismatched sized, got %d, expected %d", i, len(sorted), len(tc.expected))
 			continue

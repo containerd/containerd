@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package image
+package reference
 
 import (
 	"sort"
@@ -22,8 +22,8 @@ import (
 	"github.com/containerd/containerd/reference/docker"
 )
 
-// sortReferences sorts references by refRank then string comparison
-func sortReferences(references []string) []string {
+// Sort sorts references by refRank then string comparison
+func Sort(references []string) []string {
 	var prefs []docker.Reference
 	var bad []string
 
