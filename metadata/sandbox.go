@@ -18,6 +18,7 @@ package metadata
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -29,7 +30,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	api "github.com/containerd/containerd/sandbox"
 	"github.com/containerd/typeurl"
-	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
 )
 
@@ -55,7 +55,7 @@ func (s *sandboxStore) Create(ctx context.Context, sandbox api.Sandbox) (api.San
 	sandbox.UpdatedAt = sandbox.CreatedAt
 
 	if err := s.validate(&sandbox); err != nil {
-		return api.Sandbox{}, errors.Wrap(err, "failed to validate sandbox")
+		return api.Sandbox{}, fmt.Errorf("failed to validate sandbox: %w", err)
 	}
 
 	if err := s.db.Update(func(tx *bbolt.Tx) error {
@@ -87,7 +87,7 @@ func (s *sandboxStore) Update(ctx context.Context, sandbox api.Sandbox, fieldpat
 	if err := update(ctx, s.db, func(tx *bbolt.Tx) error {
 		parent := getSandboxBucket(tx, ns)
 		if parent == nil {
-			return errors.Wrap(errdefs.ErrNotFound, "no sandbox buckets")
+			return fmt.Errorf("no sandbox buckets: %w", errdefs.ErrNotFound)
 		}
 
 		updated, err := s.read(parent, []byte(sandbox.ID))
@@ -99,7 +99,7 @@ func (s *sandboxStore) Update(ctx context.Context, sandbox api.Sandbox, fieldpat
 			fieldpaths = []string{"labels", "extensions", "spec", "runtime"}
 
 			if updated.Runtime.Name != sandbox.Runtime.Name {
-				return errors.Wrapf(errdefs.ErrInvalidArgument, "sandbox.Runtime.Name field is immutable")
+				return fmt.Errorf("sandbox.Runtime.Name field is immutable: %w", errdefs.ErrInvalidArgument)
 			}
 		}
 
@@ -132,7 +132,7 @@ func (s *sandboxStore) Update(ctx context.Context, sandbox api.Sandbox, fieldpat
 			case "spec":
 				updated.Spec = sandbox.Spec
 			default:
-				return errors.Wrapf(errdefs.ErrInvalidArgument, "cannot update %q field on sandbox %q", path, sandbox.ID)
+				return fmt.Errorf("cannot update %q field on sandbox %q: %w", path, sandbox.ID, errdefs.ErrInvalidArgument)
 			}
 		}
 
@@ -166,7 +166,7 @@ func (s *sandboxStore) Get(ctx context.Context, id string) (api.Sandbox, error) 
 	if err := view(ctx, s.db, func(tx *bbolt.Tx) error {
 		bucket := getSandboxBucket(tx, ns)
 		if bucket == nil {
-			return errors.Wrap(errdefs.ErrNotFound, "no sandbox buckets")
+			return fmt.Errorf("no sandbox buckets: %w", errdefs.ErrNotFound)
 		}
 
 		out, err := s.read(bucket, []byte(id))
@@ -192,7 +192,7 @@ func (s *sandboxStore) List(ctx context.Context, fields ...string) ([]api.Sandbo
 
 	filter, err := filters.ParseAll(fields...)
 	if err != nil {
-		return nil, errors.Wrap(errdefs.ErrInvalidArgument, err.Error())
+		return nil, fmt.Errorf("%s: %w", err.Error(), errdefs.ErrInvalidArgument)
 	}
 
 	var (
@@ -209,7 +209,7 @@ func (s *sandboxStore) List(ctx context.Context, fields ...string) ([]api.Sandbo
 		if err := bucket.ForEach(func(k, v []byte) error {
 			info, err := s.read(bucket, k)
 			if err != nil {
-				return errors.Wrapf(err, "failed to read bucket %q", string(k))
+				return fmt.Errorf("failed to read bucket %q: %w", string(k), err)
 			}
 
 			if filter.Match(adaptSandbox(&info)) {
@@ -239,11 +239,11 @@ func (s *sandboxStore) Delete(ctx context.Context, id string) error {
 	if err := update(ctx, s.db, func(tx *bbolt.Tx) error {
 		buckets := getSandboxBucket(tx, ns)
 		if buckets == nil {
-			return errors.Wrap(errdefs.ErrNotFound, "no sandbox buckets")
+			return fmt.Errorf("no sandbox buckets: %w", errdefs.ErrNotFound)
 		}
 
 		if err := buckets.DeleteBucket([]byte(id)); err != nil {
-			return errors.Wrapf(err, "failed to delete sandbox %q", id)
+			return fmt.Errorf("failed to delete sandbox %q: %w", id, err)
 		}
 
 		return nil
@@ -269,7 +269,7 @@ func (s *sandboxStore) write(parent *bbolt.Bucket, instance *api.Sandbox, overwr
 	} else {
 		bucket = parent.Bucket(id)
 		if bucket != nil {
-			return errors.Wrapf(errdefs.ErrAlreadyExists, "sandbox bucket %q already exists", instance.ID)
+			return fmt.Errorf("sandbox bucket %q already exists: %w", instance.ID, errdefs.ErrAlreadyExists)
 		}
 
 		bucket, err = parent.CreateBucket(id)
@@ -318,7 +318,7 @@ func (s *sandboxStore) read(parent *bbolt.Bucket, id []byte) (api.Sandbox, error
 
 	bucket := parent.Bucket(id)
 	if bucket == nil {
-		return api.Sandbox{}, errors.Wrapf(errdefs.ErrNotFound, "bucket %q not found", id)
+		return api.Sandbox{}, fmt.Errorf("bucket %q not found: %w", id, errdefs.ErrNotFound)
 	}
 
 	inst.ID = string(id)
@@ -358,19 +358,19 @@ func (s *sandboxStore) read(parent *bbolt.Bucket, id []byte) (api.Sandbox, error
 
 func (s *sandboxStore) validate(new *api.Sandbox) error {
 	if err := identifiers.Validate(new.ID); err != nil {
-		return errors.Wrap(err, "invalid sandbox ID")
+		return fmt.Errorf("invalid sandbox ID: %w", err)
 	}
 
 	if new.CreatedAt.IsZero() {
-		return errors.Wrap(errdefs.ErrInvalidArgument, "creation date must not be zero")
+		return fmt.Errorf("creation date must not be zero: %w", errdefs.ErrInvalidArgument)
 	}
 
 	if new.UpdatedAt.IsZero() {
-		return errors.Wrap(errdefs.ErrInvalidArgument, "updated date must not be zero")
+		return fmt.Errorf("updated date must not be zero: %w", errdefs.ErrInvalidArgument)
 	}
 
 	if new.Runtime.Name == "" {
-		return errors.Wrapf(errdefs.ErrInvalidArgument, "sandbox.Runtime.Name must be set")
+		return fmt.Errorf("sandbox.Runtime.Name must be set: %w", errdefs.ErrInvalidArgument)
 	}
 
 	return nil
