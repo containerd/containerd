@@ -36,8 +36,8 @@ const (
 	eol = '\n'
 	// timestampFormat is the timestamp format used in CRI logging format.
 	timestampFormat = time.RFC3339Nano
-	// defaultBufSize is the default size of the read buffer in bytes.
-	defaultBufSize = 4096
+	// minReadBufSize is the minimum size of the read buffer in bytes.
+	minReadBufSize = 4096
 )
 
 // NewDiscardLogger creates logger which discards all the input.
@@ -50,12 +50,12 @@ func NewDiscardLogger() io.WriteCloser {
 // returns a channel which indicates whether the logger is stopped.
 // maxLen is the max length limit of a line. A line longer than the
 // limit will be cut into multiple lines.
-func NewCRILogger(path string, w io.Writer, stream StreamType, maxLen int) (io.WriteCloser, <-chan struct{}) {
+func NewCRILogger(path string, w io.Writer, stream StreamType, maxLen int, readBufSize int) (io.WriteCloser, <-chan struct{}) {
 	logrus.Debugf("Start writing stream %q to log file %q", stream, path)
 	prc, pwc := io.Pipe()
 	stop := make(chan struct{})
 	go func() {
-		redirectLogs(path, prc, w, stream, maxLen)
+		redirectLogs(path, prc, w, stream, maxLen, readBufSize)
 		close(stop)
 	}()
 	return pwc, stop
@@ -111,7 +111,7 @@ func readLine(b *bufio.Reader) (line []byte, isPrefix bool, err error) {
 	return
 }
 
-func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxLen int) {
+func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxLen int, readBufSize int) {
 	defer rc.Close()
 	var (
 		stream    = []byte(s)
@@ -120,11 +120,19 @@ func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxL
 		full      = []byte(runtime.LogTagFull)
 		buf       [][]byte
 		length    int
-		bufSize   = defaultBufSize
+		bufSize   = minReadBufSize
 
 		timeBuffer = make([]byte, len(timestampFormat))
 		lineBuffer = bytes.Buffer{}
 	)
+
+	// readBufBytes should be equal to or greater than minReadBufSize
+	if readBufSize > bufSize {
+		bufSize = readBufSize
+	} else {
+		logrus.Debugf("Read buffer size not specified or less than %d bytes, set to min by default", minReadBufSize)
+	}
+
 	// Make sure bufSize <= maxLen
 	if maxLen > 0 && maxLen < bufSize {
 		bufSize = maxLen

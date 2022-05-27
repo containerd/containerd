@@ -226,10 +226,12 @@ func (c *criService) createContainerLoggers(logPath string, tty bool) (stdout io
 		}()
 		var stdoutCh, stderrCh <-chan struct{}
 		wc := cioutil.NewSerialWriteCloser(f)
-		stdout, stdoutCh = cio.NewCRILogger(logPath, wc, cio.Stdout, c.config.MaxContainerLogLineSize)
+		maxLen := c.config.MaxContainerLogLineSize
+		bufSize := c.config.LogReadBufBytes
+		stdout, stdoutCh = cio.NewCRILogger(logPath, wc, cio.Stdout, maxLen, bufSize)
 		// Only redirect stderr when there is no tty.
 		if !tty {
-			stderr, stderrCh = cio.NewCRILogger(logPath, wc, cio.Stderr, c.config.MaxContainerLogLineSize)
+			stderr, stderrCh = cio.NewCRILogger(logPath, wc, cio.Stderr, maxLen, bufSize)
 		}
 		go func() {
 			if stdoutCh != nil {

@@ -263,6 +263,8 @@ type PluginConfig struct {
 	// Log line longer than the limit will be split into multiple lines. Non-positive
 	// value means no limit.
 	MaxContainerLogLineSize int `toml:"max_container_log_line_size" json:"maxContainerLogSize"`
+	// LogReadBufBytes is the size of the read buffer in bytes.
+	LogReadBufBytes int `toml:"log_read_buf_bytes" json:"logReadBufBytes"`
 	// DisableCgroup indicates to disable the cgroup support.
 	// This is useful when the containerd does not have permission to access cgroup.
 	DisableCgroup bool `toml:"disable_cgroup" json:"disableCgroup"`
