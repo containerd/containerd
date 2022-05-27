@@ -50,7 +50,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.1
 	github.com/tchap/go-patricia/v2 v2.3.1
-	github.com/urfave/cli v1.22.2
+	github.com/urfave/cli v1.22.9
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
 	go.etcd.io/bbolt v1.3.6
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.32.0
@@ -135,7 +135,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
-
-// When updating replace rules, make sure to also update the rules in integration/client/go.mod and api/go.mod
-// urfave/cli must be <= v1.22.1 due to a regression: https://github.com/urfave/cli/issues/1092
-replace github.com/urfave/cli => github.com/urfave/cli v1.22.1

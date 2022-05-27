@@ -379,7 +379,7 @@ github.com/syndtr/gocapability/capability
 # github.com/tchap/go-patricia/v2 v2.3.1
 ## explicit; go 1.16
 github.com/tchap/go-patricia/v2/patricia
-# github.com/urfave/cli v1.22.2 => github.com/urfave/cli v1.22.1
+# github.com/urfave/cli v1.22.9
 ## explicit; go 1.11
 github.com/urfave/cli
 # github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
@@ -758,4 +758,3 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
-# github.com/urfave/cli => github.com/urfave/cli v1.22.1

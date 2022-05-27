@@ -65,17 +65,9 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-replace (
-	// use the containerd module from this repository instead of downloading
-	//
-	// IMPORTANT: this replace rule ONLY replaces containerd itself; dependencies
-	// in the "require" section above are still taken into account for version
-	// resolution if newer.
-	github.com/containerd/containerd => ../../
-
-	// Replace rules below must be kept in sync with the main go.mod file at the
-	// root, because that's the actual version expected by the "containerd/containerd"
-	// dependency above.
-	// urfave/cli must be <= v1.22.1 due to a regression: https://github.com/urfave/cli/issues/1092
-	github.com/urfave/cli => github.com/urfave/cli v1.22.1
-)
+// use the containerd module from this repository instead of downloading
+//
+// IMPORTANT: this replace rule ONLY replaces containerd itself; dependencies
+// in the "require" section above are still taken into account for version
+// resolution if newer.
+replace github.com/containerd/containerd => ../../
