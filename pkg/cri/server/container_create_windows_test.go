@@ -83,6 +83,7 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 			Namespace: "test-sandbox-ns",
 			Attempt:   2,
 		},
+		Windows:     &runtime.WindowsPodSandboxConfig{},
 		Hostname:    "test-hostname",
 		Annotations: map[string]string{"c": "d"},
 	}
@@ -194,4 +195,53 @@ func TestMountNamedPipe(t *testing.T) {
 	assert.NotNil(t, spec)
 	specCheck(t, testID, testSandboxID, testPid, spec)
 	checkMount(t, spec.Mounts, `\\.\pipe\foo`, `\\.\pipe\foo`, "", []string{"rw"}, nil)
+}
+
+func TestHostProcessRequirements(t *testing.T) {
+	testID := "test-id"
+	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
+	testPid := uint32(1234)
+	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+	ociRuntime := config.Runtime{}
+	c := newTestCRIService()
+	for desc, test := range map[string]struct {
+		containerHostProcess bool
+		sandboxHostProcess   bool
+		expectError          bool
+	}{
+		"hostprocess container in non-hostprocess sandbox should fail": {
+			containerHostProcess: true,
+			sandboxHostProcess:   false,
+			expectError:          true,
+		},
+		"hostprocess container in hostprocess sandbox should be fine": {
+			containerHostProcess: true,
+			sandboxHostProcess:   true,
+			expectError:          false,
+		},
+		"non-hostprocess container in hostprocess sandbox should fail": {
+			containerHostProcess: false,
+			sandboxHostProcess:   true,
+			expectError:          true,
+		},
+		"non-hostprocess container in non-hostprocess sandbox should be fine": {
+			containerHostProcess: false,
+			sandboxHostProcess:   false,
+			expectError:          false,
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			containerConfig.Windows.SecurityContext.HostProcess = test.containerHostProcess
+			sandboxConfig.Windows.SecurityContext = &runtime.WindowsSandboxSecurityContext{
+				HostProcess: test.sandboxHostProcess,
+			}
+			_, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+			if test.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }

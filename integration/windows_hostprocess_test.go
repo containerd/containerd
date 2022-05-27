@@ -32,6 +32,7 @@ var (
 	defaultCommand       = WithCommand("Powershell", "/c", "$env:CONTAINER_SANDBOX_MOUNT_POINT/pause.exe")
 	localServiceUsername = WithWindowsUsername("NT AUTHORITY\\Local service")
 	localSystemUsername  = WithWindowsUsername("NT AUTHORITY\\System")
+	hpcContainerOpt      = WithWindowsHostProcessContainer()
 )
 
 // Tests to verify the Windows HostProcess
@@ -39,34 +40,34 @@ func TestWindowsHostProcess(t *testing.T) {
 	EnsureImageExists(t, pauseImage)
 
 	t.Run("run as Local Service", func(t *testing.T) {
-		runHostProcess(t, false, pauseImage, localServiceUsername, defaultCommand)
+		runHostProcess(t, false, pauseImage, hpcContainerOpt, localServiceUsername, defaultCommand)
 	})
 	t.Run("run as Local System", func(t *testing.T) {
-		runHostProcess(t, false, pauseImage, localSystemUsername, defaultCommand)
+		runHostProcess(t, false, pauseImage, hpcContainerOpt, localSystemUsername, defaultCommand)
 	})
 	t.Run("run as unacceptable user", func(t *testing.T) {
-		runHostProcess(t, true, pauseImage, WithWindowsUsername("Guest"), defaultCommand)
+		runHostProcess(t, true, pauseImage, hpcContainerOpt, WithWindowsUsername("Guest"), defaultCommand)
 	})
 	t.Run("run command on host", func(t *testing.T) {
 		cmd := WithCommand("Powershell", "/c", "Get-Command containerd.exe")
-		runHostProcess(t, false, pauseImage, localServiceUsername, cmd)
+		runHostProcess(t, false, pauseImage, hpcContainerOpt, localServiceUsername, cmd)
 	})
 	t.Run("run withHostNetwork", func(t *testing.T) {
 		hostname, err := os.Hostname()
 		require.NoError(t, err)
 		cmd := WithCommand("Powershell", "/c", fmt.Sprintf("if ($env:COMPUTERNAME -ne %s) { exit -1 }", hostname))
-		runHostProcess(t, false, pauseImage, localServiceUsername, cmd)
+		runHostProcess(t, false, pauseImage, hpcContainerOpt, localServiceUsername, cmd)
 	})
 	t.Run("run with a different os.version image", func(t *testing.T) {
 		image := "docker.io/e2eteam/busybox:1.29-windows-amd64-1909"
 		EnsureImageExists(t, image)
-		runHostProcess(t, false, image, localServiceUsername, defaultCommand)
+		runHostProcess(t, false, image, hpcContainerOpt, localServiceUsername, defaultCommand)
 	})
 }
 
 func runHostProcess(t *testing.T, expectErr bool, image string, opts ...ContainerOpts) {
 	t.Logf("Create a pod config and run sandbox container")
-	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "hostprocess", WithWindowsHostProcess)
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "hostprocess", WithWindowsHostProcessPod)
 
 	t.Logf("Create a container config and run container in a pod")
 	containerConfig := ContainerConfig(
