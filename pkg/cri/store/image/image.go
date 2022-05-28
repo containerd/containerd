@@ -136,7 +136,7 @@ func getImage(ctx context.Context, i containerd.Image) (*Image, error) {
 
 	spec, err := i.Spec(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read get image spec: %w", err)
+		return nil, fmt.Errorf("failed to get OCI image spec: %w", err)
 	}
 
 	return &Image{
