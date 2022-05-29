@@ -168,7 +168,6 @@ func TestContainerMetricsCPU(t *testing.T) {
 		expectedFirst  *runtime.CpuUsage
 		expectedSecond *runtime.CpuUsage
 	}{
-
 		"v1 metrics": {
 			firstMetrics: &v1.Metrics{
 				CPU: &v1.CPUStat{

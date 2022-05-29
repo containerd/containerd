@@ -75,10 +75,11 @@ func TestGetUserFromImage(t *testing.T) {
 			name: "test",
 		},
 	} {
-		t.Logf("TestCase - %q", c)
-		actualUID, actualName := getUserFromImage(test.user)
-		assert.Equal(t, test.uid, actualUID)
-		assert.Equal(t, test.name, actualName)
+		t.Run(c, func(t *testing.T) {
+			actualUID, actualName := getUserFromImage(test.user)
+			assert.Equal(t, test.uid, actualUID)
+			assert.Equal(t, test.name, actualName)
+		})
 	}
 }
 
@@ -112,12 +113,13 @@ func TestGetRepoDigestAndTag(t *testing.T) {
 			expectedRepoTag:    "",
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		named, err := docker.ParseDockerRef(test.ref)
-		assert.NoError(t, err)
-		repoDigest, repoTag := getRepoDigestAndTag(named, digest, test.schema1)
-		assert.Equal(t, test.expectedRepoDigest, repoDigest)
-		assert.Equal(t, test.expectedRepoTag, repoTag)
+		t.Run(desc, func(t *testing.T) {
+			named, err := docker.ParseDockerRef(test.ref)
+			assert.NoError(t, err)
+			repoDigest, repoTag := getRepoDigestAndTag(named, digest, test.schema1)
+			assert.Equal(t, test.expectedRepoDigest, repoDigest)
+			assert.Equal(t, test.expectedRepoTag, repoTag)
+		})
 	}
 }
 
@@ -364,17 +366,18 @@ func TestEnvDeduplication(t *testing.T) {
 			},
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		var spec runtimespec.Spec
-		if len(test.existing) > 0 {
-			spec.Process = &runtimespec.Process{
-				Env: test.existing,
+		t.Run(desc, func(t *testing.T) {
+			var spec runtimespec.Spec
+			if len(test.existing) > 0 {
+				spec.Process = &runtimespec.Process{
+					Env: test.existing,
+				}
 			}
-		}
-		for _, kv := range test.kv {
-			oci.WithEnv([]string{kv[0] + "=" + kv[1]})(context.Background(), nil, nil, &spec)
-		}
-		assert.Equal(t, test.expected, spec.Process.Env)
+			for _, kv := range test.kv {
+				oci.WithEnv([]string{kv[0] + "=" + kv[1]})(context.Background(), nil, nil, &spec)
+			}
+			assert.Equal(t, test.expected, spec.Process.Env)
+		})
 	}
 }
 

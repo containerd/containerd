@@ -211,19 +211,20 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 			},
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		config := criconfig.Config{
-			PluginConfig: criconfig.PluginConfig{
-				TolerateMissingHugetlbController: true,
-				DisableHugetlbController:         false,
-			},
-		}
-		got, err := updateOCIResource(context.Background(), test.spec, test.request, config)
-		if test.expectErr {
-			assert.Error(t, err)
-		} else {
-			assert.NoError(t, err)
-		}
-		assert.Equal(t, test.expected, got)
+		t.Run(desc, func(t *testing.T) {
+			config := criconfig.Config{
+				PluginConfig: criconfig.PluginConfig{
+					TolerateMissingHugetlbController: true,
+					DisableHugetlbController:         false,
+				},
+			}
+			got, err := updateOCIResource(context.Background(), test.spec, test.request, config)
+			if test.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, test.expected, got)
+		})
 	}
 }

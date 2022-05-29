@@ -65,8 +65,9 @@ func TestContainerState(t *testing.T) {
 			state: runtime.ContainerState_CONTAINER_EXITED,
 		},
 	} {
-		t.Logf("TestCase %q", c)
-		assertlib.Equal(t, test.state, test.status.State())
+		t.Run(c, func(t *testing.T) {
+			assertlib.Equal(t, test.state, test.status.State())
+		})
 	}
 }
 

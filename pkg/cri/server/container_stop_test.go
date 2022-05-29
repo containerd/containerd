@@ -61,25 +61,27 @@ func TestWaitContainerStop(t *testing.T) {
 			expectErr: false,
 		},
 	} {
-		c := newTestCRIService()
-		container, err := containerstore.NewContainer(
-			containerstore.Metadata{ID: id},
-			containerstore.WithFakeStatus(*test.status),
-		)
-		assert.NoError(t, err)
-		assert.NoError(t, c.containerStore.Add(container))
-		ctx := context.Background()
-		if test.cancel {
-			cancelledCtx, cancel := context.WithCancel(ctx)
-			cancel()
-			ctx = cancelledCtx
-		}
-		if test.timeout > 0 {
-			timeoutCtx, cancel := context.WithTimeout(ctx, test.timeout)
-			defer cancel()
-			ctx = timeoutCtx
-		}
-		err = c.waitContainerStop(ctx, container)
-		assert.Equal(t, test.expectErr, err != nil, desc)
+		t.Run(desc, func(t *testing.T) {
+			c := newTestCRIService()
+			container, err := containerstore.NewContainer(
+				containerstore.Metadata{ID: id},
+				containerstore.WithFakeStatus(*test.status),
+			)
+			assert.NoError(t, err)
+			assert.NoError(t, c.containerStore.Add(container))
+			ctx := context.Background()
+			if test.cancel {
+				cancelledCtx, cancel := context.WithCancel(ctx)
+				cancel()
+				ctx = cancelledCtx
+			}
+			if test.timeout > 0 {
+				timeoutCtx, cancel := context.WithTimeout(ctx, test.timeout)
+				defer cancel()
+				ctx = timeoutCtx
+			}
+			err = c.waitContainerStop(ctx, container)
+			assert.Equal(t, test.expectErr, err != nil, desc)
+		})
 	}
 }

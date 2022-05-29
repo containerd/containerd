@@ -54,9 +54,10 @@ func TestGetCgroupsPath(t *testing.T) {
 			expected:      "/test-id",
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		got := getCgroupsPath(test.cgroupsParent, testID)
-		assert.Equal(t, test.expected, got)
+		t.Run(desc, func(t *testing.T) {
+			got := getCgroupsPath(test.cgroupsParent, testID)
+			assert.Equal(t, test.expected, got)
+		})
 	}
 }
 

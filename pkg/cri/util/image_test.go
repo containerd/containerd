@@ -73,12 +73,13 @@ func TestNormalizeImageRef(t *testing.T) {
 			expect: "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
 		},
 	} {
-		t.Logf("TestCase %q", test.input)
-		normalized, err := NormalizeImageRef(test.input)
-		assert.NoError(t, err)
-		output := normalized.String()
-		assert.Equal(t, test.expect, output)
-		_, err = reference.Parse(output)
-		assert.NoError(t, err, "%q should be containerd supported reference", output)
+		t.Run(test.input, func(t *testing.T) {
+			normalized, err := NormalizeImageRef(test.input)
+			assert.NoError(t, err)
+			output := normalized.String()
+			assert.Equal(t, test.expect, output)
+			_, err = reference.Parse(output)
+			assert.NoError(t, err, "%q should be containerd supported reference", output)
+		})
 	}
 }

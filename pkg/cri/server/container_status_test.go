@@ -127,29 +127,32 @@ func TestToCRIContainerStatus(t *testing.T) {
 			expectedReason: errorExitReason,
 		},
 	} {
-		metadata, status, _, expected := getContainerStatusTestData()
-		// Update status with test case.
-		status.StartedAt = test.startedAt
-		status.FinishedAt = test.finishedAt
-		status.ExitCode = test.exitCode
-		status.Reason = test.reason
-		status.Message = test.message
-		container, err := containerstore.NewContainer(
-			*metadata,
-			containerstore.WithFakeStatus(*status),
-		)
-		assert.NoError(t, err)
-		// Set expectation based on test case.
-		expected.Reason = test.expectedReason
-		expected.StartedAt = test.startedAt
-		expected.FinishedAt = test.finishedAt
-		expected.ExitCode = test.exitCode
-		expected.Message = test.message
-		patchExceptedWithState(expected, test.expectedState)
-		containerStatus := toCRIContainerStatus(container,
-			expected.Image,
-			expected.ImageRef)
-		assert.Equal(t, expected, containerStatus, desc)
+		t.Run(desc, func(t *testing.T) {
+
+			metadata, status, _, expected := getContainerStatusTestData()
+			// Update status with test case.
+			status.StartedAt = test.startedAt
+			status.FinishedAt = test.finishedAt
+			status.ExitCode = test.exitCode
+			status.Reason = test.reason
+			status.Message = test.message
+			container, err := containerstore.NewContainer(
+				*metadata,
+				containerstore.WithFakeStatus(*status),
+			)
+			assert.NoError(t, err)
+			// Set expectation based on test case.
+			expected.Reason = test.expectedReason
+			expected.StartedAt = test.startedAt
+			expected.FinishedAt = test.finishedAt
+			expected.ExitCode = test.exitCode
+			expected.Message = test.message
+			patchExceptedWithState(expected, test.expectedState)
+			containerStatus := toCRIContainerStatus(container,
+				expected.Image,
+				expected.ImageRef)
+			assert.Equal(t, expected, containerStatus, desc)
+		})
 	}
 }
 
@@ -209,37 +212,38 @@ func TestContainerStatus(t *testing.T) {
 			expectErr:  true,
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		c := newTestCRIService()
-		metadata, status, image, expected := getContainerStatusTestData()
-		// Update status with test case.
-		status.StartedAt = test.startedAt
-		status.FinishedAt = test.finishedAt
-		status.Reason = test.reason
-		container, err := containerstore.NewContainer(
-			*metadata,
-			containerstore.WithFakeStatus(*status),
-		)
-		assert.NoError(t, err)
-		if test.exist {
-			assert.NoError(t, c.containerStore.Add(container))
-		}
-		if test.imageExist {
-			c.imageStore, err = imagestore.NewFakeStore([]imagestore.Image{*image})
+		t.Run(desc, func(t *testing.T) {
+			c := newTestCRIService()
+			metadata, status, image, expected := getContainerStatusTestData()
+			// Update status with test case.
+			status.StartedAt = test.startedAt
+			status.FinishedAt = test.finishedAt
+			status.Reason = test.reason
+			container, err := containerstore.NewContainer(
+				*metadata,
+				containerstore.WithFakeStatus(*status),
+			)
 			assert.NoError(t, err)
-		}
-		resp, err := c.ContainerStatus(context.Background(), &runtime.ContainerStatusRequest{ContainerId: container.ID})
-		if test.expectErr {
-			assert.Error(t, err)
-			assert.Nil(t, resp)
-			continue
-		}
-		// Set expectation based on test case.
-		expected.StartedAt = test.startedAt
-		expected.FinishedAt = test.finishedAt
-		expected.Reason = test.reason
-		patchExceptedWithState(expected, test.expectedState)
-		assert.Equal(t, expected, resp.GetStatus())
+			if test.exist {
+				assert.NoError(t, c.containerStore.Add(container))
+			}
+			if test.imageExist {
+				c.imageStore, err = imagestore.NewFakeStore([]imagestore.Image{*image})
+				assert.NoError(t, err)
+			}
+			resp, err := c.ContainerStatus(context.Background(), &runtime.ContainerStatusRequest{ContainerId: container.ID})
+			if test.expectErr {
+				assert.Error(t, err)
+				assert.Nil(t, resp)
+				return
+			}
+			// Set expectation based on test case.
+			expected.StartedAt = test.startedAt
+			expected.FinishedAt = test.finishedAt
+			expected.Reason = test.reason
+			patchExceptedWithState(expected, test.expectedState)
+			assert.Equal(t, expected, resp.GetStatus())
+		})
 	}
 }
 
