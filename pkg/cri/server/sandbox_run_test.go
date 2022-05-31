@@ -92,29 +92,30 @@ func TestSandboxContainerSpec(t *testing.T) {
 			},
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		c := newTestCRIService()
-		config, imageConfig, specCheck := getRunPodSandboxTestData()
-		if test.configChange != nil {
-			test.configChange(config)
-		}
+		t.Run(desc, func(t *testing.T) {
+			c := newTestCRIService()
+			config, imageConfig, specCheck := getRunPodSandboxTestData()
+			if test.configChange != nil {
+				test.configChange(config)
+			}
 
-		if test.imageConfigChange != nil {
-			test.imageConfigChange(imageConfig)
-		}
-		spec, err := c.sandboxContainerSpec(testID, config, imageConfig, nsPath,
-			test.podAnnotations)
-		if test.expectErr {
-			assert.Error(t, err)
-			assert.Nil(t, spec)
-			continue
-		}
-		assert.NoError(t, err)
-		assert.NotNil(t, spec)
-		specCheck(t, testID, spec)
-		if test.specCheck != nil {
-			test.specCheck(t, spec)
-		}
+			if test.imageConfigChange != nil {
+				test.imageConfigChange(imageConfig)
+			}
+			spec, err := c.sandboxContainerSpec(testID, config, imageConfig, nsPath,
+				test.podAnnotations)
+			if test.expectErr {
+				assert.Error(t, err)
+				assert.Nil(t, spec)
+				return
+			}
+			assert.NoError(t, err)
+			assert.NotNil(t, spec)
+			specCheck(t, testID, spec)
+			if test.specCheck != nil {
+				test.specCheck(t, spec)
+			}
+		})
 	}
 }
 
@@ -139,25 +140,26 @@ func TestTypeurlMarshalUnmarshalSandboxMeta(t *testing.T) {
 			},
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		meta := &sandboxstore.Metadata{
-			ID:        "1",
-			Name:      "sandbox_1",
-			NetNSPath: "/home/cloud",
-		}
-		meta.Config, _, _ = getRunPodSandboxTestData()
-		if test.configChange != nil {
-			test.configChange(meta.Config)
-		}
+		t.Run(desc, func(t *testing.T) {
+			meta := &sandboxstore.Metadata{
+				ID:        "1",
+				Name:      "sandbox_1",
+				NetNSPath: "/home/cloud",
+			}
+			meta.Config, _, _ = getRunPodSandboxTestData()
+			if test.configChange != nil {
+				test.configChange(meta.Config)
+			}
 
-		any, err := typeurl.MarshalAny(meta)
-		assert.NoError(t, err)
-		data, err := typeurl.UnmarshalAny(any)
-		assert.NoError(t, err)
-		assert.IsType(t, &sandboxstore.Metadata{}, data)
-		curMeta, ok := data.(*sandboxstore.Metadata)
-		assert.True(t, ok)
-		assert.Equal(t, meta, curMeta)
+			any, err := typeurl.MarshalAny(meta)
+			assert.NoError(t, err)
+			data, err := typeurl.UnmarshalAny(any)
+			assert.NoError(t, err)
+			assert.IsType(t, &sandboxstore.Metadata{}, data)
+			curMeta, ok := data.(*sandboxstore.Metadata)
+			assert.True(t, ok)
+			assert.Equal(t, meta, curMeta)
+		})
 	}
 }
 
@@ -251,8 +253,9 @@ func TestToCNIPortMappings(t *testing.T) {
 			},
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		assert.Equal(t, test.cniPortMappings, toCNIPortMappings(test.criPortMappings))
+		t.Run(desc, func(t *testing.T) {
+			assert.Equal(t, test.cniPortMappings, toCNIPortMappings(test.criPortMappings))
+		})
 	}
 }
 
@@ -297,16 +300,17 @@ func TestSelectPodIP(t *testing.T) {
 			expectedAdditionalIPs: []string{"2001:db8:85a3::8a2e:370:7334", "2001:db8:85a3::8a2e:370:7335", "192.168.17.45"},
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		var ipConfigs []*cni.IPConfig
-		for _, ip := range test.ips {
-			ipConfigs = append(ipConfigs, &cni.IPConfig{
-				IP: net.ParseIP(ip),
-			})
-		}
-		ip, additionalIPs := selectPodIPs(context.Background(), ipConfigs, test.pref)
-		assert.Equal(t, test.expectedIP, ip)
-		assert.Equal(t, test.expectedAdditionalIPs, additionalIPs)
+		t.Run(desc, func(t *testing.T) {
+			var ipConfigs []*cni.IPConfig
+			for _, ip := range test.ips {
+				ipConfigs = append(ipConfigs, &cni.IPConfig{
+					IP: net.ParseIP(ip),
+				})
+			}
+			ip, additionalIPs := selectPodIPs(context.Background(), ipConfigs, test.pref)
+			assert.Equal(t, test.expectedIP, ip)
+			assert.Equal(t, test.expectedAdditionalIPs, additionalIPs)
+		})
 	}
 }
 

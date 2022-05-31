@@ -187,21 +187,22 @@ func TestContainerSpecCommand(t *testing.T) {
 			expectErr: true,
 		},
 	} {
+		t.Run(desc, func(t *testing.T) {
+			config, _, imageConfig, _ := getCreateContainerTestData()
+			config.Command = test.criEntrypoint
+			config.Args = test.criArgs
+			imageConfig.Entrypoint = test.imageEntrypoint
+			imageConfig.Cmd = test.imageArgs
 
-		config, _, imageConfig, _ := getCreateContainerTestData()
-		config.Command = test.criEntrypoint
-		config.Args = test.criArgs
-		imageConfig.Entrypoint = test.imageEntrypoint
-		imageConfig.Cmd = test.imageArgs
-
-		var spec runtimespec.Spec
-		err := opts.WithProcessArgs(config, imageConfig)(context.Background(), nil, nil, &spec)
-		if test.expectErr {
-			assert.Error(t, err)
-			continue
-		}
-		assert.NoError(t, err)
-		assert.Equal(t, test.expected, spec.Process.Args, desc)
+			var spec runtimespec.Spec
+			err := opts.WithProcessArgs(config, imageConfig)(context.Background(), nil, nil, &spec)
+			if test.expectErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, test.expected, spec.Process.Args, desc)
+		})
 	}
 }
 
@@ -253,26 +254,27 @@ func TestVolumeMounts(t *testing.T) {
 			},
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		config := &imagespec.ImageConfig{
-			Volumes: test.imageVolumes,
-		}
-		c := newTestCRIService()
-		got := c.volumeMounts(testContainerRootDir, test.criMounts, config)
-		assert.Len(t, got, len(test.expectedMountDest))
-		for _, dest := range test.expectedMountDest {
-			found := false
-			for _, m := range got {
-				if m.ContainerPath == dest {
-					found = true
-					assert.Equal(t,
-						filepath.Dir(m.HostPath),
-						filepath.Join(testContainerRootDir, "volumes"))
-					break
-				}
+		t.Run(desc, func(t *testing.T) {
+			config := &imagespec.ImageConfig{
+				Volumes: test.imageVolumes,
 			}
-			assert.True(t, found)
-		}
+			c := newTestCRIService()
+			got := c.volumeMounts(testContainerRootDir, test.criMounts, config)
+			assert.Len(t, got, len(test.expectedMountDest))
+			for _, dest := range test.expectedMountDest {
+				found := false
+				for _, m := range got {
+					if m.ContainerPath == dest {
+						found = true
+						assert.Equal(t,
+							filepath.Dir(m.HostPath),
+							filepath.Join(testContainerRootDir, "volumes"))
+						break
+					}
+				}
+				assert.True(t, found)
+			}
+		})
 	}
 }
 

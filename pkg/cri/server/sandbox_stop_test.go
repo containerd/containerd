@@ -51,23 +51,25 @@ func TestWaitSandboxStop(t *testing.T) {
 			expectErr: false,
 		},
 	} {
-		c := newTestCRIService()
-		sandbox := sandboxstore.NewSandbox(
-			sandboxstore.Metadata{ID: id},
-			sandboxstore.Status{State: test.state},
-		)
-		ctx := context.Background()
-		if test.cancel {
-			cancelledCtx, cancel := context.WithCancel(ctx)
-			cancel()
-			ctx = cancelledCtx
-		}
-		if test.timeout > 0 {
-			timeoutCtx, cancel := context.WithTimeout(ctx, test.timeout)
-			defer cancel()
-			ctx = timeoutCtx
-		}
-		err := c.waitSandboxStop(ctx, sandbox)
-		assert.Equal(t, test.expectErr, err != nil, desc)
+		t.Run(desc, func(t *testing.T) {
+			c := newTestCRIService()
+			sandbox := sandboxstore.NewSandbox(
+				sandboxstore.Metadata{ID: id},
+				sandboxstore.Status{State: test.state},
+			)
+			ctx := context.Background()
+			if test.cancel {
+				cancelledCtx, cancel := context.WithCancel(ctx)
+				cancel()
+				ctx = cancelledCtx
+			}
+			if test.timeout > 0 {
+				timeoutCtx, cancel := context.WithTimeout(ctx, test.timeout)
+				defer cancel()
+				ctx = timeoutCtx
+			}
+			err := c.waitSandboxStop(ctx, sandbox)
+			assert.Equal(t, test.expectErr, err != nil, desc)
+		})
 	}
 }

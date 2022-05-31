@@ -102,11 +102,12 @@ func TestParseAuth(t *testing.T) {
 			expectedSecret: testPasswd,
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		u, s, err := ParseAuth(test.auth, test.host)
-		assert.Equal(t, test.expectErr, err != nil)
-		assert.Equal(t, test.expectedUser, u)
-		assert.Equal(t, test.expectedSecret, s)
+		t.Run(desc, func(t *testing.T) {
+			u, s, err := ParseAuth(test.auth, test.host)
+			assert.Equal(t, test.expectErr, err != nil)
+			assert.Equal(t, test.expectedUser, u)
+			assert.Equal(t, test.expectedSecret, s)
+		})
 	}
 }
 
@@ -250,12 +251,13 @@ func TestRegistryEndpoints(t *testing.T) {
 			},
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		c := newTestCRIService()
-		c.config.Registry.Mirrors = test.mirrors
-		got, err := c.registryEndpoints(test.host)
-		assert.NoError(t, err)
-		assert.Equal(t, test.expected, got)
+		t.Run(desc, func(t *testing.T) {
+			c := newTestCRIService()
+			c.config.Registry.Mirrors = test.mirrors
+			got, err := c.registryEndpoints(test.host)
+			assert.NoError(t, err)
+			assert.Equal(t, test.expected, got)
+		})
 	}
 }
 
@@ -305,9 +307,10 @@ func TestDefaultScheme(t *testing.T) {
 			expected: "https",
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		got := defaultScheme(test.host)
-		assert.Equal(t, test.expected, got)
+		t.Run(desc, func(t *testing.T) {
+			got := defaultScheme(test.host)
+			assert.Equal(t, test.expected, got)
+		})
 	}
 }
 
@@ -325,11 +328,12 @@ func TestEncryptedImagePullOpts(t *testing.T) {
 			expectedOpts: 0,
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		c := newTestCRIService()
-		c.config.ImageDecryption.KeyModel = test.keyModel
-		got := len(c.encryptedImagesPullOpts())
-		assert.Equal(t, test.expectedOpts, got)
+		t.Run(desc, func(t *testing.T) {
+			c := newTestCRIService()
+			c.config.ImageDecryption.KeyModel = test.keyModel
+			got := len(c.encryptedImagesPullOpts())
+			assert.Equal(t, test.expectedOpts, got)
+		})
 	}
 }
 
