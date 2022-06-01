@@ -187,6 +187,7 @@ jobs:
             ;;
           windows/arm/v7)
             echo "CGO_ENABLED=0" >> $GITHUB_ENV
+            go install github.com/tc-hib/go-winres@v0.3.0
             ;;
           esac
 
@@ -230,6 +231,9 @@ jobs:
       - uses: actions/checkout@v2
         with:
           path: src/github.com/containerd/containerd
+
+      - run: go install github.com/tc-hib/go-winres@v0.3.0
+        if: success() && startsWith( matrix.os, 'windows-' )
 
       - name: Make
         run: |
