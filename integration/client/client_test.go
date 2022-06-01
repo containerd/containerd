@@ -333,7 +333,7 @@ func TestImagePullAllPlatforms(t *testing.T) {
 	defer cancel()
 
 	cs := client.ContentStore()
-	img, err := client.Fetch(ctx, "k8s.gcr.io/pause:3.6")
+	img, err := client.Fetch(ctx, "k8s.gcr.io/pause:3.7")
 	if err != nil {
 		t.Fatal(err)
 	}

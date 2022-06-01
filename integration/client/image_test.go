@@ -31,7 +31,7 @@ import (
 )
 
 func TestImageIsUnpacked(t *testing.T) {
-	const imageName = "k8s.gcr.io/pause:3.6"
+	const imageName = "k8s.gcr.io/pause:3.7"
 	ctx, cancel := testContext(t)
 	defer cancel()
 
@@ -137,7 +137,7 @@ func TestImageUsage(t *testing.T) {
 		t.Skip()
 	}
 
-	imageName := "k8s.gcr.io/pause:3.6"
+	imageName := "k8s.gcr.io/pause:3.7"
 	ctx, cancel := testContext(t)
 	defer cancel()
 

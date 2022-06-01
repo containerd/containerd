@@ -55,7 +55,7 @@ func TestLeaseResources(t *testing.T) {
 	defer ls.Delete(ctx, l, leases.SynchronousDelete)
 
 	// step 1: download image
-	imageName := "k8s.gcr.io/pause:3.6"
+	imageName := "k8s.gcr.io/pause:3.7"
 
 	image, err := client.Pull(ctx, imageName, WithPullUnpack, WithPullSnapshotter(snapshotterName))
 	if err != nil {
