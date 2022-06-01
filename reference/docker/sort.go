@@ -14,21 +14,26 @@
    limitations under the License.
 */
 
-package reference
+package docker
 
 import (
 	"sort"
-
-	"github.com/containerd/containerd/reference/docker"
 )
 
-// Sort sorts references by refRank then string comparison
+// Sort sorts string references preferring higher information references
+// The precedence is as follows:
+// 1. Name + Tag + Digest
+// 2. Name + Tag
+// 3. Name + Digest
+// 4. Name
+// 5. Digest
+// 6. Parse error
 func Sort(references []string) []string {
-	var prefs []docker.Reference
+	var prefs []Reference
 	var bad []string
 
 	for _, ref := range references {
-		pref, err := docker.ParseAnyReference(ref)
+		pref, err := ParseAnyReference(ref)
 		if err != nil {
 			bad = append(bad, ref)
 		} else {
@@ -51,22 +56,15 @@ func Sort(references []string) []string {
 	return append(refs, bad...)
 }
 
-// refRank ranks precedence for reference type, preferring higher information references
-// 1. Name + Tag + Digest
-// 2. Name + Tag
-// 3. Name + Digest
-// 4. Name
-// 5. Digest
-// 6. Parse error
-func refRank(ref docker.Reference) uint8 {
-	if _, ok := ref.(docker.Named); ok {
-		if _, ok = ref.(docker.Tagged); ok {
-			if _, ok = ref.(docker.Digested); ok {
+func refRank(ref Reference) uint8 {
+	if _, ok := ref.(Named); ok {
+		if _, ok = ref.(Tagged); ok {
+			if _, ok = ref.(Digested); ok {
 				return 1
 			}
 			return 2
 		}
-		if _, ok = ref.(docker.Digested); ok {
+		if _, ok = ref.(Digested); ok {
 			return 3
 		}
 		return 4

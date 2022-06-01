@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package reference
+package docker
 
 import (
 	"io"
