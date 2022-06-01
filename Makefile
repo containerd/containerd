@@ -88,6 +88,7 @@ ifdef BUILDTAGS
     GO_BUILDTAGS = ${BUILDTAGS}
 endif
 GO_BUILDTAGS ?=
+GO_BUILDTAGS += urfave_cli_no_docs
 GO_BUILDTAGS += ${DEBUG_TAGS}
 GO_TAGS=$(if $(GO_BUILDTAGS),-tags "$(strip $(GO_BUILDTAGS))",)
 GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) $(EXTRA_LDFLAGS)'
@@ -221,12 +222,17 @@ FORCE:
 
 define BUILD_BINARY
 @echo "$(WHALE) $@"
-@$(GO) build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o $@ ${GO_LDFLAGS} ${GO_TAGS}  ./$<
+$(GO) build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o $@ ${GO_LDFLAGS} ${GO_TAGS}  ./$<
 endef
 
 # Build a binary from a cmd.
 bin/%: cmd/% FORCE
 	$(call BUILD_BINARY)
+
+# gen-manpages must not have the urfave_cli_no_docs build-tag set
+bin/gen-manpages: cmd/gen-manpages FORCE
+	@echo "$(WHALE) $@"
+	$(GO) build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o $@ ${GO_LDFLAGS} $(subst urfave_cli_no_docs,,${GO_TAGS})  ./cmd/gen-manpages
 
 bin/containerd-shim: cmd/containerd-shim FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
 	@echo "$(WHALE) $@"
