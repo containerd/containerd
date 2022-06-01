@@ -18,14 +18,13 @@ package image
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/pkg/cri/util"
+	"github.com/containerd/containerd/reference"
 
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/go-digest/digestset"
@@ -132,15 +131,12 @@ func getImage(ctx context.Context, i containerd.Image) (*Image, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get image config descriptor: %w", err)
 	}
+
 	id := desc.Digest.String()
 
-	rb, err := content.ReadBlob(ctx, i.ContentStore(), desc)
+	spec, err := i.Spec(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("read image config from content store: %w", err)
-	}
-	var ociimage imagespec.Image
-	if err := json.Unmarshal(rb, &ociimage); err != nil {
-		return nil, fmt.Errorf("unmarshal image config %s: %w", rb, err)
+		return nil, fmt.Errorf("failed to get OCI image spec: %w", err)
 	}
 
 	return &Image{
@@ -148,7 +144,7 @@ func getImage(ctx context.Context, i containerd.Image) (*Image, error) {
 		References: []string{i.Name()},
 		ChainID:    chainID.String(),
 		Size:       size,
-		ImageSpec:  ociimage,
+		ImageSpec:  spec,
 	}, nil
 }
 
@@ -210,7 +206,7 @@ func (s *store) add(img Image) error {
 		return nil
 	}
 	// Or else, merge and sort the references.
-	i.References = sortReferences(util.MergeStringSlices(i.References, img.References))
+	i.References = reference.Sort(util.MergeStringSlices(i.References, img.References))
 	s.images[img.ID] = i
 	return nil
 }

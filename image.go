@@ -64,6 +64,8 @@ type Image interface {
 	Metadata() images.Image
 	// Platform returns the platform match comparer. Can be nil.
 	Platform() platforms.MatchComparer
+	// Spec returns the OCI image spec for a given image.
+	Spec(ctx context.Context) (ocispec.Image, error)
 }
 
 type usageOptions struct {
@@ -277,6 +279,26 @@ func (i *image) IsUnpacked(ctx context.Context, snapshotterName string) (bool, e
 	}
 
 	return false, nil
+}
+
+func (i *image) Spec(ctx context.Context) (ocispec.Image, error) {
+	var ociImage ocispec.Image
+
+	desc, err := i.Config(ctx)
+	if err != nil {
+		return ociImage, fmt.Errorf("get image config descriptor: %w", err)
+	}
+
+	blob, err := content.ReadBlob(ctx, i.ContentStore(), desc)
+	if err != nil {
+		return ociImage, fmt.Errorf("read image config from content store: %w", err)
+	}
+
+	if err := json.Unmarshal(blob, &ociImage); err != nil {
+		return ociImage, fmt.Errorf("unmarshal image config %s: %w", blob, err)
+	}
+
+	return ociImage, nil
 }
 
 // UnpackConfig provides configuration for the unpack of an image
