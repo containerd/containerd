@@ -194,8 +194,8 @@ func PodSandboxConfigWithCleanup(t *testing.T, name, ns string, opts ...PodSandb
 	return sb, sbConfig
 }
 
-// Set Windows HostProcess.
-func WithWindowsHostProcess(p *runtime.PodSandboxConfig) { //nolint:unused
+// Set Windows HostProcess on the pod.
+func WithWindowsHostProcessPod(p *runtime.PodSandboxConfig) { //nolint:unused
 	if p.Windows == nil {
 		p.Windows = &runtime.WindowsPodSandboxConfig{}
 	}
@@ -249,6 +249,18 @@ func WithWindowsUsername(username string) ContainerOpts { //nolint:unused
 			c.Windows.SecurityContext = &runtime.WindowsContainerSecurityContext{}
 		}
 		c.Windows.SecurityContext.RunAsUsername = username
+	}
+}
+
+func WithWindowsHostProcessContainer() ContainerOpts { //nolint:unused
+	return func(c *runtime.ContainerConfig) {
+		if c.Windows == nil {
+			c.Windows = &runtime.WindowsContainerConfig{}
+		}
+		if c.Windows.SecurityContext == nil {
+			c.Windows.SecurityContext = &runtime.WindowsContainerSecurityContext{}
+		}
+		c.Windows.SecurityContext.HostProcess = true
 	}
 }
 
