@@ -65,12 +65,12 @@ require (
 	google.golang.org/genproto v0.0.0-20220426171045-31bebdecfb46
 	google.golang.org/grpc v1.46.0
 	google.golang.org/protobuf v1.28.0
-	k8s.io/api v0.24.0
-	k8s.io/apimachinery v0.24.0
-	k8s.io/apiserver v0.24.0
-	k8s.io/client-go v0.24.0
-	k8s.io/component-base v0.24.0
-	k8s.io/cri-api v0.24.0
+	k8s.io/api v0.24.1
+	k8s.io/apimachinery v0.24.1
+	k8s.io/apiserver v0.24.1
+	k8s.io/client-go v0.24.1
+	k8s.io/component-base v0.24.1
+	k8s.io/cri-api v0.24.1
 	k8s.io/klog/v2 v2.60.1
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
 )
