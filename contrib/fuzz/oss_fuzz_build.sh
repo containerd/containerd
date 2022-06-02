@@ -20,11 +20,11 @@ set -x
 
 apt-get update && apt-get install -y wget
 cd $SRC
-wget https://go.dev/dl/go1.18.2.linux-amd64.tar.gz
+wget https://go.dev/dl/go1.18.3.linux-amd64.tar.gz
 
 mkdir temp-go
 rm -rf /root/.go/*
-tar -C temp-go/ -xzf go1.18.2.linux-amd64.tar.gz
+tar -C temp-go/ -xzf go1.18.3.linux-amd64.tar.gz
 mv temp-go/go/* /root/.go/
 cd $SRC/containerd
 
