@@ -33,12 +33,15 @@ func TestCWWrite(t *testing.T) {
 	assert.Equal(t, 5, n)
 
 	n, err = cw.Write([]byte("helloworld"))
-	assert.Equal(t, []byte("hellohello"), buf.Bytes(), "partial write")
-	assert.Equal(t, 5, n)
-	assert.ErrorIs(t, err, errNoRemain)
+	assert.NoError(t, err, "no errors even it hits the cap")
+	assert.Equal(t, 10, n, "no indication of partial write")
+	assert.True(t, cw.isFull())
+	assert.Equal(t, []byte("hellohello"), buf.Bytes(), "the underlying writer is capped")
 
 	_, err = cw.Write([]byte("world"))
-	assert.ErrorIs(t, err, errNoRemain)
+	assert.NoError(t, err)
+	assert.True(t, cw.isFull())
+	assert.Equal(t, []byte("hellohello"), buf.Bytes(), "the underlying writer is capped")
 }
 
 func TestCWClose(t *testing.T) {
