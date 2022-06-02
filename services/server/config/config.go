@@ -17,7 +17,9 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -196,6 +198,17 @@ const (
 	SharingPolicyIsolated = "isolated"
 )
 
+var (
+	unicodeByteOrderMarks = [][]byte{
+		// NOTE: these are checked in order so the more-specific longer BOMs should come first:
+		{0xFF, 0xFE, 0x00, 0x00}, // utf-32-le: 255 254 0 0
+		{0x00, 0x00, 0xFE, 0xFF}, // utf-32-be: 0 0 254 255
+		{0xEF, 0xBB, 0xBF},       // utf-8: 	239 187 191
+		{0xFF, 0xFE},             // utf-16-le: 255 254
+		{0xFE, 0xFF},             // utf-16-be: 254 255
+	}
+)
+
 // Validate validates if BoltConfig is valid
 func (bc *BoltConfig) Validate() error {
 	switch bc.ContentSharingPolicy {
@@ -276,13 +289,34 @@ func LoadConfig(path string, out *Config) error {
 func loadConfigFile(path string) (*Config, error) {
 	config := &Config{}
 
-	file, err := toml.LoadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load TOML: %s: %w", path, err)
+		return nil, fmt.Errorf("failed to open config file: %s: %w", path, err)
 	}
 
-	if err := file.Unmarshal(config); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal TOML: %w", err)
+	// Check if there is a UTF Byte Order Mark (BOM) at the beginning of
+	// the file stream which might trip up the TOML parser:
+	for _, bom := range unicodeByteOrderMarks {
+		read := make([]byte, len(bom))
+		// file.Read will consume the file up to the exact size of the expected BOM:
+		nread, err := file.Read(read)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read config file header: %s: %w", path, err)
+		}
+		if nread == len(read) && bytes.Equal(read, bom) {
+			logrus.Debugf("skipped Byte Order Mark %+v in TOML config file: %s", bom, path)
+			// Break the loop, leaving the file stream seek'd right after the BOM:
+			break
+		} else {
+			// Else reset the file stream:
+			file.Seek(0, 0)
+		}
+	}
+
+	decoder := toml.NewDecoder(file)
+	err = decoder.Decode(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode TOML file: %s: %w", path, err)
 	}
 
 	return config, nil
