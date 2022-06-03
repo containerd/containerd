@@ -1,0 +1,26 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.5.11"
+
+pre_release = false
+
+preface = """\
+The twelfth patch release for containerd 1.5 includes various fixes and updates
+along with an updated version of runc.
+
+### Notable Updates
+
+* **Fix inotify fd leak when cgroup is deleted** ([#6961](https://github.com/containerd/containerd/pull/6961))
+* **Close fifos when container is deleted in CRI plugin** ([#6857](https://github.com/containerd/containerd/pull/6857))
+* **Update unpack to to respect MaxConcurrentDownloads** ([#6774](https://github.com/containerd/containerd/pull/6774))
+* **Monitor OOMKill instead of OOM in cgroupv2** ([#6735](https://github.com/containerd/containerd/pull/6735))
+* **Make the temp mount as ready only in container WithVolumes** ([#6729](https://github.com/containerd/containerd/pull/6729))
+* **Fix deadlock from abandoned transactions in native snapshotter** ([#6726](https://github.com/containerd/containerd/pull/6726))
+
+See the changelog for complete list of changes"""
