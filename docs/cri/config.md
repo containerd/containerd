@@ -228,7 +228,8 @@ version = 2
   # 'plugins."io.containerd.grpc.v1.cri".containerd' contains config related to containerd
   [plugins."io.containerd.grpc.v1.cri".containerd]
 
-    # snapshotter is the snapshotter used by containerd.
+    # snapshotter is the default snapshotter used by containerd
+    # for all runtimes, if not overridden by an experimental runtime's snapshotter config.
     snapshotter = "overlayfs"
 
     # no_pivot disables pivot-root (linux only), required when running a container in a RamDisk with runc.
@@ -328,6 +329,11 @@ version = 2
       # interpreted as no limit is desired and will result in all CNI plugin
       # config files being loaded from the CNI config directory.
       cni_max_conf_num = 1
+
+      # snapshotter overrides the global default snapshotter to a runtime specific value.
+      # Please be aware that overriding the default snapshotter on a runtime basis is currently an experimental feature.
+      # See https://github.com/containerd/containerd/issues/6657 for context.
+      snapshotter = ""
 
       # 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options' is options specific to
       # "io.containerd.runc.v1" and "io.containerd.runc.v2". Its corresponding options type is:
