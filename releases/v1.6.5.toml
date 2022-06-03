@@ -1,0 +1,22 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.6.4"
+
+pre_release = false
+
+preface = """\
+The fifth patch release for containerd 1.6 includes a few fixes and updated
+version of runc.
+
+### Notable Updates
+
+* **Fix for older CNI plugins not reporting version** ([#7011](https://github.com/containerd/containerd/pull/7011))
+* **Fix mount path handling for CRI plugin on Windows** ([#6929](https://github.com/containerd/containerd/pull/6929))
+
+See the changelog for complete list of changes"""
