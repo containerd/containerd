@@ -1,0 +1,21 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.6.5"
+
+pre_release = false
+
+preface = """\
+The sixth patch release for containerd 1.6 includes a fix for
+[GHSA-5ffw-gxpp-mxpf](https://github.com/containerd/containerd/security/advisories/GHSA-5ffw-gxpp-mxpf).
+
+### Notable Updates
+
+* **Fix ExecSync handler to cap console output size** ([GHSA-5ffw-gxpp-mxpf](https://github.com/containerd/containerd/security/advisories/GHSA-5ffw-gxpp-mxpf))
+
+See the changelog for complete list of changes"""
