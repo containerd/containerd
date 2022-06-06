@@ -253,9 +253,8 @@ func (s *gcScheduler) run(ctx context.Context) {
 		nextCollection *time.Time
 
 		interval    = time.Second
-		gcTime      time.Duration
+		gcTimeSum   time.Duration
 		collections int
-		// TODO(dmcg): expose collection stats as metrics
 
 		triggered bool
 		deletions int
@@ -311,6 +310,7 @@ func (s *gcScheduler) run(ctx context.Context) {
 		last := time.Now()
 		if err != nil {
 			log.G(ctx).WithError(err).Error("garbage collection failed")
+			collectionCounter.WithValues("fail").Inc()
 
 			// Reschedule garbage collection for same duration + 1 second
 			schedC, nextCollection = schedule(nextCollection.Sub(*lastCollection) + time.Second)
@@ -326,10 +326,12 @@ func (s *gcScheduler) run(ctx context.Context) {
 			continue
 		}
 
-		log.G(ctx).WithField("d", stats.Elapsed()).Debug("garbage collected")
-
-		gcTime += stats.Elapsed()
+		gcTime := stats.Elapsed()
+		gcTimeHist.Update(gcTime)
+		log.G(ctx).WithField("d", gcTime).Debug("garbage collected")
+		gcTimeSum += gcTime
 		collections++
+		collectionCounter.WithValues("success").Inc()
 		triggered = false
 		deletions = 0
 		mutations = 0
@@ -340,7 +342,7 @@ func (s *gcScheduler) run(ctx context.Context) {
 			// This algorithm ensures that a gc is scheduled to allow enough
 			// runtime in between gc to reach the pause threshold.
 			// Pause threshold is always 0.0 < threshold <= 0.5
-			avg := float64(gcTime) / float64(collections)
+			avg := float64(gcTimeSum) / float64(collections)
 			interval = time.Duration(avg/s.pauseThreshold - avg)
 		}
 
