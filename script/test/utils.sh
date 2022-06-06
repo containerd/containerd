@@ -14,6 +14,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+# USE_HYPERV configures containerd to spawn Hyper-V isolated containers
+# when running on Windows.
+USE_HYPERV=${USE_HYPERV:-0}
+
 IS_WINDOWS=0
 if [ -v "OS" ] && [ "${OS}" == "Windows_NT" ]; then
   IS_WINDOWS=1
@@ -102,6 +106,24 @@ EOF
     }
   ]
 }
+EOF
+fi
+
+if [ ${IS_WINDOWS} -eq 1 -a ${USE_HYPERV} -eq 1 ];then
+  cat >> ${CONTAINERD_CONFIG_FILE} << EOF
+version = 2
+[plugins]
+    [plugins."io.containerd.grpc.v1.cri".containerd]
+      default_runtime_name = "runhcs-wcow-hyperv"
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
+
+       [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runhcs-wcow-hyperv]
+        runtime_type = "io.containerd.runhcs.v1"
+        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runhcs-wcow-hyperv.options]
+          Debug = true
+          DebugType = 2
+          SandboxPlatform = "windows/amd64"
+          SandboxIsolation = 1
 EOF
 fi
 
