@@ -9,7 +9,7 @@ require (
 	github.com/container-orchestrated-devices/container-device-interface v0.3.1
 	github.com/containerd/aufs v1.0.0
 	github.com/containerd/btrfs v1.0.0
-	github.com/containerd/cgroups v1.0.3
+	github.com/containerd/cgroups v1.0.4
 	github.com/containerd/console v1.0.3
 	github.com/containerd/continuity v0.2.2
 	github.com/containerd/fifo v1.0.0
