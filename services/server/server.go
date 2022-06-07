@@ -403,7 +403,8 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 			plugin.SnapshotPlugin,
 		},
 		Config: &srvconfig.BoltConfig{
-			ContentSharingPolicy: srvconfig.SharingPolicyShared,
+			ContentSharingPolicy:  srvconfig.SharingPolicyShared,
+			SnapshotSharingPolicy: srvconfig.SharingPolicyIsolated,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			if err := os.MkdirAll(ic.Root, 0711); err != nil {
@@ -432,19 +433,35 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 				snapshotters[name] = sn.(snapshots.Snapshotter)
 			}
 
-			shared := true
-			ic.Meta.Exports["policy"] = srvconfig.SharingPolicyShared
+			contentShared := true
+			ic.Meta.Exports["content_policy"] = srvconfig.SharingPolicyShared
 			if cfg, ok := ic.Config.(*srvconfig.BoltConfig); ok {
 				if cfg.ContentSharingPolicy != "" {
 					if err := cfg.Validate(); err != nil {
 						return nil, err
 					}
 					if cfg.ContentSharingPolicy == srvconfig.SharingPolicyIsolated {
-						ic.Meta.Exports["policy"] = srvconfig.SharingPolicyIsolated
-						shared = false
+						ic.Meta.Exports["content_policy"] = srvconfig.SharingPolicyIsolated
+						contentShared = false
 					}
 
-					log.L.WithField("policy", cfg.ContentSharingPolicy).Info("metadata content store policy set")
+					log.L.WithField("content_policy", cfg.ContentSharingPolicy).Info("metadata content store policy set")
+				}
+			}
+
+			snapshotShared := false
+			ic.Meta.Exports["snapshot_policy"] = srvconfig.SharingPolicyIsolated
+			if cfg, ok := ic.Config.(*srvconfig.BoltConfig); ok {
+				if cfg.SnapshotSharingPolicy != "" {
+					if err := cfg.Validate(); err != nil {
+						return nil, err
+					}
+					if cfg.SnapshotSharingPolicy == srvconfig.SharingPolicyShared {
+						ic.Meta.Exports["snapshot_policy"] = srvconfig.SharingPolicyShared
+						snapshotShared = true
+					}
+
+					log.L.WithField("snapshot_policy", cfg.ContentSharingPolicy).Info("metadata snapshot policy set")
 				}
 			}
 
@@ -478,8 +495,11 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 			}
 
 			var dbopts []metadata.DBOpt
-			if !shared {
-				dbopts = append(dbopts, metadata.WithPolicyIsolated)
+			if !contentShared {
+				dbopts = append(dbopts, metadata.WithContentPolicyIsolated)
+			}
+			if snapshotShared {
+				dbopts = append(dbopts, metadata.WithSnapshotPolicyShared)
 			}
 			mdb := metadata.NewDB(db, cs.(content.Store), snapshotters, dbopts...)
 			if err := mdb.Init(ic.Context); err != nil {

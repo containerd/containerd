@@ -124,6 +124,10 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 	for {
 		key = fmt.Sprintf(snapshots.UnpackKeyFormat, uniquePart(), chainID)
 
+		// Include chainID label if doesn't already exist
+		chainIDLabelMap := map[string]string{"containerd.io/snapshot.ref": chainID.String()}
+		opts = append(opts, snapshots.WithLabels(chainIDLabelMap))
+
 		// Prepare snapshot with from parent, label as root
 		mounts, err = sn.Prepare(ctx, key, parent.String(), opts...)
 		if err != nil {
@@ -136,6 +140,10 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 				// Do no try applying layers again
 				layers = nil
 				continue
+			} else if snapshots.IsTargetSnapshotExists(err) {
+				// TargetSnapshotExists means we don't need to prepare and apply the
+				// layer contents. Just AlreadyExists means prepare key should be regenerated.
+				return errdefs.ErrAlreadyExists
 			} else if errdefs.IsAlreadyExists(err) {
 				// Try a different key
 				continue
@@ -143,7 +151,6 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 
 			// Already exists should have the caller retry
 			return fmt.Errorf("failed to prepare extraction snapshot %q: %w", key, err)
-
 		}
 		break
 	}

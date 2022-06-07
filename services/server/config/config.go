@@ -187,6 +187,9 @@ type BoltConfig struct {
 	// bandwidth across namespaces, at the cost of allowing access to any blob
 	// just by knowing its digest.
 	ContentSharingPolicy string `toml:"content_sharing_policy"`
+
+	// SnapshotSharingPolicy is same as ContentSharingPolicy but for snapshots.
+	SnapshotSharingPolicy string `toml:"snapshot_sharing_policy"`
 }
 
 const (
@@ -200,10 +203,17 @@ const (
 func (bc *BoltConfig) Validate() error {
 	switch bc.ContentSharingPolicy {
 	case SharingPolicyShared, SharingPolicyIsolated:
-		return nil
 	default:
 		return fmt.Errorf("unknown policy: %s: %w", bc.ContentSharingPolicy, errdefs.ErrInvalidArgument)
 	}
+
+	switch bc.SnapshotSharingPolicy {
+	case SharingPolicyShared, SharingPolicyIsolated:
+	default:
+		return fmt.Errorf("unknown policy: %s: %w", bc.SnapshotSharingPolicy, errdefs.ErrInvalidArgument)
+	}
+
+	return nil
 }
 
 // Decode unmarshals a plugin specific configuration by plugin id

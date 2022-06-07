@@ -51,14 +51,20 @@ const (
 // DBOpt configures how we set up the DB
 type DBOpt func(*dbOptions)
 
-// WithPolicyIsolated isolates contents between namespaces
-func WithPolicyIsolated(o *dbOptions) {
-	o.shared = false
+// WithContentPolicyIsolated isolates contents between namespaces
+func WithContentPolicyIsolated(o *dbOptions) {
+	o.contentShared = false
+}
+
+// WithSnapshotPolicyShared shares the snapshots between namespaces
+func WithSnapshotPolicyShared(o *dbOptions) {
+	o.snapshotShared = true
 }
 
 // dbOptions configure db options.
 type dbOptions struct {
-	shared bool
+	contentShared  bool
+	snapshotShared bool
 }
 
 // DB represents a metadata database backed by a bolt
@@ -108,7 +114,7 @@ func NewDB(db *bolt.DB, cs content.Store, ss map[string]snapshots.Snapshotter, o
 		ss:      make(map[string]*snapshotter, len(ss)),
 		dirtySS: map[string]struct{}{},
 		dbopts: dbOptions{
-			shared: true,
+			contentShared: true,
 		},
 	}
 
@@ -117,9 +123,9 @@ func NewDB(db *bolt.DB, cs content.Store, ss map[string]snapshots.Snapshotter, o
 	}
 
 	// Initialize data stores
-	m.cs = newContentStore(m, m.dbopts.shared, cs)
+	m.cs = newContentStore(m, m.dbopts.contentShared, cs)
 	for name, sn := range ss {
-		m.ss[name] = newSnapshotter(m, name, sn)
+		m.ss[name] = newSnapshotter(m, name, m.dbopts.snapshotShared, sn)
 	}
 
 	return m

@@ -86,11 +86,11 @@ func TestContent(t *testing.T) {
 	testsuite.ContentCrossNSSharedSuite(t, "metadata", createContentStoreWithPolicy())
 	testsuite.ContentCrossNSIsolatedSuite(
 		t, "metadata", createContentStoreWithPolicy([]DBOpt{
-			WithPolicyIsolated,
+			WithContentPolicyIsolated,
 		}...))
 	testsuite.ContentSharedNSIsolatedSuite(
 		t, "metadata", createContentStoreWithPolicy([]DBOpt{
-			WithPolicyIsolated,
+			WithContentPolicyIsolated,
 		}...))
 }
 

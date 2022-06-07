@@ -42,18 +42,20 @@ const (
 
 type snapshotter struct {
 	snapshots.Snapshotter
-	name string
-	db   *DB
-	l    sync.RWMutex
+	name   string
+	db     *DB
+	l      sync.RWMutex
+	shared bool
 }
 
 // newSnapshotter returns a new Snapshotter which namespaces the given snapshot
 // using the provided name and database.
-func newSnapshotter(db *DB, name string, sn snapshots.Snapshotter) *snapshotter {
+func newSnapshotter(db *DB, name string, shared bool, sn snapshots.Snapshotter) *snapshotter {
 	return &snapshotter{
 		Snapshotter: sn,
 		name:        name,
 		db:          db,
+		shared:      shared,
 	}
 }
 
@@ -280,6 +282,42 @@ func (s *snapshotter) View(ctx context.Context, key, parent string, opts ...snap
 	return s.createSnapshot(ctx, key, parent, true, opts)
 }
 
+// checkIfSnapshotExists checks if a snapshot with the given `key` exists in the given namespace `ns`
+// If `checkAllNamespaces` is set to `true` it checks other namespaces
+// too. If the snapshot is found then returns `true` and the name of the namespace in which
+// it was found. Returns false otherwise.
+func (s *snapshotter) checkIfSnapshotExists(tx *bolt.Tx, ns, key string, checkAllNamespaces bool) (bool, string, error) {
+	bkt := getSnapshotterBucket(tx, ns, s.name)
+	if bkt == nil {
+		return false, "", fmt.Errorf("can not find snapshotter %q: %w", s.name, errdefs.ErrNotFound)
+	}
+
+	if tbkt := bkt.Bucket([]byte(key)); tbkt != nil {
+		return true, ns, nil
+	}
+
+	if checkAllNamespaces {
+		vbkt := tx.Bucket(bucketKeyVersion)
+		if vbkt == nil {
+			return false, "", fmt.Errorf("can not find version bucket")
+		}
+
+		// iterate through each namespace
+		vc := vbkt.Cursor()
+		for nk, _ := vc.First(); nk != nil; nk, _ = vc.Next() {
+			bkt := getSnapshotterBucket(tx, string(nk), s.name)
+			if bkt == nil {
+				continue
+			}
+
+			if tbkt := bkt.Bucket([]byte(key)); tbkt != nil {
+				return true, string(nk), nil
+			}
+		}
+	}
+	return false, "", nil
+}
+
 func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, readonly bool, opts []snapshots.Opt) ([]mount.Mount, error) {
 	s.l.RLock()
 	defer s.l.RUnlock()
@@ -307,19 +345,14 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 		bopts   = []snapshots.Opt{
 			snapshots.WithLabels(snapshots.FilterInheritedLabels(base.Labels)),
 		}
+		targetPresentInNamespace string
+		targetExists             bool
 	)
 
 	if err := update(ctx, s.db, func(tx *bolt.Tx) error {
 		bkt, err := createSnapshotterBucket(tx, ns, s.name)
 		if err != nil {
 			return err
-		}
-
-		// Check if target exists, if so, return already exists
-		if target != "" {
-			if tbkt := bkt.Bucket([]byte(target)); tbkt != nil {
-				return fmt.Errorf("target snapshot %q: %w", target, errdefs.ErrAlreadyExists)
-			}
 		}
 
 		if bbkt := bkt.Bucket([]byte(key)); bbkt != nil {
@@ -334,6 +367,21 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 			bparent = string(pbkt.Get(bucketKeyName))
 		}
 
+		// Check if target exists, if so, return already exists
+		if target != "" {
+			targetExists, targetPresentInNamespace, err = s.checkIfSnapshotExists(tx, ns, target, s.shared)
+			if err != nil {
+				return err
+			}
+			if targetExists {
+				if targetPresentInNamespace == ns {
+					return fmt.Errorf("target snapshot %q exists: %w", target, errdefs.ErrAlreadyExists)
+				}
+				return nil
+			}
+		}
+
+		// Target or key doesn't exist, we are creating a new bucket, make a new key for it.
 		sid, err := bkt.NextSequence()
 		if err != nil {
 			return err
@@ -350,15 +398,18 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 		created string
 		rerr    error
 	)
-	if readonly {
-		m, err = s.Snapshotter.View(ctx, bkey, bparent, bopts...)
-	} else {
-		m, err = s.Snapshotter.Prepare(ctx, bkey, bparent, bopts...)
+
+	if !targetExists {
+		if readonly {
+			m, err = s.Snapshotter.View(ctx, bkey, bparent, bopts...)
+		} else {
+			m, err = s.Snapshotter.Prepare(ctx, bkey, bparent, bopts...)
+		}
 	}
 
 	// An already exists error should indicate the backend found a snapshot
 	// matching a provided target reference.
-	if errdefs.IsAlreadyExists(err) {
+	if targetExists || errdefs.IsAlreadyExists(err) {
 		if target != "" {
 			var tinfo *snapshots.Info
 			filter := fmt.Sprintf(`labels."containerd.io/snapshot.ref"==%s,parent==%q`, target, bparent)
@@ -400,7 +451,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 			}
 
 			// Propagate this error after the final update
-			rerr = fmt.Errorf("target snapshot %q from snapshotter: %w", target, errdefs.ErrAlreadyExists)
+			rerr = snapshots.ErrorTargetSnapshotAlreadyExists
 		} else {
 			// This condition is unexpected as the key provided is expected
 			// to be new and unique, return as unknown response from backend

@@ -19,9 +19,12 @@ package snapshots
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strings"
 	"time"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 )
 
@@ -34,6 +37,19 @@ const (
 	inheritedLabelsPrefix = "containerd.io/snapshot/"
 	labelSnapshotRef      = "containerd.io/snapshot.ref"
 )
+
+// ErrTargetSnapshotAlreadyExists is different than ErrAlreadyExists when it comes to snapshots.  If
+// snapshot sharing is enabled and if the target snapshot (i.e the final digest when the snapshot is
+// being committed) already exists, the Prepare call returns this error to let the client know that
+// the target snapshots exists. This can only happen during image extraction scenarios where you
+// already know the final digest after the layer contents are written into the snapshot.  Since this
+// error wraps the ErrAlreadyExists, when checking for errors first `IsTargetSnapshotExists` should
+// be checked.
+var ErrorTargetSnapshotAlreadyExists = fmt.Errorf("target snapshot already exists: %w", errdefs.ErrAlreadyExists)
+
+func IsTargetSnapshotExists(e error) bool {
+	return errors.Is(e, errdefs.ErrAlreadyExists) && strings.HasPrefix(e.Error(), "target snapshot already exists")
+}
 
 // Kind identifies the kind of snapshot.
 type Kind uint8

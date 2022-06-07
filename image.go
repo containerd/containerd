@@ -382,7 +382,7 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 
 	for _, layer := range layers {
 		unpacked, err = rootfs.ApplyLayerWithOpts(ctx, layer, chain, sn, a, config.SnapshotOpts, config.ApplyOpts)
-		if err != nil {
+		if err != nil && !errdefs.IsAlreadyExists(err) {
 			return err
 		}
 
