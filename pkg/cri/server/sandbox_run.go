@@ -200,7 +200,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// Generate spec options that will be applied to the spec later.
 	specOpts, err := c.sandboxContainerSpecOpts(config, &image.ImageSpec.Config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate sanbdox container spec options: %w", err)
+		return nil, fmt.Errorf("failed to generate sandbox container spec options: %w", err)
 	}
 
 	sandboxLabels := buildLabels(config.Labels, image.ImageSpec.Config.Labels, containerKindSandbox)
