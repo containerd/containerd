@@ -390,7 +390,7 @@ func (c *context) checkoutFile(fp string, rf RegularFile) error {
 		}
 	}
 	if err != nil {
-		return fmt.Errorf("file content could not be provided: %v", err)
+		return fmt.Errorf("file content could not be provided: %w", err)
 	}
 	defer r.Close()
 
@@ -422,7 +422,7 @@ func (c *context) Apply(resource Resource) error {
 	case RegularFile:
 		if fi == nil {
 			if err := c.checkoutFile(fp, r); err != nil {
-				return fmt.Errorf("error checking out file %q: %v", resource.Path(), err)
+				return fmt.Errorf("error checking out file %q: %w", resource.Path(), err)
 			}
 			chmod = false
 		} else {
@@ -431,18 +431,18 @@ func (c *context) Apply(resource Resource) error {
 			}
 			if fi.Size() != r.Size() {
 				if err := c.checkoutFile(fp, r); err != nil {
-					return fmt.Errorf("error checking out file %q: %v", resource.Path(), err)
+					return fmt.Errorf("error checking out file %q: %w", resource.Path(), err)
 				}
 			} else {
 				for _, dgst := range r.Digests() {
 					f, err := os.Open(fp)
 					if err != nil {
-						return fmt.Errorf("failure opening file for read %q: %v", resource.Path(), err)
+						return fmt.Errorf("failure opening file for read %q: %w", resource.Path(), err)
 					}
 					compared, err := dgst.Algorithm().FromReader(f)
 					if err == nil && dgst != compared {
 						if err := c.checkoutFile(fp, r); err != nil {
-							return fmt.Errorf("error checking out file %q: %v", resource.Path(), err)
+							return fmt.Errorf("error checking out file %q: %w", resource.Path(), err)
 						}
 						break
 					}
@@ -450,7 +450,7 @@ func (c *context) Apply(resource Resource) error {
 						err = err1
 					}
 					if err != nil {
-						return fmt.Errorf("error checking digest for %q: %v", resource.Path(), err)
+						return fmt.Errorf("error checking digest for %q: %w", resource.Path(), err)
 					}
 				}
 			}

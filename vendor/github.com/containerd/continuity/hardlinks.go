@@ -63,7 +63,7 @@ func (hlm *hardlinkManager) Merge() ([]Resource, error) {
 
 		merged, err := Merge(linked...)
 		if err != nil {
-			return nil, fmt.Errorf("error merging hardlink: %v", err)
+			return nil, fmt.Errorf("error merging hardlink: %w", err)
 		}
 
 		resources = append(resources, merged)
