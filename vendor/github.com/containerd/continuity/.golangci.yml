@@ -6,8 +6,8 @@ linters:
     - unconvert
     - gofmt
     - goimports
-    - golint
     - ineffassign
+    - revive
     - vet
     - unused
     - misspell
