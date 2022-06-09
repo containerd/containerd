@@ -844,7 +844,7 @@ func testApply(t *testing.T, a fstest.Applier) error {
 		return fmt.Errorf("failed to apply filesystem changes: %w", err)
 	}
 
-	tarArgs := []string{"c", "-C", td}
+	tarArgs := []string{"cf", "-", "-C", td}
 	names, err := readDirNames(td)
 	if err != nil {
 		return fmt.Errorf("failed to read directory names: %w", err)
@@ -879,9 +879,12 @@ func testBaseDiff(t *testing.T, a fstest.Applier) error {
 
 	arch := Diff(context.Background(), "", td)
 
-	cmd := exec.Command(tarCmd, "x", "-C", dest)
+	cmd := exec.Command(tarCmd, "xf", "-", "-C", dest)
 	cmd.Stdin = arch
+	stderr := &bytes.Buffer{}
+	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
+		fmt.Println(stderr.String())
 		return fmt.Errorf("tar command failed: %w", err)
 	}
 
