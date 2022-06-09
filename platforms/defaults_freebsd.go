@@ -17,8 +17,9 @@
 package platforms
 
 import (
-	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"runtime"
+
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // DefaultSpec returns the current platform's default platform specification.
