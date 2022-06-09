@@ -69,8 +69,11 @@ func TestGeneralContainerSpec(t *testing.T) {
 }
 
 func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
-	if goruntime.GOOS == "darwin" {
+	switch goruntime.GOOS {
+	case "darwin":
 		t.Skip("not implemented on Darwin")
+	case "freebsd":
+		t.Skip("not implemented on FreeBSD")
 	}
 
 	testID := "test-id"
@@ -279,8 +282,11 @@ func TestVolumeMounts(t *testing.T) {
 }
 
 func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
-	if goruntime.GOOS == "darwin" {
+	switch goruntime.GOOS {
+	case "darwin":
 		t.Skip("not implemented on Darwin")
+	case "freebsd":
+		t.Skip("not implemented on FreeBSD")
 	}
 
 	testID := "test-id"
