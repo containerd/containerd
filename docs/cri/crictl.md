@@ -59,29 +59,29 @@ command. With the load command you inject a container image into the container
 runtime from a file. First you need to create a container image tarball. For
 example to create an image tarball for a pause container using Docker:
 ```console
-$ docker pull k8s.gcr.io/pause:3.6
+$ docker pull registry.k8s.io/pause:3.6
   3.6: Pulling from pause
   fbe1a72f5dcd: Pull complete
   Digest: sha256:3d380ca8864549e74af4b29c10f9cb0956236dfb01c40ca076fb6c37253234db
-  Status: Downloaded newer image for k8s.gcr.io/pause:3.6
-  k8s.gcr.io/pause:3.6
-$ docker save k8s.gcr.io/pause:3.6 -o pause.tar
+  Status: Downloaded newer image for registry.k8s.io/pause:3.6
+  registry.k8s.io/pause:3.6
+$ docker save registry.k8s.io/pause:3.6 -o pause.tar
 ```
 Then use `ctr` to load the container image into the container runtime:
 ```console
 # The cri plugin uses the "k8s.io" containerd namespace.
 $ sudo ctr -n=k8s.io images import pause.tar
-  Loaded image: k8s.gcr.io/pause:3.6
+  Loaded image: registry.k8s.io/pause:3.6
 ```
 List images and inspect the pause image:
 ```console
 $ sudo crictl images
 IMAGE                       TAG                 IMAGE ID            SIZE
 docker.io/library/busybox   latest              f6e427c148a76       728kB
-k8s.gcr.io/pause            3.6                 ed210e3e4a5ba       683kB
+registry.k8s.io/pause       3.6                 ed210e3e4a5ba       683kB
 $ sudo crictl inspecti ed210e3e4a5ba
   ... displays information about the pause image.
-$ sudo crictl inspecti k8s.gcr.io/pause:3.6
+$ sudo crictl inspecti registry.k8s.io/pause:3.6
   ... displays information about the pause image.
 ```
 
@@ -201,7 +201,7 @@ $ crictl info
       }
     },
     "streamServerPort": "10010",
-    "sandboxImage": "k8s.gcr.io/pause:3.6",
+    "sandboxImage": "registry.k8s.io/pause:3.6",
     "statsCollectPeriod": 10,
     "containerdRootDir": "/var/lib/containerd",
     "containerdEndpoint": "unix:///run/containerd/containerd.sock",

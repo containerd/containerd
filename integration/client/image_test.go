@@ -79,7 +79,7 @@ func TestImageIsUnpacked(t *testing.T) {
 
 func TestImagePullWithDistSourceLabel(t *testing.T) {
 	var (
-		source   = "k8s.gcr.io"
+		source   = "registry.k8s.io"
 		repoName = "pause"
 		tag      = "3.6"
 	)
@@ -231,7 +231,7 @@ func TestImageUsage(t *testing.T) {
 func TestImageSupportedBySnapshotter_Error(t *testing.T) {
 	var unsupportedImage string
 	if runtime.GOOS == "windows" {
-		unsupportedImage = "k8s.gcr.io/pause-amd64:3.2"
+		unsupportedImage = "registry.k8s.io/pause-amd64:3.2"
 	} else {
 		unsupportedImage = "mcr.microsoft.com/windows/nanoserver:1809"
 	}
