@@ -1,5 +1,5 @@
-//go:build (linux && !no_cri) || (windows && !no_cri)
-// +build linux,!no_cri windows,!no_cri
+//go:build (linux && !no_cri) || (windows && !no_cri) || (darwin && !no_cri)
+// +build linux,!no_cri windows,!no_cri darwin,!no_cri
 
 /*
    Copyright The containerd Authors.
