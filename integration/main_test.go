@@ -231,6 +231,16 @@ func WithResources(r *runtime.LinuxContainerResources) ContainerOpts { //nolint:
 	}
 }
 
+// Adds Windows container resource limits.
+func WithWindowsResources(r *runtime.WindowsContainerResources) ContainerOpts { //nolint:unused
+	return func(c *runtime.ContainerConfig) {
+		if c.Windows == nil {
+			c.Windows = &runtime.WindowsContainerConfig{}
+		}
+		c.Windows.Resources = r
+	}
+}
+
 func WithVolumeMount(hostPath, containerPath string) ContainerOpts {
 	return func(c *runtime.ContainerConfig) {
 		hostPath, _ = filepath.Abs(hostPath)

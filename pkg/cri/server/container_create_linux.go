@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/snapshots"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	selinux "github.com/opencontainers/selinux/go-selinux"
@@ -596,4 +597,9 @@ func generateUserString(username string, uid, gid *runtime.Int64Value) (string, 
 		userstr = userstr + ":" + groupstr
 	}
 	return userstr, nil
+}
+
+// snapshotterOpts returns any Linux specific snapshotter options for the rootfs snapshot
+func snapshotterOpts(snapshotterName string, config *runtime.ContainerConfig) []snapshots.Opt {
+	return []snapshots.Opt{}
 }
