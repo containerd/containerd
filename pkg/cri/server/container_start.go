@@ -64,8 +64,12 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	}
 	defer func() {
 		if retErr != nil {
-			// Set container to exited if fail to start.
+			// Set container state depended on whether task is alive
 			if err := cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
+				if _, err := container.Task(ctx, nil); err == nil {
+					// task still alive
+					return unknownContainerStatus(), nil
+				}
 				status.Pid = 0
 				status.FinishedAt = time.Now().UnixNano()
 				status.ExitCode = errorStartExitCode
