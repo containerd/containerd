@@ -1,3 +1,5 @@
+//go:build !freebsd
+
 /*
    Copyright The containerd Authors.
 
@@ -14,24 +16,10 @@
    limitations under the License.
 */
 
-package oci
+package archive
 
-import (
-	specs "github.com/opencontainers/runtime-spec/specs-go"
-)
+import "os"
 
-func defaultMounts() []specs.Mount {
-	return []specs.Mount{
-		{
-			Destination: "/dev",
-			Type:        "devfs",
-			Source:      "devfs",
-			Options:     []string{"ruleset=4"},
-		},
-		{
-			Destination: "/dev/fd",
-			Type:        "fdescfs",
-			Source:      "fdescfs",
-		},
-	}
+func link(oldname, newname string) error {
+	return os.Link(oldname, newname)
 }
