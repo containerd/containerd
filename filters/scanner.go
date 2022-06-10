@@ -262,7 +262,7 @@ func isDigitRune(r rune) bool {
 
 func isOperatorRune(r rune) bool {
 	switch r {
-	case '=', '!', '~':
+	case '=', '!', '~', '@':
 		return true
 	}
 

@@ -42,7 +42,7 @@ selectors := selector ("," selector)*
 selector  := fieldpath (operator value)
 fieldpath := field ('.' field)*
 field     := quoted | [A-Za-z] [A-Za-z0-9_]+
-operator  := "==" | "!=" | "~="
+operator  := "==" | "!=" | "~=" | "^="
 value     := quoted | [^\s,]+
 quoted    := <go string syntax>
 
@@ -226,6 +226,8 @@ func (p *parser) operator() (operator, error) {
 			return operatorNotEqual, nil
 		case "~=":
 			return operatorMatches, nil
+		case "@=":
+			return operatorContains, nil
 		default:
 			return 0, p.mkerr(pos, "unsupported operator %q", s)
 		}
@@ -233,7 +235,7 @@ func (p *parser) operator() (operator, error) {
 		return 0, p.mkerr(pos, p.scanner.err)
 	}
 
-	return 0, p.mkerr(pos, `expected an operator ("=="|"!="|"~=")`)
+	return 0, p.mkerr(pos, `expected an operator ("=="|"!="|"~="|"@=")`)
 }
 
 func (p *parser) value(allowAltQuotes bool) (string, error) {
