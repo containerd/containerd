@@ -34,6 +34,7 @@ VERSION ?= $(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
 REVISION=$(shell git rev-parse HEAD)$(shell if ! git diff --no-ext-diff --quiet --exit-code; then echo .m; fi)
 PACKAGE=github.com/containerd/containerd
 SHIM_CGO_ENABLED ?= 0
+COMMIT=$(shell git rev-parse HEAD)
 
 ifneq "$(strip $(shell command -v $(GO) 2>/dev/null))" ""
 	GOOS ?= $(shell $(GO) env GOOS)
@@ -90,8 +91,17 @@ endif
 GO_BUILDTAGS ?=
 GO_BUILDTAGS += urfave_cli_no_docs
 GO_BUILDTAGS += ${DEBUG_TAGS}
+ifneq ($(STATIC),)
+	GO_BUILDTAGS += osusergo netgo static_build
+endif
 GO_TAGS=$(if $(GO_BUILDTAGS),-tags "$(strip $(GO_BUILDTAGS))",)
-GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) $(EXTRA_LDFLAGS)'
+
+GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) $(EXTRA_LDFLAGS)
+ifneq ($(STATIC),)
+	GO_LDFLAGS += -extldflags "-static"
+endif
+GO_LDFLAGS+='
+
 SHIM_GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) -extldflags "-static" $(EXTRA_LDFLAGS)'
 
 # Project packages.
@@ -206,7 +216,7 @@ integration: ## run integration tests
 
 bench-integration: ## benchmarks 
 	@echo "$(WHALE) $@"
-	@cd "${ROOTDIR}/integration/benchmark" && $(GO) mod download && $(GOTEST) -v ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL} .
+	@cd "${ROOTDIR}integration/benchmark" && rm -rf bin/ && $(GO) build -o bin/benchmarkTests main.go && ./bin/benchmarkTests $(COMMIT)
 
 # TODO integrate cri integration bucket with coverage
 bin/cri-integration.test:

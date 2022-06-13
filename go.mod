@@ -37,7 +37,7 @@ require (
 	github.com/intel/goresctrl v0.2.0
 	github.com/klauspost/compress v1.11.13
 	github.com/moby/locker v1.0.1
-	github.com/moby/sys/mountinfo v0.6.0
+	github.com/moby/sys/mountinfo v0.6.2
 	github.com/moby/sys/signal v0.7.0
 	github.com/moby/sys/symlink v0.2.0
 	github.com/opencontainers/go-digest v1.0.0
@@ -61,7 +61,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.7.0
 	go.opentelemetry.io/otel/trace v1.7.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20220422013727-9388b58f7150
+	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a
 	google.golang.org/genproto v0.0.0-20220426171045-31bebdecfb46
 	google.golang.org/grpc v1.47.0
 	google.golang.org/protobuf v1.28.0

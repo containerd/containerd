@@ -36,7 +36,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// upperdirKey is a key of an optional lablel to each snapshot.
+// upperdirKey is a key of an optional label to each snapshot.
 // This optional label of a snapshot contains the location of "upperdir" where
 // the change set between this snapshot and its parent is stored.
 const upperdirKey = "containerd.io/snapshot/overlay.upperdir"

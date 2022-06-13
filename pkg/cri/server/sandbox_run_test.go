@@ -35,10 +35,12 @@ import (
 )
 
 func TestSandboxContainerSpec(t *testing.T) {
-	if goruntime.GOOS == "darwin" {
+	switch goruntime.GOOS {
+	case "darwin":
 		t.Skip("not implemented on Darwin")
+	case "freebsd":
+		t.Skip("not implemented on FreeBSD")
 	}
-
 	testID := "test-id"
 	nsPath := "test-cni"
 	for desc, test := range map[string]struct {

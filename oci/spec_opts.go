@@ -377,6 +377,7 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 			return fmt.Errorf("unknown image config media type %s", ic.MediaType)
 		}
 
+		appendOSMounts(s, ociimage.OS)
 		setProcess(s)
 		if s.Linux != nil {
 			defaults := config.Env

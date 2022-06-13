@@ -203,3 +203,7 @@ func WithCDI(annotations map[string]string, cdiSpecDirs []string) SpecOpts {
 		return nil
 	}
 }
+
+func appendOSMounts(s *Spec, os string) error {
+	return nil
+}

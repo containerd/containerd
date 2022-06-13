@@ -18,9 +18,11 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/snapshots"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -139,4 +141,23 @@ func (c *criService) containerSpec(
 // No extra spec options needed for windows.
 func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
 	return nil, nil
+}
+
+// snapshotterOpts returns any Windows specific snapshotter options for the r/w layer
+func snapshotterOpts(snapshotterName string, config *runtime.ContainerConfig) []snapshots.Opt {
+	var opts []snapshots.Opt
+
+	switch snapshotterName {
+	case "windows":
+		rootfsSize := config.GetWindows().GetResources().GetRootfsSizeInBytes()
+		if rootfsSize != 0 {
+			sizeStr := fmt.Sprintf("%d", rootfsSize)
+			labels := map[string]string{
+				"containerd.io/snapshot/windows/rootfs.sizebytes": sizeStr,
+			}
+			opts = append(opts, snapshots.WithLabels(labels))
+		}
+	}
+
+	return opts
 }

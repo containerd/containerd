@@ -94,7 +94,7 @@ func (k *Kind) UnmarshalJSON(b []byte) error {
 }
 
 // Info provides information about a particular snapshot.
-// JSON marshallability is supported for interactive with tools like ctr,
+// JSON marshalling is supported for interacting with tools like ctr,
 type Info struct {
 	Kind   Kind   // active or committed snapshot
 	Name   string // name or key of snapshot
@@ -102,8 +102,8 @@ type Info struct {
 
 	// Labels for a snapshot.
 	//
-	// Note: only labels prefixed with `containerd.io/snapshot/` will be inherited by the
-	// snapshotter's `Prepare`, `View`, or `Commit` calls.
+	// Note: only labels prefixed with `containerd.io/snapshot/` will be inherited
+	// by the snapshotter's `Prepare`, `View`, or `Commit` calls.
 	Labels  map[string]string `json:",omitempty"`
 	Created time.Time         `json:",omitempty"` // Created time
 	Updated time.Time         `json:",omitempty"` // Last update time
@@ -165,19 +165,18 @@ type WalkFunc func(context.Context, Info) error
 // same key space. For example, an active snapshot may not share the same key
 // with a committed snapshot.
 //
-// We cover several examples below to demonstrate the utility of a snapshot
-// snapshotter.
+// We cover several examples below to demonstrate the utility of the snapshotter.
 //
 // Importing a Layer
 //
-// To import a layer, we simply have the Snapshotter provide a list of
+// To import a layer, we simply have the snapshotter provide a list of
 // mounts to be applied such that our dst will capture a changeset. We start
 // out by getting a path to the layer tar file and creating a temp location to
 // unpack it to:
 //
 //	layerPath, tmpDir := getLayerPath(), mkTmpDir() // just a path to layer tar file.
 //
-// We start by using a Snapshotter to Prepare a new snapshot transaction, using a
+// We start by using the snapshotter to Prepare a new snapshot transaction, using a
 // key and descending from the empty parent "". To prevent our layer from being
 // garbage collected during unpacking, we add the `containerd.io/gc.root` label:
 //
@@ -187,7 +186,7 @@ type WalkFunc func(context.Context, Info) error
 //	mounts, err := snapshotter.Prepare(ctx, key, "", noGcOpt)
 // 	if err != nil { ... }
 //
-// We get back a list of mounts from Snapshotter.Prepare, with the key identifying
+// We get back a list of mounts from snapshotter.Prepare(), with the key identifying
 // the active snapshot. Mount this to the temporary location with the
 // following:
 //
@@ -205,7 +204,7 @@ type WalkFunc func(context.Context, Info) error
 // 	digest, err := unpackLayer(tmpLocation, layer) // unpack into layer location
 // 	if err != nil { ... }
 //
-// When the above completes, we should have a filesystem the represents the
+// When the above completes, we should have a filesystem that represents the
 // contents of the layer. Careful implementations should verify that digest
 // matches the expected DiffID. When completed, we unmount the mounts:
 //
@@ -218,14 +217,14 @@ type WalkFunc func(context.Context, Info) error
 //
 //	if err := snapshotter.Commit(ctx, digest.String(), key, noGcOpt); err != nil { ... }
 //
-// Now, we have a layer in the Snapshotter that can be accessed with the digest
+// Now, we have a layer in the snapshotter that can be accessed with the digest
 // provided during commit.
 //
 // Importing the Next Layer
 //
 // Making a layer depend on the above is identical to the process described
 // above except that the parent is provided as parent when calling
-// Manager.Prepare, assuming a clean, unique key identifier:
+// snapshotter.Prepare(), assuming a clean, unique key identifier:
 //
 // 	mounts, err := snapshotter.Prepare(ctx, key, parentDigest, noGcOpt)
 //
@@ -234,20 +233,20 @@ type WalkFunc func(context.Context, Info) error
 //
 // Running a Container
 //
-// To run a container, we simply provide Snapshotter.Prepare the committed image
+// To run a container, we simply provide snapshotter.Prepare() the committed image
 // snapshot as the parent. After mounting, the prepared path can
 // be used directly as the container's filesystem:
 //
 // 	mounts, err := snapshotter.Prepare(ctx, containerKey, imageRootFSChainID)
 //
 // The returned mounts can then be passed directly to the container runtime. If
-// one would like to create a new image from the filesystem, Manager.Commit is
+// one would like to create a new image from the filesystem, snapshotter.Commit() is
 // called:
 //
 // 	if err := snapshotter.Commit(ctx, newImageSnapshot, containerKey); err != nil { ... }
 //
-// Alternatively, for most container runs, Snapshotter.Remove will be called to
-// signal the Snapshotter to abandon the changes.
+// Alternatively, for most container runs, snapshotter.Remove() will be called to
+// signal the snapshotter to abandon the changes.
 type Snapshotter interface {
 	// Stat returns the info for an active or committed snapshot by name or
 	// key.
