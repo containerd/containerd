@@ -204,6 +204,10 @@ integration: ## run integration tests
 	@echo "$(WHALE) $@"
 	@cd "${ROOTDIR}/integration/client" && $(GO) mod download && $(GOTEST) -v ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL} .
 
+bench-integration: ## benchmarks 
+	@echo "$(WHALE) $@"
+	@cd "${ROOTDIR}/integration/benchmark" && $(GO) mod download && $(GOTEST) -v ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL} .
+
 # TODO integrate cri integration bucket with coverage
 bin/cri-integration.test:
 	@echo "$(WHALE) $@"
