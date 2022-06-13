@@ -38,6 +38,8 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+const testPassword = "password1"
+
 func TestHTTPResolver(t *testing.T) {
 	s := func(h http.Handler) (string, ResolverOptions, func()) {
 		s := httptest.NewServer(h)
@@ -59,7 +61,7 @@ func TestBasicResolver(t *testing.T) {
 		// Wrap with basic auth
 		wrapped := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 			username, password, ok := r.BasicAuth()
-			if !ok || username != "user1" || password != "password1" {
+			if !ok || username != "user1" || password != testPassword {
 				rw.Header().Set("WWW-Authenticate", "Basic realm=localhost")
 				rw.WriteHeader(http.StatusUnauthorized)
 				return
@@ -71,7 +73,7 @@ func TestBasicResolver(t *testing.T) {
 		options.Hosts = ConfigureDefaultRegistries(
 			WithClient(options.Client),
 			WithAuthorizer(NewAuthorizer(options.Client, func(string) (string, string, error) {
-				return "user1", "password1", nil
+				return "user1", testPassword, nil
 			})),
 		)
 		return base, options, close
@@ -102,14 +104,14 @@ func TestBasicAuthTokenResolver(t *testing.T) {
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 		username, password, ok := r.BasicAuth()
-		if !ok || username != "user1" || password != "password1" {
+		if !ok || username != "user1" || password != testPassword {
 			rw.Write([]byte(`{"access_token":"insufficientscope"}`))
 		} else {
 			rw.Write([]byte(`{"access_token":"perfectlyvalidopaquetoken"}`))
 		}
 	})
 	creds := func(string) (string, string, error) {
-		return "user1", "password1", nil
+		return "user1", testPassword, nil
 	}
 
 	runBasicTest(t, "testname", withTokenServer(th, creds))
@@ -173,14 +175,14 @@ func TestPostBasicAuthTokenResolver(t *testing.T) {
 		rw.WriteHeader(http.StatusOK)
 
 		r.ParseForm()
-		if r.PostForm.Get("grant_type") != "password" || r.PostForm.Get("username") != "user1" || r.PostForm.Get("password") != "password1" {
+		if r.PostForm.Get("grant_type") != "password" || r.PostForm.Get("username") != "user1" || r.PostForm.Get("password") != testPassword {
 			rw.Write([]byte(`{"access_token":"insufficientscope"}`))
 		} else {
 			rw.Write([]byte(`{"access_token":"perfectlyvalidopaquetoken"}`))
 		}
 	})
 	creds := func(string) (string, string, error) {
-		return "user1", "password1", nil
+		return "user1", testPassword, nil
 	}
 
 	runBasicTest(t, "testname", withTokenServer(th, creds))
