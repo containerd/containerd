@@ -38,6 +38,7 @@ import (
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl"
+	imageidentity "github.com/opencontainers/image-spec/identity"
 	"github.com/sirupsen/logrus"
 
 	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
@@ -85,6 +86,12 @@ const (
 	sandboxMetadataExtension = criContainerdPrefix + ".sandbox.metadata"
 	// containerMetadataExtension is an extension name that identify metadata of container in CreateContainerRequest
 	containerMetadataExtension = criContainerdPrefix + ".container.metadata"
+	// imageLabelConfigDigest is the label key for image ID.
+	imageLabelConfigDigest = criContainerdPrefix + ".image-config-digest"
+	// imageLabelChainID is the label key for image's chain ID
+	imageLabelChainID = criContainerdPrefix + ".image-chain-id"
+	// imageLabelSize is the label key for image size information.
+	imageLabelSize = criContainerdPrefix + ".image-size"
 
 	// defaultIfName is the default network interface for the pods
 	defaultIfName = "eth0"
@@ -428,4 +435,61 @@ func getPassthroughAnnotations(podAnnotations map[string]string,
 		}
 	}
 	return passthroughAnnotations
+}
+
+// ensureImageMetadata will make sure image gets all metadata labels required by CRI.
+func (c *criService) ensureImageMetadata(ctx context.Context, name string) error {
+	image, err := c.client.GetImage(ctx, name)
+	if err != nil {
+		return fmt.Errorf("unable to get image %q: %w", name, err)
+	}
+
+	var (
+		metadata = image.Metadata()
+		labels   = metadata.Labels
+		update   = false
+	)
+
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+
+	if _, ok := metadata.Labels[imageLabelConfigDigest]; !ok {
+		imageConfig, err := image.Config(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get config descriptor: %w", err)
+		}
+
+		metadata.Labels[imageLabelConfigDigest] = imageConfig.Digest.String()
+		update = true
+	}
+
+	if _, ok := metadata.Labels[imageLabelChainID]; !ok {
+		diffIDs, err := image.RootFS(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get diffids: %w", err)
+		}
+
+		chainID := imageidentity.ChainID(diffIDs)
+		metadata.Labels[imageLabelChainID] = chainID.String()
+		update = true
+	}
+
+	if _, ok := metadata.Labels[imageLabelSize]; !ok {
+		size, err := image.Size(ctx)
+		if err != nil {
+			return fmt.Errorf("get image compressed resource size: %w", err)
+		}
+
+		metadata.Labels[imageLabelSize] = strconv.FormatInt(size, 10)
+		update = true
+	}
+
+	if update {
+		if _, err := c.client.ImageService().Update(ctx, metadata, "labels"); err != nil {
+			return fmt.Errorf("failed to update image metadata with repo tag and digest: %w", err)
+		}
+	}
+
+	return nil
 }

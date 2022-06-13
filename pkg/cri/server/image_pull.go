@@ -180,6 +180,9 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		if err := c.createImageReference(ctx, r, image.Target()); err != nil {
 			return nil, fmt.Errorf("failed to create image reference %q: %w", r, err)
 		}
+		if err := c.ensureImageMetadata(ctx, r); err != nil {
+			return nil, err
+		}
 		// Update image store to reflect the newest state in containerd.
 		// No need to use `updateImage`, because the image reference must
 		// have been managed by the cri plugin.
@@ -188,8 +191,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		}
 	}
 
-	log.G(ctx).Debugf("Pulled image %q with image id %q, repo tag %q, repo digest %q", imageRef, imageID,
-		repoTag, repoDigest)
+	log.G(ctx).Debugf("Pulled image %q with image id %q, repo tag %q, repo digest %q", imageRef, imageID, repoTag, repoDigest)
 	// NOTE(random-liu): the actual state in containerd is the source of truth, even we maintain
 	// in-memory image store, it's only for in-memory indexing. The image could be removed
 	// by someone else anytime, before/during/after we create the metadata. We should always
@@ -287,6 +289,12 @@ func (c *criService) updateImage(ctx context.Context, r string) error {
 		// The image id is ready, add the label to mark the image as managed.
 		if err := c.createImageReference(ctx, r, img.Target()); err != nil {
 			return fmt.Errorf("create managed label: %w", err)
+		}
+		if err := c.ensureImageMetadata(ctx, id); err != nil {
+			return err
+		}
+		if err := c.ensureImageMetadata(ctx, r); err != nil {
+			return err
 		}
 	}
 	// If the image is not found, we should continue updating the cache,
