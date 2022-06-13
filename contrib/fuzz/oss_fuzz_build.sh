@@ -70,10 +70,10 @@ mv $SRC/containerd/filters/filter_test.go $SRC/containerd/filters/filter_test_fu
 go get github.com/AdamKorcz/go-118-fuzz-build/utils
 compile_native_go_fuzzer github.com/containerd/containerd/filters FuzzFiltersParse fuzz_filters_parse
 compile_native_go_fuzzer github.com/containerd/containerd/pkg/cap FuzzParseProcPIDStatus fuzz_parse_proc_pid_status
+compile_native_go_fuzzer github.com/containerd/containerd/platforms FuzzPlatformsParse fuzz_platforms_parse
 
 compile_go_fuzzer github.com/containerd/containerd/remotes/docker FuzzFetcher fuzz_fetcher
 compile_go_fuzzer github.com/containerd/containerd/remotes/docker FuzzParseDockerRef fuzz_parse_docker_ref
-compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzPlatformsParse fuzz_platforms_parse
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzApply fuzz_apply
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzImportIndex fuzz_import_index
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzCSWalk fuzz_cs_walk
