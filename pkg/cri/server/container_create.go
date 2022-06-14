@@ -140,11 +140,16 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		}
 	}()
 
+	imageSpec, err := getImageSpec(ctx, containerdImage)
+	if err != nil {
+		return nil, err
+	}
+
 	var volumeMounts []*runtime.Mount
 	if !c.config.IgnoreImageDefinedVolumes {
 		// Create container image volumes mounts.
-		volumeMounts = c.volumeMounts(containerRootDir, config.GetMounts(), &image.ImageSpec.Config)
-	} else if len(image.ImageSpec.Config.Volumes) != 0 {
+		volumeMounts = c.volumeMounts(containerRootDir, config.GetMounts(), &imageSpec.Config)
+	} else if len(imageSpec.Config.Volumes) != 0 {
 		log.G(ctx).Debugf("Ignoring volumes defined in image %v because IgnoreImageDefinedVolumes is set", image.ID)
 	}
 
@@ -158,7 +163,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	log.G(ctx).Debugf("Use OCI runtime %+v for sandbox %q and container %q", ociRuntime, sandboxID, id)
 
 	spec, err := c.containerSpec(id, sandboxID, sandboxPid, sandbox.NetNSPath, containerName, containerdImage.Name(), config, sandboxConfig,
-		&image.ImageSpec.Config, append(mounts, volumeMounts...), ociRuntime)
+		&imageSpec.Config, append(mounts, volumeMounts...), ociRuntime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate container %q spec: %w", id, err)
 	}
@@ -204,7 +209,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		opts = append(opts, customopts.WithVolumes(mountMap))
 	}
 	meta.ImageRef = image.ID
-	meta.StopSignal = image.ImageSpec.Config.StopSignal
+	meta.StopSignal = imageSpec.Config.StopSignal
 
 	// Validate log paths and compose full container log path.
 	if sandboxConfig.GetLogDirectory() != "" && config.GetLogPath() != "" {
@@ -229,12 +234,12 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		}
 	}()
 
-	specOpts, err := c.containerSpecOpts(config, &image.ImageSpec.Config)
+	specOpts, err := c.containerSpecOpts(config, &imageSpec.Config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container spec opts: %w", err)
 	}
 
-	containerLabels := buildLabels(config.Labels, image.ImageSpec.Config.Labels, containerKindContainer)
+	containerLabels := buildLabels(config.Labels, imageSpec.Config.Labels, containerKindContainer)
 
 	runtimeOptions, err := getRuntimeOptions(sandboxInfo)
 	if err != nil {

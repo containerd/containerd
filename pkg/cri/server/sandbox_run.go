@@ -27,12 +27,12 @@ import (
 	"strings"
 	"time"
 
-	cni "github.com/containerd/go-cni"
+	"github.com/containerd/go-cni"
 	"github.com/containerd/nri"
 	v1 "github.com/containerd/nri/types/v1"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
-	selinux "github.com/opencontainers/selinux/go-selinux"
+	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -170,11 +170,17 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 
 	runtimeStart := time.Now()
+
+	imageSpec, err := getImageSpec(ctx, containerdImage)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create sandbox container.
 	// NOTE: sandboxContainerSpec SHOULD NOT have side
 	// effect, e.g. accessing/creating files, so that we can test
 	// it safely.
-	spec, err := c.sandboxContainerSpec(id, config, &image.ImageSpec.Config, sandbox.NetNSPath, ociRuntime.PodAnnotations)
+	spec, err := c.sandboxContainerSpec(id, config, &imageSpec.Config, sandbox.NetNSPath, ociRuntime.PodAnnotations)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox container spec: %w", err)
 	}
@@ -198,12 +204,12 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 
 	// Generate spec options that will be applied to the spec later.
-	specOpts, err := c.sandboxContainerSpecOpts(config, &image.ImageSpec.Config)
+	specOpts, err := c.sandboxContainerSpecOpts(config, &imageSpec.Config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox container spec options: %w", err)
 	}
 
-	sandboxLabels := buildLabels(config.Labels, image.ImageSpec.Config.Labels, containerKindSandbox)
+	sandboxLabels := buildLabels(config.Labels, imageSpec.Config.Labels, containerKindSandbox)
 
 	runtimeOpts, err := generateRuntimeOptions(ociRuntime, c.config)
 	if err != nil {

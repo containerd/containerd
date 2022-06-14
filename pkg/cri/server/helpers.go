@@ -40,6 +40,7 @@ import (
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl"
 	imageidentity "github.com/opencontainers/image-spec/identity"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 
 	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
@@ -444,6 +445,19 @@ func getPassthroughAnnotations(podAnnotations map[string]string,
 	}
 	return passthroughAnnotations
 }
+
+func retrieveImageSpec(ctx context.Context, image containerd.Image) (imagespec.Image, error) {
+	spec, err := image.Spec(ctx)
+	if err != nil {
+		return imagespec.Image{}, fmt.Errorf("failed to get image spec for image %q: %w", image.Name(), err)
+	}
+
+	return spec, nil
+}
+
+// getImageSpec retrieves an image spec from containerd client.
+// This declared as variable for easier unit testing.
+var getImageSpec = retrieveImageSpec
 
 // ensureImageMetadata will make sure image gets all metadata labels required by CRI.
 func (c *criService) ensureImageMetadata(ctx context.Context, name string) error {

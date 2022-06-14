@@ -44,8 +44,18 @@ func (c *criService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequ
 	// TODO(random-liu): [P0] Make sure corresponding snapshot exists. What if snapshot
 	// doesn't exist?
 
-	runtimeImage := toCRIImage(image)
-	info, err := c.toCRIImageInfo(ctx, &image, r.GetVerbose())
+	containerdImage, err := c.client.GetImage(ctx, image.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get image %q from client: %w", image.ID, err)
+	}
+
+	imageSpec, err := getImageSpec(ctx, containerdImage)
+	if err != nil {
+		return nil, err
+	}
+
+	runtimeImage := toCRIImage(image, imageSpec)
+	info, err := c.toCRIImageInfo(ctx, &image, imageSpec, r.GetVerbose())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate image info: %w", err)
 	}
@@ -57,7 +67,7 @@ func (c *criService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequ
 }
 
 // toCRIImage converts internal image object to CRI runtime.Image.
-func toCRIImage(image imagestore.Image) *runtime.Image {
+func toCRIImage(image imagestore.Image, imageSpec imagespec.Image) *runtime.Image {
 	repoTags, repoDigests := parseImageReferences(image.References)
 	runtimeImage := &runtime.Image{
 		Id:          image.ID,
@@ -65,7 +75,7 @@ func toCRIImage(image imagestore.Image) *runtime.Image {
 		RepoDigests: repoDigests,
 		Size_:       uint64(image.Size),
 	}
-	uid, username := getUserFromImage(image.ImageSpec.Config.User)
+	uid, username := getUserFromImage(imageSpec.Config.User)
 	if uid != nil {
 		runtimeImage.Uid = &runtime.Int64Value{Value: *uid}
 	}
@@ -81,7 +91,7 @@ type verboseImageInfo struct {
 }
 
 // toCRIImageInfo converts internal image object information to CRI image status response info map.
-func (c *criService) toCRIImageInfo(ctx context.Context, image *imagestore.Image, verbose bool) (map[string]string, error) {
+func (c *criService) toCRIImageInfo(ctx context.Context, image *imagestore.Image, imageSpec imagespec.Image, verbose bool) (map[string]string, error) {
 	if !verbose {
 		return nil, nil
 	}
@@ -90,7 +100,7 @@ func (c *criService) toCRIImageInfo(ctx context.Context, image *imagestore.Image
 
 	imi := &verboseImageInfo{
 		ChainID:   image.ChainID,
-		ImageSpec: image.ImageSpec,
+		ImageSpec: imageSpec,
 	}
 
 	m, err := json.Marshal(imi)

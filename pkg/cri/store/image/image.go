@@ -29,7 +29,6 @@ import (
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/go-digest/digestset"
 	imageidentity "github.com/opencontainers/image-spec/identity"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // Image contains all resources associated with the image. All fields
@@ -43,8 +42,6 @@ type Image struct {
 	ChainID string
 	// Size is the compressed size of the image.
 	Size int64
-	// ImageSpec is the oci image structure which describes basic information about the image.
-	ImageSpec imagespec.Image
 }
 
 // Store stores all images.
@@ -134,17 +131,11 @@ func getImage(ctx context.Context, i containerd.Image) (*Image, error) {
 
 	id := desc.Digest.String()
 
-	spec, err := i.Spec(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get OCI image spec: %w", err)
-	}
-
 	return &Image{
 		ID:         id,
 		References: []string{i.Name()},
 		ChainID:    chainID.String(),
 		Size:       size,
-		ImageSpec:  spec,
 	}, nil
 }
 

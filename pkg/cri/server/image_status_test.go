@@ -17,6 +17,7 @@
 package server
 
 import (
+	"context"
 	"testing"
 
 	"github.com/containerd/containerd"
@@ -40,12 +41,8 @@ func TestImageStatus(t *testing.T) {
 			"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
 		},
 		Size: 1234,
-		ImageSpec: imagespec.Image{
-			Config: imagespec.ImageConfig{
-				User: "user:group",
-			},
-		},
 	}
+
 	expected := &runtime.Image{
 		Id:          testID,
 		RepoTags:    []string{"gcr.io/library/busybox:latest"},
@@ -53,6 +50,17 @@ func TestImageStatus(t *testing.T) {
 		Size_:       uint64(1234),
 		Username:    "user",
 	}
+
+	getImageSpec = func(ctx context.Context, image containerd.Image) (imagespec.Image, error) {
+		switch image.Name() {
+		case "sha256:d848ce12891bf78792cda4a23c58984033b0c397a55e93a1556202222ecc5ed4":
+			return imagespec.Image{Config: imagespec.ImageConfig{User: "user:group"}}, nil
+		default:
+			t.Fatalf("unexpected OCI spec request for image %q", image.Name())
+		}
+		return imagespec.Image{}, nil
+	}
+	t.Cleanup(func() { getImageSpec = retrieveImageSpec })
 
 	list := []images.Image{
 		{

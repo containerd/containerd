@@ -129,8 +129,18 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 				}
 				log.G(ctx).Warningf("Image %q not found, stop container with signal %q", container.ImageRef, stopSignal)
 			} else {
-				if image.ImageSpec.Config.StopSignal != "" {
-					stopSignal = image.ImageSpec.Config.StopSignal
+				containerdImage, err := c.client.GetImage(ctx, image.ID)
+				if err != nil {
+					return err
+				}
+
+				imageSpec, err := getImageSpec(ctx, containerdImage)
+				if err != nil {
+					return err
+				}
+
+				if imageSpec.Config.StopSignal != "" {
+					stopSignal = imageSpec.Config.StopSignal
 				}
 			}
 		}

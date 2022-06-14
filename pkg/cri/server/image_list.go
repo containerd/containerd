@@ -30,9 +30,19 @@ func (c *criService) ListImages(ctx context.Context, r *runtime.ListImagesReques
 
 	var images []*runtime.Image
 	for _, image := range imagesInStore {
+		containerdImage, err := c.client.GetImage(ctx, image.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		imageSpec, err := getImageSpec(ctx, containerdImage)
+		if err != nil {
+			return nil, err
+		}
+
 		// TODO(random-liu): [P0] Make sure corresponding snapshot exists. What if snapshot
 		// doesn't exist?
-		images = append(images, toCRIImage(image))
+		images = append(images, toCRIImage(image, imageSpec))
 	}
 
 	return &runtime.ListImagesResponse{Images: images}, nil
