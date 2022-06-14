@@ -122,19 +122,14 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 			// default SIGTERM is still better than returning error and leaving
 			// the container unstoppable. (See issue #990)
 			// TODO(random-liu): Remove this logic when containerd 1.2 is deprecated.
-			image, err := c.imageStore.Get(container.ImageRef)
+			image, err := c.localResolve(ctx, container.ImageRef)
 			if err != nil {
 				if !errdefs.IsNotFound(err) {
 					return fmt.Errorf("failed to get image %q: %w", container.ImageRef, err)
 				}
 				log.G(ctx).Warningf("Image %q not found, stop container with signal %q", container.ImageRef, stopSignal)
 			} else {
-				containerdImage, err := c.client.GetImage(ctx, image.ID)
-				if err != nil {
-					return err
-				}
-
-				imageSpec, err := getImageSpec(ctx, containerdImage)
+				imageSpec, err := getImageSpec(ctx, image)
 				if err != nil {
 					return err
 				}

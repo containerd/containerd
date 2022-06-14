@@ -21,15 +21,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/metadata"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 )
 
 func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Status,
-	*imagestore.Image, *runtime.ContainerStatus) {
+	[]images.Image, *runtime.ContainerStatus) {
 	imageID := "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	testID := "test-id"
 	config := &runtime.ContainerConfig{
@@ -60,11 +63,27 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 		Pid:       1234,
 		CreatedAt: createdAt,
 	}
-	image := &imagestore.Image{
-		ID: imageID,
-		References: []string{
-			"gcr.io/library/busybox:latest",
-			"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+	images := []images.Image{
+		{
+			Name:   imageID,
+			Target: fakeTarget,
+			Labels: map[string]string{
+				imageLabelConfigDigest: imageID,
+			},
+		},
+		{
+			Name:   "gcr.io/library/busybox:latest",
+			Target: fakeTarget,
+			Labels: map[string]string{
+				imageLabelConfigDigest: imageID,
+			},
+		},
+		{
+			Name:   "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+			Target: fakeTarget,
+			Labels: map[string]string{
+				imageLabelConfigDigest: imageID,
+			},
 		},
 	}
 	expected := &runtime.ContainerStatus{
@@ -81,7 +100,7 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 		LogPath:     "test-log-path",
 	}
 
-	return metadata, status, image, expected
+	return metadata, status, images, expected
 }
 
 func TestToCRIContainerStatus(t *testing.T) {
@@ -213,8 +232,13 @@ func TestContainerStatus(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			c := newTestCRIService()
-			metadata, status, image, expected := getContainerStatusTestData()
+			var (
+				ctx, db    = makeTestDB(t)
+				imageStore = metadata.NewImageStore(db)
+				c          = newTestCRIService(containerd.WithImageStore(imageStore))
+			)
+
+			metadata, status, images, expected := getContainerStatusTestData()
 			// Update status with test case.
 			status.StartedAt = test.startedAt
 			status.FinishedAt = test.finishedAt
@@ -228,10 +252,12 @@ func TestContainerStatus(t *testing.T) {
 				assert.NoError(t, c.containerStore.Add(container))
 			}
 			if test.imageExist {
-				c.imageStore, err = imagestore.NewFakeStore([]imagestore.Image{*image})
-				assert.NoError(t, err)
+				for _, img := range images {
+					_, err := imageStore.Create(ctx, img)
+					require.NoError(t, err)
+				}
 			}
-			resp, err := c.ContainerStatus(context.Background(), &runtime.ContainerStatusRequest{ContainerId: container.ID})
+			resp, err := c.ContainerStatus(ctx, &runtime.ContainerStatusRequest{ContainerId: container.ID})
 			if test.expectErr {
 				assert.Error(t, err)
 				assert.Nil(t, resp)

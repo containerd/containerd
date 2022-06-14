@@ -94,13 +94,9 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	// Prepare container image snapshot. For container, the image should have
 	// been pulled before creating the container, so do not ensure the image.
-	image, err := c.localResolve(ctx, config.GetImage().GetImage())
+	containerdImage, err := c.localResolve(ctx, config.GetImage().GetImage())
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve image %q: %w", config.GetImage().GetImage(), err)
-	}
-	containerdImage, err := c.toContainerdImage(ctx, image)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
 	}
 
 	start := time.Now()
@@ -145,12 +141,17 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, err
 	}
 
+	imageID, err := getImageID(containerdImage)
+	if err != nil {
+		return nil, err
+	}
+
 	var volumeMounts []*runtime.Mount
 	if !c.config.IgnoreImageDefinedVolumes {
 		// Create container image volumes mounts.
 		volumeMounts = c.volumeMounts(containerRootDir, config.GetMounts(), &imageSpec.Config)
 	} else if len(imageSpec.Config.Volumes) != 0 {
-		log.G(ctx).Debugf("Ignoring volumes defined in image %v because IgnoreImageDefinedVolumes is set", image.ID)
+		log.G(ctx).Debugf("Ignoring volumes defined in image %v because IgnoreImageDefinedVolumes is set", imageID)
 	}
 
 	// Generate container mounts.
@@ -208,7 +209,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		}
 		opts = append(opts, customopts.WithVolumes(mountMap))
 	}
-	meta.ImageRef = image.ID
+	meta.ImageRef = imageID
 	meta.StopSignal = imageSpec.Config.StopSignal
 
 	// Validate log paths and compose full container log path.

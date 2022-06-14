@@ -27,41 +27,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 )
 
 func TestListImages(t *testing.T) {
-	imagesInStore := []imagestore.Image{
-		{
-			ID:      "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-			ChainID: "test-chainid-1",
-			References: []string{
-				"gcr.io/library/busybox:latest",
-				"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
-			},
-			Size: 1000,
-		},
-		{
-			ID:      "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-			ChainID: "test-chainid-2",
-			References: []string{
-				"gcr.io/library/alpine:latest",
-				"gcr.io/library/alpine@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
-			},
-			Size: 2000,
-		},
-		{
-			ID:      "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-			ChainID: "test-chainid-3",
-			References: []string{
-				"gcr.io/library/ubuntu:latest",
-				"gcr.io/library/ubuntu@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
-			},
-			Size: 3000,
-		},
-	}
-
 	metadataStore := []images.Image{
 		// Image 1
 		{
@@ -188,10 +156,6 @@ func TestListImages(t *testing.T) {
 		_, err := imageStore.Create(ctx, img)
 		require.NoError(t, err)
 	}
-
-	var err error
-	c.imageStore, err = imagestore.NewFakeStore(imagesInStore)
-	assert.NoError(t, err)
 
 	resp, err := c.ListImages(ctx, &runtime.ListImagesRequest{})
 	assert.NoError(t, err)

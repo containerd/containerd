@@ -42,10 +42,20 @@ func (c *criService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequ
 		return nil, fmt.Errorf("can not resolve %q locally: %w", r.GetImage().GetImage(), err)
 	}
 
+	imageID, err := getImageID(image)
+	if err != nil {
+		return nil, err
+	}
+
+	references, err := c.findReferences(ctx, imageID)
+	if err != nil {
+		return nil, err
+	}
+
 	// Remove all image references.
-	for i, ref := range image.References {
+	for i, ref := range references {
 		var opts []images.DeleteOpt
-		if i == len(image.References)-1 {
+		if i == len(references)-1 {
 			// Delete the last image reference synchronously to trigger garbage collection.
 			// This is best effort. It is possible that the image reference is deleted by
 			// someone else before this point.
@@ -53,13 +63,9 @@ func (c *criService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequ
 		}
 		err = c.client.ImageService().Delete(ctx, ref, opts...)
 		if err == nil || errdefs.IsNotFound(err) {
-			// Update image store to reflect the newest state in containerd.
-			if err := c.imageStore.Update(ctx, ref); err != nil {
-				return nil, fmt.Errorf("failed to update image reference %q for %q: %w", ref, image.ID, err)
-			}
 			continue
 		}
-		return nil, fmt.Errorf("failed to delete image reference %q for %q: %w", ref, image.ID, err)
+		return nil, fmt.Errorf("failed to delete image reference %q for %q: %w", ref, imageID, err)
 	}
 	return &runtime.RemoveImageResponse{}, nil
 }

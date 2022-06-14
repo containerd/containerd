@@ -34,7 +34,6 @@ import (
 	"github.com/containerd/containerd/oci"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/reference/docker"
@@ -197,16 +196,6 @@ var fakeTarget = ocispec.Descriptor{
 }
 
 func TestLocalResolve(t *testing.T) {
-	image := imagestore.Image{
-		ID:      "sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113799",
-		ChainID: "test-chain-id-1",
-		References: []string{
-			"docker.io/library/busybox:latest",
-			"docker.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
-		},
-		Size: 10,
-	}
-
 	list := []images.Image{
 		{
 			Name:   "sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113799",
@@ -233,10 +222,6 @@ func TestLocalResolve(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	var err error
-	c.imageStore, err = imagestore.NewFakeStore([]imagestore.Image{image})
-	assert.NoError(t, err)
-
 	for _, ref := range []string{
 		"sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113799",
 		"busybox",
@@ -256,13 +241,13 @@ func TestLocalResolve(t *testing.T) {
 		t.Run(ref, func(t *testing.T) {
 			img, err := c.localResolve(ctx, ref)
 			assert.NoError(t, err)
-			assert.Equal(t, image, img)
+			require.NotNil(t, img)
 		})
 	}
 
 	img, err := c.localResolve(ctx, "randomid")
 	assert.Equal(t, errdefs.IsNotFound(err), true)
-	assert.Equal(t, imagestore.Image{}, img)
+	assert.Nil(t, img)
 }
 
 func TestGenerateRuntimeOptions(t *testing.T) {

@@ -42,13 +42,23 @@ func (c *criService) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 	// * ImageRef in container status is repo digest.
 	spec := container.Config.GetImage()
 	imageRef := container.ImageRef
-	image, err := c.imageStore.Get(imageRef)
+	image, err := c.localResolve(ctx, imageRef)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to get image %q: %w", imageRef, err)
 		}
 	} else {
-		repoTags, repoDigests := parseImageReferences(image.References)
+		imageID, err := getImageID(image)
+		if err != nil {
+			return nil, err
+		}
+
+		references, err := c.findReferences(ctx, imageID)
+		if err != nil {
+			return nil, err
+		}
+
+		repoTags, repoDigests := parseImageReferences(references)
 		if len(repoTags) > 0 {
 			// Based on current behavior of dockershim, this field should be
 			// image tag.

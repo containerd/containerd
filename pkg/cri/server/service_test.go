@@ -30,7 +30,6 @@ import (
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	servertesting "github.com/containerd/containerd/pkg/cri/server/testing"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	"github.com/containerd/containerd/pkg/cri/store/label"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
@@ -70,7 +69,6 @@ func newTestCRIService(services ...containerd.ServicesOpt) *criService {
 		os:                 ostesting.NewFakeOS(),
 		sandboxStore:       sandboxstore.NewStore(labels),
 		client:             client,
-		imageStore:         imagestore.NewStore(nil),
 		snapshotStore:      snapshotstore.NewStore(),
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerStore:     containerstore.NewStore(labels),

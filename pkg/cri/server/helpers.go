@@ -18,7 +18,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path"
 	"path/filepath"
@@ -31,7 +30,6 @@ import (
 	clabels "github.com/containerd/containerd/labels"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	runtimeoptions "github.com/containerd/containerd/pkg/runtimeoptions/v1"
 	"github.com/containerd/containerd/plugin"
@@ -172,7 +170,7 @@ func getRepoDigestAndTag(namedRef docker.Named, digest imagedigest.Digest, schem
 
 // localResolve resolves image reference locally and returns corresponding image metadata. It
 // returns store.ErrNotExist if the reference doesn't exist.
-func (c *criService) localResolve(ctx context.Context, refOrID string) (imagestore.Image, error) {
+func (c *criService) localResolve(ctx context.Context, refOrID string) (containerd.Image, error) {
 	var filters []string
 
 	if _, err := imagedigest.Parse(refOrID); err != nil {
@@ -189,31 +187,15 @@ func (c *criService) localResolve(ctx context.Context, refOrID string) (imagesto
 
 	list, err := c.client.ImageService().List(ctx, filters...)
 	if err != nil {
-		return imagestore.Image{}, fmt.Errorf("failed to list images: %w", err)
+		return nil, fmt.Errorf("failed to list images: %w", err)
 	}
 
 	if len(list) == 0 {
-		return imagestore.Image{}, errdefs.ErrNotFound
+		return nil, errdefs.ErrNotFound
 	}
 
 	image := list[0]
-	id, err := c.imageStore.Resolve(image.Name)
-	if err != nil {
-		if errors.Is(err, errdefs.ErrNotFound) {
-			return c.imageStore.Get(image.Name)
-		}
-	}
-
-	return c.imageStore.Get(id)
-}
-
-// toContainerdImage converts an image object in image store to containerd image handler.
-func (c *criService) toContainerdImage(ctx context.Context, image imagestore.Image) (containerd.Image, error) {
-	// image should always have at least one reference.
-	if len(image.References) == 0 {
-		return nil, fmt.Errorf("invalid image with no reference %q", image.ID)
-	}
-	return c.client.GetImage(ctx, image.References[0])
+	return c.client.GetImage(ctx, image.Name)
 }
 
 // getUserFromImage gets uid or user name of the image user.
@@ -237,13 +219,13 @@ func getUserFromImage(user string) (*int64, string) {
 
 // ensureImageExists returns corresponding metadata of the image reference, if image is not
 // pulled yet, the function will pull the image.
-func (c *criService) ensureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig) (*imagestore.Image, error) {
+func (c *criService) ensureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig) (containerd.Image, error) {
 	image, err := c.localResolve(ctx, ref)
 	if err != nil && !errdefs.IsNotFound(err) {
 		return nil, fmt.Errorf("failed to get image %q: %w", ref, err)
 	}
 	if err == nil {
-		return &image, nil
+		return image, nil
 	}
 	// Pull image to ensure the image exists
 	resp, err := c.PullImage(ctx, &runtime.PullImageRequest{Image: &runtime.ImageSpec{Image: ref}, SandboxConfig: config})
@@ -251,12 +233,12 @@ func (c *criService) ensureImageExists(ctx context.Context, ref string, config *
 		return nil, fmt.Errorf("failed to pull image %q: %w", ref, err)
 	}
 	imageID := resp.GetImageRef()
-	newImage, err := c.imageStore.Get(imageID)
+	newImage, err := c.client.GetImage(ctx, imageID)
 	if err != nil {
 		// It's still possible that someone removed the image right after it is pulled.
 		return nil, fmt.Errorf("failed to get image %q after pulling: %w", imageID, err)
 	}
-	return &newImage, nil
+	return newImage, nil
 }
 
 // validateTargetContainer checks that a container is a valid
