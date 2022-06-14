@@ -20,7 +20,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
@@ -54,7 +56,15 @@ func (c *criService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequ
 		return nil, err
 	}
 
-	runtimeImage := toCRIImage(image, imageSpec)
+	references, err := c.findReferences(ctx, image.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	runtimeImage, err := toCRIImage(containerdImage, references, imageSpec)
+	if err != nil {
+		return nil, err
+	}
 	info, err := c.toCRIImageInfo(ctx, &image, imageSpec, r.GetVerbose())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate image info: %w", err)
@@ -67,21 +77,37 @@ func (c *criService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequ
 }
 
 // toCRIImage converts internal image object to CRI runtime.Image.
-func toCRIImage(image imagestore.Image, imageSpec imagespec.Image) *runtime.Image {
-	repoTags, repoDigests := parseImageReferences(image.References)
+func toCRIImage(image containerd.Image, references []string, imageSpec imagespec.Image) (*runtime.Image, error) {
+	imageID, err := getImageID(image)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		labels    = image.Labels()
+		labelSize = labels[imageLabelSize]
+	)
+
+	size, err := strconv.ParseUint(labelSize, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse image size from str %q: %w", labelSize, err)
+	}
+
+	repoTags, repoDigests := parseImageReferences(references)
 	runtimeImage := &runtime.Image{
-		Id:          image.ID,
+		Id:          imageID,
 		RepoTags:    repoTags,
 		RepoDigests: repoDigests,
-		Size_:       uint64(image.Size),
+		Size_:       size,
 	}
+
 	uid, username := getUserFromImage(imageSpec.Config.User)
 	if uid != nil {
 		runtimeImage.Uid = &runtime.Int64Value{Value: *uid}
 	}
 	runtimeImage.Username = username
 
-	return runtimeImage
+	return runtimeImage, nil
 }
 
 // TODO (mikebrow): discuss moving this struct and / or constants for info map for some or all of these fields to CRI

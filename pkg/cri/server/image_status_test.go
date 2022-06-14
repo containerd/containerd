@@ -66,14 +66,26 @@ func TestImageStatus(t *testing.T) {
 		{
 			Name:   "sha256:d848ce12891bf78792cda4a23c58984033b0c397a55e93a1556202222ecc5ed4",
 			Target: fakeTarget,
+			Labels: map[string]string{
+				imageLabelConfigDigest: "sha256:d848ce12891bf78792cda4a23c58984033b0c397a55e93a1556202222ecc5ed4",
+				imageLabelSize:         "1234",
+			},
 		},
 		{
 			Name:   "gcr.io/library/busybox:latest",
 			Target: fakeTarget,
+			Labels: map[string]string{
+				imageLabelConfigDigest: "sha256:d848ce12891bf78792cda4a23c58984033b0c397a55e93a1556202222ecc5ed4",
+				imageLabelSize:         "1234",
+			},
 		},
 		{
 			Name:   "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
 			Target: fakeTarget,
+			Labels: map[string]string{
+				imageLabelConfigDigest: "sha256:d848ce12891bf78792cda4a23c58984033b0c397a55e93a1556202222ecc5ed4",
+				imageLabelSize:         "1234",
+			},
 		},
 	}
 

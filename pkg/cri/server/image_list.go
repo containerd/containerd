@@ -18,7 +18,10 @@ package server
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/containerd/containerd"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -26,23 +29,50 @@ import (
 // TODO(random-liu): Add image list filters after CRI defines this more clear, and kubelet
 // actually needs it.
 func (c *criService) ListImages(ctx context.Context, r *runtime.ListImagesRequest) (*runtime.ListImagesResponse, error) {
-	imagesInStore := c.imageStore.List()
+	list, err := c.client.ListImages(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query image store: %w", err)
+	}
+
+	type pair struct {
+		image      containerd.Image
+		references []string
+		spec       imagespec.Image
+	}
+
+	// Group by image id and gather image references
+	groups := make(map[string]*pair)
+	for _, image := range list {
+		imageID, err := getImageID(image)
+		if err != nil {
+			return nil, err
+		}
+
+		if existing, ok := groups[imageID]; ok {
+			existing.references = append(existing.references, image.Name())
+		} else {
+			spec, err := getImageSpec(ctx, image)
+			if err != nil {
+				return nil, err
+			}
+
+			groups[imageID] = &pair{
+				image:      image,
+				references: []string{image.Name()},
+				spec:       spec,
+			}
+		}
+	}
 
 	var images []*runtime.Image
-	for _, image := range imagesInStore {
-		containerdImage, err := c.client.GetImage(ctx, image.ID)
-		if err != nil {
-			return nil, err
-		}
-
-		imageSpec, err := getImageSpec(ctx, containerdImage)
-		if err != nil {
-			return nil, err
-		}
-
+	for _, pair := range groups {
 		// TODO(random-liu): [P0] Make sure corresponding snapshot exists. What if snapshot
 		// doesn't exist?
-		images = append(images, toCRIImage(image, imageSpec))
+		image, err := toCRIImage(pair.image, pair.references, pair.spec)
+		if err != nil {
+			return nil, err
+		}
+		images = append(images, image)
 	}
 
 	return &runtime.ListImagesResponse{Images: images}, nil

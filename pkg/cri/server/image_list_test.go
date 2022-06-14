@@ -63,27 +63,89 @@ func TestListImages(t *testing.T) {
 	}
 
 	metadataStore := []images.Image{
+		// Image 1
 		{
 			Name:   "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			Target: fakeTarget,
+			Labels: map[string]string{
+				imageLabelConfigDigest: "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+				imageLabelSize:         "1000",
+			},
 		},
+		{
+			Name:   "gcr.io/library/busybox:latest",
+			Target: fakeTarget,
+			Labels: map[string]string{
+				imageLabelConfigDigest: "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+				imageLabelSize:         "1000",
+			},
+		},
+		{
+			Name:   "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+			Target: fakeTarget,
+			Labels: map[string]string{
+				imageLabelConfigDigest: "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+				imageLabelSize:         "1000",
+			},
+		},
+		// Image 2
 		{
 			Name:   "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			Target: fakeTarget,
+			Labels: map[string]string{
+				imageLabelConfigDigest: "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+				imageLabelSize:         "2000",
+			},
 		},
+		{
+			Name:   "gcr.io/library/alpine:latest",
+			Target: fakeTarget,
+			Labels: map[string]string{
+				imageLabelConfigDigest: "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+				imageLabelSize:         "2000",
+			},
+		},
+		{
+			Name:   "gcr.io/library/alpine@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+			Target: fakeTarget,
+			Labels: map[string]string{
+				imageLabelConfigDigest: "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+				imageLabelSize:         "2000",
+			},
+		},
+		// Image 3
 		{
 			Name:   "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			Target: fakeTarget,
+			Labels: map[string]string{
+				imageLabelConfigDigest: "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+				imageLabelSize:         "3000",
+			},
+		},
+		{
+			Name:   "gcr.io/library/ubuntu:latest",
+			Target: fakeTarget,
+			Labels: map[string]string{
+				imageLabelConfigDigest: "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+				imageLabelSize:         "3000",
+			},
+		}, {
+			Name:   "gcr.io/library/ubuntu@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+			Target: fakeTarget,
+			Labels: map[string]string{
+				imageLabelConfigDigest: "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+				imageLabelSize:         "3000",
+			},
 		},
 	}
 
 	getImageSpec = func(ctx context.Context, image containerd.Image) (imagespec.Image, error) {
 		switch image.Name() {
-		case "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef":
+		case "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "gcr.io/library/busybox:latest":
 			return imagespec.Image{Config: imagespec.ImageConfig{User: "root"}}, nil
-		case "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef":
+		case "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "gcr.io/library/alpine:latest":
 			return imagespec.Image{Config: imagespec.ImageConfig{User: "1234:1234"}}, nil
-		case "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef":
+		case "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "gcr.io/library/ubuntu:latest":
 			return imagespec.Image{Config: imagespec.ImageConfig{User: "nobody"}}, nil
 		default:
 			t.Fatalf("unexpected OCI spec request for image %q", image.Name())

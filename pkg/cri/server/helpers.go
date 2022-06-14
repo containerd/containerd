@@ -176,14 +176,14 @@ func (c *criService) localResolve(ctx context.Context, refOrID string) (imagesto
 	var filters []string
 
 	if _, err := imagedigest.Parse(refOrID); err != nil {
-		// Not a digest, try also find by ref
+		// Not a digest, try find by ref
 		if normalized, err := docker.ParseDockerRef(refOrID); err == nil {
 			filters = append(filters, fmt.Sprintf(`name@="%s"`, normalized))
 		}
 
 		filters = append(filters, fmt.Sprintf(`name@="%s"`, refOrID))
 	} else {
-		// Got vaid digest, just perform strong match
+		// Got a valid digest, just perform strong match
 		filters = append(filters, fmt.Sprintf(`name=="%s"`, refOrID))
 	}
 
@@ -458,6 +458,32 @@ func retrieveImageSpec(ctx context.Context, image containerd.Image) (imagespec.I
 // getImageSpec retrieves an image spec from containerd client.
 // This declared as variable for easier unit testing.
 var getImageSpec = retrieveImageSpec
+
+// findReferences retrieves all image references from metadata store.
+func (c *criService) findReferences(ctx context.Context, imageID string) ([]string, error) {
+	filter := fmt.Sprintf(`labels."%s"=="%s"`, imageLabelConfigDigest, imageID)
+	list, err := c.client.ImageService().List(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query image store: %w", err)
+	}
+
+	var references []string
+	for _, image := range list {
+		references = append(references, image.Name)
+	}
+
+	return references, nil
+}
+
+// getImageID retrieves image ID from image labels.
+func getImageID(image containerd.Image) (string, error) {
+	if labels := image.Labels(); labels != nil {
+		if id, ok := labels[imageLabelConfigDigest]; ok {
+			return id, nil
+		}
+	}
+	return "", fmt.Errorf("image %q has no ID label", image.Name())
+}
 
 // ensureImageMetadata will make sure image gets all metadata labels required by CRI.
 func (c *criService) ensureImageMetadata(ctx context.Context, name string) error {
