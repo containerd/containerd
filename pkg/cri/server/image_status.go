@@ -33,7 +33,7 @@ import (
 // TODO(random-liu): We should change CRI to distinguish image id and image spec. (See
 // kubernetes/kubernetes#46255)
 func (c *criService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequest) (*runtime.ImageStatusResponse, error) {
-	image, err := c.localResolve(r.GetImage().GetImage())
+	image, err := c.localResolve(ctx, r.GetImage().GetImage())
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			// return empty without error when image not found.

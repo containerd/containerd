@@ -33,7 +33,7 @@ import (
 // Remove the whole image no matter the it's image id or reference. This is the
 // semantic defined in CRI now.
 func (c *criService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequest) (*runtime.RemoveImageResponse, error) {
-	image, err := c.localResolve(r.GetImage().GetImage())
+	image, err := c.localResolve(ctx, r.GetImage().GetImage())
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			// return empty without error when image not found.

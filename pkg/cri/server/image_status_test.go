@@ -17,9 +17,11 @@
 package server
 
 import (
-	"context"
 	"testing"
 
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/metadata"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -52,9 +54,34 @@ func TestImageStatus(t *testing.T) {
 		Username:    "user",
 	}
 
-	c := newTestCRIService()
+	list := []images.Image{
+		{
+			Name:   "sha256:d848ce12891bf78792cda4a23c58984033b0c397a55e93a1556202222ecc5ed4",
+			Target: fakeTarget,
+		},
+		{
+			Name:   "gcr.io/library/busybox:latest",
+			Target: fakeTarget,
+		},
+		{
+			Name:   "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+			Target: fakeTarget,
+		},
+	}
+
+	var (
+		ctx, db    = makeTestDB(t)
+		imageStore = metadata.NewImageStore(db)
+		c          = newTestCRIService(containerd.WithImageStore(imageStore))
+	)
+
+	for _, img := range list {
+		_, err := imageStore.Create(ctx, img)
+		require.NoError(t, err)
+	}
+
 	t.Logf("should return nil image spec without error for non-exist image")
-	resp, err := c.ImageStatus(context.Background(), &runtime.ImageStatusRequest{
+	resp, err := c.ImageStatus(ctx, &runtime.ImageStatusRequest{
 		Image: &runtime.ImageSpec{Image: testID},
 	})
 	assert.NoError(t, err)
@@ -65,7 +92,7 @@ func TestImageStatus(t *testing.T) {
 	assert.NoError(t, err)
 
 	t.Logf("should return correct image status for exist image")
-	resp, err = c.ImageStatus(context.Background(), &runtime.ImageStatusRequest{
+	resp, err = c.ImageStatus(ctx, &runtime.ImageStatusRequest{
 		Image: &runtime.ImageSpec{Image: testID},
 	})
 	assert.NoError(t, err)

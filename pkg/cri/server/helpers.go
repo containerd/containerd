@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
 	"path/filepath"
@@ -170,32 +171,39 @@ func getRepoDigestAndTag(namedRef docker.Named, digest imagedigest.Digest, schem
 
 // localResolve resolves image reference locally and returns corresponding image metadata. It
 // returns store.ErrNotExist if the reference doesn't exist.
-func (c *criService) localResolve(refOrID string) (imagestore.Image, error) {
-	getImageID := func(refOrId string) string {
-		if _, err := imagedigest.Parse(refOrID); err == nil {
-			return refOrID
+func (c *criService) localResolve(ctx context.Context, refOrID string) (imagestore.Image, error) {
+	var filters []string
+
+	if _, err := imagedigest.Parse(refOrID); err != nil {
+		// Not a digest, try also find by ref
+		if normalized, err := docker.ParseDockerRef(refOrID); err == nil {
+			filters = append(filters, fmt.Sprintf(`name@="%s"`, normalized))
 		}
-		return func(ref string) string {
-			// ref is not image id, try to resolve it locally.
-			// TODO(random-liu): Handle this error better for debugging.
-			normalized, err := docker.ParseDockerRef(ref)
-			if err != nil {
-				return ""
-			}
-			id, err := c.imageStore.Resolve(normalized.String())
-			if err != nil {
-				return ""
-			}
-			return id
-		}(refOrID)
+
+		filters = append(filters, fmt.Sprintf(`name@="%s"`, refOrID))
+	} else {
+		// Got vaid digest, just perform strong match
+		filters = append(filters, fmt.Sprintf(`name=="%s"`, refOrID))
 	}
 
-	imageID := getImageID(refOrID)
-	if imageID == "" {
-		// Try to treat ref as imageID
-		imageID = refOrID
+	list, err := c.client.ImageService().List(ctx, filters...)
+	if err != nil {
+		return imagestore.Image{}, fmt.Errorf("failed to list images: %w", err)
 	}
-	return c.imageStore.Get(imageID)
+
+	if len(list) == 0 {
+		return imagestore.Image{}, errdefs.ErrNotFound
+	}
+
+	image := list[0]
+	id, err := c.imageStore.Resolve(image.Name)
+	if err != nil {
+		if errors.Is(err, errdefs.ErrNotFound) {
+			return c.imageStore.Get(image.Name)
+		}
+	}
+
+	return c.imageStore.Get(id)
 }
 
 // toContainerdImage converts an image object in image store to containerd image handler.
@@ -229,7 +237,7 @@ func getUserFromImage(user string) (*int64, string) {
 // ensureImageExists returns corresponding metadata of the image reference, if image is not
 // pulled yet, the function will pull the image.
 func (c *criService) ensureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig) (*imagestore.Image, error) {
-	image, err := c.localResolve(ref)
+	image, err := c.localResolve(ctx, ref)
 	if err != nil && !errdefs.IsNotFound(err) {
 		return nil, fmt.Errorf("failed to get image %q: %w", ref, err)
 	}
@@ -446,12 +454,11 @@ func (c *criService) ensureImageMetadata(ctx context.Context, name string) error
 
 	var (
 		metadata = image.Metadata()
-		labels   = metadata.Labels
 		update   = false
 	)
 
-	if labels == nil {
-		labels = make(map[string]string)
+	if metadata.Labels == nil {
+		metadata.Labels = make(map[string]string)
 	}
 
 	if _, ok := metadata.Labels[imageLabelConfigDigest]; !ok {

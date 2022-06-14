@@ -27,7 +27,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	selinux "github.com/opencontainers/selinux/go-selinux"
+	"github.com/opencontainers/selinux/go-selinux"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd"
@@ -94,7 +94,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	// Prepare container image snapshot. For container, the image should have
 	// been pulled before creating the container, so do not ensure the image.
-	image, err := c.localResolve(config.GetImage().GetImage())
+	image, err := c.localResolve(ctx, config.GetImage().GetImage())
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve image %q: %w", config.GetImage().GetImage(), err)
 	}
