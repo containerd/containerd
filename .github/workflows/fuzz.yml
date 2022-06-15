@@ -1,7 +1,10 @@
-name: CI Fuzz
+name: Fuzzing
 on: [pull_request]
 jobs:
-  Fuzzing:
+  # Run all fuzzing tests. Some of them use Go 1.18's testing.F.
+  # Others use https://github.com/AdaLogics/go-fuzz-headers.
+  ci_fuzz:
+    name: CI Fuzz
     runs-on: ubuntu-latest
     steps:
     - name: Build Fuzzers
@@ -24,3 +27,15 @@ jobs:
       with:
         name: artifacts
         path: ./out/artifacts
+
+  # Make sure all fuzzing tests which use Go 1.18's testing.F are
+  # runnable with go test -fuzz.
+  go_test_fuzz:
+    name : go test -fuzz
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v2
+        with:
+          go-version: 1.18
+      - uses: actions/checkout@v2
+      - run: script/go-test-fuzz.sh
