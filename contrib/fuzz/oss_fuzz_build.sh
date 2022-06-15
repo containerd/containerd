@@ -69,16 +69,16 @@ mv $SRC/cmd-containerd-backup $SRC/containerd/cmd/containerd
 mv $SRC/containerd/filters/filter_test.go $SRC/containerd/filters/filter_test_fuzz.go
 go get github.com/AdamKorcz/go-118-fuzz-build/utils
 compile_native_go_fuzzer github.com/containerd/containerd/filters FuzzFiltersParse fuzz_filters_parse
+compile_native_go_fuzzer github.com/containerd/containerd/pkg/cap FuzzParseProcPIDStatus fuzz_parse_proc_pid_status
+compile_native_go_fuzzer github.com/containerd/containerd/platforms FuzzPlatformsParse fuzz_platforms_parse
 
 compile_go_fuzzer github.com/containerd/containerd/remotes/docker FuzzFetcher fuzz_fetcher
 compile_go_fuzzer github.com/containerd/containerd/remotes/docker FuzzParseDockerRef fuzz_parse_docker_ref
-compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzPlatformsParse fuzz_platforms_parse
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzApply fuzz_apply
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzImportIndex fuzz_import_index
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzCSWalk fuzz_cs_walk
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzArchiveExport fuzz_archive_export
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzParseAuth fuzz_parse_auth
-compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzParseProcPIDStatus fuzz_parse_proc_pid_status
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzImageStore fuzz_image_store
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzLeaseManager fuzz_lease_manager
 compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzContainerStore fuzz_container_store
