@@ -16,11 +16,10 @@
 set -o nounset
 set -o pipefail
 set -o errexit
-set -x
 
 apt-get update && apt-get install -y wget
 cd $SRC
-wget https://go.dev/dl/go1.18.3.linux-amd64.tar.gz
+wget --quiet https://go.dev/dl/go1.18.3.linux-amd64.tar.gz
 
 mkdir temp-go
 rm -rf /root/.go/*
@@ -87,7 +86,7 @@ compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzContentStore
 
 # The below fuzzers require more setup than the fuzzers above.
 # We need the binaries from "make".
-wget -c https://github.com/protocolbuffers/protobuf/releases/download/v3.11.4/protoc-3.11.4-linux-x86_64.zip
+wget --quiet https://github.com/protocolbuffers/protobuf/releases/download/v3.11.4/protoc-3.11.4-linux-x86_64.zip
 unzip protoc-3.11.4-linux-x86_64.zip -d /usr/local
 
 export CGO_ENABLED=1
@@ -102,10 +101,7 @@ make install
 
 # Build static containerd
 cd $SRC/containerd
-make EXTRA_FLAGS="-buildmode pie" \
-	EXTRA_LDFLAGS='-linkmode external -extldflags "-fno-PIC -static"' \
-	BUILDTAGS="netgo osusergo static_build"
-
+make STATIC=1
 
 mkdir $OUT/containerd-binaries || true
 cd $SRC/containerd/bin && cp * $OUT/containerd-binaries/ && cd -
