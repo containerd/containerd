@@ -139,7 +139,6 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		containerd.WithResolver(resolver),
 		containerd.WithPullSnapshotter(snapshotter),
 		containerd.WithPullUnpack,
-		containerd.WithPullLabel(imageLabelKey, imageLabelValue),
 		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
 		containerd.WithImageHandler(imageHandler),
 		containerd.WithUnpackOpts([]containerd.UnpackOpt{
@@ -246,8 +245,6 @@ func (c *criService) createImageReference(ctx context.Context, name string, desc
 	img := containerdimages.Image{
 		Name:   name,
 		Target: desc,
-		// Add a label to indicate that the image is managed by the cri plugin.
-		Labels: map[string]string{imageLabelKey: imageLabelValue},
 	}
 	// TODO(random-liu): Figure out which is the more performant sequence create then update or
 	// update then create.
@@ -255,10 +252,10 @@ func (c *criService) createImageReference(ctx context.Context, name string, desc
 	if err == nil || !errdefs.IsAlreadyExists(err) {
 		return err
 	}
-	if oldImg.Target.Digest == img.Target.Digest && oldImg.Labels[imageLabelKey] == imageLabelValue {
+	if oldImg.Target.Digest == img.Target.Digest {
 		return nil
 	}
-	_, err = c.client.ImageService().Update(ctx, img, "target", "labels."+imageLabelKey)
+	_, err = c.client.ImageService().Update(ctx, img, "target")
 	return err
 }
 
