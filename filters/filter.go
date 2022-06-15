@@ -53,10 +53,9 @@
 // labels."very complex label"==something
 // ```
 //
-// We also define `!=`, `~=`, `@=` as operators. The `!=` will match all
-// objects that don't match the value for a field. `~=` will compile the
+// We also define `!=` and `~=` as operators. The `!=` will match all
+// objects that don't match the value for a field and `~=` will compile the
 // target value as a regular expression and match the field value against that.
-// `@=` is a "contains" substring operator.
 //
 // Selectors can be combined using a comma, such that the resulting
 // selector will require all selectors are matched for the object to match.
@@ -71,7 +70,6 @@ package filters
 
 import (
 	"regexp"
-	"strings"
 
 	"github.com/containerd/containerd/log"
 )
@@ -129,7 +127,6 @@ const (
 	operatorEqual
 	operatorNotEqual
 	operatorMatches
-	operatorContains
 )
 
 func (op operator) String() string {
@@ -142,8 +139,6 @@ func (op operator) String() string {
 		return "!="
 	case operatorMatches:
 		return "~="
-	case operatorContains:
-		return "@="
 	}
 
 	return "unknown"
@@ -166,8 +161,6 @@ func (m selector) Match(adaptor Adaptor) bool {
 		return present && value == m.value
 	case operatorNotEqual:
 		return value != m.value
-	case operatorContains:
-		return strings.Contains(value, m.value)
 	case operatorMatches:
 		if m.re == nil {
 			r, err := regexp.Compile(m.value)

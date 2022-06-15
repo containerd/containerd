@@ -181,10 +181,10 @@ func (c *criService) localResolve(ctx context.Context, refOrID string) (containe
 	if _, err := imagedigest.Parse(refOrID); err != nil {
 		// Not a digest, try find by ref
 		if normalized, err := docker.ParseDockerRef(refOrID); err == nil {
-			filters = append(filters, fmt.Sprintf(`name@="%s",%s`, normalized, managed))
+			filters = append(filters, fmt.Sprintf(`name~="%s",%s`, normalized, managed))
 		}
 
-		filters = append(filters, fmt.Sprintf(`name@="%s",%s`, refOrID, managed))
+		filters = append(filters, fmt.Sprintf(`name~="%s",%s`, refOrID, managed))
 	} else {
 		// Got a valid digest, just perform strong match
 		filters = append(filters, fmt.Sprintf(`name=="%s",%s`, refOrID, managed))

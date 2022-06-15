@@ -36,6 +36,7 @@ func (tr tokenResult) String() string {
 }
 
 func TestScanner(t *testing.T) {
+
 	for _, testcase := range []struct {
 		name     string
 		input    string
@@ -51,7 +52,7 @@ func TestScanner(t *testing.T) {
 		},
 		{
 			name:  "SelectorsWithOperators",
-			input: "name==value,foo!=bar,x@=y",
+			input: "name==value,foo!=bar",
 			expected: []tokenResult{
 				{pos: 0, token: tokenField, text: "name"},
 				{pos: 4, token: tokenOperator, text: "=="},
@@ -60,11 +61,7 @@ func TestScanner(t *testing.T) {
 				{pos: 12, token: tokenField, text: "foo"},
 				{pos: 15, token: tokenOperator, text: "!="},
 				{pos: 17, token: tokenValue, text: "bar"},
-				{pos: 20, token: tokenSeparator, text: ","},
-				{pos: 21, token: tokenField, text: "x"},
-				{pos: 22, token: tokenOperator, text: "@="},
-				{pos: 24, token: tokenValue, text: "y"},
-				{pos: 25, token: tokenEOF},
+				{pos: 20, token: tokenEOF},
 			},
 		},
 		{
