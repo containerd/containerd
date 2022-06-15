@@ -23,8 +23,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const testPath = "/tmp/path/for/testing"
+
 func TestCreateTopLevelDirectoriesErrorsWithSamePathForRootAndState(t *testing.T) {
-	path := "/tmp/path/for/testing"
+	path := testPath
 	err := CreateTopLevelDirectories(&srvconfig.Config{
 		Root:  path,
 		State: path,
@@ -34,7 +36,7 @@ func TestCreateTopLevelDirectoriesErrorsWithSamePathForRootAndState(t *testing.T
 
 func TestCreateTopLevelDirectoriesWithEmptyStatePath(t *testing.T) {
 	statePath := ""
-	rootPath := "/tmp/path/for/testing"
+	rootPath := testPath
 	err := CreateTopLevelDirectories(&srvconfig.Config{
 		Root:  rootPath,
 		State: statePath,
@@ -43,7 +45,7 @@ func TestCreateTopLevelDirectoriesWithEmptyStatePath(t *testing.T) {
 }
 
 func TestCreateTopLevelDirectoriesWithEmptyRootPath(t *testing.T) {
-	statePath := "/tmp/path/for/testing"
+	statePath := testPath
 	rootPath := ""
 	err := CreateTopLevelDirectories(&srvconfig.Config{
 		Root:  rootPath,
