@@ -171,18 +171,23 @@ func getRepoDigestAndTag(namedRef docker.Named, digest imagedigest.Digest, schem
 // localResolve resolves image reference locally and returns corresponding image metadata. It
 // returns store.ErrNotExist if the reference doesn't exist.
 func (c *criService) localResolve(ctx context.Context, refOrID string) (containerd.Image, error) {
-	var filters []string
+
+	var (
+		filters []string
+		// Query only images already updated by CRI
+		managed = fmt.Sprintf(`labels."%s"=="%s"`, imageLabelKey, imageLabelValue)
+	)
 
 	if _, err := imagedigest.Parse(refOrID); err != nil {
 		// Not a digest, try find by ref
 		if normalized, err := docker.ParseDockerRef(refOrID); err == nil {
-			filters = append(filters, fmt.Sprintf(`name@="%s"`, normalized))
+			filters = append(filters, fmt.Sprintf(`name@="%s",%s`, normalized, managed))
 		}
 
-		filters = append(filters, fmt.Sprintf(`name@="%s"`, refOrID))
+		filters = append(filters, fmt.Sprintf(`name@="%s",%s`, refOrID, managed))
 	} else {
 		// Got a valid digest, just perform strong match
-		filters = append(filters, fmt.Sprintf(`name=="%s"`, refOrID))
+		filters = append(filters, fmt.Sprintf(`name=="%s",%s`, refOrID, managed))
 	}
 
 	list, err := c.client.ImageService().List(ctx, filters...)
@@ -515,6 +520,8 @@ func (c *criService) ensureImageMetadata(ctx context.Context, name string) error
 	}
 
 	if update {
+		metadata.Labels[imageLabelKey] = imageLabelValue
+
 		if _, err := c.client.ImageService().Update(ctx, metadata, "labels"); err != nil {
 			return fmt.Errorf("failed to update image metadata with repo tag and digest: %w", err)
 		}

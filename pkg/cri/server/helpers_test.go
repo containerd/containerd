@@ -200,14 +200,17 @@ func TestLocalResolve(t *testing.T) {
 		{
 			Name:   "sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113799",
 			Target: fakeTarget,
+			Labels: map[string]string{imageLabelKey: imageLabelValue},
 		},
 		{
 			Name:   "docker.io/library/busybox:latest",
 			Target: fakeTarget,
+			Labels: map[string]string{imageLabelKey: imageLabelValue},
 		},
 		{
 			Name:   "docker.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
 			Target: fakeTarget,
+			Labels: map[string]string{imageLabelKey: imageLabelValue},
 		},
 	}
 

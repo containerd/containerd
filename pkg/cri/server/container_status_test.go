@@ -69,6 +69,7 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 			Target: fakeTarget,
 			Labels: map[string]string{
 				imageLabelConfigDigest: imageID,
+				imageLabelKey:          imageLabelValue,
 			},
 		},
 		{
@@ -76,6 +77,7 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 			Target: fakeTarget,
 			Labels: map[string]string{
 				imageLabelConfigDigest: imageID,
+				imageLabelKey:          imageLabelValue,
 			},
 		},
 		{
@@ -83,6 +85,7 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 			Target: fakeTarget,
 			Labels: map[string]string{
 				imageLabelConfigDigest: imageID,
+				imageLabelKey:          imageLabelValue,
 			},
 		},
 	}

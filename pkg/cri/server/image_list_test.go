@@ -38,6 +38,7 @@ func TestListImages(t *testing.T) {
 			Labels: map[string]string{
 				imageLabelConfigDigest: "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 				imageLabelSize:         "1000",
+				imageLabelKey:          imageLabelValue,
 			},
 		},
 		{
@@ -46,6 +47,7 @@ func TestListImages(t *testing.T) {
 			Labels: map[string]string{
 				imageLabelConfigDigest: "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 				imageLabelSize:         "1000",
+				imageLabelKey:          imageLabelValue,
 			},
 		},
 		{
@@ -54,6 +56,7 @@ func TestListImages(t *testing.T) {
 			Labels: map[string]string{
 				imageLabelConfigDigest: "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 				imageLabelSize:         "1000",
+				imageLabelKey:          imageLabelValue,
 			},
 		},
 		// Image 2
@@ -63,6 +66,7 @@ func TestListImages(t *testing.T) {
 			Labels: map[string]string{
 				imageLabelConfigDigest: "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 				imageLabelSize:         "2000",
+				imageLabelKey:          imageLabelValue,
 			},
 		},
 		{
@@ -71,6 +75,7 @@ func TestListImages(t *testing.T) {
 			Labels: map[string]string{
 				imageLabelConfigDigest: "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 				imageLabelSize:         "2000",
+				imageLabelKey:          imageLabelValue,
 			},
 		},
 		{
@@ -79,6 +84,7 @@ func TestListImages(t *testing.T) {
 			Labels: map[string]string{
 				imageLabelConfigDigest: "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 				imageLabelSize:         "2000",
+				imageLabelKey:          imageLabelValue,
 			},
 		},
 		// Image 3
@@ -88,6 +94,7 @@ func TestListImages(t *testing.T) {
 			Labels: map[string]string{
 				imageLabelConfigDigest: "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 				imageLabelSize:         "3000",
+				imageLabelKey:          imageLabelValue,
 			},
 		},
 		{
@@ -96,6 +103,7 @@ func TestListImages(t *testing.T) {
 			Labels: map[string]string{
 				imageLabelConfigDigest: "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 				imageLabelSize:         "3000",
+				imageLabelKey:          imageLabelValue,
 			},
 		}, {
 			Name:   "gcr.io/library/ubuntu@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
@@ -103,6 +111,7 @@ func TestListImages(t *testing.T) {
 			Labels: map[string]string{
 				imageLabelConfigDigest: "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 				imageLabelSize:         "3000",
+				imageLabelKey:          imageLabelValue,
 			},
 		},
 	}

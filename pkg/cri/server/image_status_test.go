@@ -57,6 +57,7 @@ func TestImageStatus(t *testing.T) {
 			Labels: map[string]string{
 				imageLabelConfigDigest: "sha256:d848ce12891bf78792cda4a23c58984033b0c397a55e93a1556202222ecc5ed4",
 				imageLabelSize:         "1234",
+				imageLabelKey:          imageLabelValue,
 			},
 		},
 		{
@@ -65,6 +66,7 @@ func TestImageStatus(t *testing.T) {
 			Labels: map[string]string{
 				imageLabelConfigDigest: "sha256:d848ce12891bf78792cda4a23c58984033b0c397a55e93a1556202222ecc5ed4",
 				imageLabelSize:         "1234",
+				imageLabelKey:          imageLabelValue,
 			},
 		},
 		{
@@ -73,6 +75,7 @@ func TestImageStatus(t *testing.T) {
 			Labels: map[string]string{
 				imageLabelConfigDigest: "sha256:d848ce12891bf78792cda4a23c58984033b0c397a55e93a1556202222ecc5ed4",
 				imageLabelSize:         "1234",
+				imageLabelKey:          imageLabelValue,
 			},
 		},
 	}

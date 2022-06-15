@@ -42,7 +42,7 @@ selectors := selector ("," selector)*
 selector  := fieldpath (operator value)
 fieldpath := field ('.' field)*
 field     := quoted | [A-Za-z] [A-Za-z0-9_]+
-operator  := "==" | "!=" | "~=" | "^="
+operator  := "==" | "!=" | "~=" | "@="
 value     := quoted | [^\s,]+
 quoted    := <go string syntax>
 

@@ -29,19 +29,19 @@ import (
 // TODO(random-liu): Add image list filters after CRI defines this more clear, and kubelet
 // actually needs it.
 func (c *criService) ListImages(ctx context.Context, r *runtime.ListImagesRequest) (*runtime.ListImagesResponse, error) {
-	list, err := c.client.ListImages(ctx)
+	list, err := c.client.ListImages(ctx, fmt.Sprintf(`labels."%s"=="%s"`, imageLabelKey, imageLabelValue))
 	if err != nil {
 		return nil, fmt.Errorf("failed to query image store: %w", err)
 	}
 
-	type pair struct {
+	type imageInfo struct {
 		image      containerd.Image
 		references []string
 		spec       imagespec.Image
 	}
 
 	// Group by image id and gather image references
-	groups := make(map[string]*pair)
+	groups := make(map[string]*imageInfo)
 	for _, image := range list {
 		imageID, err := getImageID(image)
 		if err != nil {
@@ -56,7 +56,7 @@ func (c *criService) ListImages(ctx context.Context, r *runtime.ListImagesReques
 				return nil, err
 			}
 
-			groups[imageID] = &pair{
+			groups[imageID] = &imageInfo{
 				image:      image,
 				references: []string{image.Name()},
 				spec:       spec,
@@ -65,10 +65,10 @@ func (c *criService) ListImages(ctx context.Context, r *runtime.ListImagesReques
 	}
 
 	var images []*runtime.Image
-	for _, pair := range groups {
+	for _, info := range groups {
 		// TODO(random-liu): [P0] Make sure corresponding snapshot exists. What if snapshot
 		// doesn't exist?
-		image, err := toCRIImage(pair.image, pair.references, pair.spec)
+		image, err := toCRIImage(info.image, info.references, info.spec)
 		if err != nil {
 			return nil, err
 		}

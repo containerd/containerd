@@ -166,6 +166,10 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
 	}
 
+	if err := c.ensureImageMetadata(ctx, image.Name()); err != nil {
+		return nil, err
+	}
+
 	configDesc, err := image.Config(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get image config descriptor: %w", err)
