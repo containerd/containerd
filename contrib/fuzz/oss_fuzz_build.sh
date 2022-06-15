@@ -17,6 +17,25 @@ set -o nounset
 set -o pipefail
 set -o errexit
 
+IFS=$'\n'
+
+compile_fuzzers() {
+    local regex=$1
+    local compile_fuzzer=$2
+
+    for line in $(git grep "$regex" | grep -v vendor)
+    do
+        if [[ "$line" =~ (.*)/.*:.*(Fuzz[A-Za-z0-9]+) ]]; then
+            local pkg=${BASH_REMATCH[1]}
+            local func=${BASH_REMATCH[2]}
+            "$compile_fuzzer" "github.com/containerd/containerd/$pkg" "$func" "fuzz_$func"
+        else
+            echo "failed to parse: $line"
+            exit 1
+        fi
+    done
+}
+
 apt-get update && apt-get install -y wget
 cd $SRC
 wget --quiet https://go.dev/dl/go1.18.3.linux-amd64.tar.gz
@@ -67,22 +86,9 @@ mv $SRC/cmd-containerd-backup $SRC/containerd/cmd/containerd
 # Compile more fuzzers
 mv $SRC/containerd/filters/filter_test.go $SRC/containerd/filters/filter_test_fuzz.go
 go get github.com/AdamKorcz/go-118-fuzz-build/utils
-compile_native_go_fuzzer github.com/containerd/containerd/filters FuzzFiltersParse fuzz_filters_parse
-compile_native_go_fuzzer github.com/containerd/containerd/pkg/cap FuzzParseProcPIDStatus fuzz_parse_proc_pid_status
-compile_native_go_fuzzer github.com/containerd/containerd/platforms FuzzPlatformsParse fuzz_platforms_parse
 
-compile_go_fuzzer github.com/containerd/containerd/remotes/docker FuzzFetcher fuzz_fetcher
-compile_go_fuzzer github.com/containerd/containerd/remotes/docker FuzzParseDockerRef fuzz_parse_docker_ref
-compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzApply fuzz_apply
-compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzImportIndex fuzz_import_index
-compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzCSWalk fuzz_cs_walk
-compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzArchiveExport fuzz_archive_export
-compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzParseAuth fuzz_parse_auth
-compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzImageStore fuzz_image_store
-compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzLeaseManager fuzz_lease_manager
-compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzContainerStore fuzz_container_store
-compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzContentStore fuzz_content_store
-
+compile_fuzzers '^func Fuzz.*testing\.F' compile_native_go_fuzzer
+compile_fuzzers '^func Fuzz.*data' compile_go_fuzzer
 
 # The below fuzzers require more setup than the fuzzers above.
 # We need the binaries from "make".
