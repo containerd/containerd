@@ -105,6 +105,12 @@ type ttrpcService interface {
 	RegisterTTRPC(*ttrpc.Server) error
 }
 
+type ttrpcServerOptioner interface {
+	ttrpcService
+
+	UnaryInterceptor() ttrpc.UnaryServerInterceptor
+}
+
 type taskService struct {
 	shimapi.TaskService
 }
@@ -366,6 +372,8 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 	var (
 		initialized   = plugin.NewPluginSet()
 		ttrpcServices = []ttrpcService{}
+
+		ttrpcUnaryInterceptors = []ttrpc.UnaryServerInterceptor{}
 	)
 	plugins := plugin.Graph(func(*plugin.Registration) bool { return false })
 	for _, p := range plugins {
@@ -414,11 +422,17 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 		if src, ok := instance.(ttrpcService); ok {
 			logrus.WithField("id", id).Debug("registering ttrpc service")
 			ttrpcServices = append(ttrpcServices, src)
+
+		}
+
+		if src, ok := instance.(ttrpcServerOptioner); ok {
+			ttrpcUnaryInterceptors = append(ttrpcUnaryInterceptors, src.UnaryInterceptor())
 		}
 	}
 
-	server, err := newServer()
-	if err != nil { //nolint:staticcheck // Ignore SA4023 as some platforms always return error
+	unaryInterceptor := chainUnaryServerInterceptors(ttrpcUnaryInterceptors...)
+	server, err := newServer(ttrpc.WithUnaryServerInterceptor(unaryInterceptor))
+	if err != nil {
 		return fmt.Errorf("failed creating server: %w", err)
 	}
 
