@@ -805,7 +805,7 @@ func WithUsername(username string) SpecOpts {
 }
 
 // WithAdditionalGIDs sets the OCI spec's additionalGids array to any additional groups listed
-// for a particular user in the /etc/groups file of the image's root filesystem
+// for a particular user in the /etc/group file of the image's root filesystem
 // The passed in user can be either a uid or a username.
 func WithAdditionalGIDs(userstr string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {

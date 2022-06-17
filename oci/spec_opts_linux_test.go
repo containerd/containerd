@@ -22,10 +22,78 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/pkg/testutil"
+	"github.com/containerd/continuity/fs/fstest"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/stretchr/testify/assert"
 	"golang.org/x/sys/unix"
 )
+
+// nolint:gosec
+func TestWithAdditionalGIDs(t *testing.T) {
+	t.Parallel()
+	expectedPasswd := `root:x:0:0:root:/root:/bin/ash
+bin:x:1:1:bin:/bin:/sbin/nologin
+daemon:x:2:2:daemon:/sbin:/sbin/nologin
+`
+	expectedGroup := `root:x:0:root
+bin:x:1:root,bin,daemon
+daemon:x:2:root,bin,daemon
+sys:x:3:root,bin,adm
+`
+	td := t.TempDir()
+	apply := fstest.Apply(
+		fstest.CreateDir("/etc", 0777),
+		fstest.CreateFile("/etc/passwd", []byte(expectedPasswd), 0777),
+		fstest.CreateFile("/etc/group", []byte(expectedGroup), 0777),
+	)
+	if err := apply.Apply(td); err != nil {
+		t.Fatalf("failed to apply: %v", err)
+	}
+	c := containers.Container{ID: t.Name()}
+
+	testCases := []struct {
+		name     string
+		user     string
+		expected []uint32
+	}{
+		{
+			user:     "root",
+			expected: []uint32{},
+		},
+		{
+			user:     "1000",
+			expected: []uint32{},
+		},
+		{
+			user:     "bin",
+			expected: []uint32{2, 3},
+		},
+		{
+			user:     "bin:root",
+			expected: []uint32{},
+		},
+		{
+			user:     "daemon",
+			expected: []uint32{1},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.user, func(t *testing.T) {
+			t.Parallel()
+			s := Spec{
+				Version: specs.Version,
+				Root: &specs.Root{
+					Path: td,
+				},
+			}
+			err := WithAdditionalGIDs(testCase.user)(context.Background(), nil, &c, &s)
+			assert.NoError(t, err)
+			assert.Equal(t, testCase.expected, s.Process.User.AdditionalGids)
+		})
+	}
+}
 
 func TestAddCaps(t *testing.T) {
 	t.Parallel()
