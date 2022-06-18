@@ -128,7 +128,7 @@ func main() {
 
 Using the previous configuration and example, you could run a snapshot plugin
 with
-```
+```shell
 # Start plugin in one terminal
 $ go run ./main.go /var/run/mysnapshotter.sock /tmp/snapshots
 
@@ -165,7 +165,7 @@ containerd uses plugins internally to ensure that internal implementations are
 decoupled, stable, and treated equally with external plugins. To see all the
 plugins containerd has, use `ctr plugins ls`
 
-```
+```shell
 $ ctr plugins ls
 TYPE                            ID                    PLATFORMS      STATUS
 io.containerd.content.v1        content               -              ok
@@ -208,7 +208,7 @@ successfully load. In this case `aufs` and `zfs` are expected not to load
 since they are not support on the machine. The logs will show why it failed,
 but you can also get more details using the `-d` option.
 
-```
+```shell
 $ ctr plugins ls -d id==aufs id==zfs
 Type:          io.containerd.snapshotter.v1
 ID:            aufs
