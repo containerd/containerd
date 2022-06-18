@@ -117,6 +117,10 @@ var (
 			Usage: "specify additional labels (e.g. foo=bar)",
 		},
 		cli.StringSliceFlag{
+			Name:  "annotation",
+			Usage: "specify additional OCI annotations (e.g. foo=bar)",
+		},
+		cli.StringSliceFlag{
 			Name:  "mount",
 			Usage: "specify additional container mount (e.g. type=bind,src=/tmp,dst=/host,options=rbind:ro)",
 		},
@@ -225,6 +229,19 @@ func LabelArgs(labelStrings []string) map[string]string {
 	}
 
 	return labels
+}
+
+// AnnotationArgs returns a map of annotation key,value pairs.
+func AnnotationArgs(annoStrings []string) (map[string]string, error) {
+	annotations := make(map[string]string, len(annoStrings))
+	for _, anno := range annoStrings {
+		parts := strings.SplitN(anno, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid key=value format annotation: %v", anno)
+		}
+		annotations[parts[0]] = parts[1]
+	}
+	return annotations, nil
 }
 
 // PrintAsJSON prints input in JSON format
