@@ -413,10 +413,9 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 		if err != nil {
 			if plugin.IsSkipPlugin(err) {
 				log.G(ctx).WithError(err).WithField("type", p.Type).Infof("skip loading plugin %q...", id)
-			} else {
-				log.G(ctx).WithError(err).Warnf("failed to load plugin %s", id)
+				continue
 			}
-			continue
+			return fmt.Errorf("failed to load plugin %s: %w", id, err)
 		}
 
 		if src, ok := instance.(ttrpcService); ok {
@@ -428,6 +427,10 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 		if src, ok := instance.(ttrpcServerOptioner); ok {
 			ttrpcUnaryInterceptors = append(ttrpcUnaryInterceptors, src.UnaryInterceptor())
 		}
+	}
+
+	if len(ttrpcServices) == 0 {
+		return fmt.Errorf("required that ttrpc service")
 	}
 
 	unaryInterceptor := chainUnaryServerInterceptors(ttrpcUnaryInterceptors...)
