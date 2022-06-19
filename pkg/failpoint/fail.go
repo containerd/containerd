@@ -25,6 +25,9 @@ import (
 	"time"
 )
 
+// EvalFn is the func type about delegated evaluation.
+type EvalFn func() error
+
 // Type is the type of failpoint to specifies which action to take.
 type Type int
 
@@ -100,6 +103,12 @@ func NewFailpoint(fnName string, terms string) (*Failpoint, error) {
 
 // Evaluate evaluates a failpoint.
 func (fp *Failpoint) Evaluate() error {
+	fn := fp.DelegatedEval()
+	return fn()
+}
+
+// DelegatedEval evaluates a failpoint but delegates to caller to fire that.
+func (fp *Failpoint) DelegatedEval() EvalFn {
 	var target *failpointEntry
 
 	func() {
@@ -118,9 +127,9 @@ func (fp *Failpoint) Evaluate() error {
 	}()
 
 	if target == nil {
-		return nil
+		return nopEvalFn
 	}
-	return target.evaluate()
+	return target.evaluate
 }
 
 // Failpoint returns the current state of control in string format.
@@ -290,4 +299,8 @@ func parseInt64(term []byte, terminate byte, val *int64) ([]byte, error) {
 
 	*val = v
 	return term[i+1:], nil
+}
+
+func nopEvalFn() error {
+	return nil
 }
