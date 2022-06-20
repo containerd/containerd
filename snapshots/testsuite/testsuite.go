@@ -62,7 +62,6 @@ func SnapshotterSuite(t *testing.T, name string, snapshotterFn SnapshotterFunc) 
 	t.Run("RemoveIntermediateSnapshot", makeTest(name, snapshotterFn, checkRemoveIntermediateSnapshot))
 	t.Run("DeletedFilesInChildSnapshot", makeTest(name, snapshotterFn, checkDeletedFilesInChildSnapshot))
 	t.Run("MoveFileFromLowerLayer", makeTest(name, snapshotterFn, checkFileFromLowerLayer))
-	t.Run("Rename", makeTest(name, snapshotterFn, checkRename))
 
 	t.Run("ViewReadonly", makeTest(name, snapshotterFn, checkSnapshotterViewReadonly))
 
@@ -70,10 +69,16 @@ func SnapshotterSuite(t *testing.T, name string, snapshotterFn SnapshotterFunc) 
 	t.Run("CloseTwice", makeTest(name, snapshotterFn, closeTwice))
 	t.Run("RootPermission", makeTest(name, snapshotterFn, checkRootPermission))
 
+	// Different snapshotters behave slightly differently in the tests below.
+	t.Run("Rename", makeTest(name, snapshotterFn, checkRename(name)))
 	t.Run("128LayersMount", makeTest(name, snapshotterFn, check128LayersMount(name)))
 }
 
-func makeTest(name string, snapshotterFn func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error), fn func(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string)) func(t *testing.T) {
+func makeTest(
+	snapshotter string,
+	snapshotterFn func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error),
+	fn func(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string),
+) func(t *testing.T) {
 	return func(t *testing.T) {
 		t.Parallel()
 
@@ -85,7 +90,7 @@ func makeTest(name string, snapshotterFn func(ctx context.Context, root string) 
 		// 		work/ -> passed to test functions
 		// 		root/ -> passed to snapshotter
 		//
-		tmpDir, err := os.MkdirTemp("", "snapshot-suite-"+name+"-")
+		tmpDir, err := os.MkdirTemp("", "snapshot-suite-"+snapshotter+"-")
 		if err != nil {
 			t.Fatal(err)
 		}
