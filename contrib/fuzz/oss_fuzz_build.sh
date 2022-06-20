@@ -54,7 +54,6 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 cd ../../
 
 # Move all fuzzers that don't have the "fuzz" package out of this dir
-mv contrib/fuzz/docker_fuzzer.go remotes/docker/
 mv contrib/fuzz/container_fuzzer.go integration/client/
 
 rm -r vendor
