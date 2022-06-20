@@ -57,7 +57,7 @@ func TestOverlay(t *testing.T) {
 	for optsName, opts := range optTestCases {
 		t.Run(optsName, func(t *testing.T) {
 			newSnapshotter := newSnapshotterWithOpts(opts...)
-			testsuite.SnapshotterSuite(t, "Overlay", newSnapshotter)
+			testsuite.SnapshotterSuite(t, "overlayfs", newSnapshotter)
 			t.Run("TestOverlayMounts", func(t *testing.T) {
 				testOverlayMounts(t, newSnapshotter)
 			})
