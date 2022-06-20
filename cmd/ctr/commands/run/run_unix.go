@@ -106,7 +106,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	} else {
 		var (
 			ref = context.Args().First()
-			//for container's id is Args[1]
+			// for container's id is Args[1]
 			args = context.Args()[2:]
 		)
 		opts = append(opts, oci.WithDefaultSpec(), oci.WithDefaultUnixDevices)
@@ -345,6 +345,9 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		}
 		if c := context.String("rdt-class"); c != "" {
 			opts = append(opts, oci.WithRdt(c, "", ""))
+		}
+		if hostname := context.String("hostname"); hostname != "" {
+			opts = append(opts, oci.WithHostname(hostname))
 		}
 	}
 
