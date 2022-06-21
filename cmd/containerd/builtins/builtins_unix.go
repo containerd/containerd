@@ -1,5 +1,5 @@
-//go:build !no_tracing
-// +build !no_tracing
+//go:build darwin || freebsd || solaris
+// +build darwin freebsd solaris
 
 /*
    Copyright The containerd Authors.
@@ -17,8 +17,8 @@
    limitations under the License.
 */
 
-package main
+package builtins
 
 import (
-	_ "github.com/containerd/containerd/tracing/plugin"
+	_ "github.com/containerd/containerd/snapshots/native/plugin"
 )

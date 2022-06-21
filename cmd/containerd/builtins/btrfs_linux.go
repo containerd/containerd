@@ -17,6 +17,6 @@
    limitations under the License.
 */
 
-package main
+package builtins
 
 import _ "github.com/containerd/containerd/snapshots/btrfs/plugin"

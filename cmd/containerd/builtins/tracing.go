@@ -1,3 +1,6 @@
+//go:build !no_tracing
+// +build !no_tracing
+
 /*
    Copyright The containerd Authors.
 
@@ -14,11 +17,8 @@
    limitations under the License.
 */
 
-package main
+package builtins
 
 import (
-	_ "github.com/containerd/containerd/diff/lcow"
-	_ "github.com/containerd/containerd/diff/windows"
-	_ "github.com/containerd/containerd/snapshots/lcow"
-	_ "github.com/containerd/containerd/snapshots/windows"
+	_ "github.com/containerd/containerd/tracing/plugin"
 )
