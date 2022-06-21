@@ -400,6 +400,13 @@ file {
       type: TYPE_STRING
       json_name: "parent"
     }
+    field {
+      name: "snapshotter"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "snapshotter"
+    }
   }
   message_type {
     name: "SnapshotCommit"
@@ -417,6 +424,13 @@ file {
       type: TYPE_STRING
       json_name: "name"
     }
+    field {
+      name: "snapshotter"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "snapshotter"
+    }
   }
   message_type {
     name: "SnapshotRemove"
@@ -426,6 +440,13 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "key"
+    }
+    field {
+      name: "snapshotter"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "snapshotter"
     }
   }
   options {
