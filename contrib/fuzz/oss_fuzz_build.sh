@@ -53,11 +53,7 @@ rm /root/go/pkg/mod/github.com/cilium/ebpf@v0.7.0/internal/btf/fuzz.go
 cd "$(dirname "${BASH_SOURCE[0]}")"
 cd ../../
 
-# Move all fuzzers that don't have the "fuzz" package out of this dir
-mv contrib/fuzz/container_fuzzer.go integration/client/
-
 rm -r vendor
-
 
 # Change path of socket since OSS-fuzz does not grant access to /run
 sed -i 's/\/run\/containerd/\/tmp\/containerd/g' $SRC/containerd/defaults/defaults_unix.go
