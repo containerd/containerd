@@ -16,14 +16,16 @@
 set -o nounset
 set -o pipefail
 set -o errexit
+set -x
 
 IFS=$'\n'
 
 compile_fuzzers() {
     local regex=$1
     local compile_fuzzer=$2
+    local blocklist=$3
 
-    for line in $(git grep "$regex" | grep -v vendor)
+    for line in $(git grep --full-name "$regex" | grep -v -E "$blocklist")
     do
         if [[ "$line" =~ (.*)/.*:.*(Fuzz[A-Za-z0-9]+) ]]; then
             local pkg=${BASH_REMATCH[1]}
@@ -58,12 +60,10 @@ rm -r vendor
 # Change path of socket since OSS-fuzz does not grant access to /run
 sed -i 's/\/run\/containerd/\/tmp\/containerd/g' $SRC/containerd/defaults/defaults_unix.go
 
-# Compile more fuzzers
-mv $SRC/containerd/filters/filter_test.go $SRC/containerd/filters/filter_test_fuzz.go
 go get github.com/AdamKorcz/go-118-fuzz-build/utils
 
-compile_fuzzers '^func Fuzz.*testing\.F' compile_native_go_fuzzer
-compile_fuzzers '^func Fuzz.*data' compile_go_fuzzer
+compile_fuzzers '^func Fuzz.*testing\.F' compile_native_go_fuzzer vendor
+compile_fuzzers '^func Fuzz.*data' compile_go_fuzzer '(vendor|Integ)'
 
 # The below fuzzers require more setup than the fuzzers above.
 # We need the binaries from "make".
@@ -98,6 +98,5 @@ for i in $( ls *_test.go ); do mv $i ./${i%.*}_fuzz.go; done
 # Remove windows test to avoid double declarations:
 rm ./client_windows_test_fuzz.go
 rm ./helpers_windows_test_fuzz.go
-compile_go_fuzzer github.com/containerd/containerd/integration/client FuzzCreateContainerNoTearDown fuzz_create_container_no_teardown
-compile_go_fuzzer github.com/containerd/containerd/integration/client FuzzCreateContainerWithTearDown fuzz_create_container_with_teardown
-compile_go_fuzzer github.com/containerd/containerd/integration/client FuzzNoTearDownWithDownload fuzz_no_teardown_with_download
+
+compile_fuzzers '^func FuzzInteg.*data' compile_go_fuzzer vendor

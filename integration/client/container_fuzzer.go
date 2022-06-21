@@ -407,7 +407,7 @@ func doFuzz(data []byte, shouldTearDown bool) int {
 // This fuzzer is experimental for now and is being run
 // continuously by OSS-fuzz to collect feedback on
 // its sustainability.
-func FuzzNoTearDownWithDownload(data []byte) int {
+func FuzzIntegNoTearDownWithDownload(data []byte) int {
 	if !haveInitialized {
 		shouldRestart := initInSteps()
 		if shouldRestart {
@@ -423,7 +423,7 @@ func FuzzNoTearDownWithDownload(data []byte) int {
 // with one minor distinction: One tears down the
 // daemon after each iteration whereas the other doesn't.
 // The two fuzzers' performance will be compared over time.
-func FuzzCreateContainerNoTearDown(data []byte) int {
+func FuzzIntegCreateContainerNoTearDown(data []byte) int {
 	if !haveInitialized {
 		err := updatePathEnv()
 		if err != nil {
@@ -438,7 +438,7 @@ func FuzzCreateContainerNoTearDown(data []byte) int {
 // FuzzCreateContainerNoTearDown() except that
 // FuzzCreateContainerWithTearDown tears down the daemon
 // after each iteration.
-func FuzzCreateContainerWithTearDown(data []byte) int {
+func FuzzIntegCreateContainerWithTearDown(data []byte) int {
 	if !haveInitialized {
 		err := updatePathEnv()
 		if err != nil {
