@@ -25,7 +25,7 @@ import (
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 
 	"github.com/containerd/containerd"
-	_ "github.com/containerd/containerd/cmd/containerd"
+	_ "github.com/containerd/containerd/cmd/containerd/builtins"
 	"github.com/containerd/containerd/cmd/containerd/command"
 	"github.com/containerd/containerd/namespaces"
 )
@@ -40,6 +40,11 @@ var (
 	initDaemon sync.Once
 )
 
+func startDaemonForFuzzing(arguments []string) {
+	app := command.App()
+	_ = app.Run(arguments)
+}
+
 func startDaemon() {
 	args := []string{"--log-level", "debug"}
 	go func() {
@@ -47,7 +52,7 @@ func startDaemon() {
 		// containerd binary.
 		// See contrib/fuzz/oss_fuzz_build.sh
 		// for more info.
-		command.StartDaemonForFuzzing(args)
+		startDaemonForFuzzing(args)
 	}()
 	time.Sleep(time.Second * 4)
 }

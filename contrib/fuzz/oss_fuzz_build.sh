@@ -62,26 +62,6 @@ rm -r vendor
 # Change path of socket since OSS-fuzz does not grant access to /run
 sed -i 's/\/run\/containerd/\/tmp\/containerd/g' $SRC/containerd/defaults/defaults_unix.go
 
-# To build FuzzContainer2 we need to prepare a few things:
-# We change the name of the cmd/containerd package
-# so that we can import it.
-# We furthermore add an exported function that is similar
-# to cmd/containerd.main and call that instead of calling
-# the containerd binary.
-#
-# In the fuzzer we import cmd/containerd as a low-maintenance
-# way of initializing all the plugins.
-# Make backup of cmd/containerd:
-cp -r $SRC/containerd/cmd/containerd $SRC/cmd-containerd-backup
-# Rename package:
-find $SRC/containerd/cmd/containerd -type f -exec sed -i 's/package main/package mainfuzz/g' {} \;
-# Add an exported function
-sed -i -e '$afunc StartDaemonForFuzzing(arguments []string) {\n\tapp := App()\n\t_ = app.Run(arguments)\n}' $SRC/containerd/cmd/containerd/command/main.go
-# Build fuzzer:
-compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzContainerdImport fuzz_containerd_import
-# Reinstante backup of cmd/containerd:
-mv $SRC/cmd-containerd-backup $SRC/containerd/cmd/containerd
-
 # Compile more fuzzers
 mv $SRC/containerd/filters/filter_test.go $SRC/containerd/filters/filter_test_fuzz.go
 go get github.com/AdamKorcz/go-118-fuzz-build/utils
