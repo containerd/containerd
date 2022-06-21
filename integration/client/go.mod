@@ -20,6 +20,7 @@ require (
 )
 
 require (
+	github.com/AdaLogics/go-fuzz-headers v0.0.0-20210715213245-6c3934b029d8 // indirect
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cilium/ebpf v0.7.0 // indirect
