@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/netns"
+	"github.com/containerd/containerd/snapshots"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -100,7 +101,10 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			containerd.WithImage(image),
 			containerd.WithImageConfigLabels(image),
 			containerd.WithSnapshotter(snapshotter),
-			containerd.WithNewSnapshot(id, image),
+			containerd.WithNewSnapshot(
+				id,
+				image,
+				snapshots.WithLabels(commands.LabelArgs(context.StringSlice("snapshotter-label")))),
 			containerd.WithAdditionalContainerLabels(labels))
 
 		if len(args) > 0 {
