@@ -22,8 +22,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/pkg/testutil"
+	"github.com/containerd/continuity/fs/fstest"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/stretchr/testify/assert"
 	"golang.org/x/sys/unix"
 )
 
@@ -246,4 +249,77 @@ func TestGetDevices(t *testing.T) {
 			}
 		})
 	})
+}
+
+func TestWithAppendAdditionalGroups(t *testing.T) {
+	t.Parallel()
+	expectedContent := `root:x:0:root
+bin:x:1:root,bin,daemon
+daemon:x:2:root,bin,daemon
+`
+	td := t.TempDir()
+	apply := fstest.Apply(
+		fstest.CreateDir("/etc", 0777),
+		fstest.CreateFile("/etc/group", []byte(expectedContent), 0777),
+	)
+	if err := apply.Apply(td); err != nil {
+		t.Fatalf("failed to apply: %v", err)
+	}
+	c := containers.Container{ID: t.Name()}
+
+	testCases := []struct {
+		name           string
+		additionalGIDs []uint32
+		groups         []string
+		expected       []uint32
+		err            string
+	}{
+		{
+			name:   "no additional gids",
+			groups: []string{},
+		},
+		{
+			name:     "no additional gids, append root gid",
+			groups:   []string{"root"},
+			expected: []uint32{0},
+		},
+		{
+			name:     "no additional gids, append bin and daemon gids",
+			groups:   []string{"bin", "daemon"},
+			expected: []uint32{1, 2},
+		},
+		{
+			name:           "has root additional gids, append bin and daemon gids",
+			additionalGIDs: []uint32{0},
+			groups:         []string{"bin", "daemon"},
+			expected:       []uint32{0, 1, 2},
+		},
+		{
+			name:   "unknown group",
+			groups: []string{"unknown"},
+			err:    "unable to find group unknown",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			s := Spec{
+				Version: specs.Version,
+				Root: &specs.Root{
+					Path: td,
+				},
+				Process: &specs.Process{
+					User: specs.User{
+						AdditionalGids: testCase.additionalGIDs,
+					},
+				},
+			}
+			err := WithAppendAdditionalGroups(testCase.groups...)(context.Background(), nil, &c, &s)
+			if err != nil {
+				assert.EqualError(t, err, testCase.err)
+			}
+			assert.Equal(t, testCase.expected, s.Process.User.AdditionalGids)
+		})
+	}
 }
