@@ -31,6 +31,7 @@ import (
 // snapshotter wraps snapshots.Snapshotter with proper events published.
 type snapshotter struct {
 	snapshots.Snapshotter
+	name      string
 	publisher events.Publisher
 }
 
@@ -55,16 +56,17 @@ func init() {
 			db := m.(*metadata.DB)
 			ss := make(map[string]snapshots.Snapshotter)
 			for n, sn := range db.Snapshotters() {
-				ss[n] = newSnapshotter(sn, ep.(events.Publisher))
+				ss[n] = newSnapshotter(sn, n, ep.(events.Publisher))
 			}
 			return ss, nil
 		},
 	})
 }
 
-func newSnapshotter(sn snapshots.Snapshotter, publisher events.Publisher) snapshots.Snapshotter {
+func newSnapshotter(sn snapshots.Snapshotter, name string, publisher events.Publisher) snapshots.Snapshotter {
 	return &snapshotter{
 		Snapshotter: sn,
+		name:        name,
 		publisher:   publisher,
 	}
 }
@@ -75,8 +77,9 @@ func (s *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 		return nil, err
 	}
 	if err := s.publisher.Publish(ctx, "/snapshot/prepare", &eventstypes.SnapshotPrepare{
-		Key:    key,
-		Parent: parent,
+		Key:         key,
+		Parent:      parent,
+		Snapshotter: s.name,
 	}); err != nil {
 		return nil, err
 	}
@@ -88,8 +91,9 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		return err
 	}
 	return s.publisher.Publish(ctx, "/snapshot/commit", &eventstypes.SnapshotCommit{
-		Key:  key,
-		Name: name,
+		Key:         key,
+		Name:        name,
+		Snapshotter: s.name,
 	})
 }
 
@@ -98,6 +102,7 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 		return err
 	}
 	return s.publisher.Publish(ctx, "/snapshot/remove", &eventstypes.SnapshotRemove{
-		Key: key,
+		Key:         key,
+		Snapshotter: s.name,
 	})
 }

@@ -13,6 +13,8 @@ func (m *SnapshotPrepare) Field(fieldpath []string) (string, bool) {
 		return string(m.Key), len(m.Key) > 0
 	case "parent":
 		return string(m.Parent), len(m.Parent) > 0
+	case "snapshotter":
+		return string(m.Snapshotter), len(m.Snapshotter) > 0
 	}
 	return "", false
 }
@@ -28,6 +30,8 @@ func (m *SnapshotCommit) Field(fieldpath []string) (string, bool) {
 		return string(m.Key), len(m.Key) > 0
 	case "name":
 		return string(m.Name), len(m.Name) > 0
+	case "snapshotter":
+		return string(m.Snapshotter), len(m.Snapshotter) > 0
 	}
 	return "", false
 }
@@ -41,6 +45,8 @@ func (m *SnapshotRemove) Field(fieldpath []string) (string, bool) {
 	switch fieldpath[0] {
 	case "key":
 		return string(m.Key), len(m.Key) > 0
+	case "snapshotter":
+		return string(m.Snapshotter), len(m.Snapshotter) > 0
 	}
 	return "", false
 }
