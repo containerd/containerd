@@ -498,6 +498,7 @@ func (c *criService) registryEndpoints(host string) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parse endpoint url: %w", err)
 		}
+		en = strings.TrimRight(en, "/")
 		endpoints[i] = en
 	}
 	for _, e := range endpoints {
