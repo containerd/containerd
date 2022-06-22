@@ -42,7 +42,7 @@ func TestImageStatus(t *testing.T) {
 	getImageSpec = func(ctx context.Context, image containerd.Image) (imagespec.Image, error) {
 		switch image.Name() {
 		case "sha256:d848ce12891bf78792cda4a23c58984033b0c397a55e93a1556202222ecc5ed4":
-			return imagespec.Image{Config: imagespec.ImageConfig{User: "user:group"}}, nil
+			return imagespec.Image{}, nil
 		default:
 			t.Fatalf("unexpected OCI spec request for image %q", image.Name())
 		}
@@ -58,6 +58,7 @@ func TestImageStatus(t *testing.T) {
 				imageLabelConfigDigest: "sha256:d848ce12891bf78792cda4a23c58984033b0c397a55e93a1556202222ecc5ed4",
 				imageLabelSize:         "1234",
 				imageLabelKey:          imageLabelValue,
+				imageLabelUser:         "user:group",
 			},
 		},
 		{
@@ -67,6 +68,7 @@ func TestImageStatus(t *testing.T) {
 				imageLabelConfigDigest: "sha256:d848ce12891bf78792cda4a23c58984033b0c397a55e93a1556202222ecc5ed4",
 				imageLabelSize:         "1234",
 				imageLabelKey:          imageLabelValue,
+				imageLabelUser:         "user:group",
 			},
 		},
 		{
@@ -76,6 +78,7 @@ func TestImageStatus(t *testing.T) {
 				imageLabelConfigDigest: "sha256:d848ce12891bf78792cda4a23c58984033b0c397a55e93a1556202222ecc5ed4",
 				imageLabelSize:         "1234",
 				imageLabelKey:          imageLabelValue,
+				imageLabelUser:         "user:group",
 			},
 		},
 	}

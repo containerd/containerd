@@ -92,6 +92,8 @@ const (
 	imageLabelChainID = criContainerdPrefix + ".image-chain-id"
 	// imageLabelSize is the label key for image size information.
 	imageLabelSize = criContainerdPrefix + ".image-size"
+	// imageLabelUser is the label key to retrieve image spec user.
+	imageLabelUser = criContainerdPrefix + ".image-spec-user"
 
 	// defaultIfName is the default network interface for the pods
 	defaultIfName = "eth0"
@@ -516,6 +518,16 @@ func (c *criService) ensureImageMetadata(ctx context.Context, name string) error
 		}
 
 		metadata.Labels[imageLabelSize] = strconv.FormatInt(size, 10)
+		update = true
+	}
+
+	if _, ok := metadata.Labels[imageLabelUser]; !ok {
+		spec, err := image.Spec(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to read image spec: %w", err)
+		}
+
+		metadata.Labels[imageLabelUser] = spec.Config.User
 		update = true
 	}
 

@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -37,7 +36,6 @@ func (c *criService) ListImages(ctx context.Context, r *runtime.ListImagesReques
 	type imageInfo struct {
 		image      containerd.Image
 		references []string
-		spec       imagespec.Image
 	}
 
 	// Group by image id and gather image references
@@ -51,15 +49,9 @@ func (c *criService) ListImages(ctx context.Context, r *runtime.ListImagesReques
 		if existing, ok := groups[imageID]; ok {
 			existing.references = append(existing.references, image.Name())
 		} else {
-			spec, err := getImageSpec(ctx, image)
-			if err != nil {
-				return nil, err
-			}
-
 			groups[imageID] = &imageInfo{
 				image:      image,
 				references: []string{image.Name()},
-				spec:       spec,
 			}
 		}
 	}
@@ -68,7 +60,7 @@ func (c *criService) ListImages(ctx context.Context, r *runtime.ListImagesReques
 	for _, info := range groups {
 		// TODO(random-liu): [P0] Make sure corresponding snapshot exists. What if snapshot
 		// doesn't exist?
-		image, err := toCRIImage(info.image, info.references, info.spec)
+		image, err := toCRIImage(info.image, info.references)
 		if err != nil {
 			return nil, err
 		}

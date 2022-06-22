@@ -60,10 +60,11 @@ func (c *criService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequ
 		return nil, err
 	}
 
-	runtimeImage, err := toCRIImage(containerdImage, references, imageSpec)
+	runtimeImage, err := toCRIImage(containerdImage, references)
 	if err != nil {
 		return nil, err
 	}
+
 	info, err := c.toCRIImageInfo(ctx, containerdImage.Metadata(), imageSpec, r.GetVerbose())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate image info: %w", err)
@@ -76,7 +77,7 @@ func (c *criService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequ
 }
 
 // toCRIImage converts internal image object to CRI runtime.Image.
-func toCRIImage(image containerd.Image, references []string, imageSpec imagespec.Image) (*runtime.Image, error) {
+func toCRIImage(image containerd.Image, references []string) (*runtime.Image, error) {
 	imageID, err := getImageID(image)
 	if err != nil {
 		return nil, err
@@ -85,6 +86,7 @@ func toCRIImage(image containerd.Image, references []string, imageSpec imagespec
 	var (
 		labels    = image.Labels()
 		labelSize = labels[imageLabelSize]
+		labelUser = labels[imageLabelUser]
 	)
 
 	size, err := strconv.ParseUint(labelSize, 10, 64)
@@ -100,7 +102,7 @@ func toCRIImage(image containerd.Image, references []string, imageSpec imagespec
 		Size_:       size,
 	}
 
-	uid, username := getUserFromImage(imageSpec.Config.User)
+	uid, username := getUserFromImage(labelUser)
 	if uid != nil {
 		runtimeImage.Uid = &runtime.Int64Value{Value: *uid}
 	}

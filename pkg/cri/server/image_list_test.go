@@ -17,13 +17,11 @@
 package server
 
 import (
-	"context"
 	"testing"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/metadata"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -39,6 +37,7 @@ func TestListImages(t *testing.T) {
 				imageLabelConfigDigest: "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 				imageLabelSize:         "1000",
 				imageLabelKey:          imageLabelValue,
+				imageLabelUser:         "root",
 			},
 		},
 		{
@@ -48,6 +47,7 @@ func TestListImages(t *testing.T) {
 				imageLabelConfigDigest: "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 				imageLabelSize:         "1000",
 				imageLabelKey:          imageLabelValue,
+				imageLabelUser:         "root",
 			},
 		},
 		{
@@ -57,6 +57,7 @@ func TestListImages(t *testing.T) {
 				imageLabelConfigDigest: "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 				imageLabelSize:         "1000",
 				imageLabelKey:          imageLabelValue,
+				imageLabelUser:         "root",
 			},
 		},
 		// Image 2
@@ -67,6 +68,7 @@ func TestListImages(t *testing.T) {
 				imageLabelConfigDigest: "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 				imageLabelSize:         "2000",
 				imageLabelKey:          imageLabelValue,
+				imageLabelUser:         "1234:1234",
 			},
 		},
 		{
@@ -76,6 +78,7 @@ func TestListImages(t *testing.T) {
 				imageLabelConfigDigest: "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 				imageLabelSize:         "2000",
 				imageLabelKey:          imageLabelValue,
+				imageLabelUser:         "1234:1234",
 			},
 		},
 		{
@@ -85,6 +88,7 @@ func TestListImages(t *testing.T) {
 				imageLabelConfigDigest: "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 				imageLabelSize:         "2000",
 				imageLabelKey:          imageLabelValue,
+				imageLabelUser:         "1234:1234",
 			},
 		},
 		// Image 3
@@ -95,6 +99,7 @@ func TestListImages(t *testing.T) {
 				imageLabelConfigDigest: "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 				imageLabelSize:         "3000",
 				imageLabelKey:          imageLabelValue,
+				imageLabelUser:         "nobody",
 			},
 		},
 		{
@@ -104,6 +109,7 @@ func TestListImages(t *testing.T) {
 				imageLabelConfigDigest: "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 				imageLabelSize:         "3000",
 				imageLabelKey:          imageLabelValue,
+				imageLabelUser:         "nobody",
 			},
 		}, {
 			Name:   "gcr.io/library/ubuntu@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
@@ -112,24 +118,10 @@ func TestListImages(t *testing.T) {
 				imageLabelConfigDigest: "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 				imageLabelSize:         "3000",
 				imageLabelKey:          imageLabelValue,
+				imageLabelUser:         "nobody",
 			},
 		},
 	}
-
-	getImageSpec = func(ctx context.Context, image containerd.Image) (imagespec.Image, error) {
-		switch image.Name() {
-		case "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "gcr.io/library/busybox:latest":
-			return imagespec.Image{Config: imagespec.ImageConfig{User: "root"}}, nil
-		case "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "gcr.io/library/alpine:latest":
-			return imagespec.Image{Config: imagespec.ImageConfig{User: "1234:1234"}}, nil
-		case "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "gcr.io/library/ubuntu:latest":
-			return imagespec.Image{Config: imagespec.ImageConfig{User: "nobody"}}, nil
-		default:
-			t.Fatalf("unexpected OCI spec request for image %q", image.Name())
-		}
-		return imagespec.Image{}, nil
-	}
-	t.Cleanup(func() { getImageSpec = retrieveImageSpec })
 
 	expect := []*runtime.Image{
 		{
