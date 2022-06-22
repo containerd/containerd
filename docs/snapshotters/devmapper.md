@@ -63,7 +63,7 @@ set -ex
 DATA_DIR=/var/lib/containerd/devmapper
 POOL_NAME=devpool
 
-mkdir -p ${DATA_DIR}
+sudo mkdir -p ${DATA_DIR}
 
 # Create data file
 sudo touch "${DATA_DIR}/data"
