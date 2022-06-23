@@ -14,6 +14,10 @@
    limitations under the License.
 */
 
+// Package failpoint provides the code point in the path, which can be controlled
+// by user's variable.
+//
+// Inspired by FreeBSD fail(9): https://freebsd.org/cgi/man.cgi?query=fail.
 package failpoint
 
 import (
@@ -80,7 +84,7 @@ func (t Type) String() string {
 // be evaluated. If you want the error injected code should fire in second
 // call, you can specify "1*off->1*error(oops)".
 //
-// Based on fail(9) freebsd: https://www.freebsd.org/cgi/man.cgi?query=fail&sektion=9&apropos=0&manpath=FreeBSD%2B10.0-RELEASE
+// Inspired by FreeBSD fail(9): https://freebsd.org/cgi/man.cgi?query=fail.
 type Failpoint struct {
 	sync.Mutex
 
