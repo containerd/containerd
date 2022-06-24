@@ -618,11 +618,8 @@ func WithUIDGID(uid, gid uint32) SpecOpts {
 func WithUserID(uid uint32) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
 		setProcess(s)
-		if c.Snapshotter == "" && c.SnapshotKey == "" {
-			if !isRootfsAbs(s.Root.Path) {
-				return errors.Errorf("rootfs absolute path is required")
-			}
-			user, err := UserFromPath(s.Root.Path, func(u user.User) bool {
+		setUser := func(root string) error {
+			user, err := UserFromPath(root, func(u user.User) bool {
 				return u.Uid == int(uid)
 			})
 			if err != nil {
@@ -634,7 +631,12 @@ func WithUserID(uid uint32) SpecOpts {
 			}
 			s.Process.User.UID, s.Process.User.GID = uint32(user.Uid), uint32(user.Gid)
 			return nil
-
+		}
+		if c.Snapshotter == "" && c.SnapshotKey == "" {
+			if !isRootfsAbs(s.Root.Path) {
+				return errors.New("rootfs absolute path is required")
+			}
+			return setUser(s.Root.Path)
 		}
 		if c.Snapshotter == "" {
 			return errors.Errorf("no snapshotter set for container")
@@ -649,20 +651,7 @@ func WithUserID(uid uint32) SpecOpts {
 		}
 
 		mounts = tryReadonlyMounts(mounts)
-		return mount.WithTempMount(ctx, mounts, func(root string) error {
-			user, err := UserFromPath(root, func(u user.User) bool {
-				return u.Uid == int(uid)
-			})
-			if err != nil {
-				if os.IsNotExist(err) || err == ErrNoUsersFound {
-					s.Process.User.UID, s.Process.User.GID = uid, 0
-					return nil
-				}
-				return err
-			}
-			s.Process.User.UID, s.Process.User.GID = uint32(user.Uid), uint32(user.Gid)
-			return nil
-		})
+		return mount.WithTempMount(ctx, mounts, setUser)
 	}
 }
 
@@ -674,11 +663,8 @@ func WithUsername(username string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
 		setProcess(s)
 		if s.Linux != nil {
-			if c.Snapshotter == "" && c.SnapshotKey == "" {
-				if !isRootfsAbs(s.Root.Path) {
-					return errors.Errorf("rootfs absolute path is required")
-				}
-				user, err := UserFromPath(s.Root.Path, func(u user.User) bool {
+			setUser := func(root string) error {
+				user, err := UserFromPath(root, func(u user.User) bool {
 					return u.Name == username
 				})
 				if err != nil {
@@ -686,6 +672,12 @@ func WithUsername(username string) SpecOpts {
 				}
 				s.Process.User.UID, s.Process.User.GID = uint32(user.Uid), uint32(user.Gid)
 				return nil
+			}
+			if c.Snapshotter == "" && c.SnapshotKey == "" {
+				if !isRootfsAbs(s.Root.Path) {
+					return errors.New("rootfs absolute path is required")
+				}
+				return setUser(s.Root.Path)
 			}
 			if c.Snapshotter == "" {
 				return errors.Errorf("no snapshotter set for container")
@@ -700,16 +692,7 @@ func WithUsername(username string) SpecOpts {
 			}
 
 			mounts = tryReadonlyMounts(mounts)
-			return mount.WithTempMount(ctx, mounts, func(root string) error {
-				user, err := UserFromPath(root, func(u user.User) bool {
-					return u.Name == username
-				})
-				if err != nil {
-					return err
-				}
-				s.Process.User.UID, s.Process.User.GID = uint32(user.Uid), uint32(user.Gid)
-				return nil
-			})
+			return mount.WithTempMount(ctx, mounts, setUser)
 		} else if s.Windows != nil {
 			s.Process.User.Username = username
 		} else {
