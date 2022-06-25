@@ -48,6 +48,7 @@ import (
 	_ "github.com/containerd/containerd/events/plugin"
 	_ "github.com/containerd/containerd/gc/scheduler"
 	_ "github.com/containerd/containerd/leases/plugin"
+	_ "github.com/containerd/containerd/metadata/plugin"
 	_ "github.com/containerd/containerd/runtime/v2"
 	_ "github.com/containerd/containerd/runtime/v2/runc/options"
 	_ "github.com/containerd/containerd/services/containers"

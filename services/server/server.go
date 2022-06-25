@@ -36,40 +36,28 @@ import (
 
 	csapi "github.com/containerd/containerd/api/services/content/v1"
 	ssapi "github.com/containerd/containerd/api/services/snapshots/v1"
-	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/content/local"
 	csproxy "github.com/containerd/containerd/content/proxy"
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin"
 	srvconfig "github.com/containerd/containerd/services/server/config"
-	"github.com/containerd/containerd/snapshots"
 	ssproxy "github.com/containerd/containerd/snapshots/proxy"
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/ttrpc"
 	metrics "github.com/docker/go-metrics"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-	bolt "go.etcd.io/bbolt"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
-
-const (
-	boltOpenTimeout = "io.containerd.timeout.bolt.open"
-)
-
-func init() {
-	timeout.Set(boltOpenTimeout, 0) // set to 0 means to wait indefinitely for bolt.Open
-}
 
 // CreateTopLevelDirectories creates the top-level root and state directories.
 func CreateTopLevelDirectories(config *srvconfig.Config) error {
@@ -393,99 +381,6 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			ic.Meta.Exports["root"] = ic.Root
 			return local.NewStore(ic.Root)
-		},
-	})
-	plugin.Register(&plugin.Registration{
-		Type: plugin.MetadataPlugin,
-		ID:   "bolt",
-		Requires: []plugin.Type{
-			plugin.ContentPlugin,
-			plugin.SnapshotPlugin,
-		},
-		Config: &srvconfig.BoltConfig{
-			ContentSharingPolicy: srvconfig.SharingPolicyShared,
-		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			if err := os.MkdirAll(ic.Root, 0711); err != nil {
-				return nil, err
-			}
-			cs, err := ic.Get(plugin.ContentPlugin)
-			if err != nil {
-				return nil, err
-			}
-
-			snapshottersRaw, err := ic.GetByType(plugin.SnapshotPlugin)
-			if err != nil {
-				return nil, err
-			}
-
-			snapshotters := make(map[string]snapshots.Snapshotter)
-			for name, sn := range snapshottersRaw {
-				sn, err := sn.Instance()
-				if err != nil {
-					if !plugin.IsSkipPlugin(err) {
-						log.G(ic.Context).WithError(err).
-							Warnf("could not use snapshotter %v in metadata plugin", name)
-					}
-					continue
-				}
-				snapshotters[name] = sn.(snapshots.Snapshotter)
-			}
-
-			shared := true
-			ic.Meta.Exports["policy"] = srvconfig.SharingPolicyShared
-			if cfg, ok := ic.Config.(*srvconfig.BoltConfig); ok {
-				if cfg.ContentSharingPolicy != "" {
-					if err := cfg.Validate(); err != nil {
-						return nil, err
-					}
-					if cfg.ContentSharingPolicy == srvconfig.SharingPolicyIsolated {
-						ic.Meta.Exports["policy"] = srvconfig.SharingPolicyIsolated
-						shared = false
-					}
-
-					log.L.WithField("policy", cfg.ContentSharingPolicy).Info("metadata content store policy set")
-				}
-			}
-
-			path := filepath.Join(ic.Root, "meta.db")
-			ic.Meta.Exports["path"] = path
-
-			options := *bolt.DefaultOptions
-			// Reading bbolt's freelist sometimes fails when the file has a data corruption.
-			// Disabling freelist sync reduces the chance of the breakage.
-			// https://github.com/etcd-io/bbolt/pull/1
-			// https://github.com/etcd-io/bbolt/pull/6
-			options.NoFreelistSync = true
-			// Without the timeout, bbolt.Open would block indefinitely due to flock(2).
-			options.Timeout = timeout.Get(boltOpenTimeout)
-
-			doneCh := make(chan struct{})
-			go func() {
-				t := time.NewTimer(10 * time.Second)
-				defer t.Stop()
-				select {
-				case <-t.C:
-					log.G(ctx).WithField("plugin", "bolt").Warn("waiting for response from boltdb open")
-				case <-doneCh:
-					return
-				}
-			}()
-			db, err := bolt.Open(path, 0644, &options)
-			close(doneCh)
-			if err != nil {
-				return nil, err
-			}
-
-			var dbopts []metadata.DBOpt
-			if !shared {
-				dbopts = append(dbopts, metadata.WithPolicyIsolated)
-			}
-			mdb := metadata.NewDB(db, cs.(content.Store), snapshotters, dbopts...)
-			if err := mdb.Init(ic.Context); err != nil {
-				return nil, err
-			}
-			return mdb, nil
 		},
 	})
 
