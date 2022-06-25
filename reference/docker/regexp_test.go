@@ -131,6 +131,46 @@ func TestDomainRegexp(t *testing.T) {
 			input: "Asdf.com", // uppercase character
 			match: true,
 		},
+		{
+			input: "192.168.1.1:75050", // ipv4
+			match: true,
+		},
+		{
+			input: "192.168.1.1:750050", // port with more than 5 digits, it will fail on validation
+			match: true,
+		},
+		{
+			input: "[fd00:1:2::3]:75050", // ipv6 compressed
+			match: true,
+		},
+		{
+			input: "[fd00:1:2::3]75050", // ipv6 wrong port separator
+			match: false,
+		},
+		{
+			input: "[fd00:1:2::3]::75050", // ipv6 wrong port separator
+			match: false,
+		},
+		{
+			input: "[fd00:1:2::3%eth0]:75050", // ipv6 with zone
+			match: false,
+		},
+		{
+			input: "[fd00123123123]:75050", // ipv6 wrong format, will fail in validation
+			match: true,
+		},
+		{
+			input: "[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:75050", // ipv6 long format
+			match: true,
+		},
+		{
+			input: "[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:750505", // ipv6 long format and invalid port, it will fail in validation
+			match: true,
+		},
+		{
+			input: "fd00:1:2::3:75050", // bad ipv6 without square brackets
+			match: false,
+		},
 	}
 	r := regexp.MustCompile(`^` + DomainRegexp.String() + `$`)
 	for i := range hostcases {

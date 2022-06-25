@@ -187,6 +187,101 @@ func TestReferenceParse(t *testing.T) {
 			repository: "foo/foo_bar.com",
 			tag:        "8080",
 		},
+		{
+			input:      "192.168.1.1",
+			repository: "192.168.1.1",
+		},
+		{
+			input:      "192.168.1.1:tag",
+			repository: "192.168.1.1",
+			tag:        "tag",
+		},
+		{
+			input:      "192.168.1.1:5000",
+			repository: "192.168.1.1",
+			tag:        "5000",
+		},
+		{
+			input:      "192.168.1.1/repo",
+			domain:     "192.168.1.1",
+			repository: "192.168.1.1/repo",
+		},
+		{
+			input:      "192.168.1.1:5000/repo",
+			domain:     "192.168.1.1:5000",
+			repository: "192.168.1.1:5000/repo",
+		},
+		{
+			input:      "192.168.1.1:5000/repo:5050",
+			domain:     "192.168.1.1:5000",
+			repository: "192.168.1.1:5000/repo",
+			tag:        "5050",
+		},
+		{
+			input: "[2001:db8::1]",
+			err:   ErrReferenceInvalidFormat,
+		},
+		{
+			input: "[2001:db8::1]:5000",
+			err:   ErrReferenceInvalidFormat,
+		},
+		{
+			input: "[2001:db8::1]:tag",
+			err:   ErrReferenceInvalidFormat,
+		},
+		{
+			input:      "[2001:db8::1]/repo",
+			domain:     "[2001:db8::1]",
+			repository: "[2001:db8::1]/repo",
+		},
+		{
+			input:      "[2001:db8:1:2:3:4:5:6]/repo:tag",
+			domain:     "[2001:db8:1:2:3:4:5:6]",
+			repository: "[2001:db8:1:2:3:4:5:6]/repo",
+			tag:        "tag",
+		},
+		{
+			input:      "[2001:db8::1]:5000/repo",
+			domain:     "[2001:db8::1]:5000",
+			repository: "[2001:db8::1]:5000/repo",
+		},
+		{
+			input:      "[2001:db8::1]:5000/repo:tag",
+			domain:     "[2001:db8::1]:5000",
+			repository: "[2001:db8::1]:5000/repo",
+			tag:        "tag",
+		},
+		{
+			input:      "[2001:db8::1]:5000/repo@sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+			domain:     "[2001:db8::1]:5000",
+			repository: "[2001:db8::1]:5000/repo",
+			digest:     "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+		},
+		{
+			input:      "[2001:db8::1]:5000/repo:tag@sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+			domain:     "[2001:db8::1]:5000",
+			repository: "[2001:db8::1]:5000/repo",
+			tag:        "tag",
+			digest:     "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+		},
+		{
+			input:      "[2001:db8::]:5000/repo",
+			domain:     "[2001:db8::]:5000",
+			repository: "[2001:db8::]:5000/repo",
+		},
+		{
+			input:      "[::1]:5000/repo",
+			domain:     "[::1]:5000",
+			repository: "[::1]:5000/repo",
+		},
+		{
+			input: "[fe80::1%eth0]:5000/repo",
+			err:   ErrReferenceInvalidFormat,
+		},
+		{
+			input: "[fe80::1%@invalidzone]:5000/repo",
+			err:   ErrReferenceInvalidFormat,
+		},
 	}
 	for _, testcase := range referenceTestcases {
 		failf := func(format string, v ...interface{}) {

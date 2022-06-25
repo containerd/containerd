@@ -39,15 +39,40 @@ var (
 		alphaNumeric,
 		optional(repeated(separator, alphaNumeric)))
 
-	// domainComponent restricts the registry domain component of a
-	// repository name to start with a component as defined by DomainRegexp
-	// and followed by an optional port.
-	domainComponent = `(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])`
+	// domainNameComponent restricts the registry domain component of a
+	// repository name to start with a component as defined by DomainRegexp.
+	domainNameComponent = `(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])`
 
+	// ipv6address are enclosed between square brackets and may be represented
+	// in many ways, see rfc5952. Only IPv6 in compressed or uncompressed format
+	// are allowed, IPv6 zone identifiers (rfc6874) or Special addresses such as
+	// IPv4-Mapped are deliberately excluded.
+	ipv6address = expression(
+		literal(`[`), `(?:[a-fA-F0-9:]+)`, literal(`]`),
+	)
+
+	// domainName defines the structure of potential domain components
+	// that may be part of image names. This is purposely a subset of what is
+	// allowed by DNS to ensure backwards compatibility with Docker image
+	// names. This includes IPv4 addresses on decimal format.
+	domainName = expression(
+		domainNameComponent,
+		optional(repeated(literal(`.`), domainNameComponent)),
+	)
+
+	// host defines the structure of potential domains based on the URI
+	// Host subcomponent on rfc3986. It may be a subset of DNS domain name,
+	// or an IPv4 address in decimal format, or an IPv6 address between square
+	// brackets (excluding zone identifiers as defined by rfc6874 or special
+	// addresses such as IPv4-Mapped).
+	host = `(?:` + domainName + `|` + ipv6address + `)`
+
+	// allowed by the URI Host subcomponent on rfc3986 to ensure backwards
+	// compatibility with Docker image names.
 	domain = expression(
-		domainComponent,
-		optional(repeated(literal(`.`), domainComponent)),
+		host,
 		optional(literal(`:`), `[0-9]+`))
+
 	// DomainRegexp defines the structure of potential domain components
 	// that may be part of image names. This is purposely a subset of what is
 	// allowed by DNS to ensure backwards compatibility with Docker image

@@ -21,7 +21,9 @@
 //
 //	reference                       := name [ ":" tag ] [ "@" digest ]
 //	name                            := [domain '/'] path-component ['/' path-component]*
-//	domain                          := domain-component ['.' domain-component]* [':' port-number]
+//	domain                          := host [':' port-number]
+//	host                            := domain-name | IPv4address | \[ IPv6address \]	; rfc3986 appendix-A
+//	domain-name                     := domain-component ['.' domain-component]*
 //	domain-component                := /([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])/
 //	port-number                     := /[0-9]+/
 //	path-component                  := alpha-numeric [separator alpha-numeric]*
