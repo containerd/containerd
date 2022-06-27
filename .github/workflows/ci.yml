@@ -295,6 +295,14 @@ jobs:
 
       - run: script/setup/install-dev-tools
 
+      # There is currently an issue in the race detector in Go on Windows when
+      # used with a newer version of GCC. The issue was first reported here:
+      # https://github.com/golang/go/issues/46099
+      - name: Downgrade MinGW
+        shell: bash
+        run: |
+          choco install mingw --version 10.2.0 --allow-downgrade
+
       - name: Binaries
         env:
           CGO_ENABLED: 1
