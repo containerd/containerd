@@ -294,7 +294,10 @@ Now that we have an image to base our container off of, we need to generate an O
 containerd provides reasonable defaults for generating OCI runtime specs.
 There is also an `Opt` for modifying the default config based on the image that we pulled.
 
-The container will be based off of the image, use the runtime information in the spec that was just created, and we will allocate a new read-write snapshot so the container can store any persistent information.
+The container will be based off of the image, and we will:
+1. allocate a new read-write snapshot so the container can store any persistent information.
+2. create a new spec for the container.
+
 
 ```go
 	container, err := client.NewContainer(
