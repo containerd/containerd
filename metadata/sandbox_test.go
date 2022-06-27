@@ -27,8 +27,7 @@ import (
 )
 
 func TestSandboxCreate(t *testing.T) {
-	ctx, db, done := testDB(t)
-	defer done()
+	ctx, db := testDB(t)
 
 	store := NewSandboxStore(db)
 
@@ -60,8 +59,7 @@ func TestSandboxCreate(t *testing.T) {
 }
 
 func TestSandboxCreateDup(t *testing.T) {
-	ctx, db, done := testDB(t)
-	defer done()
+	ctx, db := testDB(t)
 
 	store := NewSandboxStore(db)
 
@@ -83,9 +81,7 @@ func TestSandboxCreateDup(t *testing.T) {
 }
 
 func TestSandboxUpdate(t *testing.T) {
-	ctx, db, done := testDB(t)
-	defer done()
-
+	ctx, db := testDB(t)
 	store := NewSandboxStore(db)
 
 	if _, err := store.Create(ctx, api.Sandbox{
@@ -131,9 +127,7 @@ func TestSandboxUpdate(t *testing.T) {
 }
 
 func TestSandboxGetInvalid(t *testing.T) {
-	ctx, db, done := testDB(t)
-	defer done()
-
+	ctx, db := testDB(t)
 	store := NewSandboxStore(db)
 
 	_, err := store.Get(ctx, "invalid_id")
@@ -145,9 +139,7 @@ func TestSandboxGetInvalid(t *testing.T) {
 }
 
 func TestSandboxList(t *testing.T) {
-	ctx, db, done := testDB(t)
-	defer done()
-
+	ctx, db := testDB(t)
 	store := NewSandboxStore(db)
 
 	in := []api.Sandbox{
@@ -192,9 +184,7 @@ func TestSandboxList(t *testing.T) {
 }
 
 func TestSandboxListWithFilter(t *testing.T) {
-	ctx, db, done := testDB(t)
-	defer done()
-
+	ctx, db := testDB(t)
 	store := NewSandboxStore(db)
 
 	in := []api.Sandbox{
@@ -237,8 +227,7 @@ func TestSandboxListWithFilter(t *testing.T) {
 }
 
 func TestSandboxDelete(t *testing.T) {
-	ctx, db, done := testDB(t)
-	defer done()
+	ctx, db := testDB(t)
 
 	store := NewSandboxStore(db)
 

@@ -29,8 +29,7 @@ import (
 )
 
 func TestCreateDelete(t *testing.T) {
-	ctx, db, cleanup := testDB(t)
-	defer cleanup()
+	ctx, db := testDB(t)
 
 	subtests := []struct {
 		name     string

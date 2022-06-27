@@ -35,6 +35,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -43,16 +44,11 @@ func init() {
 }
 
 func TestContainersList(t *testing.T) {
-	ctx, db, cancel := testEnv(t)
-	defer cancel()
-
+	ctx, db := testEnv(t)
 	store := NewContainerStore(NewDB(db, nil, nil))
-
 	spec := &specs.Spec{}
 	encoded, err := protobuf.MarshalAnyToProto(spec)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	testset := map[string]*containers.Container{}
 	for i := 0; i < 4; i++ {
@@ -175,22 +171,18 @@ func TestContainersList(t *testing.T) {
 
 // TestContainersUpdate ensures that updates are taken in an expected manner.
 func TestContainersCreateUpdateDelete(t *testing.T) {
-	ctx, db, cancel := testEnv(t)
-	defer cancel()
+	var (
+		ctx, db = testEnv(t)
+		store   = NewContainerStore(NewDB(db, nil, nil))
+		spec    = &specs.Spec{}
+	)
 
-	store := NewContainerStore(NewDB(db, nil, nil))
-
-	spec := &specs.Spec{}
 	encoded, err := protobuf.MarshalAnyToProto(spec)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	spec.Annotations = map[string]string{"updated": "true"}
 	encodedUpdated, err := protobuf.MarshalAnyToProto(spec)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	for _, testcase := range []struct {
 		name       string
@@ -708,20 +700,19 @@ func checkContainersEqual(t *testing.T, a, b *containers.Container, format strin
 	assert.True(t, cmp.Equal(a, b, compareNil, compareAny))
 }
 
-func testEnv(t *testing.T) (context.Context, *bolt.DB, func()) {
+func testEnv(t *testing.T) (context.Context, *bolt.DB) {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = namespaces.WithNamespace(ctx, "testing")
 	ctx = logtest.WithT(ctx, t)
-
 	dirname := t.TempDir()
 
 	db, err := bolt.Open(filepath.Join(dirname, "meta.db"), 0644, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	return ctx, db, func() {
-		db.Close()
+	t.Cleanup(func() {
+		assert.NoError(t, db.Close())
 		cancel()
-	}
+	})
+
+	return ctx, db
 }
