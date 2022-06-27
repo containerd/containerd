@@ -32,7 +32,7 @@ import (
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/namespaces"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	bolt "go.etcd.io/bbolt"
 )
@@ -95,8 +95,7 @@ func TestContent(t *testing.T) {
 }
 
 func TestContentLeased(t *testing.T) {
-	ctx, db, cancel := testDB(t)
-	defer cancel()
+	ctx, db := testDB(t)
 
 	cs := db.ContentStore()
 
@@ -143,11 +142,8 @@ func TestContentLeased(t *testing.T) {
 }
 
 func TestIngestLeased(t *testing.T) {
-	ctx, db, cancel := testDB(t)
-	defer cancel()
-
+	ctx, db := testDB(t)
 	cs := db.ContentStore()
-
 	blob := []byte("any content")
 	expected := digest.FromBytes(blob)
 
