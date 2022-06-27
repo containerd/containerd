@@ -18,16 +18,8 @@ package images
 
 import (
 	"fmt"
-	"time"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/cmd/ctr/commands/content"
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/platforms"
-	"github.com/opencontainers/image-spec/identity"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
 )
 
@@ -87,57 +79,64 @@ command. As part of this process, we do the following:
 		}
 		defer done(ctx)
 
-		config, err := content.NewFetchConfig(ctx, context)
-		if err != nil {
+		// TODO: Handle this locally via transfer config
+		//config, err := content.NewFetchConfig(ctx, context)
+		// if err != nil {
+		//	return err
+		//}
+
+		if err := client.Transfer(ctx, nil, nil); err != nil {
 			return err
 		}
 
-		img, err := content.Fetch(ctx, client, ref, config)
-		if err != nil {
-			return err
-		}
-
-		log.G(ctx).WithField("image", ref).Debug("unpacking")
-
-		// TODO: Show unpack status
-
-		var p []ocispec.Platform
-		if context.Bool("all-platforms") {
-			p, err = images.Platforms(ctx, client.ContentStore(), img.Target)
-			if err != nil {
-				return fmt.Errorf("unable to resolve image platforms: %w", err)
-			}
-		} else {
-			for _, s := range context.StringSlice("platform") {
-				ps, err := platforms.Parse(s)
-				if err != nil {
-					return fmt.Errorf("unable to parse platform %s: %w", s, err)
-				}
-				p = append(p, ps)
-			}
-		}
-		if len(p) == 0 {
-			p = append(p, platforms.DefaultSpec())
-		}
-
-		start := time.Now()
-		for _, platform := range p {
-			fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
-			i := containerd.NewImageWithPlatform(client, img, platforms.Only(platform))
-			err = i.Unpack(ctx, context.String("snapshotter"))
+		/*
+			img, err := content.Fetch(ctx, client, ref, config)
 			if err != nil {
 				return err
 			}
-			if context.Bool("print-chainid") {
-				diffIDs, err := i.RootFS(ctx)
+
+			log.G(ctx).WithField("image", ref).Debug("unpacking")
+
+			// TODO: Show unpack status
+
+			var p []ocispec.Platform
+			if context.Bool("all-platforms") {
+				p, err = images.Platforms(ctx, client.ContentStore(), img.Target)
+				if err != nil {
+					return fmt.Errorf("unable to resolve image platforms: %w", err)
+				}
+			} else {
+				for _, s := range context.StringSlice("platform") {
+					ps, err := platforms.Parse(s)
+					if err != nil {
+						return fmt.Errorf("unable to parse platform %s: %w", s, err)
+					}
+					p = append(p, ps)
+				}
+			}
+			if len(p) == 0 {
+				p = append(p, platforms.DefaultSpec())
+			}
+
+			start := time.Now()
+			for _, platform := range p {
+				fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
+				i := containerd.NewImageWithPlatform(client, img, platforms.Only(platform))
+				err = i.Unpack(ctx, context.String("snapshotter"))
 				if err != nil {
 					return err
 				}
-				chainID := identity.ChainID(diffIDs).String()
-				fmt.Printf("image chain ID: %s\n", chainID)
+				if context.Bool("print-chainid") {
+					diffIDs, err := i.RootFS(ctx)
+					if err != nil {
+						return err
+					}
+					chainID := identity.ChainID(diffIDs).String()
+					fmt.Printf("image chain ID: %s\n", chainID)
+				}
 			}
-		}
-		fmt.Printf("done: %s\t\n", time.Since(start))
+			fmt.Printf("done: %s\t\n", time.Since(start))
+		*/
 		return nil
 	},
 }
