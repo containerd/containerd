@@ -3,21 +3,18 @@
 
 /*
    Copyright The containerd Authors.
+
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
+
        http://www.apache.org/licenses/LICENSE-2.0
+
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
-*/
-
-/*
-	To run this fuzzer, it must first be moved to
-	integration/client. OSS-fuzz does this automatically
-	everytime it builds the fuzzers.
 */
 
 package client
@@ -410,7 +407,7 @@ func doFuzz(data []byte, shouldTearDown bool) int {
 // This fuzzer is experimental for now and is being run
 // continuously by OSS-fuzz to collect feedback on
 // its sustainability.
-func FuzzNoTearDownWithDownload(data []byte) int {
+func FuzzIntegNoTearDownWithDownload(data []byte) int {
 	if !haveInitialized {
 		shouldRestart := initInSteps()
 		if shouldRestart {
@@ -426,7 +423,7 @@ func FuzzNoTearDownWithDownload(data []byte) int {
 // with one minor distinction: One tears down the
 // daemon after each iteration whereas the other doesn't.
 // The two fuzzers' performance will be compared over time.
-func FuzzCreateContainerNoTearDown(data []byte) int {
+func FuzzIntegCreateContainerNoTearDown(data []byte) int {
 	if !haveInitialized {
 		err := updatePathEnv()
 		if err != nil {
@@ -441,7 +438,7 @@ func FuzzCreateContainerNoTearDown(data []byte) int {
 // FuzzCreateContainerNoTearDown() except that
 // FuzzCreateContainerWithTearDown tears down the daemon
 // after each iteration.
-func FuzzCreateContainerWithTearDown(data []byte) int {
+func FuzzIntegCreateContainerWithTearDown(data []byte) int {
 	if !haveInitialized {
 		err := updatePathEnv()
 		if err != nil {

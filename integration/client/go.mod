@@ -19,8 +19,9 @@ require (
 	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a
 )
 
+require github.com/AdaLogics/go-fuzz-headers v0.0.0-20210715213245-6c3934b029d8
+
 require (
-	github.com/AdaLogics/go-fuzz-headers v0.0.0-20210715213245-6c3934b029d8 // indirect
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cilium/ebpf v0.7.0 // indirect

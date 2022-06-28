@@ -16,14 +16,16 @@
 set -o nounset
 set -o pipefail
 set -o errexit
+set -x
 
 IFS=$'\n'
 
 compile_fuzzers() {
     local regex=$1
     local compile_fuzzer=$2
+    local blocklist=$3
 
-    for line in $(git grep "$regex" | grep -v vendor)
+    for line in $(git grep --full-name "$regex" | grep -v -E "$blocklist")
     do
         if [[ "$line" =~ (.*)/.*:.*(Fuzz[A-Za-z0-9]+) ]]; then
             local pkg=${BASH_REMATCH[1]}
@@ -53,41 +55,15 @@ rm /root/go/pkg/mod/github.com/cilium/ebpf@v0.7.0/internal/btf/fuzz.go
 cd "$(dirname "${BASH_SOURCE[0]}")"
 cd ../../
 
-# Move all fuzzers that don't have the "fuzz" package out of this dir
-mv contrib/fuzz/container_fuzzer.go integration/client/
-
 rm -r vendor
-
 
 # Change path of socket since OSS-fuzz does not grant access to /run
 sed -i 's/\/run\/containerd/\/tmp\/containerd/g' $SRC/containerd/defaults/defaults_unix.go
 
-# To build FuzzContainer2 we need to prepare a few things:
-# We change the name of the cmd/containerd package
-# so that we can import it.
-# We furthermore add an exported function that is similar
-# to cmd/containerd.main and call that instead of calling
-# the containerd binary.
-#
-# In the fuzzer we import cmd/containerd as a low-maintenance
-# way of initializing all the plugins.
-# Make backup of cmd/containerd:
-cp -r $SRC/containerd/cmd/containerd $SRC/cmd-containerd-backup
-# Rename package:
-find $SRC/containerd/cmd/containerd -type f -exec sed -i 's/package main/package mainfuzz/g' {} \;
-# Add an exported function
-sed -i -e '$afunc StartDaemonForFuzzing(arguments []string) {\n\tapp := App()\n\t_ = app.Run(arguments)\n}' $SRC/containerd/cmd/containerd/command/main.go
-# Build fuzzer:
-compile_go_fuzzer github.com/containerd/containerd/contrib/fuzz FuzzContainerdImport fuzz_containerd_import
-# Reinstante backup of cmd/containerd:
-mv $SRC/cmd-containerd-backup $SRC/containerd/cmd/containerd
-
-# Compile more fuzzers
-mv $SRC/containerd/filters/filter_test.go $SRC/containerd/filters/filter_test_fuzz.go
 go get github.com/AdamKorcz/go-118-fuzz-build/utils
 
-compile_fuzzers '^func Fuzz.*testing\.F' compile_native_go_fuzzer
-compile_fuzzers '^func Fuzz.*data' compile_go_fuzzer
+compile_fuzzers '^func Fuzz.*testing\.F' compile_native_go_fuzzer vendor
+compile_fuzzers '^func Fuzz.*data' compile_go_fuzzer '(vendor|Integ)'
 
 # The below fuzzers require more setup than the fuzzers above.
 # We need the binaries from "make".
@@ -122,6 +98,5 @@ for i in $( ls *_test.go ); do mv $i ./${i%.*}_fuzz.go; done
 # Remove windows test to avoid double declarations:
 rm ./client_windows_test_fuzz.go
 rm ./helpers_windows_test_fuzz.go
-compile_go_fuzzer github.com/containerd/containerd/integration/client FuzzCreateContainerNoTearDown fuzz_create_container_no_teardown
-compile_go_fuzzer github.com/containerd/containerd/integration/client FuzzCreateContainerWithTearDown fuzz_create_container_with_teardown
-compile_go_fuzzer github.com/containerd/containerd/integration/client FuzzNoTearDownWithDownload fuzz_no_teardown_with_download
+
+compile_fuzzers '^func FuzzInteg.*data' compile_go_fuzzer vendor
