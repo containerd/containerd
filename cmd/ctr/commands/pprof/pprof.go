@@ -182,6 +182,7 @@ func httpGetRequest(client *http.Client, request string) (io.ReadCloser, error) 
 		return nil, err
 	}
 	if resp.StatusCode != 200 {
+		resp.Body.Close()
 		return nil, fmt.Errorf("http get failed with status: %s", resp.Status)
 	}
 	return resp.Body, nil
