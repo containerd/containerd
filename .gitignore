@@ -1,7 +1,7 @@
 /bin/
 /man/
 coverage.txt
-/integration/benchmark/bin/
+integration/benchmark/bin/
 profile.out
 containerd.test
 _site/

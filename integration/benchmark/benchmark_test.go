@@ -14,18 +14,14 @@
    limitations under the License.
 */
 
-package benchmark
+package main 
 
 import (
+	"encoding/json"
 	"fmt"
-	"math/rand"
 	"testing"
-	"time"
 )
 
-func BenchmarkExample(t *testing.B) {
-	fmt.Println("Ugh..", t.N)
-	sleepTime := time.Duration(rand.Int63n(24))
-	time.Sleep(sleepTime * 0 * time.Second)
+func TestJson(t *testing.T) {
 
 }
