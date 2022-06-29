@@ -601,5 +601,5 @@ func generateUserString(username string, uid, gid *runtime.Int64Value) (string, 
 
 // snapshotterOpts returns any Linux specific snapshotter options for the rootfs snapshot
 func snapshotterOpts(snapshotterName string, config *runtime.ContainerConfig) []snapshots.Opt {
-	return []snapshots.Opt{}
+	return []snapshots.Opt{snapshots.WithLabels(snapshots.FilterInheritedLabels(config.Annotations))}
 }
