@@ -35,6 +35,10 @@ jobs:
       contents: 'read'
       id-token: 'write'
     strategy:
+      # NOTE(aznashwan): this will permit all other jobs from the matrix to finish and
+      # upload their results even if one has a failing non-test-task:
+      # (e.g. hitting resource limits in the `AZTestVMCreate` task)
+      fail-fast: false
       matrix:
         win_ver: [ltsc2019, ltsc2022]
         include:
@@ -60,8 +64,11 @@ jobs:
           LOGS_DIR=$HOME/$STARTED_TIME
           echo "STARTED_TIME=$STARTED_TIME" >> $GITHUB_ENV
           echo "LOGS_DIR=$LOGS_DIR" >> $GITHUB_ENV
-          mkdir -p $LOGS_DIR/artifacts
 
+          echo "VM_INTEGRATION_LOGFILE=/c/Logs/integration.log" >> $GITHUB_ENV
+          echo "VM_CRI_INTEGRATION_LOGFILE=/c/Logs/cri-integration.log" >> $GITHUB_ENV
+
+          mkdir -p $LOGS_DIR/artifacts
           jq -n --arg node temp --arg timestamp $STARTED_TIME '$timestamp|tonumber|{timestamp:.,$node}' > $LOGS_DIR/started.json
 
       - name: Generate ssh key pair
@@ -152,13 +159,18 @@ jobs:
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "cd c:\containerd ; make binaries"
 
       - name: RunIntegrationTests
+        id: RunIntegrationTests
+        # NOTE(aznashwan): this is set to continue-on-error to allow the workflow to run until
+        # the reports are converted/uploaded to GCloud so as to show up on testgrid.k8s.io too.
+        continue-on-error: true
         run: |
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -s" << EOF
             cd /c/containerd
             export EXTRA_TESTFLAGS="-timeout=20m"
-            make integration | tee /c/Logs/integration.log
+            set -o pipefail
+            make integration | tee ${{ env.VM_INTEGRATION_LOGFILE }}
           EOF
-          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cat /c/Logs/integration.log | go-junit-report.exe > /c/Logs/junit_00.xml'"
+          echo '::set-output name=SUCCEEDED::1'
 
       - name: PrepareRepoList
         run: |
@@ -176,14 +188,19 @@ jobs:
             scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} cri-test-images.yaml azureuser@${{ env.VM_PUB_IP }}:c:/cri-test-images.yaml
 
       - name: RunCRIIntegrationTests
+        id: RunCRIIntegrationTests
+        # NOTE(aznashwan): this is set to continue-on-error to allow the workflow to run until
+        # the reports are converted/uploaded to GCloud so as to show up on testgrid.k8s.io too.
+        continue-on-error: true
         run: |
            ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -s" <<EOF
              cd c:/containerd
              ./script/setup/install-cni-windows
              export TEST_IMAGE_LIST=c:/repolist.toml
-             make cri-integration | tee c:/Logs/cri-integration.log
+             set -o pipefail
+             make cri-integration | tee ${{ env.VM_CRI_INTEGRATION_LOGFILE }}
            EOF
-           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cat /c/Logs/cri-integration.log | go-junit-report.exe > c:/Logs/junit_01.xml' "
+           echo '::set-output name=SUCCEEDED::1'
 
       - name: GetCritestRepo
         run: |
@@ -194,6 +211,10 @@ jobs:
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cd /c/cri-tools && make critest'"
 
       - name: RunCritest
+        id: RunCritest
+        # NOTE(aznashwan): this is set to continue-on-error to allow the workflow to run until
+        # the reports are converted/uploaded to GCloud so as to show up on testgrid.k8s.io too.
+        continue-on-error: true
         run: |
           # This test is exceedingly flaky only on ws2022 so skip for now to keep CI happy.
           # Info: https://github.com/containerd/containerd/issues/6652
@@ -205,11 +226,18 @@ jobs:
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "powershell.exe -command { C:\containerd\bin\containerd.exe --log-level=debug --log-file=C:/logs/containerd.log --service-name containerd --register-service ; Set-Service containerd -StartupType Automatic; Start-Service containerd }"
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -s" <<EOF
             sleep 5
+            set -o pipefail
             c:/cri-tools/build/bin/critest.exe $SKIP --runtime-endpoint='npipe://./pipe/containerd-containerd' --test-images-file='c:/cri-test-images.yaml' --report-dir='c:/Logs' -ginkgo.junit-report="C:\Logs\junit_critest.xml" | tee c:/Logs/critest.log
           EOF
+          echo '::set-output name=SUCCEEDED::1'
 
       - name: PullLogsFromWinNode
         run: |
+          # Generate JUnit reports from the stdouts of the tests:
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'touch ${{ env.VM_INTEGRATION_LOGFILE }}; cat ${{ env.VM_INTEGRATION_LOGFILE }} | go-junit-report.exe > /c/Logs/junit_integration.xml'"
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'touch ${{ env.VM_CRI_INTEGRATION_LOGFILE }}; cat ${{ env.VM_CRI_INTEGRATION_LOGFILE }} | go-junit-report.exe > /c/Logs/junit_cri_integration.xml'"
+
+          # Copy over all the JUnit reports:
           scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }}:c:/Logs/*.xml ${{ env.LOGS_DIR }}/artifacts/
           for f in $(ls ${{ env.LOGS_DIR }}/artifacts/*.xml); do
               xmlstarlet ed -d "/testsuites/testsuite/properties" $f > ${{ env.LOGS_DIR }}/$(basename $f)
@@ -249,6 +277,27 @@ jobs:
           path: ${{ env.LOGS_DIR }}
           destination: ${{ matrix.GOOGLE_BUCKET }}${{ env.STARTED_TIME}}
           parent: false
+
+      - name: Check all CI stages succeeded
+        uses: actions/github-script@v3
+        with:
+          script: |
+            const stepResults = {
+              RunIntegrationTests: "${{ steps.RunIntegrationTests.outputs.SUCCEEDED }}",
+              RunCRIIntegrationTests: "${{ steps.RunCRIIntegrationTests.outputs.SUCCEEDED }}",
+              RunCritest: "${{ steps.RunCritest.outputs.SUCCEEDED }}",
+            };
+
+            let failedTasks = [];
+            for( [step, result] of Object.entries(stepResults) ) {
+              if (result != "1") {
+                failedTasks.push(step);
+              }
+            };
+
+            if (failedTasks.length != 0) {
+              core.setFailed(`One or more CI stages have failed. Please review the outputs of the following stepts: ${failedTasks}.`);
+            };
 
       - name: ResourceCleanup
         if: always()

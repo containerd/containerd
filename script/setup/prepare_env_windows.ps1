@@ -5,7 +5,7 @@
 # lived test environment.
 Set-MpPreference -DisableRealtimeMonitoring:$true
 
-$PACKAGES= @{ mingw = "11.2.0"; git = ""; golang = "1.18.3"; make = ""; nssm = "" }
+$PACKAGES= @{ mingw = "10.2.0"; git = ""; golang = "1.18.3"; make = ""; nssm = "" }
 
 Write-Host "Downloading chocolatey package"
 curl.exe -L "https://packages.chocolatey.org/chocolatey.0.10.15.nupkg" -o 'c:\choco.zip'
@@ -40,6 +40,10 @@ Write-Host $env:PATH
 
 # Prepare Log dir
 mkdir c:\Logs
+
+# Log go env for future reference:
+go env > c:\Logs\go-env.txt
+cat c:\Logs\go-env.txt
 
 # Pull junit conversion tool
 go install github.com/jstemmer/go-junit-report@v0.9.1

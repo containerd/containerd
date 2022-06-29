@@ -1,5 +1,5 @@
-//go:build gofuzz
-// +build gofuzz
+//go:build !no_aufs
+// +build !no_aufs
 
 /*
    Copyright The containerd Authors.
@@ -17,16 +17,6 @@
    limitations under the License.
 */
 
-package fuzz
+package builtins
 
-import (
-	"github.com/containerd/containerd/platforms"
-)
-
-func FuzzPlatformsParse(data []byte) int {
-	_, err := platforms.Parse(string(data))
-	if err != nil {
-		return 0
-	}
-	return 1
-}
+import _ "github.com/containerd/aufs/plugin"

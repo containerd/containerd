@@ -26,13 +26,12 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/images"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestImagesList(t *testing.T) {
-	ctx, db, cancel := testEnv(t)
-	defer cancel()
+	ctx, db := testEnv(t)
 	store := NewImageStore(NewDB(db, nil, nil))
 
 	testset := map[string]*images.Image{}
@@ -148,8 +147,7 @@ func TestImagesList(t *testing.T) {
 	}
 }
 func TestImagesCreateUpdateDelete(t *testing.T) {
-	ctx, db, cancel := testEnv(t)
-	defer cancel()
+	ctx, db := testEnv(t)
 	store := NewImageStore(NewDB(db, nil, nil))
 
 	for _, testcase := range []struct {

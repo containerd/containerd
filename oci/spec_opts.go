@@ -701,11 +701,8 @@ func WithUIDGID(uid, gid uint32) SpecOpts {
 func WithUserID(uid uint32) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
 		setProcess(s)
-		if c.Snapshotter == "" && c.SnapshotKey == "" {
-			if !isRootfsAbs(s.Root.Path) {
-				return errors.New("rootfs absolute path is required")
-			}
-			user, err := UserFromPath(s.Root.Path, func(u user.User) bool {
+		setUser := func(root string) error {
+			user, err := UserFromPath(root, func(u user.User) bool {
 				return u.Uid == int(uid)
 			})
 			if err != nil {
@@ -717,7 +714,12 @@ func WithUserID(uid uint32) SpecOpts {
 			}
 			s.Process.User.UID, s.Process.User.GID = uint32(user.Uid), uint32(user.Gid)
 			return nil
-
+		}
+		if c.Snapshotter == "" && c.SnapshotKey == "" {
+			if !isRootfsAbs(s.Root.Path) {
+				return errors.New("rootfs absolute path is required")
+			}
+			return setUser(s.Root.Path)
 		}
 		if c.Snapshotter == "" {
 			return errors.New("no snapshotter set for container")
@@ -732,20 +734,7 @@ func WithUserID(uid uint32) SpecOpts {
 		}
 
 		mounts = tryReadonlyMounts(mounts)
-		return mount.WithTempMount(ctx, mounts, func(root string) error {
-			user, err := UserFromPath(root, func(u user.User) bool {
-				return u.Uid == int(uid)
-			})
-			if err != nil {
-				if os.IsNotExist(err) || err == ErrNoUsersFound {
-					s.Process.User.UID, s.Process.User.GID = uid, 0
-					return nil
-				}
-				return err
-			}
-			s.Process.User.UID, s.Process.User.GID = uint32(user.Uid), uint32(user.Gid)
-			return nil
-		})
+		return mount.WithTempMount(ctx, mounts, setUser)
 	}
 }
 
@@ -759,11 +748,8 @@ func WithUsername(username string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
 		setProcess(s)
 		if s.Linux != nil {
-			if c.Snapshotter == "" && c.SnapshotKey == "" {
-				if !isRootfsAbs(s.Root.Path) {
-					return errors.New("rootfs absolute path is required")
-				}
-				user, err := UserFromPath(s.Root.Path, func(u user.User) bool {
+			setUser := func(root string) error {
+				user, err := UserFromPath(root, func(u user.User) bool {
 					return u.Name == username
 				})
 				if err != nil {
@@ -771,6 +757,12 @@ func WithUsername(username string) SpecOpts {
 				}
 				s.Process.User.UID, s.Process.User.GID = uint32(user.Uid), uint32(user.Gid)
 				return nil
+			}
+			if c.Snapshotter == "" && c.SnapshotKey == "" {
+				if !isRootfsAbs(s.Root.Path) {
+					return errors.New("rootfs absolute path is required")
+				}
+				return setUser(s.Root.Path)
 			}
 			if c.Snapshotter == "" {
 				return errors.New("no snapshotter set for container")
@@ -785,16 +777,7 @@ func WithUsername(username string) SpecOpts {
 			}
 
 			mounts = tryReadonlyMounts(mounts)
-			return mount.WithTempMount(ctx, mounts, func(root string) error {
-				user, err := UserFromPath(root, func(u user.User) bool {
-					return u.Name == username
-				})
-				if err != nil {
-					return err
-				}
-				s.Process.User.UID, s.Process.User.GID = uint32(user.Uid), uint32(user.Gid)
-				return nil
-			})
+			return mount.WithTempMount(ctx, mounts, setUser)
 		} else if s.Windows != nil {
 			s.Process.User.Username = username
 		} else {
@@ -805,7 +788,7 @@ func WithUsername(username string) SpecOpts {
 }
 
 // WithAdditionalGIDs sets the OCI spec's additionalGids array to any additional groups listed
-// for a particular user in the /etc/groups file of the image's root filesystem
+// for a particular user in the /etc/group file of the image's root filesystem
 // The passed in user can be either a uid or a username.
 func WithAdditionalGIDs(userstr string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
@@ -854,6 +837,63 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 		}
 		if c.Snapshotter == "" && c.SnapshotKey == "" {
 			if !isRootfsAbs(s.Root.Path) {
+				return errors.New("rootfs absolute path is required")
+			}
+			return setAdditionalGids(s.Root.Path)
+		}
+		if c.Snapshotter == "" {
+			return errors.New("no snapshotter set for container")
+		}
+		if c.SnapshotKey == "" {
+			return errors.New("rootfs snapshot not created for container")
+		}
+		snapshotter := client.SnapshotService(c.Snapshotter)
+		mounts, err := snapshotter.Mounts(ctx, c.SnapshotKey)
+		if err != nil {
+			return err
+		}
+
+		mounts = tryReadonlyMounts(mounts)
+		return mount.WithTempMount(ctx, mounts, setAdditionalGids)
+	}
+}
+
+// WithAppendAdditionalGroups append additional groups within the container.
+// The passed in groups can be either a gid or a groupname.
+func WithAppendAdditionalGroups(groups ...string) SpecOpts {
+	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
+		// For LCOW or on Darwin additional GID's are not supported
+		if s.Windows != nil || runtime.GOOS == "darwin" {
+			return nil
+		}
+		setProcess(s)
+		setAdditionalGids := func(root string) error {
+			gpath, err := fs.RootPath(root, "/etc/group")
+			if err != nil {
+				return err
+			}
+			ugroups, err := user.ParseGroupFile(gpath)
+			if err != nil {
+				return err
+			}
+			groupMap := make(map[string]user.Group)
+			for _, group := range ugroups {
+				groupMap[group.Name] = group
+				groupMap[strconv.Itoa(group.Gid)] = group
+			}
+			var gids []uint32
+			for _, group := range groups {
+				g, ok := groupMap[group]
+				if !ok {
+					return fmt.Errorf("unable to find group %s", group)
+				}
+				gids = append(gids, uint32(g.Gid))
+			}
+			s.Process.User.AdditionalGids = append(s.Process.User.AdditionalGids, gids...)
+			return nil
+		}
+		if c.Snapshotter == "" && c.SnapshotKey == "" {
+			if !filepath.IsAbs(s.Root.Path) {
 				return errors.New("rootfs absolute path is required")
 			}
 			return setAdditionalGids(s.Root.Path)
@@ -979,7 +1019,7 @@ func UserFromPath(root string, filter func(user.User) bool) (user.User, error) {
 // ErrNoGroupsFound can be returned from GIDFromPath
 var ErrNoGroupsFound = errors.New("no groups found")
 
-// GIDFromPath inspects the GID using /etc/passwd in the specified rootfs.
+// GIDFromPath inspects the GID using /etc/group in the specified rootfs.
 // filter can be nil.
 func GIDFromPath(root string, filter func(user.Group) bool) (gid uint32, err error) {
 	gpath, err := fs.RootPath(root, "/etc/group")

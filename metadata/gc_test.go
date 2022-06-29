@@ -27,7 +27,9 @@ import (
 
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/metadata/boltutil"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/go-digest"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -41,11 +43,8 @@ func TestResourceMax(t *testing.T) {
 }
 
 func TestGCRoots(t *testing.T) {
-	db, cleanup, err := newDatabase(t)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cleanup()
+	db, err := newDatabase(t)
+	require.NoError(t, err)
 
 	alters := []alterFunc{
 		addImage("ns1", "image1", dgst(1), nil),
@@ -162,11 +161,8 @@ func TestGCRoots(t *testing.T) {
 }
 
 func TestGCRemove(t *testing.T) {
-	db, cleanup, err := newDatabase(t)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cleanup()
+	db, err := newDatabase(t)
+	require.NoError(t, err)
 
 	alters := []alterFunc{
 		addImage("ns1", "image1", dgst(1), nil),
@@ -256,11 +252,8 @@ func TestGCRemove(t *testing.T) {
 }
 
 func TestGCRefs(t *testing.T) {
-	db, cleanup, err := newDatabase(t)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cleanup()
+	db, err := newDatabase(t)
+	require.NoError(t, err)
 
 	alters := []alterFunc{
 		addContent("ns1", dgst(1), nil),
@@ -389,12 +382,11 @@ func TestGCRefs(t *testing.T) {
 }
 
 func TestCollectibleResources(t *testing.T) {
-	db, cleanup, err := newDatabase(t)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db, err := newDatabase(t)
+	require.NoError(t, err)
+
 	testResource := gc.ResourceType(0x10)
-	defer cleanup()
+
 	alters := []alterFunc{
 		addContent("ns1", dgst(1), nil),
 		addImage("ns1", "image1", dgst(1), nil),
@@ -556,17 +548,19 @@ func (tc *testCollector) Finish() error {
 	return nil
 }
 
-func newDatabase(t testing.TB) (*bolt.DB, func(), error) {
+func newDatabase(t testing.TB) (*bolt.DB, error) {
 	td := t.TempDir()
 
 	db, err := bolt.Open(filepath.Join(td, "test.db"), 0777, nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return db, func() {
-		db.Close()
-	}, nil
+	t.Cleanup(func() {
+		assert.NoError(t, db.Close())
+	})
+
+	return db, nil
 }
 
 func checkNodeC(ctx context.Context, t *testing.T, db *bolt.DB, expected []gc.Node, fn func(context.Context, *bolt.Tx, chan<- gc.Node) error) {

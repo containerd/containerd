@@ -201,6 +201,10 @@ var (
 			Name:  "rdt-class",
 			Usage: "name of the RDT class to associate the container with. Specifies a Class of Service (CLOS) for cache and memory bandwidth management.",
 		},
+		cli.StringFlag{
+			Name:  "hostname",
+			Usage: "set the container's host name",
+		},
 	}
 )
 

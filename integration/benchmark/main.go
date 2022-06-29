@@ -12,7 +12,7 @@ func main() {
 	commit := os.Args[1]
 	fmt.Println(commit)
 	res := testing.Benchmark(BenchmarkExample)
-	fmt.Printf("Number of run: %d \n", res.N)
+        fmt.Printf("Number of run: %d, time taken: %d\n", res.N, res.T)
 }
 
 type benchresult struct {
@@ -22,7 +22,9 @@ type benchresult struct {
 
 func BenchmarkExample(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		sleepTime := time.Duration(rand.Int63n(24))
-		time.Sleep(sleepTime * 0 * time.Second)
+                rand.Seed(time.Now().UnixNano())
+		sleepTime := time.Duration(rand.Int63n(3))
+                fmt.Printf("SleepTime = %d\n", sleepTime)
+		time.Sleep(sleepTime * time.Second)
 	}
 }
