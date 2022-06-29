@@ -1577,29 +1577,24 @@ func (in *instrumentedAlphaService) ReopenContainerLog(ctx context.Context, r *r
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.ReopenContainerLogRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.ReopenContainerLogResponse
-			v1res, err = in.c.ReopenContainerLog(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.ReopenContainerLogResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("ReopenContainerLog for %q failed", r.GetContainerId())
-					}
-				}
+	var v1r runtime.ReopenContainerLogRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.ReopenContainerLogResponse
+	v1res, err = in.c.ReopenContainerLog(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.ReopenContainerLogResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("ReopenContainerLog for %q failed", r.GetContainerId())
 			}
 		}
 	}
