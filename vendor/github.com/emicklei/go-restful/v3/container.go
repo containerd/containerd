@@ -261,7 +261,7 @@ func (c *Container) dispatch(httpWriter http.ResponseWriter, httpRequest *http.R
 			contentEncodingEnabled = *route.contentEncodingEnabled
 		}
 		if contentEncodingEnabled {
-			doCompress, encoding := wantsCompressedResponse(httpRequest)
+			doCompress, encoding := wantsCompressedResponse(httpRequest, httpWriter)
 			if doCompress {
 				var err error
 				writer, err = NewCompressingResponseWriter(httpWriter, encoding)
@@ -288,8 +288,8 @@ func (c *Container) dispatch(httpWriter http.ResponseWriter, httpRequest *http.R
 		allFilters = append(allFilters, webService.filters...)
 		allFilters = append(allFilters, route.Filters...)
 		chain := FilterChain{
-			Filters: allFilters,
-			Target: route.Function,
+			Filters:       allFilters,
+			Target:        route.Function,
 			ParameterDocs: route.ParameterDocs,
 			Operation:     route.Operation,
 		}
@@ -332,7 +332,7 @@ func (c *Container) ServeHTTP(httpWriter http.ResponseWriter, httpRequest *http.
 		}
 	}()
 
-	doCompress, encoding := wantsCompressedResponse(httpRequest)
+	doCompress, encoding := wantsCompressedResponse(httpRequest, httpWriter)
 	if doCompress {
 		var err error
 		writer, err = NewCompressingResponseWriter(httpWriter, encoding)
@@ -365,7 +365,7 @@ func (c *Container) Handle(pattern string, handler http.Handler) {
 		}()
 
 		if c.contentEncodingEnabled {
-			doCompress, encoding := wantsCompressedResponse(httpRequest)
+			doCompress, encoding := wantsCompressedResponse(httpRequest, httpWriter)
 			if doCompress {
 				var err error
 				writer, err = NewCompressingResponseWriter(httpWriter, encoding)
