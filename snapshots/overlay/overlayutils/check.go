@@ -197,3 +197,54 @@ func NeedsUserXAttr(d string) (bool, error) {
 	}
 	return true, nil
 }
+
+// PrepareMetacopyState reads metacopy value from the underlaying
+// kernel and writes it as a local state. If metacopy state has been
+// written earlier no action occurs. This function assumes
+// that the kernel supports metacopy option, so the caller is
+// responsible for this check.
+func PrepareMetacopyState(root string) error {
+	kval, err := os.ReadFile("/sys/module/overlay/parameters/metacopy")
+	if err != nil {
+		return err
+	}
+	_, err = os.ReadFile(filepath.Join(root, "metacopy-state"))
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(root, "metacopy-state"), kval, 0600); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// GetMetacopyState reads local metacopy value written
+// earlier by PrepareMetacopyState or MaybeUpdateMetacopyState.
+func GetMetacopyState(root string) (bool, error) {
+	uval, err := os.ReadFile(filepath.Join(root, "metacopy-state"))
+	if err != nil {
+		return false, nil
+	}
+	if string(uval) == "Y\n" {
+		return true, nil
+	}
+	return false, nil
+}
+
+// MaybeUpdateMetacopyState updates local metacopy value conditionally,
+// that means it is only allowed to write "metacopy=on" only if
+// "metacopy=off" in the state.
+func MaybeUpdateMetacopyState(root string, metacopyOn bool) error {
+	uval, err := os.ReadFile(filepath.Join(root, "metacopy-state"))
+	if err != nil {
+		return err
+	}
+	if string(uval) == "N\n" && metacopyOn {
+		if err := os.WriteFile(filepath.Join(root, "metacopy-state"), []byte("Y\n"), 0600); err != nil {
+			return err
+		}
+	}
+	return nil
+}

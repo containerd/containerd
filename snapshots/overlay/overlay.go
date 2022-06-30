@@ -130,6 +130,50 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		config.mountOptions = append(config.mountOptions, "index=off")
 	}
 
+	if supportsMetacopy() {
+		ok := false
+		unknownOptionMsg := `unknown value for "metacopy" mount option (must be one of ["metacopy=on", "metacopy=off"])`
+		// maintaine the state of the metacopy for each snapshotter. This value
+		// is the same as from /sys/module/overlay/parameters/metacopy. We need to
+		// maintaine this value because system's value may be changed later, i.e.
+		// after saving the state for snapshotter (snapshots created before
+		// changing that state will have opposite value).
+		if err := overlayutils.PrepareMetacopyState(root); err != nil {
+			return nil, err
+		}
+		// if metacopy is supported by the kernel we set it to "metacopy=on" by default if it's possible
+		if !hasOption(config.mountOptions, "metacopy", true) && !hasOption(config.mountOptions, "userxattr", false) {
+			config.mountOptions = append(config.mountOptions, "metacopy=on")
+		}
+		// check one more time because user may not specify the option but above we did it.
+		if hasOption(config.mountOptions, "metacopy=on", false) {
+			if hasOption(config.mountOptions, "userxattr", false) {
+				logrus.Warnf("cannot apply \"metacopy=on\" when \"userxattr\" is set")
+				if config.mountOptions, ok = unsetOption(config.mountOptions, "metacopy=on", false); !ok {
+					return nil, fmt.Errorf(unknownOptionMsg)
+				}
+			} else {
+				// update metacopy-state to "Y" (metacopy=on) if current state is "N" (metacopy=off)
+				if err := overlayutils.MaybeUpdateMetacopyState(root, true); err != nil {
+					return nil, err
+				}
+			}
+		} else if hasOption(config.mountOptions, "metacopy=off", false) {
+			if metacopyOn, err := overlayutils.GetMetacopyState(root); err != nil {
+				return nil, err
+			} else if metacopyOn {
+				logrus.Warnf("setting \"metacopy=off\" is dangerous; \"metacopy=on\" detected by the snapshotter state; unsetting the option")
+				// rely on the system's choice (should be the same as metacopy-state but not required)
+				// if system has "metacopy=on" life is good, otherwise if the system has "metacopy=off",
+				// that means a user did something like # echo N > /sys/module/overlay/parameters/metacopy,
+				// even though snpahots with metacopy=on may exist, i.e. shooted his leg himself.
+				if config.mountOptions, ok = unsetOption(config.mountOptions, "metacopy=off", false); !ok {
+					return nil, fmt.Errorf(unknownOptionMsg)
+				}
+			}
+		}
+	}
+
 	return &snapshotter{
 		root:          root,
 		ms:            ms,
@@ -150,6 +194,27 @@ func hasOption(options []string, key string, hasValue bool) bool {
 		}
 	}
 	return false
+}
+
+func unsetOption(options []string, key string, hasValue bool) ([]string, bool) {
+	var (
+		i      int
+		option string
+	)
+	for i, option = range options {
+		if hasValue {
+			if strings.HasPrefix(option, key) && len(option) > len(key) && option[len(key)] == '=' {
+				goto unset
+			}
+		} else if option == key {
+			goto unset
+		}
+	}
+	return options, false
+unset:
+	copyOpts := make([]string, 0)
+	copyOpts = append(copyOpts, options[:i]...)
+	return append(copyOpts, options[i+1:]...), true
 }
 
 // Stat returns the info for an active or committed snapshot by name or
@@ -517,7 +582,6 @@ func (o *snapshotter) mounts(s storage.Snapshot) []mount.Mount {
 			Options: options,
 		},
 	}
-
 }
 
 func (o *snapshotter) upperPath(id string) string {
@@ -536,6 +600,14 @@ func (o *snapshotter) Close() error {
 // supportsIndex checks whether the "index=off" option is supported by the kernel.
 func supportsIndex() bool {
 	if _, err := os.Stat("/sys/module/overlay/parameters/index"); err == nil {
+		return true
+	}
+	return false
+}
+
+// supportsMetacopy tells whether the "metacopy" option is supported by kernel.
+func supportsMetacopy() bool {
+	if _, err := os.Stat("/sys/module/overlay/parameters/metacopy"); err == nil {
 		return true
 	}
 	return false
