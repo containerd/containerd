@@ -145,6 +145,17 @@ func (e *Exchange) Subscribe(ctx context.Context, fs ...string) (ch <-chan *even
 	ch = evch
 	errs = errq
 
+	ns, ok := namespaces.Namespace(ctx)
+	if ok && ns != "" {
+		dst = goevents.NewFilter(dst, goevents.MatcherFunc(func(gev goevents.Event) bool {
+			if e, ok := gev.(*events.Envelope); ok {
+				return e.Namespace == ns
+			}
+			// pass non-envelope events
+			return true
+		}))
+	}
+
 	if len(fs) > 0 {
 		filter, err := filters.ParseAll(fs...)
 		if err != nil {
@@ -153,7 +164,7 @@ func (e *Exchange) Subscribe(ctx context.Context, fs ...string) (ch <-chan *even
 			return
 		}
 
-		dst = goevents.NewFilter(queue, goevents.MatcherFunc(func(gev goevents.Event) bool {
+		dst = goevents.NewFilter(dst, goevents.MatcherFunc(func(gev goevents.Event) bool {
 			return filter.Match(adapt(gev))
 		}))
 	}
