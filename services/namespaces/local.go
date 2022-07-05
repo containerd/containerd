@@ -135,6 +135,7 @@ func (l *local) Create(ctx context.Context, req *api.CreateNamespaceRequest, _ .
 		return &resp, err
 	}
 
+	ctx = namespaces.WithNamespace(ctx, req.Namespace.Name)
 	if err := l.publisher.Publish(ctx, "/namespaces/create", &eventstypes.NamespaceCreate{
 		Name:   req.Namespace.Name,
 		Labels: req.Namespace.Labels,
@@ -188,6 +189,7 @@ func (l *local) Update(ctx context.Context, req *api.UpdateNamespaceRequest, _ .
 		return &resp, err
 	}
 
+	ctx = namespaces.WithNamespace(ctx, req.Namespace.Name)
 	if err := l.publisher.Publish(ctx, "/namespaces/update", &eventstypes.NamespaceUpdate{
 		Name:   req.Namespace.Name,
 		Labels: req.Namespace.Labels,
