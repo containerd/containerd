@@ -1,4 +1,4 @@
-# github.com/AdaLogics/go-fuzz-headers v0.0.0-20210715213245-6c3934b029d8
+# github.com/AdaLogics/go-fuzz-headers v0.0.0-20220706123152-fef3fe1bab07
 ## explicit; go 1.13
 github.com/AdaLogics/go-fuzz-headers
 # github.com/Microsoft/go-winio v0.5.2
@@ -166,6 +166,9 @@ github.com/coreos/go-systemd/v22/dbus
 # github.com/cpuguy83/go-md2man/v2 v2.0.1
 ## explicit; go 1.11
 github.com/cpuguy83/go-md2man/v2/md2man
+# github.com/cyphar/filepath-securejoin v0.2.3
+## explicit; go 1.13
+github.com/cyphar/filepath-securejoin
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew

@@ -291,20 +291,6 @@ func populateBlobStore(ctx context.Context, t checker, cs content.Store, nblobs,
 	return blobs
 }
 
-func contentStoreEnv(t testing.TB) (context.Context, string, content.Store, func()) {
-	tmpdir := t.TempDir()
-
-	cs, err := NewStore(tmpdir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	return ctx, tmpdir, cs, func() {
-		cancel()
-	}
-}
-
 func checkCopy(t checker, size int64, dst io.Writer, src io.Reader) {
 	nn, err := io.Copy(dst, src)
 	if err != nil {

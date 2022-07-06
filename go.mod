@@ -3,7 +3,7 @@ module github.com/containerd/containerd
 go 1.18
 
 require (
-	github.com/AdaLogics/go-fuzz-headers v0.0.0-20210715213245-6c3934b029d8
+	github.com/AdaLogics/go-fuzz-headers v0.0.0-20220706123152-fef3fe1bab07
 	github.com/Microsoft/go-winio v0.5.2
 	github.com/Microsoft/hcsshim v0.9.2
 	github.com/container-orchestrated-devices/container-device-interface v0.3.1
@@ -85,6 +85,7 @@ require (
 	github.com/containernetworking/cni v1.1.1 // indirect
 	github.com/containers/ocicrypt v1.1.3 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.1 // indirect
+	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
 	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

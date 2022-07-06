@@ -27,6 +27,8 @@ issues:
   exclude-rules:
     - path: 'cmd[\\/]containerd[\\/]builtins[\\/]'
       text: "blank-imports:"
+    - path: 'contrib[\\/]fuzz[\\/]'
+      text: "exported: func name will be used as fuzz.Fuzz"
 
 linters-settings:
   gosec:
