@@ -512,7 +512,7 @@ var (
 	}
 )
 
-func edit(context *cli.Context, rd io.Reader) (io.ReadCloser, error) {
+func edit(context *cli.Context, rd io.Reader) (_ io.ReadCloser, retErr error) {
 	editor := context.String("editor")
 	if editor == "" {
 		return nil, fmt.Errorf("editor is required")
@@ -523,8 +523,14 @@ func edit(context *cli.Context, rd io.Reader) (io.ReadCloser, error) {
 		return nil, err
 	}
 
-	if _, err := io.Copy(tmp, rd); err != nil {
-		tmp.Close()
+	defer func() {
+		if retErr != nil {
+			os.Remove(tmp.Name())
+		}
+	}()
+	_, err = io.Copy(tmp, rd)
+	tmp.Close()
+	if err != nil {
 		return nil, err
 	}
 
@@ -536,17 +542,15 @@ func edit(context *cli.Context, rd io.Reader) (io.ReadCloser, error) {
 	cmd.Env = os.Environ()
 
 	if err := cmd.Run(); err != nil {
-		tmp.Close()
 		return nil, err
 	}
-
-	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
-		tmp.Close()
+	// The editor might recreate new file and override the original one. We should reopen the file
+	edited, err := os.OpenFile(tmp.Name(), os.O_RDONLY, 0600)
+	if err != nil {
 		return nil, err
 	}
-
-	return onCloser{ReadCloser: tmp, onClose: func() error {
-		return os.RemoveAll(tmp.Name())
+	return onCloser{ReadCloser: edited, onClose: func() error {
+		return os.RemoveAll(edited.Name())
 	}}, nil
 }
 
