@@ -30,12 +30,13 @@ var imageListFile = flag.String("image-list", "", "The TOML file containing the 
 
 // ImageList holds public image references
 type ImageList struct {
-	Alpine           string
-	BusyBox          string
-	Pause            string
-	ResourceConsumer string
-	VolumeCopyUp     string
-	VolumeOwnership  string
+	Alpine               string
+	BusyBox              string
+	Pause                string
+	ResourceConsumer     string
+	VolumeCopyUp         string
+	VolumeOwnership      string
+	ArgsEscapedTestImage string
 }
 
 var (
@@ -47,12 +48,13 @@ var initOnce sync.Once
 
 func initImages(imageListFile string) {
 	imageList = ImageList{
-		Alpine:           "docker.io/library/alpine:latest",
-		BusyBox:          "docker.io/library/busybox:latest",
-		Pause:            "registry.k8s.io/pause:3.7",
-		ResourceConsumer: "registry.k8s.io/e2e-test-images/resource-consumer:1.10",
-		VolumeCopyUp:     "ghcr.io/containerd/volume-copy-up:2.1",
-		VolumeOwnership:  "ghcr.io/containerd/volume-ownership:2.1",
+		Alpine:               "docker.io/library/alpine:latest",
+		BusyBox:              "docker.io/library/busybox:latest",
+		Pause:                "registry.k8s.io/pause:3.7",
+		ResourceConsumer:     "registry.k8s.io/e2e-test-images/resource-consumer:1.10",
+		VolumeCopyUp:         "ghcr.io/containerd/volume-copy-up:2.1",
+		VolumeOwnership:      "ghcr.io/containerd/volume-ownership:2.1",
+		ArgsEscapedTestImage: "cplatpublic.azurecr.io/args-escaped-test-image-ns:latest",
 	}
 
 	if imageListFile != "" {
@@ -88,6 +90,8 @@ const (
 	VolumeCopyUp
 	// VolumeOwnership image
 	VolumeOwnership
+	// Test image for ArgsEscaped windows bug
+	ArgsEscapedTestImage
 )
 
 func initImageMap(imageList ImageList) map[int]string {
@@ -98,6 +102,7 @@ func initImageMap(imageList ImageList) map[int]string {
 	images[ResourceConsumer] = imageList.ResourceConsumer
 	images[VolumeCopyUp] = imageList.VolumeCopyUp
 	images[VolumeOwnership] = imageList.VolumeOwnership
+	images[ArgsEscapedTestImage] = imageList.ArgsEscapedTestImage
 	return images
 }
 

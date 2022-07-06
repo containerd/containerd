@@ -27,6 +27,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/pkg/cri/config"
+	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 )
 
 // containerMounts sets up necessary container system file mounts
@@ -44,7 +45,7 @@ func (c *criService) containerSpec(
 	imageName string,
 	config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig,
+	image imagestore.Image,
 	extraMounts []*runtime.Mount,
 	ociRuntime config.Runtime,
 ) (_ *runtimespec.Spec, retErr error) {

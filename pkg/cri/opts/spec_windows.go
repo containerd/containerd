@@ -26,7 +26,9 @@ import (
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"golang.org/x/sys/windows"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	osinterface "github.com/containerd/containerd/pkg/os"
@@ -272,5 +274,40 @@ func WithDevices(config *runtime.ContainerConfig) oci.SpecOpts {
 			}
 		}
 		return nil
+	}
+}
+
+func escapeAndCombineArgs(args []string) string {
+	escaped := make([]string, len(args))
+	for i, a := range args {
+		escaped[i] = windows.EscapeArg(a)
+	}
+	return strings.Join(escaped, " ")
+}
+
+// WithProcessCommandLine sets the process command line on the spec based on the image and runtime config
+func WithProcessCommandLine(config *runtime.ContainerConfig, image *imagespec.ImageConfig, argsEscaped bool) oci.SpecOpts {
+	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
+		// firstArgFromImg is a flag that is returned to indicate that the first arg in the slice comes from either the
+		// image Entrypoint or Cmd. If the first arg instead comes from the container config (e.g. overriding the image values),
+		// it should be false. This is done to support the non-OCI ArgsEscaped field that Docker used to determine how the image
+		// entrypoint and cmd should be interpreted.
+		//
+		args, firstArgFromImg, err := getArgs(image.Entrypoint, image.Cmd, config.GetCommand(), config.GetArgs())
+		if err != nil {
+			return err
+		}
+
+		var cmdLine string
+		if argsEscaped && firstArgFromImg {
+			cmdLine = args[0]
+			if len(args) > 1 {
+				cmdLine += " " + escapeAndCombineArgs(args[1:])
+			}
+		} else {
+			cmdLine = escapeAndCombineArgs(args)
+		}
+
+		return oci.WithProcessCommandLine(cmdLine)(ctx, client, c, s)
 	}
 }

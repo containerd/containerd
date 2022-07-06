@@ -58,12 +58,12 @@ const testImageName = "container-image-name"
 func TestGeneralContainerSpec(t *testing.T) {
 	testID := "test-id"
 	testPid := uint32(1234)
-	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	containerConfig, sandboxConfig, image, specCheck := getCreateContainerTestData()
 	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
 	testSandboxID := "sandbox-id"
 	testContainerName := "container-name"
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+	spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, image, nil, ociRuntime)
 	require.NoError(t, err)
 	specCheck(t, testID, testSandboxID, testPid, spec)
 }
@@ -126,7 +126,7 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 	} {
 		t.Run(desc, func(t *testing.T) {
 			c := newTestCRIService()
-			containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+			containerConfig, sandboxConfig, image, specCheck := getCreateContainerTestData()
 			if test.configChange != nil {
 				test.configChange(sandboxConfig)
 			}
@@ -135,7 +135,7 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 				PodAnnotations: test.podAnnotations,
 			}
 			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName,
-				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+				containerConfig, sandboxConfig, image, nil, ociRuntime)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
 			specCheck(t, testID, testSandboxID, testPid, spec)
@@ -191,14 +191,14 @@ func TestContainerSpecCommand(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			config, _, imageConfig, _ := getCreateContainerTestData()
+			config, _, image, _ := getCreateContainerTestData()
 			config.Command = test.criEntrypoint
 			config.Args = test.criArgs
-			imageConfig.Entrypoint = test.imageEntrypoint
-			imageConfig.Cmd = test.imageArgs
+			image.ImageSpec.Config.Entrypoint = test.imageEntrypoint
+			image.ImageSpec.Config.Cmd = test.imageArgs
 
 			var spec runtimespec.Spec
-			err := opts.WithProcessArgs(config, imageConfig)(context.Background(), nil, nil, &spec)
+			err := opts.WithProcessArgs(config, &image.ImageSpec.Config)(context.Background(), nil, nil, &spec)
 			if test.expectErr {
 				assert.Error(t, err)
 				return
@@ -380,7 +380,7 @@ func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 	} {
 		t.Run(desc, func(t *testing.T) {
 			c := newTestCRIService()
-			containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+			containerConfig, sandboxConfig, image, specCheck := getCreateContainerTestData()
 			if test.configChange != nil {
 				test.configChange(containerConfig)
 			}
@@ -392,7 +392,7 @@ func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 				ContainerAnnotations: test.containerAnnotations,
 			}
 			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName,
-				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+				containerConfig, sandboxConfig, image, nil, ociRuntime)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
 			specCheck(t, testID, testSandboxID, testPid, spec)

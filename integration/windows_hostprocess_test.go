@@ -124,3 +124,35 @@ func runHostProcess(t *testing.T, expectErr bool, image string, action hpcAction
 
 	action(t, cn, containerConfig)
 }
+
+func TestArgsEscapedImagesOnWindows(t *testing.T) {
+	containerName := "test-container"
+	testImage := images.Get(images.ArgsEscapedTestImage)
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", testImage, WithWindowsHostProcessPod)
+	EnsureImageExists(t, testImage)
+
+	cnConfig := ContainerConfig(
+		containerName,
+		testImage,
+		WithCommand("ping", "-t", "127.0.0.1"),
+		hpcContainerOpt,
+		localSystemUsername,
+	)
+
+	t.Log("Create the container")
+	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+	require.NoError(t, err)
+
+	t.Log("Start the container")
+	_, err = t, runtimeService.StartContainer(cn)
+
+	if err != nil {
+		t.Fatalf("Starting container: %v failed", err)
+	}
+
+	t.Log("Stop the container")
+	require.NoError(t, runtimeService.StopContainer(cn, 0))
+
+	t.Log("Remove the container")
+	require.NoError(t, runtimeService.RemoveContainer(cn))
+}

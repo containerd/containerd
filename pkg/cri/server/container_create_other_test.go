@@ -22,6 +22,7 @@ package server
 import (
 	"testing"
 
+	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -31,11 +32,16 @@ import (
 var _ = checkMount
 
 func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandboxConfig,
-	*imagespec.ImageConfig, func(*testing.T, string, string, uint32, *runtimespec.Spec)) {
+	imagestore.Image, func(*testing.T, string, string, uint32, *runtimespec.Spec)) {
 	config := &runtime.ContainerConfig{}
 	sandboxConfig := &runtime.PodSandboxConfig{}
-	imageConfig := &imagespec.ImageConfig{}
+	imageConfig := imagespec.ImageConfig{}
+	image := imagestore.Image{
+		ImageSpec: imagespec.Image{
+			Config: imageConfig,
+		},
+	}
 	specCheck := func(t *testing.T, id string, sandboxID string, sandboxPid uint32, spec *runtimespec.Spec) {
 	}
-	return config, sandboxConfig, imageConfig, specCheck
+	return config, sandboxConfig, image, specCheck
 }

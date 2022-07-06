@@ -18,10 +18,12 @@ package image
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/reference/docker"
@@ -45,6 +47,10 @@ type Image struct {
 	Size int64
 	// ImageSpec is the oci image structure which describes basic information about the image.
 	ImageSpec imagespec.Image
+	// ArgsEscaped is a non-standard extension that was introduced by Docker. It is used for
+	// Windows images to indicate that the command has already been escaped and should be
+	// used directly as the command line.
+	ArgsEscaped bool
 }
 
 // Store stores all images.
@@ -134,17 +140,38 @@ func getImage(ctx context.Context, i containerd.Image) (*Image, error) {
 
 	id := desc.Digest.String()
 
-	spec, err := i.Spec(ctx)
+	contentStoreImgBlob, err := content.ReadBlob(ctx, i.ContentStore(), desc)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get OCI image spec: %w", err)
+		return nil, fmt.Errorf("failed to read image config from content store: %w", err)
+	}
+	var ociImage imagespec.Image
+	if err := json.Unmarshal(contentStoreImgBlob, &ociImage); err != nil {
+		return nil, fmt.Errorf("unmarshal image config %s: %w", contentStoreImgBlob, err)
 	}
 
+	// imageExtended is a superset of the oci Image struct. It helps
+	// to deserialize `ArgsEscaped` which is a non-OCI field that is
+	// used by docker to determine how the image command should be
+	// interpreted
+	type imageExtended struct {
+		Config struct {
+			ArgsEscaped bool `json:"ArgsEscaped,omitempty"`
+		}
+	}
+	// Deserialize the extended image format for Windows.
+	var ociImageExtended imageExtended
+	if err := json.Unmarshal(contentStoreImgBlob, &ociImageExtended); err != nil {
+		return nil, fmt.Errorf("unmarshal image config for ArgsEscaped %s: %w", contentStoreImgBlob, err)
+	}
+	argsEscaped := ociImageExtended.Config.ArgsEscaped
+
 	return &Image{
-		ID:         id,
-		References: []string{i.Name()},
-		ChainID:    chainID.String(),
-		Size:       size,
-		ImageSpec:  spec,
+		ID:          id,
+		References:  []string{i.Name()},
+		ChainID:     chainID.String(),
+		Size:        size,
+		ImageSpec:   ociImage,
+		ArgsEscaped: argsEscaped,
 	}, nil
 }
 

@@ -232,6 +232,16 @@ func WithProcessArgs(args ...string) SpecOpts {
 	}
 }
 
+// WithProcessCommandLine replaces the command line on the generated spec
+func WithProcessCommandLine(cmdLine string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setProcess(s)
+		s.Process.Args = nil
+		s.Process.CommandLine = cmdLine
+		return nil
+	}
+}
+
 // WithProcessCwd replaces the current working directory on the generated spec
 func WithProcessCwd(cwd string) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
