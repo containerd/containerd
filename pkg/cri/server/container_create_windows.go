@@ -48,9 +48,8 @@ func (c *criService) containerSpec(
 	extraMounts []*runtime.Mount,
 	ociRuntime config.Runtime,
 ) (*runtimespec.Spec, error) {
-	specOpts := []oci.SpecOpts{
-		customopts.WithProcessArgs(config, imageConfig),
-	}
+	var specOpts []oci.SpecOpts
+	specOpts = append(specOpts, customopts.WithProcessCommandLineOrArgsForWindows(config, imageConfig))
 
 	// All containers in a pod need to have HostProcess set if it was set on the pod,
 	// and vice versa no containers in the pod can be HostProcess if the pods spec
