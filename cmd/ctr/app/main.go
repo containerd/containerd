@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/cmd/ctr/commands/containers"
 	"github.com/containerd/containerd/cmd/ctr/commands/content"
 	"github.com/containerd/containerd/cmd/ctr/commands/events"
@@ -116,6 +117,7 @@ containerd CLI
 		install.Command,
 		ociCmd.Command,
 		sandboxes.Command,
+		commands.CompletionCommand,
 	}, extraCmds...)
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
