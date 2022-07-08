@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/typeurl"
 )
 
@@ -67,23 +68,27 @@ func (s *Sandbox) AddLabel(name string, value string) {
 }
 
 // GetExtension retrieves a sandbox extension by name.
-func (s *Sandbox) GetExtension(name string, obj interface{}) (bool, error) {
+func (s *Sandbox) GetExtension(name string, obj interface{}) error {
 	out, ok := s.Extensions[name]
 	if !ok {
-		return false, nil
+		return errdefs.ErrNotFound
 	}
 
 	if err := typeurl.UnmarshalTo(out, obj); err != nil {
-		return false, fmt.Errorf("failed to unmarshal sandbox extension %q: %w", name, err)
+		return fmt.Errorf("failed to unmarshal sandbox extension %q: %w", name, err)
 	}
 
-	return true, nil
+	return nil
 }
 
 // GetLabel retrieves a sandbox label by name.
-func (s *Sandbox) GetLabel(name string) (string, bool) {
+func (s *Sandbox) GetLabel(name string) (string, error) {
 	out, ok := s.Labels[name]
-	return out, ok
+	if !ok {
+		return "", fmt.Errorf("unable to find label %q in sandbox metadata: %w", name, errdefs.ErrNotFound)
+	}
+
+	return out, nil
 }
 
 // RuntimeOpts holds runtime specific information

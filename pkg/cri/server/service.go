@@ -31,7 +31,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/streaming"
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/plugin"
-	cni "github.com/containerd/go-cni"
+	"github.com/containerd/go-cni"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"

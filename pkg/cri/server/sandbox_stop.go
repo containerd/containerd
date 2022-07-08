@@ -92,7 +92,7 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 		} else if closed {
 			sandbox.NetNSPath = ""
 		}
-		if err := c.teardownPodNetwork(ctx, sandbox); err != nil {
+		if err := c.teardownPodNetwork(ctx, sandbox.ID, sandbox.RuntimeHandler, sandbox.NetNSPath, sandbox.Config); err != nil {
 			return fmt.Errorf("failed to destroy network for sandbox %q: %w", id, err)
 		}
 		if err := sandbox.NetNS.Remove(); err != nil {
@@ -170,23 +170,18 @@ func (c *criService) waitSandboxStop(ctx context.Context, sandbox sandboxstore.S
 }
 
 // teardownPodNetwork removes the network from the pod
-func (c *criService) teardownPodNetwork(ctx context.Context, sandbox sandboxstore.Sandbox) error {
-	netPlugin := c.getNetworkPlugin(sandbox.RuntimeHandler)
+func (c *criService) teardownPodNetwork(ctx context.Context, id, runtimeHandler, netNSPath string, config *runtime.PodSandboxConfig) error {
+	netPlugin := c.getNetworkPlugin(runtimeHandler)
 	if netPlugin == nil {
 		return errors.New("cni config not initialized")
 	}
 
-	var (
-		id     = sandbox.ID
-		path   = sandbox.NetNSPath
-		config = sandbox.Config
-	)
 	opts, err := cniNamespaceOpts(id, config)
 	if err != nil {
 		return fmt.Errorf("get cni namespace options: %w", err)
 	}
 
-	return netPlugin.Remove(ctx, id, path, opts...)
+	return netPlugin.Remove(ctx, id, netNSPath, opts...)
 }
 
 // cleanupUnknownSandbox cleanup stopped sandbox in unknown state.

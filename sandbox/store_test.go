@@ -34,8 +34,7 @@ func TestAddExtension(t *testing.T) {
 	assert.NoError(t, sb.AddExtension("test", &in))
 
 	var out test
-	ok, err := sb.GetExtension("test", &out)
-	assert.True(t, ok)
+	err := sb.GetExtension("test", &out)
 	assert.NoError(t, err)
 	assert.Equal(t, "test", out.Name)
 }
