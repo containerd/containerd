@@ -28,16 +28,17 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/containerd/continuity/fs"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/opencontainers/runc/libcontainer/user"
+	"github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/continuity/fs"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/opencontainers/runc/libcontainer/user"
-	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // SpecOpts sets spec specific information to a newly generated OCI spec
@@ -1403,7 +1404,25 @@ func WithDevShmSize(kb int64) SpecOpts {
 // `containerd.io/snapshot/readonly.mount` something like that.
 func tryReadonlyMounts(mounts []mount.Mount) []mount.Mount {
 	if len(mounts) == 1 && mounts[0].Type == "overlay" {
-		mounts[0].Options = append(mounts[0].Options, "ro")
+		newOpts := []string{"ro"}
+		var upperCache string
+		for _, opt := range mounts[0].Options {
+			if strings.HasPrefix(opt, "workdir") || strings.HasPrefix(opt, "lowerdir") {
+				continue
+			} else if strings.HasPrefix(opt, "upperdir") {
+				if result := strings.Split(opt, "="); len(result) == 2 {
+					upperCache = result[1]
+				}
+			} else {
+				newOpts = append(newOpts, opt)
+			}
+		}
+		for _, opt := range mounts[0].Options {
+			if result := strings.Split(opt, "="); strings.HasPrefix(opt, "lower") && upperCache != "" && len(result) == 2 {
+				newOpts = append(newOpts, fmt.Sprintf("lowerdir=%s", strings.Join([]string{upperCache, result[1]}, ":")))
+			}
+		}
+		mounts[0].Options = newOpts
 	}
 	return mounts
 }
