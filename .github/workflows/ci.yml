@@ -530,3 +530,41 @@ jobs:
           name: TestResults MacOS
           path: |
             *-junit.xml
+
+ armv64_job:
+      name: Build and Test for arm64
+      runs-on: ubuntu-18.04
+      
+      env:
+        GOTEST: gotestsum --
+      steps:
+        - uses: actions/setup-go@v2
+          with:
+            go-version: '1.18.2'
+        - uses: actions/checkout@v2
+        - name: Set up QEMU
+          id: qemu
+          uses: docker/setup-qemu-action@v1
+        - name: Install and Run tests
+          run: |
+            docker run --rm -v ${{ github.workspace }}:/ws:rw --workdir=/ws \
+              arm64v8/ubuntu:18.04 \
+              bash -exc 'apt-get update && apt-get -y install git sudo curl make wget git build-essential unzip && \
+              cat /proc/cpuinfo && \
+              wget https://go.dev/dl/go1.18.2.linux-arm64.tar.gz && \
+              sudo tar -xvf go1.18.2.linux-arm64.tar.gz && \
+              sudo mv go /usr/local && \
+              export GOPATH=$HOME/go && \
+              export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin && \
+              source ~/.profile && \
+              go version && \
+              git config --global --add safe.directory /ws && \
+              sudo apt-get install -y btrfs-progs && \
+              sudo apt-get install -y gperf && \
+              sudo -E PATH=$PATH script/setup/install-seccomp && \
+              export GOSU=/usr/local/bin/gosu && \
+              sudo wget -O ${GOSU} "https://github.com/tianon/gosu/releases/download/1.14/gosu-arm64" && \
+              sudo chmod +x ${GOSU} && \
+              sudo chown root ${GOSU} && \
+              sudo chmod +s ${GOSU} && \
+              make test'
