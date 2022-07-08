@@ -18,6 +18,7 @@ containerd is designed to be embedded into a larger system, rather than being us
 ## Announcements
 
 ### Hello Kubernetes v1.24!
+
 The containerd project would like to announce containerd [v1.6.4](https://github.com/containerd/containerd/releases/tag/v1.6.4). While other prior releases are supported, this latest release and the containerd [v1.5.11](https://github.com/containerd/containerd/releases/tag/v1.5.11) release are recommended for Kubernetes v1.24.
 
 We felt it important to announce this, particularly in view of [the dockershim removal from this release of Kubernetes](https://kubernetes.io/blog/2022/05/03/dockershim-historical-context/).
@@ -26,11 +27,12 @@ It should be noted here that moving to CRI integrations has been in the plan for
 
 If you have any concerns or questions, we will be here to answer them in [issues, discussions, and/or on slack](#communication). Below you will find information / detail about our [CRI Integration](#cri) implementation.
 
-For containerd users already on v1.6.0-v1.6.3, there are known issues addressed by [v1.6.4](https://github.com/containerd/containerd/releases/tag/v1.6.4). The issues are primarily related to [CNI setup](https://github.com/kubernetes/website/blob/dev-1.24/content/en/docs/tasks/administer-cluster/migrating-from-dockershim/troubleshooting-cni-plugin-related-errors.md)
+For containerd users already on v1.6.0-v1.6.3, there are known issues addressed by [v1.6.4](https://github.com/containerd/containerd/releases/tag/v1.6.4). The issues are primarily related to [CNI setup](https://github.com/kubernetes/website/blob/dev-1.24/content/en/docs/tasks/administer-cluster/migrating-from-dockershim/troubleshooting-cni-plugin-related-errors.md).
 
 ### Now Recruiting
 
-We are a large inclusive OSS project that is welcoming help of any kind shape or form:
+containerd is a large inclusive OSS project that is welcoming help of any kind shape or form:
+
 * Documentation help is needed to make the product easier to consume and extend.
 * We need OSS community outreach / organizing help to get the word out; manage
 and create messaging and educational content; and to help with social media, community forums/groups, and google groups.
@@ -49,7 +51,7 @@ See our documentation on [containerd.io](https://containerd.io):
 
 See how to build containerd from source at [BUILDING](BUILDING.md).
 
-If you are interested in trying out containerd see our example at [Getting Started](docs/getting-started.md).
+If you are interested in trying out containerd see examples at [Getting Started](docs/getting-started.md).
 
 ## Nightly builds
 
@@ -81,13 +83,12 @@ your system. See more details in [Checkpoint and Restore](#checkpoint-and-restor
 
 Build requirements for developers are listed in [BUILDING](BUILDING.md).
 
-
 ## Supported Registries
 
 Any registry which is compliant with the [OCI Distribution Specification](https://github.com/opencontainers/distribution-spec)
 is supported by containerd.
 
-For configuring registries, see [registry host configuration documentation](docs/hosts.md)
+For configuring registries, see [registry host configuration documentation](docs/hosts.md).
 
 ## Features
 
@@ -248,7 +249,7 @@ effect.
     address =  "/var/run/mysnapshotter.sock"
 ```
 
-See [PLUGINS.md](/docs/PLUGINS.md) for how to create plugins
+See [PLUGINS.md](/docs/PLUGINS.md) for how to create plugins.
 
 ### Releases and API Stability
 
@@ -296,18 +297,21 @@ loaded for the user's shell environment.
 was moved to [`containerd/containerd/pkg/cri` package](https://github.com/containerd/containerd/tree/main/pkg/cri).
 
 The `cri` plugin has reached GA status, representing that it is:
-* Feature complete
-* Works with Kubernetes 1.10 and above
-* Passes all [CRI validation tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-validation.md).
-* Passes all [node e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/e2e-node-tests.md).
-* Passes all [e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/e2e-tests.md).
 
-See results on the containerd k8s [test dashboard](https://k8s-testgrid.appspot.com/sig-node-containerd)
+* Feature complete.
+* Available with Kubernetes 1.10 and above.
+* Passed in all [CRI validation tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-validation.md).
+* Passed in all [node e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/e2e-node-tests.md).
+* Passed in all [e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/e2e-tests.md).
+
+See results on the containerd k8s [test dashboard](https://k8s-testgrid.appspot.com/sig-node-containerd).
 
 #### Validating Your `cri` Setup
+
 A Kubernetes incubator project, [cri-tools](https://github.com/kubernetes-sigs/cri-tools), includes programs for exercising CRI implementations. More importantly, cri-tools includes the program `critest` which is used for running [CRI Validation Testing](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-validation.md).
 
 #### CRI Guides
+
 * [Installing with Ansible and Kubeadm](contrib/ansible/README.md)
 * [For Non-Ansible Users, Preforming a Custom Installation Using the Release Tarball and Kubeadm](docs/cri/installation.md)
 * [CRI Plugin Testing Guide](./docs/cri/testing.md)
@@ -328,7 +332,7 @@ A third party security audit was performed by Cure53 in 4Q2018; the [full report
 
 ### Reporting security issues
 
-__If you are reporting a security issue, please reach out discreetly at security@containerd.io__.
+**If you are reporting a security issue, please reach out discreetly at security@containerd.io**.
 
 ## Licenses
 
@@ -344,6 +348,7 @@ However, all projects within the repo have common maintainership, governance, an
 guidelines which are stored in a `project` repository commonly for all containerd projects.
 
 Please find all these core project documents, including the:
+
  * [Project governance](https://github.com/containerd/project/blob/main/GOVERNANCE.md),
  * [Maintainers](https://github.com/containerd/project/blob/main/MAINTAINERS),
  * and [Contributing guidelines](https://github.com/containerd/project/blob/main/CONTRIBUTING.md)
