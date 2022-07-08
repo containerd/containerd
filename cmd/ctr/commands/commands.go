@@ -205,6 +205,10 @@ var (
 			Name:  "hostname",
 			Usage: "set the container's host name",
 		},
+		cli.StringFlag{
+			Name:  "user,u",
+			Usage: "username or user id, group optional (format: <name|uid>[:<group|gid>])",
+		},
 	}
 )
 
