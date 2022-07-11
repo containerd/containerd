@@ -20,17 +20,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"syscall"
 	"time"
 
-	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/pkg/netns"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 )
 
 // StopPodSandbox stops the sandbox. If there are any running containers in the
@@ -42,16 +39,18 @@ func (c *criService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandb
 			r.GetPodSandboxId(), err)
 	}
 
-	if err := c.stopPodSandbox(ctx, sandbox); err != nil {
+	if err := c.stopPodSandbox(ctx, sandbox.ID); err != nil {
 		return nil, err
 	}
 
 	return &runtime.StopPodSandboxResponse{}, nil
 }
 
-func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sandbox) error {
-	// Use the full sandbox id.
-	id := sandbox.ID
+func (c *criService) stopPodSandbox(ctx context.Context, id string) error {
+	sandboxInfo, err := c.client.SandboxStore().Get(ctx, id)
+	if err != nil {
+		return fmt.Errorf("failed to get sandbox %q metadata: %w", id, err)
+	}
 
 	// Stop all containers inside the sandbox. This terminates the container forcibly,
 	// and container may still be created, so production should not rely on this behavior.
@@ -69,33 +68,40 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 		}
 	}
 
-	if err := c.cleanupSandboxFiles(id, sandbox.Config); err != nil {
-		return fmt.Errorf("failed to cleanup sandbox files: %w", err)
+	if err := c.sandboxController.Shutdown(ctx, id); err != nil {
+		return fmt.Errorf("failed to shutdown sandbox %q: %w", id, err)
 	}
 
-	// Only stop sandbox container when it's running or unknown.
-	state := sandbox.Status.Get().State
-	if state == sandboxstore.StateReady || state == sandboxstore.StateUnknown {
-		if err := c.stopSandboxContainer(ctx, sandbox); err != nil {
-			return fmt.Errorf("failed to stop sandbox container %q in %q state: %w", id, state, err)
-		}
+	sandboxRuntimeStopTimer.WithValues(sandboxInfo.Runtime.Name).UpdateSince(stop)
+
+	var networkMetadata sandboxstore.PodNetworkMetadata
+	err = sandboxInfo.GetExtension("network", &networkMetadata)
+	if err != nil && !errdefs.IsNotFound(err) {
+		return fmt.Errorf("failed to sandbox %q network: %w", id, err)
 	}
-	sandboxRuntimeStopTimer.WithValues(sandbox.RuntimeHandler).UpdateSince(stop)
 
 	// Teardown network for sandbox.
-	if sandbox.NetNS != nil {
+	if err == nil {
+		netNS := netns.LoadNetNS(networkMetadata.NetNSPath)
+
 		netStop := time.Now()
 		// Use empty netns path if netns is not available. This is defined in:
 		// https://github.com/containernetworking/cni/blob/v0.7.0-alpha1/SPEC.md
-		if closed, err := sandbox.NetNS.Closed(); err != nil {
+		if closed, err := netNS.Closed(); err != nil {
 			return fmt.Errorf("failed to check network namespace closed: %w", err)
 		} else if closed {
-			sandbox.NetNSPath = ""
+			networkMetadata.NetNSPath = ""
 		}
-		if err := c.teardownPodNetwork(ctx, sandbox.ID, sandbox.RuntimeHandler, sandbox.NetNSPath, sandbox.Config); err != nil {
+
+		var config runtime.PodSandboxConfig
+		if err := sandboxInfo.GetExtension("config", &config); err != nil {
+			return fmt.Errorf("failed to get sandbox %q config: %w", id, err)
+		}
+
+		if err := c.teardownPodNetwork(ctx, id, sandboxInfo.Runtime.Name, networkMetadata.NetNSPath, &config); err != nil {
 			return fmt.Errorf("failed to destroy network for sandbox %q: %w", id, err)
 		}
-		if err := sandbox.NetNS.Remove(); err != nil {
+		if err := netNS.Remove(); err != nil {
 			return fmt.Errorf("failed to remove network namespace for sandbox %q: %w", id, err)
 		}
 		sandboxDeleteNetwork.UpdateSince(netStop)
@@ -104,58 +110,6 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 	log.G(ctx).Infof("TearDown network for sandbox %q successfully", id)
 
 	return nil
-}
-
-// stopSandboxContainer kills the sandbox container.
-// `task.Delete` is not called here because it will be called when
-// the event monitor handles the `TaskExit` event.
-func (c *criService) stopSandboxContainer(ctx context.Context, sandbox sandboxstore.Sandbox) error {
-	id := sandbox.ID
-	container := sandbox.Container
-	state := sandbox.Status.Get().State
-	task, err := container.Task(ctx, nil)
-	if err != nil {
-		if !errdefs.IsNotFound(err) {
-			return fmt.Errorf("failed to get sandbox container: %w", err)
-		}
-		// Don't return for unknown state, some cleanup needs to be done.
-		if state == sandboxstore.StateUnknown {
-			return cleanupUnknownSandbox(ctx, id, sandbox)
-		}
-		return nil
-	}
-
-	// Handle unknown state.
-	// The cleanup logic is the same with container unknown state.
-	if state == sandboxstore.StateUnknown {
-		// Start an exit handler for containers in unknown state.
-		waitCtx, waitCancel := context.WithCancel(ctrdutil.NamespacedContext())
-		defer waitCancel()
-		exitCh, err := task.Wait(waitCtx)
-		if err != nil {
-			if !errdefs.IsNotFound(err) {
-				return fmt.Errorf("failed to wait for task: %w", err)
-			}
-			return cleanupUnknownSandbox(ctx, id, sandbox)
-		}
-
-		exitCtx, exitCancel := context.WithCancel(context.Background())
-		stopCh := c.eventMonitor.startSandboxExitMonitor(exitCtx, id, task.Pid(), exitCh)
-		defer func() {
-			exitCancel()
-			// This ensures that exit monitor is stopped before
-			// `Wait` is cancelled, so no exit event is generated
-			// because of the `Wait` cancellation.
-			<-stopCh
-		}()
-	}
-
-	// Kill the sandbox container.
-	if err = task.Kill(ctx, syscall.SIGKILL); err != nil && !errdefs.IsNotFound(err) {
-		return fmt.Errorf("failed to kill sandbox container: %w", err)
-	}
-
-	return c.waitSandboxStop(ctx, sandbox)
 }
 
 // waitSandboxStop waits for sandbox to be stopped until context is cancelled or
@@ -182,16 +136,4 @@ func (c *criService) teardownPodNetwork(ctx context.Context, id, runtimeHandler,
 	}
 
 	return netPlugin.Remove(ctx, id, netNSPath, opts...)
-}
-
-// cleanupUnknownSandbox cleanup stopped sandbox in unknown state.
-func cleanupUnknownSandbox(ctx context.Context, id string, sandbox sandboxstore.Sandbox) error {
-	// Reuse handleSandboxExit to do the cleanup.
-	return handleSandboxExit(ctx, &eventtypes.TaskExit{
-		ContainerID: id,
-		ID:          id,
-		Pid:         0,
-		ExitStatus:  unknownExitCode,
-		ExitedAt:    protobuf.ToTimestamp(time.Now()),
-	}, sandbox)
 }

@@ -72,11 +72,6 @@ func NewPause(
 
 var _ sandbox.Controller = (*Controller)(nil)
 
-func (c *Controller) Shutdown(ctx context.Context, sandboxID string) error {
-	//TODO implement me
-	panic("implement me")
-}
-
 func (c *Controller) Wait(ctx context.Context, sandboxID string) (*api.ControllerWaitResponse, error) {
 	//TODO implement me
 	panic("implement me")

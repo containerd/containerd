@@ -51,7 +51,7 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	// Even if it's in a NotReady state, this will close its network namespace, if open.
 	// This can happen if the task process associated with the Pod died or it was killed.
 	logrus.Infof("Forcibly stopping sandbox %q", id)
-	if err := c.stopPodSandbox(ctx, sandbox); err != nil {
+	if err := c.stopPodSandbox(ctx, sandbox.ID); err != nil {
 		return nil, fmt.Errorf("failed to forcibly stop sandbox %q: %w", id, err)
 	}
 

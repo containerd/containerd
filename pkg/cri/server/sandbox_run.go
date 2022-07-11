@@ -150,11 +150,11 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			return nil, fmt.Errorf("failed to setup network for sandbox %q: %w", id, err)
 		}
 		sandboxCreateNetworkTimer.UpdateSince(netStart)
-	}
 
-	// Save network metadata to store
-	if err := sandboxInfo.AddExtension("network", &networkMetadata); err != nil {
-		return nil, err
+		// Save network metadata to store
+		if err := sandboxInfo.AddExtension("network", &networkMetadata); err != nil {
+			return nil, err
+		}
 	}
 
 	if _, err = c.client.SandboxStore().Create(ctx, sandboxInfo); err != nil {

@@ -61,11 +61,7 @@ func (c *Controller) Start(ctx context.Context, sandboxID string) (_ uint32, ret
 	)
 
 	if err := sandboxInfo.GetExtension("config", &config); err != nil {
-		return 0, err
-	}
-
-	if err := sandboxInfo.GetExtension("network", &networkMetadata); err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to get sandbox %q config: %w", id, err)
 	}
 
 	// Create initial internal sandbox object.
@@ -81,12 +77,19 @@ func (c *Controller) Start(ctx context.Context, sandboxID string) (_ uint32, ret
 		},
 	)
 
-	// Copy over network metadata for compatibility
-	sandbox.NetNSPath = networkMetadata.NetNSPath
-	sandbox.NetNS = netns.LoadNetNS(networkMetadata.NetNSPath)
-	sandbox.IP = networkMetadata.IP
-	sandbox.AdditionalIPs = networkMetadata.AdditionalIPs
-	sandbox.CNIResult = networkMetadata.CNIResult
+	err = sandboxInfo.GetExtension("network", &networkMetadata)
+	if err != nil && !errdefs.IsNotFound(err) {
+		return 0, fmt.Errorf("failed to get sandbox %q network metadata: %q", id, err)
+	}
+
+	if err == nil {
+		// Copy over network metadata for compatibility
+		sandbox.NetNSPath = networkMetadata.NetNSPath
+		sandbox.NetNS = netns.LoadNetNS(networkMetadata.NetNSPath)
+		sandbox.IP = networkMetadata.IP
+		sandbox.AdditionalIPs = networkMetadata.AdditionalIPs
+		sandbox.CNIResult = networkMetadata.CNIResult
+	}
 
 	// Ensure sandbox container image snapshot.
 	image, err := c.cri.EnsureImageExists(ctx, c.config.SandboxImage, &config)

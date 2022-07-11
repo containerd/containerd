@@ -92,11 +92,6 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	return c.runtimeSpec(id, "", specOpts...)
 }
 
-// No sandbox files needed for windows.
-func (c *criService) cleanupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
-	return nil
-}
-
 // No task options needed for windows.
 func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {
 	return nil
