@@ -17,27 +17,40 @@
    limitations under the License.
 */
 
-package server
+package pause
 
 import (
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
+func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
 	imageConfig *imagespec.ImageConfig, nsPath string, runtimePodAnnotations []string) (_ *runtimespec.Spec, retErr error) {
 	return c.runtimeSpec(id, "")
 }
 
+// sandboxContainerSpecOpts generates OCI spec options for
+// the sandbox container.
+func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
+	return []oci.SpecOpts{}, nil
+}
+
+// setupSandboxFiles sets up necessary sandbox files including /dev/shm, /etc/hosts,
+// /etc/resolv.conf and /etc/hostname.
+func (c *Controller) setupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
+	return nil
+}
+
 // cleanupSandboxFiles unmount some sandbox files, we rely on the removal of sandbox root directory to
 // remove these files. Unmount should *NOT* return error if the mount point is already unmounted.
-func (c *criService) cleanupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
+func (c *Controller) cleanupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
 	return nil
 }
 
 // taskOpts generates task options for a (sandbox) container.
-func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {
+func (c *Controller) taskOpts(runtimeType string) []containerd.NewTaskOpts {
 	return []containerd.NewTaskOpts{}
 }

@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	cni "github.com/containerd/go-cni"
+	"github.com/containerd/go-cni"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -86,4 +86,16 @@ func (c *Metadata) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 	return fmt.Errorf("unsupported version: %q", versioned.Version)
+}
+
+// PodNetworkMetadata stores Pod network metadata in the store.
+type PodNetworkMetadata struct {
+	// NetNSPath is the network namespace used by the sandbox.
+	NetNSPath string
+	// IP of Pod if it is attached to non host network
+	IP string
+	// AdditionalIPs of the Pod if it is attached to non host network
+	AdditionalIPs []string
+	// CNIresult resulting configuration for attached network namespace interfaces
+	CNIResult *cni.Result
 }

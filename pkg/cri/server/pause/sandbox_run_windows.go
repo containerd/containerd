@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package server
+package pause
 
 import (
 	"fmt"
@@ -30,7 +30,7 @@ import (
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
 )
 
-func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
+func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
 	imageConfig *imagespec.ImageConfig, nsPath string, runtimePodAnnotations []string) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
 	specOpts := []oci.SpecOpts{
@@ -92,12 +92,22 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	return c.runtimeSpec(id, "", specOpts...)
 }
 
+// No sandbox container spec options for windows yet.
+func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
+	return nil, nil
+}
+
 // No sandbox files needed for windows.
-func (c *criService) cleanupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
+func (c *Controller) setupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
+	return nil
+}
+
+// No sandbox files needed for windows.
+func (c *Controller) cleanupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
 	return nil
 }
 
 // No task options needed for windows.
-func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {
+func (c *Controller) taskOpts(runtimeType string) []containerd.NewTaskOpts {
 	return nil
 }
