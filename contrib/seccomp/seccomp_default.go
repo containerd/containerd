@@ -641,6 +641,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 					"settimeofday",
 					"stime",
 					"clock_settime",
+					"clock_settime64",
 				},
 				Action: specs.ActAllow,
 				Args:   []specs.LinuxSeccompArg{},
