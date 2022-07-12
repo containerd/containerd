@@ -63,20 +63,12 @@ func loadAddress(path string) (string, error) {
 	return string(data), nil
 }
 
-func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ *shimTask, err error) {
+func loadShim(ctx context.Context, bundle *Bundle, onClose func(), tl *runtime.TTrpcClientList) (_ *shimTask, err error) {
 	address, err := loadAddress(filepath.Join(bundle.Path, "address"))
 	if err != nil {
 		return nil, err
 	}
-	conn, err := client.Connect(address, client.AnonReconnectDialer)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err != nil {
-			conn.Close()
-		}
-	}()
+
 	shimCtx, cancelShimLog := context.WithCancel(ctx)
 	defer func() {
 		if err != nil {
@@ -111,18 +103,37 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ *shimTask,
 		cancelShimLog()
 		f.Close()
 	}
-	client := ttrpc.NewClient(conn, ttrpc.WithOnClose(onCloseWithShimLog))
-	defer func() {
+
+	tclient, err := tl.Get(ctx, address)
+	if err != nil {
+		conn, err := client.Connect(address, client.AnonReconnectDialer)
 		if err != nil {
-			client.Close()
+			return nil, err
 		}
-	}()
+		defer func() {
+			if err != nil {
+				conn.Close()
+			}
+		}()
+
+		tclient = ttrpc.NewClient(conn, ttrpc.WithOnClose(func() { tl.DoAllCloseFuncs(address) }))
+		defer func() {
+			if err != nil {
+				tl.DoClientClose(ctx, address, func() error { return tclient.Close() })
+			}
+		}()
+	}
+	if err = tl.Inc(ctx, address, tclient, bundle.ID, onCloseWithShimLog); err != nil {
+		return nil, err
+	}
+
 	s := &shimTask{
 		shim: &shim{
-			bundle: bundle,
-			client: client,
+			bundle:  bundle,
+			client:  tclient,
+			address: address,
 		},
-		task: task.NewTaskClient(client),
+		task: task.NewTaskClient(tclient),
 	}
 	ctx, cancel := timeout.WithContext(ctx, loadTimeout)
 	defer cancel()
@@ -201,8 +212,9 @@ type ShimProcess interface {
 }
 
 type shim struct {
-	bundle *Bundle
-	client *ttrpc.Client
+	bundle  *Bundle
+	client  *ttrpc.Client
+	address string
 }
 
 // ID of the shim/task
@@ -222,17 +234,21 @@ func (s *shim) Close() error {
 	return s.client.Close()
 }
 
-func (s *shim) delete(ctx context.Context) error {
+func (s *shim) delete(ctx context.Context, tl *runtime.TTrpcClientList) error {
 	var (
 		result *multierror.Error
 	)
 
-	if err := s.Close(); err != nil {
-		result = multierror.Append(result, fmt.Errorf("failed to close ttrpc client: %w", err))
-	}
+	tl.DoCloseFunc(ctx, s.address, s.bundle.ID)
+	done, err := tl.DoClientClose(ctx, s.address, func() error { return s.Close() })
+	if done {
+		if err != nil {
+			result = multierror.Append(result, fmt.Errorf("failed to close ttrpc client: %w", err))
+		}
 
-	if err := s.client.UserOnCloseWait(ctx); err != nil {
-		result = multierror.Append(result, fmt.Errorf("close wait error: %w", err))
+		if err := s.client.UserOnCloseWait(ctx); err != nil {
+			result = multierror.Append(result, fmt.Errorf("close wait error: %w", err))
+		}
 	}
 
 	if err := s.bundle.Delete(); err != nil {
@@ -283,7 +299,7 @@ func (s *shimTask) PID(ctx context.Context) (uint32, error) {
 	return response.TaskPid, nil
 }
 
-func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(ctx context.Context, id string)) (*runtime.Exit, error) {
+func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(ctx context.Context, id string), tl *runtime.TTrpcClientList) (*runtime.Exit, error) {
 	response, shimErr := s.task.Delete(ctx, &task.DeleteRequest{
 		ID: s.ID(),
 	})
@@ -319,7 +335,7 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 		}
 	}
 
-	if err := s.shim.delete(ctx); err != nil {
+	if err := s.shim.delete(ctx, tl); err != nil {
 		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete shim")
 	}
 

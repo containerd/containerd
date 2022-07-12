@@ -63,7 +63,7 @@ type binary struct {
 	bundle                 *Bundle
 }
 
-func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ *shim, err error) {
+func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func(), tl *runtime.TTrpcClientList) (_ *shim, err error) {
 	args := []string{"-id", b.bundle.ID}
 	switch logrus.GetLevel() {
 	case logrus.DebugLevel, logrus.TraceLevel:
@@ -121,23 +121,33 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 		return nil, fmt.Errorf("%s: %w", out, err)
 	}
 	address := strings.TrimSpace(string(out))
-	conn, err := client.Connect(address, client.AnonDialer)
-	if err != nil {
-		return nil, err
-	}
 	onCloseWithShimLog := func() {
 		onClose()
 		cancelShimLog()
 		f.Close()
 	}
+
+	tclient, err := tl.Get(ctx, address)
+	if err != nil {
+		conn, err := client.Connect(address, client.AnonDialer)
+		tclient = ttrpc.NewClient(conn, ttrpc.WithOnClose(func() { tl.DoAllCloseFuncs(address) }))
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err = tl.Inc(ctx, address, tclient, b.bundle.ID, onCloseWithShimLog); err != nil {
+		return nil, err
+	}
+
 	// Save runtime binary path for restore.
 	if err := os.WriteFile(filepath.Join(b.bundle.Path, "shim-binary-path"), []byte(b.runtime), 0600); err != nil {
 		return nil, err
 	}
-	client := ttrpc.NewClient(conn, ttrpc.WithOnClose(onCloseWithShimLog))
+
 	return &shim{
-		bundle: b.bundle,
-		client: client,
+		bundle:  b.bundle,
+		client:  tclient,
+		address: address,
 	}, nil
 }
 

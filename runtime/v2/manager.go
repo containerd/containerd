@@ -144,6 +144,7 @@ func NewShimManager(ctx context.Context, config *ManagerConfig) (*ShimManager, e
 		containerdAddress:      config.Address,
 		containerdTTRPCAddress: config.TTRPCAddress,
 		shims:                  runtime.NewTaskList(),
+		ttrpcs:                 runtime.NewTTrpcClientList(),
 		events:                 config.Events,
 		containers:             config.Store,
 		schedCore:              config.SchedCore,
@@ -168,6 +169,7 @@ type ShimManager struct {
 	containerdTTRPCAddress string
 	schedCore              bool
 	shims                  *runtime.TaskList
+	ttrpcs                 *runtime.TTrpcClientList
 	events                 *exchange.Exchange
 	containers             containers.Store
 	// runtimePaths is a cache of `runtime names` -> `resolved fs path`
@@ -214,7 +216,7 @@ func (m *ShimManager) Start(ctx context.Context, id string, opts runtime.CreateO
 			return nil, err
 		}
 
-		shim, err := loadShim(ctx, bundle, func() {})
+		shim, err := loadShim(ctx, bundle, func() {}, m.ttrpcs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load sandbox task %q: %w", opts.SandboxID, err)
 		}
@@ -281,7 +283,7 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 		// disconnect and there is no chance to remove this dead task from runtime task lists.
 		// Thus it's better to delete it here.
 		m.shims.Delete(ctx, id)
-	})
+	}, m.ttrpcs)
 	if err != nil {
 		return nil, fmt.Errorf("start failed: %w", err)
 	}
@@ -372,7 +374,7 @@ func (m *ShimManager) cleanupShim(shim *shim) {
 	dctx, cancel := timeout.WithContext(context.Background(), cleanupTimeout)
 	defer cancel()
 
-	_ = shim.delete(dctx)
+	_ = shim.delete(dctx, m.ttrpcs)
 	m.shims.Delete(dctx, shim.ID())
 }
 
@@ -394,7 +396,7 @@ func (m *ShimManager) Delete(ctx context.Context, id string) error {
 	}
 
 	shimTask := proc.(*shimTask)
-	err = shimTask.shim.delete(ctx)
+	err = shimTask.shim.delete(ctx, m.ttrpcs)
 	m.shims.Delete(ctx, id)
 
 	return err
@@ -448,7 +450,7 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 		defer cancel()
 
 		sandboxed := opts.SandboxID != ""
-		_, errShim := shim.delete(dctx, sandboxed, func(context.Context, string) {})
+		_, errShim := shim.delete(dctx, sandboxed, func(context.Context, string) {}, m.manager.ttrpcs)
 		if errShim != nil {
 			if errdefs.IsDeadlineExceeded(errShim) {
 				dctx, cancel = timeout.WithContext(context.Background(), cleanupTimeout)
@@ -491,7 +493,7 @@ func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit,
 	shimTask := item.(*shimTask)
 	exit, err := shimTask.delete(ctx, sandboxed, func(ctx context.Context, id string) {
 		m.manager.shims.Delete(ctx, id)
-	})
+	}, m.manager.ttrpcs)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete task: %w", err)
