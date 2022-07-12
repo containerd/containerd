@@ -161,7 +161,7 @@ func (s *Store) Resolve(ref string) (string, error) {
 
 // Get gets image metadata by image id. The id can be truncated.
 // Returns various validation errors if the image id is invalid.
-// Returns storeutil.ErrNotExist if the image doesn't exist.
+// Returns errdefs.ErrNotFound if the image doesn't exist.
 func (s *Store) Get(id string) (Image, error) {
 	return s.store.get(id)
 }

@@ -162,7 +162,7 @@ func getRepoDigestAndTag(namedRef docker.Named, digest imagedigest.Digest, schem
 }
 
 // localResolve resolves image reference locally and returns corresponding image metadata. It
-// returns store.ErrNotExist if the reference doesn't exist.
+// returns errdefs.ErrNotFound if the reference doesn't exist.
 func (c *criService) localResolve(refOrID string) (imagestore.Image, error) {
 	getImageID := func(refOrId string) string {
 		if _, err := imagedigest.Parse(refOrID); err == nil {

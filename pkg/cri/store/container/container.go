@@ -122,7 +122,7 @@ func NewStore(labels *label.Store) *Store {
 	}
 }
 
-// Add a container into the store. Returns store.ErrAlreadyExist if the
+// Add a container into the store. Returns errdefs.ErrAlreadyExists if the
 // container already exists.
 func (s *Store) Add(c Container) error {
 	s.lock.Lock()
@@ -140,7 +140,7 @@ func (s *Store) Add(c Container) error {
 	return nil
 }
 
-// Get returns the container with specified id. Returns store.ErrNotExist
+// Get returns the container with specified id. Returns errdefs.ErrNotFound
 // if the container doesn't exist.
 func (s *Store) Get(id string) (Container, error) {
 	s.lock.RLock()
@@ -169,6 +169,9 @@ func (s *Store) List() []Container {
 	return containers
 }
 
+// UpdateContainerStats updates the container specified by ID with the
+// stats present in 'newContainerStats'. Returns errdefs.ErrNotFound
+// if the container does not exist in the store.
 func (s *Store) UpdateContainerStats(id string, newContainerStats *stats.ContainerStats) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
