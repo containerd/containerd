@@ -19,6 +19,7 @@ package cri
 import (
 	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/containerd/containerd"
@@ -31,6 +32,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/pkg/cri/sbserver"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
@@ -97,7 +99,13 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, fmt.Errorf("failed to create containerd client: %w", err)
 	}
 
-	s, err := server.NewCRIService(c, client)
+	var s server.CRIService
+	if os.Getenv("ENABLE_CRI_SANDBOXES") != "" {
+		log.G(ctx).Warn("using experimental CRI Sandbox server")
+		s, err = sbserver.NewCRIService(c, client)
+	} else {
+		s, err = server.NewCRIService(c, client)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRI service: %w", err)
 	}

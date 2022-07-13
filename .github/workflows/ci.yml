@@ -252,6 +252,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-2019, windows-2022]
+        enable_cri_sandboxes: [ "", "sandboxed"]
 
     defaults:
       run:
@@ -335,6 +336,7 @@ jobs:
       - name: Integration 1
         env:
           CGO_ENABLED: 1
+          ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
         run: mingw32-make.exe integration
 
@@ -344,17 +346,20 @@ jobs:
           TESTFLAGS_PARALLEL: 1
           EXTRA_TESTFLAGS: "-short"
           CGO_ENABLED: 1
+          ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
         run: mingw32-make.exe integration
 
       - name: CRI Integration Test
         env:
+          ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
           TEST_IMAGE_LIST: ${{github.workspace}}/repolist.toml
         run: |
           make cri-integration
 
       - name: cri-tools critest
         env:
+          ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
           CRI_TEST_IMAGES: ${{github.workspace}}/cri-test-images.yaml
         shell: powershell
         run: |
@@ -368,6 +373,7 @@ jobs:
             $skip = "-ginkgo.skip=runtime should support exec with tty=true and stdin=true"
           }
           critest.exe --runtime-endpoint=npipe://.//pipe//containerd-containerd --test-images-file='${{env.CRI_TEST_IMAGES}}' --report-dir='${{github.workspace}}/critestreport' $skip
+
       - uses: actions/upload-artifact@v2
         if: always()
         with:
@@ -386,6 +392,7 @@ jobs:
       matrix:
         runtime: [io.containerd.runtime.v1.linux, io.containerd.runc.v1, io.containerd.runc.v2]
         runc: [runc, crun]
+        enable_cri_sandboxes: [ "", "sandboxed"]
         exclude:
           - runtime: io.containerd.runc.v1
             runc: crun
@@ -439,6 +446,7 @@ jobs:
           GOPROXY: direct
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
+          ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
         run: |
           extraflags=""
@@ -453,6 +461,7 @@ jobs:
           GOPROXY: direct
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
+          ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
         run: |
           extraflags=""
@@ -464,12 +473,14 @@ jobs:
       - name: CRI Integration Test
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
+          ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
         run: |
           CONTAINERD_RUNTIME=$TEST_RUNTIME make cri-integration
 
       - name: cri-tools critest
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
+          ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
         run: |
           BDIR="$(mktemp -d -p $PWD)"
           mkdir -p ${BDIR}/{root,state}
