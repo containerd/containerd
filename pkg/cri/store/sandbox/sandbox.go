@@ -78,7 +78,8 @@ func NewStore(labels *label.Store) *Store {
 	}
 }
 
-// Add a sandbox into the store.
+// Add a sandbox into the store. Returns errdefs.ErrAlreadyExists if the sandbox is
+// already stored.
 func (s *Store) Add(sb Sandbox) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -96,7 +97,7 @@ func (s *Store) Add(sb Sandbox) error {
 }
 
 // Get returns the sandbox with specified id.
-// Returns store.ErrNotExist if the sandbox doesn't exist.
+// Returns errdefs.ErrNotFound if the sandbox doesn't exist.
 func (s *Store) Get(id string) (Sandbox, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
@@ -124,6 +125,9 @@ func (s *Store) List() []Sandbox {
 	return sandboxes
 }
 
+// UpdateContainerStats updates the sandbox specified by ID with the
+// stats present in 'newContainerStats'. Returns errdefs.ErrNotFound
+// if the sandbox does not exist in the store.
 func (s *Store) UpdateContainerStats(id string, newContainerStats *stats.ContainerStats) error {
 	s.lock.RLock()
 	defer s.lock.RUnlock()

@@ -1,11 +1,12 @@
 ## Devmapper snapshotter
 
-Devmapper is a `containerd` snapshotter plugin that stores snapshots in ext4-formatted filesystem images
-in a devicemapper thin pool.
+Devmapper is a `containerd` snapshotter plugin that stores snapshots in filesystem images
+in a Device-mapper thin-pool. The devmapper plugin takes advantage of Device-mapper features
+like [device snapshot support](https://www.kernel.org/doc/Documentation/device-mapper/snapshot.txt).
 
 ## Setup
 
-To make it work you need to prepare `thin-pool` in advance and update containerd's configuration file.
+To use the devmapper snapshotter plugin you need to prepare a Device-mapper `thin-pool` in advance and update containerd's configuration file.
 This file is typically located at `/etc/containerd/config.toml`.
 
 Here's a minimal sample entry that can be made in the configuration file:
@@ -16,6 +17,7 @@ version = 2
 [plugins]
   ...
   [plugins."io.containerd.snapshotter.v1.devmapper"]
+    root_path = "/var/lib/containerd/devmapper"
     pool_name = "containerd-pool"
     base_image_size = "8192MB"
   ...
@@ -24,15 +26,15 @@ version = 2
 The following configuration flags are supported:
 * `root_path` - a directory where the metadata will be available (if empty
   default location for `containerd` plugins will be used)
-* `pool_name` - a name to use for the devicemapper thin pool. Pool name
+* `pool_name` - a name to use for the Device-mapper thin-pool. Pool name
   should be the same as in `/dev/mapper/` directory
-* `base_image_size` - defines how much space to allocate when creating the base device
-* `async_remove` - flag to async remove device using snapshot GC's cleanup callback
-* `discard_blocks` - whether to discard blocks when removing a device. This is especially useful for returning disk space to the filesystem when using loopback devices.
-* `fs_type` - defines the file system to use for snapshot device mount. Valid values are `ext4` and `xfs`. Defaults to `ext4` if unspecified.
-* `fs_options` - optionally defines the file system options. This is currently only applicable to `ext4` file system.
+* `base_image_size` - defines how much space to allocate when creating thin device snapshots from the base (pool) device
+* `async_remove` - flag to async remove device using snapshot GC's cleanup callback (default: `false`)
+* `discard_blocks` - whether to discard blocks when removing a device. This is especially useful for returning disk space to the filesystem when using loopback devices. (default: `false`)
+* `fs_type` - defines the file system to use for snapshot device mount. Valid values are `ext4` and `xfs` (default: `"ext4"`)
+* `fs_options` - optionally defines the file system options. This is currently only applicable to `ext4` file system. (default: `""`)
 
-Pool name and base image size are required snapshotter parameters.
+`root_path`, `pool_name`, and `base_image_size` are required snapshotter parameters.
 
 ## Run
 Give it a try with the following commands:
@@ -47,14 +49,17 @@ ctr run --snapshotter devmapper docker.io/library/hello-world:latest test
 The devicemapper snapshotter requires `dmsetup` (>= 1.02.110) command line tool to be installed and
 available on your computer. On Ubuntu, it can be installed with `apt-get install dmsetup` command.
 
-### How to setup device mapper thin-pool
+### How to setup Device-Mapper thin-pool
 
-There are many ways how to configure a devmapper thin-pool depending on your requirements, disk configuration,
-and environment.
+There are many ways how to configure a Device-mapper thin-pool depending on your requirements, disk configuration,
+and environment. Two common configurations are provided below, one for development environments and one for
+production environments.
+
+#### 1. Loopback Devices
 
 On local dev environment you can utilize loopback devices. This type of configuration is simple and suits well for
-development and testing (please note that this configuration is slow and not recommended for production uses).
-Run the following script to create a thin-pool device:
+development and testing (*please note that this configuration is slow and not recommended for production uses*).
+Run the following script to create a thin-pool device with associated metadata and data device files:
 
 ```bash
 #!/bin/bash
@@ -111,8 +116,10 @@ devpool	(253:0)
 Once `containerd` is configured and restarted, you'll see the following output:
 ```
 INFO[2020-03-17T20:24:45.532604888Z] loading plugin "io.containerd.snapshotter.v1.devmapper"...  type=io.containerd.snapshotter.v1
-INFO[2020-03-17T20:24:45.532672738Z] initializing pool device "dev-pool"
+INFO[2020-03-17T20:24:45.532672738Z] initializing pool device "devpool"
 ```
+
+#### 2. direct-lvm thin-pool
 
 Another way to setup a thin-pool is via the [container-storage-setup](https://github.com/projectatomic/container-storage-setup)
 tool (formerly known as `docker-storage-setup`). It is a script to configure CoW file systems like devicemapper:
@@ -149,6 +156,7 @@ cat << EOF
 #
 [plugins]
   [plugins.devmapper]
+    root_path = "/var/lib/containerd/devmapper"
     pool_name = "${VG_NAME}-${POOL_NAME}"
     base_image_size = "10GB"
 EOF
@@ -180,3 +188,15 @@ containerd-devpool          (253:2)
 containerd-devpool_tdata    (253:1)
 containerd-devpool_tmeta    (253:0)
 ```
+
+See also [Configure direct-lvm mode for production](https://docs.docker.com/storage/storagedriver/device-mapper-driver/#configure-direct-lvm-mode-for-production) for additional information about production devmapper setups.
+
+## Additional Resources
+
+For more information on Device-mapper, thin provisioning, etc., you can refer to the following resources:
+
+* https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/logical_volume_manager_administration/device_mapper
+* https://en.wikipedia.org/wiki/Device_mapper
+* https://docs.docker.com/storage/storagedriver/device-mapper-driver/
+* https://www.kernel.org/doc/Documentation/device-mapper/thin-provisioning.txt
+* https://www.kernel.org/doc/Documentation/device-mapper/snapshot.txt

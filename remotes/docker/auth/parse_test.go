@@ -21,9 +21,11 @@ import (
 	"net/http"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestParseAuthHeader(t *testing.T) {
+func TestParseAuthHeaderBearer(t *testing.T) {
 	headerTemplate := `Bearer realm="%s",service="%s",scope="%s"`
 
 	for _, tc := range []struct {
@@ -68,4 +70,26 @@ func TestParseAuthHeader(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseAuthHeader(t *testing.T) {
+	v := `Bearer realm="https://auth.example.io/token",empty="",service="registry.example.io",scope="repository:library/hello-world:pull,push"`
+	h := http.Header{http.CanonicalHeaderKey("WWW-Authenticate"): []string{v}}
+	challenge := ParseAuthHeader(h)
+
+	actual, ok := challenge[0].Parameters["empty"]
+	assert.True(t, ok)
+	assert.Equal(t, "", actual)
+
+	actual, ok = challenge[0].Parameters["service"]
+	assert.True(t, ok)
+	assert.Equal(t, "registry.example.io", actual)
+}
+
+func FuzzParseAuthHeader(f *testing.F) {
+	f.Add(`Bearer realm="https://example.com/token",service="example.com",scope="repository:foo/bar:pull,push"`)
+	f.Fuzz(func(t *testing.T, v string) {
+		h := http.Header{http.CanonicalHeaderKey("WWW-Authenticate"): []string{v}}
+		_ = ParseAuthHeader(h)
+	})
 }

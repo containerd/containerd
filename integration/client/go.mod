@@ -19,7 +19,7 @@ require (
 	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a
 )
 
-require github.com/AdaLogics/go-fuzz-headers v0.0.0-20210715213245-6c3934b029d8
+require github.com/AdaLogics/go-fuzz-headers v0.0.0-20220706123152-fef3fe1bab07
 
 require (
 	github.com/Microsoft/go-winio v0.5.2 // indirect
@@ -30,6 +30,7 @@ require (
 	github.com/containerd/continuity v0.3.0 // indirect
 	github.com/containerd/fifo v1.0.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
+	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/docker/go-units v0.4.0 // indirect

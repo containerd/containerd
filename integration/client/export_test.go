@@ -60,7 +60,7 @@ func TestExport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Seet to begining of file before passing it to assertOCITar()
+	// Seek to beginning of file before passing it to assertOCITar()
 	dstFile.Seek(0, 0)
 	assertOCITar(t, dstFile)
 }
