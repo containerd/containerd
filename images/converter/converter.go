@@ -31,6 +31,7 @@ type convertOpts struct {
 	docker2oci       bool
 	indexConvertFunc ConvertFunc
 	platformMC       platforms.MatchComparer
+	hooks            ConvertHooks
 }
 
 // Opt is an option for Convert()
@@ -70,6 +71,14 @@ func WithIndexConvertFunc(fn ConvertFunc) Opt {
 	}
 }
 
+// WithConvertHooks specifies a configuration for hook callbacks called during blob conversion.
+func WithConvertHooks(hooks ConvertHooks) Opt {
+	return func(copts *convertOpts) error {
+		copts.hooks = hooks
+		return nil
+	}
+}
+
 // Client is implemented by *containerd.Client .
 type Client interface {
 	WithLease(ctx context.Context, opts ...leases.Opt) (context.Context, func(context.Context) error, error)
@@ -77,35 +86,46 @@ type Client interface {
 	ImageService() images.Store
 }
 
-// Convert converts an image.
-func Convert(ctx context.Context, client Client, dstRef, srcRef string, opts ...Opt) (*images.Image, error) {
+// Converter converts one or more images.
+type Converter struct {
+	client Client
+	copts  convertOpts
+}
+
+// New creates a converter instance.
+func New(client Client, opts ...Opt) (*Converter, error) {
 	var copts convertOpts
 	for _, o := range opts {
 		if err := o(&copts); err != nil {
 			return nil, err
 		}
 	}
-	if copts.platformMC == nil {
-		copts.platformMC = platforms.All
-	}
 	if copts.indexConvertFunc == nil {
-		copts.indexConvertFunc = DefaultIndexConvertFunc(copts.layerConvertFunc, copts.docker2oci, copts.platformMC)
+		copts.indexConvertFunc = newDefaultWithOpts(copts).Convert
 	}
 
-	ctx, done, err := client.WithLease(ctx)
+	return &Converter{
+		client: client,
+		copts:  copts,
+	}, nil
+}
+
+// Convert converts an image.
+func (c *Converter) Convert(ctx context.Context, dstRef, srcRef string) (*images.Image, error) {
+	ctx, done, err := c.client.WithLease(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer done(ctx)
 
-	cs := client.ContentStore()
-	is := client.ImageService()
+	cs := c.client.ContentStore()
+	is := c.client.ImageService()
 	srcImg, err := is.Get(ctx, srcRef)
 	if err != nil {
 		return nil, err
 	}
 
-	dstDesc, err := copts.indexConvertFunc(ctx, cs, srcImg.Target)
+	dstDesc, err := c.copts.indexConvertFunc(ctx, cs, srcImg.Target)
 	if err != nil {
 		return nil, err
 	}

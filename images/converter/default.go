@@ -39,13 +39,11 @@ type ConvertFunc func(ctx context.Context, cs content.Store, desc ocispec.Descri
 
 // DefaultIndexConvertFunc is the default convert func used by Convert.
 func DefaultIndexConvertFunc(layerConvertFunc ConvertFunc, docker2oci bool, platformMC platforms.MatchComparer) ConvertFunc {
-	c := &defaultConverter{
+	return newDefaultWithOpts(convertOpts{
 		layerConvertFunc: layerConvertFunc,
 		docker2oci:       docker2oci,
 		platformMC:       platformMC,
-		diffIDMap:        make(map[digest.Digest]digest.Digest),
-	}
-	return c.convert
+	}).Convert
 }
 
 // ConvertHookFunc is a callback function called during conversion of a blob.
@@ -60,29 +58,47 @@ type ConvertHooks struct {
 
 // IndexConvertFuncWithHook is the convert func used by Convert with hook functions support.
 func IndexConvertFuncWithHook(layerConvertFunc ConvertFunc, docker2oci bool, platformMC platforms.MatchComparer, hooks ConvertHooks) ConvertFunc {
-	c := &defaultConverter{
+	return newDefaultWithOpts(convertOpts{
 		layerConvertFunc: layerConvertFunc,
 		docker2oci:       docker2oci,
 		platformMC:       platformMC,
-		diffIDMap:        make(map[digest.Digest]digest.Digest),
 		hooks:            hooks,
-	}
-	return c.convert
+	}).Convert
 }
 
-type defaultConverter struct {
-	layerConvertFunc ConvertFunc
-	docker2oci       bool
-	platformMC       platforms.MatchComparer
-	diffIDMap        map[digest.Digest]digest.Digest // key: old diffID, value: new diffID
-	diffIDMapMu      sync.RWMutex
-	hooks            ConvertHooks
+func NewDefault(opts ...Opt) (*DefaultConverter, error) {
+	var copts convertOpts
+	for _, o := range opts {
+		if err := o(&copts); err != nil {
+			return nil, err
+		}
+	}
+
+	return newDefaultWithOpts(copts), nil
+}
+
+func newDefaultWithOpts(copts convertOpts) *DefaultConverter {
+	if copts.platformMC == nil {
+		copts.platformMC = platforms.All
+	}
+
+	return &DefaultConverter{
+		convertOpts: copts,
+		diffIDMap:   make(map[digest.Digest]digest.Digest),
+	}
+}
+
+type DefaultConverter struct {
+	convertOpts
+
+	diffIDMap   map[digest.Digest]digest.Digest // key: old diffID, value: new diffID
+	diffIDMapMu sync.RWMutex
 }
 
 // convert dispatches desc.MediaType and calls c.convert{Layer,Manifest,Index,Config}.
 //
 // Also converts media type if c.docker2oci is set.
-func (c *defaultConverter) convert(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
+func (c *DefaultConverter) Convert(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
 	var (
 		newDesc *ocispec.Descriptor
 		err     error
@@ -135,7 +151,7 @@ func copyDesc(desc ocispec.Descriptor) *ocispec.Descriptor {
 // convertLayer converts image image layers if c.layerConvertFunc is set.
 //
 // c.layerConvertFunc can be nil, e.g., for converting Docker media types to OCI ones.
-func (c *defaultConverter) convertLayer(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
+func (c *DefaultConverter) convertLayer(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
 	if c.layerConvertFunc != nil {
 		return c.layerConvertFunc(ctx, cs, desc)
 	}
@@ -146,7 +162,7 @@ func (c *defaultConverter) convertLayer(ctx context.Context, cs content.Store, d
 //
 // - converts `.mediaType` if the target format is OCI
 // - records diff ID changes in c.diffIDMap
-func (c *defaultConverter) convertManifest(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
+func (c *DefaultConverter) convertManifest(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
 	var (
 		manifest ocispec.Manifest
 		modified bool
@@ -172,7 +188,7 @@ func (c *defaultConverter) convertManifest(ctx context.Context, cs content.Store
 			return nil, err
 		}
 		eg.Go(func() error {
-			newL, err := c.convert(ctx2, cs, l)
+			newL, err := c.Convert(ctx2, cs, l)
 			if err != nil {
 				return err
 			}
@@ -206,7 +222,7 @@ func (c *defaultConverter) convertManifest(ctx context.Context, cs content.Store
 		return nil, err
 	}
 
-	newConfig, err := c.convert(ctx, cs, manifest.Config)
+	newConfig, err := c.Convert(ctx, cs, manifest.Config)
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +243,7 @@ func (c *defaultConverter) convertManifest(ctx context.Context, cs content.Store
 //
 // - converts `.mediaType` if the target format is OCI
 // - clears manifest entries that do not match c.platformMC
-func (c *defaultConverter) convertIndex(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
+func (c *DefaultConverter) convertIndex(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
 	var (
 		index    ocispec.Index
 		modified bool
@@ -261,7 +277,7 @@ func (c *defaultConverter) convertIndex(ctx context.Context, cs content.Store, d
 				mu.Unlock()
 				return nil
 			}
-			newMani, err := c.convert(ctx2, cs, mani)
+			newMani, err := c.Convert(ctx2, cs, mani)
 			if err != nil {
 				return err
 			}
@@ -300,7 +316,7 @@ func (c *defaultConverter) convertIndex(ctx context.Context, cs content.Store, d
 // - updates `.rootfs.diff_ids` using c.diffIDMap .
 //
 // - clears legacy `.config.Image` and `.container_config.Image` fields if `.rootfs.diff_ids` was updated.
-func (c *defaultConverter) convertConfig(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
+func (c *DefaultConverter) convertConfig(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
 	var (
 		cfg      DualConfig
 		cfgAsOCI ocispec.Image // read only, used for parsing cfg

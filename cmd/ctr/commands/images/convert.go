@@ -98,7 +98,11 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		}
 		defer cancel()
 
-		newImg, err := converter.Convert(ctx, client, targetRef, srcRef, convertOpts...)
+		cvt, err := converter.New(client, convertOpts...)
+		if err != nil {
+			return err
+		}
+		newImg, err := cvt.Convert(ctx, targetRef, srcRef)
 		if err != nil {
 			return err
 		}
