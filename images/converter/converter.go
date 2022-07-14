@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/platforms"
+	"golang.org/x/sync/singleflight"
 )
 
 type convertOpts struct {
@@ -32,6 +33,7 @@ type convertOpts struct {
 	indexConvertFunc ConvertFunc
 	platformMC       platforms.MatchComparer
 	hooks            ConvertHooks
+	sg               *singleflight.Group
 }
 
 // Opt is an option for Convert()
@@ -75,6 +77,15 @@ func WithIndexConvertFunc(fn ConvertFunc) Opt {
 func WithConvertHooks(hooks ConvertHooks) Opt {
 	return func(copts *convertOpts) error {
 		copts.hooks = hooks
+		return nil
+	}
+}
+
+// WithSingleflight makes sure that only one conversion execution is
+// in-flight for a given child descriptor at a time.
+func WithSingleflight() Opt {
+	return func(copts *convertOpts) error {
+		copts.sg = &singleflight.Group{}
 		return nil
 	}
 }

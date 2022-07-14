@@ -95,6 +95,36 @@ type DefaultConverter struct {
 	diffIDMapMu sync.RWMutex
 }
 
+func makeRefKey(desc ocispec.Descriptor) (string, error) {
+	key, err := json.Marshal(desc)
+	if err != nil {
+		return "", err
+	}
+	return string(key), nil
+}
+
+// singleflightDo makes sure that only one conversion execution is
+// in-flight for a given descriptor at a time.
+func (c *DefaultConverter) singleflightDo(ctx context.Context, cs content.Store, desc ocispec.Descriptor, convert ConvertFunc) (*ocispec.Descriptor, error) {
+	if c.sg == nil {
+		return convert(ctx, cs, desc)
+	}
+
+	key, err := makeRefKey(desc)
+	if err != nil {
+		return nil, err
+	}
+
+	newDesc, err, _ := c.sg.Do(key, func() (interface{}, error) {
+		return convert(ctx, cs, desc)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return newDesc.(*ocispec.Descriptor), nil
+}
+
 // convert dispatches desc.MediaType and calls c.convert{Layer,Manifest,Index,Config}.
 //
 // Also converts media type if c.docker2oci is set.
@@ -104,13 +134,13 @@ func (c *DefaultConverter) Convert(ctx context.Context, cs content.Store, desc o
 		err     error
 	)
 	if images.IsLayerType(desc.MediaType) {
-		newDesc, err = c.convertLayer(ctx, cs, desc)
+		newDesc, err = c.singleflightDo(ctx, cs, desc, c.convertLayer)
 	} else if images.IsManifestType(desc.MediaType) {
-		newDesc, err = c.convertManifest(ctx, cs, desc)
+		newDesc, err = c.singleflightDo(ctx, cs, desc, c.convertManifest)
 	} else if images.IsIndexType(desc.MediaType) {
-		newDesc, err = c.convertIndex(ctx, cs, desc)
+		newDesc, err = c.singleflightDo(ctx, cs, desc, c.convertIndex)
 	} else if images.IsConfigType(desc.MediaType) {
-		newDesc, err = c.convertConfig(ctx, cs, desc)
+		newDesc, err = c.singleflightDo(ctx, cs, desc, c.convertConfig)
 	}
 	if err != nil {
 		return nil, err
@@ -128,6 +158,9 @@ func (c *DefaultConverter) Convert(ctx context.Context, cs content.Store, desc o
 		if c.docker2oci {
 			if newDesc == nil {
 				newDesc = copyDesc(desc)
+			} else {
+				// Prevent possible data race before modifying.
+				newDesc = copyDesc(*newDesc)
 			}
 			newDesc.MediaType = ConvertDockerMediaTypeToOCI(newDesc.MediaType)
 		} else if (newDesc == nil && len(desc.Annotations) != 0) || (newDesc != nil && len(newDesc.Annotations) != 0) {
@@ -135,6 +168,9 @@ func (c *DefaultConverter) Convert(ctx context.Context, cs content.Store, desc o
 			// We need to remove annotations for Docker media types.
 			if newDesc == nil {
 				newDesc = copyDesc(desc)
+			} else {
+				// Prevent possible data race before modifying.
+				newDesc = copyDesc(*newDesc)
 			}
 			newDesc.Annotations = nil
 		}

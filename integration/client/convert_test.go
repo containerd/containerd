@@ -1,9 +1,12 @@
 /*
    Copyright The containerd Authors.
+
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
+
        http://www.apache.org/licenses/LICENSE-2.0
+
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,6 +17,7 @@
 package client
 
 import (
+	"fmt"
 	"testing"
 
 	. "github.com/containerd/containerd"
@@ -23,9 +27,10 @@ import (
 	"github.com/containerd/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/sync/errgroup"
 )
 
-// TestConvert creates an image from testImage, with the following conversion:
+// TestConvert creates multiple images from testImage, with the following conversion:
 // - Media type: Docker -> OCI
 // - Layer type: tar.gz -> tar
 // - Arch:       Multi  -> Single
@@ -46,41 +51,63 @@ func TestConvert(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dstRef := testImage + "-testconvert"
+
 	defPlat := platforms.DefaultStrict()
-	dstImg, err := converter.New(
-		client,
+	opts := []converter.Opt{
 		converter.WithDockerToOCI(true),
 		converter.WithLayerConvertFunc(uncompress.LayerConvertFunc),
 		converter.WithPlatform(defPlat),
-	).Convert(ctx, dstRef, testImage)
-	if err != nil {
-		t.Fatal(err)
+		converter.WithSingleflight(),
 	}
-	defer func() {
-		if deleteErr := client.ImageService().Delete(ctx, dstRef); deleteErr != nil {
-			t.Fatal(deleteErr)
-		}
-	}()
-	cs := client.ContentStore()
-	plats, err := images.Platforms(ctx, cs, dstImg.Target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Assert that the image does not have any extra arch.
-	assert.Equal(t, 1, len(plats))
-	assert.True(t, defPlat.Match(plats[0]))
 
-	// Assert that the media type is converted to OCI and also uncompressed
-	mani, err := images.Manifest(ctx, cs, dstImg.Target, defPlat)
+	c, err := converter.New(client, opts...)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, l := range mani.Layers {
-		if plats[0].OS == "windows" {
-			assert.Equal(t, ocispec.MediaTypeImageLayerNonDistributable, l.MediaType)
-		} else {
-			assert.Equal(t, ocispec.MediaTypeImageLayer, l.MediaType)
-		}
+
+	eg := errgroup.Group{}
+
+	// Loop to test that the conversion works well when executed concurrently.
+	for i := 0; i < 5; i++ {
+		func(i int) {
+			eg.Go(func() error {
+				dstRef := fmt.Sprintf("%s-testconvert-%d", testImage, i)
+				dstImg, err := c.Convert(ctx, dstRef, testImage)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer func() {
+					if deleteErr := client.ImageService().Delete(ctx, dstRef); deleteErr != nil {
+						t.Fatal(deleteErr)
+					}
+				}()
+				cs := client.ContentStore()
+				plats, err := images.Platforms(ctx, cs, dstImg.Target)
+				if err != nil {
+					t.Fatal(err)
+				}
+				// Assert that the image does not have any extra arch.
+				assert.Equal(t, 1, len(plats))
+				assert.True(t, defPlat.Match(plats[0]))
+
+				// Assert that the media type is converted to OCI and also uncompressed
+				mani, err := images.Manifest(ctx, cs, dstImg.Target, defPlat)
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, l := range mani.Layers {
+					if plats[0].OS == "windows" {
+						assert.Equal(t, ocispec.MediaTypeImageLayerNonDistributable, l.MediaType)
+					} else {
+						assert.Equal(t, ocispec.MediaTypeImageLayer, l.MediaType)
+					}
+				}
+				return nil
+			})
+		}(i)
+	}
+
+	if err := eg.Wait(); err != nil {
+		t.Fatal(err)
 	}
 }
