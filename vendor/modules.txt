@@ -495,6 +495,10 @@ golang.org/x/oauth2/internal
 ## explicit
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
+# golang.org/x/perf v0.0.0-20220411212318-84e58bfe0a7e
+## explicit
+golang.org/x/perf/internal
+golang.org/x/perf/internal/stats
 # golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a
 ## explicit; go 1.17
 golang.org/x/sys/execabs
