@@ -652,6 +652,16 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				Action: specs.ActAllow,
 				Args:   []specs.LinuxSeccompArg{},
 			})
+		case "CAP_SYS_NICE":
+			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+				Names: []string{
+					"get_mempolicy",
+					"mbind",
+					"set_mempolicy",
+				},
+				Action: specs.ActAllow,
+				Args:   []specs.LinuxSeccompArg{},
+			})
 		case "CAP_SYSLOG":
 			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
 				Names:  []string{"syslog"},
