@@ -84,15 +84,16 @@ func newDefaultWithOpts(copts convertOpts) *DefaultConverter {
 
 	return &DefaultConverter{
 		convertOpts: copts,
-		diffIDMap:   make(map[digest.Digest]digest.Digest),
 	}
 }
 
 type DefaultConverter struct {
 	convertOpts
+}
 
-	diffIDMap   map[digest.Digest]digest.Digest // key: old diffID, value: new diffID
-	diffIDMapMu sync.RWMutex
+type diffIDMap struct {
+	diffIDs map[digest.Digest]digest.Digest // key: old diffID, value: new diffID
+	mutex   sync.RWMutex
 }
 
 func makeRefKey(desc ocispec.Descriptor) (string, error) {
@@ -129,10 +130,15 @@ func (c *DefaultConverter) singleflightDo(ctx context.Context, cs content.Store,
 //
 // Also converts media type if c.docker2oci is set.
 func (c *DefaultConverter) Convert(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
+	return c.convert(ctx, cs, desc, nil)
+}
+
+func (c *DefaultConverter) convert(ctx context.Context, cs content.Store, desc ocispec.Descriptor, dm *diffIDMap) (*ocispec.Descriptor, error) {
 	var (
 		newDesc *ocispec.Descriptor
 		err     error
 	)
+
 	if images.IsLayerType(desc.MediaType) {
 		newDesc, err = c.singleflightDo(ctx, cs, desc, c.convertLayer)
 	} else if images.IsManifestType(desc.MediaType) {
@@ -140,7 +146,7 @@ func (c *DefaultConverter) Convert(ctx context.Context, cs content.Store, desc o
 	} else if images.IsIndexType(desc.MediaType) {
 		newDesc, err = c.singleflightDo(ctx, cs, desc, c.convertIndex)
 	} else if images.IsConfigType(desc.MediaType) {
-		newDesc, err = c.singleflightDo(ctx, cs, desc, c.convertConfig)
+		newDesc, err = c.convertConfig(ctx, cs, desc, dm)
 	}
 	if err != nil {
 		return nil, err
@@ -214,6 +220,10 @@ func (c *DefaultConverter) convertManifest(ctx context.Context, cs content.Store
 		manifest.MediaType = ConvertDockerMediaTypeToOCI(manifest.MediaType)
 		modified = true
 	}
+
+	dm := &diffIDMap{
+		diffIDs: make(map[digest.Digest]digest.Digest),
+	}
 	var mu sync.Mutex
 	eg, ctx2 := errgroup.WithContext(ctx)
 	for i, l := range manifest.Layers {
@@ -246,9 +256,9 @@ func (c *DefaultConverter) convertManifest(ctx context.Context, cs content.Store
 					return err
 				}
 				if newDiffID != oldDiffID {
-					c.diffIDMapMu.Lock()
-					c.diffIDMap[oldDiffID] = newDiffID
-					c.diffIDMapMu.Unlock()
+					dm.mutex.Lock()
+					dm.diffIDs[oldDiffID] = newDiffID
+					dm.mutex.Unlock()
 				}
 			}
 			return nil
@@ -258,7 +268,7 @@ func (c *DefaultConverter) convertManifest(ctx context.Context, cs content.Store
 		return nil, err
 	}
 
-	newConfig, err := c.Convert(ctx, cs, manifest.Config)
+	newConfig, err := c.convert(ctx, cs, manifest.Config, dm)
 	if err != nil {
 		return nil, err
 	}
@@ -352,11 +362,15 @@ func (c *DefaultConverter) convertIndex(ctx context.Context, cs content.Store, d
 // - updates `.rootfs.diff_ids` using c.diffIDMap .
 //
 // - clears legacy `.config.Image` and `.container_config.Image` fields if `.rootfs.diff_ids` was updated.
-func (c *DefaultConverter) convertConfig(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
+func (c *DefaultConverter) convertConfig(ctx context.Context, cs content.Store, desc ocispec.Descriptor, dm *diffIDMap) (*ocispec.Descriptor, error) {
+	if dm == nil {
+		// No need to convert config if no `.rootfs.diff_ids` was updated.
+		return nil, nil
+	}
+
 	var (
 		cfg      DualConfig
 		cfgAsOCI ocispec.Image // read only, used for parsing cfg
-		modified bool
 	)
 
 	labels, err := readJSON(ctx, cs, &cfg, desc)
@@ -369,28 +383,26 @@ func (c *DefaultConverter) convertConfig(ctx context.Context, cs content.Store, 
 	if _, err := readJSON(ctx, cs, &cfgAsOCI, desc); err != nil {
 		return nil, err
 	}
-
+	rootfsModified := false
 	if rootfs := cfgAsOCI.RootFS; rootfs.Type == "layers" {
-		rootfsModified := false
-		c.diffIDMapMu.RLock()
+		dm.mutex.RLock()
 		for i, oldDiffID := range rootfs.DiffIDs {
-			if newDiffID, ok := c.diffIDMap[oldDiffID]; ok && newDiffID != oldDiffID {
+			if newDiffID, ok := dm.diffIDs[oldDiffID]; ok && newDiffID != oldDiffID {
 				rootfs.DiffIDs[i] = newDiffID
 				rootfsModified = true
 			}
 		}
-		c.diffIDMapMu.RUnlock()
+		dm.mutex.RUnlock()
 		if rootfsModified {
 			rootfsB, err := json.Marshal(rootfs)
 			if err != nil {
 				return nil, err
 			}
 			cfg["rootfs"] = (*json.RawMessage)(&rootfsB)
-			modified = true
 		}
 	}
 
-	if modified {
+	if rootfsModified {
 		// cfg may have dummy value for legacy `.config.Image` and `.container_config.Image`
 		// We should clear the ID if we changed the diff IDs.
 		if _, err := clearDockerV1DummyID(cfg); err != nil {
