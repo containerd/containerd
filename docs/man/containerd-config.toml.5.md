@@ -155,7 +155,7 @@ the main config.
 
 The following is a complete **config.toml** default configuration example:
 
-```
+```toml
 version = 2
 
 root = "/var/lib/containerd"
@@ -182,7 +182,7 @@ imports = ["/etc/containerd/runtime_*.toml", "./debug.toml"]
   path = ""
 
 [plugins]
-  [[plugins."io.containerd.monitor.v1.cgroups"]
+  [plugins."io.containerd.monitor.v1.cgroups"]
     no_prometheus = false
   [plugins."io.containerd.service.v1.diff-service"]
     default = ["walking"]
