@@ -1,6 +1,5 @@
-# While Cirrus CI gives open-source projects free 16.0 CPUs,
-# we use only 2 CPUs x 3 tasks = 6 CPUs since the tests here aren't fully
-# utilizing multiple CPUs.
+# Cirrus CI gives open-source projects free 16.0 CPUs,
+# we use 4 CPUs x 3 tasks = 12 CPUs.
 # https://cirrus-ci.org/faq/#are-there-any-limits
 #
 # Undocumented constraints;
@@ -15,8 +14,8 @@ task:
     image: family/docker-kvm
     platform: linux
     nested_virtualization: true
-    cpu: 2
-    memory: 8G
+    cpu: 4
+    memory: 16G
 
   env:
     GOTEST: gotestsum --
@@ -54,8 +53,8 @@ task:
     image: family/docker-kvm
     platform: linux
     nested_virtualization: true
-    cpu: 2
-    memory: 8G
+    cpu: 4
+    memory: 16G
 
   install_libvirt_vagrant_script: |
     apt-get update
