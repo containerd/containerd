@@ -44,8 +44,8 @@ Containerd doesn't provide persistent container log. It redirects container STDI
 
 CRI-containerd should start a goroutine (process/container in the future) to:
 * Continuously drain the FIFO;
-* Decorate the log line into [CRI-defined format](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/kubelet-cri-logging.md#proposed-solution);
-* Write the log into [CRI-defined log path](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/kubelet-cri-logging.md#proposed-solution).
+* Decorate the log line into [CRI-defined format](https://git.k8s.io/design-proposals-archive/node/kubelet-cri-logging.md#proposed-solution);
+* Write the log into [CRI-defined log path](https://git.k8s.io/design-proposals-archive/node/kubelet-cri-logging.md#proposed-solution).
 ### Container Streaming
 Containerd supports creating a process in the container with `Exec`, and the STDIO is also exposed as FIFOs. Containerd also supports resizing console of a specific process with `Pty`.
 
@@ -61,7 +61,7 @@ Containerd doesn't provide container networking, but OCI runtime spec supports j
 
 CRI-containerd should:
 * Create a network namespace for a sandbox;
-* Call [network plugin](https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/network/plugins.go) to update the options of the network namespace;
+* Call [network plugin](https://github.com/kubernetes/kubernetes/blob/release-0.18/pkg/kubelet/network/plugins.go) to update the options of the network namespace;
 * Let the user containers in the same sandbox share the network namespace.
 ### Container Metrics
 Containerd provides [container cgroup metrics](https://github.com/containerd/containerd/blob/main/reports/2017-03-17.md#metrics), and plans to provide [container writable layer disk usage](https://github.com/containerd/containerd/issues/678).
