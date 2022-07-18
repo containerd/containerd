@@ -45,16 +45,14 @@ func TestStatus(t *testing.T) {
 
 	t.Logf("failed update should not take effect")
 	err := s.Update(func(o Status) (Status, error) {
-		o = updateStatus
-		return o, updateErr
+		return updateStatus, updateErr
 	})
 	assert.Equal(updateErr, err)
 	assert.Equal(testStatus, s.Get())
 
 	t.Logf("successful update should take effect but not checkpoint")
 	err = s.Update(func(o Status) (Status, error) {
-		o = updateStatus
-		return o, nil
+		return updateStatus, nil
 	})
 	assert.NoError(err)
 	assert.Equal(updateStatus, s.Get())
