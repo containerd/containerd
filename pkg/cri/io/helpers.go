@@ -46,9 +46,9 @@ const (
 	// Stdin stream type.
 	Stdin StreamType = "stdin"
 	// Stdout stream type.
-	Stdout StreamType = StreamType(runtime.Stdout)
+	Stdout = StreamType(runtime.Stdout)
 	// Stderr stream type.
-	Stderr StreamType = StreamType(runtime.Stderr)
+	Stderr = StreamType(runtime.Stderr)
 )
 
 type wgCloser struct {

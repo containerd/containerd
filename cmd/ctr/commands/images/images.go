@@ -238,11 +238,11 @@ var checkCommand = cli.Command{
 
 		for _, image := range imageList {
 			var (
-				status       string = "complete"
+				status       = "complete"
 				size         string
 				requiredSize int64
 				presentSize  int64
-				complete     bool = true
+				complete     = true
 			)
 
 			available, required, present, missing, err := images.Check(ctx, contentStore, image.Target(), platforms.Default())
