@@ -19,47 +19,84 @@ package transfer
 import (
 	"context"
 	"fmt"
+	"net/http"
 
-	"github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/pkg/streaming"
+	"github.com/containerd/containerd/pkg/transfer"
 	"github.com/containerd/containerd/pkg/unpack"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/typeurl"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // TODO: Should a factory be exposed here as a service??
-func NewOCIRegistryFromProto(p *transfer.OCIRegistry, resolver remotes.Resolver, sm streaming.StreamManager) *OCIRegistry {
+/*
+func NewOCIRegistryFromProto(p *transferapi.OCIRegistry, resolver remotes.Resolver, sm streaming.StreamManager) *OCIRegistry {
 	//transfer.OCIRegistry
 	// Create resolver
 	// Convert auth stream to credential manager
 	return &OCIRegistry{
 		reference: p.Reference,
 		resolver:  resolver,
-		streams:   sm,
+	}
+}
+*/
+
+// Initialize with hosts, authorizer callback, and headers
+func NewOCIRegistry(ref string, headers http.Header, creds CredentialHelper) *OCIRegistry {
+	// Create an authorizer
+	var ropts []docker.RegistryOpt
+	if creds != nil {
+		// TODO: Support bearer
+		authorizer := docker.NewDockerAuthorizer(docker.WithAuthCreds(func(host string) (string, string, error) {
+			c, err := creds.GetCredentials(context.Background(), ref, host)
+			if err != nil {
+				return "", "", err
+			}
+
+			return c.Username, c.Secret, nil
+		}))
+		ropts = append(ropts, docker.WithAuthorizer(authorizer))
+	}
+
+	// TODO: Apply local configuration, maybe dynamically create resolver when requested
+	resolver := docker.NewResolver(docker.ResolverOptions{
+		Hosts:   docker.ConfigureDefaultRegistries(ropts...),
+		Headers: headers,
+	})
+	return &OCIRegistry{
+		reference: ref,
+		headers:   headers,
+		creds:     creds,
+		resolver:  resolver,
 	}
 }
 
-func NewOCIRegistry(ref string, resolver remotes.Resolver, sm streaming.StreamManager) *OCIRegistry {
-	// With options, stream,
-	// With streams?
-	return &OCIRegistry{
-		reference: ref,
-		resolver:  resolver,
-		streams:   sm,
-	}
+// From stream
+type CredentialHelper interface {
+	GetCredentials(ctx context.Context, ref, host string) (Credentials, error)
+}
+
+type Credentials struct {
+	Host     string
+	Username string
+	Secret   string
+	Bearer   string
 }
 
 // OCI
 type OCIRegistry struct {
 	reference string
 
+	headers http.Header
+	creds   CredentialHelper
+
 	resolver remotes.Resolver
-	streams  streaming.StreamManager
 
 	// This could be an interface which returns resolver?
 	// Resolver could also be a plug-able interface, to call out to a program to fetch?
@@ -73,15 +110,49 @@ func (r *OCIRegistry) Image() string {
 	return r.reference
 }
 
-func (r *OCIRegistry) Resolver() remotes.Resolver {
-	return r.resolver
+func (r *OCIRegistry) Resolve(ctx context.Context) (name string, desc ocispec.Descriptor, err error) {
+	return r.resolver.Resolve(ctx, r.reference)
 }
 
-func (r *OCIRegistry) ToProto() typeurl.Any {
-	// Might need more context to convert to proto
-	// Need access to a stream manager
-	// Service provider
-	return nil
+func (r *OCIRegistry) Fetcher(ctx context.Context, ref string) (transfer.Fetcher, error) {
+	return r.resolver.Fetcher(ctx, ref)
+}
+
+func (r *OCIRegistry) MarshalAny(ctx context.Context, sm streaming.StreamManager) (typeurl.Any, error) {
+	if r.creds != nil {
+		// TODO: Unique stream ID
+		stream, err := sm.Get(ctx, "")
+		if err != nil {
+			return nil, err
+		}
+		go func() {
+			// Check for context cancellation as well
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
+				_, err := stream.Recv()
+				if err != nil {
+					// If not EOF, log error
+					return
+				}
+				// If closed, return
+				// Call creds helper
+				// Send response
+			}
+
+		}()
+		// link creds to stream
+	}
+
+	// Create API OCI Registry type
+
+	// Marshal and return
+
+	return nil, nil
 }
 
 type ImageStore struct {
@@ -101,9 +172,11 @@ type ImageStore struct {
 	unpacks []unpack.Platform
 }
 
-func NewImageStore(image string) *ImageStore {
+func NewImageStore(image string, cs content.Store, is images.Store) *ImageStore {
 	return &ImageStore{
 		imageName: image,
+		images:    is,
+		content:   cs,
 	}
 }
 

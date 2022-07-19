@@ -44,6 +44,8 @@ type ImageFilterer interface {
 	ImageFilter(images.HandlerFunc) images.HandlerFunc
 }
 
+// ImageStorer is a type which is capable of storing an image to
+// for a provided descriptor
 type ImageStorer interface {
 	Store(context.Context, ocispec.Descriptor) (images.Image, error)
 }
@@ -53,21 +55,27 @@ type ImageUnpacker interface {
 	UnpackPlatforms() []unpack.Platform
 }
 
+type ProgressFunc func(Progress)
+
 type TransferOpts struct {
+	Progress ProgressFunc
 }
 
 type Opt func(*TransferOpts)
 
-func WithProgress() Opt {
-	return nil
+func WithProgress(f ProgressFunc) Opt {
+	return func(opts *TransferOpts) {
+		opts.Progress = f
+	}
 }
 
 type Progress struct {
 	Event    string
 	Name     string
-	Digest   string
+	Parents  []string
 	Progress int64
 	Total    int64
+	// Descriptor?
 }
 
 /*

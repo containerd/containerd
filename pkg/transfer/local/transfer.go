@@ -19,17 +19,20 @@ package local
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/leases"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/transfer"
 	"github.com/containerd/containerd/pkg/unpack"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/typeurl"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -74,8 +77,16 @@ func (ts *localTransferService) Transfer(ctx context.Context, src interface{}, d
 		case transfer.ImageStorer:
 			return ts.pull(ctx, s, d, topts)
 		}
+	case transfer.ImageImportStreamer:
+		switch d := dest.(type) {
+		case transfer.ImageExportStreamer:
+			return ts.echo(ctx, s, d, topts)
+
+			// Image import
+			//  case transfer.ImageStorer
+		}
 	}
-	return fmt.Errorf("Unable to transfer from %s to %s: %w", name(src), name(dest), errdefs.ErrNotImplemented)
+	return fmt.Errorf("unable to transfer from %s to %s: %w", name(src), name(dest), errdefs.ErrNotImplemented)
 }
 
 func name(t interface{}) string {
@@ -89,6 +100,25 @@ func name(t interface{}) string {
 	}
 }
 
+// echo is mostly used for testing, it implements an import->export which is
+// a no-op which only roundtrips the bytes.
+func (ts *localTransferService) echo(ctx context.Context, i transfer.ImageImportStreamer, e transfer.ImageExportStreamer, tops *transfer.TransferOpts) error {
+	r, err := i.ImportStream(ctx)
+	if err != nil {
+		return err
+	}
+	wc, err := e.ExportStream(ctx)
+	if err != nil {
+		return err
+	}
+
+	// TODO: Use fixed buffer? Send write progress?
+	_, err = io.Copy(wc, r)
+	if werr := wc.Close(); werr != nil && err == nil {
+		err = werr
+	}
+	return err
+}
 func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageResolver, is transfer.ImageStorer, tops *transfer.TransferOpts) error {
 	// TODO: Attach lease if doesn't have one
 
@@ -102,6 +132,11 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageResol
 	//     - Platform to Snapshotter
 	//   - Child label map
 	//   - All metdata?
+	if tops.Progress != nil {
+		tops.Progress(transfer.Progress{
+			Event: fmt.Sprintf("Resolving from %s", ir),
+		})
+	}
 
 	name, desc, err := ir.Resolve(ctx)
 	if err != nil {
@@ -110,6 +145,18 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageResol
 	if desc.MediaType == images.MediaTypeDockerSchema1Manifest {
 		// Explicitly call out schema 1 as deprecated and not supported
 		return fmt.Errorf("schema 1 image manifests are no longer supported: %w", errdefs.ErrInvalidArgument)
+	}
+
+	// TODO: Handle already exists
+	if tops.Progress != nil {
+		tops.Progress(transfer.Progress{
+			Event: fmt.Sprintf("Pulling from %s", ir),
+		})
+		tops.Progress(transfer.Progress{
+			Event: "fetching image content",
+			Name:  name,
+			//Digest: img.Target.Digest.String(),
+		})
 	}
 
 	fetcher, err := ir.Fetcher(ctx, name)
@@ -125,8 +172,19 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageResol
 		// has a config media type bug (distribution#1622)
 		hasMediaTypeBug1622 bool
 
-		store = ts.content
+		store           = ts.content
+		progressTracker *ProgressTracker
 	)
+
+	if tops.Progress != nil {
+		progressTracker = NewProgressTracker(name, store) //Pass in first name as root
+		go progressTracker.HandleProgress(ctx, tops.Progress)
+		defer progressTracker.Wait()
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	//func (is *ImageStore) FilterHandler(h images.HandlerFunc) images.HandlerFunc {
 	//func (is *ImageStore) Store(ctx context.Context, desc ocispec.Descriptor) (images.Image, error) {
 
@@ -158,16 +216,35 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageResol
 		return err
 	}
 
-	// TODO: Support set of base handlers from configuration or image store
-	// Progress handlers?
-	handlers := []images.Handler{
-		remotes.FetchHandler(store, fetcher),
-		checkNeedsFix,
-		childrenHandler,
-		appendDistSrcLabelHandler,
+	// TODO: Allow initialization from configuration
+	baseHandlers := []images.Handler{}
+
+	if tops.Progress != nil {
+		baseHandlers = append(baseHandlers, images.HandlerFunc(
+			func(_ context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+				progressTracker.Add(desc)
+
+				return []ocispec.Descriptor{}, nil
+			},
+		))
+
+		baseChildrenHandler := childrenHandler
+		childrenHandler = images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) (children []ocispec.Descriptor, err error) {
+			children, err = baseChildrenHandler(ctx, desc)
+			if err != nil {
+				return
+			}
+			progressTracker.AddChildren(desc, children)
+			return
+		})
 	}
 
-	handler = images.Handlers(handlers...)
+	handler = images.Handlers(append(baseHandlers,
+		fetchHandler(store, fetcher, progressTracker),
+		checkNeedsFix,
+		childrenHandler, // List children to track hierachy
+		appendDistSrcLabelHandler,
+	)...)
 
 	// TODO: Should available platforms be a configuration of the service?
 	// First find suitable platforms to unpack into
@@ -189,20 +266,15 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageResol
 			if err != nil {
 				return fmt.Errorf("unable to initialize unpacker: %w", err)
 			}
-			defer func() {
-				// TODO: This needs to be tigher scoped...
-				if _, err := unpacker.Wait(); err != nil {
-					//if retErr == nil {
-					//	retErr = fmt.Errorf("unpack: %w", err)
-					//}
-				}
-			}()
 			handler = unpacker.Unpack(handler)
 		}
 	}
 
 	if err := images.Dispatch(ctx, handler, ts.limiter, desc); err != nil {
-		// TODO: Cancel unpack and wait?
+		if unpacker != nil {
+			// wait for unpacker to cleanup
+			unpacker.Wait()
+		}
 		return err
 	}
 
@@ -222,12 +294,46 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageResol
 		}
 	}
 
-	_, err = is.Store(ctx, desc)
+	img, err := is.Store(ctx, desc)
 	if err != nil {
 		return err
 	}
 
-	// TODO: Send status update for created image
+	if tops.Progress != nil {
+		tops.Progress(transfer.Progress{
+			Event: "saved",
+			Name:  img.Name,
+			//Digest: img.Target.Digest.String(),
+		})
+	}
+
+	if tops.Progress != nil {
+		tops.Progress(transfer.Progress{
+			Event: fmt.Sprintf("Completed pull from %s", ir),
+		})
+	}
 
 	return nil
+}
+
+func fetchHandler(ingester content.Ingester, fetcher remotes.Fetcher, pt *ProgressTracker) images.HandlerFunc {
+	return func(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error) {
+		ctx = log.WithLogger(ctx, log.G(ctx).WithFields(logrus.Fields{
+			"digest":    desc.Digest,
+			"mediatype": desc.MediaType,
+			"size":      desc.Size,
+		}))
+
+		switch desc.MediaType {
+		case images.MediaTypeDockerSchema1Manifest:
+			return nil, fmt.Errorf("%v not supported", desc.MediaType)
+		default:
+			err := remotes.Fetch(ctx, ingester, fetcher, desc)
+			if errdefs.IsAlreadyExists(err) {
+				pt.MarkExists(desc)
+				return nil, nil
+			}
+			return nil, err
+		}
+	}
 }

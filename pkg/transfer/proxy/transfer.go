@@ -20,29 +20,32 @@ import (
 	"context"
 
 	transferapi "github.com/containerd/containerd/api/services/transfer/v1"
+	"github.com/containerd/containerd/pkg/streaming"
 	"github.com/containerd/containerd/pkg/transfer"
 	"github.com/containerd/typeurl"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type proxyTransferer struct {
-	client transferapi.TransferClient
+	client        transferapi.TransferClient
+	streamManager streaming.StreamManager
 }
 
 // NewTransferer returns a new transferr which communicates over a GRPC
 // connection using the containerd transfer API
-func NewTransferer(client transferapi.TransferClient) transfer.Transferer {
+func NewTransferer(client transferapi.TransferClient, sm streaming.StreamManager) transfer.Transferer {
 	return &proxyTransferer{
-		client: client,
+		client:        client,
+		streamManager: sm,
 	}
 }
 
 func (p *proxyTransferer) Transfer(ctx context.Context, src interface{}, dst interface{}, opts ...transfer.Opt) error {
-	asrc, err := typeurl.MarshalAny(src)
+	asrc, err := p.marshalAny(ctx, src)
 	if err != nil {
 		return err
 	}
-	adst, err := typeurl.MarshalAny(dst)
+	adst, err := p.marshalAny(ctx, dst)
 	if err != nil {
 		return err
 	}
@@ -60,4 +63,15 @@ func (p *proxyTransferer) Transfer(ctx context.Context, src interface{}, dst int
 	}
 	_, err = p.client.Transfer(ctx, req)
 	return err
+}
+func (p *proxyTransferer) marshalAny(ctx context.Context, i interface{}) (typeurl.Any, error) {
+	switch m := i.(type) {
+	case streamMarshaler:
+		return m.MarshalAny(ctx, p.streamManager)
+	}
+	return typeurl.MarshalAny(i)
+}
+
+type streamMarshaler interface {
+	MarshalAny(context.Context, streaming.StreamManager) (typeurl.Any, error)
 }

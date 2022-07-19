@@ -100,20 +100,21 @@ func FetchHandler(ingester content.Ingester, fetcher Fetcher) images.HandlerFunc
 		case images.MediaTypeDockerSchema1Manifest:
 			return nil, fmt.Errorf("%v not supported", desc.MediaType)
 		default:
-			err := fetch(ctx, ingester, fetcher, desc)
+			err := Fetch(ctx, ingester, fetcher, desc)
+			if errdefs.IsAlreadyExists(err) {
+				return nil, nil
+			}
 			return nil, err
 		}
 	}
 }
 
-func fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc ocispec.Descriptor) error {
+// Fetch fetches the given digest into the provided ingester
+func Fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc ocispec.Descriptor) error {
 	log.G(ctx).Debug("fetch")
 
 	cw, err := content.OpenWriter(ctx, ingester, content.WithRef(MakeRefKey(ctx, desc)), content.WithDescriptor(desc))
 	if err != nil {
-		if errdefs.IsAlreadyExists(err) {
-			return nil
-		}
 		return err
 	}
 	defer cw.Close()
@@ -135,7 +136,7 @@ func fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc
 		if err != nil && !errdefs.IsAlreadyExists(err) {
 			return fmt.Errorf("failed commit on ref %q: %w", ws.Ref, err)
 		}
-		return nil
+		return err
 	}
 
 	rc, err := fetcher.Fetch(ctx, desc)
