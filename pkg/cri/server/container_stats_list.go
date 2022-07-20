@@ -19,6 +19,9 @@ package server
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"github.com/containerd/containerd/pkg/cri/store/stats"
 
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
@@ -61,9 +64,83 @@ func (c *criService) toCRIContainerStats(
 		if err != nil { //nolint:staticcheck // Ignore SA4023 as some platforms always return nil (metrics unimplemented)
 			return nil, fmt.Errorf("failed to decode container metrics for %q: %w", cntr.ID, err)
 		}
+
+		// this is a calculated value and should be computed for all OSes
+		nanoUsage, err := c.getUsageNanoCores(cntr.Metadata.ID, false, cs.Cpu.UsageCoreNanoSeconds.Value, time.Unix(0, cs.Cpu.Timestamp))
+		if err != nil {
+			return nil, fmt.Errorf("failed to get usage nano cores, containerID: %s: %w", cntr.Metadata.ID, err)
+		}
+		cs.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: nanoUsage}
+
 		containerStats.Stats = append(containerStats.Stats, cs)
 	}
 	return containerStats, nil
+}
+
+func (c *criService) getUsageNanoCores(containerID string, isSandbox bool, currentUsageCoreNanoSeconds uint64, currentTimestamp time.Time) (uint64, error) {
+	var oldStats *stats.ContainerStats
+
+	if isSandbox {
+		sandbox, err := c.sandboxStore.Get(containerID)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get sandbox container: %s: %w", containerID, err)
+		}
+		oldStats = sandbox.Stats
+	} else {
+		container, err := c.containerStore.Get(containerID)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get container ID: %s: %w", containerID, err)
+		}
+		oldStats = container.Stats
+	}
+
+	if oldStats == nil {
+		newStats := &stats.ContainerStats{
+			UsageCoreNanoSeconds: currentUsageCoreNanoSeconds,
+			Timestamp:            currentTimestamp,
+		}
+		if isSandbox {
+			err := c.sandboxStore.UpdateContainerStats(containerID, newStats)
+			if err != nil {
+				return 0, fmt.Errorf("failed to update sandbox stats container ID: %s: %w", containerID, err)
+			}
+		} else {
+			err := c.containerStore.UpdateContainerStats(containerID, newStats)
+			if err != nil {
+				return 0, fmt.Errorf("failed to update container stats ID: %s: %w", containerID, err)
+			}
+		}
+		return 0, nil
+	}
+
+	nanoSeconds := currentTimestamp.UnixNano() - oldStats.Timestamp.UnixNano()
+
+	// zero or negative interval
+	if nanoSeconds <= 0 {
+		return 0, nil
+	}
+
+	newUsageNanoCores := uint64(float64(currentUsageCoreNanoSeconds-oldStats.UsageCoreNanoSeconds) /
+		float64(nanoSeconds) * float64(time.Second/time.Nanosecond))
+
+	newStats := &stats.ContainerStats{
+		UsageCoreNanoSeconds: currentUsageCoreNanoSeconds,
+		Timestamp:            currentTimestamp,
+	}
+	if isSandbox {
+		err := c.sandboxStore.UpdateContainerStats(containerID, newStats)
+		if err != nil {
+			return 0, fmt.Errorf("failed to update sandbox container stats: %s: %w", containerID, err)
+		}
+
+	} else {
+		err := c.containerStore.UpdateContainerStats(containerID, newStats)
+		if err != nil {
+			return 0, fmt.Errorf("failed to update container stats ID: %s: %w", containerID, err)
+		}
+	}
+
+	return newUsageNanoCores, nil
 }
 
 func (c *criService) normalizeContainerStatsFilter(filter *runtime.ContainerStatsFilter) {
