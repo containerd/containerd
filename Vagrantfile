@@ -227,6 +227,7 @@ EOF
         'RUNC_FLAVOR': ENV['RUNC_FLAVOR'] || "runc",
         'GOTEST': ENV['GOTEST'] || "go test",
         'GOTESTSUM_JUNITFILE': ENV['GOTESTSUM_JUNITFILE'],
+        'GOTESTSUM_JSONFILE': ENV['GOTESTSUM_JSONFILE'],
     }
     sh.inline = <<~SHELL
         #!/usr/bin/env bash
