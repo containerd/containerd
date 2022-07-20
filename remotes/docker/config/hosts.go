@@ -73,10 +73,10 @@ type HostOptions struct {
 // certificate files laid out in the Docker specific layout.
 // If a `HostDir` function is not required, defaults are used.
 func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHosts {
-	return func(host string) ([]docker.RegistryHost, error) {
+	return func(tagetHost string) ([]docker.RegistryHost, error) {
 		var hosts []hostConfig
 		if options.HostDir != nil {
-			dir, err := options.HostDir(host)
+			dir, err := options.HostDir(tagetHost)
 			if err != nil && !errdefs.IsNotFound(err) {
 				return nil, err
 			}
@@ -96,11 +96,11 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			hosts = make([]hostConfig, 1)
 		}
 		if len(hosts) > 0 && hosts[len(hosts)-1].host == "" {
-			if host == "docker.io" {
+			if tagetHost == "docker.io" {
 				hosts[len(hosts)-1].scheme = "https"
 				hosts[len(hosts)-1].host = "registry-1.docker.io"
 			} else {
-				hosts[len(hosts)-1].host = host
+				hosts[len(hosts)-1].host = tagetHost
 				if options.DefaultScheme != "" {
 					hosts[len(hosts)-1].scheme = options.DefaultScheme
 				} else {
@@ -152,7 +152,11 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 		for i, host := range hosts {
 
 			rhosts[i].Scheme = host.scheme
-			rhosts[i].Host = host.host
+			if host.host == "*" {
+				rhosts[i].Host = tagetHost
+			} else {
+				rhosts[i].Host = host.host
+			}
 			rhosts[i].Path = host.path
 			rhosts[i].Capabilities = host.capabilities
 			rhosts[i].Header = host.header
@@ -239,8 +243,52 @@ func HostDirFromRoot(root string) func(string) (string, error) {
 				return "", err
 			}
 		}
+		entries, err := os.ReadDir(root)
+		if err != nil {
+			return "", err
+		}
+		cidrs := map[string]*net.IPNet{}
+		for _, f := range entries {
+			if !f.IsDir() {
+				continue
+			}
+			diraname := f.Name()
+			if cidr := dirnameToCIDR(diraname); cidr != nil {
+				cidrs[diraname] = cidr
+			}
+		}
+		if len(cidrs) > 0 {
+			ips := hostToIPs(host)
+			for _, addr := range ips {
+				for diraname, cidr := range cidrs {
+					if cidr.Contains(addr) {
+						return filepath.Join(root, diraname), nil
+					}
+				}
+			}
+		}
 		return "", errdefs.ErrNotFound
 	}
+}
+
+func hostToIPs(host string) []net.IP {
+	if strings.LastIndex(host, ":") > 0 {
+		host, _, _ = net.SplitHostPort(host)
+	}
+
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		if ip := net.ParseIP(host); ip != nil {
+			ips = []net.IP{ip}
+		}
+	}
+	return ips
+}
+
+func dirnameToCIDR(diraname string) *net.IPNet {
+	cidrStr := strings.Replace(diraname, "_", "/", 1)
+	_, cidr, _ := net.ParseCIDR(cidrStr)
+	return cidr
 }
 
 // hostDirectory converts ":port" to "_port_" in directory names
