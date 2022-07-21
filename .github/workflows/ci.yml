@@ -119,7 +119,7 @@ jobs:
   crossbuild:
     name: Crossbuild Binaries
     needs: [project, linters, protos, man]
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -133,6 +133,10 @@ jobs:
           - goos: linux
             goarch: arm
             goarm: "5"
+          - goos: linux
+            goarch: ppc64le
+          - goos: linux
+            goarch: riscv64
           - goos: freebsd
             goarch: amd64
           - goos: freebsd
@@ -149,7 +153,7 @@ jobs:
       - run: |
           set -e -x
 
-          packages=""
+          packages="libbtrfs-dev"
           platform="${{matrix.goos}}/${{matrix.goarch}}"
           if [ -n "${{matrix.goarm}}" ]; then
             platform+="/v${{matrix.goarm}}"
@@ -170,6 +174,16 @@ jobs:
             packages+=" crossbuild-essential-arm64"
             echo "CGO_ENABLED=1" >> $GITHUB_ENV
             echo "CC=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+            ;;
+          linux/ppc64le)
+            packages+=" crossbuild-essential-ppc64el"
+            echo "CGO_ENABLED=1" >> $GITHUB_ENV
+            echo "CC=powerpc64le-linux-gnu-gcc" >> $GITHUB_ENV
+            ;;
+          linux/riscv64)
+            packages+=" crossbuild-essential-riscv64"
+            echo "CGO_ENABLED=1" >> $GITHUB_ENV
+            echo "CC=riscv64-linux-gnu-gcc" >> $GITHUB_ENV
             ;;
           windows/arm/v7)
             echo "CGO_ENABLED=0" >> $GITHUB_ENV
