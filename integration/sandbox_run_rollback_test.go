@@ -39,7 +39,7 @@ const (
 
 	failpointShimPrefixKey = "io.containerd.runtime.v2.shim.failpoint."
 
-	failpointCNIStateDirKey = "cniFailpointControlStateDir"
+	failpointCNIConfPathKey = "failpoint.cni.containerd.io/confpath"
 )
 
 func TestRunPodSandboxWithSetupCNIFailure(t *testing.T) {
@@ -109,7 +109,7 @@ func injectCNIFailpoint(t *testing.T, sbConfig *criapiv1.PodSandboxConfig, conf 
 	err = os.WriteFile(fpFilename, data, 0666)
 	require.NoError(t, err)
 
-	sbConfig.Annotations[failpointCNIStateDirKey] = stateDir
+	sbConfig.Annotations[failpointCNIConfPathKey] = fpFilename
 }
 
 func injectShimFailpoint(t *testing.T, sbConfig *criapiv1.PodSandboxConfig, methodFps map[string]string) {
