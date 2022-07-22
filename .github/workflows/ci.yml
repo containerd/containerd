@@ -328,24 +328,28 @@ jobs:
         env:
           CGO_ENABLED: 1
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root.xml
-          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-unit-root.json
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-unit-root-gotest.json
         run: mingw32-make.exe test root-test
-      - run: echo '# Root Test' >> $GITHUB_STEP_SUMMARY; teststat -markdown ${TESTFILE} >> $GITHUB_STEP_SUMMARY
+      - run: if [ -f *-gotest.json ]; then echo '# Root Test' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
         if: always()
+      - run: script/test/test2annotation.sh ${TESTFILE}
         env:
-          TESTFILE: ${{github.workspace}}/test-unit-root.json
+          TESTFILE: ${{github.workspace}}/test-unit-root-gotest.json
+        if: always()
 
       - name: Integration 1
         env:
           CGO_ENABLED: 1
           ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
-          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-serial.json
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-serial-gotest.json
         run: mingw32-make.exe integration
-      - run: echo '# Integration 1' >> $GITHUB_STEP_SUMMARY; teststat -markdown ${TESTFILE} >> $GITHUB_STEP_SUMMARY
+      - run: if [ -f *-gotest.json ]; then echo '# Integration 1' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
         if: always()
+      - run: script/test/test2annotation.sh ${TESTFILE}
         env:
-          TESTFILE: ${{github.workspace}}/test-integration-serial.json
+          TESTFILE: ${{github.workspace}}/test-integration-serial-gotest.json
+        if: always()
 
       # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
       - name: Integration 2
@@ -355,12 +359,14 @@ jobs:
           CGO_ENABLED: 1
           ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
-          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-parallel.json
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-parallel-gotest.json
         run: mingw32-make.exe integration
-      - run: echo '# Integration 2' >> $GITHUB_STEP_SUMMARY; teststat -markdown ${TESTFILE} >> $GITHUB_STEP_SUMMARY
+      - run: if [ -f *-gotest.json ]; then echo '# Integration 2' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
         if: always()
+      - run: script/test/test2annotation.sh ${TESTFILE}
         env:
-          TESTFILE: ${{github.workspace}}/test-integration-parallel.json
+          TESTFILE: ${{github.workspace}}/test-integration-parallel-gotest.json
+        if: always()
 
       - name: CRI Integration Test
         env:
@@ -392,6 +398,7 @@ jobs:
           name: TestResults ${{ matrix.os }}
           path: |
             ${{github.workspace}}/*-junit.xml
+            ${{github.workspace}}/*-gotest.json
 
   integration-linux:
     name: Linux Integration
@@ -454,14 +461,14 @@ jobs:
       - name: Tests
         env:
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root-junit.xml
-          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-unit-root.json
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-unit-root-gotest.json
         run: |
           make test
           sudo -E PATH=$PATH make root-test
-      - run: echo '# Root Test' >> $GITHUB_STEP_SUMMARY; teststat -markdown ${TESTFILE} >> $GITHUB_STEP_SUMMARY
+      - run: if [ -f *-gotest.json ]; then echo '# Root Test' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
         if: always()
-        env:
-          TESTFILE: ${{github.workspace}}/test-unit-root.json
+      - run: script/test/test2annotation.sh *-gotest.json
+        if: always()
 
       - name: Integration 1
         env:
@@ -469,17 +476,17 @@ jobs:
           RUNC_FLAVOR: ${{ matrix.runc }}
           ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
-          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-serial.json
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-serial-gotest.json
         run: |
           extraflags=""
           [ "${RUNC_FLAVOR}" == "crun" ] && {
                   extraflags="EXTRA_TESTFLAGS=-no-criu";
           }
           sudo -E PATH=$PATH make integration ${extraflags} TESTFLAGS_RACE=-race
-      - run: echo '# Integration 1' >> $GITHUB_STEP_SUMMARY; teststat -markdown ${TESTFILE} >> $GITHUB_STEP_SUMMARY
+      - run: if [ -f *-gotest.json ]; then echo '# Integration 1' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
         if: always()
-        env:
-          TESTFILE: ${{github.workspace}}/test-integration-serial.json
+      - run: script/test/test2annotation.sh *-gotest.json
+        if: always()
 
       # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
       - name: Integration 2
@@ -488,17 +495,17 @@ jobs:
           RUNC_FLAVOR: ${{ matrix.runc }}
           ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
-          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-parallel.json
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-parallel-gotest.json
         run: |
           extraflags=""
           [ "${RUNC_FLAVOR}" == "crun" ] && {
                   extraflags="EXTRA_TESTFLAGS=-no-criu";
           }
           sudo -E PATH=$PATH TESTFLAGS_PARALLEL=1 make integration ${extraflags}
-      - run: echo '# Integration 2' >> $GITHUB_STEP_SUMMARY; teststat -markdown ${TESTFILE} >> $GITHUB_STEP_SUMMARY
+      - run: if [ -f *-gotest.json ]; then echo '# Integration 2' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
         if: always()
-        env:
-          TESTFILE: ${{github.workspace}}/test-integration-parallel.json
+      - run: script/test/test2annotation.sh *-gotest.json
+        if: always()
 
       - name: CRI Integration Test
         env:
@@ -547,6 +554,7 @@ jobs:
           name: TestResults ${{ matrix.runtime }} ${{matrix.runc}}
           path: |
             *-junit.xml
+            *-gotest.json
             ${{github.workspace}}/critestreport/*.xml
 
   tests-mac-os:
@@ -563,18 +571,20 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
       - uses: actions/checkout@v2
       - run: script/setup/install-gotestsum
+      - run: script/setup/install-teststat
       - name: Tests
         env:
           GOTESTSUM_JUNITFILE: "${{ github.workspace }}/macos-test-junit.xml"
-          GOTESTSUM_JSONFILE: "${{ github.workspace }}/macos-test.json"
+          GOTESTSUM_JSONFILE: "${{ github.workspace }}/macos-test-gotest.json"
         run: make test
-      - run: script/setup/install-teststat && teststat -markdown ${TESTFILE} >> $GITHUB_STEP_SUMMARY
+      - run: if [ -f *-gotest.json ]; then echo '# Unit Tests' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
         if: always()
-        env:
-          TESTFILE: "${{ github.workspace }}/macos-test.json"
+      - run: script/test/test2annotation.sh *-gotest.json
+        if: always()
       - uses: actions/upload-artifact@v2
         if: always()
         with:
           name: TestResults MacOS
           path: |
             *-junit.xml
+            *-gotest.json
