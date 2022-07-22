@@ -65,12 +65,14 @@ func (c *criService) toCRIContainerStats(
 			return nil, fmt.Errorf("failed to decode container metrics for %q: %w", cntr.ID, err)
 		}
 
-		// this is a calculated value and should be computed for all OSes
-		nanoUsage, err := c.getUsageNanoCores(cntr.Metadata.ID, false, cs.Cpu.UsageCoreNanoSeconds.Value, time.Unix(0, cs.Cpu.Timestamp))
-		if err != nil {
-			return nil, fmt.Errorf("failed to get usage nano cores, containerID: %s: %w", cntr.Metadata.ID, err)
+		if cs.Cpu != nil && cs.Cpu.UsageCoreNanoSeconds != nil {
+			// this is a calculated value and should be computed for all OSes
+			nanoUsage, err := c.getUsageNanoCores(cntr.Metadata.ID, false, cs.Cpu.UsageCoreNanoSeconds.Value, time.Unix(0, cs.Cpu.Timestamp))
+			if err != nil {
+				return nil, fmt.Errorf("failed to get usage nano cores, containerID: %s: %w", cntr.Metadata.ID, err)
+			}
+			cs.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: nanoUsage}
 		}
-		cs.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: nanoUsage}
 
 		containerStats.Stats = append(containerStats.Stats, cs)
 	}
