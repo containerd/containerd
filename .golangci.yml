@@ -14,6 +14,7 @@ linters:
     - gosec
     - exportloopref # Checks for pointers to enclosing loop variables
     - tenv # Detects using os.Setenv instead of t.Setenv since Go 1.17
+    - depguard # Checks if package imports are in a list of acceptable packages
   disable:
     - errcheck
 
@@ -42,6 +43,11 @@ linters-settings:
       - G306
       - G402
       - G404
+  depguard:
+    list-type: denylist
+    include-go-root: true
+    packages-with-error-message:
+      - io/ioutil: "deprecated in 1.16 (see https://go.dev/doc/go1.16#ioutil)"
 
 run:
   timeout: 8m
