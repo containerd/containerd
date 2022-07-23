@@ -456,7 +456,7 @@ func (s *snapshotter) openOrCreateScratch(ctx context.Context, sizeGB int, scrat
 
 		log.G(ctx).Debugf("vhdx %s not found, creating a new one", vhdFileName)
 
-		// Golang logic for ioutil.TempFile without the file creation
+		// Golang logic for os.CreateTemp without the file creation
 		r := uint32(time.Now().UnixNano() + int64(os.Getpid()))
 		r = r*1664525 + 1013904223 // constants from Numerical Recipes
 

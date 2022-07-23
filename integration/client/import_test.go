@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"math/rand"
@@ -76,7 +75,7 @@ func testExportImport(t *testing.T, imageName string) {
 		t.Fatal(err)
 	}
 
-	dstFile, err := ioutil.TempFile("", "export-import-test")
+	dstFile, err := os.CreateTemp("", "export-import-test")
 	if err != nil {
 		t.Fatal(err)
 	}
