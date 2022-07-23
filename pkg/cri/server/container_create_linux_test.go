@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -1524,14 +1523,14 @@ func writeFilesToTempDir(tmpDirPattern string, content []string) (string, error)
 		return "", nil
 	}
 
-	dir, err := ioutil.TempDir("", tmpDirPattern)
+	dir, err := os.MkdirTemp("", tmpDirPattern)
 	if err != nil {
 		return "", err
 	}
 
 	for idx, data := range content {
 		file := filepath.Join(dir, fmt.Sprintf("spec-%d.yaml", idx))
-		err := ioutil.WriteFile(file, []byte(data), 0644)
+		err := os.WriteFile(file, []byte(data), 0644)
 		if err != nil {
 			return "", err
 		}

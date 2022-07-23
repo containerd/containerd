@@ -19,7 +19,6 @@ package client
 import (
 	"archive/tar"
 	"io"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -46,7 +45,7 @@ func TestExport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dstFile, err := ioutil.TempFile("", "export-import-test")
+	dstFile, err := os.CreateTemp("", "export-import-test")
 	if err != nil {
 		t.Fatal(err)
 	}

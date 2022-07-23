@@ -22,7 +22,7 @@ package integration
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -75,7 +75,7 @@ func TestSandboxRemoveWithoutIPLeakage(t *testing.T) {
 		require.NoError(t, err)
 		defer f.Close()
 
-		data, err := ioutil.ReadAll(f)
+		data, err := io.ReadAll(f)
 		require.NoError(t, err)
 
 		var jsonData map[string]interface{}
