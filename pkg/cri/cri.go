@@ -23,20 +23,10 @@ import (
 	"path/filepath"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/api/services/containers/v1"
-	"github.com/containerd/containerd/api/services/diff/v1"
-	"github.com/containerd/containerd/api/services/images/v1"
-	introspectionapi "github.com/containerd/containerd/api/services/introspection/v1"
-	"github.com/containerd/containerd/api/services/namespaces/v1"
-	"github.com/containerd/containerd/api/services/tasks/v1"
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/cri/sbserver"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/services"
-	"github.com/containerd/containerd/snapshots"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/klog/v2"
@@ -83,17 +73,12 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, fmt.Errorf("failed to set glog level: %w", err)
 	}
 
-	servicesOpts, err := getServicesOpts(ic)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get services: %w", err)
-	}
-
 	log.G(ctx).Info("Connect containerd service")
 	client, err := containerd.New(
 		"",
 		containerd.WithDefaultNamespace(constants.K8sContainerdNamespace),
 		containerd.WithDefaultPlatform(platforms.Default()),
-		containerd.WithServices(servicesOpts...),
+		containerd.WithInMemoryServices(ic),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create containerd client: %w", err)
@@ -118,70 +103,6 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		// TODO(random-liu): Whether and how we can stop containerd.
 	}()
 	return s, nil
-}
-
-// getServicesOpts get service options from plugin context.
-func getServicesOpts(ic *plugin.InitContext) ([]containerd.ServicesOpt, error) {
-	var opts []containerd.ServicesOpt
-	for t, fn := range map[plugin.Type]func(interface{}) containerd.ServicesOpt{
-		plugin.EventPlugin: func(i interface{}) containerd.ServicesOpt {
-			return containerd.WithEventService(i.(containerd.EventService))
-		},
-		plugin.LeasePlugin: func(i interface{}) containerd.ServicesOpt {
-			return containerd.WithLeasesService(i.(leases.Manager))
-		},
-	} {
-		i, err := ic.Get(t)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get %q plugin: %w", t, err)
-		}
-		opts = append(opts, fn(i))
-	}
-
-	plugins, err := ic.GetByType(plugin.ServicePlugin)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get service plugin: %w", err)
-	}
-	for s, fn := range map[string]func(interface{}) containerd.ServicesOpt{
-		services.ContentService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithContentStore(s.(content.Store))
-		},
-		services.ImagesService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithImageClient(s.(images.ImagesClient))
-		},
-		services.SnapshotsService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithSnapshotters(s.(map[string]snapshots.Snapshotter))
-		},
-		services.ContainersService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithContainerClient(s.(containers.ContainersClient))
-		},
-		services.TasksService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithTaskClient(s.(tasks.TasksClient))
-		},
-		services.DiffService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithDiffClient(s.(diff.DiffClient))
-		},
-		services.NamespacesService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithNamespaceClient(s.(namespaces.NamespacesClient))
-		},
-		services.IntrospectionService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithIntrospectionClient(s.(introspectionapi.IntrospectionClient))
-		},
-	} {
-		p := plugins[s]
-		if p == nil {
-			return nil, fmt.Errorf("service %q not found", s)
-		}
-		i, err := p.Instance()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get instance of service %q: %w", s, err)
-		}
-		if i == nil {
-			return nil, fmt.Errorf("instance of service %q not found", s)
-		}
-		opts = append(opts, fn(i))
-	}
-	return opts, nil
 }
 
 // Set glog level.
