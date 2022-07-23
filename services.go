@@ -17,6 +17,8 @@
 package containerd
 
 import (
+	"fmt"
+
 	containersapi "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/api/services/diff/v1"
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
@@ -29,7 +31,9 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/sandbox"
+	srv "github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/services/introspection"
 	"github.com/containerd/containerd/snapshots"
 )
@@ -171,5 +175,77 @@ func WithSandboxStore(client sandboxsapi.StoreClient) ServicesOpt {
 func WithSandboxController(client sandboxsapi.ControllerClient) ServicesOpt {
 	return func(s *services) {
 		s.sandboxController = NewSandboxRemoteController(client)
+	}
+}
+
+// WithInMemoryServices is suitable for cases when there is need to use containerd's client from
+// another (in-memory) containerd plugin (such as CRI).
+func WithInMemoryServices(ic *plugin.InitContext) ClientOpt {
+	return func(c *clientOpts) error {
+		var opts []ServicesOpt
+		for t, fn := range map[plugin.Type]func(interface{}) ServicesOpt{
+			plugin.EventPlugin: func(i interface{}) ServicesOpt {
+				return WithEventService(i.(EventService))
+			},
+			plugin.LeasePlugin: func(i interface{}) ServicesOpt {
+				return WithLeasesService(i.(leases.Manager))
+			},
+		} {
+			i, err := ic.Get(t)
+			if err != nil {
+				return fmt.Errorf("failed to get %q plugin: %w", t, err)
+			}
+			opts = append(opts, fn(i))
+		}
+
+		plugins, err := ic.GetByType(plugin.ServicePlugin)
+		if err != nil {
+			return fmt.Errorf("failed to get service plugin: %w", err)
+		}
+		for s, fn := range map[string]func(interface{}) ServicesOpt{
+			srv.ContentService: func(s interface{}) ServicesOpt {
+				return WithContentStore(s.(content.Store))
+			},
+			srv.ImagesService: func(s interface{}) ServicesOpt {
+				return WithImageClient(s.(imagesapi.ImagesClient))
+			},
+			srv.SnapshotsService: func(s interface{}) ServicesOpt {
+				return WithSnapshotters(s.(map[string]snapshots.Snapshotter))
+			},
+			srv.ContainersService: func(s interface{}) ServicesOpt {
+				return WithContainerClient(s.(containersapi.ContainersClient))
+			},
+			srv.TasksService: func(s interface{}) ServicesOpt {
+				return WithTaskClient(s.(tasks.TasksClient))
+			},
+			srv.DiffService: func(s interface{}) ServicesOpt {
+				return WithDiffClient(s.(diff.DiffClient))
+			},
+			srv.NamespacesService: func(s interface{}) ServicesOpt {
+				return WithNamespaceClient(s.(namespacesapi.NamespacesClient))
+			},
+			srv.IntrospectionService: func(s interface{}) ServicesOpt {
+				return WithIntrospectionClient(s.(introspectionapi.IntrospectionClient))
+			},
+		} {
+			p := plugins[s]
+			if p == nil {
+				return fmt.Errorf("service %q not found", s)
+			}
+			i, err := p.Instance()
+			if err != nil {
+				return fmt.Errorf("failed to get instance of service %q: %w", s, err)
+			}
+			if i == nil {
+				return fmt.Errorf("instance of service %q not found", s)
+			}
+			opts = append(opts, fn(i))
+		}
+
+		c.services = &services{}
+		for _, o := range opts {
+			o(c.services)
+		}
+		return nil
 	}
 }
