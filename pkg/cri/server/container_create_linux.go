@@ -193,7 +193,7 @@ func (c *criService) containerSpec(
 	}
 	defer func() {
 		if retErr != nil {
-			_ = label.ReleaseLabel(processLabel)
+			selinux.ReleaseLabel(processLabel)
 		}
 	}()
 
