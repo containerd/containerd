@@ -268,24 +268,10 @@ func (c *criService) Run() error {
 		eventMonitorErr = err
 	}
 	logrus.Info("Event monitor stopped")
-	// There is a race condition with http.Server.Serve.
-	// When `Close` is called at the same time with `Serve`, `Close`
-	// may finish first, and `Serve` may still block.
-	// See https://github.com/golang/go/issues/20239.
-	// Here we set a 2 second timeout for the stream server wait,
-	// if it timeout, an error log is generated.
-	// TODO(random-liu): Get rid of this after https://github.com/golang/go/issues/20239
-	// is fixed.
-	const streamServerStopTimeout = 2 * time.Second
-	select {
-	case err := <-streamServerErrCh:
-		if err != nil {
-			streamServerErr = err
-		}
-		logrus.Info("Stream server stopped")
-	case <-time.After(streamServerStopTimeout):
-		logrus.Errorf("Stream server is not stopped in %q", streamServerStopTimeout)
+	if err := <-streamServerErrCh; err != nil {
+		streamServerErr = err
 	}
+	logrus.Info("Stream server stopped")
 	if eventMonitorErr != nil {
 		return fmt.Errorf("event monitor error: %w", eventMonitorErr)
 	}
