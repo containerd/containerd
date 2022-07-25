@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/cgroups"
 	cgroupsv2 "github.com/containerd/cgroups/v2"
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/integration/images"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -151,7 +152,7 @@ func TestUpdateContainerResources_MemorySwap(t *testing.T) {
 	t.Log("Create a sandbox")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "update-container-swap-resources")
 
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, images.PauseImage)
 
 	memoryLimit := int64(128 * 1024 * 1024)
 	baseSwapLimit := int64(200 * 1024 * 1024)
@@ -168,7 +169,7 @@ func TestUpdateContainerResources_MemorySwap(t *testing.T) {
 	t.Log("Create a container with memory limit but no swap")
 	cnConfig := ContainerConfig(
 		"container",
-		pauseImage,
+		images.PauseImage,
 		WithResources(&runtime.LinuxContainerResources{
 			MemoryLimitInBytes:     memoryLimit,
 			MemorySwapLimitInBytes: baseSwapLimit,
@@ -223,12 +224,12 @@ func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
 	t.Log("Create a sandbox")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "update-container-resources")
 
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, images.PauseImage)
 
 	t.Log("Create a container with memory limit")
 	cnConfig := ContainerConfig(
 		"container",
-		pauseImage,
+		images.PauseImage,
 		WithResources(&runtime.LinuxContainerResources{
 			MemoryLimitInBytes: 200 * 1024 * 1024,
 		}),

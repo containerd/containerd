@@ -26,6 +26,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/integration/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -108,12 +109,12 @@ func TestContainerdRestart(t *testing.T) {
 			runtimeService.RemovePodSandbox(sid)
 		}()
 
-		EnsureImageExists(t, pauseImage)
+		EnsureImageExists(t, images.PauseImage)
 
 		s.id = sid
 		for j := range s.containers {
 			c := &s.containers[j]
-			cfg := ContainerConfig(c.name, pauseImage,
+			cfg := ContainerConfig(c.name, images.PauseImage,
 				// Set pid namespace as per container, so that container won't die
 				// when sandbox container is killed.
 				WithPidNamespace(runtime.NamespaceMode_CONTAINER),
@@ -170,7 +171,7 @@ func TestContainerdRestart(t *testing.T) {
 	}
 
 	t.Logf("Pull test images")
-	for _, image := range []string{GetImage(BusyBox), GetImage(Pause)} {
+	for _, image := range []string{images.Get(images.BusyBox), images.Get(images.Pause)} {
 		EnsureImageExists(t, image)
 	}
 	imagesBeforeRestart, err := imageService.ListImages(nil)

@@ -20,6 +20,7 @@ import (
 	goruntime "runtime"
 	"testing"
 
+	"github.com/containerd/containerd/integration/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -33,7 +34,7 @@ func TestTruncIndex(t *testing.T) {
 	sbConfig := PodSandboxConfig("sandbox", "truncindex")
 
 	t.Logf("Pull an image")
-	var appImage = GetImage(BusyBox)
+	var appImage = images.Get(images.BusyBox)
 
 	imgID := EnsureImageExists(t, appImage)
 	imgTruncID := genTruncIndex(imgID)

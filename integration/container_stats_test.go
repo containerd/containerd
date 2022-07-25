@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/integration/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -33,12 +34,12 @@ func TestContainerStats(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "stats")
 
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, images.PauseImage)
 
 	t.Logf("Create a container config and run container in a pod")
 	containerConfig := ContainerConfig(
 		"container1",
-		pauseImage,
+		images.PauseImage,
 		WithTestLabels(),
 		WithTestAnnotations(),
 	)
@@ -74,7 +75,7 @@ func TestContainerConsumedStats(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "stats")
 
-	testImage := GetImage(ResourceConsumer)
+	testImage := images.Get(images.ResourceConsumer)
 	EnsureImageExists(t, testImage)
 
 	t.Logf("Create a container config and run container in a pod")
@@ -145,7 +146,7 @@ func TestContainerListStats(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "running-pod", "statsls")
 
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, images.PauseImage)
 
 	t.Logf("Create a container config and run containers in a pod")
 	containerConfigMap := make(map[string]*runtime.ContainerConfig)
@@ -153,7 +154,7 @@ func TestContainerListStats(t *testing.T) {
 		cName := fmt.Sprintf("container%d", i)
 		containerConfig := ContainerConfig(
 			cName,
-			pauseImage,
+			images.PauseImage,
 			WithTestLabels(),
 			WithTestAnnotations(),
 		)
@@ -199,7 +200,7 @@ func TestContainerListStatsWithIdFilter(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "running-pod", "statsls")
 
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, images.PauseImage)
 
 	t.Logf("Create a container config and run containers in a pod")
 	containerConfigMap := make(map[string]*runtime.ContainerConfig)
@@ -207,7 +208,7 @@ func TestContainerListStatsWithIdFilter(t *testing.T) {
 		cName := fmt.Sprintf("container%d", i)
 		containerConfig := ContainerConfig(
 			cName,
-			pauseImage,
+			images.PauseImage,
 			WithTestLabels(),
 			WithTestAnnotations(),
 		)
@@ -258,7 +259,7 @@ func TestContainerListStatsWithSandboxIdFilter(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "running-pod", "statsls")
 
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, images.PauseImage)
 
 	t.Logf("Create a container config and run containers in a pod")
 	containerConfigMap := make(map[string]*runtime.ContainerConfig)
@@ -266,7 +267,7 @@ func TestContainerListStatsWithSandboxIdFilter(t *testing.T) {
 		cName := fmt.Sprintf("container%d", i)
 		containerConfig := ContainerConfig(
 			cName,
-			pauseImage,
+			images.PauseImage,
 			WithTestLabels(),
 			WithTestAnnotations(),
 		)
@@ -318,7 +319,7 @@ func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "running-pod", "statsls")
 
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, images.PauseImage)
 
 	t.Logf("Create container config and run containers in a pod")
 	containerConfigMap := make(map[string]*runtime.ContainerConfig)
@@ -326,7 +327,7 @@ func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 		cName := fmt.Sprintf("container%d", i)
 		containerConfig := ContainerConfig(
 			cName,
-			pauseImage,
+			images.PauseImage,
 			WithTestLabels(),
 			WithTestAnnotations(),
 		)
