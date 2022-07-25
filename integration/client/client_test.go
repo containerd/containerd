@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	imagelist "github.com/containerd/containerd/integration/images"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/log/logtest"
@@ -333,7 +334,7 @@ func TestImagePullAllPlatforms(t *testing.T) {
 	defer cancel()
 
 	cs := client.ContentStore()
-	img, err := client.Fetch(ctx, "k8s.gcr.io/pause:3.7")
+	img, err := client.Fetch(ctx, imagelist.PauseImage)
 	if err != nil {
 		t.Fatal(err)
 	}
