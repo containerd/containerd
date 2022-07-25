@@ -21,7 +21,7 @@ jobs:
     strategy:
       matrix:
         go-version: [1.18.4]
-        os: [ubuntu-18.04, macos-10.15, windows-2019]
+        os: [ubuntu-18.04, macos-12, windows-2019]
 
     steps:
       - uses: actions/setup-go@v2
@@ -214,7 +214,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-18.04, macos-10.15, windows-2019, windows-2022]
+        os: [ubuntu-18.04, macos-12, windows-2019, windows-2022]
         go-version: ['1.17.12', '1.18.4']
     steps:
       - uses: actions/setup-go@v2
@@ -518,7 +518,7 @@ jobs:
 
   tests-mac-os:
     name: MacOS unit tests
-    runs-on: macos-10.15
+    runs-on: macos-12
     timeout-minutes: 10
     needs: [project, linters, protos, man]
     env:
