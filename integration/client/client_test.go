@@ -334,7 +334,7 @@ func TestImagePullAllPlatforms(t *testing.T) {
 	defer cancel()
 
 	cs := client.ContentStore()
-	img, err := client.Fetch(ctx, imagelist.PauseImage)
+	img, err := client.Fetch(ctx, imagelist.Get(imagelist.Pause))
 	if err != nil {
 		t.Fatal(err)
 	}

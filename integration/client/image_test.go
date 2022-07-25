@@ -32,7 +32,7 @@ import (
 )
 
 func TestImageIsUnpacked(t *testing.T) {
-	imageName := imagelist.PauseImage
+	imageName := imagelist.Get(imagelist.Pause)
 	ctx, cancel := testContext(t)
 	defer cancel()
 
@@ -138,7 +138,7 @@ func TestImageUsage(t *testing.T) {
 		t.Skip()
 	}
 
-	imageName := imagelist.PauseImage
+	imageName := imagelist.Get(imagelist.Pause)
 	ctx, cancel := testContext(t)
 	defer cancel()
 

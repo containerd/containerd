@@ -31,12 +31,13 @@ func TestDuplicateName(t *testing.T) {
 	_, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.Error(t, err)
 
-	EnsureImageExists(t, images.PauseImage)
+	pauseImage := images.Get(images.Pause)
+	EnsureImageExists(t, pauseImage)
 
 	t.Logf("Create a container")
 	cnConfig := ContainerConfig(
 		"container",
-		images.PauseImage,
+		pauseImage,
 	)
 	_, err = runtimeService.CreateContainer(sb, cnConfig, sbConfig)
 	require.NoError(t, err)

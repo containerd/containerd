@@ -29,12 +29,13 @@ func TestContainerRestart(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "restart")
 
-	EnsureImageExists(t, images.PauseImage)
+	pauseImage := images.Get(images.Pause)
+	EnsureImageExists(t, pauseImage)
 
 	t.Logf("Create a container config and run container in a pod")
 	containerConfig := ContainerConfig(
 		"container1",
-		images.PauseImage,
+		pauseImage,
 		WithTestLabels(),
 		WithTestAnnotations(),
 	)
@@ -63,12 +64,13 @@ func TestFailedContainerRestart(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "restart")
 
-	EnsureImageExists(t, images.PauseImage)
+	pauseImage := images.Get(images.Pause)
+	EnsureImageExists(t, pauseImage)
 
 	t.Logf("Create a container config in a pod with a command that fails")
 	containerConfig := ContainerConfig(
 		"container1",
-		images.PauseImage,
+		pauseImage,
 		WithCommand("something-that-doesnt-exist"),
 		WithTestLabels(),
 		WithTestAnnotations(),
@@ -89,7 +91,7 @@ func TestFailedContainerRestart(t *testing.T) {
 
 	containerConfig = ContainerConfig(
 		"container1",
-		images.PauseImage,
+		pauseImage,
 		WithTestLabels(),
 		WithTestAnnotations(),
 	)

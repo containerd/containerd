@@ -56,7 +56,7 @@ func TestLeaseResources(t *testing.T) {
 	defer ls.Delete(ctx, l, leases.SynchronousDelete)
 
 	// step 1: download image
-	imageName := imagelist.PauseImage
+	imageName := imagelist.Get(imagelist.Pause)
 
 	image, err := client.Pull(ctx, imageName, WithPullUnpack, WithPullSnapshotter(snapshotterName))
 	if err != nil {

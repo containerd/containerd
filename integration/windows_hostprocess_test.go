@@ -38,7 +38,7 @@ var (
 
 // Tests to verify the Windows HostProcess
 func TestWindowsHostProcess(t *testing.T) {
-	pauseImage := images.PauseImage
+	pauseImage := images.Get(images.Pause)
 	EnsureImageExists(t, pauseImage)
 
 	t.Run("run as Local Service", func(t *testing.T) {

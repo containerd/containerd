@@ -152,7 +152,8 @@ func TestUpdateContainerResources_MemorySwap(t *testing.T) {
 	t.Log("Create a sandbox")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "update-container-swap-resources")
 
-	EnsureImageExists(t, images.PauseImage)
+	pauseImage := images.Get(images.Pause)
+	EnsureImageExists(t, pauseImage)
 
 	memoryLimit := int64(128 * 1024 * 1024)
 	baseSwapLimit := int64(200 * 1024 * 1024)
@@ -169,7 +170,7 @@ func TestUpdateContainerResources_MemorySwap(t *testing.T) {
 	t.Log("Create a container with memory limit but no swap")
 	cnConfig := ContainerConfig(
 		"container",
-		images.PauseImage,
+		pauseImage,
 		WithResources(&runtime.LinuxContainerResources{
 			MemoryLimitInBytes:     memoryLimit,
 			MemorySwapLimitInBytes: baseSwapLimit,
@@ -224,12 +225,13 @@ func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
 	t.Log("Create a sandbox")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "update-container-resources")
 
-	EnsureImageExists(t, images.PauseImage)
+	pauseImage := images.Get(images.Pause)
+	EnsureImageExists(t, pauseImage)
 
 	t.Log("Create a container with memory limit")
 	cnConfig := ContainerConfig(
 		"container",
-		images.PauseImage,
+		pauseImage,
 		WithResources(&runtime.LinuxContainerResources{
 			MemoryLimitInBytes: 200 * 1024 * 1024,
 		}),

@@ -109,12 +109,13 @@ func TestContainerdRestart(t *testing.T) {
 			runtimeService.RemovePodSandbox(sid)
 		}()
 
-		EnsureImageExists(t, images.PauseImage)
+		pauseImage := images.Get(images.Pause)
+		EnsureImageExists(t, pauseImage)
 
 		s.id = sid
 		for j := range s.containers {
 			c := &s.containers[j]
-			cfg := ContainerConfig(c.name, images.PauseImage,
+			cfg := ContainerConfig(c.name, pauseImage,
 				// Set pid namespace as per container, so that container won't die
 				// when sandbox container is killed.
 				WithPidNamespace(runtime.NamespaceMode_CONTAINER),

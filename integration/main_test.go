@@ -32,6 +32,7 @@ import (
 
 	"github.com/containerd/containerd"
 	cri "github.com/containerd/containerd/integration/cri-api/pkg/apis"
+	_ "github.com/containerd/containerd/integration/images" // Keep this around to parse `imageListFile` command line var
 	"github.com/containerd/containerd/integration/remote"
 	dialer "github.com/containerd/containerd/integration/remote/util"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"

@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/pelletier/go-toml"
 	"github.com/sirupsen/logrus"
@@ -38,14 +39,11 @@ type ImageList struct {
 }
 
 var (
-	imageMap   map[int]string
-	imageList  ImageList
-	PauseImage string // This is the same with default sandbox image
+	imageMap  map[int]string
+	imageList ImageList
 )
 
-func init() {
-	initImages(*imageListFile)
-}
+var initOnce sync.Once
 
 func initImages(imageListFile string) {
 	imageList = ImageList{
@@ -58,6 +56,8 @@ func initImages(imageListFile string) {
 	}
 
 	if imageListFile != "" {
+		logrus.Infof("loading image list from file: %s", imageListFile)
+
 		fileContent, err := os.ReadFile(imageListFile)
 		if err != nil {
 			panic(fmt.Errorf("error reading '%v' file contents: %v", imageList, err))
@@ -70,9 +70,7 @@ func initImages(imageListFile string) {
 	}
 
 	logrus.Infof("Using the following image list: %+v", imageList)
-
 	imageMap = initImageMap(imageList)
-	PauseImage = Get(Pause)
 }
 
 const (
@@ -105,5 +103,9 @@ func initImageMap(imageList ImageList) map[int]string {
 
 // Get returns the fully qualified URI to an image (including version)
 func Get(image int) string {
+	initOnce.Do(func() {
+		initImages(*imageListFile)
+	})
+
 	return imageMap[image]
 }
