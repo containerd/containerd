@@ -24,6 +24,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/containerd/containerd/integration/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,6 +38,7 @@ var (
 
 // Tests to verify the Windows HostProcess
 func TestWindowsHostProcess(t *testing.T) {
+	pauseImage := images.PauseImage
 	EnsureImageExists(t, pauseImage)
 
 	t.Run("run as Local Service", func(t *testing.T) {
