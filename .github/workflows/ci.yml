@@ -499,7 +499,7 @@ jobs:
         # We can enable crun again when we get a better CI infra.
         runc: [runc]
         # Fedora is for testing cgroup v2 functionality, Rocky Linux is for testing on an enterprise-grade environment
-        box: ["fedora/35-cloud-base", "rockylinux/8"]
+        box: ["fedora/36-cloud-base", "rockylinux/8"]
     env:
       GOTEST: gotestsum --
     steps:
