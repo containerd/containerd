@@ -19,6 +19,7 @@ package integration
 import (
 	"testing"
 
+	"github.com/containerd/containerd/integration/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,6 +29,7 @@ func TestContainerRestart(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "restart")
 
+	pauseImage := images.Get(images.Pause)
 	EnsureImageExists(t, pauseImage)
 
 	t.Logf("Create a container config and run container in a pod")
@@ -62,6 +64,7 @@ func TestFailedContainerRestart(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "restart")
 
+	pauseImage := images.Get(images.Pause)
 	EnsureImageExists(t, pauseImage)
 
 	t.Logf("Create a container config in a pod with a command that fails")

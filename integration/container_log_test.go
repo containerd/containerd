@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/integration/images"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -38,7 +40,7 @@ func TestContainerLogWithoutTailingNewLine(t *testing.T) {
 	)
 
 	var (
-		testImage     = GetImage(BusyBox)
+		testImage     = images.Get(images.BusyBox)
 		containerName = "test-container"
 	)
 
@@ -86,7 +88,7 @@ func TestLongContainerLog(t *testing.T) {
 	)
 
 	var (
-		testImage     = GetImage(BusyBox)
+		testImage     = images.Get(images.BusyBox)
 		containerName = "test-container"
 	)
 

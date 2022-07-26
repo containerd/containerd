@@ -14,19 +14,19 @@
    limitations under the License.
 */
 
-package integration
+package images
 
 import (
+	"flag"
 	"fmt"
 	"os"
-	"testing"
+	"sync"
 
-	cri "github.com/containerd/containerd/integration/cri-api/pkg/apis"
 	"github.com/pelletier/go-toml"
 	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/require"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
+
+var imageListFile = flag.String("image-list", "", "The TOML file containing the non-default images to be used in tests.")
 
 // ImageList holds public image references
 type ImageList struct {
@@ -39,11 +39,11 @@ type ImageList struct {
 }
 
 var (
-	imageService cri.ImageManagerService
-	imageMap     map[int]string
-	imageList    ImageList
-	pauseImage   string // This is the same with default sandbox image
+	imageMap  map[int]string
+	imageList ImageList
 )
+
+var initOnce sync.Once
 
 func initImages(imageListFile string) {
 	imageList = ImageList{
@@ -56,6 +56,8 @@ func initImages(imageListFile string) {
 	}
 
 	if imageListFile != "" {
+		logrus.Infof("loading image list from file: %s", imageListFile)
+
 		fileContent, err := os.ReadFile(imageListFile)
 		if err != nil {
 			panic(fmt.Errorf("error reading '%v' file contents: %v", imageList, err))
@@ -68,9 +70,7 @@ func initImages(imageListFile string) {
 	}
 
 	logrus.Infof("Using the following image list: %+v", imageList)
-
 	imageMap = initImageMap(imageList)
-	pauseImage = GetImage(Pause)
 }
 
 const (
@@ -101,24 +101,11 @@ func initImageMap(imageList ImageList) map[int]string {
 	return images
 }
 
-// GetImage returns the fully qualified URI to an image (including version)
-func GetImage(image int) string {
+// Get returns the fully qualified URI to an image (including version)
+func Get(image int) string {
+	initOnce.Do(func() {
+		initImages(*imageListFile)
+	})
+
 	return imageMap[image]
-}
-
-// EnsureImageExists pulls the given image, ensures that no error was encountered
-// while pulling it.
-func EnsureImageExists(t *testing.T, imageName string) string {
-	img, err := imageService.ImageStatus(&runtime.ImageSpec{Image: imageName})
-	require.NoError(t, err)
-	if img != nil {
-		t.Logf("Image %q already exists, not pulling.", imageName)
-		return img.Id
-	}
-
-	t.Logf("Pull test image %q", imageName)
-	imgID, err := imageService.PullImage(&runtime.ImageSpec{Image: imageName}, nil, nil)
-	require.NoError(t, err)
-
-	return imgID
 }

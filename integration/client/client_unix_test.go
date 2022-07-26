@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	. "github.com/containerd/containerd"
+	"github.com/containerd/containerd/integration/images"
 	"github.com/containerd/containerd/platforms"
 )
 
@@ -33,8 +34,8 @@ const (
 )
 
 var (
-	testImage             = "ghcr.io/containerd/busybox:1.32"
-	testMultiLayeredImage = "ghcr.io/containerd/volume-copy-up:2.1"
+	testImage             = images.Get(images.BusyBox)
+	testMultiLayeredImage = images.Get(images.VolumeCopyUp)
 	shortCommand          = withProcessArgs("true")
 	longCommand           = withProcessArgs("/bin/sh", "-c", "while true; do sleep 1; done")
 )

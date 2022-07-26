@@ -32,6 +32,7 @@ import (
 
 	"github.com/containerd/containerd"
 	cri "github.com/containerd/containerd/integration/cri-api/pkg/apis"
+	_ "github.com/containerd/containerd/integration/images" // Keep this around to parse `imageListFile` command line var
 	"github.com/containerd/containerd/integration/remote"
 	dialer "github.com/containerd/containerd/integration/remote/util"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
@@ -54,6 +55,7 @@ const (
 
 var (
 	runtimeService     cri.RuntimeService
+	imageService       cri.ImageManagerService
 	containerdClient   *containerd.Client
 	containerdEndpoint string
 )
@@ -62,11 +64,9 @@ var criEndpoint = flag.String("cri-endpoint", "unix:///run/containerd/containerd
 var criRoot = flag.String("cri-root", "/var/lib/containerd/io.containerd.grpc.v1.cri", "The root directory of cri plugin.")
 var runtimeHandler = flag.String("runtime-handler", "", "The runtime handler to use in the test.")
 var containerdBin = flag.String("containerd-bin", "containerd", "The containerd binary name. The name is used to restart containerd during test.")
-var imageListFile = flag.String("image-list", "", "The TOML file containing the non-default images to be used in tests.")
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	initImages(*imageListFile)
 	if err := ConnectDaemons(); err != nil {
 		logrus.WithError(err).Fatalf("Failed to connect daemons")
 	}
@@ -505,4 +505,21 @@ func RestartContainerd(t *testing.T) {
 	require.NoError(t, Eventually(func() (bool, error) {
 		return ConnectDaemons() == nil, nil
 	}, time.Second, 30*time.Second), "wait for containerd to be restarted")
+}
+
+// EnsureImageExists pulls the given image, ensures that no error was encountered
+// while pulling it.
+func EnsureImageExists(t *testing.T, imageName string) string {
+	img, err := imageService.ImageStatus(&runtime.ImageSpec{Image: imageName})
+	require.NoError(t, err)
+	if img != nil {
+		t.Logf("Image %q already exists, not pulling.", imageName)
+		return img.Id
+	}
+
+	t.Logf("Pull test image %q", imageName)
+	imgID, err := imageService.PullImage(&runtime.ImageSpec{Image: imageName}, nil, nil)
+	require.NoError(t, err)
+
+	return imgID
 }
