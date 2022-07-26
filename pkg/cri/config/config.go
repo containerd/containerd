@@ -84,10 +84,6 @@ type ContainerdConfig struct {
 	Snapshotter string `toml:"snapshotter" json:"snapshotter"`
 	// DefaultRuntimeName is the default runtime name to use from the runtimes table.
 	DefaultRuntimeName string `toml:"default_runtime_name" json:"defaultRuntimeName"`
-	// DefaultRuntime is the default runtime to use in containerd.
-	// This runtime is used when no runtime handler (or the empty string) is provided.
-	// DEPRECATED: use DefaultRuntimeName instead. Remove in containerd 1.4.
-	DefaultRuntime Runtime `toml:"default_runtime" json:"defaultRuntime"`
 	// UntrustedWorkloadRuntime is a runtime to run untrusted workloads on it.
 	// DEPRECATED: use `untrusted` runtime in Runtimes instead. Remove in containerd 1.4.
 	UntrustedWorkloadRuntime Runtime `toml:"untrusted_workload_runtime" json:"untrustedWorkloadRuntime"`
@@ -379,13 +375,6 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 			return fmt.Errorf("conflicting definitions: configuration includes both `untrusted_workload_runtime` and `runtimes[%q]`", RuntimeUntrusted)
 		}
 		c.ContainerdConfig.Runtimes[RuntimeUntrusted] = c.ContainerdConfig.UntrustedWorkloadRuntime
-	}
-
-	// Validation for deprecated default_runtime field.
-	if c.ContainerdConfig.DefaultRuntime.Type != "" {
-		log.G(ctx).Warning("`default_runtime` is deprecated, please use `default_runtime_name` to reference the default configuration you have defined in `runtimes`")
-		c.ContainerdConfig.DefaultRuntimeName = RuntimeDefault
-		c.ContainerdConfig.Runtimes[RuntimeDefault] = c.ContainerdConfig.DefaultRuntime
 	}
 
 	// Validation for default_runtime_name

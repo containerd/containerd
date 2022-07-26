@@ -81,28 +81,6 @@ func TestValidateConfig(t *testing.T) {
 			},
 			expectedErr: fmt.Sprintf("conflicting definitions: configuration includes both `untrusted_workload_runtime` and `runtimes[%q]`", RuntimeUntrusted),
 		},
-		"deprecated default_runtime": {
-			config: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntime: Runtime{
-						Type: "default",
-					},
-				},
-			},
-			expected: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntime: Runtime{
-						Type: "default",
-					},
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Type: "default",
-						},
-					},
-				},
-			},
-		},
 		"no default_runtime_name": {
 			config:      &PluginConfig{},
 			expectedErr: "`default_runtime_name` is empty",
