@@ -17,7 +17,7 @@
 
 # Vagrantfile for Fedora and EL
 Vagrant.configure("2") do |config|
-  config.vm.box = ENV["BOX"] || "fedora/35-cloud-base"
+  config.vm.box = ENV["BOX"] || "fedora/36-cloud-base"
   config.vm.box_version = ENV["BOX_VERSION"]
   memory = 4096
   cpus = 2
