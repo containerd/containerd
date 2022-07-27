@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20210715213245-6c3934b029d8
 	github.com/Microsoft/go-winio v0.5.1
-	github.com/Microsoft/hcsshim v0.9.3
+	github.com/Microsoft/hcsshim v0.9.4
 	github.com/containerd/aufs v1.0.0
 	github.com/containerd/btrfs v1.0.0
 	github.com/containerd/cgroups v1.0.3
