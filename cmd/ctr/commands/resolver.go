@@ -159,7 +159,7 @@ type DebugTransport struct {
 
 // RoundTrip dumps request/responses and executes the request using the underlying transport.
 func (t DebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	in, err := httputil.DumpRequest(req, true)
+	in, err := httputil.DumpRequestOut(req, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dump request: %w", err)
 	}
