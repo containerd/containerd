@@ -47,7 +47,7 @@ import (
 
 var (
 	defaultImagePullProgressTimeout = 5 * time.Second
-	pullProgressTestImageName       = "ghcr.io/containerd/registry:2.7"
+	pullProgressTestImageName       = "ghcr.io/containerd/volume-ownership:2.1"
 )
 
 func TestCRIImagePullTimeout(t *testing.T) {
@@ -82,43 +82,72 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T) {
 	ctx := namespaces.WithNamespace(context.Background(), k8sNamespace)
 	contentStore := cli.ContentStore()
 
-	// imageIndexJSON is the manifest of ghcr.io/containerd/registry:2.7.
+	// imageIndexJSON is the manifest of ghcr.io/containerd/volume-ownership:2.1.
 	var imageIndexJSON = `
-{
-  "manifests": [
-    {
-      "digest": "sha256:b0b8dd398630cbb819d9a9c2fbd50561370856874b5d5d935be2e0af07c0ff4c",
-      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-      "platform": {
-        "architecture": "amd64",
-        "os": "linux"
-      },
-      "size": 1363
-    },
-    {
-      "digest": "sha256:6de6b4d5063876c92220d0438ae6068c778d9a2d3845b3d5c57a04a307998df6",
-      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-      "platform": {
-        "architecture": "arm",
-        "os": "linux",
-        "variant": "v6"
-      },
-      "size": 1363
-    },
-    {
-      "digest": "sha256:c11a277a91045f91866550314a988f937366bc2743859aa0f6ec8ef57b0458ce",
-      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-      "platform": {
-        "architecture": "arm64",
-        "os": "linux",
-        "variant": "v8"
-      },
-      "size": 1363
-    }
-  ],
-  "mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",
-  "schemaVersion": 2
-}`
+	{
+		"schemaVersion": 2,
+		"mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",
+		"manifests": [
+			{
+				"mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+				"size": 736,
+				"digest": "sha256:0d92c9993db0a3a2c38e5ffe31b150ea114922fca5dacbbe5ffbe75f64d6d674",
+				"platform": {
+					"architecture": "amd64",
+					"os": "linux"
+				}
+			},
+			{
+				"mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+				"size": 736,
+				"digest": "sha256:b9abb629fc01b6ce674b7bc4898dbb4d4a3f0766f4ccb13101e95fa44f9d9fad",
+				"platform": {
+					"architecture": "arm64",
+					"os": "linux"
+				}
+			},
+			{
+				"mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+				"size": 736,
+				"digest": "sha256:ad3b2f13d23c6eb36310a2e5e9efede9fe815b3f13216049a41772168b6c6c31",
+				"platform": {
+					"architecture": "ppc64le",
+					"os": "linux"
+				}
+			},
+			{
+				"mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+				"size": 2796,
+				"digest": "sha256:0b329ba6f677012bbb17d381159661fb25accae42baf870c1e0dae9c40591c6c",
+				"platform": {
+					"architecture": "amd64",
+					"os": "windows",
+					"os.version": "10.0.17763.2452"
+				}
+			},
+			{
+				"mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+				"size": 2796,
+				"digest": "sha256:a246e419ad39e242deef88ceed67c400b2a3a217c5148a4a7054c5e5ac13d2af",
+				"platform": {
+					"architecture": "amd64",
+					"os": "windows",
+					"os.version": "10.0.19042.1466"
+				}
+			},
+			{
+				"mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+				"size": 2797,
+				"digest": "sha256:7030c34dabb80a73f86a0fcccfa6c0b423bfea77f60f813749497df2d46b5eff",
+				"platform": {
+					"architecture": "amd64",
+					"os": "windows",
+					"os.version": "10.0.20348.469"
+				}
+			}
+		]
+	}
+	`
 	var index ocispec.Index
 	assert.NoError(t, json.Unmarshal([]byte(imageIndexJSON), &index))
 
@@ -176,7 +205,7 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T) {
 // CRI plugin, it will see there is no data transported. And then cancel the
 // pulling request when timeout.
 //
-// This case uses ghcr.io/containerd/registry:2.7 which has one layer > 3MB.
+// This case uses ghcr.io/containerd/volume-ownership:2.1 which has one layer > 3MB.
 // The circuit breaker will enable after transferred 3MB in one connection.
 func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T) {
 	t.Parallel()
@@ -244,7 +273,7 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T) {
 
 		_, err = criService.PullImage(dctx, &runtimeapi.PullImageRequest{
 			Image: &runtimeapi.ImageSpec{
-				Image: fmt.Sprintf("%s/%s", mirrorURL.Host, "containerd/registry:2.7"),
+				Image: fmt.Sprintf("%s/%s", mirrorURL.Host, "containerd/volume-ownership:2.1"),
 			},
 		})
 
