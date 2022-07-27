@@ -174,7 +174,8 @@ func PodSandboxConfig(name, ns string, opts ...PodSandboxOpts) *runtime.PodSandb
 			Uid:       util.GenerateID(),
 			Namespace: Randomize(ns),
 		},
-		Linux: &runtime.LinuxPodSandboxConfig{},
+		Linux:       &runtime.LinuxPodSandboxConfig{},
+		Annotations: make(map[string]string),
 	}
 	for _, opt := range opts {
 		opt(config)

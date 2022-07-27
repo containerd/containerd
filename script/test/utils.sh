@@ -35,9 +35,10 @@ CONTAINERD_RUNTIME=${CONTAINERD_RUNTIME:-""}
 if [ -z "${CONTAINERD_CONFIG_FILE}" ]; then
   config_file="${CONTAINERD_CONFIG_DIR}/containerd-config-cri.toml"
   truncate --size 0 "${config_file}"
+  echo "version=2" >> ${config_file}
+
   if command -v sestatus >/dev/null 2>&1; then
     cat >>${config_file} <<EOF
-version=2
 [plugins."io.containerd.grpc.v1.cri"]
   enable_selinux = true
 EOF
@@ -49,6 +50,59 @@ runtime_type = "${CONTAINERD_RUNTIME}"
 EOF
   fi
   CONTAINERD_CONFIG_FILE="${config_file}"
+fi
+
+if [ $IS_WINDOWS -eq 0 ]; then
+  FAILPOINT_CONTAINERD_RUNTIME="runc-fp.v1"
+  FAILPOINT_CNI_CONF_DIR=${FAILPOINT_CNI_CONF_DIR:-"/tmp/failpoint-cni-net.d"}
+  mkdir -p "${FAILPOINT_CNI_CONF_DIR}"
+
+  # Add runtime with failpoint
+  cat << EOF | tee -a "${CONTAINERD_CONFIG_FILE}"
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc-fp]
+  cni_conf_dir = "${FAILPOINT_CNI_CONF_DIR}"
+  cni_max_conf_num = 1
+  pod_annotations = ["io.containerd.runtime.v2.shim.failpoint.*"]
+  runtime_type = "${FAILPOINT_CONTAINERD_RUNTIME}"
+EOF
+
+  cat << EOF | tee "${FAILPOINT_CNI_CONF_DIR}/10-containerd-net.conflist"
+{
+  "cniVersion": "1.0.0",
+  "name": "containerd-net-failpoint",
+  "plugins": [
+    {
+      "type": "cni-bridge-fp",
+      "bridge": "cni-fp",
+      "isGateway": true,
+      "ipMasq": true,
+      "promiscMode": true,
+      "ipam": {
+        "type": "host-local",
+        "ranges": [
+          [{
+            "subnet": "10.88.0.0/16"
+          }],
+          [{
+            "subnet": "2001:4860:4860::/64"
+          }]
+        ],
+        "routes": [
+          { "dst": "0.0.0.0/0" },
+          { "dst": "::/0" }
+        ]
+      },
+      "capabilities": {
+        "io.kubernetes.cri.pod-annotations": true
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {"portMappings": true}
+    }
+  ]
+}
+EOF
 fi
 
 # CONTAINERD_TEST_SUFFIX is the suffix appended to the root/state directory used
@@ -183,6 +237,8 @@ test_setup() {
   fi
   readiness_check run_ctr
   readiness_check run_crictl
+  # Show the config about cri plugin in log when it's ready
+  run_crictl
 }
 
 # test_teardown kills containerd.

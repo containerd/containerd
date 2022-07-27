@@ -425,6 +425,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y criu
 
+      - name: Install failpoint binaries
+        run: |
+          script/setup/install-failpoint-binaries
+
       - name: Install containerd
         env:
           CGO_ENABLED: 1

@@ -108,6 +108,12 @@ type ttrpcService interface {
 	RegisterTTRPC(*ttrpc.Server) error
 }
 
+type ttrpcServerOptioner interface {
+	ttrpcService
+
+	UnaryInterceptor() ttrpc.UnaryServerInterceptor
+}
+
 type taskService struct {
 	shimapi.TaskService
 }
@@ -370,6 +376,8 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 	var (
 		initialized   = plugin.NewPluginSet()
 		ttrpcServices = []ttrpcService{}
+
+		ttrpcUnaryInterceptors = []ttrpc.UnaryServerInterceptor{}
 	)
 	plugins := plugin.Graph(func(*plugin.Registration) bool { return false })
 	for _, p := range plugins {
@@ -409,19 +417,28 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 		if err != nil {
 			if plugin.IsSkipPlugin(err) {
 				log.G(ctx).WithError(err).WithField("type", p.Type).Infof("skip loading plugin %q...", id)
-			} else {
-				log.G(ctx).WithError(err).Warnf("failed to load plugin %s", id)
+				continue
 			}
-			continue
+			return fmt.Errorf("failed to load plugin %s: %w", id, err)
 		}
 
 		if src, ok := instance.(ttrpcService); ok {
 			logrus.WithField("id", id).Debug("registering ttrpc service")
 			ttrpcServices = append(ttrpcServices, src)
+
+		}
+
+		if src, ok := instance.(ttrpcServerOptioner); ok {
+			ttrpcUnaryInterceptors = append(ttrpcUnaryInterceptors, src.UnaryInterceptor())
 		}
 	}
 
-	server, err := newServer()
+	if len(ttrpcServices) == 0 {
+		return fmt.Errorf("required that ttrpc service")
+	}
+
+	unaryInterceptor := chainUnaryServerInterceptors(ttrpcUnaryInterceptors...)
+	server, err := newServer(ttrpc.WithUnaryServerInterceptor(unaryInterceptor))
 	if err != nil {
 		return fmt.Errorf("failed creating server: %w", err)
 	}

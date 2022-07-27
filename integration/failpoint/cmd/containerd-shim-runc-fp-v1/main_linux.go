@@ -14,14 +14,16 @@
    limitations under the License.
 */
 
-package shim
+package main
 
-import "github.com/containerd/ttrpc"
+import (
+	"context"
 
-func newServer(opts ...ttrpc.ServerOpt) (*ttrpc.Server, error) {
-	return ttrpc.NewServer(opts...)
-}
+	"github.com/containerd/containerd/runtime/v2/runc/manager"
+	_ "github.com/containerd/containerd/runtime/v2/runc/pause"
+	"github.com/containerd/containerd/runtime/v2/shim"
+)
 
-func subreaper() error {
-	return nil
+func main() {
+	shim.RunManager(context.Background(), manager.NewShimManager("io.containerd.runc-fp.v1"))
 }
