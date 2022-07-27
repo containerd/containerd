@@ -23,16 +23,22 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
+type hpcAction func(*testing.T, string, *v1.ContainerConfig)
+
 var (
-	defaultCommand       = WithCommand("Powershell", "/c", "$env:CONTAINER_SANDBOX_MOUNT_POINT/pause.exe")
-	localServiceUsername = WithWindowsUsername("NT AUTHORITY\\Local service")
-	localSystemUsername  = WithWindowsUsername("NT AUTHORITY\\System")
-	hpcContainerOpt      = WithWindowsHostProcessContainer()
+	defaultCommand                 = WithCommand("Powershell", "/c", "$env:CONTAINER_SANDBOX_MOUNT_POINT/pause.exe")
+	localServiceUsername           = WithWindowsUsername("NT AUTHORITY\\Local service")
+	localSystemUsername            = WithWindowsUsername("NT AUTHORITY\\System")
+	hpcContainerOpt                = WithWindowsHostProcessContainer()
+	defaultAction        hpcAction = func(t *testing.T, containerID string, containerConfig *v1.ContainerConfig) {}
 )
 
 // Tests to verify the Windows HostProcess
@@ -40,32 +46,55 @@ func TestWindowsHostProcess(t *testing.T) {
 	EnsureImageExists(t, pauseImage)
 
 	t.Run("run as Local Service", func(t *testing.T) {
-		runHostProcess(t, false, pauseImage, hpcContainerOpt, localServiceUsername, defaultCommand)
+		runHostProcess(t, false, pauseImage, defaultAction, hpcContainerOpt, localServiceUsername, defaultCommand)
 	})
 	t.Run("run as Local System", func(t *testing.T) {
-		runHostProcess(t, false, pauseImage, hpcContainerOpt, localSystemUsername, defaultCommand)
+		runHostProcess(t, false, pauseImage, defaultAction, hpcContainerOpt, localSystemUsername, defaultCommand)
 	})
 	t.Run("run as unacceptable user", func(t *testing.T) {
-		runHostProcess(t, true, pauseImage, hpcContainerOpt, WithWindowsUsername("Guest"), defaultCommand)
+		runHostProcess(t, true, pauseImage, defaultAction, hpcContainerOpt, WithWindowsUsername("Guest"), defaultCommand)
 	})
 	t.Run("run command on host", func(t *testing.T) {
 		cmd := WithCommand("Powershell", "/c", "Get-Command containerd.exe")
-		runHostProcess(t, false, pauseImage, hpcContainerOpt, localServiceUsername, cmd)
+		runHostProcess(t, false, pauseImage, defaultAction, hpcContainerOpt, localServiceUsername, cmd)
 	})
 	t.Run("run withHostNetwork", func(t *testing.T) {
 		hostname, err := os.Hostname()
 		require.NoError(t, err)
 		cmd := WithCommand("Powershell", "/c", fmt.Sprintf("if ($env:COMPUTERNAME -ne %s) { exit -1 }", hostname))
-		runHostProcess(t, false, pauseImage, hpcContainerOpt, localServiceUsername, cmd)
+		runHostProcess(t, false, pauseImage, defaultAction, hpcContainerOpt, localServiceUsername, cmd)
 	})
 	t.Run("run with a different os.version image", func(t *testing.T) {
 		image := "docker.io/e2eteam/busybox:1.29-windows-amd64-1909"
 		EnsureImageExists(t, image)
-		runHostProcess(t, false, image, hpcContainerOpt, localServiceUsername, defaultCommand)
+		runHostProcess(t, false, image, defaultAction, hpcContainerOpt, localServiceUsername, defaultCommand)
+	})
+	t.Run("run and check stats", func(t *testing.T) {
+		var stats = func(t *testing.T, containerID string, containerConfig *v1.ContainerConfig) {
+			t.Logf("Fetch stats for container")
+			var (
+				s   *runtime.ContainerStats
+				err error
+			)
+			require.NoError(t, Eventually(func() (bool, error) {
+				s, err = runtimeService.ContainerStats(containerID)
+				if err != nil {
+					return false, err
+				}
+				if s.GetWritableLayer().GetUsedBytes().GetValue() != 0 {
+					return true, nil
+				}
+				return false, nil
+			}, time.Second, 30*time.Second))
+
+			t.Logf("Verify stats received for container %q", containerConfig)
+			testStats(t, s, containerConfig)
+		}
+		runHostProcess(t, false, pauseImage, stats, hpcContainerOpt, localServiceUsername, defaultCommand, WithTestAnnotations(), WithTestLabels())
 	})
 }
 
-func runHostProcess(t *testing.T, expectErr bool, image string, opts ...ContainerOpts) {
+func runHostProcess(t *testing.T, expectErr bool, image string, action hpcAction, opts ...ContainerOpts) {
 	t.Logf("Create a pod config and run sandbox container")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "hostprocess", WithWindowsHostProcessPod)
 
@@ -90,4 +119,6 @@ func runHostProcess(t *testing.T, expectErr bool, image string, opts ...Containe
 	defer func() {
 		assert.NoError(t, runtimeService.StopContainer(cn, 10))
 	}()
+
+	action(t, cn, containerConfig)
 }
