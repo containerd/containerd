@@ -30,7 +30,7 @@ type Controller interface {
 	// containerd will run new shim runtime instance and will invoke Start to create a sandbox process.
 	// This routine must be invoked before scheduling containers on this instance.
 	// Once started clients may run containers via Task service (additionally specifying sandbox id the container will belong to).
-	Start(ctx context.Context, sandboxID string) (uint32, error)
+	Start(ctx context.Context, sandboxID string) (*sandbox.ControllerStartResponse, error)
 	// Shutdown deletes and cleans all tasks and sandbox instance.
 	Shutdown(ctx context.Context, sandboxID string) error
 	// Wait blocks until sandbox process exits.

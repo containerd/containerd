@@ -82,12 +82,12 @@ func (s *sandboxClient) Labels(ctx context.Context) (map[string]string, error) {
 }
 
 func (s *sandboxClient) Start(ctx context.Context) error {
-	pid, err := s.client.SandboxController().Start(ctx, s.ID())
+	resp, err := s.client.SandboxController().Start(ctx, s.ID())
 	if err != nil {
 		return err
 	}
 
-	s.pid = &pid
+	s.pid = &resp.Pid
 	return nil
 }
 

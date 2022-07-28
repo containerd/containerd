@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/containerd/protobuf"
 	sb "github.com/containerd/containerd/sandbox"
 	"github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
@@ -167,18 +168,23 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	runtimeStart := time.Now()
 
-	pid, err := c.sandboxController.Start(ctx, id)
+	resp, err := c.sandboxController.Start(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start sandbox %q: %w", id, err)
 	}
 
-	createdAt := time.Now() // TODO: return created at from Start.
+	labels := resp.GetLabels()
+	if labels == nil {
+		labels = map[string]string{}
+	}
+
+	sandbox.ProcessLabel = labels["selinux_label"]
 
 	if err := sandbox.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
 		// Set the pod sandbox as ready after successfully start sandbox container.
-		status.Pid = pid
+		status.Pid = resp.Pid
 		status.State = sandboxstore.StateReady
-		status.CreatedAt = createdAt
+		status.CreatedAt = protobuf.FromTimestamp(resp.CreatedAt)
 		return status, nil
 	}); err != nil {
 		return nil, fmt.Errorf("failed to update sandbox status: %w", err)
@@ -189,7 +195,6 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	if err != nil {
 		return nil, fmt.Errorf("failed to load container %q for sandbox: %w", id, err)
 	}
-
 	// Add sandbox into sandbox store in INIT state.
 	sandbox.Container = container
 
@@ -197,12 +202,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, fmt.Errorf("failed to add sandbox %+v into store: %w", sandbox, err)
 	}
 
-	// TODO: Remove this, this is needed only to update the timer below.
-	ociRuntime, err := c.getSandboxRuntime(config, sandboxInfo.Runtime.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
-	}
-	sandboxRuntimeCreateTimer.WithValues(ociRuntime.Type).UpdateSince(runtimeStart)
+	sandboxRuntimeCreateTimer.WithValues(labels["oci_runtime_type"]).UpdateSince(runtimeStart)
 
 	return &runtime.RunPodSandboxResponse{PodSandboxId: id}, nil
 }

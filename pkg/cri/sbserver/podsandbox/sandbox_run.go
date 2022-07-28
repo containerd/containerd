@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd"
+	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
@@ -30,6 +31,7 @@ import (
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/nri"
 	v1 "github.com/containerd/nri/types/v1"
@@ -44,35 +46,40 @@ func init() {
 		"github.com/containerd/cri/pkg/store/sandbox", "Metadata")
 }
 
-func (c *Controller) Start(ctx context.Context, id string) (_ uint32, retErr error) {
+func (c *Controller) Start(ctx context.Context, id string) (_ *api.ControllerStartResponse, retErr error) {
 	sandboxInfo, err := c.client.SandboxStore().Get(ctx, id)
 	if err != nil {
-		return 0, fmt.Errorf("unable to find sandbox with id %q: %w", id, err)
+		return nil, fmt.Errorf("unable to find sandbox with id %q: %w", id, err)
 	}
 
 	var metadata sandboxstore.Metadata
 	if err := sandboxInfo.GetExtension("metadata", &metadata); err != nil {
-		return 0, fmt.Errorf("failed to get sandbox %q metadata: %w", id, err)
+		return nil, fmt.Errorf("failed to get sandbox %q metadata: %w", id, err)
 	}
 
-	var config = metadata.Config
+	var (
+		config = metadata.Config
+		labels = map[string]string{}
+	)
 
 	// Ensure sandbox container image snapshot.
 	image, err := c.cri.EnsureImageExists(ctx, c.config.SandboxImage, config)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get sandbox image %q: %w", c.config.SandboxImage, err)
+		return nil, fmt.Errorf("failed to get sandbox image %q: %w", c.config.SandboxImage, err)
 	}
 
 	containerdImage, err := c.toContainerdImage(ctx, *image)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
+		return nil, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
 	}
 
 	ociRuntime, err := c.getSandboxRuntime(config, sandboxInfo.Runtime.Name)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get sandbox runtime: %w", err)
+		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
 	log.G(ctx).WithField("podsandboxid", id).Debugf("use OCI runtime %+v", ociRuntime)
+
+	labels["oci_runtime_type"] = ociRuntime.Type
 
 	// Create sandbox container.
 	// NOTE: sandboxContainerSpec SHOULD NOT have side
@@ -80,7 +87,7 @@ func (c *Controller) Start(ctx context.Context, id string) (_ uint32, retErr err
 	// it safely.
 	spec, err := c.sandboxContainerSpec(id, config, &image.ImageSpec.Config, metadata.NetNSPath, ociRuntime.PodAnnotations)
 	if err != nil {
-		return 0, fmt.Errorf("failed to generate sandbox container spec: %w", err)
+		return nil, fmt.Errorf("failed to generate sandbox container spec: %w", err)
 	}
 	log.G(ctx).WithField("podsandboxid", id).Debugf("sandbox container spec: %#+v", spew.NewFormatter(spec))
 
@@ -90,10 +97,11 @@ func (c *Controller) Start(ctx context.Context, id string) (_ uint32, retErr err
 			selinux.ReleaseLabel(metadata.ProcessLabel)
 		}
 	}()
+	labels["selinux_label"] = metadata.ProcessLabel
 
 	// handle any KVM based runtime
 	if err := modifyProcessLabel(ociRuntime.Type, spec); err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	if config.GetLinux().GetSecurityContext().GetPrivileged() {
@@ -105,14 +113,14 @@ func (c *Controller) Start(ctx context.Context, id string) (_ uint32, retErr err
 	// Generate spec options that will be applied to the spec later.
 	specOpts, err := c.sandboxContainerSpecOpts(config, &image.ImageSpec.Config)
 	if err != nil {
-		return 0, fmt.Errorf("failed to generate sandbox container spec options: %w", err)
+		return nil, fmt.Errorf("failed to generate sandbox container spec options: %w", err)
 	}
 
 	sandboxLabels := buildLabels(config.Labels, image.ImageSpec.Config.Labels, containerKindSandbox)
 
 	runtimeOpts, err := generateRuntimeOptions(ociRuntime, c.config)
 	if err != nil {
-		return 0, fmt.Errorf("failed to generate runtime options: %w", err)
+		return nil, fmt.Errorf("failed to generate runtime options: %w", err)
 	}
 
 	snapshotterOpt := snapshots.WithLabels(snapshots.FilterInheritedLabels(config.Annotations))
@@ -126,7 +134,7 @@ func (c *Controller) Start(ctx context.Context, id string) (_ uint32, retErr err
 
 	container, err := c.client.NewContainer(ctx, id, opts...)
 	if err != nil {
-		return 0, fmt.Errorf("failed to create containerd container: %w", err)
+		return nil, fmt.Errorf("failed to create containerd container: %w", err)
 	}
 	defer func() {
 		if retErr != nil {
@@ -141,7 +149,7 @@ func (c *Controller) Start(ctx context.Context, id string) (_ uint32, retErr err
 	// Create sandbox container root directories.
 	sandboxRootDir := c.getSandboxRootDir(id)
 	if err := c.os.MkdirAll(sandboxRootDir, 0755); err != nil {
-		return 0, fmt.Errorf("failed to create sandbox root directory %q: %w",
+		return nil, fmt.Errorf("failed to create sandbox root directory %q: %w",
 			sandboxRootDir, err)
 	}
 	defer func() {
@@ -156,7 +164,7 @@ func (c *Controller) Start(ctx context.Context, id string) (_ uint32, retErr err
 
 	volatileSandboxRootDir := c.getVolatileSandboxRootDir(id)
 	if err := c.os.MkdirAll(volatileSandboxRootDir, 0755); err != nil {
-		return 0, fmt.Errorf("failed to create volatile sandbox root directory %q: %w",
+		return nil, fmt.Errorf("failed to create volatile sandbox root directory %q: %w",
 			volatileSandboxRootDir, err)
 	}
 	defer func() {
@@ -171,7 +179,7 @@ func (c *Controller) Start(ctx context.Context, id string) (_ uint32, retErr err
 
 	// Setup files required for the sandbox.
 	if err = c.setupSandboxFiles(id, config); err != nil {
-		return 0, fmt.Errorf("failed to setup sandbox files: %w", err)
+		return nil, fmt.Errorf("failed to setup sandbox files: %w", err)
 	}
 	defer func() {
 		if retErr != nil {
@@ -183,11 +191,10 @@ func (c *Controller) Start(ctx context.Context, id string) (_ uint32, retErr err
 	}()
 
 	// Update sandbox created timestamp.
-	info, err := container.Info(ctx) // TODO: return info.CreatedAt.
+	info, err := container.Info(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get sandbox container info: %w", err)
+		return nil, fmt.Errorf("failed to get sandbox container info: %w", err)
 	}
-	log.G(ctx).Debugf("container info: %+v", info)
 
 	// Create sandbox task in containerd.
 	log.G(ctx).Tracef("Create sandbox container (id=%q, name=%q).", id, metadata.Name)
@@ -200,7 +207,7 @@ func (c *Controller) Start(ctx context.Context, id string) (_ uint32, retErr err
 	// We don't need stdio for sandbox container.
 	task, err := container.NewTask(ctx, containerdio.NullIO, taskOpts...)
 	if err != nil {
-		return 0, fmt.Errorf("failed to create containerd task: %w", err)
+		return nil, fmt.Errorf("failed to create containerd task: %w", err)
 	}
 	defer func() {
 		if retErr != nil {
@@ -216,12 +223,12 @@ func (c *Controller) Start(ctx context.Context, id string) (_ uint32, retErr err
 	// wait is a long running background request, no timeout needed.
 	exitCh, err := task.Wait(ctrdutil.NamespacedContext())
 	if err != nil {
-		return 0, fmt.Errorf("failed to wait for sandbox container task: %w", err)
+		return nil, fmt.Errorf("failed to wait for sandbox container task: %w", err)
 	}
 
 	nric, err := nri.New()
 	if err != nil {
-		return 0, fmt.Errorf("unable to create nri client: %w", err)
+		return nil, fmt.Errorf("unable to create nri client: %w", err)
 	}
 	if nric != nil {
 		nriSB := &nri.Sandbox{
@@ -229,12 +236,12 @@ func (c *Controller) Start(ctx context.Context, id string) (_ uint32, retErr err
 			Labels: config.Labels,
 		}
 		if _, err := nric.InvokeWithSandbox(ctx, task, v1.Create, nriSB); err != nil {
-			return 0, fmt.Errorf("nri invoke: %w", err)
+			return nil, fmt.Errorf("nri invoke: %w", err)
 		}
 	}
 
 	if err := task.Start(ctx); err != nil {
-		return 0, fmt.Errorf("failed to start sandbox container task %q: %w", id, err)
+		return nil, fmt.Errorf("failed to start sandbox container task %q: %w", id, err)
 	}
 
 	// start the monitor after adding sandbox into the store, this ensures
@@ -244,7 +251,13 @@ func (c *Controller) Start(ctx context.Context, id string) (_ uint32, retErr err
 	// but we don't care about sandbox TaskOOM right now, so it is fine.
 	c.cri.StartSandboxExitMonitor(context.Background(), id, task.Pid(), exitCh) // TODO: Move back to CRI service.
 
-	return 0, nil
+	resp := &api.ControllerStartResponse{
+		SandboxID: id,
+		Pid:       task.Pid(),
+		CreatedAt: protobuf.ToTimestamp(info.CreatedAt),
+	}
+
+	return resp, nil
 }
 
 // untrustedWorkload returns true if the sandbox contains untrusted workload.

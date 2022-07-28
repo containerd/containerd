@@ -100,6 +100,8 @@ message ControllerStartRequest {
 message ControllerStartResponse {
 	string sandbox_id = 1;
 	uint32 pid = 2;
+	google.protobuf.Timestamp created_at = 3;
+	map<string, string> labels = 4;
 }
 
 message ControllerShutdownRequest {
