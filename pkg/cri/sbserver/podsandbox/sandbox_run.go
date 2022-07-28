@@ -84,10 +84,10 @@ func (c *Controller) Start(ctx context.Context, id string) (_ uint32, retErr err
 	}
 	log.G(ctx).WithField("podsandboxid", id).Debugf("sandbox container spec: %#+v", spew.NewFormatter(spec))
 
-	processLabel := spec.Process.SelinuxLabel
+	metadata.ProcessLabel = spec.Process.SelinuxLabel
 	defer func() {
 		if retErr != nil {
-			selinux.ReleaseLabel(processLabel)
+			selinux.ReleaseLabel(metadata.ProcessLabel)
 		}
 	}()
 

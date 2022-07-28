@@ -17,90 +17,9 @@
 package sbserver
 
 import (
-	"fmt"
-	"strconv"
-
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/oci"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	"github.com/containerd/containerd/pkg/cri/annotations"
-	customopts "github.com/containerd/containerd/pkg/cri/opts"
 )
-
-func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig, nsPath string, runtimePodAnnotations []string) (*runtimespec.Spec, error) {
-	// Creates a spec Generator with the default spec.
-	specOpts := []oci.SpecOpts{
-		oci.WithEnv(imageConfig.Env),
-		oci.WithHostname(config.GetHostname()),
-	}
-	if imageConfig.WorkingDir != "" {
-		specOpts = append(specOpts, oci.WithProcessCwd(imageConfig.WorkingDir))
-	}
-
-	if len(imageConfig.Entrypoint) == 0 && len(imageConfig.Cmd) == 0 {
-		// Pause image must have entrypoint or cmd.
-		return nil, fmt.Errorf("invalid empty entrypoint and cmd in image config %+v", imageConfig)
-	}
-	specOpts = append(specOpts, oci.WithProcessArgs(append(imageConfig.Entrypoint, imageConfig.Cmd...)...))
-
-	specOpts = append(specOpts,
-		// Clear the root location since hcsshim expects it.
-		// NOTE: readonly rootfs doesn't work on windows.
-		customopts.WithoutRoot,
-		customopts.WithWindowsNetworkNamespace(nsPath),
-	)
-
-	specOpts = append(specOpts, customopts.WithWindowsDefaultSandboxShares)
-
-	// Start with the image config user and override below if RunAsUsername is not "".
-	username := imageConfig.User
-
-	runAsUser := config.GetWindows().GetSecurityContext().GetRunAsUsername()
-	if runAsUser != "" {
-		username = runAsUser
-	}
-
-	cs := config.GetWindows().GetSecurityContext().GetCredentialSpec()
-	if cs != "" {
-		specOpts = append(specOpts, customopts.WithWindowsCredentialSpec(cs))
-	}
-
-	// There really isn't a good Windows way to verify that the username is available in the
-	// image as early as here like there is for Linux. Later on in the stack hcsshim
-	// will handle the behavior of erroring out if the user isn't available in the image
-	// when trying to run the init process.
-	specOpts = append(specOpts, oci.WithUser(username))
-
-	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
-		runtimePodAnnotations) {
-		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
-	}
-
-	specOpts = append(specOpts,
-		customopts.WithAnnotation(annotations.ContainerType, annotations.ContainerTypeSandbox),
-		customopts.WithAnnotation(annotations.SandboxID, id),
-		customopts.WithAnnotation(annotations.SandboxNamespace, config.GetMetadata().GetNamespace()),
-		customopts.WithAnnotation(annotations.SandboxName, config.GetMetadata().GetName()),
-		customopts.WithAnnotation(annotations.SandboxLogDir, config.GetLogDirectory()),
-		customopts.WithAnnotation(annotations.WindowsHostProcess, strconv.FormatBool(config.GetWindows().GetSecurityContext().GetHostProcess())),
-	)
-
-	return c.runtimeSpec(id, "", specOpts...)
-}
-
-// No sandbox container spec options for windows yet.
-func (c *criService) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
-	return nil, nil
-}
-
-// No sandbox files needed for windows.
-func (c *criService) setupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
-	return nil
-}
 
 // No sandbox files needed for windows.
 func (c *criService) cleanupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {

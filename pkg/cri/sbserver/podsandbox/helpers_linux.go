@@ -30,7 +30,6 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/pkg/apparmor"
 	"github.com/containerd/containerd/pkg/seccomp"
 	"github.com/containerd/containerd/pkg/seutil"
 	"github.com/moby/sys/mountinfo"
@@ -51,12 +50,8 @@ const (
 	devShm = "/dev/shm"
 	// etcHosts is the default path of /etc/hosts file.
 	etcHosts = "/etc/hosts"
-	// etcHostname is the default path of /etc/hostname file.
-	etcHostname = "/etc/hostname"
 	// resolvConfPath is the abs path of resolv.conf on host or container.
 	resolvConfPath = "/etc/resolv.conf"
-	// hostnameEnv is the key for HOSTNAME env.
-	hostnameEnv = "HOSTNAME"
 )
 
 // getCgroupsPath generates container cgroups path.
@@ -138,25 +133,8 @@ func checkSelinuxLevel(level string) error {
 	return nil
 }
 
-// apparmorEnabled returns true if apparmor is enabled, supported by the host,
-// if apparmor_parser is installed, and if we are not running docker-in-docker.
-func (c *Controller) apparmorEnabled() bool {
-	if c.config.DisableApparmor {
-		return false
-	}
-	return apparmor.HostSupports()
-}
-
 func (c *Controller) seccompEnabled() bool {
 	return seccomp.IsEnabled()
-}
-
-// openLogFile opens/creates a container log file.
-func openLogFile(path string) (*os.File, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return nil, err
-	}
-	return os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0640)
 }
 
 // unmountRecursive unmounts the target and all mounts underneath, starting with

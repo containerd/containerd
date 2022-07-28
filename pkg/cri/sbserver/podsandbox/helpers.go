@@ -30,9 +30,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	runtimeoptions "github.com/containerd/containerd/pkg/runtimeoptions/v1"
 	"github.com/containerd/containerd/plugin"
@@ -46,79 +44,25 @@ import (
 	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/pelletier/go-toml"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 const (
-	// errorStartReason is the exit reason when fails to start container.
-	errorStartReason = "StartError"
-	// errorStartExitCode is the exit code when fails to start container.
-	// 128 is the same with Docker's behavior.
-	// TODO(windows): Figure out what should be used for windows.
-	errorStartExitCode = 128
-	// completeExitReason is the exit reason when container exits with code 0.
-	completeExitReason = "Completed"
-	// errorExitReason is the exit reason when container exits with code non-zero.
-	errorExitReason = "Error"
-	// oomExitReason is the exit reason when process in container is oom killed.
-	oomExitReason = "OOMKilled"
 
 	// sandboxesDir contains all sandbox root. A sandbox root is the running
 	// directory of the sandbox, all files created for the sandbox will be
 	// placed under this directory.
 	sandboxesDir = "sandboxes"
-	// containersDir contains all container root.
-	containersDir = "containers"
-	// Delimiter used to construct container/sandbox names.
-	nameDelimiter = "_"
-
 	// criContainerdPrefix is common prefix for cri-containerd
 	criContainerdPrefix = "io.cri-containerd"
 	// containerKindLabel is a label key indicating container is sandbox container or application container
 	containerKindLabel = criContainerdPrefix + ".kind"
 	// containerKindSandbox is a label value indicating container is sandbox container
 	containerKindSandbox = "sandbox"
-	// containerKindContainer is a label value indicating container is application container
-	containerKindContainer = "container"
-	// imageLabelKey is the label key indicating the image is managed by cri plugin.
-	imageLabelKey = criContainerdPrefix + ".image"
-	// imageLabelValue is the label value indicating the image is managed by cri plugin.
-	imageLabelValue = "managed"
 	// sandboxMetadataExtension is an extension name that identify metadata of sandbox in CreateContainerRequest
 	sandboxMetadataExtension = criContainerdPrefix + ".sandbox.metadata"
-	// containerMetadataExtension is an extension name that identify metadata of container in CreateContainerRequest
-	containerMetadataExtension = criContainerdPrefix + ".container.metadata"
-
-	// defaultIfName is the default network interface for the pods
-	defaultIfName = "eth0"
-
 	// runtimeRunhcsV1 is the runtime type for runhcs.
 	runtimeRunhcsV1 = "io.containerd.runhcs.v1"
 )
-
-// makeSandboxName generates sandbox name from sandbox metadata. The name
-// generated is unique as long as sandbox metadata is unique.
-func makeSandboxName(s *runtime.PodSandboxMetadata) string {
-	return strings.Join([]string{
-		s.Name,                       // 0
-		s.Namespace,                  // 1
-		s.Uid,                        // 2
-		fmt.Sprintf("%d", s.Attempt), // 3
-	}, nameDelimiter)
-}
-
-// makeContainerName generates container name from sandbox and container metadata.
-// The name generated is unique as long as the sandbox container combination is
-// unique.
-func makeContainerName(c *runtime.ContainerMetadata, s *runtime.PodSandboxMetadata) string {
-	return strings.Join([]string{
-		c.Name,                       // 0: container name
-		s.Name,                       // 1: pod name
-		s.Namespace,                  // 2: pod namespace
-		s.Uid,                        // 3: pod uid
-		fmt.Sprintf("%d", c.Attempt), // 4: attempt number of creating the container
-	}, nameDelimiter)
-}
 
 // getSandboxRootDir returns the root directory for managing sandbox files,
 // e.g. hosts files.
@@ -130,23 +74,6 @@ func (c *Controller) getSandboxRootDir(id string) string {
 // e.g. named pipes.
 func (c *Controller) getVolatileSandboxRootDir(id string) string {
 	return filepath.Join(c.config.StateDir, sandboxesDir, id)
-}
-
-// getContainerRootDir returns the root directory for managing container files,
-// e.g. state checkpoint.
-func (c *Controller) getContainerRootDir(id string) string {
-	return filepath.Join(c.config.RootDir, containersDir, id)
-}
-
-// getVolatileContainerRootDir returns the root directory for managing volatile container files,
-// e.g. named pipes.
-func (c *Controller) getVolatileContainerRootDir(id string) string {
-	return filepath.Join(c.config.StateDir, containersDir, id)
-}
-
-// criContainerStateToString formats CRI container state to string.
-func criContainerStateToString(state runtime.ContainerState) string {
-	return runtime.ContainerState_name[int32(state)]
 }
 
 // getRepoDigestAngTag returns image repoDigest and repoTag of the named image reference.
@@ -192,22 +119,6 @@ func getUserFromImage(user string) (*int64, string) {
 	return &uid, ""
 }
 
-// isInCRIMounts checks whether a destination is in CRI mount list.
-func isInCRIMounts(dst string, mounts []*runtime.Mount) bool {
-	for _, m := range mounts {
-		if filepath.Clean(m.ContainerPath) == filepath.Clean(dst) {
-			return true
-		}
-	}
-	return false
-}
-
-// filterLabel returns a label filter. Use `%q` here because containerd
-// filter needs extra quote to work properly.
-func filterLabel(k, v string) string {
-	return fmt.Sprintf("labels.%q==%q", k, v)
-}
-
 // buildLabel builds the labels from config to be passed to containerd
 func buildLabels(configLabels, imageConfigLabels map[string]string, containerType string) map[string]string {
 	labels := make(map[string]string)
@@ -227,16 +138,6 @@ func buildLabels(configLabels, imageConfigLabels map[string]string, containerTyp
 	}
 	labels[containerKindLabel] = containerType
 	return labels
-}
-
-// toRuntimeAuthConfig converts cri plugin auth config to runtime auth config.
-func toRuntimeAuthConfig(a criconfig.AuthConfig) *runtime.AuthConfig {
-	return &runtime.AuthConfig{
-		Username:      a.Username,
-		Password:      a.Password,
-		Auth:          a.Auth,
-		IdentityToken: a.IdentityToken,
-	}
 }
 
 // parseImageReferences parses a list of arbitrary image references and returns
@@ -308,32 +209,6 @@ func getRuntimeOptions(c containers.Container) (interface{}, error) {
 		return nil, err
 	}
 	return opts, nil
-}
-
-const (
-	// unknownExitCode is the exit code when exit reason is unknown.
-	unknownExitCode = 255
-	// unknownExitReason is the exit reason when exit reason is unknown.
-	unknownExitReason = "Unknown"
-)
-
-// unknownContainerStatus returns the default container status when its status is unknown.
-func unknownContainerStatus() containerstore.Status {
-	return containerstore.Status{
-		CreatedAt:  0,
-		StartedAt:  0,
-		FinishedAt: 0,
-		ExitCode:   unknownExitCode,
-		Reason:     unknownExitReason,
-		Unknown:    true,
-	}
-}
-
-// unknownSandboxStatus returns the default sandbox status when its status is unknown.
-func unknownSandboxStatus() sandboxstore.Status {
-	return sandboxstore.Status{
-		State: sandboxstore.StateUnknown,
-	}
 }
 
 // getPassthroughAnnotations filters requested pod annotations by comparing

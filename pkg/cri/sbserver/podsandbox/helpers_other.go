@@ -26,11 +26,6 @@ import (
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
-// openLogFile opens/creates a container log file.
-func openLogFile(path string) (*os.File, error) {
-	return os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0640)
-}
-
 // ensureRemoveAll wraps `os.RemoveAll` to check for specific errors that can
 // often be remedied.
 // Only use `ensureRemoveAll` if you really want to make every effort to remove

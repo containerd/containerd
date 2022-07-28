@@ -35,16 +35,11 @@ import (
 	"github.com/containerd/containerd/pkg/seutil"
 	"github.com/moby/sys/mountinfo"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/opencontainers/selinux/go-selinux/label"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 const (
-	// defaultSandboxOOMAdj is default omm adj for sandbox container. (kubernetes#47938).
-	defaultSandboxOOMAdj = -998
-	// defaultShmSize is the default size of the sandbox shm.
-	defaultShmSize = int64(1024 * 1024 * 64)
 	// relativeRootfsPath is the rootfs path relative to bundle path.
 	relativeRootfsPath = "rootfs"
 	// devShm is the default path of /dev/shm.
@@ -113,14 +108,6 @@ func toLabel(selinuxOptions *runtime.SELinuxOption) ([]string, error) {
 	}
 
 	return labels, nil
-}
-
-func initLabelsFromOpt(selinuxOpts *runtime.SELinuxOption) (string, string, error) {
-	labels, err := toLabel(selinuxOpts)
-	if err != nil {
-		return "", "", err
-	}
-	return label.InitLabels(labels)
 }
 
 func checkSelinuxLevel(level string) error {
