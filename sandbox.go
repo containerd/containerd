@@ -115,10 +115,16 @@ func (s *sandboxClient) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 }
 
 func (s *sandboxClient) Stop(ctx context.Context) error {
-	return s.client.SandboxController().Shutdown(ctx, s.ID())
+	if _, err := s.client.SandboxController().Stop(ctx, s.ID()); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *sandboxClient) Delete(ctx context.Context) error {
+	if _, err := s.client.SandboxController().Delete(ctx, s.ID()); err != nil {
+		return err
+	}
 	return s.client.SandboxStore().Delete(ctx, s.ID())
 }
 

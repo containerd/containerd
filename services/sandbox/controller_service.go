@@ -74,9 +74,9 @@ func (s *controllerService) Start(ctx context.Context, req *api.ControllerStartR
 	return s.local.Start(ctx, req)
 }
 
-func (s *controllerService) Shutdown(ctx context.Context, req *api.ControllerShutdownRequest) (*api.ControllerShutdownResponse, error) {
+func (s *controllerService) Stop(ctx context.Context, req *api.ControllerStopRequest) (*api.ControllerStopResponse, error) {
 	log.G(ctx).WithField("req", req).Debug("delete sandbox")
-	return s.local.Shutdown(ctx, req)
+	return s.local.Stop(ctx, req)
 }
 
 func (s *controllerService) Wait(ctx context.Context, req *api.ControllerWaitRequest) (*api.ControllerWaitResponse, error) {
@@ -87,4 +87,9 @@ func (s *controllerService) Wait(ctx context.Context, req *api.ControllerWaitReq
 func (s *controllerService) Status(ctx context.Context, req *api.ControllerStatusRequest) (*api.ControllerStatusResponse, error) {
 	log.G(ctx).WithField("req", req).Debug("sandbox status")
 	return s.local.Status(ctx, req)
+}
+
+func (s *controllerService) Delete(ctx context.Context, req *api.ControllerDeleteRequest) (*api.ControllerDeleteResponse, error) {
+	log.G(ctx).WithField("req", req).Debug("delete sandbox")
+	return s.local.Delete(ctx, req)
 }

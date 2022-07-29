@@ -4247,7 +4247,7 @@ file {
     }
   }
   message_type {
-    name: "ControllerShutdownRequest"
+    name: "ControllerStopRequest"
     field {
       name: "sandbox_id"
       number: 1
@@ -4264,7 +4264,7 @@ file {
     }
   }
   message_type {
-    name: "ControllerShutdownResponse"
+    name: "ControllerStopResponse"
   }
   message_type {
     name: "ControllerWaitRequest"
@@ -4351,6 +4351,19 @@ file {
       json_name: "extra"
     }
   }
+  message_type {
+    name: "ControllerDeleteRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+  }
+  message_type {
+    name: "ControllerDeleteResponse"
+  }
   service {
     name: "Store"
     method {
@@ -4387,9 +4400,9 @@ file {
       output_type: ".containerd.services.sandbox.v1.ControllerStartResponse"
     }
     method {
-      name: "Shutdown"
-      input_type: ".containerd.services.sandbox.v1.ControllerShutdownRequest"
-      output_type: ".containerd.services.sandbox.v1.ControllerShutdownResponse"
+      name: "Stop"
+      input_type: ".containerd.services.sandbox.v1.ControllerStopRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerStopResponse"
     }
     method {
       name: "Wait"
@@ -4400,6 +4413,11 @@ file {
       name: "Status"
       input_type: ".containerd.services.sandbox.v1.ControllerStatusRequest"
       output_type: ".containerd.services.sandbox.v1.ControllerStatusResponse"
+    }
+    method {
+      name: "Delete"
+      input_type: ".containerd.services.sandbox.v1.ControllerDeleteRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerDeleteResponse"
     }
   }
   options {

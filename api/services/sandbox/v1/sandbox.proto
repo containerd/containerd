@@ -86,9 +86,10 @@ message StoreGetResponse {
 // Controller is an interface to manage runtime sandbox instances.
 service Controller {
 	rpc Start(ControllerStartRequest) returns (ControllerStartResponse);
-	rpc Shutdown(ControllerShutdownRequest) returns (ControllerShutdownResponse);
+	rpc Stop(ControllerStopRequest) returns (ControllerStopResponse);
 	rpc Wait(ControllerWaitRequest) returns (ControllerWaitResponse);
 	rpc Status(ControllerStatusRequest) returns (ControllerStatusResponse);
+	rpc Delete(ControllerDeleteRequest) returns (ControllerDeleteResponse);
 }
 
 message ControllerStartRequest {
@@ -104,12 +105,12 @@ message ControllerStartResponse {
 	map<string, string> labels = 4;
 }
 
-message ControllerShutdownRequest {
+message ControllerStopRequest {
 	string sandbox_id = 1;
 	uint32 timeout_secs = 2;
 }
 
-message ControllerShutdownResponse {}
+message ControllerStopResponse {}
 
 message ControllerWaitRequest {
 	string sandbox_id = 1;
@@ -132,3 +133,9 @@ message ControllerStatusResponse {
 	google.protobuf.Timestamp exited_at = 5;
 	google.protobuf.Any extra = 6;
 }
+
+message ControllerDeleteRequest {
+	string sandbox_id = 1;
+}
+
+message ControllerDeleteResponse {}

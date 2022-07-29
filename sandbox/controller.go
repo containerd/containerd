@@ -31,11 +31,13 @@ type Controller interface {
 	// This routine must be invoked before scheduling containers on this instance.
 	// Once started clients may run containers via Task service (additionally specifying sandbox id the container will belong to).
 	Start(ctx context.Context, sandboxID string) (*sandbox.ControllerStartResponse, error)
-	// Shutdown deletes and cleans all tasks and sandbox instance.
-	Shutdown(ctx context.Context, sandboxID string) error
+	// Stop will stop sandbox intances
+	Stop(ctx context.Context, sandboxID string) (*sandbox.ControllerStopResponse, error)
 	// Wait blocks until sandbox process exits.
 	Wait(ctx context.Context, sandboxID string) (*sandbox.ControllerWaitResponse, error)
 	// Status will query sandbox process status. It is heavier than Ping call and must be used whenever you need to
 	// gather metadata about current sandbox state (status, uptime, resource use, etc).
 	Status(ctx context.Context, sandboxID string) (*sandbox.ControllerStatusResponse, error)
+	// Delete deletes and cleans all tasks and sandbox instance.
+	Delete(ctx context.Context, sandboxID string) (*sandbox.ControllerDeleteResponse, error)
 }

@@ -253,9 +253,10 @@ var Store_ServiceDesc = grpc.ServiceDesc{
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ControllerClient interface {
 	Start(ctx context.Context, in *ControllerStartRequest, opts ...grpc.CallOption) (*ControllerStartResponse, error)
-	Shutdown(ctx context.Context, in *ControllerShutdownRequest, opts ...grpc.CallOption) (*ControllerShutdownResponse, error)
+	Stop(ctx context.Context, in *ControllerStopRequest, opts ...grpc.CallOption) (*ControllerStopResponse, error)
 	Wait(ctx context.Context, in *ControllerWaitRequest, opts ...grpc.CallOption) (*ControllerWaitResponse, error)
 	Status(ctx context.Context, in *ControllerStatusRequest, opts ...grpc.CallOption) (*ControllerStatusResponse, error)
+	Delete(ctx context.Context, in *ControllerDeleteRequest, opts ...grpc.CallOption) (*ControllerDeleteResponse, error)
 }
 
 type controllerClient struct {
@@ -275,9 +276,9 @@ func (c *controllerClient) Start(ctx context.Context, in *ControllerStartRequest
 	return out, nil
 }
 
-func (c *controllerClient) Shutdown(ctx context.Context, in *ControllerShutdownRequest, opts ...grpc.CallOption) (*ControllerShutdownResponse, error) {
-	out := new(ControllerShutdownResponse)
-	err := c.cc.Invoke(ctx, "/containerd.services.sandbox.v1.Controller/Shutdown", in, out, opts...)
+func (c *controllerClient) Stop(ctx context.Context, in *ControllerStopRequest, opts ...grpc.CallOption) (*ControllerStopResponse, error) {
+	out := new(ControllerStopResponse)
+	err := c.cc.Invoke(ctx, "/containerd.services.sandbox.v1.Controller/Stop", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -302,14 +303,24 @@ func (c *controllerClient) Status(ctx context.Context, in *ControllerStatusReque
 	return out, nil
 }
 
+func (c *controllerClient) Delete(ctx context.Context, in *ControllerDeleteRequest, opts ...grpc.CallOption) (*ControllerDeleteResponse, error) {
+	out := new(ControllerDeleteResponse)
+	err := c.cc.Invoke(ctx, "/containerd.services.sandbox.v1.Controller/Delete", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ControllerServer is the server API for Controller service.
 // All implementations must embed UnimplementedControllerServer
 // for forward compatibility
 type ControllerServer interface {
 	Start(context.Context, *ControllerStartRequest) (*ControllerStartResponse, error)
-	Shutdown(context.Context, *ControllerShutdownRequest) (*ControllerShutdownResponse, error)
+	Stop(context.Context, *ControllerStopRequest) (*ControllerStopResponse, error)
 	Wait(context.Context, *ControllerWaitRequest) (*ControllerWaitResponse, error)
 	Status(context.Context, *ControllerStatusRequest) (*ControllerStatusResponse, error)
+	Delete(context.Context, *ControllerDeleteRequest) (*ControllerDeleteResponse, error)
 	mustEmbedUnimplementedControllerServer()
 }
 
@@ -320,14 +331,17 @@ type UnimplementedControllerServer struct {
 func (UnimplementedControllerServer) Start(context.Context, *ControllerStartRequest) (*ControllerStartResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Start not implemented")
 }
-func (UnimplementedControllerServer) Shutdown(context.Context, *ControllerShutdownRequest) (*ControllerShutdownResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Shutdown not implemented")
+func (UnimplementedControllerServer) Stop(context.Context, *ControllerStopRequest) (*ControllerStopResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Stop not implemented")
 }
 func (UnimplementedControllerServer) Wait(context.Context, *ControllerWaitRequest) (*ControllerWaitResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Wait not implemented")
 }
 func (UnimplementedControllerServer) Status(context.Context, *ControllerStatusRequest) (*ControllerStatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Status not implemented")
+}
+func (UnimplementedControllerServer) Delete(context.Context, *ControllerDeleteRequest) (*ControllerDeleteResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
 }
 func (UnimplementedControllerServer) mustEmbedUnimplementedControllerServer() {}
 
@@ -360,20 +374,20 @@ func _Controller_Start_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Controller_Shutdown_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ControllerShutdownRequest)
+func _Controller_Stop_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ControllerStopRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ControllerServer).Shutdown(ctx, in)
+		return srv.(ControllerServer).Stop(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.services.sandbox.v1.Controller/Shutdown",
+		FullMethod: "/containerd.services.sandbox.v1.Controller/Stop",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ControllerServer).Shutdown(ctx, req.(*ControllerShutdownRequest))
+		return srv.(ControllerServer).Stop(ctx, req.(*ControllerStopRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -414,6 +428,24 @@ func _Controller_Status_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Controller_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ControllerDeleteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControllerServer).Delete(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.services.sandbox.v1.Controller/Delete",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControllerServer).Delete(ctx, req.(*ControllerDeleteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Controller_ServiceDesc is the grpc.ServiceDesc for Controller service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -426,8 +458,8 @@ var Controller_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Controller_Start_Handler,
 		},
 		{
-			MethodName: "Shutdown",
-			Handler:    _Controller_Shutdown_Handler,
+			MethodName: "Stop",
+			Handler:    _Controller_Stop_Handler,
 		},
 		{
 			MethodName: "Wait",
@@ -436,6 +468,10 @@ var Controller_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Status",
 			Handler:    _Controller_Status_Handler,
+		},
+		{
+			MethodName: "Delete",
+			Handler:    _Controller_Delete_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
