@@ -17,6 +17,7 @@
 package server
 
 import (
+	"errors"
 	"strconv"
 
 	"github.com/containerd/containerd/oci"
@@ -50,6 +51,16 @@ func (c *criService) containerSpec(
 	specOpts := []oci.SpecOpts{
 		customopts.WithProcessArgs(config, imageConfig),
 	}
+
+	// All containers in a pod need to have HostProcess set if it was set on the pod,
+	// and vice versa no containers in the pod can be HostProcess if the pods spec
+	// didn't have the field set. The only case that is valid is if these are the same value.
+	cntrHpc := config.GetWindows().GetSecurityContext().GetHostProcess()
+	sandboxHpc := sandboxConfig.GetWindows().GetSecurityContext().GetHostProcess()
+	if cntrHpc != sandboxHpc {
+		return nil, errors.New("pod spec and all containers inside must have the HostProcess field set to be valid")
+	}
+
 	if config.GetWorkingDir() != "" {
 		specOpts = append(specOpts, oci.WithProcessCwd(config.GetWorkingDir()))
 	} else if imageConfig.WorkingDir != "" {
@@ -120,7 +131,7 @@ func (c *criService) containerSpec(
 		customopts.WithAnnotation(annotations.SandboxName, sandboxConfig.GetMetadata().GetName()),
 		customopts.WithAnnotation(annotations.ContainerName, containerName),
 		customopts.WithAnnotation(annotations.ImageName, imageName),
-		customopts.WithAnnotation(annotations.WindowsHostProcess, strconv.FormatBool(sandboxConfig.GetWindows().GetSecurityContext().GetHostProcess())),
+		customopts.WithAnnotation(annotations.WindowsHostProcess, strconv.FormatBool(sandboxHpc)),
 	)
 	return c.runtimeSpec(id, ociRuntime.BaseRuntimeSpec, specOpts...)
 }
