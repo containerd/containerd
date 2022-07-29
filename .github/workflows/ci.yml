@@ -487,6 +487,14 @@ jobs:
           ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
         run: |
           BDIR="$(mktemp -d -p $PWD)"
+
+          function cleanup() {
+            sudo pkill containerd || true
+            cat ${BDIR}/containerd-cri.log
+            sudo -E rm -rf ${BDIR}
+          }
+          trap cleanup EXIT
+
           mkdir -p ${BDIR}/{root,state}
           cat > ${BDIR}/config.toml <<EOF
             version = 2
@@ -497,11 +505,6 @@ jobs:
           sudo -E PATH=$PATH /usr/local/bin/containerd -a ${BDIR}/c.sock --config ${BDIR}/config.toml --root ${BDIR}/root --state ${BDIR}/state --log-level debug &> ${BDIR}/containerd-cri.log &
           sudo -E PATH=$PATH /usr/local/bin/ctr -a ${BDIR}/c.sock version
           sudo -E PATH=$PATH critest --report-dir "${{github.workspace}}/critestreport" --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8
-          TEST_RC=$?
-          test $TEST_RC -ne 0 && cat ${BDIR}/containerd-cri.log
-          sudo pkill containerd
-          sudo -E rm -rf ${BDIR}
-          test $TEST_RC -eq 0 || /bin/false
 
       # Log the status of this VM to investigate issues like
       # https://github.com/containerd/containerd/issues/4969
