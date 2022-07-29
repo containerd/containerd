@@ -489,7 +489,7 @@ jobs:
   vagrant:
     name: Vagrant
     # nested virtualization is only available on macOS hosts
-    runs-on: macos-10.15
+    runs-on: macos-12
     timeout-minutes: 45
     needs: [project, linters, protos, man]
     strategy:
@@ -560,7 +560,7 @@ jobs:
   cgroup2-misc:
     name: CGroupsV2 - rootless CRI test
     # nested virtualization is only available on macOS hosts
-    runs-on: macos-10.15
+    runs-on: macos-12
     timeout-minutes: 45
     needs: [project, linters, protos, man]
     steps:
