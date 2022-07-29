@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	cni "github.com/containerd/go-cni"
 	"github.com/fsnotify/fsnotify"
@@ -77,6 +78,17 @@ func (syncer *cniNetConfSyncer) syncLoop() error {
 			if !ok {
 				logrus.Debugf("cni watcher channel is closed")
 				return nil
+			}
+			if event.Op&fsnotify.Remove > 0 {
+				for {
+					err := syncer.watcher.Add(syncer.confDir)
+					if err == nil {
+						logrus.Infof("Successfully watch cni conf dir from: %s", syncer.confDir)
+						break
+					}
+					logrus.WithError(err).Errorf("failed to watch cni conf dir from %s, will retry again in 5 seconds.", syncer.confDir)
+					time.Sleep(5 * time.Second)
+				}
 			}
 			// Only reload config when receiving write/rename/remove
 			// events
