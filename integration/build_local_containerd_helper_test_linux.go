@@ -19,5 +19,6 @@ package integration
 import (
 	// Register for linux platforms
 	_ "github.com/containerd/containerd/runtime/v1/linux"
+	_ "github.com/containerd/containerd/services/sandbox" // WithInMemoryServices will fail otherwise
 	_ "github.com/containerd/containerd/snapshots/overlay/plugin"
 )

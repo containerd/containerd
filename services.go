@@ -24,7 +24,7 @@ import (
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	introspectionapi "github.com/containerd/containerd/api/services/introspection/v1"
 	namespacesapi "github.com/containerd/containerd/api/services/namespaces/v1"
-	sandboxsapi "github.com/containerd/containerd/api/services/sandbox/v1"
+	sandboxapi "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
@@ -165,14 +165,14 @@ func WithIntrospectionService(in introspection.Service) ServicesOpt {
 }
 
 // WithSandboxStore sets the sandbox store.
-func WithSandboxStore(client sandboxsapi.StoreClient) ServicesOpt {
+func WithSandboxStore(client sandboxapi.StoreClient) ServicesOpt {
 	return func(s *services) {
 		s.sandboxStore = NewRemoteSandboxStore(client)
 	}
 }
 
 // WithSandboxController sets the sandbox controller.
-func WithSandboxController(client sandboxsapi.ControllerClient) ServicesOpt {
+func WithSandboxController(client sandboxapi.ControllerClient) ServicesOpt {
 	return func(s *services) {
 		s.sandboxController = NewSandboxRemoteController(client)
 	}
@@ -226,6 +226,12 @@ func WithInMemoryServices(ic *plugin.InitContext) ClientOpt {
 			},
 			srv.IntrospectionService: func(s interface{}) ServicesOpt {
 				return WithIntrospectionClient(s.(introspectionapi.IntrospectionClient))
+			},
+			srv.SandboxStoreService: func(s interface{}) ServicesOpt {
+				return WithSandboxStore(s.(sandboxapi.StoreClient))
+			},
+			srv.SandboxControllerService: func(s interface{}) ServicesOpt {
+				return WithSandboxController(s.(sandboxapi.ControllerClient))
 			},
 		} {
 			p := plugins[s]
