@@ -28,7 +28,7 @@ PROTOBUF_DIR=$(mktemp -d)
 case $GOARCH in
 
 arm64)
-	wget -O "$PROTOBUF_DIR/protobuf" "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-linux-aarch64.zip"
+	wget -O "$PROTOBUF_DIR/protobuf" "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-linux-aarch_64.zip"
 	unzip "$PROTOBUF_DIR/protobuf" -d /usr/local
 	;;
 
