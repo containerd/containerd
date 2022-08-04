@@ -26,6 +26,7 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/platforms"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -96,6 +97,48 @@ type diffIDMap struct {
 	mutex   sync.RWMutex
 }
 
+type leaseMap struct {
+	leaseIDs map[string][]string
+	mutex    sync.Mutex
+	lm       leases.Manager
+}
+
+func (l *leaseMap) Add(ctx context.Context, key string) {
+	leaseID, ok := leases.FromContext(ctx)
+	if ok {
+		l.mutex.Lock()
+		defer l.mutex.Unlock()
+		l.leaseIDs[key] = append(l.leaseIDs[key], leaseID)
+	}
+}
+
+func (l *leaseMap) Clean(key string) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	delete(l.leaseIDs, key)
+}
+
+func (l *leaseMap) Finalize(ctx context.Context, key string, desc *ocispec.Descriptor) error {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	defer delete(l.leaseIDs, key)
+
+	if desc == nil {
+		return nil
+	}
+
+	for _, leaseID := range l.leaseIDs[key] {
+		if err := l.lm.AddResource(ctx, leases.Lease{ID: leaseID}, leases.Resource{
+			ID:   desc.Digest.String(),
+			Type: "content",
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func makeRefKey(desc ocispec.Descriptor) (string, error) {
 	key, err := json.Marshal(desc)
 	if err != nil {
@@ -116,10 +159,18 @@ func (c *DefaultConverter) singleflightDo(ctx context.Context, cs content.Store,
 		return nil, err
 	}
 
+	c.leases.Add(ctx, key)
 	newDesc, err, _ := c.sg.Do(key, func() (interface{}, error) {
 		return convert(ctx, cs, desc)
 	})
 	if err != nil {
+		c.leases.Clean(key)
+		return nil, err
+	}
+
+	// Make sure all blobs in skipped conversions by singleflight are added
+	// to lease to prevent them from being GC-ed before they are read.
+	if err := c.leases.Finalize(ctx, key, newDesc.(*ocispec.Descriptor)); err != nil {
 		return nil, err
 	}
 

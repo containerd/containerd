@@ -115,7 +115,7 @@ func testConvert(t *testing.T, layerConvertFunc converter.ConvertFunc) {
 		converter.WithDockerToOCI(true),
 		converter.WithLayerConvertFunc(layerConvertFunc),
 		converter.WithPlatform(defPlat),
-		converter.WithSingleflight(),
+		converter.WithSingleflight(client.LeasesService()),
 	}
 
 	c, err := converter.New(client, opts...)

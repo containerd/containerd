@@ -33,6 +33,7 @@ type convertOpts struct {
 	indexConvertFunc ConvertFunc
 	platformMC       platforms.MatchComparer
 	hooks            ConvertHooks
+	leases           *leaseMap
 	sg               *singleflight.Group
 }
 
@@ -83,9 +84,13 @@ func WithConvertHooks(hooks ConvertHooks) Opt {
 
 // WithSingleflight makes sure that only one conversion execution is
 // in-flight for a given child descriptor at a time.
-func WithSingleflight() Opt {
+func WithSingleflight(lm leases.Manager) Opt {
 	return func(copts *convertOpts) error {
 		copts.sg = &singleflight.Group{}
+		copts.leases = &leaseMap{
+			leaseIDs: make(map[string][]string),
+			lm:       lm,
+		}
 		return nil
 	}
 }
@@ -95,6 +100,7 @@ type Client interface {
 	WithLease(ctx context.Context, opts ...leases.Opt) (context.Context, func(context.Context) error, error)
 	ContentStore() content.Store
 	ImageService() images.Store
+	LeasesService() leases.Manager
 }
 
 // Converter converts one or more images.
