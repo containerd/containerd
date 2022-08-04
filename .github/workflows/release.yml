@@ -52,7 +52,7 @@ jobs:
     name: Build Release Binaries
     runs-on: ${{ matrix.os }}
     needs: [check]
-    timeout-minutes: 10
+    timeout-minutes: 20
     strategy:
       matrix:
         os: [ubuntu-18.04]
