@@ -76,7 +76,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}()
 
 	sandboxInfo := sb.Sandbox{
-		ID:      id,
+		ID: id,
+		// TODO: runtime handler can be an empty string, should use default one and enable back validation of this field in metadata store.
 		Runtime: sb.RuntimeOpts{Name: r.GetRuntimeHandler()},
 	}
 

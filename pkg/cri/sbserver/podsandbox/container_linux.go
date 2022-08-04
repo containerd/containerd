@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-// These are copied from container_create_linux.go and should be consolidated later.
+// TODO: these are copied from container_create_linux.go and should be consolidated later.
 
 package podsandbox
 

@@ -31,10 +31,11 @@ import (
 )
 
 // CRIService interface contains things required by controller, but not yet refactored from criService.
-// This will be removed in subsequent iterations.
+// TODO: this will be removed in subsequent iterations.
 type CRIService interface {
 	EnsureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig) (*imagestore.Image, error)
 
+	// TODO: we should implement Controller.Wait and use it instead of this to monitor sandbox exit.
 	StartSandboxExitMonitor(ctx context.Context, id string, pid uint32, exitCh <-chan containerd.ExitStatus) <-chan struct{}
 }
 

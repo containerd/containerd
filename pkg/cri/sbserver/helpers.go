@@ -46,6 +46,8 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
+// TODO: Move common helpers for sbserver and podsandbox to a dedicated package once basic services are functinal.
+
 const (
 	// errorStartReason is the exit reason when fails to start container.
 	errorStartReason = "StartError"
