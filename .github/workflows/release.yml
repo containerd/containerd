@@ -83,7 +83,10 @@ jobs:
       - name: Checkout containerd
         uses: actions/checkout@v2
         with:
-          repository: containerd/containerd
+          # Intentionally use github.repository instead of containerd/containerd to
+          # make this action runnable on forks.
+          # See https://github.com/containerd/containerd/issues/5098 for the context.
+          repository: ${{ github.repository }}
           ref: ${{ github.ref }}
           path: src/github.com/containerd/containerd
 
