@@ -274,11 +274,11 @@ func (m *DB) RegisterMutationCallback(fn func(bool)) {
 // to be tracked by go away after reboot or process restart.
 //
 // A few limitations to consider:
-// - Collectible Resources cannot reference other resources.
-// - A failure to complete collection will not fail the garbage collection,
-//   however, the resources can be collected in a later run.
-// - Collectible Resources must track whether the resource is active and/or
-//   lease membership.
+//   - Collectible Resources cannot reference other resources.
+//   - A failure to complete collection will not fail the garbage collection,
+//     however, the resources can be collected in a later run.
+//   - Collectible Resources must track whether the resource is active and/or
+//     lease membership.
 func (m *DB) RegisterCollectibleResource(t gc.ResourceType, c Collector) {
 	if t < resourceEnd {
 		panic("cannot re-register metadata resource")

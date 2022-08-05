@@ -505,7 +505,7 @@ func checkDeletedFilesInChildSnapshot(ctx context.Context, t *testing.T, snapsho
 
 }
 
-//Create three layers. Deleting intermediate layer must fail.
+// Create three layers. Deleting intermediate layer must fail.
 func checkRemoveIntermediateSnapshot(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 
 	base, err := snapshotterPrepareMount(ctx, snapshotter, "base", "", work)
@@ -559,12 +559,13 @@ func checkRemoveIntermediateSnapshot(ctx context.Context, t *testing.T, snapshot
 
 // baseTestSnapshots creates a base set of snapshots for tests, each snapshot is empty
 // Tests snapshots:
-//  c1 - committed snapshot, no parent
-//  c2 - committed snapshot, c1 is parent
-//  a1 - active snapshot, c2 is parent
-//  a1 - active snapshot, no parent
-//  v1 - view snapshot, v1 is parent
-//  v2 - view snapshot, no parent
+//
+//	c1 - committed snapshot, no parent
+//	c2 - committed snapshot, c1 is parent
+//	a1 - active snapshot, c2 is parent
+//	a1 - active snapshot, no parent
+//	v1 - view snapshot, v1 is parent
+//	v2 - view snapshot, no parent
 func baseTestSnapshots(ctx context.Context, snapshotter snapshots.Snapshotter) error {
 	if _, err := snapshotter.Prepare(ctx, "c1-a", "", opt); err != nil {
 		return err

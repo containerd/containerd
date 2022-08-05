@@ -64,7 +64,7 @@ func TestCRIImagePullTimeout(t *testing.T) {
 
 // testCRIImagePullTimeoutByHoldingContentOpenWriter tests that
 //
-//  It should not cancel if there is no active http requests.
+//	It should not cancel if there is no active http requests.
 //
 // When there are several pulling requests for the same blob content, there
 // will only one active http request. It is singleflight. For the waiting pulling
@@ -197,7 +197,7 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T) {
 
 // testCRIImagePullTimeoutByNoDataTransferred tests that
 //
-//   It should fail because there is no data transferred in open http request.
+//	It should fail because there is no data transferred in open http request.
 //
 // The case uses the local mirror registry to forward request with circuit
 // breaker. If the local registry has transferred a certain amount of data in

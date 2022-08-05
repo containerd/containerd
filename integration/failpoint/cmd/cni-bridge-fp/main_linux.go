@@ -20,7 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -168,7 +168,7 @@ func (c *failpointControl) updateTx(updateFn func(conf *failpointConf) error) er
 	}
 	defer unflock(f.Fd())
 
-	data, err := ioutil.ReadAll(f)
+	data, err := io.ReadAll(f)
 	if err != nil {
 		return fmt.Errorf("failed to read failpoint setting %s: %w", c.confPath, err)
 	}

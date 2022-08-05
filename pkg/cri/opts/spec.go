@@ -77,7 +77,8 @@ func WithProcessArgs(config *runtime.ContainerConfig, image *imagespec.ImageConf
 
 // mounts defines how to sort runtime.Mount.
 // This is the same with the Docker implementation:
-//   https://github.com/moby/moby/blob/17.05.x/daemon/volumes.go#L26
+//
+//	https://github.com/moby/moby/blob/17.05.x/daemon/volumes.go#L26
 type orderedMounts []*runtime.Mount
 
 // Len returns the number of mounts. Used in sorting.

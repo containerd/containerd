@@ -153,10 +153,10 @@ type WalkFunc func(context.Context, Info) error
 // For consistency, we define the following terms to be used throughout this
 // interface for snapshotter implementations:
 //
-// 	`ctx` - refers to a context.Context
-// 	`key` - refers to an active snapshot
-// 	`name` - refers to a committed snapshot
-// 	`parent` - refers to the parent in relation
+//	`ctx` - refers to a context.Context
+//	`key` - refers to an active snapshot
+//	`name` - refers to a committed snapshot
+//	`parent` - refers to the parent in relation
 //
 // Most methods take various combinations of these identifiers. Typically,
 // `name` and `parent` will be used in cases where a method *only* takes
@@ -167,7 +167,7 @@ type WalkFunc func(context.Context, Info) error
 //
 // We cover several examples below to demonstrate the utility of the snapshotter.
 //
-// Importing a Layer
+// # Importing a Layer
 //
 // To import a layer, we simply have the snapshotter provide a list of
 // mounts to be applied such that our dst will capture a changeset. We start
@@ -184,7 +184,7 @@ type WalkFunc func(context.Context, Info) error
 //		"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
 //	})
 //	mounts, err := snapshotter.Prepare(ctx, key, "", noGcOpt)
-// 	if err != nil { ... }
+//	if err != nil { ... }
 //
 // We get back a list of mounts from snapshotter.Prepare(), with the key identifying
 // the active snapshot. Mount this to the temporary location with the
@@ -201,8 +201,8 @@ type WalkFunc func(context.Context, Info) error
 //
 //	layer, err := os.Open(layerPath)
 //	if err != nil { ... }
-// 	digest, err := unpackLayer(tmpLocation, layer) // unpack into layer location
-// 	if err != nil { ... }
+//	digest, err := unpackLayer(tmpLocation, layer) // unpack into layer location
+//	if err != nil { ... }
 //
 // When the above completes, we should have a filesystem that represents the
 // contents of the layer. Careful implementations should verify that digest
@@ -220,30 +220,30 @@ type WalkFunc func(context.Context, Info) error
 // Now, we have a layer in the snapshotter that can be accessed with the digest
 // provided during commit.
 //
-// Importing the Next Layer
+// # Importing the Next Layer
 //
 // Making a layer depend on the above is identical to the process described
 // above except that the parent is provided as parent when calling
 // snapshotter.Prepare(), assuming a clean, unique key identifier:
 //
-// 	mounts, err := snapshotter.Prepare(ctx, key, parentDigest, noGcOpt)
+//	mounts, err := snapshotter.Prepare(ctx, key, parentDigest, noGcOpt)
 //
 // We then mount, apply and commit, as we did above. The new snapshot will be
 // based on the content of the previous one.
 //
-// Running a Container
+// # Running a Container
 //
 // To run a container, we simply provide snapshotter.Prepare() the committed image
 // snapshot as the parent. After mounting, the prepared path can
 // be used directly as the container's filesystem:
 //
-// 	mounts, err := snapshotter.Prepare(ctx, containerKey, imageRootFSChainID)
+//	mounts, err := snapshotter.Prepare(ctx, containerKey, imageRootFSChainID)
 //
 // The returned mounts can then be passed directly to the container runtime. If
 // one would like to create a new image from the filesystem, snapshotter.Commit() is
 // called:
 //
-// 	if err := snapshotter.Commit(ctx, newImageSnapshot, containerKey); err != nil { ... }
+//	if err := snapshotter.Commit(ctx, newImageSnapshot, containerKey); err != nil { ... }
 //
 // Alternatively, for most container runs, snapshotter.Remove() will be called to
 // signal the snapshotter to abandon the changes.
