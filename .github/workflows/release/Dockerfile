@@ -12,7 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-ARG UBUNTU_VERSION=22.04
+# UBUNTU_VERSION can be set to 18.04 (bionic), 20.04 (focal), or 22.04 (jammy)
+ARG UBUNTU_VERSION=18.04
 ARG BASE_IMAGE=ubuntu:${UBUNTU_VERSION}
 ARG GO_VERSION
 ARG GO_IMAGE=golang:${GO_VERSION}
@@ -25,7 +26,8 @@ SHELL ["/bin/bash", "-xec"]
 RUN	apt-get update && \
 	apt-get install -y dpkg-dev git make pkg-config
 ARG TARGETPLATFORM
-RUN xx-apt-get install -y libseccomp-dev libbtrfs-dev gcc
+RUN xx-apt-get install -y libseccomp-dev btrfs-progs gcc
+RUN if grep -qE 'UBUNTU_CODENAME=(focal|jammy)' /etc/os-release; then xx-apt-get install -y libbtrfs-dev; fi
 ENV PATH=/usr/local/go/bin:$PATH
 ENV GOPATH=/go
 ENV CGO_ENABLED=1
