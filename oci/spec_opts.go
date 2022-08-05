@@ -794,15 +794,19 @@ func WithAppendAdditionalGroups(groups ...string) SpecOpts {
 			groupMap := make(map[string]user.Group)
 			for _, group := range ugroups {
 				groupMap[group.Name] = group
-				groupMap[strconv.Itoa(group.Gid)] = group
 			}
 			var gids []uint32
 			for _, group := range groups {
-				g, ok := groupMap[group]
-				if !ok {
-					return fmt.Errorf("unable to find group %s", group)
+				gid, err := strconv.ParseUint(group, 10, 32)
+				if err == nil {
+					gids = append(gids, uint32(gid))
+				} else {
+					g, ok := groupMap[group]
+					if !ok {
+						return fmt.Errorf("unable to find group %s", group)
+					}
+					gids = append(gids, uint32(g.Gid))
 				}
-				gids = append(gids, uint32(g.Gid))
 			}
 			s.Process.User.AdditionalGids = append(s.Process.User.AdditionalGids, gids...)
 			return nil
