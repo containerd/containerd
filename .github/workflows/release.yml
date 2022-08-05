@@ -5,6 +5,9 @@ on:
 
 name: Containerd Release
 
+env:
+  GO_VERSION: '1.18.5'
+
 jobs:
   check:
     name: Check Signed Tag
@@ -66,7 +69,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v2
         with:
-          go-version: '1.18.5'
+          go-version: ${{ env.GO_VERSION }}
       - name: Set env
         shell: bash
         env:
@@ -109,7 +112,6 @@ jobs:
           find ./releases/ -maxdepth 1 -type l | xargs rm
         working-directory: src/github.com/containerd/containerd
         env:
-          GO_VERSION: '1.18.5'
           PLATFORM: ${{ matrix.platform }}
       - name: Save Artifacts
         uses: actions/upload-artifact@v2

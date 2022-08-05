@@ -9,6 +9,11 @@ on:
       - main
       - 'release/**'
 
+env:
+  # Go version we currently use to build containerd across all CI.
+  # Note: don't forget to update `Binaries` step, as it contains the matrix of all supported Go versions.
+  GO_VERSION: '1.18.5'
+
 jobs:
   #
   # golangci-lint
@@ -20,13 +25,12 @@ jobs:
 
     strategy:
       matrix:
-        go-version: [1.18.5]
         os: [ubuntu-18.04, macos-12, windows-2019]
 
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: ${{ env.GO_VERSION }}
 
       - uses: actions/checkout@v2
       - uses: golangci/golangci-lint-action@v3
@@ -46,7 +50,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.18.5'
+          go-version: ${{ env.GO_VERSION }}
 
       - uses: actions/checkout@v2
         with:
@@ -78,7 +82,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.18.5'
+          go-version: ${{ env.GO_VERSION }}
 
       - uses: actions/checkout@v2
         with:
@@ -110,7 +114,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.18.5'
+          go-version: ${{ env.GO_VERSION }}
       - uses: actions/checkout@v2
       - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.1
       - run: make man
@@ -148,7 +152,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.18.5'
+          go-version: ${{ env.GO_VERSION }}
       - uses: actions/checkout@v2
       - run: |
           set -e -x
@@ -262,7 +266,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.18.5'
+          go-version: ${{ env.GO_VERSION }}
 
       - uses: actions/checkout@v2
         with:
@@ -404,7 +408,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.18.5'
+          go-version: ${{ env.GO_VERSION }}
 
       - uses: actions/checkout@v2
 
@@ -534,7 +538,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.18.5'
+          go-version: ${{ env.GO_VERSION }}
       - uses: actions/checkout@v2
       - run: sudo -E PATH=$PATH script/setup/install-gotestsum
       - name: Tests
