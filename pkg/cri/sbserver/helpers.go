@@ -46,6 +46,8 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
+// TODO: Move common helpers for sbserver and podsandbox to a dedicated package once basic services are functinal.
+
 const (
 	// errorStartReason is the exit reason when fails to start container.
 	errorStartReason = "StartError"
@@ -219,9 +221,9 @@ func getUserFromImage(user string) (*int64, string) {
 	return &uid, ""
 }
 
-// ensureImageExists returns corresponding metadata of the image reference, if image is not
+// EnsureImageExists returns corresponding metadata of the image reference, if image is not
 // pulled yet, the function will pull the image.
-func (c *criService) ensureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig) (*imagestore.Image, error) {
+func (c *criService) EnsureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig) (*imagestore.Image, error) {
 	image, err := c.localResolve(ref)
 	if err != nil && !errdefs.IsNotFound(err) {
 		return nil, fmt.Errorf("failed to get image %q: %w", ref, err)

@@ -17,20 +17,23 @@
    limitations under the License.
 */
 
-package sbserver
+package podsandbox
 
 import (
-	"github.com/containerd/containerd"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"context"
+	"os"
+
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
-// cleanupSandboxFiles unmount some sandbox files, we rely on the removal of sandbox root directory to
-// remove these files. Unmount should *NOT* return error if the mount point is already unmounted.
-func (c *criService) cleanupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
-	return nil
+// ensureRemoveAll wraps `os.RemoveAll` to check for specific errors that can
+// often be remedied.
+// Only use `ensureRemoveAll` if you really want to make every effort to remove
+// a directory.
+func ensureRemoveAll(ctx context.Context, dir string) error {
+	return os.RemoveAll(dir)
 }
 
-// taskOpts generates task options for a (sandbox) container.
-func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {
-	return []containerd.NewTaskOpts{}
+func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
+	return nil
 }

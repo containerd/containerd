@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package sbserver
+package podsandbox
 
 import (
 	"os"
@@ -236,7 +236,7 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			c := newTestCRIService()
+			c := newControllerService()
 			c.config.EnableUnprivilegedICMP = true
 			c.config.EnableUnprivilegedPorts = true
 			config, imageConfig, specCheck := getRunPodSandboxTestData()
@@ -428,7 +428,7 @@ options timeout:1
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			c := newTestCRIService()
+			c := newControllerService()
 			c.os.(*ostesting.FakeOS).HostnameFn = func() (string, error) {
 				return realhostname, nil
 			}
@@ -509,7 +509,7 @@ options timeout:1
 
 func TestSandboxDisableCgroup(t *testing.T) {
 	config, imageConfig, _ := getRunPodSandboxTestData()
-	c := newTestCRIService()
+	c := newControllerService()
 	c.config.DisableCgroup = true
 	spec, err := c.sandboxContainerSpec("test-id", config, imageConfig, "test-cni", []string{})
 	require.NoError(t, err)

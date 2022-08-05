@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package sbserver
+package podsandbox
 
 import (
 	"testing"
@@ -95,7 +95,7 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 func TestSandboxWindowsNetworkNamespace(t *testing.T) {
 	testID := "test-id"
 	nsPath := "test-cni"
-	c := newTestCRIService()
+	c := newControllerService()
 
 	config, imageConfig, specCheck := getRunPodSandboxTestData()
 	spec, err := c.sandboxContainerSpec(testID, config, imageConfig, nsPath, nil)

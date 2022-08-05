@@ -17,20 +17,20 @@
    limitations under the License.
 */
 
-package sbserver
+package podsandbox
 
 import (
-	"github.com/containerd/containerd"
+	"testing"
+
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-// cleanupSandboxFiles unmount some sandbox files, we rely on the removal of sandbox root directory to
-// remove these files. Unmount should *NOT* return error if the mount point is already unmounted.
-func (c *criService) cleanupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
-	return nil
-}
-
-// taskOpts generates task options for a (sandbox) container.
-func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {
-	return []containerd.NewTaskOpts{}
+func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
+	config := &runtime.PodSandboxConfig{}
+	imageConfig := &imagespec.ImageConfig{}
+	specCheck := func(t *testing.T, id string, spec *runtimespec.Spec) {
+	}
+	return config, imageConfig, specCheck
 }

@@ -1,6 +1,3 @@
-//go:build !windows && !linux
-// +build !windows,!linux
-
 /*
    Copyright The containerd Authors.
 
@@ -17,20 +14,20 @@
    limitations under the License.
 */
 
-package sbserver
+package podsandbox
 
 import (
-	"testing"
+	"context"
+	"os"
 
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
-func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
-	config := &runtime.PodSandboxConfig{}
-	imageConfig := &imagespec.ImageConfig{}
-	specCheck := func(t *testing.T, id string, spec *runtimespec.Spec) {
-	}
-	return config, imageConfig, specCheck
+// ensureRemoveAll is a wrapper for os.RemoveAll on Windows.
+func ensureRemoveAll(_ context.Context, dir string) error {
+	return os.RemoveAll(dir)
+}
+
+func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
+	return nil
 }

@@ -18,8 +18,10 @@ package sandbox
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/typeurl"
 )
 
@@ -63,4 +65,52 @@ type Store interface {
 
 	// Delete a sandbox from metadata store using the id
 	Delete(ctx context.Context, id string) error
+}
+
+// AddExtension is a helper function to add sandbox metadata extension.
+func (s *Sandbox) AddExtension(name string, obj interface{}) error {
+	if s.Extensions == nil {
+		s.Extensions = map[string]typeurl.Any{}
+	}
+
+	out, err := typeurl.MarshalAny(obj)
+	if err != nil {
+		return fmt.Errorf("failed to marshal sandbox extension %q: %w", name, err)
+	}
+
+	s.Extensions[name] = out
+	return nil
+}
+
+// AddLabel adds a label to sandbox's labels.
+func (s *Sandbox) AddLabel(name string, value string) {
+	if s.Labels == nil {
+		s.Labels = map[string]string{}
+	}
+
+	s.Labels[name] = value
+}
+
+// GetExtension retrieves a sandbox extension by name.
+func (s *Sandbox) GetExtension(name string, obj interface{}) error {
+	out, ok := s.Extensions[name]
+	if !ok {
+		return errdefs.ErrNotFound
+	}
+
+	if err := typeurl.UnmarshalTo(out, obj); err != nil {
+		return fmt.Errorf("failed to unmarshal sandbox extension %q: %w", name, err)
+	}
+
+	return nil
+}
+
+// GetLabel retrieves a sandbox label by name.
+func (s *Sandbox) GetLabel(name string) (string, error) {
+	out, ok := s.Labels[name]
+	if !ok {
+		return "", fmt.Errorf("unable to find label %q in sandbox metadata: %w", name, errdefs.ErrNotFound)
+	}
+
+	return out, nil
 }

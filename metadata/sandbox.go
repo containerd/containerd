@@ -369,9 +369,5 @@ func (s *sandboxStore) validate(new *api.Sandbox) error {
 		return fmt.Errorf("updated date must not be zero: %w", errdefs.ErrInvalidArgument)
 	}
 
-	if new.Runtime.Name == "" {
-		return fmt.Errorf("sandbox.Runtime.Name must be set: %w", errdefs.ErrInvalidArgument)
-	}
-
 	return nil
 }

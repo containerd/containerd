@@ -108,6 +108,10 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	// 3) On-going operations which have held the reference will not be affected.
 	c.sandboxStore.Delete(id)
 
+	if err := c.client.SandboxStore().Delete(ctx, id); err != nil {
+		return nil, fmt.Errorf("failed to remove sandbox metadata from store: %w", err)
+	}
+
 	// Release the sandbox name reserved for the sandbox.
 	c.sandboxNameIndex.ReleaseByKey(id)
 

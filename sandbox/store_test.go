@@ -14,19 +14,27 @@
    limitations under the License.
 */
 
-package sbserver
+package sandbox
 
 import (
-	"github.com/containerd/containerd"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"testing"
+
+	"github.com/containerd/typeurl"
+	"github.com/stretchr/testify/assert"
 )
 
-// No sandbox files needed for windows.
-func (c *criService) cleanupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
-	return nil
-}
+func TestAddExtension(t *testing.T) {
+	sb := Sandbox{ID: "1"}
 
-// No task options needed for windows.
-func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {
-	return nil
+	type test struct{ Name string }
+
+	typeurl.Register(&test{})
+
+	var in = test{Name: "test"}
+	assert.NoError(t, sb.AddExtension("test", &in))
+
+	var out test
+	err := sb.GetExtension("test", &out)
+	assert.NoError(t, err)
+	assert.Equal(t, "test", out.Name)
 }

@@ -17,6 +17,7 @@
 package sbserver
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -28,9 +29,11 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/pkg/cri/sbserver/podsandbox"
 	"github.com/containerd/containerd/pkg/cri/streaming"
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/go-cni"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -88,6 +91,8 @@ type criService struct {
 	sandboxNameIndex *registrar.Registrar
 	// containerStore stores all resources associated with containers.
 	containerStore *containerstore.Store
+	// sandboxController controls sandbox lifecycle (and hides implementation details behind).
+	sandboxController sandbox.Controller
 	// containerNameIndex stores all container names and make sure each
 	// name is unique.
 	containerNameIndex *registrar.Registrar
@@ -181,7 +186,15 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 		return nil, err
 	}
 
+	c.sandboxController = podsandbox.New(config, client, c.sandboxStore, c.os, c, c.baseOCISpecs)
+
 	return c, nil
+}
+
+// StartSandboxExitMonitor is a temporary workaround to call monitor from pause controller.
+// TODO: get rid of this.
+func (c *criService) StartSandboxExitMonitor(ctx context.Context, id string, pid uint32, exitCh <-chan containerd.ExitStatus) <-chan struct{} {
+	return c.eventMonitor.startSandboxExitMonitor(ctx, id, pid, exitCh)
 }
 
 // Register registers all required services onto a specific grpc server.

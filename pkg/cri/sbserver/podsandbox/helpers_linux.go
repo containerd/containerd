@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package sbserver
+package podsandbox
 
 import (
 	"context"
@@ -30,28 +30,28 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/pkg/apparmor"
 	"github.com/containerd/containerd/pkg/seccomp"
 	"github.com/containerd/containerd/pkg/seutil"
 	"github.com/moby/sys/mountinfo"
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/selinux/go-selinux/label"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 const (
+	// defaultSandboxOOMAdj is default omm adj for sandbox container. (kubernetes#47938).
+	defaultSandboxOOMAdj = -998
+	// defaultShmSize is the default size of the sandbox shm.
+	defaultShmSize = int64(1024 * 1024 * 64)
 	// relativeRootfsPath is the rootfs path relative to bundle path.
 	relativeRootfsPath = "rootfs"
 	// devShm is the default path of /dev/shm.
 	devShm = "/dev/shm"
 	// etcHosts is the default path of /etc/hosts file.
 	etcHosts = "/etc/hosts"
-	// etcHostname is the default path of /etc/hostname file.
-	etcHostname = "/etc/hostname"
 	// resolvConfPath is the abs path of resolv.conf on host or container.
 	resolvConfPath = "/etc/resolv.conf"
-	// hostnameEnv is the key for HOSTNAME env.
-	hostnameEnv = "HOSTNAME"
 )
 
 // getCgroupsPath generates container cgroups path.
@@ -66,22 +66,22 @@ func getCgroupsPath(cgroupsParent, id string) string {
 }
 
 // getSandboxHostname returns the hostname file path inside the sandbox root directory.
-func (c *criService) getSandboxHostname(id string) string {
+func (c *Controller) getSandboxHostname(id string) string {
 	return filepath.Join(c.getSandboxRootDir(id), "hostname")
 }
 
 // getSandboxHosts returns the hosts file path inside the sandbox root directory.
-func (c *criService) getSandboxHosts(id string) string {
+func (c *Controller) getSandboxHosts(id string) string {
 	return filepath.Join(c.getSandboxRootDir(id), "hosts")
 }
 
 // getResolvPath returns resolv.conf filepath for specified sandbox.
-func (c *criService) getResolvPath(id string) string {
+func (c *Controller) getResolvPath(id string) string {
 	return filepath.Join(c.getSandboxRootDir(id), "resolv.conf")
 }
 
 // getSandboxDevShm returns the shm file path inside the sandbox root directory.
-func (c *criService) getSandboxDevShm(id string) string {
+func (c *Controller) getSandboxDevShm(id string) string {
 	return filepath.Join(c.getVolatileSandboxRootDir(id), "shm")
 }
 
@@ -110,6 +110,14 @@ func toLabel(selinuxOptions *runtime.SELinuxOption) ([]string, error) {
 	return labels, nil
 }
 
+func initLabelsFromOpt(selinuxOpts *runtime.SELinuxOption) (string, string, error) {
+	labels, err := toLabel(selinuxOpts)
+	if err != nil {
+		return "", "", err
+	}
+	return label.InitLabels(labels)
+}
+
 func checkSelinuxLevel(level string) error {
 	if len(level) == 0 {
 		return nil
@@ -125,25 +133,8 @@ func checkSelinuxLevel(level string) error {
 	return nil
 }
 
-// apparmorEnabled returns true if apparmor is enabled, supported by the host,
-// if apparmor_parser is installed, and if we are not running docker-in-docker.
-func (c *criService) apparmorEnabled() bool {
-	if c.config.DisableApparmor {
-		return false
-	}
-	return apparmor.HostSupports()
-}
-
-func (c *criService) seccompEnabled() bool {
+func (c *Controller) seccompEnabled() bool {
 	return seccomp.IsEnabled()
-}
-
-// openLogFile opens/creates a container log file.
-func openLogFile(path string) (*os.File, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return nil, err
-	}
-	return os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0640)
 }
 
 // unmountRecursive unmounts the target and all mounts underneath, starting with
