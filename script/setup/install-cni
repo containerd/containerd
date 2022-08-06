@@ -25,6 +25,12 @@ CNI_COMMIT=${1:-$(go list -f "{{.Version}}" -m github.com/containernetworking/pl
 CNI_DIR=${DESTDIR:=''}/opt/cni
 CNI_CONFIG_DIR=${DESTDIR}/etc/cni/net.d
 
+# e2e and Cirrus will fail with "sudo: command not found"
+SUDO=''
+if (( $EUID != 0 )); then
+    SUDO='sudo'
+fi
+
 TMPROOT=$(mktemp -d)
 git clone https://github.com/containernetworking/plugins.git "${TMPROOT}"/plugins
 pushd "${TMPROOT}"/plugins
@@ -32,8 +38,8 @@ git checkout "$CNI_COMMIT"
 ./build_linux.sh
 mkdir -p $CNI_DIR
 cp -r ./bin $CNI_DIR
-mkdir -p $CNI_CONFIG_DIR
-cat << EOF | tee $CNI_CONFIG_DIR/10-containerd-net.conflist
+$SUDO mkdir -p $CNI_CONFIG_DIR
+$SUDO cat << EOF | $SUDO tee $CNI_CONFIG_DIR/10-containerd-net.conflist
 {
   "cniVersion": "0.4.0",
   "name": "containerd-net",

@@ -333,13 +333,13 @@ jobs:
       - name: Install containerd dependencies
         env:
           RUNC_FLAVOR: ${{ matrix.runc }}
-          GOFLAGS: -modcacherw
         run: |
           sudo apt-get install -y gperf
-          sudo -E PATH=$PATH script/setup/install-seccomp
-          sudo -E PATH=$PATH script/setup/install-runc
-          sudo -E PATH=$PATH script/setup/install-cni
-          sudo -E PATH=$PATH script/setup/install-critools
+          script/setup/install-seccomp
+          script/setup/install-runc
+          script/setup/install-cni $(grep containernetworking/plugins go.mod | awk '{print $2}')
+          script/setup/install-critools
+          script/setup/install-failpoint-binaries
 
       - name: Install criu
         run: |
@@ -358,10 +358,6 @@ jobs:
           cd criu-3.13
           sudo make install-criu
 
-      - name: Install failpoint binaries
-        run: |
-          script/setup/install-failpoint-binaries
-
       - name: Install containerd
         env:
           CGO_ENABLED: 1
@@ -369,7 +365,7 @@ jobs:
           make binaries GO_BUILD_FLAGS="-mod=vendor"
           sudo -E PATH=$PATH make install
 
-      - run: sudo -E PATH=$PATH script/setup/install-gotestsum
+      - run: script/setup/install-gotestsum
       - name: Tests
         env:
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root-junit.xml
@@ -470,7 +466,7 @@ jobs:
         with:
           go-version: '1.18.9'
       - uses: actions/checkout@v2
-      - run: sudo -E PATH=$PATH script/setup/install-gotestsum
+      - run: script/setup/install-gotestsum
       - name: Tests
         env:
           GOTESTSUM_JUNITFILE: "${{ github.workspace }}/macos-test-junit.xml"
