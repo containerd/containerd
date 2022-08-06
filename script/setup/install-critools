@@ -22,6 +22,12 @@ set -eu -o pipefail
 
 script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
 
+# e2e will fail with "sudo: command not found"
+SUDO=''
+if (( $EUID != 0 )); then
+    SUDO='sudo'
+fi
+
 cd "$(go env GOPATH)"
 go install github.com/onsi/ginkgo/v2/ginkgo@v2.1.4
 
@@ -33,10 +39,10 @@ git clone https://github.com/kubernetes-sigs/cri-tools.git "${TMPROOT}/cri-tools
 pushd "${TMPROOT}"/cri-tools
 git checkout "$CRITEST_COMMIT"
 make
-make install -e DESTDIR="${DESTDIR}" BINDIR=/usr/local/bin
+$SUDO make install -e DESTDIR="${DESTDIR}" BINDIR=/usr/local/bin
 
 mkdir -p "${DESTDIR}/etc/"
-cat << EOF | tee "${DESTDIR}/etc/crictl.yaml"
+$SUDO cat << EOF | $SUDO tee "${DESTDIR}/etc/crictl.yaml"
 runtime-endpoint: unix:///run/containerd/containerd.sock
 EOF
 

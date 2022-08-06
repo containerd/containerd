@@ -20,6 +20,14 @@
 #
 set -eu -o pipefail
 
+script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
+
+# e2e and Cirrus will fail with "sudo: command not found"
+SUDO=''
+if (( $EUID != 0 )); then
+    SUDO='sudo'
+fi
+
 function install_runc() {
 	script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
 
@@ -31,15 +39,15 @@ function install_runc() {
 	pushd "${TMPROOT}"/runc
 	git checkout "${RUNC_VERSION}"
 	make BUILDTAGS='seccomp' runc
-	make install
+	$SUDO make install
 	popd
 	rm -fR "${TMPROOT}"
 }
 
 function install_crun() {
 	CRUN_VERSION=1.3
-	curl -o /usr/local/sbin/runc -L https://github.com/containers/crun/releases/download/"${CRUN_VERSION}"/crun-"${CRUN_VERSION}"-linux-"$(go env GOARCH)"
-	chmod +x /usr/local/sbin/runc
+	$SUDO curl -S -o /usr/local/sbin/runc -L https://github.com/containers/crun/releases/download/"${CRUN_VERSION}"/crun-"${CRUN_VERSION}"-linux-"$(go env GOARCH)"
+	$SUDO chmod +x /usr/local/sbin/runc
 }
 
 : "${RUNC_FLAVOR:=runc}"
