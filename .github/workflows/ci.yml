@@ -415,23 +415,19 @@ jobs:
       - name: Install containerd dependencies
         env:
           RUNC_FLAVOR: ${{ matrix.runc }}
-          GOFLAGS: -modcacherw
         run: |
           sudo apt-get install -y gperf
-          sudo -E PATH=$PATH script/setup/install-seccomp
-          sudo -E PATH=$PATH script/setup/install-runc
-          sudo -E PATH=$PATH script/setup/install-cni $(grep containernetworking/plugins go.mod | awk '{print $2}')
-          sudo -E PATH=$PATH script/setup/install-critools
+          script/setup/install-seccomp
+          script/setup/install-runc
+          script/setup/install-cni $(grep containernetworking/plugins go.mod | awk '{print $2}')
+          script/setup/install-critools
+          script/setup/install-failpoint-binaries
 
       - name: Install criu
         run: |
           sudo add-apt-repository ppa:criu/ppa
           sudo apt-get update
           sudo apt-get install -y criu
-
-      - name: Install failpoint binaries
-        run: |
-          script/setup/install-failpoint-binaries
 
       - name: Install containerd
         env:
@@ -440,7 +436,7 @@ jobs:
           make binaries GO_BUILD_FLAGS="-mod=vendor"
           sudo -E PATH=$PATH make install
 
-      - run: sudo -E PATH=$PATH script/setup/install-gotestsum
+      - run: script/setup/install-gotestsum
       - name: Tests
         env:
           GOPROXY: direct
@@ -540,7 +536,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - uses: actions/checkout@v2
-      - run: sudo -E PATH=$PATH script/setup/install-gotestsum
+      - run: script/setup/install-gotestsum
       - name: Tests
         env:
           GOPROXY: direct
