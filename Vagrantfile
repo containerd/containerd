@@ -259,6 +259,7 @@ EOF
         function cleanup()
         {
             journalctl -u containerd > /tmp/containerd.log
+            cat /tmp/containerd.log
             systemctl stop containerd
         }
         selinux=$(getenforce)
