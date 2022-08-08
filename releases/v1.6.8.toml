@@ -1,0 +1,17 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.6.7"
+
+pre_release = false
+
+preface = """\
+The eighth patch release for containerd 1.6 fixes a regression in the release
+build binaries which limited the environments they could be run in.
+
+See the changelog for complete list of changes"""
