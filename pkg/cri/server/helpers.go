@@ -32,17 +32,13 @@ import (
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-	runtimeoptions "github.com/containerd/containerd/pkg/runtimeoptions/v1"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
-	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl"
-	"github.com/sirupsen/logrus"
-
-	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/pelletier/go-toml"
+	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -88,9 +84,6 @@ const (
 
 	// defaultIfName is the default network interface for the pods
 	defaultIfName = "eth0"
-
-	// runtimeRunhcsV1 is the runtime type for runhcs.
-	runtimeRunhcsV1 = "io.containerd.runhcs.v1"
 )
 
 // makeSandboxName generates sandbox name from sandbox metadata. The name
@@ -354,22 +347,6 @@ func generateRuntimeOptions(r criconfig.Runtime, c criconfig.Config) (interface{
 		return nil, err
 	}
 	return options, nil
-}
-
-// getRuntimeOptionsType gets empty runtime options by the runtime type name.
-func getRuntimeOptionsType(t string) interface{} {
-	switch t {
-	case plugin.RuntimeRuncV1:
-		fallthrough
-	case plugin.RuntimeRuncV2:
-		return &runcoptions.Options{}
-	case plugin.RuntimeLinuxV1:
-		return &runctypes.RuncOptions{}
-	case runtimeRunhcsV1:
-		return &runhcsoptions.Options{}
-	default:
-		return &runtimeoptions.Options{}
-	}
 }
 
 // getRuntimeOptions get runtime options from container metadata.

@@ -23,6 +23,7 @@ import (
 	"context"
 	"os"
 
+	runtimeoptions "github.com/containerd/containerd/pkg/runtimeoptions/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -41,4 +42,9 @@ func ensureRemoveAll(ctx context.Context, dir string) error {
 
 func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
 	return nil
+}
+
+// getRuntimeOptionsType gets empty runtime options by the runtime type name.
+func getRuntimeOptionsType(t string) interface{} {
+	return &runtimeoptions.Options{}
 }

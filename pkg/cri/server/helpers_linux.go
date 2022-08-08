@@ -31,8 +31,12 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/apparmor"
+	runtimeoptions "github.com/containerd/containerd/pkg/runtimeoptions/v1"
 	"github.com/containerd/containerd/pkg/seccomp"
 	"github.com/containerd/containerd/pkg/seutil"
+	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/runtime/linux/runctypes"
+	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/moby/sys/mountinfo"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux/label"
@@ -274,4 +278,18 @@ func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
 	}
 	spec.Process.SelinuxLabel = l
 	return nil
+}
+
+// getRuntimeOptionsType gets empty runtime options by the runtime type name.
+func getRuntimeOptionsType(t string) interface{} {
+	switch t {
+	case plugin.RuntimeRuncV1:
+		fallthrough
+	case plugin.RuntimeRuncV2:
+		return &runcoptions.Options{}
+	case plugin.RuntimeLinuxV1:
+		return &runctypes.RuncOptions{}
+	default:
+		return &runtimeoptions.Options{}
+	}
 }
