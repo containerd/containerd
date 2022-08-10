@@ -261,6 +261,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}()
 
 	status := containerstore.Status{CreatedAt: time.Now().UnixNano()}
+	status = copyResourcesToStatus(spec, status)
 	container, err := containerstore.NewContainer(meta,
 		containerstore.WithStatus(status, containerRootDir),
 		containerstore.WithContainer(cntr),
