@@ -1601,6 +1601,41 @@ func (in *instrumentedAlphaService) ReopenContainerLog(ctx context.Context, r *r
 	return res, errdefs.ToGRPC(err)
 }
 
+func (in *instrumentedService) CheckpointContainer(ctx context.Context, r *runtime.CheckpointContainerRequest) (res *runtime.CheckpointContainerResponse, err error) {
+	if err := in.checkInitialized(); err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("CheckpointContainer failed, error")
+		} else {
+			log.G(ctx).Debug("CheckpointContainer returns successfully")
+		}
+	}()
+
+	res, err = in.c.CheckpointContainer(ctx, r)
+	return res, errdefs.ToGRPC(err)
+}
+
+func (in *instrumentedService) GetContainerEvents(r *runtime.GetEventsRequest, s runtime.RuntimeService_GetContainerEventsServer) (err error) {
+	if err := in.checkInitialized(); err != nil {
+		return err
+	}
+
+	ctx := s.Context()
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("GetContainerEvents failed, error")
+		} else {
+			log.G(ctx).Debug("GetContainerEvents returns successfully")
+		}
+	}()
+
+	err = in.c.GetContainerEvents(r, s)
+	return errdefs.ToGRPC(err)
+}
+
 func alphaReqToV1Req(
 	alphar interface{ Marshal() ([]byte, error) },
 	v1r interface{ Unmarshal(_ []byte) error },
