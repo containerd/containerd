@@ -27,7 +27,7 @@ require (
 	github.com/cilium/ebpf v0.7.0 // indirect
 	github.com/container-orchestrated-devices/container-device-interface v0.3.1 // indirect
 	github.com/containerd/console v1.0.3 // indirect
-	github.com/containerd/continuity v0.3.0 // indirect
+	github.com/containerd/continuity v0.3.1-0.20220810172617-b4ca35286886 // indirect
 	github.com/containerd/fifo v1.0.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
