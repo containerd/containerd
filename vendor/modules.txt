@@ -467,7 +467,7 @@ golang.org/x/crypto/openpgp/errors
 golang.org/x/crypto/openpgp/packet
 golang.org/x/crypto/openpgp/s2k
 golang.org/x/crypto/pbkdf2
-# golang.org/x/net v0.0.0-20211216030914-fe4d6282115f
+# golang.org/x/net v0.0.0-20220225172249-27dd8689420f
 ## explicit; go 1.17
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
@@ -497,7 +497,7 @@ golang.org/x/sys/windows/registry
 golang.org/x/sys/windows/svc
 golang.org/x/sys/windows/svc/debug
 golang.org/x/sys/windows/svc/mgr
-# golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b
+# golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 ## explicit; go 1.17
 golang.org/x/term
 # golang.org/x/text v0.3.7
@@ -522,13 +522,13 @@ google.golang.org/appengine/internal/log
 google.golang.org/appengine/internal/remote_api
 google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/urlfetch
-# google.golang.org/genproto v0.0.0-20211208223120-3a66f561d7aa => google.golang.org/genproto v0.0.0-20200224152610-e50cd9704f63
+# google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21 => google.golang.org/genproto v0.0.0-20200224152610-e50cd9704f63
 ## explicit; go 1.11
 google.golang.org/genproto/googleapis/api/httpbody
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
 google.golang.org/genproto/protobuf/field_mask
-# google.golang.org/grpc v1.43.0
+# google.golang.org/grpc v1.47.0
 ## explicit; go 1.14
 google.golang.org/grpc
 google.golang.org/grpc/attributes
@@ -538,6 +538,7 @@ google.golang.org/grpc/balancer/base
 google.golang.org/grpc/balancer/grpclb/state
 google.golang.org/grpc/balancer/roundrobin
 google.golang.org/grpc/binarylog/grpc_binarylog_v1
+google.golang.org/grpc/channelz
 google.golang.org/grpc/codes
 google.golang.org/grpc/connectivity
 google.golang.org/grpc/credentials
@@ -550,6 +551,7 @@ google.golang.org/grpc/health
 google.golang.org/grpc/health/grpc_health_v1
 google.golang.org/grpc/internal
 google.golang.org/grpc/internal/backoff
+google.golang.org/grpc/internal/balancer/gracefulswitch
 google.golang.org/grpc/internal/balancerload
 google.golang.org/grpc/internal/binarylog
 google.golang.org/grpc/internal/buffer
@@ -561,6 +563,7 @@ google.golang.org/grpc/internal/grpcrand
 google.golang.org/grpc/internal/grpcsync
 google.golang.org/grpc/internal/grpcutil
 google.golang.org/grpc/internal/metadata
+google.golang.org/grpc/internal/pretty
 google.golang.org/grpc/internal/resolver
 google.golang.org/grpc/internal/resolver/dns
 google.golang.org/grpc/internal/resolver/passthrough
@@ -578,8 +581,8 @@ google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
-# google.golang.org/protobuf v1.27.1
-## explicit; go 1.9
+# google.golang.org/protobuf v1.28.0
+## explicit; go 1.11
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire
@@ -624,7 +627,7 @@ gopkg.in/square/go-jose.v2/json
 # gopkg.in/yaml.v2 v2.4.0
 ## explicit; go 1.15
 gopkg.in/yaml.v2
-# gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+# gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
 # gotest.tools/v3 v3.0.3
@@ -729,8 +732,8 @@ k8s.io/component-base/logs/logreduction
 k8s.io/component-base/metrics
 k8s.io/component-base/metrics/legacyregistry
 k8s.io/component-base/version
-# k8s.io/cri-api v0.23.1
-## explicit; go 1.16
+# k8s.io/cri-api v0.25.0-alpha.3.0.20220803042751-33bb7ae0d927
+## explicit; go 1.18
 k8s.io/cri-api/pkg/apis/runtime/v1
 k8s.io/cri-api/pkg/apis/runtime/v1alpha2
 # k8s.io/klog/v2 v2.30.0
