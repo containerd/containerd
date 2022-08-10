@@ -48,11 +48,11 @@ type Task struct {
 	namespace string
 	cg        cgroups.Cgroup
 	events    *exchange.Exchange
-	tasks     *runtime.TaskList
+	tasks     *runtime.NSMap[runtime.Task]
 	bundle    *bundle
 }
 
-func newTask(id, namespace string, pid int, shim *client.Client, events *exchange.Exchange, list *runtime.TaskList, bundle *bundle) (*Task, error) {
+func newTask(id, namespace string, pid int, shim *client.Client, events *exchange.Exchange, list *runtime.NSMap[runtime.Task], bundle *bundle) (*Task, error) {
 	var (
 		err error
 		cg  cgroups.Cgroup

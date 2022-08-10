@@ -134,7 +134,7 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ *shimTask,
 	return s, nil
 }
 
-func cleanupAfterDeadShim(ctx context.Context, id, ns string, rt *runtime.TaskList, events *exchange.Exchange, binaryCall *binary) {
+func cleanupAfterDeadShim(ctx context.Context, id, ns string, rt *runtime.NSMap[runtime.Task], events *exchange.Exchange, binaryCall *binary) {
 	ctx = namespaces.WithNamespace(ctx, ns)
 	ctx, cancel := timeout.WithContext(ctx, cleanupTimeout)
 	defer cancel()

@@ -143,7 +143,7 @@ func NewShimManager(ctx context.Context, config *ManagerConfig) (*ShimManager, e
 		state:                  config.State,
 		containerdAddress:      config.Address,
 		containerdTTRPCAddress: config.TTRPCAddress,
-		shims:                  runtime.NewTaskList(),
+		shims:                  runtime.NewNSMap[runtime.Task](),
 		events:                 config.Events,
 		containers:             config.Store,
 		schedCore:              config.SchedCore,
@@ -167,7 +167,7 @@ type ShimManager struct {
 	containerdAddress      string
 	containerdTTRPCAddress string
 	schedCore              bool
-	shims                  *runtime.TaskList
+	shims                  *runtime.NSMap[runtime.Task]
 	events                 *exchange.Exchange
 	containers             containers.Store
 	// runtimePaths is a cache of `runtime names` -> `resolved fs path`

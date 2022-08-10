@@ -124,7 +124,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	r := &Runtime{
 		root:       ic.Root,
 		state:      ic.State,
-		tasks:      runtime.NewTaskList(),
+		tasks:      runtime.NewNSMap[runtime.Task](),
 		containers: metadata.NewContainerStore(m.(*metadata.DB)),
 		address:    ic.Address,
 		events:     ep.(*exchange.Exchange),
@@ -148,7 +148,7 @@ type Runtime struct {
 	state   string
 	address string
 
-	tasks      *runtime.TaskList
+	tasks      *runtime.NSMap[runtime.Task]
 	containers containers.Store
 	events     *exchange.Exchange
 
