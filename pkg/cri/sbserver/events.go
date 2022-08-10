@@ -234,11 +234,11 @@ func convertEvent(e typeurl.Any) (string, interface{}, error) {
 // event monitor.
 //
 // NOTE:
-// 1. start must be called after subscribe.
-// 2. The task exit event has been handled in individual startSandboxExitMonitor
-//    or startContainerExitMonitor goroutine at the first. If the goroutine fails,
-//    it puts the event into backoff retry queue and event monitor will handle
-//    it later.
+//  1. start must be called after subscribe.
+//  2. The task exit event has been handled in individual startSandboxExitMonitor
+//     or startContainerExitMonitor goroutine at the first. If the goroutine fails,
+//     it puts the event into backoff retry queue and event monitor will handle
+//     it later.
 func (em *eventMonitor) start() <-chan error {
 	errCh := make(chan error)
 	if em.ch == nil || em.errCh == nil {

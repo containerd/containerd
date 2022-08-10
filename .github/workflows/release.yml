@@ -6,7 +6,7 @@ on:
 name: Containerd Release
 
 env:
-  GO_VERSION: '1.18.5'
+  GO_VERSION: '1.19'
 
 jobs:
   check:
