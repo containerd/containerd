@@ -25,6 +25,10 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	bolt "go.etcd.io/bbolt"
+
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/content/local"
 	"github.com/containerd/containerd/content/testsuite"
@@ -32,9 +36,6 @@ import (
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	bolt "go.etcd.io/bbolt"
 )
 
 func createContentStore(ctx context.Context, root string, opts ...DBOpt) (context.Context, content.Store, func() error, error) {
@@ -70,7 +71,7 @@ func createContentStore(ctx context.Context, root string, opts ...DBOpt) (contex
 	}
 	ctx = testsuite.SetContextWrapper(ctx, wrap)
 
-	return ctx, NewDB(db, cs, nil, opts...).ContentStore(), func() error {
+	return ctx, NewDB(db, cs, nil, nil, opts...).ContentStore(), func() error {
 		return db.Close()
 	}, nil
 }

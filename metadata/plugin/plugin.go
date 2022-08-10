@@ -22,6 +22,8 @@ import (
 	"path/filepath"
 	"time"
 
+	bolt "go.etcd.io/bbolt"
+
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
@@ -29,7 +31,6 @@ import (
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots"
-	bolt "go.etcd.io/bbolt"
 )
 
 const (
@@ -169,7 +170,7 @@ func init() {
 				dbopts = append(dbopts, metadata.WithPolicyIsolated)
 			}
 
-			mdb := metadata.NewDB(db, cs.(content.Store), snapshotters, dbopts...)
+			mdb := metadata.NewDB(db, cs.(content.Store), snapshotters, ic.Events, dbopts...)
 			if err := mdb.Init(ic.Context); err != nil {
 				return nil, err
 			}

@@ -29,6 +29,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	bolt "go.etcd.io/bbolt"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/content/local"
@@ -41,11 +47,6 @@ import (
 	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/native"
-	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	bolt "go.etcd.io/bbolt"
 )
 
 type testOptions struct {
@@ -97,7 +98,7 @@ func testDB(t *testing.T, opt ...testOpt) (context.Context, *DB) {
 	bdb, err := bolt.Open(filepath.Join(dirname, "metadata.db"), 0644, nil)
 	require.NoError(t, err)
 
-	db := NewDB(bdb, cs, snapshotters)
+	db := NewDB(bdb, cs, snapshotters, nil)
 	require.NoError(t, db.Init(ctx))
 
 	t.Cleanup(func() {
@@ -111,7 +112,7 @@ func testDB(t *testing.T, opt ...testOpt) (context.Context, *DB) {
 func TestInit(t *testing.T) {
 	ctx, db := testEnv(t)
 
-	require.NoError(t, NewDB(db, nil, nil).Init(ctx))
+	require.NoError(t, NewDB(db, nil, nil, nil).Init(ctx))
 
 	version, err := readDBVersion(db, bucketKeyVersion)
 	require.NoError(t, err)
@@ -655,6 +656,13 @@ func create(obj object, tx *bolt.Tx, db *DB, cs content.Store, sn snapshots.Snap
 		if err != nil {
 			return nil, fmt.Errorf("failed to create image: %w", err)
 		}
+		if !obj.removed {
+			node = &gc.Node{
+				Type:      ResourceImages,
+				Namespace: namespace,
+				Key:       v.name,
+			}
+		}
 	case testContainer:
 		container := containers.Container{
 			ID:          v.id,
@@ -798,7 +806,7 @@ func newStores(t testing.TB) (*DB, content.Store, snapshots.Snapshotter, func())
 		t.Fatal(err)
 	}
 
-	mdb := NewDB(db, lcs, map[string]snapshots.Snapshotter{"native": nsn})
+	mdb := NewDB(db, lcs, map[string]snapshots.Snapshotter{"native": nsn}, nil)
 
 	return mdb, mdb.ContentStore(), mdb.Snapshotter("native"), func() {
 		nsn.Close()

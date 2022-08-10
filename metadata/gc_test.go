@@ -25,12 +25,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/gc"
-	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
+
+	"github.com/containerd/containerd/gc"
+	"github.com/containerd/containerd/metadata/boltutil"
 )
 
 func TestResourceMax(t *testing.T) {
@@ -136,6 +137,9 @@ func TestGCRoots(t *testing.T) {
 		gcnode(ResourceIngest, "ns3", "ingest-1"),
 		gcnode(resourceContentFlat, "ns3", dgst(1).String()),
 		gcnode(resourceSnapshotFlat, "ns3", "overlay/sn1"),
+		gcnode(ResourceImages, "ns1", "image1"),
+		gcnode(ResourceImages, "ns1", "image2"),
+		gcnode(ResourceImages, "ns2", "image3"),
 	}
 
 	if err := db.Update(func(tx *bolt.Tx) error {
@@ -199,6 +203,8 @@ func TestGCRemove(t *testing.T) {
 		gcnode(ResourceLease, "ns2", "l2"),
 		gcnode(ResourceIngest, "ns1", "ingest-1"),
 		gcnode(ResourceIngest, "ns2", "ingest-2"),
+		gcnode(ResourceImages, "ns1", "image1"),
+		gcnode(ResourceImages, "ns1", "image2"),
 	}
 
 	var deleted, remaining []gc.Node
@@ -408,6 +414,8 @@ func TestCollectibleResources(t *testing.T) {
 		gcnode(ResourceContent, "ns1", dgst(2).String()),
 		gcnode(ResourceLease, "ns1", "lease1"),
 		gcnode(ResourceLease, "ns1", "lease2"),
+		gcnode(ResourceImages, "ns1", "image1"),
+		gcnode(ResourceImages, "ns1", "image2"),
 		gcnode(testResource, "ns1", "test1"),
 		gcnode(testResource, "ns1", "test2"), // 5: Will be removed
 		gcnode(testResource, "ns1", "test3"),
@@ -417,6 +425,8 @@ func TestCollectibleResources(t *testing.T) {
 	roots := []gc.Node{
 		gcnode(ResourceContent, "ns1", dgst(1).String()),
 		gcnode(ResourceContent, "ns1", dgst(2).String()),
+		gcnode(ResourceImages, "ns1", "image1"),
+		gcnode(ResourceImages, "ns1", "image2"),
 		gcnode(ResourceLease, "ns1", "lease1"),
 		gcnode(testResource, "ns1", "test1"),
 		gcnode(testResource, "ns1", "test3"),

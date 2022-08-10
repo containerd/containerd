@@ -24,6 +24,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/typeurl"
+	"github.com/google/go-cmp/cmp"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	bolt "go.etcd.io/bbolt"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
@@ -31,12 +38,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/protobuf/types"
-	"github.com/containerd/typeurl"
-	"github.com/google/go-cmp/cmp"
-	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	bolt "go.etcd.io/bbolt"
 )
 
 func init() {
@@ -45,7 +46,7 @@ func init() {
 
 func TestContainersList(t *testing.T) {
 	ctx, db := testEnv(t)
-	store := NewContainerStore(NewDB(db, nil, nil))
+	store := NewContainerStore(NewDB(db, nil, nil, nil))
 	spec := &specs.Spec{}
 	encoded, err := protobuf.MarshalAnyToProto(spec)
 	require.NoError(t, err)
@@ -173,7 +174,7 @@ func TestContainersList(t *testing.T) {
 func TestContainersCreateUpdateDelete(t *testing.T) {
 	var (
 		ctx, db = testEnv(t)
-		store   = NewContainerStore(NewDB(db, nil, nil))
+		store   = NewContainerStore(NewDB(db, nil, nil, nil))
 		spec    = &specs.Spec{}
 	)
 

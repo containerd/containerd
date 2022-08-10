@@ -72,7 +72,7 @@ func FuzzImageStore(data []byte) int {
 		return 0
 	}
 	defer cancel()
-	store := metadata.NewImageStore(metadata.NewDB(db, nil, nil))
+	store := metadata.NewImageStore(metadata.NewDB(db, nil, nil, nil))
 	f := fuzz.NewConsumer(data)
 	noOfOperations, err := f.GetInt()
 	if err != nil {
@@ -130,7 +130,7 @@ func FuzzLeaseManager(data []byte) int {
 		return 0
 	}
 	defer cancel()
-	lm := metadata.NewLeaseManager(metadata.NewDB(db, nil, nil))
+	lm := metadata.NewLeaseManager(metadata.NewDB(db, nil, nil, nil))
 
 	f := fuzz.NewConsumer(data)
 	noOfOperations, err := f.GetInt()
@@ -219,7 +219,7 @@ func FuzzContainerStore(data []byte) int {
 	}
 	defer cancel()
 
-	store := metadata.NewContainerStore(metadata.NewDB(db, nil, nil))
+	store := metadata.NewContainerStore(metadata.NewDB(db, nil, nil, nil))
 	c := containers.Container{}
 	f := fuzz.NewConsumer(data)
 	noOfOperations, err := f.GetInt()
@@ -320,7 +320,7 @@ func testDB(opt ...testOpt) (context.Context, *metadata.DB, func(), error) {
 		return ctx, nil, func() { cancel() }, err
 	}
 
-	db := metadata.NewDB(bdb, cs, snapshotters)
+	db := metadata.NewDB(bdb, cs, snapshotters, nil)
 	if err := db.Init(ctx); err != nil {
 		return ctx, nil, func() { cancel() }, err
 	}

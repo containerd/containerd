@@ -22,15 +22,16 @@ import (
 	"fmt"
 	"testing"
 
+	bolt "go.etcd.io/bbolt"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/leases"
-	bolt "go.etcd.io/bbolt"
 )
 
 func TestLeases(t *testing.T) {
 	ctx, db := testEnv(t)
 
-	lm := NewLeaseManager(NewDB(db, nil, nil))
+	lm := NewLeaseManager(NewDB(db, nil, nil, nil))
 
 	testCases := []struct {
 		ID        string
@@ -109,7 +110,7 @@ func TestLeases(t *testing.T) {
 func TestLeasesList(t *testing.T) {
 	ctx, db := testEnv(t)
 
-	lm := NewLeaseManager(NewDB(db, nil, nil))
+	lm := NewLeaseManager(NewDB(db, nil, nil, nil))
 
 	testset := [][]leases.Opt{
 		{
@@ -252,7 +253,7 @@ func TestLeasesList(t *testing.T) {
 func TestLeaseResource(t *testing.T) {
 	ctx, db := testEnv(t)
 
-	lm := NewLeaseManager(NewDB(db, nil, nil))
+	lm := NewLeaseManager(NewDB(db, nil, nil, nil))
 
 	var (
 		leaseID = "l1"

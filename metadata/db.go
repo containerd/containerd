@@ -26,11 +26,15 @@ import (
 	"sync/atomic"
 	"time"
 
+	bolt "go.etcd.io/bbolt"
+
+	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/snapshots"
-	bolt "go.etcd.io/bbolt"
 )
 
 const (
@@ -67,9 +71,10 @@ type dbOptions struct {
 // while proxying data shared across namespaces to backend
 // datastores for content and snapshots.
 type DB struct {
-	db *bolt.DB
-	ss map[string]*snapshotter
-	cs *contentStore
+	db        *bolt.DB
+	ss        map[string]*snapshotter
+	cs        *contentStore
+	publisher events.Publisher
 
 	// wlock is used to protect access to the data structures during garbage
 	// collection. While the wlock is held no writable transactions can be
@@ -102,11 +107,12 @@ type DB struct {
 
 // NewDB creates a new metadata database using the provided
 // bolt database, content store, and snapshotters.
-func NewDB(db *bolt.DB, cs content.Store, ss map[string]snapshots.Snapshotter, opts ...DBOpt) *DB {
+func NewDB(db *bolt.DB, cs content.Store, ss map[string]snapshots.Snapshotter, publisher events.Publisher, opts ...DBOpt) *DB {
 	m := &DB{
-		db:      db,
-		ss:      make(map[string]*snapshotter, len(ss)),
-		dirtySS: map[string]struct{}{},
+		publisher: publisher,
+		db:        db,
+		ss:        make(map[string]*snapshotter, len(ss)),
+		dirtySS:   map[string]struct{}{},
 		dbopts: dbOptions{
 			shared: true,
 		},
@@ -316,6 +322,7 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 	m.wlock.Lock()
 	t1 := time.Now()
 	c := startGCContext(ctx, m.collectors)
+	var removedImages []gc.Node
 
 	marked, err := m.getMarked(ctx, c) // Pass in gc context
 	if err != nil {
@@ -338,6 +345,8 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 				}
 			} else if n.Type == ResourceContent || n.Type == ResourceIngest {
 				m.dirtyCS = true
+			} else if n.Type == ResourceImages {
+				removedImages = append(removedImages, n)
 			}
 			return c.remove(ctx, tx, n) // From gc context
 		}
@@ -389,6 +398,14 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 			wg.Done()
 		}()
 		m.dirtyCS = false
+	}
+
+	for _, node := range removedImages {
+		if m.publisher != nil {
+			if err := m.publisher.Publish(namespaces.WithNamespace(ctx, node.Namespace), "/images/delete", &eventstypes.ImageDelete{Name: node.Key}); err != nil {
+				log.G(ctx).WithError(err).Infof("imageDelete event sent failed for %s", node.Key)
+			}
+		}
 	}
 
 	stats.MetaD = time.Since(t1)
