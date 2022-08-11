@@ -269,6 +269,21 @@ func (c *criService) updateImage(ctx context.Context, r string) error {
 	img, err := c.client.GetImage(ctx, r)
 	if err != nil && !errdefs.IsNotFound(err) {
 		return fmt.Errorf("get image by reference: %w", err)
+	} else if errdefs.IsNotFound(err) {
+		// If image is not found we should remove all the reference images created by cri.
+		if image, err := c.localResolve(r); err == nil {
+			for _, ref := range image.References {
+				err = c.client.ImageService().Delete(ctx, ref)
+				if err == nil || errdefs.IsNotFound(err) {
+					// Update image store to reflect the newest state in containerd.
+					if err := c.imageStore.Update(ctx, ref); err != nil {
+						log.G(ctx).Errorf("failed to update image reference %q for %q: %v", ref, image.ID, err)
+					}
+					continue
+				}
+				log.G(ctx).Errorf("failed to delete image reference %q for %q: %v", ref, image.ID, err)
+			}
+		}
 	}
 	if err == nil && img.Labels()[imageLabelKey] != imageLabelValue {
 		// Make sure the image has the image id as its unique
