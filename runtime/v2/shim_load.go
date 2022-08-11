@@ -136,7 +136,7 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 			cleanupAfterDeadShim(context.Background(), id, ns, m.shims, m.events, binaryCall)
 			// Remove self from the runtime task list.
 			m.shims.Delete(ctx, id)
-		})
+		}, m.ttrpcs)
 		if err != nil {
 			cleanupAfterDeadShim(ctx, id, ns, m.shims, m.events, binaryCall)
 			continue
@@ -157,7 +157,7 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 			// We are unable to get Pids from the shim and it's not a sandbox
 			// shim. We should clean it up her.
 			// No need to do anything for removeTask since we never added this shim.
-			shim.delete(ctx, false, func(ctx context.Context, id string) {})
+			shim.delete(ctx, false, func(ctx context.Context, id string) {}, m.ttrpcs)
 		} else {
 			m.shims.Add(ctx, shim)
 		}
