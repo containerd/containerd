@@ -35,6 +35,7 @@ limitations under the License.
 package cri
 
 import (
+	"context"
 	"time"
 
 	"google.golang.org/grpc"
@@ -75,6 +76,7 @@ type ContainerManager interface {
 	// for the container. If it returns error, new container log file MUST NOT
 	// be created.
 	ReopenContainerLog(ContainerID string, opts ...grpc.CallOption) error
+	GetContainerEvents(ctx context.Context, request *runtimeapi.GetEventsRequest, opts ...grpc.CallOption) (runtimeapi.RuntimeService_GetContainerEventsClient, error)
 }
 
 // PodSandboxManager contains methods for operating on PodSandboxes. The methods

@@ -122,6 +122,9 @@ type criService struct {
 	unpackDuplicationSuppressor kmutex.KeyedLocker
 
 	nri *nriAPI
+	// containerEventsChan is used to capture container events and send them
+	// to the caller of GetContainerEvents.
+	containerEventsChan chan runtime.ContainerEventResponse
 }
 
 // NewCRIService returns a new instance of CRIService
@@ -142,6 +145,9 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nrip nri.
 		netPlugin:                   make(map[string]cni.CNI),
 		unpackDuplicationSuppressor: kmutex.New(),
 	}
+
+	// TODO: figure out a proper channel size.
+	c.containerEventsChan = make(chan runtime.ContainerEventResponse, 1000)
 
 	if client.SnapshotService(c.config.ContainerdConfig.Snapshotter) == nil {
 		return nil, fmt.Errorf("failed to find snapshotter %q", c.config.ContainerdConfig.Snapshotter)
