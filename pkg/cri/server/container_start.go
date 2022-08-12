@@ -180,6 +180,8 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	// It handles the TaskExit event and update container state after this.
 	c.eventMonitor.startContainerExitMonitor(context.Background(), id, task.Pid(), exitCh)
 
+	c.generateAndSendContainerEvent(ctx, id, sandboxID, runtime.ContainerEventType_CONTAINER_STARTED_EVENT)
+
 	if c.nri.isEnabled() {
 		err = c.nri.postStartContainer(ctx, &sandbox, &cntr)
 		if err != nil {

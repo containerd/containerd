@@ -594,3 +594,15 @@ func (r *RuntimeService) ReopenContainerLog(containerID string, opts ...grpc.Cal
 	klog.V(10).Infof("[RuntimeService] ReopenContainerLog Response (containerID=%v)", containerID)
 	return nil
 }
+
+// GetContainerEvents returns a GRPC client to stream container events
+func (r *RuntimeService) GetContainerEvents(ctx context.Context, request *runtimeapi.GetEventsRequest, opts ...grpc.CallOption) (runtimeapi.RuntimeService_GetContainerEventsClient, error) {
+	klog.V(10).Infof("[RuntimeService] GetContainerEvents", r.timeout)
+
+	client, err := r.runtimeClient.GetContainerEvents(ctx, request, opts...)
+	if err != nil {
+		klog.Errorf("GetContainerEvents from runtime service failed: %v", err)
+		return nil, err
+	}
+	return client, nil
+}
