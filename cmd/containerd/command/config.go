@@ -18,13 +18,16 @@ package command
 
 import (
 	gocontext "context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/pkg/timeout"
+	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/services/server"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -44,7 +47,7 @@ func (c *Config) WriteTo(w io.Writer) (int64, error) {
 	return 0, toml.NewEncoder(w).Encode(c)
 }
 
-func outputConfig(cfg *srvconfig.Config) error {
+func outputConfig(cfg *srvconfig.Config, value string) error {
 	config := &Config{
 		Config: cfg,
 	}
@@ -88,6 +91,29 @@ func outputConfig(cfg *srvconfig.Config) error {
 	// remove overridden Plugins type to avoid duplication in output
 	config.Config.Plugins = nil
 
+	if len(value) > 0 {
+		b, err := toml.Marshal(config)
+		if err != nil {
+			return err
+		}
+
+		var configMap map[string]interface{}
+
+		if err = toml.Unmarshal(b, &configMap); err != nil {
+			return err
+		}
+
+		fields := strings.Split(value, ":")
+
+		v, err := commands.TraverseMap(configMap, fields...)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("%v\n", v)
+		return nil
+	}
+
 	_, err = config.WriteTo(os.Stdout)
 	return err
 }
@@ -100,19 +126,25 @@ var configCommand = cli.Command{
 			Name:  "default",
 			Usage: "see the output of the default config",
 			Action: func(context *cli.Context) error {
-				return outputConfig(defaultConfig())
+				return outputConfig(defaultConfig(), "")
 			},
 		},
 		{
 			Name:  "dump",
 			Usage: "see the output of the final main config with imported in subconfig files",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "value",
+					Usage: "get the value of a particular field, nested fields separated by a colon (:)",
+				},
+			},
 			Action: func(context *cli.Context) error {
 				config := defaultConfig()
 				if err := srvconfig.LoadConfig(context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
 					return err
 				}
 
-				return outputConfig(config)
+				return outputConfig(config, context.String("value"))
 			},
 		},
 	},
