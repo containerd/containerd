@@ -18,6 +18,7 @@ package containers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -253,6 +254,10 @@ var infoCommand = cli.Command{
 			Name:  "spec",
 			Usage: "only display the spec",
 		},
+		cli.StringFlag{
+			Name:  "value",
+			Usage: "get the value of a particular field, nested fields separated by a period (.)",
+		},
 	},
 	Action: func(context *cli.Context) error {
 		id := context.Args().First()
@@ -272,6 +277,47 @@ var infoCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+
+		if len(context.String("value")) > 0 {
+
+			i := struct {
+				containers.Container
+				Spec interface{} `json:"Spec,omitempty"`
+			}{
+				Container: info,
+				Spec: func(info containers.Container) interface{} {
+					if info.Spec != nil && info.Spec.GetValue() != nil {
+						v, err := typeurl.UnmarshalAny(info.Spec)
+						if err == nil {
+							return v
+						}
+					}
+					return ""
+				}(info),
+			}
+
+			b, err := json.Marshal(i)
+			if err != nil {
+				return err
+			}
+
+			var infoMap map[string]interface{}
+
+			if err = json.Unmarshal(b, &infoMap); err != nil {
+				return err
+			}
+
+			fields := strings.Split(context.String("value"), ".")
+
+			value, err := commands.TraverseMap(infoMap, fields...)
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("%v\n", value)
+			return nil
+		}
+
 		if context.Bool("spec") {
 			v, err := typeurl.UnmarshalAny(info.Spec)
 			if err != nil {
