@@ -1,3 +1,5 @@
+//go:build windows
+
 // Shim for the Host Compute Service (HCS) to manage Windows Server
 // containers and Hyper-V containers.
 

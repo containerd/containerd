@@ -1,3 +1,5 @@
+//go:build windows
+
 package wclayer
 
 import (
@@ -20,7 +22,7 @@ import (
 // be present on the system at the paths provided in parentLayerPaths.
 func ImportLayer(ctx context.Context, path string, importFolderPath string, parentLayerPaths []string) (err error) {
 	title := "hcsshim::ImportLayer"
-	ctx, span := trace.StartSpan(ctx, title)
+	ctx, span := oc.StartSpan(ctx, title)
 	defer span.End()
 	defer func() { oc.SetSpanStatus(span, err) }()
 	span.AddAttributes(
@@ -124,7 +126,7 @@ func (r *legacyLayerWriterWrapper) Close() (err error) {
 // The caller must have taken the SeBackupPrivilege and SeRestorePrivilege privileges
 // to call this and any methods on the resulting LayerWriter.
 func NewLayerWriter(ctx context.Context, path string, parentLayerPaths []string) (_ LayerWriter, err error) {
-	ctx, span := trace.StartSpan(ctx, "hcsshim::NewLayerWriter")
+	ctx, span := oc.StartSpan(ctx, "hcsshim::NewLayerWriter")
 	defer func() {
 		if err != nil {
 			oc.SetSpanStatus(span, err)
