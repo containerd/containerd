@@ -625,6 +625,11 @@ func (c *Client) SnapshotService(snapshotterName string) snapshots.Snapshotter {
 	return snproxy.NewSnapshotter(snapshotsapi.NewSnapshotsClient(c.conn), snapshotterName)
 }
 
+// DefaultNamespace return the default namespace
+func (c *Client) DefaultNamespace() string {
+	return c.defaultns
+}
+
 // TaskService returns the underlying TasksClient
 func (c *Client) TaskService() tasks.TasksClient {
 	if c.taskService != nil {
