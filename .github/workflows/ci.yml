@@ -416,7 +416,6 @@ jobs:
         working-directory: src/github.com/containerd/containerd
       - name: Tests
         env:
-          GOPROXY: direct
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root-junit.xml
         run: |
           make test
@@ -425,7 +424,6 @@ jobs:
 
       - name: Integration 1
         env:
-          GOPROXY: direct
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
@@ -436,7 +434,6 @@ jobs:
       # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
       - name: Integration 2
         env:
-          GOPROXY: direct
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
@@ -534,7 +531,6 @@ jobs:
         working-directory: src/github.com/containerd/containerd
       - name: Tests
         env:
-          GOPROXY: direct
           GOTESTSUM_JUNITFILE: "${{ github.workspace }}/macos-test-junit.xml"
         run: |
           make test
