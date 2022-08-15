@@ -439,7 +439,6 @@ jobs:
       - run: script/setup/install-gotestsum
       - name: Tests
         env:
-          GOPROXY: direct
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root-junit.xml
         run: |
           make test
@@ -447,7 +446,6 @@ jobs:
 
       - name: Integration 1
         env:
-          GOPROXY: direct
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
           ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
@@ -462,7 +460,6 @@ jobs:
       # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
       - name: Integration 2
         env:
-          GOPROXY: direct
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
           ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
@@ -539,7 +536,6 @@ jobs:
       - run: script/setup/install-gotestsum
       - name: Tests
         env:
-          GOPROXY: direct
           GOTESTSUM_JUNITFILE: "${{ github.workspace }}/macos-test-junit.xml"
         run: make test
       - uses: actions/upload-artifact@v2
