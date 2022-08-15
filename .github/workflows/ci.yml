@@ -447,7 +447,7 @@ jobs:
 
       - name: Integration 1
         env:
-          GOPROXY: direct
+          GOPROXY: https://proxy.golang.org
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
           ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
@@ -462,7 +462,7 @@ jobs:
       # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
       - name: Integration 2
         env:
-          GOPROXY: direct
+          GOPROXY: https://proxy.golang.org
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
           ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
