@@ -18,11 +18,14 @@ package platforms
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"runtime"
 	"strings"
 	"sync"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
@@ -96,9 +99,17 @@ func getCPUVariant() string {
 	}
 
 	variant, err := getCPUInfo("Cpu architecture")
-	if err != nil {
-		log.L.WithError(err).Error("failure getting variant")
-		return ""
+	if err != nil || variant == "" {
+		if !errdefs.IsNotImplemented(err) {
+			log.L.WithError(err).Error("failure getting variant with getCPUInfo")
+		}
+		variant, err = getCPUArchitecture()
+		if err != nil || variant == "" {
+			if !errdefs.IsNotImplemented(err) {
+				log.L.WithError(err).Error("failure getting variant with getCPUArchitecture")
+			}
+			return ""
+		}
 	}
 
 	// handle edge case for Raspberry Pi ARMv6 devices (which due to a kernel quirk, report "CPU architecture: 7")
@@ -128,4 +139,17 @@ func getCPUVariant() string {
 	}
 
 	return variant
+}
+
+// getCPUArchitecture from uname -m get CPU Architecture
+func getCPUArchitecture() (string, error) {
+	if !isLinuxOS(runtime.GOOS) {
+		return "", fmt.Errorf("getCPUArchitecture for OS %s: %w", runtime.GOOS, errdefs.ErrNotImplemented)
+	}
+	var name unix.Utsname
+	err := unix.Uname(&name)
+	if err != nil {
+		return "", err
+	}
+	return string(name.Machine[:bytes.IndexByte(name.Machine[:], 0)]), nil
 }

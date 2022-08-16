@@ -47,6 +47,10 @@ github.com/Microsoft/hcsshim/internal/winapi
 github.com/Microsoft/hcsshim/osversion
 github.com/Microsoft/hcsshim/pkg/go-runhcs
 github.com/Microsoft/hcsshim/pkg/ociwclayer
+# github.com/agiledragon/gomonkey/v2 v2.8.0
+## explicit; go 1.14
+github.com/agiledragon/gomonkey/v2
+github.com/agiledragon/gomonkey/v2/creflect
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
@@ -237,6 +241,8 @@ github.com/google/gofuzz/bytesource
 # github.com/google/uuid v1.2.0
 ## explicit
 github.com/google/uuid
+# github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1
+## explicit
 # github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 ## explicit; go 1.14
 github.com/grpc-ecosystem/go-grpc-middleware
@@ -268,6 +274,8 @@ github.com/intel/goresctrl/pkg/utils
 # github.com/json-iterator/go v1.1.12
 ## explicit; go 1.12
 github.com/json-iterator/go
+# github.com/jtolds/gls v4.20.0+incompatible
+## explicit
 # github.com/klauspost/compress v1.11.13
 ## explicit; go 1.13
 github.com/klauspost/compress/fse
@@ -369,6 +377,10 @@ github.com/russross/blackfriday/v2
 # github.com/sirupsen/logrus v1.8.1
 ## explicit; go 1.13
 github.com/sirupsen/logrus
+# github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d
+## explicit
+# github.com/smartystreets/goconvey v1.6.4
+## explicit
 # github.com/spf13/pflag v1.0.5
 ## explicit; go 1.12
 github.com/spf13/pflag
