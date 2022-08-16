@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/Microsoft/hcsshim v0.10.0-rc.1
 	github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1
-	github.com/containerd/cgroups v1.0.4
+	github.com/containerd/cgroups v1.0.5-0.20220816231112-7083cd60b721
 	github.com/containerd/containerd v1.6.2 // see replace; the actual version of containerd is replaced with the code at the root of this repository
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/ttrpc v1.1.1-0.20220420014843-944ef4a40df3
@@ -24,7 +24,7 @@ require github.com/AdaLogics/go-fuzz-headers v0.0.0-20220706123152-fef3fe1bab07
 require (
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
-	github.com/cilium/ebpf v0.7.0 // indirect
+	github.com/cilium/ebpf v0.9.1 // indirect
 	github.com/container-orchestrated-devices/container-device-interface v0.3.1 // indirect
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/containerd/continuity v0.3.0 // indirect
