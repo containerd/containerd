@@ -5905,6 +5905,34 @@ file {
   syntax: "proto3"
 }
 file {
+  name: "github.com/containerd/containerd/api/types/transfer/import.proto"
+  package: "containerd.v1.types"
+  message_type {
+    name: "ImageImportStream"
+    field {
+      name: "stream"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stream"
+    }
+  }
+  message_type {
+    name: "ImageExportStream"
+    field {
+      name: "stream"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stream"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/types/transfer"
+  }
+  syntax: "proto3"
+}
+file {
   name: "github.com/containerd/containerd/api/types/transfer/registry.proto"
   package: "containerd.v1.types"
   dependency: "google/protobuf/timestamp.proto"

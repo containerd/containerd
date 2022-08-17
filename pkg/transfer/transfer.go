@@ -50,6 +50,17 @@ type ImageStorer interface {
 	Store(context.Context, ocispec.Descriptor) (images.Image, error)
 }
 
+// ImageImportStreamer returns an import streamer based on OCI or
+// Docker image tar archives. The stream should be a raw tar stream
+// and without compression.
+type ImageImportStreamer interface {
+	ImportStream(context.Context) (io.Reader, error)
+}
+
+type ImageExportStreamer interface {
+	ExportStream(context.Context) (io.WriteCloser, error)
+}
+
 type ImageUnpacker interface {
 	// TODO: Or unpack options?
 	UnpackPlatforms() []unpack.Platform
