@@ -18,7 +18,7 @@ syntax = "proto3";
 
 package containerd.v1.types;
 
-import "google/protobuf/timestamp.proto";
+//import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/containerd/containerd/api/types/transfer";
 
@@ -28,6 +28,14 @@ message Progress {
 	int64 offset = 3;
 	int64 total = 4;
 
+}
+
+message Data {
+	bytes data = 1;
+}
+
+message WindowUpdate {
+	int32 update = 1;
 }
 
 
