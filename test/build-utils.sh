@@ -18,13 +18,9 @@
 : "${PROJECT:=k8s-cri-containerd}"
 
 # GOOGLE_APPLICATION_CREDENTIALS is the path of service account file.
-if [ -z "${GOOGLE_APPLICATION_CREDENTIALS:-""}" ]; then
-  echo "GOOGLE_APPLICATION_CREDENTIALS is not set"
-  exit 1
+if [ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]; then
+  gcloud auth activate-service-account --key-file "${GOOGLE_APPLICATION_CREDENTIALS}" --project="${PROJECT}"
 fi
-
-# Activate gcloud service account.
-gcloud auth activate-service-account --key-file "${GOOGLE_APPLICATION_CREDENTIALS}" --project="${PROJECT}"
 
 cat /etc/os-release
 apt-get update
