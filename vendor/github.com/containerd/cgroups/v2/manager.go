@@ -366,6 +366,22 @@ func (c *Manager) Procs(recursive bool) ([]uint64, error) {
 	return processes, err
 }
 
+func (c *Manager) MoveTo(destination *Manager) error {
+	processes, err := c.Procs(true)
+	if err != nil {
+		return err
+	}
+	for _, p := range processes {
+		if err := destination.AddProc(p); err != nil {
+			if strings.Contains(err.Error(), "no such process") {
+				continue
+			}
+			return err
+		}
+	}
+	return nil
+}
+
 var singleValueFiles = []string{
 	"pids.current",
 	"pids.max",

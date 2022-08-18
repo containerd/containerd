@@ -49,8 +49,6 @@ mv temp-go/go/* /root/.go/
 cd $SRC/containerd
 
 go mod tidy
-rm vendor/github.com/cilium/ebpf/internal/btf/fuzz.go
-rm /root/go/pkg/mod/github.com/cilium/ebpf@v0.7.0/internal/btf/fuzz.go
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 cd ../../
