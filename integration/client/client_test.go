@@ -33,7 +33,6 @@ import (
 	imagelist "github.com/containerd/containerd/integration/images"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/platforms"
@@ -45,30 +44,14 @@ import (
 )
 
 var (
-	address           string
-	noDaemon          bool
-	noCriu            bool
-	supportsCriu      bool
-	testNamespace     = "testing"
-	testSnapshotter   = DefaultSnapshotter
-	ctrdStdioFilePath string
-
-	ctrd = &daemon{}
+	noDaemon     bool
+	noCriu       bool
+	supportsCriu bool
 )
 
 func init() {
-	flag.StringVar(&address, "address", defaultAddress, "The address to the containerd socket for use in the tests")
 	flag.BoolVar(&noDaemon, "no-daemon", false, "Do not start a dedicated daemon for the tests")
 	flag.BoolVar(&noCriu, "no-criu", false, "Do not run the checkpoint tests")
-}
-
-func testContext(t testing.TB) (context.Context, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(context.Background())
-	ctx = namespaces.WithNamespace(ctx, testNamespace)
-	if t != nil {
-		ctx = logtest.WithT(ctx, t)
-	}
-	return ctx, cancel
 }
 
 func TestMain(m *testing.M) {
@@ -505,26 +488,6 @@ func TestClientReconnect(t *testing.T) {
 	if err := client.Close(); err != nil {
 		t.Errorf("client closed returned error %v", err)
 	}
-}
-
-func createShimDebugConfig() string {
-	f, err := os.CreateTemp("", "containerd-config-")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create config file: %s\n", err)
-		os.Exit(1)
-	}
-	defer f.Close()
-	if _, err := f.WriteString("version = 2\n"); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to write to config file %s: %s\n", f.Name(), err)
-		os.Exit(1)
-	}
-
-	if _, err := f.WriteString("[plugins.\"io.containerd.runtime.v1.linux\"]\n\tshim_debug = true\n"); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to write to config file %s: %s\n", f.Name(), err)
-		os.Exit(1)
-	}
-
-	return f.Name()
 }
 
 func TestDefaultRuntimeWithNamespaceLabels(t *testing.T) {
