@@ -20,10 +20,16 @@ package containerd.types.transfer;
 
 option go_package = "github.com/containerd/containerd/api/types/transfer";
 
-message Data {
-	bytes data = 1;
+message ImageImportStream {
+	// Stream is used to identify the binary input stream for the import operation.
+	// The stream uses the transfer binary stream protocol with the client as the sender.
+	// The binary data is expected to be a raw tar stream.
+	string stream = 1;
 }
 
-message WindowUpdate {
-	int32 update = 1;
+message ImageExportStream {
+	// Stream is used to identify the binary output stream for the export operation.
+	// The stream uses the transfer binary stream protocol with the server as the sender.
+	// The binary data is expected to be a raw tar stream.
+	string stream = 1;
 }

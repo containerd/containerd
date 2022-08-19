@@ -16,14 +16,14 @@
 
 syntax = "proto3";
 
-package containerd.v1.types;
+package containerd.types.transfer;
 
 option go_package = "github.com/containerd/containerd/api/types/transfer";
 
-message ImageImportStream {
-    string stream = 1;
-}
-
-message ImageExportStream {
-    string stream = 1;
+message Progress {
+	string event = 1;
+	string name = 2;
+	repeated string parents = 3;
+	int64 progress = 4;
+	int64 total = 5;
 }

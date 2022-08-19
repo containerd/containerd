@@ -5705,6 +5705,14 @@ file {
       type_name: ".google.protobuf.Any"
       json_name: "destination"
     }
+    field {
+      name: "options"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.transfer.v1.TransferOptions"
+      json_name: "options"
+    }
   }
   message_type {
     name: "TransferOptions"
@@ -5832,9 +5840,10 @@ file {
 }
 file {
   name: "github.com/containerd/containerd/api/types/transfer/imagestore.proto"
-  package: "containerd.v1.types"
+  package: "containerd.types.transfer"
+  dependency: "github.com/containerd/containerd/api/types/platform.proto"
   message_type {
-    name: "ImageStoreDestination"
+    name: "ImageStore"
     field {
       name: "name"
       number: 1
@@ -5847,14 +5856,15 @@ file {
       number: 2
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
-      type_name: ".containerd.v1.types.ImageStoreDestination.LabelsEntry"
+      type_name: ".containerd.types.transfer.ImageStore.LabelsEntry"
       json_name: "labels"
     }
     field {
       name: "platforms"
       number: 3
       label: LABEL_REPEATED
-      type: TYPE_STRING
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Platform"
       json_name: "platforms"
     }
     field {
@@ -5872,11 +5882,12 @@ file {
       json_name: "manifestLimit"
     }
     field {
-      name: "unpack_platforms"
+      name: "unpacks"
       number: 6
       label: LABEL_REPEATED
-      type: TYPE_STRING
-      json_name: "unpackPlatforms"
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.transfer.UnpackConfiguration"
+      json_name: "unpacks"
     }
     nested_type {
       name: "LabelsEntry"
@@ -5899,14 +5910,32 @@ file {
       }
     }
   }
+  message_type {
+    name: "UnpackConfiguration"
+    field {
+      name: "platform"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Platform"
+      json_name: "platform"
+    }
+    field {
+      name: "snapshotter"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "snapshotter"
+    }
+  }
   options {
     go_package: "github.com/containerd/containerd/api/types/transfer"
   }
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/types/transfer/import.proto"
-  package: "containerd.v1.types"
+  name: "github.com/containerd/containerd/api/types/transfer/importexport.proto"
+  package: "containerd.types.transfer"
   message_type {
     name: "ImageImportStream"
     field {
@@ -5933,8 +5962,54 @@ file {
   syntax: "proto3"
 }
 file {
+  name: "github.com/containerd/containerd/api/types/transfer/progress.proto"
+  package: "containerd.types.transfer"
+  message_type {
+    name: "Progress"
+    field {
+      name: "event"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "event"
+    }
+    field {
+      name: "name"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "parents"
+      number: 3
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "parents"
+    }
+    field {
+      name: "progress"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_INT64
+      json_name: "progress"
+    }
+    field {
+      name: "total"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_INT64
+      json_name: "total"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/types/transfer"
+  }
+  syntax: "proto3"
+}
+file {
   name: "github.com/containerd/containerd/api/types/transfer/registry.proto"
-  package: "containerd.v1.types"
+  package: "containerd.types.transfer"
   dependency: "google/protobuf/timestamp.proto"
   message_type {
     name: "OCIRegistry"
@@ -5950,7 +6025,7 @@ file {
       number: 2
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
-      type_name: ".containerd.v1.types.RegistryResolver"
+      type_name: ".containerd.types.transfer.RegistryResolver"
       json_name: "resolver"
     }
   }
@@ -5968,7 +6043,7 @@ file {
       number: 2
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
-      type_name: ".containerd.v1.types.RegistryResolver.HeadersEntry"
+      type_name: ".containerd.types.transfer.RegistryResolver.HeadersEntry"
       json_name: "headers"
     }
     nested_type {
@@ -6002,8 +6077,15 @@ file {
       json_name: "host"
     }
     field {
-      name: "wwwauthenticate"
+      name: "reference"
       number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "reference"
+    }
+    field {
+      name: "wwwauthenticate"
+      number: 3
       label: LABEL_REPEATED
       type: TYPE_STRING
       json_name: "wwwauthenticate"
@@ -6016,7 +6098,7 @@ file {
       number: 1
       label: LABEL_OPTIONAL
       type: TYPE_ENUM
-      type_name: ".containerd.v1.types.AuthType"
+      type_name: ".containerd.types.transfer.AuthType"
       json_name: "authType"
     }
     field {
@@ -6068,38 +6150,7 @@ file {
 }
 file {
   name: "github.com/containerd/containerd/api/types/transfer/streaming.proto"
-  package: "containerd.v1.types"
-  message_type {
-    name: "Progress"
-    field {
-      name: "reference"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "reference"
-    }
-    field {
-      name: "status"
-      number: 2
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "status"
-    }
-    field {
-      name: "offset"
-      number: 3
-      label: LABEL_OPTIONAL
-      type: TYPE_INT64
-      json_name: "offset"
-    }
-    field {
-      name: "total"
-      number: 4
-      label: LABEL_OPTIONAL
-      type: TYPE_INT64
-      json_name: "total"
-    }
-  }
+  package: "containerd.types.transfer"
   message_type {
     name: "Data"
     field {

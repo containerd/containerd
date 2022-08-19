@@ -30,6 +30,7 @@ service Transfer {
 message TransferRequest {
 	google.protobuf.Any source = 1;
 	google.protobuf.Any destination = 2;
+	TransferOptions options = 3;
 }
 
 message TransferOptions {

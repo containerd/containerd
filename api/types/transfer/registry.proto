@@ -16,7 +16,7 @@
 
 syntax = "proto3";
 
-package containerd.v1.types;
+package containerd.types.transfer;
 
 import "google/protobuf/timestamp.proto";
 
@@ -43,8 +43,14 @@ message RegistryResolver {
 
 // AuthRequest is sent as a callback on a stream
 message AuthRequest {
+	// host is the registry host
 	string host = 1;
-	repeated string wwwauthenticate = 2;
+
+	// reference is the namespace and repository name requested from the registry
+	string reference = 2;
+
+	// wwwauthenticate is the HTTP WWW-Authenticate header values returned from the registry
+	repeated string wwwauthenticate = 3;
 }
 
 enum AuthType {
@@ -69,5 +75,5 @@ message AuthResponse {
 	string secret = 2;
 	string username = 3;
 	google.protobuf.Timestamp expire_at = 4;
-	// Stream error
+	// TODO: Stream error
 }

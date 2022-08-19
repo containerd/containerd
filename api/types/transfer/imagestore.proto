@@ -16,23 +16,32 @@
 
 syntax = "proto3";
 
-package containerd.v1.types;
+package containerd.types.transfer;
+
+import "github.com/containerd/containerd/api/types/platform.proto";
 
 option go_package = "github.com/containerd/containerd/api/types/transfer";
 
-message ImageStoreDestination {
-	// Target image
-
+message ImageStore {
 	string name = 1;
 	map<string, string> labels = 2;
 
 	// Content filters
 
-	repeated string platforms = 3; // Does this need a separate type? MatchComparer
+	repeated types.Platform platforms = 3;
 	bool all_metadata = 4;
 	uint32 manifest_limit = 5;
 
-	// Unpack Configuration
+	// Unpack Configuration, multiple allowed
 
-	repeated string unpack_platforms = 6;
+	repeated UnpackConfiguration unpacks = 6;
+}
+
+message UnpackConfiguration {
+	// platform is the platform to unpack for, used for resolving manifest and snapshotter
+	// if not provided
+	types.Platform platform = 1;
+
+	// snapshotter to unpack to, if not provided default for platform shoudl be used
+	string snapshotter = 2;
 }

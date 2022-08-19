@@ -35,77 +35,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type Progress struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Reference string `protobuf:"bytes,1,opt,name=reference,proto3" json:"reference,omitempty"`
-	Status    string `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	Offset    int64  `protobuf:"varint,3,opt,name=offset,proto3" json:"offset,omitempty"`
-	Total     int64  `protobuf:"varint,4,opt,name=total,proto3" json:"total,omitempty"`
-}
-
-func (x *Progress) Reset() {
-	*x = Progress{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_github_com_containerd_containerd_api_types_transfer_streaming_proto_msgTypes[0]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *Progress) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Progress) ProtoMessage() {}
-
-func (x *Progress) ProtoReflect() protoreflect.Message {
-	mi := &file_github_com_containerd_containerd_api_types_transfer_streaming_proto_msgTypes[0]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Progress.ProtoReflect.Descriptor instead.
-func (*Progress) Descriptor() ([]byte, []int) {
-	return file_github_com_containerd_containerd_api_types_transfer_streaming_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *Progress) GetReference() string {
-	if x != nil {
-		return x.Reference
-	}
-	return ""
-}
-
-func (x *Progress) GetStatus() string {
-	if x != nil {
-		return x.Status
-	}
-	return ""
-}
-
-func (x *Progress) GetOffset() int64 {
-	if x != nil {
-		return x.Offset
-	}
-	return 0
-}
-
-func (x *Progress) GetTotal() int64 {
-	if x != nil {
-		return x.Total
-	}
-	return 0
-}
-
 type Data struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -117,7 +46,7 @@ type Data struct {
 func (x *Data) Reset() {
 	*x = Data{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_github_com_containerd_containerd_api_types_transfer_streaming_proto_msgTypes[1]
+		mi := &file_github_com_containerd_containerd_api_types_transfer_streaming_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -130,7 +59,7 @@ func (x *Data) String() string {
 func (*Data) ProtoMessage() {}
 
 func (x *Data) ProtoReflect() protoreflect.Message {
-	mi := &file_github_com_containerd_containerd_api_types_transfer_streaming_proto_msgTypes[1]
+	mi := &file_github_com_containerd_containerd_api_types_transfer_streaming_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -143,7 +72,7 @@ func (x *Data) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Data.ProtoReflect.Descriptor instead.
 func (*Data) Descriptor() ([]byte, []int) {
-	return file_github_com_containerd_containerd_api_types_transfer_streaming_proto_rawDescGZIP(), []int{1}
+	return file_github_com_containerd_containerd_api_types_transfer_streaming_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Data) GetData() []byte {
@@ -164,7 +93,7 @@ type WindowUpdate struct {
 func (x *WindowUpdate) Reset() {
 	*x = WindowUpdate{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_github_com_containerd_containerd_api_types_transfer_streaming_proto_msgTypes[2]
+		mi := &file_github_com_containerd_containerd_api_types_transfer_streaming_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -177,7 +106,7 @@ func (x *WindowUpdate) String() string {
 func (*WindowUpdate) ProtoMessage() {}
 
 func (x *WindowUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_github_com_containerd_containerd_api_types_transfer_streaming_proto_msgTypes[2]
+	mi := &file_github_com_containerd_containerd_api_types_transfer_streaming_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -190,7 +119,7 @@ func (x *WindowUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WindowUpdate.ProtoReflect.Descriptor instead.
 func (*WindowUpdate) Descriptor() ([]byte, []int) {
-	return file_github_com_containerd_containerd_api_types_transfer_streaming_proto_rawDescGZIP(), []int{2}
+	return file_github_com_containerd_containerd_api_types_transfer_streaming_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *WindowUpdate) GetUpdate() int32 {
@@ -207,23 +136,17 @@ var file_github_com_containerd_containerd_api_types_transfer_streaming_proto_raw
 	0x74, 0x61, 0x69, 0x6e, 0x65, 0x72, 0x64, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65,
 	0x72, 0x64, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2f, 0x74, 0x72, 0x61,
 	0x6e, 0x73, 0x66, 0x65, 0x72, 0x2f, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x69, 0x6e, 0x67, 0x2e,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x13, 0x63, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65, 0x72,
-	0x64, 0x2e, 0x76, 0x31, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x22, 0x6e, 0x0a, 0x08, 0x50, 0x72,
-	0x6f, 0x67, 0x72, 0x65, 0x73, 0x73, 0x12, 0x1c, 0x0a, 0x09, 0x72, 0x65, 0x66, 0x65, 0x72, 0x65,
-	0x6e, 0x63, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x72, 0x65, 0x66, 0x65, 0x72,
-	0x65, 0x6e, 0x63, 0x65, 0x12, 0x16, 0x0a, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x18, 0x02,
-	0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x12, 0x16, 0x0a, 0x06,
-	0x6f, 0x66, 0x66, 0x73, 0x65, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x03, 0x52, 0x06, 0x6f, 0x66,
-	0x66, 0x73, 0x65, 0x74, 0x12, 0x14, 0x0a, 0x05, 0x74, 0x6f, 0x74, 0x61, 0x6c, 0x18, 0x04, 0x20,
-	0x01, 0x28, 0x03, 0x52, 0x05, 0x74, 0x6f, 0x74, 0x61, 0x6c, 0x22, 0x1a, 0x0a, 0x04, 0x44, 0x61,
-	0x74, 0x61, 0x12, 0x12, 0x0a, 0x04, 0x64, 0x61, 0x74, 0x61, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c,
-	0x52, 0x04, 0x64, 0x61, 0x74, 0x61, 0x22, 0x26, 0x0a, 0x0c, 0x57, 0x69, 0x6e, 0x64, 0x6f, 0x77,
-	0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x12, 0x16, 0x0a, 0x06, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65,
-	0x18, 0x01, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x42, 0x35,
-	0x5a, 0x33, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x6f, 0x6e,
-	0x74, 0x61, 0x69, 0x6e, 0x65, 0x72, 0x64, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65,
-	0x72, 0x64, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2f, 0x74, 0x72, 0x61,
-	0x6e, 0x73, 0x66, 0x65, 0x72, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x19, 0x63, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65, 0x72,
+	0x64, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2e, 0x74, 0x72, 0x61, 0x6e, 0x73, 0x66, 0x65, 0x72,
+	0x22, 0x1a, 0x0a, 0x04, 0x44, 0x61, 0x74, 0x61, 0x12, 0x12, 0x0a, 0x04, 0x64, 0x61, 0x74, 0x61,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x04, 0x64, 0x61, 0x74, 0x61, 0x22, 0x26, 0x0a, 0x0c,
+	0x57, 0x69, 0x6e, 0x64, 0x6f, 0x77, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x12, 0x16, 0x0a, 0x06,
+	0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x75, 0x70,
+	0x64, 0x61, 0x74, 0x65, 0x42, 0x35, 0x5a, 0x33, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63,
+	0x6f, 0x6d, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65, 0x72, 0x64, 0x2f, 0x63, 0x6f,
+	0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65, 0x72, 0x64, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x74, 0x79, 0x70,
+	0x65, 0x73, 0x2f, 0x74, 0x72, 0x61, 0x6e, 0x73, 0x66, 0x65, 0x72, 0x62, 0x06, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x33,
 }
 
 var (
@@ -238,11 +161,10 @@ func file_github_com_containerd_containerd_api_types_transfer_streaming_proto_ra
 	return file_github_com_containerd_containerd_api_types_transfer_streaming_proto_rawDescData
 }
 
-var file_github_com_containerd_containerd_api_types_transfer_streaming_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_github_com_containerd_containerd_api_types_transfer_streaming_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_github_com_containerd_containerd_api_types_transfer_streaming_proto_goTypes = []interface{}{
-	(*Progress)(nil),     // 0: containerd.v1.types.Progress
-	(*Data)(nil),         // 1: containerd.v1.types.Data
-	(*WindowUpdate)(nil), // 2: containerd.v1.types.WindowUpdate
+	(*Data)(nil),         // 0: containerd.types.transfer.Data
+	(*WindowUpdate)(nil), // 1: containerd.types.transfer.WindowUpdate
 }
 var file_github_com_containerd_containerd_api_types_transfer_streaming_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -259,18 +181,6 @@ func file_github_com_containerd_containerd_api_types_transfer_streaming_proto_in
 	}
 	if !protoimpl.UnsafeEnabled {
 		file_github_com_containerd_containerd_api_types_transfer_streaming_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Progress); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_github_com_containerd_containerd_api_types_transfer_streaming_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Data); i {
 			case 0:
 				return &v.state
@@ -282,7 +192,7 @@ func file_github_com_containerd_containerd_api_types_transfer_streaming_proto_in
 				return nil
 			}
 		}
-		file_github_com_containerd_containerd_api_types_transfer_streaming_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+		file_github_com_containerd_containerd_api_types_transfer_streaming_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*WindowUpdate); i {
 			case 0:
 				return &v.state
@@ -301,7 +211,7 @@ func file_github_com_containerd_containerd_api_types_transfer_streaming_proto_in
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_github_com_containerd_containerd_api_types_transfer_streaming_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
