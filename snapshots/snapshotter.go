@@ -33,6 +33,11 @@ const (
 	UnpackKeyFormat       = UnpackKeyPrefix + "-%s %s"
 	inheritedLabelsPrefix = "containerd.io/snapshot/"
 	labelSnapshotRef      = "containerd.io/snapshot.ref"
+
+	// LabelSnapshotUIDMapping is the label used for UID mappings
+	LabelSnapshotUIDMapping = "containerd.io/snapshot/uidmapping"
+	// LabelSnapshotGIDMapping is the label used for GID mappings
+	LabelSnapshotGIDMapping = "containerd.io/snapshot/gidmapping"
 )
 
 // Kind identifies the kind of snapshot.

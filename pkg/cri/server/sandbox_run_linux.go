@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/snapshots"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	selinux "github.com/opencontainers/selinux/go-selinux"
@@ -357,4 +358,11 @@ func (c *criService) updateNetNamespacePath(spec *runtimespec.Spec, nsPath strin
 			break
 		}
 	}
+}
+
+// sandboxSnapshotterOpts generates any platform specific snapshotter options
+// for a sandbox container.
+func sandboxSnapshotterOpts(config *runtime.PodSandboxConfig) ([]snapshots.Opt, error) {
+	nsOpts := config.GetLinux().GetSecurityContext().GetNamespaceOptions()
+	return snapshotterRemapOpts(nsOpts)
 }
