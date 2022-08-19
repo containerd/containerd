@@ -601,6 +601,7 @@ func generateUserString(username string, uid, gid *runtime.Int64Value) (string, 
 }
 
 // snapshotterOpts returns any Linux specific snapshotter options for the rootfs snapshot
-func snapshotterOpts(snapshotterName string, config *runtime.ContainerConfig) []snapshots.Opt {
-	return []snapshots.Opt{}
+func snapshotterOpts(snapshotterName string, config *runtime.ContainerConfig) ([]snapshots.Opt, error) {
+	nsOpts := config.GetLinux().GetSecurityContext().GetNamespaceOptions()
+	return snapshotterRemapOpts(nsOpts)
 }

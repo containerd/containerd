@@ -158,10 +158,17 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate runtime options: %w", err)
 	}
-	snapshotterOpt := snapshots.WithLabels(snapshots.FilterInheritedLabels(config.Annotations))
+
+	sOpts := []snapshots.Opt{snapshots.WithLabels(snapshots.FilterInheritedLabels(config.Annotations))}
+	extraSOpts, err := sandboxSnapshotterOpts(config)
+	if err != nil {
+		return nil, err
+	}
+	sOpts = append(sOpts, extraSOpts...)
+
 	opts := []containerd.NewContainerOpts{
 		containerd.WithSnapshotter(c.runtimeSnapshotter(ctx, ociRuntime)),
-		customopts.WithNewSnapshot(id, containerdImage, snapshotterOpt),
+		customopts.WithNewSnapshot(id, containerdImage, sOpts...),
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(sandboxLabels),
 		containerd.WithContainerExtension(sandboxMetadataExtension, &sandbox.Metadata),
