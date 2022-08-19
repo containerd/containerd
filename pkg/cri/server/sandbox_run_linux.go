@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/snapshots"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	selinux "github.com/opencontainers/selinux/go-selinux"
@@ -347,4 +348,20 @@ func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {
 	}
 
 	return taskOpts
+}
+
+// sandboxSnapshotterOpts generates any platform specific snapshotter options
+// for a sandbox container.
+func sandboxSnapshotterOpts(config *runtime.PodSandboxConfig) ([]snapshots.Opt, error) {
+	nsOpts := config.GetLinux().GetSecurityContext().GetNamespaceOptions()
+	uids, gids, err := validateUserns(nsOpts.GetUsernsOptions())
+	if err != nil {
+		return nil, err
+	}
+
+	snapshotOpt := []snapshots.Opt{}
+	if nsOpts.GetUsernsOptions() != nil && nsOpts.GetUsernsOptions().GetMode() == runtime.NamespaceMode_POD {
+		snapshotOpt = append(snapshotOpt, containerd.WithRemapperLabels(0, uids[0].HostID, 0, gids[0].HostID, uids[0].Size))
+	}
+	return snapshotOpt, nil
 }

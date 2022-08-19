@@ -854,3 +854,21 @@ func toPlatforms(pt []*apitypes.Platform) []ocispec.Platform {
 	}
 	return platforms
 }
+
+// GetSnapshotterCapabilities returns the capabilities of a snapshotter.
+func (c *Client) GetSnapshotterCapabilities(ctx context.Context, snapshotterName string) ([]string, error) {
+	filters := []string{fmt.Sprintf("type==%s, id==%s", plugin.SnapshotPlugin, snapshotterName)}
+	in := c.IntrospectionService()
+
+	resp, err := in.Plugins(ctx, filters)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(resp.Plugins) <= 0 {
+		return nil, fmt.Errorf("inspection service could not find snapshotter %s plugin", snapshotterName)
+	}
+
+	sn := resp.Plugins[0]
+	return sn.Capabilities, nil
+}

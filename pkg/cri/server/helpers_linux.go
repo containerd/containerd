@@ -275,3 +275,87 @@ func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
 	spec.Process.SelinuxLabel = l
 	return nil
 }
+
+func parseUsernsIDs(runtimeIDMap []*runtime.IDMapping) ([]specs.LinuxIDMapping, error) {
+       var m []specs.LinuxIDMapping
+
+       if len(runtimeIDMap) == 0 {
+               return m, nil
+       }
+
+       if len(runtimeIDMap) > 1 {
+               // We only accept 1 line, because containerd.WithRemappedSnapshot() only supports that.
+               return m, fmt.Errorf("only one mapping line supported, got %v mapping lines", len(runtimeIDMap))
+       }
+
+       // We know len is 1 now.
+       if runtimeIDMap[0] == nil {
+               return m, nil
+       }
+       uidMap := *runtimeIDMap[0]
+
+       if uidMap.Length < 1 {
+               return m, fmt.Errorf("invalid mapping length: %v", uidMap.Length)
+       }
+
+       m = []specs.LinuxIDMapping{
+               specs.LinuxIDMapping{
+                       ContainerID: uidMap.ContainerId,
+                       HostID:      uidMap.HostId,
+                       Size:        uidMap.Length,
+               },
+       }
+
+       return m, nil
+}
+
+func parseUsernsAllIDs(UIDMap, GIDMap []*runtime.IDMapping) (uids, gids []specs.LinuxIDMapping, err error) {
+       if uids, err = parseUsernsIDs(UIDMap); err != nil {
+               err = fmt.Errorf("UID mapping: %w", err)
+               return
+       }
+
+       if gids, err = parseUsernsIDs(GIDMap); err != nil {
+               err = fmt.Errorf("GID mapping: %w", err)
+               return
+       }
+
+       return
+}
+
+func validateUserns(userns *runtime.UserNamespace) (retUids, retGids []specs.LinuxIDMapping, retErr error) {
+       if userns == nil {
+               // If userns is not set, the kubelet doesn't support this option
+               // and we should just fallback to no userns. This is completely
+               // valid.
+               return
+       }
+
+       uidRuntimeMap := userns.GetUids()
+       gidRuntimeMap := userns.GetGids()
+
+       uids, gids, err := parseUsernsAllIDs(uidRuntimeMap, gidRuntimeMap)
+       if err != nil {
+               retErr = fmt.Errorf("failed to parse user namespace mappings: %w", err)
+               return
+       }
+
+       switch mode := userns.GetMode(); mode {
+       case runtime.NamespaceMode_NODE:
+               if len(uids) != 0 || len(gids) != 0 {
+                       retErr = fmt.Errorf("can't use user namespace mode %q with mappings. Got %v UID mappings and %v GID mappings", mode, len(uids), len(gids))
+                       return
+               }
+       case runtime.NamespaceMode_POD:
+               // This is valid, we will handle it in WithPodNamespaces().
+               if len(uids) == 0 || len(gids) == 0 {
+                       retErr = fmt.Errorf("can't use user namespace mode %q without mappings", mode)
+                       return
+               }
+       default:
+               retErr = fmt.Errorf("unsupported user namespace mode: %q", mode)
+               return
+       }
+
+       return uids, gids, nil
+}

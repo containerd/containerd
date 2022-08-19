@@ -22,6 +22,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/snapshots"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -110,4 +111,9 @@ func (c *criService) cleanupSandboxFiles(id string, config *runtime.PodSandboxCo
 // No task options needed for windows.
 func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {
 	return nil
+}
+
+// No sandbox snapshotter options needed for windows.
+func sandboxSnapshotterOpts(config *runtime.PodSandboxConfig) ([]snapshots.Opt, error) {
+	return []snapshots.Opt{}, nil
 }
