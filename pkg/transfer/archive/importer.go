@@ -21,6 +21,7 @@ import (
 	"io"
 
 	transferapi "github.com/containerd/containerd/api/types/transfer"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/streaming"
 	tstreaming "github.com/containerd/containerd/pkg/transfer/streaming"
 	"github.com/containerd/typeurl"
@@ -42,11 +43,9 @@ func (iis *ImageImportStream) ImportStream(context.Context) (io.Reader, error) {
 	return iis.stream, nil
 }
 
-func (iis *ImageImportStream) MarshalAny(ctx context.Context, sm streaming.StreamManager) (typeurl.Any, error) {
-	// TODO: Unique stream ID
-	sid := "randomid"
-	// TODO: Should this API be create instead of get
-	stream, err := sm.Get(ctx, sid)
+func (iis *ImageImportStream) MarshalAny(ctx context.Context, sm streaming.StreamCreator) (typeurl.Any, error) {
+	sid := tstreaming.GenerateID("import")
+	stream, err := sm.Create(ctx, sid)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +58,7 @@ func (iis *ImageImportStream) MarshalAny(ctx context.Context, sm streaming.Strea
 	return typeurl.MarshalAny(s)
 }
 
-func (iis *ImageImportStream) UnmarshalAny(ctx context.Context, sm streaming.StreamManager, any typeurl.Any) error {
+func (iis *ImageImportStream) UnmarshalAny(ctx context.Context, sm streaming.StreamGetter, any typeurl.Any) error {
 	var s transferapi.ImageImportStream
 	if err := typeurl.UnmarshalTo(any, &s); err != nil {
 		return err
@@ -67,6 +66,7 @@ func (iis *ImageImportStream) UnmarshalAny(ctx context.Context, sm streaming.Str
 
 	stream, err := sm.Get(ctx, s.Stream)
 	if err != nil {
+		log.G(ctx).WithError(err).WithField("stream", s.Stream).Debug("failed to get import stream")
 		return err
 	}
 

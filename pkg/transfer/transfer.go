@@ -20,6 +20,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/pkg/unpack"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -31,23 +32,40 @@ type Transferer interface {
 
 type ImageResolver interface {
 	Resolve(ctx context.Context) (name string, desc ocispec.Descriptor, err error)
+}
+
+type ImageFetcher interface {
+	ImageResolver
 
 	Fetcher(ctx context.Context, ref string) (Fetcher, error)
 }
 
+type ImagePusher interface {
+	Pusher(context.Context, ocispec.Descriptor) (Pusher, error)
+}
+
 type Fetcher interface {
-	Fetch(ctx context.Context, desc ocispec.Descriptor) (io.ReadCloser, error)
+	Fetch(context.Context, ocispec.Descriptor) (io.ReadCloser, error)
+}
+
+type Pusher interface {
+	Push(context.Context, ocispec.Descriptor) (content.Writer, error)
 }
 
 // ImageFilterer is used to filter out child objects of an image
 type ImageFilterer interface {
-	ImageFilter(images.HandlerFunc) images.HandlerFunc
+	ImageFilter(images.HandlerFunc, content.Store) images.HandlerFunc
 }
 
 // ImageStorer is a type which is capable of storing an image to
 // for a provided descriptor
 type ImageStorer interface {
-	Store(context.Context, ocispec.Descriptor) (images.Image, error)
+	Store(context.Context, ocispec.Descriptor, images.Store) (images.Image, error)
+}
+
+// ImageGetter is type which returns an image from an image store
+type ImageGetter interface {
+	Get(context.Context, images.Store) (images.Image, error)
 }
 
 // ImageImportStreamer returns an import streamer based on OCI or

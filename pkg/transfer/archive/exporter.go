@@ -20,12 +20,19 @@ import (
 	"context"
 	"io"
 
-	transferapi "github.com/containerd/containerd/api/types/transfer"
+	transfertypes "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/streaming"
+	"github.com/containerd/containerd/pkg/transfer/plugins"
 	tstreaming "github.com/containerd/containerd/pkg/transfer/streaming"
 	"github.com/containerd/typeurl"
 )
+
+func init() {
+	// TODO: Move this to seperate package?
+	plugins.Register(&transfertypes.ImageExportStream{}, &ImageExportStream{})
+	plugins.Register(&transfertypes.ImageImportStream{}, &ImageImportStream{})
+}
 
 // NewImageImportStream returns a image importer via tar stream
 // TODO: Add import options
@@ -43,11 +50,9 @@ func (iis *ImageExportStream) ExportStream(context.Context) (io.WriteCloser, err
 	return iis.stream, nil
 }
 
-func (iis *ImageExportStream) MarshalAny(ctx context.Context, sm streaming.StreamManager) (typeurl.Any, error) {
-	// TODO: Unique stream ID
-	sid := "randomid"
-	// TODO: Should this API be create instead of get
-	stream, err := sm.Get(ctx, sid)
+func (iis *ImageExportStream) MarshalAny(ctx context.Context, sm streaming.StreamCreator) (typeurl.Any, error) {
+	sid := tstreaming.GenerateID("export")
+	stream, err := sm.Create(ctx, sid)
 	if err != nil {
 		return nil, err
 	}
@@ -60,28 +65,26 @@ func (iis *ImageExportStream) MarshalAny(ctx context.Context, sm streaming.Strea
 		iis.stream.Close()
 	}()
 
-	s := &transferapi.ImageExportStream{
+	s := &transfertypes.ImageExportStream{
 		Stream: sid,
 	}
 
 	return typeurl.MarshalAny(s)
 }
 
-func (iis *ImageExportStream) UnmarshalAny(ctx context.Context, sm streaming.StreamManager, any typeurl.Any) error {
-	var s transferapi.ImageExportStream
+func (iis *ImageExportStream) UnmarshalAny(ctx context.Context, sm streaming.StreamGetter, any typeurl.Any) error {
+	var s transfertypes.ImageExportStream
 	if err := typeurl.UnmarshalTo(any, &s); err != nil {
 		return err
 	}
 
 	stream, err := sm.Get(ctx, s.Stream)
 	if err != nil {
+		log.G(ctx).WithError(err).WithField("stream", s.Stream).Debug("failed to get export stream")
 		return err
 	}
 
-	r, w := io.Pipe()
-
-	tstreaming.SendStream(ctx, r, stream)
-	iis.stream = w
+	iis.stream = tstreaming.WriteByteStream(ctx, stream)
 
 	return nil
 }

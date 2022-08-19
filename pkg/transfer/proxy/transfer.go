@@ -18,29 +18,73 @@ package proxy
 
 import (
 	"context"
+	"io"
 
 	transferapi "github.com/containerd/containerd/api/services/transfer/v1"
+	transfertypes "github.com/containerd/containerd/api/types/transfer"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/streaming"
 	"github.com/containerd/containerd/pkg/transfer"
+	tstreaming "github.com/containerd/containerd/pkg/transfer/streaming"
 	"github.com/containerd/typeurl"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type proxyTransferer struct {
 	client        transferapi.TransferClient
-	streamManager streaming.StreamManager
+	streamCreator streaming.StreamCreator
 }
 
 // NewTransferer returns a new transferr which communicates over a GRPC
 // connection using the containerd transfer API
-func NewTransferer(client transferapi.TransferClient, sm streaming.StreamManager) transfer.Transferer {
+func NewTransferer(client transferapi.TransferClient, sc streaming.StreamCreator) transfer.Transferer {
 	return &proxyTransferer{
 		client:        client,
-		streamManager: sm,
+		streamCreator: sc,
 	}
 }
 
 func (p *proxyTransferer) Transfer(ctx context.Context, src interface{}, dst interface{}, opts ...transfer.Opt) error {
+	o := &transfer.TransferOpts{}
+	for _, opt := range opts {
+		opt(o)
+	}
+	apiOpts := &transferapi.TransferOptions{}
+	if o.Progress != nil {
+		sid := tstreaming.GenerateID("progress")
+		stream, err := p.streamCreator.Create(ctx, sid)
+		if err != nil {
+			return err
+		}
+		apiOpts.ProgressStream = sid
+		go func() {
+			for {
+				a, err := stream.Recv()
+				if err != nil {
+					if err != io.EOF {
+						log.G(ctx).WithError(err).Error("progress stream failed to recv")
+					}
+					return
+				}
+				i, err := typeurl.UnmarshalAny(a)
+				if err != nil {
+					log.G(ctx).WithError(err).Warnf("failed to unmarshal progress object: %v", a.GetTypeUrl())
+				}
+				switch v := i.(type) {
+				case *transfertypes.Progress:
+					o.Progress(transfer.Progress{
+						Event:    v.Event,
+						Name:     v.Name,
+						Parents:  v.Parents,
+						Progress: v.Progress,
+						Total:    v.Total,
+					})
+				default:
+					log.G(ctx).Warnf("unhandled progress object %T: %v", i, a.GetTypeUrl())
+				}
+			}
+		}()
+	}
 	asrc, err := p.marshalAny(ctx, src)
 	if err != nil {
 		return err
@@ -49,7 +93,6 @@ func (p *proxyTransferer) Transfer(ctx context.Context, src interface{}, dst int
 	if err != nil {
 		return err
 	}
-	// Resolve opts to
 	req := &transferapi.TransferRequest{
 		Source: &anypb.Any{
 			TypeUrl: asrc.GetTypeUrl(),
@@ -59,7 +102,7 @@ func (p *proxyTransferer) Transfer(ctx context.Context, src interface{}, dst int
 			TypeUrl: adst.GetTypeUrl(),
 			Value:   adst.GetValue(),
 		},
-		// TODO: Options
+		Options: apiOpts,
 	}
 	_, err = p.client.Transfer(ctx, req)
 	return err
@@ -67,11 +110,11 @@ func (p *proxyTransferer) Transfer(ctx context.Context, src interface{}, dst int
 func (p *proxyTransferer) marshalAny(ctx context.Context, i interface{}) (typeurl.Any, error) {
 	switch m := i.(type) {
 	case streamMarshaler:
-		return m.MarshalAny(ctx, p.streamManager)
+		return m.MarshalAny(ctx, p.streamCreator)
 	}
 	return typeurl.MarshalAny(i)
 }
 
 type streamMarshaler interface {
-	MarshalAny(context.Context, streaming.StreamManager) (typeurl.Any, error)
+	MarshalAny(context.Context, streaming.StreamCreator) (typeurl.Any, error)
 }

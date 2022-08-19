@@ -19,56 +19,68 @@ package containerd
 import (
 	"context"
 
+	streamingapi "github.com/containerd/containerd/api/services/streaming/v1"
 	transferapi "github.com/containerd/containerd/api/services/transfer/v1"
 	"github.com/containerd/containerd/pkg/streaming"
 	"github.com/containerd/containerd/pkg/transfer"
+	"github.com/containerd/containerd/pkg/transfer/proxy"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/typeurl"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func (c *Client) Transfer(ctx context.Context, src interface{}, dst interface{}, opts ...transfer.Opt) error {
-	// Conver Options
-	// Convert Source
-	// Convert Destinations
-	// Get Stream Manager
+func (c *Client) Transfer(ctx context.Context, src interface{}, dest interface{}, opts ...transfer.Opt) error {
+	return proxy.NewTransferer(transferapi.NewTransferClient(c.conn), c.streamCreator()).Transfer(ctx, src, dest, opts...)
+}
 
-	asrc, err := c.toAny(ctx, src)
+func (c *Client) streamCreator() streaming.StreamCreator {
+	return &streamCreator{
+		client: streamingapi.NewStreamingClient(c.conn),
+	}
+}
+
+type streamCreator struct {
+	client streamingapi.StreamingClient
+}
+
+func (sc *streamCreator) Create(ctx context.Context, id string) (streaming.Stream, error) {
+	stream, err := sc.client.Stream(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	adst, err := c.toAny(ctx, dst)
-	if err != nil {
-		return err
-	}
-
-	_, err = transferapi.NewTransferClient(c.conn).Transfer(ctx, &transferapi.TransferRequest{
-		Source: &anypb.Any{
-			TypeUrl: asrc.GetTypeUrl(),
-			Value:   asrc.GetValue(),
-		},
-		Destination: &anypb.Any{
-			TypeUrl: adst.GetTypeUrl(),
-			Value:   adst.GetValue(),
-		},
+	a, err := typeurl.MarshalAny(&streamingapi.StreamInit{
+		ID: id,
 	})
-	return err
-}
-
-func (c *Client) toAny(ctx context.Context, i interface{}) (a typeurl.Any, err error) {
-	switch v := i.(type) {
-	case toAny:
-		//Get stream manager
-		a, err = v.ToAny(ctx, nil)
-	case typeurl.Any:
-		a = v
-	default:
-		a, err = typeurl.MarshalAny(i)
+	if err != nil {
+		return nil, err
+	}
+	err = stream.Send(protobuf.FromAny(a))
+	if err != nil {
+		return nil, err
 	}
 
-	return
+	// Receive an ack that stream is init and ready
+	if _, err = stream.Recv(); err != nil {
+		return nil, err
+	}
+
+	return &clientStream{
+		s: stream,
+	}, nil
 }
 
-type toAny interface {
-	ToAny(context.Context, streaming.StreamManager) (typeurl.Any, error)
+type clientStream struct {
+	s streamingapi.Streaming_StreamClient
+}
+
+func (cs *clientStream) Send(a typeurl.Any) error {
+	return cs.s.Send(protobuf.FromAny(a))
+}
+
+func (cs *clientStream) Recv() (typeurl.Any, error) {
+	return cs.s.Recv()
+}
+
+func (cs *clientStream) Close() error {
+	return cs.s.CloseSend()
 }
