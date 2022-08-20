@@ -37,12 +37,19 @@ func errnoErr(e syscall.Errno) error {
 }
 
 var (
-	modkernel32 = windows.NewLazySystemDLL("kernel32.dll")
-	modntdll    = windows.NewLazySystemDLL("ntdll.dll")
-	modiphlpapi = windows.NewLazySystemDLL("iphlpapi.dll")
-	modadvapi32 = windows.NewLazySystemDLL("advapi32.dll")
-	modcfgmgr32 = windows.NewLazySystemDLL("cfgmgr32.dll")
+	modbindfltapi = windows.NewLazySystemDLL("bindfltapi.dll")
+	modnetapi32   = windows.NewLazySystemDLL("netapi32.dll")
+	modkernel32   = windows.NewLazySystemDLL("kernel32.dll")
+	modntdll      = windows.NewLazySystemDLL("ntdll.dll")
+	modiphlpapi   = windows.NewLazySystemDLL("iphlpapi.dll")
+	modadvapi32   = windows.NewLazySystemDLL("advapi32.dll")
+	modcfgmgr32   = windows.NewLazySystemDLL("cfgmgr32.dll")
 
+	procBfSetupFilter                          = modbindfltapi.NewProc("BfSetupFilter")
+	procNetLocalGroupGetInfo                   = modnetapi32.NewProc("NetLocalGroupGetInfo")
+	procNetUserAdd                             = modnetapi32.NewProc("NetUserAdd")
+	procNetUserDel                             = modnetapi32.NewProc("NetUserDel")
+	procNetLocalGroupAddMembers                = modnetapi32.NewProc("NetLocalGroupAddMembers")
 	procCreatePseudoConsole                    = modkernel32.NewProc("CreatePseudoConsole")
 	procClosePseudoConsole                     = modkernel32.NewProc("ClosePseudoConsole")
 	procResizePseudoConsole                    = modkernel32.NewProc("ResizePseudoConsole")
@@ -72,6 +79,52 @@ var (
 	procNtQueryDirectoryObject                 = modntdll.NewProc("NtQueryDirectoryObject")
 	procRtlNtStatusToDosError                  = modntdll.NewProc("RtlNtStatusToDosError")
 )
+
+func BfSetupFilter(jobHandle windows.Handle, flags uint32, virtRootPath *uint16, virtTargetPath *uint16, virtExceptions **uint16, virtExceptionPathCount uint32) (hr error) {
+	if hr = procBfSetupFilter.Find(); hr != nil {
+		return
+	}
+	r0, _, _ := syscall.Syscall6(procBfSetupFilter.Addr(), 6, uintptr(jobHandle), uintptr(flags), uintptr(unsafe.Pointer(virtRootPath)), uintptr(unsafe.Pointer(virtTargetPath)), uintptr(unsafe.Pointer(virtExceptions)), uintptr(virtExceptionPathCount))
+	if int32(r0) < 0 {
+		if r0&0x1fff0000 == 0x00070000 {
+			r0 &= 0xffff
+		}
+		hr = syscall.Errno(r0)
+	}
+	return
+}
+
+func netLocalGroupGetInfo(serverName *uint16, groupName *uint16, level uint32, bufptr **byte) (status error) {
+	r0, _, _ := syscall.Syscall6(procNetLocalGroupGetInfo.Addr(), 4, uintptr(unsafe.Pointer(serverName)), uintptr(unsafe.Pointer(groupName)), uintptr(level), uintptr(unsafe.Pointer(bufptr)), 0, 0)
+	if r0 != 0 {
+		status = syscall.Errno(r0)
+	}
+	return
+}
+
+func netUserAdd(serverName *uint16, level uint32, buf *byte, parm_err *uint32) (status error) {
+	r0, _, _ := syscall.Syscall6(procNetUserAdd.Addr(), 4, uintptr(unsafe.Pointer(serverName)), uintptr(level), uintptr(unsafe.Pointer(buf)), uintptr(unsafe.Pointer(parm_err)), 0, 0)
+	if r0 != 0 {
+		status = syscall.Errno(r0)
+	}
+	return
+}
+
+func netUserDel(serverName *uint16, username *uint16) (status error) {
+	r0, _, _ := syscall.Syscall(procNetUserDel.Addr(), 2, uintptr(unsafe.Pointer(serverName)), uintptr(unsafe.Pointer(username)), 0)
+	if r0 != 0 {
+		status = syscall.Errno(r0)
+	}
+	return
+}
+
+func netLocalGroupAddMembers(serverName *uint16, groupName *uint16, level uint32, buf *byte, totalEntries uint32) (status error) {
+	r0, _, _ := syscall.Syscall6(procNetLocalGroupAddMembers.Addr(), 5, uintptr(unsafe.Pointer(serverName)), uintptr(unsafe.Pointer(groupName)), uintptr(level), uintptr(unsafe.Pointer(buf)), uintptr(totalEntries), 0)
+	if r0 != 0 {
+		status = syscall.Errno(r0)
+	}
+	return
+}
 
 func createPseudoConsole(size uint32, hInput windows.Handle, hOutput windows.Handle, dwFlags uint32, hpcon *windows.Handle) (hr error) {
 	r0, _, _ := syscall.Syscall6(procCreatePseudoConsole.Addr(), 5, uintptr(size), uintptr(hInput), uintptr(hOutput), uintptr(dwFlags), uintptr(unsafe.Pointer(hpcon)), 0)
@@ -164,14 +217,8 @@ func QueryInformationJobObject(jobHandle windows.Handle, infoClass uint32, jobOb
 	return
 }
 
-func OpenJobObject(desiredAccess uint32, inheritHandle bool, lpName *uint16) (handle windows.Handle, err error) {
-	var _p0 uint32
-	if inheritHandle {
-		_p0 = 1
-	} else {
-		_p0 = 0
-	}
-	r0, _, e1 := syscall.Syscall(procOpenJobObjectW.Addr(), 3, uintptr(desiredAccess), uintptr(_p0), uintptr(unsafe.Pointer(lpName)))
+func OpenJobObject(desiredAccess uint32, inheritHandle int32, lpName *uint16) (handle windows.Handle, err error) {
+	r0, _, e1 := syscall.Syscall(procOpenJobObjectW.Addr(), 3, uintptr(desiredAccess), uintptr(inheritHandle), uintptr(unsafe.Pointer(lpName)))
 	handle = windows.Handle(r0)
 	if handle == 0 {
 		if e1 != 0 {

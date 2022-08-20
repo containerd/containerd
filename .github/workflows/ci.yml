@@ -286,14 +286,6 @@ jobs:
 
       - run: script/setup/install-dev-tools
 
-      # There is currently an issue in the race detector in Go on Windows when
-      # used with a newer version of GCC. The issue was first reported here:
-      # https://github.com/golang/go/issues/46099
-      - name: Downgrade MinGW
-        shell: bash
-        run: |
-          choco install mingw --version 10.2.0 --allow-downgrade
-
       - name: Binaries
         env:
           CGO_ENABLED: 1
@@ -439,7 +431,6 @@ jobs:
       - run: script/setup/install-gotestsum
       - name: Tests
         env:
-          GOPROXY: direct
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root-junit.xml
         run: |
           make test
@@ -447,7 +438,6 @@ jobs:
 
       - name: Integration 1
         env:
-          GOPROXY: direct
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
           ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
@@ -462,7 +452,6 @@ jobs:
       # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
       - name: Integration 2
         env:
-          GOPROXY: direct
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
           ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
@@ -539,7 +528,6 @@ jobs:
       - run: script/setup/install-gotestsum
       - name: Tests
         env:
-          GOPROXY: direct
           GOTESTSUM_JUNITFILE: "${{ github.workspace }}/macos-test-junit.xml"
         run: make test
       - uses: actions/upload-artifact@v2

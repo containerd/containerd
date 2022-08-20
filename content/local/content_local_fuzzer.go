@@ -23,6 +23,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	_ "crypto/sha256"
 	"io"
 	"testing"
 

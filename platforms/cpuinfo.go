@@ -151,5 +151,18 @@ func getCPUArchitecture() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(name.Machine[:bytes.IndexByte(name.Machine[:], 0)]), nil
+	machine := string(name.Machine[:bytes.IndexByte(name.Machine[:], 0)])
+	// https://github.com/qemu/qemu/blob/master/linux-user/uname.c
+	if machine == "aarch64" {
+		return machine, nil
+	}
+	length := len(machine)
+	// remove last 1 char l or b
+	variant := machine[:length-1]
+	if len(variant) <= 4 {
+		return "", fmt.Errorf("getCPUArchitecture for unix.Uname for machine field invalid %s", machine)
+	}
+	// remove first 4 char armv
+	variant = variant[3:]
+	return variant, nil
 }

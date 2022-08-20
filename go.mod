@@ -5,12 +5,12 @@ go 1.18
 require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20220706123152-fef3fe1bab07
 	github.com/Microsoft/go-winio v0.5.2
-	github.com/Microsoft/hcsshim v0.9.4
+	github.com/Microsoft/hcsshim v0.10.0-rc.1
 	github.com/agiledragon/gomonkey/v2 v2.8.0
 	github.com/container-orchestrated-devices/container-device-interface v0.3.1
 	github.com/containerd/aufs v1.0.0
 	github.com/containerd/btrfs v1.0.0
-	github.com/containerd/cgroups v1.0.4
+	github.com/containerd/cgroups v1.0.5-0.20220816231112-7083cd60b721
 	github.com/containerd/console v1.0.3
 	github.com/containerd/continuity v0.3.0
 	github.com/containerd/fifo v1.0.0
@@ -31,7 +31,7 @@ require (
 	github.com/emicklei/go-restful/v3 v3.8.0
 	github.com/fsnotify/fsnotify v1.5.1
 	github.com/google/go-cmp v0.5.8
-	github.com/google/uuid v1.2.0
+	github.com/google/uuid v1.3.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/hashicorp/go-multierror v1.1.1
@@ -50,7 +50,6 @@ require (
 	github.com/pelletier/go-toml v1.9.3
 	github.com/prometheus/client_golang v1.12.1
 	github.com/sirupsen/logrus v1.8.1
-	github.com/smartystreets/goconvey v1.6.4
 	github.com/stretchr/testify v1.8.0
 	github.com/tchap/go-patricia/v2 v2.3.1
 	github.com/urfave/cli v1.22.9
@@ -84,7 +83,7 @@ require (
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
-	github.com/cilium/ebpf v0.7.0 // indirect
+	github.com/cilium/ebpf v0.9.1 // indirect
 	github.com/containers/ocicrypt v1.1.3 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.1 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
@@ -96,11 +95,9 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/jtolds/gls v4.20.0+incompatible // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/miekg/pkcs11 v1.1.1 // indirect
 	github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible // indirect
@@ -114,7 +111,6 @@ require (
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stefanberger/go-pkcs11uri v0.0.0-20201008174630-78d3cae3a980 // indirect
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect

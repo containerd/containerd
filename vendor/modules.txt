@@ -11,8 +11,8 @@ github.com/Microsoft/go-winio/pkg/fs
 github.com/Microsoft/go-winio/pkg/guid
 github.com/Microsoft/go-winio/pkg/security
 github.com/Microsoft/go-winio/vhd
-# github.com/Microsoft/hcsshim v0.9.4
-## explicit; go 1.13
+# github.com/Microsoft/hcsshim v0.10.0-rc.1
+## explicit; go 1.18
 github.com/Microsoft/hcsshim
 github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options
 github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats
@@ -34,12 +34,15 @@ github.com/Microsoft/hcsshim/internal/jobobject
 github.com/Microsoft/hcsshim/internal/log
 github.com/Microsoft/hcsshim/internal/logfields
 github.com/Microsoft/hcsshim/internal/longpath
+github.com/Microsoft/hcsshim/internal/memory
 github.com/Microsoft/hcsshim/internal/mergemaps
 github.com/Microsoft/hcsshim/internal/oc
+github.com/Microsoft/hcsshim/internal/protocol/guestrequest
 github.com/Microsoft/hcsshim/internal/queue
 github.com/Microsoft/hcsshim/internal/regstate
 github.com/Microsoft/hcsshim/internal/runhcs
 github.com/Microsoft/hcsshim/internal/safefile
+github.com/Microsoft/hcsshim/internal/security
 github.com/Microsoft/hcsshim/internal/timeout
 github.com/Microsoft/hcsshim/internal/vmcompute
 github.com/Microsoft/hcsshim/internal/wclayer
@@ -66,12 +69,13 @@ github.com/cenkalti/backoff/v4
 # github.com/cespare/xxhash/v2 v2.1.2
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
-# github.com/cilium/ebpf v0.7.0
-## explicit; go 1.16
+# github.com/cilium/ebpf v0.9.1
+## explicit; go 1.17
 github.com/cilium/ebpf
 github.com/cilium/ebpf/asm
+github.com/cilium/ebpf/btf
 github.com/cilium/ebpf/internal
-github.com/cilium/ebpf/internal/btf
+github.com/cilium/ebpf/internal/sys
 github.com/cilium/ebpf/internal/unix
 github.com/cilium/ebpf/link
 # github.com/container-orchestrated-devices/container-device-interface v0.3.1
@@ -86,7 +90,7 @@ github.com/containerd/aufs/plugin
 # github.com/containerd/btrfs v1.0.0
 ## explicit; go 1.15
 github.com/containerd/btrfs
-# github.com/containerd/cgroups v1.0.4
+# github.com/containerd/cgroups v1.0.5-0.20220816231112-7083cd60b721
 ## explicit; go 1.17
 github.com/containerd/cgroups
 github.com/containerd/cgroups/stats/v1
@@ -238,7 +242,7 @@ github.com/google/go-cmp/cmp/internal/value
 ## explicit; go 1.12
 github.com/google/gofuzz
 github.com/google/gofuzz/bytesource
-# github.com/google/uuid v1.2.0
+# github.com/google/uuid v1.3.0
 ## explicit
 github.com/google/uuid
 # github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1
