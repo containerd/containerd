@@ -18,6 +18,7 @@ package sbserver
 
 import (
 	"github.com/docker/go-metrics"
+	prom "github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -34,6 +35,11 @@ var (
 	containerCreateTimer metrics.LabeledTimer
 	containerStopTimer   metrics.LabeledTimer
 	containerStartTimer  metrics.LabeledTimer
+
+	imagePulls           metrics.LabeledCounter
+	inProgressImagePulls metrics.Gauge
+	//  pull duration / (image size / 1MBi)
+	imagePullThroughput prom.Histogram
 )
 
 func init() {
@@ -53,6 +59,16 @@ func init() {
 	containerCreateTimer = ns.NewLabeledTimer("container_create", "time to create a container", "runtime")
 	containerStopTimer = ns.NewLabeledTimer("container_stop", "time to stop a container", "runtime")
 	containerStartTimer = ns.NewLabeledTimer("container_start", "time to start a container", "runtime")
+
+	imagePulls = ns.NewLabeledCounter("image_pulls", "succeeded and failed counters", "status")
+	inProgressImagePulls = ns.NewGauge("in_progress_image_pulls", "in progress pulls", metrics.Total)
+	imagePullThroughput = prom.NewHistogram(
+		prom.HistogramOpts{
+			Name:    "image_pulling_throughput",
+			Help:    "image pull throughput",
+			Buckets: prom.DefBuckets,
+		},
+	)
 
 	metrics.Register(ns)
 }
