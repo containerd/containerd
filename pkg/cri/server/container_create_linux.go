@@ -602,15 +602,15 @@ func generateUserString(username string, uid, gid *runtime.Int64Value) (string, 
 
 // snapshotterOpts returns any Linux specific snapshotter options for the rootfs snapshot
 func snapshotterOpts(snapshotterName string, config *runtime.ContainerConfig) ([]snapshots.Opt, error) {
-			 nsOpts := config.GetLinux().GetSecurityContext().GetNamespaceOptions()
-       uids, gids, err := validateUserns(nsOpts.GetUsernsOptions())
-       if err != nil {
-               return nil, err
-       }
+	nsOpts := config.GetLinux().GetSecurityContext().GetNamespaceOptions()
+	uids, gids, err := validateUserns(nsOpts.GetUsernsOptions())
+	if err != nil {
+		return nil, err
+	}
 
-       snapshotOpt := []snapshots.Opt{}
-       if nsOpts.GetUsernsOptions() != nil && nsOpts.GetUsernsOptions().GetMode() == runtime.NamespaceMode_POD {
-               snapshotOpt = append(snapshotOpt, containerd.WithRemapperLabels(0, uids[0].HostID, 0, gids[0].HostID, uids[0].Size))
-       }
-       return snapshotOpt, nil
+	snapshotOpt := []snapshots.Opt{}
+	if nsOpts.GetUsernsOptions() != nil && nsOpts.GetUsernsOptions().GetMode() == runtime.NamespaceMode_POD {
+		snapshotOpt = append(snapshotOpt, containerd.WithRemapperLabels(0, uids[0].HostID, 0, gids[0].HostID, uids[0].Size))
+	}
+	return snapshotOpt, nil
 }

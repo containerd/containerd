@@ -27,8 +27,8 @@ import (
 )
 
 const (
-	labelSnapshotUidMapping = "containerd.io/snapshot/uidmapping"
-	labelSnapshotGidMapping = "containerd.io/snapshot/gidmapping"
+	labelSnapshotUIDMapping = "containerd.io/snapshot/uidmapping"
+	labelSnapshotGIDMapping = "containerd.io/snapshot/gidmapping"
 )
 
 // WithRemapperLabels creates the labels used by any supporting snapshotter
@@ -36,8 +36,8 @@ const (
 // supported by the fuse-overlayfs snapshotter
 func WithRemapperLabels(ctrUID, hostUID, ctrGID, hostGID, length uint32) snapshots.Opt {
 	return snapshots.WithLabels(map[string]string{
-		labelSnapshotUidMapping: fmt.Sprintf("%d:%d:%d", ctrUID, hostUID, length),
-		labelSnapshotGidMapping: fmt.Sprintf("%d:%d:%d", ctrGID, hostGID, length)})
+		labelSnapshotUIDMapping: fmt.Sprintf("%d:%d:%d", ctrUID, hostUID, length),
+		labelSnapshotGIDMapping: fmt.Sprintf("%d:%d:%d", ctrGID, hostGID, length)})
 }
 
 func resolveSnapshotOptions(ctx context.Context, client *Client, snapshotterName string, snapshotter snapshots.Snapshotter, parent string, opts ...snapshots.Opt) (string, error) {
@@ -61,11 +61,11 @@ func resolveSnapshotOptions(ctx context.Context, client *Client, snapshotterName
 	needsRemap := false
 	var uidMap, gidMap string
 
-	if value, ok := local.Labels[labelSnapshotUidMapping]; ok {
+	if value, ok := local.Labels[labelSnapshotUIDMapping]; ok {
 		needsRemap = true
 		uidMap = value
 	}
-	if value, ok := local.Labels[labelSnapshotGidMapping]; ok {
+	if value, ok := local.Labels[labelSnapshotGIDMapping]; ok {
 		needsRemap = true
 		gidMap = value
 	}
@@ -77,13 +77,13 @@ func resolveSnapshotOptions(ctx context.Context, client *Client, snapshotterName
 	var ctrUID, hostUID, length uint32
 	_, err = fmt.Sscanf(uidMap, "%d:%d:%d", &ctrUID, &hostUID, &length)
 	if err != nil {
-		return "", fmt.Errorf("uidMap unparsable: %w")
+		return "", fmt.Errorf("uidMap unparsable: %w", err)
 	}
 
 	var ctrGID, hostGID, lengthGID uint32
 	_, err = fmt.Sscanf(gidMap, "%d:%d:%d", &ctrGID, &hostGID, &lengthGID)
 	if err != nil {
-		return "", fmt.Errorf("gidMap unparsable: %w")
+		return "", fmt.Errorf("gidMap unparsable: %w", err)
 	}
 
 	if ctrUID != 0 || ctrGID != 0 {
