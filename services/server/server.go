@@ -52,6 +52,8 @@ import (
 	metrics "github.com/docker/go-metrics"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
@@ -298,14 +300,20 @@ type Server struct {
 
 // ServeGRPC provides the containerd grpc APIs on the provided listener
 func (s *Server) ServeGRPC(l net.Listener) error {
+
 	if s.config.Metrics.GRPCHistogram {
 		// enable grpc time histograms to measure rpc latencies
 		grpc_prometheus.EnableHandlingTimeHistogram()
 	}
-	// before we start serving the grpc API register the grpc_prometheus metrics
-	// handler.  This needs to be the last service registered so that it can collect
-	// metrics for every other service
-	grpc_prometheus.Register(s.grpcServer)
+	if !s.config.Metrics.ContainerMetricsOnly {
+		// before we start serving the grpc API register the grpc_prometheus metrics
+		// handler.  This needs to be the last service registered so that it can collect
+		// metrics for every other service
+		grpc_prometheus.Register(s.grpcServer)
+	} else {
+		prometheus.DefaultRegisterer.Unregister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+		prometheus.DefaultRegisterer.Unregister(collectors.NewGoCollector())
+	}
 	return trapClosedConnErr(s.grpcServer.Serve(l))
 }
 
