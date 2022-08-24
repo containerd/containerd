@@ -90,11 +90,4 @@ sed -i 's/\/run\/containerd-test/\/tmp\/containerd-test/g' $SRC/containerd/integ
 
 cd integration/client
 
-# Rename all *_test.go to *_test_fuzz.go to use their declarations:
-for i in $( ls *_test.go ); do mv $i ./${i%.*}_fuzz.go; done
-
-# Remove windows test to avoid double declarations:
-rm ./client_windows_test_fuzz.go
-rm ./helpers_windows_test_fuzz.go
-
 compile_fuzzers '^func FuzzInteg.*data' compile_go_fuzzer vendor

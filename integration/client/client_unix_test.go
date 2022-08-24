@@ -27,12 +27,6 @@ import (
 	"github.com/containerd/containerd/platforms"
 )
 
-const (
-	defaultRoot    = "/var/lib/containerd-test"
-	defaultState   = "/run/containerd-test"
-	defaultAddress = "/run/containerd-test/containerd.sock"
-)
-
 var (
 	testImage             = images.Get(images.BusyBox)
 	testMultiLayeredImage = images.Get(images.VolumeCopyUp)
