@@ -591,7 +591,8 @@ func WithNamespacedCgroup() SpecOpts {
 
 // WithUser sets the user to be used within the container.
 // It accepts a valid user string in OCI Image Spec v1.0.0:
-//   user, uid, user:group, uid:gid, uid:group, user:gid
+//
+//	user, uid, user:group, uid:gid, uid:group, user:gid
 func WithUser(userstr string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
 		setProcess(s)
@@ -879,15 +880,19 @@ func WithAppendAdditionalGroups(groups ...string) SpecOpts {
 			groupMap := make(map[string]user.Group)
 			for _, group := range ugroups {
 				groupMap[group.Name] = group
-				groupMap[strconv.Itoa(group.Gid)] = group
 			}
 			var gids []uint32
 			for _, group := range groups {
-				g, ok := groupMap[group]
-				if !ok {
-					return fmt.Errorf("unable to find group %s", group)
+				gid, err := strconv.ParseUint(group, 10, 32)
+				if err == nil {
+					gids = append(gids, uint32(gid))
+				} else {
+					g, ok := groupMap[group]
+					if !ok {
+						return fmt.Errorf("unable to find group %s", group)
+					}
+					gids = append(gids, uint32(g.Gid))
 				}
-				gids = append(gids, uint32(g.Gid))
 			}
 			s.Process.User.AdditionalGids = append(s.Process.User.AdditionalGids, gids...)
 			return nil

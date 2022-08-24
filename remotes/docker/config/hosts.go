@@ -530,13 +530,13 @@ func makeAbsPath(p string, base string) string {
 
 // loadCertsDir loads certs from certsDir like "/etc/docker/certs.d" .
 // Compatible with Docker file layout
-// - files ending with ".crt" are treated as CA certificate files
-// - files ending with ".cert" are treated as client certificates, and
-//   files with the same name but ending with ".key" are treated as the
-//   corresponding private key.
-//   NOTE: If a ".key" file is missing, this function will just return
-//   the ".cert", which may contain the private key. If the ".cert" file
-//   does not contain the private key, the caller should detect and error.
+//   - files ending with ".crt" are treated as CA certificate files
+//   - files ending with ".cert" are treated as client certificates, and
+//     files with the same name but ending with ".key" are treated as the
+//     corresponding private key.
+//     NOTE: If a ".key" file is missing, this function will just return
+//     the ".cert", which may contain the private key. If the ".cert" file
+//     does not contain the private key, the caller should detect and error.
 func loadCertFiles(ctx context.Context, certsDir string) ([]hostConfig, error) {
 	fs, err := os.ReadDir(certsDir)
 	if err != nil && !os.IsNotExist(err) {

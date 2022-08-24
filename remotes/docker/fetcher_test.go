@@ -193,7 +193,7 @@ func TestDockerFetcherOpen(t *testing.T) {
 			req := f.request(host, http.MethodGet)
 
 			got, err := f.open(context.TODO(), req, "", 0)
-			assert.Equal(t, tt.wantErr, (err != nil))
+			assert.Equal(t, tt.wantErr, err != nil)
 			assert.Equal(t, tt.want, got)
 			assert.Equal(t, tt.retries, 0)
 			if tt.wantErr {

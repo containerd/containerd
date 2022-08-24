@@ -9,7 +9,7 @@ Go package for creating, managing, inspecting, and destroying cgroups.
 The resources format for settings on the cgroup uses the OCI runtime-spec found
 [here](https://github.com/opencontainers/runtime-spec).
 
-## Examples
+## Examples (v1)
 
 ### Create a new cgroup
 
@@ -58,7 +58,7 @@ if err := control.Add(cgroups.Process{Pid:1234}); err != nil {
 }
 ```
 
-###  Update the cgroup 
+###  Update the cgroup
 
 To update the resources applied in the cgroup
 
@@ -131,6 +131,61 @@ efd, err := control.OOMEventFD()
 // or by using RegisterMemoryEvent
 event := cgroups.OOMEvent()
 efd, err := control.RegisterMemoryEvent(event)
+```
+
+## Examples (v2/unified)
+
+### Check that the current system is running cgroups v2
+
+```go
+var cgroupV2 bool
+if cgroups.Mode() == cgroups.Unified {
+	cgroupV2 = true
+}
+```
+
+### Create a new cgroup
+
+This creates a new systemd v2 cgroup slice. Systemd slices consider ["-" a special character](https://www.freedesktop.org/software/systemd/man/systemd.slice.html),
+so the resulting slice would be located here on disk:
+
+* /sys/fs/cgroup/my.slice/my-cgroup.slice/my-cgroup-abc.slice
+
+```go
+import (
+    cgroupsv2 "github.com/containerd/cgroups/v2"
+    specs "github.com/opencontainers/runtime-spec/specs-go"
+)
+
+res := cgroupsv2.Resources{}
+// dummy PID of -1 is used for creating a "general slice" to be used as a parent cgroup.
+// see https://github.com/containerd/cgroups/blob/1df78138f1e1e6ee593db155c6b369466f577651/v2/manager.go#L732-L735
+m, err := cgroupsv2.NewSystemd("/", "my-cgroup-abc.slice", -1, &res)
+if err != nil {
+	return err
+}
+```
+
+### Load an existing cgroup
+
+```go
+m, err := cgroupsv2.LoadSystemd("/", "my-cgroup-abc.slice")
+if err != nil {
+	return err
+}
+```
+
+### Delete a cgroup
+
+```go
+m, err := cgroupsv2.LoadSystemd("/", "my-cgroup-abc.slice")
+if err != nil {
+	return err
+}
+err = m.DeleteSystemd()
+if err != nil {
+	return err
+}
 ```
 
 ### Attention

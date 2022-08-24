@@ -249,6 +249,9 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"pidfd_send_signal",
 				"pipe",
 				"pipe2",
+				"pkey_alloc",
+				"pkey_free",
+				"pkey_mprotect",
 				"poll",
 				"ppoll",
 				"ppoll_time64",
@@ -652,9 +655,31 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				Action: specs.ActAllow,
 				Args:   []specs.LinuxSeccompArg{},
 			})
+		case "CAP_SYS_NICE":
+			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+				Names: []string{
+					"get_mempolicy",
+					"mbind",
+					"set_mempolicy",
+				},
+				Action: specs.ActAllow,
+				Args:   []specs.LinuxSeccompArg{},
+			})
 		case "CAP_SYSLOG":
 			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
 				Names:  []string{"syslog"},
+				Action: specs.ActAllow,
+				Args:   []specs.LinuxSeccompArg{},
+			})
+		case "CAP_BPF":
+			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+				Names:  []string{"bpf"},
+				Action: specs.ActAllow,
+				Args:   []specs.LinuxSeccompArg{},
+			})
+		case "CAP_PERFMON":
+			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+				Names:  []string{"perf_event_open"},
 				Action: specs.ActAllow,
 				Args:   []specs.LinuxSeccompArg{},
 			})

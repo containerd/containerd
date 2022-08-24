@@ -477,6 +477,11 @@ daemon:x:2:root,bin,daemon
 			expected:       []uint32{0, 1, 2},
 		},
 		{
+			name:     "append group id",
+			groups:   []string{"999"},
+			expected: []uint32{999},
+		},
+		{
 			name:   "unknown group",
 			groups: []string{"unknown"},
 			err:    "unable to find group unknown",

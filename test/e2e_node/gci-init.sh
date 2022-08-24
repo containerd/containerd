@@ -16,7 +16,6 @@
 
 # This script is used to do extra initialization on GCI.
 
-# set up cgroupv2 based on flag CONTAINERD_CGROUPV2 in containerd-env
 CONTAINERD_HOME="/home/containerd"
 CONTAINERD_ENV_METADATA="containerd-env"
 
@@ -24,28 +23,46 @@ if [ -f "${CONTAINERD_HOME}/${CONTAINERD_ENV_METADATA}" ]; then
   source "${CONTAINERD_HOME}/${CONTAINERD_ENV_METADATA}"
 fi
 
-if [ "${CONTAINERD_CGROUPV2:-"false"}"  == "true" ]; then
-  # check cos image
-  if [ -r /etc/os-release ]; then
-    OS_ID="$(. /etc/os-release && echo "$ID")"
+# CONTAINERD_COS_CGROUP_MODE can be specified as "v1" or "v2". If specified,
+# cgroup configuration will be switched as appropriate.
+function configure_cgroup_mode() {
+  if [[ -z "${CONTAINERD_COS_CGROUP_MODE}" ]]; then
+    return
   fi
-  if [ "${OS_ID}" = "cos" ]; then
-    if ! grep -q 'systemd.unified_cgroup_hierarchy=true' /proc/cmdline && [ "$(stat -fc %T /sys/fs/cgroup/)" != "cgroup2fs" ]; then
-      echo "Setting up cgroupv2"
 
-      mount_path="/tmp/esp"
-      mkdir -p "${mount_path}"
-      esp_partition="/dev/sda12"
-      mount "${esp_partition}" "${mount_path}"
-      sed -i 's/systemd.unified_cgroup_hierarchy=false/systemd.unified_cgroup_hierarchy=true/g' "${mount_path}/efi/boot/grub.cfg"
-      umount "${mount_path}"
-      rmdir "${mount_path}"
-
-      echo "Reconfigured grub; rebooting..."
-      reboot
-    fi
+  if [[ ! -r /etc/os-release ]]; then
+    echo "Skipped configuring cgroup mode to ${CONTAINERD_COS_CGROUP_MODE} because /etc/os-release was not readable"
+    return
   fi
-fi
+
+  OS_ID="$(cat /etc/os-release | grep '^ID=' | sed -e 's/ID=//')"
+  if [[ "${OS_ID}" != "cos" ]]; then
+    echo "Skipped configuring cgroup mode to ${CONTAINERD_COS_CGROUP_MODE} because OS is not COS"
+    return
+  fi
+
+  # cgroup_helper was introduced in COS M97, see if it's available first...
+  if ! command -v cgroup_helper > /dev/null 2>&1; then
+    echo "Skipped configuring cgroup mode to ${CONTAINERD_COS_CGROUP_MODE} because cgroup_helper tool is not available (only introduced in COS M97)"
+    return
+  fi
+
+  # if cgroup mode requested was v1 but it's currently set as unified (v2),
+  # switch to hybrid (v1) and reboot
+  if [[ "${CONTAINERD_COS_CGROUP_MODE:-}" == "v1" ]] && cgroup_helper show | grep -q 'unified'; then
+    cgroup_helper set hybrid
+    echo "set cgroup config to hybrid, now rebooting..."
+    reboot
+  # if cgroup mode requested was v2 but it's currently set as hybrid (v1),
+  # switch to unified (v2) and reboot
+  elif [[ "${CONTAINERD_COS_CGROUP_MODE:-}" == "v2" ]] && cgroup_helper show | grep -q 'hybrid'; then
+    cgroup_helper set unified
+    echo "set cgroup config to unified, now rebooting..."
+    reboot
+  fi
+}
+
+configure_cgroup_mode
 
 mount /tmp /tmp -o remount,exec,suid
 #TODO(random-liu): Stop docker and remove this docker thing.

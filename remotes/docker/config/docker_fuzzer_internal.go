@@ -20,7 +20,6 @@
 package config
 
 import (
-	"io/ioutil"
 	"os"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
@@ -28,7 +27,7 @@ import (
 
 func FuzzParseHostsFile(data []byte) int {
 	f := fuzz.NewConsumer(data)
-	dir, err := ioutil.TempDir("", "fuzz-")
+	dir, err := os.MkdirTemp("", "fuzz-")
 	if err != nil {
 		return 0
 	}

@@ -228,7 +228,7 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 		return nil, err
 	}
 	_, err = rtime.Get(ctx, r.ContainerID)
-	if err != nil && err != runtime.ErrTaskNotExists {
+	if err != nil && !errdefs.IsNotFound(err) {
 		return nil, errdefs.ToGRPC(err)
 	}
 	if err == nil {

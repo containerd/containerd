@@ -18,7 +18,7 @@ package compression
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -31,7 +31,7 @@ func BenchmarkDecompression(b *testing.B) {
 	resp, err := http.Get(benchmarkTestDataURL)
 	require.NoError(b, err)
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	require.NoError(b, err)
 	resp.Body.Close()
 

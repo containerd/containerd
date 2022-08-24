@@ -23,7 +23,6 @@ import (
 
 	v1 "github.com/containerd/cgroups/stats/v1"
 	v2 "github.com/containerd/cgroups/v2/stats"
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -154,75 +153,6 @@ func TestGetAvailableBytesV2(t *testing.T) {
 			assert.Equal(t, test.expected, got)
 		})
 	}
-}
-
-func TestContainerMetricsCPU(t *testing.T) {
-	c := newTestCRIService()
-	timestamp := time.Now()
-	secondAfterTimeStamp := timestamp.Add(time.Second)
-	ID := "ID"
-
-	for desc, test := range map[string]struct {
-		firstMetrics   interface{}
-		secondMetrics  interface{}
-		expectedFirst  *runtime.CpuUsage
-		expectedSecond *runtime.CpuUsage
-	}{
-		"v1 metrics": {
-			firstMetrics: &v1.Metrics{
-				CPU: &v1.CPUStat{
-					Usage: &v1.CPUUsage{
-						Total: 50,
-					},
-				},
-			},
-			secondMetrics: &v1.Metrics{
-				CPU: &v1.CPUStat{
-					Usage: &v1.CPUUsage{
-						Total: 500,
-					},
-				},
-			},
-			expectedFirst: &runtime.CpuUsage{
-				Timestamp:            timestamp.UnixNano(),
-				UsageCoreNanoSeconds: &runtime.UInt64Value{Value: 50},
-				UsageNanoCores:       &runtime.UInt64Value{Value: 0},
-			},
-			expectedSecond: &runtime.CpuUsage{
-				Timestamp:            secondAfterTimeStamp.UnixNano(),
-				UsageCoreNanoSeconds: &runtime.UInt64Value{Value: 500},
-				UsageNanoCores:       &runtime.UInt64Value{Value: 450},
-			},
-		},
-	} {
-		t.Run(desc, func(t *testing.T) {
-			container, err := containerstore.NewContainer(
-				containerstore.Metadata{ID: ID},
-			)
-			assert.NoError(t, err)
-			assert.Nil(t, container.Stats)
-			err = c.containerStore.Add(container)
-			assert.NoError(t, err)
-
-			cpuUsage, err := c.cpuContainerStats(ID, false, test.firstMetrics, timestamp)
-			assert.NoError(t, err)
-
-			container, err = c.containerStore.Get(ID)
-			assert.NoError(t, err)
-			assert.NotNil(t, container.Stats)
-
-			assert.Equal(t, test.expectedFirst, cpuUsage)
-
-			cpuUsage, err = c.cpuContainerStats(ID, false, test.secondMetrics, secondAfterTimeStamp)
-			assert.NoError(t, err)
-			assert.Equal(t, test.expectedSecond, cpuUsage)
-
-			container, err = c.containerStore.Get(ID)
-			assert.NoError(t, err)
-			assert.NotNil(t, container.Stats)
-		})
-	}
-
 }
 
 func TestContainerMetricsMemory(t *testing.T) {

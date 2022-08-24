@@ -130,7 +130,7 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 				ttrpcAddress: m.containerdTTRPCAddress,
 				schedCore:    m.schedCore,
 			})
-		shim, err := loadShim(ctx, bundle, func() {
+		instance, err := loadShim(ctx, bundle, func() {
 			log.G(ctx).WithField("id", id).Info("shim disconnected")
 
 			cleanupAfterDeadShim(context.Background(), id, ns, m.shims, m.events, binaryCall)
@@ -141,6 +141,7 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 			cleanupAfterDeadShim(ctx, id, ns, m.shims, m.events, binaryCall)
 			continue
 		}
+		shim := newShimTask(instance)
 
 		// There are 3 possibilities for the loaded shim here:
 		// 1. It could be a shim that is running a task.
@@ -159,7 +160,7 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 			// No need to do anything for removeTask since we never added this shim.
 			shim.delete(ctx, false, func(ctx context.Context, id string) {})
 		} else {
-			m.shims.Add(ctx, shim)
+			m.shims.Add(ctx, shim.ShimInstance)
 		}
 	}
 	return nil

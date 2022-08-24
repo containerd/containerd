@@ -40,17 +40,15 @@ compile_fuzzers() {
 
 apt-get update && apt-get install -y wget
 cd $SRC
-wget --quiet https://go.dev/dl/go1.18.4.linux-amd64.tar.gz
+wget --quiet https://go.dev/dl/go1.19.linux-amd64.tar.gz
 
 mkdir temp-go
 rm -rf /root/.go/*
-tar -C temp-go/ -xzf go1.18.4.linux-amd64.tar.gz
+tar -C temp-go/ -xzf go1.19.linux-amd64.tar.gz
 mv temp-go/go/* /root/.go/
 cd $SRC/containerd
 
 go mod tidy
-rm vendor/github.com/cilium/ebpf/internal/btf/fuzz.go
-rm /root/go/pkg/mod/github.com/cilium/ebpf@v0.7.0/internal/btf/fuzz.go
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 cd ../../

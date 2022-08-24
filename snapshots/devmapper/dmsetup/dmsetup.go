@@ -353,7 +353,8 @@ func BlockDeviceSize(path string) (int64, error) {
 }
 
 // DiscardBlocks discards all blocks for the given thin device
-//  ported from https://github.com/moby/moby/blob/7b9275c0da707b030e62c96b679a976f31f929d3/pkg/devicemapper/devmapper.go#L416
+//
+//	ported from https://github.com/moby/moby/blob/7b9275c0da707b030e62c96b679a976f31f929d3/pkg/devicemapper/devmapper.go#L416
 func DiscardBlocks(deviceName string) error {
 	inUse, err := isInUse(deviceName)
 	if err != nil {
@@ -402,8 +403,10 @@ func tryGetUnixError(output string) (unix.Errno, bool) {
 }
 
 // dmsetup returns error messages in format:
-// 	device-mapper: message ioctl on <name> failed: File exists\n
-// 	Command failed\n
+//
+//	device-mapper: message ioctl on <name> failed: File exists\n
+//	Command failed\n
+//
 // parseDmsetupError extracts text between "failed: " and "\n"
 func parseDmsetupError(output string) string {
 	lines := strings.SplitN(output, "\n", 2)

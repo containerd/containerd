@@ -196,6 +196,9 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		if cwd := context.String("cwd"); cwd != "" {
 			opts = append(opts, oci.WithProcessCwd(cwd))
 		}
+		if user := context.String("user"); user != "" {
+			opts = append(opts, oci.WithUser(user), oci.WithAdditionalGIDs(user))
+		}
 		if context.Bool("tty") {
 			opts = append(opts, oci.WithTTY)
 		}
@@ -213,6 +216,13 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 				oci.WithHostResolvconf,
 				oci.WithEnv([]string{fmt.Sprintf("HOSTNAME=%s", hostname)}),
 			)
+		}
+		if annoStrings := context.StringSlice("annotation"); len(annoStrings) > 0 {
+			annos, err := commands.AnnotationArgs(annoStrings)
+			if err != nil {
+				return nil, err
+			}
+			opts = append(opts, oci.WithAnnotations(annos))
 		}
 
 		if context.Bool("cni") {

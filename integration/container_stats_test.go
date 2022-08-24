@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/integration/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -33,6 +34,7 @@ func TestContainerStats(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "stats")
 
+	pauseImage := images.Get(images.Pause)
 	EnsureImageExists(t, pauseImage)
 
 	t.Logf("Create a container config and run container in a pod")
@@ -74,7 +76,7 @@ func TestContainerConsumedStats(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "stats")
 
-	testImage := GetImage(ResourceConsumer)
+	testImage := images.Get(images.ResourceConsumer)
 	EnsureImageExists(t, testImage)
 
 	t.Logf("Create a container config and run container in a pod")
@@ -145,6 +147,7 @@ func TestContainerListStats(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "running-pod", "statsls")
 
+	pauseImage := images.Get(images.Pause)
 	EnsureImageExists(t, pauseImage)
 
 	t.Logf("Create a container config and run containers in a pod")
@@ -199,6 +202,7 @@ func TestContainerListStatsWithIdFilter(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "running-pod", "statsls")
 
+	pauseImage := images.Get(images.Pause)
 	EnsureImageExists(t, pauseImage)
 
 	t.Logf("Create a container config and run containers in a pod")
@@ -258,6 +262,7 @@ func TestContainerListStatsWithSandboxIdFilter(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "running-pod", "statsls")
 
+	pauseImage := images.Get(images.Pause)
 	EnsureImageExists(t, pauseImage)
 
 	t.Logf("Create a container config and run containers in a pod")
@@ -318,6 +323,7 @@ func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 	t.Logf("Create a pod config and run sandbox container")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "running-pod", "statsls")
 
+	pauseImage := images.Get(images.Pause)
 	EnsureImageExists(t, pauseImage)
 
 	t.Logf("Create container config and run containers in a pod")

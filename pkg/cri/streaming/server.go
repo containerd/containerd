@@ -45,7 +45,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	restful "github.com/emicklei/go-restful/v3"
+	"github.com/emicklei/go-restful/v3"
 
 	"k8s.io/apimachinery/pkg/types"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
@@ -165,6 +165,8 @@ func NewServer(config Config, runtime Runtime) (Server, error) {
 		Addr:      s.config.Addr,
 		Handler:   s.handler,
 		TLSConfig: s.config.TLSConfig,
+		// TODO(fuweid): allow user to configure streaming server
+		ReadHeaderTimeout: 30 * time.Minute, // Fix linter G112: Potential Slowloris Attack because ReadHeaderTimeout is not configured in the http.Server
 	}
 
 	return s, nil

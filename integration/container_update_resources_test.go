@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/cgroups"
 	cgroupsv2 "github.com/containerd/cgroups/v2"
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/integration/images"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -151,6 +152,7 @@ func TestUpdateContainerResources_MemorySwap(t *testing.T) {
 	t.Log("Create a sandbox")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "update-container-swap-resources")
 
+	pauseImage := images.Get(images.Pause)
 	EnsureImageExists(t, pauseImage)
 
 	memoryLimit := int64(128 * 1024 * 1024)
@@ -223,6 +225,7 @@ func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
 	t.Log("Create a sandbox")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "update-container-resources")
 
+	pauseImage := images.Get(images.Pause)
 	EnsureImageExists(t, pauseImage)
 
 	t.Log("Create a container with memory limit")

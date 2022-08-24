@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/integration/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,7 +38,7 @@ const (
 
 func TestVolumeCopyUp(t *testing.T) {
 	var (
-		testImage   = GetImage(VolumeCopyUp)
+		testImage   = images.Get(images.VolumeCopyUp)
 		execTimeout = time.Minute
 	)
 
@@ -95,7 +96,7 @@ func TestVolumeCopyUp(t *testing.T) {
 
 func TestVolumeOwnership(t *testing.T) {
 	var (
-		testImage   = GetImage(VolumeOwnership)
+		testImage   = images.Get(images.VolumeOwnership)
 		execTimeout = time.Minute
 	)
 

@@ -36,22 +36,31 @@ func NewSandboxRemoteController(client api.ControllerClient) sb.Controller {
 	return &sandboxRemoteController{client: client}
 }
 
-func (s *sandboxRemoteController) Start(ctx context.Context, sandboxID string) (uint32, error) {
+func (s *sandboxRemoteController) Start(ctx context.Context, sandboxID string) (*api.ControllerStartResponse, error) {
 	resp, err := s.client.Start(ctx, &api.ControllerStartRequest{SandboxID: sandboxID})
 	if err != nil {
-		return 0, errdefs.FromGRPC(err)
+		return nil, errdefs.FromGRPC(err)
 	}
 
-	return resp.Pid, nil
+	return resp, nil
 }
 
-func (s *sandboxRemoteController) Shutdown(ctx context.Context, sandboxID string) error {
-	_, err := s.client.Shutdown(ctx, &api.ControllerShutdownRequest{SandboxID: sandboxID})
+func (s *sandboxRemoteController) Stop(ctx context.Context, sandboxID string) (*api.ControllerStopResponse, error) {
+	resp, err := s.client.Stop(ctx, &api.ControllerStopRequest{SandboxID: sandboxID})
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return nil, errdefs.FromGRPC(err)
 	}
 
-	return nil
+	return resp, nil
+}
+
+func (s *sandboxRemoteController) Delete(ctx context.Context, sandboxID string) (*api.ControllerDeleteResponse, error) {
+	resp, err := s.client.Delete(ctx, &api.ControllerDeleteRequest{SandboxID: sandboxID})
+	if err != nil {
+		return nil, errdefs.FromGRPC(err)
+	}
+
+	return resp, nil
 }
 
 func (s *sandboxRemoteController) Wait(ctx context.Context, sandboxID string) (*api.ControllerWaitResponse, error) {

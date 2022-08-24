@@ -24,18 +24,9 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
-	containers "github.com/containerd/containerd/api/services/containers/v1"
-	diff "github.com/containerd/containerd/api/services/diff/v1"
-	images "github.com/containerd/containerd/api/services/images/v1"
-	namespacesapi "github.com/containerd/containerd/api/services/namespaces/v1"
-	tasks "github.com/containerd/containerd/api/services/tasks/v1"
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime/restart"
-	"github.com/containerd/containerd/services"
-	"github.com/containerd/containerd/snapshots"
 	"github.com/sirupsen/logrus"
 )
 
@@ -74,11 +65,7 @@ func init() {
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			ic.Meta.Capabilities = []string{"no", "always", "on-failure", "unless-stopped"}
-			opts, err := getServicesOpts(ic)
-			if err != nil {
-				return nil, err
-			}
-			client, err := containerd.New("", containerd.WithServices(opts...))
+			client, err := containerd.New("", containerd.WithInMemoryServices(ic))
 			if err != nil {
 				return nil, err
 			}
@@ -89,67 +76,6 @@ func init() {
 			return m, nil
 		},
 	})
-}
-
-// getServicesOpts get service options from plugin context.
-func getServicesOpts(ic *plugin.InitContext) ([]containerd.ServicesOpt, error) {
-	var opts []containerd.ServicesOpt
-	for t, fn := range map[plugin.Type]func(interface{}) containerd.ServicesOpt{
-		plugin.EventPlugin: func(i interface{}) containerd.ServicesOpt {
-			return containerd.WithEventService(i.(containerd.EventService))
-		},
-		plugin.LeasePlugin: func(i interface{}) containerd.ServicesOpt {
-			return containerd.WithLeasesService(i.(leases.Manager))
-		},
-	} {
-		i, err := ic.Get(t)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get %q plugin: %w", t, err)
-		}
-		opts = append(opts, fn(i))
-	}
-
-	plugins, err := ic.GetByType(plugin.ServicePlugin)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get service plugin: %w", err)
-	}
-	for s, fn := range map[string]func(interface{}) containerd.ServicesOpt{
-		services.ContentService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithContentStore(s.(content.Store))
-		},
-		services.ImagesService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithImageClient(s.(images.ImagesClient))
-		},
-		services.SnapshotsService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithSnapshotters(s.(map[string]snapshots.Snapshotter))
-		},
-		services.ContainersService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithContainerClient(s.(containers.ContainersClient))
-		},
-		services.TasksService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithTaskClient(s.(tasks.TasksClient))
-		},
-		services.DiffService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithDiffClient(s.(diff.DiffClient))
-		},
-		services.NamespacesService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithNamespaceClient(s.(namespacesapi.NamespacesClient))
-		},
-	} {
-		p := plugins[s]
-		if p == nil {
-			return nil, fmt.Errorf("service %q not found", s)
-		}
-		i, err := p.Instance()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get instance of service %q: %w", s, err)
-		}
-		if i == nil {
-			return nil, fmt.Errorf("instance of service %q not found", s)
-		}
-		opts = append(opts, fn(i))
-	}
-	return opts, nil
 }
 
 type change interface {

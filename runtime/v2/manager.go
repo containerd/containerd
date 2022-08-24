@@ -25,7 +25,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events/exchange"
@@ -143,7 +142,7 @@ func NewShimManager(ctx context.Context, config *ManagerConfig) (*ShimManager, e
 		state:                  config.State,
 		containerdAddress:      config.Address,
 		containerdTTRPCAddress: config.TTRPCAddress,
-		shims:                  runtime.NewTaskList(),
+		shims:                  runtime.NewNSMap[ShimInstance](),
 		events:                 config.Events,
 		containers:             config.Store,
 		schedCore:              config.SchedCore,
@@ -167,7 +166,7 @@ type ShimManager struct {
 	containerdAddress      string
 	containerdTTRPCAddress string
 	schedCore              bool
-	shims                  *runtime.TaskList
+	shims                  *runtime.NSMap[ShimInstance]
 	events                 *exchange.Exchange
 	containers             containers.Store
 	// runtimePaths is a cache of `runtime names` -> `resolved fs path`
@@ -181,7 +180,7 @@ func (m *ShimManager) ID() string {
 }
 
 // Start launches a new shim instance
-func (m *ShimManager) Start(ctx context.Context, id string, opts runtime.CreateOpts) (_ ShimProcess, retErr error) {
+func (m *ShimManager) Start(ctx context.Context, id string, opts runtime.CreateOpts) (_ ShimInstance, retErr error) {
 	bundle, err := NewBundle(ctx, m.root, m.state, id, opts.Spec)
 	if err != nil {
 		return nil, err
@@ -236,18 +235,11 @@ func (m *ShimManager) Start(ctx context.Context, id string, opts runtime.CreateO
 		}
 	}()
 
-	// NOTE: temporarily keep this wrapper around until containerd's task service depends on it.
-	// This will no longer be required once we migrate to client side task management.
-	shimTask := &shimTask{
-		shim: shim,
-		task: task.NewTaskClient(shim.client),
-	}
-
-	if err := m.shims.Add(ctx, shimTask); err != nil {
+	if err := m.shims.Add(ctx, shim); err != nil {
 		return nil, fmt.Errorf("failed to add task: %w", err)
 	}
 
-	return shimTask, nil
+	return shim, nil
 }
 
 func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, opts runtime.CreateOpts) (*shim, error) {
@@ -372,29 +364,22 @@ func (m *ShimManager) cleanupShim(shim *shim) {
 	dctx, cancel := timeout.WithContext(context.Background(), cleanupTimeout)
 	defer cancel()
 
-	_ = shim.delete(dctx)
+	_ = shim.Delete(dctx)
 	m.shims.Delete(dctx, shim.ID())
 }
 
-func (m *ShimManager) Get(ctx context.Context, id string) (ShimProcess, error) {
-	proc, err := m.shims.Get(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	shimTask := proc.(*shimTask)
-	return shimTask, nil
+func (m *ShimManager) Get(ctx context.Context, id string) (ShimInstance, error) {
+	return m.shims.Get(ctx, id)
 }
 
 // Delete a runtime task
 func (m *ShimManager) Delete(ctx context.Context, id string) error {
-	proc, err := m.shims.Get(ctx, id)
+	shim, err := m.shims.Get(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	shimTask := proc.(*shimTask)
-	err = shimTask.shim.delete(ctx)
+	err = shim.Delete(ctx)
 	m.shims.Delete(ctx, id)
 
 	return err
@@ -431,15 +416,15 @@ func (m *TaskManager) ID() string {
 
 // Create launches new shim instance and creates new task
 func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.CreateOpts) (runtime.Task, error) {
-	process, err := m.manager.Start(ctx, taskID, opts)
+	shim, err := m.manager.Start(ctx, taskID, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start shim: %w", err)
 	}
 
 	// Cast to shim task and call task service to create a new container task instance.
 	// This will not be required once shim service / client implemented.
-	shim := process.(*shimTask)
-	t, err := shim.Create(ctx, opts)
+	shimTask := newShimTask(shim)
+	t, err := shimTask.Create(ctx, opts)
 	if err != nil {
 		// NOTE: ctx contains required namespace information.
 		m.manager.shims.Delete(ctx, taskID)
@@ -448,15 +433,15 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 		defer cancel()
 
 		sandboxed := opts.SandboxID != ""
-		_, errShim := shim.delete(dctx, sandboxed, func(context.Context, string) {})
+		_, errShim := shimTask.delete(dctx, sandboxed, func(context.Context, string) {})
 		if errShim != nil {
 			if errdefs.IsDeadlineExceeded(errShim) {
 				dctx, cancel = timeout.WithContext(context.Background(), cleanupTimeout)
 				defer cancel()
 			}
 
-			shim.Shutdown(dctx)
-			shim.Close()
+			shimTask.Shutdown(dctx)
+			shimTask.Client().Close()
 		}
 
 		return nil, fmt.Errorf("failed to create shim task: %w", err)
@@ -467,17 +452,29 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 
 // Get a specific task
 func (m *TaskManager) Get(ctx context.Context, id string) (runtime.Task, error) {
-	return m.manager.shims.Get(ctx, id)
+	shim, err := m.manager.shims.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return newShimTask(shim), nil
 }
 
 // Tasks lists all tasks
 func (m *TaskManager) Tasks(ctx context.Context, all bool) ([]runtime.Task, error) {
-	return m.manager.shims.GetAll(ctx, all)
+	shims, err := m.manager.shims.GetAll(ctx, all)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]runtime.Task, len(shims))
+	for i := range shims {
+		out[i] = newShimTask(shims[i])
+	}
+	return out, nil
 }
 
 // Delete deletes the task and shim instance
 func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit, error) {
-	item, err := m.manager.shims.Get(ctx, taskID)
+	shim, err := m.manager.shims.Get(ctx, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -487,8 +484,11 @@ func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit,
 		return nil, err
 	}
 
-	sandboxed := container.SandboxID != ""
-	shimTask := item.(*shimTask)
+	var (
+		sandboxed = container.SandboxID != ""
+		shimTask  = newShimTask(shim)
+	)
+
 	exit, err := shimTask.delete(ctx, sandboxed, func(ctx context.Context, id string) {
 		m.manager.shims.Delete(ctx, id)
 	})

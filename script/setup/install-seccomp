@@ -30,8 +30,8 @@ curl -fsSL "https://github.com/seccomp/libseccomp/releases/download/v${SECCOMP_V
 	cd "$SECCOMP_PATH"
 	./configure --prefix=/usr/local
 	make
-	make install
-	ldconfig
+	sudo make install
+	sudo ldconfig
 )
 
 rm -rf "$SECCOMP_PATH"
