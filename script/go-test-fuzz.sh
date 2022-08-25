@@ -20,10 +20,10 @@
 
 set -euo pipefail
 
-fuzztime=30s
+fuzztime=5s
 pkgs=$(git grep 'func Fuzz.*testing\.F' | grep -o '.*\/' | sort | uniq)
 
 for pkg in $pkgs
 do
-    go test -fuzz=. ./$pkg -fuzztime=$fuzztime
+    (cd $pkg && go test -fuzz=. . -fuzztime=$fuzztime)
 done

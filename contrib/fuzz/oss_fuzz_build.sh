@@ -48,8 +48,6 @@ tar -C temp-go/ -xzf go1.19.linux-amd64.tar.gz
 mv temp-go/go/* /root/.go/
 cd $SRC/containerd
 
-go mod tidy
-
 cd "$(dirname "${BASH_SOURCE[0]}")"
 cd ../../
 
@@ -58,9 +56,7 @@ rm -r vendor
 # Change path of socket since OSS-fuzz does not grant access to /run
 sed -i 's/\/run\/containerd/\/tmp\/containerd/g' $SRC/containerd/defaults/defaults_unix.go
 
-go get github.com/AdamKorcz/go-118-fuzz-build/utils
-
-compile_fuzzers '^func Fuzz.*testing\.F' compile_native_go_fuzzer vendor
+compile_fuzzers '^func Fuzz.*testing\.F' compile_native_go_fuzzer '(vendor|Integ)'
 compile_fuzzers '^func Fuzz.*data' compile_go_fuzzer '(vendor|Integ)'
 
 # The below fuzzers require more setup than the fuzzers above.
@@ -90,4 +86,5 @@ sed -i 's/\/run\/containerd-test/\/tmp\/containerd-test/g' $SRC/containerd/integ
 
 cd integration/client
 
+compile_fuzzers '^func FuzzInteg.*testing\.F' compile_native_go_fuzzer vendor
 compile_fuzzers '^func FuzzInteg.*data' compile_go_fuzzer vendor
