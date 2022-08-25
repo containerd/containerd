@@ -36,8 +36,8 @@ git clone https://github.com/containernetworking/plugins.git "${TMPROOT}"/plugin
 pushd "${TMPROOT}"/plugins
 git checkout "$CNI_COMMIT"
 ./build_linux.sh
-mkdir -p $CNI_DIR
-cp -r ./bin $CNI_DIR
+$SUDO mkdir -p $CNI_DIR
+$SUDO cp -r ./bin $CNI_DIR
 $SUDO mkdir -p $CNI_CONFIG_DIR
 $SUDO cat << EOF | $SUDO tee $CNI_CONFIG_DIR/10-containerd-net.conflist
 {
