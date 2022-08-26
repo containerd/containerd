@@ -215,6 +215,10 @@ func (c *criService) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 		specOpts = append(specOpts, seccompSpecOpts)
 	}
 
+	if c.config.EnableCDI {
+		specOpts = append(specOpts, oci.WithCDI(config.Annotations, c.config.CDISpecDirs))
+	}
+
 	userstr, err := generateUserString(
 		"",
 		securityContext.GetRunAsUser(),

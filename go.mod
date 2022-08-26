@@ -6,7 +6,7 @@ require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20220706123152-fef3fe1bab07
 	github.com/Microsoft/go-winio v0.5.2
 	github.com/Microsoft/hcsshim v0.10.0-rc.1
-	github.com/container-orchestrated-devices/container-device-interface v0.3.1
+	github.com/container-orchestrated-devices/container-device-interface v0.5.0
 	github.com/containerd/aufs v1.0.0
 	github.com/containerd/btrfs v1.0.0
 	github.com/containerd/cgroups v1.0.5-0.20220816231112-7083cd60b721

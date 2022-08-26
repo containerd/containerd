@@ -17,30 +17,32 @@
 package cdi
 
 import (
-	"github.com/container-orchestrated-devices/container-device-interface/schema"
-	cdi "github.com/container-orchestrated-devices/container-device-interface/specs-go"
+	"os"
+
+	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 )
 
-const (
-	// DefaultExternalSchema is the JSON schema to load if found.
-	DefaultExternalSchema = "/etc/cdi/schema/schema.json"
-)
+// Rename src to dst, both relative to the directory dir. If dst already exists
+// refuse renaming with an error unless overwrite is explicitly asked for.
+func renameIn(dir, src, dst string, overwrite bool) error {
+	var flags uint
 
-// SetSchema sets the Spec JSON validation schema to use.
-func SetSchema(name string) error {
-	s, err := schema.Load(name)
+	dirf, err := os.Open(dir)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "rename failed")
 	}
-	schema.Set(s)
+	defer dirf.Close()
+
+	if !overwrite {
+		flags = unix.RENAME_NOREPLACE
+	}
+
+	dirFd := int(dirf.Fd())
+	err = unix.Renameat2(dirFd, src, dirFd, dst, flags)
+	if err != nil {
+		return errors.Wrap(err, "rename failed")
+	}
+
 	return nil
-}
-
-// Validate CDI Spec against JSON Schema.
-func validateWithSchema(raw *cdi.Spec) error {
-	return schema.ValidateType(raw)
-}
-
-func init() {
-	SetSchema(DefaultExternalSchema)
 }
