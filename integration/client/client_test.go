@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"syscall"
 	"testing"
 	"time"
 
@@ -172,7 +173,9 @@ func TestMain(m *testing.M) {
 				fmt.Fprintln(os.Stderr, "failed to wait for containerd", err)
 			}
 		}
-
+		if err := syscall.Unmount(defaultRoot, syscall.MNT_FORCE); err != nil {
+			fmt.Fprintln(os.Stderr, "failed to  unmount test root dir", err)
+		}
 		if err := sys.ForceRemoveAll(defaultRoot); err != nil {
 			fmt.Fprintln(os.Stderr, "failed to remove test root dir", err)
 			os.Exit(1)
