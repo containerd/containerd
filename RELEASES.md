@@ -124,6 +124,7 @@ of containerd for every supported version of Kubernetes.
 | 1.22               | 1.5.5+             | v1alpha2     |
 | 1.23               | 1.6.0+, 1,5.8+     | v1, v1alpha2 |
 | 1.24               | 1.6.4+, 1.5.11+    | v1, v1alpha2 |
+| 1.25               | 1.6.4+, 1.5.11+    | v1, v1alpha2 |
 
 Deprecated containerd and kubernetes versions
 
