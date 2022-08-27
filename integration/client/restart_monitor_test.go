@@ -36,7 +36,6 @@ import (
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/runtime/restart"
 	srvconfig "github.com/containerd/containerd/services/server/config"
-	"github.com/containerd/containerd/sys"
 	"github.com/containerd/typeurl"
 	exec "golang.org/x/sys/execabs"
 )
@@ -107,7 +106,7 @@ func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, fun
 				t.Errorf("failed to wait for: %v", err)
 			}
 		}
-		if err := sys.ForceRemoveAll(tempDir); err != nil {
+		if err := forceRemoveAll(tempDir); err != nil {
 			t.Errorf("failed to remove %s: %v", tempDir, err)
 		}
 		if t.Failed() {

@@ -33,7 +33,6 @@ import (
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/sys"
 	exec "golang.org/x/sys/execabs"
 )
 
@@ -125,7 +124,7 @@ func tearDown() error {
 			return err
 		}
 	}
-	if err := sys.ForceRemoveAll(defaultRoot); err != nil {
+	if err := forceRemoveAll(defaultRoot); err != nil {
 		return err
 	}
 

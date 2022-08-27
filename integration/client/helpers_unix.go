@@ -17,11 +17,11 @@
    limitations under the License.
 */
 
-package sys
+package client
 
 import "os"
 
-// MkdirAllWithACL is a wrapper for os.MkdirAll on Unix systems.
-func MkdirAllWithACL(path string, perm os.FileMode) error {
-	return os.MkdirAll(path, perm)
+// forceRemoveAll on unix is just a wrapper for os.RemoveAll
+func forceRemoveAll(path string) error {
+	return os.RemoveAll(path)
 }
