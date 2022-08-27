@@ -45,6 +45,7 @@ require (
 	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/moby/locker v1.0.1 // indirect
 	github.com/moby/sys/mountinfo v0.6.2 // indirect
+	github.com/moby/sys/sequential v0.0.0-20220829095930-b22ba8a69b30 // indirect
 	github.com/moby/sys/signal v0.7.0 // indirect
 	github.com/opencontainers/runc v1.1.4 // indirect
 	github.com/opencontainers/runtime-tools v0.0.0-20190417131837-cd1349b7c47e // indirect

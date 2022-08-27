@@ -39,6 +39,7 @@ require (
 	github.com/klauspost/compress v1.15.9
 	github.com/moby/locker v1.0.1
 	github.com/moby/sys/mountinfo v0.6.2
+	github.com/moby/sys/sequential v0.0.0-20220829095930-b22ba8a69b30
 	github.com/moby/sys/signal v0.7.0
 	github.com/moby/sys/symlink v0.2.0
 	github.com/opencontainers/go-digest v1.0.0
