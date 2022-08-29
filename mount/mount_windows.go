@@ -18,18 +18,12 @@ package mount
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/Microsoft/hcsshim"
-)
-
-var (
-	// ErrNotImplementOnWindows is returned when an action is not implemented for windows
-	ErrNotImplementOnWindows = errors.New("not implemented under windows")
 )
 
 // Mount to the provided target
