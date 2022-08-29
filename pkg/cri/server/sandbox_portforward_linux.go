@@ -30,7 +30,7 @@ import (
 )
 
 // portForward uses netns to enter the sandbox namespace, and forwards a stream inside the
-// the namespace to a specific port. It keeps forwarding until it exits or client disconnect.
+// namespace to a specific port. It keeps forwarding until it exits or client disconnect.
 func (c *criService) portForward(ctx context.Context, id string, port int32, stream io.ReadWriteCloser) error {
 	s, err := c.sandboxStore.Get(id)
 	if err != nil {
@@ -83,7 +83,7 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 		defer conn.Close()
 
 		errCh := make(chan error, 2)
-		// Copy from the the namespace port connection to the client stream
+		// Copy from the namespace port connection to the client stream
 		go func() {
 			log.G(ctx).Debugf("PortForward copying data from namespace %q port %d to the client stream", id, port)
 			_, err := io.Copy(stream, conn)

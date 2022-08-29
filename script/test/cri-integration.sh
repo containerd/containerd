@@ -28,7 +28,7 @@ cd "${ROOT}"
 
 # FOCUS focuses the test to run.
 FOCUS=${FOCUS:-""}
-# REPORT_DIR is the the directory to store test logs.
+# REPORT_DIR is the directory to store test logs.
 if [ $IS_WINDOWS -eq 0 ]; then
   REPORT_DIR=${REPORT_DIR:-"/tmp/test-integration"}
 else
