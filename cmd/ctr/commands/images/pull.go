@@ -52,7 +52,7 @@ command. As part of this process, we do the following:
 		},
 		cli.BoolFlag{
 			Name:  "all-platforms",
-			Usage: "pull content and metadata from all platforms",
+			Usage: "Pull content and metadata from all platforms",
 		},
 		cli.BoolFlag{
 			Name:  "all-metadata",
