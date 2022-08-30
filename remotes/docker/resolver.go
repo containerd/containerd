@@ -367,7 +367,8 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				size = bodyReader.bytesRead
 			}
 			// Prevent resolving to excessively large manifests
-			if size > MaxManifestSize {
+			isManifest := u[0] == "manifests"
+			if isManifest && size > MaxManifestSize {
 				if firstErr == nil {
 					firstErr = fmt.Errorf("rejecting %d byte manifest for %s: %w", size, ref, errdefs.ErrNotFound)
 				}
