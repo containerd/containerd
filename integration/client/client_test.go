@@ -36,7 +36,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/sys"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/sirupsen/logrus"
@@ -71,7 +70,7 @@ func TestMain(m *testing.M) {
 	defer cancel()
 
 	if !noDaemon {
-		sys.ForceRemoveAll(defaultRoot)
+		_ = forceRemoveAll(defaultRoot)
 
 		stdioFile, err := os.CreateTemp("", "")
 		if err != nil {
@@ -173,7 +172,7 @@ func TestMain(m *testing.M) {
 			}
 		}
 
-		if err := sys.ForceRemoveAll(defaultRoot); err != nil {
+		if err := forceRemoveAll(defaultRoot); err != nil {
 			fmt.Fprintln(os.Stderr, "failed to remove test root dir", err)
 			os.Exit(1)
 		}
