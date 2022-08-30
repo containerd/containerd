@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20220706123152-fef3fe1bab07
+	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20220723121359-e03a0069662f
 	github.com/Microsoft/go-winio v0.5.2
 	github.com/Microsoft/hcsshim v0.10.0-rc.1
 	github.com/container-orchestrated-devices/container-device-interface v0.3.1
