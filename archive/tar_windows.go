@@ -23,7 +23,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/containerd/containerd/sys"
+	"github.com/moby/sys/sequential"
 )
 
 // tarName returns platform-specific filepath
@@ -57,15 +57,15 @@ func setHeaderForSpecialDevice(*tar.Header, string, os.FileInfo) error {
 }
 
 func open(p string) (*os.File, error) {
-	// We use sys.OpenSequential to ensure we use sequential file
-	// access on Windows to avoid depleting the standby list.
-	return sys.OpenSequential(p)
+	// We use sequential file access to avoid depleting the standby list on
+	// Windows.
+	return sequential.Open(p)
 }
 
 func openFile(name string, flag int, perm os.FileMode) (*os.File, error) {
-	// Source is regular file. We use sys.OpenFileSequential to use sequential
-	// file access to avoid depleting the standby list on Windows.
-	return sys.OpenFileSequential(name, flag, perm)
+	// Source is regular file. We use sequential file access to avoid depleting
+	// the standby list on Windows.
+	return sequential.OpenFile(name, flag, perm)
 }
 
 func mkdir(path string, perm os.FileMode) error {
