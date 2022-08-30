@@ -36,9 +36,7 @@ import (
 	exec "golang.org/x/sys/execabs"
 )
 
-// the following nolint is for shutting up gometalinter on non-linux.
-//
-//nolint:unused
+//nolint:unused // Ignore on non-Linux
 func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, func()) {
 	if testing.Short() {
 		t.Skip()

@@ -205,6 +205,6 @@ func (s *Store) Delete(id string) {
 		c.IO.Close()
 	}
 	s.labels.Release(c.ProcessLabel)
-	s.idIndex.Delete(id) //nolint:errcheck
+	s.idIndex.Delete(id)
 	delete(s.containers, id)
 }

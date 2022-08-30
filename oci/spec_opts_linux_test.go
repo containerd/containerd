@@ -31,7 +31,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// nolint:gosec
+//nolint:gosec
 func TestWithUserID(t *testing.T) {
 	t.Parallel()
 
@@ -87,7 +87,7 @@ guest:x:405:100:guest:/dev/null:/sbin/nologin
 	}
 }
 
-// nolint:gosec
+//nolint:gosec
 func TestWithUsername(t *testing.T) {
 	t.Parallel()
 
@@ -150,7 +150,7 @@ guest:x:405:100:guest:/dev/null:/sbin/nologin
 
 }
 
-// nolint:gosec
+//nolint:gosec
 func TestWithAdditionalGIDs(t *testing.T) {
 	t.Parallel()
 	expectedPasswd := `root:x:0:0:root:/root:/bin/ash

@@ -250,6 +250,6 @@ func (s *store) delete(id, ref string) {
 		return
 	}
 	// Remove the image if it is not referenced any more.
-	s.digestSet.Remove(digest) //nolint:errcheck
+	s.digestSet.Remove(digest)
 	delete(s.images, digest.String())
 }

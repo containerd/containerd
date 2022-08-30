@@ -77,7 +77,7 @@ func newNS(baseDir string) (nsPath string, err error) {
 	defer func() {
 		// Ensure the mount point is cleaned up on errors
 		if err != nil {
-			os.RemoveAll(nsPath) //nolint:errcheck
+			os.RemoveAll(nsPath)
 		}
 	}()
 
@@ -107,7 +107,7 @@ func newNS(baseDir string) (nsPath string, err error) {
 		}
 
 		// Put this thread back to the orig ns, since it might get reused (pre go1.10)
-		defer origNS.Set() //nolint:errcheck
+		defer origNS.Set()
 
 		// bind mount the netns from the current thread (from /proc) onto the
 		// mount point. This causes the namespace to persist, even when there
@@ -214,6 +214,6 @@ func (n *NetNS) Do(f func(cnins.NetNS) error) error {
 	if err != nil {
 		return fmt.Errorf("get netns fd: %w", err)
 	}
-	defer ns.Close() //nolint:errcheck
+	defer ns.Close()
 	return ns.Do(f)
 }
