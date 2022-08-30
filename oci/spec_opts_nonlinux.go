@@ -28,19 +28,22 @@ import (
 
 // WithAllCurrentCapabilities propagates the effective capabilities of the caller process to the container process.
 // The capability set may differ from WithAllKnownCapabilities when running in a container.
-// nolint: deadcode, unused
+//
+//nolint:unused
 var WithAllCurrentCapabilities = func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
 	return WithCapabilities(nil)(ctx, client, c, s)
 }
 
 // WithAllKnownCapabilities sets all the known linux capabilities for the container process
-// nolint: deadcode, unused
+//
+//nolint:unused
 var WithAllKnownCapabilities = func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
 	return WithCapabilities(nil)(ctx, client, c, s)
 }
 
 // WithBlockIO sets the container's blkio parameters
-// nolint: deadcode, unused
+//
+//nolint:unused
 func WithBlockIO(blockio interface{}) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
 		return errors.New("blkio not supported")
@@ -48,7 +51,8 @@ func WithBlockIO(blockio interface{}) SpecOpts {
 }
 
 // WithCPUShares sets the container's cpu shares
-// nolint: deadcode, unused
+//
+//nolint:unused
 func WithCPUShares(shares uint64) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
 		return nil
