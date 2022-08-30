@@ -574,11 +574,9 @@ func (cw *ChangeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 				return fmt.Errorf("failed to make path relative: %w", err)
 			}
 		}
-		name, err = tarName(name)
-		if err != nil {
-			return fmt.Errorf("cannot canonicalize path: %w", err)
-		}
-		// suffix with '/' for directories
+		// Canonicalize to POSIX-style paths using forward slashes. Directory
+		// entries must end with a slash.
+		name = filepath.ToSlash(name)
 		if f.IsDir() && !strings.HasSuffix(name, "/") {
 			name += "/"
 		}

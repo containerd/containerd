@@ -34,10 +34,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func tarName(p string) (string, error) {
-	return p, nil
-}
-
 func chmodTarEntry(perm os.FileMode) os.FileMode {
 	return perm
 }
