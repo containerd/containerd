@@ -127,7 +127,7 @@ func getDevices(path, containerPath string) ([]specs.LinuxDevice, error) {
 
 // TODO consider adding these consts to the OCI runtime-spec.
 const (
-	wildcardDevice = "a" //nolint:deadcode,nolintlint,unused,varcheck // currently unused, but should be included when upstreaming to OCI runtime-spec.
+	wildcardDevice = "a" //nolint:nolintlint,unused,varcheck // currently unused, but should be included when upstreaming to OCI runtime-spec.
 	blockDevice    = "b"
 	charDevice     = "c" // or "u"
 	fifoDevice     = "p"
