@@ -28,7 +28,6 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
 	types "github.com/containerd/nri/types/v1"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -107,7 +106,7 @@ func (c *Client) InvokeWithSandbox(ctx context.Context, task containerd.Task, st
 		r.Conf = p.Conf
 		result, err := c.invokePlugin(ctx, p.Type, r)
 		if err != nil {
-			return nil, errors.Wrapf(err, "plugin: %s", p.Type)
+			return nil, fmt.Errorf("plugin: %s: %w", p.Type, err)
 		}
 		r.Results = append(r.Results, result)
 	}
@@ -141,7 +140,7 @@ func (c *Client) invokePlugin(ctx context.Context, name string, r *types.Request
 	}
 	var result types.Result
 	if err := json.Unmarshal(out, &result); err != nil {
-		return nil, errors.Errorf("failed to unmarshal plugin output: %s: %s", err.Error(), msg)
+		return nil, fmt.Errorf("failed to unmarshal plugin output %s: %w", msg, err)
 	}
 	if result.Err() != nil {
 		return nil, result.Err()

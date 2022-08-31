@@ -18,8 +18,7 @@ package v1
 
 import (
 	"encoding/json"
-
-	"github.com/pkg/errors"
+	"errors"
 )
 
 // Plugin type and configuration

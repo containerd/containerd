@@ -1,0 +1,441 @@
+/*
+   Copyright The containerd Authors.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+syntax = "proto3";
+
+package nri.pkg.api.v1alpha1;
+
+option go_package = "github.com/containerd/nri/pkg/api;api";
+
+// Runtime service is the public API runtimes expose for NRI plugins.
+// On this interface RPC requests are initiated by the plugin. This
+// only covers plugin registration and unsolicited container updates.
+// The rest of the API is defined by the Plugin service.
+service Runtime {
+    // RegisterPlugin registers the plugin with the runtime.
+    rpc RegisterPlugin(RegisterPluginRequest) returns (Empty);
+    // UpdateContainers requests unsolicited updates to a set of containers.
+    rpc UpdateContainers(UpdateContainersRequest) returns (UpdateContainersResponse);
+}
+
+message RegisterPluginRequest {
+    // Name of the plugin to register.
+    string plugin_name = 1;
+    // Plugin invocation index. Plugins are called in ascending index order.
+    string plugin_idx = 2;
+}
+
+message UpdateContainersRequest {
+  // List of containers to update.
+  repeated ContainerUpdate update = 1;
+  // List of containers to evict.
+  repeated ContainerEviction evict = 2;
+}
+
+message UpdateContainersResponse {
+  // Containers that the runtime failed to udpate.
+  repeated ContainerUpdate failed = 1;
+}
+
+
+//
+// Plugin is the API NRI uses to interact with plugins. It is used to
+// - configure a plugin and subscribe it for lifecycle events
+// - synchronize the state of a plugin with that of the runtime
+// - hook a plugin into the lifecycle events of its interest
+//
+// During configuration the plugin tells the runtime which lifecycle events
+// it wishes to get hooked into. Once configured, the plugin is synchronized
+// with the runtime by receiving the list of pods and containers known to
+// the runtime. The plugin can request changes to any of the containers in
+// response. After initial synchronization the plugin starts receiving the
+// events it subscribed for as they occur in the runtime. For container
+// creation, update, and stop events, the plugin can request changes, both
+// to the container that triggered the event or any other existing container
+// in the runtime.
+//
+// For a subset of the container lifecycle events, NRI defines an additional
+// Post-variant of the event. These variants are defined for CreateContainer,
+// StartContainer, and UpdateContainer. For creation and update, these events
+// can be used by plugins to discover the full extent of changes applied to
+// the container, including any changes made by other active plugins.
+//
+service Plugin {
+  // Configure the plugin and get its event subscription.
+  rpc Configure(ConfigureRequest) returns (ConfigureResponse);
+
+  // Synchronize the plugin with the state of the runtime.
+  rpc Synchronize(SynchronizeRequest) returns (SynchronizeResponse);
+
+  // Shutdown a plugin (let it know the runtime is going down).
+  rpc Shutdown(Empty) returns (Empty);
+
+  // CreateContainer relays the corresponding request to the plugin. In
+  // response, the plugin can adjust the container being created, and
+  // update other containers in the runtime. Container adjustment can
+  // alter labels, annotations, mounts, devices, environment variables,
+  // OCI hooks, and assigned container resources. Updates can alter
+  // assigned container resources.
+  rpc CreateContainer(CreateContainerRequest) returns (CreateContainerResponse);
+
+  // UpdateContainer relays the corresponding request to the plugin.
+  // The plugin can alter how the container is updated and request updates
+  // to additional containers in the runtime.
+  rpc UpdateContainer(UpdateContainerRequest) returns (UpdateContainerResponse);
+
+  // StopContainer relays the corresponding request to the plugin. The plugin
+  // can update any of the remaining containers in the runtime in response.
+  rpc StopContainer(StopContainerRequest) returns (StopContainerResponse);
+
+  // StateChange relays any remaining pod or container lifecycle/state change
+  // events the plugin has subscribed for. These can be used to trigger any
+  // plugin-specific processing which needs to occur in connection with any of
+  // these events.
+  rpc StateChange(StateChangeEvent) returns (Empty);
+}
+
+message ConfigureRequest {
+  // Any plugin-specific data, if present among the NRI configuration.
+  string config = 1;
+  // Name of the runtime NRI is running in.
+  string runtime_name = 2;
+  // Version of the runtime NRI is running in.
+  string runtime_version = 3;
+}
+
+message ConfigureResponse {
+  // Events to subscribe the plugin for. Each bit set corresponds to an
+  // enumerated Event.
+  int32 events = 2;
+}
+
+message SynchronizeRequest {
+  // Pods known to the runtime.
+  repeated PodSandbox pods = 1;
+  // Containers known to the runtime.
+  repeated Container containers = 2;
+}
+
+message SynchronizeResponse {
+  // Updates to containers requested by the plugin.
+  repeated ContainerUpdate update = 1;
+}
+
+message CreateContainerRequest {
+  // Pod of container being created.
+  PodSandbox pod = 1;
+  // Container being created.
+  Container container = 2;
+}
+
+message CreateContainerResponse {
+  // Requested adjustments to container being created.
+  ContainerAdjustment adjust = 1;
+  // Requested updates to other existing containers.
+  repeated ContainerUpdate update = 2;
+  // Requested eviction of existing containers.
+  repeated ContainerEviction evict = 3;
+}
+
+message UpdateContainerRequest {
+  // Pod of container being updated.
+  PodSandbox pod = 1;
+  // Container being updated.
+  Container container = 2;
+  // Resources to update.
+  LinuxResources linux_resources = 3;
+}
+
+message UpdateContainerResponse {
+  // Requested updates to containers.
+  repeated ContainerUpdate update = 1;
+  // Requested eviction of containers.
+  repeated ContainerEviction evict = 2;
+}
+
+message StopContainerRequest {
+  // Pod of container being stopped.
+  PodSandbox pod = 1;
+  // Container being stopped.
+  Container container = 2;
+}
+
+message StopContainerResponse {
+  // Requested updates to containers.
+  repeated ContainerUpdate update = 1;
+}
+
+message StateChangeEvent {
+  // Event type of notification.
+  Event event = 1;
+  // Pod this notification is sent for. If this event is related to a container,
+  // pod is set to the pod of the container.
+  PodSandbox pod = 2;
+  // Container this notification is sent for. If the event is related to a pod,
+  // container is nil.
+  Container container = 3;
+}
+
+// Empty response for those *Requests that are semantically events.
+message Empty {}
+
+// Events that plugins can subscribe to in ConfigureResponse.
+enum Event {
+  UNKNOWN = 0;
+  RUN_POD_SANDBOX = 1;
+  STOP_POD_SANDBOX = 2;
+  REMOVE_POD_SANDBOX = 3;
+  CREATE_CONTAINER = 4;
+  POST_CREATE_CONTAINER = 5;
+  START_CONTAINER = 6;
+  POST_START_CONTAINER = 7;
+  UPDATE_CONTAINER = 8;
+  POST_UPDATE_CONTAINER = 9;
+  STOP_CONTAINER = 10;
+  REMOVE_CONTAINER = 11;
+  LAST = 12;
+}
+
+// Pod metadata that is considered relevant for a plugin.
+message PodSandbox {
+  string id = 1;
+  string name = 2;
+  string uid = 3;
+  string namespace = 4;
+  map<string, string> labels = 5;
+  map<string, string> annotations = 6;
+  string runtime_handler = 7;
+  LinuxPodSandbox linux = 8;
+  uint32 pid = 9; // for NRI v1 emulation
+}
+
+// PodSandbox linux-specific metadata
+message LinuxPodSandbox {
+  LinuxResources pod_overhead = 1;
+  LinuxResources pod_resources = 2;
+  string cgroup_parent = 3;
+  string cgroups_path = 4; // for NRI v1 emulation
+  repeated LinuxNamespace namespaces = 5; // for NRI v1 emulation
+  LinuxResources resources = 6; // for NRI v1 emulation
+}
+
+// Container metadata that is considered relevant for a plugin.
+message Container {
+  string id = 1;
+  string pod_sandbox_id = 2;
+  string name = 3;
+  ContainerState state = 4;
+  map<string, string> labels = 5;
+  map<string, string> annotations = 6;
+  repeated string args = 7;
+  repeated string env = 8;
+  repeated Mount mounts = 9;
+  Hooks hooks = 10;
+  LinuxContainer linux = 11;
+  uint32 pid = 12; // for NRI v1 emulation
+}
+
+// Possible container states.
+enum ContainerState {
+  CONTAINER_UNKNOWN = 0;
+  CONTAINER_CREATED = 1;
+  CONTAINER_PAUSED = 2; // is this useful/necessary ?
+  CONTAINER_RUNNING = 3;
+  CONTAINER_STOPPED = 4;
+}
+
+// A container mount.
+message Mount {
+  string destination = 1;
+  string type = 2;
+  string source = 3;
+  repeated string options = 4;
+}
+
+// Container OCI hooks.
+message Hooks {
+  repeated Hook prestart = 1;
+  repeated Hook create_runtime = 2;
+  repeated Hook create_container = 3;
+  repeated Hook start_container = 4;
+  repeated Hook poststart = 5;
+  repeated Hook poststop = 6;
+}
+
+// One OCI hook.
+message Hook {
+  string path = 1;
+  repeated string args = 2;
+  repeated string env = 3;
+  OptionalInt timeout = 4;
+}
+
+// Container (linux) metadata.
+message LinuxContainer {
+  repeated LinuxNamespace namespaces = 1;
+  repeated LinuxDevice devices = 2;
+  LinuxResources resources = 3;
+  OptionalInt oom_score_adj = 4;
+  string cgroups_path = 5;
+}
+
+// A linux namespace.
+message LinuxNamespace {
+  string type = 1;
+  string path = 2;
+}
+
+// A container (linux) device.
+message LinuxDevice {
+  string path = 1;
+  string type = 2;
+  int64 major = 3;
+  int64 minor = 4;
+  OptionalFileMode file_mode = 5;
+  OptionalUInt32 uid = 6;
+  OptionalUInt32 gid = 7;
+}
+
+// A linux device cgroup controller rule.
+message LinuxDeviceCgroup {
+  bool allow = 1;
+  string type = 2;
+  OptionalInt64 major = 3;
+  OptionalInt64 minor = 4;
+  string access = 5;
+}
+
+// Container (linux) resources.
+message LinuxResources {
+  LinuxMemory memory = 1;
+  LinuxCPU cpu = 2;
+  repeated HugepageLimit hugepage_limits = 3;
+  OptionalString blockio_class = 4;
+  OptionalString rdt_class = 5;
+  map<string, string> unified = 6;
+  repeated LinuxDeviceCgroup devices = 7; // for NRI v1 emulation
+}
+
+// Memory-related parts of (linux) resources.
+message LinuxMemory {
+  OptionalInt64 limit = 1;
+  OptionalInt64 reservation = 2;
+  OptionalInt64 swap = 3;
+  OptionalInt64 kernel = 4;
+  OptionalInt64 kernel_tcp = 5;
+  OptionalUInt64 swappiness = 6;
+  OptionalBool disable_oom_killer = 7;
+  OptionalBool use_hierarchy = 8;
+}
+
+// CPU-related parts of (linux) resources.
+message LinuxCPU {
+  OptionalUInt64 shares = 1;
+  OptionalInt64 quota = 2;
+  OptionalUInt64 period = 3;
+  OptionalInt64 realtime_runtime = 4;
+  OptionalUInt64 realtime_period = 5;
+  string cpus = 6;
+  string mems = 7;
+}
+
+// Container huge page limit.
+message HugepageLimit {
+  string page_size = 1;
+  uint64 limit = 2;
+}
+
+// Requested adjustments to a container being created.
+message ContainerAdjustment {
+  map<string, string> annotations = 2;
+  repeated Mount mounts = 3;
+  repeated KeyValue env = 4;
+  Hooks hooks = 5;
+  LinuxContainerAdjustment linux = 6;
+}
+
+// Adjustments to (linux) resources.
+message LinuxContainerAdjustment {
+  repeated LinuxDevice devices = 1;
+  LinuxResources resources = 2;
+  string cgroups_path = 3;
+}
+
+// Requested update to an already created container.
+message ContainerUpdate {
+  string container_id = 1;
+  LinuxContainerUpdate linux = 2;
+  bool ignore_failure = 3;
+}
+
+// Updates to (linux) resources.
+message LinuxContainerUpdate {
+  LinuxResources resources = 1;
+}
+
+// Request to evict (IOW unsolicitedly stop) a container.
+message ContainerEviction {
+  // Container to evict.
+  string container_id = 1;
+  // Human-readable reason for eviction.
+  string reason = 2;
+}
+
+// KeyValue represents an environment variable.
+message KeyValue {
+  string key = 1;
+  string value = 2;
+}
+
+// An optional string value.
+message OptionalString {
+  string value = 1;
+}
+
+// An optional signed integer value.
+message OptionalInt {
+  int64 value = 1;
+}
+
+// An optional 32-bit signed integer value.
+message OptionalInt32 {
+  int32 value = 1;
+}
+
+// An optional 32-bit unsigned integer value.
+message OptionalUInt32 {
+  uint32 value = 1;
+}
+
+// An optional 64-bit signed integer value.
+message OptionalInt64 {
+  int64 value = 1;
+}
+
+// An optional 64-bit unsigned integer value.
+message OptionalUInt64 {
+  uint64 value = 1;
+}
+
+// An optional boolean value.
+message OptionalBool {
+  bool value = 1;
+}
+
+// An optional value of file permissions.
+message OptionalFileMode {
+  uint32 value = 1;
+}

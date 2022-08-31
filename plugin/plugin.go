@@ -80,6 +80,8 @@ const (
 	LeasePlugin Type = "io.containerd.lease.v1"
 	// TracingProcessorPlugin implements a open telemetry span processor
 	TracingProcessorPlugin Type = "io.containerd.tracing.processor.v1"
+	// NRIApiPlugin implements the NRI adaptation interface for containerd.
+	NRIApiPlugin Type = "io.containerd.nri.v1"
 )
 
 const (

@@ -13,7 +13,7 @@ require (
 	github.com/containerd/typeurl v1.0.3-0.20220422153119-7f6e6d160d67
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b
-	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
+	github.com/opencontainers/runtime-spec v1.0.3-0.20220825212826-86290f6a00fb
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.0
 	golang.org/x/sys v0.2.0
@@ -58,7 +58,7 @@ require (
 	golang.org/x/net v0.1.1-0.20221027164007-c63010009c80 // indirect
 	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/text v0.4.0 // indirect
-	golang.org/x/tools v0.1.13-0.20221007141809-02bef08ac854 // indirect
+	golang.org/x/tools v0.2.0 // indirect
 	google.golang.org/genproto v0.0.0-20221107162902-2d387536bcdd // indirect
 	google.golang.org/grpc v1.50.1 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
@@ -70,4 +70,10 @@ require (
 // IMPORTANT: this replace rule ONLY replaces containerd itself; dependencies
 // in the "require" section above are still taken into account for version
 // resolution if newer.
-replace github.com/containerd/containerd => ../../
+replace (
+	github.com/containerd/containerd => ../../
+
+	// Temporarily divert repo for updated/extended NRI.
+	github.com/containerd/nri => github.com/klihub/nri v0.0.0-20221122201439-2b09b4ad5cf3
+	github.com/opencontainers/runtime-tools => github.com/opencontainers/runtime-tools v0.0.0-20221026201742-946c877fa809
+)
