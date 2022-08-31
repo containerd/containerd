@@ -6,13 +6,12 @@ linters:
     - gosec
     - ineffassign
     - misspell
+    - nolintlint
     - revive
     - staticcheck
-    - structcheck
     - tenv # Detects using os.Setenv instead of t.Setenv since Go 1.17
     - unconvert
     - unused
-    - varcheck
     - vet
   disable:
     - errcheck

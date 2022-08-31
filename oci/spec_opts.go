@@ -89,7 +89,7 @@ func setResources(s *Spec) {
 	}
 }
 
-//nolint:unused // not used on all platforms
+//nolint:nolintlint,unused // not used on all platforms
 func setCPU(s *Spec) {
 	setResources(s)
 	if s.Linux != nil {

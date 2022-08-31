@@ -61,10 +61,9 @@ import (
 //                      DELETED
 
 // statusVersion is current version of container status.
-const statusVersion = "v1" // nolint
+const statusVersion = "v1"
 
 // versionedStatus is the internal used versioned container status.
-// nolint
 type versionedStatus struct {
 	// Version indicates the version of the versioned container status.
 	Version string
