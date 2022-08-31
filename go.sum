@@ -43,6 +43,8 @@ dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7
 github.com/AdaLogics/go-fuzz-headers v0.0.0-20210715213245-6c3934b029d8/go.mod h1:CzsSbkDixRphAF5hS6wbMKq0eI6ccJRb7/A0M6JBnwg=
 github.com/AdaLogics/go-fuzz-headers v0.0.0-20220706123152-fef3fe1bab07 h1:7dZd6IhJApT69RGnt+YHRRVHXkO9fA6tAdl5E7iG9EU=
 github.com/AdaLogics/go-fuzz-headers v0.0.0-20220706123152-fef3fe1bab07/go.mod h1:i9fr2JpcEcY/IHEvzCM3qXUZYOQHgR89dt4es1CgMhc=
+github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20220723121359-e03a0069662f h1:XVPaJiLu0IxgLI9zeQaJzDfQDBCs36X+3v+Zy4AVHXw=
+github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20220723121359-e03a0069662f/go.mod h1:M7EoPeNo2SSN8PrOJ8Yvx2wM6FxnHZSnoFSNAO2XdW8=
 github.com/Azure/azure-sdk-for-go v16.2.1+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
 github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78/go.mod h1:LmzpDX56iTiv29bbRTIsUNlaFfuhWRQBWjQdVyAevI8=
 github.com/Azure/go-ansiterm v0.0.0-20210608223527-2377c96fe795/go.mod h1:LmzpDX56iTiv29bbRTIsUNlaFfuhWRQBWjQdVyAevI8=
