@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -687,7 +688,12 @@ func checkContainerTimestamps(t *testing.T, c *containers.Container, now time.Ti
 	} else {
 		// ensure that updatedat is always after createdat
 		if !c.UpdatedAt.After(c.CreatedAt) {
-			t.Fatalf("timestamp for updatedat not after createdat: %v <= %v", c.UpdatedAt, c.CreatedAt)
+			if runtime.GOOS == "windows" && c.UpdatedAt == c.CreatedAt {
+				// Windows' time.Now resolution is lower than Linux, due to Go.
+				// https://github.com/golang/go/issues/31160
+			} else {
+				t.Fatalf("timestamp for updatedat not after createdat: %v <= %v", c.UpdatedAt, c.CreatedAt)
+			}
 		}
 	}
 
