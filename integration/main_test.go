@@ -210,7 +210,7 @@ func PodSandboxConfigWithCleanup(t *testing.T, name, ns string, opts ...PodSandb
 }
 
 // Set Windows HostProcess on the pod.
-func WithWindowsHostProcessPod(p *runtime.PodSandboxConfig) { //nolint:unused
+func WithWindowsHostProcessPod(p *runtime.PodSandboxConfig) {
 	if p.Windows == nil {
 		p.Windows = &runtime.WindowsPodSandboxConfig{}
 	}
@@ -237,7 +237,7 @@ func WithTestAnnotations() ContainerOpts {
 }
 
 // Add container resource limits.
-func WithResources(r *runtime.LinuxContainerResources) ContainerOpts { //nolint:unused
+func WithResources(r *runtime.LinuxContainerResources) ContainerOpts {
 	return func(c *runtime.ContainerConfig) {
 		if c.Linux == nil {
 			c.Linux = &runtime.LinuxContainerConfig{}
@@ -247,7 +247,7 @@ func WithResources(r *runtime.LinuxContainerResources) ContainerOpts { //nolint:
 }
 
 // Adds Windows container resource limits.
-func WithWindowsResources(r *runtime.WindowsContainerResources) ContainerOpts { //nolint:unused
+func WithWindowsResources(r *runtime.WindowsContainerResources) ContainerOpts {
 	return func(c *runtime.ContainerConfig) {
 		if c.Windows == nil {
 			c.Windows = &runtime.WindowsContainerConfig{}
@@ -265,7 +265,7 @@ func WithVolumeMount(hostPath, containerPath string) ContainerOpts {
 	}
 }
 
-func WithWindowsUsername(username string) ContainerOpts { //nolint:unused
+func WithWindowsUsername(username string) ContainerOpts {
 	return func(c *runtime.ContainerConfig) {
 		if c.Windows == nil {
 			c.Windows = &runtime.WindowsContainerConfig{}
@@ -277,7 +277,7 @@ func WithWindowsUsername(username string) ContainerOpts { //nolint:unused
 	}
 }
 
-func WithWindowsHostProcessContainer() ContainerOpts { //nolint:unused
+func WithWindowsHostProcessContainer() ContainerOpts {
 	return func(c *runtime.ContainerConfig) {
 		if c.Windows == nil {
 			c.Windows = &runtime.WindowsContainerConfig{}
@@ -322,7 +322,7 @@ func WithLogPath(path string) ContainerOpts {
 }
 
 // WithSupplementalGroups adds supplemental groups.
-func WithSupplementalGroups(gids []int64) ContainerOpts { //nolint:unused
+func WithSupplementalGroups(gids []int64) ContainerOpts {
 	return func(c *runtime.ContainerConfig) {
 		if c.Linux == nil {
 			c.Linux = &runtime.LinuxContainerConfig{}
@@ -335,7 +335,7 @@ func WithSupplementalGroups(gids []int64) ContainerOpts { //nolint:unused
 }
 
 // WithDevice adds a device mount.
-func WithDevice(containerPath, hostPath, permissions string) ContainerOpts { //nolint:unused
+func WithDevice(containerPath, hostPath, permissions string) ContainerOpts {
 	return func(c *runtime.ContainerConfig) {
 		c.Devices = append(c.Devices, &runtime.Device{
 			ContainerPath: containerPath, HostPath: hostPath, Permissions: permissions,
@@ -558,7 +558,7 @@ func CRIConfig() (*criconfig.Config, error) {
 }
 
 // SandboxInfo gets sandbox info.
-func SandboxInfo(id string) (*runtime.PodSandboxStatus, *server.SandboxInfo, error) { //nolint:unused
+func SandboxInfo(id string) (*runtime.PodSandboxStatus, *server.SandboxInfo, error) {
 	client, err := RawRuntimeClient()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get raw runtime client: %w", err)
