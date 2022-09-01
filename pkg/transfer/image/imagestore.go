@@ -62,7 +62,7 @@ func (is *Store) String() string {
 	return fmt.Sprintf("Local Image Store (%s)", is.imageName)
 }
 
-func (is *Store) FilterHandler(h images.HandlerFunc, cs content.Store) images.HandlerFunc {
+func (is *Store) ImageFilter(h images.HandlerFunc, cs content.Store) images.HandlerFunc {
 	h = images.SetChildrenMappedLabels(cs, h, is.labelMap)
 	if is.allMetadata {
 		// Filter manifests by platforms but allow to handle manifest

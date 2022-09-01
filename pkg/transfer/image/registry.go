@@ -45,10 +45,10 @@ func init() {
 // Initialize with hosts, authorizer callback, and headers
 func NewOCIRegistry(ref string, headers http.Header, creds CredentialHelper) *OCIRegistry {
 	// Create an authorizer
-	var ropts []docker.RegistryOpt
+	var aopts []docker.AuthorizerOpt
 	if creds != nil {
 		// TODO: Support bearer
-		authorizer := docker.NewDockerAuthorizer(docker.WithAuthCreds(func(host string) (string, string, error) {
+		aopts = append(aopts, docker.WithAuthCreds(func(host string) (string, string, error) {
 			c, err := creds.GetCredentials(context.Background(), ref, host)
 			if err != nil {
 				return "", "", err
@@ -56,7 +56,10 @@ func NewOCIRegistry(ref string, headers http.Header, creds CredentialHelper) *OC
 
 			return c.Username, c.Secret, nil
 		}))
-		ropts = append(ropts, docker.WithAuthorizer(authorizer))
+	}
+
+	ropts := []docker.RegistryOpt{
+		docker.WithAuthorizer(docker.NewDockerAuthorizer(aopts...)),
 	}
 
 	// TODO: Apply local configuration, maybe dynamically create resolver when requested
