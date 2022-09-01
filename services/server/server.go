@@ -49,7 +49,7 @@ import (
 	ssproxy "github.com/containerd/containerd/snapshots/proxy"
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/ttrpc"
-	metrics "github.com/docker/go-metrics"
+	"github.com/docker/go-metrics"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -121,12 +121,12 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 	serverOpts := []grpc.ServerOption{
 		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
 			otelgrpc.StreamServerInterceptor(),
-			grpc.StreamServerInterceptor(grpc_prometheus.StreamServerInterceptor),
+			grpc_prometheus.StreamServerInterceptor,
 			streamNamespaceInterceptor,
 		)),
 		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
 			otelgrpc.UnaryServerInterceptor(),
-			grpc.UnaryServerInterceptor(grpc_prometheus.UnaryServerInterceptor),
+			grpc_prometheus.UnaryServerInterceptor,
 			unaryNamespaceInterceptor,
 		)),
 	}
