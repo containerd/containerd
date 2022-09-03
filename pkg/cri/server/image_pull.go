@@ -426,8 +426,9 @@ func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig
 					return ParseAuth(auth, host)
 				}))
 
-			if u.Path == "" {
+			if u.Path == "" || u.Path == "/" {
 				u.Path = "/v2"
+				log.G(ctx).Debug("registry path was automatically replace with /v2")
 			}
 
 			registries = append(registries, docker.RegistryHost{
