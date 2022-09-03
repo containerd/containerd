@@ -25,7 +25,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-18.04, macos-12, windows-2019]
+        os: [ubuntu-20.04, macos-12, windows-2019]
 
     steps:
       - uses: actions/setup-go@v2
@@ -44,7 +44,7 @@ jobs:
   #
   project:
     name: Project Checks
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 5
 
     steps:
@@ -72,7 +72,7 @@ jobs:
   #
   protos:
     name: Protobuf
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 5
 
     defaults:
@@ -108,7 +108,7 @@ jobs:
 
   man:
     name: Manpages
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 5
 
     steps:
@@ -218,7 +218,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-18.04, macos-12, windows-2019, windows-2022]
+        os: [ubuntu-20.04, macos-12, windows-2019, windows-2022]
         go-version: ['1.19', '1.18.5']
     steps:
       - uses: actions/setup-go@v2
@@ -379,7 +379,7 @@ jobs:
 
   integration-linux:
     name: Linux Integration
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 40
     needs: [project, linters, protos, man]
 

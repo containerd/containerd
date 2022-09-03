@@ -11,7 +11,7 @@ env:
 jobs:
   check:
     name: Check Signed Tag
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 5
     outputs:
       stringver: ${{ steps.contentrel.outputs.stringver }}
@@ -123,7 +123,7 @@ jobs:
 
   release:
     name: Create containerd Release
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 10
     needs: [build, check]
     steps:
