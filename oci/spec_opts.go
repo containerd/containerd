@@ -1324,13 +1324,12 @@ func WithLinuxDevices(devices []specs.LinuxDevice) SpecOpts {
 	}
 }
 
-// WithLinuxDevice adds the device specified by path to the spec
-func WithLinuxDevice(path, permissions string) SpecOpts {
+func WithLinuxDeviceNewContainerPath(path, containerPath, permissions string) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setLinux(s)
 		setResources(s)
 
-		dev, err := DeviceFromPath(path)
+		dev, err := DeviceFromPathNewContainerPath(path, containerPath)
 		if err != nil {
 			return err
 		}
@@ -1347,6 +1346,11 @@ func WithLinuxDevice(path, permissions string) SpecOpts {
 
 		return nil
 	}
+}
+
+// WithLinuxDevice adds the device specified by path to the spec
+func WithLinuxDevice(path, permissions string) SpecOpts {
+	return WithLinuxDeviceNewContainerPath(path, path, permissions)
 }
 
 // WithEnvFile adds environment variables from a file to the container's spec

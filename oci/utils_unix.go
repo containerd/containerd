@@ -133,9 +133,7 @@ const (
 	fifoDevice     = "p"
 )
 
-// DeviceFromPath takes the path to a device to look up the information about a
-// linux device and returns that information as a LinuxDevice struct.
-func DeviceFromPath(path string) (*specs.LinuxDevice, error) {
+func DeviceFromPathNewContainerPath(path, containerPath string) (*specs.LinuxDevice, error) {
 	if overrideDeviceFromPath != nil {
 		if err := overrideDeviceFromPath(path); err != nil {
 			return nil, err
@@ -171,11 +169,17 @@ func DeviceFromPath(path string) (*specs.LinuxDevice, error) {
 	fm := os.FileMode(mode &^ unix.S_IFMT)
 	return &specs.LinuxDevice{
 		Type:     devType,
-		Path:     path,
+		Path:     containerPath,
 		Major:    int64(major),
 		Minor:    int64(minor),
 		FileMode: &fm,
 		UID:      &stat.Uid,
 		GID:      &stat.Gid,
 	}, nil
+}
+
+// DeviceFromPath takes the path to a device to look up the information about a
+// linux device and returns that information as a LinuxDevice struct.
+func DeviceFromPath(path string) (*specs.LinuxDevice, error) {
+	return DeviceFromPathNewContainerPath(path, path)
 }
