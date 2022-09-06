@@ -230,7 +230,6 @@ func TestUpdateContainerResources_MemorySwap(t *testing.T) {
 }
 
 func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
-	// TODO(claudiub): Make this test work once https://github.com/microsoft/hcsshim/pull/931 merges.
 	t.Log("Create a sandbox")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "update-container-resources")
 
