@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/snapshots"
@@ -307,6 +308,9 @@ func WithContainerExtension(name string, extension interface{}) NewContainerOpts
 // WithNewSpec generates a new spec for a new container
 func WithNewSpec(opts ...oci.SpecOpts) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
+		if _, ok := namespaces.Namespace(ctx); !ok {
+			ctx = namespaces.WithNamespace(ctx, client.DefaultNamespace())
+		}
 		s, err := oci.GenerateSpec(ctx, client, c, opts...)
 		if err != nil {
 			return err
