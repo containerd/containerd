@@ -38,7 +38,6 @@ jobs:
 
       - name: Install containerd dependencies
         env:
-          RUNC_FLAVOR: ${{ matrix.runc }}
           GOFLAGS: -modcacherw
         run: |
           sudo apt-get install -y gperf
