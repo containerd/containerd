@@ -215,7 +215,6 @@ integration: ## run integration tests
 	@cd "${ROOTDIR}/integration/client" && $(GO) mod download && $(GOTEST) -v ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL} .
 
 bench-integration: ## benchmarks 
-	@echo "$(WHALE) $@"
 	@cd "${ROOTDIR}integration/benchmark" && rm -rf bin/ && $(GO) build -o bin/benchmarkTests main.go && ./bin/benchmarkTests $(COMMIT)
 
 # TODO integrate cri integration bucket with coverage
