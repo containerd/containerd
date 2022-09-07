@@ -2,15 +2,47 @@ name: benchmark
 
 env:
   # Go version we currently use to build containerd across all CI.
+  # FIXME make this version available on the self hosted runner
   GO_VERSION: '1.19'
+  GOCACHE: /home/ubuntu/go/cache
+  AWS_EC2_IMAGE_ID: ami-00f78bca13a3ed742
+  AWS_EC2_INSTANCE_TYPE: t2.micro
+  AWS_SUBNET_ID: subnet-063672503b1a6cebc
+  AWS_SECURITY_GROUP_ID: sg-02118687bc0d8cbda
 
 # Run on push to any branch
 # Production use could restrict to main branch, and/or include pull_request
 on: push
 
 jobs:
-  bench:
+  # TODO keep runner online, re-use it for additional workflow runs, suspend itself after idle timeout
+  start-runner:
+    name: Start self-hosted EC2 runner
     runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.start-ec2-runner.outputs.label }}
+      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Start EC2 runner
+        id: start-ec2-runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          ec2-image-id: ${{ env.AWS_EC2_IMAGE_ID }}
+          ec2-instance-type: ${{ env.AWS_EC2_INSTANCE_TYPE }}
+          subnet-id: ${{ env.AWS_SUBNET_ID }}
+          security-group-id: ${{ env.AWS_SECURITY_GROUP_ID }}
+
+  bench:
+    needs: start-runner
+    runs-on: ${{ needs.start-runner.outputs.label }}
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -27,6 +59,28 @@ jobs:
       - name: Export benchmark name list to job output
         id: set-matrix
         run: echo "::set-output name=matrix::$(jq -c '.benchmarkResults | keys' "${{ runner.temp }}/current/BenchmarkResults")"
+
+  stop-runner:
+    name: Stop self-hosted EC2 runner
+    needs:
+      - start-runner # required to get output from the start-runner job
+      - bench # required to wait when the main job is done
+    runs-on: ubuntu-latest
+    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Stop EC2 runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          label: ${{ needs.start-runner.outputs.label }}
+          ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
 
 # this job will run once per benchmark and compare the current and previous values
   compare:
@@ -90,6 +144,8 @@ jobs:
           DELTA="${DELTA//$'\r'/%0D}"
           echo "::set-output name=delta::$DELTA"
 
+      # TODO move regression checks to script in the repo for cleaner and more reusable code
+      # TODO OR store delta to job output, matrix-ize regression check jobs to deduplicate code
       - name: Regression Mean
         if: always() && fromJSON(steps.results.outputs.delta).mean > 4
         uses: actions/github-script@v3 # provides better custom error output than `echo "::error::" && exit 1`
