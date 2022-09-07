@@ -1,0 +1,112 @@
+name: benchmark
+
+env:
+  # Go version we currently use to build containerd across all CI.
+  GO_VERSION: '1.19'
+
+# Run on push to any branch
+# Production use could restrict to main branch, and/or include pull_request
+on: push
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Check out the source
+        uses: actions/checkout@v3
+      - name: Run benchmarks
+        run: |
+          mkdir -p "${{ runner.temp	}}/current" && sudo -E make bench-integration > "${{ runner.temp	}}/current/BenchmarkResults"
+      - name: Upload the new benchmark results to an artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: BenchmarkResults
+          path: ${{ runner.temp	}}/current/BenchmarkResults
+      - name: Export benchmark name list to job output
+        id: set-matrix
+        run: echo "::set-output name=matrix::$(jq -c '.benchmarkResults | keys' "${{ runner.temp }}/current/BenchmarkResults")"
+
+# this job will run once per benchmark and compare the current and previous values
+  compare:
+    needs: bench
+    runs-on: ubuntu-latest
+    # parallelize this job per benchmark
+    strategy:
+        matrix:
+            benchmark: ${{ fromJson(needs.bench.outputs.matrix) }}
+        # don't cancel other benchmarks when one fails
+        fail-fast: false
+  
+    steps:
+      - name: Download benchmark results from earlier in this workflow
+        uses: actions/download-artifact@v3
+        with:
+          name: BenchmarkResults
+          path: ${{ runner.temp	}}/current
+      - name: Download benchmark results from the last completed workflow
+        # TODO smarter error handling
+        continue-on-error: true
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          ### FIXME
+          ### success is too narrow if we fail the job when there are regressions
+          ### completed is too broad, it will select a run no or defective artifacts
+          workflow_conclusion: completed
+          # branch main
+          # FIXME don't compare across unrelated branches
+          event: push
+          name: BenchmarkResults
+          path: ${{ runner.temp	}}/previous
+      - name: Check out benchmark comparison script
+        uses: snow-actions/sparse-checkout@v1.1.0
+        with:
+          patterns: |
+            integration/benchmark/compare_results.jq
+      - name: Compare current and previous bencmarks
+        # TODO smarter error handling
+        continue-on-error: true
+        # only run this step if all previous steps completed without error
+        if: ${{ success() }}
+        # use jq to produce a comparison between the previous and current benchmarks
+        run: >
+          jq
+          --argfile prev ${{ runner.temp }}/previous/BenchmarkResults
+          --argfile curr ${{ runner.temp }}/current/BenchmarkResults
+          --arg benchmark ${{ matrix.benchmark }}
+          -n
+          -f integration/benchmark/compare_results.jq
+          | tee "${{ runner.temp }}/BenchmarkResultsPctDelta"
+      
+      # sanitize and store the comparison results to a step output that can be read by the later steps
+      - name: Save comparison results
+        if: ${{ success() }}
+        id: results
+        run: |
+          DELTA="$(cat ${{ runner.temp }}/BenchmarkResultsPctDelta)"
+          DELTA="${DELTA//'%'/%25}"
+          DELTA="${DELTA//$'\n'/%0A}"   
+          DELTA="${DELTA//$'\r'/%0D}"
+          echo "::set-output name=delta::$DELTA"
+
+      - name: Regression Mean
+        if: always() && fromJSON(steps.results.outputs.delta).mean > 4
+        uses: actions/github-script@v3 # provides better custom error output than `echo "::error::" && exit 1`
+        with:
+          script: |
+            core.setFailed('Mean increased by ${{ fromJSON(steps.results.outputs.delta).mean }}%')
+
+      - name: Regression Median
+        if: always() && fromJSON(steps.results.outputs.delta).pct50 > 4
+        uses: actions/github-script@v3
+        with:
+          script: |
+            core.setFailed('Median increased by ${{ fromJSON(steps.results.outputs.delta).pct50 }}%')
+
+      - name: Regression 90th Percentile
+        if: always() && fromJSON(steps.results.outputs.delta).pct90 > 4
+        uses: actions/github-script@v3
+        with:
+          script: |
+            core.setFailed('90th Percentile increased by ${{ fromJSON(steps.results.outputs.delta).pct90 }}%')
