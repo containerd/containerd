@@ -40,7 +40,28 @@ func DefaultConfig() PluginConfig {
 			NoPivot:            false,
 			Runtimes: map[string]Runtime{
 				"runhcs-wcow-process": {
-					Type: "io.containerd.runhcs.v1",
+					Type:                 "io.containerd.runhcs.v1",
+					ContainerAnnotations: []string{"io.microsoft.container.*"},
+				},
+				"runhcs-wcow-hypervisor": {
+					Type:                 "io.containerd.runhcs.v1",
+					PodAnnotations:       []string{"io.microsoft.virtualmachine.*"},
+					ContainerAnnotations: []string{"io.microsoft.container.*"},
+					// Full set of Windows shim options:
+					// https://pkg.go.dev/github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options#Options
+					Options: map[string]interface{}{
+						// SandboxIsolation specifies the isolation level of the sandbox.
+						// PROCESS (0) and HYPERVISOR (1) are the valid options.
+						"SandboxIsolation": 1,
+						// ScaleCpuLimitsToSandbox indicates that the containers CPU
+						// maximum value (specifies the portion of processor cycles that
+						// a container can use as a percentage times 100) should be adjusted
+						// to account for the difference in the number of cores between the
+						// host and UVM.
+						//
+						// This should only be turned on if SandboxIsolation is 1.
+						"ScaleCpuLimitsToSandbox": true,
+					},
 				},
 			},
 		},
