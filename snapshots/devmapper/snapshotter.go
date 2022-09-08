@@ -44,6 +44,7 @@ type fsType string
 const (
 	metadataFileName               = "metadata.db"
 	fsTypeExt4              fsType = "ext4"
+	fsTypeExt2              fsType = "ext2"
 	fsTypeXFS               fsType = "xfs"
 	devmapperSnapshotFsType        = "containerd.io/snapshot/devmapper/fstype"
 )
@@ -463,6 +464,13 @@ func mkfs(ctx context.Context, fs fsType, fsOptions string, path string) error {
 	switch fs {
 	case fsTypeExt4:
 		mkfsCommand = "mkfs.ext4"
+		args = []string{
+			"-E",
+			fsOptions,
+			path,
+		}
+	case fsTypeExt2:
+		mkfsCommand = "mkfs.ext2"
 		args = []string{
 			"-E",
 			fsOptions,

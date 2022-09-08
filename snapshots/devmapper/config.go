@@ -117,7 +117,7 @@ func (c *Config) Validate() error {
 
 	if c.FileSystemType != "" {
 		switch c.FileSystemType {
-		case fsTypeExt4, fsTypeXFS:
+		case fsTypeExt4, fsTypeXFS, fsTypeExt2:
 		default:
 			result = multierror.Append(result, fmt.Errorf("unsupported Filesystem Type: %q", c.FileSystemType))
 		}
