@@ -44,7 +44,7 @@ require (
 	github.com/moby/sys/signal v0.7.0
 	github.com/moby/sys/symlink v0.2.0
 	github.com/opencontainers/go-digest v1.0.0
-	github.com/opencontainers/image-spec v1.0.3-0.20220303224323-02efb9a75ee1
+	github.com/opencontainers/image-spec v1.0.3-0.20220303224323-02efb9a75ee1 // FIXME: see replace
 	github.com/opencontainers/runc v1.1.4
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 	github.com/opencontainers/selinux v1.10.1
@@ -77,6 +77,9 @@ require (
 	k8s.io/klog/v2 v2.60.1
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
 )
+
+// FIXME: testing "embed_platform" branch from https://github.com/opencontainers/image-spec/pull/949
+replace github.com/opencontainers/image-spec => github.com/thaJeztah/image-spec v1.0.2-0.20220908165244-ca2e500b1693
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect

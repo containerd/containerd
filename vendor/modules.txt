@@ -321,7 +321,7 @@ github.com/modern-go/reflect2
 ## explicit; go 1.13
 github.com/opencontainers/go-digest
 github.com/opencontainers/go-digest/digestset
-# github.com/opencontainers/image-spec v1.0.3-0.20220303224323-02efb9a75ee1
+# github.com/opencontainers/image-spec v1.0.3-0.20220303224323-02efb9a75ee1 => github.com/thaJeztah/image-spec v1.0.2-0.20220908165244-ca2e500b1693
 ## explicit; go 1.16
 github.com/opencontainers/image-spec/identity
 github.com/opencontainers/image-spec/specs-go
@@ -775,3 +775,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
+# github.com/opencontainers/image-spec => github.com/thaJeztah/image-spec v1.0.2-0.20220908165244-ca2e500b1693

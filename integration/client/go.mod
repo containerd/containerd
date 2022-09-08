@@ -19,6 +19,9 @@ require (
 	golang.org/x/sys v0.0.0-20220829200755-d48e67d00261
 )
 
+// FIXME: testing "embed_platform" branch from https://github.com/opencontainers/image-spec/pull/949
+replace github.com/opencontainers/image-spec => github.com/thaJeztah/image-spec v1.0.2-0.20220908165244-ca2e500b1693
+
 require github.com/AdaLogics/go-fuzz-headers v0.0.0-20220706123152-fef3fe1bab07
 
 require (
