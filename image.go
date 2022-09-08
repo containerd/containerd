@@ -472,11 +472,13 @@ func (i *image) getManifestPlatform(ctx context.Context, manifest ocispec.Manife
 		return ocispec.Platform{}, err
 	}
 
-	var image ocispec.Image
-	if err := json.Unmarshal(p, &image); err != nil {
+	// Technically, this should be ocispec.Image, but we only need the
+	// ocispec.Platform that is embedded in the image struct.
+	var imagePlatform ocispec.Platform
+	if err := json.Unmarshal(p, &imagePlatform); err != nil {
 		return ocispec.Platform{}, err
 	}
-	return platforms.Normalize(ocispec.Platform{OS: image.OS, Architecture: image.Architecture}), nil
+	return platforms.Normalize(imagePlatform), nil
 }
 
 func (i *image) checkSnapshotterSupport(ctx context.Context, snapshotterName string, manifest ocispec.Manifest) error {

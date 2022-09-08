@@ -253,7 +253,7 @@ func (u *Unpacker) unpack(
 	// TODO: Support multiple unpacks rather than just first match
 	var unpack *Platform
 
-	imgPlatform := platforms.Normalize(ocispec.Platform{OS: i.OS, Architecture: i.Architecture})
+	imgPlatform := platforms.Normalize(i.Platform)
 	for _, up := range u.platforms {
 		if up.Platform.Match(imgPlatform) {
 			unpack = up
