@@ -182,6 +182,7 @@ func BenchmarkContainerCreate(b *testing.B) {
 	// reset the timer so that only the container creation time is counted
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		time.Sleep(time.Second / 10)
 		id := fmt.Sprintf("%s-%d", "test", i)
 		container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithSpec(spec))
 		if err != nil {
