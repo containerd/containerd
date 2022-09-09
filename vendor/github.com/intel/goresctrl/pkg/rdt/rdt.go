@@ -206,10 +206,6 @@ func Initialize(resctrlGroupPrefix string) error {
 		return fmt.Errorf("failed to initialize classes from resctrl fs: %v", err)
 	}
 
-	if err := r.pruneMonGroups(); err != nil {
-		return err
-	}
-
 	rdt = r
 
 	return nil
