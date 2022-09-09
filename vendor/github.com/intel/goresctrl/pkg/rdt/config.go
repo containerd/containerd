@@ -231,19 +231,21 @@ func (s catSchema) toStr(typ catSchemaType, baseSchema catSchema) (string, error
 	sep := ""
 
 	// Get a sorted slice of cache ids for deterministic output
-	ids := make([]uint64, 0, len(baseSchema.Alloc))
-	for id := range baseSchema.Alloc {
-		ids = append(ids, id)
-	}
+	ids := append([]uint64{}, info.cat[s.Lvl].cacheIds...)
 	utils.SortUint64s(ids)
 
 	minBits := info.cat[s.Lvl].minCbmBits()
 	for _, id := range ids {
-		baseMask, ok := baseSchema.Alloc[id].getEffective(typ).(catAbsoluteAllocation)
-		if !ok {
-			return "", fmt.Errorf("BUG: basemask not of type catAbsoluteAllocation")
+		// Default to 100%
+		bmask := info.cat[s.Lvl].cbmMask()
+
+		if base, ok := baseSchema.Alloc[id]; ok {
+			baseMask, ok := base.getEffective(typ).(catAbsoluteAllocation)
+			if !ok {
+				return "", fmt.Errorf("BUG: basemask not of type catAbsoluteAllocation")
+			}
+			bmask = bitmask(baseMask)
 		}
-		bmask := bitmask(baseMask)
 
 		if s.Alloc != nil {
 			var err error
@@ -416,14 +418,19 @@ func (s mbSchema) toStr(base map[uint64]uint64) string {
 	sep := ""
 
 	// Get a sorted slice of cache ids for deterministic output
-	ids := make([]uint64, 0, len(base))
-	for id := range base {
-		ids = append(ids, id)
-	}
+	ids := append([]uint64{}, info.mb.cacheIds...)
 	utils.SortUint64s(ids)
 
 	for _, id := range ids {
-		baseAllocation := base[id]
+		baseAllocation, ok := base[id]
+		if !ok {
+			if info.mb.mbpsEnabled {
+				baseAllocation = math.MaxUint32
+			} else {
+				baseAllocation = 100
+			}
+		}
+
 		value := uint64(0)
 		if info.mb.mbpsEnabled {
 			value = math.MaxUint32
@@ -547,6 +554,10 @@ func (c *Config) resolvePartitions() (partitionSet, error) {
 
 // resolveCatPartitions tries to resolve requested cache allocations between partitions
 func (c *Config) resolveCatPartitions(lvl cacheLevel, conf partitionSet) error {
+	if len(c.Partitions) == 0 {
+		return nil
+	}
+
 	// Resolve partitions in sorted order for reproducibility
 	names := make([]string, 0, len(c.Partitions))
 	for name := range c.Partitions {
