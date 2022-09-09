@@ -43,7 +43,7 @@ func TestPrefixHeaderReadable(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	_, err = Apply(context.Background(), tmpDir, r)
+	_, err = Apply(context.Background(), tmpDir, r, WithNoSameOwner())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -24,7 +24,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -290,7 +289,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 		srcData := io.Reader(tr)
 		srcHdr := hdr
 
-		if err := createTarFile(ctx, path, root, srcHdr, srcData); err != nil {
+		if err := createTarFile(ctx, path, root, srcHdr, srcData, options.NoSameOwner); err != nil {
 			return 0, err
 		}
 
@@ -315,7 +314,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 	return size, nil
 }
 
-func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header, reader io.Reader) error {
+func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header, reader io.Reader, noSameOwner bool) error {
 	// hdr.Mode is in linux format, which we can use for syscalls,
 	// but for os.Foo() calls we need the mode converted to os.FileMode,
 	// so use hdrInfo.Mode() (they differ for e.g. setuid bits)
@@ -380,8 +379,7 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 		return fmt.Errorf("unhandled tar header type %d", hdr.Typeflag)
 	}
 
-	// Lchown is not supported on Windows.
-	if runtime.GOOS != "windows" {
+	if !noSameOwner {
 		if err := os.Lchown(path, hdr.Uid, hdr.Gid); err != nil {
 			err = fmt.Errorf("failed to Lchown %q for UID %d, GID %d: %w", path, hdr.Uid, hdr.Gid, err)
 			if errors.Is(err, syscall.EINVAL) && userns.RunningInUserNS() {
