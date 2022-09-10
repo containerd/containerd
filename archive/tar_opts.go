@@ -27,6 +27,7 @@ type ApplyOptions struct {
 	Filter          Filter          // Filter tar headers
 	ConvertWhiteout ConvertWhiteout // Convert whiteout files
 	Parents         []string        // Parent directories to handle inherited attributes without CoW
+	NoSameOwner     bool            // NoSameOwner will not attempt to preserve the owner specified in the tar archive.
 
 	applyFunc func(context.Context, string, io.Reader, ApplyOptions) (int64, error)
 }
@@ -57,6 +58,15 @@ func WithFilter(f Filter) ApplyOpt {
 func WithConvertWhiteout(c ConvertWhiteout) ApplyOpt {
 	return func(options *ApplyOptions) error {
 		options.ConvertWhiteout = c
+		return nil
+	}
+}
+
+// WithNoSameOwner is same as '--no-same-owner` in 'tar' command.
+// It'll skip attempt to preserve the owner specified in the tar archive.
+func WithNoSameOwner() ApplyOpt {
+	return func(options *ApplyOptions) error {
+		options.NoSameOwner = true
 		return nil
 	}
 }
