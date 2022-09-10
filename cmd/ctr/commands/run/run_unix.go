@@ -70,6 +70,10 @@ var platformRunFlags = []cli.Flag{
 		Name:  "remap-labels",
 		Usage: "provide the user namespace ID remapping to the snapshotter via label options; requires snapshotter support",
 	},
+	cli.BoolFlag{
+		Name:  "privileged-without-host-devices",
+		Usage: "don't pass all host devices to privileged container",
+	},
 	cli.Float64Flag{
 		Name:  "cpus",
 		Usage: "set the CFS cpu quota",
@@ -202,9 +206,20 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		if context.Bool("tty") {
 			opts = append(opts, oci.WithTTY)
 		}
-		if context.Bool("privileged") {
-			opts = append(opts, oci.WithPrivileged, oci.WithAllDevicesAllowed, oci.WithHostDevices)
+
+		privileged := context.Bool("privileged")
+		privilegedWithoutHostDevices := context.Bool("privileged-without-host-devices")
+		if privilegedWithoutHostDevices && !privileged {
+			return nil, fmt.Errorf("can't use 'privileged-without-host-devices' without 'privileged' specified")
 		}
+		if privileged {
+			if privilegedWithoutHostDevices {
+				opts = append(opts, oci.WithPrivileged)
+			} else {
+				opts = append(opts, oci.WithPrivileged, oci.WithAllDevicesAllowed, oci.WithHostDevices)
+			}
+		}
+
 		if context.Bool("net-host") {
 			hostname, err := os.Hostname()
 			if err != nil {
