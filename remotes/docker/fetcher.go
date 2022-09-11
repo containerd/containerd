@@ -91,13 +91,13 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 			return rc, nil
 		}
 
+		var errorList Errors
 		// Try manifests endpoints for manifests types
 		switch desc.MediaType {
 		case images.MediaTypeDockerSchema2Manifest, images.MediaTypeDockerSchema2ManifestList,
 			images.MediaTypeDockerSchema1Manifest,
 			ocispec.MediaTypeImageManifest, ocispec.MediaTypeImageIndex:
 
-			var firstErr error
 			for _, host := range r.hosts {
 				req := r.request(host, http.MethodGet, "manifests", desc.Digest.String())
 				if err := req.addNamespace(r.refspec.Hostname()); err != nil {
@@ -107,20 +107,17 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 				rc, err := r.open(ctx, req, desc.MediaType, offset)
 				if err != nil {
 					// Store the error for referencing later
-					if firstErr == nil {
-						firstErr = err
-					}
+					errorList = append(errorList, err)
 					continue // try another host
 				}
 
 				return rc, nil
 			}
 
-			return nil, firstErr
+			return nil, errorList
 		}
 
 		// Finally use blobs endpoints
-		var firstErr error
 		for _, host := range r.hosts {
 			req := r.request(host, http.MethodGet, "blobs", desc.Digest.String())
 			if err := req.addNamespace(r.refspec.Hostname()); err != nil {
@@ -130,23 +127,22 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 			rc, err := r.open(ctx, req, desc.MediaType, offset)
 			if err != nil {
 				// Store the error for referencing later
-				if firstErr == nil {
-					firstErr = err
-				}
+				errorList = append(errorList, err)
 				continue // try another host
 			}
 
 			return rc, nil
 		}
 
-		if errdefs.IsNotFound(firstErr) {
-			firstErr = fmt.Errorf("could not fetch content descriptor %v (%v) from remote: %w",
-				desc.Digest, desc.MediaType, errdefs.ErrNotFound,
-			)
+		for _, err := range errorList {
+			if errdefs.IsNotFound(err) {
+				return nil, fmt.Errorf("could not fetch content descriptor %v (%v) from remote: %w",
+					desc.Digest, desc.MediaType, errdefs.ErrNotFound)
+			}
 		}
 
-		return nil, firstErr
-
+		return nil, fmt.Errorf("could not fetch content descriptor %v (%v) from remote: %w, detail: %s",
+			desc.Digest, desc.MediaType, errdefs.ErrUnavailable, errorList)
 	})
 }
 
