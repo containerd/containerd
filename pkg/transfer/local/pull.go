@@ -83,13 +83,12 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		progressTracker *ProgressTracker
 	)
 
+	ctx, cancel := context.WithCancel(ctx)
 	if tops.Progress != nil {
-		progressTracker = NewProgressTracker(name, store) //Pass in first name as root
-		go progressTracker.HandleProgress(ctx, tops.Progress)
+		progressTracker = NewProgressTracker(name, "downloading") //Pass in first name as root
+		go progressTracker.HandleProgress(ctx, tops.Progress, NewContentStatusTracker(store))
 		defer progressTracker.Wait()
 	}
-
-	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	// Get all the children for a descriptor
@@ -103,6 +102,7 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 	//if limit > 0 {
 	//	childrenHandler = images.LimitManifests(childrenHandler, rCtx.PlatformMatcher, limit)
 	//}
+	//SetChildrenMappedLabels(manager content.Manager, f HandlerFunc, labelMap func(ocispec.Descriptor) []string) HandlerFunc {
 
 	checkNeedsFix := images.HandlerFunc(
 		func(_ context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {

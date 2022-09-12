@@ -31,10 +31,10 @@ import (
 )
 
 type ProgressTracker struct {
-	root  string
-	cs    content.Store
-	added chan jobUpdate
-	waitC chan struct{}
+	root          string
+	transferState string
+	added         chan jobUpdate
+	waitC         chan struct{}
 
 	parents map[digest.Digest][]ocispec.Descriptor
 	parentL sync.Mutex
@@ -62,22 +62,76 @@ type jobUpdate struct {
 	//children []ocispec.Descriptor
 }
 
+type ActiveJobs interface {
+	Status(string) (content.Status, bool)
+}
+
+type StatusTracker interface {
+	Active(context.Context, ...string) (ActiveJobs, error)
+	Check(context.Context, digest.Digest) (bool, error)
+}
+
 // NewProgressTracker tracks content download progress
-func NewProgressTracker(root string, cs content.Store) *ProgressTracker {
+func NewProgressTracker(root, transferState string) *ProgressTracker {
 	return &ProgressTracker{
-		root:    root,
-		cs:      cs,
-		added:   make(chan jobUpdate, 1),
-		waitC:   make(chan struct{}),
-		parents: map[digest.Digest][]ocispec.Descriptor{},
+		root:          root,
+		transferState: transferState,
+		added:         make(chan jobUpdate, 1),
+		waitC:         make(chan struct{}),
+		parents:       map[digest.Digest][]ocispec.Descriptor{},
 	}
 }
 
-func (j *ProgressTracker) HandleProgress(ctx context.Context, pf transfer.ProgressFunc) {
+func (j *ProgressTracker) HandleProgress(ctx context.Context, pf transfer.ProgressFunc, pt StatusTracker) {
 	defer close(j.waitC)
 	// Instead of ticker, just delay
 	jobs := map[digest.Digest]*jobStatus{}
-	tc := time.NewTicker(time.Millisecond * 200)
+	tc := time.NewTicker(time.Millisecond * 300)
+
+	update := func() {
+		// TODO: Filter by references
+		active, err := pt.Active(ctx)
+		if err != nil {
+			log.G(ctx).WithError(err).Error("failed to get statuses for progress")
+		}
+		for dgst, job := range jobs {
+			if job.state != jobComplete {
+				status, ok := active.Status(job.name)
+				if ok {
+					if status.Offset > job.progress {
+						pf(transfer.Progress{
+							Event:   j.transferState,
+							Name:    job.name,
+							Parents: job.parents,
+							//Digest:   job.desc.Digest.String(),
+							Progress: status.Offset,
+							Total:    status.Total,
+						})
+						job.progress = status.Offset
+						job.state = jobInProgress
+						jobs[dgst] = job
+					}
+				} else {
+					ok, err := pt.Check(ctx, job.desc.Digest)
+					if err != nil {
+						log.G(ctx).WithError(err).Error("failed to get statuses for progress")
+					} else if ok {
+						pf(transfer.Progress{
+							Event:   "complete",
+							Name:    job.name,
+							Parents: job.parents,
+							//Digest:   job.desc.Digest.String(),
+							Progress: job.desc.Size,
+							Total:    job.desc.Size,
+						})
+
+					}
+					job.state = jobComplete
+					jobs[dgst] = job
+				}
+			}
+		}
+	}
 	for {
 		select {
 		case update := <-j.added:
@@ -126,52 +180,10 @@ func (j *ProgressTracker) HandleProgress(ctx context.Context, pf transfer.Progre
 			}
 
 		case <-tc.C:
-			// TODO: Filter by references
-			active, err := j.cs.ListStatuses(ctx)
-			if err != nil {
-				log.G(ctx).WithError(err).Error("failed to list statuses for progress")
-			}
-			sort.Slice(active, func(i, j int) bool {
-				return active[i].Ref < active[j].Ref
-			})
-
-			for dgst, job := range jobs {
-				if job.state != jobComplete {
-					idx := sort.Search(len(active), func(i int) bool { return active[i].Ref >= job.name })
-					if idx < len(active) && active[idx].Ref == job.name {
-						if active[idx].Offset > job.progress {
-							pf(transfer.Progress{
-								Event:   "downloading",
-								Name:    job.name,
-								Parents: job.parents,
-								//Digest:   job.desc.Digest.String(),
-								Progress: active[idx].Offset,
-								Total:    active[idx].Total,
-							})
-							job.progress = active[idx].Offset
-							job.state = jobInProgress
-							jobs[dgst] = job
-						}
-					} else {
-						_, err := j.cs.Info(ctx, job.desc.Digest)
-						if err == nil {
-							pf(transfer.Progress{
-								Event:   "complete",
-								Name:    job.name,
-								Parents: job.parents,
-								//Digest:   job.desc.Digest.String(),
-								Progress: job.desc.Size,
-								Total:    job.desc.Size,
-							})
-
-						}
-						job.state = jobComplete
-						jobs[dgst] = job
-					}
-				}
-			}
+			update()
 			// Next timer?
 		case <-ctx.Done():
+			update()
 			return
 		}
 	}
@@ -218,4 +230,49 @@ func (j *ProgressTracker) Wait() {
 	case <-timeout:
 	case <-j.waitC:
 	}
+}
+
+type contentActive struct {
+	active []content.Status
+}
+
+func (c *contentActive) Status(ref string) (content.Status, bool) {
+	idx := sort.Search(len(c.active), func(i int) bool { return c.active[i].Ref >= ref })
+	if idx < len(c.active) && c.active[idx].Ref == ref {
+		return c.active[idx], true
+	}
+
+	return content.Status{}, false
+}
+
+type contentStatusTracker struct {
+	cs content.Store
+}
+
+func NewContentStatusTracker(cs content.Store) StatusTracker {
+	return &contentStatusTracker{
+		cs: cs,
+	}
+}
+
+func (c *contentStatusTracker) Active(ctx context.Context, _ ...string) (ActiveJobs, error) {
+	active, err := c.cs.ListStatuses(ctx)
+	if err != nil {
+		log.G(ctx).WithError(err).Error("failed to list statuses for progress")
+	}
+	sort.Slice(active, func(i, j int) bool {
+		return active[i].Ref < active[j].Ref
+	})
+
+	return &contentActive{
+		active: active,
+	}, nil
+}
+
+func (c *contentStatusTracker) Check(ctx context.Context, dgst digest.Digest) (bool, error) {
+	_, err := c.cs.Info(ctx, dgst)
+	if err == nil {
+		return true, nil
+	}
+	return false, nil
 }
