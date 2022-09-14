@@ -58,7 +58,7 @@ func NewTransferService(lm leases.Manager, cs content.Store, is images.Store) tr
 }
 
 func (ts *localTransferService) Transfer(ctx context.Context, src interface{}, dest interface{}, opts ...transfer.Opt) error {
-	topts := &transfer.TransferOpts{}
+	topts := &transfer.Config{}
 	for _, opt := range opts {
 		opt(topts)
 	}
@@ -100,7 +100,7 @@ func name(t interface{}) string {
 
 // echo is mostly used for testing, it implements an import->export which is
 // a no-op which only roundtrips the bytes.
-func (ts *localTransferService) echo(ctx context.Context, i transfer.ImageImportStreamer, e transfer.ImageExportStreamer, tops *transfer.TransferOpts) error {
+func (ts *localTransferService) echo(ctx context.Context, i transfer.ImageImportStreamer, e transfer.ImageExportStreamer, tops *transfer.Config) error {
 	r, err := i.ImportStream(ctx)
 	if err != nil {
 		return err

@@ -29,7 +29,7 @@ import (
 )
 
 func init() {
-	// TODO: Move this to seperate package?
+	// TODO: Move this to separate package?
 	plugins.Register(&transfertypes.ImageExportStream{}, &ImageExportStream{})
 	plugins.Register(&transfertypes.ImageImportStream{}, &ImageImportStream{})
 }

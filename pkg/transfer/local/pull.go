@@ -32,7 +32,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetcher, is transfer.ImageStorer, tops *transfer.TransferOpts) error {
+func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetcher, is transfer.ImageStorer, tops *transfer.Config) error {
 	ctx, done, err := ts.withLease(ctx)
 	if err != nil {
 		return err
@@ -146,7 +146,7 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 	handler = images.Handlers(append(baseHandlers,
 		fetchHandler(store, fetcher, progressTracker),
 		checkNeedsFix,
-		childrenHandler, // List children to track hierachy
+		childrenHandler, // List children to track hierarchy
 		appendDistSrcLabelHandler,
 	)...)
 

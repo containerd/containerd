@@ -86,14 +86,14 @@ type ImageUnpacker interface {
 
 type ProgressFunc func(Progress)
 
-type TransferOpts struct {
+type Config struct {
 	Progress ProgressFunc
 }
 
-type Opt func(*TransferOpts)
+type Opt func(*Config)
 
 func WithProgress(f ProgressFunc) Opt {
-	return func(opts *TransferOpts) {
+	return func(opts *Config) {
 		opts.Progress = f
 	}
 }

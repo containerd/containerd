@@ -22,6 +22,7 @@ import (
 	"github.com/containerd/containerd/pkg/transfer/local"
 	"github.com/containerd/containerd/plugin"
 
+	// Load packages with type registrations
 	_ "github.com/containerd/containerd/pkg/transfer/archive"
 	_ "github.com/containerd/containerd/pkg/transfer/image"
 )

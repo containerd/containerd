@@ -34,11 +34,11 @@ import (
 )
 
 func init() {
-	// TODO: Move this to seperate package?
-	plugins.Register(&transfertypes.ImageStore{}, &ImageStore{}) // TODO: Rename ImageStoreDestination
+	// TODO: Move this to separate package?
+	plugins.Register(&transfertypes.ImageStore{}, &Store{}) // TODO: Rename ImageStoreDestination
 }
 
-type ImageStore struct {
+type Store struct {
 	// TODO: Put these configurations in object which can convert to/from any
 	// Embed generated type
 	imageName     string
@@ -52,17 +52,17 @@ type ImageStore struct {
 	unpacks []unpack.Platform
 }
 
-func NewImageStore(image string) *ImageStore {
-	return &ImageStore{
+func NewStore(image string) *Store {
+	return &Store{
 		imageName: image,
 	}
 }
 
-func (is *ImageStore) String() string {
+func (is *Store) String() string {
 	return fmt.Sprintf("Local Image Store (%s)", is.imageName)
 }
 
-func (is *ImageStore) FilterHandler(h images.HandlerFunc, cs content.Store) images.HandlerFunc {
+func (is *Store) FilterHandler(h images.HandlerFunc, cs content.Store) images.HandlerFunc {
 	h = images.SetChildrenMappedLabels(cs, h, is.labelMap)
 	if is.allMetadata {
 		// Filter manifests by platforms but allow to handle manifest
@@ -80,7 +80,7 @@ func (is *ImageStore) FilterHandler(h images.HandlerFunc, cs content.Store) imag
 	return h
 }
 
-func (is *ImageStore) Store(ctx context.Context, desc ocispec.Descriptor, store images.Store) (images.Image, error) {
+func (is *Store) Store(ctx context.Context, desc ocispec.Descriptor, store images.Store) (images.Image, error) {
 	img := images.Image{
 		Name:   is.imageName,
 		Target: desc,
@@ -111,15 +111,15 @@ func (is *ImageStore) Store(ctx context.Context, desc ocispec.Descriptor, store 
 	}
 }
 
-func (is *ImageStore) Get(ctx context.Context, store images.Store) (images.Image, error) {
+func (is *Store) Get(ctx context.Context, store images.Store) (images.Image, error) {
 	return store.Get(ctx, is.imageName)
 }
 
-func (is *ImageStore) UnpackPlatforms() []unpack.Platform {
+func (is *Store) UnpackPlatforms() []unpack.Platform {
 	return is.unpacks
 }
 
-func (is *ImageStore) MarshalAny(ctx context.Context, sm streaming.StreamCreator) (typeurl.Any, error) {
+func (is *Store) MarshalAny(ctx context.Context, sm streaming.StreamCreator) (typeurl.Any, error) {
 	s := &transfertypes.ImageStore{
 		Name: is.imageName,
 		// TODO: Support other fields
@@ -127,7 +127,7 @@ func (is *ImageStore) MarshalAny(ctx context.Context, sm streaming.StreamCreator
 	return typeurl.MarshalAny(s)
 }
 
-func (is *ImageStore) UnmarshalAny(ctx context.Context, sm streaming.StreamGetter, a typeurl.Any) error {
+func (is *Store) UnmarshalAny(ctx context.Context, sm streaming.StreamGetter, a typeurl.Any) error {
 	var s transfertypes.ImageStore
 	if err := typeurl.UnmarshalTo(a, &s); err != nil {
 		return err

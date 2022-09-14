@@ -45,7 +45,7 @@ func NewTransferer(client transferapi.TransferClient, sc streaming.StreamCreator
 }
 
 func (p *proxyTransferer) Transfer(ctx context.Context, src interface{}, dst interface{}, opts ...transfer.Opt) error {
-	o := &transfer.TransferOpts{}
+	o := &transfer.Config{}
 	for _, opt := range opts {
 		opt(o)
 	}
