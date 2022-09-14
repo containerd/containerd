@@ -201,14 +201,19 @@ func push(ctx context.Context, provider content.Provider, pusher Pusher, desc oc
 func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, store content.Store, limiter *semaphore.Weighted, platform platforms.MatchComparer, wrapper func(h images.Handler) images.Handler) error {
 
 	var m sync.Mutex
-	manifestStack := []ocispec.Descriptor{}
+	manifests := []ocispec.Descriptor{}
+	indexStack := []ocispec.Descriptor{}
 
 	filterHandler := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		switch desc.MediaType {
-		case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest,
-			images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+		case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
 			m.Lock()
-			manifestStack = append(manifestStack, desc)
+			manifests = append(manifests, desc)
+			m.Unlock()
+			return nil, images.ErrStopHandler
+		case images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+			m.Lock()
+			indexStack = append(indexStack, desc)
 			m.Unlock()
 			return nil, images.ErrStopHandler
 		default:
@@ -235,16 +240,18 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, st
 		return err
 	}
 
+	if err := images.Dispatch(ctx, pushHandler, limiter, manifests...); err != nil {
+		return err
+	}
+
 	// Iterate in reverse order as seen, parent always uploaded after child
-	for i := len(manifestStack) - 1; i >= 0; i-- {
-		_, err := pushHandler(ctx, manifestStack[i])
+	for i := len(indexStack) - 1; i >= 0; i-- {
+		err := images.Dispatch(ctx, pushHandler, limiter, indexStack[i])
 		if err != nil {
 			// TODO(estesp): until we have a more complete method for index push, we need to report
 			// missing dependencies in an index/manifest list by sensing the "400 Bad Request"
 			// as a marker for this problem
-			if (manifestStack[i].MediaType == ocispec.MediaTypeImageIndex ||
-				manifestStack[i].MediaType == images.MediaTypeDockerSchema2ManifestList) &&
-				errors.Unwrap(err) != nil && strings.Contains(errors.Unwrap(err).Error(), "400 Bad Request") {
+			if errors.Unwrap(err) != nil && strings.Contains(errors.Unwrap(err).Error(), "400 Bad Request") {
 				return fmt.Errorf("manifest list/index references to blobs and/or manifests are missing in your target registry: %w", err)
 			}
 			return err
