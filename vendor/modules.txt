@@ -1,7 +1,7 @@
-# github.com/AdaLogics/go-fuzz-headers v0.0.0-20220706123152-fef3fe1bab07
+# github.com/AdaLogics/go-fuzz-headers v0.0.0-20220903154154-e8044f6e4c72
 ## explicit; go 1.13
 github.com/AdaLogics/go-fuzz-headers
-# github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20220723121359-e03a0069662f
+# github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20220912195655-e1f97a00006b
 ## explicit; go 1.18
 github.com/AdamKorcz/go-118-fuzz-build/utils
 # github.com/Microsoft/go-winio v0.5.2
@@ -505,11 +505,11 @@ golang.org/x/net/websocket
 ## explicit; go 1.11
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+# golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 ## explicit
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.0.0-20220829200755-d48e67d00261
+# golang.org/x/sys v0.0.0-20220915200043-7b5979e65e41
 ## explicit; go 1.17
 golang.org/x/sys/execabs
 golang.org/x/sys/internal/unsafeheader

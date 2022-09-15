@@ -158,6 +158,14 @@ func (f *F) Fuzz(ff any) {
 			newFloat := reflect.New(v)
 			newFloat.Elem().Set(reflect.ValueOf(randFloat))
 			args = append(args, newFloat.Elem())
+		case "bool":
+			randBool, err := fuzzConsumer.GetBool()
+			if err != nil {
+				return
+			}
+			newBool := reflect.New(v)
+			newBool.Elem().Set(reflect.ValueOf(randBool))
+			args = append(args, newBool.Elem())
 		default:
 			fmt.Println(v.String())
 		}

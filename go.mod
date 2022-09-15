@@ -3,8 +3,8 @@ module github.com/containerd/containerd
 go 1.18
 
 require (
-	github.com/AdaLogics/go-fuzz-headers v0.0.0-20220706123152-fef3fe1bab07
-	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20220723121359-e03a0069662f
+	github.com/AdaLogics/go-fuzz-headers v0.0.0-20220903154154-e8044f6e4c72
+	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20220912195655-e1f97a00006b
 	github.com/Microsoft/go-winio v0.5.2
 	github.com/Microsoft/hcsshim v0.10.0-rc.1
 	github.com/container-orchestrated-devices/container-device-interface v0.5.1
@@ -63,8 +63,8 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.7.0
 	go.opentelemetry.io/otel/sdk v1.7.0
 	go.opentelemetry.io/otel/trace v1.7.0
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20220829200755-d48e67d00261
+	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
+	golang.org/x/sys v0.0.0-20220915200043-7b5979e65e41
 	google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21
 	google.golang.org/grpc v1.47.0
 	google.golang.org/protobuf v1.28.0
