@@ -348,3 +348,12 @@ func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {
 
 	return taskOpts
 }
+
+func (c *criService) updateNetNamespacePath(spec *runtimespec.Spec, nsPath string) {
+	for i := range spec.Linux.Namespaces {
+		if spec.Linux.Namespaces[i].Type == runtimespec.NetworkNamespace {
+			spec.Linux.Namespaces[i].Path = nsPath
+			break
+		}
+	}
+}
