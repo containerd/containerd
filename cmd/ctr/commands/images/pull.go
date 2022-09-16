@@ -97,8 +97,36 @@ command. As part of this process, we do the following:
 			if err != nil {
 				return err
 			}
+
+			var sopts []image.StoreOpt
+			if !context.Bool("all-platforms") {
+				var p []ocispec.Platform
+				for _, s := range context.StringSlice("platform") {
+					ps, err := platforms.Parse(s)
+					if err != nil {
+						return fmt.Errorf("unable to parse platform %s: %w", s, err)
+					}
+					p = append(p, ps)
+				}
+				if len(p) == 0 {
+					p = append(p, platforms.DefaultSpec())
+				}
+				sopts = append(sopts, image.WithPlatforms(p...))
+			}
+			// TODO: Support unpack for all platforms..?
+			// Pass in a *?
+
+			if context.Bool("metadata-only") {
+				sopts = append(sopts, image.WithAllMetadata)
+				// Any with an empty set is None
+				// TODO: Specify way to specify not default platorm
+				//config.PlatformMatcher = platforms.Any()
+			} else if context.Bool("all-metadata") {
+				sopts = append(sopts, image.WithAllMetadata)
+			}
+
 			reg := image.NewOCIRegistry(ref, nil, ch)
-			is := image.NewStore(ref)
+			is := image.NewStore(ref, sopts...)
 
 			pf, done := ProgressHandler(ctx, os.Stdout)
 			defer done()
