@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/pkg/streaming"
 	"github.com/containerd/containerd/pkg/transfer/plugins"
 	"github.com/containerd/containerd/pkg/unpack"
@@ -46,6 +47,12 @@ type Store struct {
 	allMetadata   bool
 	labelMap      func(ocispec.Descriptor) []string
 	manifestLimit int
+
+	//import image options
+	namePrefix   string
+	checkPrefix  bool
+	digestRefs   bool
+	alwaysDigest bool
 
 	unpacks []UnpackConfiguration
 }
@@ -84,6 +91,25 @@ func WithManifestLimit(limit int) StoreOpt {
 
 func WithAllMetadata(s *Store) {
 	s.allMetadata = true
+}
+
+// WithNamePrefix sets the name prefix for imported images, if
+// check is enabled, then only images with the prefix are stored.
+func WithNamePrefix(prefix string, check bool) StoreOpt {
+	return func(s *Store) {
+		s.namePrefix = prefix
+		s.checkPrefix = check
+	}
+}
+
+// WithDigestRefs sets digest refs for imported images, if
+// always is enabled, then digest refs are added even if a
+// non-digest image name is added for the same image.
+func WithDigestRefs(always bool) StoreOpt {
+	return func(s *Store) {
+		s.digestRefs = true
+		s.alwaysDigest = always
+	}
 }
 
 // WithUnpack specifies a platform to unpack for and an optional snapshotter to use
@@ -144,6 +170,35 @@ func (is *Store) Store(ctx context.Context, desc ocispec.Descriptor, store image
 		Labels: is.imageLabels,
 	}
 
+	// Handle imported image names
+	if refType, ok := desc.Annotations["io.containerd.import.ref-type"]; ok {
+		var nameT func(string) string
+		if is.checkPrefix {
+			nameT = archive.FilterRefPrefix(is.namePrefix)
+		} else {
+			nameT = archive.AddRefPrefix(is.namePrefix)
+		}
+		name := imageName(desc.Annotations, nameT)
+		switch refType {
+		case "name":
+			if name == "" {
+				return images.Image{}, fmt.Errorf("no image name: %w", errdefs.ErrNotFound)
+			}
+			img.Name = name
+		case "digest":
+			if !is.digestRefs || (!is.alwaysDigest && name != "") {
+				return images.Image{}, fmt.Errorf("no digest refs: %w", errdefs.ErrNotFound)
+			}
+			img.Name = fmt.Sprintf("%s@%s", is.namePrefix, desc.Digest)
+		default:
+			return images.Image{}, fmt.Errorf("ref type not supported: %w", errdefs.ErrInvalidArgument)
+		}
+		delete(desc.Annotations, "io.containerd.import.ref-type")
+	} else if img.Name == "" {
+		// No valid image combination found
+		return images.Image{}, fmt.Errorf("no image name found: %w", errdefs.ErrNotFound)
+	}
+
 	for {
 		if created, err := store.Create(ctx, img); err != nil {
 			if !errdefs.IsAlreadyExists(err) {
@@ -189,6 +244,10 @@ func (is *Store) MarshalAny(context.Context, streaming.StreamCreator) (typeurl.A
 		ManifestLimit: uint32(is.manifestLimit),
 		AllMetadata:   is.allMetadata,
 		Platforms:     platformsToProto(is.platforms),
+		Prefix:        is.namePrefix,
+		CheckPrefix:   is.checkPrefix,
+		DigestRefs:    is.digestRefs,
+		AlwaysDigest:  is.alwaysDigest,
 		Unpacks:       unpackToProto(is.unpacks),
 	}
 	return typeurl.MarshalAny(s)
@@ -205,6 +264,10 @@ func (is *Store) UnmarshalAny(ctx context.Context, sm streaming.StreamGetter, a 
 	is.manifestLimit = int(s.ManifestLimit)
 	is.allMetadata = s.AllMetadata
 	is.platforms = platformFromProto(s.Platforms)
+	is.namePrefix = s.Prefix
+	is.checkPrefix = s.CheckPrefix
+	is.digestRefs = s.DigestRefs
+	is.alwaysDigest = s.AlwaysDigest
 	is.unpacks = unpackFromProto(s.Unpacks)
 
 	return nil
@@ -261,4 +324,18 @@ func unpackFromProto(auc []*transfertypes.UnpackConfiguration) []UnpackConfigura
 		}
 	}
 	return uc
+}
+
+func imageName(annotations map[string]string, ociCleanup func(string) string) string {
+	name := annotations[images.AnnotationImageName]
+	if name != "" {
+		return name
+	}
+	name = annotations[ocispec.AnnotationRefName]
+	if name != "" {
+		if ociCleanup != nil {
+			name = ociCleanup(name)
+		}
+	}
+	return name
 }

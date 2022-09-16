@@ -75,13 +75,12 @@ func (ts *localTransferService) Transfer(ctx context.Context, src interface{}, d
 		case transfer.ImagePusher:
 			return ts.push(ctx, s, d, topts)
 		}
-	case transfer.ImageImportStreamer:
+	case transfer.ImageImporter:
 		switch d := dest.(type) {
 		case transfer.ImageExportStreamer:
 			return ts.echo(ctx, s, d, topts)
-
-			// Image import
-			//  case transfer.ImageStorer
+		case transfer.ImageStorer:
+			return ts.importStream(ctx, s, d, topts)
 		}
 	}
 	return fmt.Errorf("unable to transfer from %s to %s: %w", name(src), name(dest), errdefs.ErrNotImplemented)
@@ -100,8 +99,12 @@ func name(t interface{}) string {
 
 // echo is mostly used for testing, it implements an import->export which is
 // a no-op which only roundtrips the bytes.
-func (ts *localTransferService) echo(ctx context.Context, i transfer.ImageImportStreamer, e transfer.ImageExportStreamer, tops *transfer.Config) error {
-	r, err := i.ImportStream(ctx)
+func (ts *localTransferService) echo(ctx context.Context, i transfer.ImageImporter, e transfer.ImageExportStreamer, tops *transfer.Config) error {
+	iis, ok := i.(transfer.ImageImportStreamer)
+	if !ok {
+		return fmt.Errorf("echo requires access to raw stream: %w", errdefs.ErrNotImplemented)
+	}
+	r, _, err := iis.ImportStream(ctx)
 	if err != nil {
 		return err
 	}

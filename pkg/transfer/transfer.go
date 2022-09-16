@@ -68,11 +68,16 @@ type ImageGetter interface {
 	Get(context.Context, images.Store) (images.Image, error)
 }
 
+// ImageImporter imports an image into a content store
+type ImageImporter interface {
+	Import(context.Context, content.Store) (ocispec.Descriptor, error)
+}
+
 // ImageImportStreamer returns an import streamer based on OCI or
 // Docker image tar archives. The stream should be a raw tar stream
 // and without compression.
 type ImageImportStreamer interface {
-	ImportStream(context.Context) (io.Reader, error)
+	ImportStream(context.Context) (io.Reader, string, error)
 }
 
 type ImageExportStreamer interface {

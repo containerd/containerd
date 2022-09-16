@@ -21,26 +21,49 @@ import (
 	"io"
 
 	transferapi "github.com/containerd/containerd/api/types/transfer"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/streaming"
 	tstreaming "github.com/containerd/containerd/pkg/transfer/streaming"
 	"github.com/containerd/typeurl"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+type ImportOpt func(*ImageImportStream)
+
+func WithForceCompression(s *ImageImportStream) {
+	s.forceCompress = true
+}
+
 // NewImageImportStream returns a image importer via tar stream
-// TODO: Add import options
-func NewImageImportStream(stream io.Reader) *ImageImportStream {
-	return &ImageImportStream{
-		stream: stream,
+func NewImageImportStream(stream io.Reader, mediaType string, opts ...ImportOpt) *ImageImportStream {
+	s := &ImageImportStream{
+		stream:    stream,
+		mediaType: mediaType,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 type ImageImportStream struct {
-	stream io.Reader
+	stream        io.Reader
+	mediaType     string
+	forceCompress bool
 }
 
 func (iis *ImageImportStream) ImportStream(context.Context) (io.Reader, error) {
 	return iis.stream, nil
+}
+
+func (iis *ImageImportStream) Import(ctx context.Context, store content.Store) (ocispec.Descriptor, error) {
+	var opts []archive.ImportOpt
+	if iis.forceCompress {
+		opts = append(opts, archive.WithImportCompression())
+	}
+	return archive.ImportIndex(ctx, store, iis.stream, opts...)
 }
 
 func (iis *ImageImportStream) MarshalAny(ctx context.Context, sm streaming.StreamCreator) (typeurl.Any, error) {
@@ -52,7 +75,9 @@ func (iis *ImageImportStream) MarshalAny(ctx context.Context, sm streaming.Strea
 	tstreaming.SendStream(ctx, iis.stream, stream)
 
 	s := &transferapi.ImageImportStream{
-		Stream: sid,
+		Stream:        sid,
+		MediaType:     iis.mediaType,
+		ForceCompress: iis.forceCompress,
 	}
 
 	return typeurl.MarshalAny(s)
@@ -71,6 +96,8 @@ func (iis *ImageImportStream) UnmarshalAny(ctx context.Context, sm streaming.Str
 	}
 
 	iis.stream = tstreaming.ReceiveStream(ctx, stream)
+	iis.mediaType = s.MediaType
+	iis.forceCompress = s.ForceCompress
 
 	return nil
 }
