@@ -316,7 +316,10 @@ func WithNewSpec(opts ...oci.SpecOpts) NewContainerOpts {
 			return err
 		}
 		c.Spec, err = typeurl.MarshalAny(s)
-		return err
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 }
 
