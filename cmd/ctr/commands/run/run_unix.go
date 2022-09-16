@@ -238,6 +238,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 				return nil, err
 			}
 			opts = append(opts, oci.WithAnnotations(annos))
+			opts = append(opts, oci.WithCDI(annos, []string{"/etc/cdi"}))
 		}
 
 		if context.Bool("cni") {

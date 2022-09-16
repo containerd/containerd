@@ -22,7 +22,9 @@ package oci
 import (
 	"context"
 	"errors"
+	"fmt"
 
+	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	"github.com/containerd/containerd/containers"
 )
 
@@ -59,5 +61,18 @@ func WithCPUShares(shares uint64) SpecOpts {
 func WithRdt(closID, l3CacheSchema, memBwSchema string) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, _ *Spec) error {
 		return errors.New("RDT not supported")
+	}
+}
+
+func WithCDI(annotations map[string]string, cdiSpecDirs []string) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		_, cdiDevices, err := cdi.ParseAnnotations(annotations)
+		if err != nil {
+			return fmt.Errorf("failed to parse CDI device annotations: %w", err)
+		}
+		if cdiDevices == nil {
+			return nil
+		}
+		return errors.New("CDI not supported")
 	}
 }
