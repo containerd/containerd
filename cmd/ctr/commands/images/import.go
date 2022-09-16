@@ -26,6 +26,9 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/pkg/transfer"
+	tarchive "github.com/containerd/containerd/pkg/transfer/archive"
+	"github.com/containerd/containerd/pkg/transfer/image"
 	"github.com/containerd/containerd/platforms"
 	"github.com/urfave/cli"
 )
@@ -82,6 +85,10 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			Usage: "skip unpacking the images, cannot be used with --discard-unpacked-layers, false by default",
 		},
 		cli.BoolFlag{
+			Name:  "local",
+			Usage: "run import locally rather than through transfer API",
+		},
+		cli.BoolFlag{
 			Name:  "compress-blobs",
 			Usage: "compress uncompressed blobs when creating manifest (Docker format only)",
 		},
@@ -97,6 +104,65 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			opts            []containerd.ImportOpt
 			platformMatcher platforms.MatchComparer
 		)
+
+		client, ctx, cancel, err := commands.NewClient(context)
+		if err != nil {
+			return err
+		}
+		defer cancel()
+
+		if !context.Bool("local") {
+			var opts []image.StoreOpt
+			prefix := context.String("base-name")
+			if prefix == "" {
+				prefix = fmt.Sprintf("import-%s", time.Now().Format("2006-01-02"))
+				opts = append(opts, image.WithNamePrefix(prefix, false))
+			} else {
+				// When provided, filter out references which do not match
+				opts = append(opts, image.WithNamePrefix(prefix, true))
+			}
+
+			if context.Bool("digests") {
+				opts = append(opts, image.WithDigestRefs(!context.Bool("skip-digest-for-named")))
+			}
+
+			// TODO: Add platform options
+
+			// TODO: Add unpack options
+
+			is := image.NewStore(context.String("index-name"), opts...)
+
+			var iopts []tarchive.ImportOpt
+
+			if context.Bool("compress-blobs") {
+				iopts = append(iopts, tarchive.WithForceCompression)
+			}
+
+			var r io.ReadCloser
+			if in == "-" {
+				r = os.Stdin
+			} else {
+				var err error
+				r, err = os.Open(in)
+				if err != nil {
+					return err
+				}
+			}
+			iis := tarchive.NewImageImportStream(r, "", iopts...)
+
+			pf, done := ProgressHandler(ctx, os.Stdout)
+			defer done()
+
+			err := client.Transfer(ctx, iis, is, transfer.WithProgress(pf))
+			closeErr := r.Close()
+			if err != nil {
+				return err
+			}
+
+			return closeErr
+		}
+
+		// Local logic
 
 		prefix := context.String("base-name")
 		if prefix == "" {
@@ -142,12 +208,6 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			}
 			opts = append(opts, containerd.WithDiscardUnpackedLayers())
 		}
-
-		client, ctx, cancel, err := commands.NewClient(context)
-		if err != nil {
-			return err
-		}
-		defer cancel()
 
 		ctx, done, err := client.WithLease(ctx)
 		if err != nil {
