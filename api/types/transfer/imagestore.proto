@@ -32,9 +32,20 @@ message ImageStore {
 	bool all_metadata = 4;
 	uint32 manifest_limit = 5;
 
+	// Import naming
+
+	// prefix is the intended image name prefix for imported images
+	string prefix = 6;
+	// check_prefix only stores images with the prefix
+	bool check_prefix = 7;
+	// digest_refs adds digest references for images using prefix
+	bool digest_refs = 8;
+	// always_digest includes a digest image even when a non-digest image is stored
+	bool always_digest = 9;
+
 	// Unpack Configuration, multiple allowed
 
-	repeated UnpackConfiguration unpacks = 6;
+	repeated UnpackConfiguration unpacks = 10;
 }
 
 message UnpackConfiguration {

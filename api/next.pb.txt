@@ -5882,8 +5882,36 @@ file {
       json_name: "manifestLimit"
     }
     field {
-      name: "unpacks"
+      name: "prefix"
       number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "prefix"
+    }
+    field {
+      name: "check_prefix"
+      number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "checkPrefix"
+    }
+    field {
+      name: "digest_refs"
+      number: 8
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "digestRefs"
+    }
+    field {
+      name: "always_digest"
+      number: 9
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "alwaysDigest"
+    }
+    field {
+      name: "unpacks"
+      number: 10
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
       type_name: ".containerd.types.transfer.UnpackConfiguration"
@@ -5944,6 +5972,20 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "stream"
+    }
+    field {
+      name: "media_type"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "mediaType"
+    }
+    field {
+      name: "force_compress"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "forceCompress"
     }
   }
   message_type {

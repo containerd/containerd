@@ -25,6 +25,10 @@ message ImageImportStream {
 	// The stream uses the transfer binary stream protocol with the client as the sender.
 	// The binary data is expected to be a raw tar stream.
 	string stream = 1;
+
+	string media_type = 2;
+
+	bool force_compress = 3;
 }
 
 message ImageExportStream {
