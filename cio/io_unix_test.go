@@ -20,13 +20,19 @@
 package cio
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
+	"syscall"
 	"testing"
 
+	"github.com/containerd/fifo"
 	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
 )
 
 func TestOpenFifos(t *testing.T) {
@@ -100,4 +106,112 @@ func TestOpenFifosWithTerminal(t *testing.T) {
 			t.Fatalf("unexpected stderr pipe")
 		}
 	}
+}
+
+func assertHasPrefix(t *testing.T, s, prefix string) {
+	t.Helper()
+	if !strings.HasPrefix(s, prefix) {
+		t.Fatalf("expected %s to start with %s", s, prefix)
+	}
+}
+
+func TestNewFIFOSetInDir(t *testing.T) {
+	root := t.TempDir()
+
+	fifos, err := NewFIFOSetInDir(root, "theid", true)
+	assert.NilError(t, err)
+
+	dir := filepath.Dir(fifos.Stdin)
+	assertHasPrefix(t, dir, root)
+	expected := &FIFOSet{
+		Config: Config{
+			Stdin:    filepath.Join(dir, "theid-stdin"),
+			Stdout:   filepath.Join(dir, "theid-stdout"),
+			Stderr:   filepath.Join(dir, "theid-stderr"),
+			Terminal: true,
+		},
+	}
+
+	assert.Equal(t, fifos.Config, expected.Config)
+
+	files, err := os.ReadDir(root)
+	assert.NilError(t, err)
+	assert.Check(t, is.Len(files, 1))
+
+	assert.NilError(t, fifos.Close())
+	files, err = os.ReadDir(root)
+	assert.NilError(t, err)
+	assert.Check(t, is.Len(files, 0))
+}
+
+func TestNewAttach(t *testing.T) {
+	var (
+		expectedStdin  = "this is the stdin"
+		expectedStdout = "this is the stdout"
+		expectedStderr = "this is the stderr"
+		stdin          = bytes.NewBufferString(expectedStdin)
+		stdout         = new(bytes.Buffer)
+		stderr         = new(bytes.Buffer)
+	)
+
+	withBytesBuffers := func(streams *Streams) {
+		*streams = Streams{Stdin: stdin, Stdout: stdout, Stderr: stderr}
+	}
+	attacher := NewAttach(withBytesBuffers)
+
+	fifos, err := NewFIFOSetInDir("", "theid", false)
+	assert.NilError(t, err)
+
+	attachedFifos, err := attacher(fifos)
+	assert.NilError(t, err)
+	defer attachedFifos.Close()
+
+	producers := setupFIFOProducers(t, attachedFifos.Config())
+	initProducers(t, producers, expectedStdout, expectedStderr)
+
+	actualStdin, err := io.ReadAll(producers.Stdin)
+	assert.NilError(t, err)
+
+	attachedFifos.Wait()
+	attachedFifos.Cancel()
+	assert.NilError(t, attachedFifos.Close())
+
+	assert.Equal(t, expectedStdout, stdout.String())
+	assert.Equal(t, expectedStderr, stderr.String())
+	assert.Equal(t, expectedStdin, string(actualStdin))
+}
+
+type producers struct {
+	Stdin  io.ReadCloser
+	Stdout io.WriteCloser
+	Stderr io.WriteCloser
+}
+
+func setupFIFOProducers(t *testing.T, fifos Config) producers {
+	var (
+		err   error
+		pipes producers
+		ctx   = context.Background()
+	)
+
+	pipes.Stdin, err = fifo.OpenFifo(ctx, fifos.Stdin, syscall.O_RDONLY, 0)
+	assert.NilError(t, err)
+
+	pipes.Stdout, err = fifo.OpenFifo(ctx, fifos.Stdout, syscall.O_WRONLY, 0)
+	assert.NilError(t, err)
+
+	pipes.Stderr, err = fifo.OpenFifo(ctx, fifos.Stderr, syscall.O_WRONLY, 0)
+	assert.NilError(t, err)
+
+	return pipes
+}
+
+func initProducers(t *testing.T, producers producers, stdout, stderr string) {
+	_, err := producers.Stdout.Write([]byte(stdout))
+	assert.NilError(t, err)
+	assert.NilError(t, producers.Stdout.Close())
+
+	_, err = producers.Stderr.Write([]byte(stderr))
+	assert.NilError(t, err)
+	assert.NilError(t, producers.Stderr.Close())
 }
