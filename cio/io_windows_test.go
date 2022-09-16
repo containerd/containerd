@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewFifoSetInDir_NoTerminal(t *testing.T) {
@@ -44,4 +45,20 @@ func TestNewFifoSetInDir_Terminal(t *testing.T) {
 	assert.NotEmpty(t, set.Stdin, "FIFOSet.Stdin should be set")
 	assert.NotEmpty(t, set.Stdout, "FIFOSet.Stdout should be set")
 	assert.Empty(t, set.Stderr, "FIFOSet.Stderr should not be set")
+}
+
+func TestLogFileBackslash(t *testing.T) {
+	testcases := []struct {
+		path string
+	}{
+		{`C:/foo/bar.log`},
+		{`C:\foo\bar.log`},
+	}
+	for _, tc := range testcases {
+		f := LogFile(tc.path)
+		res, err := f("unused")
+		require.NoError(t, err)
+		assert.Equal(t, res.Config().Stdout, res.Config().Stderr)
+		assert.Equal(t, "file:///C:/foo/bar.log", res.Config().Stdout)
+	}
 }
