@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/containerd/containerd/api/types"
 	transfertypes "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
@@ -39,23 +40,73 @@ func init() {
 }
 
 type Store struct {
-	// TODO: Put these configurations in object which can convert to/from any
-	// Embed generated type
 	imageName     string
 	imageLabels   map[string]string
-	platforms     platforms.MatchComparer
+	platforms     []ocispec.Platform
 	allMetadata   bool
 	labelMap      func(ocispec.Descriptor) []string
 	manifestLimit int
 
-	// TODO: Convert these to unpack platforms
-	unpacks []unpack.Platform
+	unpacks []UnpackConfiguration
 }
 
-func NewStore(image string) *Store {
-	return &Store{
+// UnpackConfiguration specifies the platform and snapshotter to use for resolving
+// the unpack Platform, if snapshotter is not specified the platform default will
+// be used.
+type UnpackConfiguration struct {
+	Platform    ocispec.Platform
+	Snapshotter string
+}
+
+// StoreOpt defines options when configuring an image store source or destination
+type StoreOpt func(*Store)
+
+// WithImageLabels are the image labels to apply to a new image
+func WithImageLabels(labels map[string]string) StoreOpt {
+	return func(s *Store) {
+		s.imageLabels = labels
+	}
+}
+
+// WithPlatforms specifies which platforms to fetch content for
+func WithPlatforms(p ...ocispec.Platform) StoreOpt {
+	return func(s *Store) {
+		s.platforms = append(s.platforms, p...)
+	}
+}
+
+// WithManifestLimit defines the max number of manifests to fetch
+func WithManifestLimit(limit int) StoreOpt {
+	return func(s *Store) {
+		s.manifestLimit = limit
+	}
+}
+
+func WithAllMetadata(s *Store) {
+	s.allMetadata = true
+}
+
+// WithUnpack specifies a platform to unpack for and an optional snapshotter to use
+func WithUnpack(p ocispec.Platform, snapshotter string) StoreOpt {
+	return func(s *Store) {
+		s.unpacks = append(s.unpacks, UnpackConfiguration{
+			Platform:    p,
+			Snapshotter: snapshotter,
+		})
+	}
+}
+
+// NewStore creates a new image store source or Destination
+func NewStore(image string, opts ...StoreOpt) *Store {
+	s := &Store{
 		imageName: image,
 	}
+
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	return s
 }
 
 func (is *Store) String() string {
@@ -63,19 +114,25 @@ func (is *Store) String() string {
 }
 
 func (is *Store) ImageFilter(h images.HandlerFunc, cs content.Store) images.HandlerFunc {
+	var p platforms.MatchComparer
+	if len(is.platforms) == 0 {
+		p = platforms.All
+	} else {
+		p = platforms.Ordered(is.platforms...)
+	}
 	h = images.SetChildrenMappedLabels(cs, h, is.labelMap)
 	if is.allMetadata {
 		// Filter manifests by platforms but allow to handle manifest
 		// and configuration for not-target platforms
-		h = remotes.FilterManifestByPlatformHandler(h, is.platforms)
+		h = remotes.FilterManifestByPlatformHandler(h, p)
 	} else {
 		// Filter children by platforms if specified.
-		h = images.FilterPlatforms(h, is.platforms)
+		h = images.FilterPlatforms(h, p)
 	}
 
 	// Sort and limit manifests if a finite number is needed
 	if is.manifestLimit > 0 {
-		h = images.LimitManifests(h, is.platforms, is.manifestLimit)
+		h = images.LimitManifests(h, p, is.manifestLimit)
 	}
 	return h
 }
@@ -116,13 +173,23 @@ func (is *Store) Get(ctx context.Context, store images.Store) (images.Image, err
 }
 
 func (is *Store) UnpackPlatforms() []unpack.Platform {
-	return is.unpacks
+	unpacks := make([]unpack.Platform, len(is.unpacks))
+	for i, uc := range is.unpacks {
+		unpacks[i].SnapshotterKey = uc.Snapshotter
+		unpacks[i].Platform = platforms.Only(uc.Platform)
+	}
+	return unpacks
 }
 
-func (is *Store) MarshalAny(ctx context.Context, sm streaming.StreamCreator) (typeurl.Any, error) {
+func (is *Store) MarshalAny(context.Context, streaming.StreamCreator) (typeurl.Any, error) {
+	//unpack.Platform
 	s := &transfertypes.ImageStore{
-		Name: is.imageName,
-		// TODO: Support other fields
+		Name:          is.imageName,
+		Labels:        is.imageLabels,
+		ManifestLimit: uint32(is.manifestLimit),
+		AllMetadata:   is.allMetadata,
+		Platforms:     platformsToProto(is.platforms),
+		Unpacks:       unpackToProto(is.unpacks),
 	}
 	return typeurl.MarshalAny(s)
 }
@@ -134,7 +201,64 @@ func (is *Store) UnmarshalAny(ctx context.Context, sm streaming.StreamGetter, a 
 	}
 
 	is.imageName = s.Name
-	// TODO: Support other fields
+	is.imageLabels = s.Labels
+	is.manifestLimit = int(s.ManifestLimit)
+	is.allMetadata = s.AllMetadata
+	is.platforms = platformFromProto(s.Platforms)
+	is.unpacks = unpackFromProto(s.Unpacks)
 
 	return nil
+}
+
+func platformsToProto(platforms []ocispec.Platform) []*types.Platform {
+	ap := make([]*types.Platform, len(platforms))
+	for i := range platforms {
+		p := types.Platform{
+			OS:           platforms[i].OS,
+			Architecture: platforms[i].Architecture,
+			Variant:      platforms[i].Variant,
+		}
+
+		ap[i] = &p
+	}
+	return ap
+}
+
+func platformFromProto(platforms []*types.Platform) []ocispec.Platform {
+	op := make([]ocispec.Platform, len(platforms))
+	for i := range platforms {
+		op[i].OS = platforms[i].OS
+		op[i].Architecture = platforms[i].Architecture
+		op[i].Variant = platforms[i].Variant
+	}
+	return op
+}
+
+func unpackToProto(uc []UnpackConfiguration) []*transfertypes.UnpackConfiguration {
+	auc := make([]*transfertypes.UnpackConfiguration, len(uc))
+	for i := range uc {
+		p := types.Platform{
+			OS:           uc[i].Platform.OS,
+			Architecture: uc[i].Platform.Architecture,
+			Variant:      uc[i].Platform.Variant,
+		}
+		auc[i] = &transfertypes.UnpackConfiguration{
+			Platform:    &p,
+			Snapshotter: uc[i].Snapshotter,
+		}
+	}
+	return auc
+}
+
+func unpackFromProto(auc []*transfertypes.UnpackConfiguration) []UnpackConfiguration {
+	uc := make([]UnpackConfiguration, len(auc))
+	for i := range auc {
+		uc[i].Snapshotter = auc[i].Snapshotter
+		if auc[i].Platform != nil {
+			uc[i].Platform.OS = auc[i].Platform.OS
+			uc[i].Platform.Architecture = auc[i].Platform.Architecture
+			uc[i].Platform.Variant = auc[i].Platform.Variant
+		}
+	}
+	return uc
 }
