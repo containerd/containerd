@@ -38,6 +38,10 @@ compile_fuzzers() {
     done
 }
 
+# This is from https://github.com/AdamKorcz/instrumentation
+cd $SRC/instrumentation
+go run main.go $SRC/containerd/images
+
 apt-get update && apt-get install -y wget
 cd $SRC
 wget --quiet https://go.dev/dl/go1.19.1.linux-amd64.tar.gz
@@ -89,3 +93,6 @@ sed -i 's/\/run\/containerd-test/\/tmp\/containerd-test/g' $SRC/containerd/integ
 cd integration/client
 
 compile_fuzzers '^func FuzzInteg.*data' compile_go_fuzzer vendor
+
+cp $SRC/containerd/contrib/fuzz/*.options $OUT/
+cp $SRC/containerd/contrib/fuzz/*.dict $OUT/
