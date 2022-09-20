@@ -119,6 +119,7 @@ func toCRIContainerStatus(container containerstore.Container, spec *runtime.Imag
 		Annotations: meta.Config.GetAnnotations(),
 		Mounts:      meta.Config.GetMounts(),
 		LogPath:     meta.LogPath,
+		Resources:   status.Resources,
 	}
 }
 
