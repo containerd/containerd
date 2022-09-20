@@ -165,8 +165,12 @@ run_containerd() {
     local report_dir=$1
   fi
   CMD=""
-  if [ ! -z "${sudo}" ]; then
+  if [ -n "${sudo}" ]; then
     CMD+="${sudo} "
+    # sudo strips environment variables, so add ENABLE_CRI_SANDBOXES back if present
+    if [ -n  "${ENABLE_CRI_SANDBOXES}" ]; then
+      CMD+="ENABLE_CRI_SANDBOXES='${ENABLE_CRI_SANDBOXES}' "
+    fi
   fi
   CMD+="${PWD}/bin/containerd"
 
