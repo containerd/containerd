@@ -79,11 +79,15 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 		},
 		cli.BoolFlag{
 			Name:  "no-unpack",
-			Usage: "skip unpacking the images, false by default",
+			Usage: "skip unpacking the images, cannot be used with --discard-unpacked-layers, false by default",
 		},
 		cli.BoolFlag{
 			Name:  "compress-blobs",
 			Usage: "compress uncompressed blobs when creating manifest (Docker format only)",
+		},
+		cli.BoolFlag{
+			Name:  "discard-unpacked-layers",
+			Usage: "allow the garbage collector to clean layers up from the content store after unpacking, cannot be used with --no-unpack, false by default",
 		},
 	}, commands.SnapshotterFlags...),
 
@@ -132,11 +136,22 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 
 		opts = append(opts, containerd.WithAllPlatforms(context.Bool("all-platforms")))
 
+		if context.Bool("discard-unpacked-layers") && context.Bool("no-unpack") {
+			return fmt.Errorf("--discard-unpacked-layers and --no-unpack are incompatible options")
+		}
+		opts = append(opts, containerd.WithDiscardUnpackedLayers(context.Bool("discard-unpacked-layers")))
+
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
 		defer cancel()
+
+		ctx, done, err := client.WithLease(ctx)
+		if err != nil {
+			return err
+		}
+		defer done(ctx)
 
 		var r io.ReadCloser
 		if in == "-" {
@@ -147,6 +162,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 				return err
 			}
 		}
+
 		imgs, err := client.Import(ctx, r, opts...)
 		closeErr := r.Close()
 		if err != nil {
