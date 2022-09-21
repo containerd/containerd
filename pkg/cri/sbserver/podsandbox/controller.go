@@ -41,8 +41,8 @@ import (
 type CRIService interface {
 	EnsureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig) (*imagestore.Image, error)
 
-	// TODO: we should implement Controller.Wait and use it instead of this to monitor sandbox exit.
-	StartSandboxExitMonitor(ctx context.Context, id string, pid uint32, exitCh <-chan containerd.ExitStatus) <-chan struct{}
+	// TODO: we should implement Event backoff in Controller.
+	BackOffEvent(id string, event interface{})
 }
 
 type Controller struct {
@@ -82,11 +82,6 @@ func New(
 }
 
 var _ sandbox.Controller = (*Controller)(nil)
-
-func (c *Controller) Stop(ctx context.Context, sandboxID string) (*api.ControllerStopResponse, error) {
-	//TODO implement me
-	panic("implement me")
-}
 
 func (c *Controller) Delete(ctx context.Context, sandboxID string) (*api.ControllerDeleteResponse, error) {
 	//TODO implement me

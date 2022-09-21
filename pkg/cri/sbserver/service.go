@@ -17,7 +17,6 @@
 package sbserver
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -191,10 +190,10 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 	return c, nil
 }
 
-// StartSandboxExitMonitor is a temporary workaround to call monitor from pause controller.
+// BackOffEvent is a temporary workaround to call eventMonitor from controller.Stop.
 // TODO: get rid of this.
-func (c *criService) StartSandboxExitMonitor(ctx context.Context, id string, pid uint32, exitCh <-chan containerd.ExitStatus) <-chan struct{} {
-	return c.eventMonitor.startSandboxExitMonitor(ctx, id, pid, exitCh)
+func (c *criService) BackOffEvent(id string, event interface{}) {
+	c.eventMonitor.backOff.enBackOff(id, event)
 }
 
 // Register registers all required services onto a specific grpc server.
