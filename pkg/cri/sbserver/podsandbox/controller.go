@@ -18,15 +18,21 @@ package podsandbox
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/containerd/containerd"
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	osinterface "github.com/containerd/containerd/pkg/os"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/sandbox"
+	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -52,6 +58,8 @@ type Controller struct {
 	cri CRIService
 	// baseOCISpecs contains cached OCI specs loaded via `Runtime.BaseRuntimeSpec`
 	baseOCISpecs map[string]*oci.Spec
+
+	store *Store
 }
 
 func New(
@@ -69,6 +77,7 @@ func New(
 		os:           os,
 		cri:          cri,
 		baseOCISpecs: baseOCISpecs,
+		store:        NewStore(),
 	}
 }
 
@@ -84,10 +93,89 @@ func (c *Controller) Delete(ctx context.Context, sandboxID string) (*api.Control
 	panic("implement me")
 }
 
-func (c *Controller) Wait(ctx context.Context, sandboxID string) (*api.ControllerWaitResponse, error) {
+func (c *Controller) Status(ctx context.Context, sandboxID string) (*api.ControllerStatusResponse, error) {
+	//TODO implement me
 	panic("implement me")
 }
 
-func (c *Controller) Status(ctx context.Context, sandboxID string) (*api.ControllerStatusResponse, error) {
-	panic("implement me")
+func (c *Controller) Wait(ctx context.Context, sandboxID string) (*api.ControllerWaitResponse, error) {
+	status := c.store.Get(sandboxID)
+	if status == nil {
+		return nil, fmt.Errorf("failed to get exit channel. %q", sandboxID)
+	}
+
+	exitStatus, exitedAt, err := c.waitSandboxExit(ctx, sandboxID, status.Waiter)
+
+	return &api.ControllerWaitResponse{
+		ExitStatus: exitStatus,
+		ExitedAt:   protobuf.ToTimestamp(exitedAt),
+	}, err
+}
+
+func (c *Controller) waitSandboxExit(ctx context.Context, id string, exitCh <-chan containerd.ExitStatus) (exitStatus uint32, exitedAt time.Time, err error) {
+	exitStatus = unknownExitCode
+	exitedAt = time.Now()
+	select {
+	case exitRes := <-exitCh:
+		logrus.Debugf("received sandbox exit %+v", exitRes)
+
+		exitStatus, exitedAt, err = exitRes.Result()
+		if err != nil {
+			logrus.WithError(err).Errorf("failed to get task exit status for %q", id)
+			exitStatus = unknownExitCode
+			exitedAt = time.Now()
+		}
+
+		err = func() error {
+			dctx := ctrdutil.NamespacedContext()
+			dctx, dcancel := context.WithTimeout(dctx, handleEventTimeout)
+			defer dcancel()
+
+			sb, err := c.sandboxStore.Get(id)
+			if err == nil {
+				if err := handleSandboxExit(dctx, sb); err != nil {
+					return err
+				}
+				return nil
+			} else if !errdefs.IsNotFound(err) {
+				return fmt.Errorf("failed to get sandbox %s: %w", id, err)
+			}
+			return nil
+		}()
+		if err != nil {
+			logrus.WithError(err).Errorf("failed to handle sandbox TaskExit %s", id)
+			// Don't backoff, the caller is responsible for.
+			return
+		}
+	case <-ctx.Done():
+		return exitStatus, exitedAt, ctx.Err()
+	}
+	return
+}
+
+// handleSandboxExit handles TaskExit event for sandbox.
+func handleSandboxExit(ctx context.Context, sb sandboxstore.Sandbox) error {
+	// No stream attached to sandbox container.
+	task, err := sb.Container.Task(ctx, nil)
+	if err != nil {
+		if !errdefs.IsNotFound(err) {
+			return fmt.Errorf("failed to load task for sandbox: %w", err)
+		}
+	} else {
+		// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
+		if _, err = task.Delete(ctx, WithNRISandboxDelete(sb.ID), containerd.WithProcessKill); err != nil {
+			if !errdefs.IsNotFound(err) {
+				return fmt.Errorf("failed to stop sandbox: %w", err)
+			}
+			// Move on to make sure container status is updated.
+		}
+	}
+	sb.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
+		status.State = sandboxstore.StateNotReady
+		status.Pid = 0
+		return status, nil
+	})
+	// Using channel to propagate the information of sandbox stop
+	sb.Stop()
+	return nil
 }

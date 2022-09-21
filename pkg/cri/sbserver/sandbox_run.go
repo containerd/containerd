@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/protobuf"
 	sb "github.com/containerd/containerd/sandbox"
 	"github.com/containerd/go-cni"
@@ -202,6 +203,26 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	if err := c.sandboxStore.Add(sandbox); err != nil {
 		return nil, fmt.Errorf("failed to add sandbox %+v into store: %w", sandbox, err)
 	}
+
+	// start the monitor after adding sandbox into the store, this ensures
+	// that sandbox is in the store, when event monitor receives the TaskExit event.
+	//
+	// TaskOOM from containerd may come before sandbox is added to store,
+	// but we don't care about sandbox TaskOOM right now, so it is fine.
+	go func() {
+		resp, err := c.sandboxController.Wait(context.Background(), id)
+		if err != nil && err != context.Canceled && err != context.DeadlineExceeded {
+			e := &eventtypes.TaskExit{
+				ContainerID: id,
+				ID:          id,
+				// Pid is not used
+				Pid:        0,
+				ExitStatus: resp.ExitStatus,
+				ExitedAt:   resp.ExitedAt,
+			}
+			c.eventMonitor.backOff.enBackOff(id, e)
+		}
+	}()
 
 	sandboxRuntimeCreateTimer.WithValues(labels["oci_runtime_type"]).UpdateSince(runtimeStart)
 
