@@ -18,11 +18,12 @@ package server
 
 import (
 	"context"
-	"errors"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.CheckpointContainerRequest) (res *runtime.CheckpointContainerResponse, err error) {
-	return nil, errors.New("not implemented")
+	return nil, status.Errorf(codes.Unimplemented, "method CheckpointContainer not implemented")
 }
