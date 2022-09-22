@@ -17,30 +17,9 @@
 package sbserver
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/plugin"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	osinterface "github.com/containerd/containerd/pkg/os"
 )
-
-// cleanupSandboxFiles unmount some sandbox files, we rely on the removal of sandbox root directory to
-// remove these files. Unmount should *NOT* return error if the mount point is already unmounted.
-func (c *criService) cleanupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
-	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetIpc() != runtime.NamespaceMode_NODE {
-		path, err := c.os.FollowSymlinkInScope(c.getSandboxDevShm(id), "/")
-		if err != nil {
-			return fmt.Errorf("failed to follow symlink: %w", err)
-		}
-		if err := c.os.(osinterface.UNIX).Unmount(path); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("failed to unmount %q: %w", path, err)
-		}
-	}
-	return nil
-}
 
 // taskOpts generates task options for a (sandbox) container.
 func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {

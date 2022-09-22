@@ -1,6 +1,3 @@
-//go:build !windows && !linux
-// +build !windows,!linux
-
 /*
    Copyright The containerd Authors.
 
@@ -17,13 +14,36 @@
    limitations under the License.
 */
 
-package sbserver
+package podsandbox
 
 import (
+	"sync"
+
 	"github.com/containerd/containerd"
 )
 
-// taskOpts generates task options for a (sandbox) container.
-func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {
-	return []containerd.NewTaskOpts{}
+type Status struct {
+	Waiter <-chan containerd.ExitStatus
+}
+
+type Store struct {
+	sync.Map
+}
+
+func NewStore() *Store {
+	return &Store{}
+}
+
+func (s *Store) Save(id string, exitCh <-chan containerd.ExitStatus) {
+	s.Store(id, &Status{Waiter: exitCh})
+}
+
+func (s *Store) Get(id string) *Status {
+	i, ok := s.LoadAndDelete(id)
+	if !ok {
+		// not exist
+		return nil
+	}
+	// Only save *Status
+	return i.(*Status)
 }

@@ -18,13 +18,7 @@ package sbserver
 
 import (
 	"github.com/containerd/containerd"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
-
-// No sandbox files needed for windows.
-func (c *criService) cleanupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
-	return nil
-}
 
 // No task options needed for windows.
 func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {

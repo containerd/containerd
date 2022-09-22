@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
@@ -62,6 +63,15 @@ const (
 	sandboxMetadataExtension = criContainerdPrefix + ".sandbox.metadata"
 	// runtimeRunhcsV1 is the runtime type for runhcs.
 	runtimeRunhcsV1 = "io.containerd.runhcs.v1"
+)
+
+const (
+	// unknownExitCode is the exit code when exit reason is unknown.
+	unknownExitCode = 255
+)
+
+const (
+	handleEventTimeout = 10 * time.Second
 )
 
 // getSandboxRootDir returns the root directory for managing sandbox files,

@@ -225,6 +225,7 @@ func (c *Controller) Start(ctx context.Context, id string) (_ *api.ControllerSta
 	if err != nil {
 		return nil, fmt.Errorf("failed to wait for sandbox container task: %w", err)
 	}
+	c.store.Save(id, exitCh)
 
 	nric, err := nri.New()
 	if err != nil {
@@ -243,13 +244,6 @@ func (c *Controller) Start(ctx context.Context, id string) (_ *api.ControllerSta
 	if err := task.Start(ctx); err != nil {
 		return nil, fmt.Errorf("failed to start sandbox container task %q: %w", id, err)
 	}
-
-	// start the monitor after adding sandbox into the store, this ensures
-	// that sandbox is in the store, when event monitor receives the TaskExit event.
-	//
-	// TaskOOM from containerd may come before sandbox is added to store,
-	// but we don't care about sandbox TaskOOM right now, so it is fine.
-	c.cri.StartSandboxExitMonitor(context.Background(), id, task.Pid(), exitCh) // TODO: Move back to CRI service.
 
 	resp := &api.ControllerStartResponse{
 		SandboxID: id,
