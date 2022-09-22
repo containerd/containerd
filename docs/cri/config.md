@@ -223,6 +223,8 @@ version = 2
   enable_cdi = false
 
   # cdi_spec_dirs is the list of directories to scan for CDI spec files
+  # For more details about CDI configuration please refer to
+  # https://github.com/container-orchestrated-devices/container-device-interface#containerd-configuration
   cdi_spec_dirs = ["/etc/cdi", "/var/run/cdi"]
 
   # 'plugins."io.containerd.grpc.v1.cri".containerd' contains config related to containerd

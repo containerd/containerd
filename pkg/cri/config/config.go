@@ -322,6 +322,8 @@ type PluginConfig struct {
 	// https://github.com/container-orchestrated-devices/container-device-interface.
 	EnableCDI bool `toml:"enable_cdi" json:"enableCDI"`
 	// CDISpecDirs is the list of directories to scan for Container Device Interface Specifications
+	// For more details about CDI configuration please refer to
+	// https://github.com/container-orchestrated-devices/container-device-interface#containerd-configuration
 	CDISpecDirs []string `toml:"cdi_spec_dirs" json:"cdiSpecDirs"`
 	// ImagePullProgressTimeout is the maximum duration that there is no
 	// image data read from image registry in the open connection. It will
