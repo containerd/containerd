@@ -17,11 +17,11 @@
 package server
 
 import (
-	"errors"
-
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func (c *criService) GetContainerEvents(r *runtime.GetEventsRequest, s runtime.RuntimeService_GetContainerEventsServer) error {
-	return errors.New("not implemented")
+	return status.Errorf(codes.Unimplemented, "method GetContainerEvents not implemented")
 }
