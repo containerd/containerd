@@ -46,11 +46,13 @@ var (
 	noDaemon     bool
 	noCriu       bool
 	supportsCriu bool
+	noShimCgroup bool
 )
 
 func init() {
 	flag.BoolVar(&noDaemon, "no-daemon", false, "Do not start a dedicated daemon for the tests")
 	flag.BoolVar(&noCriu, "no-criu", false, "Do not run the checkpoint tests")
+	flag.BoolVar(&noShimCgroup, "no-shim-cgroup", false, "Do not run the shim cgroup tests")
 }
 
 func TestMain(m *testing.M) {

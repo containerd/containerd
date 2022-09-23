@@ -160,6 +160,10 @@ func TestTaskUpdate(t *testing.T) {
 }
 
 func TestShimInCgroup(t *testing.T) {
+	if noShimCgroup {
+		t.Skip("shim cgroup is not enabled")
+	}
+
 	t.Parallel()
 
 	client, err := newClient(t, address)
