@@ -241,7 +241,7 @@ FORCE:
 
 define BUILD_BINARY
 @echo "$(WHALE) $@"
-$(GO) build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o $@ ${GO_LDFLAGS} ${GO_TAGS}  ./$<
+cd cmd && $(GO) build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o ../$@ ${GO_LDFLAGS} ${GO_TAGS}  ./$(notdir $<)
 endef
 
 # Build a binary from a cmd.
@@ -251,19 +251,19 @@ bin/%: cmd/% FORCE
 # gen-manpages must not have the urfave_cli_no_docs build-tag set
 bin/gen-manpages: cmd/gen-manpages FORCE
 	@echo "$(WHALE) $@"
-	$(GO) build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o $@ ${GO_LDFLAGS} $(subst urfave_cli_no_docs,,${GO_TAGS})  ./cmd/gen-manpages
+	cd cmd && $(GO) build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o ../$@ ${GO_LDFLAGS} $(subst urfave_cli_no_docs,,${GO_TAGS})  ./gen-manpages
 
 bin/containerd-shim: cmd/containerd-shim FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
 	@echo "$(WHALE) $@"
-	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./cmd/containerd-shim
+	@cd cmd && CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o ../$@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./containerd-shim
 
 bin/containerd-shim-runc-v1: cmd/containerd-shim-runc-v1 FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
 	@echo "$(WHALE) $@"
-	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./cmd/containerd-shim-runc-v1
+	@cd cmd && CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o ../$@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./containerd-shim-runc-v1
 
 bin/containerd-shim-runc-v2: cmd/containerd-shim-runc-v2 FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
 	@echo "$(WHALE) $@"
-	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./cmd/containerd-shim-runc-v2
+	@cd cmd && CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o ../$@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./containerd-shim-runc-v2
 
 binaries: $(BINARIES) ## build binaries
 	@echo "$(WHALE) $@"

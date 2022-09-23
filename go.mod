@@ -8,7 +8,6 @@ require (
 	github.com/Microsoft/go-winio v0.6.0
 	github.com/Microsoft/hcsshim v0.10.0-rc.1
 	github.com/container-orchestrated-devices/container-device-interface v0.5.1
-	github.com/containerd/aufs v1.0.0
 	github.com/containerd/btrfs v1.0.0
 	github.com/containerd/cgroups v1.0.5-0.20220816231112-7083cd60b721
 	github.com/containerd/console v1.0.3
@@ -20,10 +19,8 @@ require (
 	github.com/containerd/nri v0.1.0
 	github.com/containerd/ttrpc v1.1.1-0.20220420014843-944ef4a40df3
 	github.com/containerd/typeurl v1.0.3-0.20220422153119-7f6e6d160d67
-	github.com/containerd/zfs v1.0.0
 	github.com/containernetworking/cni v1.1.1
 	github.com/containernetworking/plugins v1.1.1
-	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c
 	github.com/docker/go-metrics v0.0.1
@@ -53,7 +50,6 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.8.0
 	github.com/tchap/go-patricia/v2 v2.3.1
-	github.com/urfave/cli v1.22.9
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
 	go.etcd.io/bbolt v1.3.6
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.32.0
@@ -78,6 +74,8 @@ require (
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
 )
 
+require github.com/coreos/go-systemd/v22 v22.3.2 // indirect
+
 require (
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/tools v0.1.12 // indirect
@@ -91,7 +89,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cilium/ebpf v0.9.1 // indirect
 	github.com/containers/ocicrypt v1.1.3 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.1 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
 	github.com/emicklei/go-restful v2.16.0+incompatible // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
@@ -106,7 +103,6 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2 // indirect
 	github.com/miekg/pkcs11 v1.1.1 // indirect
-	github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible // indirect
 	github.com/moby/spdystream v0.2.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
@@ -116,7 +112,6 @@ require (
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
-	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stefanberger/go-pkcs11uri v0.0.0-20201008174630-78d3cae3a980 // indirect
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
