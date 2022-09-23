@@ -103,9 +103,6 @@ func TestRunPodSandboxWithShimDeleteFailure(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip()
 	}
-	if os.Getenv("ENABLE_CRI_SANDBOXES") != "" {
-		t.Skip()
-	}
 
 	testCase := func(restart bool) func(*testing.T) {
 		return func(t *testing.T) {
@@ -175,9 +172,6 @@ func TestRunPodSandboxWithShimDeleteFailure(t *testing.T) {
 // record if failed to rollback CNI API.
 func TestRunPodSandboxWithShimStartAndTeardownCNIFailure(t *testing.T) {
 	if runtime.GOOS != "linux" {
-		t.Skip()
-	}
-	if os.Getenv("ENABLE_CRI_SANDBOXES") != "" {
 		t.Skip()
 	}
 
