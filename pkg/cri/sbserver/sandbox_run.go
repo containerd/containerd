@@ -27,13 +27,15 @@ import (
 	"strings"
 	"time"
 
-	eventtypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/protobuf"
-	sb "github.com/containerd/containerd/sandbox"
 	"github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	eventtypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/containerd/pkg/cri/sbserver/podsandbox"
+	"github.com/containerd/containerd/protobuf"
+	sb "github.com/containerd/containerd/sandbox"
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/cri/annotations"
@@ -64,6 +66,13 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 	name := makeSandboxName(metadata)
 	log.G(ctx).WithField("podsandboxid", id).Debugf("generated id for sandbox name %q", name)
+
+	// cleanupErr records the last error returned by the critical cleanup operations in deferred functions,
+	// like CNI teardown and stopping the running sandbox task.
+	// If cleanup is not completed for some reason, the CRI-plugin will leave the sandbox
+	// in a not-ready state, which can later be cleaned up by the next execution of the kubelet's syncPod workflow.
+	var cleanupErr error
+
 	// Reserve the sandbox name to avoid concurrent `RunPodSandbox` request starting the
 	// same sandbox.
 	if err := c.sandboxNameIndex.Reserve(name, id); err != nil {
@@ -71,7 +80,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 	defer func() {
 		// Release the name if the function returns with an error.
-		if retErr != nil {
+		// When cleanupErr != nil, the name will be cleaned in sandbox_remove.
+		if retErr != nil && cleanupErr == nil {
 			c.sandboxNameIndex.ReleaseByName(name)
 		}
 	}()
@@ -98,6 +108,25 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		},
 	)
 
+	if _, err := c.client.SandboxStore().Create(ctx, sandboxInfo); err != nil {
+		return nil, fmt.Errorf("failed to save sandbox metadata: %w", err)
+	}
+	defer func() {
+		if retErr != nil && cleanupErr == nil {
+			cleanupErr = c.client.SandboxStore().Delete(ctx, id)
+		}
+	}()
+
+	defer func() {
+		// Put the sandbox into sandbox store when some resources fail to be cleaned.
+		if retErr != nil && cleanupErr != nil {
+			log.G(ctx).WithError(cleanupErr).Errorf("encountered an error cleaning up failed sandbox %q, marking sandbox state as SANDBOX_UNKNOWN", id)
+			if err := c.sandboxStore.Add(sandbox); err != nil {
+				log.G(ctx).WithError(err).Errorf("failed to add sandbox %+v into store", sandbox)
+			}
+		}
+	}()
+
 	var (
 		podNetwork = true
 		err        error
@@ -110,7 +139,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 	if goruntime.GOOS == "windows" &&
 		config.GetWindows().GetSecurityContext().GetHostProcess() {
-		//Windows HostProcess pods can only run on the host network
+		// Windows HostProcess pods can only run on the host network
 		podNetwork = false
 	}
 
@@ -128,20 +157,32 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		if err != nil {
 			return nil, fmt.Errorf("failed to create network namespace for sandbox %q: %w", id, err)
 		}
+		// Update network namespace in the store, which is used to generate the container's spec
 		sandbox.NetNSPath = sandbox.NetNS.GetPath()
 		defer func() {
-			if retErr != nil {
+			// Remove the network namespace only if all the resource cleanup is done
+			if retErr != nil && cleanupErr == nil {
+				if cleanupErr = sandbox.NetNS.Remove(); cleanupErr != nil {
+					log.G(ctx).WithError(cleanupErr).Errorf("Failed to remove network namespace %s for sandbox %q", sandbox.NetNSPath, id)
+					return
+				}
+				sandbox.NetNSPath = ""
+			}
+		}()
+
+		// Define this defer to teardownPodNetwork prior to the setupPodNetwork function call.
+		// This is because in setupPodNetwork the resource is allocated even if it returns error, unlike other resource
+		// creation functions.
+		defer func() {
+			// Remove the network namespace only if all the resource cleanup is done.
+			if retErr != nil && cleanupErr == nil {
 				deferCtx, deferCancel := ctrdutil.DeferContext()
 				defer deferCancel()
 				// Teardown network if an error is returned.
-				if err := c.teardownPodNetwork(deferCtx, sandbox); err != nil {
-					log.G(ctx).WithError(err).Errorf("Failed to destroy network for sandbox %q", id)
+				if cleanupErr = c.teardownPodNetwork(deferCtx, sandbox); cleanupErr != nil {
+					log.G(ctx).WithError(cleanupErr).Errorf("Failed to destroy network for sandbox %q", id)
 				}
 
-				if err := sandbox.NetNS.Remove(); err != nil {
-					log.G(ctx).WithError(err).Errorf("Failed to remove network namespace %s for sandbox %q", sandbox.NetNSPath, id)
-				}
-				sandbox.NetNSPath = ""
 			}
 		}()
 
@@ -159,8 +200,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		sandboxCreateNetworkTimer.UpdateSince(netStart)
 	}
 
-	// Save sandbox metadata to store
-	if err := sandboxInfo.AddExtension("metadata", &sandbox.Metadata); err != nil {
+	if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
 		return nil, fmt.Errorf("unable to save sandbox %q to store: %w", id, err)
 	}
 
@@ -169,8 +209,9 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
 	}
 
-	if _, err := c.client.SandboxStore().Create(ctx, sandboxInfo); err != nil {
-		return nil, fmt.Errorf("failed to save sandbox metadata: %w", err)
+	// Save sandbox metadata to store
+	if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
+		return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
 	}
 
 	runtimeStart := time.Now()
@@ -181,8 +222,19 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	resp, err := controller.Start(ctx, id)
 	if err != nil {
+		sandbox.Container, _ = c.client.LoadContainer(ctx, id)
+		if resp != nil && resp.SandboxID == "" && resp.Pid == 0 && resp.CreatedAt == nil && len(resp.Labels) == 0 {
+			// if resp is a non-nil zero-value, an error occurred during cleanup
+			cleanupErr = fmt.Errorf("failed to cleanup sandbox")
+		}
 		return nil, fmt.Errorf("failed to start sandbox %q: %w", id, err)
 	}
+	// TODO: get rid of this. sandbox object should no longer have Container field.
+	container, err := c.client.LoadContainer(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load container %q for sandbox: %w", id, err)
+	}
+	sandbox.Container = container
 
 	labels := resp.GetLabels()
 	if labels == nil {
@@ -201,14 +253,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, fmt.Errorf("failed to update sandbox status: %w", err)
 	}
 
-	// TODO: get rid of this. sandbox object should no longer have Container field.
-	container, err := c.client.LoadContainer(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load container %q for sandbox: %w", id, err)
-	}
 	// Add sandbox into sandbox store in INIT state.
-	sandbox.Container = container
-
 	if err := c.sandboxStore.Add(sandbox); err != nil {
 		return nil, fmt.Errorf("failed to add sandbox %+v into store: %w", sandbox, err)
 	}
