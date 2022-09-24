@@ -330,7 +330,7 @@ func compressBlob(ctx context.Context, cs content.Store, r io.Reader, ref string
 	}
 
 	defer func() {
-		w.Close()
+		err = w.Close()
 		if err != nil {
 			cs.Abort(ctx, ref)
 		}
