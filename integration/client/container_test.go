@@ -23,6 +23,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -2548,5 +2549,119 @@ func TestContainerPTY(t *testing.T) {
 	out := buf.String()
 	if !strings.ContainsAny(fmt.Sprintf("%#q", out), `\x00`) {
 		t.Fatal(`expected \x00 in output`)
+	}
+}
+
+func TestContainerAccessMount(t *testing.T) {
+	// The Linux busybox image has a www-data user.
+	username := "www-data"
+	if runtime.GOOS == "windows" {
+		username = "ContainerUser"
+	}
+
+	checkContainerAccessMount(t, username, false)
+}
+
+func TestContainerAccessMountRoot(t *testing.T) {
+	username := "root"
+	if runtime.GOOS == "windows" {
+		username = "ContainerAdministrator"
+	}
+	checkContainerAccessMount(t, username, true)
+}
+
+func checkContainerAccessMount(t *testing.T, username string, runsAsAdmin bool) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	tempDir, err := os.MkdirTemp("", id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !runsAsAdmin {
+		// If the container we're creating does not run as root/ContainerAdministrator
+		// then allow everyone to read the contents of the folder we'll be mounting as
+		// a volume. On linux, the lack of +x on the source folder, for "others" will mean
+		// we will not be able to enter the mount. On Windows, if we don't grant
+		// GENERIC_READ to "Everyone" an unprivileged user will not be able to read
+		// the contents of the volume mount
+		if err := grantReadToEveryone(tempDir); err != nil {
+			t.Fatal(err)
+		}
+	}
+	defer os.RemoveAll(tempDir)
+
+	const expectedStr = "Hello there."
+	tempFile := filepath.Join(tempDir, "hello.txt")
+	os.WriteFile(tempFile, []byte(expectedStr), 0644)
+	command := []string{"cat", "/greetings/hello.txt"}
+	destination := "/greetings"
+	if runtime.GOOS == "windows" {
+		command = []string{"type", `C:\greetings\hello.txt`}
+		destination = `C:\greetings`
+	}
+	mounts := []specs.Mount{
+		{
+			Destination: destination,
+			Source:      tempDir,
+			Options:     []string{"rbind", "ro"},
+		},
+	}
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithMounts(mounts), oci.WithUsername(username), withProcessArgs(command...)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+	stdout := bytes.NewBuffer(nil)
+	task, err := container.NewTask(ctx, cio.NewCreator(withByteBuffers(stdout)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	status := <-statusC
+	code, _, err := status.Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if code != 0 {
+		t.Errorf("expected exec exit code 0 but received %d", code)
+	}
+	if _, err := task.Delete(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	stdoutStr := stdout.String()
+	if stdoutStr != expectedStr {
+		t.Fatalf("process output does not match expectation: ideal output: %q, actual output: %q", expectedStr, stdoutStr)
 	}
 }
