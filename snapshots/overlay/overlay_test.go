@@ -35,6 +35,8 @@ import (
 	"github.com/containerd/containerd/snapshots/testsuite"
 )
 
+const testKey = "/tmp/test"
+
 func newSnapshotterWithOpts(opts ...Opt) testsuite.SnapshotterFunc {
 	return func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
 		snapshotter, err := NewSnapshotter(root, opts...)
@@ -84,7 +86,7 @@ func testOverlayMounts(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mounts, err := o.Prepare(ctx, "/tmp/test", "")
+	mounts, err := o.Prepare(ctx, testKey, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +116,7 @@ func testOverlayCommit(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	key := "/tmp/test"
+	key := testKey
 	mounts, err := o.Prepare(ctx, key, "")
 	if err != nil {
 		t.Fatal(err)
@@ -135,7 +137,7 @@ func testOverlayOverlayMount(t *testing.T, newSnapshotter testsuite.SnapshotterF
 	if err != nil {
 		t.Fatal(err)
 	}
-	key := "/tmp/test"
+	key := testKey
 	if _, err = o.Prepare(ctx, key, ""); err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +230,7 @@ func testOverlayOverlayRead(t *testing.T, newSnapshotter testsuite.SnapshotterFu
 	if err != nil {
 		t.Fatal(err)
 	}
-	key := "/tmp/test"
+	key := testKey
 	mounts, err := o.Prepare(ctx, key, "")
 	if err != nil {
 		t.Fatal(err)
