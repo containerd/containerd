@@ -54,9 +54,9 @@ func checkMount(t *testing.T, mounts []runtimespec.Mount, src, dest, typ string,
 }
 
 const testImageName = "container-image-name"
+const testID = "test-id"
 
 func TestGeneralContainerSpec(t *testing.T) {
-	testID := "test-id"
 	testPid := uint32(1234)
 	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 	ociRuntime := config.Runtime{}
@@ -76,7 +76,6 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 		t.Skip("not implemented on FreeBSD")
 	}
 
-	testID := "test-id"
 	testSandboxID := "sandbox-id"
 	testContainerName := "container-name"
 	testPid := uint32(1234)
@@ -289,7 +288,6 @@ func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 		t.Skip("not implemented on FreeBSD")
 	}
 
-	testID := "test-id"
 	testSandboxID := "sandbox-id"
 	testContainerName := "container-name"
 	testPid := uint32(1234)
