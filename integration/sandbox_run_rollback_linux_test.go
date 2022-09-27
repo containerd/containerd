@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -32,7 +33,7 @@ import (
 	"github.com/containerd/go-cni"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	criapiv1alpha2 "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 const (
@@ -84,6 +85,134 @@ func TestRunPodSandboxWithShimStartFailure(t *testing.T) {
 	require.Equal(t, true, strings.Contains(err.Error(), "no hard feelings"))
 }
 
+// TestRunPodSandboxWithShimDeleteFailure should keep the sandbox record if
+// failed to rollback shim by shim.Delete API.
+func TestRunPodSandboxWithShimDeleteFailure(t *testing.T) {
+	testCase := func(restart bool) func(*testing.T) {
+		return func(t *testing.T) {
+			t.Log("Init PodSandboxConfig with specific label")
+			labels := map[string]string{
+				t.Name(): "true",
+			}
+			sbConfig := PodSandboxConfig(t.Name(), "failpoint", WithPodLabels(labels))
+
+			t.Log("Inject Shim failpoint")
+			injectShimFailpoint(t, sbConfig, map[string]string{
+				"Start":  "1*error(failed to start shim)",
+				"Delete": "1*error(please retry)", // inject failpoint during rollback shim
+			})
+
+			t.Log("Create a sandbox")
+			_, err := runtimeService.RunPodSandbox(sbConfig, failpointRuntimeHandler)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "failed to start shim")
+
+			t.Log("ListPodSandbox with the specific label")
+			l, err := runtimeService.ListPodSandbox(&criapiv1alpha2.PodSandboxFilter{LabelSelector: labels})
+			require.NoError(t, err)
+			require.Len(t, l, 1)
+
+			sb := l[0]
+			require.Equal(t, sb.State, criapiv1alpha2.PodSandboxState_SANDBOX_NOTREADY)
+			require.Equal(t, sb.Metadata.Name, sbConfig.Metadata.Name)
+			require.Equal(t, sb.Metadata.Namespace, sbConfig.Metadata.Namespace)
+			require.Equal(t, sb.Metadata.Uid, sbConfig.Metadata.Uid)
+			require.Equal(t, sb.Metadata.Attempt, sbConfig.Metadata.Attempt)
+
+			t.Log("Check PodSandboxStatus")
+			sbStatus, err := runtimeService.PodSandboxStatus(sb.Id)
+			require.NoError(t, err)
+			require.Equal(t, sbStatus.State, criapiv1alpha2.PodSandboxState_SANDBOX_NOTREADY)
+			require.Greater(t, len(sbStatus.Network.Ip), 0)
+
+			if restart {
+				t.Log("Restart containerd")
+				RestartContainerd(t)
+
+				t.Log("ListPodSandbox with the specific label")
+				l, err = runtimeService.ListPodSandbox(&criapiv1alpha2.PodSandboxFilter{Id: sb.Id})
+				require.NoError(t, err)
+				require.Len(t, l, 1)
+				require.Equal(t, l[0].State, criapiv1alpha2.PodSandboxState_SANDBOX_NOTREADY)
+
+				t.Log("Check PodSandboxStatus")
+				sbStatus, err := runtimeService.PodSandboxStatus(sb.Id)
+				require.NoError(t, err)
+				t.Log(sbStatus.Network)
+				require.Equal(t, sbStatus.State, criapiv1alpha2.PodSandboxState_SANDBOX_NOTREADY)
+			}
+
+			t.Log("Cleanup leaky sandbox")
+			err = runtimeService.RemovePodSandbox(sb.Id)
+			require.NoError(t, err)
+		}
+	}
+
+	t.Run("CleanupAfterRestart", testCase(true))
+	t.Run("JustCleanup", testCase(false))
+}
+
+// TestRunPodSandboxWithShimStartAndTeardownCNIFailure should keep the sandbox
+// record if failed to rollback CNI API.
+func TestRunPodSandboxWithShimStartAndTeardownCNIFailure(t *testing.T) {
+	testCase := func(restart bool) func(*testing.T) {
+		return func(t *testing.T) {
+			defer prepareFailpointCNI(t)()
+
+			t.Log("Init PodSandboxConfig with specific key")
+			labels := map[string]string{
+				t.Name(): "true",
+			}
+			sbConfig := PodSandboxConfig(t.Name(), "failpoint", WithPodLabels(labels))
+
+			t.Log("Inject Shim failpoint")
+			injectShimFailpoint(t, sbConfig, map[string]string{
+				"Start": "1*error(failed to start shim)",
+			})
+
+			t.Log("Inject CNI failpoint")
+			conf := &failpointConf{
+				Del: "1*error(please retry)",
+			}
+			injectCNIFailpoint(t, sbConfig, conf)
+
+			t.Log("Create a sandbox")
+			_, err := runtimeService.RunPodSandbox(sbConfig, failpointRuntimeHandler)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "failed to start shim")
+
+			t.Log("ListPodSandbox with the specific label")
+			l, err := runtimeService.ListPodSandbox(&criapiv1alpha2.PodSandboxFilter{LabelSelector: labels})
+			require.NoError(t, err)
+			require.Len(t, l, 1)
+
+			sb := l[0]
+			require.Equal(t, sb.State, criapiv1alpha2.PodSandboxState_SANDBOX_NOTREADY)
+			require.Equal(t, sb.Metadata.Name, sbConfig.Metadata.Name)
+			require.Equal(t, sb.Metadata.Namespace, sbConfig.Metadata.Namespace)
+			require.Equal(t, sb.Metadata.Uid, sbConfig.Metadata.Uid)
+			require.Equal(t, sb.Metadata.Attempt, sbConfig.Metadata.Attempt)
+
+			if restart {
+				t.Log("Restart containerd")
+				RestartContainerd(t)
+
+				t.Log("ListPodSandbox with the specific label")
+				l, err = runtimeService.ListPodSandbox(&criapiv1alpha2.PodSandboxFilter{Id: sb.Id})
+				require.NoError(t, err)
+				require.Len(t, l, 1)
+				require.Equal(t, l[0].State, criapiv1alpha2.PodSandboxState_SANDBOX_NOTREADY)
+			}
+
+			t.Log("Cleanup leaky sandbox")
+			err = runtimeService.RemovePodSandbox(sb.Id)
+			require.NoError(t, err)
+		}
+	}
+	t.Run("CleanupAfterRestart", testCase(true))
+	t.Run("JustCleanup", testCase(false))
+}
+
 // failpointConf is used to describe cmdAdd/cmdDel/cmdCheck command's failpoint.
 type failpointConf struct {
 	Add   string `json:"cmdAdd"`
@@ -91,12 +220,12 @@ type failpointConf struct {
 	Check string `json:"cmdCheck"`
 }
 
-func injectCNIFailpoint(t *testing.T, sbConfig *runtime.PodSandboxConfig, conf *failpointConf) {
+func injectCNIFailpoint(t *testing.T, sbConfig *criapiv1alpha2.PodSandboxConfig, conf *failpointConf) {
 	stateDir := t.TempDir()
 
 	metadata := sbConfig.Metadata
 	fpFilename := filepath.Join(stateDir,
-		fmt.Sprintf("%s-%s.json", metadata.Namespace, metadata.Name))
+		fmt.Sprintf("%s-%s.json", metadata.Namespace, strings.Replace(metadata.Name, "/", "-", -1)))
 
 	data, err := json.Marshal(conf)
 	require.NoError(t, err)
@@ -107,7 +236,7 @@ func injectCNIFailpoint(t *testing.T, sbConfig *runtime.PodSandboxConfig, conf *
 	sbConfig.Annotations[failpointCNIConfPathKey] = fpFilename
 }
 
-func injectShimFailpoint(t *testing.T, sbConfig *runtime.PodSandboxConfig, methodFps map[string]string) {
+func injectShimFailpoint(t *testing.T, sbConfig *criapiv1alpha2.PodSandboxConfig, methodFps map[string]string) {
 	for method, fp := range methodFps {
 		_, err := failpoint.NewFailpoint(method, fp)
 		require.NoError(t, err, "check failpoint %s for shim method %s", fp, method)
@@ -210,7 +339,7 @@ func getCNIConfig() (*cni.ConfigResult, error) {
 		return nil, errors.Wrap(err, "failed to get raw runtime client")
 	}
 
-	resp, err := client.Status(context.Background(), &runtime.StatusRequest{Verbose: true})
+	resp, err := client.Status(context.Background(), &criapiv1alpha2.StatusRequest{Verbose: true})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get status")
 	}

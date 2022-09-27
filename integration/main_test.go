@@ -164,6 +164,15 @@ func WithPodHostname(hostname string) PodSandboxOpts {
 	}
 }
 
+// Add pod labels.
+func WithPodLabels(kvs map[string]string) PodSandboxOpts {
+	return func(p *runtime.PodSandboxConfig) {
+		for k, v := range kvs {
+			p.Labels[k] = v
+		}
+	}
+}
+
 // PodSandboxConfig generates a pod sandbox config for test.
 func PodSandboxConfig(name, ns string, opts ...PodSandboxOpts) *runtime.PodSandboxConfig {
 	config := &runtime.PodSandboxConfig{
@@ -176,6 +185,7 @@ func PodSandboxConfig(name, ns string, opts ...PodSandboxOpts) *runtime.PodSandb
 		},
 		Linux:       &runtime.LinuxPodSandboxConfig{},
 		Annotations: make(map[string]string),
+		Labels:      make(map[string]string),
 	}
 	for _, opt := range opts {
 		opt(config)
