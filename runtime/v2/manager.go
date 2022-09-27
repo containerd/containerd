@@ -18,6 +18,7 @@ package v2
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -314,41 +315,28 @@ func (m *ShimManager) resolveRuntimePath(runtime string) (string, error) {
 		return path.(string), nil
 	}
 
-	var (
-		cmdPath string
-		lerr    error
-	)
-
-	binaryPath := shimbinary.BinaryPath(runtime)
-	if _, serr := os.Stat(binaryPath); serr == nil {
-		cmdPath = binaryPath
-	}
-
-	if cmdPath == "" {
-		if cmdPath, lerr = exec.LookPath(name); lerr != nil {
-			if eerr, ok := lerr.(*exec.Error); ok {
-				if eerr.Err == exec.ErrNotFound {
-					self, err := os.Executable()
-					if err != nil {
-						return "", err
-					}
-
-					// Match the calling binaries (containerd) path and see
-					// if they are side by side. If so, execute the shim
-					// found there.
-					testPath := filepath.Join(filepath.Dir(self), name)
-					if _, serr := os.Stat(testPath); serr == nil {
-						cmdPath = testPath
-					}
-					if cmdPath == "" {
-						return "", fmt.Errorf("runtime %q binary not installed %q: %w", runtime, name, os.ErrNotExist)
-					}
-				}
+	cmdPath, err := exec.LookPath(name)
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			self, err := os.Executable()
+			if err != nil {
+				return "", err
 			}
+
+			// Match the calling binaries (containerd) path and see
+			// if they are side by side. If so, execute the shim
+			// found there.
+			cmdPath := filepath.Join(filepath.Dir(self), name)
+			if _, serr := os.Stat(cmdPath); serr != nil {
+				return "", fmt.Errorf("runtime %q binary not installed %q: %w", runtime, name, os.ErrNotExist)
+			}
+		} else if !errors.Is(err, exec.ErrDot) {
+			return "", fmt.Errorf("lookup runtime %q binary path failed: %w", runtime, err)
 		}
 	}
 
-	cmdPath, err := filepath.Abs(cmdPath)
+	// LookPath could return a path relative to the current directory
+	cmdPath, err = filepath.Abs(cmdPath)
 	if err != nil {
 		return "", err
 	}

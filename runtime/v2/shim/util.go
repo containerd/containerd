@@ -99,20 +99,6 @@ func BinaryName(runtime string) string {
 	return fmt.Sprintf(shimBinaryFormat, parts[len(parts)-2], parts[len(parts)-1])
 }
 
-// BinaryPath returns the full path for the shim binary from the runtime name,
-// empty string returns means runtime name is invalid
-func BinaryPath(runtime string) string {
-	dir := filepath.Dir(runtime)
-	binary := BinaryName(runtime)
-
-	path, err := filepath.Abs(filepath.Join(dir, binary))
-	if err != nil {
-		return ""
-	}
-
-	return path
-}
-
 // Connect to the provided address
 func Connect(address string, d func(string, time.Duration) (net.Conn, error)) (net.Conn, error) {
 	return d(address, 100*time.Second)
