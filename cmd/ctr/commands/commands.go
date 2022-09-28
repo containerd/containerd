@@ -60,8 +60,9 @@ var (
 			Usage: "allow connections using plain HTTP",
 		},
 		cli.StringFlag{
-			Name:  "user,u",
-			Usage: "user[:password] Registry user and password",
+			Name:   "user,u",
+			Usage:  "user[:password] Registry user and password",
+			EnvVar: "REGISTRY_USER",
 		},
 		cli.StringFlag{
 			Name:  "refresh",
