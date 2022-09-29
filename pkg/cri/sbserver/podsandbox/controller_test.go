@@ -17,10 +17,16 @@
 package podsandbox
 
 import (
+	"context"
+	"testing"
+	"time"
+
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/store/label"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ostesting "github.com/containerd/containerd/pkg/os/testing"
+	"github.com/containerd/containerd/protobuf"
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -49,4 +55,35 @@ func newControllerService() *Controller {
 		os:           ostesting.NewFakeOS(),
 		sandboxStore: sandboxstore.NewStore(labels),
 	}
+}
+
+func Test_Status(t *testing.T) {
+	sandboxID, pid, exitStatus := "1", uint32(1), uint32(0)
+	createdAt, exitedAt := time.Now(), time.Now()
+	controller := newControllerService()
+	status := sandboxstore.Status{
+		Pid:        pid,
+		CreatedAt:  createdAt,
+		ExitStatus: exitStatus,
+		ExitedAt:   exitedAt,
+		State:      sandboxstore.StateReady,
+	}
+	sb := sandboxstore.Sandbox{
+		Metadata: sandboxstore.Metadata{
+			ID: sandboxID,
+		},
+		Status: sandboxstore.StoreStatus(status),
+	}
+	err := controller.sandboxStore.Add(sb)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := controller.Status(context.Background(), sandboxID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, s.Pid, pid)
+	assert.Equal(t, s.ExitStatus, exitStatus)
+	assert.Equal(t, s.ExitedAt, protobuf.ToTimestamp(exitedAt))
+	assert.Equal(t, s.State, sandboxstore.StateReady.String())
 }

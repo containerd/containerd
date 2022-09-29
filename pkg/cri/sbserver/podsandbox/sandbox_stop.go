@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"syscall"
+	"time"
 
 	eventtypes "github.com/containerd/containerd/api/events"
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
@@ -134,5 +135,5 @@ func (c *Controller) waitSandboxStop(ctx context.Context, sandbox sandboxstore.S
 // cleanupUnknownSandbox cleanup stopped sandbox in unknown state.
 func cleanupUnknownSandbox(ctx context.Context, id string, sandbox sandboxstore.Sandbox) error {
 	// Reuse handleSandboxExit to do the cleanup.
-	return handleSandboxExit(ctx, sandbox)
+	return handleSandboxExit(ctx, sandbox, &eventtypes.TaskExit{ExitStatus: unknownExitCode, ExitedAt: protobuf.ToTimestamp(time.Now())})
 }
