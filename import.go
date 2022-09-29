@@ -108,9 +108,9 @@ func WithImportCompression() ImportOpt {
 
 // WithDiscardUnpackedLayers allows the garbage collector to clean up
 // layers from content store after unpacking.
-func WithDiscardUnpackedLayers(discard bool) ImportOpt {
+func WithDiscardUnpackedLayers() ImportOpt {
 	return func(c *importOpts) error {
-		c.discardLayers = discard
+		c.discardLayers = true
 		return nil
 	}
 }

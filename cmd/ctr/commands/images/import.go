@@ -136,10 +136,12 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 
 		opts = append(opts, containerd.WithAllPlatforms(context.Bool("all-platforms")))
 
-		if context.Bool("discard-unpacked-layers") && context.Bool("no-unpack") {
-			return fmt.Errorf("--discard-unpacked-layers and --no-unpack are incompatible options")
+		if context.Bool("discard-unpacked-layers") {
+			if context.Bool("no-unpack") {
+				return fmt.Errorf("--discard-unpacked-layers and --no-unpack are incompatible options")
+			}
+			opts = append(opts, containerd.WithDiscardUnpackedLayers())
 		}
-		opts = append(opts, containerd.WithDiscardUnpackedLayers(context.Bool("discard-unpacked-layers")))
 
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
