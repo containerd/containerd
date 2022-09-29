@@ -73,7 +73,7 @@ command. As part of this process, we do the following:
 			Name:  "max-concurrent-downloads",
 			Usage: "Set the max concurrent downloads for each pull",
 		},
-		cli.BoolFlag{
+		cli.BoolTFlag{
 			Name:  "local",
 			Usage: "Fetch content from local client rather than using transfer service",
 		},
@@ -92,7 +92,7 @@ command. As part of this process, we do the following:
 		}
 		defer cancel()
 
-		if !context.Bool("local") {
+		if !context.BoolT("local") {
 			ch, err := commands.NewStaticCredentials(ctx, context, ref)
 			if err != nil {
 				return err

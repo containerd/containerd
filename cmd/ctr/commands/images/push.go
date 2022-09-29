@@ -70,9 +70,9 @@ var pushCommand = cli.Command{
 	}, cli.IntFlag{
 		Name:  "max-concurrent-uploaded-layers",
 		Usage: "set the max concurrent uploaded layers for each push",
-	}, cli.BoolFlag{
+	}, cli.BoolTFlag{
 		Name:  "local",
-		Usage: "Push content from local client rather than using transfer service",
+		Usage: "push content from local client rather than using transfer service",
 	}, cli.BoolFlag{
 		Name:  "allow-non-distributable-blobs",
 		Usage: "allow pushing blobs that are marked as non-distributable",
@@ -94,7 +94,7 @@ var pushCommand = cli.Command{
 		}
 		defer cancel()
 
-		if !context.Bool("local") {
+		if !context.BoolT("local") {
 			ch, err := commands.NewStaticCredentials(ctx, context, ref)
 			if err != nil {
 				return err
