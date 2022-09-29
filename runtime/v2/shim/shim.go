@@ -22,11 +22,11 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
-	"strings"
 	"time"
 
 	shimapi "github.com/containerd/containerd/api/runtime/task/v2"
@@ -486,8 +486,7 @@ func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal, sh
 	}
 	go func() {
 		defer l.Close()
-		if err := server.Serve(ctx, l); err != nil &&
-			!strings.Contains(err.Error(), "use of closed network connection") {
+		if err := server.Serve(ctx, l); err != nil && !errors.Is(err, net.ErrClosed) {
 			log.G(ctx).WithError(err).Fatal("containerd-shim: ttrpc server failure")
 		}
 	}()

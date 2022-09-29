@@ -30,7 +30,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 
@@ -473,10 +472,7 @@ func (pc *proxyClients) getClient(address string) (*grpc.ClientConn, error) {
 }
 
 func trapClosedConnErr(err error) error {
-	if err == nil {
-		return nil
-	}
-	if strings.Contains(err.Error(), "use of closed network connection") {
+	if err == nil || errors.Is(err, net.ErrClosed) {
 		return nil
 	}
 	return err
