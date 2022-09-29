@@ -28,28 +28,27 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/pkg/atomic"
+	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/sbserver/podsandbox"
+	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
+	"github.com/containerd/containerd/pkg/cri/store/label"
+	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
 	"github.com/containerd/containerd/pkg/cri/streaming"
+	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/pkg/kmutex"
+	osinterface "github.com/containerd/containerd/pkg/os"
+	"github.com/containerd/containerd/pkg/registrar"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/sandbox"
+
 	"github.com/containerd/go-cni"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtime_alpha "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-
-	"github.com/containerd/containerd/pkg/cri/store/label"
-
-	"github.com/containerd/containerd/pkg/atomic"
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
-	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
-	osinterface "github.com/containerd/containerd/pkg/os"
-	"github.com/containerd/containerd/pkg/registrar"
 )
 
 // defaultNetworkPlugin is used for the default CNI configuration

@@ -42,7 +42,7 @@ import (
 )
 
 const (
-	// profileNamePrefix is the prefix for loading profiles on a localhost. Eg. AppArmor localhost/profileName.
+	// profileNamePrefix is the prefix for loading profiles on a localhost. E.g. AppArmor localhost/profileName.
 	profileNamePrefix = "localhost/" // TODO (mikebrow): get localhost/ & runtime/default from CRI kubernetes/kubernetes#51747
 	// runtimeDefault indicates that we should use or create a runtime default profile.
 	runtimeDefault = "runtime/default"

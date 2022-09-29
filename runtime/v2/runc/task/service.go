@@ -25,8 +25,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/containerd/cgroups"
-	cgroupsv2 "github.com/containerd/cgroups/v2"
 	eventstypes "github.com/containerd/containerd/api/events"
 	taskAPI "github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/api/types/task"
@@ -45,6 +43,9 @@ import (
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/containerd/sys/reaper"
+
+	"github.com/containerd/cgroups"
+	cgroupsv2 "github.com/containerd/cgroups/v2"
 	runcC "github.com/containerd/go-runc"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl"

@@ -27,9 +27,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/containerd/cgroups"
-	cgroupsv2 "github.com/containerd/cgroups/v2"
-	"github.com/containerd/console"
 	"github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
@@ -37,6 +34,10 @@ import (
 	"github.com/containerd/containerd/pkg/process"
 	"github.com/containerd/containerd/pkg/stdio"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
+
+	"github.com/containerd/cgroups"
+	cgroupsv2 "github.com/containerd/cgroups/v2"
+	"github.com/containerd/console"
 	"github.com/containerd/typeurl"
 	"github.com/sirupsen/logrus"
 )

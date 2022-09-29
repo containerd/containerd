@@ -267,45 +267,6 @@ func TestValidateConfig(t *testing.T) {
 			},
 			expectedErr: fmt.Sprintf("`runtime_root` only works for runtime %s", plugin.RuntimeLinuxV1),
 		},
-		"deprecated auths": {
-			config: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Type: plugin.RuntimeRuncV1,
-						},
-					},
-				},
-				Registry: Registry{
-					Auths: map[string]AuthConfig{
-						"https://gcr.io": {Username: "test"},
-					},
-				},
-			},
-			expected: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Type: plugin.RuntimeRuncV1,
-						},
-					},
-				},
-				Registry: Registry{
-					Configs: map[string]RegistryConfig{
-						"gcr.io": {
-							Auth: &AuthConfig{
-								Username: "test",
-							},
-						},
-					},
-					Auths: map[string]AuthConfig{
-						"https://gcr.io": {Username: "test"},
-					},
-				},
-			},
-		},
 		"invalid stream_idle_timeout": {
 			config: &PluginConfig{
 				StreamIdleTimeout: "invalid",

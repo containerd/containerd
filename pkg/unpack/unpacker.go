@@ -78,7 +78,7 @@ type Platform struct {
 type UnpackerOpt func(*unpackerConfig) error
 
 func WithUnpackPlatform(u Platform) UnpackerOpt {
-	return UnpackerOpt(func(c *unpackerConfig) error {
+	return func(c *unpackerConfig) error {
 		if u.Platform == nil {
 			u.Platform = platforms.All
 		}
@@ -99,21 +99,21 @@ func WithUnpackPlatform(u Platform) UnpackerOpt {
 		c.platforms = append(c.platforms, &u)
 
 		return nil
-	})
+	}
 }
 
 func WithLimiter(l *semaphore.Weighted) UnpackerOpt {
-	return UnpackerOpt(func(c *unpackerConfig) error {
+	return func(c *unpackerConfig) error {
 		c.limiter = l
 		return nil
-	})
+	}
 }
 
 func WithDuplicationSuppressor(d kmutex.KeyedLocker) UnpackerOpt {
-	return UnpackerOpt(func(c *unpackerConfig) error {
+	return func(c *unpackerConfig) error {
 		c.duplicationSuppressor = d
 		return nil
-	})
+	}
 }
 
 // Unpacker unpacks images by hooking into the image handler process.

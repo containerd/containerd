@@ -92,7 +92,7 @@ func (s *snapshotsSyncer) sync() error {
 				continue
 			}
 		}
-		// Get newest stats if the snapshot is new or active.
+		// Get the newest stats if the snapshot is new or active.
 		sn = snapshotstore.Snapshot{
 			Key:       info.Name,
 			Kind:      info.Kind,

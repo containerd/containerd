@@ -38,6 +38,7 @@ import (
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime"
 	client "github.com/containerd/containerd/runtime/v2/shim"
+
 	"github.com/containerd/ttrpc"
 	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
@@ -313,8 +314,8 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 		removeTask(ctx, s.ID())
 	}
 
-	// Don't shutdown sandbox as there may be other containers running.
-	// Let controller decide when to shutdown.
+	// Don't shut down sandbox as there may be other containers running.
+	// Let controller decide when to shut down.
 	if !sandboxed {
 		if err := s.waitShutdown(ctx); err != nil {
 			log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim task")

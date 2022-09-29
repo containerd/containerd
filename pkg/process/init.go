@@ -36,8 +36,9 @@ import (
 	"github.com/containerd/containerd/pkg/stdio"
 	google_protobuf "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/fifo"
-	runc "github.com/containerd/go-runc"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/containerd/go-runc"
+
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
 )
 

@@ -141,7 +141,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		}
 	}()
 
-	// wait is a long running background request, no timeout needed.
+	// wait is a long-running background request, no timeout needed.
 	exitCh, err := task.Wait(ctrdutil.NamespacedContext())
 	if err != nil {
 		return nil, fmt.Errorf("failed to wait for containerd task: %w", err)

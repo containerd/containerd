@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"time"
 
 	"github.com/containerd/containerd/log"
@@ -194,10 +193,6 @@ type Registry struct {
 	// The key is the domain name or IP of the registry.
 	// This option will be fully deprecated for ConfigPath in the future.
 	Configs map[string]RegistryConfig `toml:"configs" json:"configs"`
-	// Auths are registry endpoint to auth config mapping. The registry endpoint must
-	// be a valid url with host specified.
-	// DEPRECATED: Use ConfigPath instead. Remove in containerd 1.6.
-	Auths map[string]AuthConfig `toml:"auths" json:"auths"`
 	// Headers adds additional HTTP headers that get sent to all registries
 	Headers map[string][]string `toml:"headers" json:"headers"`
 }
@@ -449,28 +444,6 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 			return errors.New("`configs.tls` cannot be set when `config_path` is provided")
 		}
 		log.G(ctx).Warning("`configs.tls` is deprecated, please use `config_path` instead")
-	}
-
-	// Validation for deprecated auths options and mapping it to configs.
-	if len(c.Registry.Auths) != 0 {
-		if c.Registry.Configs == nil {
-			c.Registry.Configs = make(map[string]RegistryConfig)
-		}
-		for endpoint, auth := range c.Registry.Auths {
-			auth := auth
-			u, err := url.Parse(endpoint)
-			if err != nil {
-				return fmt.Errorf("failed to parse registry url %q from `registry.auths`: %w", endpoint, err)
-			}
-			if u.Scheme != "" {
-				// Do not include the scheme in the new registry config.
-				endpoint = u.Host
-			}
-			config := c.Registry.Configs[endpoint]
-			config.Auth = &auth
-			c.Registry.Configs[endpoint] = config
-		}
-		log.G(ctx).Warning("`auths` is deprecated, please use `configs` instead")
 	}
 
 	// Validation for stream_idle_timeout

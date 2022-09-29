@@ -20,7 +20,8 @@ import (
 	"context"
 
 	contentapi "github.com/containerd/containerd/api/services/content/v1"
-	digest "github.com/opencontainers/go-digest"
+
+	"github.com/opencontainers/go-digest"
 )
 
 type remoteReaderAt struct {

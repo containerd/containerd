@@ -110,8 +110,8 @@ func (c *Controller) toContainerdImage(ctx context.Context, image imagestore.Ima
 	return c.client.GetImage(ctx, image.References[0])
 }
 
-// getUserFromImage gets uid or user name of the image user.
-// If user is numeric, it will be treated as uid; or else, it is treated as user name.
+// getUserFromImage gets uid or username of the image user.
+// If user is numeric, it will be treated as uid; or else, it is treated as username.
 func getUserFromImage(user string) (*int64, string) {
 	// return both empty if user is not specified in the image.
 	if user == "" {
@@ -119,7 +119,7 @@ func getUserFromImage(user string) (*int64, string) {
 	}
 	// split instances where the id may contain user:group
 	user = strings.Split(user, ":")[0]
-	// user could be either uid or user name. Try to interpret as numeric uid.
+	// user could be either uid or username. Try to interpret as numeric uid.
 	uid, err := strconv.ParseInt(user, 10, 64)
 	if err != nil {
 		// If user is non numeric, assume it's user name.

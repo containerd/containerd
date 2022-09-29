@@ -27,7 +27,7 @@ type Bool interface {
 	IsSet() bool
 }
 
-// NewBool creates an Bool with given default value
+// NewBool creates a Bool with given default value
 func NewBool(ok bool) Bool {
 	ab := new(atomicBool)
 	if ok {

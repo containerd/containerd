@@ -33,7 +33,7 @@ type Snapshot struct {
 	Size uint64
 	// Inodes is the number of inodes used by the snapshot
 	Inodes uint64
-	// Timestamp is latest update time (in nanoseconds) of the snapshot
+	// Timestamp is the latest update time (in nanoseconds) of the snapshot
 	// information.
 	Timestamp int64
 }

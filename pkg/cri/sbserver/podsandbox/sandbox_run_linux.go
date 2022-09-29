@@ -24,17 +24,17 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/pkg/cri/annotations"
+	customopts "github.com/containerd/containerd/pkg/cri/opts"
+	osinterface "github.com/containerd/containerd/pkg/os"
+	"github.com/containerd/containerd/pkg/userns"
 	"github.com/containerd/containerd/plugin"
+
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	"github.com/containerd/containerd/pkg/cri/annotations"
-	customopts "github.com/containerd/containerd/pkg/cri/opts"
-	osinterface "github.com/containerd/containerd/pkg/os"
-	"github.com/containerd/containerd/pkg/userns"
 )
 
 func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
@@ -103,9 +103,9 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	}
 	// Remove the default /dev/shm mount from defaultMounts, it is added in oci/mounts.go.
 	specOpts = append(specOpts, oci.WithoutMounts(devShm))
-	// In future the when user-namespace is enabled, the `nosuid, nodev, noexec` flags are
+	// In future when user-namespace is enabled, the `nosuid, nodev, noexec` flags are
 	// required, otherwise the remount will fail with EPERM. Just use them unconditionally,
-	// they are nice to have anyways.
+	// they are nice to have anyway.
 	specOpts = append(specOpts, oci.WithMounts([]runtimespec.Mount{
 		{
 			Source:      sandboxDevShm,
@@ -169,7 +169,7 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 			customopts.WithAnnotation(annotations.SandboxMem, strconv.FormatInt(res.MemoryLimitInBytes, 10)))
 	}
 
-	specOpts = append(specOpts, customopts.WithPodOOMScoreAdj(int(defaultSandboxOOMAdj), c.config.RestrictOOMScoreAdj))
+	specOpts = append(specOpts, customopts.WithPodOOMScoreAdj(defaultSandboxOOMAdj, c.config.RestrictOOMScoreAdj))
 
 	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
 		runtimePodAnnotations) {

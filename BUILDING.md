@@ -112,7 +112,7 @@ make generate
 
 Vendoring of external imports uses the [Go Modules](https://golang.org/ref/mod#vendoring). You need
 to use `go mod` command to modify the dependencies. After modifition, you should run `go mod tidy`
-and `go mod vendor` to ensure the `go.mod`, `go.sum` files and `vendor` directory are up to date.
+and `go mod vendor` to ensure the `go.mod`, `go.sum` files and `vendor` directory are up-to-date.
 Changes to these files should become a single commit for a PR which relies on vendored updates.
 
 Please refer to [RUNC.md](/docs/RUNC.md) for the currently supported version of `runc` that is used by containerd.

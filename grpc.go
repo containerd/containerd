@@ -48,5 +48,5 @@ func newNSInterceptors(ns string) (grpc.UnaryClientInterceptor, grpc.StreamClien
 	ni := namespaceInterceptor{
 		namespace: ns,
 	}
-	return grpc.UnaryClientInterceptor(ni.unary), grpc.StreamClientInterceptor(ni.stream)
+	return ni.unary, ni.stream
 }

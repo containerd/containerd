@@ -42,7 +42,7 @@ import (
 	"github.com/containerd/containerd/pkg/netns"
 )
 
-// NOTE: The recovery logic has following assumption: when the cri plugin is down:
+// NOTE: The recovery logic has the following assumption: when the cri plugin is down:
 // 1) Files (e.g. root directory, netns) and checkpoint maintained by the plugin MUST NOT be
 // touched. Or else, recovery logic for those containers/sandboxes may return error.
 // 2) Containerd containers may be deleted, but SHOULD NOT be added. Or else, recovery logic
@@ -118,8 +118,8 @@ func (c *criService) recover(ctx context.Context) error {
 	c.loadImages(ctx, cImages)
 
 	// It's possible that containerd containers are deleted unexpectedly. In that case,
-	// we can't even get metadata, we should cleanup orphaned sandbox/container directories
-	// with best effort.
+	// we can't even get metadata, we should clean up orphaned sandbox/container directories
+	// with the best effort.
 
 	// Cleanup orphaned sandbox and container directories without corresponding containerd container.
 	for _, cleanup := range []struct {
@@ -295,7 +295,7 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 					status.Pid = t.Pid()
 				}
 				// Wait for the task for exit monitor.
-				// wait is a long running background request, no timeout needed.
+				// wait is a long-running background request, no timeout needed.
 				exitCh, err := t.Wait(ctrdutil.NamespacedContext())
 				if err != nil {
 					if !errdefs.IsNotFound(err) {
@@ -396,7 +396,7 @@ func (c *criService) loadSandbox(ctx context.Context, cntr containerd.Container)
 		} else {
 			if taskStatus.Status == containerd.Running {
 				// Wait for the task for sandbox monitor.
-				// wait is a long running background request, no timeout needed.
+				// wait is a long-running background request, no timeout needed.
 				exitCh, err := t.Wait(ctrdutil.NamespacedContext())
 				if err != nil {
 					if !errdefs.IsNotFound(err) {

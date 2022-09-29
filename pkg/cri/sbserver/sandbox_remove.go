@@ -105,7 +105,7 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	// deleted:
 	// 1) ListPodSandbox will not include this sandbox.
 	// 2) PodSandboxStatus and StopPodSandbox will return error.
-	// 3) On-going operations which have held the reference will not be affected.
+	// 3) Ongoing operations which have held the reference will not be affected.
 	c.sandboxStore.Delete(id)
 
 	if err := c.client.SandboxStore().Delete(ctx, id); err != nil {

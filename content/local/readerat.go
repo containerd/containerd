@@ -39,8 +39,7 @@ func OpenReader(p string) (content.ReaderAt, error) {
 		if !os.IsNotExist(err) {
 			return nil, err
 		}
-
-		return nil, fmt.Errorf("blob not found: %w", errdefs.ErrNotFound)
+		return nil, fmt.Errorf("blob(%s) not found: %w", p, errdefs.ErrNotFound)
 	}
 
 	fp, err := os.Open(p)
@@ -48,8 +47,7 @@ func OpenReader(p string) (content.ReaderAt, error) {
 		if !os.IsNotExist(err) {
 			return nil, err
 		}
-
-		return nil, fmt.Errorf("blob not found: %w", errdefs.ErrNotFound)
+		return nil, fmt.Errorf("open blob(%s) failed: %w", p, errdefs.ErrNotFound)
 	}
 
 	return sizeReaderAt{size: fi.Size(), fp: fp}, nil

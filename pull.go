@@ -263,7 +263,7 @@ func (c *Client) createNewImage(ctx context.Context, img images.Image) (images.I
 
 			updated, err := is.Update(ctx, img)
 			if err != nil {
-				// if image was removed, try create again
+				// if image was removed, try to create again
 				if errdefs.IsNotFound(err) {
 					continue
 				}

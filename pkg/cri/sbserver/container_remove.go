@@ -74,7 +74,7 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	}()
 
 	// NOTE(random-liu): Docker set container to "Dead" state when start removing the
-	// container so as to avoid start/restart the container again. However, for current
+	// container to avoid start/restart the container again. However, for current
 	// kubelet implementation, we'll never start a container once we decide to remove it,
 	// so we don't need the "Dead" state for now.
 

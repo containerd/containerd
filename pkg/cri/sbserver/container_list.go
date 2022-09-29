@@ -85,7 +85,7 @@ func (c *criService) filterCRIContainers(containers []*runtime.Container, filter
 	}
 
 	c.normalizeContainerFilter(filter)
-	filtered := []*runtime.Container{}
+	var filtered []*runtime.Container
 	for _, cntr := range containers {
 		if filter.GetId() != "" && filter.GetId() != cntr.Id {
 			continue

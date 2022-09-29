@@ -220,7 +220,7 @@ func (c *Controller) Start(ctx context.Context, id string) (_ *api.ControllerSta
 		}
 	}()
 
-	// wait is a long running background request, no timeout needed.
+	// wait is a long-running background request, no timeout needed.
 	exitCh, err := task.Wait(ctrdutil.NamespacedContext())
 	if err != nil {
 		return nil, fmt.Errorf("failed to wait for sandbox container task: %w", err)

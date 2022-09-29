@@ -340,7 +340,7 @@ type RemoteContext struct {
 	BaseHandlers []images.Handler
 
 	// HandlerWrapper wraps the handler which gets sent to dispatch.
-	// Unlike BaseHandlers, this can run before and after the built
+	// Unlike BaseHandlers, this can run before and after the built-
 	// in handlers, allowing operations to run on the descriptor
 	// after it has completed transferring.
 	HandlerWrapper func(images.Handler) images.Handler
@@ -514,7 +514,7 @@ func (c *Client) Restore(ctx context.Context, id string, checkpoint Image, opts 
 	}
 	defer done(ctx)
 
-	copts := []NewContainerOpts{}
+	var copts []NewContainerOpts
 	for _, o := range opts {
 		copts = append(copts, o(ctx, id, c, checkpoint, index))
 	}

@@ -44,10 +44,11 @@ import (
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl"
-	digest "github.com/opencontainers/go-digest"
+
+	"github.com/opencontainers/go-digest"
 	is "github.com/opencontainers/image-spec/specs-go"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // UnknownExitStatus is returned when containerd is unable to
@@ -79,7 +80,7 @@ type ProcessInfo struct {
 	Info *google_protobuf.Any
 }
 
-// ProcessStatus returns a human readable status for the Process representing its current status
+// ProcessStatus returns a human-readable status for the Process representing its current status
 type ProcessStatus string
 
 const (
@@ -88,7 +89,7 @@ const (
 	// Created indicates the process has been created within containerd but the
 	// user's defined process has not started
 	Created ProcessStatus = "created"
-	// Stopped indicates that the process has ran and exited
+	// Stopped indicates that the process has run and exited
 	Stopped ProcessStatus = "stopped"
 	// Paused indicates that the process is currently paused
 	Paused ProcessStatus = "paused"
@@ -174,7 +175,7 @@ type Task interface {
 	// Metrics returns task metrics for runtime specific metrics
 	//
 	// The metric types are generic to containerd and change depending on the runtime
-	// For the built in Linux runtime, github.com/containerd/cgroups.Metrics
+	// For the built-in Linux runtime, github.com/containerd/cgroups.Metrics
 	// are returned in protobuf format
 	Metrics(context.Context) (*types.Metric, error)
 	// Spec returns the current OCI specification for the task
@@ -308,7 +309,7 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 	case Stopped, Unknown, "":
 	case Created:
 		if t.client.runtime == fmt.Sprintf("%s.%s", plugin.RuntimePlugin, "windows") {
-			// On windows Created is akin to Stopped
+			// On Windows Created is akin to Stopped
 			break
 		}
 		fallthrough

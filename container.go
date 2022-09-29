@@ -36,6 +36,7 @@ import (
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/fifo"
 	"github.com/containerd/typeurl"
+
 	ver "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/selinux/go-selinux/label"
@@ -144,7 +145,7 @@ func (c *container) SetLabels(ctx context.Context, labels map[string]string) (ma
 
 	var paths []string
 	// mask off paths so we only muck with the labels encountered in labels.
-	// Labels not in the passed in argument will be left alone.
+	// Labels not in the past in argument will be left alone.
 	for k := range labels {
 		paths = append(paths, strings.Join([]string{"labels", k}, "."))
 	}

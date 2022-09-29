@@ -47,7 +47,7 @@ func (c *criService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequ
 		var opts []images.DeleteOpt
 		if i == len(image.References)-1 {
 			// Delete the last image reference synchronously to trigger garbage collection.
-			// This is best effort. It is possible that the image reference is deleted by
+			// This is the best effort. It is possible that the image reference is deleted by
 			// someone else before this point.
 			opts = []images.DeleteOpt{images.SynchronousDelete()}
 		}

@@ -34,7 +34,7 @@ import (
 type Sandbox interface {
 	// ID is a sandbox identifier
 	ID() string
-	// PID returns sandbox's process PID or error if its not yet started.
+	// PID returns sandbox's process PID or error if it's not yet started.
 	PID() (uint32, error)
 	// NewContainer creates new container that will belong to this sandbox
 	NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error)
@@ -158,7 +158,7 @@ func (c *Client) NewSandbox(ctx context.Context, sandboxID string, opts ...NewSa
 	}, nil
 }
 
-// LoadSandbox laods existing sandbox metadata object using the id
+// LoadSandbox loads existing sandbox metadata object using the id
 func (c *Client) LoadSandbox(ctx context.Context, id string) (Sandbox, error) {
 	sandbox, err := c.SandboxStore().Get(ctx, id)
 	if err != nil {

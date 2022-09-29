@@ -149,7 +149,11 @@ Filesystems are provided by the containerd snapshotters.
 
 ### Events
 
-The Runtime v2 supports an async event model. In order for the an upstream caller (such as Docker) to get these events in the correct order a Runtime v2 shim MUST implement the following events where `Compliance=MUST`. This avoids race conditions between the shim and shim client where for example a call to `Start` can signal a `TaskExitEventTopic` before even returning the results from the `Start` call. With these guarantees of a Runtime v2 shim a call to `Start` is required to have published the async event `TaskStartEventTopic` before the shim can publish the `TaskExitEventTopic`.
+The Runtime v2 supports an async event model. In order for the an upstream caller (such as Docker) to get these events in 
+the correct order a Runtime v2 shim MUST implement the following events where `Compliance=MUST`. This avoids race conditions 
+between the shim and shim client where for example a call to `Start` can signal a `TaskExitEventTopic` before even returning 
+the results from the `Start` call. With these guarantees of a Runtime v2 shim a call to `Start` is required to have published 
+the async event `TaskStartEventTopic` before the shim can publish the `TaskExitEventTopic`.
 
 #### Tasks
 
