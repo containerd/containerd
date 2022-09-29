@@ -27,7 +27,21 @@ import (
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/tracing"
+
 	bolt "go.etcd.io/bbolt"
+)
+
+var (
+	resourceTypeMap = map[gc.ResourceType]string{
+		ResourceUnknown:   "ResourceUnknown",
+		ResourceContent:   "ResourceContent",
+		ResourceSnapshot:  "ResourceSnapshot",
+		ResourceContainer: "ResourceContainer",
+		ResourceTask:      "ResourceTask",
+		ResourceLease:     "ResourceLease",
+		ResourceIngest:    "ResourceIngest",
+	}
 )
 
 const (
@@ -112,6 +126,8 @@ type referenceLabelHandler struct {
 }
 
 func startGCContext(ctx context.Context, collectors map[gc.ResourceType]Collector) *gcContext {
+	ctx, span := tracing.StartSpan(ctx, tracing.Name(gcSpanPrefix, "startGCContext"))
+	defer span.End()
 	var contexts map[gc.ResourceType]CollectionContext
 	labelHandlers := []referenceLabelHandler{
 		{
@@ -203,6 +219,8 @@ func (c *gcContext) cancel(ctx context.Context) {
 }
 
 func (c *gcContext) finish(ctx context.Context) {
+	_, span := tracing.StartSpan(ctx, tracing.Name(gcSpanPrefix, "finish"))
+	defer span.End()
 	for _, gctx := range c.contexts {
 		if err := gctx.Finish(); err != nil {
 			log.G(ctx).WithError(err).Error("failed to finish collection context")
@@ -213,6 +231,8 @@ func (c *gcContext) finish(ctx context.Context) {
 // scanRoots sends the given channel "root" resources that are certainly used.
 // The caller could look the references of the resources to find all resources that are used.
 func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
+	_, span := tracing.StartSpan(ctx, tracing.Name(gcSpanPrefix, "scanRoots"))
+	defer span.End()
 	v1bkt := tx.Bucket(bucketKeyVersion)
 	if v1bkt == nil {
 		return nil
@@ -486,6 +506,8 @@ func (c *gcContext) references(ctx context.Context, tx *bolt.Tx, node gc.Node, f
 
 // scanAll finds all resources regardless whether the resources are used or not.
 func (c *gcContext) scanAll(ctx context.Context, tx *bolt.Tx, fn func(ctx context.Context, n gc.Node) error) error {
+	ctx, span := tracing.StartSpan(ctx, tracing.Name(gcSpanPrefix, "scanAll"))
+	defer span.End()
 	v1bkt := tx.Bucket(bucketKeyVersion)
 	if v1bkt == nil {
 		return nil
@@ -571,6 +593,12 @@ func (c *gcContext) scanAll(ctx context.Context, tx *bolt.Tx, fn func(ctx contex
 
 // remove all buckets for the given node.
 func (c *gcContext) remove(ctx context.Context, tx *bolt.Tx, node gc.Node) (interface{}, error) {
+	_, span := tracing.StartSpan(ctx, tracing.Name(gcSpanPrefix, "remove"))
+	span.SetAttributes(tracing.Attribute("bucket.remove.node.type", resourceTypeMap[node.Type]),
+		tracing.Attribute("bucket.remove.node.namespace", node.Namespace),
+		tracing.Attribute("bucket.remove.node.key", node.Key))
+	defer span.End()
+
 	v1bkt := tx.Bucket(bucketKeyVersion)
 	if v1bkt == nil {
 		return nil, nil

@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/tracing"
 )
 
 // config configures the garbage collection policies.
@@ -305,6 +306,13 @@ func (s *gcScheduler) run(ctx context.Context) {
 		}
 
 		s.waiterL.Lock()
+		ctx, gcRunSpan := tracing.StartSpan(ctx, tracing.Name(gcSpanPrefix, "run"))
+		gcRunSpan.SetAttributes(
+			tracing.Attribute("schedule.pause_threshold", s.pauseThreshold),
+			tracing.Attribute("schedule.deletion_threshold", s.deletionThreshold),
+			tracing.Attribute("schedule.mutation_threshold", s.mutationThreshold),
+			tracing.Attribute("schedule.delay", s.scheduleDelay.String()),
+			tracing.Attribute("schedule.startup_delay", s.startupDelay.String()))
 
 		stats, err := s.c.GarbageCollect(ctx)
 		last := time.Now()
@@ -323,12 +331,20 @@ func (s *gcScheduler) run(ctx context.Context) {
 			}
 			s.waiters = nil
 			s.waiterL.Unlock()
+			gcRunSpan.SetStatus(err)
+			gcRunSpan.SetAttributes(tracing.Attribute("schedule.collection.next_gc", nextCollection.String()),
+				tracing.Attribute("schedule.collection.last_gc", lastCollection.String()))
+			gcRunSpan.End()
 			continue
 		}
 
 		gcTime := stats.Elapsed()
 		gcTimeHist.Update(gcTime)
 		log.G(ctx).WithField("d", gcTime).Debug("garbage collected")
+		gcRunSpan.SetAttributes(tracing.Attribute("schedule.run.triggered", triggered),
+			tracing.Attribute("schedule.run.deletions", deletions),
+			tracing.Attribute("schedule.run.mutations", mutations))
+
 		gcTimeSum += gcTime
 		collections++
 		collectionCounter.WithValues("success").Inc()
@@ -354,5 +370,15 @@ func (s *gcScheduler) run(ctx context.Context) {
 		}
 		s.waiters = nil
 		s.waiterL.Unlock()
+		gcRunSpan.SetAttributes(tracing.Attribute("schedule.gc_time", gcTime.String()),
+			tracing.Attribute("schedule.collections", collections),
+			tracing.Attribute("schedule.collection.next_gc", nextCollection.String()),
+			tracing.Attribute("schedule.collection.last_gc", lastCollection.String()))
+		gcRunSpan.End()
 	}
 }
+
+const (
+	// name prefix for GC specific spans
+	gcSpanPrefix = "gc.scheduler.scheduler"
+)

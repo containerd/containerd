@@ -34,7 +34,10 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/cleanup"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/tracing"
+
 	bolt "go.etcd.io/bbolt"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
@@ -354,6 +357,9 @@ func (s GCStats) Elapsed() time.Duration {
 func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 	m.wlock.Lock()
 	t1 := time.Now()
+	ctx, gcSpan := tracing.StartSpan(ctx, tracing.Name(dbSpanPrefix, "GarbageCollect"))
+	defer gcSpan.End()
+
 	c := startGCContext(ctx, m.collectors)
 
 	marked, err := m.getMarked(ctx, c) // Pass in gc context
@@ -460,9 +466,10 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 
 // getMarked returns all resources that are used.
 func (m *DB) getMarked(ctx context.Context, c *gcContext) (map[gc.Node]struct{}, error) {
+	span := tracing.SpanFromContext(ctx)
 	var marked map[gc.Node]struct{}
 	if err := m.db.View(func(tx *bolt.Tx) error {
-		ctx, cancel := context.WithCancel(ctx)
+		cancelCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
 		var (
@@ -478,16 +485,17 @@ func (m *DB) getMarked(ctx context.Context, c *gcContext) (map[gc.Node]struct{},
 			}
 		}()
 		// Call roots
-		if err := c.scanRoots(ctx, tx, roots); err != nil { // From gc context
+		if err := c.scanRoots(cancelCtx, tx, roots); err != nil { // From gc context
 			cancel()
 			return err
 		}
 		close(roots)
 		wg.Wait()
+		span.SetAttributes(attribute.Int("root-node-num", len(nodes)))
 
 		refs := func(n gc.Node) ([]gc.Node, error) {
 			var sn []gc.Node
-			if err := c.references(ctx, tx, n, func(nn gc.Node) { // From gc context
+			if err := c.references(cancelCtx, tx, n, func(nn gc.Node) { // From gc context
 				sn = append(sn, nn)
 			}); err != nil {
 				return nil, err
@@ -507,14 +515,23 @@ func (m *DB) getMarked(ctx context.Context, c *gcContext) (map[gc.Node]struct{},
 	return marked, nil
 }
 
-func (m *DB) cleanupSnapshotter(ctx context.Context, name string) (time.Duration, error) {
+func (m *DB) cleanupSnapshotter(ctx context.Context, name string) (d time.Duration, err error) {
 	ctx = cleanup.Background(ctx)
+	ctx, span := tracing.StartSpan(ctx, tracing.Name(dbSpanPrefix, "cleanupSnapshotter"))
+	span.SetAttributes(tracing.Attribute("snapshotter.cleanup.name", name))
+	defer func() {
+		if err != nil {
+			span.SetStatus(err)
+		}
+		span.SetAttributes(tracing.Attribute("snapshotter.cleanup.duration", d.String()))
+		span.End()
+	}()
 	sn, ok := m.ss[name]
 	if !ok {
 		return 0, nil
 	}
 
-	d, err := sn.garbageCollect(ctx)
+	d, err = sn.garbageCollect(ctx)
 	logger := log.G(ctx).WithField("snapshotter", name)
 	if err != nil {
 		logger.WithError(err).Warn("snapshot garbage collection failed")
@@ -524,13 +541,21 @@ func (m *DB) cleanupSnapshotter(ctx context.Context, name string) (time.Duration
 	return d, err
 }
 
-func (m *DB) cleanupContent(ctx context.Context) (time.Duration, error) {
+func (m *DB) cleanupContent(ctx context.Context) (d time.Duration, err error) {
 	ctx = cleanup.Background(ctx)
+	ctx, span := tracing.StartSpan(ctx, tracing.Name(dbSpanPrefix, "cleanupContent"))
+	defer func() {
+		if err != nil {
+			span.SetStatus(err)
+		}
+		span.SetAttributes(tracing.Attribute("content.cleanup.duration", d.String()))
+		span.End()
+	}()
 	if m.cs == nil {
 		return 0, nil
 	}
 
-	d, err := m.cs.garbageCollect(ctx)
+	d, err = m.cs.garbageCollect(ctx)
 	if err != nil {
 		log.G(ctx).WithError(err).Warn("content garbage collection failed")
 	} else {

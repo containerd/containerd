@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/tracing"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	bolt "go.etcd.io/bbolt"
@@ -801,6 +802,7 @@ func writeExpireAt(expire time.Time, bkt *bolt.Bucket) error {
 
 // garbageCollect removes all contents that are no longer used.
 func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, err error) {
+	ctx, span := tracing.StartSpan(ctx, tracing.Name(contentSpanPrefix, "garbageCollect"))
 	cs.l.Lock()
 	t1 := time.Now()
 	defer func() {
@@ -808,6 +810,8 @@ func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, er
 			d = time.Since(t1)
 		}
 		cs.l.Unlock()
+		span.SetAttributes(tracing.Attribute("gc.duration", d.String()))
+		span.End()
 	}()
 
 	contentSeen := map[string]struct{}{}
@@ -820,7 +824,6 @@ func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, er
 
 		// iterate through each namespace
 		v1c := v1bkt.Cursor()
-
 		for k, v := v1c.First(); k != nil; k, v = v1c.Next() {
 			if v != nil {
 				continue
