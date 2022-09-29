@@ -137,6 +137,7 @@ func newTracer(ic *plugin.InitContext) (io.Closer, error) {
 	config := ic.Config.(*TraceConfig)
 
 	res, err := resource.New(ctx,
+		resource.WithHost(),
 		resource.WithAttributes(
 			// Service name used to displace traces in backends
 			semconv.ServiceNameKey.String(config.ServiceName),
@@ -146,8 +147,10 @@ func newTracer(ic *plugin.InitContext) (io.Closer, error) {
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
 
+	sampler := sdktrace.ParentBased(sdktrace.TraceIDRatioBased(config.TraceSamplingRatio))
+
 	opts := []sdktrace.TracerProviderOption{
-		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(config.TraceSamplingRatio)),
+		sdktrace.WithSampler(sampler),
 		sdktrace.WithResource(res),
 	}
 
@@ -175,7 +178,8 @@ func newTracer(ic *plugin.InitContext) (io.Closer, error) {
 	provider := sdktrace.NewTracerProvider(opts...)
 
 	otel.SetTracerProvider(provider)
-	otel.SetTextMapPropagator(propagation.TraceContext{})
+
+	otel.SetTextMapPropagator(propagators())
 
 	return &closer{close: func() error {
 		for _, p := range procs {
@@ -185,4 +189,9 @@ func newTracer(ic *plugin.InitContext) (io.Closer, error) {
 		}
 		return nil
 	}}, nil
+}
+
+// Returns a composite TestMap propagator
+func propagators() propagation.TextMapPropagator {
+	return propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})
 }

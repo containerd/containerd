@@ -36,6 +36,7 @@ import (
 	"github.com/containerd/imgcrypt"
 	"github.com/containerd/imgcrypt/images/encryption"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"go.opentelemetry.io/otel/attribute"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd"
@@ -48,6 +49,7 @@ import (
 	distribution "github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/config"
+	"github.com/containerd/containerd/tracing"
 )
 
 // For image management:
@@ -93,6 +95,7 @@ import (
 
 // PullImage pulls an image with authentication config.
 func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (*runtime.PullImageResponse, error) {
+	span := tracing.CurrentSpan(ctx)
 	imageRef := r.GetImage().GetImage()
 	namedRef, err := distribution.ParseDockerRef(imageRef)
 	if err != nil {
@@ -133,7 +136,10 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		return nil, err
 	}
 	log.G(ctx).Debugf("PullImage %q with snapshotter %s", ref, snapshotter)
-
+	span.SetAttributes(
+		attribute.String("image.ref", ref),
+		attribute.String("snapshotter.name", snapshotter),
+	)
 	pullOpts := []containerd.RemoteOpt{
 		containerd.WithSchema1Conversion, //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 		containerd.WithResolver(resolver),
@@ -165,6 +171,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
 	}
+	span.AddEvent("Pull and unpack image complete")
 
 	configDesc, err := image.Config(ctx)
 	if err != nil {

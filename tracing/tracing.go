@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -34,4 +35,20 @@ func StartSpan(ctx context.Context, opName string, opts ...trace.SpanStartOption
 // StopSpan ends the span specified
 func StopSpan(span trace.Span) {
 	span.End()
+}
+
+// CurrentSpan returns current span from context or noopSpan if no span exists.
+func CurrentSpan(ctx context.Context) trace.Span {
+	return trace.SpanFromContext(ctx)
+}
+
+// SetSpanStatus sets the status of the current span.
+// If an error is encountered, it records the error and sets span status to Error.
+func SetSpanStatus(span trace.Span, err error) {
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+	} else {
+		span.SetStatus(codes.Ok, "")
+	}
 }

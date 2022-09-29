@@ -28,14 +28,20 @@ import (
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/schema1" //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
+	"github.com/containerd/containerd/tracing"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/semaphore"
 )
 
 // Pull downloads the provided content into containerd's content store
 // and returns a platform specific image object
 func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Image, retErr error) {
+	ctx, span := tracing.StartSpan(ctx, "pull.Pull")
+	defer tracing.StopSpan(span)
+
 	pullCtx := defaultRemoteContext()
+
 	for _, o := range opts {
 		if err := o(c, pullCtx); err != nil {
 			return nil, err
@@ -57,6 +63,14 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		}
 	}
 
+	span.SetAttributes(
+		attribute.String("image.ref", ref),
+		attribute.Bool("unpack", pullCtx.Unpack),
+		attribute.Int("max.concurrent.downloads", pullCtx.MaxConcurrentDownloads),
+		attribute.Int("max.concurrent.upload.layers", pullCtx.MaxConcurrentUploadedLayers),
+		attribute.Int("platforms.count", len(pullCtx.Platforms)),
+	)
+
 	ctx, done, err := c.WithLease(ctx)
 	if err != nil {
 		return nil, err
@@ -70,6 +84,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		if err != nil {
 			return nil, fmt.Errorf("unable to resolve snapshotter: %w", err)
 		}
+		span.SetAttributes(attribute.String("snapshotter.name", snapshotterName))
 		var uconfig UnpackConfig
 		for _, opt := range pullCtx.UnpackOpts {
 			if err := opt(ctx, &uconfig); err != nil {
@@ -127,9 +142,13 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 	// download).
 	var ur unpack.Result
 	if unpacker != nil {
+		_, unpackSpan := tracing.StartSpan(ctx, "pull.UnpackWait")
 		if ur, err = unpacker.Wait(); err != nil {
+			unpackSpan.RecordError(err)
+			tracing.StopSpan(unpackSpan)
 			return nil, err
 		}
+		tracing.StopSpan(unpackSpan)
 	}
 
 	img, err = c.createNewImage(ctx, img)
@@ -138,6 +157,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 	}
 
 	i := NewImageWithPlatform(c, img, pullCtx.PlatformMatcher)
+	span.SetAttributes(attribute.String("image.ref", i.Name()))
 
 	if unpacker != nil && ur.Unpacks == 0 {
 		// Unpack was tried previously but nothing was unpacked
@@ -151,6 +171,8 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 }
 
 func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, limit int) (images.Image, error) {
+	ctx, span := tracing.StartSpan(ctx, "pull.fetch")
+	defer tracing.StopSpan(span)
 	store := c.ContentStore()
 	name, desc, err := rCtx.Resolver.Resolve(ctx, ref)
 	if err != nil {
@@ -254,6 +276,8 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 }
 
 func (c *Client) createNewImage(ctx context.Context, img images.Image) (images.Image, error) {
+	ctx, span := tracing.StartSpan(ctx, "pull.createNewImage")
+	defer tracing.StopSpan(span)
 	is := c.ImageService()
 	for {
 		if created, err := is.Create(ctx, img); err != nil {

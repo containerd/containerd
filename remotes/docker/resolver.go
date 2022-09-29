@@ -34,10 +34,13 @@ import (
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker/schema1" //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 	remoteerrors "github.com/containerd/containerd/remotes/errors"
+	"github.com/containerd/containerd/tracing"
 	"github.com/containerd/containerd/version"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
+	semconv "go.opentelemetry.io/otel/semconv/v1.10.0"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -566,11 +569,20 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 			return nil
 		}
 	}
-
+	_, httpSpan := tracing.StartSpan(
+		ctx,
+		"remotes.docker.resolver.HTTPRequest",
+		oteltrace.WithSpanKind(oteltrace.SpanKindClient),
+		oteltrace.WithAttributes(semconv.HTTPClientAttributesFromHTTPRequest(req)...),
+	)
 	resp, err := client.Do(req)
 	if err != nil {
+		httpSpan.RecordError(err)
+		tracing.StopSpan(httpSpan)
 		return nil, fmt.Errorf("failed to do request: %w", err)
 	}
+	httpSpan.SetAttributes(semconv.HTTPAttributesFromHTTPStatusCode(resp.StatusCode)...)
+	tracing.StopSpan(httpSpan)
 	log.G(ctx).WithFields(responseFields(resp)).Debug("fetch response received")
 	return resp, nil
 }
