@@ -23,6 +23,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/containers"
+	"github.com/containerd/typeurl"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
@@ -43,4 +47,20 @@ func (c *criService) UpdateContainerResources(ctx context.Context, r *runtime.Up
 		return nil, fmt.Errorf("failed to update resources: %w", err)
 	}
 	return &runtime.UpdateContainerResourcesResponse{}, nil
+}
+
+// TODO: Copied from container_update_resources.go because that file is not built for darwin.
+// updateContainerSpec updates container spec.
+func updateContainerSpec(ctx context.Context, cntr containerd.Container, spec *runtimespec.Spec) error {
+	any, err := typeurl.MarshalAny(spec)
+	if err != nil {
+		return fmt.Errorf("failed to marshal spec %+v: %w", spec, err)
+	}
+	if err := cntr.Update(ctx, func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
+		c.Spec = any
+		return nil
+	}); err != nil {
+		return fmt.Errorf("failed to update container spec: %w", err)
+	}
+	return nil
 }

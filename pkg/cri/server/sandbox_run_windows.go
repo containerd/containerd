@@ -111,3 +111,7 @@ func (c *criService) cleanupSandboxFiles(id string, config *runtime.PodSandboxCo
 func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {
 	return nil
 }
+
+func (c *criService) updateNetNamespacePath(spec *runtimespec.Spec, nsPath string) {
+	spec.Windows.Network.NetworkNamespace = nsPath
+}
