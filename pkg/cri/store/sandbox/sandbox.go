@@ -144,6 +144,7 @@ func (s *Store) UpdateContainerStats(id string, newContainerStats *stats.Contain
 	}
 
 	c := s.sandboxes[id]
+
 	c.Stats = newContainerStats
 	s.sandboxes[id] = c
 	return nil

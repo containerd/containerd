@@ -97,50 +97,18 @@ func (c *criService) getUsageNanoCores(containerID string, isSandbox bool, curre
 	}
 
 	if oldStats == nil {
-		newStats := &stats.ContainerStats{
-			UsageCoreNanoSeconds: currentUsageCoreNanoSeconds,
-			Timestamp:            currentTimestamp,
-		}
-		if isSandbox {
-			err := c.sandboxStore.UpdateContainerStats(containerID, newStats)
-			if err != nil {
-				return 0, fmt.Errorf("failed to update sandbox stats container ID: %s: %w", containerID, err)
-			}
-		} else {
-			err := c.containerStore.UpdateContainerStats(containerID, newStats)
-			if err != nil {
-				return 0, fmt.Errorf("failed to update container stats ID: %s: %w", containerID, err)
-			}
-		}
-		return 0, nil
+		return currentUsageCoreNanoSeconds, nil
 	}
 
-	nanoSeconds := currentTimestamp.UnixNano() - oldStats.Timestamp.UnixNano()
+	nanoSeconds := currentTimestamp.UnixNano() - oldStats.ContainerCPUStats.Timestamp
 
 	// zero or negative interval
 	if nanoSeconds <= 0 {
 		return 0, nil
 	}
 
-	newUsageNanoCores := uint64(float64(currentUsageCoreNanoSeconds-oldStats.UsageCoreNanoSeconds) /
+	newUsageNanoCores := uint64(float64(currentUsageCoreNanoSeconds-oldStats.ContainerCPUStats.UsageCoreNanoSeconds) /
 		float64(nanoSeconds) * float64(time.Second/time.Nanosecond))
-
-	newStats := &stats.ContainerStats{
-		UsageCoreNanoSeconds: currentUsageCoreNanoSeconds,
-		Timestamp:            currentTimestamp,
-	}
-	if isSandbox {
-		err := c.sandboxStore.UpdateContainerStats(containerID, newStats)
-		if err != nil {
-			return 0, fmt.Errorf("failed to update sandbox container stats: %s: %w", containerID, err)
-		}
-
-	} else {
-		err := c.containerStore.UpdateContainerStats(containerID, newStats)
-		if err != nil {
-			return 0, fmt.Errorf("failed to update container stats ID: %s: %w", containerID, err)
-		}
-	}
 
 	return newUsageNanoCores, nil
 }

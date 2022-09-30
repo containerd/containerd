@@ -251,7 +251,16 @@ func TestContainerMetricsMemory(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			got, err := c.memoryContainerStats("ID", test.metrics, timestamp)
+			metrics, err := c.generatedMemoryContainerStats("ID", test.metrics, timestamp)
+			got := &runtime.MemoryUsage{
+				Timestamp:       metrics.Timestamp,
+				WorkingSetBytes: &runtime.UInt64Value{Value: metrics.WorkingSetBytes},
+				AvailableBytes:  &runtime.UInt64Value{Value: metrics.AvailableBytes},
+				UsageBytes:      &runtime.UInt64Value{Value: metrics.UsageBytes},
+				RssBytes:        &runtime.UInt64Value{Value: metrics.RssBytes},
+				PageFaults:      &runtime.UInt64Value{Value: metrics.PageFaults},
+				MajorPageFaults: &runtime.UInt64Value{Value: metrics.MajorPageFaults},
+			}
 			assert.NoError(t, err)
 			assert.Equal(t, test.expected, got)
 		})

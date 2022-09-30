@@ -24,6 +24,7 @@ import (
 	v1 "github.com/containerd/cgroups/stats/v1"
 	v2 "github.com/containerd/cgroups/v2/stats"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+	containerstorestats "github.com/containerd/containerd/pkg/cri/store/stats"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -204,22 +205,36 @@ func TestContainerMetricsCPU(t *testing.T) {
 			err = c.containerStore.Add(container)
 			assert.NoError(t, err)
 
-			cpuUsage, err := c.cpuContainerStats(ID, false, test.firstMetrics, timestamp)
+			var cs containerstorestats.ContainerStats
+
+			c.setContainerStats(ID, false, &cs)
+
+			cpuMetrics, err := c.generatedCPUContainerStats(ID, false, test.firstMetrics, timestamp)
+			cs.ContainerCPUStats = *cpuMetrics
+
+			cpuUsage := &runtime.CpuUsage{
+				Timestamp:            cpuMetrics.Timestamp,
+				UsageCoreNanoSeconds: &runtime.UInt64Value{Value: cpuMetrics.UsageCoreNanoSeconds},
+				UsageNanoCores:       &runtime.UInt64Value{Value: cpuMetrics.UsageNanoCores},
+			}
 			assert.NoError(t, err)
 
 			container, err = c.containerStore.Get(ID)
 			assert.NoError(t, err)
-			assert.NotNil(t, container.Stats)
 
 			assert.Equal(t, test.expectedFirst, cpuUsage)
 
-			cpuUsage, err = c.cpuContainerStats(ID, false, test.secondMetrics, secondAfterTimeStamp)
+			cpuMetrics, err = c.generatedCPUContainerStats(ID, false, test.secondMetrics, secondAfterTimeStamp)
+			cpuUsage = &runtime.CpuUsage{
+				Timestamp:            cpuMetrics.Timestamp,
+				UsageCoreNanoSeconds: &runtime.UInt64Value{Value: cpuMetrics.UsageCoreNanoSeconds},
+				UsageNanoCores:       &runtime.UInt64Value{Value: cpuMetrics.UsageNanoCores},
+			}
 			assert.NoError(t, err)
 			assert.Equal(t, test.expectedSecond, cpuUsage)
 
 			container, err = c.containerStore.Get(ID)
 			assert.NoError(t, err)
-			assert.NotNil(t, container.Stats)
 		})
 	}
 
@@ -321,9 +336,76 @@ func TestContainerMetricsMemory(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			got, err := c.memoryContainerStats("ID", test.metrics, timestamp)
+			metrics, err := c.generatedMemoryContainerStats("ID", test.metrics, timestamp)
+			got := &runtime.MemoryUsage{
+				Timestamp:       metrics.Timestamp,
+				WorkingSetBytes: &runtime.UInt64Value{Value: metrics.WorkingSetBytes},
+				AvailableBytes:  &runtime.UInt64Value{Value: metrics.AvailableBytes},
+				UsageBytes:      &runtime.UInt64Value{Value: metrics.UsageBytes},
+				RssBytes:        &runtime.UInt64Value{Value: metrics.RssBytes},
+				PageFaults:      &runtime.UInt64Value{Value: metrics.PageFaults},
+				MajorPageFaults: &runtime.UInt64Value{Value: metrics.MajorPageFaults},
+			}
 			assert.NoError(t, err)
 			assert.Equal(t, test.expected, got)
 		})
 	}
+}
+
+func TestContainerMetricsCPUNanoCoreUsage(t *testing.T) {
+	c := newTestCRIService()
+	timestamp := time.Now()
+	secondAfterTimeStamp := timestamp.Add(time.Second)
+	ID := "ID"
+
+	for desc, test := range map[string]struct {
+		firstCPUValue               uint64
+		secondCPUValue              uint64
+		expectedNanoCoreUsageFirst  uint64
+		expectedNanoCoreUsageSecond uint64
+	}{
+		"metrics": {
+			firstCPUValue:               50,
+			secondCPUValue:              500,
+			expectedNanoCoreUsageFirst:  50,
+			expectedNanoCoreUsageSecond: 450,
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			container, err := containerstore.NewContainer(
+				containerstore.Metadata{ID: ID},
+			)
+			assert.NoError(t, err)
+			assert.Nil(t, container.Stats)
+			err = c.containerStore.Add(container)
+			assert.NoError(t, err)
+
+			cpuUsage, err := c.getUsageNanoCores(ID, false, test.firstCPUValue, timestamp)
+			assert.NoError(t, err)
+
+			var cs containerstorestats.ContainerStats
+
+			err = c.setContainerStats(ID, false, &cs)
+			assert.NoError(t, err)
+
+			cpuMetrics := &containerstorestats.ContainerCPUStats{
+				Timestamp:            timestamp.UnixNano(),
+				UsageCoreNanoSeconds: cpuUsage,
+			}
+			cs.ContainerCPUStats = *cpuMetrics
+
+			container, err = c.containerStore.Get(ID)
+			assert.NoError(t, err)
+
+			assert.Equal(t, test.expectedNanoCoreUsageFirst, cpuUsage)
+
+			cpuUsage, err = c.getUsageNanoCores(ID, false, test.secondCPUValue, secondAfterTimeStamp)
+			assert.NoError(t, err)
+			assert.Equal(t, test.expectedNanoCoreUsageSecond, cpuUsage)
+
+			container, err = c.containerStore.Get(ID)
+			assert.NoError(t, err)
+		})
+	}
+
 }

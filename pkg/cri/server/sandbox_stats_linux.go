@@ -57,17 +57,29 @@ func (c *criService) podSandboxStats(
 	if stats != nil {
 		timestamp := time.Now()
 
-		cpuStats, err := c.cpuContainerStats(meta.ID, true /* isSandbox */, stats, timestamp)
+		cpuStats, err := c.generatedCPUContainerStats(meta.ID, true /* isSandbox */, stats, timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("failed to obtain cpu stats: %w", err)
 		}
-		podSandboxStats.Linux.Cpu = cpuStats
+		podSandboxStats.Linux.Cpu = &runtime.CpuUsage{
+			Timestamp:            cpuStats.Timestamp,
+			UsageCoreNanoSeconds: &runtime.UInt64Value{Value: cpuStats.UsageCoreNanoSeconds},
+			UsageNanoCores:       &runtime.UInt64Value{Value: cpuStats.UsageNanoCores},
+		}
 
-		memoryStats, err := c.memoryContainerStats(meta.ID, stats, timestamp)
+		memoryStats, err := c.generatedMemoryContainerStats(meta.ID, stats, timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("failed to obtain memory stats: %w", err)
 		}
-		podSandboxStats.Linux.Memory = memoryStats
+		podSandboxStats.Linux.Memory = &runtime.MemoryUsage{
+			Timestamp:       memoryStats.Timestamp,
+			WorkingSetBytes: &runtime.UInt64Value{Value: memoryStats.WorkingSetBytes},
+			AvailableBytes:  &runtime.UInt64Value{Value: memoryStats.AvailableBytes},
+			UsageBytes:      &runtime.UInt64Value{Value: memoryStats.UsageBytes},
+			RssBytes:        &runtime.UInt64Value{Value: memoryStats.RssBytes},
+			PageFaults:      &runtime.UInt64Value{Value: memoryStats.PageFaults},
+			MajorPageFaults: &runtime.UInt64Value{Value: memoryStats.MajorPageFaults},
+		}
 
 		if sandbox.NetNSPath != "" {
 			rxBytes, rxErrors, txBytes, txErrors := getContainerNetIO(ctx, sandbox.NetNSPath)

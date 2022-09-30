@@ -113,20 +113,32 @@ func TestSandboxStore(t *testing.T) {
 	)
 	stats := map[string]*stats.ContainerStats{
 		"1": {
-			Timestamp:            time.Now(),
-			UsageCoreNanoSeconds: 1,
+			ContainerCPUStats: stats.ContainerCPUStats{
+				Timestamp:            time.Now().Unix(),
+				UsageCoreNanoSeconds: 1,
+				UsageNanoCores:       3,
+			},
 		},
 		"2abcd": {
-			Timestamp:            time.Now(),
-			UsageCoreNanoSeconds: 2,
+			ContainerCPUStats: stats.ContainerCPUStats{
+				Timestamp:            time.Now().Unix(),
+				UsageCoreNanoSeconds: 2,
+				UsageNanoCores:       4,
+			},
 		},
 		"4a333": {
-			Timestamp:            time.Now(),
-			UsageCoreNanoSeconds: 3,
+			ContainerCPUStats: stats.ContainerCPUStats{
+				Timestamp:            time.Now().Unix(),
+				UsageCoreNanoSeconds: 3,
+				UsageNanoCores:       5,
+			},
 		},
 		"4abcd": {
-			Timestamp:            time.Now(),
-			UsageCoreNanoSeconds: 4,
+			ContainerCPUStats: stats.ContainerCPUStats{
+				Timestamp:            time.Now().Unix(),
+				UsageCoreNanoSeconds: 4,
+				UsageNanoCores:       6,
+			},
 		},
 	}
 	assert := assertlib.New(t)
