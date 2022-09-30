@@ -83,11 +83,6 @@ func New(
 
 var _ sandbox.Controller = (*Controller)(nil)
 
-func (c *Controller) Delete(ctx context.Context, sandboxID string) (*api.ControllerDeleteResponse, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
 func (c *Controller) Status(ctx context.Context, sandboxID string) (*api.ControllerStatusResponse, error) {
 	//TODO implement me
 	panic("implement me")

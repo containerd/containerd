@@ -65,6 +65,18 @@ func getCgroupsPath(cgroupsParent, id string) string {
 	return filepath.Join(cgroupsParent, id)
 }
 
+// getSandboxRootDir returns the root directory for managing sandbox files,
+// e.g. hosts files.
+func (c *criService) getSandboxRootDir(id string) string {
+	return filepath.Join(c.config.RootDir, sandboxesDir, id)
+}
+
+// getVolatileSandboxRootDir returns the root directory for managing volatile sandbox files,
+// e.g. named pipes.
+func (c *criService) getVolatileSandboxRootDir(id string) string {
+	return filepath.Join(c.config.StateDir, sandboxesDir, id)
+}
+
 // getSandboxHostname returns the hostname file path inside the sandbox root directory.
 func (c *criService) getSandboxHostname(id string) string {
 	return filepath.Join(c.getSandboxRootDir(id), "hostname")
