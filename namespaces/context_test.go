@@ -19,6 +19,8 @@ package namespaces
 import (
 	"context"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestContext(t *testing.T) {
@@ -64,6 +66,27 @@ func TestNamespaceFromEnv(t *testing.T) {
 	if !ok {
 		t.Fatal("expected to find a namespace")
 	}
+
+	if namespace != expected {
+		t.Fatalf("unexpected namespace: %q != %q", namespace, expected)
+	}
+}
+
+func TestNamespaceRequired(t *testing.T) {
+	ctx := context.Background()
+	namespace, ok := Namespace(ctx)
+	if ok {
+		t.Fatal("namespace should not be present")
+	}
+
+	if namespace != "" {
+		t.Fatalf("namespace should not be defined: got %q", namespace)
+	}
+
+	expected := "test-namespace"
+	nctx := WithNamespace(ctx, expected)
+	namespace, err := NamespaceRequired(nctx)
+	assert.NoError(t, err)
 
 	if namespace != expected {
 		t.Fatalf("unexpected namespace: %q != %q", namespace, expected)
