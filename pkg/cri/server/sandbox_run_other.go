@@ -54,3 +54,6 @@ func (c *criService) cleanupSandboxFiles(id string, config *runtime.PodSandboxCo
 func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {
 	return []containerd.NewTaskOpts{}
 }
+
+func (c *criService) updateNetNamespacePath(spec *runtimespec.Spec, nsPath string) {
+}
