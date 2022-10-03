@@ -492,7 +492,7 @@ to request a pod be run using a runtime for untrusted workloads, the RuntimeHand
 `plugins."io.containerd.grpc.v1.cri"cri.containerd.runtimes.untrusted` must be defined first.
 When the annotation `io.kubernetes.cri.untrusted-workload` is set to `true` the `untrusted`
 runtime will be used. For example, see
-[Create an untrusted pod using Kata Containers](https://github.com/kata-containers/documentation/blob/master/how-to/how-to-use-k8s-with-cri-containerd-and-kata.md#create-an-untrusted-pod-using-kata-containers).
+[Create an untrusted pod using Kata Containers](https://github.com/kata-containers/kata-containers/blob/main/docs/how-to/containerd-kata.md#kata-containers-as-the-runtime-for-untrusted-workload).
 
 ## CNI Config Template
 
