@@ -19,6 +19,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/platforms"
+	"github.com/hashicorp/go-multierror"
 	"github.com/montanaflynn/stats"
 )
 
@@ -59,7 +60,11 @@ func main() {
 			// fmt.Printf("%d: %f\n", i, res.T.Seconds())
 			benchmarkResult.addResult(res)
 		}
-		benchmarkResult.updateStats()
+
+		err := benchmarkResult.updateStats()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error when updating stats: %s\n", err)
+		}
 
 		commitResults.Results[benchmarkResult.TestName] = benchmarkResult
 	}
@@ -97,16 +102,42 @@ func (driver *BenchmarkResult) addResult(individualResult testing.BenchmarkResul
 }
 
 // calculate statistical metrics for all testTimes
-func (results *BenchmarkResult) updateStats() {
+func (results *BenchmarkResult) updateStats() error {
 	//TODO add assert for single test
-	results.StdDev, _ = stats.StandardDeviation(results.testTimes)
-	results.Mean, _ = stats.Mean(results.testTimes)
-	results.Min, _ = stats.Min(results.testTimes)
-	results.Pct25, _ = stats.Percentile(results.testTimes, 25)
-	results.Pct50, _ = stats.Percentile(results.testTimes, 50)
-	results.Pct75, _ = stats.Percentile(results.testTimes, 75)
-	results.Pct90, _ = stats.Percentile(results.testTimes, 90)
-	results.Max, _ = stats.Max(results.testTimes)
+	var err, errs error
+	results.StdDev, err = stats.StandardDeviation(results.testTimes)
+	if err != nil {
+		errs = multierror.Append(errs, err)
+	}
+	results.Mean, err = stats.Mean(results.testTimes)
+	if err != nil {
+		errs = multierror.Append(errs, err)
+	}
+	results.Min, err = stats.Min(results.testTimes)
+	if err != nil {
+		errs = multierror.Append(errs, err)
+	}
+	results.Pct25, err = stats.Percentile(results.testTimes, 25)
+	if err != nil {
+		errs = multierror.Append(errs, err)
+	}
+	results.Pct50, err = stats.Percentile(results.testTimes, 50)
+	if err != nil {
+		errs = multierror.Append(errs, err)
+	}
+	results.Pct75, err = stats.Percentile(results.testTimes, 75)
+	if err != nil {
+		errs = multierror.Append(errs, err)
+	}
+	results.Pct90, err = stats.Percentile(results.testTimes, 90)
+	if err != nil {
+		errs = multierror.Append(errs, err)
+	}
+	results.Max, err = stats.Max(results.testTimes)
+	if err != nil {
+		errs = multierror.Append(errs, err)
+	}
+	return errs
 }
 
 func BenchmarkRandom(b *testing.B) {
