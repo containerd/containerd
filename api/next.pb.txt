@@ -5997,6 +5997,13 @@ file {
       type: TYPE_STRING
       json_name: "stream"
     }
+    field {
+      name: "media_type"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "mediaType"
+    }
   }
   options {
     go_package: "github.com/containerd/containerd/api/types/transfer"
