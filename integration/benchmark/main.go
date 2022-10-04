@@ -122,8 +122,7 @@ func BenchmarkRandom(b *testing.B) {
 func BenchmarkGetImage(b *testing.B) {
 	client, err := newClient(b, address)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error new client : %s\n", err)
-		b.Fatal(err)
+		b.Fatalf("Error new client : %s\n", err)
 	}
 	defer client.Close()
 
@@ -132,23 +131,19 @@ func BenchmarkGetImage(b *testing.B) {
 
 	_, fetchErr := client.Fetch(ctx, testImage, getRemoteOpts()...)
 	if fetchErr != nil {
-		fmt.Fprintf(os.Stderr, "Error Fetch : %s\n", fetchErr)
-		return
+		b.Fatalf("Error Fetch : %s\n", fetchErr)
 	}
 
 	_, getErr := client.GetImage(ctx, testImage)
 	if getErr != nil {
-		fmt.Fprintf(os.Stderr, "Error get Image : %s\n", getErr)
-		b.Error(getErr)
-		return
+		b.Fatalf("Error get Image : %s\n", getErr)
 	}
 }
 
 func BenchmarkContainerCreate(b *testing.B) {
 	client, err := newClient(b, address)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error new client : %s\n", err)
-		b.Fatal(err)
+		b.Fatalf("Error new client : %s\n", err)
 	}
 	defer client.Close()
 
@@ -157,24 +152,19 @@ func BenchmarkContainerCreate(b *testing.B) {
 
 	image, pullErr := client.Pull(ctx, testImage, WithPullUnpack)
 	if pullErr != nil {
-		fmt.Fprintf(os.Stderr, "Error Pull : %s\n", pullErr)
-		b.Error(err)
-		return
+		b.Fatalf("Error Pull : %s\n", pullErr)
 	}
 
 	spec, err := oci.GenerateSpec(ctx, client, &containers.Container{ID: "test"}, oci.WithRootFSPath("/var/lib/containerd-test"), oci.WithImageConfig(image), withTrue())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error Generate Spec : %s\n", err)
-		b.Error(err)
-		return
+		b.Fatalf("Error Generate Spec : %s\n", err)
 	}
 
 	var containers []Container
 	defer func() {
 		for _, c := range containers {
 			if err := c.Delete(ctx, WithSnapshotCleanup); err != nil {
-				fmt.Fprintf(os.Stderr, "Error Container delete : %s\n", err)
-				b.Error(err)
+				b.Errorf("Error Container delete : %s\n", err)
 			}
 		}
 	}()
@@ -185,11 +175,10 @@ func BenchmarkContainerCreate(b *testing.B) {
 		id := fmt.Sprintf("%s-%d", "test", i)
 		container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithSpec(spec))
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error New Container : %s\n", err)
-			b.Error(err)
-			return
+			b.Errorf("Error New Container : %s\n", err)
+		} else {
+			containers = append(containers, container)
 		}
-		containers = append(containers, container)
 	}
 }
 
