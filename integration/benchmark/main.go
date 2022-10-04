@@ -218,7 +218,7 @@ func withTrue() oci.SpecOpts {
 }
 
 func getRemoteOpts() []RemoteOpt {
-	platformList := []string{"linux/amd64", "linux/arm64/v8", "linux/s390x"}
+	platformList := []string{"linux/amd64"}
 	m := make(map[string]platforms.Matcher)
 	var opts []RemoteOpt
 
