@@ -68,7 +68,7 @@ func (t Type) String() string {
 // user. The user controlled variable will be parsed for how the error injected
 // code should fire. There is the way to set the rule for failpoint.
 //
-// 	<count>*<type>[(arg)][-><more terms>]
+//	<count>*<type>[(arg)][-><more terms>]
 //
 // The <type> argument specifies which action to take; it can be one of:
 //

@@ -55,12 +55,12 @@ func WithImportCompression() ImportOpt {
 }
 
 // ImportIndex imports an index from a tar archive image bundle
-// - implements Docker v1.1, v1.2 and OCI v1.
-// - prefers OCI v1 when provided
-// - creates OCI index for Docker formats
-// - normalizes Docker references and adds as OCI ref name
-//      e.g. alpine:latest -> docker.io/library/alpine:latest
-// - existing OCI reference names are untouched
+//   - implements Docker v1.1, v1.2 and OCI v1.
+//   - prefers OCI v1 when provided
+//   - creates OCI index for Docker formats
+//   - normalizes Docker references and adds as OCI ref name
+//     e.g. alpine:latest -> docker.io/library/alpine:latest
+//   - existing OCI reference names are untouched
 func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opts ...ImportOpt) (ocispec.Descriptor, error) {
 	var (
 		tr = tar.NewReader(reader)

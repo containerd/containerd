@@ -37,7 +37,8 @@ import (
 )
 
 // the following nolint is for shutting up gometalinter on non-linux.
-// nolint: unused
+//
+//nolint:unused
 func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, func()) {
 	if testing.Short() {
 		t.Skip()
