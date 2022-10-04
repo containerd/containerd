@@ -42,7 +42,7 @@ Users of such distributions may have to install containerd from the source or a 
 
 ##### systemd
 If you intend to start containerd via systemd, you should also download the `containerd.service` unit file from
-https://github.com/containerd/containerd/blob/main/containerd.service into `/usr/local/lib/systemd/system/containerd.service`,
+https://raw.githubusercontent.com/containerd/containerd/main/containerd.service into `/usr/local/lib/systemd/system/containerd.service`,
 and run the following commands:
 
 ```bash
