@@ -293,7 +293,7 @@ func Test_dockerPusher_push(t *testing.T) {
 		dp               dockerPusher
 		dockerBaseObject string
 		args             args
-		checkerFunc      func(writer pushWriter) bool
+		checkerFunc      func(writer *pushWriter) bool
 		wantErr          error
 	}{
 		{
@@ -306,7 +306,7 @@ func Test_dockerPusher_push(t *testing.T) {
 				ref:               fmt.Sprintf("manifest-%s", manifestContentDigest.String()),
 				unavailableOnFail: false,
 			},
-			checkerFunc: func(writer pushWriter) bool {
+			checkerFunc: func(writer *pushWriter) bool {
 				select {
 				case resp := <-writer.respC:
 					// 201 should be the response code when uploading a new manifest
@@ -340,7 +340,7 @@ func Test_dockerPusher_push(t *testing.T) {
 				ref:               fmt.Sprintf("layer-%s", layerContentDigest.String()),
 				unavailableOnFail: false,
 			},
-			checkerFunc: func(writer pushWriter) bool {
+			checkerFunc: func(writer *pushWriter) bool {
 				select {
 				case resp := <-writer.respC:
 					// 201 should be the response code when uploading a new blob
@@ -381,7 +381,7 @@ func Test_dockerPusher_push(t *testing.T) {
 			}
 
 			// test whether a proper response has been received after the push operation
-			assert.True(t, test.checkerFunc(*pw))
+			assert.True(t, test.checkerFunc(pw))
 
 		})
 	}
