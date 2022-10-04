@@ -40,7 +40,7 @@ jobs:
 
       - uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.44.2
+          version: v1.49.0
           working-directory: src/github.com/containerd/containerd
           args: --timeout=5m
 
