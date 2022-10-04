@@ -20,7 +20,7 @@ jobs:
 
     strategy:
       matrix:
-        go-version: [1.17.13]
+        go-version: [1.18.7]
         os: [ubuntu-18.04, macos-12, windows-2019]
 
     steps:
@@ -55,7 +55,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.13'
+          go-version: '1.18.7'
 
       - shell: bash
         run: |
@@ -86,7 +86,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.13'
+          go-version: '1.18.7'
 
       - uses: actions/checkout@v2
         with:
@@ -118,7 +118,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.13'
+          go-version: '1.18.7'
 
       - name: Set env
         shell: bash
@@ -160,7 +160,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.13'
+          go-version: '1.18.7'
       - name: Set env
         shell: bash
         run: |
@@ -225,11 +225,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-18.04, macos-12, windows-2019]
-        go-version: ['1.17.13']
-        include:
-          # Go 1.13.x is still used by Docker/Moby
-          - go-version: '1.13.x'
-            os: ubuntu-18.04
+        go-version: ['1.18.7']
 
     steps:
       - uses: actions/setup-go@v2
@@ -271,7 +267,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.13'
+          go-version: '1.18.7'
 
       - uses: actions/checkout@v2
         with:
@@ -360,7 +356,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.13'
+          go-version: '1.18.7'
 
       - uses: actions/checkout@v2
         with:
@@ -512,7 +508,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.13'
+          go-version: '1.18.7'
       - uses: actions/checkout@v2
         with:
           path: src/github.com/containerd/containerd
