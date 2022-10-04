@@ -111,7 +111,7 @@ jobs:
           find ./releases/ -maxdepth 1 -type l | xargs rm
         working-directory: src/github.com/containerd/containerd
         env:
-          GO_VERSION: '1.17.13'
+          GO_VERSION: '1.18.7'
           PLATFORM: ${{ matrix.platform }}
       - name: Save Artifacts
         uses: actions/upload-artifact@v2
