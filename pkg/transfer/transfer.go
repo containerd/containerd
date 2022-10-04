@@ -81,7 +81,7 @@ type ImageImportStreamer interface {
 }
 
 type ImageExportStreamer interface {
-	ExportStream(context.Context) (io.WriteCloser, error)
+	ExportStream(context.Context) (io.WriteCloser, string, error)
 }
 
 type ImageUnpacker interface {

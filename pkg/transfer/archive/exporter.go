@@ -34,20 +34,22 @@ func init() {
 	plugins.Register(&transfertypes.ImageImportStream{}, &ImageImportStream{})
 }
 
-// NewImageImportStream returns a image importer via tar stream
-// TODO: Add import options
-func NewImageExportStream(stream io.WriteCloser) *ImageExportStream {
+// NewImageExportStream returns a image importer via tar stream
+// TODO: Add export options
+func NewImageExportStream(stream io.WriteCloser, mediaType string) *ImageExportStream {
 	return &ImageExportStream{
-		stream: stream,
+		stream:    stream,
+		mediaType: mediaType,
 	}
 }
 
 type ImageExportStream struct {
-	stream io.WriteCloser
+	stream    io.WriteCloser
+	mediaType string
 }
 
-func (iis *ImageExportStream) ExportStream(context.Context) (io.WriteCloser, error) {
-	return iis.stream, nil
+func (iis *ImageExportStream) ExportStream(context.Context) (io.WriteCloser, string, error) {
+	return iis.stream, iis.mediaType, nil
 }
 
 func (iis *ImageExportStream) MarshalAny(ctx context.Context, sm streaming.StreamCreator) (typeurl.Any, error) {
@@ -66,7 +68,8 @@ func (iis *ImageExportStream) MarshalAny(ctx context.Context, sm streaming.Strea
 	}()
 
 	s := &transfertypes.ImageExportStream{
-		Stream: sid,
+		Stream:    sid,
+		MediaType: iis.mediaType,
 	}
 
 	return typeurl.MarshalAny(s)
@@ -85,6 +88,7 @@ func (iis *ImageExportStream) UnmarshalAny(ctx context.Context, sm streaming.Str
 	}
 
 	iis.stream = tstreaming.WriteByteStream(ctx, stream)
+	iis.mediaType = s.MediaType
 
 	return nil
 }

@@ -54,8 +54,8 @@ type ImageImportStream struct {
 	forceCompress bool
 }
 
-func (iis *ImageImportStream) ImportStream(context.Context) (io.Reader, error) {
-	return iis.stream, nil
+func (iis *ImageImportStream) ImportStream(context.Context) (io.Reader, string, error) {
+	return iis.stream, iis.mediaType, nil
 }
 
 func (iis *ImageImportStream) Import(ctx context.Context, store content.Store) (ocispec.Descriptor, error) {

@@ -45,7 +45,7 @@ func TestTransferEcho(t *testing.T) {
 func newImportExportEcho(ctx context.Context, client *containerd.Client, expected []byte) func(*testing.T) {
 	return func(t *testing.T) {
 		testBuf := newWaitBuffer()
-		err := client.Transfer(ctx, archive.NewImageImportStream(bytes.NewReader(expected), "application/octet-stream"), archive.NewImageExportStream(testBuf))
+		err := client.Transfer(ctx, archive.NewImageImportStream(bytes.NewReader(expected), "application/octet-stream"), archive.NewImageExportStream(testBuf, "application/octet-stream"))
 		if err != nil {
 			t.Fatal(err)
 		}

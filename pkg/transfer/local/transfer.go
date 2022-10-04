@@ -108,7 +108,7 @@ func (ts *localTransferService) echo(ctx context.Context, i transfer.ImageImport
 	if err != nil {
 		return err
 	}
-	wc, err := e.ExportStream(ctx)
+	wc, _, err := e.ExportStream(ctx)
 	if err != nil {
 		return err
 	}
