@@ -67,7 +67,7 @@ func FuzzApply(data []byte) int {
 // that targets archive.ImportIndex()
 func FuzzImportIndex(data []byte) int {
 	f := fuzz.NewConsumer(data)
-	tarBytes, err := f.GetBytes()
+	tarBytes, err := f.TarBytes()
 	if err != nil {
 		return 0
 	}
