@@ -83,7 +83,7 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 		// if it fails but not RM snapshot data.
 		// refer to https://github.com/containerd/containerd/pull/1868
 		// https://github.com/containerd/containerd/pull/1785
-		defer os.Remove(root) // nolint: errcheck
+		defer os.Remove(root) //nolint:errcheck
 
 		unmounter := func(mountPath string) {
 			if uerr := mount.Unmount(mountPath, 0); uerr != nil {

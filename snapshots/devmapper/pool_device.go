@@ -484,7 +484,9 @@ func (p *PoolDevice) IsLoaded(deviceName string) bool {
 // GetUsage reports total size in bytes consumed by a thin-device.
 // It relies on the number of used blocks reported by 'dmsetup status'.
 // The output looks like:
-//  device2: 0 204800 thin 17280 204799
+//
+//	device2: 0 204800 thin 17280 204799
+//
 // Where 17280 is the number of used sectors
 func (p *PoolDevice) GetUsage(deviceName string) (int64, error) {
 	status, err := dmsetup.Status(deviceName)

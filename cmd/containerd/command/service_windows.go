@@ -307,7 +307,7 @@ func launchService(s *server.Server, done chan struct{}) error {
 		done:    done,
 	}
 
-	interactive, err := svc.IsAnInteractiveSession() // nolint:staticcheck
+	interactive, err := svc.IsAnInteractiveSession() //nolint:staticcheck
 	if err != nil {
 		return err
 	}
