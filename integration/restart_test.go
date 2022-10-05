@@ -177,7 +177,7 @@ func TestContainerdRestart(t *testing.T) {
 	assert.NoError(t, err)
 
 	t.Logf("Restart containerd")
-	RestartContainerd(t)
+	RestartContainerd(t, syscall.SIGTERM)
 
 	t.Logf("Check sandbox and container state after restart")
 	loadedSandboxes, err := runtimeService.ListPodSandbox(&runtime.PodSandboxFilter{})

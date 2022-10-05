@@ -290,7 +290,12 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 		// Update network namespace in the container's spec
 		c.updateNetNamespacePath(spec, sandbox.NetNSPath)
-		if err := updateContainerSpec(ctx, container, spec); err != nil {
+
+		if err := container.Update(ctx,
+			// Update spec of the container
+			containerd.UpdateContainerOpts(containerd.WithSpec(spec)),
+			// Update sandbox metadata to include NetNS info
+			containerd.UpdateContainerOpts(containerd.WithContainerExtension(sandboxMetadataExtension, &sandbox.Metadata))); err != nil {
 			return nil, fmt.Errorf("failed to update the network namespace for the sandbox container %q: %w", id, err)
 		}
 
