@@ -378,8 +378,10 @@ func tryGetUnixError(output string) (unix.Errno, bool) {
 }
 
 // dmsetup returns error messages in format:
-// 	device-mapper: message ioctl on <name> failed: File exists\n
-// 	Command failed\n
+//
+//	device-mapper: message ioctl on <name> failed: File exists\n
+//	Command failed\n
+//
 // parseDmsetupError extracts text between "failed: " and "\n"
 func parseDmsetupError(output string) string {
 	lines := strings.SplitN(output, "\n", 2)
