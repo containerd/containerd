@@ -17,20 +17,24 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/containers"
 	cri "github.com/containerd/containerd/integration/cri-api/pkg/apis"
 	_ "github.com/containerd/containerd/integration/images" // Keep this around to parse `imageListFile` command line var
 	"github.com/containerd/containerd/integration/remote"
@@ -403,12 +407,12 @@ func Randomize(str string) string {
 }
 
 // KillProcess kills the process by name. pkill is used.
-func KillProcess(name string) error {
+func KillProcess(name string, signal syscall.Signal) error {
 	var command []string
 	if goruntime.GOOS == "windows" {
 		command = []string{"taskkill", "/IM", name, "/F"}
 	} else {
-		command = []string{"pkill", "-x", fmt.Sprintf("^%s$", name)}
+		command = []string{"pkill", "-" + strconv.Itoa(int(signal)), "-x", fmt.Sprintf("^%s$", name)}
 	}
 
 	output, err := exec.Command(command[0], command[1:]...).CombinedOutput()
@@ -442,6 +446,80 @@ func PidOf(name string) (int, error) {
 		return 0, nil
 	}
 	return strconv.Atoi(output)
+}
+
+// PidsOf returns pid(s) of a process by name
+func PidsOf(name string) ([]int, error) {
+	if len(name) == 0 {
+		return []int{}, fmt.Errorf("name is required")
+	}
+
+	procDirFD, err := os.Open("/proc")
+	if err != nil {
+		return nil, fmt.Errorf("failed to open /proc: %w", err)
+	}
+	defer procDirFD.Close()
+
+	res := []int{}
+	for {
+		fileInfos, err := procDirFD.Readdir(100)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, fmt.Errorf("failed to readdir: %w", err)
+		}
+
+		for _, fileInfo := range fileInfos {
+			if !fileInfo.IsDir() {
+				continue
+			}
+
+			pid, err := strconv.Atoi(fileInfo.Name())
+			if err != nil {
+				continue
+			}
+
+			exePath, err := os.Readlink(filepath.Join("/proc", fileInfo.Name(), "exe"))
+			if err != nil {
+				continue
+			}
+
+			if strings.HasSuffix(exePath, name) {
+				res = append(res, pid)
+			}
+		}
+	}
+	return res, nil
+}
+
+// PidEnvs returns the environ of pid in key-value pairs.
+func PidEnvs(pid int) (map[string]string, error) {
+	envPath := filepath.Join("/proc", strconv.Itoa(pid), "environ")
+
+	b, err := os.ReadFile(envPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read %s: %w", envPath, err)
+	}
+
+	values := bytes.Split(b, []byte{0})
+	if len(values) == 0 {
+		return nil, nil
+	}
+
+	res := make(map[string]string)
+	for _, value := range values {
+		value := strings.TrimSpace(string(value))
+		if len(value) == 0 {
+			continue
+		}
+
+		parts := strings.SplitN(value, "=", 2)
+		if len(parts) == 2 {
+			res[parts[0]] = parts[1]
+		}
+	}
+	return res, nil
 }
 
 // RawRuntimeClient returns a raw grpc runtime service client.
@@ -500,8 +578,8 @@ func SandboxInfo(id string) (*runtime.PodSandboxStatus, *server.SandboxInfo, err
 	return status, &info, nil
 }
 
-func RestartContainerd(t *testing.T) {
-	require.NoError(t, KillProcess(*containerdBin))
+func RestartContainerd(t *testing.T, signal syscall.Signal) {
+	require.NoError(t, KillProcess(*containerdBin, signal))
 
 	// Use assert so that the 3rd wait always runs, this makes sure
 	// containerd is running before this function returns.
@@ -533,4 +611,8 @@ func EnsureImageExists(t *testing.T, imageName string) string {
 	require.NoError(t, err)
 
 	return imgID
+}
+
+func GetContainer(id string) (containers.Container, error) {
+	return containerdClient.ContainerService().Get(context.Background(), id)
 }
