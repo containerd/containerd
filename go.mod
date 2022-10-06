@@ -41,7 +41,6 @@ require (
 	github.com/moby/sys/mountinfo v0.6.2
 	github.com/moby/sys/signal v0.7.0
 	github.com/moby/sys/symlink v0.2.0
-	github.com/montanaflynn/stats v0.6.6
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.0.3-0.20220303224323-02efb9a75ee1
 	github.com/opencontainers/runc v1.1.2
