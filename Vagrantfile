@@ -146,7 +146,8 @@ EOF
         source /etc/environment
         source /etc/profile.d/sh.local
         set -eux -o pipefail
-        ${GOPATH}/src/github.com/containerd/containerd/script/setup/install-cni
+        cd ${GOPATH}/src/github.com/containerd/containerd
+        script/setup/install-cni
         PATH=/opt/cni/bin:$PATH type ${CNI_BINARIES} || true
     SHELL
   end
