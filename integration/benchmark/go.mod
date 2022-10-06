@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/containerd/containerd v1.5.13
+	github.com/hashicorp/go-multierror v1.1.1
 	github.com/montanaflynn/stats v0.6.6
 )
 
