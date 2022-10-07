@@ -20,6 +20,7 @@ import (
 	"archive/tar"
 	"context"
 	"io"
+	"time"
 )
 
 // ApplyOptions provides additional options for an Apply operation
@@ -89,7 +90,19 @@ type WriteDiffOptions struct {
 	ParentLayers []string // Windows needs the full list of parent layers
 
 	writeDiffFunc func(context.Context, io.Writer, string, string, WriteDiffOptions) error
+
+	// SourceDateEpoch specifies the timestamp used for whiteouts to provide control for reproducibility.
+	// See also https://reproducible-builds.org/docs/source-date-epoch/ .
+	SourceDateEpoch *time.Time
 }
 
 // WriteDiffOpt allows setting mutable archive write properties on creation
 type WriteDiffOpt func(options *WriteDiffOptions) error
+
+// WithSourceDateEpoch specifies the SOURCE_DATE_EPOCH without touching the env vars.
+func WithSourceDateEpoch(tm *time.Time) WriteDiffOpt {
+	return func(options *WriteDiffOptions) error {
+		options.SourceDateEpoch = tm
+		return nil
+	}
+}

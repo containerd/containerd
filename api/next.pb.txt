@@ -2827,6 +2827,7 @@ file {
   name: "github.com/containerd/containerd/api/services/diff/v1/diff.proto"
   package: "containerd.services.diff.v1"
   dependency: "google/protobuf/any.proto"
+  dependency: "google/protobuf/timestamp.proto"
   dependency: "github.com/containerd/containerd/api/types/mount.proto"
   dependency: "github.com/containerd/containerd/api/types/descriptor.proto"
   message_type {
@@ -2927,6 +2928,14 @@ file {
       type: TYPE_MESSAGE
       type_name: ".containerd.services.diff.v1.DiffRequest.LabelsEntry"
       json_name: "labels"
+    }
+    field {
+      name: "source_date_epoch"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      json_name: "sourceDateEpoch"
     }
     nested_type {
       name: "LabelsEntry"

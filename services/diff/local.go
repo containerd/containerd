@@ -145,6 +145,10 @@ func (l *local) Diff(ctx context.Context, dr *diffapi.DiffRequest, _ ...grpc.Cal
 	if dr.Labels != nil {
 		opts = append(opts, diff.WithLabels(dr.Labels))
 	}
+	if dr.SourceDateEpoch != nil {
+		tm := dr.SourceDateEpoch.AsTime()
+		opts = append(opts, diff.WithSourceDateEpoch(&tm))
+	}
 
 	for _, d := range l.differs {
 		ocidesc, err = d.Compare(ctx, aMounts, bMounts, opts...)

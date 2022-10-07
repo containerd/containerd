@@ -28,6 +28,7 @@ import (
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // DiffService handles the computation and application of diffs
@@ -80,12 +81,17 @@ func (r *diffRemote) Compare(ctx context.Context, a, b []mount.Mount, opts ...di
 			return ocispec.Descriptor{}, err
 		}
 	}
+	var sourceDateEpoch *timestamppb.Timestamp
+	if config.SourceDateEpoch != nil {
+		sourceDateEpoch = timestamppb.New(*config.SourceDateEpoch)
+	}
 	req := &diffapi.DiffRequest{
-		Left:      fromMounts(a),
-		Right:     fromMounts(b),
-		MediaType: config.MediaType,
-		Ref:       config.Reference,
-		Labels:    config.Labels,
+		Left:            fromMounts(a),
+		Right:           fromMounts(b),
+		MediaType:       config.MediaType,
+		Ref:             config.Reference,
+		Labels:          config.Labels,
+		SourceDateEpoch: sourceDateEpoch,
 	}
 	resp, err := r.client.Diff(ctx, req)
 	if err != nil {

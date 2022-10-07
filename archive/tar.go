@@ -50,11 +50,11 @@ var errInvalidArchive = errors.New("invalid archive")
 // files will be prepended with the prefix ".wh.". This style is
 // based off AUFS whiteouts.
 // See https://github.com/opencontainers/image-spec/blob/main/layer.md
-func Diff(ctx context.Context, a, b string) io.ReadCloser {
+func Diff(ctx context.Context, a, b string, opts ...WriteDiffOpt) io.ReadCloser {
 	r, w := io.Pipe()
 
 	go func() {
-		err := WriteDiff(ctx, w, a, b)
+		err := WriteDiff(ctx, w, a, b, opts...)
 		if err != nil {
 			log.G(ctx).WithError(err).Debugf("write diff failed")
 		}
@@ -94,8 +94,12 @@ func WriteDiff(ctx context.Context, w io.Writer, a, b string, opts ...WriteDiffO
 // files will be prepended with the prefix ".wh.". This style is
 // based off AUFS whiteouts.
 // See https://github.com/opencontainers/image-spec/blob/main/layer.md
-func writeDiffNaive(ctx context.Context, w io.Writer, a, b string, _ WriteDiffOptions) error {
-	cw := NewChangeWriter(w, b)
+func writeDiffNaive(ctx context.Context, w io.Writer, a, b string, o WriteDiffOptions) error {
+	var opts []ChangeWriterOpt
+	if o.SourceDateEpoch != nil {
+		opts = append(opts, WithWhiteoutTime(*o.SourceDateEpoch))
+	}
+	cw := NewChangeWriter(w, b, opts...)
 	err := fs.Changes(ctx, a, b, cw.HandleChange)
 	if err != nil {
 		return fmt.Errorf("failed to create diff tar stream: %w", err)
@@ -497,18 +501,32 @@ type ChangeWriter struct {
 	addedDirs map[string]struct{}
 }
 
+// ChangeWriterOpt can be specified in NewChangeWriter.
+type ChangeWriterOpt func(cw *ChangeWriter)
+
+// WithWhiteoutTime sets the whiteout timestamp.
+func WithWhiteoutTime(tm time.Time) ChangeWriterOpt {
+	return func(cw *ChangeWriter) {
+		cw.whiteoutT = tm
+	}
+}
+
 // NewChangeWriter returns ChangeWriter that writes tar stream of the source directory
 // to the privided writer. Change information (add/modify/delete/unmodified) for each
 // file needs to be passed through HandleChange method.
-func NewChangeWriter(w io.Writer, source string) *ChangeWriter {
-	return &ChangeWriter{
+func NewChangeWriter(w io.Writer, source string, opts ...ChangeWriterOpt) *ChangeWriter {
+	cw := &ChangeWriter{
 		tw:        tar.NewWriter(w),
 		source:    source,
-		whiteoutT: time.Now(),
+		whiteoutT: time.Now(), // can be overridden with WithWhiteoutTime(time.Time) ChangeWriterOpt .
 		inodeSrc:  map[uint64]string{},
 		inodeRefs: map[uint64][]string{},
 		addedDirs: map[string]struct{}{},
 	}
+	for _, o := range opts {
+		o(cw)
+	}
+	return cw
 }
 
 // HandleChange receives filesystem change information and reflect that information to

@@ -19,6 +19,7 @@ package diff
 import (
 	"context"
 	"io"
+	"time"
 
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/typeurl"
@@ -44,6 +45,9 @@ type Config struct {
 	// the MediaType of the target diff content to the compressor.
 	// When using this config, MediaType must be specified as well.
 	Compressor func(dest io.Writer, mediaType string) (io.WriteCloser, error)
+
+	// SourceDateEpoch specifies the SOURCE_DATE_EPOCH without touching the env vars.
+	SourceDateEpoch *time.Time
 }
 
 // Opt is used to configure a diff operation
@@ -117,6 +121,15 @@ func WithLabels(labels map[string]string) Opt {
 func WithPayloads(payloads map[string]typeurl.Any) ApplyOpt {
 	return func(_ context.Context, _ ocispec.Descriptor, c *ApplyConfig) error {
 		c.ProcessorPayloads = payloads
+		return nil
+	}
+}
+
+// WithSourceDateEpoch specifies the timestamp used for whiteouts to provide control for reproducibility.
+// See also https://reproducible-builds.org/docs/source-date-epoch/ .
+func WithSourceDateEpoch(tm *time.Time) Opt {
+	return func(c *Config) error {
+		c.SourceDateEpoch = tm
 		return nil
 	}
 }
