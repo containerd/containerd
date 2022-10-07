@@ -300,6 +300,9 @@ func resolveLayers(ctx context.Context, store content.Store, layerFiles []string
 		}
 		if s.GetCompression() == compression.Uncompressed {
 			if compress {
+				if err := desc.Digest.Validate(); err != nil {
+					return nil, err
+				}
 				ref := fmt.Sprintf("compress-blob-%s-%s", desc.Digest.Algorithm().String(), desc.Digest.Encoded())
 				labels := map[string]string{
 					"containerd.io/uncompressed": desc.Digest.String(),
