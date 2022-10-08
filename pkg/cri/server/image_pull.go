@@ -142,7 +142,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
 	if !c.config.ContainerdConfig.DisableSnapshotAnnotations {
 		pullOpts = append(pullOpts,
-			containerd.WithImageHandlerWrapper(appendInfoHandlerWrapper(ref)))
+			containerd.WithImageHandlerWrapper(appendInfoHandlerWrapper(ref, r.GetAuth())))
 	}
 
 	if c.config.ContainerdConfig.DiscardUnpackedLayers {
@@ -548,6 +548,10 @@ const (
 	// the target image and will be passed to snapshotters for preparing layers in
 	// parallel. Skipping some layers is allowed and only affects performance.
 	targetImageLayersLabel = "containerd.io/snapshot/cri.image-layers"
+	// Secret or password used to resolve or pull container image layers.
+	targetRegistrySecret = "containerd.io/snapshot/cri.registry-secret"
+	// User name to access registry to resolve or push container image layers.
+	targetRegistryUsername = "containerd.io/snapshot/cri.registry-user"
 )
 
 // appendInfoHandlerWrapper makes a handler which appends some basic information
@@ -555,13 +559,17 @@ const (
 // These annotations will be passed to snapshotters as labels. These labels will be
 // used mainly by stargz-based snapshotters for querying image contents from the
 // registry.
-func appendInfoHandlerWrapper(ref string) func(f containerdimages.Handler) containerdimages.Handler {
+func appendInfoHandlerWrapper(ref string, auth *runtime.AuthConfig) func(f containerdimages.Handler) containerdimages.Handler {
 	return func(f containerdimages.Handler) containerdimages.Handler {
 		return containerdimages.HandlerFunc(func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 			children, err := f.Handle(ctx, desc)
 			if err != nil {
 				return nil, err
 			}
+
+			// Ignore auth parsing error since containerd still has a chance to use auth on node.
+			user, passwd, authErr := ParseAuth(auth, "")
+
 			switch desc.MediaType {
 			case imagespec.MediaTypeImageManifest, containerdimages.MediaTypeDockerSchema2Manifest:
 				for i := range children {
@@ -574,6 +582,10 @@ func appendInfoHandlerWrapper(ref string) func(f containerdimages.Handler) conta
 						c.Annotations[targetLayerDigestLabel] = c.Digest.String()
 						c.Annotations[targetImageLayersLabel] = getLayers(ctx, targetImageLayersLabel, children[i:], labels.Validate)
 						c.Annotations[targetManifestDigestLabel] = desc.Digest.String()
+						if authErr == nil {
+							c.Annotations[targetRegistryUsername] = user
+							c.Annotations[targetRegistrySecret] = passwd
+						}
 					}
 				}
 			}
