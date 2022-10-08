@@ -211,7 +211,12 @@ func (c config) newClient() (*containerd.Client, error) {
 
 func serve(c config) error {
 	go func() {
-		if err := http.ListenAndServe(c.Metrics, metrics.Handler()); err != nil {
+		srv := &http.Server{
+			Addr:              c.Metrics,
+			Handler:           metrics.Handler(),
+			ReadHeaderTimeout: 5 * time.Minute, // "G112: Potential Slowloris Attack (gosec)"; not a real concern for our use, so setting a long timeout.
+		}
+		if err := srv.ListenAndServe(); err != nil {
 			logrus.WithError(err).Error("listen and serve")
 		}
 	}()

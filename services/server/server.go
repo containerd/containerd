@@ -330,7 +330,11 @@ func (s *Server) ServeTTRPC(l net.Listener) error {
 func (s *Server) ServeMetrics(l net.Listener) error {
 	m := http.NewServeMux()
 	m.Handle("/v1/metrics", metrics.Handler())
-	return trapClosedConnErr(http.Serve(l, m))
+	srv := &http.Server{
+		Handler:           m,
+		ReadHeaderTimeout: 5 * time.Minute, // "G112: Potential Slowloris Attack (gosec)"; not a real concern for our use, so setting a long timeout.
+	}
+	return trapClosedConnErr(srv.Serve(l))
 }
 
 // ServeTCP allows services to serve over tcp
@@ -350,7 +354,11 @@ func (s *Server) ServeDebug(l net.Listener) error {
 	m.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
 	m.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
 	m.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
-	return trapClosedConnErr(http.Serve(l, m))
+	srv := &http.Server{
+		Handler:           m,
+		ReadHeaderTimeout: 5 * time.Minute, // "G112: Potential Slowloris Attack (gosec)"; not a real concern for our use, so setting a long timeout.
+	}
+	return trapClosedConnErr(srv.Serve(l))
 }
 
 // Stop the containerd server canceling any open connections
