@@ -307,16 +307,17 @@ func launchService(s *server.Server, done chan struct{}) error {
 		done:    done,
 	}
 
-	interactive, err := svc.IsAnInteractiveSession() // nolint:staticcheck
+	// Check if we're running as a Windows service or interactively.
+	isService, err := svc.IsWindowsService()
 	if err != nil {
 		return err
 	}
 
 	go func() {
-		if interactive {
-			err = debug.Run(serviceNameFlag, h)
-		} else {
+		if isService {
 			err = svc.Run(serviceNameFlag, h)
+		} else {
+			err = debug.Run(serviceNameFlag, h)
 		}
 		h.fromsvc <- err
 	}()
