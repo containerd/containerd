@@ -494,6 +494,12 @@ func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit,
 	})
 
 	if err != nil {
+		if errdefs.IsDeadlineExceeded(err) {
+			dctx, cancel := timeout.WithContext(context.Background(), cleanupTimeout)
+			defer cancel()
+			shimTask.Shutdown(dctx)
+			shimTask.Client().Close()
+		}
 		return nil, fmt.Errorf("failed to delete task: %w", err)
 	}
 
