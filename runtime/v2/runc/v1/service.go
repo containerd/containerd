@@ -103,7 +103,7 @@ type service struct {
 	cancel func()
 }
 
-func newCommand(ctx context.Context, id, containerdBinary, containerdAddress, containerdTTRPCAddress string) (*exec.Cmd, error) {
+func newCommand(ctx context.Context, id, containerdAddress, containerdTTRPCAddress string) (*exec.Cmd, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -131,7 +131,7 @@ func newCommand(ctx context.Context, id, containerdBinary, containerdAddress, co
 }
 
 func (s *service) StartShim(ctx context.Context, opts shim.StartOpts) (_ string, retErr error) {
-	cmd, err := newCommand(ctx, opts.ID, opts.ContainerdBinary, opts.Address, opts.TTRPCAddress)
+	cmd, err := newCommand(ctx, opts.ID, opts.Address, opts.TTRPCAddress)
 	if err != nil {
 		return "", err
 	}
