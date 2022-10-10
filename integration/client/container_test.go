@@ -46,6 +46,7 @@ import (
 	"github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/stretchr/testify/require"
 	exec "golang.org/x/sys/execabs"
 )
 
@@ -2205,6 +2206,11 @@ func TestContainerKillInitKillsChildWhenNotHostPid(t *testing.T) {
 }
 
 func TestTaskResize(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// PowerShell can, but nanoserver images don't have that.
+		t.Skipf("%q doesn't have a way to query its terminal size", testImage)
+	}
+
 	t.Parallel()
 
 	client, err := newClient(t, address)
@@ -2224,27 +2230,50 @@ func TestTaskResize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)))
+
+	container, err := client.NewContainer(ctx, id,
+		WithNewSnapshot(id, image),
+		WithNewSpec(oci.WithImageConfig(image), withProcessArgs("/bin/stty", "size"), oci.WithTTY),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
-	task, err := container.NewTask(ctx, empty())
+	stdout := &bytes.Buffer{}
+
+	task, err := container.NewTask(ctx,
+		cio.NewCreator(cio.WithStreams(nil, stdout, nil), cio.WithTerminal),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
 
+	if err := task.Resize(ctx, 12, 34); err != nil {
+		t.Fatal(err)
+	}
+
+	err = task.Start(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	statusC, err := task.Wait(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := task.Resize(ctx, 32, 32); err != nil {
+
+	<-statusC
+
+	task.Kill(ctx, syscall.SIGKILL)
+
+	_, err = task.Delete(ctx)
+	if err != nil {
 		t.Fatal(err)
 	}
-	task.Kill(ctx, syscall.SIGKILL)
-	<-statusC
+
+	require.Equal(t, "34 12\r\n", stdout.String())
 }
 
 func TestContainerImage(t *testing.T) {
