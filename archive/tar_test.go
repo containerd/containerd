@@ -36,6 +36,7 @@ import (
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/continuity/fs/fstest"
+	"github.com/stretchr/testify/require"
 	exec "golang.org/x/sys/execabs"
 )
 
@@ -1156,7 +1157,34 @@ func TestDiffTar(t *testing.T) {
 	}
 }
 
+func TestWhiteoutSourceDateEpoch(t *testing.T) {
+	sourceDateEpoch, err := time.Parse(time.RFC3339, "2022-01-23T12:34:56Z")
+	require.NoError(t, err)
+	opts := []WriteDiffOpt{WithSourceDateEpoch(&sourceDateEpoch)}
+	validators := []tarEntryValidator{
+		composeValidators(whiteoutEntry("f1"), requireModTime(sourceDateEpoch)),
+	}
+	a := fstest.Apply(
+		fstest.CreateFile("/f1", []byte("content"), 0644),
+	)
+	b := fstest.Apply(
+		fstest.RemoveAll("/f1"),
+	)
+	makeDiffTarTest(validators, a, b, opts...)(t)
+}
+
 type tarEntryValidator func(*tar.Header, []byte) error
+
+func composeValidators(vv ...tarEntryValidator) tarEntryValidator {
+	return func(hdr *tar.Header, b []byte) error {
+		for _, v := range vv {
+			if err := v(hdr, b); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
 
 func dirEntry(name string, mode int) tarEntryValidator {
 	return func(hdr *tar.Header, b []byte) error {
@@ -1222,7 +1250,16 @@ func whiteoutEntry(name string) tarEntryValidator {
 	}
 }
 
-func makeDiffTarTest(validators []tarEntryValidator, a, b fstest.Applier) func(*testing.T) {
+func requireModTime(expected time.Time) tarEntryValidator {
+	return func(hdr *tar.Header, b []byte) error {
+		if !hdr.ModTime.Equal(expected) {
+			return fmt.Errorf("expected ModTime %v, got %v", expected, hdr.ModTime)
+		}
+		return nil
+	}
+}
+
+func makeDiffTarTest(validators []tarEntryValidator, a, b fstest.Applier, opts ...WriteDiffOpt) func(*testing.T) {
 	return func(t *testing.T) {
 		ad := t.TempDir()
 		if err := a.Apply(ad); err != nil {
@@ -1237,7 +1274,7 @@ func makeDiffTarTest(validators []tarEntryValidator, a, b fstest.Applier) func(*
 			t.Fatalf("failed to apply b: %v", err)
 		}
 
-		rc := Diff(context.Background(), ad, bd)
+		rc := Diff(context.Background(), ad, bd, opts...)
 		defer rc.Close()
 
 		tr := tar.NewReader(rc)
