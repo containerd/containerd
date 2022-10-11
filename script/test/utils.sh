@@ -271,6 +271,9 @@ run_crictl() {
 # keepalive runs a command and keeps it alive.
 # keepalive process is eventually killed in test_teardown.
 keepalive() {
+  # The command may return non-zero and we want to continue this script.
+  # e.g. containerd receives SIGKILL
+  set +e
   local command=$1
   echo "${command}"
   local wait_period=$2
