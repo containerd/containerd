@@ -42,7 +42,6 @@ var (
 	logFileFlag           string
 
 	kernel32     = windows.NewLazySystemDLL("kernel32.dll")
-	setStdHandle = kernel32.NewProc("SetStdHandle")
 	allocConsole = kernel32.NewProc("AllocConsole")
 	oldStderr    windows.Handle
 	panicFile    *os.File
@@ -355,27 +354,19 @@ func initPanicFile(path string) error {
 	// Update STD_ERROR_HANDLE to point to the panic file so that Go writes to
 	// it when it panics. Remember the old stderr to restore it before removing
 	// the panic file.
-	sh := uint32(windows.STD_ERROR_HANDLE)
-	h, err := windows.GetStdHandle(sh)
+	h, err := windows.GetStdHandle(windows.STD_ERROR_HANDLE)
 	if err != nil {
 		return err
 	}
-
 	oldStderr = h
 
-	r, _, err := setStdHandle.Call(uintptr(sh), panicFile.Fd())
-	if r == 0 && err != nil {
-		return err
-	}
-
-	return nil
+	return windows.SetStdHandle(windows.STD_ERROR_HANDLE, windows.Handle(panicFile.Fd()))
 }
 
 func removePanicFile() {
 	if st, err := panicFile.Stat(); err == nil {
 		if st.Size() == 0 {
-			sh := uint32(windows.STD_ERROR_HANDLE)
-			setStdHandle.Call(uintptr(sh), uintptr(oldStderr))
+			windows.SetStdHandle(windows.STD_ERROR_HANDLE, oldStderr)
 			panicFile.Close()
 			os.Remove(panicFile.Name())
 		}
