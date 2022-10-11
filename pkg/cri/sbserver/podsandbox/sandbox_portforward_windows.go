@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package sbserver
+package podsandbox
 
 import (
 	"bytes"
@@ -28,7 +28,7 @@ import (
 	cioutil "github.com/containerd/containerd/pkg/ioutil"
 )
 
-func (c *criService) portForward(ctx context.Context, id string, port int32, stream io.ReadWriter) error {
+func (c *Controller) PortForward(ctx context.Context, id string, port int32, stream io.ReadWriteCloser) error {
 	stdout := cioutil.NewNopWriteCloser(stream)
 	stderrBuffer := new(bytes.Buffer)
 	stderr := cioutil.NewNopWriteCloser(stderrBuffer)
@@ -42,7 +42,7 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 	return nil
 }
 
-func (c *criService) execInSandbox(ctx context.Context, sandboxID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser) error {
+func (c *Controller) execInSandbox(ctx context.Context, sandboxID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser) error {
 	// Get sandbox from our sandbox store.
 	sb, err := c.sandboxStore.Get(sandboxID)
 	if err != nil {

@@ -19,9 +19,13 @@ package podsandbox
 import (
 	"context"
 	"os"
+	"path/filepath"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
+
+// containersDir contains all container root.
+const containersDir = "containers"
 
 // ensureRemoveAll is a wrapper for os.RemoveAll on Windows.
 func ensureRemoveAll(_ context.Context, dir string) error {
@@ -30,4 +34,10 @@ func ensureRemoveAll(_ context.Context, dir string) error {
 
 func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
 	return nil
+}
+
+// getVolatileContainerRootDir returns the root directory for managing volatile container files,
+// e.g. named pipes.
+func (c *Controller) getVolatileContainerRootDir(id string) string {
+	return filepath.Join(c.config.StateDir, containersDir, id)
 }

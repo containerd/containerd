@@ -23,6 +23,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	goruntime "runtime"
 	"sort"
 	"strings"
 	"syscall"
@@ -252,4 +253,23 @@ func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
 	}
 	spec.Process.SelinuxLabel = l
 	return nil
+}
+
+// hostNetwork handles checking if host networking was requested.
+func hostNetwork(config *runtime.PodSandboxConfig) bool {
+	var hostNet bool
+	switch goruntime.GOOS {
+	case "windows":
+		// Windows HostProcess pods can only run on the host network
+		hostNet = config.GetWindows().GetSecurityContext().GetHostProcess()
+	case "darwin":
+		// No CNI on Darwin yet.
+		hostNet = true
+	default:
+		// Even on other platforms, the logic containerd uses is to check if NamespaceMode == NODE.
+		// So this handles Linux, as well as any other platforms not governed by the cases above
+		// that have special quirks.
+		hostNet = config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE
+	}
+	return hostNet
 }

@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package sbserver
+package podsandbox
 
 import (
 	"context"
@@ -27,9 +27,9 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 )
 
-// portForward uses netns to enter the sandbox namespace, and forwards a stream inside the
+// PortForward uses netns to enter the sandbox namespace, and forwards a stream inside the
 // namespace to a specific port. It keeps forwarding until it exits or client disconnect.
-func (c *criService) portForward(ctx context.Context, id string, port int32, stream io.ReadWriteCloser) error {
+func (c *Controller) PortForward(ctx context.Context, id string, port int32, stream io.ReadWriteCloser) error {
 	s, err := c.sandboxStore.Get(id)
 	if err != nil {
 		return fmt.Errorf("failed to find sandbox %q in store: %w", id, err)

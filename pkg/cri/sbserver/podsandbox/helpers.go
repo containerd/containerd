@@ -32,10 +32,9 @@ import (
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/reference/docker"
+	imagedigest "github.com/opencontainers/go-digest"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
-
-	imagedigest "github.com/opencontainers/go-digest"
 )
 
 const (

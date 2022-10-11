@@ -33,6 +33,8 @@ import (
 	k8scert "k8s.io/client-go/util/cert"
 	"k8s.io/utils/exec"
 
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/pkg/cri/sbserver/podsandbox"
 	"github.com/containerd/containerd/pkg/cri/streaming"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 )
@@ -158,7 +160,18 @@ func (s *streamRuntime) PortForward(podSandboxID string, port int32, stream io.R
 		return fmt.Errorf("invalid port %d", port)
 	}
 	ctx := ctrdutil.NamespacedContext()
-	return s.c.portForward(ctx, podSandboxID, port, stream)
+	sandbox, err := s.c.sandboxStore.Get(podSandboxID)
+	if err != nil {
+		return fmt.Errorf("failed to find sandbox id %q: %w", podSandboxID, err)
+	}
+	controller, err := s.c.getSandboxController(sandbox.Config, sandbox.RuntimeHandler)
+	if err != nil {
+		return fmt.Errorf("failed to get sandbox controller: %w", err)
+	}
+	if podCtrl, ok := controller.(*podsandbox.Controller); ok {
+		return podCtrl.PortForward(ctx, podSandboxID, port, stream)
+	}
+	return fmt.Errorf("port forward: %w", errdefs.ErrNotImplemented)
 }
 
 // handleResizing spawns a goroutine that processes the resize channel, calling resizeFunc for each
