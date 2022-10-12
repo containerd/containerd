@@ -43,6 +43,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	"github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/opts"
+	customopts "github.com/containerd/containerd/pkg/cri/opts"
 	"github.com/containerd/containerd/pkg/cri/util"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	ostesting "github.com/containerd/containerd/pkg/os/testing"
@@ -1647,7 +1648,7 @@ containerEdits:
 			}
 			require.NoError(t, err)
 
-			injectFun := oci.WithCDI(test.annotations, []string{cdiDir})
+			injectFun := customopts.WithCDI(test.annotations, []string{cdiDir})
 			err = injectFun(nil, nil, nil, spec)
 			assert.Equal(t, test.expectError, err != nil)
 
