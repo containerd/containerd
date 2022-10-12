@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           ref: ${{ github.ref }}
           path: src/github.com/containerd/containerd
@@ -82,7 +82,7 @@ jobs:
           echo "RELEASE_VER=${releasever}" >> $GITHUB_ENV
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
       - name: Checkout containerd
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           # Intentionally use github.repository instead of containerd/containerd to
           # make this action runnable on forks.
