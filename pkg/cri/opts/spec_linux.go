@@ -732,7 +732,7 @@ func GetPIDNamespace(pid uint32) string {
 }
 
 // WithCDI updates OCI spec with CDI content
-func WithCDI(annotations map[string]string, cdiSpecDirs []string) oci.SpecOpts {
+func WithCDI(annotations map[string]string) oci.SpecOpts {
 	return func(ctx context.Context, _ oci.Client, c *containers.Container, s *oci.Spec) error {
 		// TODO: Once CRI is extended with native CDI support this will need to be updated...
 		_, cdiDevices, err := cdi.ParseAnnotations(annotations)
@@ -743,7 +743,7 @@ func WithCDI(annotations map[string]string, cdiSpecDirs []string) oci.SpecOpts {
 			return nil
 		}
 
-		registry := cdi.GetRegistry(cdi.WithSpecDirs(cdiSpecDirs...))
+		registry := cdi.GetRegistry()
 		if err = registry.Refresh(); err != nil {
 			// We don't consider registry refresh failure a fatal error.
 			// For instance, a dynamically generated invalid CDI Spec file for

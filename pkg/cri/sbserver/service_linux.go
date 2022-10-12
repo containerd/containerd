@@ -19,6 +19,7 @@ package sbserver
 import (
 	"fmt"
 
+	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	"github.com/containerd/containerd/pkg/cap"
 	"github.com/containerd/containerd/pkg/userns"
 	"github.com/containerd/go-cni"
@@ -84,6 +85,14 @@ func (c *criService) initPlatform() (err error) {
 		c.allCaps, err = cap.Current()
 		if err != nil {
 			return fmt.Errorf("failed to get caps: %w", err)
+		}
+	}
+
+	if c.config.EnableCDI {
+		reg := cdi.GetRegistry()
+		err = reg.Configure(cdi.WithSpecDirs(c.config.CDISpecDirs...))
+		if err != nil {
+			return fmt.Errorf("failed to configure CDI registry")
 		}
 	}
 

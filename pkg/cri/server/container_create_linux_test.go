@@ -1648,7 +1648,11 @@ containerEdits:
 			}
 			require.NoError(t, err)
 
-			injectFun := customopts.WithCDI(test.annotations, []string{cdiDir})
+			reg := cdi.GetRegistry()
+			err = reg.Configure(cdi.WithSpecDirs(cdiDir))
+			require.NoError(t, err)
+
+			injectFun := customopts.WithCDI(test.annotations)
 			err = injectFun(nil, nil, nil, spec)
 			assert.Equal(t, test.expectError, err != nil)
 
