@@ -18,7 +18,6 @@ package fstest
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"testing"
 )
@@ -49,7 +48,7 @@ func makeTest(t *testing.T, ta TestApplier, as []Applier) func(t *testing.T) {
 		}
 		defer cleanup()
 
-		applyDir, err := ioutil.TempDir("", "test-expected-")
+		applyDir, err := os.MkdirTemp("", "test-expected-")
 		if err != nil {
 			t.Fatalf("Unable to make temp directory: %+v", err)
 		}
