@@ -597,7 +597,11 @@ func (s *service) Shutdown(ctx context.Context, r *taskAPI.ShutdownRequest) (*pt
 }
 
 func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.StatsResponse, error) {
-	cgx := s.container.Cgroup()
+	container, err := s.getContainer()
+	if err != nil {
+		return nil, err
+	}
+	cgx := container.Cgroup()
 	if cgx == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "cgroup does not exist")
 	}
