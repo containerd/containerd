@@ -38,7 +38,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: golangci/golangci-lint-action@v3
         with:
           version: v1.49.0
@@ -54,11 +54,11 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
           fetch-depth: 100
@@ -80,11 +80,11 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
 
@@ -112,10 +112,10 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.1
       - run: make man
 
@@ -123,7 +123,7 @@ jobs:
   crossbuild:
     name: Crossbuild Binaries
     needs: [project, linters, protos, man]
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -146,14 +146,14 @@ jobs:
             goarm: "7"
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - run: |
           set -e -x
 
-          packages=""
+          packages="libbtrfs-dev"
           platform="${{matrix.goos}}/${{matrix.goarch}}"
           if [ -n "${{matrix.goarm}}" ]; then
             platform+="/v${{matrix.goarm}}"
@@ -223,7 +223,7 @@ jobs:
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
 
@@ -250,15 +250,15 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           repository: Microsoft/hcsshim
           path: src/github.com/Microsoft/hcsshim
@@ -339,11 +339,11 @@ jobs:
     env:
       GOTEST: gotestsum --
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install containerd dependencies
         env:
@@ -367,7 +367,7 @@ jobs:
             libnl-3-dev \
             libnet-dev \
             libcap-dev \
-            python-future
+            python3-future
           wget https://github.com/checkpoint-restore/criu/archive/v3.13.tar.gz -O criu.tar.gz
           tar -zxf criu.tar.gz
           cd criu-3.13
@@ -477,10 +477,10 @@ jobs:
       GOTEST: gotestsum --
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - run: script/setup/install-gotestsum
       - name: Tests
         env:
@@ -507,10 +507,10 @@ jobs:
     env:
       GOTEST: gotestsum --
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: "Cache ~/.vagrant.d/boxes"
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: ~/.vagrant.d/boxes
           key: vagrant-${{ hashFiles('Vagrantfile*') }}

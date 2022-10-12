@@ -19,11 +19,11 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
 
@@ -136,11 +136,11 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
 
