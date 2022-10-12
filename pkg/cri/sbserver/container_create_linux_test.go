@@ -1548,6 +1548,8 @@ func TestCDIInjections(t *testing.T) {
 	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
+	testContainer := &containers.Container{ID: "64ddfe361f0099f8d59075398feeb3dcb3863b6851df7b946744755066c03e9d"}
+	ctx := context.Background()
 
 	for _, test := range []struct {
 		description   string
@@ -1653,7 +1655,7 @@ containerEdits:
 			require.NoError(t, err)
 
 			injectFun := customopts.WithCDI(test.annotations)
-			err = injectFun(nil, nil, nil, spec)
+			err = injectFun(ctx, nil, testContainer, spec)
 			assert.Equal(t, test.expectError, err != nil)
 
 			if err != nil {

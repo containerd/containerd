@@ -743,6 +743,8 @@ func WithCDI(annotations map[string]string) oci.SpecOpts {
 			return nil
 		}
 
+		log.G(ctx).Infof("container %v: CDI devices: %v", c.ID, cdiDevices)
+
 		registry := cdi.GetRegistry()
 		if err = registry.Refresh(); err != nil {
 			// We don't consider registry refresh failure a fatal error.
