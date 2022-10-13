@@ -68,11 +68,15 @@ func TestBasicResolver(t *testing.T) {
 		})
 
 		base, options, close := tlsServer(wrapped)
+		authorizer := NewDockerAuthorizer(
+			WithAuthClient(options.Client),
+			WithAuthCreds(func(host string) (string, string, error) {
+				return "user1", "password1", nil
+			}),
+		)
 		options.Hosts = ConfigureDefaultRegistries(
 			WithClient(options.Client),
-			WithAuthorizer(NewAuthorizer(options.Client, func(string) (string, string, error) {
-				return "user1", "password1", nil
-			})),
+			WithAuthorizer(authorizer),
 		)
 		return base, options, close
 	}
