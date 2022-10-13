@@ -357,7 +357,6 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"signalfd4",
 				"sigprocmask",
 				"sigreturn",
-				"socket",
 				"socketcall",
 				"socketpair",
 				"splice",
@@ -410,6 +409,17 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 			},
 			Action: specs.ActAllow,
 			Args:   []specs.LinuxSeccompArg{},
+		},
+		{
+			Names:  []string{"socket"},
+			Action: specs.ActAllow,
+			Args: []specs.LinuxSeccompArg{
+				{
+					Index: 0,
+					Value: unix.AF_VSOCK,
+					Op:    specs.OpNotEqual,
+				},
+			},
 		},
 		{
 			Names:  []string{"personality"},
