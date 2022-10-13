@@ -141,36 +141,64 @@ type SandboxInfo struct {
 	RuntimeType    string                    `json:"runtimeType"`
 	RuntimeOptions interface{}               `json:"runtimeOptions"`
 	Config         *runtime.PodSandboxConfig `json:"config"`
-	RuntimeSpec    *runtimespec.Spec         `json:"runtimeSpec"`
-	CNIResult      *cni.Result               `json:"cniResult"`
+	// Note: RuntimeSpec may not be populated if the sandbox has not been fully created.
+	RuntimeSpec *runtimespec.Spec      `json:"runtimeSpec"`
+	CNIResult   *cni.Result            `json:"cniResult"`
+	Metadata    *sandboxstore.Metadata `json:"sandboxMetadata"`
 }
 
 // toCRISandboxInfo converts internal container object information to CRI sandbox status response info map.
 func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox) (map[string]string, error) {
-	container := sandbox.Container
-	task, err := container.Task(ctx, nil)
-	if err != nil && !errdefs.IsNotFound(err) {
-		return nil, fmt.Errorf("failed to get sandbox container task: %w", err)
-	}
-
-	var processStatus containerd.ProcessStatus
-	if task != nil {
-		if taskStatus, err := task.Status(ctx); err != nil {
-			if !errdefs.IsNotFound(err) {
-				return nil, fmt.Errorf("failed to get task status: %w", err)
-			}
-			processStatus = containerd.Unknown
-		} else {
-			processStatus = taskStatus.Status
-		}
-	}
-
 	si := &SandboxInfo{
 		Pid:            sandbox.Status.Get().Pid,
-		RuntimeHandler: sandbox.RuntimeHandler,
-		Status:         string(processStatus),
 		Config:         sandbox.Config,
+		RuntimeHandler: sandbox.RuntimeHandler,
 		CNIResult:      sandbox.CNIResult,
+	}
+
+	if sandbox.Container != nil {
+		container := sandbox.Container
+		task, err := container.Task(ctx, nil)
+		if err != nil && !errdefs.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to get sandbox container task: %w", err)
+		}
+
+		var processStatus containerd.ProcessStatus
+		if task != nil {
+			if taskStatus, err := task.Status(ctx); err != nil {
+				if !errdefs.IsNotFound(err) {
+					return nil, fmt.Errorf("failed to get task status: %w", err)
+				}
+				processStatus = containerd.Unknown
+			} else {
+				processStatus = taskStatus.Status
+			}
+		}
+		si.Status = string(processStatus)
+
+		spec, err := container.Spec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get sandbox container runtime spec: %w", err)
+		}
+		si.RuntimeSpec = spec
+
+		ctrInfo, err := container.Info(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get sandbox container info: %w", err)
+		}
+		// Do not use config.SandboxImage because the configuration might
+		// be changed during restart. It may not reflect the actual image
+		// used by the sandbox container.
+		si.Image = ctrInfo.Image
+		si.SnapshotKey = ctrInfo.SnapshotKey
+		si.Snapshotter = ctrInfo.Snapshotter
+
+		runtimeOptions, err := getRuntimeOptions(ctrInfo)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get runtime options: %w", err)
+		}
+		si.RuntimeType = ctrInfo.Runtime.Name
+		si.RuntimeOptions = runtimeOptions
 	}
 
 	if si.Status == "" {
@@ -188,29 +216,7 @@ func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox) (map[st
 		si.NetNSClosed = closed
 	}
 
-	spec, err := container.Spec(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox container runtime spec: %w", err)
-	}
-	si.RuntimeSpec = spec
-
-	ctrInfo, err := container.Info(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox container info: %w", err)
-	}
-	// Do not use config.SandboxImage because the configuration might
-	// be changed during restart. It may not reflect the actual image
-	// used by the sandbox container.
-	si.Image = ctrInfo.Image
-	si.SnapshotKey = ctrInfo.SnapshotKey
-	si.Snapshotter = ctrInfo.Snapshotter
-
-	runtimeOptions, err := getRuntimeOptions(ctrInfo)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get runtime options: %w", err)
-	}
-	si.RuntimeType = ctrInfo.Runtime.Name
-	si.RuntimeOptions = runtimeOptions
+	si.Metadata = &sandbox.Metadata
 
 	infoBytes, err := json.Marshal(si)
 	if err != nil {

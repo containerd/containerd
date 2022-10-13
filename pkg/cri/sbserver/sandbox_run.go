@@ -170,6 +170,14 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			}
 		}()
 
+		if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
+			return nil, fmt.Errorf("unable to save sandbox %q to store: %w", id, err)
+		}
+		// Save sandbox metadata to store
+		if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
+			return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
+		}
+
 		// Define this defer to teardownPodNetwork prior to the setupPodNetwork function call.
 		// This is because in setupPodNetwork the resource is allocated even if it returns error, unlike other resource
 		// creation functions.
