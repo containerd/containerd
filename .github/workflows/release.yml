@@ -11,7 +11,7 @@ env:
 jobs:
   check:
     name: Check Signed Tag
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 5
     outputs:
       stringver: ${{ steps.contentrel.outputs.stringver }}
@@ -53,29 +53,29 @@ jobs:
 
   build:
     name: Build Release Binaries
-    runs-on: ubuntu-${{ matrix.ubuntu }}
+    runs-on: ubuntu-20.04
     needs: [check]
     timeout-minutes: 30
     strategy:
       matrix:
         include:
           # Choose an old release of Ubuntu to avoid glibc issue https://github.com/containerd/containerd/issues/7255
-          - ubuntu: 18.04
-            platform: linux/amd64
-          - ubuntu: 18.04
-            platform: linux/arm64
-          - ubuntu: 18.04
-            platform: linux/ppc64le
+          - dockerfile-ubuntu: 18.04
+            dockerfile-platform: linux/amd64
+          - dockerfile-ubuntu: 18.04
+            dockerfile-platform: linux/arm64
+          - dockerfile-ubuntu: 18.04
+            dockerfile-platform: linux/ppc64le
           # riscv64 isn't supported by Ubuntu 18.04
-          - ubuntu: 22.04
-            platform: linux/riscv64
-          - ubuntu: 18.04
-            platform: windows/amd64
+          - dockerfile-ubuntu: 22.04
+            dockerfile-platform: linux/riscv64
+          - dockerfile-ubuntu: 18.04
+            dockerfile-platform: windows/amd64
     steps:
       - name: Set env
         shell: bash
         env:
-          MOS: ubuntu-${{ matrix.ubuntu }}
+          MOS: ubuntu-20.04
         run: |
           releasever=${{ github.ref }}
           releasever="${releasever#refs/tags/}"
@@ -107,14 +107,14 @@ jobs:
             export PREFIX_LEN=12
             BUILD_ARGS="--build-arg GATEWAY --build-arg PREFIX_LEN"
           fi
-          docker buildx build ${cache} --build-arg RELEASE_VER --build-arg UBUNTU_VERSION=${{ matrix.ubuntu }} --build-arg GO_VERSION ${BUILD_ARGS} -f .github/workflows/release/Dockerfile --platform=${PLATFORM} -o releases/ .
+          docker buildx build ${cache} --build-arg RELEASE_VER --build-arg UBUNTU_VERSION=${{ matrix.dockerfile-ubuntu }} --build-arg GO_VERSION ${BUILD_ARGS} -f .github/workflows/release/Dockerfile --platform=${PLATFORM} -o releases/ .
           echo PLATFORM_CLEAN=${PLATFORM/\//-} >> $GITHUB_ENV
 
           # Remove symlinks since we don't want these in the release Artifacts
           find ./releases/ -maxdepth 1 -type l | xargs rm
         working-directory: src/github.com/containerd/containerd
         env:
-          PLATFORM: ${{ matrix.platform }}
+          PLATFORM: ${{ matrix.dockerfile-platform }}
       - name: Save Artifacts
         uses: actions/upload-artifact@v2
         with:
@@ -123,7 +123,7 @@ jobs:
 
   release:
     name: Create containerd Release
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 10
     needs: [build, check]
     steps:
