@@ -345,26 +345,31 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				if err != nil {
 					return "", ocispec.Descriptor{}, err
 				}
-				defer resp.Body.Close()
 
 				bodyReader := countingReader{reader: resp.Body}
 
 				contentType = getManifestMediaType(resp)
-				if dgst == "" {
+				err = func() error {
+					defer resp.Body.Close()
+					if dgst != "" {
+						_, err = io.Copy(io.Discard, &bodyReader)
+						return err
+					}
+
 					if contentType == images.MediaTypeDockerSchema1Manifest {
 						b, err := schema1.ReadStripSignature(&bodyReader)
 						if err != nil {
-							return "", ocispec.Descriptor{}, err
+							return err
 						}
 
 						dgst = digest.FromBytes(b)
-					} else {
-						dgst, err = digest.FromReader(&bodyReader)
-						if err != nil {
-							return "", ocispec.Descriptor{}, err
-						}
+						return nil
 					}
-				} else if _, err := io.Copy(io.Discard, &bodyReader); err != nil {
+
+					dgst, err = digest.FromReader(&bodyReader)
+					return err
+				}()
+				if err != nil {
 					return "", ocispec.Descriptor{}, err
 				}
 				size = bodyReader.bytesRead
