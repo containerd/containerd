@@ -17,3 +17,5 @@
 package proto
 
 //go:generate protoc --go_out=. manifest.proto
+//go:generate mv github.com/containerd/continuity/proto/manifest.pb.go .
+//go:generate rmdir -p github.com/containerd/continuity/proto
