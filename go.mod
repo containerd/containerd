@@ -43,6 +43,7 @@ require (
 	github.com/moby/sys/sequential v0.0.0-20220829095930-b22ba8a69b30
 	github.com/moby/sys/signal v0.7.0
 	github.com/moby/sys/symlink v0.2.0
+	github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b
 	github.com/opencontainers/runc v1.1.4
@@ -79,6 +80,7 @@ require (
 )
 
 require (
+	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/tools v0.1.12 // indirect
 )

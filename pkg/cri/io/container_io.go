@@ -27,6 +27,8 @@ import (
 
 	"github.com/containerd/containerd/pkg/cri/util"
 	cioutil "github.com/containerd/containerd/pkg/ioutil"
+
+	"github.com/moby/term"
 )
 
 // streamKey generates a key for the stream.
@@ -149,7 +151,19 @@ func (c *ContainerIO) Attach(opts AttachOptions) {
 		stdinStreamRC = cioutil.NewWrapReadCloser(opts.Stdin)
 		wg.Add(1)
 		go func() {
-			if _, err := io.Copy(c.stdin, stdinStreamRC); err != nil {
+			var err error
+			if opts.Tty {
+				detachKeys, err := term.ToBytes("ctrl-p,ctrl-q")
+				if err != nil {
+					logrus.WithError(err).Errorf("Failed to set detach keys")
+				}
+				pr := term.NewEscapeProxy(stdinStreamRC, detachKeys)
+				defer stdinStreamRC.Close()
+				_, err = io.Copy(c.stdin, pr)
+			} else {
+				_, err = io.Copy(c.stdin, stdinStreamRC)
+			}
+			if err != nil {
 				logrus.WithError(err).Errorf("Failed to pipe stdin for container attach %q", c.id)
 			}
 			logrus.Infof("Attach stream %q closed", stdinKey)

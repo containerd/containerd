@@ -4,6 +4,10 @@ github.com/AdaLogics/go-fuzz-headers
 # github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20220912195655-e1f97a00006b
 ## explicit; go 1.18
 github.com/AdamKorcz/go-118-fuzz-build/utils
+# github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1
+## explicit; go 1.16
+github.com/Azure/go-ansiterm
+github.com/Azure/go-ansiterm/winterm
 # github.com/Microsoft/go-winio v0.6.0
 ## explicit; go 1.17
 github.com/Microsoft/go-winio
@@ -312,6 +316,10 @@ github.com/moby/sys/signal
 # github.com/moby/sys/symlink v0.2.0
 ## explicit; go 1.16
 github.com/moby/sys/symlink
+# github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6
+## explicit; go 1.13
+github.com/moby/term
+github.com/moby/term/windows
 # github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
 ## explicit
 github.com/modern-go/concurrent
