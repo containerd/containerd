@@ -19,10 +19,11 @@ package sbserver
 import (
 	"context"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/nri"
 	v1 "github.com/containerd/nri/types/v1"
+
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/log"
 )
 
 // WithNRISandboxDelete calls delete for a sandbox'd task

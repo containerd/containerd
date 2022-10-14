@@ -24,13 +24,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	digest "github.com/opencontainers/go-digest"
+	bolt "go.etcd.io/bbolt"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/namespaces"
-	digest "github.com/opencontainers/go-digest"
-	bolt "go.etcd.io/bbolt"
 )
 
 // leaseManager manages the create/delete lifecycle of leases

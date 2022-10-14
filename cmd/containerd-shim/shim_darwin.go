@@ -20,9 +20,10 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/containerd/containerd/sys/reaper"
 	runc "github.com/containerd/go-runc"
 	"github.com/containerd/ttrpc"
+
+	"github.com/containerd/containerd/sys/reaper"
 )
 
 // setupSignals creates a new signal handler for all signals and sets the shim as a

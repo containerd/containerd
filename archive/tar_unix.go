@@ -28,10 +28,11 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/containerd/containerd/pkg/userns"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/continuity/sysx"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/pkg/userns"
 )
 
 func chmodTarEntry(perm os.FileMode) os.FileMode {

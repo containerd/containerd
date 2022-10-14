@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/containerd/ttrpc"
+
 	taskapi "github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/failpoint"
@@ -31,7 +33,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime/v2/runc/task"
 	"github.com/containerd/containerd/runtime/v2/shim"
-	"github.com/containerd/ttrpc"
 )
 
 const (

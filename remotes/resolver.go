@@ -20,8 +20,9 @@ import (
 	"context"
 	"io"
 
-	"github.com/containerd/containerd/content"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/content"
 )
 
 // Resolver provides remotes based on a locator.

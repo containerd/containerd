@@ -24,9 +24,10 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/leases"
-	"github.com/urfave/cli"
 )
 
 // Command is the cli command for managing content

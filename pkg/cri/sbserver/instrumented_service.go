@@ -20,10 +20,11 @@ import (
 	"context"
 	"errors"
 
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtime_alpha "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/log"
 
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 )

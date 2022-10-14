@@ -22,10 +22,11 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/images"
 	"github.com/moby/sys/signal"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/images"
 )
 
 // StopSignalLabel is a well-known containerd label for storing the stop

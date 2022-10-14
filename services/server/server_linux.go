@@ -22,11 +22,12 @@ import (
 
 	"github.com/containerd/cgroups"
 	cgroupsv2 "github.com/containerd/cgroups/v2"
+	"github.com/containerd/ttrpc"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/log"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/containerd/containerd/sys"
-	"github.com/containerd/ttrpc"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // apply sets config settings on the server process

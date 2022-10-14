@@ -23,10 +23,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/oci"
-	"github.com/sirupsen/logrus"
 )
 
 type ctrWorker struct {

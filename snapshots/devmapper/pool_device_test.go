@@ -27,13 +27,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/pkg/testutil"
-	"github.com/containerd/containerd/snapshots/devmapper/dmsetup"
 	"github.com/docker/go-units"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	exec "golang.org/x/sys/execabs"
+
+	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/pkg/testutil"
+	"github.com/containerd/containerd/snapshots/devmapper/dmsetup"
 )
 
 const (

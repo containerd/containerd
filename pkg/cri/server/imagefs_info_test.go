@@ -20,10 +20,11 @@ import (
 	"context"
 	"testing"
 
-	snapshot "github.com/containerd/containerd/snapshots"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	snapshot "github.com/containerd/containerd/snapshots"
 
 	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
 )

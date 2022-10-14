@@ -25,9 +25,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	internalapi "github.com/containerd/containerd/integration/cri-api/pkg/apis"
 	"github.com/containerd/containerd/pkg/cri/util"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 type criWorker struct {

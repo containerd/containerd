@@ -23,10 +23,11 @@ import (
 	"time"
 
 	"github.com/containerd/console"
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/log"
-	"github.com/urfave/cli"
 )
 
 var platformStartFlags = []cli.Flag{}

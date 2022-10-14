@@ -28,15 +28,16 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/hashicorp/go-multierror"
+	"github.com/sirupsen/logrus"
+	exec "golang.org/x/sys/execabs"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/devmapper/dmsetup"
 	"github.com/containerd/containerd/snapshots/storage"
-	"github.com/hashicorp/go-multierror"
-	"github.com/sirupsen/logrus"
-	exec "golang.org/x/sys/execabs"
 )
 
 type fsType string

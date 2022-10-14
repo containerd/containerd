@@ -23,10 +23,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/snapshots"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/snapshots"
 )
 
 type testFunc func(context.Context, *testing.T, *MetaStore)

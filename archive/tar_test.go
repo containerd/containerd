@@ -32,12 +32,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/archive/tartest"
-	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/continuity/fs/fstest"
 	"github.com/stretchr/testify/require"
 	exec "golang.org/x/sys/execabs"
+
+	"github.com/containerd/containerd/archive/tartest"
+	"github.com/containerd/containerd/pkg/testutil"
 )
 
 const tarCmd = "tar"

@@ -27,11 +27,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/ttrpc"
+	exec "golang.org/x/sys/execabs"
+
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/containerd/protobuf/types"
-	"github.com/containerd/ttrpc"
-	exec "golang.org/x/sys/execabs"
 )
 
 type CommandConfig struct {

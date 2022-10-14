@@ -33,6 +33,10 @@ import (
 	"testing"
 	"time"
 
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/stretchr/testify/assert"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/leases"
@@ -40,9 +44,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	criserver "github.com/containerd/containerd/pkg/cri/server"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/stretchr/testify/assert"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 var (

@@ -29,6 +29,9 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/containerd/ttrpc"
+	"github.com/sirupsen/logrus"
+
 	shimapi "github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
@@ -38,8 +41,6 @@ import (
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/containerd/version"
-	"github.com/containerd/ttrpc"
-	"github.com/sirupsen/logrus"
 )
 
 // Publisher for events

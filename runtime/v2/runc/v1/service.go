@@ -31,6 +31,12 @@ import (
 	"time"
 
 	"github.com/containerd/cgroups"
+	runcC "github.com/containerd/go-runc"
+	"github.com/containerd/typeurl"
+	"github.com/sirupsen/logrus"
+	exec "golang.org/x/sys/execabs"
+	"golang.org/x/sys/unix"
+
 	eventstypes "github.com/containerd/containerd/api/events"
 	taskAPI "github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/api/types/task"
@@ -49,11 +55,6 @@ import (
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/containerd/sys/reaper"
-	runcC "github.com/containerd/go-runc"
-	"github.com/containerd/typeurl"
-	"github.com/sirupsen/logrus"
-	exec "golang.org/x/sys/execabs"
-	"golang.org/x/sys/unix"
 )
 
 var (

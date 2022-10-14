@@ -29,6 +29,11 @@ import (
 
 	"github.com/containerd/cgroups"
 	cgroupsv2 "github.com/containerd/cgroups/v2"
+	runcC "github.com/containerd/go-runc"
+	"github.com/containerd/typeurl"
+	exec "golang.org/x/sys/execabs"
+	"golang.org/x/sys/unix"
+
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
@@ -39,10 +44,6 @@ import (
 	"github.com/containerd/containerd/runtime/v2/runc"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/runtime/v2/shim"
-	runcC "github.com/containerd/go-runc"
-	"github.com/containerd/typeurl"
-	exec "golang.org/x/sys/execabs"
-	"golang.org/x/sys/unix"
 )
 
 // NewShimManager returns an implementation of the shim manager

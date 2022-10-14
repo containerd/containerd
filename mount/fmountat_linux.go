@@ -22,8 +22,9 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/containerd/containerd/log"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/log"
 )
 
 // fMountat performs mount from the provided directory.

@@ -22,8 +22,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/containerd/containerd/errdefs"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/errdefs"
 )
 
 // mediatype definitions for image components handled in containerd.

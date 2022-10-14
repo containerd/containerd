@@ -27,11 +27,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v1/shim"
 	"github.com/containerd/containerd/runtime/v1/shim/client"
-	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // loadBundle loads an existing bundle from disk

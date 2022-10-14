@@ -22,10 +22,11 @@ package sbserver
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/services/tasks"
 	"github.com/intel/goresctrl/pkg/blockio"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
+
+	"github.com/containerd/containerd/services/tasks"
 )
 
 // blockIOClassFromAnnotations examines container and pod annotations of a

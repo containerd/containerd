@@ -23,9 +23,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd/cmd/containerd/command"
 	"github.com/containerd/containerd/cmd/ctr/app"
-	"github.com/urfave/cli"
 )
 
 func main() {

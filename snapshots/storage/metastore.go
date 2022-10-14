@@ -26,8 +26,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/containerd/containerd/snapshots"
 	bolt "go.etcd.io/bbolt"
+
+	"github.com/containerd/containerd/snapshots"
 )
 
 // Transactor is used to finalize an active transaction.

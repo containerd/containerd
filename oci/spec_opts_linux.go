@@ -21,10 +21,11 @@ import (
 	"fmt"
 
 	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/cap"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // WithHostDevices adds all the hosts device nodes to the container's spec

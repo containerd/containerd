@@ -21,10 +21,11 @@ import (
 	"runtime"
 	"testing"
 
+	specs "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/testutil"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func TestGenerateSpec(t *testing.T) {

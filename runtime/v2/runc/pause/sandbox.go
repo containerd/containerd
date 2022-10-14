@@ -22,9 +22,10 @@ package pause
 import (
 	"context"
 
-	"github.com/containerd/containerd/pkg/shutdown"
 	"github.com/containerd/ttrpc"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/containerd/containerd/pkg/shutdown"
 
 	api "github.com/containerd/containerd/api/runtime/sandbox/v1"
 	"github.com/containerd/containerd/plugin"

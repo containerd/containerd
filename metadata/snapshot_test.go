@@ -27,6 +27,8 @@ import (
 	"testing"
 	"time"
 
+	bolt "go.etcd.io/bbolt"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/mount"
@@ -35,7 +37,6 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/native"
 	"github.com/containerd/containerd/snapshots/testsuite"
-	bolt "go.etcd.io/bbolt"
 )
 
 func newTestSnapshotter(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {

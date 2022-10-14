@@ -22,14 +22,15 @@ import (
 	"os"
 	"path/filepath"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/sirupsen/logrus"
+	"k8s.io/klog/v2"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/cri/sbserver"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/sirupsen/logrus"
-	"k8s.io/klog/v2"
 
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/constants"

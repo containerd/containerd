@@ -23,8 +23,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/containerd/containerd/log"
 	"github.com/containernetworking/plugins/pkg/ns"
+
+	"github.com/containerd/containerd/log"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )

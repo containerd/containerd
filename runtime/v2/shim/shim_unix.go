@@ -28,10 +28,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/containerd/containerd/sys/reaper"
 	"github.com/containerd/fifo"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/sys/reaper"
 )
 
 // setupSignals creates a new signal handler for all signals and sets the shim as a

@@ -24,10 +24,11 @@ import (
 	"os"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
-	"github.com/containerd/containerd/content/local"
-	"github.com/containerd/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
+
+	"github.com/containerd/containerd/content/local"
+	"github.com/containerd/containerd/log"
 )
 
 func FuzzConvertManifest(data []byte) int {

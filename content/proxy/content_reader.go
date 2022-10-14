@@ -19,8 +19,9 @@ package proxy
 import (
 	"context"
 
-	contentapi "github.com/containerd/containerd/api/services/content/v1"
 	digest "github.com/opencontainers/go-digest"
+
+	contentapi "github.com/containerd/containerd/api/services/content/v1"
 )
 
 type remoteReaderAt struct {

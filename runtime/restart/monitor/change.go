@@ -23,10 +23,11 @@ import (
 	"strconv"
 	"syscall"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/runtime/restart"
-	"github.com/sirupsen/logrus"
 )
 
 type stopChange struct {

@@ -114,8 +114,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/containerd/containerd/errdefs"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/errdefs"
 )
 
 var (

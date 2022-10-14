@@ -25,6 +25,8 @@ import (
 	"strings"
 	"sync"
 
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events/exchange"
@@ -38,7 +40,6 @@ import (
 	"github.com/containerd/containerd/runtime"
 	shimbinary "github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/containerd/sandbox"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // Config for the v2 runtime

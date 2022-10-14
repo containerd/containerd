@@ -22,11 +22,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/containerd/typeurl"
+	"github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/typeurl"
-	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 const configFilename = "config.json"

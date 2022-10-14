@@ -23,12 +23,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/continuity/fs/fstest"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/pkg/testutil"
 )
 
 // nolint:gosec

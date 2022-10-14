@@ -25,9 +25,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/containerd/containerd/pkg/userns"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/pkg/userns"
 )
 
 // ErrNotADevice denotes that a file is not a valid linux device.

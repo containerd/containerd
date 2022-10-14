@@ -20,11 +20,12 @@ import (
 	"context"
 	"errors"
 
+	"google.golang.org/grpc"
+
 	api "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/plugin"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/services"
-	"google.golang.org/grpc"
 )
 
 var (

@@ -25,8 +25,9 @@ import (
 	"sync"
 	"syscall"
 
-	. "github.com/containerd/containerd"
 	exec "golang.org/x/sys/execabs"
+
+	. "github.com/containerd/containerd"
 )
 
 type daemon struct {

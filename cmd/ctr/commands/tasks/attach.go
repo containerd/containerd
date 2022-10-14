@@ -18,10 +18,11 @@ package tasks
 
 import (
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+
+	"github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/cmd/ctr/commands"
 )
 
 var attachCommand = cli.Command{

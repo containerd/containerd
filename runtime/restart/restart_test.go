@@ -19,8 +19,9 @@ package restart
 import (
 	"testing"
 
-	"github.com/containerd/containerd"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/containerd"
 )
 
 func TestNewRestartPolicy(t *testing.T) {

@@ -22,9 +22,10 @@ package server
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/services/tasks"
 	"github.com/intel/goresctrl/pkg/rdt"
 	"github.com/sirupsen/logrus"
+
+	"github.com/containerd/containerd/services/tasks"
 )
 
 // rdtClassFromAnnotations examines container and pod annotations of a

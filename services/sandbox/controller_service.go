@@ -20,11 +20,12 @@ import (
 	"context"
 	"errors"
 
+	"google.golang.org/grpc"
+
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
-	"google.golang.org/grpc"
 )
 
 func init() {

@@ -22,12 +22,13 @@ import (
 	"os"
 	"time"
 
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
-	"github.com/urfave/cli"
 )
 
 var importCommand = cli.Command{

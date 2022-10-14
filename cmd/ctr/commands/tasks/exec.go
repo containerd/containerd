@@ -23,12 +23,13 @@ import (
 	"os"
 
 	"github.com/containerd/console"
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/oci"
-	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
 )
 
 var execCommand = cli.Command{

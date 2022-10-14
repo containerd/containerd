@@ -25,12 +25,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/containerd/continuity/fs"
+	"github.com/containerd/continuity/fs/fstest"
+
 	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/snapshots/overlay/overlayutils"
-	"github.com/containerd/continuity/fs"
-	"github.com/containerd/continuity/fs/fstest"
 )
 
 func TestOverlayApply(t *testing.T) {

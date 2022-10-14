@@ -27,16 +27,18 @@ import (
 	"time"
 
 	"github.com/containerd/cgroups"
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/containerd/containerd/metrics/cgroups/common"
 	v1 "github.com/containerd/containerd/metrics/cgroups/v1"
 	v2 "github.com/containerd/containerd/metrics/cgroups/v2"
 	v1types "github.com/containerd/containerd/metrics/types/v1"
 	v2types "github.com/containerd/containerd/metrics/types/v2"
 	"github.com/containerd/containerd/protobuf"
-	"github.com/prometheus/client_golang/prometheus"
+
+	metrics "github.com/docker/go-metrics"
 
 	"github.com/containerd/containerd/protobuf/types"
-	metrics "github.com/docker/go-metrics"
 )
 
 // TestRegressionIssue6772 should not have dead-lock when Collect and Add run

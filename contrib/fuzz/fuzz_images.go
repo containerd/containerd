@@ -20,10 +20,11 @@ import (
 	"os"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/content/local"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/platforms"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func FuzzImagesCheck(data []byte) int {

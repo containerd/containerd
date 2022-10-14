@@ -28,6 +28,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/intel/goresctrl/pkg/blockio"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/containers"
@@ -39,10 +44,6 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/snapshots"
-	"github.com/intel/goresctrl/pkg/blockio"
-	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
 )
 
 var platformRunFlags = []cli.Flag{

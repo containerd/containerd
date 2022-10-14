@@ -30,14 +30,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/typeurl"
+	exec "golang.org/x/sys/execabs"
+
 	. "github.com/containerd/containerd"
 	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/runtime/restart"
 	srvconfig "github.com/containerd/containerd/services/server/config"
-	"github.com/containerd/typeurl"
-	exec "golang.org/x/sys/execabs"
 )
 
 // the following nolint is for shutting up gometalinter on non-linux.

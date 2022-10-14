@@ -22,9 +22,10 @@ package config
 import (
 	"time"
 
+	"github.com/pelletier/go-toml"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/pkg/cri/streaming"
-	"github.com/pelletier/go-toml"
 )
 
 // DefaultConfig returns default configurations of cri plugin.

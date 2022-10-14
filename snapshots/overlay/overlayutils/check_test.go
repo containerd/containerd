@@ -22,9 +22,10 @@ package overlayutils
 import (
 	"testing"
 
-	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/continuity/testutil/loopback"
 	exec "golang.org/x/sys/execabs"
+
+	"github.com/containerd/containerd/pkg/testutil"
 )
 
 func testOverlaySupported(t testing.TB, expected bool, mkfs ...string) {

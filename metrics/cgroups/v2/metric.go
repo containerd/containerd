@@ -20,9 +20,10 @@
 package v2
 
 import (
-	v2 "github.com/containerd/containerd/metrics/types/v2"
 	metrics "github.com/docker/go-metrics"
 	"github.com/prometheus/client_golang/prometheus"
+
+	v2 "github.com/containerd/containerd/metrics/types/v2"
 )
 
 // IDName is the name that is used to identify the id being collected in the metric

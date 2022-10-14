@@ -19,8 +19,9 @@ package util
 import (
 	"testing"
 
-	"github.com/containerd/containerd/reference"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/containerd/reference"
 )
 
 func TestNormalizeImageRef(t *testing.T) {

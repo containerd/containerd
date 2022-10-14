@@ -20,9 +20,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/version"
-	"github.com/urfave/cli"
 )
 
 // Command is a cli command to output the client and containerd server version

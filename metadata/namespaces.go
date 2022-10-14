@@ -21,11 +21,12 @@ import (
 	"fmt"
 	"strings"
 
+	bolt "go.etcd.io/bbolt"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/identifiers"
 	l "github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/namespaces"
-	bolt "go.etcd.io/bbolt"
 )
 
 type namespaceStore struct {
