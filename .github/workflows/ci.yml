@@ -312,7 +312,7 @@ jobs:
           CGO_ENABLED: 1
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
         run: mingw32-make.exe integration
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         if: always()
         with:
           name: TestResults Windows
@@ -460,7 +460,7 @@ jobs:
           mount
           df
           losetup -l
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         if: always()
         with:
           name: TestResults ${{ matrix.runtime }} ${{matrix.runc}}
@@ -486,7 +486,7 @@ jobs:
         env:
           GOTESTSUM_JUNITFILE: "${{ github.workspace }}/macos-test-junit.xml"
         run: make test
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         if: always()
         with:
           name: TestResults MacOS
@@ -541,7 +541,7 @@ jobs:
           vagrant plugin install vagrant-scp
           vagrant scp :/tmp/test-integration-junit.xml "${{ github.workspace }}/"
           vagrant scp :/tmp/critestreport "${{ github.workspace }}/critestreport"
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         if: always()
         with:
           name:  TestResults cgroup2 ${{ matrix.runtime }} ${{matrix.runc}}
