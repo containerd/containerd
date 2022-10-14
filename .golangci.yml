@@ -42,6 +42,8 @@ linters-settings:
       - G306
       - G402
       - G404
+  goimports:
+    local-prefixes: github.com/containerd/containerd
 
 run:
   timeout: 8m
