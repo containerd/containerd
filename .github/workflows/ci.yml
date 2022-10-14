@@ -411,6 +411,7 @@ jobs:
           path: |
             ${{github.workspace}}/*-junit.xml
             ${{github.workspace}}/*-gotest.json
+            ${{github.workspace}}/report/*.log
 
   integration-linux:
     name: Linux Integration
@@ -532,10 +533,15 @@ jobs:
           ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
         run: |
           BDIR="$(mktemp -d -p $PWD)"
+          mkdir -p ${{github.workspace}}/report
 
           function cleanup() {
             sudo pkill containerd || true
-            cat ${BDIR}/containerd-cri.log
+
+            echo ::group::containerd logs
+            cat ${{github.workspace}}/report/containerd.log
+            echo ::endgroup::
+
             sudo -E rm -rf ${BDIR}
           }
           trap cleanup EXIT
@@ -547,9 +553,9 @@ jobs:
             runtime_type = "${TEST_RUNTIME}"
           EOF
           sudo ls /etc/cni/net.d
-          sudo -E PATH=$PATH /usr/local/bin/containerd -a ${BDIR}/c.sock --config ${BDIR}/config.toml --root ${BDIR}/root --state ${BDIR}/state --log-level debug &> ${BDIR}/containerd-cri.log &
+          sudo -E PATH=$PATH /usr/local/bin/containerd -a ${BDIR}/c.sock --config ${BDIR}/config.toml --root ${BDIR}/root --state ${BDIR}/state --log-level debug &> ${{github.workspace}}/report/containerd.log &
           sudo -E PATH=$PATH /usr/local/bin/ctr -a ${BDIR}/c.sock version
-          sudo -E PATH=$PATH critest --report-dir "${{github.workspace}}/critestreport" --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8
+          sudo -E PATH=$PATH critest --report-dir "${{github.workspace}}/report" --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8
 
       # Log the status of this VM to investigate issues like
       # https://github.com/containerd/containerd/issues/4969
@@ -567,7 +573,8 @@ jobs:
           path: |
             *-junit.xml
             *-gotest.json
-            ${{github.workspace}}/critestreport/*.xml
+            ${{github.workspace}}/report/*.xml
+            ${{github.workspace}}/report/*.log
 
   tests-mac-os:
     name: MacOS unit tests

@@ -220,7 +220,7 @@ bin/cri-integration.test:
 
 cri-integration: binaries bin/cri-integration.test ## run cri integration tests (example: FOCUS=TestContainerListStats make cri-integration)
 	@echo "$(WHALE) $@"
-	@bash -x ./script/test/cri-integration.sh
+	@bash ./script/test/cri-integration.sh
 	@rm -rf bin/cri-integration.test
 
 # build runc shimv2 with failpoint control, only used by integration test
