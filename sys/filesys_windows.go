@@ -18,9 +18,7 @@ package sys
 
 import (
 	"os"
-	"path/filepath"
 	"regexp"
-	"strings"
 	"syscall"
 	"unsafe"
 
@@ -133,20 +131,4 @@ func mkdirWithACL(name string) error {
 		return &os.PathError{Op: "mkdir", Path: name, Err: e}
 	}
 	return nil
-}
-
-// IsAbs is a platform-specific wrapper for filepath.IsAbs. On Windows,
-// golang filepath.IsAbs does not consider a path \windows\system32 as absolute
-// as it doesn't start with a drive-letter/colon combination. However, in
-// docker we need to verify things such as WORKDIR /windows/system32 in
-// a Dockerfile (which gets translated to \windows\system32 when being processed
-// by the daemon. This SHOULD be treated as absolute from a docker processing
-// perspective.
-func IsAbs(path string) bool {
-	if !filepath.IsAbs(path) {
-		if !strings.HasPrefix(path, string(os.PathSeparator)) {
-			return false
-		}
-	}
-	return true
 }
