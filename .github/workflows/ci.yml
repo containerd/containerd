@@ -404,7 +404,7 @@ jobs:
           }
           critest.exe --runtime-endpoint=npipe://.//pipe//containerd-containerd --test-images-file='${{env.CRI_TEST_IMAGES}}' --report-dir='${{github.workspace}}/critestreport' $skip
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         if: always()
         with:
           name: TestResults ${{ matrix.os }}
@@ -560,7 +560,7 @@ jobs:
           mount
           df
           losetup -l
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         if: always()
         with:
           name: TestResults ${{ matrix.runtime }} ${{matrix.runc}}
@@ -593,7 +593,7 @@ jobs:
         if: always()
       - run: script/test/test2annotation.sh *-gotest.json
         if: always()
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         if: always()
         with:
           name: TestResults MacOS
