@@ -1006,7 +1006,7 @@ func TestDaemonRestartWithRunningShim(t *testing.T) {
 		t.Errorf(`first task.Wait() should have failed with "transport is closing"`)
 	}
 
-	waitCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+	waitCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	c, err := ctrd.waitForStart(waitCtx)
 	cancel()
 	if err != nil {

@@ -24,6 +24,7 @@ import (
 	"runtime"
 	"sync"
 	"syscall"
+	"time"
 
 	. "github.com/containerd/containerd"
 	exec "golang.org/x/sys/execabs"
@@ -59,21 +60,30 @@ func (d *daemon) waitForStart(ctx context.Context) (*Client, error) {
 		client  *Client
 		serving bool
 		err     error
+		ticker  = time.NewTicker(500 * time.Millisecond)
 	)
+	defer ticker.Stop()
 
-	client, err = New(d.addr)
-	if err != nil {
-		return nil, err
-	}
-	serving, err = client.IsServing(ctx)
-	if !serving {
-		client.Close()
-		if err == nil {
-			err = errors.New("connection was successful but service is not available")
+	for {
+		select {
+		case <-ticker.C:
+			client, err = New(d.addr)
+			if err != nil {
+				continue
+			}
+			serving, err = client.IsServing(ctx)
+			if !serving {
+				client.Close()
+				if err == nil {
+					err = errors.New("connection was successful but service is not available")
+				}
+				continue
+			}
+			return client, err
+		case <-ctx.Done():
+			return nil, fmt.Errorf("context deadline exceeded: %w", err)
 		}
-		return nil, err
 	}
-	return client, err
 }
 
 func (d *daemon) Stop() error {
