@@ -34,6 +34,8 @@ Vagrant.configure("2") do |config|
     v.machine_virtual_size = disk_size
   end
 
+  config.vm.synced_folder ".", "/vagrant", type: "rsync"
+
   config.vm.provision 'shell', path: 'script/resize-vagrant-root.sh'
 
   # Disabled by default. To run:
