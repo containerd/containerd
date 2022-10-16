@@ -30,6 +30,8 @@ Vagrant.configure("2") do |config|
     v.cpus = cpus
   end
 
+  config.vm.synced_folder ".", "/vagrant", type: "rsync"
+
   # Disabled by default. To run:
   #   vagrant up --provision-with=upgrade-packages
   # To upgrade only specific packages:
