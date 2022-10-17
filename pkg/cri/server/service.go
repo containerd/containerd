@@ -113,7 +113,7 @@ type criService struct {
 	baseOCISpecs map[string]*oci.Spec
 	// allCaps is the list of the capabilities.
 	// When nil, parsed from CapEff of /proc/self/status.
-	allCaps []string // nolint
+	allCaps []string //nolint:nolintlint,unused // Ignore on non-Linux
 	// unpackDuplicationSuppressor is used to make sure that there is only
 	// one in-flight fetch request or unpack handler for a given descriptor's
 	// or chain ID.

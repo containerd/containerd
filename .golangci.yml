@@ -1,19 +1,18 @@
 linters:
   enable:
-    - structcheck
-    - varcheck
-    - staticcheck
-    - unconvert
+    - exportloopref # Checks for pointers to enclosing loop variables
     - gofmt
     - goimports
-    - revive
-    - ineffassign
-    - vet
-    - unused
-    - misspell
     - gosec
-    - exportloopref # Checks for pointers to enclosing loop variables
+    - ineffassign
+    - misspell
+    - nolintlint
+    - revive
+    - staticcheck
     - tenv # Detects using os.Setenv instead of t.Setenv since Go 1.17
+    - unconvert
+    - unused
+    - vet
   disable:
     - errcheck
 

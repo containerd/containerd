@@ -76,7 +76,6 @@ func setLinux(s *Spec) {
 	}
 }
 
-// nolint
 func setResources(s *Spec) {
 	if s.Linux != nil {
 		if s.Linux.Resources == nil {
@@ -85,7 +84,7 @@ func setResources(s *Spec) {
 	}
 }
 
-// nolint
+//nolint:nolintlint,unused // not used on all platforms
 func setResourcesWindows(s *Spec) {
 	if s.Windows != nil {
 		if s.Windows.Resources == nil {
@@ -94,7 +93,7 @@ func setResourcesWindows(s *Spec) {
 	}
 }
 
-// nolint
+//nolint:nolintlint,unused // not used on all platforms
 func setCPU(s *Spec) {
 	setResources(s)
 	if s.Linux != nil {
@@ -104,7 +103,7 @@ func setCPU(s *Spec) {
 	}
 }
 
-// nolint
+//nolint:nolintlint,unused // not used on all platforms
 func setCPUWindows(s *Spec) {
 	setResourcesWindows(s)
 	if s.Windows != nil {

@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-// nolint: golint
+//nolint:golint
 package fuzz
 
 import (
