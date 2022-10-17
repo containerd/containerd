@@ -51,6 +51,7 @@ jobs:
           AZURE_RESOURCE_GROUP: ctrd-integration-ltsc2022-${{ github.run_id }}
           GOOGLE_BUCKET: "containerd-integration/logs/windows-ltsc2022/"
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v3
 

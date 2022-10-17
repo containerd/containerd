@@ -9,11 +9,12 @@ on:
       image:
         description: "Target image name (override)"
 
-
 jobs:
   mirror:
     name: "Mirror Image"
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
     permissions:
       packages: write
 
