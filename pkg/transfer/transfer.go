@@ -27,7 +27,7 @@ import (
 )
 
 type Transferer interface {
-	Transfer(context.Context, interface{}, interface{}, ...Opt) error
+	Transfer(ctx context.Context, source interface{}, destination interface{}, opts ...Opt) error
 }
 
 type ImageResolver interface {
