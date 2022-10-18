@@ -152,12 +152,14 @@ func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox) (map[st
 
 	var processStatus containerd.ProcessStatus
 	if task != nil {
-		taskStatus, err := task.Status(ctx)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get task status")
+		if taskStatus, err := task.Status(ctx); err != nil {
+			if !errdefs.IsNotFound(err) {
+				return nil, errors.Wrap(err, "failed to get task status")
+			}
+			processStatus = containerd.Unknown
+		} else {
+			processStatus = taskStatus.Status
 		}
-
-		processStatus = taskStatus.Status
 	}
 
 	si := &SandboxInfo{
