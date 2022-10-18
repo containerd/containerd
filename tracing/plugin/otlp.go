@@ -160,7 +160,11 @@ func newTracer(ic *plugin.InitContext) (io.Closer, error) {
 	for id, pctx := range ls {
 		p, err := pctx.Instance()
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("failed to initialize a tracing processor %q", id)
+			if plugin.IsSkipPlugin(err) {
+				log.G(ctx).WithError(err).Infof("skipping tracing processor initialization (no tracing plugin)")
+			} else {
+				log.G(ctx).WithError(err).Errorf("failed to initialize a tracing processor %q", id)
+			}
 			continue
 		}
 		proc := p.(sdktrace.SpanProcessor)
