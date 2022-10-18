@@ -6,11 +6,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
+	"time"
 	"unsafe"
 
 	securejoin "github.com/cyphar/filepath-securejoin"
@@ -500,45 +502,177 @@ func (f *ConsumeFuzzer) FuzzMap(m interface{}) error {
 	return nil
 }
 
+func returnTarBytes(buf []byte) ([]byte, error) {
+	reader := bytes.NewReader(buf)
+	tr := tar.NewReader(reader)
+
+	// Count files
+	var fileCounter int
+	fileCounter = 0
+	for {
+		_, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		fileCounter++
+	}
+	if fileCounter > 4 {
+		return buf, nil
+	}
+	return nil, fmt.Errorf("Not enough files were created\n")
+}
+
+func setTarHeaderFormat(hdr *tar.Header, f *ConsumeFuzzer) error {
+	ind, err := f.GetInt()
+	if err != nil {
+		return err
+	}
+	switch ind % 4 {
+	case 0:
+		hdr.Format = tar.FormatUnknown
+	case 1:
+		hdr.Format = tar.FormatUSTAR
+	case 2:
+		hdr.Format = tar.FormatPAX
+	case 3:
+		hdr.Format = tar.FormatGNU
+	}
+	return nil
+}
+
+func setTarHeaderTypeflag(hdr *tar.Header, f *ConsumeFuzzer) error {
+	ind, err := f.GetInt()
+	if err != nil {
+		return err
+	}
+	switch ind % 13 {
+	case 0:
+		hdr.Typeflag = tar.TypeReg
+	case 1:
+		hdr.Typeflag = tar.TypeLink
+		linkname, err := f.GetString()
+		if err != nil {
+			return err
+		}
+		hdr.Linkname = linkname
+	case 2:
+		hdr.Typeflag = tar.TypeSymlink
+		linkname, err := f.GetString()
+		if err != nil {
+			return err
+		}
+		hdr.Linkname = linkname
+	case 3:
+		hdr.Typeflag = tar.TypeChar
+	case 4:
+		hdr.Typeflag = tar.TypeBlock
+	case 5:
+		hdr.Typeflag = tar.TypeDir
+	case 6:
+		hdr.Typeflag = tar.TypeFifo
+	case 7:
+		hdr.Typeflag = tar.TypeCont
+	case 8:
+		hdr.Typeflag = tar.TypeXHeader
+	case 9:
+		hdr.Typeflag = tar.TypeXGlobalHeader
+	case 10:
+		hdr.Typeflag = tar.TypeGNUSparse
+	case 11:
+		hdr.Typeflag = tar.TypeGNULongName
+	case 12:
+		hdr.Typeflag = tar.TypeGNULongLink
+	}
+	return nil
+}
+
+func (f *ConsumeFuzzer) createTarFileBody() ([]byte, error) {
+	filebody, err := f.GetBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	// Trick fuzzer to explore large file sizes.
+	if len(filebody) > 200 {
+		if len(filebody) > 2000 {
+			if len(filebody) > 20000 {
+				if len(filebody) > 200000 {
+					if len(filebody) > 800000 {
+						if len(filebody) > 1200000 {
+						}
+					}
+				}
+			}
+		}
+	}
+	return filebody, nil
+
+}
+
 // TarBytes returns valid bytes for a tar archive
 func (f *ConsumeFuzzer) TarBytes() ([]byte, error) {
-	var buf bytes.Buffer
-	tw := tar.NewWriter(&buf)
-
 	numberOfFiles, err := f.GetInt()
 	if err != nil {
 		return nil, err
 	}
-	maxNoOfFiles := 100000
+
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	defer tw.Close()
+
+	maxNoOfFiles := 1000
 	for i := 0; i < numberOfFiles%maxNoOfFiles; i++ {
 		filename, err := f.GetString()
 		if err != nil {
-			return nil, err
+			return returnTarBytes(buf.Bytes())
 		}
-		filebody, err := f.GetBytes()
+		filebody, err := f.createTarFileBody()
 		if err != nil {
-			return nil, err
+			return returnTarBytes(buf.Bytes())
 		}
 		hdr := &tar.Header{}
-		err = f.GenerateStruct(hdr)
+		/*err = f.GenerateStruct(hdr)
 		if err != nil {
-			return nil, err
+			return returnTarBytes(buf.Bytes())
+		}*/
+
+		err = setTarHeaderTypeflag(hdr, f)
+		if err != nil {
+			return returnTarBytes(buf.Bytes())
 		}
+
+		sec, err := f.GetInt()
+		if err != nil {
+			return returnTarBytes(buf.Bytes())
+		}
+
+		nsec, err := f.GetInt()
+		if err != nil {
+			return returnTarBytes(buf.Bytes())
+		}
+
+		hdr.ModTime = time.Unix(int64(sec), int64(nsec))
+
 		hdr.Name = filename
 		hdr.Size = int64(len(filebody))
 		hdr.Mode = 0600
 
+		err = setTarHeaderFormat(hdr, f)
+		if err != nil {
+			return returnTarBytes(buf.Bytes())
+		}
+
 		if err := tw.WriteHeader(hdr); err != nil {
-			return nil, err
+			return returnTarBytes(buf.Bytes())
 		}
 		if _, err := tw.Write(filebody); err != nil {
-			return nil, err
+			return returnTarBytes(buf.Bytes())
 		}
 	}
-	if err := tw.Close(); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return returnTarBytes(buf.Bytes())
 }
 
 // Creates pseudo-random files in rootDir.
