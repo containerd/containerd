@@ -23,9 +23,9 @@ env:
   DEFAULT_ADMIN_USERNAME: azureuser
   SSH_OPTS: "-o ServerAliveInterval=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
   REMOTE_VM_BIN_PATH: "c:\\containerd\\bin"
-  BUSYBOX_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/busybox:1.29-2"
-  RESOURCE_CONSUMER_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/resource-consumer:1.10"
-  WEBSERVER_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/nginx:1.14-2"
+  BUSYBOX_TESTING_IMAGE_REF: "registry.k8s.io/e2e-test-images/busybox:1.29-2"
+  RESOURCE_CONSUMER_TESTING_IMAGE_REF: "registry.k8s.io/e2e-test-images/resource-consumer:1.10"
+  WEBSERVER_TESTING_IMAGE_REF: "registry.k8s.io/e2e-test-images/nginx:1.14-2"
 
 
 jobs:
