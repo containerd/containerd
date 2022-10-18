@@ -55,7 +55,7 @@ func DefaultConfig() PluginConfig {
 			TLSKeyFile:  "",
 			TLSCertFile: "",
 		},
-		SandboxImage:              "k8s.gcr.io/pause:3.5",
+		SandboxImage:              "registry.k8s.io/pause:3.5",
 		StatsCollectPeriod:        10,
 		MaxContainerLogLineSize:   16 * 1024,
 		MaxConcurrentDownloads:    3,
