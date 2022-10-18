@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
@@ -61,7 +62,7 @@ var (
 // buildLocalContainerdClient is to return containerd client with initialized
 // core plugins in local.
 func buildLocalContainerdClient(t *testing.T, tmpDir string) *containerd.Client {
-	ctx := context.Background()
+	ctx := logtest.WithT(context.Background(), t)
 
 	// load plugins
 	loadPluginOnce.Do(func() {

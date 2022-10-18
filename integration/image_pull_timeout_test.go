@@ -37,6 +37,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/namespaces"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	criserver "github.com/containerd/containerd/pkg/cri/server"
@@ -79,7 +80,7 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T) {
 	criService, err := initLocalCRIPlugin(cli, tmpDir, criconfig.Registry{})
 	assert.NoError(t, err)
 
-	ctx := namespaces.WithNamespace(context.Background(), k8sNamespace)
+	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)
 	contentStore := cli.ContentStore()
 
 	// imageIndexJSON is the manifest of ghcr.io/containerd/volume-ownership:2.1.
@@ -241,7 +242,7 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T) {
 	err = os.WriteFile(filepath.Join(hostCfgDir, "hosts.toml"), []byte(hostTomlContent), 0600)
 	assert.NoError(t, err)
 
-	ctx := namespaces.WithNamespace(context.Background(), k8sNamespace)
+	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)
 	for idx, registryCfg := range []criconfig.Registry{
 		{
 			ConfigPath: filepath.Dir(hostCfgDir),

@@ -59,7 +59,17 @@ ${CMD} --test.run="${FOCUS}" --test.v \
   --containerd-bin="${CONTAINERD_BIN}" \
   --image-list="${TEST_IMAGE_LIST:-}" && test_exit_code=$? || test_exit_code=$?
 
-test $test_exit_code -ne 0 && \
-  cat "$REPORT_DIR/containerd.log"
+if [[ "$test_exit_code" -ne 0 ]]; then
+  if [[ -e "$GITHUB_WORKSPACE" ]]; then
+    mkdir -p "$GITHUB_WORKSPACE/report"
+    mv "$REPORT_DIR/containerd.log" "$GITHUB_WORKSPACE/report"
+
+    echo ::group::containerd logs
+    cat "$GITHUB_WORKSPACE/report/containerd.log"
+    echo ::endgroup::
+  else
+    cat "$REPORT_DIR/containerd.log"
+  fi
+fi
 
 exit ${test_exit_code}
