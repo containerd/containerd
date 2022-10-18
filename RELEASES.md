@@ -113,7 +113,7 @@ The current state is available in the following tables:
 | [1.2](https://github.com/containerd/containerd/releases/tag/v1.2.13) | End of Life | October 24, 2018 | October 15, 2020 |
 | [1.3](https://github.com/containerd/containerd/releases/tag/v1.3.10) | End of Life | September 26, 2019  | March 4, 2021 |
 | [1.4](https://github.com/containerd/containerd/releases/tag/v1.4.13) | End of Life | August 17, 2020 | March 3, 2022 |
-| [1.5](https://github.com/containerd/containerd/releases/tag/v1.5.11) | Active   | May 3, 2021  | October 28, 2022 |
+| [1.5](https://github.com/containerd/containerd/releases/tag/v1.5.13) | Active   | May 3, 2021  | January 28, 2023 |
 | [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.8)  | LTS   | February 15, 2022  | max(February 15, 2025 or next LTS + 6 months) |
 | [1.7](https://github.com/containerd/containerd/milestone/42)         | Next   | TBD  | TBD |
 
