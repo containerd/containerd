@@ -41,8 +41,8 @@ cloud.google.com/go/storage v1.8.0/go.mod h1:Wv1Oy7z6Yz3DshWRJFhqM/UCfaWIRTdp0RX
 cloud.google.com/go/storage v1.10.0/go.mod h1:FLPqc6j+Ki4BU591ie1oL6qBQGu2Bl/tZ9ullr3+Kg0=
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
 github.com/AdaLogics/go-fuzz-headers v0.0.0-20210715213245-6c3934b029d8/go.mod h1:CzsSbkDixRphAF5hS6wbMKq0eI6ccJRb7/A0M6JBnwg=
-github.com/AdaLogics/go-fuzz-headers v0.0.0-20220903154154-e8044f6e4c72 h1:1sCHCT0xRr7UArrI1WJxsl9S8QeYdf0fmuGIl2xb7YI=
-github.com/AdaLogics/go-fuzz-headers v0.0.0-20220903154154-e8044f6e4c72/go.mod h1:i9fr2JpcEcY/IHEvzCM3qXUZYOQHgR89dt4es1CgMhc=
+github.com/AdaLogics/go-fuzz-headers v0.0.0-20221007124625-37f5449ff7df h1:kDJd/7926nFt3yQeX/o3D/LMoJmlmYKe5AdC3uDGOm4=
+github.com/AdaLogics/go-fuzz-headers v0.0.0-20221007124625-37f5449ff7df/go.mod h1:i9fr2JpcEcY/IHEvzCM3qXUZYOQHgR89dt4es1CgMhc=
 github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20220912195655-e1f97a00006b h1:RQhYYLDVbdN+fw4I+A90nMRcxg/tEg4KvHiDYOwY32g=
 github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20220912195655-e1f97a00006b/go.mod h1:P/MhpyNnqWUWlF8b/ksNuhU2kywD3Qc5fzauL06Gez8=
 github.com/Azure/azure-sdk-for-go v16.2.1+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=

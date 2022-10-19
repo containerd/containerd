@@ -19,7 +19,7 @@ require (
 	golang.org/x/sys v0.0.0-20220915200043-7b5979e65e41
 )
 
-require github.com/AdaLogics/go-fuzz-headers v0.0.0-20220903154154-e8044f6e4c72
+require github.com/AdaLogics/go-fuzz-headers v0.0.0-20221007124625-37f5449ff7df
 
 require (
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20220912195655-e1f97a00006b // indirect
