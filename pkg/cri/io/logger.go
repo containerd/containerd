@@ -143,7 +143,10 @@ func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxL
 			lineBuffer.Write(l)
 		}
 		lineBuffer.WriteByte(eol)
-		if _, err := lineBuffer.WriteTo(w); err != nil {
+		if n, err := lineBuffer.WriteTo(w); err == nil {
+			outputEntries.Inc()
+			outputBytes.Inc(float64(n))
+		} else {
 			logrus.WithError(err).Errorf("Fail to write %q log to log file %q", s, path)
 			// Continue on write error to drain the container output.
 		}
@@ -153,6 +156,8 @@ func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxL
 		newLine, isPrefix, err := readLine(r)
 		// NOTE(random-liu): readLine can return actual content even if there is an error.
 		if len(newLine) > 0 {
+			inputEntries.Inc()
+			inputBytes.Inc(float64(len(newLine)))
 			// Buffer returned by ReadLine will change after
 			// next read, copy it.
 			l := make([]byte, len(newLine))
@@ -183,6 +188,7 @@ func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxL
 			}
 			buf[len(buf)-1] = last[:len(last)-exceedLen]
 			writeLineBuffer(partial, buf)
+			splitEntries.Inc()
 			buf = [][]byte{last[len(last)-exceedLen:]}
 			length = exceedLen
 		}
