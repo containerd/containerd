@@ -17,56 +17,102 @@
 package metadata
 
 import (
+	"context"
+	"errors"
 	"testing"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/protobuf/types"
-	api "github.com/containerd/containerd/sandbox"
+	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/typeurl"
 	"github.com/google/go-cmp/cmp"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func TestSandboxCreate(t *testing.T) {
-	ctx, db := testDB(t)
-
-	store := NewSandboxStore(db)
-
-	in := api.Sandbox{
-		ID:     "1",
-		Labels: map[string]string{"a": "1", "b": "2"},
-		Spec:   &types.Any{TypeUrl: "1", Value: []byte{1, 2, 3}},
-		Extensions: map[string]typeurl.Any{
-			"ext1": &types.Any{TypeUrl: "url/1", Value: []byte{1, 2, 3}},
-			"ext2": &types.Any{TypeUrl: "url/2", Value: []byte{3, 2, 1}},
-		},
-		Runtime: api.RuntimeOpts{
-			Name:    "test",
-			Options: &types.Any{TypeUrl: "url/3", Value: []byte{4, 5, 6}},
-		},
+func withSandbox(name string, controller sandbox.Controller) testOpt {
+	return func(to *testOptions) {
+		if to.extraSandboxes == nil {
+			to.extraSandboxes = map[string]sandbox.Controller{}
+		}
+		to.extraSandboxes[name] = controller
 	}
-
-	_, err := store.Create(ctx, in)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	out, err := store.Get(ctx, "1")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assertEqualInstances(t, in, out)
 }
 
-func TestSandboxCreateDup(t *testing.T) {
-	ctx, db := testDB(t)
+func TestSandboxStart(t *testing.T) {
+	ctx, db := testDB(t, withSandbox("test", &mockController{}))
 
-	store := NewSandboxStore(db)
+	sb := db.Sandboxes()
+	store := sb["test"]
 
-	in := api.Sandbox{
-		ID:      "1",
-		Spec:    &types.Any{TypeUrl: "1", Value: []byte{1, 2, 3}},
-		Runtime: api.RuntimeOpts{Name: "test"},
+	in := sandbox.Sandbox{
+		ID:         "1",
+		Labels:     map[string]string{"test": "1"},
+		Spec:       &oci.Spec{},
+		Extensions: map[string]typeurl.Any{},
+	}
+
+	out, err := store.Create(ctx, &in)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if out.ID != "1" {
+		t.Fatalf("unexpected instance ID: %q", out.ID)
+	}
+
+	if out.CreatedAt.IsZero() {
+		t.Fatal("creation time not assigned")
+	}
+
+	if out.UpdatedAt.IsZero() {
+		t.Fatal("updated time not assigned")
+	}
+
+	// Read back
+	out, err = store.Get(ctx, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertEqualInstances(t, &in, out)
+}
+
+func TestSandboxRollbackStart(t *testing.T) {
+	ctx, db := testDB(t, withSandbox("test", &mockController{err: errors.New("failed to start")}))
+
+	sb := db.Sandboxes()
+	store := sb["test"]
+
+	_, err := store.Create(ctx, &sandbox.Sandbox{
+		ID:     "1",
+		Labels: map[string]string{"test": "1"},
+		Spec:   &oci.Spec{},
+	})
+
+	if err == nil {
+		t.Fatal("expected start error")
+	}
+
+	_, err = store.Get(ctx, "1")
+	if err == nil {
+		t.Fatal("should not have saved failed instance to store")
+	} else if !errdefs.IsNotFound(err) {
+		t.Fatal("expected 'not found' error")
+	}
+}
+
+func TestSandboxStartDup(t *testing.T) {
+	ctx, db := testDB(t, withSandbox("test", &mockController{}))
+
+	sb := db.Sandboxes()
+	store := sb["test"]
+
+	in := &sandbox.Sandbox{
+		ID:     "1",
+		Labels: map[string]string{"test": "1"},
+		Spec:   &oci.Spec{},
 	}
 
 	_, err := store.Create(ctx, in)
@@ -75,90 +121,160 @@ func TestSandboxCreateDup(t *testing.T) {
 	}
 
 	_, err = store.Create(ctx, in)
-	if !errdefs.IsAlreadyExists(err) {
-		t.Fatalf("expected %+v, got %+v", errdefs.ErrAlreadyExists, err)
+	if err == nil {
+		t.Fatal("should return error on double start")
+	} else if !errdefs.IsAlreadyExists(err) {
+		t.Fatalf("unexpected error: %+v", err)
 	}
 }
 
-func TestSandboxUpdate(t *testing.T) {
-	ctx, db := testDB(t)
-	store := NewSandboxStore(db)
-
-	if _, err := store.Create(ctx, api.Sandbox{
-		ID:     "2",
-		Labels: map[string]string{"lbl1": "existing"},
-		Spec:   &types.Any{TypeUrl: "1", Value: []byte{1}}, // will replace
-		Extensions: map[string]typeurl.Any{
-			"ext2": &types.Any{TypeUrl: "url2", Value: []byte{4, 5, 6}}, // will append `ext1`
+func TestSandboxDelete(t *testing.T) {
+	ctx, db := testDB(t, withSandbox("test", &mockController{
+		update: func(action string, instance *sandbox.Sandbox) (*sandbox.Sandbox, error) {
+			if action == "stop" {
+				instance.Labels["test"] = "updated"
+			}
+			return instance, nil
 		},
-		Runtime: api.RuntimeOpts{Name: "test"}, // no change
-	}); err != nil {
-		t.Fatal(err)
-	}
+	}))
 
-	expectedSpec := types.Any{TypeUrl: "2", Value: []byte{3, 2, 1}}
+	sb := db.Sandboxes()
+	store := sb["test"]
 
-	out, err := store.Update(ctx, api.Sandbox{
-		ID:     "2",
-		Labels: map[string]string{"lbl1": "new"},
-		Spec:   &expectedSpec,
-		Extensions: map[string]typeurl.Any{
-			"ext1": &types.Any{TypeUrl: "url1", Value: []byte{1, 2}},
-		},
-	}, "labels.lbl1", "extensions.ext1", "spec")
+	_, err := store.Create(ctx, &sandbox.Sandbox{
+		ID:     "1",
+		Labels: map[string]string{"test": "1"},
+		Spec:   &oci.Spec{},
+	})
+
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	expected := api.Sandbox{
+	err = store.Delete(ctx, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Read back, make sure dabase got updated instance
+	_, err = store.Get(ctx, "1")
+	if err == nil {
+		t.Fatal("expected 'not found' error")
+	}
+}
+
+func TestSandboxStopInvalid(t *testing.T) {
+	ctx, db := testDB(t, withSandbox("test", &mockController{}))
+
+	sb := db.Sandboxes()
+	store := sb["test"]
+
+	err := store.Delete(ctx, "invalid_id")
+	if err == nil {
+		t.Fatal("expected 'not found' error for invalid ID")
+	} else if !errdefs.IsNotFound(err) {
+		t.Fatalf("unexpected error %T type", err)
+	}
+}
+
+func TestSandboxUpdate(t *testing.T) {
+	ctx, db := testDB(t, withSandbox("test", &mockController{
+		update: func(action string, instance *sandbox.Sandbox) (*sandbox.Sandbox, error) {
+			if action == "update" {
+				instance.Labels["lbl2"] = "updated"
+				instance.Extensions["ext2"] = &anypb.Any{
+					TypeUrl: "url2",
+					Value:   []byte{4, 5, 6},
+				}
+			}
+			return instance, nil
+		},
+	}))
+
+	sb := db.Sandboxes()
+	store := sb["test"]
+
+	_, err := store.Create(ctx, &sandbox.Sandbox{
 		ID:   "2",
-		Spec: &expectedSpec,
+		Spec: &oci.Spec{},
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedSpec := &oci.Spec{
+		Version:  "1.0.0",
+		Hostname: "localhost",
+		Linux: &specs.Linux{
+			Sysctl: map[string]string{"a": "b"},
+		},
+	}
+
+	out, err := store.Update(ctx, &sandbox.Sandbox{
+		ID:     "2",
+		Labels: map[string]string{"lbl1": "new"},
+		Spec:   expectedSpec,
+		Extensions: map[string]typeurl.Any{
+			"ext1": &anypb.Any{TypeUrl: "url1", Value: []byte{1, 2}},
+		},
+	}, "labels.lbl1", "extensions.ext1", "spec")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := &sandbox.Sandbox{
+		ID:   "2",
+		Spec: expectedSpec,
 		Labels: map[string]string{
 			"lbl1": "new",
+			"lbl2": "updated",
 		},
 		Extensions: map[string]typeurl.Any{
-			"ext1": &types.Any{TypeUrl: "url1", Value: []byte{1, 2}},
-			"ext2": &types.Any{TypeUrl: "url2", Value: []byte{4, 5, 6}},
+			"ext1": &anypb.Any{TypeUrl: "url1", Value: []byte{1, 2}},
+			"ext2": &anypb.Any{TypeUrl: "url2", Value: []byte{4, 5, 6}},
 		},
-		Runtime: api.RuntimeOpts{Name: "test"},
 	}
 
 	assertEqualInstances(t, out, expected)
 }
 
-func TestSandboxGetInvalid(t *testing.T) {
-	ctx, db := testDB(t)
-	store := NewSandboxStore(db)
+func TestSandboxFindInvalid(t *testing.T) {
+	ctx, db := testDB(t, withSandbox("test", &mockController{}))
+
+	sb := db.Sandboxes()
+	store := sb["test"]
 
 	_, err := store.Get(ctx, "invalid_id")
 	if err == nil {
-		t.Fatalf("expected %+v error for invalid ID", errdefs.ErrNotFound)
+		t.Fatal("expected 'not found' error for invalid ID")
 	} else if !errdefs.IsNotFound(err) {
 		t.Fatalf("unexpected error %T type", err)
 	}
 }
 
 func TestSandboxList(t *testing.T) {
-	ctx, db := testDB(t)
-	store := NewSandboxStore(db)
+	ctx, db := testDB(t, withSandbox("test", &mockController{}))
 
-	in := []api.Sandbox{
+	sb := db.Sandboxes()
+	store := sb["test"]
+
+	in := []*sandbox.Sandbox{
 		{
 			ID:         "1",
 			Labels:     map[string]string{"test": "1"},
-			Spec:       &types.Any{TypeUrl: "1", Value: []byte{1, 2, 3}},
-			Extensions: map[string]typeurl.Any{"ext": &types.Any{}},
-			Runtime:    api.RuntimeOpts{Name: "test"},
+			Spec:       &oci.Spec{},
+			Extensions: map[string]typeurl.Any{"ext": &anypb.Any{}},
 		},
 		{
 			ID:     "2",
 			Labels: map[string]string{"test": "2"},
-			Spec:   &types.Any{TypeUrl: "2", Value: []byte{3, 2, 1}},
-			Extensions: map[string]typeurl.Any{"ext": &types.Any{
+			Spec:   &oci.Spec{},
+			Extensions: map[string]typeurl.Any{"ext": &anypb.Any{
 				TypeUrl: "test",
 				Value:   []byte{9},
 			}},
-			Runtime: api.RuntimeOpts{Name: "test"},
 		},
 	}
 
@@ -179,31 +295,31 @@ func TestSandboxList(t *testing.T) {
 	}
 
 	for i := range out {
-		assertEqualInstances(t, out[i], in[i])
+		assertEqualInstances(t, &out[i], in[i])
 	}
 }
 
-func TestSandboxListWithFilter(t *testing.T) {
-	ctx, db := testDB(t)
-	store := NewSandboxStore(db)
+func TestSandboxListFilter(t *testing.T) {
+	ctx, db := testDB(t, withSandbox("test", &mockController{}))
 
-	in := []api.Sandbox{
+	sb := db.Sandboxes()
+	store := sb["test"]
+
+	in := []*sandbox.Sandbox{
 		{
 			ID:         "1",
 			Labels:     map[string]string{"test": "1"},
-			Spec:       &types.Any{TypeUrl: "1", Value: []byte{1, 2, 3}},
-			Extensions: map[string]typeurl.Any{"ext": &types.Any{}},
-			Runtime:    api.RuntimeOpts{Name: "test"},
+			Spec:       &oci.Spec{},
+			Extensions: map[string]typeurl.Any{"ext": &anypb.Any{}},
 		},
 		{
 			ID:     "2",
 			Labels: map[string]string{"test": "2"},
-			Spec:   &types.Any{TypeUrl: "2", Value: []byte{3, 2, 1}},
-			Extensions: map[string]typeurl.Any{"ext": &types.Any{
+			Spec:   &oci.Spec{},
+			Extensions: map[string]typeurl.Any{"ext": &anypb.Any{
 				TypeUrl: "test",
 				Value:   []byte{9},
 			}},
-			Runtime: api.RuntimeOpts{Name: "test"},
 		},
 	}
 
@@ -214,7 +330,7 @@ func TestSandboxListWithFilter(t *testing.T) {
 		}
 	}
 
-	out, err := store.List(ctx, "id==1")
+	out, err := store.List(ctx, `id==1`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,18 +339,29 @@ func TestSandboxListWithFilter(t *testing.T) {
 		t.Fatalf("expected list to contain 1 element, got %d", len(out))
 	}
 
-	assertEqualInstances(t, out[0], in[0])
+	assertEqualInstances(t, &out[0], in[0])
 }
 
-func TestSandboxDelete(t *testing.T) {
-	ctx, db := testDB(t)
+func TestSandboxReadWrite(t *testing.T) {
+	ctx, db := testDB(t, withSandbox("test", &mockController{}))
 
-	store := NewSandboxStore(db)
+	sb := db.Sandboxes()
+	store := sb["test"]
 
-	in := api.Sandbox{
-		ID:      "2",
-		Spec:    &types.Any{TypeUrl: "1", Value: []byte{1, 2, 3}},
-		Runtime: api.RuntimeOpts{Name: "test"},
+	in := &sandbox.Sandbox{
+		ID:     "1",
+		Labels: map[string]string{"a": "1", "b": "2"},
+		Spec: &oci.Spec{
+			Version:  "1.0.0",
+			Hostname: "localhost",
+			Linux: &specs.Linux{
+				Sysctl: map[string]string{"a": "b"},
+			},
+		},
+		Extensions: map[string]typeurl.Any{
+			"ext1": &anypb.Any{TypeUrl: "url/1", Value: []byte{1, 2, 3}},
+			"ext2": &anypb.Any{TypeUrl: "url/2", Value: []byte{3, 2, 1}},
+		},
 	}
 
 	_, err := store.Create(ctx, in)
@@ -242,20 +369,71 @@ func TestSandboxDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = store.Delete(ctx, "2")
+	out, err := store.Get(ctx, "1")
 	if err != nil {
-		t.Fatalf("deleted failed %+v", err)
+		t.Fatal(err)
 	}
 
-	_, err = store.Get(ctx, "2")
-	if !errdefs.IsNotFound(err) {
-		t.Fatalf("unexpected err result: %+v != %+v", err, errdefs.ErrNotFound)
-	}
+	assertEqualInstances(t, in, out)
 }
 
-func assertEqualInstances(t *testing.T, x, y api.Sandbox) {
+func assertEqualInstances(t *testing.T, x, y *sandbox.Sandbox) {
 	diff := cmp.Diff(x, y, compareNil, compareAny, ignoreTime)
 	if diff != "" {
 		t.Fatalf("x and y are different: %s", diff)
 	}
 }
+
+// A passthru sandbox controller for testing
+type mockController struct {
+	err    error
+	update func(action string, instance *sandbox.Sandbox) (*sandbox.Sandbox, error)
+}
+
+func (m *mockController) Start(ctx context.Context, sandbox *sandbox.Sandbox) (*sandbox.Sandbox, error) {
+	if m.update != nil {
+		return m.update("start", sandbox)
+	}
+	return sandbox, m.err
+}
+
+func (m *mockController) Shutdown(ctx context.Context, id string) error {
+	return m.err
+}
+
+func (m *mockController) Pause(ctx context.Context, id string) error {
+	return m.err
+}
+
+func (m *mockController) Resume(ctx context.Context, id string) error {
+	return m.err
+}
+
+func (m *mockController) Update(ctx context.Context, sandboxID string, sandbox *sandbox.Sandbox) (*sandbox.Sandbox, error) {
+	if m.update != nil {
+		return m.update("update", sandbox)
+	}
+	return sandbox, m.err
+}
+
+func (m *mockController) AppendContainer(ctx context.Context, sandboxID string, container *sandbox.Container) (*sandbox.Container, error) {
+	return nil, m.err
+}
+
+func (m *mockController) UpdateContainer(ctx context.Context, sandboxID string, container *sandbox.Container) (*sandbox.Container, error) {
+	return nil, m.err
+}
+
+func (m *mockController) RemoveContainer(ctx context.Context, sandboxID string, id string) error {
+	return m.err
+}
+
+func (m *mockController) Status(ctx context.Context, id string) (sandbox.Status, error) {
+	return sandbox.Status{}, m.err
+}
+
+func (m *mockController) Ping(ctx context.Context, id string) error {
+	return m.err
+}
+
+var _ sandbox.Controller = &mockController{}

@@ -206,7 +206,8 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 		Runtime:        container.Runtime.Name,
 		RuntimeOptions: container.Runtime.Options,
 		TaskOptions:    r.Options,
-		SandboxID:      container.SandboxID,
+		TaskAddress:    container.Labels["task-address"],
+		Bundle:         container.Labels["bundle"],
 	}
 	if r.RuntimePath != "" {
 		opts.Runtime = r.RuntimePath

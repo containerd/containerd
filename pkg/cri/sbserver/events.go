@@ -105,7 +105,7 @@ func (em *eventMonitor) subscribe(subscriber events.Subscriber) {
 	em.ch, em.errCh = subscriber.Subscribe(em.ctx, filters...)
 }
 
-// startSandboxExitMonitor starts an exit monitor for a given sandbox.
+//nolint:nolintlint,unused // startSandboxExitMonitor starts an exit monitor for a given sandbox.
 func (em *eventMonitor) startSandboxExitMonitor(ctx context.Context, id string, pid uint32, exitCh <-chan containerd.ExitStatus) <-chan struct{} {
 	stopCh := make(chan struct{})
 	go func() {
@@ -416,22 +416,7 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 
 // handleSandboxExit handles TaskExit event for sandbox.
 func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxstore.Sandbox) error {
-	// No stream attached to sandbox container.
-	task, err := sb.Container.Task(ctx, nil)
-	if err != nil {
-		if !errdefs.IsNotFound(err) {
-			return fmt.Errorf("failed to load task for sandbox: %w", err)
-		}
-	} else {
-		// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
-		if _, err = task.Delete(ctx, WithNRISandboxDelete(sb.ID), containerd.WithProcessKill); err != nil {
-			if !errdefs.IsNotFound(err) {
-				return fmt.Errorf("failed to stop sandbox: %w", err)
-			}
-			// Move on to make sure container status is updated.
-		}
-	}
-	err = sb.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
+	err := sb.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
 		status.State = sandboxstore.StateNotReady
 		status.Pid = 0
 		return status, nil

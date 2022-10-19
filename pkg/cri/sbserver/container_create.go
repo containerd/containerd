@@ -27,7 +27,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/opencontainers/selinux/go-selinux"
+	selinux "github.com/opencontainers/selinux/go-selinux"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd"
@@ -57,11 +57,20 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, fmt.Errorf("failed to find sandbox id %q: %w", r.GetPodSandboxId(), err)
 	}
 	sandboxID := sandbox.ID
-	s, err := sandbox.Container.Task(ctx, nil)
+	ociRuntime, err := c.getSandboxRuntime(sandboxConfig, sandbox.Metadata.RuntimeHandler)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox container task: %w", err)
+		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
-	sandboxPid := s.Pid()
+
+	sandboxInstance, err := c.client.LoadSandbox(ctx, ociRuntime.Sandboxer, sandbox.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load sandbox by id %s : %w", sandbox.ID, err)
+	}
+	sandboxStatus, err := sandboxInstance.Status(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox status by id %s: %w", sandbox.ID, err)
+	}
+	sandboxPid := sandboxStatus.PID
 
 	// Generate unique id and name for the container and reserve the name.
 	// Reserve the container name to avoid concurrent `CreateContainer` request creating
@@ -86,12 +95,15 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	// Create initial internal container metadata.
 	meta := containerstore.Metadata{
-		ID:        id,
-		Name:      name,
+		ID:   id,
+		Name: name,
+		// TODO the sandboxer and runtime may not be one to one map
+		Sandboxer: ociRuntime.Sandboxer,
 		SandboxID: sandboxID,
 		Config:    config,
 	}
 
+	log.G(ctx).Debugf("Use OCI runtime %+v for sandbox %q and container %q", ociRuntime, sandboxID, id)
 	// Prepare container image snapshot. For container, the image should have
 	// been pulled before creating the container, so do not ensure the image.
 	image, err := c.localResolve(config.GetImage().GetImage())
@@ -104,12 +116,6 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 
 	start := time.Now()
-	// Run container using the same runtime with sandbox.
-	sandboxInfo, err := sandbox.Container.Info(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox %q info: %w", sandboxID, err)
-	}
-
 	// Create container root directory.
 	containerRootDir := c.getContainerRootDir(id)
 	if err = c.os.MkdirAll(containerRootDir, 0755); err != nil {
@@ -150,12 +156,6 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	// Generate container mounts.
 	mounts := c.containerMounts(sandboxID, config)
-
-	ociRuntime, err := c.getSandboxRuntime(sandboxConfig, sandbox.Metadata.RuntimeHandler)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
-	}
-	log.G(ctx).Debugf("Use OCI runtime %+v for sandbox %q and container %q", ociRuntime, sandboxID, id)
 
 	spec, err := c.containerSpec(id, sandboxID, sandboxPid, sandbox.NetNSPath, containerName, containerdImage.Name(), config, sandboxConfig,
 		&image.ImageSpec.Config, append(mounts, volumeMounts...), ociRuntime)
@@ -236,16 +236,16 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	containerLabels := buildLabels(config.Labels, image.ImageSpec.Config.Labels, containerKindContainer)
 
-	runtimeOptions, err := getRuntimeOptions(sandboxInfo)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get runtime options: %w", err)
-	}
-
 	opts = append(opts,
 		containerd.WithSpec(spec, specOpts...),
-		containerd.WithRuntime(sandboxInfo.Runtime.Name, runtimeOptions),
+		containerd.WithRuntime(sandbox.Runtime.Name, sandbox.Runtime.Options),
 		containerd.WithContainerLabels(containerLabels),
 		containerd.WithContainerExtension(containerMetadataExtension, &meta))
+
+	// this should be set after other opts executed
+	if ociRuntime.Sandboxer != "" && sandbox.ID != "" {
+		opts = append(opts, containerd.WithSandbox(ociRuntime.Sandboxer, sandbox.ID, sandbox.Address))
+	}
 	var cntr containerd.Container
 	if cntr, err = c.client.NewContainer(ctx, id, opts...); err != nil {
 		return nil, fmt.Errorf("failed to create containerd container: %w", err)

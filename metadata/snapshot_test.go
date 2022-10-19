@@ -53,7 +53,7 @@ func newTestSnapshotter(ctx context.Context, root string) (snapshots.Snapshotter
 		return nil, nil, err
 	}
 
-	sn := NewDB(db, nil, map[string]snapshots.Snapshotter{"native": snapshotter}).Snapshotter("native")
+	sn := NewDB(db, nil, map[string]snapshots.Snapshotter{"native": snapshotter}, nil).Snapshotter("native")
 
 	return sn, func() error {
 		if err := sn.Close(); err != nil {

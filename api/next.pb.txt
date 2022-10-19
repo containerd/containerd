@@ -381,6 +381,34 @@ file {
   syntax: "proto3"
 }
 file {
+  name: "github.com/containerd/containerd/api/events/sandbox.proto"
+  package: "containerd.events"
+  message_type {
+    name: "SandboxStart"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+  }
+  message_type {
+    name: "SandboxStop"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/events;events"
+  }
+  syntax: "proto3"
+}
+file {
   name: "github.com/containerd/containerd/api/events/snapshot.proto"
   package: "containerd.events"
   dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
@@ -2060,11 +2088,18 @@ file {
       json_name: "extensions"
     }
     field {
-      name: "sandbox"
+      name: "sandboxer"
       number: 11
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      json_name: "sandbox"
+      json_name: "sandboxer"
+    }
+    field {
+      name: "sandbox_key"
+      number: 12
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxKey"
     }
     nested_type {
       name: "LabelsEntry"
@@ -3937,46 +3972,55 @@ file {
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/types/sandbox.proto"
-  package: "containerd.types"
+  name: "github.com/containerd/containerd/api/services/sandbox/v1/sandbox.proto"
+  package: "containerd.services.sandbox.v1"
   dependency: "google/protobuf/any.proto"
   dependency: "google/protobuf/timestamp.proto"
+  dependency: "google/protobuf/empty.proto"
+  dependency: "github.com/containerd/containerd/api/types/mount.proto"
   message_type {
     name: "Sandbox"
     field {
-      name: "sandbox_id"
+      name: "id"
       number: 1
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      json_name: "sandboxId"
-    }
-    field {
-      name: "runtime"
-      number: 2
-      label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".containerd.types.Sandbox.Runtime"
-      json_name: "runtime"
+      json_name: "id"
     }
     field {
       name: "spec"
-      number: 3
+      number: 2
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Any"
       json_name: "spec"
     }
     field {
-      name: "labels"
-      number: 4
+      name: "containers"
+      number: 3
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
-      type_name: ".containerd.types.Sandbox.LabelsEntry"
+      type_name: ".containerd.services.sandbox.v1.Container"
+      json_name: "containers"
+    }
+    field {
+      name: "task_address"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "taskAddress"
+    }
+    field {
+      name: "labels"
+      number: 5
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Sandbox.LabelsEntry"
       json_name: "labels"
     }
     field {
       name: "created_at"
-      number: 5
+      number: 6
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
@@ -3984,7 +4028,7 @@ file {
     }
     field {
       name: "updated_at"
-      number: 6
+      number: 7
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
@@ -3992,29 +4036,11 @@ file {
     }
     field {
       name: "extensions"
-      number: 7
+      number: 8
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
-      type_name: ".containerd.types.Sandbox.ExtensionsEntry"
+      type_name: ".containerd.services.sandbox.v1.Sandbox.ExtensionsEntry"
       json_name: "extensions"
-    }
-    nested_type {
-      name: "Runtime"
-      field {
-        name: "name"
-        number: 1
-        label: LABEL_OPTIONAL
-        type: TYPE_STRING
-        json_name: "name"
-      }
-      field {
-        name: "options"
-        number: 2
-        label: LABEL_OPTIONAL
-        type: TYPE_MESSAGE
-        type_name: ".google.protobuf.Any"
-        json_name: "options"
-      }
     }
     nested_type {
       name: "LabelsEntry"
@@ -4058,181 +4084,69 @@ file {
       }
     }
   }
-  options {
-    go_package: "github.com/containerd/containerd/api/types;types"
-  }
-  syntax: "proto3"
-}
-file {
-  name: "github.com/containerd/containerd/api/services/sandbox/v1/sandbox.proto"
-  package: "containerd.services.sandbox.v1"
-  dependency: "google/protobuf/any.proto"
-  dependency: "google/protobuf/timestamp.proto"
-  dependency: "github.com/containerd/containerd/api/types/sandbox.proto"
-  dependency: "github.com/containerd/containerd/api/types/mount.proto"
   message_type {
-    name: "StoreCreateRequest"
+    name: "Container"
     field {
-      name: "sandbox"
+      name: "id"
       number: 1
       label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".containerd.types.Sandbox"
-      json_name: "sandbox"
-    }
-  }
-  message_type {
-    name: "StoreCreateResponse"
-    field {
-      name: "sandbox"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".containerd.types.Sandbox"
-      json_name: "sandbox"
-    }
-  }
-  message_type {
-    name: "StoreUpdateRequest"
-    field {
-      name: "sandbox"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".containerd.types.Sandbox"
-      json_name: "sandbox"
+      type: TYPE_STRING
+      json_name: "id"
     }
     field {
-      name: "fields"
+      name: "spec"
       number: 2
-      label: LABEL_REPEATED
-      type: TYPE_STRING
-      json_name: "fields"
-    }
-  }
-  message_type {
-    name: "StoreUpdateResponse"
-    field {
-      name: "sandbox"
-      number: 1
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
-      type_name: ".containerd.types.Sandbox"
-      json_name: "sandbox"
-    }
-  }
-  message_type {
-    name: "StoreDeleteRequest"
-    field {
-      name: "sandbox_id"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "sandboxId"
-    }
-  }
-  message_type {
-    name: "StoreDeleteResponse"
-  }
-  message_type {
-    name: "StoreListRequest"
-    field {
-      name: "filters"
-      number: 1
-      label: LABEL_REPEATED
-      type: TYPE_STRING
-      json_name: "filters"
-    }
-  }
-  message_type {
-    name: "StoreListResponse"
-    field {
-      name: "list"
-      number: 1
-      label: LABEL_REPEATED
-      type: TYPE_MESSAGE
-      type_name: ".containerd.types.Sandbox"
-      json_name: "list"
-    }
-  }
-  message_type {
-    name: "StoreGetRequest"
-    field {
-      name: "sandbox_id"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "sandboxId"
-    }
-  }
-  message_type {
-    name: "StoreGetResponse"
-    field {
-      name: "sandbox"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".containerd.types.Sandbox"
-      json_name: "sandbox"
-    }
-  }
-  message_type {
-    name: "ControllerStartRequest"
-    field {
-      name: "sandbox_id"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "sandboxId"
+      type_name: ".google.protobuf.Any"
+      json_name: "spec"
     }
     field {
       name: "rootfs"
-      number: 2
+      number: 3
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
       type_name: ".containerd.types.Mount"
       json_name: "rootfs"
     }
     field {
-      name: "options"
-      number: 3
+      name: "io"
+      number: 4
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
-      type_name: ".google.protobuf.Any"
-      json_name: "options"
+      type_name: ".containerd.services.sandbox.v1.IO"
+      json_name: "io"
     }
-  }
-  message_type {
-    name: "ControllerStartResponse"
     field {
-      name: "sandbox_id"
-      number: 1
+      name: "processes"
+      number: 5
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Process"
+      json_name: "processes"
+    }
+    field {
+      name: "bundle"
+      number: 6
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      json_name: "sandboxId"
-    }
-    field {
-      name: "pid"
-      number: 2
-      label: LABEL_OPTIONAL
-      type: TYPE_UINT32
-      json_name: "pid"
-    }
-    field {
-      name: "created_at"
-      number: 3
-      label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".google.protobuf.Timestamp"
-      json_name: "createdAt"
+      json_name: "bundle"
     }
     field {
       name: "labels"
-      number: 4
+      number: 7
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
-      type_name: ".containerd.services.sandbox.v1.ControllerStartResponse.LabelsEntry"
+      type_name: ".containerd.services.sandbox.v1.Container.LabelsEntry"
       json_name: "labels"
+    }
+    field {
+      name: "extensions"
+      number: 8
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Container.ExtensionsEntry"
+      json_name: "extensions"
     }
     nested_type {
       name: "LabelsEntry"
@@ -4254,67 +4168,116 @@ file {
         map_entry: true
       }
     }
+    nested_type {
+      name: "ExtensionsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_MESSAGE
+        type_name: ".google.protobuf.Any"
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
   }
   message_type {
-    name: "ControllerStopRequest"
+    name: "IO"
     field {
-      name: "sandbox_id"
+      name: "stdin"
       number: 1
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      json_name: "sandboxId"
+      json_name: "stdin"
     }
     field {
-      name: "timeout_secs"
+      name: "stdout"
       number: 2
       label: LABEL_OPTIONAL
-      type: TYPE_UINT32
-      json_name: "timeoutSecs"
+      type: TYPE_STRING
+      json_name: "stdout"
+    }
+    field {
+      name: "stderr"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stderr"
+    }
+    field {
+      name: "terminal"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "terminal"
     }
   }
   message_type {
-    name: "ControllerStopResponse"
-  }
-  message_type {
-    name: "ControllerWaitRequest"
+    name: "Process"
     field {
-      name: "sandbox_id"
+      name: "id"
       number: 1
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      json_name: "sandboxId"
-    }
-  }
-  message_type {
-    name: "ControllerWaitResponse"
-    field {
-      name: "exit_status"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_UINT32
-      json_name: "exitStatus"
+      json_name: "id"
     }
     field {
-      name: "exited_at"
+      name: "io"
       number: 2
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
-      type_name: ".google.protobuf.Timestamp"
-      json_name: "exitedAt"
+      type_name: ".containerd.services.sandbox.v1.IO"
+      json_name: "io"
     }
-  }
-  message_type {
-    name: "ControllerStatusRequest"
     field {
-      name: "sandbox_id"
-      number: 1
+      name: "process"
+      number: 3
       label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "sandboxId"
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "process"
+    }
+    field {
+      name: "extra"
+      number: 4
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Process.ExtraEntry"
+      json_name: "extra"
+    }
+    nested_type {
+      name: "ExtraEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_MESSAGE
+        type_name: ".google.protobuf.Any"
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
     }
   }
   message_type {
-    name: "ControllerStatusResponse"
+    name: "Status"
     field {
       name: "id"
       number: 1
@@ -4337,31 +4300,76 @@ file {
       json_name: "state"
     }
     field {
-      name: "exit_status"
+      name: "version"
       number: 4
       label: LABEL_OPTIONAL
-      type: TYPE_UINT32
-      json_name: "exitStatus"
-    }
-    field {
-      name: "exited_at"
-      number: 5
-      label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".google.protobuf.Timestamp"
-      json_name: "exitedAt"
+      type: TYPE_STRING
+      json_name: "version"
     }
     field {
       name: "extra"
-      number: 6
-      label: LABEL_OPTIONAL
+      number: 5
+      label: LABEL_REPEATED
       type: TYPE_MESSAGE
-      type_name: ".google.protobuf.Any"
+      type_name: ".containerd.services.sandbox.v1.Status.ExtraEntry"
       json_name: "extra"
+    }
+    nested_type {
+      name: "ExtraEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_MESSAGE
+        type_name: ".google.protobuf.Any"
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
     }
   }
   message_type {
-    name: "ControllerDeleteRequest"
+    name: "ControllerStartRequest"
+    field {
+      name: "sandbox"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Sandbox"
+      json_name: "sandbox"
+    }
+  }
+  message_type {
+    name: "ControllerStartResponse"
+    field {
+      name: "sandbox"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Sandbox"
+      json_name: "sandbox"
+    }
+  }
+  message_type {
+    name: "ControllerShutdownRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+  }
+  message_type {
+    name: "ControllerPauseRequest"
     field {
       name: "sandbox_id"
       number: 1
@@ -4371,34 +4379,413 @@ file {
     }
   }
   message_type {
-    name: "ControllerDeleteResponse"
+    name: "ControllerResumeRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
   }
-  service {
-    name: "Store"
-    method {
-      name: "Create"
-      input_type: ".containerd.services.sandbox.v1.StoreCreateRequest"
-      output_type: ".containerd.services.sandbox.v1.StoreCreateResponse"
+  message_type {
+    name: "ControllerUpdateRequest"
+    field {
+      name: "sandbox"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Sandbox"
+      json_name: "sandbox"
     }
-    method {
-      name: "Update"
-      input_type: ".containerd.services.sandbox.v1.StoreUpdateRequest"
-      output_type: ".containerd.services.sandbox.v1.StoreUpdateResponse"
+  }
+  message_type {
+    name: "ControllerUpdateResponse"
+    field {
+      name: "sandbox"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Sandbox"
+      json_name: "sandbox"
     }
-    method {
-      name: "Delete"
-      input_type: ".containerd.services.sandbox.v1.StoreDeleteRequest"
-      output_type: ".containerd.services.sandbox.v1.StoreDeleteResponse"
+  }
+  message_type {
+    name: "ControllerAppendContainerRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
     }
-    method {
-      name: "List"
-      input_type: ".containerd.services.sandbox.v1.StoreListRequest"
-      output_type: ".containerd.services.sandbox.v1.StoreListResponse"
+    field {
+      name: "container"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Container"
+      json_name: "container"
     }
-    method {
-      name: "Get"
-      input_type: ".containerd.services.sandbox.v1.StoreGetRequest"
-      output_type: ".containerd.services.sandbox.v1.StoreGetResponse"
+  }
+  message_type {
+    name: "ControllerAppendContainerResponse"
+    field {
+      name: "container"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Container"
+      json_name: "container"
+    }
+  }
+  message_type {
+    name: "ControllerUpdateContainerRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+    field {
+      name: "container"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Container"
+      json_name: "container"
+    }
+  }
+  message_type {
+    name: "ControllerUpdateContainerResponse"
+    field {
+      name: "container"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Container"
+      json_name: "container"
+    }
+  }
+  message_type {
+    name: "ControllerRemoveContainerRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+    field {
+      name: "container_id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "containerId"
+    }
+  }
+  message_type {
+    name: "ControllerPingRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+  }
+  message_type {
+    name: "ControllerStatusRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+  }
+  message_type {
+    name: "ControllerStatusResponse"
+    field {
+      name: "status"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Status"
+      json_name: "status"
+    }
+  }
+  message_type {
+    name: "ControllerDeleteRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+  }
+  message_type {
+    name: "CreateSandboxRequest"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "sandbox"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Sandbox"
+      json_name: "sandbox"
+    }
+  }
+  message_type {
+    name: "CreateSandboxResponse"
+    field {
+      name: "sandbox"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Sandbox"
+      json_name: "sandbox"
+    }
+  }
+  message_type {
+    name: "UpdateSandboxRequest"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "sandbox"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Sandbox"
+      json_name: "sandbox"
+    }
+    field {
+      name: "fields"
+      number: 3
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "fields"
+    }
+  }
+  message_type {
+    name: "UpdateSandboxResponse"
+    field {
+      name: "sandbox"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Sandbox"
+      json_name: "sandbox"
+    }
+  }
+  message_type {
+    name: "AppendContainerRequest"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "sandbox_id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+    field {
+      name: "container"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Container"
+      json_name: "container"
+    }
+  }
+  message_type {
+    name: "AppendContainerResponse"
+    field {
+      name: "container"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Container"
+      json_name: "container"
+    }
+  }
+  message_type {
+    name: "UpdateContainerRequest"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "sandbox_id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+    field {
+      name: "container"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Container"
+      json_name: "container"
+    }
+  }
+  message_type {
+    name: "UpdateContainerResponse"
+    field {
+      name: "container"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Container"
+      json_name: "container"
+    }
+  }
+  message_type {
+    name: "RemoveContainerRequest"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "sandbox_id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+    field {
+      name: "container_id"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "containerId"
+    }
+  }
+  message_type {
+    name: "GetSandboxRequest"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+  }
+  message_type {
+    name: "GetSandboxResponse"
+    field {
+      name: "sandbox"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Sandbox"
+      json_name: "sandbox"
+    }
+  }
+  message_type {
+    name: "ListSandboxRequest"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "filters"
+      number: 2
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "filters"
+    }
+  }
+  message_type {
+    name: "ListSandboxResponse"
+    field {
+      name: "list"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Sandbox"
+      json_name: "list"
+    }
+  }
+  message_type {
+    name: "StatusRequest"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+  }
+  message_type {
+    name: "StatusResponse"
+    field {
+      name: "status"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.Status"
+      json_name: "status"
+    }
+  }
+  message_type {
+    name: "DeleteSandboxRequest"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
     }
   }
   service {
@@ -4409,14 +4796,39 @@ file {
       output_type: ".containerd.services.sandbox.v1.ControllerStartResponse"
     }
     method {
-      name: "Stop"
-      input_type: ".containerd.services.sandbox.v1.ControllerStopRequest"
-      output_type: ".containerd.services.sandbox.v1.ControllerStopResponse"
+      name: "Shutdown"
+      input_type: ".containerd.services.sandbox.v1.ControllerShutdownRequest"
+      output_type: ".google.protobuf.Empty"
     }
     method {
-      name: "Wait"
-      input_type: ".containerd.services.sandbox.v1.ControllerWaitRequest"
-      output_type: ".containerd.services.sandbox.v1.ControllerWaitResponse"
+      name: "Pause"
+      input_type: ".containerd.services.sandbox.v1.ControllerPauseRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+    method {
+      name: "Resume"
+      input_type: ".containerd.services.sandbox.v1.ControllerResumeRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+    method {
+      name: "Update"
+      input_type: ".containerd.services.sandbox.v1.ControllerUpdateRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerUpdateResponse"
+    }
+    method {
+      name: "AppendContainer"
+      input_type: ".containerd.services.sandbox.v1.ControllerAppendContainerRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerAppendContainerResponse"
+    }
+    method {
+      name: "UpdateContainer"
+      input_type: ".containerd.services.sandbox.v1.ControllerUpdateContainerRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerUpdateContainerResponse"
+    }
+    method {
+      name: "RemoveContainer"
+      input_type: ".containerd.services.sandbox.v1.ControllerRemoveContainerRequest"
+      output_type: ".google.protobuf.Empty"
     }
     method {
       name: "Status"
@@ -4424,9 +4836,57 @@ file {
       output_type: ".containerd.services.sandbox.v1.ControllerStatusResponse"
     }
     method {
+      name: "Ping"
+      input_type: ".containerd.services.sandbox.v1.ControllerPingRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+  }
+  service {
+    name: "Sandboxer"
+    method {
+      name: "Create"
+      input_type: ".containerd.services.sandbox.v1.CreateSandboxRequest"
+      output_type: ".containerd.services.sandbox.v1.CreateSandboxResponse"
+    }
+    method {
+      name: "Update"
+      input_type: ".containerd.services.sandbox.v1.UpdateSandboxRequest"
+      output_type: ".containerd.services.sandbox.v1.UpdateSandboxResponse"
+    }
+    method {
+      name: "AppendContainer"
+      input_type: ".containerd.services.sandbox.v1.AppendContainerRequest"
+      output_type: ".containerd.services.sandbox.v1.AppendContainerResponse"
+    }
+    method {
+      name: "UpdateContainer"
+      input_type: ".containerd.services.sandbox.v1.UpdateContainerRequest"
+      output_type: ".containerd.services.sandbox.v1.UpdateContainerResponse"
+    }
+    method {
+      name: "RemoveContainer"
+      input_type: ".containerd.services.sandbox.v1.RemoveContainerRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+    method {
       name: "Delete"
-      input_type: ".containerd.services.sandbox.v1.ControllerDeleteRequest"
-      output_type: ".containerd.services.sandbox.v1.ControllerDeleteResponse"
+      input_type: ".containerd.services.sandbox.v1.DeleteSandboxRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+    method {
+      name: "List"
+      input_type: ".containerd.services.sandbox.v1.ListSandboxRequest"
+      output_type: ".containerd.services.sandbox.v1.ListSandboxResponse"
+    }
+    method {
+      name: "Get"
+      input_type: ".containerd.services.sandbox.v1.GetSandboxRequest"
+      output_type: ".containerd.services.sandbox.v1.GetSandboxResponse"
+    }
+    method {
+      name: "Status"
+      input_type: ".containerd.services.sandbox.v1.StatusRequest"
+      output_type: ".containerd.services.sandbox.v1.StatusResponse"
     }
   }
   options {
@@ -5727,6 +6187,133 @@ file {
   }
   options {
     go_package: "github.com/containerd/containerd/api/services/version/v1;version"
+  }
+  syntax: "proto3"
+}
+file {
+  name: "github.com/containerd/containerd/api/types/sandbox.proto"
+  package: "containerd.types"
+  dependency: "google/protobuf/any.proto"
+  dependency: "google/protobuf/timestamp.proto"
+  message_type {
+    name: "Sandbox"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+    field {
+      name: "runtime"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Sandbox.Runtime"
+      json_name: "runtime"
+    }
+    field {
+      name: "spec"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "spec"
+    }
+    field {
+      name: "labels"
+      number: 4
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Sandbox.LabelsEntry"
+      json_name: "labels"
+    }
+    field {
+      name: "created_at"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      json_name: "createdAt"
+    }
+    field {
+      name: "updated_at"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      json_name: "updatedAt"
+    }
+    field {
+      name: "extensions"
+      number: 7
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Sandbox.ExtensionsEntry"
+      json_name: "extensions"
+    }
+    nested_type {
+      name: "Runtime"
+      field {
+        name: "name"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "name"
+      }
+      field {
+        name: "options"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_MESSAGE
+        type_name: ".google.protobuf.Any"
+        json_name: "options"
+      }
+    }
+    nested_type {
+      name: "LabelsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
+    nested_type {
+      name: "ExtensionsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_MESSAGE
+        type_name: ".google.protobuf.Any"
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/types;types"
   }
   syntax: "proto3"
 }

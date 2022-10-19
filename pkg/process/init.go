@@ -488,6 +488,31 @@ func (p *Init) runtimeError(rErr error, msg string) error {
 	}
 }
 
+// SetStatus set status of the container, it is only for recovery
+func (p *Init) SetStatus(status string) {
+	switch status {
+	case "created":
+		p.initState = &createdState{p: p}
+	case "running":
+		p.initState = &runningState{p: p}
+	case "stopped":
+		p.initState = &stoppedState{p: p}
+		close(p.waitBlock)
+	default:
+		p.initState = &createdState{p: p}
+	}
+}
+
+// SetPid set pid of the process, it is only for recovery
+func (p *Init) SetPid(pid int) {
+	p.pid = pid
+}
+
+// SetStdio set stdio of the process, it is only for recovery
+func (p *Init) SetStdio(stdio stdio.Stdio) {
+	p.stdio = stdio
+}
+
 func withConditionalIO(c stdio.Stdio) runc.IOOpt {
 	return func(o *runc.IOOption) {
 		o.OpenStdin = c.Stdin != ""

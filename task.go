@@ -35,6 +35,7 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/plugin"
@@ -43,6 +44,7 @@ import (
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
+	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/typeurl"
 	digest "github.com/opencontainers/go-digest"
 	is "github.com/opencontainers/image-spec/specs-go"
@@ -333,7 +335,7 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 	return &ExitStatus{code: r.ExitStatus, exitedAt: protobuf.FromTimestamp(r.ExitedAt)}, nil
 }
 
-func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreate cio.Creator) (_ Process, err error) {
+func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreate cio.Creator) (_ Process, retErr error) {
 	if id == "" {
 		return nil, fmt.Errorf("exec id must not be empty: %w", errdefs.ErrInvalidArgument)
 	}
@@ -347,11 +349,87 @@ func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreat
 			i.Close()
 		}
 	}()
-	any, err := protobuf.MarshalAnyToProto(spec)
+	specAny, err := protobuf.MarshalAnyToProto(spec)
 	if err != nil {
 		return nil, err
 	}
 	cfg := i.Config()
+	cont, err := t.client.ContainerService().Get(ctx, t.id)
+	if err != nil {
+		return nil, err
+	}
+
+	var sandboxContainer sandbox.Container
+	if cont.SandboxKey != "" {
+		sandboxer := t.client.SandboxService(cont.Sandboxer)
+		if sandboxer == nil {
+			return nil, fmt.Errorf("failed to get sandboxer by name %s", cont.Sandboxer)
+		}
+		sb, err := sandboxer.Get(ctx, cont.SandboxKey)
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range sb.Containers {
+			if c.ID == t.id {
+				sandboxContainer = c
+			}
+		}
+		sandboxContainer.Processes = append(sandboxContainer.Processes, sandbox.Process{
+			ID: id,
+			Io: &sandbox.IO{
+				Stdin:    cfg.Stdin,
+				Stdout:   cfg.Stdout,
+				Stderr:   cfg.Stderr,
+				Terminal: cfg.Terminal,
+			},
+			Process:    specAny,
+			Extensions: nil,
+		})
+		newCont, err := sandboxer.UpdateContainer(ctx, cont.SandboxKey, &sandboxContainer)
+		if err != nil {
+			return nil, err
+		}
+		var proc sandbox.Process
+		for _, p := range newCont.Processes {
+			if p.ID == id {
+				proc = p
+			}
+		}
+		if proc.Io != nil {
+			cfg = cio.Config{
+				Terminal: proc.Io.Terminal,
+				Stdin:    proc.Io.Stdin,
+				Stdout:   proc.Io.Stdout,
+				Stderr:   proc.Io.Stderr,
+			}
+		}
+		if proc.Process != nil {
+			specAny, err = protobuf.MarshalAnyToProto(proc.Process)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	defer func() {
+		if retErr != nil && cont.SandboxKey != "" {
+			var processes []sandbox.Process
+			for _, p := range sandboxContainer.Processes {
+				if p.ID != id {
+					processes = append(processes, p)
+				}
+			}
+			sandboxContainer.Processes = processes
+			sandboxer := t.client.SandboxService(cont.Sandboxer)
+			if sandboxer == nil {
+				log.G(ctx).Errorf("failed to get sandboxer by name %s", cont.Sandboxer)
+				return
+			}
+			_, err := sandboxer.UpdateContainer(ctx, cont.SandboxKey, &sandboxContainer)
+			if err != nil {
+				log.G(ctx).Errorf("failed to rollback container when add process failed: %v", err)
+			}
+		}
+	}()
 	request := &tasks.ExecProcessRequest{
 		ContainerID: t.id,
 		ExecID:      id,
@@ -359,7 +437,7 @@ func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreat
 		Stdin:       cfg.Stdin,
 		Stdout:      cfg.Stdout,
 		Stderr:      cfg.Stderr,
-		Spec:        any,
+		Spec:        specAny,
 	}
 	if _, err := t.client.TaskService().Exec(ctx, request); err != nil {
 		i.Cancel()

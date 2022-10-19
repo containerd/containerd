@@ -30,7 +30,7 @@ import (
 func TestLeases(t *testing.T) {
 	ctx, db := testEnv(t)
 
-	lm := NewLeaseManager(NewDB(db, nil, nil))
+	lm := NewLeaseManager(NewDB(db, nil, nil, nil))
 
 	testCases := []struct {
 		ID        string
@@ -109,7 +109,7 @@ func TestLeases(t *testing.T) {
 func TestLeasesList(t *testing.T) {
 	ctx, db := testEnv(t)
 
-	lm := NewLeaseManager(NewDB(db, nil, nil))
+	lm := NewLeaseManager(NewDB(db, nil, nil, nil))
 
 	testset := [][]leases.Opt{
 		{
@@ -252,7 +252,7 @@ func TestLeasesList(t *testing.T) {
 func TestLeaseResource(t *testing.T) {
 	ctx, db := testEnv(t)
 
-	lm := NewLeaseManager(NewDB(db, nil, nil))
+	lm := NewLeaseManager(NewDB(db, nil, nil, nil))
 
 	var (
 		leaseID = "l1"

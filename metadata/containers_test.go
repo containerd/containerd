@@ -46,7 +46,7 @@ func init() {
 
 func TestContainersList(t *testing.T) {
 	ctx, db := testEnv(t)
-	store := NewContainerStore(NewDB(db, nil, nil))
+	store := NewContainerStore(NewDB(db, nil, nil, nil))
 	spec := &specs.Spec{}
 	encoded, err := protobuf.MarshalAnyToProto(spec)
 	require.NoError(t, err)
@@ -174,7 +174,7 @@ func TestContainersList(t *testing.T) {
 func TestContainersCreateUpdateDelete(t *testing.T) {
 	var (
 		ctx, db = testEnv(t)
-		store   = NewContainerStore(NewDB(db, nil, nil))
+		store   = NewContainerStore(NewDB(db, nil, nil, nil))
 		spec    = &specs.Spec{}
 	)
 

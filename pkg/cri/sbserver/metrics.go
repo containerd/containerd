@@ -25,7 +25,7 @@ var (
 	sandboxCreateNetworkTimer metrics.Timer
 	sandboxDeleteNetwork      metrics.Timer
 
-	sandboxRuntimeCreateTimer metrics.LabeledTimer
+	sandboxRuntimeCreateTimer metrics.LabeledTimer //nolint:nolintlint,unused,varcheck
 	sandboxRuntimeStopTimer   metrics.LabeledTimer
 	sandboxRemoveTimer        metrics.LabeledTimer
 
@@ -44,7 +44,7 @@ func init() {
 	sandboxCreateNetworkTimer = ns.NewTimer("sandbox_create_network", "time to create the network for a sandbox")
 	sandboxDeleteNetwork = ns.NewTimer("sandbox_delete_network", "time to delete a sandbox's network")
 
-	sandboxRuntimeCreateTimer = ns.NewLabeledTimer("sandbox_runtime_create", "time to create a sandbox in the runtime", "runtime")
+	sandboxRuntimeCreateTimer = ns.NewLabeledTimer("sandbox_runtime_create", "time to create a sandbox in the runtime", "runtime") //nolint:nolintlint,unused,varcheck
 	sandboxRuntimeStopTimer = ns.NewLabeledTimer("sandbox_runtime_stop", "time to stop a sandbox", "runtime")
 	sandboxRemoveTimer = ns.NewLabeledTimer("sandbox_remove", "time to remove a sandbox", "runtime")
 

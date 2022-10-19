@@ -54,7 +54,8 @@ func containerToProto(container *containers.Container) *api.Container {
 		CreatedAt:   protobuf.ToTimestamp(container.CreatedAt),
 		UpdatedAt:   protobuf.ToTimestamp(container.UpdatedAt),
 		Extensions:  extensions,
-		Sandbox:     container.SandboxID,
+		Sandboxer:   container.Sandboxer,
+		SandboxKey:  container.SandboxKey,
 	}
 }
 
@@ -80,6 +81,7 @@ func containerFromProto(containerpb *api.Container) containers.Container {
 		Snapshotter: containerpb.Snapshotter,
 		SnapshotKey: containerpb.SnapshotKey,
 		Extensions:  extensions,
-		SandboxID:   containerpb.Sandbox,
+		Sandboxer:   containerpb.Sandboxer,
+		SandboxKey:  containerpb.SandboxKey,
 	}
 }

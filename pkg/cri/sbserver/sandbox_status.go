@@ -22,13 +22,10 @@ import (
 	"fmt"
 	goruntime "runtime"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/go-cni"
+	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	cni "github.com/containerd/go-cni"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 )
 
 // PodSandboxStatus returns the status of the PodSandbox.
@@ -44,12 +41,8 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 	}
 	status := toCRISandboxStatus(sandbox.Metadata, sandbox.Status.Get(), ip, additionalIPs)
 	if status.GetCreatedAt() == 0 {
-		// CRI doesn't allow CreatedAt == 0.
-		info, err := sandbox.Container.Info(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get CreatedAt for sandbox container in %q state: %w", status.State, err)
-		}
-		status.CreatedAt = info.CreatedAt.UnixNano()
+		sbStatus := sandbox.Status.Get()
+		status.CreatedAt = sbStatus.CreatedAt.UnixNano()
 	}
 	if !r.GetVerbose() {
 		return &runtime.PodSandboxStatusResponse{Status: status}, nil
@@ -147,28 +140,10 @@ type SandboxInfo struct {
 
 // toCRISandboxInfo converts internal container object information to CRI sandbox status response info map.
 func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox) (map[string]string, error) {
-	container := sandbox.Container
-	task, err := container.Task(ctx, nil)
-	if err != nil && !errdefs.IsNotFound(err) {
-		return nil, fmt.Errorf("failed to get sandbox container task: %w", err)
-	}
-
-	var processStatus containerd.ProcessStatus
-	if task != nil {
-		if taskStatus, err := task.Status(ctx); err != nil {
-			if !errdefs.IsNotFound(err) {
-				return nil, fmt.Errorf("failed to get task status: %w", err)
-			}
-			processStatus = containerd.Unknown
-		} else {
-			processStatus = taskStatus.Status
-		}
-	}
-
 	si := &SandboxInfo{
 		Pid:            sandbox.Status.Get().Pid,
 		RuntimeHandler: sandbox.RuntimeHandler,
-		Status:         string(processStatus),
+		Status:         sandbox.Status.Get().State.String(),
 		Config:         sandbox.Config,
 		CNIResult:      sandbox.CNIResult,
 	}
@@ -187,30 +162,6 @@ func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox) (map[st
 		}
 		si.NetNSClosed = closed
 	}
-
-	spec, err := container.Spec(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox container runtime spec: %w", err)
-	}
-	si.RuntimeSpec = spec
-
-	ctrInfo, err := container.Info(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox container info: %w", err)
-	}
-	// Do not use config.SandboxImage because the configuration might
-	// be changed during restart. It may not reflect the actual image
-	// used by the sandbox container.
-	si.Image = ctrInfo.Image
-	si.SnapshotKey = ctrInfo.SnapshotKey
-	si.Snapshotter = ctrInfo.Snapshotter
-
-	runtimeOptions, err := getRuntimeOptions(ctrInfo)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get runtime options: %w", err)
-	}
-	si.RuntimeType = ctrInfo.Runtime.Name
-	si.RuntimeOptions = runtimeOptions
 
 	infoBytes, err := json.Marshal(si)
 	if err != nil {

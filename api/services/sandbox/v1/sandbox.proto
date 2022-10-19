@@ -16,126 +16,240 @@
 
 syntax = "proto3";
 
-// Sandbox is a v2 runtime extension that allows more complex execution environments for containers.
-// This adds a notion of groups of containers that share same lifecycle and/or resources.
-// A few good fits for sandbox can be:
-// - A "pause" container in k8s, that acts as a parent process for child containers to hold network namespace.
-// - (micro)VMs that launch a VM process and executes containers inside guest OS.
-// containerd in this case remains implementation agnostic and delegates sandbox handling to runtimes.
-// See proposal and discussion here: https://github.com/containerd/containerd/issues/4131
 package containerd.services.sandbox.v1;
 
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
-
-import "github.com/containerd/containerd/api/types/sandbox.proto";
+import "google/protobuf/empty.proto";
 import "github.com/containerd/containerd/api/types/mount.proto";
 
 option go_package = "github.com/containerd/containerd/api/services/sandbox/v1;sandbox";
 
-// Store provides a metadata storage interface for sandboxes. Similarly to `Containers`,
-// sandbox object includes info required to start a new instance, but no runtime state.
-// When running a new sandbox instance, store objects are used as base type to create from.
-service Store {
-	rpc Create(StoreCreateRequest) returns (StoreCreateResponse);
-	rpc Update(StoreUpdateRequest) returns (StoreUpdateResponse);
-	rpc Delete(StoreDeleteRequest) returns (StoreDeleteResponse);
-	rpc List(StoreListRequest) returns (StoreListResponse);
-	rpc Get(StoreGetRequest) returns (StoreGetResponse);
+message Sandbox {
+	string id = 1;
+	google.protobuf.Any spec = 2;
+	repeated Container containers = 3;
+	string task_address = 4;
+	map<string, string> labels  = 5;
+	google.protobuf.Timestamp created_at = 6;
+	google.protobuf.Timestamp updated_at = 7;
+	map<string, google.protobuf.Any> extensions = 8;
 }
 
-message StoreCreateRequest {
-	containerd.types.Sandbox sandbox = 1;
+message Container {
+	string id = 1;
+	google.protobuf.Any spec = 2;
+	repeated containerd.types.Mount rootfs = 3;
+	IO io = 4;
+	repeated Process processes = 5;
+	string bundle = 6;
+	map<string, string> labels  = 7;
+	map<string, google.protobuf.Any> extensions = 8;
 }
 
-message StoreCreateResponse {
-	containerd.types.Sandbox sandbox = 1;
+message IO {
+	string stdin = 1;
+	string stdout = 2;
+	string stderr = 3;
+	bool terminal = 4;
 }
 
-message StoreUpdateRequest {
-	containerd.types.Sandbox sandbox = 1;
-	repeated string fields = 2;
+message Process {
+	string id = 1;
+	IO io = 2;
+	google.protobuf.Any process = 3;
+	map<string, google.protobuf.Any> extra = 4;
 }
 
-message StoreUpdateResponse {
-	containerd.types.Sandbox sandbox = 1;
-}
-
-message StoreDeleteRequest {
-	string sandbox_id = 1;
-}
-
-message StoreDeleteResponse {}
-
-message StoreListRequest {
-	repeated string filters = 1;
-}
-
-message StoreListResponse {
-	repeated containerd.types.Sandbox list = 1;
-}
-
-message StoreGetRequest {
-	string sandbox_id = 1;
-}
-
-message StoreGetResponse {
-	containerd.types.Sandbox sandbox = 1;
-}
-
-// Controller is an interface to manage runtime sandbox instances.
-service Controller {
-	rpc Start(ControllerStartRequest) returns (ControllerStartResponse);
-	rpc Stop(ControllerStopRequest) returns (ControllerStopResponse);
-	rpc Wait(ControllerWaitRequest) returns (ControllerWaitResponse);
-	rpc Status(ControllerStatusRequest) returns (ControllerStatusResponse);
-	rpc Delete(ControllerDeleteRequest) returns (ControllerDeleteResponse);
-}
-
-message ControllerStartRequest {
-	string sandbox_id = 1;
-	repeated containerd.types.Mount rootfs = 2;
-	google.protobuf.Any options = 3;
-}
-
-message ControllerStartResponse {
-	string sandbox_id = 1;
-	uint32 pid = 2;
-	google.protobuf.Timestamp created_at = 3;
-	map<string, string> labels = 4;
-}
-
-message ControllerStopRequest {
-	string sandbox_id = 1;
-	uint32 timeout_secs = 2;
-}
-
-message ControllerStopResponse {}
-
-message ControllerWaitRequest {
-	string sandbox_id = 1;
-}
-
-message ControllerWaitResponse {
-	uint32 exit_status = 1;
-	google.protobuf.Timestamp exited_at = 2;
-}
-
-message ControllerStatusRequest {
-	string sandbox_id = 1;
-}
-
-message ControllerStatusResponse {
+message Status {
 	string id = 1;
 	uint32 pid = 2;
 	string state = 3;
-	uint32 exit_status = 4;
-	google.protobuf.Timestamp exited_at = 5;
-	google.protobuf.Any extra = 6;
+	string version = 4;
+	map<string, google.protobuf.Any> extra = 5;
 }
 
-message ControllerDeleteRequest {
+service Controller {
+	rpc Start (ControllerStartRequest) returns (ControllerStartResponse);
+	rpc Shutdown (ControllerShutdownRequest) returns (google.protobuf.Empty);
+	rpc Pause (ControllerPauseRequest) returns (google.protobuf.Empty);
+	rpc Resume (ControllerResumeRequest) returns (google.protobuf.Empty);
+	rpc Update (ControllerUpdateRequest) returns (ControllerUpdateResponse);
+	rpc AppendContainer (ControllerAppendContainerRequest) returns (ControllerAppendContainerResponse);
+	rpc UpdateContainer (ControllerUpdateContainerRequest) returns (ControllerUpdateContainerResponse);
+	rpc RemoveContainer (ControllerRemoveContainerRequest) returns (google.protobuf.Empty);
+	rpc Status (ControllerStatusRequest) returns (ControllerStatusResponse);
+	rpc Ping (ControllerPingRequest) returns (google.protobuf.Empty);
+}
+
+message ControllerStartRequest {
+	Sandbox sandbox = 1;
+}
+
+message ControllerStartResponse {
+	Sandbox sandbox = 1;
+}
+
+message ControllerShutdownRequest {
+	string id = 1;
+}
+
+message ControllerPauseRequest {
 	string sandbox_id = 1;
 }
 
-message ControllerDeleteResponse {}
+message ControllerResumeRequest {
+	string sandbox_id = 1;
+}
+
+message ControllerUpdateRequest {
+	Sandbox sandbox = 1;
+}
+
+message ControllerUpdateResponse {
+	Sandbox sandbox = 1;
+}
+
+message ControllerAppendContainerRequest {
+	string sandbox_id = 1;
+	Container container = 2;
+}
+
+message ControllerAppendContainerResponse {
+	Container container = 1;
+}
+
+message ControllerUpdateContainerRequest {
+	string sandbox_id = 1;
+	Container container = 2;
+}
+
+message ControllerUpdateContainerResponse {
+	Container container = 1;
+}
+
+message ControllerRemoveContainerRequest {
+	string sandbox_id = 1;
+	string container_id = 2;
+}
+
+message ControllerPingRequest {
+	string sandbox_id = 1;
+}
+
+message ControllerStatusRequest {
+	string id = 1;
+}
+
+message ControllerStatusResponse {
+	Status status = 1;
+}
+
+message ControllerDeleteRequest {
+	string id = 1;
+}
+
+// Sandboxer is the containerd grpc api to manage the metadata and lifecycles of sandboxes.
+service Sandboxer {
+	// Create create a new sandbox, as there is only "Create" and "Delete" in sandbox lifecycle,
+	// after creation, the sandbox should be running.
+	rpc Create (CreateSandboxRequest) returns (CreateSandboxResponse);
+	// Update update a sandbox metadata, it only updates spec/labels/extensions of this sandbox.
+	rpc Update (UpdateSandboxRequest) returns (UpdateSandboxResponse);
+	// AppendContainer append a new container to a sandbox, all the resources like cpu/mem/devices/mounts,
+	// will be attached to the sandbox.
+	rpc AppendContainer (AppendContainerRequest) returns (AppendContainerResponse);
+	// UpdateContainer update a container in a sandbox, the resources belongs to the container maybe changed.
+	// for example, the k8s update container cpu/mem limit of a container, sandbox should be aware of it,
+	// and adjust the resources it is managing. another case of calling UpdateContainer is when
+	// execing a process in a container, the io pipes should be attached to the sandbox.
+	rpc UpdateContainer (UpdateContainerRequest) returns (UpdateContainerResponse);
+	// RemoveContainer removes all resources belongs to a container in a sandbox.
+	rpc RemoveContainer (RemoveContainerRequest) returns (google.protobuf.Empty);
+	// Delete delete a sandbox, there is no Stop API in sandboxer, so delete a sandbox also stopped it.
+	// not only metadata deleted from db, but the running sandbox should be stopped, and all resources should be released.
+	rpc Delete (DeleteSandboxRequest) returns (google.protobuf.Empty);
+	// List list all sandboxes belongs to a specific sandboxer.
+	rpc List (ListSandboxRequest) returns (ListSandboxResponse);
+	// Get gets a sandbox metadata from db.
+	rpc Get (GetSandboxRequest) returns (GetSandboxResponse);
+	// Status query the status of a sandbox, check if it is running or stopped of paused .etc.
+	rpc Status (StatusRequest) returns (StatusResponse);
+}
+
+message CreateSandboxRequest {
+	string name = 1;
+	Sandbox sandbox = 2;
+}
+
+message CreateSandboxResponse {
+	Sandbox sandbox = 1;
+}
+
+message UpdateSandboxRequest {
+	string name = 1;
+	Sandbox sandbox = 2;
+	repeated string fields = 3;
+}
+
+message UpdateSandboxResponse {
+	Sandbox sandbox = 1;
+}
+
+message AppendContainerRequest {
+	string name = 1;
+	string sandbox_id = 2;
+	Container container = 3;
+}
+
+message AppendContainerResponse {
+	Container container = 1;
+}
+
+message UpdateContainerRequest {
+	string name = 1;
+	string sandbox_id = 2;
+	Container container = 3;
+}
+
+message UpdateContainerResponse {
+	Container container = 1;
+}
+
+message RemoveContainerRequest {
+	string name = 1;
+	string sandbox_id = 2;
+	string container_id = 3;
+}
+
+message GetSandboxRequest {
+	string name = 1;
+	string id = 2;
+}
+
+message GetSandboxResponse {
+	Sandbox sandbox = 1;
+}
+
+message ListSandboxRequest {
+	string name = 1;
+	repeated string filters = 2;
+}
+
+message ListSandboxResponse {
+	repeated Sandbox list = 1;
+}
+
+message StatusRequest {
+	string name = 1;
+	string id = 2;
+}
+
+message StatusResponse {
+	Status status = 1;
+}
+
+message DeleteSandboxRequest {
+	string name = 1;
+	string id = 2;
+}

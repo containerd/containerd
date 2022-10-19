@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/containerd/containerd/containers"
 	cni "github.com/containerd/go-cni"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -62,6 +63,10 @@ type Metadata struct {
 	CNIResult *cni.Result
 	// ProcessLabel is the SELinux process label for the container
 	ProcessLabel string
+	// Sandboxer is the sandboxer of sandbox container belongs to .
+	Sandboxer string
+	// Runtime is the runtime of sandbox container belongs to.
+	Runtime containers.RuntimeInfo
 }
 
 // MarshalJSON encodes Metadata into bytes in json format.

@@ -320,7 +320,7 @@ func testDB(opt ...testOpt) (context.Context, *metadata.DB, func(), error) {
 		return ctx, nil, func() { cancel() }, err
 	}
 
-	db := metadata.NewDB(bdb, cs, snapshotters)
+	db := metadata.NewDB(bdb, cs, snapshotters, nil)
 	if err := db.Init(ctx); err != nil {
 		return ctx, nil, func() { cancel() }, err
 	}

@@ -27,14 +27,8 @@ import (
 	"strings"
 	"time"
 
-	eventtypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/protobuf"
-	sb "github.com/containerd/containerd/sandbox"
-	"github.com/containerd/go-cni"
-	"github.com/containerd/typeurl"
-	"github.com/sirupsen/logrus"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
@@ -43,6 +37,13 @@ import (
 	"github.com/containerd/containerd/pkg/cri/util"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/pkg/netns"
+	sandbox2 "github.com/containerd/containerd/sandbox"
+	cni "github.com/containerd/go-cni"
+	"github.com/containerd/typeurl"
+	"github.com/davecgh/go-spew/spew"
+	selinux "github.com/opencontainers/selinux/go-selinux"
+	"github.com/sirupsen/logrus"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func init() {
@@ -76,15 +77,6 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 	}()
 
-	sandboxInfo := sb.Sandbox{
-		ID: id,
-		// TODO: runtime handler can be an empty string, should use default one and enable back validation of this field in metadata store.
-		Runtime: sb.RuntimeOpts{Name: r.GetRuntimeHandler()},
-	}
-
-	// Save sandbox name
-	sandboxInfo.AddLabel("name", name)
-
 	// Create initial internal sandbox object.
 	sandbox := sandboxstore.NewSandbox(
 		sandboxstore.Metadata{
@@ -98,11 +90,31 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		},
 	)
 
-	var (
-		podNetwork = true
-		err        error
-	)
+	ociRuntime, err := c.getSandboxRuntime(config, r.GetRuntimeHandler())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
+	}
+	log.G(ctx).Debugf("Use OCI %+v for sandbox %q", ociRuntime, id)
 
+	runtimeOpts, err := generateRuntimeOptions(ociRuntime, c.config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate runtime options: %w", err)
+	}
+
+	var any typeurl.Any
+	if runtimeOpts != nil {
+		any, err = typeurl.MarshalAny(runtimeOpts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal runtime options: %w", err)
+		}
+	}
+	sandbox.Sandboxer = ociRuntime.Sandboxer
+	sandbox.Runtime = containers.RuntimeInfo{
+		Name:    ociRuntime.Type,
+		Options: any,
+	}
+
+	podNetwork := true
 	if goruntime.GOOS != "windows" &&
 		config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE {
 		// Pod network is not needed on linux with host network.
@@ -159,72 +171,162 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		sandboxCreateNetworkTimer.UpdateSince(netStart)
 	}
 
-	// Save sandbox metadata to store
-	if err := sandboxInfo.AddExtension("metadata", &sandbox.Metadata); err != nil {
-		return nil, fmt.Errorf("unable to save sandbox %q to store: %w", id, err)
-	}
-
-	if _, err := c.client.SandboxStore().Create(ctx, sandboxInfo); err != nil {
-		return nil, fmt.Errorf("failed to save sandbox metadata: %w", err)
-	}
-
-	runtimeStart := time.Now()
-
-	resp, err := c.sandboxController.Start(ctx, id)
+	// Create sandbox container.
+	// NOTE: sandboxContainerSpec SHOULD NOT have side
+	// effect, e.g. accessing/creating files, so that we can test
+	// it safely.
+	spec, err := c.sandboxSpec(id, config, sandbox.NetNSPath, ociRuntime.PodAnnotations)
 	if err != nil {
-		return nil, fmt.Errorf("failed to start sandbox %q: %w", id, err)
+		return nil, fmt.Errorf("failed to generate sandbox container spec: %w", err)
+	}
+	log.G(ctx).WithField("podsandboxid", id).Debugf("sandbox container spec: %#+v", spew.NewFormatter(spec))
+	sandbox.ProcessLabel = spec.Process.SelinuxLabel
+	defer func() {
+		if retErr != nil {
+			selinux.ReleaseLabel(sandbox.ProcessLabel)
+		}
+	}()
+
+	// handle any KVM based runtime
+	if err := modifyProcessLabel(ociRuntime.Type, spec); err != nil {
+		return nil, err
 	}
 
-	labels := resp.GetLabels()
-	if labels == nil {
-		labels = map[string]string{}
+	if config.GetLinux().GetSecurityContext().GetPrivileged() {
+		// If privileged don't set selinux label, but we still record the MCS label so that
+		// the unused label can be freed later.
+		spec.Process.SelinuxLabel = ""
 	}
 
-	sandbox.ProcessLabel = labels["selinux_label"]
+	// Generate spec options that will be applied to the spec later.
+	specOpts, err := c.sandboxSpecOpts(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate sandbox container spec options: %w", err)
+	}
+
+	sandboxLabels := buildLabels(config.Labels, nil, containerKindSandbox)
+
+	opts := []containerd.NewSandboxOpt{
+		containerd.WithSandboxSpec(spec, specOpts...),
+		containerd.WithSandboxLabels(sandboxLabels),
+		containerd.WithSandboxExtension(sandboxMetadataExtension, &sandbox.Metadata)}
+	// use RuntimeHandler temporary, maybe it should be changed to Sandboxer
+
+	// Create sandbox container root directories.
+	sandboxRootDir := c.getSandboxRootDir(id)
+	if err := c.os.MkdirAll(sandboxRootDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create sandbox root directory %q: %w",
+			sandboxRootDir, err)
+	}
+	defer func() {
+		if retErr != nil {
+			// Cleanup the sandbox root directory.
+			if err := c.os.RemoveAll(sandboxRootDir); err != nil {
+				log.G(ctx).WithError(err).Errorf("Failed to remove sandbox root directory %q",
+					sandboxRootDir)
+			}
+		}
+	}()
+	volatileSandboxRootDir := c.getVolatileSandboxRootDir(id)
+	if err := c.os.MkdirAll(volatileSandboxRootDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create volatile sandbox root directory %q: %w",
+			volatileSandboxRootDir, err)
+	}
+	defer func() {
+		if retErr != nil {
+			// Cleanup the volatile sandbox root directory.
+			if err := c.os.RemoveAll(volatileSandboxRootDir); err != nil {
+				log.G(ctx).WithError(err).Errorf("Failed to remove volatile sandbox root directory %q",
+					volatileSandboxRootDir)
+			}
+		}
+	}()
+
+	// Setup files required for the sandbox.
+	if err = c.setupSandboxFiles(id, config); err != nil {
+		return nil, fmt.Errorf("failed to setup sandbox files: %w", err)
+	}
+	defer func() {
+		if retErr != nil {
+			if err = c.cleanupSandboxFiles(id, config); err != nil {
+				log.G(ctx).WithError(err).Errorf("Failed to cleanup sandbox files in %q",
+					sandboxRootDir)
+			}
+		}
+	}()
+
+	containerdSandbox, err := c.client.NewSandbox(ctx, ociRuntime.Sandboxer, id, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create containerd task: %w", err)
+	}
+	defer func() {
+		if retErr != nil {
+			deferCtx, deferCancel := ctrdutil.DeferContext()
+			defer deferCancel()
+			if err := containerdSandbox.Delete(deferCtx); err != nil {
+				log.G(ctx).WithError(err).Errorf("Failed to delete containerd sandbox %q", id)
+			}
+		}
+	}()
+
+	sandboxStatus, err := containerdSandbox.Status(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to wait for sandbox container task: %w", err)
+	}
+
+	sandboxMeta, err := containerdSandbox.Metadata(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create nri client: %w", err)
+	}
 
 	if err := sandbox.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
 		// Set the pod sandbox as ready after successfully start sandbox container.
-		status.Pid = resp.Pid
-		status.State = sandboxstore.StateReady
-		status.CreatedAt = protobuf.FromTimestamp(resp.CreatedAt)
+		switch sandboxStatus.State {
+		case sandbox2.StateReady:
+			status.State = sandboxstore.StateReady
+		default:
+			status.State = sandboxstore.StateNotReady
+		}
+		status.Pid = sandboxStatus.PID
+		status.CreatedAt = sandboxMeta.CreatedAt
 		return status, nil
 	}); err != nil {
 		return nil, fmt.Errorf("failed to update sandbox status: %w", err)
 	}
 
-	// TODO: get rid of this. sandbox object should no longer have Container field.
-	container, err := c.client.LoadContainer(ctx, id)
+	md, err := containerdSandbox.Metadata(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load container %q for sandbox: %w", id, err)
+		return nil, fmt.Errorf("failed to get metadata of sandbox %s: %w", sandbox.ID, err)
 	}
-	// Add sandbox into sandbox store in INIT state.
-	sandbox.Container = container
+	sandbox.Spec = md.Spec
+	sandbox.Address = md.TaskAddress
+	sandbox.SandboxInstance = containerdSandbox
 
 	if err := c.sandboxStore.Add(sandbox); err != nil {
-		return nil, fmt.Errorf("failed to add sandbox %+v into store: %w", sandbox, err)
+		return nil, fmt.Errorf("failed to add sandbox %v into store: %w", sandbox, err)
 	}
 
-	// start the monitor after adding sandbox into the store, this ensures
-	// that sandbox is in the store, when event monitor receives the TaskExit event.
+	//// start the monitor after adding sandbox into the store, this ensures
+	//// that sandbox is in the store, when event monitor receives the TaskExit event.
+	////
+	//// TaskOOM from containerd may come before sandbox is added to store,
+	//// but we don't care about sandbox TaskOOM right now, so it is fine.
+	//go func() {
+	//	resp, err := c.sandboxController.Wait(context.Background(), id)
+	//	if err != nil && err != context.Canceled && err != context.DeadlineExceeded {
+	//		e := &eventtypes.TaskExit{
+	//			ContainerID: id,
+	//			ID:          id,
+	//			// Pid is not used
+	//			Pid:        0,
+	//			ExitStatus: resp.ExitStatus,
+	//			ExitedAt:   resp.ExitedAt,
+	//		}
+	//		c.eventMonitor.backOff.enBackOff(id, e)
+	//	}
+	//}()
 	//
-	// TaskOOM from containerd may come before sandbox is added to store,
-	// but we don't care about sandbox TaskOOM right now, so it is fine.
-	go func() {
-		resp, err := c.sandboxController.Wait(context.Background(), id)
-		if err != nil && err != context.Canceled && err != context.DeadlineExceeded {
-			e := &eventtypes.TaskExit{
-				ContainerID: id,
-				ID:          id,
-				// Pid is not used
-				Pid:        0,
-				ExitStatus: resp.ExitStatus,
-				ExitedAt:   resp.ExitedAt,
-			}
-			c.eventMonitor.backOff.enBackOff(id, e)
-		}
-	}()
-
-	sandboxRuntimeCreateTimer.WithValues(labels["oci_runtime_type"]).UpdateSince(runtimeStart)
+	//sandboxRuntimeCreateTimer.WithValues(labels["oci_runtime_type"]).UpdateSince(runtimeStart)
 
 	return &runtime.RunPodSandboxResponse{PodSandboxId: id}, nil
 }

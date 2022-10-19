@@ -70,7 +70,7 @@ func createContentStore(ctx context.Context, root string, opts ...DBOpt) (contex
 	}
 	ctx = testsuite.SetContextWrapper(ctx, wrap)
 
-	return ctx, NewDB(db, cs, nil, opts...).ContentStore(), func() error {
+	return ctx, NewDB(db, cs, nil, nil, opts...).ContentStore(), func() error {
 		return db.Close()
 	}, nil
 }

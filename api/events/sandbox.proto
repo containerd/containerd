@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package containerd.events;
+
+option go_package = "github.com/containerd/containerd/api/events;events";
+
+message SandboxStart {
+	string id = 1;
+}
+
+message SandboxStop {
+	string id = 1;
+}

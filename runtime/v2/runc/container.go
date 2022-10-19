@@ -37,7 +37,9 @@ import (
 	"github.com/containerd/containerd/pkg/process"
 	"github.com/containerd/containerd/pkg/stdio"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
+	runcC "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -94,6 +96,14 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 	if err := WriteOptions(r.Bundle, opts); err != nil {
 		return nil, err
 	}
+	if err := WriteStdios(r.Bundle, &stdio.Stdio{
+		Terminal: r.Terminal,
+		Stdin:    r.Stdin,
+		Stdout:   r.Stdout,
+		Stderr:   r.Stderr,
+	}); err != nil {
+		return nil, err
+	}
 	// For historical reason, we write opts.BinaryName as well as the entire opts
 	if err := WriteRuntime(r.Bundle, opts.BinaryName); err != nil {
 		return nil, err
@@ -116,7 +126,7 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		}
 	}
 
-	p, err := newInit(
+	p, err := NewInit(
 		ctx,
 		r.Bundle,
 		filepath.Join(r.Bundle, "work"),
@@ -210,7 +220,7 @@ func WriteRuntime(path, runtime string) error {
 	return os.WriteFile(filepath.Join(path, "runtime"), []byte(runtime), 0600)
 }
 
-func newInit(ctx context.Context, path, workDir, namespace string, platform stdio.Platform,
+func NewInit(ctx context.Context, path, workDir, namespace string, platform stdio.Platform,
 	r *process.CreateConfig, options *options.Options, rootfs string) (*process.Init, error) {
 	runtime := process.NewRunc(options.Root, path, namespace, options.BinaryName, options.SystemdCgroup)
 	p := process.New(r.ID, runtime, stdio.Stdio{
@@ -233,6 +243,105 @@ func newInit(ctx context.Context, path, workDir, namespace string, platform stdi
 		p.CriuWorkPath = p.WorkDir
 	}
 	return p, nil
+}
+
+func RecoverContainer(runtime *runcC.Runc, c *runcC.Container, ns string, platform stdio.Platform) (*Container, error) {
+	if _, err := os.Stat(c.Bundle); err != nil {
+		if !os.IsNotExist(err) {
+			logrus.Warningf("failed to stat bundle %s", c.Bundle)
+			return nil, errors.Wrapf(err, "failed to stat %s", c.Bundle)
+		}
+		if err := runtime.Delete(context.Background(), c.ID, &runcC.DeleteOpts{Force: true}); err != nil {
+			logrus.Warningf("failed to remove orphaned container %s: %v", c.ID, err)
+		}
+		return nil, errors.Wrapf(errdefs.ErrNotFound, "container bundle %s not exist", c.Bundle)
+	}
+	cont := &Container{
+		ID:     c.ID,
+		Bundle: c.Bundle,
+	}
+	if cont.Cgroup() == nil && c.Pid > 0 {
+		var cg interface{}
+		if cgroups.Mode() == cgroups.Unified {
+			g, err := cgroupsv2.PidGroupPath(c.Pid)
+			if err != nil {
+				logrus.WithError(err).Errorf("loading cgroup2 for %d", c.Pid)
+			}
+			cg, err = cgroupsv2.LoadManager("/sys/fs/cgroup", g)
+			if err != nil {
+				logrus.WithError(err).Errorf("loading cgroup2 for %d", c.Pid)
+			}
+		} else {
+			var err error
+			cg, err = cgroups.Load(cgroups.V1, cgroups.PidPath(c.Pid))
+			if err != nil {
+				logrus.WithError(err).Errorf("loading cgroup for %d", c.Pid)
+			}
+		}
+		cont.CgroupSet(cg)
+	}
+	createConfig := &process.CreateConfig{
+		ID:      c.ID,
+		Bundle:  c.Bundle,
+		Runtime: runtime.Command,
+	}
+	opts, err := ReadOptions(c.Bundle)
+	if err != nil {
+		logrus.Warningf("failed to read options of %s when recovering: %v", c.ID, err)
+	}
+	if opts == nil {
+		opts = &options.Options{}
+	}
+	fifos, err := ReadStdios(c.Bundle)
+	if err != nil {
+		logrus.Warningf("failed to read fifos of %s when recovering: %v", c.ID, err)
+	}
+	if fifos == nil {
+		fifos = &stdio.Stdio{}
+	}
+	initProcess, err := NewInit(context.Background(), c.Bundle, filepath.Join(c.Bundle, "work"), ns, platform, createConfig, opts, c.Rootfs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to new init process for %s when recovering: %v", c.ID, err)
+	}
+	initProcess.SetStatus(c.Status)
+	initProcess.SetPid(c.Pid)
+	initProcess.SetStdio(*fifos)
+	cont.SetProcesses(initProcess, make(map[string]process.Process), make(map[string]struct{}))
+	logrus.Debugf("recovered runc containers %s", c.ID)
+	return cont, nil
+}
+
+const fifosFilename = "fifos.json"
+
+// ReadStdios reads the fifos information from the path.
+// When the file does not exist, ReadOptions returns nil without an error.
+func ReadStdios(path string) (*stdio.Stdio, error) {
+	filePath := filepath.Join(path, fifosFilename)
+	if _, err := os.Stat(filePath); err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	var fifoConfig stdio.Stdio
+	if err := json.Unmarshal(data, &fifoConfig); err != nil {
+		return nil, err
+	}
+	return &fifoConfig, nil
+}
+
+// WriteStdios writes the fifos information into the path
+func WriteStdios(path string, stdio *stdio.Stdio) error {
+	data, err := json.Marshal(stdio)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(path, fifosFilename), data, 0600)
 }
 
 // Container for operating on a runc container and its processes
@@ -507,4 +616,12 @@ func (c *Container) HasPid(pid int) bool {
 		}
 	}
 	return false
+}
+
+// SetProcesses set init process for the container,
+// this is for the recovery after containerd restart.
+func (c *Container) SetProcesses(p process.Process, processes map[string]process.Process, reservedProcesses map[string]struct{}) {
+	c.process = p
+	c.processes = processes
+	c.reservedProcess = reservedProcesses
 }

@@ -68,6 +68,10 @@ type Container struct {
 	// This field is not required but immutable.
 	Snapshotter string
 
+	Sandboxer string
+
+	SandboxKey string
+
 	// CreatedAt is the time at which the container was created.
 	CreatedAt time.Time
 
@@ -76,11 +80,6 @@ type Container struct {
 
 	// Extensions stores client-specified metadata
 	Extensions map[string]typeurl.Any
-
-	// SandboxID is an identifier of sandbox this container belongs to.
-	//
-	// This property is optional, but can't be changed after creation.
-	SandboxID string
 }
 
 // RuntimeInfo holds runtime specific information

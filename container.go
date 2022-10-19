@@ -31,9 +31,11 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
+	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/fifo"
 	"github.com/containerd/typeurl"
 	ver "github.com/opencontainers/image-spec/specs-go"
@@ -286,6 +288,73 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 		}
 		request.Options = protobuf.FromAny(any)
 	}
+
+	if r.SandboxKey != "" {
+		if r.Sandboxer == "" {
+			return nil, fmt.Errorf("sandboxer should be specified with SandboxId: %v", errdefs.ErrInvalidArgument)
+		}
+
+		sandboxService := c.client.SandboxService(r.Sandboxer)
+		if sandboxService == nil {
+			return nil, fmt.Errorf("failed to get sandboxer %s for container %s", r.Sandboxer, r.ID)
+		}
+		var rootfs []mount.Mount
+		for _, m := range request.Rootfs {
+			rootMount := mount.Mount{
+				Type:    m.Type,
+				Source:  m.Source,
+				Options: m.Options,
+			}
+			rootfs = append(rootfs, rootMount)
+		}
+		cont := &sandbox.Container{
+			ID:     c.id,
+			Spec:   c.metadata.Spec,
+			Rootfs: rootfs,
+			Io: &sandbox.IO{
+				Stdin:    request.Stdin,
+				Stdout:   request.Stdout,
+				Stderr:   request.Stderr,
+				Terminal: request.Terminal,
+			},
+			Labels:     c.metadata.Labels,
+			Extensions: c.metadata.Extensions,
+		}
+		ac, err := sandboxService.AppendContainer(ctx, r.SandboxKey, cont)
+		if err != nil {
+			return nil, fmt.Errorf("failed to append container %s to sandbox %s: %v", cont.ID, r.SandboxKey, err)
+		}
+		err = c.Update(ctx, func(ctx context.Context, client *Client, c *containers.Container) error {
+			c.Spec = ac.Spec
+			c.Labels["bundle"] = ac.Bundle
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		var newRootfs []*types.Mount
+		for _, m := range ac.Rootfs {
+			newRootfs = append(newRootfs, &types.Mount{
+				Type:    m.Type,
+				Source:  m.Source,
+				Options: m.Options,
+			})
+		}
+		request.Rootfs = newRootfs
+		if ac.Io != nil {
+			request.Stdin = ac.Io.Stdin
+			request.Stdout = ac.Io.Stdout
+			request.Stderr = ac.Io.Stderr
+			request.Terminal = ac.Io.Terminal
+		} else {
+			request.Stdin = ""
+			request.Stdout = ""
+			request.Stderr = ""
+			request.Terminal = false
+		}
+
+	}
+
 	t := &task{
 		client: c.client,
 		io:     i,

@@ -76,6 +76,9 @@ type Runtime struct {
 	// while using default snapshotters for operational simplicity.
 	// See https://github.com/containerd/containerd/issues/6657 for details.
 	Snapshotter string `toml:"snapshotter" json:"snapshotter"`
+	// Sandboxer setting sandboxer for the runtime to manage sandbox for this runtime.
+	// An example use case is to use a vmm based sandboxer for Kata container
+	Sandboxer string `toml:"sandboxer" json:"sandboxer"`
 }
 
 // ContainerdConfig contains toml config related to containerd

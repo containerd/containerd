@@ -140,12 +140,16 @@ func cleanupAfterDeadShim(ctx context.Context, id, ns string, rt *runtime.NSMap[
 		"id":        id,
 		"namespace": ns,
 	}).Warn("cleaning up after shim disconnected")
-	response, err := binaryCall.Delete(ctx)
-	if err != nil {
-		log.G(ctx).WithError(err).WithFields(logrus.Fields{
-			"id":        id,
-			"namespace": ns,
-		}).Warn("failed to clean up after shim disconnected")
+	var response *runtime.Exit
+	if binaryCall != nil {
+		var err error
+		response, err = binaryCall.Delete(ctx)
+		if err != nil {
+			log.G(ctx).WithError(err).WithFields(logrus.Fields{
+				"id":        id,
+				"namespace": ns,
+			}).Warn("failed to clean up after shim disconnected")
+		}
 	}
 
 	if _, err := rt.Get(ctx, id); err != nil {

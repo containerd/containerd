@@ -22,10 +22,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // StopPodSandbox stops the sandbox. If there are any running containers in the
@@ -64,10 +64,23 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 		}
 	}
 
-	if _, err := c.sandboxController.Stop(ctx, id); err != nil {
-		return fmt.Errorf("failed to stop sandbox %q: %w", id, err)
+	if err := c.cleanupSandboxFiles(id, sandbox.Config); err != nil {
+		return fmt.Errorf("failed to cleanup sandbox files: %w", err)
 	}
 
+	// Only stop sandbox container when it's running or unknown.
+	state := sandbox.Status.Get().State
+	if state == sandboxstore.StateReady || state == sandboxstore.StateUnknown {
+		sandboxInstance, err := c.client.LoadSandbox(ctx, sandbox.Sandboxer, sandbox.ID)
+		if err != nil && !errdefs.IsNotFound(err) {
+			return fmt.Errorf("failed to load sandbox by id %q: %v", sandbox.ID, err)
+		}
+		if sandboxInstance != nil {
+			if err := sandboxInstance.Delete(ctx); err != nil && !errdefs.IsNotFound(err) {
+				return fmt.Errorf("failed to stop sandbox by id %q: %v", sandbox.ID, err)
+			}
+		}
+	}
 	sandboxRuntimeStopTimer.WithValues(sandbox.RuntimeHandler).UpdateSince(stop)
 
 	// Teardown network for sandbox.

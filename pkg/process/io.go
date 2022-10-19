@@ -33,6 +33,7 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
+	processio "github.com/containerd/containerd/pkg/process/io"
 	"github.com/containerd/containerd/pkg/stdio"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
@@ -104,8 +105,8 @@ func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio stdio.Stdi
 	pio.uri = u
 	switch u.Scheme {
 	case "fifo":
-		pio.copy = true
-		pio.io, err = runc.NewPipeIO(ioUID, ioGID, withConditionalIO(stdio))
+		pio.copy = false
+		pio.io, err = processio.NewFifoIO(stdio, ioUID, ioGID)
 	case "binary":
 		pio.io, err = NewBinaryIO(ctx, id, u)
 	case "file":

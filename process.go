@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/sandbox"
 )
 
 // Process represents a system process
@@ -222,6 +223,39 @@ func (p *process) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitS
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
+
+	cont, err := p.task.client.ContainerService().Get(ctx, p.task.id)
+	if err != nil {
+		return nil, err
+	}
+	if cont.SandboxKey != "" {
+		sandboxer := p.task.client.SandboxService(cont.Sandboxer)
+		if sandboxer == nil {
+			return nil, fmt.Errorf("failed to get sandboxer %s", cont.Sandboxer)
+		}
+		sb, err := sandboxer.Get(ctx, cont.SandboxKey)
+		if err != nil {
+			return nil, err
+		}
+		var sandboxCont sandbox.Container
+		for _, c := range sb.Containers {
+			if c.ID == p.task.id {
+				sandboxCont = c
+			}
+		}
+		var processes []sandbox.Process
+		for _, sp := range sandboxCont.Processes {
+			if sp.ID != p.id {
+				processes = append(processes, sp)
+			}
+		}
+		sandboxCont.Processes = processes
+		_, err = sandboxer.UpdateContainer(ctx, cont.SandboxKey, &sandboxCont)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if p.io != nil {
 		p.io.Cancel()
 		p.io.Wait()

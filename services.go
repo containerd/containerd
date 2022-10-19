@@ -24,7 +24,6 @@ import (
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	introspectionapi "github.com/containerd/containerd/api/services/introspection/v1"
 	namespacesapi "github.com/containerd/containerd/api/services/namespaces/v1"
-	sandboxapi "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
@@ -49,8 +48,7 @@ type services struct {
 	eventService         EventService
 	leasesService        leases.Manager
 	introspectionService introspection.Service
-	sandboxStore         sandbox.Store
-	sandboxController    sandbox.Controller
+	sandboxers           map[string]sandbox.Sandboxer
 }
 
 // ServicesOpt allows callers to set options on the services
@@ -83,6 +81,16 @@ func WithSnapshotters(snapshotters map[string]snapshots.Snapshotter) ServicesOpt
 		s.snapshotters = make(map[string]snapshots.Snapshotter)
 		for n, sn := range snapshotters {
 			s.snapshotters[n] = sn
+		}
+	}
+}
+
+// WithSandboxers sets the sandboxers.
+func WithSandboxers(sandboxers map[string]sandbox.Sandboxer) ServicesOpt {
+	return func(s *services) {
+		s.sandboxers = make(map[string]sandbox.Sandboxer)
+		for n, sn := range sandboxers {
+			s.sandboxers[n] = sn
 		}
 	}
 }
@@ -164,20 +172,6 @@ func WithIntrospectionService(in introspection.Service) ServicesOpt {
 	}
 }
 
-// WithSandboxStore sets the sandbox store.
-func WithSandboxStore(client sandboxapi.StoreClient) ServicesOpt {
-	return func(s *services) {
-		s.sandboxStore = NewRemoteSandboxStore(client)
-	}
-}
-
-// WithSandboxController sets the sandbox controller.
-func WithSandboxController(client sandboxapi.ControllerClient) ServicesOpt {
-	return func(s *services) {
-		s.sandboxController = NewSandboxRemoteController(client)
-	}
-}
-
 // WithInMemoryServices is suitable for cases when there is need to use containerd's client from
 // another (in-memory) containerd plugin (such as CRI).
 func WithInMemoryServices(ic *plugin.InitContext) ClientOpt {
@@ -227,11 +221,8 @@ func WithInMemoryServices(ic *plugin.InitContext) ClientOpt {
 			srv.IntrospectionService: func(s interface{}) ServicesOpt {
 				return WithIntrospectionClient(s.(introspectionapi.IntrospectionClient))
 			},
-			srv.SandboxStoreService: func(s interface{}) ServicesOpt {
-				return WithSandboxStore(s.(sandboxapi.StoreClient))
-			},
-			srv.SandboxControllerService: func(s interface{}) ServicesOpt {
-				return WithSandboxController(s.(sandboxapi.ControllerClient))
+			srv.SandboxService: func(s interface{}) ServicesOpt {
+				return WithSandboxers(s.(map[string]sandbox.Sandboxer))
 			},
 		} {
 			p := plugins[s]

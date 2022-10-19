@@ -161,6 +161,15 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 		err = c.waitContainerStop(sigTermCtx, container)
 		if err == nil {
 			// Container stopped on first signal no need for SIGKILL
+			if container.SandboxID != "" && container.Sandboxer != "" {
+				sandboxer := c.client.SandboxService(container.Sandboxer)
+				if sandboxer == nil {
+					return fmt.Errorf("failed to get sandboxer %s", container.Sandboxer)
+				}
+				if err := sandboxer.RemoveContainer(ctx, container.SandboxID, container.ID); err != nil {
+					return err
+				}
+			}
 			return nil
 		}
 		// If the parent context was cancelled or exceeded return immediately
@@ -181,6 +190,16 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 	if err != nil {
 		return fmt.Errorf("an error occurs during waiting for container %q to be killed: %w", id, err)
 	}
+	if container.SandboxID != "" && container.Sandboxer != "" {
+		sandboxer := c.client.SandboxService(container.Sandboxer)
+		if sandboxer == nil {
+			return fmt.Errorf("failed to get sandboxer %s", container.Sandboxer)
+		}
+		if err := sandboxer.RemoveContainer(ctx, container.SandboxID, container.ID); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

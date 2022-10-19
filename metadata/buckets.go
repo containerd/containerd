@@ -120,6 +120,17 @@
 //     │  ╘══*blob digest* : <nil>      - Content blob reference
 //     └──ingests
 //     ╘══*ingest reference* : <nil> - Content ingest reference
+//     |
+//     |──sandbox
+//     │  ╘══*proxy name*
+//     │     ╘══*sandbox id*
+//     │        ├──spec : <json>              - JSON serialized sandbox spec
+//     │        ├──createdat : <binary time>  - Created at
+//     │        ├──updatedat : <binary time>  - Updated at
+//     │        └──labels
+//     │        |  ╘══*key* : <string>        - Label value
+//     │        ├──extensions
+//     │           ╘══*key* : <binary>        - Proto marshaled extension
 package metadata
 
 import (
@@ -152,13 +163,14 @@ var (
 	bucketKeySpec        = []byte("spec")
 	bucketKeySnapshotKey = []byte("snapshotKey")
 	bucketKeySnapshotter = []byte("snapshotter")
+	bucketKeySandboxKey  = []byte("sandboxKey")
+	bucketKeySandboxer   = []byte("sandboxer")
 	bucketKeyTarget      = []byte("target")
 	bucketKeyExtensions  = []byte("extensions")
 	bucketKeyCreatedAt   = []byte("createdat")
 	bucketKeyExpected    = []byte("expected")
 	bucketKeyRef         = []byte("ref")
 	bucketKeyExpireAt    = []byte("expireat")
-	bucketKeySandboxID   = []byte("sandboxid")
 
 	deprecatedBucketKeyObjectIngest = []byte("ingest") // stores ingest links, deprecated in v1.2
 )
@@ -281,18 +293,19 @@ func getIngestBucket(tx *bolt.Tx, namespace, ref string) *bolt.Bucket {
 	return getBucket(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectContent, bucketKeyObjectIngests, []byte(ref))
 }
 
-func createSandboxBucket(tx *bolt.Tx, namespace string) (*bolt.Bucket, error) {
+func createSandboxBuckets(tx *bolt.Tx, namespace, name string) (*bolt.Bucket, error) {
 	return createBucketIfNotExists(
 		tx,
 		[]byte(namespace),
 		bucketKeyObjectSandboxes,
-	)
+		[]byte(name))
 }
 
-func getSandboxBucket(tx *bolt.Tx, namespace string) *bolt.Bucket {
+func getSandboxBuckets(tx *bolt.Tx, namespace, name string) *bolt.Bucket {
 	return getBucket(
 		tx,
 		[]byte(namespace),
 		bucketKeyObjectSandboxes,
+		[]byte(name),
 	)
 }

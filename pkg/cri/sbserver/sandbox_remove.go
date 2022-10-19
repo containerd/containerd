@@ -21,10 +21,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-
+	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -47,12 +46,13 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	// Use the full sandbox id.
 	id := sandbox.ID
 
-	// If the sandbox is still running, not ready, or in an unknown state, forcibly stop it.
-	// Even if it's in a NotReady state, this will close its network namespace, if open.
-	// This can happen if the task process associated with the Pod died or it was killed.
-	logrus.Infof("Forcibly stopping sandbox %q", id)
-	if err := c.stopPodSandbox(ctx, sandbox); err != nil {
-		return nil, fmt.Errorf("failed to forcibly stop sandbox %q: %w", id, err)
+	// If the sandbox is still running or in an unknown state, forcibly stop it.
+	state := sandbox.Status.Get().State
+	if state == sandboxstore.StateReady || state == sandboxstore.StateUnknown {
+		logrus.Infof("Forcibly stopping sandbox %q", id)
+		if err := c.stopPodSandbox(ctx, sandbox); err != nil {
+			return nil, fmt.Errorf("failed to forcibly stop sandbox %q: %v", id, err)
+		}
 	}
 
 	// Return error if sandbox network namespace is not closed yet.
@@ -92,25 +92,21 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 		return nil, fmt.Errorf("failed to remove volatile sandbox root directory %q: %w",
 			volatileSandboxRootDir, err)
 	}
-
-	// Delete sandbox container.
-	if err := sandbox.Container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
-		if !errdefs.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to delete sandbox container %q: %w", id, err)
-		}
-		log.G(ctx).Tracef("Remove called for sandbox container %q that does not exist", id)
+	sandboxInstance, err := c.client.LoadSandbox(ctx, sandbox.Sandboxer, sandbox.ID)
+	if err != nil && !errdefs.IsNotFound(err) {
+		return nil, fmt.Errorf("failed to load sandbox by id %q, %w", sandbox.ID, err)
 	}
-
+	if sandboxInstance != nil {
+		if err := sandboxInstance.Delete(ctx); err != nil && !errdefs.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to delete sandbox by id %q, %w", sandbox.ID, err)
+		}
+	}
 	// Remove sandbox from sandbox store. Note that once the sandbox is successfully
 	// deleted:
 	// 1) ListPodSandbox will not include this sandbox.
 	// 2) PodSandboxStatus and StopPodSandbox will return error.
 	// 3) On-going operations which have held the reference will not be affected.
 	c.sandboxStore.Delete(id)
-
-	if err := c.client.SandboxStore().Delete(ctx, id); err != nil {
-		return nil, fmt.Errorf("failed to remove sandbox metadata from store: %w", err)
-	}
 
 	// Release the sandbox name reserved for the sandbox.
 	c.sandboxNameIndex.ReleaseByKey(id)

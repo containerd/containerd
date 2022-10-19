@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/log"
+	sb "github.com/containerd/containerd/sandbox"
 	"github.com/containerd/containerd/snapshots"
 	bolt "go.etcd.io/bbolt"
 )
@@ -69,6 +70,7 @@ type dbOptions struct {
 type DB struct {
 	db *bolt.DB
 	ss map[string]*snapshotter
+	sb map[string]*sandboxer
 	cs *contentStore
 
 	// wlock is used to protect access to the data structures during garbage
@@ -102,10 +104,17 @@ type DB struct {
 
 // NewDB creates a new metadata database using the provided
 // bolt database, content store, and snapshotters.
-func NewDB(db *bolt.DB, cs content.Store, ss map[string]snapshots.Snapshotter, opts ...DBOpt) *DB {
+func NewDB(
+	db *bolt.DB,
+	cs content.Store,
+	ss map[string]snapshots.Snapshotter,
+	sb map[string]sb.Controller,
+	opts ...DBOpt,
+) *DB {
 	m := &DB{
 		db:      db,
 		ss:      make(map[string]*snapshotter, len(ss)),
+		sb:      make(map[string]*sandboxer, len(sb)),
 		dirtySS: map[string]struct{}{},
 		dbopts: dbOptions{
 			shared: true,
@@ -120,6 +129,9 @@ func NewDB(db *bolt.DB, cs content.Store, ss map[string]snapshots.Snapshotter, o
 	m.cs = newContentStore(m, m.dbopts.shared, cs)
 	for name, sn := range ss {
 		m.ss[name] = newSnapshotter(m, name, sn)
+	}
+	for name, srv := range sb {
+		m.sb[name] = newSandboxer(m, name, srv)
 	}
 
 	return m
@@ -235,6 +247,15 @@ func (m *DB) Snapshotters() map[string]snapshots.Snapshotter {
 		ss[n] = sn
 	}
 	return ss
+}
+
+// Sandboxes returns all available sandbox stores.
+func (m *DB) Sandboxes() map[string]sb.Sandboxer {
+	out := make(map[string]sb.Sandboxer, len(m.sb))
+	for n, srv := range m.sb {
+		out[n] = srv
+	}
+	return out
 }
 
 // View runs a readonly transaction on the metadata store.

@@ -19,11 +19,13 @@ package v2
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
@@ -37,7 +39,7 @@ import (
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/runtime"
 	shimbinary "github.com/containerd/containerd/runtime/v2/shim"
-	"github.com/containerd/containerd/sandbox"
+	"github.com/containerd/ttrpc"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -56,6 +58,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.EventPlugin,
 			plugin.MetadataPlugin,
+			plugin.TaskPlugin,
 		},
 		Config: &Config{
 			Platforms: defaultPlatforms(),
@@ -78,7 +81,6 @@ func init() {
 				return nil, err
 			}
 			cs := metadata.NewContainerStore(m.(*metadata.DB))
-			ss := metadata.NewSandboxStore(m.(*metadata.DB))
 			events := ep.(*exchange.Exchange)
 
 			shimManager, err := NewShimManager(ic.Context, &ManagerConfig{
@@ -89,7 +91,6 @@ func init() {
 				Events:       events,
 				Store:        cs,
 				SchedCore:    config.SchedCore,
-				SandboxStore: ss,
 			})
 			if err != nil {
 				return nil, err
@@ -126,7 +127,6 @@ type ManagerConfig struct {
 	Address      string
 	TTRPCAddress string
 	SchedCore    bool
-	SandboxStore sandbox.Store
 }
 
 // NewShimManager creates a manager for v2 shims
@@ -146,7 +146,6 @@ func NewShimManager(ctx context.Context, config *ManagerConfig) (*ShimManager, e
 		events:                 config.Events,
 		containers:             config.Store,
 		schedCore:              config.SchedCore,
-		sandboxStore:           config.SandboxStore,
 	}
 
 	if err := m.loadExistingTasks(ctx); err != nil {
@@ -171,7 +170,6 @@ type ShimManager struct {
 	containers             containers.Store
 	// runtimePaths is a cache of `runtime names` -> `resolved fs path`
 	runtimePaths sync.Map
-	sandboxStore sandbox.Store
 }
 
 // ID of the shim manager
@@ -181,6 +179,89 @@ func (m *ShimManager) ID() string {
 
 // Start launches a new shim instance
 func (m *ShimManager) Start(ctx context.Context, id string, opts runtime.CreateOpts) (_ ShimInstance, retErr error) {
+	if opts.TaskAddress != "" {
+		log.G(ctx).Infof("start task in sandbox address %s, bundle: %s", opts.TaskAddress, opts.Bundle)
+		var bundle *Bundle
+		ns, err := namespaces.NamespaceRequired(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if opts.Bundle != "" {
+			bundle = &Bundle{
+				ID:        id,
+				Path:      opts.Bundle,
+				Namespace: ns,
+			}
+			if err := os.Symlink(opts.Bundle, filepath.Join(m.state, ns, id)); err != nil {
+				return nil, err
+			}
+		} else {
+			bundle, err = NewBundle(ctx, m.root, m.state, id, opts.Spec)
+			if err != nil {
+				return nil, err
+			}
+			defer func() {
+				if retErr != nil {
+					bundle.Delete()
+				}
+			}()
+		}
+
+		address := opts.TaskAddress
+		log.G(ctx).Infof("connect to shimv2 server in sandbox with address %s", address)
+		var conn net.Conn
+		var e error
+		for i := 0; i < 500; i++ {
+			conn, e = shimbinary.Connect(address, shimbinary.AnonDialer)
+			if e != nil {
+				time.Sleep(10 * time.Millisecond)
+			} else {
+				break
+			}
+		}
+		if e != nil {
+			return nil, e
+		}
+
+		log.G(ctx).Infof("succeed establish the connection to %s, new ttrpc client", address)
+		c := ttrpc.NewClient(conn, ttrpc.WithOnClose(func() {
+			log.G(ctx).WithField("id", id).Info("shim disconnected")
+
+			if err := bundle.Delete(); err != nil {
+				log.G(ctx).WithField("id", id).Errorf("failed to delete bundle")
+			}
+			// Remove self from the runtime task list. Even though the cleanupAfterDeadShim()
+			// would publish taskExit event, but the shim.Delete() would always failed with ttrpc
+			// disconnect and there is no chance to remove this dead task from runtime task lists.
+			// Thus it's better to delete it here.
+			m.shims.Delete(ctx, id)
+		}))
+		shim := &shim{
+			bundle: bundle,
+			client: c,
+		}
+		defer func() {
+			if err != nil {
+				dctx, cancel := timeout.WithContext(context.Background(), cleanupTimeout)
+				defer cancel()
+				err := shim.Delete(dctx)
+				if err != nil {
+					log.G(ctx).WithField("namespace", ns).WithError(err).Error("failed to delete shim")
+					return
+				}
+			}
+		}()
+
+		addressPath := filepath.Join(bundle.Path, "address")
+		if err := shimbinary.WriteAddress(addressPath, address); err != nil {
+			return nil, err
+		}
+
+		if err := m.shims.Add(ctx, shim); err != nil {
+			return nil, fmt.Errorf("failed to add task: %w", err)
+		}
+		return shim, nil
+	}
 	bundle, err := NewBundle(ctx, m.root, m.state, id, opts.Spec)
 	if err != nil {
 		return nil, err
@@ -190,40 +271,6 @@ func (m *ShimManager) Start(ctx context.Context, id string, opts runtime.CreateO
 			bundle.Delete()
 		}
 	}()
-
-	// This container belongs to sandbox which supposed to be already started via sandbox API.
-	if opts.SandboxID != "" {
-		process, err := m.Get(ctx, opts.SandboxID)
-		if err != nil {
-			return nil, fmt.Errorf("can't find sandbox %s", opts.SandboxID)
-		}
-
-		// Write sandbox ID this task belongs to.
-		if err := os.WriteFile(filepath.Join(bundle.Path, "sandbox"), []byte(opts.SandboxID), 0600); err != nil {
-			return nil, err
-		}
-
-		address, err := shimbinary.ReadAddress(filepath.Join(m.state, process.Namespace(), opts.SandboxID, "address"))
-		if err != nil {
-			return nil, fmt.Errorf("failed to get socket address for sandbox %q: %w", opts.SandboxID, err)
-		}
-
-		// Use sandbox's socket address to handle task requests for this container.
-		if err := shimbinary.WriteAddress(filepath.Join(bundle.Path, "address"), address); err != nil {
-			return nil, err
-		}
-
-		shim, err := loadShim(ctx, bundle, func() {})
-		if err != nil {
-			return nil, fmt.Errorf("failed to load sandbox task %q: %w", opts.SandboxID, err)
-		}
-
-		if err := m.shims.Add(ctx, shim); err != nil {
-			return nil, err
-		}
-
-		return shim, nil
-	}
 
 	shim, err := m.startShim(ctx, bundle, id, opts)
 	if err != nil {
@@ -432,7 +479,7 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 		dctx, cancel := timeout.WithContext(context.Background(), cleanupTimeout)
 		defer cancel()
 
-		sandboxed := opts.SandboxID != ""
+		sandboxed := opts.TaskAddress != ""
 		_, errShim := shimTask.delete(dctx, sandboxed, func(context.Context, string) {})
 		if errShim != nil {
 			if errdefs.IsDeadlineExceeded(errShim) {
@@ -485,7 +532,7 @@ func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit,
 	}
 
 	var (
-		sandboxed = container.SandboxID != ""
+		sandboxed = container.SandboxKey != ""
 		shimTask  = newShimTask(shim)
 	)
 

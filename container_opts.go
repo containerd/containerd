@@ -75,15 +75,6 @@ func WithRuntime(name string, options interface{}) NewContainerOpts {
 	}
 }
 
-// WithSandbox joins the container to a container group (aka sandbox) from the given ID
-// Note: shim runtime must support sandboxes environments.
-func WithSandbox(sandboxID string) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		c.SandboxID = sandboxID
-		return nil
-	}
-}
-
 // WithImage sets the provided image as the base for the container
 func WithImage(i Image) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
@@ -185,6 +176,13 @@ func WithSnapshotter(name string) NewContainerOpts {
 	}
 }
 
+func WithSandboxer(name string) NewContainerOpts {
+	return func(ctx context.Context, client *Client, c *containers.Container) error {
+		c.Sandboxer = name
+		return nil
+	}
+}
+
 // WithSnapshot uses an existing root filesystem for the container
 func WithSnapshot(id string) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
@@ -229,6 +227,16 @@ func WithNewSnapshot(id string, i Image, opts ...snapshots.Opt) NewContainerOpts
 		}
 		c.SnapshotKey = id
 		c.Image = i.Name()
+		return nil
+	}
+}
+
+func WithSandbox(sandboxer, sandboxID, sandboxAddress string) NewContainerOpts {
+	return func(ctx context.Context, client *Client, c *containers.Container) error {
+		c.SandboxKey = sandboxID
+		c.Sandboxer = sandboxer
+		// TODO if this should be a formal field of container?
+		c.Labels["task-address"] = sandboxAddress
 		return nil
 	}
 }

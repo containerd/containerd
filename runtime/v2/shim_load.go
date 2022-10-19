@@ -19,6 +19,7 @@ package v2
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -68,6 +69,14 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 		if !sd.IsDir() {
 			continue
 		}
+		// we will create a symlink in the shim dir if the bundle is created by the Sandboxer
+		info, err := sd.Info()
+		if err != nil {
+			return err
+		}
+		if info.Mode()&fs.ModeSymlink != fs.ModeSymlink {
+			continue
+		}
 		id := sd.Name()
 		// skip hidden directories
 		if len(id) > 0 && id[0] == '.' {
@@ -92,7 +101,8 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 		}
 
 		var (
-			runtime string
+			runtime   string
+			sandboxID string
 		)
 
 		// If we're on 1.6+ and specified custom path to the runtime binary, path will be saved in 'shim-binary-path' file.
@@ -114,46 +124,56 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 				continue
 			}
 			runtime = container.Runtime.Name
+			sandboxID = container.SandboxKey
 		}
 
-		runtime, err = m.resolveRuntimePath(runtime)
-		if err != nil {
-			bundle.Delete()
-			log.G(ctx).WithError(err).Error("failed to resolve runtime path")
-			continue
+		var binaryCall *binary
+		if sandboxID == "" {
+			runtime, err = m.resolveRuntimePath(runtime)
+			if err != nil {
+				bundle.Delete()
+				log.G(ctx).WithError(err).Error("failed to resolve runtime path")
+				continue
+			}
+			binaryCall = shimBinary(bundle,
+				shimBinaryConfig{
+					runtime:      runtime,
+					address:      m.containerdAddress,
+					ttrpcAddress: m.containerdTTRPCAddress,
+					schedCore:    m.schedCore,
+				})
 		}
 
-		binaryCall := shimBinary(bundle,
-			shimBinaryConfig{
-				runtime:      runtime,
-				address:      m.containerdAddress,
-				ttrpcAddress: m.containerdTTRPCAddress,
-				schedCore:    m.schedCore,
-			})
 		instance, err := loadShim(ctx, bundle, func() {
 			log.G(ctx).WithField("id", id).Info("shim disconnected")
+			if binaryCall != nil {
+				cleanupAfterDeadShim(context.Background(), id, ns, m.shims, m.events, binaryCall)
+			} else {
+				bundle.Delete()
+			}
 
-			cleanupAfterDeadShim(context.Background(), id, ns, m.shims, m.events, binaryCall)
 			// Remove self from the runtime task list.
 			m.shims.Delete(ctx, id)
 		})
 		if err != nil {
-			cleanupAfterDeadShim(ctx, id, ns, m.shims, m.events, binaryCall)
+			log.G(ctx).WithField("id", id).Infof("failed to load shim %v", err)
+			if binaryCall != nil {
+				cleanupAfterDeadShim(context.Background(), id, ns, m.shims, m.events, binaryCall)
+			} else {
+				bundle.Delete()
+			}
 			continue
 		}
 		shim := newShimTask(instance)
 
-		// There are 3 possibilities for the loaded shim here:
+		// There are 2 possibilities for the loaded shim here:
 		// 1. It could be a shim that is running a task.
-		// 2. It could be a sandbox shim.
 		// 3. Or it could be a shim that was created for running a task but
 		// something happened (probably a containerd crash) and the task was never
 		// created. This shim process should be cleaned up here. Look at
 		// containerd/containerd#6860 for further details.
-
-		_, sgetErr := m.sandboxStore.Get(ctx, id)
 		pInfo, pidErr := shim.Pids(ctx)
-		if sgetErr != nil && errors.Is(sgetErr, errdefs.ErrNotFound) && (len(pInfo) == 0 || errors.Is(pidErr, errdefs.ErrNotFound)) {
+		if len(pInfo) == 0 || errors.Is(pidErr, errdefs.ErrNotFound) {
 			log.G(ctx).WithField("id", id).Info("cleaning leaked shim process")
 			// We are unable to get Pids from the shim and it's not a sandbox
 			// shim. We should clean it up her.

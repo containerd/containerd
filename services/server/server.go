@@ -34,6 +34,7 @@ import (
 	"time"
 
 	csapi "github.com/containerd/containerd/api/services/content/v1"
+	sbapi "github.com/containerd/containerd/api/services/sandbox/v1"
 	ssapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/content/local"
 	csproxy "github.com/containerd/containerd/content/proxy"
@@ -44,6 +45,7 @@ import (
 	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/sandbox"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	ssproxy "github.com/containerd/containerd/snapshots/proxy"
 	"github.com/containerd/containerd/sys"
@@ -413,6 +415,13 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 			f = func(conn *grpc.ClientConn) interface{} {
 				return csproxy.NewContentStore(csapi.NewContentClient(conn))
 			}
+
+		case string(plugin.SandboxPlugin), "sandbox":
+			t = plugin.SandboxPlugin
+			f = func(conn *grpc.ClientConn) interface{} {
+				return sandbox.NewSandboxController(sbapi.NewControllerClient(conn))
+			}
+
 		default:
 			log.G(ctx).WithField("type", pp.Type).Warn("unknown proxy plugin type")
 		}

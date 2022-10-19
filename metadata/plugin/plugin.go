@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/containerd/snapshots"
 	bolt "go.etcd.io/bbolt"
 )
@@ -85,6 +86,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.ContentPlugin,
 			plugin.SnapshotPlugin,
+			plugin.SandboxPlugin,
 		},
 		Config: &BoltConfig{
 			ContentSharingPolicy: SharingPolicyShared,
@@ -114,6 +116,19 @@ func init() {
 					continue
 				}
 				snapshotters[name] = sn.(snapshots.Snapshotter)
+			}
+
+			sandboxesRaw, err := ic.GetByType(plugin.SandboxPlugin)
+			if err != nil {
+				return nil, err
+			}
+			sandboxes := make(map[string]sandbox.Controller)
+			for name, srv := range sandboxesRaw {
+				inst, err := srv.Instance()
+				if err != nil {
+					return nil, err
+				}
+				sandboxes[name] = inst.(sandbox.Controller)
 			}
 
 			shared := true
@@ -169,7 +184,7 @@ func init() {
 				dbopts = append(dbopts, metadata.WithPolicyIsolated)
 			}
 
-			mdb := metadata.NewDB(db, cs.(content.Store), snapshotters, dbopts...)
+			mdb := metadata.NewDB(db, cs.(content.Store), snapshotters, sandboxes, dbopts...)
 			if err := mdb.Init(ic.Context); err != nil {
 				return nil, err
 			}

@@ -49,6 +49,8 @@ type Metadata struct {
 	Name string
 	// SandboxID is the sandbox id the container belongs to.
 	SandboxID string
+	// Sandboxer is the sandboxer of sandbox container belongs to .
+	Sandboxer string
 	// Config is the CRI container config.
 	// NOTE(random-liu): Resource limits are updatable, the source
 	// of truth for resource limits are in containerd.

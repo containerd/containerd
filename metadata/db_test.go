@@ -39,6 +39,7 @@ import (
 	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/native"
 	"github.com/opencontainers/go-digest"
@@ -50,6 +51,7 @@ import (
 
 type testOptions struct {
 	extraSnapshots map[string]func(string) (snapshots.Snapshotter, error)
+	extraSandboxes map[string]sandbox.Controller
 }
 
 type testOpt func(*testOptions)
@@ -97,7 +99,7 @@ func testDB(t *testing.T, opt ...testOpt) (context.Context, *DB) {
 	bdb, err := bolt.Open(filepath.Join(dirname, "metadata.db"), 0644, nil)
 	require.NoError(t, err)
 
-	db := NewDB(bdb, cs, snapshotters)
+	db := NewDB(bdb, cs, snapshotters, topts.extraSandboxes)
 	require.NoError(t, db.Init(ctx))
 
 	t.Cleanup(func() {
@@ -111,7 +113,7 @@ func testDB(t *testing.T, opt ...testOpt) (context.Context, *DB) {
 func TestInit(t *testing.T) {
 	ctx, db := testEnv(t)
 
-	require.NoError(t, NewDB(db, nil, nil).Init(ctx))
+	require.NoError(t, NewDB(db, nil, nil, nil).Init(ctx))
 
 	version, err := readDBVersion(db, bucketKeyVersion)
 	require.NoError(t, err)
@@ -798,7 +800,7 @@ func newStores(t testing.TB) (*DB, content.Store, snapshots.Snapshotter, func())
 		t.Fatal(err)
 	}
 
-	mdb := NewDB(db, lcs, map[string]snapshots.Snapshotter{"native": nsn})
+	mdb := NewDB(db, lcs, map[string]snapshots.Snapshotter{"native": nsn}, nil)
 
 	return mdb, mdb.ContentStore(), mdb.Snapshotter("native"), func() {
 		nsn.Close()

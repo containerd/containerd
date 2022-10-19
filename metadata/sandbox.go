@@ -18,89 +18,118 @@ package metadata
 
 import (
 	"context"
-	"errors"
-	"fmt"
+	"encoding/json"
 	"strings"
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
-	"github.com/containerd/containerd/identifiers"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/namespaces"
-	api "github.com/containerd/containerd/sandbox"
+	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/typeurl"
+	runtime "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
 )
 
-type sandboxStore struct {
-	db *DB
+type sandboxer struct {
+	ctrl sandbox.Controller
+	name string
+	db   *DB
 }
 
-var _ api.Store = (*sandboxStore)(nil)
-
-// NewSandboxStore creates a datababase client for sandboxes
-func NewSandboxStore(db *DB) api.Store {
-	return &sandboxStore{db: db}
+func newSandboxer(db *DB, name string, sn sandbox.Controller) *sandboxer {
+	return &sandboxer{
+		ctrl: sn,
+		name: name,
+		db:   db,
+	}
 }
 
-// Create a sandbox record in the store
-func (s *sandboxStore) Create(ctx context.Context, sandbox api.Sandbox) (api.Sandbox, error) {
+func (s *sandboxer) Create(ctx context.Context, sb *sandbox.Sandbox) (*sandbox.Sandbox, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
-		return api.Sandbox{}, err
+		return nil, err
 	}
 
-	sandbox.CreatedAt = time.Now().UTC()
-	sandbox.UpdatedAt = sandbox.CreatedAt
+	var (
+		id  = sb.ID
+		now = time.Now().UTC()
+		ret *sandbox.Sandbox
+	)
 
-	if err := s.validate(&sandbox); err != nil {
-		return api.Sandbox{}, fmt.Errorf("failed to validate sandbox: %w", err)
+	if id == "" {
+		return nil, errors.Wrap(errdefs.ErrInvalidArgument, "empty sandbox ID")
 	}
 
-	if err := s.db.Update(func(tx *bbolt.Tx) error {
-		parent, err := createSandboxBucket(tx, ns)
+	if err := update(ctx, s.db, func(tx *bbolt.Tx) (retErr error) {
+		parent := getSandboxBuckets(tx, ns, s.name)
+		if parent != nil && parent.Bucket([]byte(id)) != nil {
+			return errdefs.ErrAlreadyExists
+		}
+
+		in := &sandbox.Sandbox{
+			ID:         id,
+			Spec:       sb.Spec,
+			Labels:     sb.Labels,
+			CreatedAt:  now,
+			UpdatedAt:  now,
+			Extensions: sb.Extensions,
+		}
+
+		out, err := s.ctrl.Start(ctx, in)
 		if err != nil {
-			return fmt.Errorf("create error: %w", err)
+			return err
+		}
+		defer func() {
+			if retErr != nil {
+				if err := s.ctrl.Shutdown(ctx, id); err != nil {
+					log.G(ctx).Warnf("failed to shutdown vm when rollback, %v", err)
+				}
+			}
+		}()
+
+		if err := s.validate(in, out); err != nil {
+			return err
 		}
 
-		if err := s.write(parent, &sandbox, false); err != nil {
-			return fmt.Errorf("write error: %w", err)
+		parent, err = createSandboxBuckets(tx, ns, s.name)
+		if err != nil {
+			return err
 		}
 
+		if err := s.write(parent, out); err != nil {
+			return err
+		}
+
+		ret = out
 		return nil
 	}); err != nil {
-		return api.Sandbox{}, err
+		return nil, err
 	}
 
-	return sandbox, nil
+	return ret, nil
 }
 
-// Update the sandbox with the provided sandbox object and fields
-func (s *sandboxStore) Update(ctx context.Context, sandbox api.Sandbox, fieldpaths ...string) (api.Sandbox, error) {
+func (s *sandboxer) Update(ctx context.Context, sb *sandbox.Sandbox, fieldpaths ...string) (*sandbox.Sandbox, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
-		return api.Sandbox{}, err
+		return nil, err
 	}
 
-	ret := api.Sandbox{}
+	ret := &sandbox.Sandbox{}
 	if err := update(ctx, s.db, func(tx *bbolt.Tx) error {
-		parent := getSandboxBucket(tx, ns)
-		if parent == nil {
-			return fmt.Errorf("no sandbox buckets: %w", errdefs.ErrNotFound)
-		}
+		parent := getSandboxBuckets(tx, ns, s.name)
 
-		updated, err := s.read(parent, []byte(sandbox.ID))
+		updated, err := s.read(parent, []byte(sb.ID))
 		if err != nil {
 			return err
 		}
 
 		if len(fieldpaths) == 0 {
-			fieldpaths = []string{"labels", "extensions", "spec", "runtime"}
-
-			if updated.Runtime.Name != sandbox.Runtime.Name {
-				return fmt.Errorf("sandbox.Runtime.Name field is immutable: %w", errdefs.ErrInvalidArgument)
-			}
+			fieldpaths = []string{"labels", "extensions", "spec"}
 		}
 
 		for _, path := range fieldpaths {
@@ -110,7 +139,7 @@ func (s *sandboxStore) Update(ctx context.Context, sandbox api.Sandbox, fieldpat
 				}
 
 				key := strings.TrimPrefix(path, "labels.")
-				updated.Labels[key] = sandbox.Labels[key]
+				updated.Labels[key] = sb.Labels[key]
 				continue
 			} else if strings.HasPrefix(path, "extensions.") {
 				if updated.Extensions == nil {
@@ -118,73 +147,197 @@ func (s *sandboxStore) Update(ctx context.Context, sandbox api.Sandbox, fieldpat
 				}
 
 				key := strings.TrimPrefix(path, "extensions.")
-				updated.Extensions[key] = sandbox.Extensions[key]
+				updated.Extensions[key] = sb.Extensions[key]
 				continue
 			}
 
 			switch path {
 			case "labels":
-				updated.Labels = sandbox.Labels
+				updated.Labels = sb.Labels
 			case "extensions":
-				updated.Extensions = sandbox.Extensions
-			case "runtime":
-				updated.Runtime = sandbox.Runtime
+				updated.Extensions = sb.Extensions
 			case "spec":
-				updated.Spec = sandbox.Spec
+				updated.Spec = sb.Spec
 			default:
-				return fmt.Errorf("cannot update %q field on sandbox %q: %w", path, sandbox.ID, errdefs.ErrInvalidArgument)
+				return errors.Wrapf(errdefs.ErrInvalidArgument, "cannot update %q field on sandbox %q", path, sb.ID)
 			}
 		}
 
 		updated.UpdatedAt = time.Now().UTC()
-
-		if err := s.validate(&updated); err != nil {
+		newSb, err := s.ctrl.Update(ctx, sb.ID, updated)
+		if err != nil {
+			return err
+		}
+		if err := s.validate(updated, newSb); err != nil {
 			return err
 		}
 
-		if err := s.write(parent, &updated, true); err != nil {
+		if err := s.write(parent, newSb); err != nil {
 			return err
 		}
 
-		ret = updated
+		ret = newSb
 		return nil
 	}); err != nil {
-		return api.Sandbox{}, err
+		return nil, err
 	}
 
 	return ret, nil
 }
 
-// Get sandbox metadata using the id
-func (s *sandboxStore) Get(ctx context.Context, id string) (api.Sandbox, error) {
+func (s *sandboxer) AppendContainer(ctx context.Context, sandboxID string, container *sandbox.Container) (*sandbox.Container, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
-		return api.Sandbox{}, err
+		return nil, err
 	}
 
-	ret := api.Sandbox{}
-	if err := view(ctx, s.db, func(tx *bbolt.Tx) error {
-		bucket := getSandboxBucket(tx, ns)
-		if bucket == nil {
-			return fmt.Errorf("no sandbox buckets: %w", errdefs.ErrNotFound)
+	var ret *sandbox.Container
+	if err := update(ctx, s.db, func(tx *bbolt.Tx) error {
+		parent := getSandboxBuckets(tx, ns, s.name)
+		updated, err := s.read(parent, []byte(sandboxID))
+		if err != nil {
+			return err
+		}
+		newCont, err := s.ctrl.AppendContainer(ctx, sandboxID, container)
+		if err != nil {
+			return err
+		}
+		updated.Containers = append(updated.Containers, *newCont)
+		updated.UpdatedAt = time.Now().UTC()
+
+		if err := s.validate(updated, updated); err != nil {
+			return err
 		}
 
-		out, err := s.read(bucket, []byte(id))
+		if err := s.write(parent, updated); err != nil {
+			return err
+		}
+
+		ret = newCont
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
+
+func (s *sandboxer) UpdateContainer(ctx context.Context, sandboxID string, container *sandbox.Container) (*sandbox.Container, error) {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var ret *sandbox.Container
+	if err := update(ctx, s.db, func(tx *bbolt.Tx) error {
+		parent := getSandboxBuckets(tx, ns, s.name)
+		updated, err := s.read(parent, []byte(sandboxID))
+		if err != nil {
+			return err
+		}
+		newCont, err := s.ctrl.UpdateContainer(ctx, sandboxID, container)
+		if err != nil {
+			return err
+		}
+		for i, c := range updated.Containers {
+			if c.ID == newCont.ID {
+				updated.Containers[i] = *newCont
+			}
+		}
+		updated.UpdatedAt = time.Now().UTC()
+
+		if err := s.validate(updated, updated); err != nil {
+			return err
+		}
+
+		if err := s.write(parent, updated); err != nil {
+			return err
+		}
+
+		ret = newCont
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
+
+func (s *sandboxer) RemoveContainer(ctx context.Context, sandboxID string, id string) error {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return err
+	}
+
+	if err := update(ctx, s.db, func(tx *bbolt.Tx) error {
+		parent := getSandboxBuckets(tx, ns, s.name)
+		updated, err := s.read(parent, []byte(sandboxID))
+		if err != nil {
+			return err
+		}
+		err = s.ctrl.RemoveContainer(ctx, sandboxID, id)
+		if err != nil {
+			return err
+		}
+		var residualContainers []sandbox.Container
+		for _, c := range updated.Containers {
+			if c.ID != id {
+				residualContainers = append(residualContainers, c)
+			}
+		}
+		updated.Containers = residualContainers
+		updated.UpdatedAt = time.Now().UTC()
+
+		if err := s.validate(updated, updated); err != nil {
+			return err
+		}
+
+		if err := s.write(parent, updated); err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *sandboxer) Delete(ctx context.Context, id string) error {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return err
+	}
+
+	if err := update(ctx, s.db, func(tx *bbolt.Tx) error {
+		buckets := getSandboxBuckets(tx, ns, s.name)
+		if buckets == nil {
+			return errors.Wrap(errdefs.ErrNotFound, "no sandbox buckets")
+		}
+
+		instance, err := s.read(buckets, []byte(id))
 		if err != nil {
 			return err
 		}
 
-		ret = out
+		if err := buckets.DeleteBucket([]byte(id)); err != nil {
+			return errors.Wrapf(err, "failed to delete bucket %q", id)
+		}
+
+		if err := s.ctrl.Shutdown(ctx, instance.ID); err != nil && !errdefs.IsNotFound(err) {
+			return errors.Wrapf(err, "failed to delete sandbox %q", id)
+		}
+
 		return nil
 	}); err != nil {
-		return api.Sandbox{}, err
+		return err
 	}
 
-	return ret, nil
+	return nil
 }
 
-// List returns sandboxes that match one or more of the provided filters
-func (s *sandboxStore) List(ctx context.Context, fields ...string) ([]api.Sandbox, error) {
+func (s *sandboxer) List(ctx context.Context, fields ...string) ([]sandbox.Sandbox, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -192,28 +345,27 @@ func (s *sandboxStore) List(ctx context.Context, fields ...string) ([]api.Sandbo
 
 	filter, err := filters.ParseAll(fields...)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", err.Error(), errdefs.ErrInvalidArgument)
+		return nil, errors.Wrap(errdefs.ErrInvalidArgument, err.Error())
 	}
 
 	var (
-		list []api.Sandbox
+		list []sandbox.Sandbox
 	)
 
 	if err := view(ctx, s.db, func(tx *bbolt.Tx) error {
-		bucket := getSandboxBucket(tx, ns)
+		bucket := getSandboxBuckets(tx, ns, s.name)
 		if bucket == nil {
-			// We haven't created any sandboxes yet, just return empty list
-			return nil
+			return errors.Wrap(errdefs.ErrNotFound, "not sandbox buckets")
 		}
 
 		if err := bucket.ForEach(func(k, v []byte) error {
 			info, err := s.read(bucket, k)
 			if err != nil {
-				return fmt.Errorf("failed to read bucket %q: %w", string(k), err)
+				return errors.Wrapf(err, "failed to read bucket %q", string(k))
 			}
 
-			if filter.Match(adaptSandbox(&info)) {
-				list = append(list, info)
+			if filter.Match(adaptSandbox(info)) {
+				list = append(list, *info)
 			}
 
 			return nil
@@ -229,55 +381,240 @@ func (s *sandboxStore) List(ctx context.Context, fields ...string) ([]api.Sandbo
 	return list, nil
 }
 
-// Delete a sandbox from metadata store using the id
-func (s *sandboxStore) Delete(ctx context.Context, id string) error {
+func (s *sandboxer) Get(ctx context.Context, id string) (*sandbox.Sandbox, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if err := update(ctx, s.db, func(tx *bbolt.Tx) error {
-		buckets := getSandboxBucket(tx, ns)
-		if buckets == nil {
-			return fmt.Errorf("no sandbox buckets: %w", errdefs.ErrNotFound)
+	var ret *sandbox.Sandbox
+	if err := view(ctx, s.db, func(tx *bbolt.Tx) error {
+		bucket := getSandboxBuckets(tx, ns, s.name)
+		if bucket == nil {
+			return errors.Wrap(errdefs.ErrNotFound, "not sandbox buckets")
 		}
-
-		if err := buckets.DeleteBucket([]byte(id)); err != nil {
-			return fmt.Errorf("failed to delete sandbox %q: %w", id, err)
+		bkt := bucket.Bucket([]byte(id))
+		if bkt == nil {
+			return errors.Wrap(errdefs.ErrNotFound, "not sandbox metadata")
 		}
-
+		sb, err := s.read(bucket, []byte(id))
+		if err != nil {
+			return err
+		}
+		ret = sb
 		return nil
 	}); err != nil {
-		return err
+		return nil, err
+	}
+
+	return ret, nil
+}
+
+func (s *sandboxer) Status(ctx context.Context, id string) (sandbox.Status, error) {
+	return s.ctrl.Status(ctx, id)
+}
+
+var _ sandbox.Sandboxer = &sandboxer{}
+
+func (s *sandboxer) validate(old, new *sandbox.Sandbox) error {
+	if new.ID == "" {
+		return errors.Wrap(errdefs.ErrInvalidArgument, "instance ID must not be empty")
+	}
+
+	if new.CreatedAt.IsZero() {
+		return errors.Wrap(errdefs.ErrInvalidArgument, "creation date must not be zero")
+	}
+
+	if new.UpdatedAt.IsZero() {
+		return errors.Wrap(errdefs.ErrInvalidArgument, "updated date must not be zero")
+	}
+
+	if new.Spec == nil {
+		return errors.Wrap(errdefs.ErrInvalidArgument, "sandbox spec must not be nil")
+	}
+
+	if old.ID != new.ID {
+		return errors.Wrap(errdefs.ErrFailedPrecondition, "controller should preserve instance ID")
+	}
+
+	if old.CreatedAt != new.CreatedAt {
+		return errors.Wrap(errdefs.ErrFailedPrecondition, "controller should preserve creation time")
 	}
 
 	return nil
 }
 
-func (s *sandboxStore) write(parent *bbolt.Bucket, instance *api.Sandbox, overwrite bool) error {
+func (s *sandboxer) read(parent *bbolt.Bucket, id []byte) (*sandbox.Sandbox, error) {
 	var (
-		bucket *bbolt.Bucket
-		err    error
-		id     = []byte(instance.ID)
+		inst sandbox.Sandbox
+		err  error
 	)
 
-	if overwrite {
-		bucket, err = parent.CreateBucketIfNotExists(id)
-		if err != nil {
-			return err
-		}
-	} else {
-		bucket = parent.Bucket(id)
-		if bucket != nil {
-			return fmt.Errorf("sandbox bucket %q already exists: %w", instance.ID, errdefs.ErrAlreadyExists)
-		}
-
-		bucket, err = parent.CreateBucket(id)
-		if err != nil {
-			return err
-		}
+	bucket := parent.Bucket(id)
+	if bucket == nil {
+		return nil, errors.Wrapf(errdefs.ErrNotFound, "bucket %q not found", id)
 	}
 
+	inst.ID = string(id)
+	inst.TaskAddress = string(bucket.Get([]byte("address")))
+
+	inst.Labels, err = boltutil.ReadLabels(bucket)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := boltutil.ReadTimestamps(bucket, &inst.CreatedAt, &inst.UpdatedAt); err != nil {
+		return nil, err
+	}
+
+	specData := bucket.Get([]byte("spec"))
+	if specData != nil {
+		runtimeSpec := runtime.Spec{}
+		if err := json.Unmarshal(specData, &runtimeSpec); err != nil {
+			return nil, errors.Wrap(err, "failed to unmarshal runtime spec")
+		}
+		inst.Spec = &runtimeSpec
+	}
+
+	inst.Extensions, err = boltutil.ReadExtensions(bucket)
+	if err != nil {
+		return nil, err
+	}
+
+	inst.Containers, err = s.readContainers(bucket)
+	if err != nil {
+		return nil, err
+	}
+
+	return &inst, nil
+}
+
+func (s *sandboxer) readContainers(bkt *bbolt.Bucket) ([]sandbox.Container, error) {
+	var containers []sandbox.Container
+	cbkt := bkt.Bucket([]byte("containers"))
+	if cbkt == nil {
+		return containers, nil
+	}
+	if err := cbkt.ForEach(func(k, v []byte) error {
+		c, err := s.readContainer(cbkt.Bucket(k))
+		if err != nil {
+			return err
+		}
+		containers = append(containers, c)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return containers, nil
+}
+
+func (s *sandboxer) readContainer(bkt *bbolt.Bucket) (sandbox.Container, error) {
+	var cont sandbox.Container
+
+	cont.ID = string(bkt.Get([]byte("id")))
+	labels, err := boltutil.ReadLabels(bkt)
+	if err != nil {
+		return cont, err
+	}
+	cont.Labels = labels
+
+	ext, err := boltutil.ReadExtensions(bkt)
+	if err != nil {
+		return cont, err
+	}
+	cont.Extensions = ext
+
+	cont.Spec, err = boltutil.ReadAny(bkt, []byte("spec"))
+	if err != nil {
+		return cont, err
+	}
+	rootfsBytes := bkt.Get([]byte("rootfs"))
+	if len(rootfsBytes) > 0 {
+		if err := json.Unmarshal(rootfsBytes, &cont.Rootfs); err != nil {
+			return cont, err
+		}
+	}
+	cont.Io, err = s.readIO(bkt)
+	if err != nil {
+		return cont, err
+	}
+	cont.Processes, err = s.readProcesses(bkt)
+	if err != nil {
+		return cont, err
+	}
+	return cont, nil
+}
+
+func (s *sandboxer) readIO(bkt *bbolt.Bucket) (*sandbox.IO, error) {
+	bucket := bkt.Bucket([]byte("io"))
+	if bucket == nil {
+		return nil, nil
+	}
+	var io sandbox.IO
+	io.Stdin = string(bucket.Get([]byte("stdin")))
+	io.Stdin = string(bucket.Get([]byte("stdin")))
+	io.Stdin = string(bucket.Get([]byte("stdin")))
+	t := bucket.Get([]byte("terminal"))
+	if len(t) >= 1 && t[0] > 0 {
+		io.Terminal = true
+	} else {
+		io.Terminal = false
+	}
+	return &io, nil
+}
+
+func (s *sandboxer) readProcesses(bkt *bbolt.Bucket) ([]sandbox.Process, error) {
+	var processes []sandbox.Process
+	cbkt := bkt.Bucket([]byte("processes"))
+	if cbkt == nil {
+		return nil, nil
+	}
+	if err := cbkt.ForEach(func(k, v []byte) error {
+		p, err := s.readProcess(cbkt.Bucket(k))
+		if err != nil {
+			return err
+		}
+		processes = append(processes, p)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return processes, nil
+}
+
+func (s *sandboxer) readProcess(bkt *bbolt.Bucket) (sandbox.Process, error) {
+	var process sandbox.Process
+
+	process.ID = string(bkt.Get([]byte("id")))
+	p, err := boltutil.ReadAny(bkt, []byte("process"))
+	if err != nil {
+		return process, err
+	}
+	process.Process = p
+	process.Extensions, err = boltutil.ReadExtensions(bkt)
+	if err != nil {
+		return process, err
+	}
+	process.Io, err = s.readIO(bkt)
+	if err != nil {
+		return process, err
+	}
+	return process, nil
+}
+
+func (s *sandboxer) write(parent *bbolt.Bucket, instance *sandbox.Sandbox) error {
+	bucket, err := parent.CreateBucketIfNotExists([]byte(instance.ID))
+	if err != nil {
+		return err
+	}
+
+	if err := bucket.Put([]byte("id"), []byte(instance.ID)); err != nil {
+		return err
+	}
+
+	if err := bucket.Put([]byte("address"), []byte(instance.TaskAddress)); err != nil {
+		return err
+	}
 	if err := boltutil.WriteTimestamps(bucket, instance.CreatedAt, instance.UpdatedAt); err != nil {
 		return err
 	}
@@ -290,84 +627,145 @@ func (s *sandboxStore) write(parent *bbolt.Bucket, instance *api.Sandbox, overwr
 		return err
 	}
 
-	if err := boltutil.WriteAny(bucket, bucketKeySpec, instance.Spec); err != nil {
-		return err
-	}
-
-	runtimeBucket, err := bucket.CreateBucketIfNotExists(bucketKeyRuntime)
+	spec, err := json.Marshal(instance.Spec)
 	if err != nil {
+		return errors.Wrap(err, "failed to marshal runtime spec")
+	}
+
+	if err := bucket.Put([]byte("spec"), spec); err != nil {
 		return err
 	}
 
-	if err := runtimeBucket.Put(bucketKeyName, []byte(instance.Runtime.Name)); err != nil {
-		return err
-	}
-
-	if err := boltutil.WriteAny(runtimeBucket, bucketKeyOptions, instance.Runtime.Options); err != nil {
+	if err := s.writeContainers(bucket, instance.Containers); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (s *sandboxStore) read(parent *bbolt.Bucket, id []byte) (api.Sandbox, error) {
-	var (
-		inst api.Sandbox
-		err  error
-	)
-
-	bucket := parent.Bucket(id)
-	if bucket == nil {
-		return api.Sandbox{}, fmt.Errorf("bucket %q not found: %w", id, errdefs.ErrNotFound)
+func (s *sandboxer) writeContainers(parent *bbolt.Bucket, containers []sandbox.Container) error {
+	if cbkts := parent.Bucket([]byte("containers")); cbkts != nil {
+		if err := parent.DeleteBucket([]byte("containers")); err != nil {
+			return err
+		}
 	}
-
-	inst.ID = string(id)
-
-	inst.Labels, err = boltutil.ReadLabels(bucket)
+	bucket, err := parent.CreateBucket([]byte("containers"))
 	if err != nil {
-		return api.Sandbox{}, err
+		return err
+	}
+	for _, container := range containers {
+		if err := s.writeContainer(bucket, container); err != nil {
+			return err
+		}
 	}
 
-	if err := boltutil.ReadTimestamps(bucket, &inst.CreatedAt, &inst.UpdatedAt); err != nil {
-		return api.Sandbox{}, err
-	}
-
-	inst.Spec, err = boltutil.ReadAny(bucket, bucketKeySpec)
-	if err != nil {
-		return api.Sandbox{}, err
-	}
-
-	runtimeBucket := bucket.Bucket(bucketKeyRuntime)
-	if runtimeBucket == nil {
-		return api.Sandbox{}, errors.New("no runtime bucket")
-	}
-
-	inst.Runtime.Name = string(runtimeBucket.Get(bucketKeyName))
-	inst.Runtime.Options, err = boltutil.ReadAny(runtimeBucket, bucketKeyOptions)
-	if err != nil {
-		return api.Sandbox{}, err
-	}
-
-	inst.Extensions, err = boltutil.ReadExtensions(bucket)
-	if err != nil {
-		return api.Sandbox{}, err
-	}
-
-	return inst, nil
+	return nil
 }
 
-func (s *sandboxStore) validate(new *api.Sandbox) error {
-	if err := identifiers.Validate(new.ID); err != nil {
-		return fmt.Errorf("invalid sandbox ID: %w", err)
+func (s *sandboxer) writeContainer(parent *bbolt.Bucket, container sandbox.Container) error {
+	bucket, err := parent.CreateBucketIfNotExists([]byte(container.ID))
+	if err != nil {
+		return err
 	}
 
-	if new.CreatedAt.IsZero() {
-		return fmt.Errorf("creation date must not be zero: %w", errdefs.ErrInvalidArgument)
+	if err := bucket.Put([]byte("id"), []byte(container.ID)); err != nil {
+		return err
+	}
+	if err := boltutil.WriteLabels(bucket, container.Labels); err != nil {
+		return err
 	}
 
-	if new.UpdatedAt.IsZero() {
-		return fmt.Errorf("updated date must not be zero: %w", errdefs.ErrInvalidArgument)
+	if err := boltutil.WriteExtensions(bucket, container.Extensions); err != nil {
+		return err
+	}
+	if err := boltutil.WriteAny(bucket, []byte("spec"), container.Spec); err != nil {
+		return err
+	}
+	rootfs, err := json.Marshal(container.Rootfs)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal container rootfs")
+	}
+	if err := bucket.Put([]byte("rootfs"), rootfs); err != nil {
+		return err
+	}
+	if err := s.writeIo(bucket, container.Io); err != nil {
+		return err
+	}
+	if err := bucket.Put([]byte("bundle"), []byte(container.Bundle)); err != nil {
+		return err
 	}
 
+	if err := s.writeProcesses(bucket, container.Processes); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *sandboxer) writeProcesses(parent *bbolt.Bucket, processes []sandbox.Process) error {
+	if pbkts := parent.Bucket([]byte("processes")); pbkts != nil {
+		if err := parent.DeleteBucket([]byte("processes")); err != nil {
+			return err
+		}
+	}
+	bucket, err := parent.CreateBucket([]byte("processes"))
+	if err != nil {
+		return err
+	}
+	for _, process := range processes {
+		if err := s.writeProcess(bucket, process); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *sandboxer) writeProcess(parent *bbolt.Bucket, process sandbox.Process) error {
+	bucket, err := parent.CreateBucketIfNotExists([]byte(process.ID))
+	if err != nil {
+		return err
+	}
+
+	if err := bucket.Put([]byte("id"), []byte(process.ID)); err != nil {
+		return err
+	}
+	if err := boltutil.WriteAny(bucket, []byte("process"), process.Process); err != nil {
+		return err
+	}
+	if err := boltutil.WriteExtensions(bucket, process.Extensions); err != nil {
+		return err
+	}
+	if err := s.writeIo(bucket, process.Io); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *sandboxer) writeIo(parent *bbolt.Bucket, io *sandbox.IO) error {
+	if io == nil {
+		return nil
+	}
+	bucket, err := parent.CreateBucketIfNotExists([]byte("io"))
+	if err != nil {
+		return err
+	}
+	if err := bucket.Put([]byte("stdin"), []byte(io.Stdin)); err != nil {
+		return err
+	}
+	if err := bucket.Put([]byte("stdout"), []byte(io.Stdout)); err != nil {
+		return err
+	}
+	if err := bucket.Put([]byte("stdin"), []byte(io.Stderr)); err != nil {
+		return err
+	}
+	var terminal byte
+	if io.Terminal {
+		terminal = 1
+	}
+	if err := bucket.Put([]byte("terminal"), []byte{terminal}); err != nil {
+		return err
+	}
 	return nil
 }

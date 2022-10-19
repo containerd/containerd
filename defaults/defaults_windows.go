@@ -43,4 +43,6 @@ const (
 	DefaultFIFODir = ""
 	// DefaultRuntime is the default windows runtime
 	DefaultRuntime = "io.containerd.runhcs.v1"
+	// DefaultSandboxer is the default sandboxer for ctr sandbox operation.
+	DefaultSandboxer = ""
 )
