@@ -40,9 +40,8 @@ WORKDIR /go/src/github.com/containerd/containerd
 
 FROM golang AS cni
 ENV DESTDIR=/build
-COPY script/setup/install-cni ./
-COPY go.mod /go/src/github.com/containerd/containerd/go.mod
-RUN ./install-cni
+COPY script/setup/install-cni go.mod /
+RUN DESTDIR=/build /install-cni
 
 FROM golang AS critools
 ARG DESTDIR=/build
