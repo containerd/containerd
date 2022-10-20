@@ -73,10 +73,10 @@ func (n *nopWriteCloser) Close() error {
 // serialWriteCloser wraps a write closer and makes sure all writes
 // are done in serial.
 // Parallel write won't intersect with each other. Use case:
-// 1) Pipe: Write content longer than PIPE_BUF.
-//    See http://man7.org/linux/man-pages/man7/pipe.7.html
-// 2) <3.14 Linux Kernel: write is not atomic
-//    See http://man7.org/linux/man-pages/man2/write.2.html
+//  1. Pipe: Write content longer than PIPE_BUF.
+//     See http://man7.org/linux/man-pages/man7/pipe.7.html
+//  2. <3.14 Linux Kernel: write is not atomic
+//     See http://man7.org/linux/man-pages/man2/write.2.html
 type serialWriteCloser struct {
 	mu sync.Mutex
 	wc io.WriteCloser

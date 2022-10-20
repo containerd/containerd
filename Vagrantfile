@@ -77,7 +77,7 @@ Vagrant.configure("2") do |config|
   config.vm.provision "install-golang", type: "shell", run: "once" do |sh|
     sh.upload_path = "/tmp/vagrant-install-golang"
     sh.env = {
-        'GO_VERSION': ENV['GO_VERSION'] || "1.17.13",
+        'GO_VERSION': ENV['GO_VERSION'] || "1.18.7",
     }
     sh.inline = <<~SHELL
         #!/usr/bin/env bash
@@ -136,7 +136,8 @@ EOF
         source /etc/environment
         source /etc/profile.d/sh.local
         set -eux -o pipefail
-        ${GOPATH}/src/github.com/containerd/containerd/script/setup/install-cni
+        cd ${GOPATH}/src/github.com/containerd/containerd
+        script/setup/install-cni
         PATH=/opt/cni/bin:$PATH type ${CNI_BINARIES} || true
     SHELL
   end

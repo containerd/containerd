@@ -2,11 +2,11 @@ name: CI
 on:
   push:
     branches:
-      - master
+      - main
       - 'release/**'
   pull_request:
     branches:
-      - master
+      - main
       - 'release/**'
 
 jobs:
@@ -20,7 +20,7 @@ jobs:
 
     strategy:
       matrix:
-        go-version: [1.17.13]
+        go-version: [1.18.7]
         os: [ubuntu-18.04, macos-12, windows-2019]
 
     steps:
@@ -29,19 +29,10 @@ jobs:
           go-version: ${{ matrix.go-version }}
 
       - uses: actions/checkout@v2
-        with:
-          path: src/github.com/containerd/containerd
-
-      - name: Set env
-        shell: bash
-        run: |
-          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
-          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
-
       - uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.44.2
-          working-directory: src/github.com/containerd/containerd
+          version: v1.49.0
+          skip-cache: true
           args: --timeout=5m
 
   #
@@ -55,12 +46,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.13'
-
-      - shell: bash
-        run: |
-          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
-          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+          go-version: '1.18.7'
 
       - uses: actions/checkout@v2
         with:
@@ -86,7 +72,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.13'
+          go-version: '1.18.7'
 
       - uses: actions/checkout@v2
         with:
@@ -96,7 +82,6 @@ jobs:
         shell: bash
         run: |
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
-          echo "GO111MODULE=off" >> $GITHUB_ENV
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - name: Install protobuf
@@ -119,22 +104,10 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.13'
-
-      - name: Set env
-        shell: bash
-        run: |
-          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
-          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
-
+          go-version: '1.18.7'
       - uses: actions/checkout@v2
-        with:
-          path: src/github.com/containerd/containerd
-
-      - run: GO111MODULE=on go get github.com/cpuguy83/go-md2man/v2@v2.0.1
-
+      - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.1
       - run: make man
-        working-directory: src/github.com/containerd/containerd
 
   # Make sure binaries compile with other platforms
   crossbuild:
@@ -165,15 +138,8 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.13'
-      - name: Set env
-        shell: bash
-        run: |
-          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
-          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+          go-version: '1.18.7'
       - uses: actions/checkout@v2
-        with:
-          path: src/github.com/containerd/containerd
       - run: |
           set -e -x
 
@@ -207,9 +173,8 @@ jobs:
           if [ -n "${packages}" ]; then
             sudo apt-get update && sudo apt-get install -y ${packages}
           fi
-        name: install deps
+        name: Install deps
       - name: Build
-        working-directory: src/github.com/containerd/containerd
         env:
           GOOS: ${{matrix.goos}}
           GOARCH: ${{matrix.goarch}}
@@ -230,11 +195,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-18.04, macos-12, windows-2019]
-        go-version: ['1.17.13']
-        include:
-          # Go 1.13.x is still used by Docker/Moby
-          - go-version: '1.13.x'
-            os: ubuntu-18.04
+        go-version: ['1.18.7']
 
     steps:
       - uses: actions/setup-go@v2
@@ -276,7 +237,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.13'
+          go-version: '1.18.7'
 
       - uses: actions/checkout@v2
         with:
@@ -365,27 +326,20 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.13'
+          go-version: '1.18.7'
 
       - uses: actions/checkout@v2
-        with:
-          path: src/github.com/containerd/containerd
-
-      - name: Set env
-        run: |
-          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
-          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - name: Install containerd dependencies
         env:
           RUNC_FLAVOR: ${{ matrix.runc }}
+          GOFLAGS: -modcacherw
         run: |
           sudo apt-get install -y gperf
           sudo -E PATH=$PATH script/setup/install-seccomp
           sudo -E PATH=$PATH script/setup/install-runc
           sudo -E PATH=$PATH script/setup/install-cni
           sudo -E PATH=$PATH script/setup/install-critools
-        working-directory: src/github.com/containerd/containerd
 
       - name: Install criu
         run: |
@@ -408,19 +362,16 @@ jobs:
         env:
           CGO_ENABLED: 1
         run: |
-          make binaries
+          make binaries GO_BUILD_FLAGS="-mod=vendor"
           sudo -E PATH=$PATH make install
-        working-directory: src/github.com/containerd/containerd
 
       - run: sudo -E PATH=$PATH script/setup/install-gotestsum
-        working-directory: src/github.com/containerd/containerd
       - name: Tests
         env:
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root-junit.xml
         run: |
           make test
           sudo -E PATH=$PATH make root-test
-        working-directory: src/github.com/containerd/containerd
 
       - name: Integration 1
         env:
@@ -429,7 +380,6 @@ jobs:
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
         run: |
           sudo -E PATH=$PATH make integration EXTRA_TESTFLAGS=-no-criu TESTFLAGS_RACE=-race
-        working-directory: src/github.com/containerd/containerd
 
       # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
       - name: Integration 2
@@ -439,7 +389,6 @@ jobs:
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
         run: |
           sudo -E PATH=$PATH TESTFLAGS_PARALLEL=1 make integration EXTRA_TESTFLAGS=-no-criu
-        working-directory: src/github.com/containerd/containerd
 
       # CRIU wouldn't work with overlay snapshotter yet.
       # See https://github.com/containerd/containerd/pull/4708#issuecomment-724322294.
@@ -456,14 +405,12 @@ jobs:
           TESTFLAGS_PARALLEL=1 \
           TEST_SNAPSHOTTER=native \
           make integration EXTRA_TESTFLAGS='-run TestCheckpoint'
-        working-directory: src/github.com/containerd/containerd
 
       - name: CRI Integration Test
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
         run: |
           CONTAINERD_RUNTIME=$TEST_RUNTIME make cri-integration
-        working-directory: src/github.com/containerd/containerd
 
       - name: cri-tools critest
         env:
@@ -517,24 +464,13 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.13'
+          go-version: '1.18.7'
       - uses: actions/checkout@v2
-        with:
-          path: src/github.com/containerd/containerd
-
-      - name: Set env
-        run: |
-          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
-          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
-
       - run: sudo -E PATH=$PATH script/setup/install-gotestsum
-        working-directory: src/github.com/containerd/containerd
       - name: Tests
         env:
           GOTESTSUM_JUNITFILE: "${{ github.workspace }}/macos-test-junit.xml"
-        run: |
-          make test
-        working-directory: src/github.com/containerd/containerd
+        run: make test
       - uses: actions/upload-artifact@v2
         if: always()
         with:

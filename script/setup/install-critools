@@ -22,8 +22,8 @@ set -eu -o pipefail
 
 script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
 
-cd "$GOPATH"
-GO111MODULE=on go install github.com/onsi/ginkgo/ginkgo@v1.16.5
+cd "$(go env GOPATH)"
+go install github.com/onsi/ginkgo/ginkgo@v1.16.5
 
 : "${CRITEST_COMMIT:=$(cat "${script_dir}/critools-version")}"
 
