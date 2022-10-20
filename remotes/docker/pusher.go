@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/containerd/containerd/content"
@@ -317,9 +318,10 @@ type pushWriter struct {
 
 	pipe *io.PipeWriter
 
-	pipeC chan *io.PipeWriter
-	respC chan *http.Response
-	errC  chan error
+	pipeC     chan *io.PipeWriter
+	respC     chan *http.Response
+	closeOnce sync.Once
+	errC      chan error
 
 	isManifest bool
 
@@ -395,14 +397,9 @@ func (pw *pushWriter) Write(p []byte) (n int, err error) {
 func (pw *pushWriter) Close() error {
 	// Ensure pipeC is closed but handle `Close()` being
 	// called multiple times without panicking
-	select {
-	case _, ok := <-pw.pipeC:
-		if ok {
-			close(pw.pipeC)
-		}
-	default:
+	pw.closeOnce.Do(func() {
 		close(pw.pipeC)
-	}
+	})
 	if pw.pipe != nil {
 		status, err := pw.tracker.GetStatus(pw.ref)
 		if err == nil && !status.Committed {
