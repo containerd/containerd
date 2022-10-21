@@ -215,3 +215,40 @@ func initProducers(t *testing.T, producers producers, stdout, stderr string) {
 	assert.NilError(t, err)
 	assert.NilError(t, producers.Stderr.Close())
 }
+
+func TestLogURIGenerator(t *testing.T) {
+	baseTestLogURIGenerator(t, []LogURIGeneratorTestCase{
+		{
+			scheme:   "fifo",
+			path:     "/full/path/pipe.fifo",
+			expected: "fifo:///full/path/pipe.fifo",
+		},
+		{
+			scheme: "file",
+			path:   "/full/path/file.txt",
+			args: map[string]string{
+				"maxSize": "100MB",
+			},
+			expected: "file:///full/path/file.txt?maxSize=100MB",
+		},
+		{
+			scheme: "binary",
+			path:   "/full/path/bin",
+			args: map[string]string{
+				"id": "testing",
+			},
+			expected: "binary:///full/path/bin?id=testing",
+		},
+		{
+			scheme: "unknown",
+			path:   "nowhere",
+			err:    "must be absolute",
+		},
+		{
+			scheme: "binary",
+			path:   "C:\\path\\to\\binary",
+			// NOTE: Windows paths should not be be parse-able outside of Windows:
+			err: "must be absolute",
+		},
+	})
+}
