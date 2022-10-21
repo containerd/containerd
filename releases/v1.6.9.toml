@@ -1,0 +1,33 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.6.8"
+
+pre_release = false
+
+preface = """\
+The ninth patch release for containerd 1.6 contains various fixes, reorders the pod setup workflow in the CRI plugin to
+prevent CNI resource leaks, and includes a new version of runc.
+
+### Notable Updates
+
+* **Update oci.WithDefaultUnixDevices(): remove tun/tap from the default devices** ([#7268](https://github.com/containerd/containerd/pull/7268))
+* **Fix CRI: Do not append []string{""} to command to preserve Docker compatibility** ([#7298](https://github.com/containerd/containerd/pull/7298))
+* **Enhance CRI: ContainerStatus to return container resources** ([#7410](https://github.com/containerd/containerd/pull/7410))
+* **Fix OCI resolver to skip TLS verification for localhost** ([#7438](https://github.com/containerd/containerd/pull/7438)
+* **Fix createTarFile: make xattr EPERM non-fatal** ([#7447](https://github.com/containerd/containerd/pull/7447))
+* **Fix CRI plugin to setup pod network after creating the sandbox container** ([#7456](https://github.com/containerd/containerd/pull/7456))
+* **Fix OCI pusher to retry request on writer reset** ([#7461](https://github.com/containerd/containerd/pull/7461))
+* **Fix archive to validate digests before use** ([#7490](https://github.com/containerd/containerd/pull/7490))
+* **Migrate from k8s.gcr.io to registry.k8s.io** ([#7549](https://github.com/containerd/containerd/pull/7549))
+* **Fix CRI: PodSandboxStatus should tolerate missing task** ([#7551](https://github.com/containerd/containerd/pull/7551))
+* **Fix io.containerd.runc.v1: Stats() shouldn't assume s.container is non-nil** ([#7557](https://github.com/containerd/containerd/pull/7557))
+* **Enhance CRI plugin to add logging volume metrics** ([#7571](https://github.com/containerd/containerd/pull/7571))
+* **Add support for CAP_BPF and CAP_PERFMON** ([#7574](https://github.com/containerd/containerd/pull/7574))
+
+See the changelog for complete list of changes"""
