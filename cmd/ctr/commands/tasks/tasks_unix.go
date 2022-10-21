@@ -27,11 +27,12 @@ import (
 	"os/signal"
 
 	"github.com/containerd/console"
+	"github.com/urfave/cli"
+	"golang.org/x/sys/unix"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/log"
-	"github.com/urfave/cli"
-	"golang.org/x/sys/unix"
 )
 
 var platformStartFlags = []cli.Flag{

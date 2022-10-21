@@ -36,6 +36,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containerd/ttrpc"
+	"github.com/sirupsen/logrus"
+	exec "golang.org/x/sys/execabs"
+	"golang.org/x/sys/unix"
+
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/process"
@@ -47,10 +52,6 @@ import (
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/containerd/sys/reaper"
 	"github.com/containerd/containerd/version"
-	"github.com/containerd/ttrpc"
-	"github.com/sirupsen/logrus"
-	exec "golang.org/x/sys/execabs"
-	"golang.org/x/sys/unix"
 )
 
 var (

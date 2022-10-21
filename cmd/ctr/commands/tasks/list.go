@@ -21,9 +21,10 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/urfave/cli"
+
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/urfave/cli"
 )
 
 var listCommand = cli.Command{

@@ -32,6 +32,10 @@ import (
 
 	"github.com/containerd/cgroups"
 	cgroupsv2 "github.com/containerd/cgroups/v2"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	exec "golang.org/x/sys/execabs"
+	"golang.org/x/sys/unix"
+
 	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
@@ -41,9 +45,6 @@ import (
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/sys"
-	"github.com/opencontainers/runtime-spec/specs-go"
-	exec "golang.org/x/sys/execabs"
-	"golang.org/x/sys/unix"
 )
 
 const testUserNSImage = "ghcr.io/containerd/alpine:3.14.0"

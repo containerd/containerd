@@ -25,12 +25,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/gc"
-	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
+
+	"github.com/containerd/containerd/gc"
+	"github.com/containerd/containerd/metadata/boltutil"
 )
 
 func TestResourceMax(t *testing.T) {

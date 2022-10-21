@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/containerd/containerd/plugin"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/containerd/plugin"
 )
 
 func TestValidateConfig(t *testing.T) {

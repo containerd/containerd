@@ -23,6 +23,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/containerd/typeurl"
+	"github.com/sirupsen/logrus"
+	"k8s.io/utils/clock"
+
 	"github.com/containerd/containerd"
 	eventtypes "github.com/containerd/containerd/api/events"
 	containerdio "github.com/containerd/containerd/cio"
@@ -33,9 +37,6 @@ import (
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/typeurl"
-	"github.com/sirupsen/logrus"
-	"k8s.io/utils/clock"
 )
 
 const (

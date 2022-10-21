@@ -31,9 +31,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/ttrpc"
+
 	v1shimcli "github.com/containerd/containerd/runtime/v1/shim/client"
 	v2shimcli "github.com/containerd/containerd/runtime/v2/shim"
-	"github.com/containerd/ttrpc"
 )
 
 const abstractSocketPrefix = "\x00"

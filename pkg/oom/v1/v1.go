@@ -25,12 +25,13 @@ import (
 	"sync"
 
 	"github.com/containerd/cgroups"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
+
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/pkg/oom"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/v2/shim"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/sys/unix"
 )
 
 // New returns an epoll implementation that listens to OOM events

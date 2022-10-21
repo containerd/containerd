@@ -23,9 +23,10 @@ import (
 
 	v1 "github.com/containerd/cgroups/stats/v1"
 	v2 "github.com/containerd/cgroups/v2/stats"
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 )
 
 func TestGetWorkingSet(t *testing.T) {

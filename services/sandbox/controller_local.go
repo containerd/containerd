@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"google.golang.org/grpc"
+
 	runtimeAPI "github.com/containerd/containerd/api/runtime/sandbox/v1"
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/errdefs"
@@ -31,7 +33,6 @@ import (
 	v2 "github.com/containerd/containerd/runtime/v2"
 	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/containerd/services"
-	"google.golang.org/grpc"
 )
 
 func init() {

@@ -22,12 +22,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/containerd/typeurl"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/protobuf/types"
 	api "github.com/containerd/containerd/sandbox"
-	"github.com/containerd/typeurl"
 )
 
 // Sandbox is a high level client to containerd's sandboxes.

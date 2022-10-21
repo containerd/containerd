@@ -20,8 +20,9 @@ import (
 	"bytes"
 	"testing"
 
-	cioutil "github.com/containerd/containerd/pkg/ioutil"
 	"github.com/stretchr/testify/assert"
+
+	cioutil "github.com/containerd/containerd/pkg/ioutil"
 )
 
 func TestCWWrite(t *testing.T) {

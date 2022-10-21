@@ -24,6 +24,11 @@ import (
 	"strings"
 
 	"github.com/containerd/console"
+	gocni "github.com/containerd/go-cni"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
@@ -31,10 +36,6 @@ import (
 	"github.com/containerd/containerd/containers"
 	clabels "github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/oci"
-	gocni "github.com/containerd/go-cni"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
 )
 
 func withMounts(context *cli.Context) oci.SpecOpts {

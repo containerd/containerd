@@ -24,8 +24,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/containerd/containerd/mount"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/containerd/mount"
 )
 
 // Unmount unmounts a given mountPoint and sets t.Error if it fails

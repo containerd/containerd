@@ -21,10 +21,11 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/log"
 	"k8s.io/client-go/tools/remotecommand"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/log"
 
 	cio "github.com/containerd/containerd/pkg/cri/io"
 )

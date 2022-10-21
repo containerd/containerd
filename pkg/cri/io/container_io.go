@@ -22,8 +22,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/containerd/containerd/cio"
 	"github.com/sirupsen/logrus"
+
+	"github.com/containerd/containerd/cio"
 
 	"github.com/containerd/containerd/pkg/cri/util"
 	cioutil "github.com/containerd/containerd/pkg/ioutil"

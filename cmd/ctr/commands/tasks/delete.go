@@ -19,11 +19,12 @@ package tasks
 import (
 	gocontext "context"
 
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/log"
-	"github.com/urfave/cli"
 )
 
 var deleteCommand = cli.Command{

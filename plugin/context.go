@@ -21,9 +21,10 @@ import (
 	"fmt"
 	"path/filepath"
 
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events/exchange"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // InitContext is used for plugin initialization

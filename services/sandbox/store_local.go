@@ -19,8 +19,9 @@ package sandbox
 import (
 	"context"
 
-	"github.com/containerd/containerd/services"
 	"google.golang.org/grpc"
+
+	"github.com/containerd/containerd/services"
 
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/api/types"

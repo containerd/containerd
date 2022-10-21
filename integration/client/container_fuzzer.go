@@ -31,9 +31,10 @@ import (
 	"time"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	exec "golang.org/x/sys/execabs"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
-	exec "golang.org/x/sys/execabs"
 )
 
 var (

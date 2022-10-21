@@ -24,8 +24,9 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
 
-	"github.com/containerd/containerd/containers"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+
+	"github.com/containerd/containerd/containers"
 )
 
 const (

@@ -25,8 +25,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/pkg/seed"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/containerd/pkg/seed"
 )
 
 func init() {

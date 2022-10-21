@@ -22,6 +22,8 @@ import (
 	"path/filepath"
 	"time"
 
+	bolt "go.etcd.io/bbolt"
+
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
@@ -29,7 +31,6 @@ import (
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots"
-	bolt "go.etcd.io/bbolt"
 )
 
 const (

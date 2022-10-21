@@ -19,11 +19,12 @@ package server
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/pkg/cap"
-	"github.com/containerd/containerd/pkg/userns"
 	cni "github.com/containerd/go-cni"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/sirupsen/logrus"
+
+	"github.com/containerd/containerd/pkg/cap"
+	"github.com/containerd/containerd/pkg/userns"
 )
 
 // networkAttachCount is the minimum number of networks the PodSandbox

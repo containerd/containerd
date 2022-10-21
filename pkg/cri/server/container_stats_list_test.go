@@ -20,8 +20,9 @@ import (
 	"testing"
 	"time"
 
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	"github.com/stretchr/testify/assert"
+
+	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 )
 
 func TestContainerMetricsCPUNanoCoreUsage(t *testing.T) {

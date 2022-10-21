@@ -27,11 +27,12 @@ import (
 	"sync"
 
 	winio "github.com/Microsoft/go-winio"
-	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/typeurl"
 	"github.com/sirupsen/logrus"
 	exec "golang.org/x/sys/execabs"
+
+	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/protobuf/proto"
 )
 
 const processorPipe = "STREAM_PROCESSOR_PIPE"

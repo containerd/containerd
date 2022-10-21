@@ -23,14 +23,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/typeurl"
+	"go.etcd.io/bbolt"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/namespaces"
 	api "github.com/containerd/containerd/sandbox"
-	"github.com/containerd/typeurl"
-	"go.etcd.io/bbolt"
 )
 
 type sandboxStore struct {

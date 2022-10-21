@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/containerd"
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/errdefs"
@@ -32,8 +35,6 @@ import (
 	osinterface "github.com/containerd/containerd/pkg/os"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/sandbox"
-	"github.com/sirupsen/logrus"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // CRIService interface contains things required by controller, but not yet refactored from criService.

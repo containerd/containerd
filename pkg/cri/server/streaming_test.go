@@ -19,8 +19,9 @@ package server
 import (
 	"testing"
 
-	"github.com/containerd/containerd/pkg/cri/config"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/containerd/pkg/cri/config"
 )
 
 func TestValidateStreamServer(t *testing.T) {

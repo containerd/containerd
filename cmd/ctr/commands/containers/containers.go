@@ -23,6 +23,9 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/containerd/typeurl"
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
@@ -30,8 +33,6 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/typeurl"
-	"github.com/urfave/cli"
 )
 
 // Command is the cli command for managing containers

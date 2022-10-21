@@ -20,10 +20,11 @@ import (
 	goruntime "runtime"
 	"testing"
 
-	"github.com/containerd/containerd/integration/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/integration/images"
 )
 
 func genTruncIndex(normalName string) string {

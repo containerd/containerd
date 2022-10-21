@@ -20,8 +20,9 @@ import (
 	"context"
 	"fmt"
 
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 )
 
 // ListPodSandboxStats returns stats of all ready sandboxes.

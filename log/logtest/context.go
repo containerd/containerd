@@ -24,8 +24,9 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/containerd/containerd/log"
 	"github.com/sirupsen/logrus"
+
+	"github.com/containerd/containerd/log"
 )
 
 // WithT adds a logging hook for the given test

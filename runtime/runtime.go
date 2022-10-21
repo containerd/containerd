@@ -20,8 +20,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/containerd/containerd/mount"
 	"github.com/containerd/typeurl"
+
+	"github.com/containerd/containerd/mount"
 )
 
 // IO holds process IO information

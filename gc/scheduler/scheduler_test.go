@@ -22,8 +22,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/gc"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/containerd/gc"
 )
 
 func TestPauseThreshold(t *testing.T) {

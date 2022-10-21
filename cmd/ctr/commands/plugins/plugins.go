@@ -23,13 +23,14 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/urfave/cli"
+	"google.golang.org/grpc/codes"
+
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/platforms"
 	pluginutils "github.com/containerd/containerd/plugin"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
-	"google.golang.org/grpc/codes"
 )
 
 // Command is a cli command that outputs plugin information

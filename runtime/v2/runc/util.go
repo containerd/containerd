@@ -25,11 +25,12 @@ import (
 	"os"
 	"path/filepath"
 
+	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/sirupsen/logrus"
+
 	"github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/runtime"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/sirupsen/logrus"
 )
 
 // GetTopic converts an event from an interface type to the specific

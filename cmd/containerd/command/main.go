@@ -27,6 +27,10 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
+	"google.golang.org/grpc/grpclog"
+
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
@@ -36,9 +40,6 @@ import (
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/containerd/version"
-	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
-	"google.golang.org/grpc/grpclog"
 )
 
 const usage = `

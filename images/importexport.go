@@ -20,8 +20,9 @@ import (
 	"context"
 	"io"
 
-	"github.com/containerd/containerd/content"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/content"
 )
 
 // Importer is the interface for image importer.

@@ -17,8 +17,9 @@
 package tasks
 
 import (
-	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/urfave/cli"
+
+	"github.com/containerd/containerd/cmd/ctr/commands"
 )
 
 var resumeCommand = cli.Command{

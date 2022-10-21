@@ -23,8 +23,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/containerd/containerd/defaults"
 	"github.com/urfave/cli"
+
+	"github.com/containerd/containerd/defaults"
 )
 
 var (

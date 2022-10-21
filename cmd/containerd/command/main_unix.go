@@ -24,9 +24,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/services/server"
-	"golang.org/x/sys/unix"
 )
 
 var handledSignals = []os.Signal{

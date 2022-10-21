@@ -23,8 +23,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/services/server"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	exec "golang.org/x/sys/execabs"
@@ -32,6 +30,9 @@ import (
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
 	"golang.org/x/sys/windows/svc/mgr"
+
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/services/server"
 )
 
 var (

@@ -22,9 +22,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
-	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // WithProfile receives the name of a file stored on disk comprising a json

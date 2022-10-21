@@ -19,9 +19,10 @@ package images
 import (
 	"fmt"
 
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/urfave/cli"
 )
 
 var tagCommand = cli.Command{

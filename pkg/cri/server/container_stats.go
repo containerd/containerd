@@ -20,8 +20,9 @@ import (
 	"context"
 	"fmt"
 
-	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 )
 
 // ContainerStats returns stats of the container. If the container does not

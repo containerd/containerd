@@ -24,9 +24,10 @@ import (
 	"strings"
 	"time"
 
+	bolt "go.etcd.io/bbolt"
+
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/log"
-	bolt "go.etcd.io/bbolt"
 )
 
 const (

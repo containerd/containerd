@@ -21,9 +21,10 @@ import (
 	"fmt"
 
 	wstats "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
-	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/typeurl"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/api/types"
 
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 )

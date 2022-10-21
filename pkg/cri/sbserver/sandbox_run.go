@@ -27,13 +27,14 @@ import (
 	"strings"
 	"time"
 
-	eventtypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/protobuf"
-	sb "github.com/containerd/containerd/sandbox"
 	"github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	eventtypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/containerd/protobuf"
+	sb "github.com/containerd/containerd/sandbox"
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/cri/annotations"

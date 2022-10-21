@@ -22,8 +22,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/log"
 
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 )

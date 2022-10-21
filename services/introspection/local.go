@@ -22,6 +22,12 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/google/uuid"
+	"google.golang.org/genproto/googleapis/rpc/code"
+	rpc "google.golang.org/genproto/googleapis/rpc/status"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/status"
+
 	api "github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
@@ -29,11 +35,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/services"
-	"github.com/google/uuid"
-	"google.golang.org/genproto/googleapis/rpc/code"
-	rpc "google.golang.org/genproto/googleapis/rpc/status"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/status"
 )
 
 func init() {

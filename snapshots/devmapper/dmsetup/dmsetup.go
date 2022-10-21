@@ -29,9 +29,10 @@ import (
 	"strconv"
 	"strings"
 
-	blkdiscard "github.com/containerd/containerd/snapshots/devmapper/blkdiscard"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
+
+	blkdiscard "github.com/containerd/containerd/snapshots/devmapper/blkdiscard"
 )
 
 const (

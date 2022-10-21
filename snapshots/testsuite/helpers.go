@@ -22,9 +22,10 @@ import (
 	"math/rand"
 	"os"
 
+	"github.com/containerd/continuity/fs/fstest"
+
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
-	"github.com/containerd/continuity/fs/fstest"
 )
 
 func applyToMounts(m []mount.Mount, work string, a fstest.Applier) (err error) {

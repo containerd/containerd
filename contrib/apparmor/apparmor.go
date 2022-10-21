@@ -25,9 +25,10 @@ import (
 	"fmt"
 	"os"
 
+	specs "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // WithProfile sets the provided apparmor profile to the spec

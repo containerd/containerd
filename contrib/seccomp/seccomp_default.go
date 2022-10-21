@@ -24,8 +24,9 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/containerd/containerd/contrib/seccomp/kernelversion"
 	"github.com/opencontainers/runtime-spec/specs-go"
+
+	"github.com/containerd/containerd/contrib/seccomp/kernelversion"
 )
 
 func arches() []specs.Arch {

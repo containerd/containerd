@@ -29,6 +29,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/go-runc"
+	"github.com/containerd/typeurl"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/stretchr/testify/require"
+	exec "golang.org/x/sys/execabs"
+
 	. "github.com/containerd/containerd"
 	apievents "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/cio"
@@ -43,11 +49,6 @@ import (
 	gogotypes "github.com/containerd/containerd/protobuf/types"
 	_ "github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
-	"github.com/containerd/go-runc"
-	"github.com/containerd/typeurl"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/stretchr/testify/require"
-	exec "golang.org/x/sys/execabs"
 )
 
 func empty() cio.Creator {

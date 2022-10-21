@@ -19,13 +19,14 @@ package content
 import (
 	"context"
 
+	digest "github.com/opencontainers/go-digest"
+
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
-	digest "github.com/opencontainers/go-digest"
 )
 
 // store wraps content.Store with proper event published.

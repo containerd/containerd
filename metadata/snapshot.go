@@ -24,6 +24,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	bolt "go.etcd.io/bbolt"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/labels"
@@ -32,7 +34,6 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/snapshots"
-	bolt "go.etcd.io/bbolt"
 )
 
 const (

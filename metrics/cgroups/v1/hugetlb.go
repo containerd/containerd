@@ -20,9 +20,10 @@
 package v1
 
 import (
-	v1 "github.com/containerd/containerd/metrics/types/v1"
 	metrics "github.com/docker/go-metrics"
 	"github.com/prometheus/client_golang/prometheus"
+
+	v1 "github.com/containerd/containerd/metrics/types/v1"
 )
 
 var hugetlbMetrics = []*metric{

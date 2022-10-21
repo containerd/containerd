@@ -22,9 +22,10 @@ package v2
 import (
 	"context"
 
+	"github.com/docker/go-metrics"
+
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/runtime"
-	"github.com/docker/go-metrics"
 )
 
 // NewTaskMonitor returns a new cgroups monitor

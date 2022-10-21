@@ -33,6 +33,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containerd/ttrpc"
+	"github.com/sirupsen/logrus"
+	exec "golang.org/x/sys/execabs"
+	"golang.org/x/sys/unix"
+
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	ptypes "github.com/containerd/containerd/protobuf/types"
@@ -40,10 +45,6 @@ import (
 	"github.com/containerd/containerd/runtime/v1/shim"
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/containerd/sys"
-	"github.com/containerd/ttrpc"
-	"github.com/sirupsen/logrus"
-	exec "golang.org/x/sys/execabs"
-	"golang.org/x/sys/unix"
 )
 
 var empty = &ptypes.Empty{}

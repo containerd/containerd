@@ -28,12 +28,13 @@ import (
 
 	"github.com/containerd/cgroups"
 	cgroupsv2 "github.com/containerd/cgroups/v2"
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/integration/images"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/integration/images"
 )
 
 func checkMemoryLimit(t *testing.T, spec *runtimespec.Spec, memLimit int64) {

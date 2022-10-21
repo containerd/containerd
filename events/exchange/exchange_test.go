@@ -22,13 +22,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/typeurl"
+	"github.com/google/go-cmp/cmp"
+
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/typeurl"
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestExchangeBasic(t *testing.T) {

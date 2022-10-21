@@ -29,9 +29,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containerd/continuity/fs"
+
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/userns"
-	"github.com/containerd/continuity/fs"
 )
 
 var bufPool = &sync.Pool{

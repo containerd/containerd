@@ -19,8 +19,9 @@ package server
 import (
 	"testing"
 
-	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/stretchr/testify/assert"
+
+	srvconfig "github.com/containerd/containerd/services/server/config"
 )
 
 const testPath = "/tmp/path/for/testing"

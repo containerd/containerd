@@ -24,10 +24,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/containerd/continuity/fs"
+
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/userns"
-	"github.com/containerd/continuity/fs"
 )
 
 // SupportsMultipleLowerDir checks if the system supports multiple lowerdirs,

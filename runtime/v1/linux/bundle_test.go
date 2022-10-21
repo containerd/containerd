@@ -28,11 +28,12 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/containerd/containerd/oci"
 	"github.com/containerd/continuity/testutil"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/containerd/containerd/oci"
 )
 
 func TestNewBundle(t *testing.T) {

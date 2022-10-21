@@ -31,14 +31,15 @@ import (
 	"time"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/pkg/stdio"
-	google_protobuf "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/pkg/stdio"
+	google_protobuf "github.com/containerd/containerd/protobuf/types"
 )
 
 // Init represents an initial process for a container
