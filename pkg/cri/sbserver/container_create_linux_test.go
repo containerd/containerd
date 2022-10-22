@@ -43,6 +43,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	"github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/opts"
+	customopts "github.com/containerd/containerd/pkg/cri/opts"
 	"github.com/containerd/containerd/pkg/cri/util"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	ostesting "github.com/containerd/containerd/pkg/os/testing"
@@ -1547,6 +1548,8 @@ func TestCDIInjections(t *testing.T) {
 	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
+	testContainer := &containers.Container{ID: "64ddfe361f0099f8d59075398feeb3dcb3863b6851df7b946744755066c03e9d"}
+	ctx := context.Background()
 
 	for _, test := range []struct {
 		description   string
@@ -1647,8 +1650,12 @@ containerEdits:
 			}
 			require.NoError(t, err)
 
-			injectFun := oci.WithCDI(test.annotations, []string{cdiDir})
-			err = injectFun(nil, nil, nil, spec)
+			reg := cdi.GetRegistry()
+			err = reg.Configure(cdi.WithSpecDirs(cdiDir))
+			require.NoError(t, err)
+
+			injectFun := customopts.WithCDI(test.annotations)
+			err = injectFun(ctx, nil, testContainer, spec)
 			assert.Equal(t, test.expectError, err != nil)
 
 			if err != nil {

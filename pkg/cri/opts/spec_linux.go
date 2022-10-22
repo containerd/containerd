@@ -28,6 +28,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
@@ -728,4 +729,40 @@ func GetUTSNamespace(pid uint32) string {
 // GetPIDNamespace returns the pid namespace of a process.
 func GetPIDNamespace(pid uint32) string {
 	return fmt.Sprintf(pidNSFormat, pid)
+}
+
+// WithCDI updates OCI spec with CDI content
+func WithCDI(annotations map[string]string) oci.SpecOpts {
+	return func(ctx context.Context, _ oci.Client, c *containers.Container, s *oci.Spec) error {
+		// TODO: Once CRI is extended with native CDI support this will need to be updated...
+		_, cdiDevices, err := cdi.ParseAnnotations(annotations)
+		if err != nil {
+			return fmt.Errorf("failed to parse CDI device annotations: %w", err)
+		}
+		if cdiDevices == nil {
+			return nil
+		}
+
+		log.G(ctx).Infof("container %v: CDI devices: %v", c.ID, cdiDevices)
+
+		registry := cdi.GetRegistry()
+		if err = registry.Refresh(); err != nil {
+			// We don't consider registry refresh failure a fatal error.
+			// For instance, a dynamically generated invalid CDI Spec file for
+			// any particular vendor shouldn't prevent injection of devices of
+			// different vendors. CDI itself knows better and it will fail the
+			// injection if necessary.
+			log.G(ctx).Warnf("CDI registry refresh failed: %v", err)
+		}
+
+		if _, err := registry.InjectDevices(s, cdiDevices...); err != nil {
+			return fmt.Errorf("CDI device injection failed: %w", err)
+		}
+
+		// One crucial thing to keep in mind is that CDI device injection
+		// might add OCI Spec environment variables, hooks, and mounts as
+		// well. Therefore it is important that none of the corresponding
+		// OCI Spec fields are reset up in the call stack once we return.
+		return nil
+	}
 }
