@@ -28,9 +28,10 @@ CONTAINERD_RUNTIME=${CONTAINERD_RUNTIME:-""}
 if [ -z "${CONTAINERD_CONFIG_FILE}" ]; then
   config_file="/tmp/containerd-config-cri.toml"
   truncate --size 0 "${config_file}"
+  echo "version = 2" >> ${config_file}
+
   if command -v sestatus >/dev/null 2>&1; then
     cat >>${config_file} <<EOF
-version=2
 [plugins."io.containerd.grpc.v1.cri"]
   enable_selinux = true
 EOF
@@ -42,6 +43,15 @@ runtime_type = "${CONTAINERD_RUNTIME}"
 EOF
   fi
   CONTAINERD_CONFIG_FILE="${config_file}"
+
+  FAILPOINT_CONTAINERD_RUNTIME="runc-fp.v1"
+
+  # Add runtime with failpoint
+  cat << EOF | tee -a "${CONTAINERD_CONFIG_FILE}"
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc-fp]
+  pod_annotations = ["io.containerd.runtime.v2.shim.failpoint.*"]
+  runtime_type = "${FAILPOINT_CONTAINERD_RUNTIME}"
+EOF
 fi
 
 # CONTAINERD_TEST_SUFFIX is the suffix appended to the root/state directory used
@@ -89,6 +99,8 @@ test_setup() {
   fi
   readiness_check "sudo bin/ctr --address ${CONTAINERD_SOCK#"unix://"} version"
   readiness_check "sudo ${crictl_path} --runtime-endpoint=${CONTAINERD_SOCK} info"
+  # Show the config about cri plugin in log when it's ready
+  sudo ${crictl_path} --runtime-endpoint=${CONTAINERD_SOCK} info
 }
 
 # test_teardown kills containerd.
