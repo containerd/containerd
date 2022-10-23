@@ -197,6 +197,13 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		if context.Bool("net-host") {
 			opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace), oci.WithHostHostsFile, oci.WithHostResolvconf)
 		}
+		if annoStrings := context.StringSlice("annotation"); len(annoStrings) > 0 {
+			annos, err := commands.AnnotationArgs(annoStrings)
+			if err != nil {
+				return nil, err
+			}
+			opts = append(opts, oci.WithAnnotations(annos))
+		}
 
 		seccompProfile := context.String("seccomp-profile")
 
