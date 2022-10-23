@@ -78,6 +78,7 @@ func NewRuntimeService(endpoint string, connectionTimeout time.Duration) (intern
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
+		grpc.WithBlock(),
 	)
 	if err != nil {
 		klog.Errorf("Connect remote runtime %s failed: %v", addr, err)

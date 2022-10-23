@@ -78,8 +78,7 @@ func TestMain(m *testing.M) {
 }
 
 // ConnectDaemons connect cri plugin and containerd, and initialize the clients.
-func ConnectDaemons() error {
-	var err error
+func ConnectDaemons() (err error) {
 	runtimeService, err = remote.NewRuntimeService(*criEndpoint, timeout)
 	if err != nil {
 		return fmt.Errorf("failed to create runtime service: %w", err)
@@ -87,17 +86,6 @@ func ConnectDaemons() error {
 	imageService, err = remote.NewImageService(*criEndpoint, timeout)
 	if err != nil {
 		return fmt.Errorf("failed to create image service: %w", err)
-	}
-	// Since CRI grpc client doesn't have `WithBlock` specified, we
-	// need to check whether it is actually connected.
-	// TODO(#6069) Use grpc options to block on connect and remove for this list containers request.
-	_, err = runtimeService.ListContainers(&runtime.ContainerFilter{})
-	if err != nil {
-		return fmt.Errorf("failed to list containers: %w", err)
-	}
-	_, err = imageService.ListImages(&runtime.ImageFilter{})
-	if err != nil {
-		return fmt.Errorf("failed to list images: %w", err)
 	}
 	// containerdEndpoint is the same with criEndpoint now
 	containerdEndpoint = strings.TrimPrefix(*criEndpoint, "unix://")
