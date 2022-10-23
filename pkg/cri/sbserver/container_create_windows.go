@@ -85,7 +85,7 @@ func (c *criService) containerSpec(
 		// Clear the root location since hcsshim expects it.
 		// NOTE: readonly rootfs doesn't work on windows.
 		customopts.WithoutRoot,
-		customopts.WithWindowsNetworkNamespace(netNSPath),
+		oci.WithWindowsNetworkNamespace(netNSPath),
 		oci.WithHostname(sandboxConfig.GetHostname()),
 	)
 

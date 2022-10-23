@@ -51,7 +51,7 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		// Clear the root location since hcsshim expects it.
 		// NOTE: readonly rootfs doesn't work on windows.
 		customopts.WithoutRoot,
-		customopts.WithWindowsNetworkNamespace(nsPath),
+		oci.WithWindowsNetworkNamespace(nsPath),
 	)
 
 	specOpts = append(specOpts, customopts.WithWindowsDefaultSandboxShares)
