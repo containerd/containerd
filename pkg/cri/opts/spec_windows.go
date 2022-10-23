@@ -32,21 +32,6 @@ import (
 	osinterface "github.com/containerd/containerd/pkg/os"
 )
 
-// WithWindowsNetworkNamespace sets windows network namespace for container.
-// TODO(windows): Move this into container/containerd.
-func WithWindowsNetworkNamespace(path string) oci.SpecOpts {
-	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
-		if s.Windows == nil {
-			s.Windows = &runtimespec.Windows{}
-		}
-		if s.Windows.Network == nil {
-			s.Windows.Network = &runtimespec.WindowsNetwork{}
-		}
-		s.Windows.Network.NetworkNamespace = path
-		return nil
-	}
-}
-
 // namedPipePath returns true if the given path is to a named pipe.
 func namedPipePath(p string) bool {
 	return strings.HasPrefix(p, `\\.\pipe\`)
