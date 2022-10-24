@@ -1,0 +1,27 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.5.13"
+
+pre_release = false
+
+preface = """\
+The fourteenth patch release for containerd 1.5 includes various fixes and updates
+along with an updated version of runc.
+
+### Notable Updates
+
+* **Fix WWW-Authenticate parsing to allow empty quoted string** ([#7132](https://github.com/containerd/containerd/pull/7132))
+* **Update oci.WithDefaultUnixDevices(): remove tun/tap from the default devices** ([#7267](https://github.com/containerd/containerd/pull/7267))
+* **Fix createTarFile: make xattr EPERM non-fatal** ([#7449](https://github.com/containerd/containerd/pull/7449))
+* **Fix dockerPusher to handle abort correctly** ([#7467](https://github.com/containerd/containerd/pull/7467))
+* **Migrate from k8s.gcr.io to registry.k8s.io** ([#7550](https://github.com/containerd/containerd/pull/7550))
+* **Fix CRI: PodSandboxStatus should tolerate missing task** ([#7552](https://github.com/containerd/containerd/pull/7552))
+* **Fix io.containerd.runc.v1: Stats() shouldn't assume s.container is non-nil** ([#7556](https://github.com/containerd/containerd/pull/7556))
+
+See the changelog for complete list of changes"""
