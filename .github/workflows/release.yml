@@ -133,11 +133,11 @@ jobs:
           _filenum=1
           for i in "ubuntu-18.04" "windows-2019"; do
             for f in `ls builds/containerd-binaries-${i}`; do
-              echo "::set-output name=file${_filenum}::${f}"
+              echo "file${_filenum}=${f}" >> $GITHUB_OUTPUT
               let "_filenum+=1"
             done
             for f in `ls builds/cri-containerd-binaries-${i}`; do
-              echo "::set-output name=file${_filenum}::${f}"
+              echo "file${_filenum}=${f}" >> $GITHUB_OUTPUT
               let "_filenum+=1"
             done
           done
