@@ -658,6 +658,18 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				Action: specs.ActAllow,
 				Args:   []specs.LinuxSeccompArg{},
 			})
+		case "CAP_BPF":
+			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+				Names:  []string{"bpf"},
+				Action: specs.ActAllow,
+				Args:   []specs.LinuxSeccompArg{},
+			})
+		case "CAP_PERFMON":
+			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+				Names:  []string{"perf_event_open"},
+				Action: specs.ActAllow,
+				Args:   []specs.LinuxSeccompArg{},
+			})
 		}
 	}
 
