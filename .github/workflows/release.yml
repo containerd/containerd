@@ -41,7 +41,7 @@ jobs:
         id: contentrel
         run: |
           RELEASEVER=${{ github.ref }}
-          echo "::set-output name=stringver::${RELEASEVER#refs/tags/v}"
+          echo "stringver=${RELEASEVER#refs/tags/v}" >> $GITHUB_OUTPUT
           git tag -l ${RELEASEVER#refs/tags/} -n20000 | tail -n +3 | cut -c 5- >release-notes.md
         working-directory: src/github.com/containerd/containerd
 
