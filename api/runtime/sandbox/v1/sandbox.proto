@@ -29,7 +29,11 @@ option go_package = "github.com/containerd/containerd/api/runtime/sandbox/v1;san
 // A typical example of sandbox is microVM or pause container - an entity that groups containers and/or
 // holds resources relevant for this group.
 service Sandbox {
-	// StartSandbox will create/start a new sandbox instance
+	// CreateSandbox will be called right after sandbox shim instance launched.
+	// It is a good place to initialize sandbox environment.
+	rpc CreateSandbox(CreateSandboxRequest) returns (CreateSandboxResponse);
+
+	// StartSandbox will start previsouly created sandbox.
 	rpc StartSandbox(StartSandboxRequest) returns (StartSandboxResponse);
 
 	// StopSandbox will stop existing sandbox instance
@@ -38,16 +42,6 @@ service Sandbox {
 	// WaitSandbox blocks until sanbox exits.
 	rpc WaitSandbox(WaitSandboxRequest) returns (WaitSandboxResponse);
 
-	// Update can be used to amend the state of currently running sandbox instance (depending on
-	// implementation this can be used to resize/reacquire needed resources like RAM/CPU).
-	rpc UpdateSandbox(UpdateSandboxRequest) returns (UpdateSandboxResponse);
-
-	// PauseSandbox will suspend currently running sandbox instance.
-	rpc PauseSandbox(PauseSandboxRequest) returns (PauseSandboxResponse);
-
-	// ResumeSandbox will resuyme previously suspended sandbox instance.
-	rpc ResumeSandbox(ResumeSandboxRequest) returns (ResumeSandboxResponse);
-
 	// SandboxStatus will return current status of the running sandbox instance
 	rpc SandboxStatus(SandboxStatusRequest) returns (SandboxStatusResponse);
 
@@ -55,15 +49,22 @@ service Sandbox {
 	rpc PingSandbox(PingRequest) returns (PingResponse);
 }
 
-message StartSandboxRequest {
+message CreateSandboxRequest {
 	string sandbox_id = 1;
 	string bundle_path = 2;
 	repeated containerd.types.Mount rootfs = 3;
 	google.protobuf.Any options = 4;
 }
 
+message CreateSandboxResponse {}
+
+message StartSandboxRequest {
+	string sandbox_id = 1;
+}
+
 message StartSandboxResponse {
 	uint32 pid = 1;
+	google.protobuf.Timestamp created_at = 2;
 }
 
 message StopSandboxRequest {
@@ -93,18 +94,6 @@ message UpdateSandboxResponse {}
 message SandboxStatusRequest {
 	string sandbox_id = 1;
 }
-
-message PauseSandboxRequest {
-	string sandbox_id = 1;
-}
-
-message PauseSandboxResponse {}
-
-message ResumeSandboxRequest {
-	string sandbox_id = 1;
-}
-
-message ResumeSandboxResponse {}
 
 message SandboxStatusResponse {
 	string id = 1;

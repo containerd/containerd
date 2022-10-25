@@ -26,12 +26,11 @@ import (
 // When running in sandbox mode, shim expected to implement `SandboxService`.
 // Shim lifetimes are now managed manually via sandbox API by the containerd's client.
 type Controller interface {
-	// Start will start new sandbox instance.
-	// containerd will run new shim runtime instance and will invoke Start to create a sandbox process.
-	// This routine must be invoked before scheduling containers on this instance.
-	// Once started clients may run containers via Task service (additionally specifying sandbox id the container will belong to).
+	// Create is used to initialize sandbox environment.
+	Create(ctx context.Context, sandboxID string) error
+	// Start will start previously created sandbox.
 	Start(ctx context.Context, sandboxID string) (*sandbox.ControllerStartResponse, error)
-	// Stop will stop sandbox intances
+	// Stop will stop sandbox instance
 	Stop(ctx context.Context, sandboxID string) (*sandbox.ControllerStopResponse, error)
 	// Wait blocks until sandbox process exits.
 	Wait(ctx context.Context, sandboxID string) (*sandbox.ControllerWaitResponse, error)

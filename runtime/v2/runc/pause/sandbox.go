@@ -62,6 +62,11 @@ func (p *pauseService) RegisterTTRPC(server *ttrpc.Server) error {
 	return nil
 }
 
+func (p *pauseService) CreateSandbox(ctx context.Context, req *api.CreateSandboxRequest) (*api.CreateSandboxResponse, error) {
+	log.Debugf("create sandbox request: %+v", req)
+	return &api.CreateSandboxResponse{}, nil
+}
+
 func (p *pauseService) StartSandbox(ctx context.Context, req *api.StartSandboxRequest) (*api.StartSandboxResponse, error) {
 	log.Debugf("start sandbox request: %+v", req)
 	return &api.StartSandboxResponse{}, nil
@@ -77,21 +82,6 @@ func (p *pauseService) WaitSandbox(ctx context.Context, req *api.WaitSandboxRequ
 	return &api.WaitSandboxResponse{
 		ExitStatus: 0,
 	}, nil
-}
-
-func (p *pauseService) UpdateSandbox(ctx context.Context, req *api.UpdateSandboxRequest) (*api.UpdateSandboxResponse, error) {
-	log.Debugf("update sandbox request: %+v", req)
-	return &api.UpdateSandboxResponse{}, nil
-}
-
-func (p *pauseService) PauseSandbox(ctx context.Context, req *api.PauseSandboxRequest) (*api.PauseSandboxResponse, error) {
-	log.Debugf("pause sandbox request: %+v", req)
-	return &api.PauseSandboxResponse{}, nil
-}
-
-func (p *pauseService) ResumeSandbox(ctx context.Context, req *api.ResumeSandboxRequest) (*api.ResumeSandboxResponse, error) {
-	log.Debugf("resume sandbox request: %+v", req)
-	return &api.ResumeSandboxResponse{}, nil
 }
 
 func (p *pauseService) SandboxStatus(ctx context.Context, req *api.SandboxStatusRequest) (*api.SandboxStatusResponse, error) {

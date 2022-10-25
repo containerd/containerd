@@ -69,6 +69,11 @@ func (s *controllerService) Register(server *grpc.Server) error {
 	return nil
 }
 
+func (s *controllerService) Create(ctx context.Context, req *api.ControllerCreateRequest) (*api.ControllerCreateResponse, error) {
+	log.G(ctx).WithField("req", req).Debug("create sandbox")
+	return s.local.Create(ctx, req)
+}
+
 func (s *controllerService) Start(ctx context.Context, req *api.ControllerStartRequest) (*api.ControllerStartResponse, error) {
 	log.G(ctx).WithField("req", req).Debug("start sandbox")
 	return s.local.Start(ctx, req)

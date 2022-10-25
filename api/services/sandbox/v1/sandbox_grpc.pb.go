@@ -252,6 +252,7 @@ var Store_ServiceDesc = grpc.ServiceDesc{
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ControllerClient interface {
+	Create(ctx context.Context, in *ControllerCreateRequest, opts ...grpc.CallOption) (*ControllerCreateResponse, error)
 	Start(ctx context.Context, in *ControllerStartRequest, opts ...grpc.CallOption) (*ControllerStartResponse, error)
 	Stop(ctx context.Context, in *ControllerStopRequest, opts ...grpc.CallOption) (*ControllerStopResponse, error)
 	Wait(ctx context.Context, in *ControllerWaitRequest, opts ...grpc.CallOption) (*ControllerWaitResponse, error)
@@ -265,6 +266,15 @@ type controllerClient struct {
 
 func NewControllerClient(cc grpc.ClientConnInterface) ControllerClient {
 	return &controllerClient{cc}
+}
+
+func (c *controllerClient) Create(ctx context.Context, in *ControllerCreateRequest, opts ...grpc.CallOption) (*ControllerCreateResponse, error) {
+	out := new(ControllerCreateResponse)
+	err := c.cc.Invoke(ctx, "/containerd.services.sandbox.v1.Controller/Create", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *controllerClient) Start(ctx context.Context, in *ControllerStartRequest, opts ...grpc.CallOption) (*ControllerStartResponse, error) {
@@ -316,6 +326,7 @@ func (c *controllerClient) Delete(ctx context.Context, in *ControllerDeleteReque
 // All implementations must embed UnimplementedControllerServer
 // for forward compatibility
 type ControllerServer interface {
+	Create(context.Context, *ControllerCreateRequest) (*ControllerCreateResponse, error)
 	Start(context.Context, *ControllerStartRequest) (*ControllerStartResponse, error)
 	Stop(context.Context, *ControllerStopRequest) (*ControllerStopResponse, error)
 	Wait(context.Context, *ControllerWaitRequest) (*ControllerWaitResponse, error)
@@ -328,6 +339,9 @@ type ControllerServer interface {
 type UnimplementedControllerServer struct {
 }
 
+func (UnimplementedControllerServer) Create(context.Context, *ControllerCreateRequest) (*ControllerCreateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
+}
 func (UnimplementedControllerServer) Start(context.Context, *ControllerStartRequest) (*ControllerStartResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Start not implemented")
 }
@@ -354,6 +368,24 @@ type UnsafeControllerServer interface {
 
 func RegisterControllerServer(s grpc.ServiceRegistrar, srv ControllerServer) {
 	s.RegisterService(&Controller_ServiceDesc, srv)
+}
+
+func _Controller_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ControllerCreateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControllerServer).Create(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.services.sandbox.v1.Controller/Create",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControllerServer).Create(ctx, req.(*ControllerCreateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Controller_Start_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -453,6 +485,10 @@ var Controller_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "containerd.services.sandbox.v1.Controller",
 	HandlerType: (*ControllerServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Create",
+			Handler:    _Controller_Create_Handler,
+		},
 		{
 			MethodName: "Start",
 			Handler:    _Controller_Start_Handler,

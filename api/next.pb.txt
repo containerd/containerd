@@ -805,7 +805,7 @@ file {
   dependency: "google/protobuf/timestamp.proto"
   dependency: "github.com/containerd/containerd/api/types/mount.proto"
   message_type {
-    name: "StartSandboxRequest"
+    name: "CreateSandboxRequest"
     field {
       name: "sandbox_id"
       number: 1
@@ -838,6 +838,19 @@ file {
     }
   }
   message_type {
+    name: "CreateSandboxResponse"
+  }
+  message_type {
+    name: "StartSandboxRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+  }
+  message_type {
     name: "StartSandboxResponse"
     field {
       name: "pid"
@@ -845,6 +858,14 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_UINT32
       json_name: "pid"
+    }
+    field {
+      name: "created_at"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      json_name: "createdAt"
     }
   }
   message_type {
@@ -955,32 +976,6 @@ file {
     }
   }
   message_type {
-    name: "PauseSandboxRequest"
-    field {
-      name: "sandbox_id"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "sandboxId"
-    }
-  }
-  message_type {
-    name: "PauseSandboxResponse"
-  }
-  message_type {
-    name: "ResumeSandboxRequest"
-    field {
-      name: "sandbox_id"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "sandboxId"
-    }
-  }
-  message_type {
-    name: "ResumeSandboxResponse"
-  }
-  message_type {
     name: "SandboxStatusResponse"
     field {
       name: "id"
@@ -1043,6 +1038,11 @@ file {
   service {
     name: "Sandbox"
     method {
+      name: "CreateSandbox"
+      input_type: ".containerd.runtime.sandbox.v1.CreateSandboxRequest"
+      output_type: ".containerd.runtime.sandbox.v1.CreateSandboxResponse"
+    }
+    method {
       name: "StartSandbox"
       input_type: ".containerd.runtime.sandbox.v1.StartSandboxRequest"
       output_type: ".containerd.runtime.sandbox.v1.StartSandboxResponse"
@@ -1056,21 +1056,6 @@ file {
       name: "WaitSandbox"
       input_type: ".containerd.runtime.sandbox.v1.WaitSandboxRequest"
       output_type: ".containerd.runtime.sandbox.v1.WaitSandboxResponse"
-    }
-    method {
-      name: "UpdateSandbox"
-      input_type: ".containerd.runtime.sandbox.v1.UpdateSandboxRequest"
-      output_type: ".containerd.runtime.sandbox.v1.UpdateSandboxResponse"
-    }
-    method {
-      name: "PauseSandbox"
-      input_type: ".containerd.runtime.sandbox.v1.PauseSandboxRequest"
-      output_type: ".containerd.runtime.sandbox.v1.PauseSandboxResponse"
-    }
-    method {
-      name: "ResumeSandbox"
-      input_type: ".containerd.runtime.sandbox.v1.ResumeSandboxRequest"
-      output_type: ".containerd.runtime.sandbox.v1.ResumeSandboxResponse"
     }
     method {
       name: "SandboxStatus"
@@ -4177,7 +4162,7 @@ file {
     }
   }
   message_type {
-    name: "ControllerStartRequest"
+    name: "ControllerCreateRequest"
     field {
       name: "sandbox_id"
       number: 1
@@ -4200,6 +4185,26 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Any"
       json_name: "options"
+    }
+  }
+  message_type {
+    name: "ControllerCreateResponse"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+  }
+  message_type {
+    name: "ControllerStartRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
     }
   }
   message_type {
@@ -4403,6 +4408,11 @@ file {
   }
   service {
     name: "Controller"
+    method {
+      name: "Create"
+      input_type: ".containerd.services.sandbox.v1.ControllerCreateRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerCreateResponse"
+    }
     method {
       name: "Start"
       input_type: ".containerd.services.sandbox.v1.ControllerStartRequest"
