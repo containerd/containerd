@@ -36,6 +36,15 @@ func NewSandboxRemoteController(client api.ControllerClient) sb.Controller {
 	return &sandboxRemoteController{client: client}
 }
 
+func (s *sandboxRemoteController) Create(ctx context.Context, sandboxID string) error {
+	_, err := s.client.Create(ctx, &api.ControllerCreateRequest{SandboxID: sandboxID})
+	if err != nil {
+		return errdefs.FromGRPC(err)
+	}
+
+	return nil
+}
+
 func (s *sandboxRemoteController) Start(ctx context.Context, sandboxID string) (*api.ControllerStartResponse, error) {
 	resp, err := s.client.Start(ctx, &api.ControllerStartRequest{SandboxID: sandboxID})
 	if err != nil {

@@ -8,12 +8,10 @@ import (
 )
 
 type SandboxService interface {
+	CreateSandbox(context.Context, *CreateSandboxRequest) (*CreateSandboxResponse, error)
 	StartSandbox(context.Context, *StartSandboxRequest) (*StartSandboxResponse, error)
 	StopSandbox(context.Context, *StopSandboxRequest) (*StopSandboxResponse, error)
 	WaitSandbox(context.Context, *WaitSandboxRequest) (*WaitSandboxResponse, error)
-	UpdateSandbox(context.Context, *UpdateSandboxRequest) (*UpdateSandboxResponse, error)
-	PauseSandbox(context.Context, *PauseSandboxRequest) (*PauseSandboxResponse, error)
-	ResumeSandbox(context.Context, *ResumeSandboxRequest) (*ResumeSandboxResponse, error)
 	SandboxStatus(context.Context, *SandboxStatusRequest) (*SandboxStatusResponse, error)
 	PingSandbox(context.Context, *PingRequest) (*PingResponse, error)
 }
@@ -21,6 +19,13 @@ type SandboxService interface {
 func RegisterSandboxService(srv *ttrpc.Server, svc SandboxService) {
 	srv.RegisterService("containerd.runtime.sandbox.v1.Sandbox", &ttrpc.ServiceDesc{
 		Methods: map[string]ttrpc.Method{
+			"CreateSandbox": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req CreateSandboxRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.CreateSandbox(ctx, &req)
+			},
 			"StartSandbox": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
 				var req StartSandboxRequest
 				if err := unmarshal(&req); err != nil {
@@ -41,27 +46,6 @@ func RegisterSandboxService(srv *ttrpc.Server, svc SandboxService) {
 					return nil, err
 				}
 				return svc.WaitSandbox(ctx, &req)
-			},
-			"UpdateSandbox": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
-				var req UpdateSandboxRequest
-				if err := unmarshal(&req); err != nil {
-					return nil, err
-				}
-				return svc.UpdateSandbox(ctx, &req)
-			},
-			"PauseSandbox": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
-				var req PauseSandboxRequest
-				if err := unmarshal(&req); err != nil {
-					return nil, err
-				}
-				return svc.PauseSandbox(ctx, &req)
-			},
-			"ResumeSandbox": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
-				var req ResumeSandboxRequest
-				if err := unmarshal(&req); err != nil {
-					return nil, err
-				}
-				return svc.ResumeSandbox(ctx, &req)
 			},
 			"SandboxStatus": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
 				var req SandboxStatusRequest
@@ -91,6 +75,14 @@ func NewSandboxClient(client *ttrpc.Client) SandboxService {
 	}
 }
 
+func (c *sandboxClient) CreateSandbox(ctx context.Context, req *CreateSandboxRequest) (*CreateSandboxResponse, error) {
+	var resp CreateSandboxResponse
+	if err := c.client.Call(ctx, "containerd.runtime.sandbox.v1.Sandbox", "CreateSandbox", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
 func (c *sandboxClient) StartSandbox(ctx context.Context, req *StartSandboxRequest) (*StartSandboxResponse, error) {
 	var resp StartSandboxResponse
 	if err := c.client.Call(ctx, "containerd.runtime.sandbox.v1.Sandbox", "StartSandbox", req, &resp); err != nil {
@@ -110,30 +102,6 @@ func (c *sandboxClient) StopSandbox(ctx context.Context, req *StopSandboxRequest
 func (c *sandboxClient) WaitSandbox(ctx context.Context, req *WaitSandboxRequest) (*WaitSandboxResponse, error) {
 	var resp WaitSandboxResponse
 	if err := c.client.Call(ctx, "containerd.runtime.sandbox.v1.Sandbox", "WaitSandbox", req, &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
-func (c *sandboxClient) UpdateSandbox(ctx context.Context, req *UpdateSandboxRequest) (*UpdateSandboxResponse, error) {
-	var resp UpdateSandboxResponse
-	if err := c.client.Call(ctx, "containerd.runtime.sandbox.v1.Sandbox", "UpdateSandbox", req, &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
-func (c *sandboxClient) PauseSandbox(ctx context.Context, req *PauseSandboxRequest) (*PauseSandboxResponse, error) {
-	var resp PauseSandboxResponse
-	if err := c.client.Call(ctx, "containerd.runtime.sandbox.v1.Sandbox", "PauseSandbox", req, &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
-func (c *sandboxClient) ResumeSandbox(ctx context.Context, req *ResumeSandboxRequest) (*ResumeSandboxResponse, error) {
-	var resp ResumeSandboxResponse
-	if err := c.client.Call(ctx, "containerd.runtime.sandbox.v1.Sandbox", "ResumeSandbox", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil

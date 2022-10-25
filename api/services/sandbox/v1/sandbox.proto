@@ -85,6 +85,7 @@ message StoreGetResponse {
 
 // Controller is an interface to manage runtime sandbox instances.
 service Controller {
+	rpc Create(ControllerCreateRequest) returns (ControllerCreateResponse);
 	rpc Start(ControllerStartRequest) returns (ControllerStartResponse);
 	rpc Stop(ControllerStopRequest) returns (ControllerStopResponse);
 	rpc Wait(ControllerWaitRequest) returns (ControllerWaitResponse);
@@ -92,10 +93,18 @@ service Controller {
 	rpc Delete(ControllerDeleteRequest) returns (ControllerDeleteResponse);
 }
 
-message ControllerStartRequest {
+message ControllerCreateRequest {
 	string sandbox_id = 1;
 	repeated containerd.types.Mount rootfs = 2;
 	google.protobuf.Any options = 3;
+}
+
+message ControllerCreateResponse {
+	string sandbox_id = 1;
+}
+
+message ControllerStartRequest {
+	string sandbox_id = 1;
 }
 
 message ControllerStartResponse {

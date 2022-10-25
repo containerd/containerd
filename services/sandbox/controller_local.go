@@ -83,7 +83,7 @@ type controllerLocal struct {
 
 var _ api.ControllerClient = (*controllerLocal)(nil)
 
-func (c *controllerLocal) Start(ctx context.Context, in *api.ControllerStartRequest, opts ...grpc.CallOption) (*api.ControllerStartResponse, error) {
+func (c *controllerLocal) Create(ctx context.Context, in *api.ControllerCreateRequest, opts ...grpc.CallOption) (*api.ControllerCreateResponse, error) {
 	if _, err := c.shims.Get(ctx, in.SandboxID); err == nil {
 		return nil, fmt.Errorf("sandbox %s already running: %w", in.SandboxID, errdefs.ErrAlreadyExists)
 	}
@@ -106,13 +106,26 @@ func (c *controllerLocal) Start(ctx context.Context, in *api.ControllerStartRequ
 
 	svc := runtimeAPI.NewSandboxClient(shim.Client())
 
-	resp, err := svc.StartSandbox(ctx, &runtimeAPI.StartSandboxRequest{
+	if _, err := svc.CreateSandbox(ctx, &runtimeAPI.CreateSandboxRequest{
 		SandboxID:  in.SandboxID,
 		BundlePath: shim.Bundle(),
 		Rootfs:     in.Rootfs,
 		Options:    in.Options,
-	})
+	}); err != nil {
+		return nil, fmt.Errorf("failed to start sandbox %s: %w", in.SandboxID, err)
+	}
 
+	return &api.ControllerCreateResponse{SandboxID: in.SandboxID}, nil
+}
+
+func (c *controllerLocal) Start(ctx context.Context, in *api.ControllerStartRequest, opts ...grpc.CallOption) (*api.ControllerStartResponse, error) {
+	shim, err := c.shims.Get(ctx, in.GetSandboxID())
+	if err != nil {
+		return nil, fmt.Errorf("unable to find sandbox %q", in.GetSandboxID())
+	}
+
+	svc := runtimeAPI.NewSandboxClient(shim.Client())
+	resp, err := svc.StartSandbox(ctx, &runtimeAPI.StartSandboxRequest{SandboxID: in.SandboxID})
 	if err != nil {
 		return nil, fmt.Errorf("failed to start sandbox %s: %w", in.SandboxID, err)
 	}
@@ -120,6 +133,7 @@ func (c *controllerLocal) Start(ctx context.Context, in *api.ControllerStartRequ
 	return &api.ControllerStartResponse{
 		SandboxID: in.SandboxID,
 		Pid:       resp.Pid,
+		CreatedAt: resp.CreatedAt,
 	}, nil
 }
 

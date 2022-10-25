@@ -254,6 +254,11 @@ func (c *Controller) Start(ctx context.Context, id string) (_ *api.ControllerSta
 	return resp, nil
 }
 
+func (c *Controller) Create(ctx context.Context, _id string) error {
+	// Not used by pod-sandbox implementation as there is no need to split pause containers logic.
+	return nil
+}
+
 // untrustedWorkload returns true if the sandbox contains untrusted workload.
 func untrustedWorkload(config *runtime.PodSandboxConfig) bool {
 	return config.GetAnnotations()[annotations.UntrustedWorkload] == "true"

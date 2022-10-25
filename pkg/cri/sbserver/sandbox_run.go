@@ -170,6 +170,10 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	runtimeStart := time.Now()
 
+	if err := c.sandboxController.Create(ctx, id); err != nil {
+		return nil, fmt.Errorf("failed to create sandbox %q: %w", id, err)
+	}
+
 	resp, err := c.sandboxController.Start(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start sandbox %q: %w", id, err)
