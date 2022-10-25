@@ -358,6 +358,10 @@ jobs:
           cd criu-3.13
           sudo make install-criu
 
+      - name: Install failpoint binaries
+        run: |
+          script/setup/install-failpoint-binaries
+
       - name: Install containerd
         env:
           CGO_ENABLED: 1

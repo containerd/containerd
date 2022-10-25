@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+#   Copyright The containerd Authors.
+
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+
+#       http://www.apache.org/licenses/LICENSE-2.0
+
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+# Build and install
+#
+# * cni-bridge-fp into /opt/cni/bin
+# * containerd-shim-runc-fp-v1 into /usr/local/bin
+#
+set -euo pipefail
+
+base_dir="$(dirname "${BASH_SOURCE[0]}")"
+root_dir="$( cd "${base_dir}" && pwd )"/../..
+
+cd "${root_dir}"
+
+CNI_BIN_DIR=${CNI_BIN_DIR:-"/opt/cni/bin"}
+make bin/cni-bridge-fp
+sudo install bin/cni-bridge-fp "${CNI_BIN_DIR}"
+
+SHIM_BIN_DIR=${SHIM_BIN_DIR:-"/usr/local/bin"}
+make bin/containerd-shim-runc-fp-v1
+sudo install bin/containerd-shim-runc-fp-v1 "${SHIM_BIN_DIR}"
