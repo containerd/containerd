@@ -30,7 +30,7 @@ import (
 func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.TransferPlugin,
-		ID:   "image",
+		ID:   "local",
 		Requires: []plugin.Type{
 			plugin.LeasePlugin,
 			plugin.MetadataPlugin,
