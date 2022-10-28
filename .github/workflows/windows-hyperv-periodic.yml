@@ -29,6 +29,9 @@ env:
   HCSSHIM_TAG: "master"
 
 
+permissions:  # added using https://github.com/step-security/secure-workflows
+  contents: read
+
 jobs:
   winIntegration:
     # NOTE: the following permissions are required by `google-github-actions/auth`:
@@ -53,7 +56,7 @@ jobs:
           GOOGLE_BUCKET: "containerd-integration/logs/windows-ltsc2022-hyperv/"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791
 
       - name: Install required packages
         run: |
@@ -79,18 +82,18 @@ jobs:
           echo "SSH_PUB_KEY=$(cat ~/.ssh/id_rsa.pub)" >> $GITHUB_ENV
 
       - name: AZLogin
-        uses: azure/login@v1
+        uses: azure/login@92a5484dfaf04ca78a94597f4f19fea633851fa2
         with:
           creds: ${{ secrets.AZURE_CREDS }}
 
       - name: AZResourceGroupCreate
-        uses: azure/CLI@v1
+        uses: azure/CLI@fa0f960f00db49b95fdb54328a767aee31e80105
         with:
           inlinescript: |
             az group create -n ${{ matrix.AZURE_RESOURCE_GROUP }} -l ${{ env.AZURE_DEFAULT_LOCATION }} --tags creationTimestamp=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
       - name: AZTestVMCreate
-        uses: azure/CLI@v1
+        uses: azure/CLI@fa0f960f00db49b95fdb54328a767aee31e80105
         with:
           inlinescript: |
             DETAILS=$(az vm create -n winTestVM --admin-username ${{ env.DEFAULT_ADMIN_USERNAME }} --admin-password ${{ env.PASSWORD }} --image ${{ matrix.AZURE_IMG }} -g ${{ matrix.AZURE_RESOURCE_GROUP }} --nsg-rule SSH --size ${{ env.AZURE_DEFAULT_VM_SIZE }} --public-ip-sku Standard -o json)
@@ -114,7 +117,7 @@ jobs:
             echo "VM_PUB_IP=$PUB_IP" >> $GITHUB_ENV
 
       - name: EnableAZVMSSH
-        uses: azure/CLI@v1
+        uses: azure/CLI@fa0f960f00db49b95fdb54328a767aee31e80105
         with:
           inlinescript: |
             az vm run-command invoke  --command-id RunPowerShellScript -n winTestVM -g ${{ matrix.AZURE_RESOURCE_GROUP }} --scripts @$GITHUB_WORKSPACE/script/setup/enable_ssh_windows.ps1 --parameters 'SSHPublicKey=${{ env.SSH_PUB_KEY }}'
@@ -302,14 +305,14 @@ jobs:
           echo '::set-output name=GCP_WORKLOAD_IDENTITY_PROVIDER::${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}'
 
       - name: AuthGcp
-        uses: google-github-actions/auth@v0
+        uses: google-github-actions/auth@c4799db9111fba4461e9f9da8732e5057b394f72
         if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
         with:
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
 
       - name: UploadJobReport
-        uses: google-github-actions/upload-cloud-storage@v0.8.0
+        uses: google-github-actions/upload-cloud-storage@c306948bf4c16a1f08b4a978354410282e420acd
         if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
         with:
           path: ${{ github.workspace }}/latest-build.txt
@@ -317,7 +320,7 @@ jobs:
           parent: false
 
       - name: UploadLogsDir
-        uses: google-github-actions/upload-cloud-storage@v0.8.0
+        uses: google-github-actions/upload-cloud-storage@c306948bf4c16a1f08b4a978354410282e420acd
         if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
         with:
           path: ${{ env.LOGS_DIR }}
@@ -325,7 +328,7 @@ jobs:
           parent: false
 
       - name: Check all CI stages succeeded
-        uses: actions/github-script@v3
+        uses: actions/github-script@f05a81df23035049204b043b50c3322045ce7eb3
         with:
           script: |
             const stepResults = {
@@ -345,7 +348,7 @@ jobs:
 
       - name: ResourceCleanup
         if: always()
-        uses: azure/CLI@v1
+        uses: azure/CLI@fa0f960f00db49b95fdb54328a767aee31e80105
         with:
           inlinescript: |
             az group delete -g ${{ matrix.AZURE_RESOURCE_GROUP }} --yes

@@ -9,6 +9,9 @@ on:
 env:
   GO_VERSION: '1.19.2'
 
+permissions:  # added using https://github.com/step-security/secure-workflows
+  contents: read
+
 jobs:
   linux:
     name: Linux
@@ -20,11 +23,11 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
         with:
           path: src/github.com/containerd/containerd
 
@@ -119,31 +122,31 @@ jobs:
       #
 
       - name: Upload artifacts (linux_amd64)
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@3446296876d12d4e3a0f3145a3c87e67bf0a16b5
         with:
           name: linux_amd64
           path: src/github.com/containerd/containerd/bin_amd64
 
       - name: Upload artifacts (linux_arm64)
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@3446296876d12d4e3a0f3145a3c87e67bf0a16b5
         with:
           name: linux_arm64
           path: src/github.com/containerd/containerd/bin_arm64
 
       - name: Upload artifacts (linux_s390x)
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@3446296876d12d4e3a0f3145a3c87e67bf0a16b5
         with:
           name: linux_s390x
           path: src/github.com/containerd/containerd/bin_s390x
 
       - name: Upload artifacts (linux_ppc64le)
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@3446296876d12d4e3a0f3145a3c87e67bf0a16b5
         with:
           name: linux_ppc64le
           path: src/github.com/containerd/containerd/bin_ppc64le
 
       - name: Upload artifacts (linux_riscv64)
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@3446296876d12d4e3a0f3145a3c87e67bf0a16b5
         with:
           name: linux_riscv64
           path: src/github.com/containerd/containerd/bin_riscv64
@@ -158,11 +161,11 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
         with:
           path: src/github.com/containerd/containerd
 
@@ -180,7 +183,7 @@ jobs:
           make binaries
 
       - name: Upload artifacts (windows_amd64)
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@3446296876d12d4e3a0f3145a3c87e67bf0a16b5
         with:
           name: windows_amd64
           path: src/github.com/containerd/containerd/bin/

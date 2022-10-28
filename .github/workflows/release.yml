@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
         with:
           ref: ${{ github.ref }}
           path: src/github.com/containerd/containerd
@@ -46,7 +46,7 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
       - name: Save release notes
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@83fd05a356d7e2593de66fc9913b3002723633cb
         with:
           name: containerd-release-notes
           path: src/github.com/containerd/containerd/release-notes.md
@@ -82,7 +82,7 @@ jobs:
           echo "RELEASE_VER=${releasever}" >> $GITHUB_ENV
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
       - name: Checkout containerd
-        uses: actions/checkout@v3
+        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
         with:
           # Intentionally use github.repository instead of containerd/containerd to
           # make this action runnable on forks.
@@ -92,10 +92,10 @@ jobs:
           path: src/github.com/containerd/containerd
 
       - name: Setup buildx instance
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@f211e3e9ded2d9377c8cadc4489a4e38014bc4c9
         with:
           use: true
-      - uses: crazy-max/ghaction-github-runtime@v1 # sets up needed vars for caching to github
+      - uses: crazy-max/ghaction-github-runtime@83094fe91195fdf87fa647051ab34148d96d3f1b # sets up needed vars for caching to github
       - name: Make
         shell: bash
         run: |
@@ -116,7 +116,7 @@ jobs:
         env:
           PLATFORM: ${{ matrix.dockerfile-platform }}
       - name: Save Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@83fd05a356d7e2593de66fc9913b3002723633cb
         with:
           name: release-tars-${{env.PLATFORM_CLEAN}}
           path: src/github.com/containerd/containerd/releases/*.tar.gz*
@@ -128,11 +128,11 @@ jobs:
     needs: [build, check]
     steps:
       - name: Download builds and release notes
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@f023be2c48cc18debc3bacd34cb396e0295e2869
         with:
           path: builds
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@1e07f4398721186383de40550babbdf2b84acfc5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fail_on_unmatched_files: true

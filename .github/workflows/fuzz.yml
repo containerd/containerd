@@ -1,5 +1,8 @@
 name: Fuzzing
 on: [pull_request]
+permissions:  # added using https://github.com/step-security/secure-workflows
+  contents: read
+
 jobs:
   # Run all fuzzing tests. Some of them use Go 1.18's testing.F.
   # Others use https://github.com/AdaLogics/go-fuzz-headers.
@@ -10,19 +13,19 @@ jobs:
     steps:
     - name: Build Fuzzers
       id: build
-      uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@master
+      uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@165ee302414f6e6a7ab420722f773269a38ff37b
       with:
         oss-fuzz-project-name: 'containerd'
         language: go
     - name: Run Fuzzers
-      uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@master
+      uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@165ee302414f6e6a7ab420722f773269a38ff37b
       with:
         oss-fuzz-project-name: 'containerd'
         fuzz-seconds: 300
         language: go
       continue-on-error: true
     - name: Upload Crash
-      uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@3446296876d12d4e3a0f3145a3c87e67bf0a16b5
       if: failure() && steps.build.outcome == 'success'
       with:
         name: artifacts
@@ -35,8 +38,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
         with:
           go-version: 1.18
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
       - run: script/go-test-fuzz.sh

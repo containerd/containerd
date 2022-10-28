@@ -9,6 +9,9 @@ on:
       image:
         description: "Target image name (override)"
 
+permissions:  # added using https://github.com/step-security/secure-workflows
+  contents: read
+
 jobs:
   mirror:
     name: "Mirror Image"
@@ -23,11 +26,11 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
         with:
           go-version: '1.19.2'
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
         with:
           path: src/github.com/containerd/containerd
 

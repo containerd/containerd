@@ -34,12 +34,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libbtrfs-dev
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v3
-      - uses: golangci/golangci-lint-action@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
+      - uses: golangci/golangci-lint-action@07db5389c99593f11ad7b44463c2d4233066a9b1
         with:
           version: v1.49.0
           skip-cache: true
@@ -54,16 +54,16 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
         with:
           path: src/github.com/containerd/containerd
           fetch-depth: 100
 
-      - uses: containerd/project-checks@v1
+      - uses: containerd/project-checks@833ac8656a495f9ed05a5cd86bf1f04f777981a2
         with:
           working-directory: src/github.com/containerd/containerd
 
@@ -86,11 +86,11 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
         with:
           path: src/github.com/containerd/containerd
 
@@ -118,10 +118,10 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
         with:
           go-version: ${{ env.GO_VERSION }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
       - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.1
       - run: make man
 
@@ -156,10 +156,10 @@ jobs:
             goarm: "7"
 
     steps:
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
         with:
           go-version: ${{ env.GO_VERSION }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
       - run: |
           set -e -x
 
@@ -233,7 +233,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libbtrfs-dev
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -243,7 +243,7 @@ jobs:
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
         with:
           path: src/github.com/containerd/containerd
 
@@ -276,15 +276,15 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
         with:
           path: src/github.com/containerd/containerd
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
         with:
           repository: kubernetes-sigs/cri-tools
           path: src/github.com/kubernetes-sigs/cri-tools
@@ -404,7 +404,7 @@ jobs:
           }
           critest.exe --runtime-endpoint=npipe://.//pipe//containerd-containerd --test-images-file='${{env.CRI_TEST_IMAGES}}' --report-dir='${{github.workspace}}/critestreport' $skip
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@83fd05a356d7e2593de66fc9913b3002723633cb
         if: always()
         with:
           name: TestResults ${{ matrix.os }}
@@ -439,11 +439,11 @@ jobs:
     env:
       GOTEST: gotestsum --
     steps:
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
 
       - name: Install containerd dependencies
         env:
@@ -566,7 +566,7 @@ jobs:
           mount
           df
           losetup -l
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@83fd05a356d7e2593de66fc9913b3002723633cb
         if: always()
         with:
           name: TestResults ${{ matrix.runtime }} ${{matrix.runc}}
@@ -585,10 +585,10 @@ jobs:
       GOTEST: gotestsum --
 
     steps:
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
         with:
           go-version: ${{ env.GO_VERSION }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
       - run: script/setup/install-gotestsum
       - run: script/setup/install-teststat
       - name: Tests
@@ -600,7 +600,7 @@ jobs:
         if: always()
       - run: script/test/test2annotation.sh *-gotest.json
         if: always()
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@83fd05a356d7e2593de66fc9913b3002723633cb
         if: always()
         with:
           name: TestResults MacOS
