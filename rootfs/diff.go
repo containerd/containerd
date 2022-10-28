@@ -19,6 +19,9 @@ package rootfs
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/mount"
@@ -45,6 +48,20 @@ func CreateDiff(ctx context.Context, snapshotID string, sn snapshots.Snapshotter
 	}
 
 	lowerKey := fmt.Sprintf("%s-parent-view", info.Parent)
+
+	// signal handler here
+	sigChannel := make(chan os.Signal, 1)
+	signal.Notify(sigChannel, syscall.SIGINT)
+
+	go func(lowerKey string) {
+		select {
+		case <-sigChannel:
+			fmt.Println("got SIGINT")
+			// remove parent snap
+			sn.Remove(dctx, lowerKey)
+		}
+	}(lowerKey)
+
 	lower, err := sn.View(ctx, lowerKey, info.Parent)
 	if err != nil {
 		return ocispec.Descriptor{}, err
