@@ -18,16 +18,13 @@ package command
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"time"
-	"unsafe"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/services/server"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	exec "golang.org/x/sys/execabs"
@@ -45,7 +42,6 @@ var (
 	logFileFlag           string
 
 	kernel32     = windows.NewLazySystemDLL("kernel32.dll")
-	setStdHandle = kernel32.NewProc("SetStdHandle")
 	allocConsole = kernel32.NewProc("AllocConsole")
 	oldStderr    windows.Handle
 	panicFile    *os.File
@@ -157,38 +153,14 @@ func registerService() error {
 	}
 	defer s.Close()
 
-	// See http://stackoverflow.com/questions/35151052/how-do-i-configure-failure-actions-of-a-windows-service-written-in-go
-	const (
-		scActionNone    = 0
-		scActionRestart = 1
-
-		serviceConfigFailureActions = 2
+	return s.SetRecoveryActions(
+		[]mgr.RecoveryAction{
+			{Type: mgr.ServiceRestart, Delay: 15 * time.Second},
+			{Type: mgr.ServiceRestart, Delay: 15 * time.Second},
+			{Type: mgr.NoAction},
+		},
+		uint32(24*time.Hour/time.Second),
 	)
-
-	type serviceFailureActions struct {
-		ResetPeriod  uint32
-		RebootMsg    *uint16
-		Command      *uint16
-		ActionsCount uint32
-		Actions      uintptr
-	}
-
-	type scAction struct {
-		Type  uint32
-		Delay uint32
-	}
-	t := []scAction{
-		{Type: scActionRestart, Delay: uint32(15 * time.Second / time.Millisecond)},
-		{Type: scActionRestart, Delay: uint32(15 * time.Second / time.Millisecond)},
-		{Type: scActionNone},
-	}
-	lpInfo := serviceFailureActions{ResetPeriod: uint32(24 * time.Hour / time.Second), ActionsCount: uint32(3), Actions: uintptr(unsafe.Pointer(&t[0]))}
-	err = windows.ChangeServiceConfig2(s.Handle, serviceConfigFailureActions, (*byte)(unsafe.Pointer(&lpInfo)))
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func unregisterService() error {
@@ -215,10 +187,9 @@ func unregisterService() error {
 // to handle (un-)registering against Windows Service Control Manager (SCM).
 // It returns an indication to stop on successful SCM operation, and an error.
 func registerUnregisterService(root string) (bool, error) {
-
 	if unregisterServiceFlag {
 		if registerServiceFlag {
-			return true, errors.Wrap(errdefs.ErrInvalidArgument, "--register-service and --unregister-service cannot be used together")
+			return true, fmt.Errorf("--register-service and --unregister-service cannot be used together: %w", errdefs.ErrInvalidArgument)
 		}
 		return true, unregisterService()
 	}
@@ -242,29 +213,64 @@ func registerUnregisterService(root string) (bool, error) {
 		// and we want to make sure stderr goes to the panic file.
 		r, _, err := allocConsole.Call()
 		if r == 0 && err != nil {
-			return true, fmt.Errorf("error allocating conhost: %s", err)
+			return true, fmt.Errorf("error allocating conhost: %w", err)
 		}
 
 		if err := initPanicFile(filepath.Join(root, "panic.log")); err != nil {
 			return true, err
 		}
 
-		logOutput := io.Discard
+		// The usual advice for Windows services is to either write to a log file or to the windows event
+		// log, the former of which we've exposed here via a --log-file flag. We additionally write panic
+		// stacks to a panic.log file to diagnose crashes. Below details the two different outcomes if
+		// --log-file is specified or not:
+		//
+		// --log-file is *not* specified.
+		// -------------------------------
+		// -logrus, the stdlibs logging package and os.Stderr output will go to
+		// NUL (Windows' /dev/null equivalent).
+		// -Panics will write their stack trace to the panic.log file.
+		// -Writing to the handle returned from GetStdHandle(STD_ERROR_HANDLE) will write
+		// to the panic.log file as the underlying handle itself has been redirected.
+		//
+		// --log-file *is* specified
+		// -------------------------------
+		// -Logging to logrus, the stdlibs logging package or directly to
+		// os.Stderr will all go to the log file specified.
+		// -Panics will write their stack trace to the panic.log file.
+		// -Writing to the handle returned from GetStdHandle(STD_ERROR_HANDLE) will write
+		// to the panic.log file as the underlying handle itself has been redirected.
+		var f *os.File
 		if logFileFlag != "" {
-			f, err := os.OpenFile(logFileFlag, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			f, err = os.OpenFile(logFileFlag, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {
-				return true, errors.Wrapf(err, "open log file %q", logFileFlag)
+				return true, fmt.Errorf("open log file %q: %w", logFileFlag, err)
 			}
-			logOutput = f
+		} else {
+			// Windows services start with NULL stdio handles, and thus os.Stderr and friends will be
+			// backed by an os.File with a NULL handle. This means writes to os.Stderr will fail, which
+			// isn't a huge issue as we want output to be discarded if the user doesn't ask for the log
+			// file. However, writes succeeding but just going to the ether is a much better construct
+			// so use devnull instead of relying on writes failing. We use devnull instead of io.Discard
+			// as os.Stderr is an os.File and can't be assigned to io.Discard.
+			f, err = os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+			if err != nil {
+				return true, err
+			}
 		}
-		logrus.SetOutput(logOutput)
+		// Reassign os.Stderr to the log file or NUL. Shim logs are copied to os.Stderr
+		// directly so this ensures those will end up in the log file as well if specified.
+		os.Stderr = f
+		// Assign the stdlibs log package in case of any miscellaneous uses by
+		// dependencies.
+		log.SetOutput(f)
+		logrus.SetOutput(f)
 	}
 	return false, nil
 }
 
 // launchService is the entry point for running the daemon under SCM.
 func launchService(s *server.Server, done chan struct{}) error {
-
 	if !runServiceFlag {
 		return nil
 	}
@@ -275,16 +281,17 @@ func launchService(s *server.Server, done chan struct{}) error {
 		done:    done,
 	}
 
-	interactive, err := svc.IsAnInteractiveSession() // nolint:staticcheck
+	// Check if we're running as a Windows service or interactively.
+	isService, err := svc.IsWindowsService()
 	if err != nil {
 		return err
 	}
 
 	go func() {
-		if interactive {
-			err = debug.Run(serviceNameFlag, h)
-		} else {
+		if isService {
 			err = svc.Run(serviceNameFlag, h)
+		} else {
+			err = debug.Run(serviceNameFlag, h)
 		}
 		h.fromsvc <- err
 	}()
@@ -347,33 +354,19 @@ func initPanicFile(path string) error {
 	// Update STD_ERROR_HANDLE to point to the panic file so that Go writes to
 	// it when it panics. Remember the old stderr to restore it before removing
 	// the panic file.
-	sh := uint32(windows.STD_ERROR_HANDLE)
-	h, err := windows.GetStdHandle(sh)
+	h, err := windows.GetStdHandle(windows.STD_ERROR_HANDLE)
 	if err != nil {
 		return err
 	}
-
 	oldStderr = h
 
-	r, _, err := setStdHandle.Call(uintptr(sh), panicFile.Fd())
-	if r == 0 && err != nil {
-		return err
-	}
-
-	// Reset os.Stderr to the panic file (so fmt.Fprintf(os.Stderr,...) actually gets redirected)
-	os.Stderr = os.NewFile(panicFile.Fd(), "/dev/stderr")
-
-	// Force threads that panic to write to stderr (the panicFile handle now), otherwise it will go into the ether
-	log.SetOutput(os.Stderr)
-
-	return nil
+	return windows.SetStdHandle(windows.STD_ERROR_HANDLE, windows.Handle(panicFile.Fd()))
 }
 
 func removePanicFile() {
 	if st, err := panicFile.Stat(); err == nil {
 		if st.Size() == 0 {
-			sh := uint32(windows.STD_ERROR_HANDLE)
-			setStdHandle.Call(uintptr(sh), uintptr(oldStderr))
+			windows.SetStdHandle(windows.STD_ERROR_HANDLE, oldStderr)
 			panicFile.Close()
 			os.Remove(panicFile.Name())
 		}

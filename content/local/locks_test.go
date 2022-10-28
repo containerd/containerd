@@ -19,14 +19,16 @@ package local
 import (
 	"testing"
 
-	"gotest.tools/v3/assert"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTryLock(t *testing.T) {
 	err := tryLock("testref")
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 	defer unlock("testref")
 
 	err = tryLock("testref")
-	assert.ErrorContains(t, err, "ref testref locked for ")
+	require.NotNil(t, err)
+	assert.Contains(t, err.Error(), "ref testref locked for ")
 }

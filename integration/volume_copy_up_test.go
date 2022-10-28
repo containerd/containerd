@@ -18,13 +18,13 @@ package integration
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/integration/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -38,7 +38,7 @@ const (
 
 func TestVolumeCopyUp(t *testing.T) {
 	var (
-		testImage   = GetImage(VolumeCopyUp)
+		testImage   = images.Get(images.VolumeCopyUp)
 		execTimeout = time.Minute
 	)
 
@@ -76,7 +76,7 @@ func TestVolumeCopyUp(t *testing.T) {
 	assert.Equal(t, len(volumePaths), 1, "expected exactly 1 volume")
 
 	testFilePath := filepath.Join(volumePaths[0], "test_file")
-	contents, err := ioutil.ReadFile(testFilePath)
+	contents, err := os.ReadFile(testFilePath)
 	require.NoError(t, err)
 	assert.Equal(t, "test_content\n", string(contents))
 
@@ -89,14 +89,14 @@ func TestVolumeCopyUp(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf("Check whether host path of the volume is updated")
-	contents, err = ioutil.ReadFile(testFilePath)
+	contents, err = os.ReadFile(testFilePath)
 	require.NoError(t, err)
 	assert.Equal(t, "new_content\n", string(contents))
 }
 
 func TestVolumeOwnership(t *testing.T) {
 	var (
-		testImage   = GetImage(VolumeOwnership)
+		testImage   = images.Get(images.VolumeOwnership)
 		execTimeout = time.Minute
 	)
 
@@ -159,7 +159,7 @@ func getHostPathForVolumes(criRoot, containerID string) ([]string, error) {
 		return nil, err
 	}
 
-	volumes, err := ioutil.ReadDir(hostPath)
+	volumes, err := os.ReadDir(hostPath)
 	if err != nil {
 		return nil, err
 	}

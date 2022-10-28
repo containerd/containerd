@@ -19,6 +19,7 @@ package containerd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -27,13 +28,13 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -63,6 +64,8 @@ type Image interface {
 	Metadata() images.Image
 	// Platform returns the platform match comparer. Can be nil.
 	Platform() platforms.MatchComparer
+	// Spec returns the OCI image spec for a given image.
+	Spec(ctx context.Context) (ocispec.Image, error)
 }
 
 type usageOptions struct {
@@ -278,6 +281,26 @@ func (i *image) IsUnpacked(ctx context.Context, snapshotterName string) (bool, e
 	return false, nil
 }
 
+func (i *image) Spec(ctx context.Context) (ocispec.Image, error) {
+	var ociImage ocispec.Image
+
+	desc, err := i.Config(ctx)
+	if err != nil {
+		return ociImage, fmt.Errorf("get image config descriptor: %w", err)
+	}
+
+	blob, err := content.ReadBlob(ctx, i.ContentStore(), desc)
+	if err != nil {
+		return ociImage, fmt.Errorf("read image config from content store: %w", err)
+	}
+
+	if err := json.Unmarshal(blob, &ociImage); err != nil {
+		return ociImage, fmt.Errorf("unmarshal image config %s: %w", blob, err)
+	}
+
+	return ociImage, nil
+}
+
 // UnpackConfig provides configuration for the unpack of an image
 type UnpackConfig struct {
 	// ApplyOpts for applying a diff to a snapshotter
@@ -287,6 +310,10 @@ type UnpackConfig struct {
 	// CheckPlatformSupported is whether to validate that a snapshotter
 	// supports an image's platform before unpacking
 	CheckPlatformSupported bool
+	// DuplicationSuppressor is used to make sure that there is only one
+	// in-flight fetch request or unpack handler for a given descriptor's
+	// digest or chain ID.
+	DuplicationSuppressor kmutex.KeyedLocker
 }
 
 // UnpackOpt provides configuration for unpack
@@ -296,6 +323,14 @@ type UnpackOpt func(context.Context, *UnpackConfig) error
 func WithSnapshotterPlatformCheck() UnpackOpt {
 	return func(ctx context.Context, uc *UnpackConfig) error {
 		uc.CheckPlatformSupported = true
+		return nil
+	}
+}
+
+// WithUnpackDuplicationSuppressor sets `DuplicationSuppressor` on the UnpackConfig.
+func WithUnpackDuplicationSuppressor(suppressor kmutex.KeyedLocker) UnpackOpt {
+	return func(ctx context.Context, uc *UnpackConfig) error {
+		uc.DuplicationSuppressor = suppressor
 		return nil
 	}
 }
@@ -399,7 +434,7 @@ func (i *image) getLayers(ctx context.Context, platform platforms.MatchComparer,
 	cs := i.ContentStore()
 	diffIDs, err := i.i.RootFS(ctx, cs, platform)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to resolve rootfs")
+		return nil, fmt.Errorf("failed to resolve rootfs: %w", err)
 	}
 	if len(diffIDs) != len(manifest.Layers) {
 		return nil, errors.New("mismatched image rootfs and manifest layers")

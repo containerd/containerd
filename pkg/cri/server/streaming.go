@@ -19,13 +19,14 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"errors"
+	"fmt"
 	"io"
 	"math"
 	"net"
 	"os"
 	"time"
 
-	"github.com/pkg/errors"
 	k8snet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/remotecommand"
@@ -70,7 +71,7 @@ func newStreamServer(c *criService, addr, port, streamIdleTimeout string) (strea
 	if addr == "" {
 		a, err := k8snet.ResolveBindAddress(nil)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to get stream server address")
+			return nil, fmt.Errorf("failed to get stream server address: %w", err)
 		}
 		addr = a.String()
 	}
@@ -79,20 +80,20 @@ func newStreamServer(c *criService, addr, port, streamIdleTimeout string) (strea
 		var err error
 		config.StreamIdleTimeout, err = time.ParseDuration(streamIdleTimeout)
 		if err != nil {
-			return nil, errors.Wrap(err, "invalid stream idle timeout")
+			return nil, fmt.Errorf("invalid stream idle timeout: %w", err)
 		}
 	}
 	config.Addr = net.JoinHostPort(addr, port)
 	run := newStreamRuntime(c)
 	tlsMode, err := getStreamListenerMode(c)
 	if err != nil {
-		return nil, errors.Wrapf(err, "invalid stream server configuration")
+		return nil, fmt.Errorf("invalid stream server configuration: %w", err)
 	}
 	switch tlsMode {
 	case x509KeyPairTLS:
 		tlsCert, err := tls.LoadX509KeyPair(c.config.X509KeyPairStreaming.TLSCertFile, c.config.X509KeyPairStreaming.TLSKeyFile)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to load x509 key pair for stream server")
+			return nil, fmt.Errorf("failed to load x509 key pair for stream server: %w", err)
 		}
 		config.TLSConfig = &tls.Config{
 			Certificates: []tls.Certificate{tlsCert},
@@ -101,7 +102,7 @@ func newStreamServer(c *criService, addr, port, streamIdleTimeout string) (strea
 	case selfSignTLS:
 		tlsCert, err := newTLSCert()
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to generate tls certificate for stream server")
+			return nil, fmt.Errorf("failed to generate tls certificate for stream server: %w", err)
 		}
 		config.TLSConfig = &tls.Config{
 			Certificates:       []tls.Certificate{tlsCert},
@@ -136,13 +137,13 @@ func (s *streamRuntime) Exec(containerID string, cmd []string, stdin io.Reader, 
 		resize: resize,
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed to exec in container")
+		return fmt.Errorf("failed to exec in container: %w", err)
 	}
 	if *exitCode == 0 {
 		return nil
 	}
 	return &exec.CodeExitError{
-		Err:  errors.Errorf("error executing command %v, exit code %d", cmd, *exitCode),
+		Err:  fmt.Errorf("error executing command %v, exit code %d", cmd, *exitCode),
 		Code: int(*exitCode),
 	}
 }
@@ -154,7 +155,7 @@ func (s *streamRuntime) Attach(containerID string, in io.Reader, out, err io.Wri
 
 func (s *streamRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
 	if port <= 0 || port > math.MaxUint16 {
-		return errors.Errorf("invalid port %d", port)
+		return fmt.Errorf("invalid port %d", port)
 	}
 	ctx := ctrdutil.NamespacedContext()
 	return s.c.portForward(ctx, podSandboxID, port, stream)
@@ -197,12 +198,12 @@ func newTLSCert() (tls.Certificate, error) {
 
 	hostName, err := os.Hostname()
 	if err != nil {
-		return fail(errors.Wrap(err, "failed to get hostname"))
+		return fail(fmt.Errorf("failed to get hostname: %w", err))
 	}
 
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
-		return fail(errors.Wrap(err, "failed to get host IP addresses"))
+		return fail(fmt.Errorf("failed to get host IP addresses: %w", err))
 	}
 
 	var alternateIPs []net.IP
@@ -226,13 +227,13 @@ func newTLSCert() (tls.Certificate, error) {
 	// Generate a self signed certificate key (CA is self)
 	certPem, keyPem, err := k8scert.GenerateSelfSignedCertKey(hostName, alternateIPs, alternateDNS)
 	if err != nil {
-		return fail(errors.Wrap(err, "certificate key could not be created"))
+		return fail(fmt.Errorf("certificate key could not be created: %w", err))
 	}
 
 	// Load the tls certificate
 	tlsCert, err := tls.X509KeyPair(certPem, keyPem)
 	if err != nil {
-		return fail(errors.Wrap(err, "certificate could not be loaded"))
+		return fail(fmt.Errorf("certificate could not be loaded: %w", err))
 	}
 
 	return tlsCert, nil

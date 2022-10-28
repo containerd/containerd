@@ -19,12 +19,11 @@ package cap
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // FromNumber returns a cap string like "CAP_SYS_ADMIN"
@@ -91,7 +90,7 @@ func ParseProcPIDStatus(r io.Reader) (map[Type]uint64, error) {
 		case "CapInh", "CapPrm", "CapEff", "CapBnd", "CapAmb":
 			ui64, err := strconv.ParseUint(v, 16, 64)
 			if err != nil {
-				return nil, errors.Errorf("failed to parse line %q", line)
+				return nil, fmt.Errorf("failed to parse line %q", line)
 			}
 			switch k {
 			case "CapInh":

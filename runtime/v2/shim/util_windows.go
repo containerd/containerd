@@ -18,13 +18,13 @@ package shim
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"syscall"
 	"time"
 
 	winio "github.com/Microsoft/go-winio"
-	"github.com/pkg/errors"
 )
 
 const shimBinaryFormat = "containerd-shim-%s-%s.exe"
@@ -40,9 +40,9 @@ func AnonReconnectDialer(address string, timeout time.Duration) (net.Conn, error
 
 	c, err := winio.DialPipeContext(ctx, address)
 	if os.IsNotExist(err) {
-		return nil, errors.Wrap(os.ErrNotExist, "npipe not found on reconnect")
+		return nil, fmt.Errorf("npipe not found on reconnect: %w", os.ErrNotExist)
 	} else if err == context.DeadlineExceeded {
-		return nil, errors.Wrapf(err, "timed out waiting for npipe %s", address)
+		return nil, fmt.Errorf("timed out waiting for npipe %s: %w", address, err)
 	} else if err != nil {
 		return nil, err
 	}
@@ -65,14 +65,14 @@ func AnonDialer(address string, timeout time.Duration) (net.Conn, error) {
 			if os.IsNotExist(err) {
 				select {
 				case <-serveTimer.C:
-					return nil, errors.Wrap(os.ErrNotExist, "pipe not found before timeout")
+					return nil, fmt.Errorf("pipe not found before timeout: %w", os.ErrNotExist)
 				default:
 					// Wait 10ms for the shim to serve and try again.
 					time.Sleep(10 * time.Millisecond)
 					continue
 				}
 			} else if err == context.DeadlineExceeded {
-				return nil, errors.Wrapf(err, "timed out waiting for npipe %s", address)
+				return nil, fmt.Errorf("timed out waiting for npipe %s: %w", address, err)
 			}
 			return nil, err
 		}

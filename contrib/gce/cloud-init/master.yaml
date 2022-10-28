@@ -75,7 +75,8 @@ write_files:
     content: |
       [Unit]
       Description=Download and install k8s binaries and configurations
-      After=network-online.target
+      After=network-online.target containerd.target
+      Wants=network-online.target containerd.target
 
       [Service]
       Type=oneshot

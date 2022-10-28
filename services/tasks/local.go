@@ -41,14 +41,16 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/protobuf/proto"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/typeurl"
-	ptypes "github.com/gogo/protobuf/types"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -63,11 +65,20 @@ const (
 	stateTimeout = "io.containerd.timeout.task.state"
 )
 
+// Config for the tasks service plugin
+type Config struct {
+	// BlockIOConfigFile specifies the path to blockio configuration file
+	BlockIOConfigFile string `toml:"blockio_config_file" json:"blockioConfigFile"`
+	// RdtConfigFile specifies the path to RDT configuration file
+	RdtConfigFile string `toml:"rdt_config_file" json:"rdtConfigFile"`
+}
+
 func init() {
 	plugin.Register(&plugin.Registration{
 		Type:     plugin.ServicePlugin,
 		ID:       services.TasksService,
 		Requires: tasksServiceRequires,
+		Config:   &Config{},
 		InitFn:   initFunc,
 	})
 
@@ -75,6 +86,7 @@ func init() {
 }
 
 func initFunc(ic *plugin.InitContext) (interface{}, error) {
+	config := ic.Config.(*Config)
 	runtimes, err := loadV1Runtimes(ic)
 	if err != nil {
 		return nil, err
@@ -128,6 +140,14 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 	for _, t := range v2Tasks {
 		l.monitor.Monitor(t, nil)
 	}
+
+	if err := initBlockIO(config.BlockIOConfigFile); err != nil {
+		log.G(ic.Context).WithError(err).Errorf("blockio initialization failed")
+	}
+	if err := initRdt(config.RdtConfigFile); err != nil {
+		log.G(ic.Context).WithError(err).Errorf("RDT initialization failed")
+	}
+
 	return l, nil
 }
 
@@ -161,8 +181,8 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 		}
 		reader, err := l.store.ReaderAt(ctx, ocispec.Descriptor{
 			MediaType:   r.Checkpoint.MediaType,
-			Digest:      r.Checkpoint.Digest,
-			Size:        r.Checkpoint.Size_,
+			Digest:      digest.Digest(r.Checkpoint.Digest),
+			Size:        r.Checkpoint.Size,
 			Annotations: r.Checkpoint.Annotations,
 		})
 		if err != nil {
@@ -186,6 +206,7 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 		Runtime:        container.Runtime.Name,
 		RuntimeOptions: container.Runtime.Options,
 		TaskOptions:    r.Options,
+		SandboxID:      container.SandboxID,
 	}
 	if r.RuntimePath != "" {
 		opts.Runtime = r.RuntimePath
@@ -207,7 +228,7 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 		return nil, err
 	}
 	_, err = rtime.Get(ctx, r.ContainerID)
-	if err != nil && err != runtime.ErrTaskNotExists {
+	if err != nil && !errdefs.IsNotFound(err) {
 		return nil, errdefs.ToGRPC(err)
 	}
 	if err == nil {
@@ -219,11 +240,11 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 	}
 	labels := map[string]string{"runtime": container.Runtime.Name}
 	if err := l.monitor.Monitor(c, labels); err != nil {
-		return nil, errors.Wrap(err, "monitor task")
+		return nil, fmt.Errorf("monitor task: %w", err)
 	}
 	pid, err := c.PID(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get task pid")
+		return nil, fmt.Errorf("failed to get task pid: %w", err)
 	}
 	return &api.CreateTaskResponse{
 		ContainerID: r.ContainerID,
@@ -283,7 +304,7 @@ func (l *local) Delete(ctx context.Context, r *api.DeleteTaskRequest, _ ...grpc.
 
 	return &api.DeleteResponse{
 		ExitStatus: exit.Status,
-		ExitedAt:   exit.Timestamp,
+		ExitedAt:   protobuf.ToTimestamp(exit.Timestamp),
 		Pid:        exit.Pid,
 	}, nil
 }
@@ -304,7 +325,7 @@ func (l *local) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest, 
 	return &api.DeleteResponse{
 		ID:         r.ExecID,
 		ExitStatus: exit.Status,
-		ExitedAt:   exit.Timestamp,
+		ExitedAt:   protobuf.ToTimestamp(exit.Timestamp),
 		Pid:        exit.Pid,
 	}, nil
 }
@@ -320,18 +341,18 @@ func getProcessState(ctx context.Context, p runtime.Process) (*task.Process, err
 		}
 		log.G(ctx).WithError(err).Errorf("get state for %s", p.ID())
 	}
-	status := task.StatusUnknown
+	status := task.Status_UNKNOWN
 	switch state.Status {
 	case runtime.CreatedStatus:
-		status = task.StatusCreated
+		status = task.Status_CREATED
 	case runtime.RunningStatus:
-		status = task.StatusRunning
+		status = task.Status_RUNNING
 	case runtime.StoppedStatus:
-		status = task.StatusStopped
+		status = task.Status_STOPPED
 	case runtime.PausedStatus:
-		status = task.StatusPaused
+		status = task.Status_PAUSED
 	case runtime.PausingStatus:
-		status = task.StatusPausing
+		status = task.Status_PAUSING
 	default:
 		log.G(ctx).WithField("status", state.Status).Warn("unknown status")
 	}
@@ -344,7 +365,7 @@ func getProcessState(ctx context.Context, p runtime.Process) (*task.Process, err
 		Stderr:     state.Stderr,
 		Terminal:   state.Terminal,
 		ExitStatus: state.ExitStatus,
-		ExitedAt:   state.ExitedAt,
+		ExitedAt:   protobuf.ToTimestamp(state.ExitedAt),
 	}, nil
 }
 
@@ -449,9 +470,9 @@ func (l *local) ListPids(ctx context.Context, r *api.ListPidsRequest, _ ...grpc.
 			Pid: p.Pid,
 		}
 		if p.Info != nil {
-			a, err := typeurl.MarshalAny(p.Info)
+			a, err := protobuf.MarshalAnyToProto(p.Info)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to marshal process %d info", p.Pid)
+				return nil, fmt.Errorf("failed to marshal process %d info: %w", p.Pid, err)
 			}
 			pInfo.Info = a
 		}
@@ -539,7 +560,7 @@ func (l *local) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest, _ 
 	checkpointImageExists := false
 	if image == "" {
 		checkpointImageExists = true
-		image, err = os.MkdirTemp(os.Getenv("XDG_RUNTIME_DIR"), "ctd-checkpoint")
+		image, err = os.MkdirTemp(os.Getenv("XDG_RUNTIME_DIR"), "ctrd-checkpoint")
 		if err != nil {
 			return nil, errdefs.ToGRPC(err)
 		}
@@ -564,7 +585,8 @@ func (l *local) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest, _ 
 		return nil, err
 	}
 	// write the config to the content store
-	data, err := container.Spec.Marshal()
+	pbany := protobuf.FromAny(container.Spec)
+	data, err := proto.Marshal(pbany)
 	if err != nil {
 		return nil, err
 	}
@@ -625,7 +647,7 @@ func (l *local) Wait(ctx context.Context, r *api.WaitRequest, _ ...grpc.CallOpti
 	}
 	return &api.WaitResponse{
 		ExitStatus: exit.Status,
-		ExitedAt:   exit.Timestamp,
+		ExitedAt:   protobuf.ToTimestamp(exit.Timestamp),
 	}, nil
 }
 
@@ -654,7 +676,7 @@ func getTasksMetrics(ctx context.Context, filter filters.Filter, tasks []runtime
 			continue
 		}
 		r.Metrics = append(r.Metrics, &types.Metric{
-			Timestamp: collected,
+			Timestamp: protobuf.ToTimestamp(collected),
 			ID:        tk.ID(),
 			Data:      stats,
 		})
@@ -676,8 +698,8 @@ func (l *local) writeContent(ctx context.Context, mediaType, ref string, r io.Re
 	}
 	return &types.Descriptor{
 		MediaType:   mediaType,
-		Digest:      writer.Digest(),
-		Size_:       size,
+		Digest:      writer.Digest().String(),
+		Size:        size,
 		Annotations: make(map[string]string),
 	}, nil
 }

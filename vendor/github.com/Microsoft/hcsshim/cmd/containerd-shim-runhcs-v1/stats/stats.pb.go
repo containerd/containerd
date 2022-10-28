@@ -11,6 +11,7 @@ import (
 	github_com_gogo_protobuf_types "github.com/gogo/protobuf/types"
 	io "io"
 	math "math"
+	math_bits "math/bits"
 	reflect "reflect"
 	strings "strings"
 	time "time"
@@ -26,7 +27,7 @@ var _ = time.Kitchen
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 type Statistics struct {
 	// Types that are valid to be assigned to Container:
@@ -52,7 +53,7 @@ func (m *Statistics) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return xxx_messageInfo_Statistics.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -78,10 +79,10 @@ type isStatistics_Container interface {
 }
 
 type Statistics_Windows struct {
-	Windows *WindowsContainerStatistics `protobuf:"bytes,1,opt,name=windows,proto3,oneof"`
+	Windows *WindowsContainerStatistics `protobuf:"bytes,1,opt,name=windows,proto3,oneof" json:"windows,omitempty"`
 }
 type Statistics_Linux struct {
-	Linux *v1.Metrics `protobuf:"bytes,2,opt,name=linux,proto3,oneof"`
+	Linux *v1.Metrics `protobuf:"bytes,2,opt,name=linux,proto3,oneof" json:"linux,omitempty"`
 }
 
 func (*Statistics_Windows) isStatistics_Container() {}
@@ -108,78 +109,12 @@ func (m *Statistics) GetLinux() *v1.Metrics {
 	return nil
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*Statistics) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _Statistics_OneofMarshaler, _Statistics_OneofUnmarshaler, _Statistics_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*Statistics) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*Statistics_Windows)(nil),
 		(*Statistics_Linux)(nil),
 	}
-}
-
-func _Statistics_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*Statistics)
-	// container
-	switch x := m.Container.(type) {
-	case *Statistics_Windows:
-		_ = b.EncodeVarint(1<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Windows); err != nil {
-			return err
-		}
-	case *Statistics_Linux:
-		_ = b.EncodeVarint(2<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Linux); err != nil {
-			return err
-		}
-	case nil:
-	default:
-		return fmt.Errorf("Statistics.Container has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _Statistics_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*Statistics)
-	switch tag {
-	case 1: // container.windows
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(WindowsContainerStatistics)
-		err := b.DecodeMessage(msg)
-		m.Container = &Statistics_Windows{msg}
-		return true, err
-	case 2: // container.linux
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(v1.Metrics)
-		err := b.DecodeMessage(msg)
-		m.Container = &Statistics_Linux{msg}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _Statistics_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*Statistics)
-	// container
-	switch x := m.Container.(type) {
-	case *Statistics_Windows:
-		s := proto.Size(x.Windows)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *Statistics_Linux:
-		s := proto.Size(x.Linux)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
 }
 
 type WindowsContainerStatistics struct {
@@ -207,7 +142,7 @@ func (m *WindowsContainerStatistics) XXX_Marshal(b []byte, deterministic bool) (
 		return xxx_messageInfo_WindowsContainerStatistics.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -248,7 +183,7 @@ func (m *WindowsContainerProcessorStatistics) XXX_Marshal(b []byte, deterministi
 		return xxx_messageInfo_WindowsContainerProcessorStatistics.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -289,7 +224,7 @@ func (m *WindowsContainerMemoryStatistics) XXX_Marshal(b []byte, deterministic b
 		return xxx_messageInfo_WindowsContainerMemoryStatistics.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -331,7 +266,7 @@ func (m *WindowsContainerStorageStatistics) XXX_Marshal(b []byte, deterministic 
 		return xxx_messageInfo_WindowsContainerStorageStatistics.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -371,7 +306,7 @@ func (m *VirtualMachineStatistics) XXX_Marshal(b []byte, deterministic bool) ([]
 		return xxx_messageInfo_VirtualMachineStatistics.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -410,7 +345,7 @@ func (m *VirtualMachineProcessorStatistics) XXX_Marshal(b []byte, deterministic 
 		return xxx_messageInfo_VirtualMachineProcessorStatistics.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -451,7 +386,7 @@ func (m *VirtualMachineMemoryStatistics) XXX_Marshal(b []byte, deterministic boo
 		return xxx_messageInfo_VirtualMachineMemoryStatistics.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -496,7 +431,7 @@ func (m *VirtualMachineMemory) XXX_Marshal(b []byte, deterministic bool) ([]byte
 		return xxx_messageInfo_VirtualMachineMemory.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -603,7 +538,7 @@ var fileDescriptor_23217f96da3a05cc = []byte{
 func (m *Statistics) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -611,65 +546,89 @@ func (m *Statistics) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *Statistics) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *Statistics) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if m.Container != nil {
-		nn1, err := m.Container.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += nn1
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	if m.VM != nil {
-		dAtA[i] = 0x1a
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.VM.Size()))
-		n2, err := m.VM.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
+		{
+			size, err := m.VM.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintStats(dAtA, i, uint64(size))
 		}
-		i += n2
+		i--
+		dAtA[i] = 0x1a
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	if m.Container != nil {
+		{
+			size := m.Container.Size()
+			i -= size
+			if _, err := m.Container.MarshalTo(dAtA[i:]); err != nil {
+				return 0, err
+			}
+		}
 	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 
 func (m *Statistics_Windows) MarshalTo(dAtA []byte) (int, error) {
-	i := 0
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *Statistics_Windows) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	if m.Windows != nil {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.Windows.Size()))
-		n3, err := m.Windows.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
+		{
+			size, err := m.Windows.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintStats(dAtA, i, uint64(size))
 		}
-		i += n3
+		i--
+		dAtA[i] = 0xa
 	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 func (m *Statistics_Linux) MarshalTo(dAtA []byte) (int, error) {
-	i := 0
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *Statistics_Linux) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	if m.Linux != nil {
-		dAtA[i] = 0x12
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.Linux.Size()))
-		n4, err := m.Linux.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
+		{
+			size, err := m.Linux.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintStats(dAtA, i, uint64(size))
 		}
-		i += n4
+		i--
+		dAtA[i] = 0x12
 	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 func (m *WindowsContainerStatistics) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -677,71 +636,83 @@ func (m *WindowsContainerStatistics) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *WindowsContainerStatistics) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *WindowsContainerStatistics) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	dAtA[i] = 0xa
-	i++
-	i = encodeVarintStats(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.Timestamp)))
-	n5, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.Timestamp, dAtA[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n5
-	dAtA[i] = 0x12
-	i++
-	i = encodeVarintStats(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.ContainerStartTime)))
-	n6, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.ContainerStartTime, dAtA[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n6
-	if m.UptimeNS != 0 {
-		dAtA[i] = 0x18
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.UptimeNS))
-	}
-	if m.Processor != nil {
-		dAtA[i] = 0x22
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.Processor.Size()))
-		n7, err := m.Processor.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n7
-	}
-	if m.Memory != nil {
-		dAtA[i] = 0x2a
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.Memory.Size()))
-		n8, err := m.Memory.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n8
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	if m.Storage != nil {
-		dAtA[i] = 0x32
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.Storage.Size()))
-		n9, err := m.Storage.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
+		{
+			size, err := m.Storage.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintStats(dAtA, i, uint64(size))
 		}
-		i += n9
+		i--
+		dAtA[i] = 0x32
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	if m.Memory != nil {
+		{
+			size, err := m.Memory.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintStats(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x2a
 	}
-	return i, nil
+	if m.Processor != nil {
+		{
+			size, err := m.Processor.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintStats(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x22
+	}
+	if m.UptimeNS != 0 {
+		i = encodeVarintStats(dAtA, i, uint64(m.UptimeNS))
+		i--
+		dAtA[i] = 0x18
+	}
+	n7, err7 := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.ContainerStartTime, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdTime(m.ContainerStartTime):])
+	if err7 != nil {
+		return 0, err7
+	}
+	i -= n7
+	i = encodeVarintStats(dAtA, i, uint64(n7))
+	i--
+	dAtA[i] = 0x12
+	n8, err8 := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.Timestamp, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdTime(m.Timestamp):])
+	if err8 != nil {
+		return 0, err8
+	}
+	i -= n8
+	i = encodeVarintStats(dAtA, i, uint64(n8))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
 }
 
 func (m *WindowsContainerProcessorStatistics) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -749,35 +720,41 @@ func (m *WindowsContainerProcessorStatistics) Marshal() (dAtA []byte, err error)
 }
 
 func (m *WindowsContainerProcessorStatistics) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *WindowsContainerProcessorStatistics) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if m.TotalRuntimeNS != 0 {
-		dAtA[i] = 0x8
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.TotalRuntimeNS))
-	}
-	if m.RuntimeUserNS != 0 {
-		dAtA[i] = 0x10
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.RuntimeUserNS))
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	if m.RuntimeKernelNS != 0 {
-		dAtA[i] = 0x18
-		i++
 		i = encodeVarintStats(dAtA, i, uint64(m.RuntimeKernelNS))
+		i--
+		dAtA[i] = 0x18
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	if m.RuntimeUserNS != 0 {
+		i = encodeVarintStats(dAtA, i, uint64(m.RuntimeUserNS))
+		i--
+		dAtA[i] = 0x10
 	}
-	return i, nil
+	if m.TotalRuntimeNS != 0 {
+		i = encodeVarintStats(dAtA, i, uint64(m.TotalRuntimeNS))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
 }
 
 func (m *WindowsContainerMemoryStatistics) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -785,35 +762,41 @@ func (m *WindowsContainerMemoryStatistics) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *WindowsContainerMemoryStatistics) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *WindowsContainerMemoryStatistics) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if m.MemoryUsageCommitBytes != 0 {
-		dAtA[i] = 0x8
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.MemoryUsageCommitBytes))
-	}
-	if m.MemoryUsageCommitPeakBytes != 0 {
-		dAtA[i] = 0x10
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.MemoryUsageCommitPeakBytes))
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	if m.MemoryUsagePrivateWorkingSetBytes != 0 {
-		dAtA[i] = 0x18
-		i++
 		i = encodeVarintStats(dAtA, i, uint64(m.MemoryUsagePrivateWorkingSetBytes))
+		i--
+		dAtA[i] = 0x18
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	if m.MemoryUsageCommitPeakBytes != 0 {
+		i = encodeVarintStats(dAtA, i, uint64(m.MemoryUsageCommitPeakBytes))
+		i--
+		dAtA[i] = 0x10
 	}
-	return i, nil
+	if m.MemoryUsageCommitBytes != 0 {
+		i = encodeVarintStats(dAtA, i, uint64(m.MemoryUsageCommitBytes))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
 }
 
 func (m *WindowsContainerStorageStatistics) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -821,40 +804,46 @@ func (m *WindowsContainerStorageStatistics) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *WindowsContainerStorageStatistics) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *WindowsContainerStorageStatistics) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if m.ReadCountNormalized != 0 {
-		dAtA[i] = 0x8
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.ReadCountNormalized))
-	}
-	if m.ReadSizeBytes != 0 {
-		dAtA[i] = 0x10
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.ReadSizeBytes))
-	}
-	if m.WriteCountNormalized != 0 {
-		dAtA[i] = 0x18
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.WriteCountNormalized))
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	if m.WriteSizeBytes != 0 {
-		dAtA[i] = 0x20
-		i++
 		i = encodeVarintStats(dAtA, i, uint64(m.WriteSizeBytes))
+		i--
+		dAtA[i] = 0x20
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	if m.WriteCountNormalized != 0 {
+		i = encodeVarintStats(dAtA, i, uint64(m.WriteCountNormalized))
+		i--
+		dAtA[i] = 0x18
 	}
-	return i, nil
+	if m.ReadSizeBytes != 0 {
+		i = encodeVarintStats(dAtA, i, uint64(m.ReadSizeBytes))
+		i--
+		dAtA[i] = 0x10
+	}
+	if m.ReadCountNormalized != 0 {
+		i = encodeVarintStats(dAtA, i, uint64(m.ReadCountNormalized))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
 }
 
 func (m *VirtualMachineStatistics) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -862,40 +851,50 @@ func (m *VirtualMachineStatistics) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *VirtualMachineStatistics) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *VirtualMachineStatistics) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if m.Processor != nil {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.Processor.Size()))
-		n10, err := m.Processor.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n10
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	if m.Memory != nil {
-		dAtA[i] = 0x12
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.Memory.Size()))
-		n11, err := m.Memory.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
+		{
+			size, err := m.Memory.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintStats(dAtA, i, uint64(size))
 		}
-		i += n11
+		i--
+		dAtA[i] = 0x12
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	if m.Processor != nil {
+		{
+			size, err := m.Processor.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintStats(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0xa
 	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 
 func (m *VirtualMachineProcessorStatistics) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -903,25 +902,31 @@ func (m *VirtualMachineProcessorStatistics) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *VirtualMachineProcessorStatistics) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *VirtualMachineProcessorStatistics) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if m.TotalRuntimeNS != 0 {
-		dAtA[i] = 0x8
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.TotalRuntimeNS))
-	}
 	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
-	return i, nil
+	if m.TotalRuntimeNS != 0 {
+		i = encodeVarintStats(dAtA, i, uint64(m.TotalRuntimeNS))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
 }
 
 func (m *VirtualMachineMemoryStatistics) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -929,40 +934,48 @@ func (m *VirtualMachineMemoryStatistics) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *VirtualMachineMemoryStatistics) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *VirtualMachineMemoryStatistics) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if m.WorkingSetBytes != 0 {
-		dAtA[i] = 0x8
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.WorkingSetBytes))
-	}
-	if m.VirtualNodeCount != 0 {
-		dAtA[i] = 0x10
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.VirtualNodeCount))
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	if m.VmMemory != nil {
-		dAtA[i] = 0x1a
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.VmMemory.Size()))
-		n12, err := m.VmMemory.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
+		{
+			size, err := m.VmMemory.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintStats(dAtA, i, uint64(size))
 		}
-		i += n12
+		i--
+		dAtA[i] = 0x1a
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	if m.VirtualNodeCount != 0 {
+		i = encodeVarintStats(dAtA, i, uint64(m.VirtualNodeCount))
+		i--
+		dAtA[i] = 0x10
 	}
-	return i, nil
+	if m.WorkingSetBytes != 0 {
+		i = encodeVarintStats(dAtA, i, uint64(m.WorkingSetBytes))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
 }
 
 func (m *VirtualMachineMemory) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -970,74 +983,82 @@ func (m *VirtualMachineMemory) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *VirtualMachineMemory) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *VirtualMachineMemory) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if m.AvailableMemory != 0 {
-		dAtA[i] = 0x8
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.AvailableMemory))
-	}
-	if m.AvailableMemoryBuffer != 0 {
-		dAtA[i] = 0x10
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.AvailableMemoryBuffer))
-	}
-	if m.ReservedMemory != 0 {
-		dAtA[i] = 0x18
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.ReservedMemory))
-	}
-	if m.AssignedMemory != 0 {
-		dAtA[i] = 0x20
-		i++
-		i = encodeVarintStats(dAtA, i, uint64(m.AssignedMemory))
-	}
-	if m.SlpActive {
-		dAtA[i] = 0x28
-		i++
-		if m.SlpActive {
-			dAtA[i] = 1
-		} else {
-			dAtA[i] = 0
-		}
-		i++
-	}
-	if m.BalancingEnabled {
-		dAtA[i] = 0x30
-		i++
-		if m.BalancingEnabled {
-			dAtA[i] = 1
-		} else {
-			dAtA[i] = 0
-		}
-		i++
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	if m.DmOperationInProgress {
-		dAtA[i] = 0x38
-		i++
+		i--
 		if m.DmOperationInProgress {
 			dAtA[i] = 1
 		} else {
 			dAtA[i] = 0
 		}
-		i++
+		i--
+		dAtA[i] = 0x38
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	if m.BalancingEnabled {
+		i--
+		if m.BalancingEnabled {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x30
 	}
-	return i, nil
+	if m.SlpActive {
+		i--
+		if m.SlpActive {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x28
+	}
+	if m.AssignedMemory != 0 {
+		i = encodeVarintStats(dAtA, i, uint64(m.AssignedMemory))
+		i--
+		dAtA[i] = 0x20
+	}
+	if m.ReservedMemory != 0 {
+		i = encodeVarintStats(dAtA, i, uint64(m.ReservedMemory))
+		i--
+		dAtA[i] = 0x18
+	}
+	if m.AvailableMemoryBuffer != 0 {
+		i = encodeVarintStats(dAtA, i, uint64(m.AvailableMemoryBuffer))
+		i--
+		dAtA[i] = 0x10
+	}
+	if m.AvailableMemory != 0 {
+		i = encodeVarintStats(dAtA, i, uint64(m.AvailableMemory))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
 }
 
 func encodeVarintStats(dAtA []byte, offset int, v uint64) int {
+	offset -= sovStats(v)
+	base := offset
 	for v >= 1<<7 {
 		dAtA[offset] = uint8(v&0x7f | 0x80)
 		v >>= 7
 		offset++
 	}
 	dAtA[offset] = uint8(v)
-	return offset + 1
+	return base
 }
 func (m *Statistics) Size() (n int) {
 	if m == nil {
@@ -1270,14 +1291,7 @@ func (m *VirtualMachineMemory) Size() (n int) {
 }
 
 func sovStats(x uint64) (n int) {
-	for {
-		n++
-		x >>= 7
-		if x == 0 {
-			break
-		}
-	}
-	return n
+	return (math_bits.Len64(x|1) + 6) / 7
 }
 func sozStats(x uint64) (n int) {
 	return sovStats(uint64((x << 1) ^ uint64((int64(x) >> 63))))
@@ -1288,7 +1302,7 @@ func (this *Statistics) String() string {
 	}
 	s := strings.Join([]string{`&Statistics{`,
 		`Container:` + fmt.Sprintf("%v", this.Container) + `,`,
-		`VM:` + strings.Replace(fmt.Sprintf("%v", this.VM), "VirtualMachineStatistics", "VirtualMachineStatistics", 1) + `,`,
+		`VM:` + strings.Replace(this.VM.String(), "VirtualMachineStatistics", "VirtualMachineStatistics", 1) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -1319,12 +1333,12 @@ func (this *WindowsContainerStatistics) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&WindowsContainerStatistics{`,
-		`Timestamp:` + strings.Replace(strings.Replace(this.Timestamp.String(), "Timestamp", "types.Timestamp", 1), `&`, ``, 1) + `,`,
-		`ContainerStartTime:` + strings.Replace(strings.Replace(this.ContainerStartTime.String(), "Timestamp", "types.Timestamp", 1), `&`, ``, 1) + `,`,
+		`Timestamp:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Timestamp), "Timestamp", "types.Timestamp", 1), `&`, ``, 1) + `,`,
+		`ContainerStartTime:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ContainerStartTime), "Timestamp", "types.Timestamp", 1), `&`, ``, 1) + `,`,
 		`UptimeNS:` + fmt.Sprintf("%v", this.UptimeNS) + `,`,
-		`Processor:` + strings.Replace(fmt.Sprintf("%v", this.Processor), "WindowsContainerProcessorStatistics", "WindowsContainerProcessorStatistics", 1) + `,`,
-		`Memory:` + strings.Replace(fmt.Sprintf("%v", this.Memory), "WindowsContainerMemoryStatistics", "WindowsContainerMemoryStatistics", 1) + `,`,
-		`Storage:` + strings.Replace(fmt.Sprintf("%v", this.Storage), "WindowsContainerStorageStatistics", "WindowsContainerStorageStatistics", 1) + `,`,
+		`Processor:` + strings.Replace(this.Processor.String(), "WindowsContainerProcessorStatistics", "WindowsContainerProcessorStatistics", 1) + `,`,
+		`Memory:` + strings.Replace(this.Memory.String(), "WindowsContainerMemoryStatistics", "WindowsContainerMemoryStatistics", 1) + `,`,
+		`Storage:` + strings.Replace(this.Storage.String(), "WindowsContainerStorageStatistics", "WindowsContainerStorageStatistics", 1) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -1375,8 +1389,8 @@ func (this *VirtualMachineStatistics) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&VirtualMachineStatistics{`,
-		`Processor:` + strings.Replace(fmt.Sprintf("%v", this.Processor), "VirtualMachineProcessorStatistics", "VirtualMachineProcessorStatistics", 1) + `,`,
-		`Memory:` + strings.Replace(fmt.Sprintf("%v", this.Memory), "VirtualMachineMemoryStatistics", "VirtualMachineMemoryStatistics", 1) + `,`,
+		`Processor:` + strings.Replace(this.Processor.String(), "VirtualMachineProcessorStatistics", "VirtualMachineProcessorStatistics", 1) + `,`,
+		`Memory:` + strings.Replace(this.Memory.String(), "VirtualMachineMemoryStatistics", "VirtualMachineMemoryStatistics", 1) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -1400,7 +1414,7 @@ func (this *VirtualMachineMemoryStatistics) String() string {
 	s := strings.Join([]string{`&VirtualMachineMemoryStatistics{`,
 		`WorkingSetBytes:` + fmt.Sprintf("%v", this.WorkingSetBytes) + `,`,
 		`VirtualNodeCount:` + fmt.Sprintf("%v", this.VirtualNodeCount) + `,`,
-		`VmMemory:` + strings.Replace(fmt.Sprintf("%v", this.VmMemory), "VirtualMachineMemory", "VirtualMachineMemory", 1) + `,`,
+		`VmMemory:` + strings.Replace(this.VmMemory.String(), "VirtualMachineMemory", "VirtualMachineMemory", 1) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -1572,10 +1586,7 @@ func (m *Statistics) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthStats
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthStats
 			}
 			if (iNdEx + skippy) > l {
@@ -1819,10 +1830,7 @@ func (m *WindowsContainerStatistics) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthStats
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthStats
 			}
 			if (iNdEx + skippy) > l {
@@ -1930,10 +1938,7 @@ func (m *WindowsContainerProcessorStatistics) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthStats
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthStats
 			}
 			if (iNdEx + skippy) > l {
@@ -2041,10 +2046,7 @@ func (m *WindowsContainerMemoryStatistics) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthStats
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthStats
 			}
 			if (iNdEx + skippy) > l {
@@ -2171,10 +2173,7 @@ func (m *WindowsContainerStorageStatistics) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthStats
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthStats
 			}
 			if (iNdEx + skippy) > l {
@@ -2297,10 +2296,7 @@ func (m *VirtualMachineStatistics) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthStats
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthStats
 			}
 			if (iNdEx + skippy) > l {
@@ -2370,10 +2366,7 @@ func (m *VirtualMachineProcessorStatistics) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthStats
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthStats
 			}
 			if (iNdEx + skippy) > l {
@@ -2498,10 +2491,7 @@ func (m *VirtualMachineMemoryStatistics) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthStats
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthStats
 			}
 			if (iNdEx + skippy) > l {
@@ -2688,10 +2678,7 @@ func (m *VirtualMachineMemory) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthStats
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthStats
 			}
 			if (iNdEx + skippy) > l {
@@ -2710,6 +2697,7 @@ func (m *VirtualMachineMemory) Unmarshal(dAtA []byte) error {
 func skipStats(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0
+	depth := 0
 	for iNdEx < l {
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
@@ -2741,10 +2729,8 @@ func skipStats(dAtA []byte) (n int, err error) {
 					break
 				}
 			}
-			return iNdEx, nil
 		case 1:
 			iNdEx += 8
-			return iNdEx, nil
 		case 2:
 			var length int
 			for shift := uint(0); ; shift += 7 {
@@ -2765,55 +2751,30 @@ func skipStats(dAtA []byte) (n int, err error) {
 				return 0, ErrInvalidLengthStats
 			}
 			iNdEx += length
-			if iNdEx < 0 {
-				return 0, ErrInvalidLengthStats
-			}
-			return iNdEx, nil
 		case 3:
-			for {
-				var innerWire uint64
-				var start int = iNdEx
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return 0, ErrIntOverflowStats
-					}
-					if iNdEx >= l {
-						return 0, io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					innerWire |= (uint64(b) & 0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				innerWireType := int(innerWire & 0x7)
-				if innerWireType == 4 {
-					break
-				}
-				next, err := skipStats(dAtA[start:])
-				if err != nil {
-					return 0, err
-				}
-				iNdEx = start + next
-				if iNdEx < 0 {
-					return 0, ErrInvalidLengthStats
-				}
-			}
-			return iNdEx, nil
+			depth++
 		case 4:
-			return iNdEx, nil
+			if depth == 0 {
+				return 0, ErrUnexpectedEndOfGroupStats
+			}
+			depth--
 		case 5:
 			iNdEx += 4
-			return iNdEx, nil
 		default:
 			return 0, fmt.Errorf("proto: illegal wireType %d", wireType)
 		}
+		if iNdEx < 0 {
+			return 0, ErrInvalidLengthStats
+		}
+		if depth == 0 {
+			return iNdEx, nil
+		}
 	}
-	panic("unreachable")
+	return 0, io.ErrUnexpectedEOF
 }
 
 var (
-	ErrInvalidLengthStats = fmt.Errorf("proto: negative length found during unmarshaling")
-	ErrIntOverflowStats   = fmt.Errorf("proto: integer overflow")
+	ErrInvalidLengthStats        = fmt.Errorf("proto: negative length found during unmarshaling")
+	ErrIntOverflowStats          = fmt.Errorf("proto: integer overflow")
+	ErrUnexpectedEndOfGroupStats = fmt.Errorf("proto: unexpected end of group")
 )

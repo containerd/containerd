@@ -21,14 +21,15 @@ package linux
 
 import (
 	"context"
+	"errors"
 
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/runtime"
 	shim "github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/ttrpc"
-	"github.com/pkg/errors"
 )
 
 // Process implements a linux process
@@ -56,6 +57,23 @@ func (p *Process) Kill(ctx context.Context, signal uint32, _ bool) error {
 	return err
 }
 
+func statusFromProto(from task.Status) runtime.Status {
+	var status runtime.Status
+	switch from {
+	case task.Status_CREATED:
+		status = runtime.CreatedStatus
+	case task.Status_RUNNING:
+		status = runtime.RunningStatus
+	case task.Status_STOPPED:
+		status = runtime.StoppedStatus
+	case task.Status_PAUSED:
+		status = runtime.PausedStatus
+	case task.Status_PAUSING:
+		status = runtime.PausingStatus
+	}
+	return status
+}
+
 // State of process
 func (p *Process) State(ctx context.Context) (runtime.State, error) {
 	// use the container status for the status of the process
@@ -72,22 +90,9 @@ func (p *Process) State(ctx context.Context) (runtime.State, error) {
 		// the connection differently if this causes problems.
 		return runtime.State{}, errdefs.ErrNotFound
 	}
-	var status runtime.Status
-	switch response.Status {
-	case task.StatusCreated:
-		status = runtime.CreatedStatus
-	case task.StatusRunning:
-		status = runtime.RunningStatus
-	case task.StatusStopped:
-		status = runtime.StoppedStatus
-	case task.StatusPaused:
-		status = runtime.PausedStatus
-	case task.StatusPausing:
-		status = runtime.PausingStatus
-	}
 	return runtime.State{
 		Pid:        response.Pid,
-		Status:     status,
+		Status:     statusFromProto(response.Status),
 		Stdin:      response.Stdin,
 		Stdout:     response.Stdout,
 		Stderr:     response.Stderr,
@@ -146,7 +151,7 @@ func (p *Process) Wait(ctx context.Context) (*runtime.Exit, error) {
 		return nil, err
 	}
 	return &runtime.Exit{
-		Timestamp: r.ExitedAt,
+		Timestamp: protobuf.FromTimestamp(r.ExitedAt),
 		Status:    r.ExitStatus,
 	}, nil
 }
@@ -161,7 +166,7 @@ func (p *Process) Delete(ctx context.Context) (*runtime.Exit, error) {
 	}
 	return &runtime.Exit{
 		Status:    r.ExitStatus,
-		Timestamp: r.ExitedAt,
+		Timestamp: protobuf.FromTimestamp(r.ExitedAt),
 		Pid:       r.Pid,
 	}, nil
 }

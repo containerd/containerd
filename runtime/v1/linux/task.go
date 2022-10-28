@@ -21,22 +21,22 @@ package linux
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/containerd/cgroups"
 	eventstypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/v1/shim/client"
 	"github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/ttrpc"
-	"github.com/containerd/typeurl"
-	"github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
 )
 
 // Task on a linux based system
@@ -48,11 +48,11 @@ type Task struct {
 	namespace string
 	cg        cgroups.Cgroup
 	events    *exchange.Exchange
-	tasks     *runtime.TaskList
+	tasks     *runtime.NSMap[runtime.Task]
 	bundle    *bundle
 }
 
-func newTask(id, namespace string, pid int, shim *client.Client, events *exchange.Exchange, list *runtime.TaskList, bundle *bundle) (*Task, error) {
+func newTask(id, namespace string, pid int, shim *client.Client, events *exchange.Exchange, list *runtime.NSMap[runtime.Task], bundle *bundle) (*Task, error) {
 	var (
 		err error
 		cg  cgroups.Cgroup
@@ -86,7 +86,7 @@ func (t *Task) Namespace() string {
 }
 
 // PID of the task
-func (t *Task) PID(_ctx context.Context) (uint32, error) {
+func (t *Task) PID(_ context.Context) (uint32, error) {
 	return uint32(t.pid), nil
 }
 
@@ -117,7 +117,7 @@ func (t *Task) Delete(ctx context.Context) (*runtime.Exit, error) {
 	})
 	return &runtime.Exit{
 		Status:    rsp.ExitStatus,
-		Timestamp: rsp.ExitedAt,
+		Timestamp: protobuf.FromTimestamp(rsp.ExitedAt),
 		Pid:       rsp.Pid,
 	}, nil
 }
@@ -165,28 +165,15 @@ func (t *Task) State(ctx context.Context) (runtime.State, error) {
 		}
 		return runtime.State{}, errdefs.ErrNotFound
 	}
-	var status runtime.Status
-	switch response.Status {
-	case task.StatusCreated:
-		status = runtime.CreatedStatus
-	case task.StatusRunning:
-		status = runtime.RunningStatus
-	case task.StatusStopped:
-		status = runtime.StoppedStatus
-	case task.StatusPaused:
-		status = runtime.PausedStatus
-	case task.StatusPausing:
-		status = runtime.PausingStatus
-	}
 	return runtime.State{
 		Pid:        response.Pid,
-		Status:     status,
+		Status:     statusFromProto(response.Status),
 		Stdin:      response.Stdin,
 		Stdout:     response.Stdout,
 		Stderr:     response.Stderr,
 		Terminal:   response.Terminal,
 		ExitStatus: response.ExitStatus,
-		ExitedAt:   response.ExitedAt,
+		ExitedAt:   protobuf.FromTimestamp(response.ExitedAt),
 	}, nil
 }
 
@@ -229,7 +216,7 @@ func (t *Task) Kill(ctx context.Context, signal uint32, all bool) error {
 // Exec creates a new process inside the task
 func (t *Task) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runtime.ExecProcess, error) {
 	if err := identifiers.Validate(id); err != nil {
-		return nil, errors.Wrapf(err, "invalid exec id")
+		return nil, fmt.Errorf("invalid exec id: %w", err)
 	}
 	request := &shim.ExecProcessRequest{
 		ID:       id,
@@ -333,13 +320,13 @@ func (t *Task) Stats(ctx context.Context) (*types.Any, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.cg == nil {
-		return nil, errors.Wrap(errdefs.ErrNotFound, "cgroup does not exist")
+		return nil, fmt.Errorf("cgroup does not exist: %w", errdefs.ErrNotFound)
 	}
 	stats, err := t.cg.Stat(cgroups.IgnoreNotExist)
 	if err != nil {
 		return nil, err
 	}
-	return typeurl.MarshalAny(stats)
+	return protobuf.MarshalAnyToProto(stats)
 }
 
 // Cgroup returns the underlying cgroup for a linux task
@@ -347,7 +334,7 @@ func (t *Task) Cgroup() (cgroups.Cgroup, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.cg == nil {
-		return nil, errors.Wrap(errdefs.ErrNotFound, "cgroup does not exist")
+		return nil, fmt.Errorf("cgroup does not exist: %w", errdefs.ErrNotFound)
 	}
 	return t.cg, nil
 }
@@ -361,7 +348,7 @@ func (t *Task) Wait(ctx context.Context) (*runtime.Exit, error) {
 		return nil, err
 	}
 	return &runtime.Exit{
-		Timestamp: r.ExitedAt,
+		Timestamp: protobuf.FromTimestamp(r.ExitedAt),
 		Status:    r.ExitStatus,
 	}, nil
 }

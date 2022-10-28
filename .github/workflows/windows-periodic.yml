@@ -10,9 +10,9 @@ on:
         required: true
       AZURE_CREDS:
         required: true
-      GCP_PROJECT_ID:
+      GCP_SERVICE_ACCOUNT:
         required: true
-      GCP_SA_KEY:
+      GCP_WORKLOAD_IDENTITY_PROVIDER:
         required: true
 
 env:
@@ -23,24 +23,37 @@ env:
   DEFAULT_ADMIN_USERNAME: azureuser
   SSH_OPTS: "-o ServerAliveInterval=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
   REMOTE_VM_BIN_PATH: "c:\\containerd\\bin"
+  BUSYBOX_TESTING_IMAGE_REF: "registry.k8s.io/e2e-test-images/busybox:1.29-2"
+  RESOURCE_CONSUMER_TESTING_IMAGE_REF: "registry.k8s.io/e2e-test-images/resource-consumer:1.10"
+  WEBSERVER_TESTING_IMAGE_REF: "registry.k8s.io/e2e-test-images/nginx:1.14-2"
+
 
 jobs:
   winIntegration:
+    # NOTE: the following permissions are required by `google-github-actions/auth`:
+    permissions:
+      contents: 'read'
+      id-token: 'write'
     strategy:
+      # NOTE(aznashwan): this will permit all other jobs from the matrix to finish and
+      # upload their results even if one has a failing non-test-task:
+      # (e.g. hitting resource limits in the `AZTestVMCreate` task)
+      fail-fast: false
       matrix:
         win_ver: [ltsc2019, ltsc2022]
         include:
         - win_ver: ltsc2019
-          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2019-Datacenter-with-Containers-smalldisk:17763.1935.2105080716"
+          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2019-Datacenter-with-Containers-smalldisk:17763.2565.220202"
           AZURE_RESOURCE_GROUP: ctrd-integration-ltsc2019-${{ github.run_id }}
-          GOOGLE_BUCKET: "gs://containerd-integration/logs/windows-ltsc2019/"
+          GOOGLE_BUCKET: "containerd-integration/logs/windows-ltsc2019/"
         - win_ver: ltsc2022
-          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2022-datacenter-smalldisk-g2:20348.169.2108120020"
+          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2022-datacenter-smalldisk-g2:20348.524.220201"
           AZURE_RESOURCE_GROUP: ctrd-integration-ltsc2022-${{ github.run_id }}
-          GOOGLE_BUCKET: "gs://containerd-integration/logs/windows-ltsc2022/"
+          GOOGLE_BUCKET: "containerd-integration/logs/windows-ltsc2022/"
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install required packages
         run: |
@@ -52,8 +65,11 @@ jobs:
           LOGS_DIR=$HOME/$STARTED_TIME
           echo "STARTED_TIME=$STARTED_TIME" >> $GITHUB_ENV
           echo "LOGS_DIR=$LOGS_DIR" >> $GITHUB_ENV
-          mkdir -p $LOGS_DIR/artifacts
 
+          echo "VM_INTEGRATION_LOGFILE=/c/Logs/integration.log" >> $GITHUB_ENV
+          echo "VM_CRI_INTEGRATION_LOGFILE=/c/Logs/cri-integration.log" >> $GITHUB_ENV
+
+          mkdir -p $LOGS_DIR/artifacts
           jq -n --arg node temp --arg timestamp $STARTED_TIME '$timestamp|tonumber|{timestamp:.,$node}' > $LOGS_DIR/started.json
 
       - name: Generate ssh key pair
@@ -77,13 +93,25 @@ jobs:
         uses: azure/CLI@v1
         with:
           inlinescript: |
-            az vm create -n winTestVM --admin-username ${{ env.DEFAULT_ADMIN_USERNAME }} --admin-password ${{ env.PASSWORD }} --image ${{ matrix.AZURE_IMG }} -g ${{ matrix.AZURE_RESOURCE_GROUP }} --nsg-rule SSH --size ${{ env.AZURE_DEFAULT_VM_SIZE }}
+            DETAILS=$(az vm create -n winTestVM --admin-username ${{ env.DEFAULT_ADMIN_USERNAME }} --admin-password ${{ env.PASSWORD }} --image ${{ matrix.AZURE_IMG }} -g ${{ matrix.AZURE_RESOURCE_GROUP }} --nsg-rule SSH --size ${{ env.AZURE_DEFAULT_VM_SIZE }} --public-ip-sku Standard -o json)
+            PUB_IP=$(echo $DETAILS | jq -r .publicIpAddress)
+            if [ "$PUB_IP" == "null" ]
+            then
+                RETRY=0
+                while [ "$PUB_IP" == "null" ] || [ $RETRY -le 5 ]
+                do
+                    sleep 5
+                    PUB_IP=$(az vm show -d -g ${{ matrix.AZURE_RESOURCE_GROUP }} -n winTestVM -o json --query publicIps | jq -r)
+                    RETRY=$(( $RETRY + 1 ))
+                done
+            fi
 
-      - name: GetAZVMPublicIP
-        uses: azure/CLI@v1
-        with:
-          inlinescript: |
-            echo "VM_PUB_IP=$(az network public-ip list -g ${{ matrix.AZURE_RESOURCE_GROUP }} | jq '.[0]["ipAddress"]' | tr -d '\"')" >> $GITHUB_ENV
+            if [ "$PUB_IP" == "null" ]
+            then
+                echo "failed to fetch public IP"
+                exit 1
+            fi
+            echo "VM_PUB_IP=$PUB_IP" >> $GITHUB_ENV
 
       - name: EnableAZVMSSH
         uses: azure/CLI@v1
@@ -130,55 +158,87 @@ jobs:
         run: |
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "git clone http://github.com/containerd/containerd c:\\containerd "
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "cd c:\containerd ; make binaries"
-          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "git clone http://github.com/Microsoft/hcsshim c:\containerd\hcsshim "
-
-          # Get shim commit from containerd local repo
-          SHIM_COMMIT=$(grep 'Microsoft/hcsshim' go.mod | awk '{ print $2 }');
-
-          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "cd c:\containerd\hcsshim; git fetch --tags origin $SHIM_COMMIT ; \
-                            git checkout $SHIM_COMMIT ; go build -mod=vendor -o ${{ env.REMOTE_VM_BIN_PATH }}\containerd-shim-runhcs-v1.exe .\cmd\containerd-shim-runhcs-v1"
 
       - name: RunIntegrationTests
+        id: RunIntegrationTests
+        # NOTE(aznashwan): this is set to continue-on-error to allow the workflow to run until
+        # the reports are converted/uploaded to GCloud so as to show up on testgrid.k8s.io too.
+        continue-on-error: true
         run: |
-          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cd /c/containerd && (make integration | tee /c/Logs/integration.log)'"
-          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cat /c/Logs/integration.log | go-junit-report.exe > /c/Logs/junit_00.xml'"
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -s" << EOF
+            cd /c/containerd
+            export EXTRA_TESTFLAGS="-timeout=20m"
+            set -o pipefail
+            make integration | tee ${{ env.VM_INTEGRATION_LOGFILE }}
+          EOF
+          echo 'SUCCEEDED=1' >> $GITHUB_OUTPUT
 
-      # CRI-integration tests for Windows PR is not merged. TO DO (adelina-t): enable these when PR #5163 merges.
       - name: PrepareRepoList
         run: |
-           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh -c 'cat > c:/repolist.toml'" <<'EOF'
-               busybox = "k8s.gcr.io/e2e-test-images/busybox:1.29-2"
-               ResourceConsumer = "k8s.gcr.io/e2e-test-images/resource-consumer:1.10"
-           EOF
+            cat > repolist.toml << EOF
+            busybox = "${{ env.BUSYBOX_TESTING_IMAGE_REF }}"
+            ResourceConsumer = "${{ env.RESOURCE_CONSUMER_TESTING_IMAGE_REF }}"
+            EOF
+
+            cat > cri-test-images.yaml << EOF
+            defaultTestContainerImage: ${{ env.BUSYBOX_TESTING_IMAGE_REF }}
+            webServerTestImage: ${{ env.WEBSERVER_TESTING_IMAGE_REF }}
+            EOF
+
+            scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} repolist.toml azureuser@${{ env.VM_PUB_IP }}:c:/repolist.toml
+            scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} cri-test-images.yaml azureuser@${{ env.VM_PUB_IP }}:c:/cri-test-images.yaml
 
       - name: RunCRIIntegrationTests
+        id: RunCRIIntegrationTests
+        # NOTE(aznashwan): this is set to continue-on-error to allow the workflow to run until
+        # the reports are converted/uploaded to GCloud so as to show up on testgrid.k8s.io too.
+        continue-on-error: true
         run: |
            ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -s" <<EOF
              cd c:/containerd
              ./script/setup/install-cni-windows
-             mkdir /c/tmp
              export TEST_IMAGE_LIST=c:/repolist.toml
-             make cri-integration | tee c:/Logs/cri-integration.log
+             set -o pipefail
+             make cri-integration | tee ${{ env.VM_CRI_INTEGRATION_LOGFILE }}
            EOF
-           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cat /c/Logs/cri-integration.log | go-junit-report.exe > c:/Logs/junit_01.xml' "
+           echo 'SUCCEEDED=1' >> $GITHUB_OUTPUT
 
       - name: GetCritestRepo
-        if: ${{ matrix.win_ver != 'ltsc2022' }}
         run: |
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "git clone https://github.com/kubernetes-sigs/cri-tools c:/cri-tools"
 
       - name: BuildCritest
-        if: ${{ matrix.win_ver != 'ltsc2022' }}
         run: |
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cd /c/cri-tools && make critest'"
 
       - name: RunCritest
-        if: ${{ matrix.win_ver != 'ltsc2022' }}
+        id: RunCritest
+        # NOTE(aznashwan): this is set to continue-on-error to allow the workflow to run until
+        # the reports are converted/uploaded to GCloud so as to show up on testgrid.k8s.io too.
+        continue-on-error: true
         run: |
-          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "powershell.exe -command { Start-Process -FilePath C:\containerd\bin\containerd.exe -NoNewWindow -RedirectStandardError true -PassThru ; get-process | sls containerd ; start-sleep 5 ; c:\cri-tools\build\bin\critest.exe --runtime-endpoint=\"npipe:\\\\.\\pipe\\containerd-containerd\" --report-dir='c:\Logs' }"
+          # This test is exceedingly flaky only on ws2022 so skip for now to keep CI happy.
+          # Info: https://github.com/containerd/containerd/issues/6652
+          SKIP=""
+          if [ '${{ matrix.win_ver }}' == 'ltsc2022' ];then
+            SKIP='-ginkgo.skip="runtime should support exec with tty=true and stdin=true"'
+          fi
+
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "powershell.exe -command { C:\containerd\bin\containerd.exe --log-level=debug --log-file=C:/logs/containerd.log --service-name containerd --register-service ; Set-Service containerd -StartupType Automatic; Start-Service containerd }"
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -s" <<EOF
+            sleep 5
+            set -o pipefail
+            c:/cri-tools/build/bin/critest.exe $SKIP --runtime-endpoint='npipe://./pipe/containerd-containerd' --test-images-file='c:/cri-test-images.yaml' --report-dir='c:/Logs' -ginkgo.junit-report="C:\Logs\junit_critest.xml" | tee c:/Logs/critest.log
+          EOF
+          echo 'SUCCEEDED=1' >> $GITHUB_OUTPUT
 
       - name: PullLogsFromWinNode
         run: |
+          # Generate JUnit reports from the stdouts of the tests:
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'touch ${{ env.VM_INTEGRATION_LOGFILE }}; cat ${{ env.VM_INTEGRATION_LOGFILE }} | go-junit-report.exe > /c/Logs/junit_integration.xml'"
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'touch ${{ env.VM_CRI_INTEGRATION_LOGFILE }}; cat ${{ env.VM_CRI_INTEGRATION_LOGFILE }} | go-junit-report.exe > /c/Logs/junit_cri_integration.xml'"
+
+          # Copy over all the JUnit reports:
           scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }}:c:/Logs/*.xml ${{ env.LOGS_DIR }}/artifacts/
           for f in $(ls ${{ env.LOGS_DIR }}/artifacts/*.xml); do
               xmlstarlet ed -d "/testsuites/testsuite/properties" $f > ${{ env.LOGS_DIR }}/$(basename $f)
@@ -188,21 +248,60 @@ jobs:
       - name: FinishJob
         run: |
           jq -n --arg result SUCCESS --arg timestamp $(date +%s) '$timestamp|tonumber|{timestamp:.,$result}' > ${{ env.LOGS_DIR }}/finished.json
-          echo "${{ env.STARTED_TIME }}" > $HOME/latest-build.txt
+          echo "${{ env.STARTED_TIME }}" > ${{ github.workspace }}/latest-build.txt
 
-      - name: SetUpCloudSDK
-        uses: google-github-actions/setup-gcloud@master
-        with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
-          export_default_credentials: true
-
-      - name: UploadArtifacts
+      - name: AssignGcpCreds
+        id: AssignGcpCreds
         run: |
-          gsutil cp -r ${{ env.LOGS_DIR }} ${{ matrix.GOOGLE_BUCKET }}
-          gsutil cp $HOME/latest-build.txt ${{ matrix.GOOGLE_BUCKET }}
+          echo 'GCP_SERVICE_ACCOUNT=${{ secrets.GCP_SERVICE_ACCOUNT }}' >> $GITHUB_OUTPUT
+          echo 'GCP_WORKLOAD_IDENTITY_PROVIDER=${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}' >> $GITHUB_OUTPUT
+
+      - name: AuthGcp
+        uses: google-github-actions/auth@v0
+        if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
+        with:
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: UploadJobReport
+        uses: google-github-actions/upload-cloud-storage@v0.8.0
+        if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
+        with:
+          path: ${{ github.workspace }}/latest-build.txt
+          destination: ${{ matrix.GOOGLE_BUCKET }}
+          parent: false
+
+      - name: UploadLogsDir
+        uses: google-github-actions/upload-cloud-storage@v0.8.0
+        if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
+        with:
+          path: ${{ env.LOGS_DIR }}
+          destination: ${{ matrix.GOOGLE_BUCKET }}${{ env.STARTED_TIME}}
+          parent: false
+
+      - name: Check all CI stages succeeded
+        uses: actions/github-script@v3
+        with:
+          script: |
+            const stepResults = {
+              RunIntegrationTests: "${{ steps.RunIntegrationTests.outputs.SUCCEEDED }}",
+              RunCRIIntegrationTests: "${{ steps.RunCRIIntegrationTests.outputs.SUCCEEDED }}",
+              RunCritest: "${{ steps.RunCritest.outputs.SUCCEEDED }}",
+            };
+
+            let failedTasks = [];
+            for( [step, result] of Object.entries(stepResults) ) {
+              if (result != "1") {
+                failedTasks.push(step);
+              }
+            };
+
+            if (failedTasks.length != 0) {
+              core.setFailed(`One or more CI stages have failed. Please review the outputs of the following stepts: ${failedTasks}.`);
+            };
 
       - name: ResourceCleanup
+        if: always()
         uses: azure/CLI@v1
         with:
           inlinescript: |

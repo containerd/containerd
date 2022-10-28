@@ -19,6 +19,7 @@ package storage
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -27,7 +28,6 @@ import (
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/snapshots"
-	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -100,7 +100,7 @@ func UpdateInfo(ctx context.Context, info snapshots.Info, fieldpaths ...string) 
 	err := withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
 		sbkt := bkt.Bucket([]byte(info.Name))
 		if sbkt == nil {
-			return errors.Wrap(errdefs.ErrNotFound, "snapshot does not exist")
+			return fmt.Errorf("snapshot does not exist: %w", errdefs.ErrNotFound)
 		}
 		if err := readSnapshot(sbkt, nil, &updated); err != nil {
 			return err
@@ -122,7 +122,7 @@ func UpdateInfo(ctx context.Context, info snapshots.Info, fieldpaths ...string) 
 				case "labels":
 					updated.Labels = info.Labels
 				default:
-					return errors.Wrapf(errdefs.ErrInvalidArgument, "cannot update %q field on snapshot %q", path, info.Name)
+					return fmt.Errorf("cannot update %q field on snapshot %q: %w", path, info.Name, errdefs.ErrInvalidArgument)
 				}
 			}
 		} else {
@@ -181,25 +181,25 @@ func GetSnapshot(ctx context.Context, key string) (s Snapshot, err error) {
 	err = withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
 		sbkt := bkt.Bucket([]byte(key))
 		if sbkt == nil {
-			return errors.Wrap(errdefs.ErrNotFound, "snapshot does not exist")
+			return fmt.Errorf("snapshot does not exist: %w", errdefs.ErrNotFound)
 		}
 
 		s.ID = fmt.Sprintf("%d", readID(sbkt))
 		s.Kind = readKind(sbkt)
 
 		if s.Kind != snapshots.KindActive && s.Kind != snapshots.KindView {
-			return errors.Wrapf(errdefs.ErrFailedPrecondition, "requested snapshot %v not active or view", key)
+			return fmt.Errorf("requested snapshot %v not active or view: %w", key, errdefs.ErrFailedPrecondition)
 		}
 
 		if parentKey := sbkt.Get(bucketKeyParent); len(parentKey) > 0 {
 			spbkt := bkt.Bucket(parentKey)
 			if spbkt == nil {
-				return errors.Wrap(errdefs.ErrNotFound, "parent does not exist")
+				return fmt.Errorf("parent does not exist: %w", errdefs.ErrNotFound)
 			}
 
 			s.ParentIDs, err = parents(bkt, spbkt, readID(spbkt))
 			if err != nil {
-				return errors.Wrap(err, "failed to get parent chain")
+				return fmt.Errorf("failed to get parent chain: %w", err)
 			}
 		}
 		return nil
@@ -216,7 +216,7 @@ func CreateSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string
 	switch kind {
 	case snapshots.KindActive, snapshots.KindView:
 	default:
-		return Snapshot{}, errors.Wrapf(errdefs.ErrInvalidArgument, "snapshot type %v invalid; only snapshots of type Active or View can be created", kind)
+		return Snapshot{}, fmt.Errorf("snapshot type %v invalid; only snapshots of type Active or View can be created: %w", kind, errdefs.ErrInvalidArgument)
 	}
 	var base snapshots.Info
 	for _, opt := range opts {
@@ -232,24 +232,24 @@ func CreateSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string
 		if parent != "" {
 			spbkt = bkt.Bucket([]byte(parent))
 			if spbkt == nil {
-				return errors.Wrapf(errdefs.ErrNotFound, "missing parent %q bucket", parent)
+				return fmt.Errorf("missing parent %q bucket: %w", parent, errdefs.ErrNotFound)
 			}
 
 			if readKind(spbkt) != snapshots.KindCommitted {
-				return errors.Wrapf(errdefs.ErrInvalidArgument, "parent %q is not committed snapshot", parent)
+				return fmt.Errorf("parent %q is not committed snapshot: %w", parent, errdefs.ErrInvalidArgument)
 			}
 		}
 		sbkt, err := bkt.CreateBucket([]byte(key))
 		if err != nil {
 			if err == bolt.ErrBucketExists {
-				err = errors.Wrapf(errdefs.ErrAlreadyExists, "snapshot %v", key)
+				err = fmt.Errorf("snapshot %v: %w", key, errdefs.ErrAlreadyExists)
 			}
 			return err
 		}
 
 		id, err := bkt.NextSequence()
 		if err != nil {
-			return errors.Wrapf(err, "unable to get identifier for snapshot %q", key)
+			return fmt.Errorf("unable to get identifier for snapshot %q: %w", key, err)
 		}
 
 		t := time.Now().UTC()
@@ -270,12 +270,12 @@ func CreateSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string
 			// Store a backlink from the key to the parent. Store the snapshot name
 			// as the value to allow following the backlink to the snapshot value.
 			if err := pbkt.Put(parentKey(pid, id), []byte(key)); err != nil {
-				return errors.Wrapf(err, "failed to write parent link for snapshot %q", key)
+				return fmt.Errorf("failed to write parent link for snapshot %q: %w", key, err)
 			}
 
 			s.ParentIDs, err = parents(bkt, spbkt, pid)
 			if err != nil {
-				return errors.Wrapf(err, "failed to get parent chain for snapshot %q", key)
+				return fmt.Errorf("failed to get parent chain for snapshot %q: %w", key, err)
 			}
 		}
 
@@ -302,33 +302,33 @@ func Remove(ctx context.Context, key string) (string, snapshots.Kind, error) {
 	if err := withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
 		sbkt := bkt.Bucket([]byte(key))
 		if sbkt == nil {
-			return errors.Wrapf(errdefs.ErrNotFound, "snapshot %v", key)
+			return fmt.Errorf("snapshot %v: %w", key, errdefs.ErrNotFound)
 		}
 
 		if err := readSnapshot(sbkt, &id, &si); err != nil {
-			return errors.Wrapf(err, "failed to read snapshot %s", key)
+			return fmt.Errorf("failed to read snapshot %s: %w", key, err)
 		}
 
 		if pbkt != nil {
 			k, _ := pbkt.Cursor().Seek(parentPrefixKey(id))
 			if getParentPrefix(k) == id {
-				return errors.Wrap(errdefs.ErrFailedPrecondition, "cannot remove snapshot with child")
+				return fmt.Errorf("cannot remove snapshot with child: %w", errdefs.ErrFailedPrecondition)
 			}
 
 			if si.Parent != "" {
 				spbkt := bkt.Bucket([]byte(si.Parent))
 				if spbkt == nil {
-					return errors.Wrapf(errdefs.ErrNotFound, "snapshot %v", key)
+					return fmt.Errorf("snapshot %v: %w", key, errdefs.ErrNotFound)
 				}
 
 				if err := pbkt.Delete(parentKey(readID(spbkt), id)); err != nil {
-					return errors.Wrap(err, "failed to delete parent link")
+					return fmt.Errorf("failed to delete parent link: %w", err)
 				}
 			}
 		}
 
 		if err := bkt.DeleteBucket([]byte(key)); err != nil {
-			return errors.Wrap(err, "failed to delete snapshot")
+			return fmt.Errorf("failed to delete snapshot: %w", err)
 		}
 
 		return nil
@@ -362,20 +362,20 @@ func CommitActive(ctx context.Context, key, name string, usage snapshots.Usage, 
 			if err == bolt.ErrBucketExists {
 				err = errdefs.ErrAlreadyExists
 			}
-			return errors.Wrapf(err, "committed snapshot %v", name)
+			return fmt.Errorf("committed snapshot %v: %w", name, err)
 		}
 		sbkt := bkt.Bucket([]byte(key))
 		if sbkt == nil {
-			return errors.Wrapf(errdefs.ErrNotFound, "failed to get active snapshot %q", key)
+			return fmt.Errorf("failed to get active snapshot %q: %w", key, errdefs.ErrNotFound)
 		}
 
 		var si snapshots.Info
 		if err := readSnapshot(sbkt, &id, &si); err != nil {
-			return errors.Wrapf(err, "failed to read active snapshot %q", key)
+			return fmt.Errorf("failed to read active snapshot %q: %w", key, err)
 		}
 
 		if si.Kind != snapshots.KindActive {
-			return errors.Wrapf(errdefs.ErrFailedPrecondition, "snapshot %q is not active", key)
+			return fmt.Errorf("snapshot %q is not active: %w", key, errdefs.ErrFailedPrecondition)
 		}
 		si.Kind = snapshots.KindCommitted
 		si.Created = time.Now().UTC()
@@ -391,18 +391,18 @@ func CommitActive(ctx context.Context, key, name string, usage snapshots.Usage, 
 			return err
 		}
 		if err := bkt.DeleteBucket([]byte(key)); err != nil {
-			return errors.Wrapf(err, "failed to delete active snapshot %q", key)
+			return fmt.Errorf("failed to delete active snapshot %q: %w", key, err)
 		}
 		if si.Parent != "" {
 			spbkt := bkt.Bucket([]byte(si.Parent))
 			if spbkt == nil {
-				return errors.Wrapf(errdefs.ErrNotFound, "missing parent %q of snapshot %q", si.Parent, key)
+				return fmt.Errorf("missing parent %q of snapshot %q: %w", si.Parent, key, errdefs.ErrNotFound)
 			}
 			pid := readID(spbkt)
 
 			// Updates parent back link to use new key
 			if err := pbkt.Put(parentKey(pid, id), []byte(name)); err != nil {
-				return errors.Wrapf(err, "failed to update parent link %q from %q to %q", pid, key, name)
+				return fmt.Errorf("failed to update parent link %q from %q to %q: %w", pid, key, name, err)
 			}
 		}
 
@@ -441,15 +441,15 @@ func withSnapshotBucket(ctx context.Context, key string, fn func(context.Context
 	}
 	vbkt := tx.Bucket(bucketKeyStorageVersion)
 	if vbkt == nil {
-		return errors.Wrap(errdefs.ErrNotFound, "bucket does not exist")
+		return fmt.Errorf("bucket does not exist: %w", errdefs.ErrNotFound)
 	}
 	bkt := vbkt.Bucket(bucketKeySnapshot)
 	if bkt == nil {
-		return errors.Wrap(errdefs.ErrNotFound, "snapshots bucket does not exist")
+		return fmt.Errorf("snapshots bucket does not exist: %w", errdefs.ErrNotFound)
 	}
 	bkt = bkt.Bucket([]byte(key))
 	if bkt == nil {
-		return errors.Wrap(errdefs.ErrNotFound, "snapshot does not exist")
+		return fmt.Errorf("snapshot does not exist: %w", errdefs.ErrNotFound)
 	}
 
 	return fn(ctx, bkt, vbkt.Bucket(bucketKeyParents))
@@ -462,7 +462,7 @@ func withBucket(ctx context.Context, fn func(context.Context, *bolt.Bucket, *bol
 	}
 	bkt := tx.Bucket(bucketKeyStorageVersion)
 	if bkt == nil {
-		return errors.Wrap(errdefs.ErrNotFound, "bucket does not exist")
+		return fmt.Errorf("bucket does not exist: %w", errdefs.ErrNotFound)
 	}
 	return fn(ctx, bkt.Bucket(bucketKeySnapshot), bkt.Bucket(bucketKeyParents))
 }
@@ -475,15 +475,15 @@ func createBucketIfNotExists(ctx context.Context, fn func(context.Context, *bolt
 
 	bkt, err := tx.CreateBucketIfNotExists(bucketKeyStorageVersion)
 	if err != nil {
-		return errors.Wrap(err, "failed to create version bucket")
+		return fmt.Errorf("failed to create version bucket: %w", err)
 	}
 	sbkt, err := bkt.CreateBucketIfNotExists(bucketKeySnapshot)
 	if err != nil {
-		return errors.Wrap(err, "failed to create snapshots bucket")
+		return fmt.Errorf("failed to create snapshots bucket: %w", err)
 	}
 	pbkt, err := bkt.CreateBucketIfNotExists(bucketKeyParents)
 	if err != nil {
-		return errors.Wrap(err, "failed to create parents bucket")
+		return fmt.Errorf("failed to create parents bucket: %w", err)
 	}
 	return fn(ctx, sbkt, pbkt)
 }
@@ -498,7 +498,7 @@ func parents(bkt, pbkt *bolt.Bucket, parent uint64) (parents []string, err error
 		}
 		pbkt = bkt.Bucket(parentKey)
 		if pbkt == nil {
-			return nil, errors.Wrap(errdefs.ErrNotFound, "missing parent")
+			return nil, fmt.Errorf("missing parent: %w", errdefs.ErrNotFound)
 		}
 
 		parent = readID(pbkt)

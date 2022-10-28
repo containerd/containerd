@@ -20,6 +20,10 @@ Please note that while this project supports generating either end of the
 protocol, the generated service definitions will be incompatible with regular
 GRPC services, as they do not speak the same protocol.
 
+# Protocol
+
+See the [protocol specification](./PROTOCOL.md).
+
 # Usage
 
 Create a gogo vanity binary (see
@@ -43,7 +47,6 @@ directly, if required.
 
 TODO:
 
-- [ ] Document protocol layout
 - [ ] Add testing under concurrent load to ensure
 - [ ] Verify connection error handling
 

@@ -18,6 +18,7 @@ package tasks
 
 import (
 	gocontext "context"
+	"errors"
 	"net/url"
 	"time"
 
@@ -25,9 +26,10 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/log"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
+
+var platformStartFlags = []cli.Flag{}
 
 // HandleConsoleResize resizes the console
 func HandleConsoleResize(ctx gocontext.Context, task resizer, con console.Console) error {

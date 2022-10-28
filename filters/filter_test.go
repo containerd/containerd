@@ -334,3 +334,13 @@ func TestOperatorStrings(t *testing.T) {
 		}
 	}
 }
+
+func FuzzFiltersParse(f *testing.F) {
+	f.Add("foo=bar")
+	f.Fuzz(func(t *testing.T, expr string) {
+		filter, err := Parse(expr)
+		if filter != nil && err != nil {
+			t.Fatal("either filter or err must be non-nil")
+		}
+	})
+}

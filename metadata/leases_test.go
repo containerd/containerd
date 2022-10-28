@@ -18,17 +18,17 @@ package metadata
 
 import (
 	_ "crypto/sha256"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/leases"
-	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
 )
 
 func TestLeases(t *testing.T) {
-	ctx, db, cancel := testEnv(t)
-	defer cancel()
+	ctx, db := testEnv(t)
 
 	lm := NewLeaseManager(NewDB(db, nil, nil))
 
@@ -107,8 +107,7 @@ func TestLeases(t *testing.T) {
 }
 
 func TestLeasesList(t *testing.T) {
-	ctx, db, cancel := testEnv(t)
-	defer cancel()
+	ctx, db := testEnv(t)
 
 	lm := NewLeaseManager(NewDB(db, nil, nil))
 
@@ -251,8 +250,7 @@ func TestLeasesList(t *testing.T) {
 }
 
 func TestLeaseResource(t *testing.T) {
-	ctx, db, cancel := testEnv(t)
-	defer cancel()
+	ctx, db := testEnv(t)
 
 	lm := NewLeaseManager(NewDB(db, nil, nil))
 
@@ -365,7 +363,7 @@ func TestLeaseResource(t *testing.T) {
 		if err := db.Update(func(tx *bolt.Tx) error {
 			err0 := lm.AddResource(WithTransactionContext(ctx, tx), tc.lease, tc.resource)
 			if !errors.Is(err0, tc.err) {
-				return errors.Errorf("expect error (%v), but got (%v)", tc.err, err0)
+				return fmt.Errorf("expect error (%v), but got (%v)", tc.err, err0)
 			}
 
 			if err0 == nil {

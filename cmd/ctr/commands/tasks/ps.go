@@ -17,13 +17,13 @@
 package tasks
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"text/tabwriter"
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/typeurl"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 

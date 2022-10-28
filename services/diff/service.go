@@ -18,11 +18,11 @@ package diff
 
 import (
 	"context"
+	"errors"
 
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 
@@ -53,6 +53,7 @@ func init() {
 
 type service struct {
 	local diffapi.DiffClient
+	diffapi.UnimplementedDiffServer
 }
 
 var _ diffapi.DiffServer = &service{}

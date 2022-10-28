@@ -23,6 +23,8 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	_ "crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -30,13 +32,11 @@ import (
 	"testing"
 	"time"
 
-	_ "crypto/sha256"
-
 	"github.com/containerd/containerd/archive/tartest"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/continuity/fs/fstest"
-	"github.com/pkg/errors"
+	"github.com/stretchr/testify/require"
 	exec "golang.org/x/sys/execabs"
 )
 
@@ -58,7 +58,7 @@ var baseApplier = fstest.Apply(
 func TestUnpack(t *testing.T) {
 	requireTar(t)
 
-	if err := testApply(baseApplier); err != nil {
+	if err := testApply(t, baseApplier); err != nil {
 		t.Fatalf("Test apply failed: %+v", err)
 	}
 }
@@ -66,7 +66,7 @@ func TestUnpack(t *testing.T) {
 func TestBaseDiff(t *testing.T) {
 	requireTar(t)
 
-	if err := testBaseDiff(baseApplier); err != nil {
+	if err := testBaseDiff(t, baseApplier); err != nil {
 		t.Fatalf("Test base diff failed: %+v", err)
 	}
 }
@@ -102,7 +102,7 @@ func TestRelativeSymlinks(t *testing.T) {
 	}
 
 	for _, bo := range breakoutLinks {
-		if err := testDiffApply(bo); err != nil {
+		if err := testDiffApply(t, bo); err != nil {
 			t.Fatalf("Test apply failed: %+v", err)
 		}
 	}
@@ -179,7 +179,7 @@ func TestSymlinks(t *testing.T) {
 	}
 
 	for i, l := range links {
-		if err := testDiffApply(l[0], l[1]); err != nil {
+		if err := testDiffApply(t, l[0], l[1]); err != nil {
 			t.Fatalf("Test[%d] apply failed: %+v", i+1, err)
 		}
 	}
@@ -235,19 +235,15 @@ func TestBreakouts(t *testing.T) {
 	unbrokenCheck := func(root string) error {
 		b, err := os.ReadFile(filepath.Join(root, "etc", "unbroken"))
 		if err != nil {
-			return errors.Wrap(err, "failed to read unbroken")
+			return fmt.Errorf("failed to read unbroken: %w", err)
 		}
 		if string(b) != expected {
-			return errors.Errorf("/etc/unbroken: unexpected value %s, expected %s", b, expected)
+			return fmt.Errorf("/etc/unbroken: unexpected value %s, expected %s", b, expected)
 		}
 		return nil
 	}
 	errFileDiff := errors.New("files differ")
-	td, err := os.MkdirTemp("", "test-breakouts-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(td)
+	td := t.TempDir()
 
 	isSymlinkFile := func(f string) func(string) error {
 		return func(root string) error {
@@ -257,7 +253,7 @@ func TestBreakouts(t *testing.T) {
 			}
 
 			if got := fi.Mode() & os.ModeSymlink; got != os.ModeSymlink {
-				return errors.Errorf("%s should be symlink", fi.Name())
+				return fmt.Errorf("%s should be symlink", fi.Name())
 			}
 			return nil
 		}
@@ -285,7 +281,7 @@ func TestBreakouts(t *testing.T) {
 			}
 
 			if t1 != t2 {
-				return errors.Wrapf(errFileDiff, "%#v and %#v", t1, t2)
+				return fmt.Errorf("%#v and %#v: %w", t1, t2, errFileDiff)
 			}
 			return nil
 		}
@@ -310,7 +306,7 @@ func TestBreakouts(t *testing.T) {
 				return err
 			}
 			if !os.SameFile(s1, s2) {
-				return errors.Wrapf(errFileDiff, "%#v and %#v", s1, s2)
+				return fmt.Errorf("%#v and %#v: %w", s1, s2, errFileDiff)
 			}
 			return nil
 		}
@@ -335,7 +331,7 @@ func TestBreakouts(t *testing.T) {
 				return err
 			}
 			if !bytes.Equal(b, content) {
-				return errors.Errorf("content differs: expected %v, got %v", content, b)
+				return fmt.Errorf("content differs: expected %v, got %v", content, b)
 			}
 			return nil
 		}
@@ -422,7 +418,7 @@ func TestBreakouts(t *testing.T) {
 			validator: func(root string) error {
 				b, err := os.ReadFile(filepath.Join(root, "etc", "emptied"))
 				if err != nil {
-					return errors.Wrap(err, "failed to read unbroken")
+					return fmt.Errorf("failed to read unbroken: %w", err)
 				}
 				if len(b) > 0 {
 					return errors.New("/etc/emptied: non-empty")
@@ -774,7 +770,7 @@ func TestBreakouts(t *testing.T) {
 					return err
 				}
 				if perm := fi.Mode() & os.ModePerm; perm != 0400 {
-					return errors.Errorf("%s perm changed from 0400 to %04o", p, perm)
+					return fmt.Errorf("%s perm changed from 0400 to %04o", p, perm)
 				}
 				return nil
 			},
@@ -800,7 +796,7 @@ func TestApplyTar(t *testing.T) {
 					return err
 				}
 				if _, err := os.Stat(p); err != nil {
-					return errors.Wrapf(err, "failure checking existence for %v", d)
+					return fmt.Errorf("failure checking existence for %v: %w", d, err)
 				}
 			}
 			return nil
@@ -841,26 +837,18 @@ func TestApplyTar(t *testing.T) {
 	}
 }
 
-func testApply(a fstest.Applier) error {
-	td, err := os.MkdirTemp("", "test-apply-")
-	if err != nil {
-		return errors.Wrap(err, "failed to create temp dir")
-	}
-	defer os.RemoveAll(td)
-	dest, err := os.MkdirTemp("", "test-apply-dest-")
-	if err != nil {
-		return errors.Wrap(err, "failed to create temp dir")
-	}
-	defer os.RemoveAll(dest)
+func testApply(t *testing.T, a fstest.Applier) error {
+	td := t.TempDir()
+	dest := t.TempDir()
 
 	if err := a.Apply(td); err != nil {
-		return errors.Wrap(err, "failed to apply filesystem changes")
+		return fmt.Errorf("failed to apply filesystem changes: %w", err)
 	}
 
-	tarArgs := []string{"c", "-C", td}
+	tarArgs := []string{"cf", "-", "-C", td}
 	names, err := readDirNames(td)
 	if err != nil {
-		return errors.Wrap(err, "failed to read directory names")
+		return fmt.Errorf("failed to read directory names: %w", err)
 	}
 	tarArgs = append(tarArgs, names...)
 
@@ -868,62 +856,49 @@ func testApply(a fstest.Applier) error {
 
 	arch, err := cmd.StdoutPipe()
 	if err != nil {
-		return errors.Wrap(err, "failed to create stdout pipe")
+		return fmt.Errorf("failed to create stdout pipe: %w", err)
 	}
 
 	if err := cmd.Start(); err != nil {
-		return errors.Wrap(err, "failed to start command")
+		return fmt.Errorf("failed to start command: %w", err)
 	}
 
 	if _, err := Apply(context.Background(), dest, arch); err != nil {
-		return errors.Wrap(err, "failed to apply tar stream")
+		return fmt.Errorf("failed to apply tar stream: %w", err)
 	}
 
 	return fstest.CheckDirectoryEqual(td, dest)
 }
 
-func testBaseDiff(a fstest.Applier) error {
-	td, err := os.MkdirTemp("", "test-base-diff-")
-	if err != nil {
-		return errors.Wrap(err, "failed to create temp dir")
-	}
-	defer os.RemoveAll(td)
-	dest, err := os.MkdirTemp("", "test-base-diff-dest-")
-	if err != nil {
-		return errors.Wrap(err, "failed to create temp dir")
-	}
-	defer os.RemoveAll(dest)
+func testBaseDiff(t *testing.T, a fstest.Applier) error {
+	td := t.TempDir()
+	dest := t.TempDir()
 
 	if err := a.Apply(td); err != nil {
-		return errors.Wrap(err, "failed to apply filesystem changes")
+		return fmt.Errorf("failed to apply filesystem changes: %w", err)
 	}
 
 	arch := Diff(context.Background(), "", td)
 
-	cmd := exec.Command(tarCmd, "x", "-C", dest)
+	cmd := exec.Command(tarCmd, "xf", "-", "-C", dest)
 	cmd.Stdin = arch
+	stderr := &bytes.Buffer{}
+	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
-		return errors.Wrap(err, "tar command failed")
+		fmt.Println(stderr.String())
+		return fmt.Errorf("tar command failed: %w", err)
 	}
 
 	return fstest.CheckDirectoryEqual(td, dest)
 }
 
-func testDiffApply(appliers ...fstest.Applier) error {
-	td, err := os.MkdirTemp("", "test-diff-apply-")
-	if err != nil {
-		return errors.Wrap(err, "failed to create temp dir")
-	}
-	defer os.RemoveAll(td)
-	dest, err := os.MkdirTemp("", "test-diff-apply-dest-")
-	if err != nil {
-		return errors.Wrap(err, "failed to create temp dir")
-	}
-	defer os.RemoveAll(dest)
+func testDiffApply(t *testing.T, appliers ...fstest.Applier) error {
+	td := t.TempDir()
+	dest := t.TempDir()
 
 	for _, a := range appliers {
 		if err := a.Apply(td); err != nil {
-			return errors.Wrap(err, "failed to apply filesystem changes")
+			return fmt.Errorf("failed to apply filesystem changes: %w", err)
 		}
 	}
 
@@ -931,18 +906,18 @@ func testDiffApply(appliers ...fstest.Applier) error {
 	if len(appliers) > 1 {
 		for _, a := range appliers[:len(appliers)-1] {
 			if err := a.Apply(dest); err != nil {
-				return errors.Wrap(err, "failed to apply base filesystem changes")
+				return fmt.Errorf("failed to apply base filesystem changes: %w", err)
 			}
 		}
 	}
 
 	diffBytes, err := io.ReadAll(Diff(context.Background(), dest, td))
 	if err != nil {
-		return errors.Wrap(err, "failed to create diff")
+		return fmt.Errorf("failed to create diff: %w", err)
 	}
 
 	if _, err := Apply(context.Background(), dest, bytes.NewReader(diffBytes)); err != nil {
-		return errors.Wrap(err, "failed to apply tar stream")
+		return fmt.Errorf("failed to apply tar stream: %w", err)
 	}
 
 	return fstest.CheckDirectoryEqual(td, dest)
@@ -950,11 +925,7 @@ func testDiffApply(appliers ...fstest.Applier) error {
 
 func makeWriterToTarTest(wt tartest.WriterToTar, a fstest.Applier, validate func(string) error, applyErr error) func(*testing.T) {
 	return func(t *testing.T) {
-		td, err := os.MkdirTemp("", "test-writer-to-tar-")
-		if err != nil {
-			t.Fatalf("Failed to create temp dir: %v", err)
-		}
-		defer os.RemoveAll(td)
+		td := t.TempDir()
 
 		if a != nil {
 			if err := a.Apply(td); err != nil {
@@ -1186,7 +1157,34 @@ func TestDiffTar(t *testing.T) {
 	}
 }
 
+func TestWhiteoutSourceDateEpoch(t *testing.T) {
+	sourceDateEpoch, err := time.Parse(time.RFC3339, "2022-01-23T12:34:56Z")
+	require.NoError(t, err)
+	opts := []WriteDiffOpt{WithSourceDateEpoch(&sourceDateEpoch)}
+	validators := []tarEntryValidator{
+		composeValidators(whiteoutEntry("f1"), requireModTime(sourceDateEpoch)),
+	}
+	a := fstest.Apply(
+		fstest.CreateFile("/f1", []byte("content"), 0644),
+	)
+	b := fstest.Apply(
+		fstest.RemoveAll("/f1"),
+	)
+	makeDiffTarTest(validators, a, b, opts...)(t)
+}
+
 type tarEntryValidator func(*tar.Header, []byte) error
+
+func composeValidators(vv ...tarEntryValidator) tarEntryValidator {
+	return func(hdr *tar.Header, b []byte) error {
+		for _, v := range vv {
+			if err := v(hdr, b); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
 
 func dirEntry(name string, mode int) tarEntryValidator {
 	return func(hdr *tar.Header, b []byte) error {
@@ -1194,10 +1192,10 @@ func dirEntry(name string, mode int) tarEntryValidator {
 			return errors.New("not directory type")
 		}
 		if hdr.Name != name {
-			return errors.Errorf("wrong name %q, expected %q", hdr.Name, name)
+			return fmt.Errorf("wrong name %q, expected %q", hdr.Name, name)
 		}
 		if hdr.Mode != int64(mode) {
-			return errors.Errorf("wrong mode %o, expected %o", hdr.Mode, mode)
+			return fmt.Errorf("wrong mode %o, expected %o", hdr.Mode, mode)
 		}
 		return nil
 	}
@@ -1209,10 +1207,10 @@ func fileEntry(name string, expected []byte, mode int) tarEntryValidator {
 			return errors.New("not file type")
 		}
 		if hdr.Name != name {
-			return errors.Errorf("wrong name %q, expected %q", hdr.Name, name)
+			return fmt.Errorf("wrong name %q, expected %q", hdr.Name, name)
 		}
 		if hdr.Mode != int64(mode) {
-			return errors.Errorf("wrong mode %o, expected %o", hdr.Mode, mode)
+			return fmt.Errorf("wrong mode %o, expected %o", hdr.Mode, mode)
 		}
 		if !bytes.Equal(b, expected) {
 			return errors.New("different file content")
@@ -1227,10 +1225,10 @@ func linkEntry(name, link string) tarEntryValidator {
 			return errors.New("not link type")
 		}
 		if hdr.Name != name {
-			return errors.Errorf("wrong name %q, expected %q", hdr.Name, name)
+			return fmt.Errorf("wrong name %q, expected %q", hdr.Name, name)
 		}
 		if hdr.Linkname != link {
-			return errors.Errorf("wrong link %q, expected %q", hdr.Linkname, link)
+			return fmt.Errorf("wrong link %q, expected %q", hdr.Linkname, link)
 		}
 		return nil
 	}
@@ -1243,31 +1241,32 @@ func whiteoutEntry(name string) tarEntryValidator {
 
 	return func(hdr *tar.Header, b []byte) error {
 		if hdr.Typeflag != tar.TypeReg {
-			return errors.Errorf("not file type: %q", hdr.Typeflag)
+			return fmt.Errorf("not file type: %q", hdr.Typeflag)
 		}
 		if hdr.Name != whiteOut {
-			return errors.Errorf("wrong name %q, expected whiteout %q", hdr.Name, name)
+			return fmt.Errorf("wrong name %q, expected whiteout %q", hdr.Name, name)
 		}
 		return nil
 	}
 }
 
-func makeDiffTarTest(validators []tarEntryValidator, a, b fstest.Applier) func(*testing.T) {
-	return func(t *testing.T) {
-		ad, err := os.MkdirTemp("", "test-make-diff-tar-")
-		if err != nil {
-			t.Fatalf("failed to create temp dir: %v", err)
+func requireModTime(expected time.Time) tarEntryValidator {
+	return func(hdr *tar.Header, b []byte) error {
+		if !hdr.ModTime.Equal(expected) {
+			return fmt.Errorf("expected ModTime %v, got %v", expected, hdr.ModTime)
 		}
-		defer os.RemoveAll(ad)
+		return nil
+	}
+}
+
+func makeDiffTarTest(validators []tarEntryValidator, a, b fstest.Applier, opts ...WriteDiffOpt) func(*testing.T) {
+	return func(t *testing.T) {
+		ad := t.TempDir()
 		if err := a.Apply(ad); err != nil {
 			t.Fatalf("failed to apply a: %v", err)
 		}
 
-		bd, err := os.MkdirTemp("", "test-make-diff-tar-")
-		if err != nil {
-			t.Fatalf("failed to create temp dir: %v", err)
-		}
-		defer os.RemoveAll(bd)
+		bd := t.TempDir()
 		if err := fs.CopyDir(bd, ad); err != nil {
 			t.Fatalf("failed to copy dir: %v", err)
 		}
@@ -1275,7 +1274,7 @@ func makeDiffTarTest(validators []tarEntryValidator, a, b fstest.Applier) func(*
 			t.Fatalf("failed to apply b: %v", err)
 		}
 
-		rc := Diff(context.Background(), ad, bd)
+		rc := Diff(context.Background(), ad, bd, opts...)
 		defer rc.Close()
 
 		tr := tar.NewReader(rc)
@@ -1309,7 +1308,7 @@ type diffApplier struct{}
 func (d diffApplier) TestContext(ctx context.Context) (context.Context, func(), error) {
 	base, err := os.MkdirTemp("", "test-diff-apply-")
 	if err != nil {
-		return ctx, nil, errors.Wrap(err, "failed to create temp dir")
+		return ctx, nil, fmt.Errorf("failed to create temp dir: %w", err)
 	}
 	return context.WithValue(ctx, d, base), func() {
 		os.RemoveAll(base)
@@ -1321,23 +1320,23 @@ func (d diffApplier) Apply(ctx context.Context, a fstest.Applier) (string, func(
 
 	applyCopy, err := os.MkdirTemp("", "test-diffapply-apply-copy-")
 	if err != nil {
-		return "", nil, errors.Wrap(err, "failed to create temp dir")
+		return "", nil, fmt.Errorf("failed to create temp dir: %w", err)
 	}
 	defer os.RemoveAll(applyCopy)
 	if err = fs.CopyDir(applyCopy, base); err != nil {
-		return "", nil, errors.Wrap(err, "failed to copy base")
+		return "", nil, fmt.Errorf("failed to copy base: %w", err)
 	}
 	if err := a.Apply(applyCopy); err != nil {
-		return "", nil, errors.Wrap(err, "failed to apply changes to copy of base")
+		return "", nil, fmt.Errorf("failed to apply changes to copy of base: %w", err)
 	}
 
 	diffBytes, err := io.ReadAll(Diff(ctx, base, applyCopy))
 	if err != nil {
-		return "", nil, errors.Wrap(err, "failed to create diff")
+		return "", nil, fmt.Errorf("failed to create diff: %w", err)
 	}
 
 	if _, err = Apply(ctx, base, bytes.NewReader(diffBytes)); err != nil {
-		return "", nil, errors.Wrap(err, "failed to apply tar stream")
+		return "", nil, fmt.Errorf("failed to apply tar stream: %w", err)
 	}
 
 	return base, nil, nil

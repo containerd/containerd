@@ -21,11 +21,11 @@ package apparmor
 
 import (
 	"context"
+	"errors"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 )
 
 // WithProfile sets the provided apparmor profile to the spec

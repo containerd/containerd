@@ -21,6 +21,7 @@ package tasks
 
 import (
 	gocontext "context"
+	"errors"
 	"net/url"
 	"os"
 	"os/signal"
@@ -29,16 +30,15 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/log"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"golang.org/x/sys/unix"
 )
 
-func init() {
-	startCommand.Flags = append(startCommand.Flags, cli.BoolFlag{
+var platformStartFlags = []cli.Flag{
+	cli.BoolFlag{
 		Name:  "no-pivot",
 		Usage: "disable use of pivot-root (linux only)",
-	})
+	},
 }
 
 // HandleConsoleResize resizes the console

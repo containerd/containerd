@@ -20,12 +20,13 @@
 package oci
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/containerd/containerd/pkg/userns"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -47,7 +48,7 @@ func HostDevices() ([]specs.LinuxDevice, error) {
 func getDevices(path, containerPath string) ([]specs.LinuxDevice, error) {
 	stat, err := os.Stat(path)
 	if err != nil {
-		return nil, errors.Wrap(err, "error stating device path")
+		return nil, fmt.Errorf("error stating device path: %w", err)
 	}
 
 	if !stat.IsDir() {
@@ -126,7 +127,7 @@ func getDevices(path, containerPath string) ([]specs.LinuxDevice, error) {
 
 // TODO consider adding these consts to the OCI runtime-spec.
 const (
-	wildcardDevice = "a" //nolint // currently unused, but should be included when upstreaming to OCI runtime-spec.
+	wildcardDevice = "a" //nolint:nolintlint,unused,varcheck // currently unused, but should be included when upstreaming to OCI runtime-spec.
 	blockDevice    = "b"
 	charDevice     = "c" // or "u"
 	fifoDevice     = "p"
@@ -147,7 +148,7 @@ func DeviceFromPath(path string) (*specs.LinuxDevice, error) {
 	}
 
 	var (
-		devNumber = uint64(stat.Rdev) //nolint: unconvert // the type is 32bit on mips.
+		devNumber = uint64(stat.Rdev) //nolint:nolintlint,unconvert // the type is 32bit on mips.
 		major     = unix.Major(devNumber)
 		minor     = unix.Minor(devNumber)
 	)

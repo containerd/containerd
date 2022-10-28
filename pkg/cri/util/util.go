@@ -17,10 +17,10 @@
 package util
 
 import (
+	"context"
 	"time"
 
 	"github.com/containerd/containerd/namespaces"
-	"golang.org/x/net/context"
 
 	"github.com/containerd/containerd/pkg/cri/constants"
 )

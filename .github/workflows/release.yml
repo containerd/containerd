@@ -5,17 +5,20 @@ on:
 
 name: Containerd Release
 
+env:
+  GO_VERSION: '1.19.2'
+
 jobs:
   check:
     name: Check Signed Tag
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 5
     outputs:
       stringver: ${{ steps.contentrel.outputs.stringver }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           ref: ${{ github.ref }}
           path: src/github.com/containerd/containerd
@@ -38,44 +41,48 @@ jobs:
         id: contentrel
         run: |
           RELEASEVER=${{ github.ref }}
-          echo "::set-output name=stringver::${RELEASEVER#refs/tags/v}"
+          echo "stringver=${RELEASEVER#refs/tags/v}" >> $GITHUB_OUTPUT
           git tag -l ${RELEASEVER#refs/tags/} -n20000 | tail -n +3 | cut -c 5- >release-notes.md
         working-directory: src/github.com/containerd/containerd
 
       - name: Save release notes
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: containerd-release-notes
           path: src/github.com/containerd/containerd/release-notes.md
 
   build:
     name: Build Release Binaries
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-20.04
     needs: [check]
-    timeout-minutes: 10
+    timeout-minutes: 30
     strategy:
       matrix:
-        os: [ubuntu-18.04]
-        platform:
-          - linux/amd64
-          - linux/arm64
-          - windows/amd64
+        include:
+          # Choose an old release of Ubuntu to avoid glibc issue https://github.com/containerd/containerd/issues/7255
+          - dockerfile-ubuntu: 18.04
+            dockerfile-platform: linux/amd64
+          - dockerfile-ubuntu: 18.04
+            dockerfile-platform: linux/arm64
+          - dockerfile-ubuntu: 18.04
+            dockerfile-platform: linux/ppc64le
+          # riscv64 isn't supported by Ubuntu 18.04
+          - dockerfile-ubuntu: 22.04
+            dockerfile-platform: linux/riscv64
+          - dockerfile-ubuntu: 18.04
+            dockerfile-platform: windows/amd64
     steps:
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: '1.17.5'
       - name: Set env
         shell: bash
         env:
-          MOS: ${{ matrix.os }}
+          MOS: ubuntu-20.04
         run: |
           releasever=${{ github.ref }}
           releasever="${releasever#refs/tags/}"
           echo "RELEASE_VER=${releasever}" >> $GITHUB_ENV
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
       - name: Checkout containerd
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           # Intentionally use github.repository instead of containerd/containerd to
           # make this action runnable on forks.
@@ -100,24 +107,23 @@ jobs:
             export PREFIX_LEN=12
             BUILD_ARGS="--build-arg GATEWAY --build-arg PREFIX_LEN"
           fi
-          docker buildx build ${cache} --build-arg RELEASE_VER --build-arg GO_VERSION ${BUILD_ARGS} -f .github/workflows/release/Dockerfile --platform=${PLATFORM} -o releases/ .
+          docker buildx build ${cache} --build-arg RELEASE_VER --build-arg UBUNTU_VERSION=${{ matrix.dockerfile-ubuntu }} --build-arg GO_VERSION ${BUILD_ARGS} -f .github/workflows/release/Dockerfile --platform=${PLATFORM} -o releases/ .
           echo PLATFORM_CLEAN=${PLATFORM/\//-} >> $GITHUB_ENV
 
           # Remove symlinks since we don't want these in the release Artifacts
           find ./releases/ -maxdepth 1 -type l | xargs rm
         working-directory: src/github.com/containerd/containerd
         env:
-          GO_VERSION: '1.17.2'
-          PLATFORM: ${{ matrix.platform }}
+          PLATFORM: ${{ matrix.dockerfile-platform }}
       - name: Save Artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: release-tars-${{env.PLATFORM_CLEAN}}
           path: src/github.com/containerd/containerd/releases/*.tar.gz*
 
   release:
     name: Create containerd Release
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 10
     needs: [build, check]
     steps:

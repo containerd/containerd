@@ -17,15 +17,16 @@
 package integration
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
-	"golang.org/x/net/context"
-
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/integration/images"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -33,7 +34,7 @@ import (
 
 // Test to test the CRI plugin should see image pulled into containerd directly.
 func TestContainerdImage(t *testing.T) {
-	var testImage = GetImage(BusyBox)
+	var testImage = images.Get(images.BusyBox)
 	ctx := context.Background()
 
 	t.Logf("make sure the test image doesn't exist in the cri plugin")
@@ -77,10 +78,10 @@ func TestContainerdImage(t *testing.T) {
 		}
 		if len(img.RepoTags) != 1 {
 			// RepoTags must have been populated correctly.
-			return false, errors.Errorf("unexpected repotags: %+v", img.RepoTags)
+			return false, fmt.Errorf("unexpected repotags: %+v", img.RepoTags)
 		}
 		if img.RepoTags[0] != testImage {
-			return false, errors.Errorf("unexpected repotag %q", img.RepoTags[0])
+			return false, fmt.Errorf("unexpected repotag %q", img.RepoTags[0])
 		}
 		return true, nil
 	}
@@ -142,6 +143,9 @@ func TestContainerdImage(t *testing.T) {
 		if err != nil {
 			return false, err
 		}
+		if s.Resources == nil || (s.Resources.Linux == nil && s.Resources.Windows == nil) {
+			return false, fmt.Errorf("No Resource field in container status: %+v", s)
+		}
 		return s.GetState() == runtime.ContainerState_CONTAINER_RUNNING, nil
 	}
 	require.NoError(t, Eventually(checkContainer, 100*time.Millisecond, 10*time.Second))
@@ -150,7 +154,7 @@ func TestContainerdImage(t *testing.T) {
 
 // Test image managed by CRI plugin shouldn't be affected by images in other namespaces.
 func TestContainerdImageInOtherNamespaces(t *testing.T) {
-	var testImage = GetImage(BusyBox)
+	var testImage = images.Get(images.BusyBox)
 	ctx := context.Background()
 
 	t.Logf("make sure the test image doesn't exist in the cri plugin")

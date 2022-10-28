@@ -20,12 +20,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/log"
-	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -44,6 +44,8 @@ const (
 	ResourceLease
 	// ResourceIngest specifies a content ingest
 	ResourceIngest
+	// resourceEnd is the end of specified resource types
+	resourceEnd
 )
 
 const (
@@ -53,13 +55,161 @@ const (
 
 var (
 	labelGCRoot       = []byte("containerd.io/gc.root")
+	labelGCRef        = []byte("containerd.io/gc.ref.")
 	labelGCSnapRef    = []byte("containerd.io/gc.ref.snapshot.")
 	labelGCContentRef = []byte("containerd.io/gc.ref.content")
 	labelGCExpire     = []byte("containerd.io/gc.expire")
 	labelGCFlat       = []byte("containerd.io/gc.flat")
 )
 
-func scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
+// CollectionContext manages a resource collection during a single run of
+// the garbage collector. The context is responsible for managing access to
+// resources as well as tracking removal.
+// Implementations should defer any longer running operations to the Finish
+// function and optimize other functions for running fast during garbage
+// collection write locks.
+type CollectionContext interface {
+	// Sends all known resources
+	All(func(gc.Node))
+
+	// Active sends all active resources
+	// Leased resources may be excluded since lease ownership should take
+	// precedence over active status.
+	Active(namespace string, fn func(gc.Node))
+
+	// Leased sends all resources associated with the given lease
+	Leased(namespace, lease string, fn func(gc.Node))
+
+	// Remove marks the given resource as removed
+	Remove(gc.Node)
+
+	// Cancel is called to cleanup a context after a failed collection
+	Cancel() error
+
+	// Finish is called to cleanup a context after a successful collection
+	Finish() error
+}
+
+// Collector is an interface to manage resource collection for any collectible
+// resource registered for garbage collection.
+type Collector interface {
+	StartCollection(context.Context) (CollectionContext, error)
+
+	ReferenceLabel() string
+}
+
+type gcContext struct {
+	labelHandlers []referenceLabelHandler
+	contexts      map[gc.ResourceType]CollectionContext
+}
+
+type referenceLabelHandler struct {
+	key []byte
+	fn  func(string, []byte, []byte, func(gc.Node))
+}
+
+func startGCContext(ctx context.Context, collectors map[gc.ResourceType]Collector) *gcContext {
+	var contexts map[gc.ResourceType]CollectionContext
+	labelHandlers := []referenceLabelHandler{
+		{
+			key: labelGCContentRef,
+			fn: func(ns string, k, v []byte, fn func(gc.Node)) {
+				if ks := string(k); ks != string(labelGCContentRef) {
+					// Allow reference naming separated by . or /, ignore names
+					if ks[len(labelGCContentRef)] != '.' && ks[len(labelGCContentRef)] != '/' {
+						return
+					}
+				}
+
+				fn(gcnode(ResourceContent, ns, string(v)))
+			},
+		},
+		{
+			key: labelGCSnapRef,
+			fn: func(ns string, k, v []byte, fn func(gc.Node)) {
+				snapshotter := k[len(labelGCSnapRef):]
+				if i := bytes.IndexByte(snapshotter, '/'); i >= 0 {
+					snapshotter = snapshotter[:i]
+				}
+				fn(gcnode(ResourceSnapshot, ns, fmt.Sprintf("%s/%s", snapshotter, v)))
+			},
+		},
+	}
+	if len(collectors) > 0 {
+		contexts = map[gc.ResourceType]CollectionContext{}
+		for rt, collector := range collectors {
+			c, err := collector.StartCollection(ctx)
+			if err != nil {
+				// Only skipping this resource this round
+				continue
+			}
+
+			if reflabel := collector.ReferenceLabel(); reflabel != "" {
+				key := append(labelGCRef, reflabel...)
+				labelHandlers = append(labelHandlers, referenceLabelHandler{
+					key: key,
+					fn: func(ns string, k, v []byte, fn func(gc.Node)) {
+						if ks := string(k); ks != string(key) {
+							// Allow reference naming separated by . or /, ignore names
+							if ks[len(key)] != '.' && ks[len(key)] != '/' {
+								return
+							}
+						}
+
+						fn(gcnode(rt, ns, string(v)))
+					},
+				})
+			}
+			contexts[rt] = c
+		}
+		// Sort labelHandlers to ensure key seeking is always forwardS
+		sort.Slice(labelHandlers, func(i, j int) bool {
+			return bytes.Compare(labelHandlers[i].key, labelHandlers[j].key) < 0
+		})
+	}
+	return &gcContext{
+		labelHandlers: labelHandlers,
+		contexts:      contexts,
+	}
+}
+
+func (c *gcContext) all(fn func(gc.Node)) {
+	for _, gctx := range c.contexts {
+		gctx.All(fn)
+	}
+}
+
+func (c *gcContext) active(namespace string, fn func(gc.Node)) {
+	for _, gctx := range c.contexts {
+		gctx.Active(namespace, fn)
+	}
+}
+
+func (c *gcContext) leased(namespace, lease string, fn func(gc.Node)) {
+	for _, gctx := range c.contexts {
+		gctx.Leased(namespace, lease, fn)
+	}
+}
+
+func (c *gcContext) cancel(ctx context.Context) {
+	for _, gctx := range c.contexts {
+		if err := gctx.Cancel(); err != nil {
+			log.G(ctx).WithError(err).Error("failed to cancel collection context")
+		}
+	}
+}
+
+func (c *gcContext) finish(ctx context.Context) {
+	for _, gctx := range c.contexts {
+		if err := gctx.Finish(); err != nil {
+			log.G(ctx).WithError(err).Error("failed to finish collection context")
+		}
+	}
+}
+
+// scanRoots sends the given channel "root" resources that are certainly used.
+// The caller could look the references of the resources to find all resources that are used.
+func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
 	v1bkt := tx.Bucket(bucketKeyVersion)
 	if v1bkt == nil {
 		return nil
@@ -169,6 +319,8 @@ func scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
 					}
 				}
 
+				c.leased(ns, string(k), fn)
+
 				return nil
 			}); err != nil {
 				return err
@@ -187,7 +339,7 @@ func scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
 					contentKey := string(target.Get(bucketKeyDigest))
 					fn(gcnode(ResourceContent, ns, contentKey))
 				}
-				return sendLabelRefs(ns, ibkt.Bucket(k), fn)
+				return c.sendLabelRefs(ns, ibkt.Bucket(k), fn)
 			}); err != nil {
 				return err
 			}
@@ -246,7 +398,7 @@ func scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
 					fn(gcnode(ResourceSnapshot, ns, fmt.Sprintf("%s/%s", snapshotter, ss)))
 				}
 
-				return sendLabelRefs(ns, cibkt, fn)
+				return c.sendLabelRefs(ns, cibkt, fn)
 			}); err != nil {
 				return err
 			}
@@ -273,11 +425,14 @@ func scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
 				return err
 			}
 		}
+
+		c.active(ns, fn)
 	}
 	return cerr
 }
 
-func references(ctx context.Context, tx *bolt.Tx, node gc.Node, fn func(gc.Node)) error {
+// references finds the resources that are reachable from the given node.
+func (c *gcContext) references(ctx context.Context, tx *bolt.Tx, node gc.Node, fn func(gc.Node)) error {
 	switch node.Type {
 	case ResourceContent:
 		bkt := getBucket(tx, bucketKeyVersion, []byte(node.Namespace), bucketKeyObjectContent, bucketKeyObjectBlob, []byte(node.Key))
@@ -286,11 +441,11 @@ func references(ctx context.Context, tx *bolt.Tx, node gc.Node, fn func(gc.Node)
 			return nil
 		}
 
-		return sendLabelRefs(node.Namespace, bkt, fn)
+		return c.sendLabelRefs(node.Namespace, bkt, fn)
 	case ResourceSnapshot, resourceSnapshotFlat:
 		parts := strings.SplitN(node.Key, "/", 2)
 		if len(parts) != 2 {
-			return errors.Errorf("invalid snapshot gc key %s", node.Key)
+			return fmt.Errorf("invalid snapshot gc key %s", node.Key)
 		}
 		ss := parts[0]
 		name := parts[1]
@@ -310,7 +465,7 @@ func references(ctx context.Context, tx *bolt.Tx, node gc.Node, fn func(gc.Node)
 			return nil
 		}
 
-		return sendLabelRefs(node.Namespace, bkt, fn)
+		return c.sendLabelRefs(node.Namespace, bkt, fn)
 	case ResourceIngest:
 		// Send expected value
 		bkt := getBucket(tx, bucketKeyVersion, []byte(node.Namespace), bucketKeyObjectContent, bucketKeyObjectIngests, []byte(node.Key))
@@ -329,7 +484,8 @@ func references(ctx context.Context, tx *bolt.Tx, node gc.Node, fn func(gc.Node)
 	return nil
 }
 
-func scanAll(ctx context.Context, tx *bolt.Tx, fn func(ctx context.Context, n gc.Node) error) error {
+// scanAll finds all resources regardless whether the resources are used or not.
+func (c *gcContext) scanAll(ctx context.Context, tx *bolt.Tx, fn func(ctx context.Context, n gc.Node) error) error {
 	v1bkt := tx.Bucket(bucketKeyVersion)
 	if v1bkt == nil {
 		return nil
@@ -406,10 +562,15 @@ func scanAll(ctx context.Context, tx *bolt.Tx, fn func(ctx context.Context, n gc
 		}
 	}
 
+	c.all(func(n gc.Node) {
+		fn(ctx, n)
+	})
+
 	return nil
 }
 
-func remove(ctx context.Context, tx *bolt.Tx, node gc.Node) error {
+// remove all buckets for the given node.
+func (c *gcContext) remove(ctx context.Context, tx *bolt.Tx, node gc.Node) error {
 	v1bkt := tx.Bucket(bucketKeyVersion)
 	if v1bkt == nil {
 		return nil
@@ -417,6 +578,10 @@ func remove(ctx context.Context, tx *bolt.Tx, node gc.Node) error {
 
 	nsbkt := v1bkt.Bucket([]byte(node.Namespace))
 	if nsbkt == nil {
+		// Still remove object if refenced outside the db
+		if cc, ok := c.contexts[node.Type]; ok {
+			cc.Remove(node)
+		}
 		return nil
 	}
 
@@ -435,7 +600,7 @@ func remove(ctx context.Context, tx *bolt.Tx, node gc.Node) error {
 		if sbkt != nil {
 			parts := strings.SplitN(node.Key, "/", 2)
 			if len(parts) != 2 {
-				return errors.Errorf("invalid snapshot gc key %s", node.Key)
+				return fmt.Errorf("invalid snapshot gc key %s", node.Key)
 			}
 			ssbkt := sbkt.Bucket([]byte(parts[0]))
 			if ssbkt != nil {
@@ -457,37 +622,29 @@ func remove(ctx context.Context, tx *bolt.Tx, node gc.Node) error {
 			log.G(ctx).WithField("ref", node.Key).Debug("remove ingest")
 			return ibkt.DeleteBucket([]byte(node.Key))
 		}
+	default:
+		cc, ok := c.contexts[node.Type]
+		if ok {
+			cc.Remove(node)
+		} else {
+			log.G(ctx).WithField("ref", node.Key).WithField("type", node.Type).Info("no remove defined for resource")
+		}
 	}
 
 	return nil
 }
 
 // sendLabelRefs sends all snapshot and content references referred to by the labels in the bkt
-func sendLabelRefs(ns string, bkt *bolt.Bucket, fn func(gc.Node)) error {
+func (c *gcContext) sendLabelRefs(ns string, bkt *bolt.Bucket, fn func(gc.Node)) error {
 	lbkt := bkt.Bucket(bucketKeyObjectLabels)
 	if lbkt != nil {
 		lc := lbkt.Cursor()
-
-		labelRef := string(labelGCContentRef)
-		for k, v := lc.Seek(labelGCContentRef); k != nil && strings.HasPrefix(string(k), labelRef); k, v = lc.Next() {
-			if ks := string(k); ks != labelRef {
-				// Allow reference naming separated by . or /, ignore names
-				if ks[len(labelRef)] != '.' && ks[len(labelRef)] != '/' {
-					continue
-				}
+		for i := range c.labelHandlers {
+			labelRef := string(c.labelHandlers[i].key)
+			for k, v := lc.Seek(c.labelHandlers[i].key); k != nil && strings.HasPrefix(string(k), labelRef); k, v = lc.Next() {
+				c.labelHandlers[i].fn(ns, k, v, fn)
 			}
-
-			fn(gcnode(ResourceContent, ns, string(v)))
 		}
-
-		for k, v := lc.Seek(labelGCSnapRef); k != nil && strings.HasPrefix(string(k), string(labelGCSnapRef)); k, v = lc.Next() {
-			snapshotter := k[len(labelGCSnapRef):]
-			if i := bytes.IndexByte(snapshotter, '/'); i >= 0 {
-				snapshotter = snapshotter[:i]
-			}
-			fn(gcnode(ResourceSnapshot, ns, fmt.Sprintf("%s/%s", snapshotter, v)))
-		}
-
 	}
 	return nil
 }

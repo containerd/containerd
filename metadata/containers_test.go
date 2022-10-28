@@ -18,11 +18,10 @@ package metadata
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
-	"reflect"
-	"strings"
+	"runtime"
 	"testing"
 	"time"
 
@@ -31,10 +30,13 @@ import (
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/typeurl"
-	"github.com/gogo/protobuf/types"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
+	"github.com/google/go-cmp/cmp"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -43,16 +45,11 @@ func init() {
 }
 
 func TestContainersList(t *testing.T) {
-	ctx, db, cancel := testEnv(t)
-	defer cancel()
-
+	ctx, db := testEnv(t)
 	store := NewContainerStore(NewDB(db, nil, nil))
-
 	spec := &specs.Spec{}
-	encoded, err := typeurl.MarshalAny(spec)
-	if err != nil {
-		t.Fatal(err)
-	}
+	encoded, err := protobuf.MarshalAnyToProto(spec)
+	require.NoError(t, err)
 
 	testset := map[string]*containers.Container{}
 	for i := 0; i < 4; i++ {
@@ -152,6 +149,7 @@ func TestContainersList(t *testing.T) {
 			}
 
 			for _, result := range results {
+				result := result
 				checkContainersEqual(t, &result, testset[result.ID], "list results did not match")
 			}
 		})
@@ -174,22 +172,18 @@ func TestContainersList(t *testing.T) {
 
 // TestContainersUpdate ensures that updates are taken in an expected manner.
 func TestContainersCreateUpdateDelete(t *testing.T) {
-	ctx, db, cancel := testEnv(t)
-	defer cancel()
+	var (
+		ctx, db = testEnv(t)
+		store   = NewContainerStore(NewDB(db, nil, nil))
+		spec    = &specs.Spec{}
+	)
 
-	store := NewContainerStore(NewDB(db, nil, nil))
-
-	spec := &specs.Spec{}
-	encoded, err := typeurl.MarshalAny(spec)
-	if err != nil {
-		t.Fatal(err)
-	}
+	encoded, err := protobuf.MarshalAnyToProto(spec)
+	require.NoError(t, err)
 
 	spec.Annotations = map[string]string{"updated": "true"}
-	encodedUpdated, err := typeurl.MarshalAny(spec)
-	if err != nil {
-		t.Fatal(err)
-	}
+	encodedUpdated, err := protobuf.MarshalAnyToProto(spec)
+	require.NoError(t, err)
 
 	for _, testcase := range []struct {
 		name       string
@@ -468,8 +462,8 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("hello"),
 					},
@@ -480,8 +474,8 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("world"),
 					},
@@ -492,8 +486,8 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("world"),
 					},
@@ -507,8 +501,8 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("hello"),
 					},
@@ -519,8 +513,8 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("world"),
 					},
@@ -532,8 +526,8 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("hello"),
 					},
@@ -547,8 +541,8 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("hello"),
 					},
@@ -558,8 +552,8 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Labels: map[string]string{
 					"foo": "one",
 				},
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("world"),
 					},
@@ -571,8 +565,8 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("world"),
 					},
@@ -586,21 +580,21 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				Extensions: map[string]types.Any{
+				Extensions: map[string]typeurl.Any{
 					// leaves hello in place.
-					"hello": {
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("hello"),
 					},
 				},
 			},
 			input: containers.Container{
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("universe"), // this will be ignored
 					},
-					"bar": {
+					"bar": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("foo"), // this will be added
 					},
@@ -612,12 +606,12 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				Runtime: containers.RuntimeInfo{
 					Name: "testruntime",
 				},
-				Extensions: map[string]types.Any{
-					"hello": {
+				Extensions: map[string]typeurl.Any{
+					"hello": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("hello"), // remains as world
 					},
-					"bar": {
+					"bar": &types.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("foo"), // this will be added
 					},
@@ -639,7 +633,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				if testcase.createerr == nil {
 					t.Fatalf("unexpected error: %v", err)
 				} else {
-					t.Fatalf("cause of %v (cause: %v) != %v", err, errors.Cause(err), testcase.createerr)
+					t.Fatalf("cause of %v (cause: %v) != %v", err, errors.Unwrap(err), testcase.createerr)
 				}
 			} else if testcase.createerr != nil {
 				return
@@ -661,7 +655,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				if testcase.cause == nil {
 					t.Fatalf("unexpected error: %v", err)
 				} else {
-					t.Fatalf("cause of %v (cause: %v) != %v", err, errors.Cause(err), testcase.cause)
+					t.Fatalf("cause of %v (cause: %v) != %v", err, errors.Unwrap(err), testcase.cause)
 				}
 			} else if testcase.cause != nil {
 				return
@@ -694,7 +688,12 @@ func checkContainerTimestamps(t *testing.T, c *containers.Container, now time.Ti
 	} else {
 		// ensure that updatedat is always after createdat
 		if !c.UpdatedAt.After(c.CreatedAt) {
-			t.Fatalf("timestamp for updatedat not after createdat: %v <= %v", c.UpdatedAt, c.CreatedAt)
+			if runtime.GOOS == "windows" && c.UpdatedAt == c.CreatedAt {
+				// Windows' time.Now resolution is lower than Linux, due to Go.
+				// https://github.com/golang/go/issues/31160
+			} else {
+				t.Fatalf("timestamp for updatedat not after createdat: %v <= %v", c.UpdatedAt, c.CreatedAt)
+			}
 		}
 	}
 
@@ -704,31 +703,22 @@ func checkContainerTimestamps(t *testing.T, c *containers.Container, now time.Ti
 }
 
 func checkContainersEqual(t *testing.T, a, b *containers.Container, format string, args ...interface{}) {
-	if !reflect.DeepEqual(a, b) {
-		t.Fatalf("containers not equal \n\t%v != \n\t%v: "+format, append([]interface{}{a, b}, args...)...)
-	}
+	assert.True(t, cmp.Equal(a, b, compareNil, compareAny))
 }
 
-func testEnv(t *testing.T) (context.Context, *bolt.DB, func()) {
+func testEnv(t *testing.T) (context.Context, *bolt.DB) {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = namespaces.WithNamespace(ctx, "testing")
 	ctx = logtest.WithT(ctx, t)
-
-	dirname, err := os.MkdirTemp("", strings.Replace(t.Name(), "/", "_", -1)+"-")
-	if err != nil {
-		t.Fatal(err)
-	}
+	dirname := t.TempDir()
 
 	db, err := bolt.Open(filepath.Join(dirname, "meta.db"), 0644, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	return ctx, db, func() {
-		db.Close()
-		if err := os.RemoveAll(dirname); err != nil {
-			t.Log("failed removing temp dir", err)
-		}
+	t.Cleanup(func() {
+		assert.NoError(t, db.Close())
 		cancel()
-	}
+	})
+
+	return ctx, db
 }

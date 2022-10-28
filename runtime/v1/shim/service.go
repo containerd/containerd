@@ -37,15 +37,15 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/process"
 	"github.com/containerd/containerd/pkg/stdio"
+	"github.com/containerd/containerd/protobuf"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/containerd/sys/reaper"
 	runc "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
-	ptypes "github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -63,9 +63,15 @@ var (
 
 // Config contains shim specific configuration
 type Config struct {
-	Path          string
-	Namespace     string
-	WorkDir       string
+	Path      string
+	Namespace string
+	WorkDir   string
+	// Criu is the path to the criu binary used for checkpoint and restore.
+	//
+	// Deprecated: runc option --criu is now ignored (with a warning), and the
+	// option will be removed entirely in a future release. Users who need a non-
+	// standard criu binary should rely on the standard way of looking up binaries
+	// in $PATH.
 	Criu          string
 	RuntimeRoot   string
 	SystemdCgroup bool
@@ -91,7 +97,7 @@ func NewService(config Config, publisher events.Publisher) (*Service, error) {
 	}
 	go s.processExits()
 	if err := s.initPlatform(); err != nil {
-		return nil, errors.Wrap(err, "failed to initialized platform behavior")
+		return nil, fmt.Errorf("failed to initialized platform behavior: %w", err)
 	}
 	go s.forward(publisher)
 	return s, nil
@@ -160,7 +166,7 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (_ *
 			Options: rm.Options,
 		}
 		if err := m.Mount(rootfs); err != nil {
-			return nil, errors.Wrapf(err, "failed to mount rootfs component %v", m)
+			return nil, fmt.Errorf("failed to mount rootfs component %v: %w", m, err)
 		}
 	}
 
@@ -173,7 +179,6 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (_ *
 		s.config.WorkDir,
 		s.config.RuntimeRoot,
 		s.config.Namespace,
-		s.config.Criu,
 		s.config.SystemdCgroup,
 		s.platform,
 		config,
@@ -225,7 +230,7 @@ func (s *Service) Delete(ctx context.Context, r *ptypes.Empty) (*shimapi.DeleteR
 	s.platform.Close()
 	return &shimapi.DeleteResponse{
 		ExitStatus: uint32(p.ExitStatus()),
-		ExitedAt:   p.ExitedAt(),
+		ExitedAt:   protobuf.ToTimestamp(p.ExitedAt()),
 		Pid:        uint32(p.Pid()),
 	}, nil
 }
@@ -247,7 +252,7 @@ func (s *Service) DeleteProcess(ctx context.Context, r *shimapi.DeleteProcessReq
 	s.mu.Unlock()
 	return &shimapi.DeleteResponse{
 		ExitStatus: uint32(p.ExitStatus()),
-		ExitedAt:   p.ExitedAt(),
+		ExitedAt:   protobuf.ToTimestamp(p.ExitedAt()),
 		Pid:        uint32(p.Pid()),
 	}, nil
 }
@@ -297,7 +302,7 @@ func (s *Service) ResizePty(ctx context.Context, r *shimapi.ResizePtyRequest) (*
 	p := s.processes[r.ID]
 	s.mu.Unlock()
 	if p == nil {
-		return nil, errors.Errorf("process does not exist %s", r.ID)
+		return nil, fmt.Errorf("process does not exist %s", r.ID)
 	}
 	if err := p.Resize(ws); err != nil {
 		return nil, errdefs.ToGRPC(err)
@@ -315,18 +320,18 @@ func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.
 	if err != nil {
 		return nil, err
 	}
-	status := task.StatusUnknown
+	status := task.Status_UNKNOWN
 	switch st {
 	case "created":
-		status = task.StatusCreated
+		status = task.Status_CREATED
 	case "running":
-		status = task.StatusRunning
+		status = task.Status_RUNNING
 	case "stopped":
-		status = task.StatusStopped
+		status = task.Status_STOPPED
 	case "paused":
-		status = task.StatusPaused
+		status = task.Status_PAUSED
 	case "pausing":
-		status = task.StatusPausing
+		status = task.Status_PAUSING
 	}
 	sio := p.Stdio()
 	return &shimapi.StateResponse{
@@ -339,7 +344,7 @@ func (s *Service) State(ctx context.Context, r *shimapi.StateRequest) (*shimapi.
 		Stderr:     sio.Stderr,
 		Terminal:   sio.Terminal,
 		ExitStatus: uint32(p.ExitStatus()),
-		ExitedAt:   p.ExitedAt(),
+		ExitedAt:   protobuf.ToTimestamp(p.ExitedAt()),
 	}, nil
 }
 
@@ -411,9 +416,9 @@ func (s *Service) ListPids(ctx context.Context, r *shimapi.ListPidsRequest) (*sh
 				}
 				a, err := typeurl.MarshalAny(d)
 				if err != nil {
-					return nil, errors.Wrapf(err, "failed to marshal process %d info", pid)
+					return nil, fmt.Errorf("failed to marshal process %d info: %w", pid, err)
 				}
-				pInfo.Info = a
+				pInfo.Info = protobuf.FromAny(a)
 				break
 			}
 		}
@@ -432,7 +437,7 @@ func (s *Service) CloseIO(ctx context.Context, r *shimapi.CloseIORequest) (*ptyp
 	}
 	if stdin := p.Stdin(); stdin != nil {
 		if err := stdin.Close(); err != nil {
-			return nil, errors.Wrap(err, "close stdin")
+			return nil, fmt.Errorf("close stdin: %w", err)
 		}
 	}
 	return empty, nil
@@ -444,13 +449,13 @@ func (s *Service) Checkpoint(ctx context.Context, r *shimapi.CheckpointTaskReque
 	if err != nil {
 		return nil, err
 	}
-	var options runctypes.CheckpointOptions
+	var options *runctypes.CheckpointOptions
 	if r.Options != nil {
 		v, err := typeurl.UnmarshalAny(r.Options)
 		if err != nil {
 			return nil, err
 		}
-		options = *v.(*runctypes.CheckpointOptions)
+		options = v.(*runctypes.CheckpointOptions)
 	}
 	if err := p.(*process.Init).Checkpoint(ctx, &process.CheckpointConfig{
 		Path:                     r.Path,
@@ -496,7 +501,7 @@ func (s *Service) Wait(ctx context.Context, r *shimapi.WaitRequest) (*shimapi.Wa
 
 	return &shimapi.WaitResponse{
 		ExitStatus: uint32(p.ExitStatus()),
-		ExitedAt:   p.ExitedAt(),
+		ExitedAt:   protobuf.ToTimestamp(p.ExitedAt()),
 	}, nil
 }
 
@@ -536,7 +541,7 @@ func (s *Service) checkProcesses(e runc.Exit) {
 		ID:          p.ID(),
 		Pid:         uint32(e.Pid),
 		ExitStatus:  uint32(e.Status),
-		ExitedAt:    p.ExitedAt(),
+		ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
 	}
 }
 
@@ -638,17 +643,17 @@ func getTopic(ctx context.Context, e interface{}) string {
 	return runtime.TaskUnknownTopic
 }
 
-func newInit(ctx context.Context, path, workDir, runtimeRoot, namespace, criu string, systemdCgroup bool, platform stdio.Platform, r *process.CreateConfig, rootfs string) (*process.Init, error) {
-	var options runctypes.CreateOptions
+func newInit(ctx context.Context, path, workDir, runtimeRoot, namespace string, systemdCgroup bool, platform stdio.Platform, r *process.CreateConfig, rootfs string) (*process.Init, error) {
+	options := &runctypes.CreateOptions{}
 	if r.Options != nil {
 		v, err := typeurl.UnmarshalAny(r.Options)
 		if err != nil {
 			return nil, err
 		}
-		options = *v.(*runctypes.CreateOptions)
+		options = v.(*runctypes.CreateOptions)
 	}
 
-	runtime := process.NewRunc(runtimeRoot, path, namespace, r.Runtime, criu, systemdCgroup)
+	runtime := process.NewRunc(runtimeRoot, path, namespace, r.Runtime, systemdCgroup)
 	p := process.New(r.ID, runtime, stdio.Stdio{
 		Stdin:    r.Stdin,
 		Stdout:   r.Stdout,

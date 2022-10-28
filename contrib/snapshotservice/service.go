@@ -23,14 +23,16 @@ import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/protobuf"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/snapshots"
-	ptypes "github.com/gogo/protobuf/types"
 )
 
 var empty = &ptypes.Empty{}
 
 type service struct {
 	sn snapshots.Snapshotter
+	snapshotsapi.UnimplementedSnapshotsServer
 }
 
 // FromSnapshotter returns a Snapshot API server from a containerd snapshotter
@@ -117,8 +119,8 @@ func (s service) Update(ctx context.Context, sr *snapshotsapi.UpdateSnapshotRequ
 
 func (s service) List(sr *snapshotsapi.ListSnapshotsRequest, ss snapshotsapi.Snapshots_ListServer) error {
 	var (
-		buffer    []snapshotsapi.Info
-		sendBlock = func(block []snapshotsapi.Info) error {
+		buffer    []*snapshotsapi.Info
+		sendBlock = func(block []*snapshotsapi.Info) error {
 			return ss.Send(&snapshotsapi.ListSnapshotsResponse{
 				Info: block,
 			})
@@ -159,7 +161,7 @@ func (s service) Usage(ctx context.Context, ur *snapshotsapi.UsageRequest) (*sna
 
 	return &snapshotsapi.UsageResponse{
 		Inodes: usage.Inodes,
-		Size_:  usage.Size,
+		Size:   usage.Size,
 	}, nil
 }
 
@@ -178,21 +180,21 @@ func (s service) Cleanup(ctx context.Context, cr *snapshotsapi.CleanupRequest) (
 
 func fromKind(kind snapshots.Kind) snapshotsapi.Kind {
 	if kind == snapshots.KindActive {
-		return snapshotsapi.KindActive
+		return snapshotsapi.Kind_ACTIVE
 	}
 	if kind == snapshots.KindView {
-		return snapshotsapi.KindView
+		return snapshotsapi.Kind_VIEW
 	}
-	return snapshotsapi.KindCommitted
+	return snapshotsapi.Kind_COMMITTED
 }
 
-func fromInfo(info snapshots.Info) snapshotsapi.Info {
-	return snapshotsapi.Info{
+func fromInfo(info snapshots.Info) *snapshotsapi.Info {
+	return &snapshotsapi.Info{
 		Name:      info.Name,
 		Parent:    info.Parent,
 		Kind:      fromKind(info.Kind),
-		CreatedAt: info.Created,
-		UpdatedAt: info.Updated,
+		CreatedAt: protobuf.ToTimestamp(info.Created),
+		UpdatedAt: protobuf.ToTimestamp(info.Updated),
 		Labels:    info.Labels,
 	}
 }
@@ -209,22 +211,22 @@ func fromMounts(mounts []mount.Mount) []*types.Mount {
 	return out
 }
 
-func toInfo(info snapshotsapi.Info) snapshots.Info {
+func toInfo(info *snapshotsapi.Info) snapshots.Info {
 	return snapshots.Info{
 		Name:    info.Name,
 		Parent:  info.Parent,
 		Kind:    toKind(info.Kind),
-		Created: info.CreatedAt,
-		Updated: info.UpdatedAt,
+		Created: protobuf.FromTimestamp(info.CreatedAt),
+		Updated: protobuf.FromTimestamp(info.UpdatedAt),
 		Labels:  info.Labels,
 	}
 }
 
 func toKind(kind snapshotsapi.Kind) snapshots.Kind {
-	if kind == snapshotsapi.KindActive {
+	if kind == snapshotsapi.Kind_ACTIVE {
 		return snapshots.KindActive
 	}
-	if kind == snapshotsapi.KindView {
+	if kind == snapshotsapi.Kind_VIEW {
 		return snapshots.KindView
 	}
 	return snapshots.KindCommitted

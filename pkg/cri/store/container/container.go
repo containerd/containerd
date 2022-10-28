@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/store"
 	"github.com/containerd/containerd/pkg/cri/store/label"
 	"github.com/containerd/containerd/pkg/cri/store/stats"
-	"github.com/containerd/containerd/pkg/cri/store/truncindex"
+	"github.com/containerd/containerd/pkg/truncindex"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -122,7 +122,7 @@ func NewStore(labels *label.Store) *Store {
 	}
 }
 
-// Add a container into the store. Returns store.ErrAlreadyExist if the
+// Add a container into the store. Returns errdefs.ErrAlreadyExists if the
 // container already exists.
 func (s *Store) Add(c Container) error {
 	s.lock.Lock()
@@ -140,7 +140,7 @@ func (s *Store) Add(c Container) error {
 	return nil
 }
 
-// Get returns the container with specified id. Returns store.ErrNotExist
+// Get returns the container with specified id. Returns errdefs.ErrNotFound
 // if the container doesn't exist.
 func (s *Store) Get(id string) (Container, error) {
 	s.lock.RLock()
@@ -169,6 +169,9 @@ func (s *Store) List() []Container {
 	return containers
 }
 
+// UpdateContainerStats updates the container specified by ID with the
+// stats present in 'newContainerStats'. Returns errdefs.ErrNotFound
+// if the container does not exist in the store.
 func (s *Store) UpdateContainerStats(id string, newContainerStats *stats.ContainerStats) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -200,7 +203,11 @@ func (s *Store) Delete(id string) {
 		// So we need to return if there are error.
 		return
 	}
-	s.labels.Release(s.containers[id].ProcessLabel)
-	s.idIndex.Delete(id) // nolint: errcheck
+	c := s.containers[id]
+	if c.IO != nil {
+		c.IO.Close()
+	}
+	s.labels.Release(c.ProcessLabel)
+	s.idIndex.Delete(id)
 	delete(s.containers, id)
 }

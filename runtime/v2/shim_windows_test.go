@@ -18,10 +18,9 @@ package v2
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
-
-	"github.com/pkg/errors"
 )
 
 func TestCheckCopyShimLogError(t *testing.T) {

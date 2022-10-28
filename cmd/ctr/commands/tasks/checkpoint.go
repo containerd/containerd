@@ -17,6 +17,7 @@
 package tasks
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/containerd/containerd"
@@ -24,7 +25,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 

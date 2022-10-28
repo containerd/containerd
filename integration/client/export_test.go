@@ -18,8 +18,8 @@ package client
 
 import (
 	"archive/tar"
-	"bytes"
 	"io"
+	"os"
 	"testing"
 
 	. "github.com/containerd/containerd"
@@ -45,12 +45,23 @@ func TestExport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wb := bytes.NewBuffer(nil)
-	err = client.Export(ctx, wb, archive.WithPlatform(platforms.Default()), archive.WithImage(client.ImageService(), testImage))
+	dstFile, err := os.CreateTemp("", "export-import-test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertOCITar(t, bytes.NewReader(wb.Bytes()))
+	defer func() {
+		dstFile.Close()
+		os.Remove(dstFile.Name())
+	}()
+
+	err = client.Export(ctx, dstFile, archive.WithPlatform(platforms.Default()), archive.WithImage(client.ImageService(), testImage))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Seek to beginning of file before passing it to assertOCITar()
+	dstFile.Seek(0, 0)
+	assertOCITar(t, dstFile)
 }
 
 func assertOCITar(t *testing.T, r io.Reader) {

@@ -14,6 +14,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+# USE_HYPERV configures containerd to spawn Hyper-V isolated containers
+# when running on Windows.
+USE_HYPERV=${USE_HYPERV:-0}
+
 IS_WINDOWS=0
 if [ -v "OS" ] && [ "${OS}" == "Windows_NT" ]; then
   IS_WINDOWS=1
@@ -35,9 +39,10 @@ CONTAINERD_RUNTIME=${CONTAINERD_RUNTIME:-""}
 if [ -z "${CONTAINERD_CONFIG_FILE}" ]; then
   config_file="${CONTAINERD_CONFIG_DIR}/containerd-config-cri.toml"
   truncate --size 0 "${config_file}"
+  echo "version=2" >> ${config_file}
+
   if command -v sestatus >/dev/null 2>&1; then
     cat >>${config_file} <<EOF
-version=2
 [plugins."io.containerd.grpc.v1.cri"]
   enable_selinux = true
 EOF
@@ -49,6 +54,77 @@ runtime_type = "${CONTAINERD_RUNTIME}"
 EOF
   fi
   CONTAINERD_CONFIG_FILE="${config_file}"
+fi
+
+if [ $IS_WINDOWS -eq 0 ]; then
+  FAILPOINT_CONTAINERD_RUNTIME="runc-fp.v1"
+  FAILPOINT_CNI_CONF_DIR=${FAILPOINT_CNI_CONF_DIR:-"/tmp/failpoint-cni-net.d"}
+  mkdir -p "${FAILPOINT_CNI_CONF_DIR}"
+
+  # Add runtime with failpoint
+  cat << EOF | tee -a "${CONTAINERD_CONFIG_FILE}"
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc-fp]
+  cni_conf_dir = "${FAILPOINT_CNI_CONF_DIR}"
+  cni_max_conf_num = 1
+  pod_annotations = ["io.containerd.runtime.v2.shim.failpoint.*"]
+  runtime_type = "${FAILPOINT_CONTAINERD_RUNTIME}"
+EOF
+
+  cat << EOF | tee "${FAILPOINT_CNI_CONF_DIR}/10-containerd-net.conflist"
+{
+  "cniVersion": "1.0.0",
+  "name": "containerd-net-failpoint",
+  "plugins": [
+    {
+      "type": "cni-bridge-fp",
+      "bridge": "cni-fp",
+      "isGateway": true,
+      "ipMasq": true,
+      "promiscMode": true,
+      "ipam": {
+        "type": "host-local",
+        "ranges": [
+          [{
+            "subnet": "10.88.0.0/16"
+          }],
+          [{
+            "subnet": "2001:4860:4860::/64"
+          }]
+        ],
+        "routes": [
+          { "dst": "0.0.0.0/0" },
+          { "dst": "::/0" }
+        ]
+      },
+      "capabilities": {
+        "io.kubernetes.cri.pod-annotations": true
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {"portMappings": true}
+    }
+  ]
+}
+EOF
+fi
+
+if [ ${IS_WINDOWS} -eq 1 -a ${USE_HYPERV} -eq 1 ];then
+  cat >> ${CONTAINERD_CONFIG_FILE} << EOF
+version = 2
+[plugins]
+    [plugins."io.containerd.grpc.v1.cri".containerd]
+      default_runtime_name = "runhcs-wcow-hyperv"
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
+
+       [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runhcs-wcow-hyperv]
+        runtime_type = "io.containerd.runhcs.v1"
+        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runhcs-wcow-hyperv.options]
+          Debug = true
+          DebugType = 2
+          SandboxPlatform = "windows/amd64"
+          SandboxIsolation = 1
+EOF
 fi
 
 # CONTAINERD_TEST_SUFFIX is the suffix appended to the root/state directory used
@@ -111,8 +187,12 @@ run_containerd() {
     local report_dir=$1
   fi
   CMD=""
-  if [ ! -z "${sudo}" ]; then
+  if [ -n "${sudo}" ]; then
     CMD+="${sudo} "
+    # sudo strips environment variables, so add ENABLE_CRI_SANDBOXES back if present
+    if [ -n  "${ENABLE_CRI_SANDBOXES}" ]; then
+      CMD+="ENABLE_CRI_SANDBOXES='${ENABLE_CRI_SANDBOXES}' "
+    fi
   fi
   CMD+="${PWD}/bin/containerd"
 
@@ -183,6 +263,8 @@ test_setup() {
   fi
   readiness_check run_ctr
   readiness_check run_crictl
+  # Show the config about cri plugin in log when it's ready
+  run_crictl
 }
 
 # test_teardown kills containerd.
@@ -215,6 +297,9 @@ run_crictl() {
 # keepalive runs a command and keeps it alive.
 # keepalive process is eventually killed in test_teardown.
 keepalive() {
+  # The command may return non-zero and we want to continue this script.
+  # e.g. containerd receives SIGKILL
+  set +e
   local command=$1
   echo "${command}"
   local wait_period=$2

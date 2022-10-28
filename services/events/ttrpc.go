@@ -23,7 +23,8 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/events/exchange"
-	ptypes "github.com/gogo/protobuf/types"
+	"github.com/containerd/containerd/protobuf"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 )
 
 type ttrpcService struct {
@@ -40,7 +41,7 @@ func (s *ttrpcService) Forward(ctx context.Context, r *api.ForwardRequest) (*pty
 
 func fromTProto(env *api.Envelope) *events.Envelope {
 	return &events.Envelope{
-		Timestamp: env.Timestamp,
+		Timestamp: protobuf.FromTimestamp(env.Timestamp),
 		Namespace: env.Namespace,
 		Topic:     env.Topic,
 		Event:     env.Event,

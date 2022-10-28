@@ -41,5 +41,5 @@ func StatMtime(st *syscall.Stat_t) syscall.Timespec {
 
 // StatATimeAsTime returns the access time as a time.Time
 func StatATimeAsTime(st *syscall.Stat_t) time.Time {
-	return time.Unix(int64(st.Atimespec.Sec), int64(st.Atimespec.Nsec)) //nolint: unconvert // int64 conversions ensure the line compiles for 32-bit systems as well.
+	return time.Unix(st.Atimespec.Unix())
 }

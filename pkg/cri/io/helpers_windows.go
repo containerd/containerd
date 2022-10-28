@@ -17,14 +17,14 @@
 package io
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"net"
 	"os"
 	"sync"
 
 	winio "github.com/Microsoft/go-winio"
-	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 )
 
 type pipe struct {
@@ -60,7 +60,7 @@ func openPipe(ctx context.Context, fn string, flag int, perm os.FileMode) (io.Re
 func (p *pipe) Write(b []byte) (int, error) {
 	p.conWg.Wait()
 	if p.conErr != nil {
-		return 0, errors.Wrap(p.conErr, "connection error")
+		return 0, fmt.Errorf("connection error: %w", p.conErr)
 	}
 	return p.con.Write(b)
 }
@@ -68,7 +68,7 @@ func (p *pipe) Write(b []byte) (int, error) {
 func (p *pipe) Read(b []byte) (int, error) {
 	p.conWg.Wait()
 	if p.conErr != nil {
-		return 0, errors.Wrap(p.conErr, "connection error")
+		return 0, fmt.Errorf("connection error: %w", p.conErr)
 	}
 	return p.con.Read(b)
 }

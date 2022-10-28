@@ -21,9 +21,10 @@ package process
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/containerd/console"
-	"github.com/pkg/errors"
 )
 
 type execState interface {
@@ -48,7 +49,7 @@ func (s *execCreatedState) transition(name string) error {
 	case "deleted":
 		s.p.execState = &deletedState{}
 	default:
-		return errors.Errorf("invalid state transition %q to %q", stateName(s), name)
+		return fmt.Errorf("invalid state transition %q to %q", stateName(s), name)
 	}
 	return nil
 }
@@ -97,7 +98,7 @@ func (s *execRunningState) transition(name string) error {
 	case "stopped":
 		s.p.execState = &execStoppedState{p: s.p}
 	default:
-		return errors.Errorf("invalid state transition %q to %q", stateName(s), name)
+		return fmt.Errorf("invalid state transition %q to %q", stateName(s), name)
 	}
 	return nil
 }
@@ -139,7 +140,7 @@ func (s *execStoppedState) transition(name string) error {
 	case "deleted":
 		s.p.execState = &deletedState{}
 	default:
-		return errors.Errorf("invalid state transition %q to %q", stateName(s), name)
+		return fmt.Errorf("invalid state transition %q to %q", stateName(s), name)
 	}
 	return nil
 }

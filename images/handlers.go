@@ -18,6 +18,7 @@ package images
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -25,7 +26,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
@@ -308,7 +308,7 @@ func LimitManifests(f HandlerFunc, m platforms.MatchComparer, n int) HandlerFunc
 
 			if n > 0 {
 				if len(children) == 0 {
-					return children, errors.Wrap(errdefs.ErrNotFound, "no match for platform in manifest")
+					return children, fmt.Errorf("no match for platform in manifest: %w", errdefs.ErrNotFound)
 				}
 				if len(children) > n {
 					children = children[:n]

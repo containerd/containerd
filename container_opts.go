@@ -19,19 +19,20 @@ package containerd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/typeurl"
-	"github.com/gogo/protobuf/types"
 	"github.com/opencontainers/image-spec/identity"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 )
 
 // DeleteOpts allows the caller to set options for the deletion of a container
@@ -57,7 +58,7 @@ type InfoConfig struct {
 func WithRuntime(name string, options interface{}) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		var (
-			any *types.Any
+			any typeurl.Any
 			err error
 		)
 		if options != nil {
@@ -70,6 +71,15 @@ func WithRuntime(name string, options interface{}) NewContainerOpts {
 			Name:    name,
 			Options: any,
 		}
+		return nil
+	}
+}
+
+// WithSandbox joins the container to a container group (aka sandbox) from the given ID
+// Note: shim runtime must support sandboxes environments.
+func WithSandbox(sandboxID string) NewContainerOpts {
+	return func(ctx context.Context, client *Client, c *containers.Container) error {
+		c.SandboxID = sandboxID
 		return nil
 	}
 }
@@ -227,7 +237,7 @@ func WithNewSnapshot(id string, i Image, opts ...snapshots.Opt) NewContainerOpts
 func WithSnapshotCleanup(ctx context.Context, client *Client, c containers.Container) error {
 	if c.SnapshotKey != "" {
 		if c.Snapshotter == "" {
-			return errors.Wrapf(errdefs.ErrInvalidArgument, "container.Snapshotter must be set to cleanup rootfs snapshot")
+			return fmt.Errorf("container.Snapshotter must be set to cleanup rootfs snapshot: %w", errdefs.ErrInvalidArgument)
 		}
 		s, err := client.getSnapshotter(ctx, c.Snapshotter)
 		if err != nil {
@@ -276,21 +286,21 @@ func WithNewSnapshotView(id string, i Image, opts ...snapshots.Opt) NewContainer
 func WithContainerExtension(name string, extension interface{}) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		if name == "" {
-			return errors.Wrapf(errdefs.ErrInvalidArgument, "extension key must not be zero-length")
+			return fmt.Errorf("extension key must not be zero-length: %w", errdefs.ErrInvalidArgument)
 		}
 
 		any, err := typeurl.MarshalAny(extension)
 		if err != nil {
 			if errors.Is(err, typeurl.ErrNotFound) {
-				return errors.Wrapf(err, "extension %q is not registered with the typeurl package, see `typeurl.Register`", name)
+				return fmt.Errorf("extension %q is not registered with the typeurl package, see `typeurl.Register`: %w", name, err)
 			}
-			return errors.Wrap(err, "error marshalling extension")
+			return fmt.Errorf("error marshalling extension: %w", err)
 		}
 
 		if c.Extensions == nil {
-			c.Extensions = make(map[string]types.Any)
+			c.Extensions = make(map[string]typeurl.Any)
 		}
-		c.Extensions[name] = *any
+		c.Extensions[name] = any
 		return nil
 	}
 }
@@ -298,6 +308,9 @@ func WithContainerExtension(name string, extension interface{}) NewContainerOpts
 // WithNewSpec generates a new spec for a new container
 func WithNewSpec(opts ...oci.SpecOpts) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
+		if _, ok := namespaces.Namespace(ctx); !ok {
+			ctx = namespaces.WithNamespace(ctx, client.DefaultNamespace())
+		}
 		s, err := oci.GenerateSpec(ctx, client, c, opts...)
 		if err != nil {
 			return err
@@ -315,7 +328,7 @@ func WithSpec(s *oci.Spec, opts ...oci.SpecOpts) NewContainerOpts {
 		}
 
 		var err error
-		c.Spec, err = typeurl.MarshalAny(s)
+		c.Spec, err = protobuf.MarshalAnyToProto(s)
 		return err
 	}
 }

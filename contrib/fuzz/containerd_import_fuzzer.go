@@ -19,14 +19,11 @@ package fuzz
 import (
 	"bytes"
 	"context"
-	"sync"
-	"time"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 
 	"github.com/containerd/containerd"
-	_ "github.com/containerd/containerd/cmd/containerd"
-	"github.com/containerd/containerd/cmd/containerd/command"
+	_ "github.com/containerd/containerd/cmd/containerd/builtins"
 	"github.com/containerd/containerd/namespaces"
 )
 
@@ -35,22 +32,6 @@ const (
 	defaultState   = "/tmp/containerd"
 	defaultAddress = "/tmp/containerd/containerd.sock"
 )
-
-var (
-	initDaemon sync.Once
-)
-
-func startDaemon() {
-	args := []string{"--log-level", "debug"}
-	go func() {
-		// This is similar to invoking the
-		// containerd binary.
-		// See contrib/fuzz/oss_fuzz_build.sh
-		// for more info.
-		command.StartDaemonForFuzzing(args)
-	}()
-	time.Sleep(time.Second * 4)
-}
 
 func fuzzContext() (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(context.Background())

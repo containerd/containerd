@@ -19,6 +19,7 @@ package integration
 import (
 	"testing"
 
+	"github.com/containerd/containerd/integration/images"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,6 +31,7 @@ func TestDuplicateName(t *testing.T) {
 	_, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.Error(t, err)
 
+	pauseImage := images.Get(images.Pause)
 	EnsureImageExists(t, pauseImage)
 
 	t.Logf("Create a container")

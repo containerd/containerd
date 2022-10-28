@@ -22,15 +22,14 @@ import (
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/gogo/protobuf/types"
+	"github.com/containerd/containerd/protobuf/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
 )
 
 func TestCreateDelete(t *testing.T) {
-	ctx, db, cleanup := testDB(t)
-	defer cleanup()
+	ctx, db := testDB(t)
 
 	subtests := []struct {
 		name     string

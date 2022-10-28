@@ -21,6 +21,7 @@ package shim
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/url"
 	"os"
@@ -31,7 +32,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/process"
 	"github.com/containerd/fifo"
-	"github.com/pkg/errors"
 )
 
 type unixPlatform struct {
@@ -55,7 +55,7 @@ func (p *unixPlatform) CopyConsole(ctx context.Context, console console.Console,
 	}
 	uri, err := url.Parse(stdout)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to parse stdout uri")
+		return nil, fmt.Errorf("unable to parse stdout uri: %w", err)
 	}
 
 	switch uri.Scheme {
@@ -78,14 +78,14 @@ func (p *unixPlatform) CopyConsole(ctx context.Context, console console.Console,
 		// Create pipe to be used by logging binary for Stdout
 		outR, outW, err := os.Pipe()
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to create stdout pipes")
+			return nil, fmt.Errorf("failed to create stdout pipes: %w", err)
 		}
 		filesToClose = append(filesToClose, outR)
 
 		// Stderr is created for logging binary but unused when terminal is true
 		serrR, _, err := os.Pipe()
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to create stderr pipes")
+			return nil, fmt.Errorf("failed to create stderr pipes: %w", err)
 		}
 		filesToClose = append(filesToClose, serrR)
 
@@ -107,18 +107,18 @@ func (p *unixPlatform) CopyConsole(ctx context.Context, console console.Console,
 		}()
 
 		if err := cmd.Start(); err != nil {
-			return nil, errors.Wrap(err, "failed to start logging binary process")
+			return nil, fmt.Errorf("failed to start logging binary process: %w", err)
 		}
 
 		// Close our side of the pipe after start
 		if err := w.Close(); err != nil {
-			return nil, errors.Wrap(err, "failed to close write pipe after start")
+			return nil, fmt.Errorf("failed to close write pipe after start: %w", err)
 		}
 
 		// Wait for the logging binary to be ready
 		b := make([]byte, 1)
 		if _, err := r.Read(b); err != nil && err != io.EOF {
-			return nil, errors.Wrap(err, "failed to read from logging binary")
+			return nil, fmt.Errorf("failed to read from logging binary: %w", err)
 		}
 		cwg.Wait()
 

@@ -1,5 +1,5 @@
-// Package ociwclayer provides functions for importing and exporting Windows
-// container layers from and to their OCI tar representation.
+//go:build windows
+
 package ociwclayer
 
 import (
@@ -9,10 +9,8 @@ import (
 	"path/filepath"
 
 	"github.com/Microsoft/go-winio/backuptar"
-	"github.com/Microsoft/hcsshim"
+	"github.com/Microsoft/hcsshim/internal/wclayer"
 )
-
-var driverInfo = hcsshim.DriverInfo{}
 
 // ExportLayerToTar writes an OCI layer tar stream from the provided on-disk layer.
 // The caller must specify the parent layers, if any, ordered from lowest to
@@ -21,25 +19,25 @@ var driverInfo = hcsshim.DriverInfo{}
 // The layer will be mounted for this process, so the caller should ensure that
 // it is not currently mounted.
 func ExportLayerToTar(ctx context.Context, w io.Writer, path string, parentLayerPaths []string) error {
-	err := hcsshim.ActivateLayer(driverInfo, path)
+	err := wclayer.ActivateLayer(ctx, path)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		_ = hcsshim.DeactivateLayer(driverInfo, path)
+		_ = wclayer.DeactivateLayer(ctx, path)
 	}()
 
 	// Prepare and unprepare the layer to ensure that it has been initialized.
-	err = hcsshim.PrepareLayer(driverInfo, path, parentLayerPaths)
+	err = wclayer.PrepareLayer(ctx, path, parentLayerPaths)
 	if err != nil {
 		return err
 	}
-	err = hcsshim.UnprepareLayer(driverInfo, path)
+	err = wclayer.UnprepareLayer(ctx, path)
 	if err != nil {
 		return err
 	}
 
-	r, err := hcsshim.NewLayerReader(driverInfo, path, parentLayerPaths)
+	r, err := wclayer.NewLayerReader(ctx, path, parentLayerPaths)
 	if err != nil {
 		return err
 	}
@@ -52,7 +50,7 @@ func ExportLayerToTar(ctx context.Context, w io.Writer, path string, parentLayer
 	return cerr
 }
 
-func writeTarFromLayer(ctx context.Context, r hcsshim.LayerReader, w io.Writer) error {
+func writeTarFromLayer(ctx context.Context, r wclayer.LayerReader, w io.Writer) error {
 	t := tar.NewWriter(w)
 	for {
 		select {

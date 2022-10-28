@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/blang/semver"
+	"github.com/blang/semver/v4"
 	"github.com/spf13/pflag"
 
 	"k8s.io/component-base/version"
@@ -58,8 +58,8 @@ func (o *Options) Validate() []error {
 
 // AddFlags adds flags for exposing component metrics.
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
-	if o != nil {
-		o = NewOptions()
+	if o == nil {
+		return
 	}
 	fs.StringVar(&o.ShowHiddenMetricsForVersion, "show-hidden-metrics-for-version", o.ShowHiddenMetricsForVersion,
 		"The previous version for which you want to show hidden metrics. "+

@@ -236,23 +236,24 @@ func TestRedirectLogs(t *testing.T) {
 			},
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		rc := io.NopCloser(strings.NewReader(test.input))
-		buf := bytes.NewBuffer(nil)
-		wc := cioutil.NewNopWriteCloser(buf)
-		redirectLogs("test-path", rc, wc, test.stream, test.maxLen)
-		output := buf.String()
-		lines := strings.Split(output, "\n")
-		lines = lines[:len(lines)-1] // Discard empty string after last \n
-		assert.Len(t, lines, len(test.content))
-		for i := range lines {
-			fields := strings.SplitN(lines[i], string([]byte{delimiter}), 4)
-			require.Len(t, fields, 4)
-			_, err := time.Parse(timestampFormat, fields[0])
-			assert.NoError(t, err)
-			assert.EqualValues(t, test.stream, fields[1])
-			assert.Equal(t, string(test.tag[i]), fields[2])
-			assert.Equal(t, test.content[i], fields[3])
-		}
+		t.Run(desc, func(t *testing.T) {
+			rc := io.NopCloser(strings.NewReader(test.input))
+			buf := bytes.NewBuffer(nil)
+			wc := cioutil.NewNopWriteCloser(buf)
+			redirectLogs("test-path", rc, wc, test.stream, test.maxLen)
+			output := buf.String()
+			lines := strings.Split(output, "\n")
+			lines = lines[:len(lines)-1] // Discard empty string after last \n
+			assert.Len(t, lines, len(test.content))
+			for i := range lines {
+				fields := strings.SplitN(lines[i], string([]byte{delimiter}), 4)
+				require.Len(t, fields, 4)
+				_, err := time.Parse(timestampFormat, fields[0])
+				assert.NoError(t, err)
+				assert.EqualValues(t, test.stream, fields[1])
+				assert.Equal(t, string(test.tag[i]), fields[2])
+				assert.Equal(t, test.content[i], fields[3])
+			}
+		})
 	}
 }

@@ -31,9 +31,8 @@ import (
 	"time"
 
 	"github.com/containerd/continuity/fs/fstest"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"gotest.tools/v3/assert"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
@@ -65,14 +64,14 @@ func BenchmarkNative(b *testing.B) {
 	}
 
 	snapshotter, err := native.NewSnapshotter(nativeRootPath)
-	assert.NilError(b, err)
+	assert.Nil(b, err)
 
 	defer func() {
 		err = snapshotter.Close()
-		assert.NilError(b, err)
+		assert.Nil(b, err)
 
 		err = os.RemoveAll(nativeRootPath)
-		assert.NilError(b, err)
+		assert.Nil(b, err)
 	}()
 
 	benchmarkSnapshotter(b, snapshotter)
@@ -84,14 +83,14 @@ func BenchmarkOverlay(b *testing.B) {
 	}
 
 	snapshotter, err := overlay.NewSnapshotter(overlayRootPath)
-	assert.NilError(b, err, "failed to create overlay snapshotter")
+	assert.Nil(b, err, "failed to create overlay snapshotter")
 
 	defer func() {
 		err = snapshotter.Close()
-		assert.NilError(b, err)
+		assert.Nil(b, err)
 
 		err = os.RemoveAll(overlayRootPath)
-		assert.NilError(b, err)
+		assert.Nil(b, err)
 	}()
 
 	benchmarkSnapshotter(b, snapshotter)
@@ -115,17 +114,17 @@ func BenchmarkDeviceMapper(b *testing.B) {
 	ctx := context.Background()
 
 	snapshotter, err := devmapper.NewSnapshotter(ctx, config)
-	assert.NilError(b, err)
+	assert.Nil(b, err)
 
 	defer func() {
 		err := snapshotter.ResetPool(ctx)
-		assert.NilError(b, err)
+		assert.Nil(b, err)
 
 		err = snapshotter.Close()
-		assert.NilError(b, err)
+		assert.Nil(b, err)
 
 		err = os.RemoveAll(dmRootPath)
-		assert.NilError(b, err)
+		assert.Nil(b, err)
 	}()
 
 	benchmarkSnapshotter(b, snapshotter)
@@ -185,19 +184,19 @@ func benchmarkSnapshotter(b *testing.B, snapshotter snapshots.Snapshotter) {
 
 				timer = time.Now()
 				mounts, err := snapshotter.Prepare(ctx, current, parent)
-				assert.NilError(b, err)
+				assert.Nil(b, err)
 				prepareDuration += time.Since(timer)
 
 				timer = time.Now()
 				err = mount.WithTempMount(ctx, mounts, layers[l].Apply)
-				assert.NilError(b, err)
+				assert.Nil(b, err)
 				writeDuration += time.Since(timer)
 
 				parent = fmt.Sprintf("committed-%d", atomic.AddInt64(&layerIndex, 1))
 
 				timer = time.Now()
 				err = snapshotter.Commit(ctx, parent, current)
-				assert.NilError(b, err)
+				assert.Nil(b, err)
 				commitDuration += time.Since(timer)
 			}
 		}
@@ -287,11 +286,12 @@ func updateFile(name string) applierFn {
 		path := filepath.Join(root, name)
 		file, err := os.OpenFile(path, os.O_WRONLY, 0600)
 		if err != nil {
-			return errors.Wrapf(err, "failed to open %q", path)
+			return fmt.Errorf("failed to open %q: %w", path, err)
 		}
 
 		info, err := file.Stat()
 		if err != nil {
+			file.Close()
 			return err
 		}
 
@@ -301,11 +301,13 @@ func updateFile(name string) applierFn {
 		)
 
 		if _, err := rand.Read(buf); err != nil {
+			file.Close()
 			return err
 		}
 
 		if _, err := file.WriteAt(buf, offset); err != nil {
-			return errors.Wrapf(err, "failed to write %q at offset %d", path, offset)
+			file.Close()
+			return fmt.Errorf("failed to write %q at offset %d: %w", path, offset, err)
 		}
 
 		return file.Close()

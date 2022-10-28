@@ -18,6 +18,7 @@ package apply
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"strings"
 
@@ -25,7 +26,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/userns"
-	"github.com/pkg/errors"
 )
 
 func apply(ctx context.Context, mounts []mount.Mount, r io.Reader) error {
@@ -86,7 +86,7 @@ func getOverlayPath(options []string) (upper string, lower []string, err error) 
 		}
 	}
 	if upper == "" {
-		return "", nil, errors.Wrap(errdefs.ErrInvalidArgument, "upperdir not found")
+		return "", nil, fmt.Errorf("upperdir not found: %w", errdefs.ErrInvalidArgument)
 	}
 
 	return
@@ -111,22 +111,22 @@ func getAufsPath(options []string) (upper string, lower []string, err error) {
 		for _, b := range strings.Split(o, sep) {
 			if strings.HasSuffix(b, rwSuffix) {
 				if upper != "" {
-					return "", nil, errors.Wrap(errdefs.ErrInvalidArgument, "multiple rw branch found")
+					return "", nil, fmt.Errorf("multiple rw branch found: %w", errdefs.ErrInvalidArgument)
 				}
 				upper = strings.TrimSuffix(b, rwSuffix)
 			} else if strings.HasSuffix(b, roSuffix) {
 				if upper == "" {
-					return "", nil, errors.Wrap(errdefs.ErrInvalidArgument, "rw branch be first")
+					return "", nil, fmt.Errorf("rw branch be first: %w", errdefs.ErrInvalidArgument)
 				}
 				lower = append(lower, strings.TrimSuffix(b, roSuffix))
 			} else {
-				return "", nil, errors.Wrap(errdefs.ErrInvalidArgument, "unhandled aufs suffix")
+				return "", nil, fmt.Errorf("unhandled aufs suffix: %w", errdefs.ErrInvalidArgument)
 			}
 
 		}
 	}
 	if upper == "" {
-		return "", nil, errors.Wrap(errdefs.ErrInvalidArgument, "rw branch not found")
+		return "", nil, fmt.Errorf("rw branch not found: %w", errdefs.ErrInvalidArgument)
 	}
 	return
 }

@@ -24,9 +24,10 @@ import (
 	v1 "github.com/containerd/containerd/api/services/ttrpc/events/v1"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/ttrpcutil"
+	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/ttrpc"
-	"github.com/gogo/protobuf/types"
-	"gotest.tools/v3/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestClientTTRPC_New(t *testing.T) {
@@ -34,10 +35,10 @@ func TestClientTTRPC_New(t *testing.T) {
 		t.Skip()
 	}
 	client, err := ttrpcutil.NewClient(address + ".ttrpc")
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	err = client.Close()
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 }
 
 func TestClientTTRPC_Reconnect(t *testing.T) {
@@ -45,27 +46,27 @@ func TestClientTTRPC_Reconnect(t *testing.T) {
 		t.Skip()
 	}
 	client, err := ttrpcutil.NewClient(address + ".ttrpc")
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	err = client.Reconnect()
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	service, err := client.EventsService()
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	// Send test request to make sure its alive after reconnect
 	_, err = service.Forward(context.Background(), &v1.ForwardRequest{
 		Envelope: &v1.Envelope{
-			Timestamp: time.Now(),
+			Timestamp: protobuf.ToTimestamp(time.Now()),
 			Namespace: namespaces.Default,
 			Topic:     "/test",
 			Event:     &types.Any{},
 		},
 	})
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	err = client.Close()
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 }
 
 func TestClientTTRPC_Close(t *testing.T) {
@@ -73,17 +74,17 @@ func TestClientTTRPC_Close(t *testing.T) {
 		t.Skip()
 	}
 	client, err := ttrpcutil.NewClient(address + ".ttrpc")
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	service, err := client.EventsService()
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	err = client.Close()
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	_, err = service.Forward(context.Background(), &v1.ForwardRequest{Envelope: &v1.Envelope{}})
 	assert.Equal(t, err, ttrpc.ErrClosed)
 
 	err = client.Close()
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 }

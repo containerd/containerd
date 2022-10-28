@@ -37,7 +37,7 @@ var (
 		},
 	}
 
-	// SnapshotterLabels are cli flags specifying labels which will be add to the new snapshot for container.
+	// SnapshotterLabels are cli flags specifying labels which will be added to the new snapshot for container.
 	SnapshotterLabels = cli.StringSliceFlag{
 		Name:  "snapshotter-label",
 		Usage: "labels added to the new snapshot for this container.",
@@ -117,6 +117,10 @@ var (
 			Usage: "specify additional labels (e.g. foo=bar)",
 		},
 		cli.StringSliceFlag{
+			Name:  "annotation",
+			Usage: "specify additional OCI annotations (e.g. foo=bar)",
+		},
+		cli.StringSliceFlag{
 			Name:  "mount",
 			Usage: "specify additional container mount (e.g. type=bind,src=/tmp,dst=/host,options=rbind:ro)",
 		},
@@ -134,7 +138,7 @@ var (
 		},
 		cli.StringFlag{
 			Name:  "runtime",
-			Usage: "runtime name",
+			Usage: "runtime name or absolute path to runtime binary",
 			Value: defaults.DefaultRuntime,
 		},
 		cli.StringFlag{
@@ -166,10 +170,6 @@ var (
 			Usage: "memory limit (in bytes) for the container",
 		},
 		cli.StringSliceFlag{
-			Name:  "device",
-			Usage: "file path to a device to add to the container; or a path to a directory tree of devices to add to the container",
-		},
-		cli.StringSliceFlag{
 			Name:  "cap-add",
 			Usage: "add Linux capabilities (Set capabilities with 'CAP_' prefix)",
 		},
@@ -192,6 +192,26 @@ var (
 		cli.StringFlag{
 			Name:  "apparmor-profile",
 			Usage: "enable AppArmor with an existing custom profile",
+		},
+		cli.StringFlag{
+			Name:  "blockio-config-file",
+			Usage: "file path to blockio class definitions. By default class definitions are not loaded.",
+		},
+		cli.StringFlag{
+			Name:  "blockio-class",
+			Usage: "name of the blockio class to associate the container with",
+		},
+		cli.StringFlag{
+			Name:  "rdt-class",
+			Usage: "name of the RDT class to associate the container with. Specifies a Class of Service (CLOS) for cache and memory bandwidth management.",
+		},
+		cli.StringFlag{
+			Name:  "hostname",
+			Usage: "set the container's host name",
+		},
+		cli.StringFlag{
+			Name:  "user,u",
+			Usage: "username or user id, group optional (format: <name|uid>[:<group|gid>])",
 		},
 	}
 )
@@ -221,6 +241,19 @@ func LabelArgs(labelStrings []string) map[string]string {
 	}
 
 	return labels
+}
+
+// AnnotationArgs returns a map of annotation key,value pairs.
+func AnnotationArgs(annoStrings []string) (map[string]string, error) {
+	annotations := make(map[string]string, len(annoStrings))
+	for _, anno := range annoStrings {
+		parts := strings.SplitN(anno, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid key=value format annotation: %v", anno)
+		}
+		annotations[parts[0]] = parts[1]
+	}
+	return annotations, nil
 }
 
 // PrintAsJSON prints input in JSON format

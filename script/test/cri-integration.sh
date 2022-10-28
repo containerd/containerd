@@ -28,7 +28,7 @@ cd "${ROOT}"
 
 # FOCUS focuses the test to run.
 FOCUS=${FOCUS:-""}
-# REPORT_DIR is the the directory to store test logs.
+# REPORT_DIR is the directory to store test logs.
 if [ $IS_WINDOWS -eq 0 ]; then
   REPORT_DIR=${REPORT_DIR:-"/tmp/test-integration"}
 else
@@ -42,14 +42,34 @@ mkdir -p "${REPORT_DIR}"
 test_setup "${REPORT_DIR}"
 
 # Run integration test.
-${sudo} bin/cri-integration.test --test.run="${FOCUS}" --test.v \
+CMD=""
+if [ -n "${sudo}" ]; then
+  CMD+="${sudo} "
+  # sudo strips environment variables, so add ENABLE_CRI_SANDBOXES back if present
+  if [ -n  "${ENABLE_CRI_SANDBOXES}" ]; then
+    CMD+="ENABLE_CRI_SANDBOXES='${ENABLE_CRI_SANDBOXES}' "
+  fi
+fi
+CMD+="${PWD}/bin/cri-integration.test"
+
+${CMD} --test.run="${FOCUS}" --test.v \
   --cri-endpoint="${CONTAINERD_SOCK}" \
   --cri-root="${CRI_ROOT}" \
   --runtime-handler="${RUNTIME}" \
   --containerd-bin="${CONTAINERD_BIN}" \
   --image-list="${TEST_IMAGE_LIST:-}" && test_exit_code=$? || test_exit_code=$?
 
-test $test_exit_code -ne 0 && \
-  cat "$REPORT_DIR/containerd.log"
+if [[ "$test_exit_code" -ne 0 ]]; then
+  if [[ -e "$GITHUB_WORKSPACE" ]]; then
+    mkdir -p "$GITHUB_WORKSPACE/report"
+    mv "$REPORT_DIR/containerd.log" "$GITHUB_WORKSPACE/report"
+
+    echo ::group::containerd logs
+    cat "$GITHUB_WORKSPACE/report/containerd.log"
+    echo ::endgroup::
+  else
+    cat "$REPORT_DIR/containerd.log"
+  fi
+fi
 
 exit ${test_exit_code}

@@ -21,6 +21,7 @@ package v1
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/containerd/cgroups"
@@ -28,7 +29,6 @@ import (
 	"github.com/containerd/containerd/pkg/oom"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/v2/shim"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
@@ -93,7 +93,7 @@ func (e *epoller) Run(ctx context.Context) {
 func (e *epoller) Add(id string, cgx interface{}) error {
 	cg, ok := cgx.(cgroups.Cgroup)
 	if !ok {
-		return errors.Errorf("expected cgroups.Cgroup, got: %T", cgx)
+		return fmt.Errorf("expected cgroups.Cgroup, got: %T", cgx)
 	}
 	e.mu.Lock()
 	defer e.mu.Unlock()

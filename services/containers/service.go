@@ -18,13 +18,13 @@ package containers
 
 import (
 	"context"
+	"errors"
 	"io"
 
 	api "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/plugin"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/services"
-	ptypes "github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 
@@ -55,6 +55,7 @@ func init() {
 
 type service struct {
 	local api.ContainersClient
+	api.UnimplementedContainersServer
 }
 
 var _ api.ContainersServer = &service{}

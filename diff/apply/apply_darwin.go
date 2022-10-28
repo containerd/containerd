@@ -19,6 +19,7 @@ package apply
 import (
 	"context"
 	"io"
+	"os"
 
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/mount"
@@ -28,8 +29,14 @@ func apply(ctx context.Context, mounts []mount.Mount, r io.Reader) error {
 	// We currently do not support mounts nor bind mounts on MacOS in the containerd daemon.
 	// Using this as an exception to enable native snapshotter and allow further research.
 	if len(mounts) == 1 && mounts[0].Type == "bind" {
+		opts := []archive.ApplyOpt{}
+
+		if os.Getuid() != 0 {
+			opts = append(opts, archive.WithNoSameOwner())
+		}
+
 		path := mounts[0].Source
-		_, err := archive.Apply(ctx, path, r)
+		_, err := archive.Apply(ctx, path, r, opts...)
 		return err
 	}
 

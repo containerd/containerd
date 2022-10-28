@@ -22,7 +22,7 @@ import (
 	"sort"
 	"testing"
 
-	"gotest.tools/v3/assert"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/containerd/containerd/plugin"
 )
@@ -48,26 +48,24 @@ func TestMergeConfigs(t *testing.T) {
 	}
 
 	err := mergeConfig(a, b)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
-	assert.Equal(t, a.Version, 2)
-	assert.Equal(t, a.Root, "new_root")
-	assert.Equal(t, a.State, "old_state")
-	assert.Equal(t, a.OOMScore, 2)
-	assert.DeepEqual(t, a.RequiredPlugins, []string{"old_plugin", "new_plugin1", "new_plugin2"})
-	assert.DeepEqual(t, a.DisabledPlugins, []string{"old_plugin"})
-	assert.DeepEqual(t, a.Timeouts, map[string]string{"a": "1", "b": "2"})
-	assert.DeepEqual(t, a.StreamProcessors, map[string]StreamProcessor{"1": {Path: "3"}, "2": {Path: "5"}})
+	assert.Equal(t, 2, a.Version)
+	assert.Equal(t, "new_root", a.Root)
+	assert.Equal(t, "old_state", a.State)
+	assert.Equal(t, 2, a.OOMScore)
+	assert.Equal(t, []string{"old_plugin", "new_plugin1", "new_plugin2"}, a.RequiredPlugins)
+	assert.Equal(t, []string{"old_plugin"}, a.DisabledPlugins)
+	assert.Equal(t, map[string]string{"a": "1", "b": "2"}, a.Timeouts)
+	assert.Equal(t, map[string]StreamProcessor{"1": {Path: "3"}, "2": {Path: "5"}}, a.StreamProcessors)
 }
 
 func TestResolveImports(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "containerd_")
-	assert.NilError(t, err)
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
 	for _, filename := range []string{"config_1.toml", "config_2.toml", "test.toml"} {
-		err = os.WriteFile(filepath.Join(tempDir, filename), []byte(""), 0600)
-		assert.NilError(t, err)
+		err := os.WriteFile(filepath.Join(tempDir, filename), []byte(""), 0600)
+		assert.NoError(t, err)
 	}
 
 	imports, err := resolveImports(filepath.Join(tempDir, "root.toml"), []string{
@@ -75,9 +73,9 @@ func TestResolveImports(t *testing.T) {
 		filepath.Join(tempDir, "./test.toml"),   // Path clean up
 		"current.toml",                          // Resolve current working dir
 	})
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
-	assert.DeepEqual(t, imports, []string{
+	assert.Equal(t, imports, []string{
 		filepath.Join(tempDir, "config_1.toml"),
 		filepath.Join(tempDir, "config_2.toml"),
 		filepath.Join(tempDir, "test.toml"),
@@ -95,20 +93,18 @@ root = "/var/lib/containerd"
 	accepts = ["application/vnd.docker.image.rootfs.diff.tar.gzip"]
 	path = "unpigz"
 `
-	tempDir, err := os.MkdirTemp("", "containerd_")
-	assert.NilError(t, err)
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
 	path := filepath.Join(tempDir, "config.toml")
-	err = os.WriteFile(path, []byte(data), 0600)
-	assert.NilError(t, err)
+	err := os.WriteFile(path, []byte(data), 0600)
+	assert.NoError(t, err)
 
 	var out Config
 	err = LoadConfig(path, &out)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, 2, out.Version)
 	assert.Equal(t, "/var/lib/containerd", out.Root)
-	assert.DeepEqual(t, map[string]StreamProcessor{
+	assert.Equal(t, map[string]StreamProcessor{
 		"io.containerd.processor.v1.pigz": {
 			Accepts: []string{"application/vnd.docker.image.rootfs.diff.tar.gzip"},
 			Path:    "unpigz",
@@ -127,23 +123,21 @@ imports = ["data2.toml"]
 disabled_plugins = ["io.containerd.v1.xyz"]
 `
 
-	tempDir, err := os.MkdirTemp("", "containerd_")
-	assert.NilError(t, err)
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
-	err = os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0600)
-	assert.NilError(t, err)
+	err := os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0600)
+	assert.NoError(t, err)
 
 	err = os.WriteFile(filepath.Join(tempDir, "data2.toml"), []byte(data2), 0600)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	var out Config
 	err = LoadConfig(filepath.Join(tempDir, "data1.toml"), &out)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	assert.Equal(t, 2, out.Version)
 	assert.Equal(t, "/var/lib/containerd", out.Root)
-	assert.DeepEqual(t, []string{"io.containerd.v1.xyz"}, out.DisabledPlugins)
+	assert.Equal(t, []string{"io.containerd.v1.xyz"}, out.DisabledPlugins)
 }
 
 func TestLoadConfigWithCircularImports(t *testing.T) {
@@ -157,26 +151,24 @@ imports = ["data2.toml", "data1.toml"]
 disabled_plugins = ["io.containerd.v1.xyz"]
 imports = ["data1.toml", "data2.toml"]
 `
-	tempDir, err := os.MkdirTemp("", "containerd_")
-	assert.NilError(t, err)
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
-	err = os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0600)
-	assert.NilError(t, err)
+	err := os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0600)
+	assert.NoError(t, err)
 
 	err = os.WriteFile(filepath.Join(tempDir, "data2.toml"), []byte(data2), 0600)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	var out Config
 	err = LoadConfig(filepath.Join(tempDir, "data1.toml"), &out)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	assert.Equal(t, 2, out.Version)
 	assert.Equal(t, "/var/lib/containerd", out.Root)
-	assert.DeepEqual(t, []string{"io.containerd.v1.xyz"}, out.DisabledPlugins)
+	assert.Equal(t, []string{"io.containerd.v1.xyz"}, out.DisabledPlugins)
 
 	sort.Strings(out.Imports)
-	assert.DeepEqual(t, []string{
+	assert.Equal(t, []string{
 		filepath.Join(tempDir, "data1.toml"),
 		filepath.Join(tempDir, "data2.toml"),
 	}, out.Imports)
@@ -189,21 +181,19 @@ version = 2
   shim_debug = true
 `
 
-	tempDir, err := os.MkdirTemp("", "containerd_")
-	assert.NilError(t, err)
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
 	path := filepath.Join(tempDir, "config.toml")
-	err = os.WriteFile(path, []byte(data), 0600)
-	assert.NilError(t, err)
+	err := os.WriteFile(path, []byte(data), 0600)
+	assert.NoError(t, err)
 
 	var out Config
 	err = LoadConfig(path, &out)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	pluginConfig := map[string]interface{}{}
 	_, err = out.Decode(&plugin.Registration{Type: "io.containerd.runtime.v1", ID: "linux", Config: &pluginConfig})
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, true, pluginConfig["shim_debug"])
 }
 
@@ -215,20 +205,16 @@ func TestDecodePluginInV1Config(t *testing.T) {
   shim_debug = true
 `
 
-	tempDir, err := os.MkdirTemp("", "containerd_")
-	assert.NilError(t, err)
-	defer os.RemoveAll(tempDir)
-
-	path := filepath.Join(tempDir, "config.toml")
-	err = os.WriteFile(path, []byte(data), 0600)
-	assert.NilError(t, err)
+	path := filepath.Join(t.TempDir(), "config.toml")
+	err := os.WriteFile(path, []byte(data), 0600)
+	assert.NoError(t, err)
 
 	var out Config
 	err = LoadConfig(path, &out)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 
 	pluginConfig := map[string]interface{}{}
 	_, err = out.Decode(&plugin.Registration{ID: "linux", Config: &pluginConfig})
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, true, pluginConfig["shim_debug"])
 }

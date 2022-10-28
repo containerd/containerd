@@ -37,7 +37,6 @@ import (
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	exec "golang.org/x/sys/execabs"
 )
 
@@ -77,7 +76,7 @@ func (p *processIO) Copy(ctx context.Context, wg *sync.WaitGroup) error {
 	}
 	var cwg sync.WaitGroup
 	if err := copyPipes(ctx, p.IO(), p.stdio.Stdin, p.stdio.Stdout, p.stdio.Stderr, wg, &cwg); err != nil {
-		return errors.Wrap(err, "unable to copy pipes")
+		return fmt.Errorf("unable to copy pipes: %w", err)
 	}
 	cwg.Wait()
 	return nil
@@ -97,7 +96,7 @@ func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio stdio.Stdi
 	}
 	u, err := url.Parse(stdio.Stdout)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to parse stdout uri")
+		return nil, fmt.Errorf("unable to parse stdout uri: %w", err)
 	}
 	if u.Scheme == "" {
 		u.Scheme = "fifo"
@@ -125,7 +124,7 @@ func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio stdio.Stdi
 		pio.copy = true
 		pio.io, err = runc.NewPipeIO(ioUID, ioGID, withConditionalIO(stdio))
 	default:
-		return nil, errors.Errorf("unknown STDIO scheme %s", u.Scheme)
+		return nil, fmt.Errorf("unknown STDIO scheme %s", u.Scheme)
 	}
 	if err != nil {
 		return nil, err
@@ -189,10 +188,10 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 		)
 		if ok {
 			if fw, err = fifo.OpenFifo(ctx, i.name, syscall.O_WRONLY, 0); err != nil {
-				return errors.Wrapf(err, "containerd-shim: opening w/o fifo %q failed", i.name)
+				return fmt.Errorf("containerd-shim: opening w/o fifo %q failed: %w", i.name, err)
 			}
 			if fr, err = fifo.OpenFifo(ctx, i.name, syscall.O_RDONLY, 0); err != nil {
-				return errors.Wrapf(err, "containerd-shim: opening r/o fifo %q failed", i.name)
+				return fmt.Errorf("containerd-shim: opening r/o fifo %q failed: %w", i.name, err)
 			}
 		} else {
 			if sameFile != nil {
@@ -201,7 +200,7 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 				continue
 			}
 			if fw, err = os.OpenFile(i.name, syscall.O_WRONLY|syscall.O_APPEND, 0); err != nil {
-				return errors.Wrapf(err, "containerd-shim: opening file %q failed", i.name)
+				return fmt.Errorf("containerd-shim: opening file %q failed: %w", i.name, err)
 			}
 			if stdout == stderr {
 				sameFile = &countingWriteCloser{
@@ -266,13 +265,13 @@ func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (_ runc.IO, err e
 
 	out, err := newPipe()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create stdout pipes")
+		return nil, fmt.Errorf("failed to create stdout pipes: %w", err)
 	}
 	closers = append(closers, out.Close)
 
 	serr, err := newPipe()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create stderr pipes")
+		return nil, fmt.Errorf("failed to create stderr pipes: %w", err)
 	}
 	closers = append(closers, serr.Close)
 
@@ -287,19 +286,19 @@ func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (_ runc.IO, err e
 	// don't need to register this with the reaper or wait when
 	// running inside a shim
 	if err := cmd.Start(); err != nil {
-		return nil, errors.Wrap(err, "failed to start binary process")
+		return nil, fmt.Errorf("failed to start binary process: %w", err)
 	}
 	closers = append(closers, func() error { return cmd.Process.Kill() })
 
 	// close our side of the pipe after start
 	if err := w.Close(); err != nil {
-		return nil, errors.Wrap(err, "failed to close write pipe after start")
+		return nil, fmt.Errorf("failed to close write pipe after start: %w", err)
 	}
 
 	// wait for the logging binary to be ready
 	b := make([]byte, 1)
 	if _, err := r.Read(b); err != nil && err != io.EOF {
-		return nil, errors.Wrap(err, "failed to read from logging binary")
+		return nil, fmt.Errorf("failed to read from logging binary: %w", err)
 	}
 
 	return &binaryIO{
@@ -357,12 +356,12 @@ func (b *binaryIO) cancel() error {
 
 	// Send SIGTERM first, so logger process has a chance to flush and exit properly
 	if err := b.cmd.Process.Signal(syscall.SIGTERM); err != nil {
-		result := multierror.Append(errors.Wrap(err, "failed to send SIGTERM"))
+		result := multierror.Append(fmt.Errorf("failed to send SIGTERM: %w", err))
 
 		log.L.WithError(err).Warn("failed to send SIGTERM signal, killing logging shim")
 
 		if err := b.cmd.Process.Kill(); err != nil {
-			result = multierror.Append(result, errors.Wrap(err, "failed to kill process after faulty SIGTERM"))
+			result = multierror.Append(result, fmt.Errorf("failed to kill process after faulty SIGTERM: %w", err))
 		}
 
 		return result.ErrorOrNil()
@@ -381,7 +380,7 @@ func (b *binaryIO) cancel() error {
 
 		err := b.cmd.Process.Kill()
 		if err != nil {
-			return errors.Wrap(err, "failed to kill shim logger process")
+			return fmt.Errorf("failed to kill shim logger process: %w", err)
 		}
 
 		return nil
@@ -429,11 +428,11 @@ func (p *pipe) Close() error {
 	var result *multierror.Error
 
 	if err := p.w.Close(); err != nil {
-		result = multierror.Append(result, errors.Wrap(err, "failed to close write pipe"))
+		result = multierror.Append(result, fmt.Errorf("failed to close write pipe: %w", err))
 	}
 
 	if err := p.r.Close(); err != nil {
-		result = multierror.Append(result, errors.Wrap(err, "failed to close read pipe"))
+		result = multierror.Append(result, fmt.Errorf("failed to close read pipe: %w", err))
 	}
 
 	return multierror.Prefix(result.ErrorOrNil(), "pipe:")

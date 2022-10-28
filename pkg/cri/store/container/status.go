@@ -18,12 +18,13 @@ package container
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
 
 	"github.com/containerd/continuity"
-	"github.com/pkg/errors"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -60,10 +61,9 @@ import (
 //                      DELETED
 
 // statusVersion is current version of container status.
-const statusVersion = "v1" // nolint
+const statusVersion = "v1"
 
 // versionedStatus is the internal used versioned container status.
-// nolint
 type versionedStatus struct {
 	// Version indicates the version of the versioned container status.
 	Version string
@@ -96,6 +96,8 @@ type Status struct {
 	// Unknown indicates that the container status is not fully loaded.
 	// This field doesn't need to be checkpointed.
 	Unknown bool `json:"-"`
+	// Resources has container runtime resource constraints
+	Resources *runtime.ContainerResources
 }
 
 // State returns current state of the container based on the container status.
@@ -165,11 +167,11 @@ type StatusStorage interface {
 func StoreStatus(root, id string, status Status) (StatusStorage, error) {
 	data, err := status.encode()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to encode status")
+		return nil, fmt.Errorf("failed to encode status: %w", err)
 	}
 	path := filepath.Join(root, "status")
 	if err := continuity.AtomicWriteFile(path, data, 0600); err != nil {
-		return nil, errors.Wrapf(err, "failed to checkpoint status to %q", path)
+		return nil, fmt.Errorf("failed to checkpoint status to %q: %w", path, err)
 	}
 	return &statusStorage{
 		path:   path,
@@ -183,11 +185,11 @@ func LoadStatus(root, id string) (Status, error) {
 	path := filepath.Join(root, "status")
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return Status{}, errors.Wrapf(err, "failed to read status from %q", path)
+		return Status{}, fmt.Errorf("failed to read status from %q: %w", path, err)
 	}
 	var status Status
 	if err := status.decode(data); err != nil {
-		return Status{}, errors.Wrapf(err, "failed to decode status %q", data)
+		return Status{}, fmt.Errorf("failed to decode status %q: %w", data, err)
 	}
 	return status, nil
 }
@@ -202,7 +204,56 @@ type statusStorage struct {
 func (s *statusStorage) Get() Status {
 	s.RLock()
 	defer s.RUnlock()
-	return s.status
+	// Deep copy is needed in case some fields in Status are updated after Get()
+	// is called.
+	return deepCopyOf(s.status)
+}
+
+func deepCopyOf(s Status) Status {
+	copy := s
+	// Resources is the only field that is a pointer, and therefore needs
+	// a manual deep copy.
+	// This will need updates when new fields are added to ContainerResources.
+	if s.Resources == nil {
+		return copy
+	}
+	copy.Resources = &runtime.ContainerResources{}
+	if s.Resources != nil && s.Resources.Linux != nil {
+		hugepageLimits := make([]*runtime.HugepageLimit, len(s.Resources.Linux.HugepageLimits))
+		for _, l := range s.Resources.Linux.HugepageLimits {
+			hugepageLimits = append(hugepageLimits, &runtime.HugepageLimit{
+				PageSize: l.PageSize,
+				Limit:    l.Limit,
+			})
+		}
+		copy.Resources = &runtime.ContainerResources{
+			Linux: &runtime.LinuxContainerResources{
+				CpuPeriod:              s.Resources.Linux.CpuPeriod,
+				CpuQuota:               s.Resources.Linux.CpuQuota,
+				CpuShares:              s.Resources.Linux.CpuShares,
+				CpusetCpus:             s.Resources.Linux.CpusetCpus,
+				CpusetMems:             s.Resources.Linux.CpusetMems,
+				MemoryLimitInBytes:     s.Resources.Linux.MemoryLimitInBytes,
+				MemorySwapLimitInBytes: s.Resources.Linux.MemorySwapLimitInBytes,
+				OomScoreAdj:            s.Resources.Linux.OomScoreAdj,
+				Unified:                s.Resources.Linux.Unified,
+				HugepageLimits:         hugepageLimits,
+			},
+		}
+	}
+
+	if s.Resources != nil && s.Resources.Windows != nil {
+		copy.Resources = &runtime.ContainerResources{
+			Windows: &runtime.WindowsContainerResources{
+				CpuShares:          s.Resources.Windows.CpuShares,
+				CpuCount:           s.Resources.Windows.CpuCount,
+				CpuMaximum:         s.Resources.Windows.CpuMaximum,
+				MemoryLimitInBytes: s.Resources.Windows.MemoryLimitInBytes,
+				RootfsSizeInBytes:  s.Resources.Windows.RootfsSizeInBytes,
+			},
+		}
+	}
+	return copy
 }
 
 // UpdateSync updates the container status and the on disk checkpoint.
@@ -215,10 +266,10 @@ func (s *statusStorage) UpdateSync(u UpdateFunc) error {
 	}
 	data, err := newStatus.encode()
 	if err != nil {
-		return errors.Wrap(err, "failed to encode status")
+		return fmt.Errorf("failed to encode status: %w", err)
 	}
 	if err := continuity.AtomicWriteFile(s.path, data, 0600); err != nil {
-		return errors.Wrapf(err, "failed to checkpoint status to %q", s.path)
+		return fmt.Errorf("failed to checkpoint status to %q: %w", s.path, err)
 	}
 	s.status = newStatus
 	return nil

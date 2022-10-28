@@ -146,7 +146,7 @@ var listCommand = cli.Command{
 	},
 }
 
-func prettyPlatforms(pspb []types.Platform) string {
+func prettyPlatforms(pspb []*types.Platform) string {
 	psm := map[string]struct{}{}
 	for _, p := range pspb {
 		psm[platforms.Format(v1.Platform{

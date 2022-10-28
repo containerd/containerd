@@ -18,6 +18,7 @@ package v2
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -26,7 +27,6 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/namespaces"
-	"github.com/pkg/errors"
 )
 
 type deferredPipeConnection struct {
@@ -78,7 +78,7 @@ func openShimLog(ctx context.Context, bundle *Bundle, dialer func(string, time.D
 			time.Second*10,
 		)
 		if conerr != nil {
-			dpc.conerr = errors.Wrap(conerr, "failed to connect to shim log")
+			dpc.conerr = fmt.Errorf("failed to connect to shim log: %w", conerr)
 		}
 		dpc.c = c
 		dpc.wg.Done()

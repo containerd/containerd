@@ -26,7 +26,6 @@ import (
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/leases"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
@@ -69,7 +68,7 @@ var listCommand = cli.Command{
 
 		leaseList, err := ls.List(ctx, filters...)
 		if err != nil {
-			return errors.Wrap(err, "failed to list leases")
+			return fmt.Errorf("failed to list leases: %w", err)
 		}
 		if quiet {
 			for _, l := range leaseList {
@@ -159,7 +158,7 @@ var createCommand = cli.Command{
 
 var deleteCommand = cli.Command{
 	Name:        "delete",
-	Aliases:     []string{"rm"},
+	Aliases:     []string{"del", "remove", "rm"},
 	Usage:       "delete a lease",
 	ArgsUsage:   "[flags] <lease id> ...",
 	Description: "delete a lease",

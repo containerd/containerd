@@ -1,0 +1,78 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.5.0"
+
+pre_release = false
+
+preface = """\
+The seventh major release of containerd includes many improvements and added
+support to increase overall compatibility and stability.
+
+### Highlights
+
+#### Runtime
+
+* **Add runtime label to metrics** ([#5744](https://github.com/containerd/containerd/pull/5744))
+* **Cleanup task delete logic in v2 shim** ([#5813](https://github.com/containerd/containerd/pull/5813))
+* **Add support for shim plugins** ([#5817](https://github.com/containerd/containerd/pull/5817))
+* **Handle sigint and sigterm in shimv2** ([#5828](https://github.com/containerd/containerd/pull/5828))
+* **Decouple shim and task manager** ([#5918](https://github.com/containerd/containerd/pull/5918))
+* **Add runc shim support for core scheduling** ([#6011](https://github.com/containerd/containerd/pull/6011))
+* **Update shim client connect attempt to fail fast when shim errors** ([#6031](https://github.com/containerd/containerd/pull/6031))
+* **Add support for absolute path to shim binaries** ([#6206](https://github.com/containerd/containerd/pull/6206))
+* **Update runc to v1.1.0** ([#6375](https://github.com/containerd/containerd/pull/6375))
+
+#### Windows
+
+* **Add support for Windows HostProcess containers** ([#5131](https://github.com/containerd/containerd/pull/5131))
+* **Add support for Windows resource limits** ([#5778](https://github.com/containerd/containerd/pull/5778))
+
+#### CRI
+
+* **Add CNI configuration based on runtime class** ([#4695](https://github.com/containerd/containerd/pull/4695))
+* **Add support for Intel RDT** ([#5439](https://github.com/containerd/containerd/pull/5439))
+* **Add support for CRI v1 and v1alpha in parallel** ([#5619](https://github.com/containerd/containerd/pull/5619))
+* **Add support for unified resources field for cgroups v2** ([#5627](https://github.com/containerd/containerd/pull/5627))
+* **Add IP preference configuration for reporting pod IP** ([#5964](https://github.com/containerd/containerd/pull/5964))
+* **Implement new CRI pod sandbox stats API** ([#6113](https://github.com/containerd/containerd/pull/6113))
+* **Add sandbox and container latency metrics** ([#6111](https://github.com/containerd/containerd/pull/6111))
+* **Add namespace to ttrpc and grpc plugin connections** ([#6130](https://github.com/containerd/containerd/pull/6130))
+* **Add option to allow ping sockets and privileged ports with no capabilities** ([#6170](https://github.com/containerd/containerd/pull/6170))
+* **Add support for configuring swap** ([#6320](https://github.com/containerd/containerd/pull/6320))
+
+#### Other
+
+* **Add support for client TLS Auth for grpc** ([#5606](https://github.com/containerd/containerd/pull/5606))
+* **Add xfs support for devicemapper snapshotter** ([#5610](https://github.com/containerd/containerd/pull/5610))
+* **Add metric exposing build version and revision** ([#5965](https://github.com/containerd/containerd/pull/5965))
+* **Add support for custom fs options in devmapper snapshotter** ([#6122](https://github.com/containerd/containerd/pull/6122))
+* **Update introspection service to show GRPC plugins** ([#6432](https://github.com/containerd/containerd/pull/6432))
+
+#### Client
+
+* **Allow WithServices to use custom implementations** ([#5709](https://github.com/containerd/containerd/pull/5709))
+* **Support custom compressor for walking differ** ([#5735](https://github.com/containerd/containerd/pull/5735))
+
+### Release Updates
+
+#### containerd/CNI/runc/critools tar bundle
+
+The tar bundles released as `cri-containerd-*.tar.gz` contain a build of runc
+linked with a newer version of libseccomp. This dynamically-linked build of runc
+was built on Ubuntu 18.04 and will not work on some other distributions, such as
+RHEL 7 and Debian 10. Users of such distributions may get a statically-linked
+runc binary from https://github.com/opencontainers/runc/releases or build runc
+for their own environment.
+
+> **_Deprecation_** These tar bundles are now deprecated and will be removed or
+> replaced in containerd 2.0. Projects relying on these tar bundles should use
+> the `containerd-*.tar.gz` bundles or work with the containerd community on a
+> suitable replacement in containerd 2.0.
+
+See the changelog for complete list of changes"""

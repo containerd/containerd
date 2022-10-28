@@ -22,13 +22,13 @@ import (
 	goruntime "runtime"
 	"testing"
 
-	"github.com/containerd/containerd/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/pkg/cri/opts"
@@ -69,8 +69,11 @@ func TestGeneralContainerSpec(t *testing.T) {
 }
 
 func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
-	if goruntime.GOOS == "darwin" {
+	switch goruntime.GOOS {
+	case "darwin":
 		t.Skip("not implemented on Darwin")
+	case "freebsd":
+		t.Skip("not implemented on FreeBSD")
 	}
 
 	testID := "test-id"
@@ -187,21 +190,22 @@ func TestContainerSpecCommand(t *testing.T) {
 			expectErr: true,
 		},
 	} {
+		t.Run(desc, func(t *testing.T) {
+			config, _, imageConfig, _ := getCreateContainerTestData()
+			config.Command = test.criEntrypoint
+			config.Args = test.criArgs
+			imageConfig.Entrypoint = test.imageEntrypoint
+			imageConfig.Cmd = test.imageArgs
 
-		config, _, imageConfig, _ := getCreateContainerTestData()
-		config.Command = test.criEntrypoint
-		config.Args = test.criArgs
-		imageConfig.Entrypoint = test.imageEntrypoint
-		imageConfig.Cmd = test.imageArgs
-
-		var spec runtimespec.Spec
-		err := opts.WithProcessArgs(config, imageConfig)(context.Background(), nil, nil, &spec)
-		if test.expectErr {
-			assert.Error(t, err)
-			continue
-		}
-		assert.NoError(t, err)
-		assert.Equal(t, test.expected, spec.Process.Args, desc)
+			var spec runtimespec.Spec
+			err := opts.WithProcessArgs(config, imageConfig)(context.Background(), nil, nil, &spec)
+			if test.expectErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, test.expected, spec.Process.Args, desc)
+		})
 	}
 }
 
@@ -253,32 +257,36 @@ func TestVolumeMounts(t *testing.T) {
 			},
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		config := &imagespec.ImageConfig{
-			Volumes: test.imageVolumes,
-		}
-		c := newTestCRIService()
-		got := c.volumeMounts(testContainerRootDir, test.criMounts, config)
-		assert.Len(t, got, len(test.expectedMountDest))
-		for _, dest := range test.expectedMountDest {
-			found := false
-			for _, m := range got {
-				if m.ContainerPath == dest {
-					found = true
-					assert.Equal(t,
-						filepath.Dir(m.HostPath),
-						filepath.Join(testContainerRootDir, "volumes"))
-					break
-				}
+		t.Run(desc, func(t *testing.T) {
+			config := &imagespec.ImageConfig{
+				Volumes: test.imageVolumes,
 			}
-			assert.True(t, found)
-		}
+			c := newTestCRIService()
+			got := c.volumeMounts(testContainerRootDir, test.criMounts, config)
+			assert.Len(t, got, len(test.expectedMountDest))
+			for _, dest := range test.expectedMountDest {
+				found := false
+				for _, m := range got {
+					if m.ContainerPath == dest {
+						found = true
+						assert.Equal(t,
+							filepath.Dir(m.HostPath),
+							filepath.Join(testContainerRootDir, "volumes"))
+						break
+					}
+				}
+				assert.True(t, found)
+			}
+		})
 	}
 }
 
 func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
-	if goruntime.GOOS == "darwin" {
+	switch goruntime.GOOS {
+	case "darwin":
 		t.Skip("not implemented on Darwin")
+	case "freebsd":
+		t.Skip("not implemented on FreeBSD")
 	}
 
 	testID := "test-id"
@@ -415,4 +423,36 @@ func TestBaseRuntimeSpec(t *testing.T) {
 	assert.Equal(t, c.baseOCISpecs["/etc/containerd/cri-base.json"].Hostname, "old")
 
 	assert.Equal(t, filepath.Join("/", constants.K8sContainerdNamespace, "id1"), out.Linux.CgroupsPath)
+}
+
+func TestRuntimeSnapshotter(t *testing.T) {
+	defaultRuntime := config.Runtime{
+		Snapshotter: "",
+	}
+
+	fooRuntime := config.Runtime{
+		Snapshotter: "devmapper",
+	}
+
+	for desc, test := range map[string]struct {
+		runtime           config.Runtime
+		expectSnapshotter string
+	}{
+		"should return default snapshotter when runtime.Snapshotter is not set": {
+			runtime:           defaultRuntime,
+			expectSnapshotter: config.DefaultConfig().Snapshotter,
+		},
+		"should return overridden snapshotter when runtime.Snapshotter is set": {
+			runtime:           fooRuntime,
+			expectSnapshotter: "devmapper",
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			cri := newTestCRIService()
+			cri.config = config.Config{
+				PluginConfig: config.DefaultConfig(),
+			}
+			assert.Equal(t, test.expectSnapshotter, cri.runtimeSnapshotter(context.Background(), test.runtime))
+		})
+	}
 }

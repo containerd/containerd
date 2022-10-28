@@ -19,7 +19,6 @@ package continuity
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -34,7 +33,7 @@ func AtomicWriteFile(filename string, data []byte, perm os.FileMode) error {
 // atomicWriteFile writes data to a file by first writing to a temp
 // file and calling rename.
 func atomicWriteFile(filename string, r io.Reader, dataSize int64, perm os.FileMode) error {
-	f, err := ioutil.TempFile(filepath.Dir(filename), ".tmp-"+filepath.Base(filename))
+	f, err := os.CreateTemp(filepath.Dir(filename), ".tmp-"+filepath.Base(filename))
 	if err != nil {
 		return err
 	}

@@ -17,13 +17,15 @@
 package ttrpcutil
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"sync"
 	"time"
 
 	v1 "github.com/containerd/containerd/api/services/ttrpc/events/v1"
 	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/ttrpc"
-	"github.com/pkg/errors"
 )
 
 const ttrpcDialTimeout = 5 * time.Second
@@ -41,9 +43,11 @@ type Client struct {
 // NewClient returns a new containerd TTRPC client that is connected to the containerd instance provided by address
 func NewClient(address string, opts ...ttrpc.ClientOpts) (*Client, error) {
 	connector := func() (*ttrpc.Client, error) {
-		conn, err := dialer.Dialer(address, ttrpcDialTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), ttrpcDialTimeout)
+		defer cancel()
+		conn, err := dialer.ContextDialer(ctx, address)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to connect")
+			return nil, fmt.Errorf("failed to connect: %w", err)
 		}
 
 		client := ttrpc.NewClient(conn, opts...)

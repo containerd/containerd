@@ -1,3 +1,5 @@
+//go:build windows
+
 package wclayer
 
 // This file contains utility functions to support storage (graph) related

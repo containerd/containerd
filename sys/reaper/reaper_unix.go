@@ -20,12 +20,13 @@
 package reaper
 
 import (
+	"errors"
+	"fmt"
 	"sync"
 	"syscall"
 	"time"
 
 	runc "github.com/containerd/go-runc"
-	"github.com/pkg/errors"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 )
@@ -143,7 +144,7 @@ func (m *Monitor) WaitTimeout(c *exec.Cmd, ec chan runc.Exit, timeout time.Durat
 	select {
 	case <-timer.C:
 		syscall.Kill(c.Process.Pid, syscall.SIGKILL)
-		return 0, errors.Errorf("timeout %v for cmd(pid=%d): %s, %s", timeout, c.Process.Pid, c.Path, c.Args)
+		return 0, fmt.Errorf("timeout %v for cmd(pid=%d): %s, %s", timeout, c.Process.Pid, c.Path, c.Args)
 	case res := <-waitCh:
 		return res.status, res.err
 	}

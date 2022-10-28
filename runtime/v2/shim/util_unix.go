@@ -33,7 +33,6 @@ import (
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/sys"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -54,11 +53,11 @@ func AdjustOOMScore(pid int) error {
 	parent := os.Getppid()
 	score, err := sys.GetOOMScoreAdj(parent)
 	if err != nil {
-		return errors.Wrap(err, "get parent OOM score")
+		return fmt.Errorf("get parent OOM score: %w", err)
 	}
 	shimScore := score + 1
 	if err := sys.AdjustOOMScore(pid, shimScore); err != nil {
-		return errors.Wrap(err, "set shim OOM score")
+		return fmt.Errorf("set shim OOM score: %w", err)
 	}
 	return nil
 }
@@ -96,7 +95,7 @@ func NewSocket(address string) (*net.UnixListener, error) {
 
 	if !isAbstract {
 		if err := os.MkdirAll(filepath.Dir(path), 0600); err != nil {
-			return nil, errors.Wrapf(err, "%s", path)
+			return nil, fmt.Errorf("%s: %w", path, err)
 		}
 	}
 	l, err := net.Listen("unix", path)

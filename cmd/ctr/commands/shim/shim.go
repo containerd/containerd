@@ -21,6 +21,7 @@ package shim
 
 import (
 	gocontext "context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -28,15 +29,14 @@ import (
 	"strings"
 
 	"github.com/containerd/console"
+	"github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/namespaces"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime/v2/shim"
-	"github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl"
-	ptypes "github.com/gogo/protobuf/types"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )

@@ -24,13 +24,11 @@ import (
 )
 
 // StartSpan starts child span in a context.
-func StartSpan(ctx context.Context, opName string, opts ...trace.SpanStartOption) (trace.Span, context.Context) {
+func StartSpan(ctx context.Context, opName string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
 	if parent := trace.SpanFromContext(ctx); parent != nil && parent.SpanContext().IsValid() {
-		ctx, span := parent.TracerProvider().Tracer("").Start(ctx, opName, opts...)
-		return span, ctx
+		return parent.TracerProvider().Tracer("").Start(ctx, opName, opts...)
 	}
-	ctx, span := otel.Tracer("").Start(ctx, opName, opts...)
-	return span, ctx
+	return otel.Tracer("").Start(ctx, opName, opts...)
 }
 
 // StopSpan ends the span specified

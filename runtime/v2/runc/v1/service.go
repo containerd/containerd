@@ -21,6 +21,7 @@ package v1
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -31,6 +32,7 @@ import (
 
 	"github.com/containerd/cgroups"
 	eventstypes "github.com/containerd/containerd/api/events"
+	taskAPI "github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
@@ -40,16 +42,15 @@ import (
 	"github.com/containerd/containerd/pkg/process"
 	"github.com/containerd/containerd/pkg/schedcore"
 	"github.com/containerd/containerd/pkg/stdio"
+	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/protobuf/proto"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime/v2/runc"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/runtime/v2/shim"
-	taskAPI "github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/containerd/sys/reaper"
 	runcC "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
-	"github.com/gogo/protobuf/proto"
-	ptypes "github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
@@ -79,7 +80,7 @@ func New(ctx context.Context, id string, publisher shim.Publisher, shutdown func
 	runcC.Monitor = reaper.Default
 	if err := s.initPlatform(); err != nil {
 		shutdown()
-		return nil, errors.Wrap(err, "failed to initialized platform behavior")
+		return nil, fmt.Errorf("failed to initialized platform behavior: %w", err)
 	}
 	go s.forward(ctx, publisher)
 	return s, nil
@@ -144,7 +145,7 @@ func (s *service) StartShim(ctx context.Context, opts shim.StartOpts) (_ string,
 			return "", err
 		}
 		if err := shim.RemoveSocket(address); err != nil {
-			return "", errors.Wrap(err, "remove already used socket")
+			return "", fmt.Errorf("remove already used socket: %w", err)
 		}
 		if socket, err = shim.NewSocket(address); err != nil {
 			return "", err
@@ -171,7 +172,7 @@ func (s *service) StartShim(ctx context.Context, opts shim.StartOpts) (_ string,
 	goruntime.LockOSThread()
 	if os.Getenv("SCHED_CORE") != "" {
 		if err := schedcore.Create(schedcore.ProcessGroup); err != nil {
-			return "", errors.Wrap(err, "enable sched core support")
+			return "", fmt.Errorf("enable sched core support: %w", err)
 		}
 	}
 
@@ -205,19 +206,17 @@ func (s *service) StartShim(ctx context.Context, opts shim.StartOpts) (_ string,
 				if opts.ShimCgroup != "" {
 					cg, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(opts.ShimCgroup))
 					if err != nil {
-						return "", errors.Wrapf(err, "failed to load cgroup %s", opts.ShimCgroup)
+						return "", fmt.Errorf("failed to load cgroup %s: %w", opts.ShimCgroup, err)
 					}
-					if err := cg.Add(cgroups.Process{
-						Pid: cmd.Process.Pid,
-					}); err != nil {
-						return "", errors.Wrapf(err, "failed to join cgroup %s", opts.ShimCgroup)
+					if err := cg.AddProc(uint64(cmd.Process.Pid)); err != nil {
+						return "", fmt.Errorf("failed to join cgroup %s: %w", opts.ShimCgroup, err)
 					}
 				}
 			}
 		}
 	}
 	if err := shim.AdjustOOMScore(cmd.Process.Pid); err != nil {
-		return "", errors.Wrap(err, "failed to adjust OOM score for shim")
+		return "", fmt.Errorf("failed to adjust OOM score for shim: %w", err)
 	}
 	return address, nil
 }
@@ -250,7 +249,7 @@ func (s *service) Cleanup(ctx context.Context) (*taskAPI.DeleteResponse, error) 
 		root = opts.Root
 	}
 
-	r := process.NewRunc(root, path, ns, runtime, "", false)
+	r := process.NewRunc(root, path, ns, runtime, false)
 	if err := r.Delete(ctx, s.id, &runcC.DeleteOpts{
 		Force: true,
 	}); err != nil {
@@ -259,9 +258,16 @@ func (s *service) Cleanup(ctx context.Context) (*taskAPI.DeleteResponse, error) 
 	if err := mount.UnmountAll(filepath.Join(path, "rootfs"), 0); err != nil {
 		logrus.WithError(err).Warn("failed to cleanup rootfs mount")
 	}
+
+	pid, err := runcC.ReadPidFile(filepath.Join(path, process.InitPidFile))
+	if err != nil {
+		logrus.WithError(err).Warn("failed to read init pid file")
+	}
+
 	return &taskAPI.DeleteResponse{
-		ExitedAt:   time.Now(),
+		ExitedAt:   protobuf.ToTimestamp(time.Now()),
 		ExitStatus: 128 + uint32(unix.SIGKILL),
+		Pid:        uint32(pid),
 	}, nil
 }
 
@@ -355,12 +361,12 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAP
 			ContainerID: container.ID,
 			Pid:         uint32(p.Pid()),
 			ExitStatus:  uint32(p.ExitStatus()),
-			ExitedAt:    p.ExitedAt(),
+			ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
 		})
 	}
 	return &taskAPI.DeleteResponse{
 		ExitStatus: uint32(p.ExitStatus()),
-		ExitedAt:   p.ExitedAt(),
+		ExitedAt:   protobuf.ToTimestamp(p.ExitedAt()),
 		Pid:        uint32(p.Pid()),
 	}, nil
 }
@@ -410,18 +416,18 @@ func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.
 	if err != nil {
 		return nil, err
 	}
-	status := task.StatusUnknown
+	status := task.Status_UNKNOWN
 	switch st {
 	case "created":
-		status = task.StatusCreated
+		status = task.Status_CREATED
 	case "running":
-		status = task.StatusRunning
+		status = task.Status_RUNNING
 	case "stopped":
-		status = task.StatusStopped
+		status = task.Status_STOPPED
 	case "paused":
-		status = task.StatusPaused
+		status = task.Status_PAUSED
 	case "pausing":
-		status = task.StatusPausing
+		status = task.Status_PAUSING
 	}
 	sio := p.Stdio()
 	return &taskAPI.StateResponse{
@@ -434,7 +440,7 @@ func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.
 		Stderr:     sio.Stderr,
 		Terminal:   sio.Terminal,
 		ExitStatus: uint32(p.ExitStatus()),
-		ExitedAt:   p.ExitedAt(),
+		ExitedAt:   protobuf.ToTimestamp(p.ExitedAt()),
 	}, nil
 }
 
@@ -500,9 +506,9 @@ func (s *service) Pids(ctx context.Context, r *taskAPI.PidsRequest) (*taskAPI.Pi
 				d := &options.ProcessDetails{
 					ExecID: p.ID(),
 				}
-				a, err := typeurl.MarshalAny(d)
+				a, err := protobuf.MarshalAnyToProto(d)
 				if err != nil {
-					return nil, errors.Wrapf(err, "failed to marshal process %d info", pid)
+					return nil, fmt.Errorf("failed to marshal process %d info: %w", pid, err)
 				}
 				pInfo.Info = a
 				break
@@ -565,7 +571,7 @@ func (s *service) Wait(ctx context.Context, r *taskAPI.WaitRequest) (*taskAPI.Wa
 
 	return &taskAPI.WaitResponse{
 		ExitStatus: uint32(p.ExitStatus()),
-		ExitedAt:   p.ExitedAt(),
+		ExitedAt:   protobuf.ToTimestamp(p.ExitedAt()),
 	}, nil
 }
 
@@ -590,7 +596,11 @@ func (s *service) Shutdown(ctx context.Context, r *taskAPI.ShutdownRequest) (*pt
 }
 
 func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.StatsResponse, error) {
-	cgx := s.container.Cgroup()
+	container, err := s.getContainer()
+	if err != nil {
+		return nil, err
+	}
+	cgx := container.Cgroup()
 	if cgx == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "cgroup does not exist")
 	}
@@ -610,7 +620,7 @@ func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.
 		return nil, err
 	}
 	return &taskAPI.StatsResponse{
-		Stats: data,
+		Stats: protobuf.FromAny(data),
 	}, nil
 }
 
@@ -653,7 +663,7 @@ func (s *service) checkProcesses(e runcC.Exit) {
 				ID:          p.ID(),
 				Pid:         uint32(e.Pid),
 				ExitStatus:  uint32(e.Status),
-				ExitedAt:    p.ExitedAt(),
+				ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
 			})
 			return
 		}

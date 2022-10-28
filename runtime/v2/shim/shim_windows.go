@@ -18,12 +18,12 @@ package shim
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"os"
 
 	"github.com/containerd/ttrpc"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -31,7 +31,7 @@ func setupSignals(config Config) (chan os.Signal, error) {
 	return nil, errors.New("not supported")
 }
 
-func newServer() (*ttrpc.Server, error) {
+func newServer(opts ...ttrpc.ServerOpt) (*ttrpc.Server, error) {
 	return nil, errors.New("not supported")
 }
 
@@ -46,8 +46,11 @@ func serveListener(path string) (net.Listener, error) {
 	return nil, errors.New("not supported")
 }
 
-func handleSignals(ctx context.Context, logger *logrus.Entry, signals chan os.Signal) error {
+func reap(ctx context.Context, logger *logrus.Entry, signals chan os.Signal) error {
 	return errors.New("not supported")
+}
+
+func handleExitSignals(ctx context.Context, logger *logrus.Entry, cancel context.CancelFunc) {
 }
 
 func openLog(ctx context.Context, _ string) (io.Writer, error) {

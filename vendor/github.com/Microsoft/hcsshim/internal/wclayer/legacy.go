@@ -1,3 +1,5 @@
+//go:build windows
+
 package wclayer
 
 import (
@@ -262,7 +264,6 @@ func (r *legacyLayerReader) Next() (path string, size int64, fileInfo *winio.Fil
 		// The creation time and access time get reset for files outside of the Files path.
 		fileInfo.CreationTime = fileInfo.LastWriteTime
 		fileInfo.LastAccessTime = fileInfo.LastWriteTime
-
 	} else {
 		// The file attributes are written before the backup stream.
 		var attr uint32
@@ -349,7 +350,7 @@ type legacyLayerWriter struct {
 	currentIsDir    bool
 }
 
-// newLegacyLayerWriter returns a LayerWriter that can write the contaler layer
+// newLegacyLayerWriter returns a LayerWriter that can write the container layer
 // transport format to disk.
 func newLegacyLayerWriter(root string, parentRoots []string, destRoot string) (w *legacyLayerWriter, err error) {
 	w = &legacyLayerWriter{
@@ -730,7 +731,7 @@ func (w *legacyLayerWriter) AddLink(name string, target string) error {
 		return errors.New("invalid hard link in layer")
 	}
 
-	// Find to try the target of the link in a previously added file. If that
+	// Try to find the target of the link in a previously added file. If that
 	// fails, search in parent layers.
 	var selectedRoot *os.File
 	if _, ok := w.addedFiles[target]; ok {

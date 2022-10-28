@@ -31,7 +31,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/typeurl"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
@@ -52,10 +51,11 @@ var Command = cli.Command{
 }
 
 var createCommand = cli.Command{
-	Name:      "create",
-	Usage:     "create container",
-	ArgsUsage: "[flags] Image|RootFS CONTAINER [COMMAND] [ARG...]",
-	Flags:     append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...), commands.ContainerFlags...),
+	Name:           "create",
+	Usage:          "create container",
+	ArgsUsage:      "[flags] Image|RootFS CONTAINER [COMMAND] [ARG...]",
+	SkipArgReorder: true,
+	Flags:          append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...), commands.ContainerFlags...),
 	Action: func(context *cli.Context) error {
 		var (
 			id     string
@@ -66,17 +66,17 @@ var createCommand = cli.Command{
 		if config {
 			id = context.Args().First()
 			if context.NArg() > 1 {
-				return errors.Wrap(errdefs.ErrInvalidArgument, "with spec config file, only container id should be provided")
+				return fmt.Errorf("with spec config file, only container id should be provided: %w", errdefs.ErrInvalidArgument)
 			}
 		} else {
 			id = context.Args().Get(1)
 			ref = context.Args().First()
 			if ref == "" {
-				return errors.Wrap(errdefs.ErrInvalidArgument, "image ref must be provided")
+				return fmt.Errorf("image ref must be provided: %w", errdefs.ErrInvalidArgument)
 			}
 		}
 		if id == "" {
-			return errors.Wrap(errdefs.ErrInvalidArgument, "container id must be provided")
+			return fmt.Errorf("container id must be provided: %w", errdefs.ErrInvalidArgument)
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -149,7 +149,7 @@ var deleteCommand = cli.Command{
 	Name:      "delete",
 	Usage:     "delete one or more existing containers",
 	ArgsUsage: "[flags] CONTAINER [CONTAINER, ...]",
-	Aliases:   []string{"del", "rm"},
+	Aliases:   []string{"del", "remove", "rm"},
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "keep-snapshot",
@@ -169,7 +169,7 @@ var deleteCommand = cli.Command{
 		}
 
 		if context.NArg() == 0 {
-			return errors.Wrap(errdefs.ErrInvalidArgument, "must specify at least one container to delete")
+			return fmt.Errorf("must specify at least one container to delete: %w", errdefs.ErrInvalidArgument)
 		}
 		for _, arg := range context.Args() {
 			if err := deleteContainer(ctx, client, arg, deleteOpts...); err != nil {
@@ -215,7 +215,7 @@ var setLabelsCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		containerID, labels := commands.ObjectWithLabelArgs(context)
 		if containerID == "" {
-			return errors.Wrap(errdefs.ErrInvalidArgument, "container id must be provided")
+			return fmt.Errorf("container id must be provided: %w", errdefs.ErrInvalidArgument)
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -257,7 +257,7 @@ var infoCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		id := context.Args().First()
 		if id == "" {
-			return errors.Wrap(errdefs.ErrInvalidArgument, "container id must be provided")
+			return fmt.Errorf("container id must be provided: %w", errdefs.ErrInvalidArgument)
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -281,7 +281,7 @@ var infoCommand = cli.Command{
 			return nil
 		}
 
-		if info.Spec != nil && info.Spec.Value != nil {
+		if info.Spec != nil && info.Spec.GetValue() != nil {
 			v, err := typeurl.UnmarshalAny(info.Spec)
 			if err != nil {
 				return err

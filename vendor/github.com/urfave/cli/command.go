@@ -114,7 +114,7 @@ func (c Command) Run(ctx *Context) (err error) {
 		c.UseShortOptionHandling = true
 	}
 
-	set, err := c.parseFlags(ctx.Args().Tail())
+	set, err := c.parseFlags(ctx.Args().Tail(), ctx.shellComplete)
 
 	context := NewContext(ctx.App, set, ctx)
 	context.Command = c
@@ -161,7 +161,6 @@ func (c Command) Run(ctx *Context) (err error) {
 	if c.Before != nil {
 		err = c.Before(context)
 		if err != nil {
-			_ = ShowCommandHelp(context, c.Name)
 			context.App.handleExitCoder(context, err)
 			return err
 		}
@@ -179,7 +178,7 @@ func (c Command) Run(ctx *Context) (err error) {
 	return err
 }
 
-func (c *Command) parseFlags(args Args) (*flag.FlagSet, error) {
+func (c *Command) parseFlags(args Args, shellComplete bool) (*flag.FlagSet, error) {
 	if c.SkipFlagParsing {
 		set, err := c.newFlagSet()
 		if err != nil {
@@ -190,10 +189,15 @@ func (c *Command) parseFlags(args Args) (*flag.FlagSet, error) {
 	}
 
 	if !c.SkipArgReorder {
-		args = reorderArgs(args)
+		args = reorderArgs(c.Flags, args)
 	}
 
-	set, err := parseIter(c, args)
+	set, err := c.newFlagSet()
+	if err != nil {
+		return nil, err
+	}
+
+	err = parseIter(set, c, args, shellComplete)
 	if err != nil {
 		return nil, err
 	}
@@ -214,34 +218,79 @@ func (c *Command) useShortOptionHandling() bool {
 	return c.UseShortOptionHandling
 }
 
-// reorderArgs moves all flags before arguments as this is what flag expects
-func reorderArgs(args []string) []string {
-	var nonflags, flags []string
+// reorderArgs moves all flags (via reorderedArgs) before the rest of
+// the arguments (remainingArgs) as this is what flag expects.
+func reorderArgs(commandFlags []Flag, args []string) []string {
+	var remainingArgs, reorderedArgs []string
 
-	readFlagValue := false
+	nextIndexMayContainValue := false
 	for i, arg := range args {
-		if arg == "--" {
-			nonflags = append(nonflags, args[i:]...)
+
+		// if we're expecting an option-value, check if this arg is a value, in
+		// which case it should be re-ordered next to its associated flag
+		if nextIndexMayContainValue && !argIsFlag(commandFlags, arg) {
+			nextIndexMayContainValue = false
+			reorderedArgs = append(reorderedArgs, arg)
+		} else if arg == "--" {
+			// don't reorder any args after the -- delimiter As described in the POSIX spec:
+			// https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap12.html#tag_12_02
+			// > Guideline 10:
+			// >   The first -- argument that is not an option-argument should be accepted
+			// >   as a delimiter indicating the end of options. Any following arguments
+			// >   should be treated as operands, even if they begin with the '-' character.
+
+			// make sure the "--" delimiter itself is at the start
+			remainingArgs = append([]string{"--"}, remainingArgs...)
+			remainingArgs = append(remainingArgs, args[i+1:]...)
 			break
-		}
+			// checks if this is an arg that should be re-ordered
+		} else if argIsFlag(commandFlags, arg) {
+			// we have determined that this is a flag that we should re-order
+			reorderedArgs = append(reorderedArgs, arg)
+			// if this arg does not contain a "=", then the next index may contain the value for this flag
+			nextIndexMayContainValue = !strings.Contains(arg, "=")
 
-		if readFlagValue && !strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") {
-			readFlagValue = false
-			flags = append(flags, arg)
-			continue
-		}
-		readFlagValue = false
-
-		if arg != "-" && strings.HasPrefix(arg, "-") {
-			flags = append(flags, arg)
-
-			readFlagValue = !strings.Contains(arg, "=")
+			// simply append any remaining args
 		} else {
-			nonflags = append(nonflags, arg)
+			remainingArgs = append(remainingArgs, arg)
 		}
 	}
 
-	return append(flags, nonflags...)
+	return append(reorderedArgs, remainingArgs...)
+}
+
+// argIsFlag checks if an arg is one of our command flags
+func argIsFlag(commandFlags []Flag, arg string) bool {
+	if arg == "-" || arg == "--"{
+		// `-` is never a flag
+		// `--` is an option-value when following a flag, and a delimiter indicating the end of options in other cases.
+		return false
+	}
+	// flags always start with a -
+	if !strings.HasPrefix(arg, "-") {
+		return false
+	}
+	// this line turns `--flag` into `flag`
+	if strings.HasPrefix(arg, "--") {
+		arg = strings.Replace(arg, "-", "", 2)
+	}
+	// this line turns `-flag` into `flag`
+	if strings.HasPrefix(arg, "-") {
+		arg = strings.Replace(arg, "-", "", 1)
+	}
+	// this line turns `flag=value` into `flag`
+	arg = strings.Split(arg, "=")[0]
+	// look through all the flags, to see if the `arg` is one of our flags
+	for _, flag := range commandFlags {
+		for _, key := range strings.Split(flag.GetName(), ",") {
+			key := strings.TrimSpace(key)
+			if key == arg {
+				return true
+			}
+		}
+	}
+	// return false if this arg was not one of our flags
+	return false
 }
 
 // Names returns the names including short names and aliases.

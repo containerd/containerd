@@ -47,7 +47,7 @@ func CreateDiff(ctx context.Context, snapshotID string, sn snapshots.Snapshotter
 		return ocispec.Descriptor{}, err
 	}
 
-	lowerKey := fmt.Sprintf("%s-parent-view", info.Parent)
+	lowerKey := fmt.Sprintf("%s-parent-view-%s", info.Parent, uniquePart())
 
 	// signal handler here
 	sigChannel := make(chan os.Signal, 1)
@@ -61,7 +61,7 @@ func CreateDiff(ctx context.Context, snapshotID string, sn snapshots.Snapshotter
 			sn.Remove(dctx, lowerKey)
 		}
 	}(lowerKey)
-
+  
 	lower, err := sn.View(ctx, lowerKey, info.Parent)
 	if err != nil {
 		return ocispec.Descriptor{}, err
@@ -75,7 +75,7 @@ func CreateDiff(ctx context.Context, snapshotID string, sn snapshots.Snapshotter
 			return ocispec.Descriptor{}, err
 		}
 	} else {
-		upperKey := fmt.Sprintf("%s-view", snapshotID)
+		upperKey := fmt.Sprintf("%s-view-%s", snapshotID, uniquePart())
 		upper, err = sn.View(ctx, upperKey, snapshotID)
 		if err != nil {
 			return ocispec.Descriptor{}, err

@@ -1,4 +1,4 @@
-# /etc/containerd/config.toml 5 08/08/2018
+# /etc/containerd/config.toml 5 04/05/2022
 
 ## NAME
 
@@ -38,38 +38,40 @@ config as version 1 has been deprecated.
 **plugin_dir**
 : The directory for dynamic plugins to be stored
 
-**sched_core**
-: Core scheduling is a feature that allows only trusted tasks to run concurrently
-on cpus sharing compute resources (eg: hyperthreads on a core).
-
 **[grpc]**
 : Section for gRPC socket listener settings. Contains the following properties:
- - **address** (Default: "/run/containerd/containerd.sock")
- - **tcp_address**
- - **tcp_tls_cert**
- - **tcp_tls_key**
- - **uid** (Default: 0)
- - **gid** (Default: 0)
- - **max_recv_message_size**
- - **max_send_message_size**
+
+- **address** (Default: "/run/containerd/containerd.sock")
+- **tcp_address**
+- **tcp_tls_cert**
+- **tcp_tls_key**
+- **uid** (Default: 0)
+- **gid** (Default: 0)
+- **max_recv_message_size**
+- **max_send_message_size**
 
 **[ttrpc]**
 : Section for TTRPC settings. Contains properties:
- - **address** (Default: "")
- - **uid** (Default: 0)
- - **gid** (Default: 0)
+
+- **address** (Default: "")
+- **uid** (Default: 0)
+- **gid** (Default: 0)
 
 **[debug]**
 : Section to enable and configure a debug socket listener. Contains four properties:
- - **address** (Default: "/run/containerd/debug.sock")
- - **uid** (Default: 0)
- - **gid** (Default: 0)
- - **level** (Default: "info") sets the debug log level
+
+- **address** (Default: "/run/containerd/debug.sock")
+- **uid** (Default: 0)
+- **gid** (Default: 0)
+- **level** (Default: "info") sets the debug log level. Supported levels are:
+  "trace", "debug", "info", "warn", "error", "fatal", "panic"
+- **format** (Default: "text") sets log format. Supported formats are "text" and "json"
 
 **[metrics]**
 : Section to enable and configure a metrics listener. Contains two properties:
- - **address** (Default: "") Metrics endpoint does not listen by default
- - **grpc_histogram** (Default: false) Turn on or off gRPC histogram metrics
+
+- **address** (Default: "") Metrics endpoint does not listen by default
+- **grpc_histogram** (Default: false) Turn on or off gRPC histogram metrics
 
 **disabled_plugins**
 : Disabled plugins are IDs of plugins to disable. Disabled plugins won't be
@@ -84,32 +86,44 @@ required plugin doesn't exist or fails to be initialized or started.
 The following plugins are enabled by default and their settings are shown below.
 Plugins that are not enabled by default will provide their own configuration values
 documentation.
- - **[plugins.cgroup]** has one option __no_prometheus__ (Default: **false**)
- - **[plugins.diff]** has one option __default__, a list by default set to **["walking"]**
- - **[plugins.linux]** has several options for configuring the runtime, shim, and related options:
-   **shim** specifies the shim binary (Default: **"containerd-shim"**),
-   **runtime** is the OCI compliant runtime binary (Default: **"runc"**),
-   **runtime_root** is the root directory used by the runtime (Default: **""**),
-   **no_shim** specifies whether to use a shim or not (Default: **false**),
-   **shim_debug** turns on debugging for the shim (Default: **false**)
- - **[plugins."io.containerd.gc.v1.scheduler"]** has several options that perform advanced tuning for the scheduler:
-   **pause_threshold** is the maximum amount of time GC should be scheduled (Default: **0.02**),
-   **deletion_threshold** guarantees GC is scheduled after n number of deletions (Default: **0** [not triggered]),
-   **mutation_threshold** guarantees GC is scheduled after n number of database mutations (Default: **100**),
-   **schedule_delay** defines the delay after trigger event before scheduling a GC (Default **"0ms"** [immediate]),
-   **startup_delay** defines the delay after startup before scheduling a GC (Default **"100ms"**)
+
+- **[plugins."io.containerd.monitor.v1.cgroups"]** has one option __no_prometheus__ (Default: **false**)
+- **[plugins."io.containerd.service.v1.diff-service"]** has one option __default__, a list by default set to **["walking"]**
+- **[plugins."io.containerd.gc.v1.scheduler"]** has several options that perform advanced tuning for the scheduler:
+  - **pause_threshold** is the maximum amount of time GC should be scheduled (Default: **0.02**),
+  - **deletion_threshold** guarantees GC is scheduled after n number of deletions (Default: **0** [not triggered]),
+  - **mutation_threshold** guarantees GC is scheduled after n number of database mutations (Default: **100**),
+  - **schedule_delay** defines the delay after trigger event before scheduling a GC (Default **"0ms"** [immediate]),
+  - **startup_delay** defines the delay after startup before scheduling a GC (Default **"100ms"**)
+- **[plugins."io.containerd.runtime.v2.task"]** specifies options for configuring the runtime shim:
+  - **platforms** specifies the list of supported platforms
+  - **sched_core** Core scheduling is a feature that allows only trusted tasks
+    to run concurrently on cpus sharing compute resources (eg: hyperthreads on
+    a core). (Default: **false**)
+- **[plugins."io.containerd.service.v1.tasks-service"]** has performance options:
+  - **blockio_config_file** (Linux only) specifies path to blockio class definitions
+    (Default: **""**). Controls I/O scheduler priority and bandwidth throttling.
+    See [blockio configuration](https://github.com/intel/goresctrl/blob/main/doc/blockio.md#configuration)
+    for details of the file format.
+  - **rdt_config_file** (Linux only) specifies path to a configuration used for configuring
+    RDT (Default: **""**). Enables support for Intel RDT, a technology
+    for cache and memory bandwidth management.
+    See [RDT configuration](https://github.com/intel/goresctrl/blob/main/doc/rdt.md#configuration)
+    for details of the file format.
 
 **oom_score**
 : The out of memory (OOM) score applied to the containerd daemon process (Default: 0)
 
 **[cgroup]**
 : Section for Linux cgroup specific settings
- - **path** (Default: "") Specify a custom cgroup path for created containers
+
+- **path** (Default: "") Specify a custom cgroup path for created containers
 
 **[proxy_plugins]**
 : Proxy plugins configures plugins which are communicated to over gRPC
- - **type** (Default: "")
- - **address** (Default: "")
+
+- **type** (Default: "")
+- **address** (Default: "")
 
 **timeouts**
 : Timeouts specified as a duration
@@ -131,21 +145,23 @@ Imported files are also versioned, and the version can't be higher than
 the main config.
 
 **stream_processors**
- - **accepts** (Default: "[]") Accepts specific media-types
- - **returns** (Default: "") Returns the media-type
- - **path** (Default: "") Path or name of the binary
- - **args** (Default: "[]") Args to the binary
+
+- **accepts** (Default: "[]") Accepts specific media-types
+- **returns** (Default: "") Returns the media-type
+- **path** (Default: "") Path or name of the binary
+- **args** (Default: "[]") Args to the binary
 
 ## EXAMPLE
 
 The following is a complete **config.toml** default configuration example:
 
-```
+```toml
+version = 2
+
 root = "/var/lib/containerd"
 state = "/run/containerd"
 oom_score = 0
 imports = ["/etc/containerd/runtime_*.toml", "./debug.toml"]
-sched_core = true
 
 [grpc]
   address = "/run/containerd/containerd.sock"
@@ -166,22 +182,22 @@ sched_core = true
   path = ""
 
 [plugins]
-  [plugins.cgroups]
+  [plugins."io.containerd.monitor.v1.cgroups"]
     no_prometheus = false
-  [plugins.diff]
+  [plugins."io.containerd.service.v1.diff-service"]
     default = ["walking"]
-  [plugins.linux]
-    shim = "containerd-shim"
-    runtime = "runc"
-    runtime_root = ""
-    no_shim = false
-    shim_debug = false
-  [plugins.scheduler]
+  [plugins."io.containerd.gc.v1.scheduler"]
     pause_threshold = 0.02
     deletion_threshold = 0
     mutation_threshold = 100
     schedule_delay = 0
     startup_delay = "100ms"
+  [plugins."io.containerd.runtime.v2.task"]
+    platforms = ["linux/amd64"]
+    sched_core = true
+  [plugins."io.containerd.service.v1.tasks-service"]
+    blockio_config_file = ""
+    rdt_config_file = ""
 ```
 
 ## BUGS

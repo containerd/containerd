@@ -19,23 +19,14 @@ package monitor
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/containerd/containerd"
-	containers "github.com/containerd/containerd/api/services/containers/v1"
-	diff "github.com/containerd/containerd/api/services/diff/v1"
-	images "github.com/containerd/containerd/api/services/images/v1"
-	namespacesapi "github.com/containerd/containerd/api/services/namespaces/v1"
-	tasks "github.com/containerd/containerd/api/services/tasks/v1"
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime/restart"
-	"github.com/containerd/containerd/services"
-	"github.com/containerd/containerd/snapshots"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -73,11 +64,8 @@ func init() {
 			},
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			opts, err := getServicesOpts(ic)
-			if err != nil {
-				return nil, err
-			}
-			client, err := containerd.New("", containerd.WithServices(opts...))
+			ic.Meta.Capabilities = []string{"no", "always", "on-failure", "unless-stopped"}
+			client, err := containerd.New("", containerd.WithInMemoryServices(ic))
 			if err != nil {
 				return nil, err
 			}
@@ -88,63 +76,6 @@ func init() {
 			return m, nil
 		},
 	})
-}
-
-// getServicesOpts get service options from plugin context.
-func getServicesOpts(ic *plugin.InitContext) ([]containerd.ServicesOpt, error) {
-	plugins, err := ic.GetByType(plugin.ServicePlugin)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get service plugin")
-	}
-
-	ep, err := ic.Get(plugin.EventPlugin)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get event plugin")
-	}
-
-	opts := []containerd.ServicesOpt{
-		containerd.WithEventService(ep.(containerd.EventService)),
-	}
-	for s, fn := range map[string]func(interface{}) containerd.ServicesOpt{
-		services.ContentService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithContentStore(s.(content.Store))
-		},
-		services.ImagesService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithImageClient(s.(images.ImagesClient))
-		},
-		services.SnapshotsService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithSnapshotters(s.(map[string]snapshots.Snapshotter))
-		},
-		services.ContainersService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithContainerClient(s.(containers.ContainersClient))
-		},
-		services.TasksService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithTaskClient(s.(tasks.TasksClient))
-		},
-		services.DiffService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithDiffClient(s.(diff.DiffClient))
-		},
-		services.NamespacesService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithNamespaceClient(s.(namespacesapi.NamespacesClient))
-		},
-		services.LeasesService: func(s interface{}) containerd.ServicesOpt {
-			return containerd.WithLeasesService(s.(leases.Manager))
-		},
-	} {
-		p := plugins[s]
-		if p == nil {
-			return nil, errors.Errorf("service %q not found", s)
-		}
-		i, err := p.Instance()
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get instance of service %q", s)
-		}
-		if i == nil {
-			return nil, errors.Errorf("instance of service %q not found", s)
-		}
-		opts = append(opts, fn(i))
-	}
-	return opts, nil
 }
 
 type change interface {
@@ -209,20 +140,46 @@ func (m *monitor) monitor(ctx context.Context) ([]change, error) {
 	}
 	var changes []change
 	for _, c := range containers {
+		var (
+			task   containerd.Task
+			status containerd.Status
+			err    error
+		)
 		labels, err := c.Labels(ctx)
 		if err != nil {
 			return nil, err
 		}
 		desiredStatus := containerd.ProcessStatus(labels[restart.StatusLabel])
-		if m.isSameStatus(ctx, desiredStatus, c) {
-			continue
+		if task, err = c.Task(ctx, nil); err == nil {
+			if status, err = task.Status(ctx); err == nil {
+				if desiredStatus == status.Status {
+					continue
+				}
+			}
 		}
+
+		// Task or Status return error, only desired to running
+		if err != nil {
+			logrus.WithError(err).Error("monitor")
+			if desiredStatus == containerd.Stopped {
+				continue
+			}
+		}
+
+		// Known issue:
+		// The status may be empty when task failed but was deleted,
+		// which will result in an `on-failure` restart policy reconcile error.
 		switch desiredStatus {
 		case containerd.Running:
+			if !restart.Reconcile(status, labels) {
+				continue
+			}
+			restartCount, _ := strconv.Atoi(labels[restart.CountLabel])
 			changes = append(changes, &startChange{
 				container: c,
 				logPath:   labels[restart.LogPathLabel],
 				logURI:    labels[restart.LogURILabel],
+				count:     restartCount + 1,
 			})
 		case containerd.Stopped:
 			changes = append(changes, &stopChange{
@@ -231,16 +188,4 @@ func (m *monitor) monitor(ctx context.Context) ([]change, error) {
 		}
 	}
 	return changes, nil
-}
-
-func (m *monitor) isSameStatus(ctx context.Context, desired containerd.ProcessStatus, container containerd.Container) bool {
-	task, err := container.Task(ctx, nil)
-	if err != nil {
-		return desired == containerd.Stopped
-	}
-	state, err := task.Status(ctx)
-	if err != nil {
-		return desired == containerd.Stopped
-	}
-	return desired == state.Status
 }

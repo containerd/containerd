@@ -79,19 +79,23 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 		},
 		cli.BoolFlag{
 			Name:  "no-unpack",
-			Usage: "skip unpacking the images, false by default",
+			Usage: "skip unpacking the images, cannot be used with --discard-unpacked-layers, false by default",
 		},
 		cli.BoolFlag{
 			Name:  "compress-blobs",
 			Usage: "compress uncompressed blobs when creating manifest (Docker format only)",
 		},
+		cli.BoolFlag{
+			Name:  "discard-unpacked-layers",
+			Usage: "allow the garbage collector to clean layers up from the content store after unpacking, cannot be used with --no-unpack, false by default",
+		},
 	}, commands.SnapshotterFlags...),
 
 	Action: func(context *cli.Context) error {
 		var (
-			in             = context.Args().First()
-			opts           []containerd.ImportOpt
-			platformMacher platforms.MatchComparer
+			in              = context.Args().First()
+			opts            []containerd.ImportOpt
+			platformMatcher platforms.MatchComparer
 		)
 
 		prefix := context.String("base-name")
@@ -126,17 +130,30 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			if err != nil {
 				return err
 			}
-			platformMacher = platforms.Only(platSpec)
-			opts = append(opts, containerd.WithImportPlatform(platformMacher))
+			platformMatcher = platforms.OnlyStrict(platSpec)
+			opts = append(opts, containerd.WithImportPlatform(platformMatcher))
 		}
 
 		opts = append(opts, containerd.WithAllPlatforms(context.Bool("all-platforms")))
+
+		if context.Bool("discard-unpacked-layers") {
+			if context.Bool("no-unpack") {
+				return fmt.Errorf("--discard-unpacked-layers and --no-unpack are incompatible options")
+			}
+			opts = append(opts, containerd.WithDiscardUnpackedLayers())
+		}
 
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err
 		}
 		defer cancel()
+
+		ctx, done, err := client.WithLease(ctx)
+		if err != nil {
+			return err
+		}
+		defer done(ctx)
 
 		var r io.ReadCloser
 		if in == "-" {
@@ -147,6 +164,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 				return err
 			}
 		}
+
 		imgs, err := client.Import(ctx, r, opts...)
 		closeErr := r.Close()
 		if err != nil {
@@ -160,10 +178,10 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			log.G(ctx).Debugf("unpacking %d images", len(imgs))
 
 			for _, img := range imgs {
-				if platformMacher == nil { // if platform not specified use default.
-					platformMacher = platforms.Default()
+				if platformMatcher == nil { // if platform not specified use default.
+					platformMatcher = platforms.Default()
 				}
-				image := containerd.NewImageWithPlatform(client, img, platformMacher)
+				image := containerd.NewImageWithPlatform(client, img, platformMatcher)
 
 				// TODO: Show unpack status
 				fmt.Printf("unpacking %s (%s)...", img.Name, img.Target.Digest)

@@ -364,3 +364,13 @@ func TestParseSelectorInvalid(t *testing.T) {
 		})
 	}
 }
+
+func FuzzPlatformsParse(f *testing.F) {
+	f.Add("linux/amd64")
+	f.Fuzz(func(t *testing.T, s string) {
+		pf, err := Parse(s)
+		if err != nil && (pf.OS != "" || pf.Architecture != "") {
+			t.Errorf("either %+v or %+v must be nil", err, pf)
+		}
+	})
+}

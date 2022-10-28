@@ -18,12 +18,12 @@ package errdefs
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"github.com/pkg/errors"
 )
 
 func TestGRPCRoundTrip(t *testing.T) {
@@ -43,7 +43,7 @@ func TestGRPCRoundTrip(t *testing.T) {
 			cause: ErrNotFound,
 		},
 		{
-			input: errors.Wrapf(ErrFailedPrecondition, "test test test"),
+			input: fmt.Errorf("test test test: %w", ErrFailedPrecondition),
 			cause: ErrFailedPrecondition,
 			str:   "test test test: failed precondition",
 		},
@@ -63,7 +63,7 @@ func TestGRPCRoundTrip(t *testing.T) {
 			str:   "context canceled",
 		},
 		{
-			input: errors.Wrapf(context.Canceled, "this is a test cancel"),
+			input: fmt.Errorf("this is a test cancel: %w", context.Canceled),
 			cause: context.Canceled,
 			str:   "this is a test cancel: context canceled",
 		},
@@ -73,7 +73,7 @@ func TestGRPCRoundTrip(t *testing.T) {
 			str:   "context deadline exceeded",
 		},
 		{
-			input: errors.Wrapf(context.DeadlineExceeded, "this is a test deadline exceeded"),
+			input: fmt.Errorf("this is a test deadline exceeded: %w", context.DeadlineExceeded),
 			cause: context.DeadlineExceeded,
 			str:   "this is a test deadline exceeded: context deadline exceeded",
 		},
@@ -85,9 +85,6 @@ func TestGRPCRoundTrip(t *testing.T) {
 			ferr := FromGRPC(gerr)
 			t.Logf("recovered: %v", ferr)
 
-			if errors.Cause(ferr) != testcase.cause {
-				t.Fatalf("unexpected cause: %v != %v", errors.Cause(ferr), testcase.cause)
-			}
 			if !errors.Is(ferr, testcase.cause) {
 				t.Fatalf("unexpected cause: !errors.Is(%v, %v)", ferr, testcase.cause)
 			}

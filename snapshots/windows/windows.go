@@ -22,6 +22,7 @@ package windows
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -32,7 +33,6 @@ import (
 	"github.com/Microsoft/go-winio"
 	winfs "github.com/Microsoft/go-winio/pkg/fs"
 	"github.com/Microsoft/hcsshim"
-	"github.com/Microsoft/hcsshim/computestorage"
 	"github.com/Microsoft/hcsshim/pkg/ociwclayer"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
@@ -43,7 +43,6 @@ import (
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/continuity/fs"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 )
 
 func init() {
@@ -61,7 +60,12 @@ const (
 	// Label to specify that we should make a scratch space for a UtilityVM.
 	uvmScratchLabel = "containerd.io/snapshot/io.microsoft.vm.storage.scratch"
 	// Label to control a containers scratch space size (sandbox.vhdx).
-	rootfsSizeLabel = "containerd.io/snapshot/io.microsoft.container.storage.rootfs.size-gb"
+	//
+	// Deprecated: use rootfsSizeInBytesLabel
+	rootfsSizeInGBLabel = "containerd.io/snapshot/io.microsoft.container.storage.rootfs.size-gb"
+	// rootfsSizeInBytesLabel is a label to control a Windows containers scratch space
+	// size in bytes.
+	rootfsSizeInBytesLabel = "containerd.io/snapshot/windows/rootfs.sizebytes"
 )
 
 type snapshotter struct {
@@ -77,7 +81,7 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 		return nil, err
 	}
 	if strings.ToLower(fsType) != "ntfs" {
-		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "%s is not on an NTFS volume - only NTFS volumes are supported", root)
+		return nil, fmt.Errorf("%s is not on an NTFS volume - only NTFS volumes are supported: %w", root, errdefs.ErrInvalidArgument)
 	}
 
 	if err := os.MkdirAll(root, 0700); err != nil {
@@ -182,7 +186,7 @@ func (s *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 
 	snapshot, err := storage.GetSnapshot(ctx, key)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get snapshot mount")
+		return nil, fmt.Errorf("failed to get snapshot mount: %w", err)
 	}
 	return s.mounts(snapshot), nil
 }
@@ -204,7 +208,7 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	// grab the existing id
 	id, _, _, err := storage.GetInfo(ctx, key)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get storage info for %s", key)
+		return fmt.Errorf("failed to get storage info for %s: %w", key, err)
 	}
 
 	snapshot, err := storage.GetSnapshot(ctx, key)
@@ -224,11 +228,11 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 
 	usage, err := fs.DiskUsage(ctx, path)
 	if err != nil {
-		return errors.Wrapf(err, "failed to collect disk usage of snapshot storage: %s", path)
+		return fmt.Errorf("failed to collect disk usage of snapshot storage: %s: %w", path, err)
 	}
 
 	if _, err := storage.CommitActive(ctx, key, name, snapshots.Usage(usage), opts...); err != nil {
-		return errors.Wrap(err, "failed to commit snapshot")
+		return fmt.Errorf("failed to commit snapshot: %w", err)
 	}
 	return t.Commit()
 }
@@ -244,7 +248,7 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 
 	id, _, err := storage.Remove(ctx, key)
 	if err != nil {
-		return errors.Wrap(err, "failed to remove")
+		return fmt.Errorf("failed to remove: %w", err)
 	}
 
 	path := s.getSnapshotDir(id)
@@ -265,11 +269,11 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 		)
 
 		if deactivateErr := hcsshim.DeactivateLayer(di, layerID); deactivateErr != nil {
-			return errors.Wrapf(err, "failed to deactivate layer following failed rename: %s", deactivateErr)
+			return fmt.Errorf("failed to deactivate layer following failed rename: %s: %w", deactivateErr, err)
 		}
 
 		if renameErr := os.Rename(path, renamed); renameErr != nil && !os.IsNotExist(renameErr) {
-			return errors.Wrapf(err, "second rename attempt following detach failed: %s", renameErr)
+			return fmt.Errorf("second rename attempt following detach failed: %s: %w", renameErr, err)
 		}
 	}
 
@@ -278,7 +282,7 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 			// May cause inconsistent data on disk
 			log.G(ctx).WithError(err1).WithField("path", renamed).Error("Failed to rename after failed commit")
 		}
-		return errors.Wrap(err, "failed to commit")
+		return fmt.Errorf("failed to commit: %w", err)
 	}
 
 	if err := hcsshim.DestroyLayer(s.info, renamedID); err != nil {
@@ -356,7 +360,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 
 	newSnapshot, err := storage.CreateSnapshot(ctx, kind, key, parent, opts...)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create snapshot")
+		return nil, fmt.Errorf("failed to create snapshot: %w", err)
 	}
 
 	if kind == snapshots.KindActive {
@@ -381,13 +385,23 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 				o(&snapshotInfo)
 			}
 
-			var sizeGB int
-			if sizeGBstr, ok := snapshotInfo.Labels[rootfsSizeLabel]; ok {
-				i32, err := strconv.ParseInt(sizeGBstr, 10, 32)
+			var sizeInBytes uint64
+			if sizeGBstr, ok := snapshotInfo.Labels[rootfsSizeInGBLabel]; ok {
+				log.G(ctx).Warnf("%q label is deprecated, please use %q instead.", rootfsSizeInGBLabel, rootfsSizeInBytesLabel)
+
+				sizeInGB, err := strconv.ParseUint(sizeGBstr, 10, 32)
 				if err != nil {
-					return nil, errors.Wrapf(err, "failed to parse label %q=%q", rootfsSizeLabel, sizeGBstr)
+					return nil, fmt.Errorf("failed to parse label %q=%q: %w", rootfsSizeInGBLabel, sizeGBstr, err)
 				}
-				sizeGB = int(i32)
+				sizeInBytes = sizeInGB * 1024 * 1024 * 1024
+			}
+
+			// Prefer the newer label in bytes over the deprecated Windows specific GB variant.
+			if sizeBytesStr, ok := snapshotInfo.Labels[rootfsSizeInBytesLabel]; ok {
+				sizeInBytes, err = strconv.ParseUint(sizeBytesStr, 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse label %q=%q: %w", rootfsSizeInBytesLabel, sizeBytesStr, err)
+				}
 			}
 
 			var makeUVMScratch bool
@@ -398,17 +412,17 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			// This has to be run first to avoid clashing with the containers sandbox.vhdx.
 			if makeUVMScratch {
 				if err := s.createUVMScratchLayer(ctx, snDir, parentLayerPaths); err != nil {
-					return nil, errors.Wrap(err, "failed to make UVM's scratch layer")
+					return nil, fmt.Errorf("failed to make UVM's scratch layer: %w", err)
 				}
 			}
-			if err := s.createScratchLayer(ctx, snDir, parentLayerPaths, sizeGB); err != nil {
-				return nil, errors.Wrap(err, "failed to create scratch layer")
+			if err := s.createScratchLayer(ctx, snDir, parentLayerPaths, sizeInBytes); err != nil {
+				return nil, fmt.Errorf("failed to create scratch layer: %w", err)
 			}
 		}
 	}
 
 	if err := t.Commit(); err != nil {
-		return nil, errors.Wrap(err, "commit failed")
+		return nil, fmt.Errorf("commit failed: %w", err)
 	}
 
 	return s.mounts(newSnapshot), nil
@@ -423,46 +437,23 @@ func (s *snapshotter) parentIDsToParentPaths(parentIDs []string) []string {
 }
 
 // This is essentially a recreation of what HCS' CreateSandboxLayer does with some extra bells and
-// whistles like expanding the volume if a size is specified. This will create a 1GB scratch
-// vhdx to be used if a different sized scratch that is not equal to the default of 20 is requested.
-func (s *snapshotter) createScratchLayer(ctx context.Context, snDir string, parentLayers []string, sizeGB int) error {
+// whistles like expanding the volume if a size is specified.
+func (s *snapshotter) createScratchLayer(ctx context.Context, snDir string, parentLayers []string, sizeInBytes uint64) error {
 	parentLen := len(parentLayers)
 	if parentLen == 0 {
 		return errors.New("no parent layers present")
 	}
+
 	baseLayer := parentLayers[parentLen-1]
-
-	var (
-		templateBase     = filepath.Join(baseLayer, "blank-base.vhdx")
-		templateDiffDisk = filepath.Join(baseLayer, "blank.vhdx")
-		newDisks         = sizeGB > 0 && sizeGB < 20
-		expand           = sizeGB > 0 && sizeGB != 20
-	)
-
-	// If a size greater than 0 and less than 20 (the default size produced by hcs)
-	// was specified we make a new set of disks to be used. We make it a 1GB disk and just
-	// expand it to the size specified so for future container runs we don't need to remake a disk.
-	if newDisks {
-		templateBase = filepath.Join(baseLayer, "scratch.vhdx")
-		templateDiffDisk = filepath.Join(baseLayer, "scratch-diff.vhdx")
-	}
-
-	if _, err := os.Stat(templateDiffDisk); os.IsNotExist(err) {
-		// Scratch disk not present so lets make it.
-		if err := computestorage.SetupContainerBaseLayer(ctx, baseLayer, templateBase, templateDiffDisk, 1); err != nil {
-			return errors.Wrapf(err, "failed to create scratch vhdx at %q", baseLayer)
-		}
-	}
-
+	templateDiffDisk := filepath.Join(baseLayer, "blank.vhdx")
 	dest := filepath.Join(snDir, "sandbox.vhdx")
 	if err := copyScratchDisk(templateDiffDisk, dest); err != nil {
 		return err
 	}
 
-	if expand {
-		gbToByte := 1024 * 1024 * 1024
-		if err := hcsshim.ExpandSandboxSize(s.info, filepath.Base(snDir), uint64(gbToByte*sizeGB)); err != nil {
-			return errors.Wrapf(err, "failed to expand sandbox vhdx size to %d GB", sizeGB)
+	if sizeInBytes != 0 {
+		if err := hcsshim.ExpandSandboxSize(s.info, filepath.Base(snDir), sizeInBytes); err != nil {
+			return fmt.Errorf("failed to expand sandbox vhdx size to %d bytes: %w", sizeInBytes, err)
 		}
 	}
 	return nil
@@ -476,7 +467,7 @@ func (s *snapshotter) convertScratchToReadOnlyLayer(ctx context.Context, snapsho
 	// temporary, leaving it enabled is OK for now.
 	// https://github.com/containerd/containerd/issues/1681
 	if err := winio.EnableProcessPrivileges([]string{winio.SeBackupPrivilege, winio.SeRestorePrivilege}); err != nil {
-		return errors.Wrap(err, "failed to enable necessary privileges")
+		return fmt.Errorf("failed to enable necessary privileges: %w", err)
 	}
 
 	parentLayerPaths := s.parentIDsToParentPaths(snapshot.ParentIDs)
@@ -488,11 +479,11 @@ func (s *snapshotter) convertScratchToReadOnlyLayer(ctx context.Context, snapsho
 	}()
 
 	if _, err := ociwclayer.ImportLayerFromTar(ctx, reader, path, parentLayerPaths); err != nil {
-		return errors.Wrap(err, "failed to reimport snapshot")
+		return fmt.Errorf("failed to reimport snapshot: %w", err)
 	}
 
 	if _, err := io.Copy(io.Discard, reader); err != nil {
-		return errors.Wrap(err, "failed discarding extra data in import stream")
+		return fmt.Errorf("failed discarding extra data in import stream: %w", err)
 	}
 
 	// NOTE: We do not delete the sandbox.vhdx here, as that will break later calls to
@@ -516,7 +507,7 @@ func (s *snapshotter) createUVMScratchLayer(ctx context.Context, snDir string, p
 	// Make sure base layer has a UtilityVM folder.
 	uvmPath := filepath.Join(baseLayer, "UtilityVM")
 	if _, err := os.Stat(uvmPath); os.IsNotExist(err) {
-		return errors.Wrapf(err, "failed to find UtilityVM directory in base layer %q", baseLayer)
+		return fmt.Errorf("failed to find UtilityVM directory in base layer %q: %w", baseLayer, err)
 	}
 
 	templateDiffDisk := filepath.Join(uvmPath, "SystemTemplate.vhdx")
@@ -530,7 +521,7 @@ func (s *snapshotter) createUVMScratchLayer(ctx context.Context, snDir string, p
 	// Move the sandbox.vhdx into a nested vm folder to avoid clashing with a containers sandbox.vhdx.
 	vmScratchDir := filepath.Join(snDir, "vm")
 	if err := os.MkdirAll(vmScratchDir, 0777); err != nil {
-		return errors.Wrap(err, "failed to make `vm` directory for vm's scratch space")
+		return fmt.Errorf("failed to make `vm` directory for vm's scratch space: %w", err)
 	}
 
 	return copyScratchDisk(templateDiffDisk, filepath.Join(vmScratchDir, "sandbox.vhdx"))
@@ -539,19 +530,19 @@ func (s *snapshotter) createUVMScratchLayer(ctx context.Context, snDir string, p
 func copyScratchDisk(source, dest string) error {
 	scratchSource, err := os.OpenFile(source, os.O_RDWR, 0700)
 	if err != nil {
-		return errors.Wrapf(err, "failed to open %s", source)
+		return fmt.Errorf("failed to open %s: %w", source, err)
 	}
 	defer scratchSource.Close()
 
 	f, err := os.OpenFile(dest, os.O_RDWR|os.O_CREATE, 0700)
 	if err != nil {
-		return errors.Wrap(err, "failed to create sandbox.vhdx in snapshot")
+		return fmt.Errorf("failed to create sandbox.vhdx in snapshot: %w", err)
 	}
 	defer f.Close()
 
 	if _, err := io.Copy(f, scratchSource); err != nil {
 		os.Remove(dest)
-		return errors.Wrapf(err, "failed to copy cached %q to %q in snapshot", source, dest)
+		return fmt.Errorf("failed to copy cached %q to %q in snapshot: %w", source, dest, err)
 	}
 	return nil
 }

@@ -86,9 +86,11 @@ func normalizeArch(arch, variant string) (string, string) {
 	case "i386":
 		arch = "386"
 		variant = ""
-	case "x86_64", "x86-64":
+	case "x86_64", "x86-64", "amd64":
 		arch = "amd64"
-		variant = ""
+		if variant == "v1" {
+			variant = ""
+		}
 	case "aarch64", "arm64":
 		arch = "arm64"
 		switch variant {

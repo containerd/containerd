@@ -18,6 +18,8 @@ package opts
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
@@ -30,11 +32,10 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/continuity/fs"
-	"github.com/pkg/errors"
 )
 
 // WithNewSnapshot wraps `containerd.WithNewSnapshot` so that if creating the
-// snapshot fails we make sure the image is actually unpacked and and retry.
+// snapshot fails we make sure the image is actually unpacked and retry.
 func WithNewSnapshot(id string, i containerd.Image, opts ...snapshots.Opt) containerd.NewContainerOpts {
 	f := containerd.WithNewSnapshot(id, i, opts...)
 	return func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
@@ -44,7 +45,7 @@ func WithNewSnapshot(id string, i containerd.Image, opts ...snapshots.Opt) conta
 			}
 
 			if err := i.Unpack(ctx, c.Snapshotter); err != nil {
-				return errors.Wrap(err, "error unpacking image")
+				return fmt.Errorf("error unpacking image: %w", err)
 			}
 			return f(ctx, client, c)
 		}
@@ -68,6 +69,12 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 		if err != nil {
 			return err
 		}
+		// Since only read is needed, append ReadOnly mount option to prevent linux kernel
+		// from syncing whole filesystem in umount syscall.
+		if len(mounts) == 1 && mounts[0].Type == "overlay" {
+			mounts[0].Options = append(mounts[0].Options, "ro")
+		}
+
 		root, err := os.MkdirTemp("", "ctd-volume")
 		if err != nil {
 			return err
@@ -76,7 +83,7 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 		// if it fails but not RM snapshot data.
 		// refer to https://github.com/containerd/containerd/pull/1868
 		// https://github.com/containerd/containerd/pull/1785
-		defer os.Remove(root) // nolint: errcheck
+		defer os.Remove(root)
 
 		unmounter := func(mountPath string) {
 			if uerr := mount.Unmount(mountPath, 0); uerr != nil {
@@ -102,7 +109,7 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 		} else {
 			mountPaths = append(mountPaths, root)
 			if err := mount.All(mounts, root); err != nil {
-				return errors.Wrap(err, "failed to mount")
+				return fmt.Errorf("failed to mount: %w", err)
 			}
 			defer unmounter(root)
 		}
@@ -111,16 +118,19 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 			// The volume may have been defined with a C: prefix, which we can't use here.
 			volume = strings.TrimPrefix(volume, "C:")
 			for _, mountPath := range mountPaths {
-				src := filepath.Join(mountPath, volume)
+				src, err := fs.RootPath(mountPath, volume)
+				if err != nil {
+					return fmt.Errorf("rootpath on mountPath %s, volume %s: %w", mountPath, volume, err)
+				}
 				if _, err := os.Stat(src); err != nil {
 					if os.IsNotExist(err) {
 						// Skip copying directory if it does not exist.
 						continue
 					}
-					return errors.Wrap(err, "stat volume in rootfs")
+					return fmt.Errorf("stat volume in rootfs: %w", err)
 				}
 				if err := copyExistingContents(src, host); err != nil {
-					return errors.Wrap(err, "taking runtime copy of volume")
+					return fmt.Errorf("taking runtime copy of volume: %w", err)
 				}
 			}
 		}
@@ -136,7 +146,7 @@ func copyExistingContents(source, destination string) error {
 		return err
 	}
 	if len(dstList) != 0 {
-		return errors.Errorf("volume at %q is not initially empty", destination)
+		return fmt.Errorf("volume at %q is not initially empty", destination)
 	}
 	return fs.CopyDir(destination, source, fs.WithXAttrExclude("security.selinux"))
 }

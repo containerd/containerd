@@ -18,6 +18,7 @@ package events
 
 import (
 	"context"
+	"fmt"
 
 	api "github.com/containerd/containerd/api/services/events/v1"
 	apittrpc "github.com/containerd/containerd/api/services/ttrpc/events/v1"
@@ -25,9 +26,9 @@ import (
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/protobuf"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/ttrpc"
-	ptypes "github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 
@@ -51,6 +52,7 @@ func init() {
 type service struct {
 	ttService *ttrpcService
 	events    *exchange.Exchange
+	api.UnimplementedEventsServer
 }
 
 // NewService returns the GRPC events server
@@ -98,11 +100,11 @@ func (s *service) Subscribe(req *api.SubscribeRequest, srv api.Events_SubscribeS
 		select {
 		case ev := <-eventq:
 			if err := srv.Send(toProto(ev)); err != nil {
-				return errors.Wrapf(err, "failed sending event to subscriber")
+				return fmt.Errorf("failed sending event to subscriber: %w", err)
 			}
 		case err := <-errq:
 			if err != nil {
-				return errors.Wrapf(err, "subscription error")
+				return fmt.Errorf("subscription error: %w", err)
 			}
 
 			return nil
@@ -112,16 +114,16 @@ func (s *service) Subscribe(req *api.SubscribeRequest, srv api.Events_SubscribeS
 
 func toProto(env *events.Envelope) *api.Envelope {
 	return &api.Envelope{
-		Timestamp: env.Timestamp,
+		Timestamp: protobuf.ToTimestamp(env.Timestamp),
 		Namespace: env.Namespace,
 		Topic:     env.Topic,
-		Event:     env.Event,
+		Event:     protobuf.FromAny(env.Event),
 	}
 }
 
 func fromProto(env *api.Envelope) *events.Envelope {
 	return &events.Envelope{
-		Timestamp: env.Timestamp,
+		Timestamp: protobuf.FromTimestamp(env.Timestamp),
 		Namespace: env.Namespace,
 		Topic:     env.Topic,
 		Event:     env.Event,

@@ -18,8 +18,8 @@ package container
 
 import (
 	"encoding/json"
+	"fmt"
 
-	"github.com/pkg/errors"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -28,10 +28,9 @@ import (
 // 2) Metadata is checkpointed as containerd container label.
 
 // metadataVersion is current version of container metadata.
-const metadataVersion = "v1" // nolint
+const metadataVersion = "v1"
 
 // versionedMetadata is the internal versioned container metadata.
-// nolint
 type versionedMetadata struct {
 	// Version indicates the version of the versioned container metadata.
 	Version string
@@ -85,5 +84,5 @@ func (c *Metadata) UnmarshalJSON(data []byte) error {
 		*c = Metadata(versioned.Metadata)
 		return nil
 	}
-	return errors.Errorf("unsupported version: %q", versioned.Version)
+	return fmt.Errorf("unsupported version: %q", versioned.Version)
 }

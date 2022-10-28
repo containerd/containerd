@@ -22,15 +22,25 @@ import (
 	"os"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	"github.com/sirupsen/logrus"
 
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/content/local"
 	imageArchive "github.com/containerd/containerd/images/archive"
+	"github.com/containerd/containerd/log"
 )
 
 // FuzzApply implements a fuzzer that applies
 // a fuzzed tar archive on a directory
 func FuzzApply(data []byte) int {
+	ctx := context.Background()
+
+	// Apply() is logging the below message, which is too noisy and not really useful
+	// if the input is random.
+	//
+	// level=warning msg="ignored xattr ... in archive" error="operation not supported"
+	log.G(ctx).Logger.SetLevel(logrus.PanicLevel)
+
 	f := fuzz.NewConsumer(data)
 	iters, err := f.GetInt()
 	if err != nil {
@@ -48,7 +58,7 @@ func FuzzApply(data []byte) int {
 			return 0
 		}
 		r := bytes.NewReader(rBytes)
-		_, _ = archive.Apply(context.Background(), tmpDir, r)
+		_, _ = archive.Apply(ctx, tmpDir, r)
 	}
 	return 1
 }

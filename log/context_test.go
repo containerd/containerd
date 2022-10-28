@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"gotest.tools/v3/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestLoggerContext(t *testing.T) {
@@ -28,5 +28,5 @@ func TestLoggerContext(t *testing.T) {
 
 	ctx = WithLogger(ctx, G(ctx).WithField("test", "one"))
 	assert.Equal(t, GetLogger(ctx).Data["test"], "one")
-	assert.Equal(t, G(ctx), GetLogger(ctx)) // these should be the same.
+	assert.Same(t, G(ctx), GetLogger(ctx)) // these should be the same.
 }

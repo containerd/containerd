@@ -14,7 +14,7 @@ This doc includes:
 
 To build the `containerd` daemon, and the `ctr` simple test client, the following build system dependencies are required:
 
-* Go 1.13.x or above except 1.14.x
+* Go 1.18.x or above
 * Protoc 3.x compiler and headers (download at the [Google protobuf releases page](https://github.com/protocolbuffers/protobuf/releases))
 * Btrfs headers and libraries for your distribution. Note that building the btrfs driver can be disabled via the build tag `no_btrfs`, removing this dependency.
 
@@ -122,14 +122,13 @@ Please refer to [RUNC.md](/docs/RUNC.md) for the currently supported version of 
 You can build static binaries by providing a few variables to `make`:
 
 ```sh
-make EXTRA_FLAGS="-buildmode pie" \
-	EXTRA_LDFLAGS='-linkmode external -extldflags "-fno-PIC -static"' \
-	BUILDTAGS="netgo osusergo static_build"
+make STATIC=1
 ```
 
 > *Note*:
 > - static build is discouraged
 > - static containerd binary does not support loading shared object plugins (`*.so`)
+> - static build binaries are not position-independent
 
 # Via Docker container
 
@@ -237,6 +236,7 @@ During the automated CI the unit tests and integration tests are run as part of 
  - `make test`: run all non-integration tests that do not require `root` privileges
  - `make root-test`: run all non-integration tests which require `root`
  - `make integration`: run all tests, including integration tests and those which require `root`. `TESTFLAGS_PARALLEL` can be used to control parallelism. For example, `TESTFLAGS_PARALLEL=1 make integration` will lead a non-parallel execution. The default value of `TESTFLAGS_PARALLEL` is **8**.
+ - `make cri-integration`: [CRI Integration Tests](https://github.com/containerd/containerd/blob/main/docs/cri/testing.md#cri-integration-test) run cri integration tests
 
 To execute a specific test or set of tests you can use the `go test` capabilities
 without using the `Makefile` targets. The following examples show how to specify a test
@@ -260,6 +260,10 @@ PASS
 ok  	github.com/containerd/containerd	4.778s
 ```
 
+> *Note*: in order to run `sudo go` you need to
+> - either keep user PATH environment variable. ex: `sudo "PATH=$PATH" env go test <args>`
+> - or use `go test -exec` ex: `go test -exec sudo -v -run "TestTarWithXattr" ./archive/ -test.root`
+
 ## Additional tools
 
 ### containerd-stress
@@ -268,7 +272,7 @@ In addition to `go test`-based testing executed via the `Makefile` targets, the 
 With this tool you can stress a running containerd daemon for a specified period of time, selecting a concurrency level to generate stress against the daemon. The following command is an example of having five workers running for two hours against a default containerd gRPC socket address:
 
 ```sh
-containerd-stress -c 5 -t 120
+containerd-stress -c 5 -d 120m
 ```
 
 For more information on this tool's options please run `containerd-stress --help`.

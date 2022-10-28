@@ -121,14 +121,14 @@ func (o *oomCollector) start() {
 			return
 		}
 		for i := 0; i < n; i++ {
-			o.process(uintptr(events[i].Fd), events[i].Events)
+			o.process(uintptr(events[i].Fd))
 		}
 	}
 }
 
-func (o *oomCollector) process(fd uintptr, event uint32) {
-	// make sure to always flush the fd
-	flush(fd)
+func (o *oomCollector) process(fd uintptr) {
+	// make sure to always flush the eventfd
+	flushEventfd(fd)
 
 	o.mu.Lock()
 	info, ok := o.set[fd]
@@ -152,8 +152,10 @@ func (o *oomCollector) process(fd uintptr, event uint32) {
 	}
 }
 
-func flush(fd uintptr) error {
+func flushEventfd(efd uintptr) error {
+	// Buffer must be >= 8 bytes for eventfd reads
+	// https://man7.org/linux/man-pages/man2/eventfd.2.html
 	var buf [8]byte
-	_, err := unix.Read(int(fd), buf[:])
+	_, err := unix.Read(int(efd), buf[:])
 	return err
 }

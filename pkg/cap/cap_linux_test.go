@@ -17,11 +17,69 @@
 package cap
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+const procPIDStatus = `Name:   cat
+Umask:  0022
+State:  R (running)
+Tgid:   170065
+Ngid:   0
+Pid:    170065
+PPid:   170064
+TracerPid:      0
+Uid:    0       0       0       0
+Gid:    0       0       0       0
+FDSize: 64
+Groups: 0
+NStgid: 170065
+NSpid:  170065
+NSpgid: 170064
+NSsid:  3784
+VmPeak:     8216 kB
+VmSize:     8216 kB
+VmLck:         0 kB
+VmPin:         0 kB
+VmHWM:       676 kB
+VmRSS:       676 kB
+RssAnon:              72 kB
+RssFile:             604 kB
+RssShmem:              0 kB
+VmData:      324 kB
+VmStk:       132 kB
+VmExe:        20 kB
+VmLib:      1612 kB
+VmPTE:        56 kB
+VmSwap:        0 kB
+HugetlbPages:          0 kB
+CoreDumping:    0
+THP_enabled:    1
+Threads:        1
+SigQ:   0/63692
+SigPnd: 0000000000000000
+ShdPnd: 0000000000000000
+SigBlk: 0000000000000000
+SigIgn: 0000000000000000
+SigCgt: 0000000000000000
+CapInh: 0000000000000000
+CapPrm: 000000ffffffffff
+CapEff: 000000ffffffffff
+CapBnd: 000000ffffffffff
+CapAmb: 0000000000000000
+NoNewPrivs:     0
+Seccomp:        0
+Speculation_Store_Bypass:       thread vulnerable
+Cpus_allowed:   00000000,00000000,00000000,0000000f
+Cpus_allowed_list:      0-3
+Mems_allowed:   00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000001
+Mems_allowed_list:      0
+voluntary_ctxt_switches:        0
+nonvoluntary_ctxt_switches:     0
+`
 
 func TestCapsList(t *testing.T) {
 	assert.Len(t, caps316, 38)
@@ -89,62 +147,6 @@ func TestFromBitmap(t *testing.T) {
 }
 
 func TestParseProcPIDStatus(t *testing.T) {
-	procPIDStatus := `Name:   cat
-Umask:  0022
-State:  R (running)
-Tgid:   170065
-Ngid:   0
-Pid:    170065
-PPid:   170064
-TracerPid:      0
-Uid:    0       0       0       0
-Gid:    0       0       0       0
-FDSize: 64
-Groups: 0
-NStgid: 170065
-NSpid:  170065
-NSpgid: 170064
-NSsid:  3784
-VmPeak:     8216 kB
-VmSize:     8216 kB
-VmLck:         0 kB
-VmPin:         0 kB
-VmHWM:       676 kB
-VmRSS:       676 kB
-RssAnon:              72 kB
-RssFile:             604 kB
-RssShmem:              0 kB
-VmData:      324 kB
-VmStk:       132 kB
-VmExe:        20 kB
-VmLib:      1612 kB
-VmPTE:        56 kB
-VmSwap:        0 kB
-HugetlbPages:          0 kB
-CoreDumping:    0
-THP_enabled:    1
-Threads:        1
-SigQ:   0/63692
-SigPnd: 0000000000000000
-ShdPnd: 0000000000000000
-SigBlk: 0000000000000000
-SigIgn: 0000000000000000
-SigCgt: 0000000000000000
-CapInh: 0000000000000000
-CapPrm: 000000ffffffffff
-CapEff: 000000ffffffffff
-CapBnd: 000000ffffffffff
-CapAmb: 0000000000000000
-NoNewPrivs:     0
-Seccomp:        0
-Speculation_Store_Bypass:       thread vulnerable
-Cpus_allowed:   00000000,00000000,00000000,0000000f
-Cpus_allowed_list:      0-3
-Mems_allowed:   00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000001
-Mems_allowed_list:      0
-voluntary_ctxt_switches:        0
-nonvoluntary_ctxt_switches:     0
-`
 	res, err := ParseProcPIDStatus(strings.NewReader(procPIDStatus))
 	assert.NoError(t, err)
 	expected := map[Type]uint64{
@@ -166,4 +168,14 @@ func TestCurrent(t *testing.T) {
 func TestKnown(t *testing.T) {
 	caps := Known()
 	assert.EqualValues(t, caps59, caps)
+}
+
+func FuzzParseProcPIDStatus(f *testing.F) {
+	f.Add(procPIDStatus)
+	f.Fuzz(func(t *testing.T, s string) {
+		result, err := ParseProcPIDStatus(bytes.NewReader([]byte(s)))
+		if err != nil && result != nil {
+			t.Errorf("either %+v or %+v must be nil", result, err)
+		}
+	})
 }

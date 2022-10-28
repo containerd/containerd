@@ -18,16 +18,15 @@ package opts
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
-
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -64,7 +63,9 @@ func WithProcessArgs(config *runtime.ContainerConfig, image *imagespec.ImageConf
 				args = append([]string{}, image.Cmd...)
 			}
 			if command == nil {
-				command = append([]string{}, image.Entrypoint...)
+				if !(len(image.Entrypoint) == 1 && image.Entrypoint[0] == "") {
+					command = append([]string{}, image.Entrypoint...)
+				}
 			}
 		}
 		if len(command) == 0 && len(args) == 0 {
@@ -76,7 +77,8 @@ func WithProcessArgs(config *runtime.ContainerConfig, image *imagespec.ImageConf
 
 // mounts defines how to sort runtime.Mount.
 // This is the same with the Docker implementation:
-//   https://github.com/moby/moby/blob/17.05.x/daemon/volumes.go#L26
+//
+//	https://github.com/moby/moby/blob/17.05.x/daemon/volumes.go#L26
 type orderedMounts []*runtime.Mount
 
 // Len returns the number of mounts. Used in sorting.

@@ -17,6 +17,7 @@
 package metadata
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -25,14 +26,12 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/images"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 )
 
 func TestImagesList(t *testing.T) {
-	ctx, db, cancel := testEnv(t)
-	defer cancel()
+	ctx, db := testEnv(t)
 	store := NewImageStore(NewDB(db, nil, nil))
 
 	testset := map[string]*images.Image{}
@@ -129,6 +128,7 @@ func TestImagesList(t *testing.T) {
 			}
 
 			for _, result := range results {
+				result := result
 				checkImagesEqual(t, &result, testset[result.Name], "list results did not match")
 			}
 		})
@@ -147,8 +147,7 @@ func TestImagesList(t *testing.T) {
 	}
 }
 func TestImagesCreateUpdateDelete(t *testing.T) {
-	ctx, db, cancel := testEnv(t)
-	defer cancel()
+	ctx, db := testEnv(t)
 	store := NewImageStore(NewDB(db, nil, nil))
 
 	for _, testcase := range []struct {
@@ -500,7 +499,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 				if testcase.createerr == nil {
 					t.Fatalf("unexpected error: %v", err)
 				} else {
-					t.Fatalf("cause of %v (cause: %v) != %v", err, errors.Cause(err), testcase.createerr)
+					t.Fatalf("cause of %v (cause: %v) != %v", err, errors.Unwrap(err), testcase.createerr)
 				}
 			} else if testcase.createerr != nil {
 				return
@@ -522,7 +521,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 				if testcase.cause == nil {
 					t.Fatalf("unexpected error: %v", err)
 				} else {
-					t.Fatalf("cause of %v (cause: %v) != %v", err, errors.Cause(err), testcase.cause)
+					t.Fatalf("cause of %v (cause: %v) != %v", err, errors.Unwrap(err), testcase.cause)
 				}
 			} else if testcase.cause != nil {
 				return

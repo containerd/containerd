@@ -160,6 +160,10 @@ func TestTaskUpdate(t *testing.T) {
 }
 
 func TestShimInCgroup(t *testing.T) {
+	if noShimCgroup {
+		t.Skip("shim cgroup is not enabled")
+	}
+
 	t.Parallel()
 
 	client, err := newClient(t, address)
@@ -445,76 +449,6 @@ func getRuntimeVersion() string {
 	}
 }
 
-func TestContainerPTY(t *testing.T) {
-	t.Parallel()
-
-	client, err := newClient(t, address)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
-
-	var (
-		image       Image
-		ctx, cancel = testContext(t)
-		id          = t.Name()
-	)
-	defer cancel()
-
-	image, err = client.GetImage(ctx, testImage)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithTTY, withProcessArgs("echo", "hello")))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer container.Delete(ctx, WithSnapshotCleanup)
-
-	direct, err := newDirectIO(ctx, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer direct.Delete()
-	var (
-		wg  sync.WaitGroup
-		buf = bytes.NewBuffer(nil)
-	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		io.Copy(buf, direct.Stdout)
-	}()
-
-	task, err := container.NewTask(ctx, direct.IOCreate)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer task.Delete(ctx)
-
-	status, err := task.Wait(ctx)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if err := task.Start(ctx); err != nil {
-		t.Fatal(err)
-	}
-
-	<-status
-	wg.Wait()
-
-	if err := direct.Close(); err != nil {
-		t.Error(err)
-	}
-
-	out := buf.String()
-	if !strings.ContainsAny(fmt.Sprintf("%#q", out), `\x00`) {
-		t.Fatal(`expected \x00 in output`)
-	}
-}
-
 func TestContainerAttach(t *testing.T) {
 	t.Parallel()
 
@@ -617,75 +551,6 @@ func TestContainerAttach(t *testing.T) {
 	expected = expected + expected
 	if output != expected {
 		t.Errorf("expected output %q but received %q", expected, output)
-	}
-}
-
-func TestContainerUsername(t *testing.T) {
-	t.Parallel()
-
-	client, err := newClient(t, address)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
-
-	var (
-		image       Image
-		ctx, cancel = testContext(t)
-		id          = t.Name()
-	)
-	defer cancel()
-
-	image, err = client.GetImage(ctx, testImage)
-	if err != nil {
-		t.Fatal(err)
-	}
-	direct, err := newDirectIO(ctx, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer direct.Delete()
-	var (
-		wg  sync.WaitGroup
-		buf = bytes.NewBuffer(nil)
-	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		io.Copy(buf, direct.Stdout)
-	}()
-
-	// the www-data user in the busybox image has a uid of 33
-	container, err := client.NewContainer(ctx, id,
-		WithNewSnapshot(id, image),
-		WithNewSpec(oci.WithImageConfig(image), oci.WithUsername("www-data"), oci.WithProcessArgs("id", "-u")),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer container.Delete(ctx, WithSnapshotCleanup)
-
-	task, err := container.NewTask(ctx, direct.IOCreate)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer task.Delete(ctx)
-
-	statusC, err := task.Wait(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := task.Start(ctx); err != nil {
-		t.Fatal(err)
-	}
-	<-statusC
-
-	wg.Wait()
-
-	output := strings.TrimSuffix(buf.String(), "\n")
-	if output != "33" {
-		t.Errorf("expected www-data uid to be 33 but received %q", output)
 	}
 }
 
@@ -1141,7 +1006,7 @@ func TestDaemonRestartWithRunningShim(t *testing.T) {
 		t.Errorf(`first task.Wait() should have failed with "transport is closing"`)
 	}
 
-	waitCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+	waitCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	c, err := ctrd.waitForStart(waitCtx)
 	cancel()
 	if err != nil {
@@ -1256,7 +1121,6 @@ func TestContainerKillInitPidHost(t *testing.T) {
 }
 
 func TestUserNamespaces(t *testing.T) {
-	t.Parallel()
 	t.Run("WritableRootFS", func(t *testing.T) { testUserNamespaces(t, false) })
 	// see #1373 and runc#1572
 	t.Run("ReadonlyRootFS", func(t *testing.T) { testUserNamespaces(t, true) })

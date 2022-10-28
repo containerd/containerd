@@ -17,10 +17,9 @@
 package plugin
 
 import (
+	"errors"
 	"fmt"
 	"sync"
-
-	"github.com/pkg/errors"
 )
 
 var (
@@ -77,6 +76,8 @@ const (
 	GCPlugin Type = "io.containerd.gc.v1"
 	// EventPlugin implements event handling
 	EventPlugin Type = "io.containerd.event.v1"
+	// LeasePlugin implements lease manager
+	LeasePlugin Type = "io.containerd.lease.v1"
 	// TracingProcessorPlugin implements a open telemetry span processor
 	TracingProcessorPlugin Type = "io.containerd.tracing.processor.v1"
 )
@@ -172,7 +173,7 @@ func Register(r *Registration) {
 func checkUnique(r *Registration) error {
 	for _, registered := range register.r {
 		if r.URI() == registered.URI() {
-			return errors.Wrap(ErrIDRegistered, r.URI())
+			return fmt.Errorf("%s: %w", r.URI(), ErrIDRegistered)
 		}
 	}
 	return nil

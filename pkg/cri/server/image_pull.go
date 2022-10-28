@@ -17,34 +17,37 @@
 package server
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
+
+	"github.com/containerd/imgcrypt"
+	"github.com/containerd/imgcrypt/images/encryption"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/pkg/cri/annotations"
+	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	distribution "github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/config"
-	"github.com/containerd/imgcrypt"
-	"github.com/containerd/imgcrypt/images/encryption"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
-	"golang.org/x/net/context"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
 )
 
 // For image management:
@@ -93,16 +96,26 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	imageRef := r.GetImage().GetImage()
 	namedRef, err := distribution.ParseDockerRef(imageRef)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse image reference %q", imageRef)
+		return nil, fmt.Errorf("failed to parse image reference %q: %w", imageRef, err)
 	}
 	ref := namedRef.String()
 	if ref != imageRef {
 		log.G(ctx).Debugf("PullImage using normalized image ref: %q", ref)
 	}
+
+	imagePullProgressTimeout, err := time.ParseDuration(c.config.ImagePullProgressTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse image_pull_progress_timeout %q: %w", c.config.ImagePullProgressTimeout, err)
+	}
+
 	var (
+		pctx, pcancel = context.WithCancel(ctx)
+
+		pullReporter = newPullProgressReporter(ref, pcancel, imagePullProgressTimeout)
+
 		resolver = docker.NewResolver(docker.ResolverOptions{
 			Headers: c.config.Registry.Headers,
-			Hosts:   c.registryHosts(ctx, r.GetAuth()),
+			Hosts:   c.registryHosts(ctx, r.GetAuth(), pullReporter.optionUpdateClient),
 		})
 		isSchema1    bool
 		imageHandler containerdimages.HandlerFunc = func(_ context.Context,
@@ -114,14 +127,24 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		}
 	)
 
+	defer pcancel()
+	snapshotter, err := c.snapshotterFromPodSandboxConfig(ctx, ref, r.SandboxConfig)
+	if err != nil {
+		return nil, err
+	}
+	log.G(ctx).Debugf("PullImage %q with snapshotter %s", ref, snapshotter)
+
 	pullOpts := []containerd.RemoteOpt{
-		containerd.WithSchema1Conversion,
+		containerd.WithSchema1Conversion, //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 		containerd.WithResolver(resolver),
-		containerd.WithPullSnapshotter(c.config.ContainerdConfig.Snapshotter),
+		containerd.WithPullSnapshotter(snapshotter),
 		containerd.WithPullUnpack,
 		containerd.WithPullLabel(imageLabelKey, imageLabelValue),
 		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
 		containerd.WithImageHandler(imageHandler),
+		containerd.WithUnpackOpts([]containerd.UnpackOpt{
+			containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
+		}),
 	}
 
 	pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
@@ -136,14 +159,16 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 			containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
 	}
 
-	image, err := c.client.Pull(ctx, ref, pullOpts...)
+	pullReporter.start(pctx)
+	image, err := c.client.Pull(pctx, ref, pullOpts...)
+	pcancel()
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to pull and unpack image %q", ref)
+		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
 	}
 
 	configDesc, err := image.Config(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "get image config descriptor")
+		return nil, fmt.Errorf("get image config descriptor: %w", err)
 	}
 	imageID := configDesc.Digest.String()
 
@@ -153,13 +178,13 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 			continue
 		}
 		if err := c.createImageReference(ctx, r, image.Target()); err != nil {
-			return nil, errors.Wrapf(err, "failed to create image reference %q", r)
+			return nil, fmt.Errorf("failed to create image reference %q: %w", r, err)
 		}
 		// Update image store to reflect the newest state in containerd.
 		// No need to use `updateImage`, because the image reference must
 		// have been managed by the cri plugin.
 		if err := c.imageStore.Update(ctx, r); err != nil {
-			return nil, errors.Wrapf(err, "failed to update image store %q", r)
+			return nil, fmt.Errorf("failed to update image store %q: %w", r, err)
 		}
 	}
 
@@ -182,7 +207,7 @@ func ParseAuth(auth *runtime.AuthConfig, host string) (string, string, error) {
 		// Do not return the auth info when server address doesn't match.
 		u, err := url.Parse(auth.ServerAddress)
 		if err != nil {
-			return "", "", errors.Wrap(err, "parse server address")
+			return "", "", fmt.Errorf("parse server address: %w", err)
 		}
 		if host != u.Host {
 			return "", "", nil
@@ -203,7 +228,7 @@ func ParseAuth(auth *runtime.AuthConfig, host string) (string, string, error) {
 		}
 		fields := strings.SplitN(string(decoded), ":", 2)
 		if len(fields) != 2 {
-			return "", "", errors.Errorf("invalid decoded auth: %q", decoded)
+			return "", "", fmt.Errorf("invalid decoded auth: %q", decoded)
 		}
 		user, passwd := fields[0], fields[1]
 		return user, strings.Trim(passwd, "\x00"), nil
@@ -243,31 +268,31 @@ func (c *criService) createImageReference(ctx context.Context, name string, desc
 func (c *criService) updateImage(ctx context.Context, r string) error {
 	img, err := c.client.GetImage(ctx, r)
 	if err != nil && !errdefs.IsNotFound(err) {
-		return errors.Wrap(err, "get image by reference")
+		return fmt.Errorf("get image by reference: %w", err)
 	}
 	if err == nil && img.Labels()[imageLabelKey] != imageLabelValue {
 		// Make sure the image has the image id as its unique
 		// identifier that references the image in its lifetime.
 		configDesc, err := img.Config(ctx)
 		if err != nil {
-			return errors.Wrap(err, "get image id")
+			return fmt.Errorf("get image id: %w", err)
 		}
 		id := configDesc.Digest.String()
 		if err := c.createImageReference(ctx, id, img.Target()); err != nil {
-			return errors.Wrapf(err, "create image id reference %q", id)
+			return fmt.Errorf("create image id reference %q: %w", id, err)
 		}
 		if err := c.imageStore.Update(ctx, id); err != nil {
-			return errors.Wrapf(err, "update image store for %q", id)
+			return fmt.Errorf("update image store for %q: %w", id, err)
 		}
 		// The image id is ready, add the label to mark the image as managed.
 		if err := c.createImageReference(ctx, r, img.Target()); err != nil {
-			return errors.Wrap(err, "create managed label")
+			return fmt.Errorf("create managed label: %w", err)
 		}
 	}
 	// If the image is not found, we should continue updating the cache,
 	// so that the image can be removed from the cache.
 	if err := c.imageStore.Update(ctx, r); err != nil {
-		return errors.Wrapf(err, "update image store for %q", r)
+		return fmt.Errorf("update image store for %q: %w", r, err)
 	}
 	return nil
 }
@@ -280,30 +305,30 @@ func (c *criService) getTLSConfig(registryTLSConfig criconfig.TLSConfig) (*tls.C
 		err       error
 	)
 	if registryTLSConfig.CertFile != "" && registryTLSConfig.KeyFile == "" {
-		return nil, errors.Errorf("cert file %q was specified, but no corresponding key file was specified", registryTLSConfig.CertFile)
+		return nil, fmt.Errorf("cert file %q was specified, but no corresponding key file was specified", registryTLSConfig.CertFile)
 	}
 	if registryTLSConfig.CertFile == "" && registryTLSConfig.KeyFile != "" {
-		return nil, errors.Errorf("key file %q was specified, but no corresponding cert file was specified", registryTLSConfig.KeyFile)
+		return nil, fmt.Errorf("key file %q was specified, but no corresponding cert file was specified", registryTLSConfig.KeyFile)
 	}
 	if registryTLSConfig.CertFile != "" && registryTLSConfig.KeyFile != "" {
 		cert, err = tls.LoadX509KeyPair(registryTLSConfig.CertFile, registryTLSConfig.KeyFile)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to load cert file")
+			return nil, fmt.Errorf("failed to load cert file: %w", err)
 		}
 		if len(cert.Certificate) != 0 {
 			tlsConfig.Certificates = []tls.Certificate{cert}
 		}
-		tlsConfig.BuildNameToCertificate() // nolint:staticcheck
+		tlsConfig.BuildNameToCertificate() //nolint:staticcheck // TODO(thaJeztah): verify if we should ignore the deprecation; see https://github.com/containerd/containerd/pull/7349/files#r990644833
 	}
 
 	if registryTLSConfig.CAFile != "" {
 		caCertPool, err := x509.SystemCertPool()
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to get system cert pool")
+			return nil, fmt.Errorf("failed to get system cert pool: %w", err)
 		}
 		caCert, err := os.ReadFile(registryTLSConfig.CAFile)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to load CA file")
+			return nil, fmt.Errorf("failed to load CA file: %w", err)
 		}
 		caCertPool.AppendCertsFromPEM(caCert)
 		tlsConfig.RootCAs = caCertPool
@@ -330,10 +355,12 @@ func hostDirFromRoots(roots []string) func(string) (string, error) {
 }
 
 // registryHosts is the registry hosts to be used by the resolver.
-func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig) docker.RegistryHosts {
+func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig, updateClientFn config.UpdateClientFunc) docker.RegistryHosts {
 	paths := filepath.SplitList(c.config.Registry.ConfigPath)
 	if len(paths) > 0 {
-		hostOptions := config.HostOptions{}
+		hostOptions := config.HostOptions{
+			UpdateClient: updateClientFn,
+		}
 		hostOptions.Credentials = func(host string) (string, string, error) {
 			hostauth := auth
 			if hostauth == nil {
@@ -354,12 +381,12 @@ func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig
 
 		endpoints, err := c.registryEndpoints(host)
 		if err != nil {
-			return nil, errors.Wrap(err, "get registry endpoints")
+			return nil, fmt.Errorf("get registry endpoints: %w", err)
 		}
 		for _, e := range endpoints {
 			u, err := url.Parse(e)
 			if err != nil {
-				return nil, errors.Wrapf(err, "parse registry endpoint %q from mirrors", e)
+				return nil, fmt.Errorf("parse registry endpoint %q from mirrors: %w", e, err)
 			}
 
 			var (
@@ -371,9 +398,9 @@ func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig
 			if config.TLS != nil {
 				transport.TLSClientConfig, err = c.getTLSConfig(*config.TLS)
 				if err != nil {
-					return nil, errors.Wrapf(err, "get TLSConfig for registry %q", e)
+					return nil, fmt.Errorf("get TLSConfig for registry %q: %w", e, err)
 				}
-			} else if isLocalHost(host) && u.Scheme == "http" {
+			} else if docker.IsLocalhost(host) && u.Scheme == "http" {
 				// Skipping TLS verification for localhost
 				transport.TLSClientConfig = &tls.Config{
 					InsecureSkipVerify: true,
@@ -386,6 +413,13 @@ func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig
 			if auth == nil && config.Auth != nil {
 				auth = toRuntimeAuthConfig(*config.Auth)
 			}
+
+			if updateClientFn != nil {
+				if err := updateClientFn(client); err != nil {
+					return nil, fmt.Errorf("failed to update http client: %w", err)
+				}
+			}
+
 			authorizer := docker.NewDockerAuthorizer(
 				docker.WithAuthClient(client),
 				docker.WithAuthCreds(func(host string) (string, string, error) {
@@ -411,24 +445,10 @@ func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig
 
 // defaultScheme returns the default scheme for a registry host.
 func defaultScheme(host string) string {
-	if isLocalHost(host) {
+	if docker.IsLocalhost(host) {
 		return "http"
 	}
 	return "https"
-}
-
-// isLocalHost checks if the registry host is local.
-func isLocalHost(host string) bool {
-	if h, _, err := net.SplitHostPort(host); err == nil {
-		host = h
-	}
-
-	if host == "localhost" {
-		return true
-	}
-
-	ip := net.ParseIP(host)
-	return ip.IsLoopback()
 }
 
 // addDefaultScheme returns the endpoint with default scheme
@@ -457,19 +477,19 @@ func (c *criService) registryEndpoints(host string) ([]string, error) {
 	}
 	defaultHost, err := docker.DefaultHost(host)
 	if err != nil {
-		return nil, errors.Wrap(err, "get default host")
+		return nil, fmt.Errorf("get default host: %w", err)
 	}
 	for i := range endpoints {
 		en, err := addDefaultScheme(endpoints[i])
 		if err != nil {
-			return nil, errors.Wrap(err, "parse endpoint url")
+			return nil, fmt.Errorf("parse endpoint url: %w", err)
 		}
 		endpoints[i] = en
 	}
 	for _, e := range endpoints {
 		u, err := url.Parse(e)
 		if err != nil {
-			return nil, errors.Wrap(err, "parse endpoint url")
+			return nil, fmt.Errorf("parse endpoint url: %w", err)
 		}
 		if u.Host == host {
 			// Do not add default if the endpoint already exists.
@@ -576,4 +596,213 @@ func getLayers(ctx context.Context, key string, descs []imagespec.Descriptor, va
 		}
 	}
 	return
+}
+
+const (
+	// minPullProgressReportInternal is used to prevent the reporter from
+	// eating more CPU resources
+	minPullProgressReportInternal = 5 * time.Second
+	// defaultPullProgressReportInterval represents that how often the
+	// reporter checks that pull progress.
+	defaultPullProgressReportInterval = 10 * time.Second
+)
+
+// pullProgressReporter is used to check single PullImage progress.
+type pullProgressReporter struct {
+	ref         string
+	cancel      context.CancelFunc
+	reqReporter pullRequestReporter
+	timeout     time.Duration
+}
+
+func newPullProgressReporter(ref string, cancel context.CancelFunc, timeout time.Duration) *pullProgressReporter {
+	return &pullProgressReporter{
+		ref:         ref,
+		cancel:      cancel,
+		reqReporter: pullRequestReporter{},
+		timeout:     timeout,
+	}
+}
+
+func (reporter *pullProgressReporter) optionUpdateClient(client *http.Client) error {
+	client.Transport = &pullRequestReporterRoundTripper{
+		rt:          client.Transport,
+		reqReporter: &reporter.reqReporter,
+	}
+	return nil
+}
+
+func (reporter *pullProgressReporter) start(ctx context.Context) {
+	if reporter.timeout == 0 {
+		log.G(ctx).Infof("no timeout and will not start pulling image %s reporter", reporter.ref)
+		return
+	}
+
+	go func() {
+		var (
+			reportInterval = defaultPullProgressReportInterval
+
+			lastSeenBytesRead = uint64(0)
+			lastSeenTimestamp = time.Now()
+		)
+
+		// check progress more frequently if timeout < default internal
+		if reporter.timeout < reportInterval {
+			reportInterval = reporter.timeout / 2
+
+			if reportInterval < minPullProgressReportInternal {
+				reportInterval = minPullProgressReportInternal
+			}
+		}
+
+		var ticker = time.NewTicker(reportInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				activeReqs, bytesRead := reporter.reqReporter.status()
+
+				log.G(ctx).WithField("ref", reporter.ref).
+					WithField("activeReqs", activeReqs).
+					WithField("totalBytesRead", bytesRead).
+					WithField("lastSeenBytesRead", lastSeenBytesRead).
+					WithField("lastSeenTimestamp", lastSeenTimestamp).
+					WithField("reportInterval", reportInterval).
+					Tracef("progress for image pull")
+
+				if activeReqs == 0 || bytesRead > lastSeenBytesRead {
+					lastSeenBytesRead = bytesRead
+					lastSeenTimestamp = time.Now()
+					continue
+				}
+
+				if time.Since(lastSeenTimestamp) > reporter.timeout {
+					log.G(ctx).Errorf("cancel pulling image %s because of no progress in %v", reporter.ref, reporter.timeout)
+					reporter.cancel()
+					return
+				}
+			case <-ctx.Done():
+				activeReqs, bytesRead := reporter.reqReporter.status()
+				log.G(ctx).Infof("stop pulling image %s: active requests=%v, bytes read=%v", reporter.ref, activeReqs, bytesRead)
+				return
+			}
+		}
+	}()
+}
+
+// countingReadCloser wraps http.Response.Body with pull request reporter,
+// which is used by pullRequestReporterRoundTripper.
+type countingReadCloser struct {
+	once sync.Once
+
+	rc          io.ReadCloser
+	reqReporter *pullRequestReporter
+}
+
+// Read reads bytes from original io.ReadCloser and increases bytes in
+// pull request reporter.
+func (r *countingReadCloser) Read(p []byte) (int, error) {
+	n, err := r.rc.Read(p)
+	r.reqReporter.incByteRead(uint64(n))
+	return n, err
+}
+
+// Close closes the original io.ReadCloser and only decreases the number of
+// active pull requests once.
+func (r *countingReadCloser) Close() error {
+	err := r.rc.Close()
+	r.once.Do(r.reqReporter.decRequest)
+	return err
+}
+
+// pullRequestReporter is used to track the progress per each criapi.PullImage.
+type pullRequestReporter struct {
+	// activeReqs indicates that current number of active pulling requests,
+	// including auth requests.
+	activeReqs int32
+	// totalBytesRead indicates that the total bytes has been read from
+	// remote registry.
+	totalBytesRead uint64
+}
+
+func (reporter *pullRequestReporter) incRequest() {
+	atomic.AddInt32(&reporter.activeReqs, 1)
+}
+
+func (reporter *pullRequestReporter) decRequest() {
+	atomic.AddInt32(&reporter.activeReqs, -1)
+}
+
+func (reporter *pullRequestReporter) incByteRead(nr uint64) {
+	atomic.AddUint64(&reporter.totalBytesRead, nr)
+}
+
+func (reporter *pullRequestReporter) status() (currentReqs int32, totalBytesRead uint64) {
+	currentReqs = atomic.LoadInt32(&reporter.activeReqs)
+	totalBytesRead = atomic.LoadUint64(&reporter.totalBytesRead)
+	return currentReqs, totalBytesRead
+}
+
+// pullRequestReporterRoundTripper wraps http.RoundTripper with pull request
+// reporter which is used to track the progress of active http request with
+// counting readable http.Response.Body.
+//
+// NOTE:
+//
+// Although containerd provides ingester manager to track the progress
+// of pulling request, for example `ctr image pull` shows the console progress
+// bar, it needs more CPU resources to open/read the ingested files with
+// acquiring containerd metadata plugin's boltdb lock.
+//
+// Before sending HTTP request to registry, the containerd.Client.Pull library
+// will open writer by containerd ingester manager. Based on this, the
+// http.RoundTripper wrapper can track the active progress with lower overhead
+// even if the ref has been locked in ingester manager by other Pull request.
+type pullRequestReporterRoundTripper struct {
+	rt http.RoundTripper
+
+	reqReporter *pullRequestReporter
+}
+
+func (rt *pullRequestReporterRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	rt.reqReporter.incRequest()
+
+	resp, err := rt.rt.RoundTrip(req)
+	if err != nil {
+		rt.reqReporter.decRequest()
+		return nil, err
+	}
+
+	resp.Body = &countingReadCloser{
+		rc:          resp.Body,
+		reqReporter: rt.reqReporter,
+	}
+	return resp, err
+}
+
+// Given that runtime information is not passed from PullImageRequest, we depend on an experimental annotation
+// passed from pod sandbox config to get the runtimeHandler. The annotation key is specified in configuration.
+// Once we know the runtime, try to override default snapshotter if it is set for this runtime.
+// See https://github.com/containerd/containerd/issues/6657
+func (c *criService) snapshotterFromPodSandboxConfig(ctx context.Context, imageRef string,
+	s *runtime.PodSandboxConfig) (string, error) {
+	snapshotter := c.config.ContainerdConfig.Snapshotter
+	if s == nil || s.Annotations == nil {
+		return snapshotter, nil
+	}
+
+	runtimeHandler, ok := s.Annotations[annotations.RuntimeHandler]
+	if !ok {
+		return snapshotter, nil
+	}
+
+	ociRuntime, err := c.getSandboxRuntime(s, runtimeHandler)
+	if err != nil {
+		return "", fmt.Errorf("experimental: failed to get sandbox runtime for %s, err: %+v", runtimeHandler, err)
+	}
+
+	snapshotter = c.runtimeSnapshotter(context.Background(), ociRuntime)
+	log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, snapshotter)
+	return snapshotter, nil
 }

@@ -28,8 +28,8 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/services"
-	ptypes "github.com/gogo/protobuf/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -82,7 +82,7 @@ func (l *local) Get(ctx context.Context, req *imagesapi.GetImageRequest, _ ...gr
 
 	imagepb := imageToProto(&image)
 	return &imagesapi.GetImageResponse{
-		Image: &imagepb,
+		Image: imagepb,
 	}, nil
 }
 
@@ -104,7 +104,7 @@ func (l *local) Create(ctx context.Context, req *imagesapi.CreateImageRequest, _
 	}
 
 	var (
-		image = imageFromProto(&req.Image)
+		image = imageFromProto(req.Image)
 		resp  imagesapi.CreateImageResponse
 	)
 	created, err := l.store.Create(ctx, image)
@@ -131,7 +131,7 @@ func (l *local) Update(ctx context.Context, req *imagesapi.UpdateImageRequest, _
 	}
 
 	var (
-		image      = imageFromProto(&req.Image)
+		image      = imageFromProto(req.Image)
 		resp       imagesapi.UpdateImageResponse
 		fieldpaths []string
 	)

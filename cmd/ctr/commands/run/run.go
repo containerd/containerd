@@ -17,9 +17,9 @@
 package run
 
 import (
-	"context"
 	gocontext "context"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -30,11 +30,9 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands/tasks"
 	"github.com/containerd/containerd/containers"
 	clabels "github.com/containerd/containerd/labels"
-	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	gocni "github.com/containerd/go-cni"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -123,6 +121,10 @@ var Command = cli.Command{
 			Name:  "platform",
 			Usage: "run image for specific platform",
 		},
+		cli.BoolFlag{
+			Name:  "cni",
+			Usage: "enable cni networking for the container",
+		},
 	}, append(platformRunFlags,
 		append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),
 			commands.ContainerFlags...)...)...),
@@ -192,7 +194,7 @@ var Command = cli.Command{
 		if !detach {
 			defer func() {
 				if enableCNI {
-					if err := network.Remove(ctx, fullID(ctx, container), ""); err != nil {
+					if err := network.Remove(ctx, commands.FullID(ctx, container), ""); err != nil {
 						logrus.WithError(err).Error("network review")
 					}
 				}
@@ -209,7 +211,12 @@ var Command = cli.Command{
 			}
 		}
 		if enableCNI {
-			if _, err := network.Setup(ctx, fullID(ctx, container), fmt.Sprintf("/proc/%d/ns/net", task.Pid())); err != nil {
+			netNsPath, err := getNetNSPath(ctx, task)
+			if err != nil {
+				return err
+			}
+
+			if _, err := network.Setup(ctx, commands.FullID(ctx, container), netNsPath); err != nil {
 				return err
 			}
 		}
@@ -240,15 +247,6 @@ var Command = cli.Command{
 		}
 		return nil
 	},
-}
-
-func fullID(ctx context.Context, c containerd.Container) string {
-	id := c.ID()
-	ns, ok := namespaces.Namespace(ctx)
-	if !ok {
-		return id
-	}
-	return fmt.Sprintf("%s-%s", ns, id)
 }
 
 // buildLabel builds the labels from command line labels and the image labels

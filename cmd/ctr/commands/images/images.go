@@ -17,6 +17,7 @@
 package images
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -29,7 +30,6 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/progress"
 	"github.com/containerd/containerd/platforms"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
@@ -82,7 +82,7 @@ var listCommand = cli.Command{
 		)
 		imageList, err := imageStore.List(ctx, filters...)
 		if err != nil {
-			return errors.Wrap(err, "failed to list images")
+			return fmt.Errorf("failed to list images: %w", err)
 		}
 		if quiet {
 			for _, image := range imageList {
@@ -224,7 +224,7 @@ var checkCommand = cli.Command{
 		args := []string(context.Args())
 		imageList, err := client.ListImages(ctx, args...)
 		if err != nil {
-			return errors.Wrap(err, "failed listing images")
+			return fmt.Errorf("failed listing images: %w", err)
 		}
 		if len(imageList) == 0 {
 			log.G(ctx).Debugf("no images found")
@@ -238,17 +238,17 @@ var checkCommand = cli.Command{
 
 		for _, image := range imageList {
 			var (
-				status       string = "complete"
+				status       = "complete"
 				size         string
 				requiredSize int64
 				presentSize  int64
-				complete     bool = true
+				complete     = true
 			)
 
 			available, required, present, missing, err := images.Check(ctx, contentStore, image.Target(), platforms.Default())
 			if err != nil {
 				if exitErr == nil {
-					exitErr = errors.Wrapf(err, "unable to check %v", image.Name())
+					exitErr = fmt.Errorf("unable to check %v: %w", image.Name(), err)
 				}
 				log.G(ctx).WithError(err).Errorf("unable to check %v", image.Name())
 				status = "error"
@@ -284,7 +284,7 @@ var checkCommand = cli.Command{
 			unpacked, err := image.IsUnpacked(ctx, context.String("snapshotter"))
 			if err != nil {
 				if exitErr == nil {
-					exitErr = errors.Wrapf(err, "unable to check unpack for %v", image.Name())
+					exitErr = fmt.Errorf("unable to check unpack for %v: %w", image.Name(), err)
 				}
 				log.G(ctx).WithError(err).Errorf("unable to check unpack for %v", image.Name())
 			}
@@ -311,8 +311,8 @@ var checkCommand = cli.Command{
 }
 
 var removeCommand = cli.Command{
-	Name:        "remove",
-	Aliases:     []string{"rm"},
+	Name:        "delete",
+	Aliases:     []string{"del", "remove", "rm"},
 	Usage:       "remove one or more images by reference",
 	ArgsUsage:   "[flags] <ref> [<ref>, ...]",
 	Description: "remove one or more images by reference",
@@ -340,7 +340,7 @@ var removeCommand = cli.Command{
 			if err := imageStore.Delete(ctx, target, opts...); err != nil {
 				if !errdefs.IsNotFound(err) {
 					if exitErr == nil {
-						exitErr = errors.Wrapf(err, "unable to delete %v", target)
+						exitErr = fmt.Errorf("unable to delete %v: %w", target, err)
 					}
 					log.G(ctx).WithError(err).Errorf("unable to delete %v", target)
 					continue

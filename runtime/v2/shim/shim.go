@@ -18,25 +18,27 @@ package shim
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"os"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
-	"strings"
 	"time"
 
+	shimapi "github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/shutdown"
 	"github.com/containerd/containerd/plugin"
-	shimapi "github.com/containerd/containerd/runtime/v2/task"
+	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/containerd/version"
 	"github.com/containerd/ttrpc"
-	"github.com/gogo/protobuf/proto"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -52,6 +54,7 @@ type StartOpts struct {
 	ContainerdBinary string
 	Address          string
 	TTRPCAddress     string
+	Debug            bool
 }
 
 type StopStatus struct {
@@ -103,6 +106,12 @@ type Config struct {
 
 type ttrpcService interface {
 	RegisterTTRPC(*ttrpc.Server) error
+}
+
+type ttrpcServerOptioner interface {
+	ttrpcService
+
+	UnaryInterceptor() ttrpc.UnaryServerInterceptor
 }
 
 type taskService struct {
@@ -217,7 +226,7 @@ func (stm shimToManager) Stop(ctx context.Context, id string) (StopStatus, error
 	return StopStatus{
 		Pid:        int(dr.Pid),
 		ExitStatus: int(dr.ExitStatus),
-		ExitedAt:   dr.ExitedAt,
+		ExitedAt:   protobuf.FromTimestamp(dr.ExitedAt),
 	}, nil
 }
 
@@ -240,7 +249,7 @@ func RunManager(ctx context.Context, manager Manager, opts ...BinaryOpts) {
 func run(ctx context.Context, manager Manager, initFunc Init, name string, config Config) error {
 	parseFlags()
 	if versionFlag {
-		fmt.Printf("%s:\n", os.Args[0])
+		fmt.Printf("%s:\n", filepath.Base(os.Args[0]))
 		fmt.Println("  Version: ", version.Version)
 		fmt.Println("  Revision:", version.Revision)
 		fmt.Println("  Go version:", version.GoVersion)
@@ -305,7 +314,7 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 			"pid":       os.Getpid(),
 			"namespace": namespaceFlag,
 		})
-		go handleSignals(ctx, logger, signals)
+		go reap(ctx, logger, signals)
 		ss, err := manager.Stop(ctx, id)
 		if err != nil {
 			return err
@@ -313,7 +322,7 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 		data, err := proto.Marshal(&shimapi.DeleteResponse{
 			Pid:        uint32(ss.Pid),
 			ExitStatus: uint32(ss.ExitStatus),
-			ExitedAt:   ss.ExitedAt,
+			ExitedAt:   protobuf.ToTimestamp(ss.ExitedAt),
 		})
 		if err != nil {
 			return err
@@ -327,6 +336,7 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 			ContainerdBinary: containerdBinaryFlag,
 			Address:          addressFlag,
 			TTRPCAddress:     ttrpcAddress,
+			Debug:            debugFlag,
 		}
 
 		address, err := manager.Start(ctx, id, opts)
@@ -366,6 +376,8 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 	var (
 		initialized   = plugin.NewPluginSet()
 		ttrpcServices = []ttrpcService{}
+
+		ttrpcUnaryInterceptors = []ttrpc.UnaryServerInterceptor{}
 	)
 	plugins := plugin.Graph(func(*plugin.Registration) bool { return false })
 	for _, p := range plugins {
@@ -398,37 +410,46 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 
 		result := p.Init(initContext)
 		if err := initialized.Add(result); err != nil {
-			return errors.Wrapf(err, "could not add plugin result to plugin set")
+			return fmt.Errorf("could not add plugin result to plugin set: %w", err)
 		}
 
 		instance, err := result.Instance()
 		if err != nil {
 			if plugin.IsSkipPlugin(err) {
 				log.G(ctx).WithError(err).WithField("type", p.Type).Infof("skip loading plugin %q...", id)
-			} else {
-				log.G(ctx).WithError(err).Warnf("failed to load plugin %s", id)
+				continue
 			}
-			continue
+			return fmt.Errorf("failed to load plugin %s: %w", id, err)
 		}
 
 		if src, ok := instance.(ttrpcService); ok {
 			logrus.WithField("id", id).Debug("registering ttrpc service")
 			ttrpcServices = append(ttrpcServices, src)
+
+		}
+
+		if src, ok := instance.(ttrpcServerOptioner); ok {
+			ttrpcUnaryInterceptors = append(ttrpcUnaryInterceptors, src.UnaryInterceptor())
 		}
 	}
 
-	server, err := newServer()
+	if len(ttrpcServices) == 0 {
+		return fmt.Errorf("required that ttrpc service")
+	}
+
+	unaryInterceptor := chainUnaryServerInterceptors(ttrpcUnaryInterceptors...)
+	server, err := newServer(ttrpc.WithUnaryServerInterceptor(unaryInterceptor))
 	if err != nil {
-		return errors.Wrap(err, "failed creating server")
+		return fmt.Errorf("failed creating server: %w", err)
 	}
 
 	for _, srv := range ttrpcServices {
 		if err := srv.RegisterTTRPC(server); err != nil {
-			return errors.Wrap(err, "failed to register service")
+			return fmt.Errorf("failed to register service: %w", err)
 		}
 	}
 
-	if err := serve(ctx, server, signals); err != nil {
+	if err := serve(ctx, server, signals, sd.Shutdown); err != nil {
 		if err != shutdown.ErrShutdown {
 			return err
 		}
@@ -450,7 +471,7 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 
 // serve serves the ttrpc API over a unix socket in the current working directory
 // and blocks until the context is canceled
-func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal) error {
+func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal, shutdown func()) error {
 	dump := make(chan os.Signal, 32)
 	setupDumpStacks(dump)
 
@@ -465,8 +486,7 @@ func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal) er
 	}
 	go func() {
 		defer l.Close()
-		if err := server.Serve(ctx, l); err != nil &&
-			!strings.Contains(err.Error(), "use of closed network connection") {
+		if err := server.Serve(ctx, l); err != nil && !errors.Is(err, net.ErrClosed) {
 			log.G(ctx).WithError(err).Fatal("containerd-shim: ttrpc server failure")
 		}
 	}()
@@ -480,7 +500,9 @@ func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal) er
 			dumpStacks(logger)
 		}
 	}()
-	return handleSignals(ctx, logger, signals)
+
+	go handleExitSignals(ctx, logger, shutdown)
+	return reap(ctx, logger, signals)
 }
 
 func dumpStacks(logger *logrus.Entry) {

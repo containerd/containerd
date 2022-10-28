@@ -20,7 +20,7 @@
 #
 set -eu -o pipefail
 
-PROTOBUF_VERSION=3.11.4
+PROTOBUF_VERSION=3.20.1
 GOARCH=$(go env GOARCH)
 GOOS=$(go env GOOS)
 PROTOBUF_DIR=$(mktemp -d)
@@ -28,7 +28,7 @@ PROTOBUF_DIR=$(mktemp -d)
 case $GOARCH in
 
 arm64)
-	wget -O "$PROTOBUF_DIR/protobuf" "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-linux-aarch64.zip"
+	wget -O "$PROTOBUF_DIR/protobuf" "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-linux-aarch_64.zip"
 	unzip "$PROTOBUF_DIR/protobuf" -d /usr/local
 	;;
 
@@ -37,6 +37,8 @@ amd64|386)
 		wget -O "$PROTOBUF_DIR/protobuf" "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-win32.zip"
 	elif [ "$GOOS" = linux ]; then
 		wget -O "$PROTOBUF_DIR/protobuf" "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-linux-x86_64.zip"
+	elif [ "$GOOS" == darwin ]; then
+	  wget -O "$PROTOBUF_DIR/protobuf" "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-osx-x86_64.zip"
 	fi
 	unzip "$PROTOBUF_DIR/protobuf" -d /usr/local
 	;;
@@ -58,3 +60,11 @@ ppc64le)
 	;;
 esac
 rm -rf "$PROTOBUF_DIR"
+
+# Download status.proto. grpc repos' one seems copied from
+# https://github.com/googleapis/googleapis/blob/master/google/rpc/status.proto,
+# but we use grpc's since the repos has tags/releases.
+mkdir -p /usr/local/include/google/rpc
+curl \
+	-L https://raw.githubusercontent.com/grpc/grpc/v1.45.2/src/proto/grpc/status/status.proto \
+	-o /usr/local/include/google/rpc/status.proto

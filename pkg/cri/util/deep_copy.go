@@ -18,8 +18,8 @@ package util
 
 import (
 	"encoding/json"
-
-	"github.com/pkg/errors"
+	"errors"
+	"fmt"
 )
 
 // DeepCopy makes a deep copy from src into dst.
@@ -32,11 +32,11 @@ func DeepCopy(dst interface{}, src interface{}) error {
 	}
 	bytes, err := json.Marshal(src)
 	if err != nil {
-		return errors.Wrap(err, "unable to marshal src")
+		return fmt.Errorf("unable to marshal src: %w", err)
 	}
 	err = json.Unmarshal(bytes, dst)
 	if err != nil {
-		return errors.Wrap(err, "unable to unmarshal into dst")
+		return fmt.Errorf("unable to unmarshal into dst: %w", err)
 	}
 	return nil
 }

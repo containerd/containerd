@@ -11,6 +11,7 @@ A generic CNI library to provide APIs for CNI plugin interactions. The library p
 - Setup networks for container namespace
 - Remove networks from container namespace
 - Query status of CNI network plugin initialization
+- Check verifies the network is still in desired state
 
 go-cni aims to support plugins that implement [Container Network Interface](https://github.com/containernetworking/cni)
 

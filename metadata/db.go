@@ -19,6 +19,8 @@ package metadata
 import (
 	"context"
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -28,7 +30,6 @@ import (
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/snapshots"
-	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -92,6 +93,9 @@ type DB struct {
 	// mutationCallbacks are called after each mutation with the flag
 	// set indicating whether any dirty flags are set
 	mutationCallbacks []func(bool)
+
+	// collectible resources
+	collectors map[gc.ResourceType]Collector
 
 	dbopts dbOptions
 }
@@ -181,7 +185,7 @@ func (m *DB) Init(ctx context.Context) error {
 			for _, m := range updates {
 				t0 := time.Now()
 				if err := m.migrate(tx); err != nil {
-					return errors.Wrapf(err, "failed to migrate to %s.%d", m.schema, m.version)
+					return fmt.Errorf("failed to migrate to %s.%d: %w", m.schema, m.version, err)
 				}
 				log.G(ctx).WithField("d", time.Since(t0)).Debugf("finished database migration to %s.%d", m.schema, m.version)
 			}
@@ -214,8 +218,8 @@ func (m *DB) ContentStore() content.Store {
 	return m.cs
 }
 
-// Snapshotter returns a namespaced content store for
-// the requested snapshotter name proxied to a snapshotter.
+// Snapshotter returns a snapshotter for the requested snapshotter name
+// proxied to a snapshotter.
 func (m *DB) Snapshotter(name string) snapshots.Snapshotter {
 	sn, ok := m.ss[name]
 	if !ok {
@@ -264,6 +268,37 @@ func (m *DB) RegisterMutationCallback(fn func(bool)) {
 	m.wlock.Unlock()
 }
 
+// RegisterCollectibleResource registers a resource type which can be
+// referenced by metadata resources and garbage collected.
+// Collectible Resources are useful ephemeral resources which need to
+// to be tracked by go away after reboot or process restart.
+//
+// A few limitations to consider:
+//   - Collectible Resources cannot reference other resources.
+//   - A failure to complete collection will not fail the garbage collection,
+//     however, the resources can be collected in a later run.
+//   - Collectible Resources must track whether the resource is active and/or
+//     lease membership.
+func (m *DB) RegisterCollectibleResource(t gc.ResourceType, c Collector) {
+	if t < resourceEnd {
+		panic("cannot re-register metadata resource")
+	} else if t >= gc.ResourceMax {
+		panic("resource type greater than max")
+	}
+
+	m.wlock.Lock()
+	defer m.wlock.Unlock()
+
+	if m.collectors == nil {
+		m.collectors = map[gc.ResourceType]Collector{}
+	}
+
+	if _, ok := m.collectors[t]; ok {
+		panic("cannot register collectible type twice")
+	}
+	m.collectors[t] = c
+}
+
 // GCStats holds the duration for the different phases of the garbage collector
 type GCStats struct {
 	MetaD     time.Duration
@@ -276,12 +311,13 @@ func (s GCStats) Elapsed() time.Duration {
 	return s.MetaD
 }
 
-// GarbageCollect starts garbage collection
+// GarbageCollect removes resources (snapshots, contents, ...) that are no longer used.
 func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 	m.wlock.Lock()
 	t1 := time.Now()
+	c := startGCContext(ctx, m.collectors)
 
-	marked, err := m.getMarked(ctx)
+	marked, err := m.getMarked(ctx, c) // Pass in gc context
 	if err != nil {
 		m.wlock.Unlock()
 		return nil, err
@@ -303,16 +339,17 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 			} else if n.Type == ResourceContent || n.Type == ResourceIngest {
 				m.dirtyCS = true
 			}
-			return remove(ctx, tx, n)
+			return c.remove(ctx, tx, n) // From gc context
 		}
 
-		if err := scanAll(ctx, tx, rm); err != nil {
-			return errors.Wrap(err, "failed to scan and remove")
+		if err := c.scanAll(ctx, tx, rm); err != nil { // From gc context
+			return fmt.Errorf("failed to scan and remove: %w", err)
 		}
 
 		return nil
 	}); err != nil {
 		m.wlock.Unlock()
+		c.cancel(ctx)
 		return nil, err
 	}
 
@@ -357,12 +394,15 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 	stats.MetaD = time.Since(t1)
 	m.wlock.Unlock()
 
+	c.finish(ctx)
+
 	wg.Wait()
 
 	return stats, err
 }
 
-func (m *DB) getMarked(ctx context.Context) (map[gc.Node]struct{}, error) {
+// getMarked returns all resources that are used.
+func (m *DB) getMarked(ctx context.Context, c *gcContext) (map[gc.Node]struct{}, error) {
 	var marked map[gc.Node]struct{}
 	if err := m.db.View(func(tx *bolt.Tx) error {
 		ctx, cancel := context.WithCancel(ctx)
@@ -381,7 +421,7 @@ func (m *DB) getMarked(ctx context.Context) (map[gc.Node]struct{}, error) {
 			}
 		}()
 		// Call roots
-		if err := scanRoots(ctx, tx, roots); err != nil {
+		if err := c.scanRoots(ctx, tx, roots); err != nil { // From gc context
 			cancel()
 			return err
 		}
@@ -390,7 +430,7 @@ func (m *DB) getMarked(ctx context.Context) (map[gc.Node]struct{}, error) {
 
 		refs := func(n gc.Node) ([]gc.Node, error) {
 			var sn []gc.Node
-			if err := references(ctx, tx, n, func(nn gc.Node) {
+			if err := c.references(ctx, tx, n, func(nn gc.Node) { // From gc context
 				sn = append(sn, nn)
 			}); err != nil {
 				return nil, err

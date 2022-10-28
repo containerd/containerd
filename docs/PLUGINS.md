@@ -50,7 +50,9 @@ section for your given plugin `[proxy_plugins.myplugin]`. The `address` must
 refer to a local socket file which the containerd process has access to. The
 currently supported types are `snapshot` and `content`.
 
-```
+```toml
+version = 2
+
 [proxy_plugins]
   [proxy_plugins.customsnapshot]
     type = "snapshot"
@@ -233,35 +235,39 @@ to load.
 #### Configuration
 
 Plugins are configured using the `[plugins]` section of containerd's config.
-Every plugin can have its own section using the pattern `[plugins.<plugin id>]`.
+Every plugin can have its own section using the pattern `[plugins."<plugin type>.<plugin id>"]`.
 
 example configuration
+```toml
+version = 2
+
+[plugins]
+  [plugins."io.containerd.monitor.v1.cgroups"]
+    no_prometheus = false
 ```
+
+To see full configuration example run `containerd config default`.
+If you want to get the configuration combined with your configuration, run `containerd config dump`.
+
+##### Version header
+
+containerd has two configuration versions:
+- Version 2 (Recommended): Introduced in containerd 1.3.
+- Version 1 (Default): Introduced in containerd 1.0. Deprecated and will be removed in containerd 2.0.
+
+A configuration with Version 2 must have `version = 2` header, and must have
+fully qualified plugin IDs in the `[plugins]` section:
+```toml
+version = 2
+
+[plugins]
+  [plugins."io.containerd.monitor.v1.cgroups"]
+    no_prometheus = false
+```
+
+A configuration with Version 1 may not have `version` header, and does not need fully qualified plugin IDs.
+```toml
 [plugins]
   [plugins.cgroups]
     no_prometheus = false
-  [plugins.cri]
-    stream_server_address = ""
-    stream_server_port = "10010"
-    enable_selinux = false
-    sandbox_image = "k8s.gcr.io/pause:3.6"
-    stats_collect_period = 10
-    systemd_cgroup = false
-    [plugins.cri.containerd]
-      snapshotter = "overlayfs"
-      [plugins.cri.containerd.default_runtime]
-        runtime_type = "io.containerd.runtime.v1.linux"
-        runtime_engine = ""
-        runtime_root = ""
-      [plugins.cri.containerd.untrusted_workload_runtime]
-        runtime_type = ""
-        runtime_engine = ""
-        runtime_root = ""
-    [plugins.cri.cni]
-      bin_dir = "/opt/cni/bin"
-      conf_dir = "/etc/cni/net.d"
-    [plugins.cri.registry]
-      [plugins.cri.registry.mirrors]
-        [plugins.cri.registry.mirrors."docker.io"]
-          endpoint = ["https://registry-1.docker.io"]
 ```

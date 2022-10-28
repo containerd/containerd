@@ -17,13 +17,13 @@
 package server
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
 )
 
@@ -54,9 +54,10 @@ func TestGetCgroupsPath(t *testing.T) {
 			expected:      "/test-id",
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		got := getCgroupsPath(test.cgroupsParent, testID)
-		assert.Equal(t, test.expected, got)
+		t.Run(desc, func(t *testing.T) {
+			got := getCgroupsPath(test.cgroupsParent, testID)
+			assert.Equal(t, test.expected, got)
+		})
 	}
 }
 
@@ -65,15 +66,9 @@ func TestEnsureRemoveAllWithMount(t *testing.T) {
 		t.Skip("skipping test that requires root")
 	}
 
-	dir1, err := os.MkdirTemp("", "test-ensure-removeall-with-dir1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	dir2, err := os.MkdirTemp("", "test-ensure-removeall-with-dir2")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir2)
+	var err error
+	dir1 := t.TempDir()
+	dir2 := t.TempDir()
 
 	bindDir := filepath.Join(dir1, "bind")
 	if err := os.MkdirAll(bindDir, 0755); err != nil {

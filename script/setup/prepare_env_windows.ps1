@@ -1,6 +1,11 @@
 # Prepare windows environment for building and running containerd tests
 
-$PACKAGES= @{ mingw = "10.2.0"; git = ""; golang = "1.17.5"; make = ""; nssm = "" }
+# Disable Windows Defender real time monitoring. Real time monitoring consumes a lot of
+# CPU and slows down tests as images are unarchived, and is not really needed in a short
+# lived test environment.
+Set-MpPreference -DisableRealtimeMonitoring:$true
+
+$PACKAGES= @{ mingw = "10.2.0"; git = ""; golang = "1.19.2"; make = ""; nssm = "" }
 
 Write-Host "Downloading chocolatey package"
 curl.exe -L "https://packages.chocolatey.org/chocolatey.0.10.15.nupkg" -o 'c:\choco.zip'
@@ -35,6 +40,10 @@ Write-Host $env:PATH
 
 # Prepare Log dir
 mkdir c:\Logs
+
+# Log go env for future reference:
+go env > c:\Logs\go-env.txt
+cat c:\Logs\go-env.txt
 
 # Pull junit conversion tool
 go install github.com/jstemmer/go-junit-report@v0.9.1

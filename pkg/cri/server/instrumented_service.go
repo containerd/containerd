@@ -17,11 +17,11 @@
 package server
 
 import (
+	"context"
 	"errors"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtime_alpha "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
@@ -72,7 +72,7 @@ func (in *instrumentedService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	log.G(ctx).Infof("RunPodsandbox for %+v", r.GetConfig().GetMetadata())
+	log.G(ctx).Infof("RunPodSandbox for %+v", r.GetConfig().GetMetadata())
 	defer func() {
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("RunPodSandbox for %+v failed, error", r.GetConfig().GetMetadata())
@@ -88,7 +88,7 @@ func (in *instrumentedAlphaService) RunPodSandbox(ctx context.Context, r *runtim
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	log.G(ctx).Infof("RunPodsandbox for %+v", r.GetConfig().GetMetadata())
+	log.G(ctx).Infof("RunPodSandbox for %+v", r.GetConfig().GetMetadata())
 	defer func() {
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("RunPodSandbox for %+v failed, error", r.GetConfig().GetMetadata())
@@ -1577,33 +1577,63 @@ func (in *instrumentedAlphaService) ReopenContainerLog(ctx context.Context, r *r
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
-	p, err := r.Marshal()
-	if err == nil {
-		var v1r runtime.ReopenContainerLogRequest
-		if err = v1r.Unmarshal(p); err == nil {
-			var v1res *runtime.ReopenContainerLogResponse
-			v1res, err = in.c.ReopenContainerLog(ctrdutil.WithNamespace(ctx), &v1r)
-			if v1res != nil {
-				p, perr := v1res.Marshal()
-				if perr == nil {
-					resp := &runtime_alpha.ReopenContainerLogResponse{}
-					if perr = resp.Unmarshal(p); perr == nil {
-						res = resp
-					}
-				}
-				// actual error has precidence on error returned vs parse error issues
-				if perr != nil {
-					if err == nil {
-						err = perr
-					} else {
-						// extra log entry if convert response parse error and request error
-						log.G(ctx).WithError(perr).Errorf("ReopenContainerLog for %q failed", r.GetContainerId())
-					}
-				}
+	var v1r runtime.ReopenContainerLogRequest
+	if err := alphaReqToV1Req(r, &v1r); err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var v1res *runtime.ReopenContainerLogResponse
+	v1res, err = in.c.ReopenContainerLog(ctrdutil.WithNamespace(ctx), &v1r)
+	if v1res != nil {
+		resp := &runtime_alpha.ReopenContainerLogResponse{}
+		perr := v1RespToAlphaResp(v1res, resp)
+		if perr == nil {
+			res = resp
+		} else {
+			// actual error has precidence on error returned vs parse error issues
+			if err == nil {
+				err = perr
+			} else {
+				// extra log entry if convert response parse error and request error
+				log.G(ctx).WithError(perr).Errorf("ReopenContainerLog for %q failed", r.GetContainerId())
 			}
 		}
 	}
 	return res, errdefs.ToGRPC(err)
+}
+
+func (in *instrumentedService) CheckpointContainer(ctx context.Context, r *runtime.CheckpointContainerRequest) (res *runtime.CheckpointContainerResponse, err error) {
+	if err := in.checkInitialized(); err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("CheckpointContainer failed, error")
+		} else {
+			log.G(ctx).Debug("CheckpointContainer returns successfully")
+		}
+	}()
+
+	res, err = in.c.CheckpointContainer(ctx, r)
+	return res, errdefs.ToGRPC(err)
+}
+
+func (in *instrumentedService) GetContainerEvents(r *runtime.GetEventsRequest, s runtime.RuntimeService_GetContainerEventsServer) (err error) {
+	if err := in.checkInitialized(); err != nil {
+		return err
+	}
+
+	ctx := s.Context()
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("GetContainerEvents failed, error")
+		} else {
+			log.G(ctx).Debug("GetContainerEvents returns successfully")
+		}
+	}()
+
+	err = in.c.GetContainerEvents(r, s)
+	return errdefs.ToGRPC(err)
 }
 
 func alphaReqToV1Req(

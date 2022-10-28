@@ -19,6 +19,7 @@ package metadata
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sync/atomic"
@@ -28,11 +29,11 @@ import (
 	"github.com/containerd/containerd/content/local"
 	"github.com/containerd/containerd/content/testsuite"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/namespaces"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -52,9 +53,18 @@ func createContentStore(ctx context.Context, root string, opts ...DBOpt) (contex
 		count uint64
 		name  = testsuite.Name(ctx)
 	)
-	wrap := func(ctx context.Context) (context.Context, func(context.Context) error, error) {
+	wrap := func(ctx context.Context, sharedNS bool) (context.Context, func(context.Context) error, error) {
 		n := atomic.AddUint64(&count, 1)
-		return namespaces.WithNamespace(ctx, fmt.Sprintf("%s-n%d", name, n)), func(context.Context) error {
+		ctx2 := namespaces.WithNamespace(ctx, fmt.Sprintf("%s-n%d", name, n))
+		if sharedNS {
+			db.Update(func(tx *bolt.Tx) error {
+				if ns, err := namespaces.NamespaceRequired(ctx2); err == nil {
+					return NewNamespaceStore(tx).SetLabel(ctx2, ns, labels.LabelSharedNamespace, "true")
+				}
+				return err
+			})
+		}
+		return ctx2, func(context.Context) error {
 			return nil
 		}, nil
 	}
@@ -78,11 +88,14 @@ func TestContent(t *testing.T) {
 		t, "metadata", createContentStoreWithPolicy([]DBOpt{
 			WithPolicyIsolated,
 		}...))
+	testsuite.ContentSharedNSIsolatedSuite(
+		t, "metadata", createContentStoreWithPolicy([]DBOpt{
+			WithPolicyIsolated,
+		}...))
 }
 
 func TestContentLeased(t *testing.T) {
-	ctx, db, cancel := testDB(t)
-	defer cancel()
+	ctx, db := testDB(t)
 
 	cs := db.ContentStore()
 
@@ -129,11 +142,8 @@ func TestContentLeased(t *testing.T) {
 }
 
 func TestIngestLeased(t *testing.T) {
-	ctx, db, cancel := testDB(t)
-	defer cancel()
-
+	ctx, db := testDB(t)
 	cs := db.ContentStore()
-
 	blob := []byte("any content")
 	expected := digest.FromBytes(blob)
 
@@ -190,11 +200,11 @@ func checkContentLeased(ctx context.Context, db *DB, dgst digest.Digest) error {
 	return db.View(func(tx *bolt.Tx) error {
 		bkt := getBucket(tx, bucketKeyVersion, []byte(ns), bucketKeyObjectLeases, []byte(lease), bucketKeyObjectContent)
 		if bkt == nil {
-			return errors.Wrapf(errdefs.ErrNotFound, "bucket not found %s", lease)
+			return fmt.Errorf("bucket not found %s: %w", lease, errdefs.ErrNotFound)
 		}
 		v := bkt.Get([]byte(dgst.String()))
 		if v == nil {
-			return errors.Wrap(errdefs.ErrNotFound, "object not leased")
+			return fmt.Errorf("object not leased: %w", errdefs.ErrNotFound)
 		}
 
 		return nil
@@ -214,11 +224,11 @@ func checkIngestLeased(ctx context.Context, db *DB, ref string) error {
 	return db.View(func(tx *bolt.Tx) error {
 		bkt := getBucket(tx, bucketKeyVersion, []byte(ns), bucketKeyObjectLeases, []byte(lease), bucketKeyObjectIngests)
 		if bkt == nil {
-			return errors.Wrapf(errdefs.ErrNotFound, "bucket not found %s", lease)
+			return fmt.Errorf("bucket not found %s: %w", lease, errdefs.ErrNotFound)
 		}
 		v := bkt.Get([]byte(ref))
 		if v == nil {
-			return errors.Wrap(errdefs.ErrNotFound, "object not leased")
+			return fmt.Errorf("object not leased: %w", errdefs.ErrNotFound)
 		}
 
 		return nil

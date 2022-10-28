@@ -1,3 +1,5 @@
+//go:build windows
+
 package hcn
 
 import (
@@ -27,7 +29,7 @@ type NamespaceResourceContainer struct {
 type NamespaceResourceType string
 
 var (
-	// NamespaceResourceTypeContainer are contianers associated with a Namespace.
+	// NamespaceResourceTypeContainer are containers associated with a Namespace.
 	NamespaceResourceTypeContainer NamespaceResourceType = "Container"
 	// NamespaceResourceTypeEndpoint are endpoints associated with a Namespace.
 	NamespaceResourceTypeEndpoint NamespaceResourceType = "Endpoint"
@@ -294,11 +296,11 @@ func GetNamespaceContainerIds(namespaceId string) ([]string, error) {
 	var containerIds []string
 	for _, resource := range namespace.Resources {
 		if resource.Type == "Container" {
-			var contaienrResource NamespaceResourceContainer
-			if err := json.Unmarshal([]byte(resource.Data), &contaienrResource); err != nil {
+			var containerResource NamespaceResourceContainer
+			if err := json.Unmarshal([]byte(resource.Data), &containerResource); err != nil {
 				return nil, err
 			}
-			containerIds = append(containerIds, contaienrResource.Id)
+			containerIds = append(containerIds, containerResource.Id)
 		}
 	}
 	return containerIds, nil
@@ -375,7 +377,7 @@ func (namespace *HostComputeNamespace) Sync() error {
 	}
 	shimPath := runhcs.VMPipePath(cfg.HostUniqueID)
 	if err := runhcs.IssueVMRequest(shimPath, &req); err != nil {
-		// The shim is likey gone. Simply ignore the sync as if it didn't exist.
+		// The shim is likely gone. Simply ignore the sync as if it didn't exist.
 		if perr, ok := err.(*os.PathError); ok && perr.Err == syscall.ERROR_FILE_NOT_FOUND {
 			// Remove the reg key there is no point to try again
 			_ = cfg.Remove()

@@ -32,7 +32,6 @@ func defaultMounts() []specs.Mount {
 			Destination: "/dev/fd",
 			Type:        "fdescfs",
 			Source:      "fdescfs",
-			Options:     []string{},
 		},
 	}
 }

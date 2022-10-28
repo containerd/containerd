@@ -36,7 +36,6 @@ import (
 	"github.com/moby/sys/mountinfo"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux/label"
-	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -131,7 +130,7 @@ func checkSelinuxLevel(level string) error {
 
 	matched, err := regexp.MatchString(`^s\d(-s\d)??(:c\d{1,4}(\.c\d{1,4})?(,c\d{1,4}(\.c\d{1,4})?)*)?$`, level)
 	if err != nil {
-		return errors.Wrapf(err, "the format of 'level' %q is not correct", level)
+		return fmt.Errorf("the format of 'level' %q is not correct: %w", level, err)
 	}
 	if !matched {
 		return fmt.Errorf("the format of 'level' %q is not correct", level)
@@ -241,7 +240,7 @@ func ensureRemoveAll(ctx context.Context, dir string) error {
 			return err
 		}
 		if e := mount.Unmount(pe.Path, unix.MNT_DETACH); e != nil {
-			return errors.Wrapf(e, "error while removing %s", dir)
+			return fmt.Errorf("error while removing %s: %w", dir, e)
 		}
 
 		if exitOnErr[pe.Path] == maxRetry {
@@ -271,7 +270,7 @@ func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
 	}
 	l, err := seutil.ChangeToKVM(spec.Process.SelinuxLabel)
 	if err != nil {
-		return errors.Wrap(err, "failed to get selinux kvm label")
+		return fmt.Errorf("failed to get selinux kvm label: %w", err)
 	}
 	spec.Process.SelinuxLabel = l
 	return nil

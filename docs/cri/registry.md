@@ -10,6 +10,13 @@ should now use the form
    config_path = "/etc/containerd/certs.d"
 ```
 
+- - -
+<!-- TODO: remove in containerd 2.0 -->
+
+<details>
+<summary>Show the original content (<strong>DEPRECATED</strong>)</summary>
+<p>
+
 ## Configure Registry Endpoint
 
 With containerd, `docker.io` is the default image registry. You can also set up other image registries similar to docker.
@@ -193,3 +200,6 @@ Image is up to date for sha256:78096d0a54788961ca68393e5f8038704b97d8af374249dc5
 ---
 
 NOTE: The configuration syntax used in this doc is in version 2 which is the recommended since `containerd` 1.3. For the previous config format you can reference [https://github.com/containerd/cri/blob/release/1.2/docs/registry.md](https://github.com/containerd/cri/blob/release/1.2/docs/registry.md).
+
+</p>
+</details>

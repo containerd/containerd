@@ -41,6 +41,10 @@ func (n *Network) Remove(ctx context.Context, ns *Namespace) error {
 	return n.cni.DelNetworkList(ctx, n.config, ns.config(n.ifName))
 }
 
+func (n *Network) Check(ctx context.Context, ns *Namespace) error {
+	return n.cni.CheckNetworkList(ctx, n.config, ns.config(n.ifName))
+}
+
 type Namespace struct {
 	id             string
 	path           string
