@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package containerd
+package proxy
 
 import (
 	"context"
@@ -31,8 +31,8 @@ type remoteSandboxStore struct {
 
 var _ sb.Store = (*remoteSandboxStore)(nil)
 
-// NewRemoteSandboxStore create client for sandbox store
-func NewRemoteSandboxStore(client api.StoreClient) sb.Store {
+// NewSandboxStore create a client for a sandbox store
+func NewSandboxStore(client api.StoreClient) sb.Store {
 	return &remoteSandboxStore{client: client}
 }
 

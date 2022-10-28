@@ -57,6 +57,7 @@ import (
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/sandbox"
+	sandboxproxy "github.com/containerd/containerd/sandbox/proxy"
 	"github.com/containerd/containerd/services/introspection"
 	"github.com/containerd/containerd/snapshots"
 	snproxy "github.com/containerd/containerd/snapshots/proxy"
@@ -704,7 +705,7 @@ func (c *Client) SandboxStore() sandbox.Store {
 	}
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
-	return NewRemoteSandboxStore(sandboxsapi.NewStoreClient(c.conn))
+	return sandboxproxy.NewSandboxStore(sandboxsapi.NewStoreClient(c.conn))
 }
 
 // SandboxController returns the underlying sandbox controller client
@@ -714,7 +715,7 @@ func (c *Client) SandboxController() sandbox.Controller {
 	}
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
-	return NewSandboxRemoteController(sandboxsapi.NewControllerClient(c.conn))
+	return sandboxproxy.NewSandboxController(sandboxsapi.NewControllerClient(c.conn))
 }
 
 // VersionService returns the underlying VersionClient

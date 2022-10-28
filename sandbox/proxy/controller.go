@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package containerd
+package proxy
 
 import (
 	"context"
@@ -24,19 +24,19 @@ import (
 	sb "github.com/containerd/containerd/sandbox"
 )
 
-// sandboxRemoteController is a low level GRPC client for containerd's sandbox controller service
-type sandboxRemoteController struct {
+// remoteSandboxController is a low level GRPC client for containerd's sandbox controller service
+type remoteSandboxController struct {
 	client api.ControllerClient
 }
 
-var _ sb.Controller = (*sandboxRemoteController)(nil)
+var _ sb.Controller = (*remoteSandboxController)(nil)
 
-// NewSandboxRemoteController creates client for sandbox controller
-func NewSandboxRemoteController(client api.ControllerClient) sb.Controller {
-	return &sandboxRemoteController{client: client}
+// NewSandboxController creates a client for a sandbox controller
+func NewSandboxController(client api.ControllerClient) sb.Controller {
+	return &remoteSandboxController{client: client}
 }
 
-func (s *sandboxRemoteController) Create(ctx context.Context, sandboxID string) error {
+func (s *remoteSandboxController) Create(ctx context.Context, sandboxID string) error {
 	_, err := s.client.Create(ctx, &api.ControllerCreateRequest{SandboxID: sandboxID})
 	if err != nil {
 		return errdefs.FromGRPC(err)
@@ -45,7 +45,7 @@ func (s *sandboxRemoteController) Create(ctx context.Context, sandboxID string) 
 	return nil
 }
 
-func (s *sandboxRemoteController) Start(ctx context.Context, sandboxID string) (*api.ControllerStartResponse, error) {
+func (s *remoteSandboxController) Start(ctx context.Context, sandboxID string) (*api.ControllerStartResponse, error) {
 	resp, err := s.client.Start(ctx, &api.ControllerStartRequest{SandboxID: sandboxID})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
@@ -54,7 +54,7 @@ func (s *sandboxRemoteController) Start(ctx context.Context, sandboxID string) (
 	return resp, nil
 }
 
-func (s *sandboxRemoteController) Stop(ctx context.Context, sandboxID string) (*api.ControllerStopResponse, error) {
+func (s *remoteSandboxController) Stop(ctx context.Context, sandboxID string) (*api.ControllerStopResponse, error) {
 	resp, err := s.client.Stop(ctx, &api.ControllerStopRequest{SandboxID: sandboxID})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
@@ -63,7 +63,7 @@ func (s *sandboxRemoteController) Stop(ctx context.Context, sandboxID string) (*
 	return resp, nil
 }
 
-func (s *sandboxRemoteController) Delete(ctx context.Context, sandboxID string) (*api.ControllerDeleteResponse, error) {
+func (s *remoteSandboxController) Delete(ctx context.Context, sandboxID string) (*api.ControllerDeleteResponse, error) {
 	resp, err := s.client.Delete(ctx, &api.ControllerDeleteRequest{SandboxID: sandboxID})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
@@ -72,7 +72,7 @@ func (s *sandboxRemoteController) Delete(ctx context.Context, sandboxID string) 
 	return resp, nil
 }
 
-func (s *sandboxRemoteController) Wait(ctx context.Context, sandboxID string) (*api.ControllerWaitResponse, error) {
+func (s *remoteSandboxController) Wait(ctx context.Context, sandboxID string) (*api.ControllerWaitResponse, error) {
 	resp, err := s.client.Wait(ctx, &api.ControllerWaitRequest{SandboxID: sandboxID})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
@@ -81,7 +81,7 @@ func (s *sandboxRemoteController) Wait(ctx context.Context, sandboxID string) (*
 	return resp, nil
 }
 
-func (s *sandboxRemoteController) Status(ctx context.Context, sandboxID string) (*api.ControllerStatusResponse, error) {
+func (s *remoteSandboxController) Status(ctx context.Context, sandboxID string) (*api.ControllerStatusResponse, error) {
 	resp, err := s.client.Status(ctx, &api.ControllerStatusRequest{SandboxID: sandboxID})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
