@@ -55,6 +55,8 @@ type hostConfig struct {
 	header http.Header
 
 	// TODO: Add credential configuration (domain alias, username)
+	username string
+	password string
 }
 
 // HostOptions is used to configure registry hosts
@@ -167,6 +169,19 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			rhosts[i].Path = host.path
 			rhosts[i].Capabilities = host.capabilities
 			rhosts[i].Header = host.header
+
+			if host.username != "" && host.password != "" {
+				credentials := func(index int) func(string) (string, string, error) {
+					return func(h string) (string, string, error) {
+						if h != hosts[index].host {
+							return "", "", nil
+						}
+						return hosts[index].username, hosts[index].password, nil
+					}
+				}
+
+				authOpts = append(authOpts, docker.WithAuthCreds(credentials(i)))
+			}
 
 			if host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil {
 				tr := defaultTransport.Clone()
@@ -322,6 +337,12 @@ type hostFileConfig struct {
 	OverridePath bool `toml:"override_path"`
 
 	// TODO: Credentials: helper? name? username? alternate domain? token?
+
+	// Username is the username used to authenticate to the server
+	Username string `toml:"username"`
+
+	// Password is the password used to authenticaate to the server
+	Password string `toml:"password"`
 }
 
 func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
@@ -488,6 +509,11 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 			}
 		}
 		result.header = header
+	}
+
+	if config.Username != "" && config.Password != "" {
+		result.username = config.Username
+		result.password = config.Password
 	}
 
 	return result, nil
