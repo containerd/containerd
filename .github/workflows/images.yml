@@ -9,7 +9,7 @@ on:
       image:
         description: "Target image name (override)"
 
-permissions:  # added using https://github.com/step-security/secure-workflows
+permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
 
 jobs:
@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v3
         with:
-          go-version: '1.19.2'
+          go-version: "1.19.3"
 
       - uses: actions/checkout@v3
         with:

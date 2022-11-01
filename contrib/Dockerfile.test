@@ -10,7 +10,7 @@
 #
 # docker build -t containerd-test --build-arg RUNC_VERSION=v1.0.0-rc94 -f Dockerfile.test ../
 
-ARG GOLANG_VERSION=1.19.2
+ARG GOLANG_VERSION=1.19.3
 ARG GOLANG_IMAGE=golang
 
 FROM ${GOLANG_IMAGE}:${GOLANG_VERSION} AS golang
@@ -19,7 +19,7 @@ FROM ${GOLANG_IMAGE}:${GOLANG_VERSION} AS golang
 FROM golang AS runc
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libseccomp-dev \
- && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 COPY script/setup/runc-version script/setup/install-runc ./
 # Allow overriding the version of runc to install through build-args
@@ -34,7 +34,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     btrfs-progs \
     libseccomp-dev \
     xfsprogs \
- && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /go/src/github.com/containerd/containerd
 WORKDIR /go/src/github.com/containerd/containerd
 
@@ -62,7 +62,7 @@ RUN make BUILDTAGS="no_btrfs no_devmapper" binaries install
 FROM build-env AS cri-in-userns
 RUN apt-get update && apt-get install -y --no-install-recommends \
     iptables \
- && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 COPY contrib/Dockerfile.test.d/cri-in-userns/etc_containerd_config.toml /etc/containerd/config.toml
 COPY contrib/Dockerfile.test.d/cri-in-userns/docker-entrypoint.sh       /docker-entrypoint.sh
 COPY --from=runc       /build/ /
@@ -85,13 +85,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     g++ \
     libtool \
     unzip \
- && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 COPY script/setup/install-protobuf install-protobuf
 RUN ./install-protobuf \
- && mkdir -p $DESTDIR/usr/local/bin $DESTDIR/usr/local/include \
- && mv /usr/local/bin/protoc $DESTDIR/usr/local/bin/protoc \
- && mv /usr/local/include/google $DESTDIR/usr/local/include/google
+    && mkdir -p $DESTDIR/usr/local/bin $DESTDIR/usr/local/include \
+    && mv /usr/local/bin/protoc $DESTDIR/usr/local/bin/protoc \
+    && mv /usr/local/include/google $DESTDIR/usr/local/include/google
 
 FROM build-env AS dev
 COPY --from=proto3 /build/ /
