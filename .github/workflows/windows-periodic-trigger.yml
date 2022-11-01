@@ -7,9 +7,16 @@ on:
   schedule:
     - cron: "0 1 * * *"
 
+permissions:  # added using https://github.com/step-security/secure-workflows
+  contents: read
+
 jobs:
 
   triggerWinIntegration:
+    # NOTE: the following permissions are required by `google-github-actions/auth`:
+    permissions:
+      contents: 'read'
+      id-token: 'write'
     if: github.repository == 'containerd/containerd'
     # NOTE(aznashwan, 11/24/21): GitHub actions do not currently support referencing
     # or evaluating any kind of variables in the `uses` clause, but this will
