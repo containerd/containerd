@@ -40,6 +40,7 @@ compile_fuzzers() {
 
 # This is from https://github.com/AdamKorcz/instrumentation
 cd $SRC/instrumentation
+git checkout cca41747087a403a1dfcbdf064e52d3e073d174f
 go run main.go $SRC/containerd/images
 
 apt-get update && apt-get install -y wget
