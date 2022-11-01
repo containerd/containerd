@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/sandbox"
+	"github.com/containerd/containerd/sandbox/proxy"
 	srv "github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/services/introspection"
 	"github.com/containerd/containerd/snapshots"
@@ -167,14 +168,14 @@ func WithIntrospectionService(in introspection.Service) ServicesOpt {
 // WithSandboxStore sets the sandbox store.
 func WithSandboxStore(client sandboxapi.StoreClient) ServicesOpt {
 	return func(s *services) {
-		s.sandboxStore = NewRemoteSandboxStore(client)
+		s.sandboxStore = proxy.NewSandboxStore(client)
 	}
 }
 
 // WithSandboxController sets the sandbox controller.
 func WithSandboxController(client sandboxapi.ControllerClient) ServicesOpt {
 	return func(s *services) {
-		s.sandboxController = NewSandboxRemoteController(client)
+		s.sandboxController = proxy.NewSandboxController(client)
 	}
 }
 
