@@ -200,7 +200,12 @@ func NewDebugClientTrace(ctx gocontext.Context) *httptrace.ClientTrace {
 			}
 		},
 		GotConn: func(connInfo httptrace.GotConnInfo) {
-			log.G(ctx).WithField("reused", connInfo.Reused).WithField("remote_addr", connInfo.Conn.RemoteAddr().String()).Debugf("Connection successful")
+			remoteAddr := "<nil>"
+			if addr := connInfo.Conn.RemoteAddr(); addr != nil {
+				remoteAddr = addr.String()
+			}
+
+			log.G(ctx).WithField("reused", connInfo.Reused).WithField("remote_addr", remoteAddr).Debugf("Connection successful")
 		},
 	}
 }
