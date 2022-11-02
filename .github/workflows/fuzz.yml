@@ -1,5 +1,8 @@
 name: Fuzzing
 on: [pull_request]
+permissions:  # added using https://github.com/step-security/secure-workflows
+  contents: read
+
 jobs:
   # Run all fuzzing tests. Some of them use Go 1.18's testing.F.
   # Others use https://github.com/AdaLogics/go-fuzz-headers.

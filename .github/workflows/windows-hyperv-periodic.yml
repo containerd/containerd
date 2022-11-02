@@ -28,6 +28,8 @@ env:
   WEBSERVER_TESTING_IMAGE_REF: "k8s.gcr.io/e2e-test-images/nginx:1.14-2"
   HCSSHIM_TAG: "master"
 
+permissions:  # added using https://github.com/step-security/secure-workflows
+  contents: read
 
 jobs:
   winIntegration:
