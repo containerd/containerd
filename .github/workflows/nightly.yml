@@ -1,15 +1,15 @@
 name: Nightly
 on:
   schedule:
-    - cron: '0 0 * * *' # Every day at midnight
+    - cron: "0 0 * * *" # Every day at midnight
   pull_request:
     paths:
-      - '.github/workflows/nightly.yml'
+      - ".github/workflows/nightly.yml"
 
 env:
-  GO_VERSION: '1.19.2'
+  GO_VERSION: "1.19.3"
 
-permissions:  # added using https://github.com/step-security/secure-workflows
+permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
 
 jobs:

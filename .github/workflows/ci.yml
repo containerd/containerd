@@ -12,9 +12,9 @@ on:
 env:
   # Go version we currently use to build containerd across all CI.
   # Note: don't forget to update `Binaries` step, as it contains the matrix of all supported Go versions.
-  GO_VERSION: "1.19.2"
+  GO_VERSION: "1.19.3"
 
-permissions:  # added using https://github.com/step-security/secure-workflows
+permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
 
 jobs:
@@ -23,8 +23,8 @@ jobs:
   #
   linters:
     permissions:
-      contents: read  # for actions/checkout to fetch code
-      pull-requests: read  # for golangci/golangci-lint-action to fetch pull requests
+      contents: read # for actions/checkout to fetch code
+      pull-requests: read # for golangci/golangci-lint-action to fetch pull requests
     name: Linters
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
@@ -231,7 +231,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-20.04, macos-12, windows-2019, windows-2022]
-        go-version: ["1.19.2", "1.18.7"]
+        go-version: ["1.19.3", "1.18.8"]
     steps:
       - name: Install dependencies
         if: matrix.os == 'ubuntu-20.04'

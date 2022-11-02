@@ -25,8 +25,7 @@ compile_fuzzers() {
     local compile_fuzzer=$2
     local blocklist=$3
 
-    for line in $(git grep --full-name "$regex" | grep -v -E "$blocklist")
-    do
+    for line in $(git grep --full-name "$regex" | grep -v -E "$blocklist"); do
         if [[ "$line" =~ (.*)/.*:.*(Fuzz[A-Za-z0-9]+) ]]; then
             local pkg=${BASH_REMATCH[1]}
             local func=${BASH_REMATCH[2]}
@@ -44,11 +43,11 @@ go run main.go $SRC/containerd/images
 
 apt-get update && apt-get install -y wget
 cd $SRC
-wget --quiet https://go.dev/dl/go1.19.2.linux-amd64.tar.gz
+wget --quiet https://go.dev/dl/go1.19.3.linux-amd64.tar.gz
 
 mkdir temp-go
 rm -rf /root/.go/*
-tar -C temp-go/ -xzf go1.19.2.linux-amd64.tar.gz
+tar -C temp-go/ -xzf go1.19.3.linux-amd64.tar.gz
 mv temp-go/go/* /root/.go/
 cd $SRC/containerd
 
