@@ -80,7 +80,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			}
 			exportOpts = append(exportOpts, archive.WithPlatform(platforms.Ordered(all...)))
 		} else {
-			exportOpts = append(exportOpts, archive.WithPlatform(platforms.Default()))
+			exportOpts = append(exportOpts, archive.WithPlatform(platforms.DefaultStrict()))
 		}
 
 		if context.Bool("all-platforms") {
