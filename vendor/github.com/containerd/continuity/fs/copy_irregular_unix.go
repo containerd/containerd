@@ -1,4 +1,5 @@
-// +build linux openbsd
+//go:build !windows && !freebsd
+// +build !windows,!freebsd
 
 /*
    Copyright The containerd Authors.
@@ -19,27 +20,21 @@
 package fs
 
 import (
+	"fmt"
+	"os"
 	"syscall"
-	"time"
 )
 
-// StatAtime returns the Atim
-func StatAtime(st *syscall.Stat_t) syscall.Timespec {
-	return st.Atim
-}
-
-// StatCtime returns the Ctim
-func StatCtime(st *syscall.Stat_t) syscall.Timespec {
-	return st.Ctim
-}
-
-// StatMtime returns the Mtim
-func StatMtime(st *syscall.Stat_t) syscall.Timespec {
-	return st.Mtim
-}
-
-// StatATimeAsTime returns st.Atim as a time.Time
-func StatATimeAsTime(st *syscall.Stat_t) time.Time {
-	// The int64 conversions ensure the line compiles for 32-bit systems as well.
-	return time.Unix(int64(st.Atim.Sec), int64(st.Atim.Nsec)) // nolint: unconvert
+// copyIrregular covers devices, pipes, and sockets
+func copyIrregular(dst string, fi os.FileInfo) error {
+	st, ok := fi.Sys().(*syscall.Stat_t) // not *unix.Stat_t
+	if !ok {
+		return fmt.Errorf("unsupported stat type: %s: %v", dst, fi.Mode())
+	}
+	var rDev int
+	if fi.Mode()&os.ModeDevice == os.ModeDevice {
+		rDev = int(st.Rdev)
+	}
+	//nolint:unconvert
+	return syscall.Mknod(dst, uint32(st.Mode), rDev)
 }
