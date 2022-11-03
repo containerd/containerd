@@ -189,6 +189,9 @@ process:
 	```console
 	$ git cherry-pick -xsS <commit>
 	```
+   (Optional) If other commits exist in the main branch which are related
+   to the cherry-picked commit; eg: fixes to the main PR. It is recommended
+   to cherry-pick those commits also into this same `my-backport-branch`.
 4. Push the branch and open up a PR against the _release branch_:
 
 	```
