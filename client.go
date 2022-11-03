@@ -825,7 +825,7 @@ func CheckRuntime(current, expected string) bool {
 	cp := strings.Split(current, ".")
 	l := len(cp)
 	for i, p := range strings.Split(expected, ".") {
-		if i > l {
+		if i > l-1 {
 			return false
 		}
 		if p != cp[i] {
