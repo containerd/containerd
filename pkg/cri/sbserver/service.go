@@ -27,12 +27,14 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	sandboxapi "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/cri/sbserver/podsandbox"
 	"github.com/containerd/containerd/pkg/cri/streaming"
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/sandbox"
+	"github.com/containerd/containerd/sandbox/proxy"
 	"github.com/containerd/go-cni"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -90,8 +92,9 @@ type criService struct {
 	sandboxNameIndex *registrar.Registrar
 	// containerStore stores all resources associated with containers.
 	containerStore *containerstore.Store
-	// sandboxController controls sandbox lifecycle (and hides implementation details behind).
-	sandboxController sandbox.Controller
+	// sandboxControllers contains different sandbox controller type,
+	// every controller controls sandbox lifecycle (and hides implementation details behind).
+	sandboxControllers map[criconfig.SandboxControllerMode]sandbox.Controller
 	// containerNameIndex stores all container names and make sure each
 	// name is unique.
 	containerNameIndex *registrar.Registrar
@@ -141,6 +144,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 		initialized:                 atomic.NewBool(false),
 		netPlugin:                   make(map[string]cni.CNI),
 		unpackDuplicationSuppressor: kmutex.New(),
+		sandboxControllers:          make(map[criconfig.SandboxControllerMode]sandbox.Controller),
 	}
 
 	if client.SnapshotService(c.config.ContainerdConfig.Snapshotter) == nil {
@@ -185,7 +189,9 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 		return nil, err
 	}
 
-	c.sandboxController = podsandbox.New(config, client, c.sandboxStore, c.os, c, c.baseOCISpecs)
+	// Load all sandbox controllers(pod sandbox controller and remote shim controller)
+	c.sandboxControllers[criconfig.ModePodSandbox] = podsandbox.New(config, client, c.sandboxStore, c.os, c, c.baseOCISpecs)
+	c.sandboxControllers[criconfig.ModeShim] = proxy.NewSandboxController(sandboxapi.NewControllerClient(client.Conn()))
 
 	return c, nil
 }
@@ -378,4 +384,17 @@ func loadBaseOCISpecs(config *criconfig.Config) (map[string]*oci.Spec, error) {
 	}
 
 	return specs, nil
+}
+
+// ValidateMode validate the given mod value,
+// returns err if mod is empty or unknown
+func ValidateMode(modeStr string) error {
+	switch modeStr {
+	case string(criconfig.ModePodSandbox), string(criconfig.ModeShim):
+		return nil
+	case "":
+		return fmt.Errorf("empty sandbox controller mode")
+	default:
+		return fmt.Errorf("unknown sandbox controller mode: %s", modeStr)
+	}
 }
