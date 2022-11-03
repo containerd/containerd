@@ -42,7 +42,6 @@ import (
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
-	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
@@ -166,8 +165,8 @@ func (u *Unpacker) Unpack(h images.Handler) images.Handler {
 		ctx, span := tracing.StartSpan(ctx, "pkg.unpack.unpacker.UnpackHandler")
 		defer span.End()
 		span.SetAttributes(
-			attribute.String("descriptor.media.type", desc.MediaType),
-			attribute.String("descriptor.digest", desc.Digest.String()))
+			tracing.SpanAttribute("descriptor.media.type", desc.MediaType),
+			tracing.SpanAttribute("descriptor.digest", desc.Digest.String()))
 		unlock, err := u.lockBlobDescriptor(ctx, desc)
 		if err != nil {
 			return nil, err
@@ -186,7 +185,7 @@ func (u *Unpacker) Unpack(h images.Handler) images.Handler {
 			// the config
 			for i, child := range children {
 				span.SetAttributes(
-					attribute.StringSlice("descriptor.child."+strconv.Itoa(i), []string{child.MediaType, child.Digest.String()}),
+					tracing.SpanAttribute("descriptor.child."+strconv.Itoa(i), []string{child.MediaType, child.Digest.String()}),
 				)
 				if images.IsLayerType(child.MediaType) {
 					manifestLayers = append(manifestLayers, child)
@@ -412,9 +411,9 @@ func (u *Unpacker) unpack(
 	for i, desc := range layers {
 		_, layerSpan := tracing.StartSpan(ctx, "pkg.unpack.unpacker.unpackLayer")
 		layerSpan.SetAttributes(
-			attribute.String("layer.media.type", desc.MediaType),
-			attribute.Int64("layer.media.size", desc.Size),
-			attribute.String("layer.media.digest", desc.Digest.String()),
+			tracing.SpanAttribute("layer.media.type", desc.MediaType),
+			tracing.SpanAttribute("layer.media.size", desc.Size),
+			tracing.SpanAttribute("layer.media.digest", desc.Digest.String()),
 		)
 		if err := doUnpackFn(i, desc); err != nil {
 			layerSpan.RecordError(err)
@@ -448,9 +447,9 @@ func (u *Unpacker) fetch(ctx context.Context, h images.Handler, layers []ocispec
 	for i, desc := range layers {
 		ctx2, layerSpan := tracing.StartSpan(ctx2, "pkg.unpack.unpacker.fetchLayer")
 		layerSpan.SetAttributes(
-			attribute.String("layer.media.type", desc.MediaType),
-			attribute.Int64("layer.media.size", desc.Size),
-			attribute.String("layer.media.digest", desc.Digest.String()),
+			tracing.SpanAttribute("layer.media.type", desc.MediaType),
+			tracing.SpanAttribute("layer.media.size", desc.Size),
+			tracing.SpanAttribute("layer.media.digest", desc.Digest.String()),
 		)
 		desc := desc
 		i := i

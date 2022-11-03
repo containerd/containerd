@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -51,4 +52,8 @@ func SetSpanStatus(span trace.Span, err error) {
 	} else {
 		span.SetStatus(codes.Ok, "")
 	}
+}
+
+func SpanAttribute(k string, v interface{}) attribute.KeyValue {
+	return any(k, v)
 }

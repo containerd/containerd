@@ -30,7 +30,6 @@ import (
 	"github.com/containerd/containerd/remotes/docker/schema1" //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 	"github.com/containerd/containerd/tracing"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -64,11 +63,11 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 	}
 
 	span.SetAttributes(
-		attribute.String("image.ref", ref),
-		attribute.Bool("unpack", pullCtx.Unpack),
-		attribute.Int("max.concurrent.downloads", pullCtx.MaxConcurrentDownloads),
-		attribute.Int("max.concurrent.upload.layers", pullCtx.MaxConcurrentUploadedLayers),
-		attribute.Int("platforms.count", len(pullCtx.Platforms)),
+		tracing.SpanAttribute("image.ref", ref),
+		tracing.SpanAttribute("unpack", pullCtx.Unpack),
+		tracing.SpanAttribute("max.concurrent.downloads", pullCtx.MaxConcurrentDownloads),
+		tracing.SpanAttribute("max.concurrent.upload.layers", pullCtx.MaxConcurrentUploadedLayers),
+		tracing.SpanAttribute("platforms.count", len(pullCtx.Platforms)),
 	)
 
 	ctx, done, err := c.WithLease(ctx)
@@ -84,7 +83,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		if err != nil {
 			return nil, fmt.Errorf("unable to resolve snapshotter: %w", err)
 		}
-		span.SetAttributes(attribute.String("snapshotter.name", snapshotterName))
+		span.SetAttributes(tracing.SpanAttribute("snapshotter.name", snapshotterName))
 		var uconfig UnpackConfig
 		for _, opt := range pullCtx.UnpackOpts {
 			if err := opt(ctx, &uconfig); err != nil {
@@ -157,7 +156,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 	}
 
 	i := NewImageWithPlatform(c, img, pullCtx.PlatformMatcher)
-	span.SetAttributes(attribute.String("image.ref", i.Name()))
+	span.SetAttributes(tracing.SpanAttribute("image.ref", i.Name()))
 
 	if unpacker != nil && ur.Unpacks == 0 {
 		// Unpack was tried previously but nothing was unpacked

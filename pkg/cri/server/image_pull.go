@@ -36,7 +36,6 @@ import (
 	"github.com/containerd/imgcrypt"
 	"github.com/containerd/imgcrypt/images/encryption"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"go.opentelemetry.io/otel/attribute"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd"
@@ -137,8 +136,8 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	}
 	log.G(ctx).Debugf("PullImage %q with snapshotter %s", ref, snapshotter)
 	span.SetAttributes(
-		attribute.String("image.ref", ref),
-		attribute.String("snapshotter.name", snapshotter),
+		tracing.SpanAttribute("image.ref", ref),
+		tracing.SpanAttribute("snapshotter.name", snapshotter),
 	)
 	pullOpts := []containerd.RemoteOpt{
 		containerd.WithSchema1Conversion, //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.

@@ -25,7 +25,6 @@ import (
 	"github.com/containerd/containerd/log"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	"github.com/containerd/containerd/tracing"
-	"go.opentelemetry.io/otel/attribute"
 
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -45,7 +44,7 @@ func (c *criService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequ
 		}
 		return nil, fmt.Errorf("can not resolve %q locally: %w", r.GetImage().GetImage(), err)
 	}
-	span.SetAttributes(attribute.String("image.id", image.ID))
+	span.SetAttributes(tracing.SpanAttribute("image.id", image.ID))
 	// TODO(random-liu): [P0] Make sure corresponding snapshot exists. What if snapshot
 	// doesn't exist?
 
