@@ -38,13 +38,15 @@ import (
 	"fmt"
 	"time"
 
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
 	internalapi "github.com/containerd/containerd/integration/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/integration/remote/util"
 )
 
@@ -69,7 +71,8 @@ func NewImageService(endpoint string, connectionTimeout time.Duration) (internal
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
-	)
+		grpc.WithInitialWindowSize(defaults.DefaultWindowSize),
+		grpc.WithInitialConnWindowSize(defaults.DefaultConnWindowSize))
 	if err != nil {
 		klog.Errorf("Connect remote image service %s failed: %v", addr, err)
 		return nil, err

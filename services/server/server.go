@@ -128,6 +128,8 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			grpc_prometheus.UnaryServerInterceptor,
 			unaryNamespaceInterceptor,
 		)),
+		grpc.InitialWindowSize(defaults.DefaultWindowSize),
+		grpc.InitialConnWindowSize(defaults.DefaultConnWindowSize),
 	}
 	if config.GRPC.MaxRecvMsgSize > 0 {
 		serverOpts = append(serverOpts, grpc.MaxRecvMsgSize(config.GRPC.MaxRecvMsgSize))
@@ -463,6 +465,8 @@ func (pc *proxyClients) getClient(address string) (*grpc.ClientConn, error) {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithConnectParams(connParams),
 		grpc.WithContextDialer(dialer.ContextDialer),
+		grpc.WithInitialWindowSize(defaults.DefaultWindowSize),
+		grpc.WithInitialConnWindowSize(defaults.DefaultConnWindowSize),
 
 		// TODO(stevvooe): We may need to allow configuration of this on the client.
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(defaults.DefaultMaxRecvMsgSize)),

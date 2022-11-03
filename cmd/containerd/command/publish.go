@@ -25,6 +25,7 @@ import (
 	"time"
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
+	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/dialer"
@@ -105,6 +106,8 @@ func connect(address string, d func(gocontext.Context, string) (net.Conn, error)
 		grpc.WithContextDialer(d),
 		grpc.FailOnNonTempDialError(true),
 		grpc.WithConnectParams(connParams),
+		grpc.WithInitialWindowSize(defaults.DefaultWindowSize),
+		grpc.WithInitialConnWindowSize(defaults.DefaultConnWindowSize),
 	}
 	ctx, cancel := gocontext.WithTimeout(gocontext.Background(), 2*time.Second)
 	defer cancel()

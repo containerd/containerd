@@ -126,6 +126,8 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 			grpc.WithConnectParams(connParams),
 			grpc.WithContextDialer(dialer.ContextDialer),
 			grpc.WithReturnConnectionError(),
+			grpc.WithInitialWindowSize(defaults.DefaultWindowSize),
+			grpc.WithInitialConnWindowSize(defaults.DefaultConnWindowSize),
 		}
 		if len(copts.dialOptions) > 0 {
 			gopts = copts.dialOptions

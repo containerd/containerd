@@ -29,4 +29,12 @@ const (
 	// DefaultSnapshotterNSLabel defines the namespace label to check for the
 	// default snapshotter
 	DefaultSnapshotterNSLabel = "containerd.io/defaults/snapshotter"
+	// DefaultWindowSize defines the default window size for stream
+	// issue: https://github.com/containerd/containerd/issues/6190
+	// reference： https://github.com/earthly/buildkit/pull/42/files
+	DefaultWindowSize = 2 << 20
+	// DefaultConnWindowSize defines the default window size for a connection
+	// issue: https://github.com/containerd/containerd/issues/6190
+	// reference： https://github.com/earthly/buildkit/pull/42/files
+	DefaultConnWindowSize = 2 << 19
 )
