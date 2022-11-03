@@ -24,16 +24,18 @@ import (
 	"path/filepath"
 )
 
-func hostPaths(root, host string) []string {
+func hostPaths(root, host string) (hosts []string) {
 	ch := hostDirectory(host)
-	if ch == host {
-		return []string{filepath.Join(root, host)}
+	if ch != host {
+		hosts = append(hosts, filepath.Join(root, ch))
 	}
 
-	return []string{
-		filepath.Join(root, ch),
+	hosts = append(hosts,
 		filepath.Join(root, host),
-	}
+		filepath.Join(root, "_default"),
+	)
+
+	return
 }
 
 func rootSystemPool() (*x509.CertPool, error) {
