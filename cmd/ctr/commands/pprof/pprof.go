@@ -56,10 +56,18 @@ var Command = cli.Command{
 var pprofGoroutinesCommand = cli.Command{
 	Name:  "goroutines",
 	Usage: "dump goroutine stack dump",
+	Flags: []cli.Flag{
+		cli.UintFlag{
+			Name:  "debug",
+			Usage: "debug pprof args",
+			Value: 2,
+		},
+	},
 	Action: func(context *cli.Context) error {
 		client := getPProfClient(context)
 
-		output, err := httpGetRequest(client, "/debug/pprof/goroutine?debug=2")
+		debug := context.Uint("debug")
+		output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/goroutine?debug=%d", debug))
 		if err != nil {
 			return err
 		}
@@ -72,10 +80,18 @@ var pprofGoroutinesCommand = cli.Command{
 var pprofHeapCommand = cli.Command{
 	Name:  "heap",
 	Usage: "dump heap profile",
+	Flags: []cli.Flag{
+		cli.UintFlag{
+			Name:  "debug",
+			Usage: "debug pprof args",
+			Value: 0,
+		},
+	},
 	Action: func(context *cli.Context) error {
 		client := getPProfClient(context)
 
-		output, err := httpGetRequest(client, "/debug/pprof/heap")
+		debug := context.Uint("debug")
+		output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/heap?debug=%d", debug))
 		if err != nil {
 			return err
 		}
@@ -94,12 +110,18 @@ var pprofProfileCommand = cli.Command{
 			Usage: "duration for collection (seconds)",
 			Value: 30 * time.Second,
 		},
+		cli.UintFlag{
+			Name:  "debug",
+			Usage: "debug pprof args",
+			Value: 0,
+		},
 	},
 	Action: func(context *cli.Context) error {
 		client := getPProfClient(context)
 
 		seconds := context.Duration("seconds").Seconds()
-		output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/profile?seconds=%v", seconds))
+		debug := context.Uint("debug")
+		output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/profile?seconds=%v&debug=%d", seconds, debug))
 		if err != nil {
 			return err
 		}
@@ -118,12 +140,18 @@ var pprofTraceCommand = cli.Command{
 			Usage: "trace time (seconds)",
 			Value: 5 * time.Second,
 		},
+		cli.UintFlag{
+			Name:  "debug",
+			Usage: "debug pprof args",
+			Value: 0,
+		},
 	},
 	Action: func(context *cli.Context) error {
 		client := getPProfClient(context)
 
 		seconds := context.Duration("seconds").Seconds()
-		uri := fmt.Sprintf("/debug/pprof/trace?seconds=%v", seconds)
+		debug := context.Uint("debug")
+		uri := fmt.Sprintf("/debug/pprof/trace?seconds=%v&debug=%d", seconds, debug)
 		output, err := httpGetRequest(client, uri)
 		if err != nil {
 			return err
@@ -137,10 +165,18 @@ var pprofTraceCommand = cli.Command{
 var pprofBlockCommand = cli.Command{
 	Name:  "block",
 	Usage: "goroutine blocking profile",
+	Flags: []cli.Flag{
+		cli.UintFlag{
+			Name:  "debug",
+			Usage: "debug pprof args",
+			Value: 0,
+		},
+	},
 	Action: func(context *cli.Context) error {
 		client := getPProfClient(context)
 
-		output, err := httpGetRequest(client, "/debug/pprof/block")
+		debug := context.Uint("debug")
+		output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/block?debug=%d", debug))
 		if err != nil {
 			return err
 		}
@@ -153,10 +189,18 @@ var pprofBlockCommand = cli.Command{
 var pprofThreadcreateCommand = cli.Command{
 	Name:  "threadcreate",
 	Usage: "goroutine thread creating profile",
+	Flags: []cli.Flag{
+		cli.UintFlag{
+			Name:  "debug",
+			Usage: "debug pprof args",
+			Value: 0,
+		},
+	},
 	Action: func(context *cli.Context) error {
 		client := getPProfClient(context)
 
-		output, err := httpGetRequest(client, "/debug/pprof/threadcreate")
+		debug := context.Uint("debug")
+		output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/threadcreate?debug=%d", debug))
 		if err != nil {
 			return err
 		}
