@@ -310,16 +310,16 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 
 		joinNs := context.StringSlice("with-ns")
 		for _, ns := range joinNs {
-			parts := strings.Split(ns, ":")
-			if len(parts) != 2 {
+			nsType, nsPath, ok := strings.Cut(ns, ":")
+			if !ok {
 				return nil, errors.New("joining a Linux namespace using --with-ns requires the format 'nstype:path'")
 			}
-			if !validNamespace(parts[0]) {
-				return nil, errors.New("the Linux namespace type specified in --with-ns is not valid: " + parts[0])
+			if !validNamespace(nsType) {
+				return nil, errors.New("the Linux namespace type specified in --with-ns is not valid: " + nsType)
 			}
 			opts = append(opts, oci.WithLinuxNamespace(specs.LinuxNamespace{
-				Type: specs.LinuxNamespaceType(parts[0]),
-				Path: parts[1],
+				Type: specs.LinuxNamespaceType(nsType),
+				Path: nsPath,
 			}))
 		}
 		if context.IsSet("gpus") {
@@ -457,7 +457,8 @@ func getNewTaskOpts(context *cli.Context) []containerd.NewTaskOpts {
 }
 
 func parseIDMapping(mapping string) (specs.LinuxIDMapping, error) {
-	parts := strings.Split(mapping, ":")
+	// We expect 3 parts, but limit to 4 to allow detection of invalid values.
+	parts := strings.SplitN(mapping, ":", 4)
 	if len(parts) != 3 {
 		return specs.LinuxIDMapping{}, errors.New("user namespace mappings require the format `container-id:host-id:size`")
 	}

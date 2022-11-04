@@ -243,15 +243,15 @@ func WithDevices(config *runtime.ContainerConfig) oci.SpecOpts {
 
 			hostPath := device.HostPath
 			if strings.HasPrefix(hostPath, "class/") {
-				hostPath = strings.Replace(hostPath, "class/", "class://", 1)
+				hostPath = "class://" + strings.TrimPrefix(hostPath, "class/")
 			}
 
-			splitParts := strings.SplitN(hostPath, "://", 2)
-			if len(splitParts) != 2 {
+			idType, id, ok := strings.Cut(hostPath, "://")
+			if !ok {
 				return fmt.Errorf("unrecognised HostPath format %v, must match IDType://ID", device.HostPath)
 			}
 
-			o := oci.WithWindowsDevice(splitParts[0], splitParts[1])
+			o := oci.WithWindowsDevice(idType, id)
 			if err := o(ctx, client, c, s); err != nil {
 				return fmt.Errorf("failed adding device with HostPath %v: %w", device.HostPath, err)
 			}

@@ -187,23 +187,23 @@ func replaceOrAppendEnvValues(defaults, overrides []string) []string {
 	cache := make(map[string]int, len(defaults))
 	results := make([]string, 0, len(defaults))
 	for i, e := range defaults {
-		parts := strings.SplitN(e, "=", 2)
+		k, _, _ := strings.Cut(e, "=")
 		results = append(results, e)
-		cache[parts[0]] = i
+		cache[k] = i
 	}
 
 	for _, value := range overrides {
 		// Values w/o = means they want this env to be removed/unset.
-		if !strings.Contains(value, "=") {
-			if i, exists := cache[value]; exists {
+		k, _, ok := strings.Cut(value, "=")
+		if !ok {
+			if i, exists := cache[k]; exists {
 				results[i] = "" // Used to indicate it should be removed
 			}
 			continue
 		}
 
 		// Just do a normal set/update
-		parts := strings.SplitN(value, "=", 2)
-		if i, exists := cache[parts[0]]; exists {
+		if i, exists := cache[k]; exists {
 			results[i] = value
 		} else {
 			results = append(results, value)

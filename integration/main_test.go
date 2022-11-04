@@ -509,14 +509,14 @@ func PidEnvs(pid int) (map[string]string, error) {
 
 	res := make(map[string]string)
 	for _, value := range values {
-		value := strings.TrimSpace(string(value))
+		value = bytes.TrimSpace(value)
 		if len(value) == 0 {
 			continue
 		}
 
-		parts := strings.SplitN(value, "=", 2)
-		if len(parts) == 2 {
-			res[parts[0]] = parts[1]
+		k, v, ok := strings.Cut(string(value), "=")
+		if ok {
+			res[k] = v
 		}
 	}
 	return res, nil

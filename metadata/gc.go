@@ -443,13 +443,10 @@ func (c *gcContext) references(ctx context.Context, tx *bolt.Tx, node gc.Node, f
 
 		return c.sendLabelRefs(node.Namespace, bkt, fn)
 	case ResourceSnapshot, resourceSnapshotFlat:
-		parts := strings.SplitN(node.Key, "/", 2)
-		if len(parts) != 2 {
+		ss, name, ok := strings.Cut(node.Key, "/")
+		if !ok {
 			return fmt.Errorf("invalid snapshot gc key %s", node.Key)
 		}
-		ss := parts[0]
-		name := parts[1]
-
 		bkt := getBucket(tx, bucketKeyVersion, []byte(node.Namespace), bucketKeyObjectSnapshots, []byte(ss), []byte(name))
 		if bkt == nil {
 			// Node may be created from dead edge
@@ -563,7 +560,7 @@ func (c *gcContext) scanAll(ctx context.Context, tx *bolt.Tx, fn func(ctx contex
 	}
 
 	c.all(func(n gc.Node) {
-		fn(ctx, n)
+		_ = fn(ctx, n)
 	})
 
 	return nil
@@ -598,14 +595,14 @@ func (c *gcContext) remove(ctx context.Context, tx *bolt.Tx, node gc.Node) error
 	case ResourceSnapshot:
 		sbkt := nsbkt.Bucket(bucketKeyObjectSnapshots)
 		if sbkt != nil {
-			parts := strings.SplitN(node.Key, "/", 2)
-			if len(parts) != 2 {
+			ss, key, ok := strings.Cut(node.Key, "/")
+			if !ok {
 				return fmt.Errorf("invalid snapshot gc key %s", node.Key)
 			}
-			ssbkt := sbkt.Bucket([]byte(parts[0]))
+			ssbkt := sbkt.Bucket([]byte(ss))
 			if ssbkt != nil {
-				log.G(ctx).WithField("key", parts[1]).WithField("snapshotter", parts[0]).Debug("remove snapshot")
-				return ssbkt.DeleteBucket([]byte(parts[1]))
+				log.G(ctx).WithField("key", key).WithField("snapshotter", ss).Debug("remove snapshot")
+				return ssbkt.DeleteBucket([]byte(key))
 			}
 		}
 	case ResourceLease:

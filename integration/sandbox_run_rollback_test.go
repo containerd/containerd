@@ -349,12 +349,7 @@ func ensureCNIAddRunning(t *testing.T, sbName string) error {
 			}
 
 			for _, arg := range strings.Split(args, ";") {
-				kv := strings.SplitN(arg, "=", 2)
-				if len(kv) != 2 {
-					continue
-				}
-
-				if kv[0] == "K8S_POD_NAME" && kv[1] == sbName {
+				if arg == "K8S_POD_NAME="+sbName {
 					return true, nil
 				}
 			}

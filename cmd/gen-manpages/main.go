@@ -43,11 +43,10 @@ func run() error {
 	}
 	dir := flag.Arg(1)
 
-	parts := strings.SplitN(flag.Arg(0), ".", 2)
-	if len(parts) != 2 {
+	name, section, ok := strings.Cut(flag.Arg(0), ".")
+	if !ok {
 		return fmt.Errorf("invalid name '%s': name does not contain man page section", flag.Arg(0))
 	}
-	name, section := parts[0], parts[1]
 
 	appName, ok := apps[name]
 	if !ok {

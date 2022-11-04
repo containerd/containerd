@@ -128,12 +128,8 @@ var createCommand = cli.Command{
 		if len(labelstr) > 0 {
 			labels := map[string]string{}
 			for _, lstr := range labelstr {
-				l := strings.SplitN(lstr, "=", 2)
-				if len(l) == 1 {
-					labels[l[0]] = ""
-				} else {
-					labels[l[0]] = l[1]
-				}
+				k, v, _ := strings.Cut(lstr, "=")
+				labels[k] = v
 			}
 			opts = append(opts, leases.WithLabels(labels))
 		}
