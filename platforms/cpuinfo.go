@@ -94,6 +94,19 @@ func getCPUVariant() string {
 
 		return variant
 	}
+	if runtime.GOOS == "freebsd" {
+		// FreeBSD supports ARMv6 and ARMv7 as well as ARMv4 and ARMv5 (though deprecated)
+		// detecting those variants is currently unimplemented
+		var variant string
+		switch runtime.GOARCH {
+		case "arm64":
+			variant = "v8"
+		default:
+			variant = "unknown"
+		}
+
+		return variant
+	}
 
 	variant, err := getCPUInfo("Cpu architecture")
 	if err != nil {
