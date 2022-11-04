@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -36,6 +37,7 @@ import (
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/tracing"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -160,6 +162,11 @@ func (u *Unpacker) Unpack(h images.Handler) images.Handler {
 		layers = map[digest.Digest][]ocispec.Descriptor{}
 	)
 	return images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		ctx, span := tracing.StartSpan(ctx, "pkg.unpack.unpacker.UnpackHandler")
+		defer span.End()
+		span.SetAttributes(
+			tracing.SpanAttribute("descriptor.media.type", desc.MediaType),
+			tracing.SpanAttribute("descriptor.digest", desc.Digest.String()))
 		unlock, err := u.lockBlobDescriptor(ctx, desc)
 		if err != nil {
 			return nil, err
@@ -174,10 +181,12 @@ func (u *Unpacker) Unpack(h images.Handler) images.Handler {
 		case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
 			var nonLayers []ocispec.Descriptor
 			var manifestLayers []ocispec.Descriptor
-
 			// Split layers from non-layers, layers will be handled after
 			// the config
-			for _, child := range children {
+			for i, child := range children {
+				span.SetAttributes(
+					tracing.SpanAttribute("descriptor.child."+strconv.Itoa(i), []string{child.MediaType, child.Digest.String()}),
+				)
 				if images.IsLayerType(child.MediaType) {
 					manifestLayers = append(manifestLayers, child)
 				} else {
@@ -223,6 +232,8 @@ func (u *Unpacker) unpack(
 	layers []ocispec.Descriptor,
 ) error {
 	ctx := u.ctx
+	ctx, layerSpan := tracing.StartSpan(ctx, "pkg.unpack.unpacker.unpack")
+	defer layerSpan.End()
 	p, err := content.ReadBlob(ctx, u.content, config)
 	if err != nil {
 		return err
@@ -398,9 +409,18 @@ func (u *Unpacker) unpack(
 	}
 
 	for i, desc := range layers {
+		_, layerSpan := tracing.StartSpan(ctx, "pkg.unpack.unpacker.unpackLayer")
+		layerSpan.SetAttributes(
+			tracing.SpanAttribute("layer.media.type", desc.MediaType),
+			tracing.SpanAttribute("layer.media.size", desc.Size),
+			tracing.SpanAttribute("layer.media.digest", desc.Digest.String()),
+		)
 		if err := doUnpackFn(i, desc); err != nil {
+			layerSpan.RecordError(err)
+			layerSpan.End()
 			return err
 		}
+		layerSpan.End()
 	}
 
 	chainID := identity.ChainID(chain).String()
@@ -425,9 +445,14 @@ func (u *Unpacker) unpack(
 func (u *Unpacker) fetch(ctx context.Context, h images.Handler, layers []ocispec.Descriptor, done []chan struct{}) error {
 	eg, ctx2 := errgroup.WithContext(ctx)
 	for i, desc := range layers {
+		ctx2, layerSpan := tracing.StartSpan(ctx2, "pkg.unpack.unpacker.fetchLayer")
+		layerSpan.SetAttributes(
+			tracing.SpanAttribute("layer.media.type", desc.MediaType),
+			tracing.SpanAttribute("layer.media.size", desc.Size),
+			tracing.SpanAttribute("layer.media.digest", desc.Digest.String()),
+		)
 		desc := desc
 		i := i
-
 		if err := u.acquire(ctx); err != nil {
 			return err
 		}
@@ -451,6 +476,7 @@ func (u *Unpacker) fetch(ctx context.Context, h images.Handler, layers []ocispec
 
 			return nil
 		})
+		layerSpan.End()
 	}
 
 	return eg.Wait()
