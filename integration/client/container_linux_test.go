@@ -1415,6 +1415,7 @@ func TestShimOOMScore(t *testing.T) {
 		cg  cgroups.Cgroup
 		cg2 *cgroupsv2.Manager
 	)
+	t.Logf("cgroups.Mode = %v", cgroups.Mode())
 	if cgroups.Mode() == cgroups.Unified {
 		cg2, err = cgroupsv2.NewManager("/sys/fs/cgroup", path, &cgroupsv2.Resources{})
 		if err != nil {

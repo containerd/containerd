@@ -37,6 +37,7 @@ Vagrant.configure("2") do |config|
   config.vm.synced_folder ".", "/vagrant", type: "rsync"
 
   config.vm.provision 'shell', path: 'script/resize-vagrant-root.sh'
+  config.vm.provision 'shell', inline: 'uname -a'
 
   # Disabled by default. To run:
   #   vagrant up --provision-with=upgrade-packages
