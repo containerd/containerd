@@ -818,21 +818,12 @@ func (c *Client) getSnapshotter(ctx context.Context, name string) (snapshots.Sna
 	return s, nil
 }
 
-// CheckRuntime returns true if the current runtime matches the expected
-// runtime. Providing various parts of the runtime schema will match those
-// parts of the expected runtime
-func CheckRuntime(current, expected string) bool {
-	cp := strings.Split(current, ".")
-	l := len(cp)
-	for i, p := range strings.Split(expected, ".") {
-		if i > l-1 {
-			return false
-		}
-		if p != cp[i] {
-			return false
-		}
+// CheckRuntime returns true if the current runtime matches the expected prefix.
+func CheckRuntime(current, prefix string) bool {
+	if current == "" || prefix == "" {
+		return false
 	}
-	return true
+	return current == prefix || strings.HasPrefix(current, strings.TrimSuffix(prefix, ".")+".")
 }
 
 // GetSnapshotterSupportedPlatforms returns a platform matchers which represents the

@@ -28,8 +28,8 @@ func TestCheckRuntime(t *testing.T) {
 		out             bool
 	}{
 		{current: "", prefix: ".", out: false},
-		{current: ".", prefix: "", out: true},
-		{current: "....b.c.d", prefix: "", out: true},
+		{current: ".", prefix: "", out: false},
+		{current: "....b.c.d", prefix: "", out: false},
 		{current: "....b.c.d", prefix: ".", out: true},
 		{current: "a.b.c.d", prefix: "a.b.c", out: true},
 		{current: "a.b.c.d.", prefix: "a.b.c", out: true},
