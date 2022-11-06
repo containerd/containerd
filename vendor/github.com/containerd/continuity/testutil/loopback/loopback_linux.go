@@ -23,7 +23,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -35,7 +34,7 @@ import (
 // New creates a loopback device
 func New(size int64) (*Loopback, error) {
 	// create temporary file for the disk image
-	file, err := ioutil.TempFile("", "containerd-test-loopback")
+	file, err := os.CreateTemp("", "containerd-test-loopback")
 	if err != nil {
 		return nil, fmt.Errorf("could not create temporary file for loopback: %w", err)
 	}

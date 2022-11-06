@@ -31,6 +31,8 @@ package containerd.plugin;
 
 import "google/protobuf/descriptor.proto";
 
+option go_package = "github.com/containerd/containerd/protobuf/plugin";
+
 extend google.protobuf.FileOptions {
 	optional bool fieldpath_all = 63300;
 }

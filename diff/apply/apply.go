@@ -125,6 +125,8 @@ type readCounter struct {
 
 func (rc *readCounter) Read(p []byte) (n int, err error) {
 	n, err = rc.r.Read(p)
-	rc.c += int64(n)
+	if n > 0 {
+		rc.c += int64(n)
+	}
 	return
 }

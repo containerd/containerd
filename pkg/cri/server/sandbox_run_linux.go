@@ -101,12 +101,17 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	if nsOptions.GetIpc() == runtime.NamespaceMode_NODE {
 		sandboxDevShm = devShm
 	}
+	// Remove the default /dev/shm mount from defaultMounts, it is added in oci/mounts.go.
+	specOpts = append(specOpts, oci.WithoutMounts(devShm))
+	// In future the when user-namespace is enabled, the `nosuid, nodev, noexec` flags are
+	// required, otherwise the remount will fail with EPERM. Just use them unconditionally,
+	// they are nice to have anyways.
 	specOpts = append(specOpts, oci.WithMounts([]runtimespec.Mount{
 		{
 			Source:      sandboxDevShm,
 			Destination: devShm,
 			Type:        "bind",
-			Options:     []string{"rbind", "ro"},
+			Options:     []string{"rbind", "ro", "nosuid", "nodev", "noexec"},
 		},
 		// Add resolv.conf for katacontainers to setup the DNS of pod VM properly.
 		{
@@ -342,4 +347,13 @@ func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {
 	}
 
 	return taskOpts
+}
+
+func (c *criService) updateNetNamespacePath(spec *runtimespec.Spec, nsPath string) {
+	for i := range spec.Linux.Namespaces {
+		if spec.Linux.Namespaces[i].Type == runtimespec.NetworkNamespace {
+			spec.Linux.Namespaces[i].Path = nsPath
+			break
+		}
+	}
 }

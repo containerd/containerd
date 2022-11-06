@@ -17,6 +17,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -26,7 +27,6 @@ import (
 	"github.com/containerd/containerd/log"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 

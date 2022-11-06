@@ -26,13 +26,15 @@ import (
 	gruntime "runtime"
 	"strings"
 
+	"github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/protobuf/proto"
+	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime"
 	client "github.com/containerd/containerd/runtime/v2/shim"
-	"github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/ttrpc"
-	"github.com/gogo/protobuf/types"
 	"github.com/sirupsen/logrus"
 )
 
@@ -184,7 +186,7 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 		log.G(ctx).Warnf("cleanup warnings %s", s)
 	}
 	var response task.DeleteResponse
-	if err := response.Unmarshal(out.Bytes()); err != nil {
+	if err := proto.Unmarshal(out.Bytes(), &response); err != nil {
 		return nil, err
 	}
 	if err := b.bundle.Delete(); err != nil {
@@ -192,7 +194,7 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 	}
 	return &runtime.Exit{
 		Status:    response.ExitStatus,
-		Timestamp: response.ExitedAt,
+		Timestamp: protobuf.FromTimestamp(response.ExitedAt),
 		Pid:       response.Pid,
 	}, nil
 }

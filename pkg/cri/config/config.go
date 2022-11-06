@@ -28,7 +28,7 @@ import (
 )
 
 // Runtime struct to contain the type(ID), engine, and root variables for a default runtime
-// and a runtime for untrusted worload.
+// and a runtime for untrusted workload.
 type Runtime struct {
 	// Type is the runtime type to use in containerd e.g. io.containerd.runtime.v1.linux
 	Type string `toml:"runtime_type" json:"runtimeType"`
@@ -59,6 +59,10 @@ type Runtime struct {
 	// PrivilegedWithoutHostDevices overloads the default behaviour for adding host devices to the
 	// runtime spec when the container is privileged. Defaults to false.
 	PrivilegedWithoutHostDevices bool `toml:"privileged_without_host_devices" json:"privileged_without_host_devices"`
+	// PrivilegedWithoutHostDevicesAllDevicesAllowed overloads the default behaviour device allowlisting when
+	// to the runtime spec when the container when PrivilegedWithoutHostDevices is already enabled. Requires
+	// PrivilegedWithoutHostDevices to be enabled. Defaults to false.
+	PrivilegedWithoutHostDevicesAllDevicesAllowed bool `toml:"privileged_without_host_devices_all_devices_allowed" json:"privileged_without_host_devices_all_devices_allowed"`
 	// BaseRuntimeSpec is a json file with OCI spec to use as base spec that all container's will be created from.
 	BaseRuntimeSpec string `toml:"base_runtime_spec" json:"baseRuntimeSpec"`
 	// NetworkPluginConfDir is a directory containing the CNI network information for the runtime class.
@@ -67,6 +71,11 @@ type Runtime struct {
 	// be loaded from the cni config directory by go-cni. Set the value to 0 to
 	// load all config files (no arbitrary limit). The legacy default value is 1.
 	NetworkPluginMaxConfNum int `toml:"cni_max_conf_num" json:"cniMaxConfNum"`
+	// Snapshotter setting snapshotter at runtime level instead of making it as a global configuration.
+	// An example use case is to use devmapper or other snapshotters in Kata containers for performance and security
+	// while using default snapshotters for operational simplicity.
+	// See https://github.com/containerd/containerd/issues/6657 for details.
+	Snapshotter string `toml:"snapshotter" json:"snapshotter"`
 }
 
 // ContainerdConfig contains toml config related to containerd
@@ -98,6 +107,11 @@ type ContainerdConfig struct {
 	// remove layers from the content store after successfully unpacking these
 	// layers to the snapshotter.
 	DiscardUnpackedLayers bool `toml:"discard_unpacked_layers" json:"discardUnpackedLayers"`
+
+	// IgnoreBlockIONotEnabledErrors is a boolean flag to ignore
+	// blockio related errors when blockio support has not been
+	// enabled.
+	IgnoreBlockIONotEnabledErrors bool `toml:"ignore_blockio_not_enabled_errors" json:"ignoreBlockIONotEnabledErrors"`
 
 	// IgnoreRdtNotEnabledErrors is a boolean flag to ignore RDT related errors
 	// when RDT support has not been enabled.
@@ -302,6 +316,23 @@ type PluginConfig struct {
 	// and if it is not overwritten by PodSandboxConfig
 	// Note that currently default is set to disabled but target change it in future together with EnableUnprivilegedPorts
 	EnableUnprivilegedICMP bool `toml:"enable_unprivileged_icmp" json:"enableUnprivilegedICMP"`
+	// EnableCDI indicates to enable injection of the Container Device Interface Specifications
+	// into the OCI config
+	// For more details about CDI and the syntax of CDI Spec files please refer to
+	// https://github.com/container-orchestrated-devices/container-device-interface.
+	EnableCDI bool `toml:"enable_cdi" json:"enableCDI"`
+	// CDISpecDirs is the list of directories to scan for Container Device Interface Specifications
+	// For more details about CDI configuration please refer to
+	// https://github.com/container-orchestrated-devices/container-device-interface#containerd-configuration
+	CDISpecDirs []string `toml:"cdi_spec_dirs" json:"cdiSpecDirs"`
+	// ImagePullProgressTimeout is the maximum duration that there is no
+	// image data read from image registry in the open connection. It will
+	// be reset whatever a new byte has been read. If timeout, the image
+	// pulling will be cancelled. A zero value means there is no timeout.
+	//
+	// The string is in the golang duration format, see:
+	//   https://golang.org/pkg/time/#ParseDuration
+	ImagePullProgressTimeout string `toml:"image_pull_progress_timeout" json:"imagePullProgressTimeout"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
@@ -394,6 +425,9 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 			}
 			log.G(ctx).Warning("`runtime_root` is deprecated, please use runtime `options` instead")
 		}
+		if !r.PrivilegedWithoutHostDevices && r.PrivilegedWithoutHostDevicesAllDevicesAllowed {
+			return errors.New("`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled")
+		}
 	}
 
 	useConfigPath := c.Registry.ConfigPath != ""
@@ -443,6 +477,13 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 	if c.StreamIdleTimeout != "" {
 		if _, err := time.ParseDuration(c.StreamIdleTimeout); err != nil {
 			return fmt.Errorf("invalid stream idle timeout: %w", err)
+		}
+	}
+
+	// Validation for image_pull_progress_timeout
+	if c.ImagePullProgressTimeout != "" {
+		if _, err := time.ParseDuration(c.ImagePullProgressTimeout); err != nil {
+			return fmt.Errorf("invalid image pull progress timeout: %w", err)
 		}
 	}
 	return nil

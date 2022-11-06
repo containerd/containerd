@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
@@ -31,12 +32,15 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/reference"
 	"github.com/containerd/containerd/remotes"
-	"github.com/containerd/containerd/remotes/docker/schema1"
+	"github.com/containerd/containerd/remotes/docker/schema1" //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
+	remoteerrors "github.com/containerd/containerd/remotes/errors"
+	"github.com/containerd/containerd/tracing"
 	"github.com/containerd/containerd/version"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context/ctxhttp"
+	semconv "go.opentelemetry.io/otel/semconv/v1.10.0"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -298,11 +302,11 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				if resp.StatusCode > 399 {
 					// Set firstErr when encountering the first non-404 status code.
 					if firstErr == nil {
-						firstErr = fmt.Errorf("pulling from host %s failed with status code %v: %v", host.Host, u, resp.Status)
+						firstErr = remoteerrors.NewUnexpectedStatusErr(resp)
 					}
 					continue // try another host
 				}
-				return "", ocispec.Descriptor{}, fmt.Errorf("pulling from host %s failed with unexpected status code %v: %v", host.Host, u, resp.Status)
+				return "", ocispec.Descriptor{}, remoteerrors.NewUnexpectedStatusErr(resp)
 			}
 			size := resp.ContentLength
 			contentType := getManifestMediaType(resp)
@@ -524,7 +528,7 @@ type request struct {
 
 func (r *request) do(ctx context.Context) (*http.Response, error) {
 	u := r.host.Scheme + "://" + r.host.Host + r.path
-	req, err := http.NewRequest(r.method, u, nil)
+	req, err := http.NewRequestWithContext(ctx, r.method, u, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -565,11 +569,20 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 			return nil
 		}
 	}
-
-	resp, err := ctxhttp.Do(ctx, client, req)
+	_, httpSpan := tracing.StartSpan(
+		ctx,
+		"remotes.docker.resolver.HTTPRequest",
+		oteltrace.WithSpanKind(oteltrace.SpanKindClient),
+		oteltrace.WithAttributes(semconv.HTTPClientAttributesFromHTTPRequest(req)...),
+	)
+	resp, err := client.Do(req)
 	if err != nil {
+		httpSpan.RecordError(err)
+		tracing.StopSpan(httpSpan)
 		return nil, fmt.Errorf("failed to do request: %w", err)
 	}
+	httpSpan.SetAttributes(semconv.HTTPAttributesFromHTTPStatusCode(resp.StatusCode)...)
+	tracing.StopSpan(httpSpan)
 	log.G(ctx).WithFields(responseFields(resp)).Debug("fetch response received")
 	return resp, nil
 }
@@ -666,4 +679,18 @@ func responseFields(resp *http.Response) logrus.Fields {
 	}
 
 	return logrus.Fields(fields)
+}
+
+// IsLocalhost checks if the registry host is local.
+func IsLocalhost(host string) bool {
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+
+	if host == "localhost" {
+		return true
+	}
+
+	ip := net.ParseIP(host)
+	return ip.IsLoopback()
 }

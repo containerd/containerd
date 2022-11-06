@@ -30,13 +30,12 @@ import (
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	imagelist "github.com/containerd/containerd/integration/images"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/sys"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/sirupsen/logrus"
@@ -44,30 +43,16 @@ import (
 )
 
 var (
-	address           string
-	noDaemon          bool
-	noCriu            bool
-	supportsCriu      bool
-	testNamespace     = "testing"
-	testSnapshotter   = DefaultSnapshotter
-	ctrdStdioFilePath string
-
-	ctrd = &daemon{}
+	noDaemon     bool
+	noCriu       bool
+	supportsCriu bool
+	noShimCgroup bool
 )
 
 func init() {
-	flag.StringVar(&address, "address", defaultAddress, "The address to the containerd socket for use in the tests")
 	flag.BoolVar(&noDaemon, "no-daemon", false, "Do not start a dedicated daemon for the tests")
 	flag.BoolVar(&noCriu, "no-criu", false, "Do not run the checkpoint tests")
-}
-
-func testContext(t testing.TB) (context.Context, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(context.Background())
-	ctx = namespaces.WithNamespace(ctx, testNamespace)
-	if t != nil {
-		ctx = logtest.WithT(ctx, t)
-	}
-	return ctx, cancel
+	flag.BoolVar(&noShimCgroup, "no-shim-cgroup", false, "Do not run the shim cgroup tests")
 }
 
 func TestMain(m *testing.M) {
@@ -87,7 +72,7 @@ func TestMain(m *testing.M) {
 	defer cancel()
 
 	if !noDaemon {
-		sys.ForceRemoveAll(defaultRoot)
+		_ = forceRemoveAll(defaultRoot)
 
 		stdioFile, err := os.CreateTemp("", "")
 		if err != nil {
@@ -189,7 +174,7 @@ func TestMain(m *testing.M) {
 			}
 		}
 
-		if err := sys.ForceRemoveAll(defaultRoot); err != nil {
+		if err := forceRemoveAll(defaultRoot); err != nil {
 			fmt.Fprintln(os.Stderr, "failed to remove test root dir", err)
 			os.Exit(1)
 		}
@@ -333,7 +318,7 @@ func TestImagePullAllPlatforms(t *testing.T) {
 	defer cancel()
 
 	cs := client.ContentStore()
-	img, err := client.Fetch(ctx, "k8s.gcr.io/pause:3.6")
+	img, err := client.Fetch(ctx, imagelist.Get(imagelist.Pause))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -383,7 +368,7 @@ func TestImagePullSomePlatforms(t *testing.T) {
 
 	// Note: Must be different to the image used in TestImagePullAllPlatforms
 	// or it will see the content pulled by that, and fail.
-	img, err := client.Fetch(ctx, "k8s.gcr.io/e2e-test-images/busybox:1.29-2", opts...)
+	img, err := client.Fetch(ctx, "registry.k8s.io/e2e-test-images/busybox:1.29-2", opts...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -449,6 +434,13 @@ func TestImagePullSchema1(t *testing.T) {
 }
 
 func TestImagePullWithConcurrencyLimit(t *testing.T) {
+	if os.Getenv("CIRRUS_CI") != "" {
+		// This test tends to fail under Cirrus CI + Vagrant due to "connection reset by peer" from
+		// pkg-containers.githubusercontent.com.
+		// Does GitHub throttle requests from Cirrus CI more compared to GitHub Actions?
+		t.Skip("unstable under Cirrus CI")
+	}
+
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -497,26 +489,6 @@ func TestClientReconnect(t *testing.T) {
 	if err := client.Close(); err != nil {
 		t.Errorf("client closed returned error %v", err)
 	}
-}
-
-func createShimDebugConfig() string {
-	f, err := os.CreateTemp("", "containerd-config-")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create config file: %s\n", err)
-		os.Exit(1)
-	}
-	defer f.Close()
-	if _, err := f.WriteString("version = 2\n"); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to write to config file %s: %s\n", f.Name(), err)
-		os.Exit(1)
-	}
-
-	if _, err := f.WriteString("[plugins.\"io.containerd.runtime.v1.linux\"]\n\tshim_debug = true\n"); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to write to config file %s: %s\n", f.Name(), err)
-		os.Exit(1)
-	}
-
-	return f.Name()
 }
 
 func TestDefaultRuntimeWithNamespaceLabels(t *testing.T) {

@@ -18,6 +18,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"syscall"
@@ -28,7 +29,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
-	"golang.org/x/net/context"
 	"k8s.io/client-go/tools/remotecommand"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -38,14 +38,55 @@ import (
 	cioutil "github.com/containerd/containerd/pkg/ioutil"
 )
 
+type cappedWriter struct {
+	w      io.WriteCloser
+	remain int
+}
+
+func (cw *cappedWriter) Write(p []byte) (int, error) {
+	if cw.remain <= 0 {
+		return len(p), nil
+	}
+
+	end := cw.remain
+	if end > len(p) {
+		end = len(p)
+	}
+	written, err := cw.w.Write(p[0:end])
+	cw.remain -= written
+
+	if err != nil {
+		return written, err
+	}
+	return len(p), nil
+}
+
+func (cw *cappedWriter) Close() error {
+	return cw.w.Close()
+}
+
+func (cw *cappedWriter) isFull() bool {
+	return cw.remain <= 0
+}
+
 // ExecSync executes a command in the container, and returns the stdout output.
 // If command exits with a non-zero exit code, an error is returned.
 func (c *criService) ExecSync(ctx context.Context, r *runtime.ExecSyncRequest) (*runtime.ExecSyncResponse, error) {
+	const maxStreamSize = 1024 * 1024 * 16
+
 	var stdout, stderr bytes.Buffer
+
+	// cappedWriter truncates the output. In that case, the size of
+	// the ExecSyncResponse will hit the CRI plugin's gRPC response limit.
+	// Thus the callers outside of the containerd process (e.g. Kubelet) never see
+	// the truncated output.
+	cout := &cappedWriter{w: cioutil.NewNopWriteCloser(&stdout), remain: maxStreamSize}
+	cerr := &cappedWriter{w: cioutil.NewNopWriteCloser(&stderr), remain: maxStreamSize}
+
 	exitCode, err := c.execInContainer(ctx, r.GetContainerId(), execOptions{
 		cmd:     r.GetCmd(),
-		stdout:  cioutil.NewNopWriteCloser(&stdout),
-		stderr:  cioutil.NewNopWriteCloser(&stderr),
+		stdout:  cout,
+		stderr:  cerr,
 		timeout: time.Duration(r.GetTimeout()) * time.Second,
 	})
 	if err != nil {

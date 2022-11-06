@@ -18,7 +18,6 @@ package ttrpc
 
 import (
 	"context"
-	"errors"
 	"io"
 	"math/rand"
 	"net"
@@ -29,10 +28,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-)
-
-var (
-	ErrServerClosed = errors.New("ttrpc: server closed")
 )
 
 type Server struct {
@@ -66,8 +61,14 @@ func NewServer(opts ...ServerOpt) (*Server, error) {
 	}, nil
 }
 
+// Register registers a map of methods to method handlers
+// TODO: Remove in 2.0, does not support streams
 func (s *Server) Register(name string, methods map[string]Method) {
-	s.services.register(name, methods)
+	s.services.register(name, &ServiceDesc{Methods: methods})
+}
+
+func (s *Server) RegisterService(name string, desc *ServiceDesc) {
+	s.services.register(name, desc)
 }
 
 func (s *Server) Serve(ctx context.Context, l net.Listener) error {
@@ -301,27 +302,24 @@ func (c *serverConn) close() error {
 
 func (c *serverConn) run(sctx context.Context) {
 	type (
-		request struct {
-			id  uint32
-			req *Request
-		}
-
 		response struct {
-			id   uint32
-			resp *Response
+			id          uint32
+			status      *status.Status
+			data        []byte
+			closeStream bool
+			streaming   bool
 		}
 	)
 
 	var (
-		ch          = newChannel(c.conn)
-		ctx, cancel = context.WithCancel(sctx)
-		active      int
-		state       connState = connStateIdle
-		responses             = make(chan response)
-		requests              = make(chan request)
-		recvErr               = make(chan error, 1)
-		shutdown              = c.shutdown
-		done                  = make(chan struct{})
+		ch                     = newChannel(c.conn)
+		ctx, cancel            = context.WithCancel(sctx)
+		state        connState = connStateIdle
+		responses              = make(chan response)
+		recvErr                = make(chan error, 1)
+		done                   = make(chan struct{})
+		active       int32
+		lastStreamID uint32
 	)
 
 	defer c.conn.Close()
@@ -329,27 +327,27 @@ func (c *serverConn) run(sctx context.Context) {
 	defer close(done)
 	defer c.server.delConnection(c)
 
+	sendStatus := func(id uint32, st *status.Status) bool {
+		select {
+		case responses <- response{
+			// even though we've had an invalid stream id, we send it
+			// back on the same stream id so the client knows which
+			// stream id was bad.
+			id:          id,
+			status:      st,
+			closeStream: true,
+		}:
+			return true
+		case <-c.shutdown:
+			return false
+		case <-done:
+			return false
+		}
+	}
+
 	go func(recvErr chan error) {
 		defer close(recvErr)
-		sendImmediate := func(id uint32, st *status.Status) bool {
-			select {
-			case responses <- response{
-				// even though we've had an invalid stream id, we send it
-				// back on the same stream id so the client knows which
-				// stream id was bad.
-				id: id,
-				resp: &Response{
-					Status: st.Proto(),
-				},
-			}:
-				return true
-			case <-c.shutdown:
-				return false
-			case <-done:
-				return false
-			}
-		}
-
+		streams := map[uint32]*streamHandler{}
 		for {
 			select {
 			case <-c.shutdown:
@@ -369,99 +367,159 @@ func (c *serverConn) run(sctx context.Context) {
 
 				// in this case, we send an error for that particular message
 				// when the status is defined.
-				if !sendImmediate(mh.StreamID, status) {
+				if !sendStatus(mh.StreamID, status) {
 					return
 				}
 
 				continue
 			}
-
-			if mh.Type != messageTypeRequest {
-				// we must ignore this for future compat.
-				continue
-			}
-
-			var req Request
-			if err := c.server.codec.Unmarshal(p, &req); err != nil {
-				ch.putmbuf(p)
-				if !sendImmediate(mh.StreamID, status.Newf(codes.InvalidArgument, "unmarshal request error: %v", err)) {
-					return
-				}
-				continue
-			}
-			ch.putmbuf(p)
 
 			if mh.StreamID%2 != 1 {
 				// enforce odd client initiated identifiers.
-				if !sendImmediate(mh.StreamID, status.Newf(codes.InvalidArgument, "StreamID must be odd for client initiated streams")) {
+				if !sendStatus(mh.StreamID, status.Newf(codes.InvalidArgument, "StreamID must be odd for client initiated streams")) {
 					return
 				}
 				continue
 			}
 
-			// Forward the request to the main loop. We don't wait on s.done
-			// because we have already accepted the client request.
-			select {
-			case requests <- request{
-				id:  mh.StreamID,
-				req: &req,
-			}:
-			case <-done:
-				return
+			if mh.Type == messageTypeData {
+				sh, ok := streams[mh.StreamID]
+				if !ok {
+					if !sendStatus(mh.StreamID, status.Newf(codes.InvalidArgument, "StreamID is no longer active")) {
+						return
+					}
+				}
+				if mh.Flags&flagNoData != flagNoData {
+					unmarshal := func(obj interface{}) error {
+						err := protoUnmarshal(p, obj)
+						ch.putmbuf(p)
+						return err
+					}
+
+					if err := sh.data(unmarshal); err != nil {
+						if !sendStatus(mh.StreamID, status.Newf(codes.InvalidArgument, "data handling error: %v", err)) {
+							return
+						}
+					}
+				}
+
+				if mh.Flags&flagRemoteClosed == flagRemoteClosed {
+					sh.closeSend()
+					if len(p) > 0 {
+						if !sendStatus(mh.StreamID, status.Newf(codes.InvalidArgument, "data close message cannot include data")) {
+							return
+						}
+					}
+				}
+			} else if mh.Type == messageTypeRequest {
+				if mh.StreamID <= lastStreamID {
+					// enforce odd client initiated identifiers.
+					if !sendStatus(mh.StreamID, status.Newf(codes.InvalidArgument, "StreamID cannot be re-used and must increment")) {
+						return
+					}
+					continue
+
+				}
+				lastStreamID = mh.StreamID
+
+				// TODO: Make request type configurable
+				// Unmarshaller which takes in a byte array and returns an interface?
+				var req Request
+				if err := c.server.codec.Unmarshal(p, &req); err != nil {
+					ch.putmbuf(p)
+					if !sendStatus(mh.StreamID, status.Newf(codes.InvalidArgument, "unmarshal request error: %v", err)) {
+						return
+					}
+					continue
+				}
+				ch.putmbuf(p)
+
+				id := mh.StreamID
+				respond := func(status *status.Status, data []byte, streaming, closeStream bool) error {
+					select {
+					case responses <- response{
+						id:          id,
+						status:      status,
+						data:        data,
+						closeStream: closeStream,
+						streaming:   streaming,
+					}:
+					case <-done:
+						return ErrClosed
+					}
+					return nil
+				}
+				sh, err := c.server.services.handle(ctx, &req, respond)
+				if err != nil {
+					status, _ := status.FromError(err)
+					if !sendStatus(mh.StreamID, status) {
+						return
+					}
+					continue
+				}
+
+				streams[id] = sh
+				atomic.AddInt32(&active, 1)
 			}
+			// TODO: else we must ignore this for future compat. log this?
 		}
 	}(recvErr)
 
 	for {
-		newstate := state
-		switch {
-		case active > 0:
+		var (
+			newstate connState
+			shutdown chan struct{}
+		)
+
+		activeN := atomic.LoadInt32(&active)
+		if activeN > 0 {
 			newstate = connStateActive
 			shutdown = nil
-		case active == 0:
+		} else {
 			newstate = connStateIdle
 			shutdown = c.shutdown // only enable this branch in idle mode
 		}
-
 		if newstate != state {
 			c.setState(newstate)
 			state = newstate
 		}
 
 		select {
-		case request := <-requests:
-			active++
-			go func(id uint32) {
-				ctx, cancel := getRequestContext(ctx, request.req)
-				defer cancel()
-
-				p, status := c.server.services.call(ctx, request.req.Service, request.req.Method, request.req.Payload)
-				resp := &Response{
-					Status:  status.Proto(),
-					Payload: p,
-				}
-
-				select {
-				case responses <- response{
-					id:   id,
-					resp: resp,
-				}:
-				case <-done:
-				}
-			}(request.id)
 		case response := <-responses:
-			p, err := c.server.codec.Marshal(response.resp)
-			if err != nil {
-				logrus.WithError(err).Error("failed marshaling response")
-				return
+			if !response.streaming || response.status.Code() != codes.OK {
+				p, err := c.server.codec.Marshal(&Response{
+					Status:  response.status.Proto(),
+					Payload: response.data,
+				})
+				if err != nil {
+					logrus.WithError(err).Error("failed marshaling response")
+					return
+				}
+
+				if err := ch.send(response.id, messageTypeResponse, 0, p); err != nil {
+					logrus.WithError(err).Error("failed sending message on channel")
+					return
+				}
+			} else {
+				var flags uint8
+				if response.closeStream {
+					flags = flagRemoteClosed
+				}
+				if response.data == nil {
+					flags = flags | flagNoData
+				}
+				if err := ch.send(response.id, messageTypeData, flags, response.data); err != nil {
+					logrus.WithError(err).Error("failed sending message on channel")
+					return
+				}
 			}
 
-			if err := ch.send(response.id, messageTypeResponse, p); err != nil {
-				logrus.WithError(err).Error("failed sending message on channel")
-				return
+			if response.closeStream {
+				// The ttrpc protocol currently does not support the case where
+				// the server is localClosed but not remoteClosed. Once the server
+				// is closing, the whole stream may be considered finished
+				atomic.AddInt32(&active, -1)
 			}
-
-			active--
 		case err := <-recvErr:
 			// TODO(stevvooe): Not wildly clear what we should do in this
 			// branch. Basically, it means that we are no longer receiving
@@ -475,6 +533,7 @@ func (c *serverConn) run(sctx context.Context) {
 			if err != nil {
 				logrus.WithError(err).Error("error receiving message")
 			}
+			// else, initiate shutdown
 		case <-shutdown:
 			return
 		}

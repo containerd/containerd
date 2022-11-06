@@ -104,13 +104,14 @@ func TestPodSandboxStatus(t *testing.T) {
 			expectedState: runtime.PodSandboxState_SANDBOX_NOTREADY,
 		},
 	} {
-		t.Logf("TestCase: %s", desc)
-		status := sandboxstore.Status{
-			CreatedAt: createdAt,
-			State:     test.state,
-		}
-		expected.State = test.expectedState
-		got := toCRISandboxStatus(metadata, status, ip, additionalIPs)
-		assert.Equal(t, expected, got)
+		t.Run(desc, func(t *testing.T) {
+			status := sandboxstore.Status{
+				CreatedAt: createdAt,
+				State:     test.state,
+			}
+			expected.State = test.expectedState
+			got := toCRISandboxStatus(metadata, status, ip, additionalIPs)
+			assert.Equal(t, expected, got)
+		})
 	}
 }

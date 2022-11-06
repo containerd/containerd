@@ -67,7 +67,7 @@ When you are done, use the unmount command.
 		}
 		defer cancel()
 
-		snapshotter := context.GlobalString("snapshotter")
+		snapshotter := context.String("snapshotter")
 		if snapshotter == "" {
 			snapshotter = containerd.DefaultSnapshotter
 		}

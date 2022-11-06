@@ -17,24 +17,24 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	selinux "github.com/opencontainers/selinux/go-selinux"
-	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/oci"
+	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	cio "github.com/containerd/containerd/pkg/cri/io"
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
@@ -183,16 +183,18 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	log.G(ctx).Debugf("Container %q spec: %#+v", id, spew.NewFormatter(spec))
 
-	snapshotterOpt := snapshots.WithLabels(snapshots.FilterInheritedLabels(config.Annotations))
+	// Grab any platform specific snapshotter opts.
+	sOpts := snapshotterOpts(c.config.ContainerdConfig.Snapshotter, config)
+
 	// Set snapshotter before any other options.
 	opts := []containerd.NewContainerOpts{
-		containerd.WithSnapshotter(c.config.ContainerdConfig.Snapshotter),
+		containerd.WithSnapshotter(c.runtimeSnapshotter(ctx, ociRuntime)),
 		// Prepare container rootfs. This is always writeable even if
 		// the container wants a readonly rootfs since we want to give
 		// the runtime (runc) a chance to modify (e.g. to create mount
 		// points corresponding to spec.Mounts) before making the
 		// rootfs readonly (requested by spec.Root.Readonly).
-		customopts.WithNewSnapshot(id, containerdImage, snapshotterOpt),
+		customopts.WithNewSnapshot(id, containerdImage, sOpts...),
 	}
 	if len(volumeMounts) > 0 {
 		mountMap := make(map[string]string)
@@ -238,6 +240,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err != nil {
 		return nil, fmt.Errorf("failed to get runtime options: %w", err)
 	}
+
 	opts = append(opts,
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithRuntime(sandboxInfo.Runtime.Name, runtimeOptions),
@@ -258,6 +261,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}()
 
 	status := containerstore.Status{CreatedAt: time.Now().UnixNano()}
+	status = copyResourcesToStatus(spec, status)
 	container, err := containerstore.NewContainer(meta,
 		containerstore.WithStatus(status, containerRootDir),
 		containerstore.WithContainer(cntr),
@@ -346,4 +350,15 @@ func (c *criService) runtimeSpec(id string, baseSpecFile string, opts ...oci.Spe
 	}
 
 	return spec, nil
+}
+
+// Overrides the default snapshotter if Snapshotter is set for this runtime.
+// See See https://github.com/containerd/containerd/issues/6657
+func (c *criService) runtimeSnapshotter(ctx context.Context, ociRuntime criconfig.Runtime) string {
+	if ociRuntime.Snapshotter == "" {
+		return c.config.ContainerdConfig.Snapshotter
+	}
+
+	log.G(ctx).Debugf("Set snapshotter for runtime %s to %s", ociRuntime.Type, ociRuntime.Snapshotter)
+	return ociRuntime.Snapshotter
 }

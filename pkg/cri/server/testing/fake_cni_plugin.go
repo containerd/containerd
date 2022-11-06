@@ -38,6 +38,11 @@ func (f *FakeCNIPlugin) Setup(ctx context.Context, id, path string, opts ...cni.
 	return nil, nil
 }
 
+// SetupSerially sets up the network of PodSandbox without doing the interfaces in parallel.
+func (f *FakeCNIPlugin) SetupSerially(ctx context.Context, id, path string, opts ...cni.NamespaceOpts) (*cni.Result, error) {
+	return nil, nil
+}
+
 // Remove teardown the network of PodSandbox.
 func (f *FakeCNIPlugin) Remove(ctx context.Context, id, path string, opts ...cni.NamespaceOpts) error {
 	return nil

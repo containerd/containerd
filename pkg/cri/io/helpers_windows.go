@@ -17,6 +17,7 @@
 package io
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -24,7 +25,6 @@ import (
 	"sync"
 
 	winio "github.com/Microsoft/go-winio"
-	"golang.org/x/net/context"
 )
 
 type pipe struct {

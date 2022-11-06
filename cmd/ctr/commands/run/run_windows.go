@@ -19,6 +19,7 @@ package run
 import (
 	gocontext "context"
 	"errors"
+	"strings"
 
 	"github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	"github.com/containerd/console"
@@ -26,6 +27,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/netns"
+	"github.com/containerd/containerd/snapshots"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -95,7 +97,10 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			containerd.WithImage(image),
 			containerd.WithImageConfigLabels(image),
 			containerd.WithSnapshotter(snapshotter),
-			containerd.WithNewSnapshot(id, image),
+			containerd.WithNewSnapshot(
+				id,
+				image,
+				snapshots.WithLabels(commands.LabelArgs(context.StringSlice("snapshotter-label")))),
 			containerd.WithAdditionalContainerLabels(labels))
 
 		if len(args) > 0 {
@@ -103,6 +108,9 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		}
 		if cwd := context.String("cwd"); cwd != "" {
 			opts = append(opts, oci.WithProcessCwd(cwd))
+		}
+		if user := context.String("user"); user != "" {
+			opts = append(opts, oci.WithUser(user))
 		}
 		if context.Bool("tty") {
 			opts = append(opts, oci.WithTTY)
@@ -134,6 +142,24 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		ccount := context.Uint64("cpu-count")
 		if ccount != 0 {
 			opts = append(opts, oci.WithWindowsCPUCount(ccount))
+		}
+		cshares := context.Uint64("cpu-shares")
+		if cshares != 0 {
+			opts = append(opts, oci.WithWindowsCPUShares(uint16(cshares)))
+		}
+		cmax := context.Uint64("cpu-max")
+		if cmax != 0 {
+			opts = append(opts, oci.WithWindowsCPUMaximum(uint16(cmax)))
+		}
+		for _, dev := range context.StringSlice("device") {
+			parts := strings.Split(dev, "://")
+			if len(parts) != 2 {
+				return nil, errors.New("devices must be in the format IDType://ID")
+			}
+			if parts[0] == "" {
+				return nil, errors.New("devices must have a non-empty IDType")
+			}
+			opts = append(opts, oci.WithWindowsDevice(parts[0], parts[1]))
 		}
 	}
 

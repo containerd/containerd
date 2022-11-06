@@ -30,7 +30,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/typeurl"
 	goevents "github.com/docker/go-events"
-	"github.com/gogo/protobuf/types"
 	"github.com/sirupsen/logrus"
 )
 
@@ -63,7 +62,7 @@ func (e *Exchange) Forward(ctx context.Context, envelope *events.Envelope) (err 
 		logger := log.G(ctx).WithFields(logrus.Fields{
 			"topic": envelope.Topic,
 			"ns":    envelope.Namespace,
-			"type":  envelope.Event.TypeUrl,
+			"type":  envelope.Event.GetTypeUrl(),
 		})
 
 		if err != nil {
@@ -82,7 +81,6 @@ func (e *Exchange) Forward(ctx context.Context, envelope *events.Envelope) (err 
 func (e *Exchange) Publish(ctx context.Context, topic string, event events.Event) (err error) {
 	var (
 		namespace string
-		encoded   *types.Any
 		envelope  events.Envelope
 	)
 
@@ -94,7 +92,7 @@ func (e *Exchange) Publish(ctx context.Context, topic string, event events.Event
 		return fmt.Errorf("envelope topic %q: %w", topic, err)
 	}
 
-	encoded, err = typeurl.MarshalAny(event)
+	encoded, err := typeurl.MarshalAny(event)
 	if err != nil {
 		return err
 	}
@@ -108,7 +106,7 @@ func (e *Exchange) Publish(ctx context.Context, topic string, event events.Event
 		logger := log.G(ctx).WithFields(logrus.Fields{
 			"topic": envelope.Topic,
 			"ns":    envelope.Namespace,
-			"type":  envelope.Event.TypeUrl,
+			"type":  envelope.Event.GetTypeUrl(),
 		})
 
 		if err != nil {

@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/integration/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -32,7 +33,7 @@ func TestImageFSInfo(t *testing.T) {
 	PodSandboxConfigWithCleanup(t, "running-pod", "imagefs")
 
 	t.Logf("Pull an image to make sure image fs is not empty")
-	EnsureImageExists(t, GetImage(BusyBox))
+	EnsureImageExists(t, images.Get(images.BusyBox))
 
 	// It takes time to populate imagefs stats. Use eventually
 	// to check for a period of time.

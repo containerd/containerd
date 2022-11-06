@@ -17,10 +17,10 @@
 package server
 
 import (
+	"context"
 	"fmt"
 
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
-	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 

@@ -52,7 +52,9 @@ import (
 // path to the network namespace.
 func newNS(baseDir string) (nsPath string, err error) {
 	b := make([]byte, 16)
-	if _, err := rand.Reader.Read(b); err != nil {
+
+	_, err = rand.Read(b)
+	if err != nil {
 		return "", fmt.Errorf("failed to generate random netns name: %w", err)
 	}
 
@@ -63,10 +65,10 @@ func newNS(baseDir string) (nsPath string, err error) {
 		return "", err
 	}
 
-	// create an empty file at the mount point
+	// create an empty file at the mount point and fail if it already exists
 	nsName := fmt.Sprintf("cni-%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 	nsPath = path.Join(baseDir, nsName)
-	mountPointFd, err := os.Create(nsPath)
+	mountPointFd, err := os.OpenFile(nsPath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
 		return "", err
 	}
@@ -75,7 +77,7 @@ func newNS(baseDir string) (nsPath string, err error) {
 	defer func() {
 		// Ensure the mount point is cleaned up on errors
 		if err != nil {
-			os.RemoveAll(nsPath) // nolint: errcheck
+			os.RemoveAll(nsPath)
 		}
 	}()
 
@@ -105,7 +107,7 @@ func newNS(baseDir string) (nsPath string, err error) {
 		}
 
 		// Put this thread back to the orig ns, since it might get reused (pre go1.10)
-		defer origNS.Set() // nolint: errcheck
+		defer origNS.Set()
 
 		// bind mount the netns from the current thread (from /proc) onto the
 		// mount point. This causes the namespace to persist, even when there
@@ -212,6 +214,6 @@ func (n *NetNS) Do(f func(cnins.NetNS) error) error {
 	if err != nil {
 		return fmt.Errorf("get netns fd: %w", err)
 	}
-	defer ns.Close() // nolint: errcheck
+	defer ns.Close()
 	return ns.Do(f)
 }

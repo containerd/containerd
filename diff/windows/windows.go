@@ -27,7 +27,7 @@ import (
 	"io"
 	"time"
 
-	winio "github.com/Microsoft/go-winio"
+	"github.com/Microsoft/go-winio"
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
@@ -38,7 +38,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 )
@@ -144,7 +144,13 @@ func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 		return emptyDesc, err
 	}
 
-	if _, err := archive.Apply(ctx, layer, rc, archive.WithParents(parentLayerPaths), archive.AsWindowsContainerLayer()); err != nil {
+	archiveOpts := []archive.ApplyOpt{
+		archive.WithParents(parentLayerPaths),
+		archive.AsWindowsContainerLayer(),
+		archive.WithNoSameOwner(), // Lchown is not supported on Windows
+	}
+
+	if _, err := archive.Apply(ctx, layer, rc, archiveOpts...); err != nil {
 		return emptyDesc, err
 	}
 

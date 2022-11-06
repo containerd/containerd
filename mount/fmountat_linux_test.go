@@ -45,11 +45,7 @@ func makeTestForFMountat(fn fMountatCaseFunc) func(t *testing.T) {
 	return func(t *testing.T) {
 		t.Parallel()
 
-		suiteDir, err := os.MkdirTemp("", "fmountat-test-")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(suiteDir)
+		suiteDir := t.TempDir()
 
 		fn(t, suiteDir)
 	}

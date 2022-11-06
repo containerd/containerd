@@ -77,17 +77,29 @@ Support horizons will be defined corresponding to a release branch, identified
 by `<major>.<minor>`. Releases branches will be in one of several states:
 
 - __*Next*__: The next planned release branch.
-- __*Active*__: The release branch is currently supported and accepting patches.
+- __*Active*__: The release is a stable branch which is currently supported and accepting patches.
 - __*Extended*__: The release branch is only accepting security patches.
+- __*LTS*__: The release is a long term stable branch which is currently supported and accepting patches.
 - __*End of Life*__: The release branch is no longer supported and no new patches will be accepted.
 
-Releases will be supported up to one year after a _minor_ release. This means that
+Releases will be supported at least one year after a _minor_ release. This means that
 we will accept bug reports and backports to release branches until the end of
 life date. If no new _minor_ release has been made, that release will be
 considered supported until 6 months after the next _minor_ is released or one year,
 whichever is longer. Additionally, releases may have an extended security support
 period after the end of the active period to accept security backports. This
 timeframe will be decided by maintainers before the end of the active status.
+
+Long term stable (_LTS_) releases will be supported for at least three years after
+their initial _minor_ release. These branches will accept bug reports and
+backports until the end of life date. They may also accept a wider range of
+patches than non-_LTS_ releases to support the longer term maintainability of the
+branch, including library dependency, toolchain (including Go) and other version updates
+which are needed to ensure each release is built with fully supported dependencies and
+remains usable by containerd clients. There should be at least a 6 month overlap between
+the end of life of an _LTS_ release and the initial release of a new _LTS_ release.
+Up to 6 months before the announced end of life of an _LTS_ branch, the branch may
+convert to a regular _Active_ release with stricter backport criteria.
 
 The current state is available in the following tables:
 
@@ -100,12 +112,33 @@ The current state is available in the following tables:
 | [1.1](https://github.com/containerd/containerd/releases/tag/v1.1.8)  | End of Life | April 23, 2018  | October 23, 2019 |
 | [1.2](https://github.com/containerd/containerd/releases/tag/v1.2.13) | End of Life | October 24, 2018 | October 15, 2020 |
 | [1.3](https://github.com/containerd/containerd/releases/tag/v1.3.10) | End of Life | September 26, 2019  | March 4, 2021 |
-| [1.4](https://github.com/containerd/containerd/releases/tag/v1.4.12) | Extended   | August 17, 2020 | March 3, 2022 (Extended) |
-| [1.5](https://github.com/containerd/containerd/releases/tag/v1.5.9)  | Active   | May 3, 2021  | October 28, 2022 |
-| [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.0)  | Active   | February 15, 2022  | max(February 15, 2023 or release of 1.7.0 + 6 months) |
+| [1.4](https://github.com/containerd/containerd/releases/tag/v1.4.13) | End of Life | August 17, 2020 | March 3, 2022 |
+| [1.5](https://github.com/containerd/containerd/releases/tag/v1.5.13) | Active   | May 3, 2021  | January 28, 2023 |
+| [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.8)  | LTS   | February 15, 2022  | max(February 15, 2025 or next LTS + 6 months) |
 | [1.7](https://github.com/containerd/containerd/milestone/42)         | Next   | TBD  | TBD |
 
-Note that branches and release from before 1.0 may not follow these rules.
+
+### Kubernetes Support
+
+The Kubernetes version matrix represents the versions of containerd which are
+recommended for a Kubernetes release. Any actively supported version of
+containerd may receive patches to fix bugs encountered in any version of
+Kubernetes, however, our recommendation is based on which versions have been
+the most thoroughly tested. See the [Kubernetes test grid](https://testgrid.k8s.io/sig-node-containerd)
+for the list of actively tested versions. Kubernetes only supports n-3 minor
+release versions and containerd will ensure there is always a supported version
+of containerd for every supported version of Kubernetes.
+
+| Kubernetes Version | containerd Version | CRI Version  |
+|--------------------|--------------------|--------------|
+| 1.20               | 1.5.0+             | v1alpha2     |
+| 1.21               | 1.5.0+             | v1alpha2     |
+| 1.22               | 1.5.5+             | v1alpha2     |
+| 1.23               | 1.6.0+, 1,5.8+     | v1, v1alpha2 |
+| 1.24               | 1.6.4+, 1.5.11+    | v1, v1alpha2 |
+| 1.25               | 1.6.4+, 1.5.11+    | v1, v1alpha2 |
+
+Deprecated containerd and kubernetes versions
 
 | CRI-Containerd Version | Containerd Version | Kubernetes Version | CRI Version  |
 |------------------------|--------------------|--------------------|--------------|
@@ -114,13 +147,7 @@ Note that branches and release from before 1.0 may not follow these rules.
 | End-Of-Life            | v1.1 (End-Of-Life) | 1.10+              | v1alpha2     |
 |                        | v1.2 (End-Of-Life) | 1.10+              | v1alpha2     |
 |                        | v1.3 (End-Of-Life) | 1.12+              | v1alpha2     |
-|                        | v1.4               | 1.19+              | v1alpha2     |
-|                        | v1.5               | 1.20+              | v1alpha2     |
-|                        | v1.6               | 1.23+              | v1, v1alpha2 |
-
-**Note:** The support table above specifies the Kubernetes Version that was supported at time of release of the containerd - cri integration and Kubernetes only supports n-3 minor release versions.
-
-These tables should be updated as part of the release preparation process.
+|                        | v1.4 (End-of-Life) | 1.19+              | v1alpha2     |
 
 ### Backporting
 
@@ -162,6 +189,9 @@ process:
 	```console
 	$ git cherry-pick -xsS <commit>
 	```
+   (Optional) If other commits exist in the main branch which are related
+   to the cherry-picked commit; eg: fixes to the main PR. It is recommended
+   to cherry-pick those commits also into this same `my-backport-branch`.
 4. Push the branch and open up a PR against the _release branch_:
 
 	```
@@ -336,10 +366,11 @@ against total impact.
 
 The deprecated features are shown in the following table:
 
-| Component                                                            | Deprecation release | Target release for removal | Recommendation                    |
-|----------------------------------------------------------------------|---------------------|----------------------------|-----------------------------------|
-| Runtime V1 API and implementation (`io.containerd.runtime.v1.linux`) | containerd v1.4     | containerd v2.0            | Use `io.containerd.runc.v2`       |
-| Runc V1 implementation of Runtime V2 (`io.containerd.runc.v1`)       | containerd v1.4     | containerd v2.0            | Use `io.containerd.runc.v2`       |
-| config.toml `version = 1`                                            | containerd v1.5     | containerd v2.0            | Use config.toml `version = 2`     |
-| Built-in `aufs` snapshotter                                          | containerd v1.5     | containerd v2.0            | Use `overlayfs` snapshotter       |
-| `cri-containerd-*.tar.gz` release bundles                            | containerd v1.6     | containerd v2.0            | Use `containerd-*.tar.gz` bundles |
+| Component                                                                        | Deprecation release | Target release for removal | Recommendation                    |
+|----------------------------------------------------------------------------------|---------------------|----------------------------|-----------------------------------|
+| Runtime V1 API and implementation (`io.containerd.runtime.v1.linux`)             | containerd v1.4     | containerd v2.0            | Use `io.containerd.runc.v2`       |
+| Runc V1 implementation of Runtime V2 (`io.containerd.runc.v1`)                   | containerd v1.4     | containerd v2.0            | Use `io.containerd.runc.v2`       |
+| config.toml `version = 1`                                                        | containerd v1.5     | containerd v2.0            | Use config.toml `version = 2`     |
+| Built-in `aufs` snapshotter                                                      | containerd v1.5     | containerd v2.0            | Use `overlayfs` snapshotter       |
+| `cri-containerd-*.tar.gz` release bundles                                        | containerd v1.6     | containerd v2.0            | Use `containerd-*.tar.gz` bundles |
+| Pulling Schema 1 images (`application/vnd.docker.distribution.manifest.v1+json`) | containerd v1.7     | containerd v2.0            | Use Schema 2 or OCI images        |

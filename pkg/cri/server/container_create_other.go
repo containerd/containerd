@@ -21,6 +21,7 @@ package server
 
 import (
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/snapshots"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -52,4 +53,9 @@ func (c *criService) containerSpec(
 
 func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
 	return []oci.SpecOpts{}, nil
+}
+
+// snapshotterOpts returns snapshotter options for the rootfs snapshot
+func snapshotterOpts(snapshotterName string, config *runtime.ContainerConfig) []snapshots.Opt {
+	return []snapshots.Opt{}
 }

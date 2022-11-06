@@ -84,6 +84,15 @@ func WithPidsLimit(limit int64) SpecOpts {
 	}
 }
 
+// WithBlockIO sets the container's blkio parameters
+func WithBlockIO(blockio *specs.LinuxBlockIO) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		setResources(s)
+		s.Linux.Resources.BlockIO = blockio
+		return nil
+	}
+}
+
 // WithCPUShares sets the container's cpu shares
 func WithCPUShares(shares uint64) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
@@ -131,7 +140,7 @@ var WithAllCurrentCapabilities = func(ctx context.Context, client Client, c *con
 	return WithCapabilities(caps)(ctx, client, c, s)
 }
 
-// WithAllKnownCapabilities sets all the the known linux capabilities for the container process
+// WithAllKnownCapabilities sets all the known linux capabilities for the container process
 var WithAllKnownCapabilities = func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
 	caps := cap.Known()
 	return WithCapabilities(caps)(ctx, client, c, s)
@@ -152,4 +161,12 @@ func WithRdt(closID, l3CacheSchema, memBwSchema string) SpecOpts {
 		}
 		return nil
 	}
+}
+
+func escapeAndCombineArgs(args []string) string {
+	panic("not supported")
+}
+
+func appendOSMounts(s *Spec, os string) error {
+	return nil
 }

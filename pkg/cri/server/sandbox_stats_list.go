@@ -17,10 +17,10 @@
 package server
 
 import (
+	"context"
 	"fmt"
 
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -34,7 +34,6 @@ func (c *criService) ListPodSandboxStats(
 	podSandboxStats := new(runtime.ListPodSandboxStatsResponse)
 	for _, sandbox := range sandboxes {
 		metrics, err := metricsForSandbox(sandbox)
-
 		if err != nil {
 			return nil, fmt.Errorf("failed to obtain metrics for sandbox %q: %w", sandbox.ID, err)
 		}

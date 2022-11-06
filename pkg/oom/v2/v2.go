@@ -71,15 +71,15 @@ func (w *watcher) Run(ctx context.Context) {
 				continue
 			}
 			lastOOM := lastOOMMap[i.id]
-			if i.ev.OOM > lastOOM {
+			if i.ev.OOMKill > lastOOM {
 				if err := w.publisher.Publish(ctx, runtime.TaskOOMEventTopic, &eventstypes.TaskOOM{
 					ContainerID: i.id,
 				}); err != nil {
 					logrus.WithError(err).Error("publish OOM event")
 				}
 			}
-			if i.ev.OOM > 0 {
-				lastOOMMap[i.id] = i.ev.OOM
+			if i.ev.OOMKill > 0 {
+				lastOOMMap[i.id] = i.ev.OOMKill
 			}
 		}
 	}

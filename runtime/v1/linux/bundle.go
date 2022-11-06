@@ -217,12 +217,10 @@ func (b *bundle) decideShimAddress(namespace string) string {
 
 func (b *bundle) shimConfig(namespace string, c *Config, runcOptions *runctypes.RuncOptions) shim.Config {
 	var (
-		criuPath      string
 		runtimeRoot   = c.RuntimeRoot
 		systemdCgroup bool
 	)
 	if runcOptions != nil {
-		criuPath = runcOptions.CriuPath
 		systemdCgroup = runcOptions.SystemdCgroup
 		if runcOptions.RuntimeRoot != "" {
 			runtimeRoot = runcOptions.RuntimeRoot
@@ -232,7 +230,6 @@ func (b *bundle) shimConfig(namespace string, c *Config, runcOptions *runctypes.
 		Path:          b.path,
 		WorkDir:       b.workDir,
 		Namespace:     namespace,
-		Criu:          criuPath,
 		RuntimeRoot:   runtimeRoot,
 		SystemdCgroup: systemdCgroup,
 	}

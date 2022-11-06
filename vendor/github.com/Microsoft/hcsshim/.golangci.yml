@@ -3,6 +3,7 @@ run:
 
 linters:
   enable:
+    - gofmt
     - stylecheck
 
 linters-settings:
@@ -24,6 +25,16 @@ issues:
       Text: "ST1003:"
 
     - path: hcsshim.go
+      linters:
+        - stylecheck
+      Text: "ST1003:"
+
+    - path: cmd\\ncproxy\\nodenetsvc\\
+      linters:
+        - stylecheck
+      Text: "ST1003:"
+
+    - path: cmd\\ncproxy_mock\\
       linters:
         - stylecheck
       Text: "ST1003:"

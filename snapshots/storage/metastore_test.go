@@ -20,15 +20,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/google/go-cmp/cmp"
-	"gotest.tools/v3/assert"
-	is "gotest.tools/v3/assert/cmp"
+	"github.com/stretchr/testify/assert"
 )
 
 type testFunc func(context.Context, *testing.T, *MetaStore)
@@ -66,16 +64,15 @@ func MetaStoreSuite(t *testing.T, name string, meta func(root string) (*MetaStor
 func makeTest(t *testing.T, name string, metaFn metaFactory, fn testFunc) func(t *testing.T) {
 	return func(t *testing.T) {
 		ctx := context.Background()
-		tmpDir, err := os.MkdirTemp("", "metastore-test-"+name+"-")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(tmpDir)
 
-		ms, err := metaFn(tmpDir)
+		ms, err := metaFn(t.TempDir())
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		t.Cleanup(func() {
+			ms.Close()
+		})
 
 		fn(ctx, t, ms)
 	}
@@ -216,29 +213,29 @@ var baseInfo = map[string]snapshots.Info{
 
 func assertNotExist(t *testing.T, err error) {
 	t.Helper()
-	assert.Assert(t, errdefs.IsNotFound(err), "got %+v", err)
+	assert.True(t, errdefs.IsNotFound(err), "got %+v", err)
 }
 
 func assertNotActive(t *testing.T, err error) {
 	t.Helper()
-	assert.Assert(t, errdefs.IsFailedPrecondition(err), "got %+v", err)
+	assert.True(t, errdefs.IsFailedPrecondition(err), "got %+v", err)
 }
 
 func assertNotCommitted(t *testing.T, err error) {
 	t.Helper()
-	assert.Assert(t, errdefs.IsInvalidArgument(err), "got %+v", err)
+	assert.True(t, errdefs.IsInvalidArgument(err), "got %+v", err)
 }
 
 func assertExist(t *testing.T, err error) {
 	t.Helper()
-	assert.Assert(t, errdefs.IsAlreadyExists(err), "got %+v", err)
+	assert.True(t, errdefs.IsAlreadyExists(err), "got %+v", err)
 }
 
 func testGetInfo(ctx context.Context, t *testing.T, _ *MetaStore) {
 	for key, expected := range baseInfo {
 		_, info, _, err := GetInfo(ctx, key)
-		assert.NilError(t, err, "on key %v", key)
-		assert.Check(t, is.DeepEqual(expected, info, cmpSnapshotInfo), "on key %v", key)
+		assert.Nil(t, err, "on key %v", key)
+		assert.Truef(t, cmp.Equal(expected, info, cmpSnapshotInfo), "on key %v", key)
 	}
 }
 
@@ -278,8 +275,8 @@ func testWalk(ctx context.Context, t *testing.T, _ *MetaStore) {
 		found[info.Name] = info
 		return nil
 	})
-	assert.NilError(t, err)
-	assert.Assert(t, is.DeepEqual(baseInfo, found, cmpSnapshotInfo))
+	assert.NoError(t, err)
+	assert.True(t, cmp.Equal(baseInfo, found, cmpSnapshotInfo))
 }
 
 func testGetSnapshot(ctx context.Context, t *testing.T, ms *MetaStore) {
@@ -328,8 +325,8 @@ func testGetSnapshot(ctx context.Context, t *testing.T, ms *MetaStore) {
 	test := func(ctx context.Context, t *testing.T, ms *MetaStore) {
 		for key, expected := range snapshotMap {
 			s, err := GetSnapshot(ctx, key)
-			assert.NilError(t, err, "failed to get snapshot %s", key)
-			assert.Check(t, is.DeepEqual(expected, s), "on key %s", key)
+			assert.Nil(t, err, "failed to get snapshot %s", key)
+			assert.Equalf(t, expected, s, "on key %s", key)
 		}
 	}
 

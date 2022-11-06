@@ -20,7 +20,6 @@ import (
 	"context"
 	"io"
 	"math/rand"
-	"os"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -28,7 +27,9 @@ import (
 
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/metadata/boltutil"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/go-digest"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -42,11 +43,8 @@ func TestResourceMax(t *testing.T) {
 }
 
 func TestGCRoots(t *testing.T) {
-	db, cleanup, err := newDatabase()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cleanup()
+	db, err := newDatabase(t)
+	require.NoError(t, err)
 
 	alters := []alterFunc{
 		addImage("ns1", "image1", dgst(1), nil),
@@ -158,16 +156,13 @@ func TestGCRoots(t *testing.T) {
 	ctx := context.Background()
 
 	checkNodeC(ctx, t, db, expected, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
-		return scanRoots(ctx, tx, nc)
+		return startGCContext(ctx, nil).scanRoots(ctx, tx, nc)
 	})
 }
 
 func TestGCRemove(t *testing.T) {
-	db, cleanup, err := newDatabase()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cleanup()
+	db, err := newDatabase(t)
+	require.NoError(t, err)
 
 	alters := []alterFunc{
 		addImage("ns1", "image1", dgst(1), nil),
@@ -231,9 +226,10 @@ func TestGCRemove(t *testing.T) {
 	}
 
 	ctx := context.Background()
+	c := startGCContext(ctx, nil)
 
 	checkNodes(ctx, t, db, all, func(ctx context.Context, tx *bolt.Tx, fn func(context.Context, gc.Node) error) error {
-		return scanAll(ctx, tx, fn)
+		return c.scanAll(ctx, tx, fn)
 	})
 	if t.Failed() {
 		t.Fatal("Scan all failed")
@@ -241,7 +237,7 @@ func TestGCRemove(t *testing.T) {
 
 	if err := db.Update(func(tx *bolt.Tx) error {
 		for _, n := range deleted {
-			if err := remove(ctx, tx, n); err != nil {
+			if err := c.remove(ctx, tx, n); err != nil {
 				return err
 			}
 		}
@@ -251,16 +247,13 @@ func TestGCRemove(t *testing.T) {
 	}
 
 	checkNodes(ctx, t, db, remaining, func(ctx context.Context, tx *bolt.Tx, fn func(context.Context, gc.Node) error) error {
-		return scanAll(ctx, tx, fn)
+		return c.scanAll(ctx, tx, fn)
 	})
 }
 
 func TestGCRefs(t *testing.T) {
-	db, cleanup, err := newDatabase()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cleanup()
+	db, err := newDatabase(t)
+	require.NoError(t, err)
 
 	alters := []alterFunc{
 		addContent("ns1", dgst(1), nil),
@@ -371,10 +364,11 @@ func TestGCRefs(t *testing.T) {
 	}
 
 	ctx := context.Background()
+	c := startGCContext(ctx, nil)
 
 	for n, nodes := range refs {
 		checkNodeC(ctx, t, db, nodes, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
-			return references(ctx, tx, n, func(n gc.Node) {
+			return c.references(ctx, tx, n, func(n gc.Node) {
 				select {
 				case nc <- n:
 				case <-ctx.Done():
@@ -387,25 +381,190 @@ func TestGCRefs(t *testing.T) {
 	}
 }
 
-func newDatabase() (*bolt.DB, func(), error) {
-	td, err := os.MkdirTemp("", "gc-roots-")
-	if err != nil {
-		return nil, nil, err
+func TestCollectibleResources(t *testing.T) {
+	db, err := newDatabase(t)
+	require.NoError(t, err)
+
+	testResource := gc.ResourceType(0x10)
+
+	alters := []alterFunc{
+		addContent("ns1", dgst(1), nil),
+		addImage("ns1", "image1", dgst(1), nil),
+		addContent("ns1", dgst(2), map[string]string{
+			"containerd.io/gc.ref.test": "test2",
+		}),
+		addImage("ns1", "image2", dgst(2), nil),
+		addLease("ns1", "lease1", labelmap(string(labelGCExpire), time.Now().Add(time.Hour).Format(time.RFC3339))),
+		addLease("ns1", "lease2", labelmap(string(labelGCExpire), time.Now().Add(-1*time.Hour).Format(time.RFC3339))),
 	}
+	refs := map[gc.Node][]gc.Node{
+		gcnode(ResourceContent, "ns1", dgst(1).String()): nil,
+		gcnode(ResourceContent, "ns1", dgst(2).String()): {
+			gcnode(testResource, "ns1", "test2"),
+		},
+	}
+	all := []gc.Node{
+		gcnode(ResourceContent, "ns1", dgst(1).String()),
+		gcnode(ResourceContent, "ns1", dgst(2).String()),
+		gcnode(ResourceLease, "ns1", "lease1"),
+		gcnode(ResourceLease, "ns1", "lease2"),
+		gcnode(testResource, "ns1", "test1"),
+		gcnode(testResource, "ns1", "test2"), // 5: Will be removed
+		gcnode(testResource, "ns1", "test3"),
+		gcnode(testResource, "ns1", "test4"),
+	}
+	removeIndex := 5
+	roots := []gc.Node{
+		gcnode(ResourceContent, "ns1", dgst(1).String()),
+		gcnode(ResourceContent, "ns1", dgst(2).String()),
+		gcnode(ResourceLease, "ns1", "lease1"),
+		gcnode(testResource, "ns1", "test1"),
+		gcnode(testResource, "ns1", "test3"),
+	}
+	collector := &testCollector{
+		all: []gc.Node{
+			gcnode(testResource, "ns1", "test1"),
+			gcnode(testResource, "ns1", "test2"),
+			gcnode(testResource, "ns1", "test3"),
+			gcnode(testResource, "ns1", "test4"),
+		},
+		active: []gc.Node{
+			gcnode(testResource, "ns1", "test1"),
+		},
+		leased: map[string][]gc.Node{
+			"lease1": {
+				gcnode(testResource, "ns1", "test3"),
+			},
+			"lease2": {
+				gcnode(testResource, "ns1", "test4"),
+			},
+		},
+	}
+
+	if err := db.Update(func(tx *bolt.Tx) error {
+		v1bkt, err := tx.CreateBucketIfNotExists(bucketKeyVersion)
+		if err != nil {
+			return err
+		}
+		for _, alter := range alters {
+			if err := alter(v1bkt); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("Update failed: %+v", err)
+	}
+
+	ctx := context.Background()
+	c := startGCContext(ctx, map[gc.ResourceType]Collector{
+		testResource: collector,
+	})
+
+	for n, nodes := range refs {
+		checkNodeC(ctx, t, db, nodes, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
+			return c.references(ctx, tx, n, func(n gc.Node) {
+				select {
+				case nc <- n:
+				case <-ctx.Done():
+				}
+			})
+		})
+		if t.Failed() {
+			t.Fatalf("Failure scanning %v", n)
+		}
+	}
+	checkNodes(ctx, t, db, all, func(ctx context.Context, tx *bolt.Tx, fn func(context.Context, gc.Node) error) error {
+		return c.scanAll(ctx, tx, fn)
+	})
+	checkNodeC(ctx, t, db, roots, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
+		return c.scanRoots(ctx, tx, nc)
+	})
+
+	if err := db.Update(func(tx *bolt.Tx) error {
+		if err := c.remove(ctx, tx, all[removeIndex]); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("Update failed: %+v", err)
+	}
+	all = append(all[:removeIndex], all[removeIndex+1:]...)
+	checkNodes(ctx, t, db, all, func(ctx context.Context, tx *bolt.Tx, fn func(context.Context, gc.Node) error) error {
+		return c.scanAll(ctx, tx, fn)
+	})
+}
+
+type testCollector struct {
+	all    []gc.Node
+	active []gc.Node
+	leased map[string][]gc.Node
+}
+
+func (tc *testCollector) StartCollection(context.Context) (CollectionContext, error) {
+	return tc, nil
+}
+
+func (tc *testCollector) ReferenceLabel() string {
+	return "test"
+}
+
+func (tc *testCollector) All(fn func(gc.Node)) {
+	for _, n := range tc.all {
+		fn(n)
+	}
+}
+
+func (tc *testCollector) Active(namespace string, fn func(gc.Node)) {
+	for _, n := range tc.active {
+		if n.Namespace == namespace {
+			fn(n)
+		}
+	}
+}
+
+func (tc *testCollector) Leased(namespace, lease string, fn func(gc.Node)) {
+	for _, n := range tc.leased[lease] {
+		if n.Namespace == namespace {
+			fn(n)
+		}
+	}
+}
+
+func (tc *testCollector) Remove(n gc.Node) {
+	for i := range tc.all {
+		if tc.all[i] == n {
+			tc.all = append(tc.all[:i], tc.all[i+1:]...)
+			return
+		}
+	}
+}
+
+func (tc *testCollector) Cancel() error {
+	return nil
+}
+
+func (tc *testCollector) Finish() error {
+	return nil
+}
+
+func newDatabase(t testing.TB) (*bolt.DB, error) {
+	td := t.TempDir()
 
 	db, err := bolt.Open(filepath.Join(td, "test.db"), 0777, nil)
 	if err != nil {
-		os.RemoveAll(td)
-		return nil, nil, err
+		return nil, err
 	}
 
-	return db, func() {
-		db.Close()
-		os.RemoveAll(td)
-	}, nil
+	t.Cleanup(func() {
+		assert.NoError(t, db.Close())
+	})
+
+	return db, nil
 }
 
 func checkNodeC(ctx context.Context, t *testing.T, db *bolt.DB, expected []gc.Node, fn func(context.Context, *bolt.Tx, chan<- gc.Node) error) {
+	t.Helper()
 	var actual []gc.Node
 	nc := make(chan gc.Node)
 	done := make(chan struct{})
@@ -427,6 +586,7 @@ func checkNodeC(ctx context.Context, t *testing.T, db *bolt.DB, expected []gc.No
 }
 
 func checkNodes(ctx context.Context, t *testing.T, db *bolt.DB, expected []gc.Node, fn func(context.Context, *bolt.Tx, func(context.Context, gc.Node) error) error) {
+	t.Helper()
 	var actual []gc.Node
 	scanFn := func(ctx context.Context, n gc.Node) error {
 		actual = append(actual, n)
@@ -443,6 +603,7 @@ func checkNodes(ctx context.Context, t *testing.T, db *bolt.DB, expected []gc.No
 }
 
 func checkNodesEqual(t *testing.T, n1, n2 []gc.Node) {
+	t.Helper()
 	sort.Sort(nodeList(n1))
 	sort.Sort(nodeList(n2))
 

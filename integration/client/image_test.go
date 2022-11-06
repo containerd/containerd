@@ -26,12 +26,13 @@ import (
 	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	imagelist "github.com/containerd/containerd/integration/images"
 	"github.com/containerd/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestImageIsUnpacked(t *testing.T) {
-	const imageName = "k8s.gcr.io/pause:3.6"
+	imageName := imagelist.Get(imagelist.Pause)
 	ctx, cancel := testContext(t)
 	defer cancel()
 
@@ -79,7 +80,7 @@ func TestImageIsUnpacked(t *testing.T) {
 
 func TestImagePullWithDistSourceLabel(t *testing.T) {
 	var (
-		source   = "k8s.gcr.io"
+		source   = "registry.k8s.io"
 		repoName = "pause"
 		tag      = "3.6"
 	)
@@ -137,7 +138,7 @@ func TestImageUsage(t *testing.T) {
 		t.Skip()
 	}
 
-	imageName := "k8s.gcr.io/pause:3.6"
+	imageName := imagelist.Get(imagelist.Pause)
 	ctx, cancel := testContext(t)
 	defer cancel()
 
@@ -231,7 +232,7 @@ func TestImageUsage(t *testing.T) {
 func TestImageSupportedBySnapshotter_Error(t *testing.T) {
 	var unsupportedImage string
 	if runtime.GOOS == "windows" {
-		unsupportedImage = "k8s.gcr.io/pause-amd64:3.2"
+		unsupportedImage = "registry.k8s.io/pause-amd64:3.2"
 	} else {
 		unsupportedImage = "mcr.microsoft.com/windows/nanoserver:1809"
 	}

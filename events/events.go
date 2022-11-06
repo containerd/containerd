@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/containerd/typeurl"
-	"github.com/gogo/protobuf/types"
 )
 
 // Envelope provides the packaging for an event.
@@ -29,7 +28,7 @@ type Envelope struct {
 	Timestamp time.Time
 	Namespace string
 	Topic     string
-	Event     *types.Any
+	Event     typeurl.Any
 }
 
 // Field returns the value for the given fieldpath as a string, if defined.

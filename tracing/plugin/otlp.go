@@ -25,12 +25,15 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/tracing"
+	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 )
@@ -47,7 +50,11 @@ func init() {
 			if cfg.Endpoint == "" {
 				return nil, fmt.Errorf("no OpenTelemetry endpoint: %w", plugin.ErrSkipPlugin)
 			}
-			return newExporter(ic.Context, cfg)
+			exp, err := newExporter(ic.Context, cfg)
+			if err != nil {
+				return nil, err
+			}
+			return trace.NewBatchSpanProcessor(exp), nil
 		},
 	})
 	plugin.Register(&plugin.Registration{
@@ -59,6 +66,9 @@ func init() {
 			return newTracer(ic)
 		},
 	})
+
+	// Register logging hook for tracing
+	logrus.StandardLogger().AddHook(tracing.NewLogrusHook())
 }
 
 // OTLPConfig holds the configurations for the built-in otlp span processor
@@ -127,6 +137,7 @@ func newTracer(ic *plugin.InitContext) (io.Closer, error) {
 	config := ic.Config.(*TraceConfig)
 
 	res, err := resource.New(ctx,
+		resource.WithHost(),
 		resource.WithAttributes(
 			// Service name used to displace traces in backends
 			semconv.ServiceNameKey.String(config.ServiceName),
@@ -136,8 +147,10 @@ func newTracer(ic *plugin.InitContext) (io.Closer, error) {
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
 
+	sampler := sdktrace.ParentBased(sdktrace.TraceIDRatioBased(config.TraceSamplingRatio))
+
 	opts := []sdktrace.TracerProviderOption{
-		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(config.TraceSamplingRatio)),
+		sdktrace.WithSampler(sampler),
 		sdktrace.WithResource(res),
 	}
 
@@ -150,7 +163,11 @@ func newTracer(ic *plugin.InitContext) (io.Closer, error) {
 	for id, pctx := range ls {
 		p, err := pctx.Instance()
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("failed to initialize a tracing processor %q", id)
+			if plugin.IsSkipPlugin(err) {
+				log.G(ctx).WithError(err).Infof("skipping tracing processor initialization (no tracing plugin)")
+			} else {
+				log.G(ctx).WithError(err).Errorf("failed to initialize a tracing processor %q", id)
+			}
 			continue
 		}
 		proc := p.(sdktrace.SpanProcessor)
@@ -161,7 +178,8 @@ func newTracer(ic *plugin.InitContext) (io.Closer, error) {
 	provider := sdktrace.NewTracerProvider(opts...)
 
 	otel.SetTracerProvider(provider)
-	otel.SetTextMapPropagator(propagation.TraceContext{})
+
+	otel.SetTextMapPropagator(propagators())
 
 	return &closer{close: func() error {
 		for _, p := range procs {
@@ -171,4 +189,9 @@ func newTracer(ic *plugin.InitContext) (io.Closer, error) {
 		}
 		return nil
 	}}, nil
+}
+
+// Returns a composite TestMap propagator
+func propagators() propagation.TextMapPropagator {
+	return propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})
 }

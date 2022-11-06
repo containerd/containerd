@@ -25,22 +25,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/integration/images"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func TestAdditionalGids(t *testing.T) {
-	testPodLogDir, err := os.MkdirTemp("/tmp", "additional-gids")
-	require.NoError(t, err)
-	defer os.RemoveAll(testPodLogDir)
+	testPodLogDir := t.TempDir()
 
 	t.Log("Create a sandbox with log directory")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "additional-gids",
 		WithPodLogDirectory(testPodLogDir))
 
 	var (
-		testImage     = GetImage(BusyBox)
+		testImage     = images.Get(images.BusyBox)
 		containerName = "test-container"
 	)
 

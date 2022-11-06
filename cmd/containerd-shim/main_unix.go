@@ -22,6 +22,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -38,13 +39,15 @@ import (
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/process"
+	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/protobuf/proto"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 	shimlog "github.com/containerd/containerd/runtime/v1"
 	"github.com/containerd/containerd/runtime/v1/shim"
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/containerd/sys/reaper"
+	"github.com/containerd/containerd/version"
 	"github.com/containerd/ttrpc"
-	"github.com/containerd/typeurl"
-	ptypes "github.com/gogo/protobuf/types"
 	"github.com/sirupsen/logrus"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
@@ -52,6 +55,7 @@ import (
 
 var (
 	debugFlag            bool
+	versionFlag          bool
 	namespaceFlag        string
 	socketFlag           string
 	addressFlag          string
@@ -68,14 +72,15 @@ var (
 	}
 )
 
-func init() {
+func parseFlags() {
 	flag.BoolVar(&debugFlag, "debug", false, "enable debug output in logs")
+	flag.BoolVar(&versionFlag, "v", false, "show the shim version and exit")
 	flag.StringVar(&namespaceFlag, "namespace", "", "namespace that owns the shim")
 	flag.StringVar(&socketFlag, "socket", "", "socket path to serve")
 	flag.StringVar(&addressFlag, "address", "", "grpc address back to main containerd")
-	flag.StringVar(&workdirFlag, "workdir", "", "path used to storge large temporary data")
+	flag.StringVar(&workdirFlag, "workdir", "", "path used to storage large temporary data")
 	flag.StringVar(&runtimeRootFlag, "runtime-root", process.RuncRoot, "root directory for the runtime")
-	flag.StringVar(&criuFlag, "criu", "", "path to criu binary")
+	flag.StringVar(&criuFlag, "criu", "", "path to criu binary (deprecated: do not use)")
 	flag.BoolVar(&systemdCgroupFlag, "systemd-cgroup", false, "set runtime to use systemd-cgroup")
 	// currently, the `containerd publish` utility is embedded in the daemon binary.
 	// The daemon invokes `containerd-shim -containerd-binary ...` with its own os.Executable() path.
@@ -83,22 +88,35 @@ func init() {
 	flag.Parse()
 }
 
-func main() {
+func setRuntime() {
 	debug.SetGCPercent(40)
 	go func() {
 		for range time.Tick(30 * time.Second) {
 			debug.FreeOSMemory()
 		}
 	}()
-
-	if debugFlag {
-		logrus.SetLevel(logrus.DebugLevel)
-	}
-
 	if os.Getenv("GOMAXPROCS") == "" {
 		// If GOMAXPROCS hasn't been set, we default to a value of 2 to reduce
 		// the number of Go stacks present in the shim.
 		runtime.GOMAXPROCS(2)
+	}
+}
+
+func main() {
+	parseFlags()
+	if versionFlag {
+		fmt.Println("containerd-shim")
+		fmt.Println("  Version: ", version.Version)
+		fmt.Println("  Revision:", version.Revision)
+		fmt.Println("  Go version:", version.GoVersion)
+		fmt.Println("")
+		return
+	}
+
+	setRuntime()
+
+	if debugFlag {
+		logrus.SetLevel(logrus.DebugLevel)
 	}
 
 	stdout, stderr, err := openStdioKeepAlivePipes(workdirFlag)
@@ -160,7 +178,6 @@ func executeShim() error {
 			Path:          path,
 			Namespace:     namespaceFlag,
 			WorkDir:       workdirFlag,
-			Criu:          criuFlag,
 			SystemdCgroup: systemdCgroupFlag,
 			RuntimeRoot:   runtimeRootFlag,
 		},
@@ -221,8 +238,7 @@ func serve(ctx context.Context, server *ttrpc.Server, path string) error {
 	logrus.WithField("socket", path).Debug("serving api on unix socket")
 	go func() {
 		defer l.Close()
-		if err := server.Serve(ctx, l); err != nil &&
-			!strings.Contains(err.Error(), "use of closed network connection") {
+		if err := server.Serve(ctx, l); err != nil && !errors.Is(err, net.ErrClosed) {
 			logrus.WithError(err).Fatal("containerd-shim: ttrpc server failure")
 		}
 	}()
@@ -286,11 +302,11 @@ type remoteEventsPublisher struct {
 
 func (l *remoteEventsPublisher) Publish(ctx context.Context, topic string, event events.Event) error {
 	ns, _ := namespaces.Namespace(ctx)
-	encoded, err := typeurl.MarshalAny(event)
+	encoded, err := protobuf.MarshalAnyToProto(event)
 	if err != nil {
 		return err
 	}
-	data, err := encoded.Marshal()
+	data, err := proto.Marshal(encoded)
 	if err != nil {
 		return err
 	}

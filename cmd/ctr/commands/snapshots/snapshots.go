@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/pkg/epoch"
 	"github.com/containerd/containerd/pkg/progress"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/snapshots"
@@ -140,6 +141,14 @@ var diffCommand = cli.Command{
 			diff.WithMediaType(context.String("media-type")),
 			diff.WithReference(context.String("ref")),
 			diff.WithLabels(labels),
+		}
+
+		ep, err := epoch.SourceDateEpoch()
+		if err != nil {
+			return err
+		}
+		if ep != nil {
+			opts = append(opts, diff.WithSourceDateEpoch(ep))
 		}
 
 		if idB == "" {

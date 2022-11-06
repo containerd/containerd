@@ -53,6 +53,7 @@ func init() {
 
 type service struct {
 	local diffapi.DiffClient
+	diffapi.UnimplementedDiffServer
 }
 
 var _ diffapi.DiffServer = &service{}

@@ -31,7 +31,7 @@ import (
 )
 
 type execWorker struct {
-	worker
+	ctrWorker
 }
 
 func (w *execWorker) exec(ctx, tctx context.Context) {
@@ -103,7 +103,7 @@ func (w *execWorker) exec(ctx, tctx context.Context) {
 			}
 			continue
 		}
-		// only log times are success so we don't scew the results from failures that go really fast
+		// only log times are success so we don't skew the results from failures that go really fast
 		execTimer.WithValues(w.commit).UpdateSince(start)
 	}
 }

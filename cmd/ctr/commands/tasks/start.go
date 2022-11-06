@@ -31,7 +31,7 @@ var startCommand = cli.Command{
 	Name:      "start",
 	Usage:     "start a container that has been created",
 	ArgsUsage: "CONTAINER",
-	Flags: []cli.Flag{
+	Flags: append(platformStartFlags, []cli.Flag{
 		cli.BoolFlag{
 			Name:  "null-io",
 			Usage: "send all IO to /dev/null",
@@ -52,7 +52,7 @@ var startCommand = cli.Command{
 			Name:  "detach,d",
 			Usage: "detach from the task after it has started execution",
 		},
-	},
+	}...),
 	Action: func(context *cli.Context) error {
 		var (
 			err    error

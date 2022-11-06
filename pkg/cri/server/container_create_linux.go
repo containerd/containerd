@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/snapshots"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	selinux "github.com/opencontainers/selinux/go-selinux"
@@ -192,7 +193,7 @@ func (c *criService) containerSpec(
 	}
 	defer func() {
 		if retErr != nil {
-			_ = label.ReleaseLabel(processLabel)
+			selinux.ReleaseLabel(processLabel)
 		}
 	}()
 
@@ -227,6 +228,9 @@ func (c *criService) containerSpec(
 		specOpts = append(specOpts, oci.WithPrivileged)
 		if !ociRuntime.PrivilegedWithoutHostDevices {
 			specOpts = append(specOpts, oci.WithHostDevices, oci.WithAllDevicesAllowed)
+		} else if ociRuntime.PrivilegedWithoutHostDevicesAllDevicesAllowed {
+			// allow rwm on all devices for the container
+			specOpts = append(specOpts, oci.WithAllDevicesAllowed)
 		}
 	}
 
@@ -259,6 +263,19 @@ func (c *criService) containerSpec(
 	}
 
 	supplementalGroups := securityContext.GetSupplementalGroups()
+
+	// Get blockio class
+	blockIOClass, err := c.blockIOClassFromAnnotations(config.GetMetadata().GetName(), config.Annotations, sandboxConfig.Annotations)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set blockio class: %w", err)
+	}
+	if blockIOClass != "" {
+		if linuxBlockIO, err := blockIOToLinuxOci(blockIOClass); err == nil {
+			specOpts = append(specOpts, oci.WithBlockIO(linuxBlockIO))
+		} else {
+			return nil, err
+		}
+	}
 
 	// Get RDT class
 	rdtClass, err := c.rdtClassFromAnnotations(config.GetMetadata().GetName(), config.Annotations, sandboxConfig.Annotations)
@@ -385,6 +402,9 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 	}
 	if seccompSpecOpts != nil {
 		specOpts = append(specOpts, seccompSpecOpts)
+	}
+	if c.config.EnableCDI {
+		specOpts = append(specOpts, customopts.WithCDI(config.Annotations))
 	}
 	return specOpts, nil
 }
@@ -577,4 +597,9 @@ func generateUserString(username string, uid, gid *runtime.Int64Value) (string, 
 		userstr = userstr + ":" + groupstr
 	}
 	return userstr, nil
+}
+
+// snapshotterOpts returns any Linux specific snapshotter options for the rootfs snapshot
+func snapshotterOpts(snapshotterName string, config *runtime.ContainerConfig) []snapshots.Opt {
+	return []snapshots.Opt{}
 }

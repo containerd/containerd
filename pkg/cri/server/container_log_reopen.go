@@ -17,10 +17,9 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
-
-	"golang.org/x/net/context"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )

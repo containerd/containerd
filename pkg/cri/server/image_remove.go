@@ -17,12 +17,13 @@
 package server
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/tracing"
 
-	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -33,15 +34,17 @@ import (
 // Remove the whole image no matter the it's image id or reference. This is the
 // semantic defined in CRI now.
 func (c *criService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequest) (*runtime.RemoveImageResponse, error) {
+	span := tracing.CurrentSpan(ctx)
 	image, err := c.localResolve(r.GetImage().GetImage())
 	if err != nil {
 		if errdefs.IsNotFound(err) {
+			span.AddEvent(err.Error())
 			// return empty without error when image not found.
 			return &runtime.RemoveImageResponse{}, nil
 		}
 		return nil, fmt.Errorf("can not resolve %q locally: %w", r.GetImage().GetImage(), err)
 	}
-
+	span.SetAttributes(tracing.SpanAttribute("image.id", image.ID))
 	// Remove all image references.
 	for i, ref := range image.References {
 		var opts []images.DeleteOpt

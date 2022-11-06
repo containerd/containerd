@@ -17,33 +17,38 @@
 package server
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
+
+	"github.com/containerd/imgcrypt"
+	"github.com/containerd/imgcrypt/images/encryption"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/pkg/cri/annotations"
+	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	distribution "github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/config"
-	"github.com/containerd/imgcrypt"
-	"github.com/containerd/imgcrypt/images/encryption"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"golang.org/x/net/context"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
+	"github.com/containerd/containerd/tracing"
 )
 
 // For image management:
@@ -89,6 +94,7 @@ import (
 
 // PullImage pulls an image with authentication config.
 func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (*runtime.PullImageResponse, error) {
+	span := tracing.CurrentSpan(ctx)
 	imageRef := r.GetImage().GetImage()
 	namedRef, err := distribution.ParseDockerRef(imageRef)
 	if err != nil {
@@ -98,10 +104,20 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	if ref != imageRef {
 		log.G(ctx).Debugf("PullImage using normalized image ref: %q", ref)
 	}
+
+	imagePullProgressTimeout, err := time.ParseDuration(c.config.ImagePullProgressTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse image_pull_progress_timeout %q: %w", c.config.ImagePullProgressTimeout, err)
+	}
+
 	var (
+		pctx, pcancel = context.WithCancel(ctx)
+
+		pullReporter = newPullProgressReporter(ref, pcancel, imagePullProgressTimeout)
+
 		resolver = docker.NewResolver(docker.ResolverOptions{
 			Headers: c.config.Registry.Headers,
-			Hosts:   c.registryHosts(ctx, r.GetAuth()),
+			Hosts:   c.registryHosts(ctx, r.GetAuth(), pullReporter.optionUpdateClient),
 		})
 		isSchema1    bool
 		imageHandler containerdimages.HandlerFunc = func(_ context.Context,
@@ -113,14 +129,27 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		}
 	)
 
+	defer pcancel()
+	snapshotter, err := c.snapshotterFromPodSandboxConfig(ctx, ref, r.SandboxConfig)
+	if err != nil {
+		return nil, err
+	}
+	log.G(ctx).Debugf("PullImage %q with snapshotter %s", ref, snapshotter)
+	span.SetAttributes(
+		tracing.SpanAttribute("image.ref", ref),
+		tracing.SpanAttribute("snapshotter.name", snapshotter),
+	)
 	pullOpts := []containerd.RemoteOpt{
-		containerd.WithSchema1Conversion,
+		containerd.WithSchema1Conversion, //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 		containerd.WithResolver(resolver),
-		containerd.WithPullSnapshotter(c.config.ContainerdConfig.Snapshotter),
+		containerd.WithPullSnapshotter(snapshotter),
 		containerd.WithPullUnpack,
 		containerd.WithPullLabel(imageLabelKey, imageLabelValue),
 		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
 		containerd.WithImageHandler(imageHandler),
+		containerd.WithUnpackOpts([]containerd.UnpackOpt{
+			containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
+		}),
 	}
 
 	pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
@@ -135,10 +164,13 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 			containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
 	}
 
-	image, err := c.client.Pull(ctx, ref, pullOpts...)
+	pullReporter.start(pctx)
+	image, err := c.client.Pull(pctx, ref, pullOpts...)
+	pcancel()
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
 	}
+	span.AddEvent("Pull and unpack image complete")
 
 	configDesc, err := image.Config(ctx)
 	if err != nil {
@@ -292,7 +324,7 @@ func (c *criService) getTLSConfig(registryTLSConfig criconfig.TLSConfig) (*tls.C
 		if len(cert.Certificate) != 0 {
 			tlsConfig.Certificates = []tls.Certificate{cert}
 		}
-		tlsConfig.BuildNameToCertificate() // nolint:staticcheck
+		tlsConfig.BuildNameToCertificate() //nolint:staticcheck // TODO(thaJeztah): verify if we should ignore the deprecation; see https://github.com/containerd/containerd/pull/7349/files#r990644833
 	}
 
 	if registryTLSConfig.CAFile != "" {
@@ -329,10 +361,12 @@ func hostDirFromRoots(roots []string) func(string) (string, error) {
 }
 
 // registryHosts is the registry hosts to be used by the resolver.
-func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig) docker.RegistryHosts {
+func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig, updateClientFn config.UpdateClientFunc) docker.RegistryHosts {
 	paths := filepath.SplitList(c.config.Registry.ConfigPath)
 	if len(paths) > 0 {
-		hostOptions := config.HostOptions{}
+		hostOptions := config.HostOptions{
+			UpdateClient: updateClientFn,
+		}
 		hostOptions.Credentials = func(host string) (string, string, error) {
 			hostauth := auth
 			if hostauth == nil {
@@ -372,7 +406,7 @@ func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig
 				if err != nil {
 					return nil, fmt.Errorf("get TLSConfig for registry %q: %w", e, err)
 				}
-			} else if isLocalHost(host) && u.Scheme == "http" {
+			} else if docker.IsLocalhost(host) && u.Scheme == "http" {
 				// Skipping TLS verification for localhost
 				transport.TLSClientConfig = &tls.Config{
 					InsecureSkipVerify: true,
@@ -385,6 +419,13 @@ func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig
 			if auth == nil && config.Auth != nil {
 				auth = toRuntimeAuthConfig(*config.Auth)
 			}
+
+			if updateClientFn != nil {
+				if err := updateClientFn(client); err != nil {
+					return nil, fmt.Errorf("failed to update http client: %w", err)
+				}
+			}
+
 			authorizer := docker.NewDockerAuthorizer(
 				docker.WithAuthClient(client),
 				docker.WithAuthCreds(func(host string) (string, string, error) {
@@ -410,24 +451,10 @@ func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig
 
 // defaultScheme returns the default scheme for a registry host.
 func defaultScheme(host string) string {
-	if isLocalHost(host) {
+	if docker.IsLocalhost(host) {
 		return "http"
 	}
 	return "https"
-}
-
-// isLocalHost checks if the registry host is local.
-func isLocalHost(host string) bool {
-	if h, _, err := net.SplitHostPort(host); err == nil {
-		host = h
-	}
-
-	if host == "localhost" {
-		return true
-	}
-
-	ip := net.ParseIP(host)
-	return ip.IsLoopback()
 }
 
 // addDefaultScheme returns the endpoint with default scheme
@@ -575,4 +602,213 @@ func getLayers(ctx context.Context, key string, descs []imagespec.Descriptor, va
 		}
 	}
 	return
+}
+
+const (
+	// minPullProgressReportInternal is used to prevent the reporter from
+	// eating more CPU resources
+	minPullProgressReportInternal = 5 * time.Second
+	// defaultPullProgressReportInterval represents that how often the
+	// reporter checks that pull progress.
+	defaultPullProgressReportInterval = 10 * time.Second
+)
+
+// pullProgressReporter is used to check single PullImage progress.
+type pullProgressReporter struct {
+	ref         string
+	cancel      context.CancelFunc
+	reqReporter pullRequestReporter
+	timeout     time.Duration
+}
+
+func newPullProgressReporter(ref string, cancel context.CancelFunc, timeout time.Duration) *pullProgressReporter {
+	return &pullProgressReporter{
+		ref:         ref,
+		cancel:      cancel,
+		reqReporter: pullRequestReporter{},
+		timeout:     timeout,
+	}
+}
+
+func (reporter *pullProgressReporter) optionUpdateClient(client *http.Client) error {
+	client.Transport = &pullRequestReporterRoundTripper{
+		rt:          client.Transport,
+		reqReporter: &reporter.reqReporter,
+	}
+	return nil
+}
+
+func (reporter *pullProgressReporter) start(ctx context.Context) {
+	if reporter.timeout == 0 {
+		log.G(ctx).Infof("no timeout and will not start pulling image %s reporter", reporter.ref)
+		return
+	}
+
+	go func() {
+		var (
+			reportInterval = defaultPullProgressReportInterval
+
+			lastSeenBytesRead = uint64(0)
+			lastSeenTimestamp = time.Now()
+		)
+
+		// check progress more frequently if timeout < default internal
+		if reporter.timeout < reportInterval {
+			reportInterval = reporter.timeout / 2
+
+			if reportInterval < minPullProgressReportInternal {
+				reportInterval = minPullProgressReportInternal
+			}
+		}
+
+		var ticker = time.NewTicker(reportInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				activeReqs, bytesRead := reporter.reqReporter.status()
+
+				log.G(ctx).WithField("ref", reporter.ref).
+					WithField("activeReqs", activeReqs).
+					WithField("totalBytesRead", bytesRead).
+					WithField("lastSeenBytesRead", lastSeenBytesRead).
+					WithField("lastSeenTimestamp", lastSeenTimestamp).
+					WithField("reportInterval", reportInterval).
+					Tracef("progress for image pull")
+
+				if activeReqs == 0 || bytesRead > lastSeenBytesRead {
+					lastSeenBytesRead = bytesRead
+					lastSeenTimestamp = time.Now()
+					continue
+				}
+
+				if time.Since(lastSeenTimestamp) > reporter.timeout {
+					log.G(ctx).Errorf("cancel pulling image %s because of no progress in %v", reporter.ref, reporter.timeout)
+					reporter.cancel()
+					return
+				}
+			case <-ctx.Done():
+				activeReqs, bytesRead := reporter.reqReporter.status()
+				log.G(ctx).Infof("stop pulling image %s: active requests=%v, bytes read=%v", reporter.ref, activeReqs, bytesRead)
+				return
+			}
+		}
+	}()
+}
+
+// countingReadCloser wraps http.Response.Body with pull request reporter,
+// which is used by pullRequestReporterRoundTripper.
+type countingReadCloser struct {
+	once sync.Once
+
+	rc          io.ReadCloser
+	reqReporter *pullRequestReporter
+}
+
+// Read reads bytes from original io.ReadCloser and increases bytes in
+// pull request reporter.
+func (r *countingReadCloser) Read(p []byte) (int, error) {
+	n, err := r.rc.Read(p)
+	r.reqReporter.incByteRead(uint64(n))
+	return n, err
+}
+
+// Close closes the original io.ReadCloser and only decreases the number of
+// active pull requests once.
+func (r *countingReadCloser) Close() error {
+	err := r.rc.Close()
+	r.once.Do(r.reqReporter.decRequest)
+	return err
+}
+
+// pullRequestReporter is used to track the progress per each criapi.PullImage.
+type pullRequestReporter struct {
+	// activeReqs indicates that current number of active pulling requests,
+	// including auth requests.
+	activeReqs int32
+	// totalBytesRead indicates that the total bytes has been read from
+	// remote registry.
+	totalBytesRead uint64
+}
+
+func (reporter *pullRequestReporter) incRequest() {
+	atomic.AddInt32(&reporter.activeReqs, 1)
+}
+
+func (reporter *pullRequestReporter) decRequest() {
+	atomic.AddInt32(&reporter.activeReqs, -1)
+}
+
+func (reporter *pullRequestReporter) incByteRead(nr uint64) {
+	atomic.AddUint64(&reporter.totalBytesRead, nr)
+}
+
+func (reporter *pullRequestReporter) status() (currentReqs int32, totalBytesRead uint64) {
+	currentReqs = atomic.LoadInt32(&reporter.activeReqs)
+	totalBytesRead = atomic.LoadUint64(&reporter.totalBytesRead)
+	return currentReqs, totalBytesRead
+}
+
+// pullRequestReporterRoundTripper wraps http.RoundTripper with pull request
+// reporter which is used to track the progress of active http request with
+// counting readable http.Response.Body.
+//
+// NOTE:
+//
+// Although containerd provides ingester manager to track the progress
+// of pulling request, for example `ctr image pull` shows the console progress
+// bar, it needs more CPU resources to open/read the ingested files with
+// acquiring containerd metadata plugin's boltdb lock.
+//
+// Before sending HTTP request to registry, the containerd.Client.Pull library
+// will open writer by containerd ingester manager. Based on this, the
+// http.RoundTripper wrapper can track the active progress with lower overhead
+// even if the ref has been locked in ingester manager by other Pull request.
+type pullRequestReporterRoundTripper struct {
+	rt http.RoundTripper
+
+	reqReporter *pullRequestReporter
+}
+
+func (rt *pullRequestReporterRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	rt.reqReporter.incRequest()
+
+	resp, err := rt.rt.RoundTrip(req)
+	if err != nil {
+		rt.reqReporter.decRequest()
+		return nil, err
+	}
+
+	resp.Body = &countingReadCloser{
+		rc:          resp.Body,
+		reqReporter: rt.reqReporter,
+	}
+	return resp, err
+}
+
+// Given that runtime information is not passed from PullImageRequest, we depend on an experimental annotation
+// passed from pod sandbox config to get the runtimeHandler. The annotation key is specified in configuration.
+// Once we know the runtime, try to override default snapshotter if it is set for this runtime.
+// See https://github.com/containerd/containerd/issues/6657
+func (c *criService) snapshotterFromPodSandboxConfig(ctx context.Context, imageRef string,
+	s *runtime.PodSandboxConfig) (string, error) {
+	snapshotter := c.config.ContainerdConfig.Snapshotter
+	if s == nil || s.Annotations == nil {
+		return snapshotter, nil
+	}
+
+	runtimeHandler, ok := s.Annotations[annotations.RuntimeHandler]
+	if !ok {
+		return snapshotter, nil
+	}
+
+	ociRuntime, err := c.getSandboxRuntime(s, runtimeHandler)
+	if err != nil {
+		return "", fmt.Errorf("experimental: failed to get sandbox runtime for %s, err: %+v", runtimeHandler, err)
+	}
+
+	snapshotter = c.runtimeSnapshotter(context.Background(), ociRuntime)
+	log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, snapshotter)
+	return snapshotter, nil
 }

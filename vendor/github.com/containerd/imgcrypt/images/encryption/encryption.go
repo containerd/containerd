@@ -50,6 +50,13 @@ const (
 // LayerFilter allows to select Layers by certain criteria
 type LayerFilter func(desc ocispec.Descriptor) bool
 
+// isLocalPlatform determines whether the given platform matches the local one
+func isLocalPlatform(platform *ocispec.Platform) bool {
+	matcher := platforms.NewMatcher(*platform)
+
+	return matcher.Match(platforms.DefaultSpec())
+}
+
 // IsEncryptedDiff returns true if mediaType is a known encrypted media type.
 func IsEncryptedDiff(ctx context.Context, mediaType string) bool {
 	switch mediaType {
@@ -380,6 +387,9 @@ func cryptManifestList(ctx context.Context, cs content.Store, desc ocispec.Descr
 	var newManifests []ocispec.Descriptor
 	modified := false
 	for _, manifest := range index.Manifests {
+		if cryptoOp == cryptoOpUnwrapOnly && !isLocalPlatform(manifest.Platform) {
+			continue
+		}
 		newManifest, m, err := cryptChildren(ctx, cs, manifest, cc, lf, cryptoOp, manifest.Platform)
 		if err != nil || cryptoOp == cryptoOpUnwrapOnly {
 			return ocispec.Descriptor{}, false, err
@@ -388,6 +398,9 @@ func cryptManifestList(ctx context.Context, cs content.Store, desc ocispec.Descr
 			modified = true
 		}
 		newManifests = append(newManifests, newManifest)
+	}
+	if cryptoOp == cryptoOpUnwrapOnly {
+		return ocispec.Descriptor{}, false, fmt.Errorf("No manifest found for local platform")
 	}
 
 	if modified {

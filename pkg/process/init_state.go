@@ -24,8 +24,8 @@ import (
 	"errors"
 	"fmt"
 
+	google_protobuf "github.com/containerd/containerd/protobuf/types"
 	runc "github.com/containerd/go-runc"
-	google_protobuf "github.com/gogo/protobuf/types"
 	"github.com/sirupsen/logrus"
 )
 

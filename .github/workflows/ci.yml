@@ -3,52 +3,68 @@ on:
   push:
     branches:
       - main
-      - 'release/**'
+      - "release/**"
   pull_request:
     branches:
       - main
-      - 'release/**'
+      - "release/**"
+
+env:
+  # Go version we currently use to build containerd across all CI.
+  # Note: don't forget to update `Binaries` step, as it contains the matrix of all supported Go versions.
+  GO_VERSION: "1.19.3"
+
+permissions: # added using https://github.com/step-security/secure-workflows
+  contents: read
 
 jobs:
   #
   # golangci-lint
   #
   linters:
+    permissions:
+      contents: read # for actions/checkout to fetch code
+      pull-requests: read # for golangci/golangci-lint-action to fetch pull requests
     name: Linters
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
 
     strategy:
       matrix:
-        go-version: [1.17.7]
-        os: [ubuntu-18.04, macos-10.15, windows-2019]
+        os: [ubuntu-20.04, macos-12, windows-2019]
 
     steps:
-      - uses: actions/setup-go@v2
-        with:
-          go-version: ${{ matrix.go-version }}
+      - name: Install dependencies
+        if: matrix.os == 'ubuntu-20.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libbtrfs-dev
 
-      - uses: actions/checkout@v2
-      - uses: golangci/golangci-lint-action@v2
+      - uses: actions/setup-go@v3
         with:
-          version: v1.42.0
-          args: --timeout=5m
-          skip-go-installation: true
+          go-version: ${{ env.GO_VERSION }}
+
+      - uses: actions/checkout@v3
+      - uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.49.0
+          skip-cache: true
+          args: --timeout=8m
 
   #
   # Project checks
   #
   project:
     name: Project Checks
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: '1.17.7'
+          go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
           fetch-depth: 100
@@ -68,7 +84,7 @@ jobs:
   #
   protos:
     name: Protobuf
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 5
 
     defaults:
@@ -76,11 +92,11 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: '1.17.7'
+          go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
 
@@ -104,14 +120,14 @@ jobs:
 
   man:
     name: Manpages
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: '1.17.7'
-      - uses: actions/checkout@v2
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/checkout@v3
       - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.1
       - run: make man
 
@@ -119,7 +135,7 @@ jobs:
   crossbuild:
     name: Crossbuild Binaries
     needs: [project, linters, protos, man]
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -133,6 +149,10 @@ jobs:
           - goos: linux
             goarch: arm
             goarm: "5"
+          - goos: linux
+            goarch: ppc64le
+          - goos: linux
+            goarch: riscv64
           - goos: freebsd
             goarch: amd64
           - goos: freebsd
@@ -142,14 +162,14 @@ jobs:
             goarm: "7"
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: '1.17.7'
-      - uses: actions/checkout@v2
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/checkout@v3
       - run: |
           set -e -x
 
-          packages=""
+          packages="libbtrfs-dev"
           platform="${{matrix.goos}}/${{matrix.goarch}}"
           if [ -n "${{matrix.goarm}}" ]; then
             platform+="/v${{matrix.goarm}}"
@@ -170,6 +190,16 @@ jobs:
             packages+=" crossbuild-essential-arm64"
             echo "CGO_ENABLED=1" >> $GITHUB_ENV
             echo "CC=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+            ;;
+          linux/ppc64le)
+            packages+=" crossbuild-essential-ppc64el"
+            echo "CGO_ENABLED=1" >> $GITHUB_ENV
+            echo "CC=powerpc64le-linux-gnu-gcc" >> $GITHUB_ENV
+            ;;
+          linux/riscv64)
+            packages+=" crossbuild-essential-riscv64"
+            echo "CGO_ENABLED=1" >> $GITHUB_ENV
+            echo "CC=riscv64-linux-gnu-gcc" >> $GITHUB_ENV
             ;;
           windows/arm/v7)
             echo "CGO_ENABLED=0" >> $GITHUB_ENV
@@ -200,11 +230,16 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-18.04, macos-10.15, windows-2019, windows-2022]
-        go-version: ['1.16.14', '1.17.7']
-
+        os: [ubuntu-20.04, macos-12, windows-2019, windows-2022]
+        go-version: ["1.19.3", "1.18.8"]
     steps:
-      - uses: actions/setup-go@v2
+      - name: Install dependencies
+        if: matrix.os == 'ubuntu-20.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libbtrfs-dev
+
+      - uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -214,7 +249,7 @@ jobs:
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
 
@@ -230,7 +265,7 @@ jobs:
   integration-windows:
     name: Windows Integration
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 35
+    timeout-minutes: 50
     needs: [project, linters, protos, man]
     env:
       GOTEST: gotestsum --
@@ -239,6 +274,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-2019, windows-2022]
+        enable_cri_sandboxes: ["", "sandboxed"]
 
     defaults:
       run:
@@ -246,24 +282,25 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: '1.17.7'
+          go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
-          repository: Microsoft/hcsshim
-          path: src/github.com/Microsoft/hcsshim
+          repository: kubernetes-sigs/cri-tools
+          path: src/github.com/kubernetes-sigs/cri-tools
 
       - name: Set env
         run: |
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
           echo "${{ github.workspace }}/src/github.com/containerd/containerd/bin" >> $GITHUB_PATH
+          echo "${{ github.workspace }}/src/github.com/kubernetes-sigs/cri-tools/build/bin" >> $GITHUB_PATH
 
       - run: script/setup/install-dev-tools
 
@@ -273,25 +310,64 @@ jobs:
         run: |
           set -o xtrace
           mingw32-make.exe binaries
-          bindir="$(pwd)"
-          SHIM_COMMIT=$(grep 'Microsoft/hcsshim ' go.mod | awk '{print $2}')
-          cd ../../Microsoft/hcsshim
-          git fetch --tags origin "${SHIM_COMMIT}"
-          git checkout "${SHIM_COMMIT}"
-          GO111MODULE=on go build -mod=vendor -o "${bindir}/integration/client/containerd-shim-runhcs-v1.exe" ./cmd/containerd-shim-runhcs-v1
+          cd ../../kubernetes-sigs/cri-tools
+          make critest
+
+      - run: script/setup/install-cni-windows
+
+      - env:
+          TEST_IMAGE_LIST: ${{github.workspace}}/repolist.toml
+          CRI_TEST_IMAGES: ${{github.workspace}}/cri-test-images.yaml
+          BUSYBOX_TESTING_IMAGE_REF: "registry.k8s.io/e2e-test-images/busybox:1.29-2"
+          RESOURCE_CONSUMER_TESTING_IMAGE_REF: "registry.k8s.io/e2e-test-images/resource-consumer:1.10"
+          WEBSERVER_TESTING_IMAGE_REF: "registry.k8s.io/e2e-test-images/nginx:1.14-2"
+        run: |
+          cat > "${{ env.TEST_IMAGE_LIST }}" << EOF
+          busybox = "${{ env.BUSYBOX_TESTING_IMAGE_REF }}"
+          ResourceConsumer = "${{ env.RESOURCE_CONSUMER_TESTING_IMAGE_REF }}"
+          EOF
+          cat > "${{ env.CRI_TEST_IMAGES }}" << EOF
+          defaultTestContainerImage: ${{ env.BUSYBOX_TESTING_IMAGE_REF }}
+          webServerTestImage: ${{ env.WEBSERVER_TESTING_IMAGE_REF }}
+          EOF
+
+      - name: Get crictl tool
+        shell: powershell
+        run: |
+          # Get critctl tool. Used for cri-integration tests
+          $CRICTL_DOWNLOAD_URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.21.0/crictl-v1.21.0-windows-amd64.tar.gz"
+          curl.exe -L $CRICTL_DOWNLOAD_URL -o c:\crictl.tar.gz
+          tar -xvf c:\crictl.tar.gz
+          mv crictl.exe "${{ github.workspace }}/bin/crictl.exe" # Move crictl somewhere in path
 
       - run: script/setup/install-gotestsum
+      - run: script/setup/install-teststat
       - name: Tests
         env:
           CGO_ENABLED: 1
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root.xml
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-unit-root-gotest.json
         run: mingw32-make.exe test root-test
+      - run: if [ -f *-gotest.json ]; then echo '# Root Test' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
+        if: always()
+      - run: script/test/test2annotation.sh ${TESTFILE}
+        env:
+          TESTFILE: ${{github.workspace}}/test-unit-root-gotest.json
+        if: always()
 
       - name: Integration 1
         env:
           CGO_ENABLED: 1
+          ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-serial-gotest.json
         run: mingw32-make.exe integration
+      - run: if [ -f *-gotest.json ]; then echo '# Integration 1' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
+        if: always()
+      - run: script/test/test2annotation.sh ${TESTFILE}
+        env:
+          TESTFILE: ${{github.workspace}}/test-integration-serial-gotest.json
+        if: always()
 
       # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
       - name: Integration 2
@@ -299,26 +375,67 @@ jobs:
           TESTFLAGS_PARALLEL: 1
           EXTRA_TESTFLAGS: "-short"
           CGO_ENABLED: 1
+          ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-parallel-gotest.json
         run: mingw32-make.exe integration
-      - uses: actions/upload-artifact@v2
+      - run: if [ -f *-gotest.json ]; then echo '# Integration 2' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
+        if: always()
+      - run: script/test/test2annotation.sh ${TESTFILE}
+        env:
+          TESTFILE: ${{github.workspace}}/test-integration-parallel-gotest.json
+        if: always()
+
+      - name: CRI Integration Test
+        env:
+          ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
+          TEST_IMAGE_LIST: ${{github.workspace}}/repolist.toml
+        run: |
+          make cri-integration
+
+      - name: cri-tools critest
+        env:
+          ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
+          CRI_TEST_IMAGES: ${{github.workspace}}/cri-test-images.yaml
+        shell: powershell
+        run: |
+          Start-Process -FilePath containerd.exe -NoNewWindow -RedirectStandardError true -PassThru
+          get-process | sls containerd
+          start-sleep 5
+          # This test is exceedingly flaky only on ws2022 so skip for now to keep CI happy.
+          # Info: https://github.com/containerd/containerd/issues/6652
+          if( '${{ matrix.os }}' -eq 'windows-2022' )
+          {
+            $skip = "-ginkgo.skip=runtime should support exec with tty=true and stdin=true"
+          }
+          critest.exe --runtime-endpoint=npipe://.//pipe//containerd-containerd --test-images-file='${{env.CRI_TEST_IMAGES}}' --report-dir='${{github.workspace}}/critestreport' $skip
+
+      - uses: actions/upload-artifact@v3
         if: always()
         with:
-          name: TestResults Windows
+          name: TestResults ${{ matrix.os }}
           path: |
             ${{github.workspace}}/*-junit.xml
+            ${{github.workspace}}/*-gotest.json
+            ${{github.workspace}}/report/*.log
 
   integration-linux:
     name: Linux Integration
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 40
     needs: [project, linters, protos, man]
 
     strategy:
       fail-fast: false
       matrix:
-        runtime: [io.containerd.runtime.v1.linux, io.containerd.runc.v1, io.containerd.runc.v2]
+        runtime:
+          [
+            io.containerd.runtime.v1.linux,
+            io.containerd.runc.v1,
+            io.containerd.runc.v2,
+          ]
         runc: [runc, crun]
+        enable_cri_sandboxes: ["", "sandboxed"]
         exclude:
           - runtime: io.containerd.runc.v1
             runc: crun
@@ -328,22 +445,22 @@ jobs:
     env:
       GOTEST: gotestsum --
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: '1.17.7'
+          go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install containerd dependencies
         env:
           RUNC_FLAVOR: ${{ matrix.runc }}
-          GOFLAGS: -modcacherw
         run: |
-          sudo apt-get install -y gperf
-          sudo -E PATH=$PATH script/setup/install-seccomp
-          sudo -E PATH=$PATH script/setup/install-runc
-          sudo -E PATH=$PATH script/setup/install-cni $(grep containernetworking/plugins go.mod | awk '{print $2}')
-          sudo -E PATH=$PATH script/setup/install-critools
+          sudo apt-get install -y gperf libbtrfs-dev
+          script/setup/install-seccomp
+          script/setup/install-runc
+          script/setup/install-cni $(grep containernetworking/plugins go.mod | awk '{print $2}')
+          script/setup/install-critools
+          script/setup/install-failpoint-binaries
 
       - name: Install criu
         run: |
@@ -358,53 +475,83 @@ jobs:
           make binaries GO_BUILD_FLAGS="-mod=vendor"
           sudo -E PATH=$PATH make install
 
-      - run: sudo -E PATH=$PATH script/setup/install-gotestsum
+      - run: script/setup/install-gotestsum
+      - run: script/setup/install-teststat
       - name: Tests
         env:
-          GOPROXY: direct
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root-junit.xml
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-unit-root-gotest.json
         run: |
           make test
           sudo -E PATH=$PATH make root-test
+      - run: if [ -f *-gotest.json ]; then echo '# Root Test' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
+        if: always()
+      - run: script/test/test2annotation.sh *-gotest.json
+        if: always()
 
       - name: Integration 1
         env:
-          GOPROXY: direct
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
+          ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-serial-gotest.json
         run: |
           extraflags=""
           [ "${RUNC_FLAVOR}" == "crun" ] && {
                   extraflags="EXTRA_TESTFLAGS=-no-criu";
           }
           sudo -E PATH=$PATH make integration ${extraflags} TESTFLAGS_RACE=-race
+      - run: if [ -f *-gotest.json ]; then echo '# Integration 1' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
+        if: always()
+      - run: script/test/test2annotation.sh *-gotest.json
+        if: always()
 
       # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
       - name: Integration 2
         env:
-          GOPROXY: direct
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
+          ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-parallel-gotest.json
         run: |
           extraflags=""
           [ "${RUNC_FLAVOR}" == "crun" ] && {
                   extraflags="EXTRA_TESTFLAGS=-no-criu";
           }
           sudo -E PATH=$PATH TESTFLAGS_PARALLEL=1 make integration ${extraflags}
+      - run: if [ -f *-gotest.json ]; then echo '# Integration 2' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
+        if: always()
+      - run: script/test/test2annotation.sh *-gotest.json
+        if: always()
 
       - name: CRI Integration Test
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
+          ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
         run: |
           CONTAINERD_RUNTIME=$TEST_RUNTIME make cri-integration
 
       - name: cri-tools critest
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
+          ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
         run: |
           BDIR="$(mktemp -d -p $PWD)"
+          mkdir -p ${{github.workspace}}/report
+
+          function cleanup() {
+            sudo pkill containerd || true
+
+            echo ::group::containerd logs
+            cat ${{github.workspace}}/report/containerd.log
+            echo ::endgroup::
+
+            sudo -E rm -rf ${BDIR}
+          }
+          trap cleanup EXIT
+
           mkdir -p ${BDIR}/{root,state}
           cat > ${BDIR}/config.toml <<EOF
             version = 2
@@ -412,14 +559,9 @@ jobs:
             runtime_type = "${TEST_RUNTIME}"
           EOF
           sudo ls /etc/cni/net.d
-          sudo -E PATH=$PATH /usr/local/bin/containerd -a ${BDIR}/c.sock --config ${BDIR}/config.toml --root ${BDIR}/root --state ${BDIR}/state --log-level debug &> ${BDIR}/containerd-cri.log &
+          sudo -E PATH=$PATH /usr/local/bin/containerd -a ${BDIR}/c.sock --config ${BDIR}/config.toml --root ${BDIR}/root --state ${BDIR}/state --log-level debug &> ${{github.workspace}}/report/containerd.log &
           sudo -E PATH=$PATH /usr/local/bin/ctr -a ${BDIR}/c.sock version
-          sudo -E PATH=$PATH critest --report-dir "${{github.workspace}}/critestreport" --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8
-          TEST_RC=$?
-          test $TEST_RC -ne 0 && cat ${BDIR}/containerd-cri.log
-          sudo pkill containerd
-          sudo -E rm -rf ${BDIR}
-          test $TEST_RC -eq 0 || /bin/false
+          sudo -E PATH=$PATH critest --report-dir "${{github.workspace}}/report" --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8
 
       # Log the status of this VM to investigate issues like
       # https://github.com/containerd/containerd/issues/4969
@@ -430,129 +572,44 @@ jobs:
           mount
           df
           losetup -l
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         if: always()
         with:
           name: TestResults ${{ matrix.runtime }} ${{matrix.runc}}
           path: |
             *-junit.xml
-            ${{github.workspace}}/critestreport/*.xml
+            *-gotest.json
+            ${{github.workspace}}/report/*.xml
+            ${{github.workspace}}/report/*.log
 
   tests-mac-os:
     name: MacOS unit tests
-    runs-on: macos-10.15
+    runs-on: macos-12
     timeout-minutes: 10
     needs: [project, linters, protos, man]
     env:
       GOTEST: gotestsum --
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: '1.17.7'
-      - uses: actions/checkout@v2
-      - run: sudo -E PATH=$PATH script/setup/install-gotestsum
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/checkout@v3
+      - run: script/setup/install-gotestsum
+      - run: script/setup/install-teststat
       - name: Tests
         env:
-          GOPROXY: direct
           GOTESTSUM_JUNITFILE: "${{ github.workspace }}/macos-test-junit.xml"
+          GOTESTSUM_JSONFILE: "${{ github.workspace }}/macos-test-gotest.json"
         run: make test
-      - uses: actions/upload-artifact@v2
+      - run: if [ -f *-gotest.json ]; then echo '# Unit Tests' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
+        if: always()
+      - run: script/test/test2annotation.sh *-gotest.json
+        if: always()
+      - uses: actions/upload-artifact@v3
         if: always()
         with:
           name: TestResults MacOS
           path: |
             *-junit.xml
-
-  cgroup2:
-    name: CGroupsV2 - SELinux enforced
-    # nested virtualization is only available on macOS hosts
-    runs-on: macos-10.15
-    timeout-minutes: 45
-    needs: [project, linters, protos, man]
-    strategy:
-      matrix:
-        # Currently crun is disabled to decrease CI flakiness.
-        # We can enable crun again when we get a better CI infra.
-        runc: [runc]
-    env:
-      GOTEST: gotestsum --
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: "Cache ~/.vagrant.d/boxes"
-        uses: actions/cache@v2
-        with:
-          path: ~/.vagrant.d/boxes
-          key: vagrant-${{ hashFiles('Vagrantfile*') }}
-
-      - name: Vagrant start
-        run: |
-          # Retry if it fails (download.fedoraproject.org returns 404 sometimes)
-          vagrant up || vagrant up
-
-      - name: Integration
-        env:
-          RUNC_FLAVOR: ${{ matrix.runc }}
-          SELINUX: Enforcing
-          GOTESTSUM_JUNITFILE: /tmp/test-integration-junit.xml
-        run: vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
-
-      - name: CRI test
-        env:
-          RUNC_FLAVOR: ${{ matrix.runc }}
-          SELINUX: Enforcing
-          REPORT_DIR: /tmp/critestreport
-        run: vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
-
-      - name: Collect the VM's IP address for Docker Hub's throttling issue
-        if: failure()
-        run: vagrant ssh -- curl https://api64.ipify.org/
-
-      - name: Get test reports
-        if: always()
-        run: |
-          set -e
-          vagrant plugin install vagrant-vbguest
-          vagrant plugin install vagrant-scp
-          vagrant scp :/tmp/test-integration-junit.xml "${{ github.workspace }}/"
-          vagrant scp :/tmp/critestreport "${{ github.workspace }}/critestreport"
-      - uses: actions/upload-artifact@v2
-        if: always()
-        with:
-          name:  TestResults cgroup2 ${{ matrix.runtime }} ${{matrix.runc}}
-          path: |
-            ${{github.workspace}}/*-junit.xml
-            ${{github.workspace}}/critestreport/*
-
-  cgroup2-misc:
-    name: CGroupsV2 - rootless CRI test
-    # nested virtualization is only available on macOS hosts
-    runs-on: macos-10.15
-    timeout-minutes: 45
-    needs: [project, linters, protos, man]
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: "Cache ~/.vagrant.d/boxes"
-        uses: actions/cache@v2
-        with:
-          path: ~/.vagrant.d/boxes
-          key: vagrant-${{ hashFiles('Vagrantfile*') }}
-
-      - name: Vagrant start
-        run: |
-          # Retry if it fails (download.fedoraproject.org returns 404 sometimes)
-          vagrant up || vagrant up
-
-      # slow, so separated from the regular cgroup2 task
-      - name: CRI-in-UserNS test with Rootless Podman
-        run: |
-          vagrant up --provision-with=install-rootless-podman
-          # Execute rootless podman to create the UserNS env
-          vagrant ssh -- podman build --target cri-in-userns -t cri-in-userns -f /vagrant/contrib/Dockerfile.test /vagrant
-          vagrant ssh -- podman run --rm --privileged cri-in-userns
-
-      - name: Collect the VM's IP address for Docker Hub's throttling issue
-        if: failure()
-        run: vagrant ssh -- curl https://api64.ipify.org/
+            *-gotest.json

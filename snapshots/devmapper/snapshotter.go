@@ -44,6 +44,7 @@ type fsType string
 const (
 	metadataFileName               = "metadata.db"
 	fsTypeExt4              fsType = "ext4"
+	fsTypeExt2              fsType = "ext2"
 	fsTypeXFS               fsType = "xfs"
 	devmapperSnapshotFsType        = "containerd.io/snapshot/devmapper/fstype"
 )
@@ -468,6 +469,13 @@ func mkfs(ctx context.Context, fs fsType, fsOptions string, path string) error {
 			fsOptions,
 			path,
 		}
+	case fsTypeExt2:
+		mkfsCommand = "mkfs.ext2"
+		args = []string{
+			"-E",
+			fsOptions,
+			path,
+		}
 	case fsTypeXFS:
 		mkfsCommand = "mkfs.xfs"
 		args = []string{
@@ -504,6 +512,8 @@ func (s *Snapshotter) buildMounts(ctx context.Context, snap storage.Snapshot, fi
 	if fileSystemType == "" {
 		log.G(ctx).Error("File system type cannot be empty")
 		return nil
+	} else if fileSystemType == fsTypeXFS {
+		options = append(options, "nouuid")
 	}
 	if snap.Kind != snapshots.KindActive {
 		options = append(options, "ro")

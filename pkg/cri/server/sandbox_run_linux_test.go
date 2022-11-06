@@ -235,26 +235,27 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 			},
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		c := newTestCRIService()
-		c.config.EnableUnprivilegedICMP = true
-		c.config.EnableUnprivilegedPorts = true
-		config, imageConfig, specCheck := getRunPodSandboxTestData()
-		if test.configChange != nil {
-			test.configChange(config)
-		}
-		spec, err := c.sandboxContainerSpec(testID, config, imageConfig, nsPath, nil)
-		if test.expectErr {
-			assert.Error(t, err)
-			assert.Nil(t, spec)
-			continue
-		}
-		assert.NoError(t, err)
-		assert.NotNil(t, spec)
-		specCheck(t, testID, spec)
-		if test.specCheck != nil {
-			test.specCheck(t, spec)
-		}
+		t.Run(desc, func(t *testing.T) {
+			c := newTestCRIService()
+			c.config.EnableUnprivilegedICMP = true
+			c.config.EnableUnprivilegedPorts = true
+			config, imageConfig, specCheck := getRunPodSandboxTestData()
+			if test.configChange != nil {
+				test.configChange(config)
+			}
+			spec, err := c.sandboxContainerSpec(testID, config, imageConfig, nsPath, nil)
+			if test.expectErr {
+				assert.Error(t, err)
+				assert.Nil(t, spec)
+				return
+			}
+			assert.NoError(t, err)
+			assert.NotNil(t, spec)
+			specCheck(t, testID, spec)
+			if test.specCheck != nil {
+				test.specCheck(t, spec)
+			}
+		})
 	}
 }
 
@@ -426,32 +427,33 @@ options timeout:1
 			},
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		c := newTestCRIService()
-		c.os.(*ostesting.FakeOS).HostnameFn = func() (string, error) {
-			return realhostname, nil
-		}
-		cfg := &runtime.PodSandboxConfig{
-			Hostname:  test.hostname,
-			DnsConfig: test.dnsConfig,
-			Linux: &runtime.LinuxPodSandboxConfig{
-				SecurityContext: &runtime.LinuxSandboxSecurityContext{
-					NamespaceOptions: &runtime.NamespaceOption{
-						Ipc: test.ipcMode,
+		t.Run(desc, func(t *testing.T) {
+			c := newTestCRIService()
+			c.os.(*ostesting.FakeOS).HostnameFn = func() (string, error) {
+				return realhostname, nil
+			}
+			cfg := &runtime.PodSandboxConfig{
+				Hostname:  test.hostname,
+				DnsConfig: test.dnsConfig,
+				Linux: &runtime.LinuxPodSandboxConfig{
+					SecurityContext: &runtime.LinuxSandboxSecurityContext{
+						NamespaceOptions: &runtime.NamespaceOption{
+							Ipc: test.ipcMode,
+						},
 					},
 				},
-			},
-		}
-		c.setupSandboxFiles(testID, cfg)
-		calls := c.os.(*ostesting.FakeOS).GetCalls()
-		assert.Len(t, calls, len(test.expectedCalls))
-		for i, expected := range test.expectedCalls {
-			if expected.Arguments == nil {
-				// Ignore arguments.
-				expected.Arguments = calls[i].Arguments
 			}
-			assert.Equal(t, expected, calls[i])
-		}
+			c.setupSandboxFiles(testID, cfg)
+			calls := c.os.(*ostesting.FakeOS).GetCalls()
+			assert.Len(t, calls, len(test.expectedCalls))
+			for i, expected := range test.expectedCalls {
+				if expected.Arguments == nil {
+					// Ignore arguments.
+					expected.Arguments = calls[i].Arguments
+				}
+				assert.Equal(t, expected, calls[i])
+			}
+		})
 	}
 }
 
@@ -493,14 +495,15 @@ options timeout:1
 `,
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		resolvContent, err := parseDNSOptions(test.servers, test.searches, test.options)
-		if test.expectErr {
-			assert.Error(t, err)
-			continue
-		}
-		assert.NoError(t, err)
-		assert.Equal(t, resolvContent, test.expectedContent)
+		t.Run(desc, func(t *testing.T) {
+			resolvContent, err := parseDNSOptions(test.servers, test.searches, test.options)
+			if test.expectErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, resolvContent, test.expectedContent)
+		})
 	}
 }
 

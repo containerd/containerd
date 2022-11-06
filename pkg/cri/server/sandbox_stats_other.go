@@ -20,9 +20,9 @@
 package server
 
 import (
+	"context"
 	"fmt"
 
-	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/errdefs"

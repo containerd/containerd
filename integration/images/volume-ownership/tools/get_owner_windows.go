@@ -26,7 +26,7 @@ import (
 
 func main() {
 	if len(os.Args) != 2 {
-		fmt.Printf("Usage: %s file_or_directory\n", os.Args[0])
+		fmt.Println("Usage: get_owner_windows.exe file_or_directory")
 		os.Exit(1)
 	}
 

@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/integration/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -64,9 +65,7 @@ func TestPodHostname(t *testing.T) {
 			if test.needsHostNetwork && goruntime.GOOS == "windows" {
 				t.Skip("Skipped on Windows.")
 			}
-			testPodLogDir, err := os.MkdirTemp("/tmp", "hostname")
-			require.NoError(t, err)
-			defer os.RemoveAll(testPodLogDir)
+			testPodLogDir := t.TempDir()
 
 			opts := append(test.opts, WithPodLogDirectory(testPodLogDir))
 			t.Log("Create a sandbox with hostname")
@@ -88,7 +87,7 @@ func TestPodHostname(t *testing.T) {
 			}
 
 			var (
-				testImage     = GetImage(BusyBox)
+				testImage     = images.Get(images.BusyBox)
 				containerName = "test-container"
 			)
 

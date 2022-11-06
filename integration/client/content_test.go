@@ -41,7 +41,7 @@ func newContentStore(ctx context.Context, root string) (context.Context, content
 		name  = testsuite.Name(ctx)
 	)
 
-	wrap := func(ctx context.Context) (context.Context, func(context.Context) error, error) {
+	wrap := func(ctx context.Context, sharedNS bool) (context.Context, func(context.Context) error, error) {
 		n := atomic.AddUint64(&count, 1)
 		ctx = namespaces.WithNamespace(ctx, fmt.Sprintf("%s-n%d", name, n))
 		return client.WithLease(ctx)

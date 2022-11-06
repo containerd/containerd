@@ -17,6 +17,7 @@
 package io
 
 import (
+	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -24,7 +25,6 @@ import (
 	"syscall"
 
 	"github.com/containerd/containerd/cio"
-	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -46,9 +46,9 @@ const (
 	// Stdin stream type.
 	Stdin StreamType = "stdin"
 	// Stdout stream type.
-	Stdout StreamType = StreamType(runtime.Stdout)
+	Stdout = StreamType(runtime.Stdout)
 	// Stderr stream type.
-	Stderr StreamType = StreamType(runtime.Stderr)
+	Stderr = StreamType(runtime.Stderr)
 )
 
 type wgCloser struct {

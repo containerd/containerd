@@ -21,8 +21,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/reference"
-	"gotest.tools/v3/assert"
-	"gotest.tools/v3/assert/cmp"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRepositoryScope(t *testing.T) {
@@ -51,7 +50,7 @@ func TestRepositoryScope(t *testing.T) {
 	for _, x := range testCases {
 		t.Run(x.refspec.String(), func(t *testing.T) {
 			actual, err := RepositoryScope(x.refspec, x.push)
-			assert.NilError(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, x.expected, actual)
 		})
 	}
@@ -97,7 +96,7 @@ func TestGetTokenScopes(t *testing.T) {
 	for _, tc := range testCases {
 		ctx := context.WithValue(context.TODO(), tokenScopesKey{}, tc.scopesInCtx)
 		actual := GetTokenScopes(ctx, tc.commonScopes)
-		assert.DeepEqual(t, tc.expected, actual)
+		assert.Equal(t, tc.expected, actual)
 	}
 }
 
@@ -107,7 +106,5 @@ func TestCustomScope(t *testing.T) {
 	ctx = ContextWithAppendPullRepositoryScope(ctx, "foo/bar")
 
 	scopes := GetTokenScopes(ctx, []string{})
-	assert.Assert(t, cmp.Len(scopes, 2))
-	assert.Check(t, cmp.Equal(scopes[0], "repository:foo/bar:pull"))
-	assert.Check(t, cmp.Equal(scopes[1], scope))
+	assert.Equal(t, []string{"repository:foo/bar:pull", scope}, scopes)
 }

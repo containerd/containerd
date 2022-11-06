@@ -39,6 +39,7 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/intel/goresctrl/pkg/blockio"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -68,6 +69,10 @@ var platformRunFlags = []cli.Flag{
 	cli.BoolFlag{
 		Name:  "remap-labels",
 		Usage: "provide the user namespace ID remapping to the snapshotter via label options; requires snapshotter support",
+	},
+	cli.BoolFlag{
+		Name:  "privileged-without-host-devices",
+		Usage: "don't pass all host devices to privileged container",
 	},
 	cli.Float64Flag{
 		Name:  "cpus",
@@ -100,12 +105,12 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	)
 
 	if config {
-		cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(context.StringSlice("labels"))))
+		cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(context.StringSlice("label"))))
 		opts = append(opts, oci.WithSpecFromFile(context.String("config")))
 	} else {
 		var (
 			ref = context.Args().First()
-			//for container's id is Args[1]
+			// for container's id is Args[1]
 			args = context.Args()[2:]
 		)
 		opts = append(opts, oci.WithDefaultSpec(), oci.WithDefaultUnixDevices)
@@ -121,7 +126,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 				return nil, err
 			}
 			opts = append(opts, oci.WithRootFSPath(rootfs))
-			cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(context.StringSlice("labels"))))
+			cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(context.StringSlice("label"))))
 		} else {
 			snapshotter := context.String("snapshotter")
 			var image containerd.Image
@@ -195,12 +200,26 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		if cwd := context.String("cwd"); cwd != "" {
 			opts = append(opts, oci.WithProcessCwd(cwd))
 		}
+		if user := context.String("user"); user != "" {
+			opts = append(opts, oci.WithUser(user), oci.WithAdditionalGIDs(user))
+		}
 		if context.Bool("tty") {
 			opts = append(opts, oci.WithTTY)
 		}
-		if context.Bool("privileged") {
-			opts = append(opts, oci.WithPrivileged, oci.WithAllDevicesAllowed, oci.WithHostDevices)
+
+		privileged := context.Bool("privileged")
+		privilegedWithoutHostDevices := context.Bool("privileged-without-host-devices")
+		if privilegedWithoutHostDevices && !privileged {
+			return nil, fmt.Errorf("can't use 'privileged-without-host-devices' without 'privileged' specified")
 		}
+		if privileged {
+			if privilegedWithoutHostDevices {
+				opts = append(opts, oci.WithPrivileged)
+			} else {
+				opts = append(opts, oci.WithPrivileged, oci.WithAllDevicesAllowed, oci.WithHostDevices)
+			}
+		}
+
 		if context.Bool("net-host") {
 			hostname, err := os.Hostname()
 			if err != nil {
@@ -213,7 +232,18 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 				oci.WithEnv([]string{fmt.Sprintf("HOSTNAME=%s", hostname)}),
 			)
 		}
+		if annoStrings := context.StringSlice("annotation"); len(annoStrings) > 0 {
+			annos, err := commands.AnnotationArgs(annoStrings)
+			if err != nil {
+				return nil, err
+			}
+			opts = append(opts, oci.WithAnnotations(annos))
+		}
 
+		if context.Bool("cni") {
+			cniMeta := &commands.NetworkMetaData{EnableCni: true}
+			cOpts = append(cOpts, containerd.WithContainerExtension(commands.CtrCniMetadataExtension, cniMeta))
+		}
 		if caps := context.StringSlice("cap-add"); len(caps) > 0 {
 			for _, cap := range caps {
 				if !strings.HasPrefix(cap, "CAP_") {
@@ -325,8 +355,24 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			})
 		}
 
+		if c := context.String("blockio-config-file"); c != "" {
+			if err := blockio.SetConfigFromFile(c, false); err != nil {
+				return nil, fmt.Errorf("blockio-config-file error: %w", err)
+			}
+		}
+
+		if c := context.String("blockio-class"); c != "" {
+			if linuxBlockIO, err := blockio.OciLinuxBlockIO(c); err == nil {
+				opts = append(opts, oci.WithBlockIO(linuxBlockIO))
+			} else {
+				return nil, fmt.Errorf("blockio-class error: %w", err)
+			}
+		}
 		if c := context.String("rdt-class"); c != "" {
 			opts = append(opts, oci.WithRdt(c, "", ""))
+		}
+		if hostname := context.String("hostname"); hostname != "" {
+			opts = append(opts, oci.WithHostname(hostname))
 		}
 	}
 

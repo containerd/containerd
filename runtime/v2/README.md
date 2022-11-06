@@ -17,6 +17,12 @@ This will be translated by containerd into a binary name for the shim.
 
 `io.containerd.runc.v1` -> `containerd-shim-runc-v1`
 
+Since 1.6 release, it's also possible to specify absolute runtime path:
+
+```bash
+> ctr run --runtime /usr/local/bin/containerd-shim-runc-v1
+```
+
 containerd keeps the `containerd-shim-*` prefix so that users can `ps aux | grep containerd-shim` to see running shims on their system.
 
 ## Shim Authoring
@@ -172,6 +178,90 @@ The Runtime v2 supports an async event model. In order for the an upstream calle
 | `runtime.TaskExecStartedEventTopic` | MUST (follow `TaskExecAddedEventTopic`)   | When an exec is successfully started |
 | `runtime.TaskExitEventTopic`        | MUST (follow `TaskExecStartedEventTopic`) | When an exec (other than the init exec) exits expected or unexpected |
 | `runtime.TaskDeleteEventTopic`      | SHOULD (follow `TaskExitEventTopic` or `TaskExecAddedEventTopic` if never started) | When an exec is removed from a shim |
+
+### Flow
+
+The following sequence diagram shows the flow of actions when `ctr run` command executed.
+
+```mermaid
+sequenceDiagram
+    participant ctr
+    participant containerd
+    participant shim
+
+    autonumber
+
+    ctr->>containerd: Create container
+    Note right of containerd: Save container metadata
+    containerd-->>ctr: Container ID
+
+    ctr->>containerd: Create task
+
+    %% Start shim
+    containerd-->shim: Prepare bundle
+    containerd->>shim: Execute binary: containerd-shim-runc-v1 start
+    shim->shim: Start TTRPC server
+    shim-->>containerd: Respond with address: unix://containerd/container.sock
+
+    containerd-->>shim: Create TTRPC client
+
+    %% Schedule task
+
+    Note right of containerd: Schedule new task
+
+    containerd->>shim: TaskService.CreateTaskRequest
+    shim-->>containerd: Task PID
+
+    containerd-->>ctr: Task ID
+
+    %% Start task
+
+    ctr->>containerd: Start task
+
+    containerd->>shim: TaskService.StartRequest
+    shim-->>containerd: OK
+
+    %% Wait task
+
+    ctr->>containerd: Wait task
+
+    containerd->>shim: TaskService.WaitRequest
+    Note right of shim: Block until task exits
+    shim-->>containerd: Exit status
+
+    containerd-->>ctr: OK
+
+    Note over ctr,shim: Other task requests (Kill, Pause, Resume, CloseIO, Exec, etc)
+
+    %% Kill signal
+
+    opt Kill task
+
+    ctr->>containerd: Kill task
+
+    containerd->>shim: TaskService.KillRequest
+    shim-->>containerd: OK
+
+    containerd-->>ctr: OK
+
+    end
+
+    %% Delete task
+
+    ctr->>containerd: Task Delete
+
+    containerd->>shim: TaskService.DeleteRequest
+    shim-->>containerd: Exit information
+
+    containerd->>shim: TaskService.ShutdownRequest
+    shim-->>containerd: OK
+
+    containerd-->shim: Close client
+    containerd->>shim: Execute binary: containerd-shim-runc-v1 delete
+    containerd-->shim: Delete bundle
+
+    containerd-->>ctr: Exit code
+```
 
 #### Logging
 

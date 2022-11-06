@@ -24,13 +24,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/pkg/userns"
 	"github.com/containerd/continuity/fs"
 )
 
@@ -50,11 +50,11 @@ var errInvalidArchive = errors.New("invalid archive")
 // files will be prepended with the prefix ".wh.". This style is
 // based off AUFS whiteouts.
 // See https://github.com/opencontainers/image-spec/blob/main/layer.md
-func Diff(ctx context.Context, a, b string) io.ReadCloser {
+func Diff(ctx context.Context, a, b string, opts ...WriteDiffOpt) io.ReadCloser {
 	r, w := io.Pipe()
 
 	go func() {
-		err := WriteDiff(ctx, w, a, b)
+		err := WriteDiff(ctx, w, a, b, opts...)
 		if err != nil {
 			log.G(ctx).WithError(err).Debugf("write diff failed")
 		}
@@ -94,8 +94,12 @@ func WriteDiff(ctx context.Context, w io.Writer, a, b string, opts ...WriteDiffO
 // files will be prepended with the prefix ".wh.". This style is
 // based off AUFS whiteouts.
 // See https://github.com/opencontainers/image-spec/blob/main/layer.md
-func writeDiffNaive(ctx context.Context, w io.Writer, a, b string, _ WriteDiffOptions) error {
-	cw := NewChangeWriter(w, b)
+func writeDiffNaive(ctx context.Context, w io.Writer, a, b string, o WriteDiffOptions) error {
+	var opts []ChangeWriterOpt
+	if o.SourceDateEpoch != nil {
+		opts = append(opts, WithWhiteoutTime(*o.SourceDateEpoch))
+	}
+	cw := NewChangeWriter(w, b, opts...)
 	err := fs.Changes(ctx, a, b, cw.HandleChange)
 	if err != nil {
 		return fmt.Errorf("failed to create diff tar stream: %w", err)
@@ -119,6 +123,8 @@ const (
 	whiteoutOpaqueDir = whiteoutMetaPrefix + ".opq"
 
 	paxSchilyXattr = "SCHILY.xattr."
+
+	userXattrPrefix = "user."
 )
 
 // Apply applies a tar stream of an OCI style diff tar.
@@ -287,7 +293,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 		srcData := io.Reader(tr)
 		srcHdr := hdr
 
-		if err := createTarFile(ctx, path, root, srcHdr, srcData); err != nil {
+		if err := createTarFile(ctx, path, root, srcHdr, srcData, options.NoSameOwner); err != nil {
 			return 0, err
 		}
 
@@ -312,7 +318,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 	return size, nil
 }
 
-func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header, reader io.Reader) error {
+func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header, reader io.Reader, noSameOwner bool) error {
 	// hdr.Mode is in linux format, which we can use for syscalls,
 	// but for os.Foo() calls we need the mode converted to os.FileMode,
 	// so use hdrInfo.Mode() (they differ for e.g. setuid bits)
@@ -360,7 +366,7 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 			return err
 		}
 
-		if err := os.Link(targetPath, path); err != nil {
+		if err := link(targetPath, path); err != nil {
 			return err
 		}
 
@@ -377,9 +383,12 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 		return fmt.Errorf("unhandled tar header type %d", hdr.Typeflag)
 	}
 
-	// Lchown is not supported on Windows.
-	if runtime.GOOS != "windows" {
+	if !noSameOwner {
 		if err := os.Lchown(path, hdr.Uid, hdr.Gid); err != nil {
+			err = fmt.Errorf("failed to Lchown %q for UID %d, GID %d: %w", path, hdr.Uid, hdr.Gid, err)
+			if errors.Is(err, syscall.EINVAL) && userns.RunningInUserNS() {
+				err = fmt.Errorf("%w (Hint: try increasing the number of subordinate IDs in /etc/subuid and /etc/subgid)", err)
+			}
 			return err
 		}
 	}
@@ -388,11 +397,19 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 		if strings.HasPrefix(key, paxSchilyXattr) {
 			key = key[len(paxSchilyXattr):]
 			if err := setxattr(path, key, value); err != nil {
+				if errors.Is(err, syscall.EPERM) && strings.HasPrefix(key, userXattrPrefix) {
+					// In the user.* namespace, only regular files and directories can have extended attributes.
+					// See https://man7.org/linux/man-pages/man7/xattr.7.html for details.
+					if fi, err := os.Lstat(path); err == nil && (!fi.Mode().IsRegular() && !fi.Mode().IsDir()) {
+						log.G(ctx).WithError(err).Warnf("ignored xattr %s in archive", key)
+						continue
+					}
+				}
 				if errors.Is(err, syscall.ENOTSUP) {
 					log.G(ctx).WithError(err).Warnf("ignored xattr %s in archive", key)
 					continue
 				}
-				return err
+				return fmt.Errorf("failed to setxattr %q for key %q: %w", path, key, err)
 			}
 		}
 	}
@@ -484,18 +501,32 @@ type ChangeWriter struct {
 	addedDirs map[string]struct{}
 }
 
+// ChangeWriterOpt can be specified in NewChangeWriter.
+type ChangeWriterOpt func(cw *ChangeWriter)
+
+// WithWhiteoutTime sets the whiteout timestamp.
+func WithWhiteoutTime(tm time.Time) ChangeWriterOpt {
+	return func(cw *ChangeWriter) {
+		cw.whiteoutT = tm
+	}
+}
+
 // NewChangeWriter returns ChangeWriter that writes tar stream of the source directory
 // to the privided writer. Change information (add/modify/delete/unmodified) for each
 // file needs to be passed through HandleChange method.
-func NewChangeWriter(w io.Writer, source string) *ChangeWriter {
-	return &ChangeWriter{
+func NewChangeWriter(w io.Writer, source string, opts ...ChangeWriterOpt) *ChangeWriter {
+	cw := &ChangeWriter{
 		tw:        tar.NewWriter(w),
 		source:    source,
-		whiteoutT: time.Now(),
+		whiteoutT: time.Now(), // can be overridden with WithWhiteoutTime(time.Time) ChangeWriterOpt .
 		inodeSrc:  map[uint64]string{},
 		inodeRefs: map[uint64][]string{},
 		addedDirs: map[string]struct{}{},
 	}
+	for _, o := range opts {
+		o(cw)
+	}
+	return cw
 }
 
 // HandleChange receives filesystem change information and reflect that information to
@@ -559,11 +590,9 @@ func (cw *ChangeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 				return fmt.Errorf("failed to make path relative: %w", err)
 			}
 		}
-		name, err = tarName(name)
-		if err != nil {
-			return fmt.Errorf("cannot canonicalize path: %w", err)
-		}
-		// suffix with '/' for directories
+		// Canonicalize to POSIX-style paths using forward slashes. Directory
+		// entries must end with a slash.
+		name = filepath.ToSlash(name)
 		if f.IsDir() && !strings.HasSuffix(name, "/") {
 			name += "/"
 		}

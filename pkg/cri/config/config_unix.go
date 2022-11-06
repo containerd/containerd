@@ -20,6 +20,8 @@
 package config
 
 import (
+	"time"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/pkg/cri/streaming"
 	"github.com/pelletier/go-toml"
@@ -92,7 +94,7 @@ func DefaultConfig() PluginConfig {
 			TLSKeyFile:  "",
 			TLSCertFile: "",
 		},
-		SandboxImage:                     "k8s.gcr.io/pause:3.6",
+		SandboxImage:                     "registry.k8s.io/pause:3.8",
 		StatsCollectPeriod:               10,
 		SystemdCgroup:                    false,
 		MaxContainerLogLineSize:          16 * 1024,
@@ -104,5 +106,8 @@ func DefaultConfig() PluginConfig {
 		ImageDecryption: ImageDecryption{
 			KeyModel: KeyModelNode,
 		},
+		EnableCDI:                false,
+		CDISpecDirs:              []string{"/etc/cdi", "/var/run/cdi"},
+		ImagePullProgressTimeout: time.Minute.String(),
 	}
 }

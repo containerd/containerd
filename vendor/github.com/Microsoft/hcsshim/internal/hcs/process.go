@@ -1,3 +1,5 @@
+//go:build windows
+
 package hcs
 
 import (
@@ -114,9 +116,9 @@ func (process *Process) processSignalResult(ctx context.Context, err error) (boo
 
 // Signal signals the process with `options`.
 //
-// For LCOW `guestrequest.SignalProcessOptionsLCOW`.
+// For LCOW `guestresource.SignalProcessOptionsLCOW`.
 //
-// For WCOW `guestrequest.SignalProcessOptionsWCOW`.
+// For WCOW `guestresource.SignalProcessOptionsWCOW`.
 func (process *Process) Signal(ctx context.Context, options interface{}) (bool, error) {
 	process.handleLock.RLock()
 	defer process.handleLock.RUnlock()
@@ -201,7 +203,7 @@ func (process *Process) Kill(ctx context.Context) (bool, error) {
 // call multiple times.
 func (process *Process) waitBackground() {
 	operation := "hcs::Process::waitBackground"
-	ctx, span := trace.StartSpan(context.Background(), operation)
+	ctx, span := oc.StartSpan(context.Background(), operation)
 	defer span.End()
 	span.AddAttributes(
 		trace.StringAttribute("cid", process.SystemID()),
@@ -254,7 +256,7 @@ func (process *Process) waitBackground() {
 }
 
 // Wait waits for the process to exit. If the process has already exited returns
-// the pervious error (if any).
+// the previous error (if any).
 func (process *Process) Wait() error {
 	<-process.waitBlock
 	return process.waitError
@@ -312,7 +314,7 @@ func (process *Process) ExitCode() (int, error) {
 // are the responsibility of the caller to close.
 func (process *Process) StdioLegacy() (_ io.WriteCloser, _ io.ReadCloser, _ io.ReadCloser, err error) {
 	operation := "hcs::Process::StdioLegacy"
-	ctx, span := trace.StartSpan(context.Background(), operation)
+	ctx, span := oc.StartSpan(context.Background(), operation)
 	defer span.End()
 	defer func() { oc.SetSpanStatus(span, err) }()
 	span.AddAttributes(
@@ -398,7 +400,7 @@ func (process *Process) CloseStdin(ctx context.Context) error {
 }
 
 func (process *Process) CloseStdout(ctx context.Context) (err error) {
-	ctx, span := trace.StartSpan(ctx, "hcs::Process::CloseStdout") //nolint:ineffassign,staticcheck
+	ctx, span := oc.StartSpan(ctx, "hcs::Process::CloseStdout") //nolint:ineffassign,staticcheck
 	defer span.End()
 	defer func() { oc.SetSpanStatus(span, err) }()
 	span.AddAttributes(
@@ -422,7 +424,7 @@ func (process *Process) CloseStdout(ctx context.Context) (err error) {
 }
 
 func (process *Process) CloseStderr(ctx context.Context) (err error) {
-	ctx, span := trace.StartSpan(ctx, "hcs::Process::CloseStderr") //nolint:ineffassign,staticcheck
+	ctx, span := oc.StartSpan(ctx, "hcs::Process::CloseStderr") //nolint:ineffassign,staticcheck
 	defer span.End()
 	defer func() { oc.SetSpanStatus(span, err) }()
 	span.AddAttributes(
@@ -441,7 +443,6 @@ func (process *Process) CloseStderr(ctx context.Context) (err error) {
 	if process.stderr != nil {
 		process.stderr.Close()
 		process.stderr = nil
-
 	}
 	return nil
 }
@@ -450,7 +451,7 @@ func (process *Process) CloseStderr(ctx context.Context) (err error) {
 // or wait on it.
 func (process *Process) Close() (err error) {
 	operation := "hcs::Process::Close"
-	ctx, span := trace.StartSpan(context.Background(), operation)
+	ctx, span := oc.StartSpan(context.Background(), operation)
 	defer span.End()
 	defer func() { oc.SetSpanStatus(span, err) }()
 	span.AddAttributes(

@@ -26,20 +26,15 @@ import (
 
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd/log"
+	cmetrics "github.com/containerd/containerd/metrics"
+	"github.com/containerd/containerd/metrics/cgroups/common"
 	v1 "github.com/containerd/containerd/metrics/types/v1"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/typeurl"
 	"github.com/docker/go-metrics"
-	"github.com/gogo/protobuf/types"
 	"github.com/prometheus/client_golang/prometheus"
 )
-
-// Statable type that returns cgroup metrics
-type Statable interface {
-	ID() string
-	Namespace() string
-	Stats(context.Context) (*types.Any, error)
-}
 
 // Trigger will be called when an event happens and provides the cgroup
 // where the event originated from
@@ -71,7 +66,7 @@ func taskID(id, namespace string) string {
 }
 
 type entry struct {
-	task Statable
+	task common.Statable
 	// ns is an optional child namespace that contains additional to parent labels.
 	// This can be used to append task specific labels to be able to differentiate the different containerd metrics.
 	ns *metrics.Namespace
@@ -80,12 +75,34 @@ type entry struct {
 // Collector provides the ability to collect container stats and export
 // them in the prometheus format
 type Collector struct {
-	mu sync.RWMutex
-
-	tasks         map[string]entry
 	ns            *metrics.Namespace
-	metrics       []*metric
 	storedMetrics chan prometheus.Metric
+
+	// TODO(fuweid):
+	//
+	// The Collector.Collect will be the field ns'Collect's callback,
+	// which be invoked periodically with internal lock. And Collector.Add
+	// might also invoke ns.Lock if the labels is not nil, which is easy to
+	// cause dead-lock.
+	//
+	// Goroutine X:
+	//
+	//	ns.Collect
+	//   	  ns.Lock
+	//          Collector.Collect
+	//            Collector.RLock
+	//
+	//
+	// Goroutine Y:
+	//
+	//	Collector.Add
+	//        ...(RLock/Lock)
+	//	    ns.Lock
+	//
+	// I think we should seek the way to decouple ns from Collector.
+	mu      sync.RWMutex
+	tasks   map[string]entry
+	metrics []*metric
 }
 
 // Describe prometheus metrics
@@ -121,13 +138,17 @@ func (c *Collector) collect(entry entry, ch chan<- prometheus.Metric, block bool
 	if wg != nil {
 		defer wg.Done()
 	}
+
 	t := entry.task
-	ctx := namespaces.WithNamespace(context.Background(), t.Namespace())
-	stats, err := t.Stats(ctx)
+	ctx, cancel := timeout.WithContext(context.Background(), cmetrics.ShimStatsRequestTimeout)
+	stats, err := t.Stats(namespaces.WithNamespace(ctx, t.Namespace()))
+	cancel()
+
 	if err != nil {
 		log.L.WithError(err).Errorf("stat task %s", t.ID())
 		return
 	}
+
 	data, err := typeurl.UnmarshalAny(stats)
 	if err != nil {
 		log.L.WithError(err).Errorf("unmarshal stats for %s", t.ID())
@@ -148,26 +169,31 @@ func (c *Collector) collect(entry entry, ch chan<- prometheus.Metric, block bool
 }
 
 // Add adds the provided cgroup and id so that metrics are collected and exported
-func (c *Collector) Add(t Statable, labels map[string]string) error {
+func (c *Collector) Add(t common.Statable, labels map[string]string) error {
 	if c.ns == nil {
 		return nil
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
 	id := taskID(t.ID(), t.Namespace())
-	if _, ok := c.tasks[id]; ok {
+	_, ok := c.tasks[id]
+	c.mu.RUnlock()
+	if ok {
 		return nil // requests to collect metrics should be idempotent
 	}
+
 	entry := entry{task: t}
 	if labels != nil {
 		entry.ns = c.ns.WithConstLabels(labels)
 	}
+
+	c.mu.Lock()
 	c.tasks[id] = entry
+	c.mu.Unlock()
 	return nil
 }
 
 // Remove removes the provided cgroup by id from the collector
-func (c *Collector) Remove(t Statable) {
+func (c *Collector) Remove(t common.Statable) {
 	if c.ns == nil {
 		return
 	}

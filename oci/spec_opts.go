@@ -76,13 +76,16 @@ func setLinux(s *Spec) {
 	}
 }
 
-// nolint
 func setResources(s *Spec) {
 	if s.Linux != nil {
 		if s.Linux.Resources == nil {
 			s.Linux.Resources = &specs.LinuxResources{}
 		}
 	}
+}
+
+//nolint:nolintlint,unused // not used on all platforms
+func setResourcesWindows(s *Spec) {
 	if s.Windows != nil {
 		if s.Windows.Resources == nil {
 			s.Windows.Resources = &specs.WindowsResources{}
@@ -90,7 +93,7 @@ func setResources(s *Spec) {
 	}
 }
 
-// nolint
+//nolint:nolintlint,unused // not used on all platforms
 func setCPU(s *Spec) {
 	setResources(s)
 	if s.Linux != nil {
@@ -98,6 +101,11 @@ func setCPU(s *Spec) {
 			s.Linux.Resources.CPU = &specs.LinuxCPU{}
 		}
 	}
+}
+
+//nolint:nolintlint,unused // not used on all platforms
+func setCPUWindows(s *Spec) {
+	setResourcesWindows(s)
 	if s.Windows != nil {
 		if s.Windows.Resources.CPU == nil {
 			s.Windows.Resources.CPU = &specs.WindowsCPUResources{}
@@ -218,6 +226,7 @@ func WithProcessArgs(args ...string) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setProcess(s)
 		s.Process.Args = args
+		s.Process.CommandLine = ""
 		return nil
 	}
 }
@@ -347,17 +356,19 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 			return err
 		}
 		var (
-			ociimage v1.Image
-			config   v1.ImageConfig
+			imageConfigBytes []byte
+			ociimage         v1.Image
+			config           v1.ImageConfig
 		)
 		switch ic.MediaType {
 		case v1.MediaTypeImageConfig, images.MediaTypeDockerSchema2Config:
-			p, err := content.ReadBlob(ctx, image.ContentStore(), ic)
+			var err error
+			imageConfigBytes, err = content.ReadBlob(ctx, image.ContentStore(), ic)
 			if err != nil {
 				return err
 			}
 
-			if err := json.Unmarshal(p, &ociimage); err != nil {
+			if err := json.Unmarshal(imageConfigBytes, &ociimage); err != nil {
 				return err
 			}
 			config = ociimage.Config
@@ -365,6 +376,7 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 			return fmt.Errorf("unknown image config media type %s", ic.MediaType)
 		}
 
+		appendOSMounts(s, ociimage.OS)
 		setProcess(s)
 		if s.Linux != nil {
 			defaults := config.Env
@@ -394,11 +406,55 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 			return WithAdditionalGIDs("root")(ctx, client, c, s)
 		} else if s.Windows != nil {
 			s.Process.Env = replaceOrAppendEnvValues(config.Env, s.Process.Env)
+
+			// To support Docker ArgsEscaped on Windows we need to combine the
+			// image Entrypoint & (Cmd Or User Args) while taking into account
+			// if Docker has already escaped them in the image config. When
+			// Docker sets `ArgsEscaped==true` in the config it has pre-escaped
+			// either Entrypoint or Cmd or both. Cmd should always be treated as
+			// arguments appended to Entrypoint unless:
+			//
+			// 1. Entrypoint does not exist, in which case Cmd[0] is the
+			// executable.
+			//
+			// 2. The user overrides the Cmd with User Args when activating the
+			// container in which case those args should be appended to the
+			// Entrypoint if it exists.
+			//
+			// To effectively do this we need to know if the arguments came from
+			// the user or if the arguments came from the image config when
+			// ArgsEscaped==true. In this case we only want to escape the
+			// additional user args when forming the complete CommandLine. This
+			// is safe in both cases of Entrypoint or Cmd being set because
+			// Docker will always escape them to an array of length one. Thus in
+			// both cases it is the "executable" portion of the command.
+			//
+			// In the case ArgsEscaped==false, Entrypoint or Cmd will contain
+			// any number of entries that are all unescaped and can simply be
+			// combined (potentially overwriting Cmd with User Args if present)
+			// and forwarded the container start as an Args array.
 			cmd := config.Cmd
+			cmdFromImage := true
 			if len(args) > 0 {
 				cmd = args
+				cmdFromImage = false
 			}
-			s.Process.Args = append(config.Entrypoint, cmd...)
+
+			cmd = append(config.Entrypoint, cmd...)
+			if len(cmd) == 0 {
+				return errors.New("no arguments specified")
+			}
+
+			if config.ArgsEscaped && (len(config.Entrypoint) > 0 || cmdFromImage) {
+				s.Process.Args = nil
+				s.Process.CommandLine = cmd[0]
+				if len(cmd) > 1 {
+					s.Process.CommandLine += " " + escapeAndCombineArgs(cmd[1:])
+				}
+			} else {
+				s.Process.Args = cmd
+				s.Process.CommandLine = ""
+			}
 
 			s.Process.Cwd = config.WorkingDir
 			s.Process.User = specs.User{
@@ -518,7 +574,8 @@ func WithNamespacedCgroup() SpecOpts {
 
 // WithUser sets the user to be used within the container.
 // It accepts a valid user string in OCI Image Spec v1.0.0:
-//   user, uid, user:group, uid:gid, uid:group, user:gid
+//
+//	user, uid, user:group, uid:gid, uid:group, user:gid
 func WithUser(userstr string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
 		setProcess(s)
@@ -628,11 +685,8 @@ func WithUIDGID(uid, gid uint32) SpecOpts {
 func WithUserID(uid uint32) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
 		setProcess(s)
-		if c.Snapshotter == "" && c.SnapshotKey == "" {
-			if !isRootfsAbs(s.Root.Path) {
-				return errors.New("rootfs absolute path is required")
-			}
-			user, err := UserFromPath(s.Root.Path, func(u user.User) bool {
+		setUser := func(root string) error {
+			user, err := UserFromPath(root, func(u user.User) bool {
 				return u.Uid == int(uid)
 			})
 			if err != nil {
@@ -644,7 +698,12 @@ func WithUserID(uid uint32) SpecOpts {
 			}
 			s.Process.User.UID, s.Process.User.GID = uint32(user.Uid), uint32(user.Gid)
 			return nil
-
+		}
+		if c.Snapshotter == "" && c.SnapshotKey == "" {
+			if !isRootfsAbs(s.Root.Path) {
+				return errors.New("rootfs absolute path is required")
+			}
+			return setUser(s.Root.Path)
 		}
 		if c.Snapshotter == "" {
 			return errors.New("no snapshotter set for container")
@@ -659,20 +718,7 @@ func WithUserID(uid uint32) SpecOpts {
 		}
 
 		mounts = tryReadonlyMounts(mounts)
-		return mount.WithTempMount(ctx, mounts, func(root string) error {
-			user, err := UserFromPath(root, func(u user.User) bool {
-				return u.Uid == int(uid)
-			})
-			if err != nil {
-				if os.IsNotExist(err) || err == ErrNoUsersFound {
-					s.Process.User.UID, s.Process.User.GID = uid, 0
-					return nil
-				}
-				return err
-			}
-			s.Process.User.UID, s.Process.User.GID = uint32(user.Uid), uint32(user.Gid)
-			return nil
-		})
+		return mount.WithTempMount(ctx, mounts, setUser)
 	}
 }
 
@@ -686,11 +732,8 @@ func WithUsername(username string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
 		setProcess(s)
 		if s.Linux != nil {
-			if c.Snapshotter == "" && c.SnapshotKey == "" {
-				if !isRootfsAbs(s.Root.Path) {
-					return errors.New("rootfs absolute path is required")
-				}
-				user, err := UserFromPath(s.Root.Path, func(u user.User) bool {
+			setUser := func(root string) error {
+				user, err := UserFromPath(root, func(u user.User) bool {
 					return u.Name == username
 				})
 				if err != nil {
@@ -698,6 +741,12 @@ func WithUsername(username string) SpecOpts {
 				}
 				s.Process.User.UID, s.Process.User.GID = uint32(user.Uid), uint32(user.Gid)
 				return nil
+			}
+			if c.Snapshotter == "" && c.SnapshotKey == "" {
+				if !isRootfsAbs(s.Root.Path) {
+					return errors.New("rootfs absolute path is required")
+				}
+				return setUser(s.Root.Path)
 			}
 			if c.Snapshotter == "" {
 				return errors.New("no snapshotter set for container")
@@ -712,16 +761,7 @@ func WithUsername(username string) SpecOpts {
 			}
 
 			mounts = tryReadonlyMounts(mounts)
-			return mount.WithTempMount(ctx, mounts, func(root string) error {
-				user, err := UserFromPath(root, func(u user.User) bool {
-					return u.Name == username
-				})
-				if err != nil {
-					return err
-				}
-				s.Process.User.UID, s.Process.User.GID = uint32(user.Uid), uint32(user.Gid)
-				return nil
-			})
+			return mount.WithTempMount(ctx, mounts, setUser)
 		} else if s.Windows != nil {
 			s.Process.User.Username = username
 		} else {
@@ -732,7 +772,7 @@ func WithUsername(username string) SpecOpts {
 }
 
 // WithAdditionalGIDs sets the OCI spec's additionalGids array to any additional groups listed
-// for a particular user in the /etc/groups file of the image's root filesystem
+// for a particular user in the /etc/group file of the image's root filesystem
 // The passed in user can be either a uid or a username.
 func WithAdditionalGIDs(userstr string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
@@ -802,6 +842,67 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 	}
 }
 
+// WithAppendAdditionalGroups append additional groups within the container.
+// The passed in groups can be either a gid or a groupname.
+func WithAppendAdditionalGroups(groups ...string) SpecOpts {
+	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
+		// For LCOW or on Darwin additional GID's are not supported
+		if s.Windows != nil || runtime.GOOS == "darwin" {
+			return nil
+		}
+		setProcess(s)
+		setAdditionalGids := func(root string) error {
+			gpath, err := fs.RootPath(root, "/etc/group")
+			if err != nil {
+				return err
+			}
+			ugroups, err := user.ParseGroupFile(gpath)
+			if err != nil {
+				return err
+			}
+			groupMap := make(map[string]user.Group)
+			for _, group := range ugroups {
+				groupMap[group.Name] = group
+			}
+			var gids []uint32
+			for _, group := range groups {
+				gid, err := strconv.ParseUint(group, 10, 32)
+				if err == nil {
+					gids = append(gids, uint32(gid))
+				} else {
+					g, ok := groupMap[group]
+					if !ok {
+						return fmt.Errorf("unable to find group %s", group)
+					}
+					gids = append(gids, uint32(g.Gid))
+				}
+			}
+			s.Process.User.AdditionalGids = append(s.Process.User.AdditionalGids, gids...)
+			return nil
+		}
+		if c.Snapshotter == "" && c.SnapshotKey == "" {
+			if !filepath.IsAbs(s.Root.Path) {
+				return errors.New("rootfs absolute path is required")
+			}
+			return setAdditionalGids(s.Root.Path)
+		}
+		if c.Snapshotter == "" {
+			return errors.New("no snapshotter set for container")
+		}
+		if c.SnapshotKey == "" {
+			return errors.New("rootfs snapshot not created for container")
+		}
+		snapshotter := client.SnapshotService(c.Snapshotter)
+		mounts, err := snapshotter.Mounts(ctx, c.SnapshotKey)
+		if err != nil {
+			return err
+		}
+
+		mounts = tryReadonlyMounts(mounts)
+		return mount.WithTempMount(ctx, mounts, setAdditionalGids)
+	}
+}
+
 // WithCapabilities sets Linux capabilities on the process
 func WithCapabilities(caps []string) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
@@ -810,7 +911,6 @@ func WithCapabilities(caps []string) SpecOpts {
 		s.Process.Capabilities.Bounding = caps
 		s.Process.Capabilities.Effective = caps
 		s.Process.Capabilities.Permitted = caps
-		s.Process.Capabilities.Inheritable = caps
 
 		return nil
 	}
@@ -845,7 +945,6 @@ func WithAddedCapabilities(caps []string) SpecOpts {
 				&s.Process.Capabilities.Bounding,
 				&s.Process.Capabilities.Effective,
 				&s.Process.Capabilities.Permitted,
-				&s.Process.Capabilities.Inheritable,
 			} {
 				if !capsContain(*cl, c) {
 					*cl = append(*cl, c)
@@ -865,7 +964,6 @@ func WithDroppedCapabilities(caps []string) SpecOpts {
 				&s.Process.Capabilities.Bounding,
 				&s.Process.Capabilities.Effective,
 				&s.Process.Capabilities.Permitted,
-				&s.Process.Capabilities.Inheritable,
 			} {
 				removeCap(cl, c)
 			}
@@ -880,7 +978,7 @@ func WithDroppedCapabilities(caps []string) SpecOpts {
 func WithAmbientCapabilities(caps []string) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setCapabilities(s)
-
+		s.Process.Capabilities.Inheritable = caps
 		s.Process.Capabilities.Ambient = caps
 		return nil
 	}
@@ -909,7 +1007,7 @@ func UserFromPath(root string, filter func(user.User) bool) (user.User, error) {
 // ErrNoGroupsFound can be returned from GIDFromPath
 var ErrNoGroupsFound = errors.New("no groups found")
 
-// GIDFromPath inspects the GID using /etc/passwd in the specified rootfs.
+// GIDFromPath inspects the GID using /etc/group in the specified rootfs.
 // filter can be nil.
 func GIDFromPath(root string, filter func(user.Group) bool) (gid uint32, err error) {
 	gpath, err := fs.RootPath(root, "/etc/group")
@@ -1123,17 +1221,10 @@ func WithDefaultUnixDevices(_ context.Context, _ Client, _ *containers.Container
 			Allow:  true,
 		},
 		{
+			// "dev/ptmx"
 			Type:   "c",
 			Major:  intptr(5),
 			Minor:  intptr(2),
-			Access: rwm,
-			Allow:  true,
-		},
-		{
-			// tuntap
-			Type:   "c",
-			Major:  intptr(10),
-			Minor:  intptr(200),
 			Access: rwm,
 			Allow:  true,
 		},
@@ -1303,4 +1394,18 @@ func tryReadonlyMounts(mounts []mount.Mount) []mount.Mount {
 		mounts[0].Options = append(mounts[0].Options, "ro")
 	}
 	return mounts
+}
+
+// WithWindowsDevice adds a device exposed to a Windows (WCOW or LCOW) Container
+func WithWindowsDevice(idType, id string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		if idType == "" {
+			return errors.New("missing idType")
+		}
+		if s.Windows == nil {
+			s.Windows = &specs.Windows{}
+		}
+		s.Windows.Devices = append(s.Windows.Devices, specs.WindowsDevice{IDType: idType, ID: id})
+		return nil
+	}
 }

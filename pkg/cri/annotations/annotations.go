@@ -70,6 +70,13 @@ const (
 	// PodAnnotations are the annotations of the pod
 	PodAnnotations = "io.kubernetes.cri.pod-annotations"
 
+	// RuntimeHandler an experimental annotation key for getting runtime handler from pod annotations.
+	// See https://github.com/containerd/containerd/issues/6657 and https://github.com/containerd/containerd/pull/6899 for details.
+	// The value of this annotation should be the runtime for sandboxes.
+	// e.g. for [plugins.cri.containerd.runtimes.runc] runtime config, this value should be runc
+	// TODO: we should deprecate this annotation as soon as kubelet supports passing RuntimeHandler from PullImageRequest
+	RuntimeHandler = "io.containerd.cri.runtime-handler"
+
 	// WindowsHostProcess is used by hcsshim to identify windows pods that are running HostProcesses
 	WindowsHostProcess = "microsoft.com/hostprocess-container"
 )

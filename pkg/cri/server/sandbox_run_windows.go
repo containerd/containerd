@@ -51,7 +51,7 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		// Clear the root location since hcsshim expects it.
 		// NOTE: readonly rootfs doesn't work on windows.
 		customopts.WithoutRoot,
-		customopts.WithWindowsNetworkNamespace(nsPath),
+		oci.WithWindowsNetworkNamespace(nsPath),
 	)
 
 	specOpts = append(specOpts, customopts.WithWindowsDefaultSandboxShares)
@@ -110,4 +110,8 @@ func (c *criService) cleanupSandboxFiles(id string, config *runtime.PodSandboxCo
 // No task options needed for windows.
 func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {
 	return nil
+}
+
+func (c *criService) updateNetNamespacePath(spec *runtimespec.Spec, nsPath string) {
+	spec.Windows.Network.NetworkNamespace = nsPath
 }

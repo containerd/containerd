@@ -34,6 +34,8 @@ been **DEPRECATED**._ You should now point your registry `config_path` to the pa
 
 Modify your `config.toml` (default location: `/etc/containerd/config.toml`) as follows:
 ```toml
+version = 2
+
 [plugins."io.containerd.grpc.v1.cri".registry]
    config_path = "/etc/containerd/certs.d"
 ```
@@ -70,6 +72,9 @@ $ tree /etc/containerd/certs.d
 └── docker.io
     └── hosts.toml
 ```
+
+Optionally the `_default` registry host namespace can be used as a fallback, if no
+other namespace matches.
 
 The `/v2` portion of the pull request format shown above refers to the version of the
 distribution api. If not included in the pull request, `/v2` is added by default for all
@@ -153,6 +158,21 @@ server = "https://registry-1.docker.io"    # Exclude this to not use upstream
 [host."https://docker-mirror.internal"]
   capabilities = ["pull", "resolve"]
   ca = "docker-mirror.crt"                 # Or absolute path /etc/containerd/certs.d/docker.io/docker-mirror.crt
+```
+
+### Setup Default Mirror for All Registries
+
+```
+$ tree /etc/containerd/certs.d
+/etc/containerd/certs.d
+└── _default
+    └── hosts.toml
+
+$ cat /etc/containerd/certs.d/_default/hosts.toml
+server = "https://registry.example.com"
+
+[host."https://registry.example.com"]
+  capabilities = ["pull", "resolve"]
 ```
 
 ### Bypass TLS Verification Example

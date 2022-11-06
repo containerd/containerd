@@ -35,12 +35,12 @@ import (
 
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 	v1 "github.com/containerd/containerd/runtime/v1"
 	"github.com/containerd/containerd/runtime/v1/shim"
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/ttrpc"
-	ptypes "github.com/gogo/protobuf/types"
 	"github.com/sirupsen/logrus"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
@@ -197,9 +197,6 @@ func newCommand(binary, daemonAddress string, debug bool, config shim.Config, so
 		"-containerd-binary", selfExe,
 	}
 
-	if config.Criu != "" {
-		args = append(args, "-criu-path", config.Criu)
-	}
 	if config.RuntimeRoot != "" {
 		args = append(args, "-runtime-root", config.RuntimeRoot)
 	}

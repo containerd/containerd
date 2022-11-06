@@ -25,14 +25,14 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/mount"
-	"gotest.tools/v3/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 // Unmount unmounts a given mountPoint and sets t.Error if it fails
 func Unmount(t testing.TB, mountPoint string) {
 	t.Log("unmount", mountPoint)
 	err := mount.UnmountAll(mountPoint, umountflags)
-	assert.NilError(t, err)
+	assert.NoError(t, err)
 }
 
 // RequiresRoot skips tests that require root, unless the test.root flag has

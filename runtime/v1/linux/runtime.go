@@ -41,13 +41,14 @@ import (
 	"github.com/containerd/containerd/pkg/process"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/protobuf"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	v1 "github.com/containerd/containerd/runtime/v1"
 	"github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/go-runc"
 	"github.com/containerd/typeurl"
-	ptypes "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
@@ -123,7 +124,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 	r := &Runtime{
 		root:       ic.Root,
 		state:      ic.State,
-		tasks:      runtime.NewTaskList(),
+		tasks:      runtime.NewNSMap[runtime.Task](),
 		containers: metadata.NewContainerStore(m.(*metadata.DB)),
 		address:    ic.Address,
 		events:     ep.(*exchange.Exchange),
@@ -147,7 +148,7 @@ type Runtime struct {
 	state   string
 	address string
 
-	tasks      *runtime.TaskList
+	tasks      *runtime.NSMap[runtime.Task]
 	containers containers.Store
 	events     *exchange.Exchange
 
@@ -178,7 +179,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 	bundle, err := newBundle(id,
 		filepath.Join(r.state, namespace),
 		filepath.Join(r.root, namespace),
-		opts.Spec.Value)
+		opts.Spec.GetValue())
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +192,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 	shimopt := ShimLocal(r.config, r.events)
 	if !r.config.NoShim {
 		var cgroup string
-		if opts.TaskOptions != nil {
+		if opts.TaskOptions != nil && opts.TaskOptions.GetValue() != nil {
 			v, err := typeurl.UnmarshalAny(opts.TaskOptions)
 			if err != nil {
 				return nil, err
@@ -244,7 +245,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 		Stderr:     opts.IO.Stderr,
 		Terminal:   opts.IO.Terminal,
 		Checkpoint: opts.Checkpoint,
-		Options:    opts.TaskOptions,
+		Options:    protobuf.FromAny(opts.TaskOptions),
 	}
 	for _, m := range opts.Rootfs {
 		sopts.Rootfs = append(sopts.Rootfs, &types.Mount{
@@ -462,7 +463,7 @@ func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, 
 		ID:          id,
 		Pid:         uint32(pid),
 		ExitStatus:  128 + uint32(unix.SIGKILL),
-		ExitedAt:    exitedAt,
+		ExitedAt:    protobuf.ToTimestamp(exitedAt),
 	})
 
 	r.tasks.Delete(ctx, id)
@@ -478,7 +479,7 @@ func (r *Runtime) cleanupAfterDeadShim(ctx context.Context, bundle *bundle, ns, 
 		ContainerID: id,
 		Pid:         uint32(pid),
 		ExitStatus:  128 + uint32(unix.SIGKILL),
-		ExitedAt:    exitedAt,
+		ExitedAt:    protobuf.ToTimestamp(exitedAt),
 	})
 
 	return nil
@@ -537,7 +538,7 @@ func (r *Runtime) getRuncOptions(ctx context.Context, id string) (*runctypes.Run
 		return nil, err
 	}
 
-	if container.Runtime.Options != nil {
+	if container.Runtime.Options != nil && container.Runtime.Options.GetValue() != nil {
 		v, err := typeurl.UnmarshalAny(container.Runtime.Options)
 		if err != nil {
 			return nil, err

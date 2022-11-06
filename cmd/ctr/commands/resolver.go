@@ -159,7 +159,7 @@ type DebugTransport struct {
 
 // RoundTrip dumps request/responses and executes the request using the underlying transport.
 func (t DebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	in, err := httputil.DumpRequest(req, true)
+	in, err := httputil.DumpRequestOut(req, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dump request: %w", err)
 	}
@@ -200,7 +200,12 @@ func NewDebugClientTrace(ctx gocontext.Context) *httptrace.ClientTrace {
 			}
 		},
 		GotConn: func(connInfo httptrace.GotConnInfo) {
-			log.G(ctx).WithField("reused", connInfo.Reused).WithField("remote_addr", connInfo.Conn.RemoteAddr().String()).Debugf("Connection successful")
+			remoteAddr := "<nil>"
+			if addr := connInfo.Conn.RemoteAddr(); addr != nil {
+				remoteAddr = addr.String()
+			}
+
+			log.G(ctx).WithField("reused", connInfo.Reused).WithField("remote_addr", remoteAddr).Debugf("Connection successful")
 		},
 	}
 }

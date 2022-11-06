@@ -20,10 +20,12 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strconv"
 	"syscall"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/runtime/restart"
 	"github.com/sirupsen/logrus"
 )
 
@@ -38,6 +40,7 @@ func (s *stopChange) apply(ctx context.Context, client *containerd.Client) error
 type startChange struct {
 	container containerd.Container
 	logURI    string
+	count     int
 
 	// Deprecated(in release 1.5): but recognized now, prefer to use logURI
 	logPath string
@@ -61,6 +64,15 @@ func (s *startChange) apply(ctx context.Context, client *containerd.Client) erro
 			s.logPath, s.logURI)
 	}
 
+	if s.count > 0 {
+		labels := map[string]string{
+			restart.CountLabel: strconv.Itoa(s.count),
+		}
+		opt := containerd.WithAdditionalContainerLabels(labels)
+		if err := s.container.Update(ctx, containerd.UpdateContainerOpts(opt)); err != nil {
+			return err
+		}
+	}
 	killTask(ctx, s.container)
 	task, err := s.container.NewTask(ctx, log)
 	if err != nil {

@@ -28,16 +28,12 @@ import (
 	"github.com/containerd/typeurl"
 
 	encconfig "github.com/containers/ocicrypt/config"
-	"github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // WithDecryptedUnpack allows to pass parameters the 'layertool' needs to the applier
 func WithDecryptedUnpack(data *imgcrypt.Payload) diff.ApplyOpt {
 	return func(_ context.Context, desc ocispec.Descriptor, c *diff.ApplyConfig) error {
-		if c.ProcessorPayloads == nil {
-			c.ProcessorPayloads = make(map[string]*types.Any)
-		}
 		data.Descriptor = desc
 		any, err := typeurl.MarshalAny(data)
 		if err != nil {
@@ -45,7 +41,7 @@ func WithDecryptedUnpack(data *imgcrypt.Payload) diff.ApplyOpt {
 		}
 
 		for _, id := range imgcrypt.PayloadToolIDs {
-			c.ProcessorPayloads[id] = any
+			setProcessorPayload(c, id, any)
 		}
 		return nil
 	}

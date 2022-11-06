@@ -33,7 +33,6 @@ import (
 	"github.com/Microsoft/go-winio"
 	winfs "github.com/Microsoft/go-winio/pkg/fs"
 	"github.com/Microsoft/hcsshim"
-	"github.com/Microsoft/hcsshim/computestorage"
 	"github.com/Microsoft/hcsshim/pkg/ociwclayer"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
@@ -61,7 +60,12 @@ const (
 	// Label to specify that we should make a scratch space for a UtilityVM.
 	uvmScratchLabel = "containerd.io/snapshot/io.microsoft.vm.storage.scratch"
 	// Label to control a containers scratch space size (sandbox.vhdx).
-	rootfsSizeLabel = "containerd.io/snapshot/io.microsoft.container.storage.rootfs.size-gb"
+	//
+	// Deprecated: use rootfsSizeInBytesLabel
+	rootfsSizeInGBLabel = "containerd.io/snapshot/io.microsoft.container.storage.rootfs.size-gb"
+	// rootfsSizeInBytesLabel is a label to control a Windows containers scratch space
+	// size in bytes.
+	rootfsSizeInBytesLabel = "containerd.io/snapshot/windows/rootfs.sizebytes"
 )
 
 type snapshotter struct {
@@ -381,13 +385,23 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 				o(&snapshotInfo)
 			}
 
-			var sizeGB int
-			if sizeGBstr, ok := snapshotInfo.Labels[rootfsSizeLabel]; ok {
-				i32, err := strconv.ParseInt(sizeGBstr, 10, 32)
+			var sizeInBytes uint64
+			if sizeGBstr, ok := snapshotInfo.Labels[rootfsSizeInGBLabel]; ok {
+				log.G(ctx).Warnf("%q label is deprecated, please use %q instead.", rootfsSizeInGBLabel, rootfsSizeInBytesLabel)
+
+				sizeInGB, err := strconv.ParseUint(sizeGBstr, 10, 32)
 				if err != nil {
-					return nil, fmt.Errorf("failed to parse label %q=%q: %w", rootfsSizeLabel, sizeGBstr, err)
+					return nil, fmt.Errorf("failed to parse label %q=%q: %w", rootfsSizeInGBLabel, sizeGBstr, err)
 				}
-				sizeGB = int(i32)
+				sizeInBytes = sizeInGB * 1024 * 1024 * 1024
+			}
+
+			// Prefer the newer label in bytes over the deprecated Windows specific GB variant.
+			if sizeBytesStr, ok := snapshotInfo.Labels[rootfsSizeInBytesLabel]; ok {
+				sizeInBytes, err = strconv.ParseUint(sizeBytesStr, 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse label %q=%q: %w", rootfsSizeInBytesLabel, sizeBytesStr, err)
+				}
 			}
 
 			var makeUVMScratch bool
@@ -401,7 +415,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 					return nil, fmt.Errorf("failed to make UVM's scratch layer: %w", err)
 				}
 			}
-			if err := s.createScratchLayer(ctx, snDir, parentLayerPaths, sizeGB); err != nil {
+			if err := s.createScratchLayer(ctx, snDir, parentLayerPaths, sizeInBytes); err != nil {
 				return nil, fmt.Errorf("failed to create scratch layer: %w", err)
 			}
 		}
@@ -423,46 +437,23 @@ func (s *snapshotter) parentIDsToParentPaths(parentIDs []string) []string {
 }
 
 // This is essentially a recreation of what HCS' CreateSandboxLayer does with some extra bells and
-// whistles like expanding the volume if a size is specified. This will create a 1GB scratch
-// vhdx to be used if a different sized scratch that is not equal to the default of 20 is requested.
-func (s *snapshotter) createScratchLayer(ctx context.Context, snDir string, parentLayers []string, sizeGB int) error {
+// whistles like expanding the volume if a size is specified.
+func (s *snapshotter) createScratchLayer(ctx context.Context, snDir string, parentLayers []string, sizeInBytes uint64) error {
 	parentLen := len(parentLayers)
 	if parentLen == 0 {
 		return errors.New("no parent layers present")
 	}
+
 	baseLayer := parentLayers[parentLen-1]
-
-	var (
-		templateBase     = filepath.Join(baseLayer, "blank-base.vhdx")
-		templateDiffDisk = filepath.Join(baseLayer, "blank.vhdx")
-		newDisks         = sizeGB > 0 && sizeGB < 20
-		expand           = sizeGB > 0 && sizeGB != 20
-	)
-
-	// If a size greater than 0 and less than 20 (the default size produced by hcs)
-	// was specified we make a new set of disks to be used. We make it a 1GB disk and just
-	// expand it to the size specified so for future container runs we don't need to remake a disk.
-	if newDisks {
-		templateBase = filepath.Join(baseLayer, "scratch.vhdx")
-		templateDiffDisk = filepath.Join(baseLayer, "scratch-diff.vhdx")
-	}
-
-	if _, err := os.Stat(templateDiffDisk); os.IsNotExist(err) {
-		// Scratch disk not present so lets make it.
-		if err := computestorage.SetupContainerBaseLayer(ctx, baseLayer, templateBase, templateDiffDisk, 1); err != nil {
-			return fmt.Errorf("failed to create scratch vhdx at %q: %w", baseLayer, err)
-		}
-	}
-
+	templateDiffDisk := filepath.Join(baseLayer, "blank.vhdx")
 	dest := filepath.Join(snDir, "sandbox.vhdx")
 	if err := copyScratchDisk(templateDiffDisk, dest); err != nil {
 		return err
 	}
 
-	if expand {
-		gbToByte := 1024 * 1024 * 1024
-		if err := hcsshim.ExpandSandboxSize(s.info, filepath.Base(snDir), uint64(gbToByte*sizeGB)); err != nil {
-			return fmt.Errorf("failed to expand sandbox vhdx size to %d GB: %w", sizeGB, err)
+	if sizeInBytes != 0 {
+		if err := hcsshim.ExpandSandboxSize(s.info, filepath.Base(snDir), sizeInBytes); err != nil {
+			return fmt.Errorf("failed to expand sandbox vhdx size to %d bytes: %w", sizeInBytes, err)
 		}
 	}
 	return nil

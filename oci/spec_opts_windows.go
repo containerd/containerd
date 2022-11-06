@@ -19,22 +19,40 @@ package oci
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/containerd/containerd/containers"
+
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"golang.org/x/sys/windows"
 )
 
 // WithWindowsCPUCount sets the `Windows.Resources.CPU.Count` section to the
 // `count` specified.
 func WithWindowsCPUCount(count uint64) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
-		if s.Windows.Resources == nil {
-			s.Windows.Resources = &specs.WindowsResources{}
-		}
-		if s.Windows.Resources.CPU == nil {
-			s.Windows.Resources.CPU = &specs.WindowsCPUResources{}
-		}
+		setCPUWindows(s)
 		s.Windows.Resources.CPU.Count = &count
+		return nil
+	}
+}
+
+// WithWindowsCPUShares sets the `Windows.Resources.CPU.Shares` section to the
+// `shares` specified.
+func WithWindowsCPUShares(shares uint16) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setCPUWindows(s)
+		s.Windows.Resources.CPU.Shares = &shares
+		return nil
+	}
+}
+
+// WithWindowsCPUMaximum sets the `Windows.Resources.CPU.Maximum` section to the
+// `max` specified.
+func WithWindowsCPUMaximum(max uint16) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setCPUWindows(s)
+		s.Windows.Resources.CPU.Maximum = &max
 		return nil
 	}
 }
@@ -88,4 +106,16 @@ func WithWindowsNetworkNamespace(ns string) SpecOpts {
 		s.Windows.Network.NetworkNamespace = ns
 		return nil
 	}
+}
+
+func escapeAndCombineArgs(args []string) string {
+	escaped := make([]string, len(args))
+	for i, a := range args {
+		escaped[i] = windows.EscapeArg(a)
+	}
+	return strings.Join(escaped, " ")
+}
+
+func appendOSMounts(s *Spec, os string) error {
+	return nil
 }

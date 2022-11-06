@@ -46,7 +46,7 @@ func TestNewBinaryIO(t *testing.T) {
 
 	after := descriptorCount(t)
 	if before != after-1 { // one descriptor must be closed from shim logger side
-		t.Fatalf("some descriptors weren't closed (%d != %d)", before, after)
+		t.Fatalf("some descriptors weren't closed (%d != %d -1)", before, after)
 	}
 }
 

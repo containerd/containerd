@@ -73,11 +73,9 @@ func TestMetadata(t *testing.T) {
 }
 
 func TestSnapshotterWithRef(t *testing.T) {
-	ctx, db, done := testDB(t, withSnapshotter("tmp", func(string) (snapshots.Snapshotter, error) {
+	ctx, db := testDB(t, withSnapshotter("tmp", func(string) (snapshots.Snapshotter, error) {
 		return NewTmpSnapshotter(), nil
 	}))
-	defer done()
-
 	sn := db.Snapshotter("tmp")
 
 	test1opt := snapshots.WithLabels(

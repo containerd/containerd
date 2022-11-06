@@ -24,6 +24,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/containerd/containerd/contrib/seccomp/kernelversion"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -43,6 +44,9 @@ func arches() []specs.Arch {
 		return []specs.Arch{specs.ArchMIPSEL, specs.ArchMIPSEL64, specs.ArchMIPSEL64N32}
 	case "s390x":
 		return []specs.Arch{specs.ArchS390, specs.ArchS390X}
+	case "riscv64":
+		// ArchRISCV32 (SCMP_ARCH_RISCV32) does not exist
+		return []specs.Arch{specs.ArchRISCV64}
 	default:
 		return []specs.Arch{}
 	}
@@ -245,6 +249,9 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"pidfd_send_signal",
 				"pipe",
 				"pipe2",
+				"pkey_alloc",
+				"pkey_free",
+				"pkey_mprotect",
 				"poll",
 				"ppoll",
 				"ppoll_time64",
@@ -350,7 +357,6 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"signalfd4",
 				"sigprocmask",
 				"sigreturn",
-				"socket",
 				"socketcall",
 				"socketpair",
 				"splice",
@@ -403,6 +409,17 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 			},
 			Action: specs.ActAllow,
 			Args:   []specs.LinuxSeccompArg{},
+		},
+		{
+			Names:  []string{"socket"},
+			Action: specs.ActAllow,
+			Args: []specs.LinuxSeccompArg{
+				{
+					Index: 0,
+					Value: unix.AF_VSOCK,
+					Op:    specs.OpNotEqual,
+				},
+			},
 		},
 		{
 			Names:  []string{"personality"},
@@ -467,6 +484,18 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 		Syscalls:      syscalls,
 	}
 
+	// include by kernel version
+	if ok, err := kernelversion.GreaterEqualThan(
+		kernelversion.KernelVersion{Kernel: 4, Major: 8}); err == nil {
+		if ok {
+			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+				Names:  []string{"ptrace"},
+				Action: specs.ActAllow,
+				Args:   []specs.LinuxSeccompArg{},
+			})
+		}
+	}
+
 	// include by arch
 	switch runtime.GOARCH {
 	case "ppc64le":
@@ -514,6 +543,14 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"s390_pci_mmio_read",
 				"s390_pci_mmio_write",
 				"s390_runtime_instr",
+			},
+			Action: specs.ActAllow,
+			Args:   []specs.LinuxSeccompArg{},
+		})
+	case "riscv64":
+		s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			Names: []string{
+				"riscv_flush_icache",
 			},
 			Action: specs.ActAllow,
 			Args:   []specs.LinuxSeccompArg{},
@@ -617,6 +654,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 					"settimeofday",
 					"stime",
 					"clock_settime",
+					"clock_settime64",
 				},
 				Action: specs.ActAllow,
 				Args:   []specs.LinuxSeccompArg{},
@@ -627,9 +665,31 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				Action: specs.ActAllow,
 				Args:   []specs.LinuxSeccompArg{},
 			})
+		case "CAP_SYS_NICE":
+			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+				Names: []string{
+					"get_mempolicy",
+					"mbind",
+					"set_mempolicy",
+				},
+				Action: specs.ActAllow,
+				Args:   []specs.LinuxSeccompArg{},
+			})
 		case "CAP_SYSLOG":
 			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
 				Names:  []string{"syslog"},
+				Action: specs.ActAllow,
+				Args:   []specs.LinuxSeccompArg{},
+			})
+		case "CAP_BPF":
+			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+				Names:  []string{"bpf"},
+				Action: specs.ActAllow,
+				Args:   []specs.LinuxSeccompArg{},
+			})
+		case "CAP_PERFMON":
+			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+				Names:  []string{"perf_event_open"},
 				Action: specs.ActAllow,
 				Args:   []specs.LinuxSeccompArg{},
 			})

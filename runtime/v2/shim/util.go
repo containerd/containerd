@@ -28,8 +28,9 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/namespaces"
-	"github.com/gogo/protobuf/proto"
-	"github.com/gogo/protobuf/types"
+	"github.com/containerd/containerd/protobuf/proto"
+	"github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/ttrpc"
 	exec "golang.org/x/sys/execabs"
 )
 
@@ -85,7 +86,7 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 func BinaryName(runtime string) string {
 	// runtime name should format like $prefix.name.version
 	parts := strings.Split(runtime, ".")
-	if len(parts) < 2 {
+	if len(parts) < 2 || parts[0] == "" {
 		return ""
 	}
 
@@ -166,4 +167,29 @@ func ReadAddress(path string) (string, error) {
 		return "", ErrNoAddress
 	}
 	return string(data), nil
+}
+
+// chainUnaryServerInterceptors creates a single ttrpc server interceptor from
+// a chain of many interceptors executed from first to last.
+func chainUnaryServerInterceptors(interceptors ...ttrpc.UnaryServerInterceptor) ttrpc.UnaryServerInterceptor {
+	n := len(interceptors)
+
+	// force to use default interceptor in ttrpc
+	if n == 0 {
+		return nil
+	}
+
+	return func(ctx context.Context, unmarshal ttrpc.Unmarshaler, info *ttrpc.UnaryServerInfo, method ttrpc.Method) (interface{}, error) {
+		currentMethod := method
+
+		for i := n - 1; i > 0; i-- {
+			interceptor := interceptors[i]
+			innerMethod := currentMethod
+
+			currentMethod = func(currentCtx context.Context, currentUnmarshal func(interface{}) error) (interface{}, error) {
+				return interceptor(currentCtx, currentUnmarshal, info, innerMethod)
+			}
+		}
+		return interceptors[0](ctx, unmarshal, info, currentMethod)
+	}
 }

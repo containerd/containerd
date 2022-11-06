@@ -239,7 +239,7 @@ $ tree /var/lib/containerd/io.containerd.content.v1.content/blobs
 We can see the same thing if we use the containerd interface. Again, we sorted it for consistent easier viewing.
 
 ```console
-ctr content ls
+$ ctr content ls
 DIGEST									SIZE		AGE		LABELS
 sha256:1d0b903e3770c2c3c79961b73a53e963f4fd4b2674c2c4911472e8a054cb5728	1.862 kB	6 minutes	containerd.io/gc.ref.content.0=sha256:a5aae2581826d13e906ff5c961d4c2817a9b96c334fd97b072d976990384156a,containerd.io/gc.ref.content.1=sha256:4ff8940144391ecd5e1632d0c427d95f4a8d2bb4a72b7e3898733352350d9ab3,containerd.io/gc.ref.content.2=sha256:ce541c3e2570b5a05d40e7fc01f87fc1222a701c81f95e7e6f2ef6df1c6e25e7,containerd.io/gc.ref.content.3=sha256:535ee258100feeeb525d4793c16c7e58147c105231d7d05ffc9c84b56750f233,containerd.io/gc.ref.content.4=sha256:0f3b047f2789547c58634ce88d71c7856999b2afc8b859b7adb5657043984b26,containerd.io/gc.ref.content.5=sha256:bfc45f499a9393aef091057f3d067ff7129ae9fb30d9f31054bafe96ca30b8d6,containerd.io/gc.ref.content.6=sha256:3198e1f1707d977939154a57918d360a172c575bddeac875cb26ca6f4d30dc1c,containerd.io/gc.ref.content.7=sha256:24a15cc9366e1557db079a987e63b98a5abf4dee4356a096442f53ddc8b9c7e9
 sha256:a5aae2581826d13e906ff5c961d4c2817a9b96c334fd97b072d976990384156a	1.572 kB	6 minutes	containerd.io/gc.ref.content.2=sha256:f2edbd6a658e04d559c1bec36d838006bbdcb39d8fb9033ed43d2014ac497774,containerd.io/gc.ref.content.3=sha256:66960bede47c1a193710cf8bfa7bf5f50bc46374260923df1db1c423b52153ac,containerd.io/gc.ref.content.4=sha256:79dc0b596c9027416a627a6237bd080ac9d87f92b60f1ce145c566632839bce7,containerd.io/gc.ref.content.5=sha256:de36df38e0b6c0e7f29913c68884a0323207c07cd7c1eba71d5618f525ac2ba6,containerd.io/gc.ref.content.6=sha256:602cd484ff92015489f7b9cf9cbd77ac392997374b1cc42937773f5bac1ff43b,containerd.io/gc.ref.content.0=sha256:df57482065789980ee9445b1dd79ab1b7b3d1dc26b6867d94470af969a64c8e6,containerd.io/gc.ref.content.1=sha256:123275d6e508d282237a22fefa5aef822b719a06496444ea89efa65da523fc4b
@@ -354,8 +354,8 @@ Returning to our example, each layer will have a corresponding immutable snapsho
 our example has 6 layers, we expect to see 6 committed snapshots. The output has been sorted to make viewing
 easier; it matches the layers from the content store and manifest itself.
 
-```
-# ctr snapshot ls
+```console
+$ ctr snapshot ls
 KEY                                                                     PARENT                                                                  KIND
 sha256:b60e5c3bcef2f42ec42648b3acf7baf6de1fa780ca16d9180f3b4a3f266fe7bc                                                                         Committed
 sha256:c2cba74b5b43db78068241279a3225ca4f9639c17a5f0ce019489ee71b4382a5 sha256:b60e5c3bcef2f42ec42648b3acf7baf6de1fa780ca16d9180f3b4a3f266fe7bc Committed

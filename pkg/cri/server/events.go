@@ -17,6 +17,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -31,10 +32,9 @@ import (
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/typeurl"
-	gogotypes "github.com/gogo/protobuf/types"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 	"k8s.io/utils/clock"
 )
 
@@ -124,7 +124,7 @@ func (em *eventMonitor) startSandboxExitMonitor(ctx context.Context, id string, 
 				ID:          id,
 				Pid:         pid,
 				ExitStatus:  exitStatus,
-				ExitedAt:    exitedAt,
+				ExitedAt:    protobuf.ToTimestamp(exitedAt),
 			}
 
 			logrus.Debugf("received exit event %+v", e)
@@ -175,7 +175,7 @@ func (em *eventMonitor) startContainerExitMonitor(ctx context.Context, id string
 				ID:          id,
 				Pid:         pid,
 				ExitStatus:  exitStatus,
-				ExitedAt:    exitedAt,
+				ExitedAt:    protobuf.ToTimestamp(exitedAt),
 			}
 
 			logrus.Debugf("received exit event %+v", e)
@@ -207,7 +207,7 @@ func (em *eventMonitor) startContainerExitMonitor(ctx context.Context, id string
 	return stopCh
 }
 
-func convertEvent(e *gogotypes.Any) (string, interface{}, error) {
+func convertEvent(e typeurl.Any) (string, interface{}, error) {
 	id := ""
 	evt, err := typeurl.UnmarshalAny(e)
 	if err != nil {
@@ -234,11 +234,11 @@ func convertEvent(e *gogotypes.Any) (string, interface{}, error) {
 // event monitor.
 //
 // NOTE:
-// 1. start must be called after subscribe.
-// 2. The task exit event has been handled in individual startSandboxExitMonitor
-//    or startContainerExitMonitor goroutine at the first. If the goroutine fails,
-//    it puts the event into backoff retry queue and event monitor will handle
-//    it later.
+//  1. start must be called after subscribe.
+//  2. The task exit event has been handled in individual startSandboxExitMonitor
+//     or startContainerExitMonitor goroutine at the first. If the goroutine fails,
+//     it puts the event into backoff retry queue and event monitor will handle
+//     it later.
 func (em *eventMonitor) start() <-chan error {
 	errCh := make(chan error)
 	if em.ch == nil || em.errCh == nil {
@@ -394,7 +394,7 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 	err = cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
 		if status.FinishedAt == 0 {
 			status.Pid = 0
-			status.FinishedAt = e.ExitedAt.UnixNano()
+			status.FinishedAt = protobuf.FromTimestamp(e.ExitedAt).UnixNano()
 			status.ExitCode = int32(e.ExitStatus)
 		}
 

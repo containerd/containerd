@@ -160,6 +160,10 @@ func TestTaskUpdate(t *testing.T) {
 }
 
 func TestShimInCgroup(t *testing.T) {
+	if noShimCgroup {
+		t.Skip("shim cgroup is not enabled")
+	}
+
 	t.Parallel()
 
 	client, err := newClient(t, address)
@@ -1002,7 +1006,7 @@ func TestDaemonRestartWithRunningShim(t *testing.T) {
 		t.Errorf(`first task.Wait() should have failed with "transport is closing"`)
 	}
 
-	waitCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+	waitCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	c, err := ctrd.waitForStart(waitCtx)
 	cancel()
 	if err != nil {
@@ -1117,7 +1121,6 @@ func TestContainerKillInitPidHost(t *testing.T) {
 }
 
 func TestUserNamespaces(t *testing.T) {
-	t.Parallel()
 	t.Run("WritableRootFS", func(t *testing.T) { testUserNamespaces(t, false) })
 	// see #1373 and runc#1572
 	t.Run("ReadonlyRootFS", func(t *testing.T) { testUserNamespaces(t, true) })

@@ -18,14 +18,13 @@ package leases
 
 import (
 	"context"
-	"errors"
 
 	api "github.com/containerd/containerd/api/services/leases/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/services"
-	ptypes "github.com/gogo/protobuf/types"
+	"github.com/containerd/containerd/protobuf"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 	"google.golang.org/grpc"
 )
 
@@ -34,18 +33,10 @@ func init() {
 		Type: plugin.GRPCPlugin,
 		ID:   "leases",
 		Requires: []plugin.Type{
-			plugin.ServicePlugin,
+			plugin.LeasePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			plugins, err := ic.GetByType(plugin.ServicePlugin)
-			if err != nil {
-				return nil, err
-			}
-			p, ok := plugins[services.LeasesService]
-			if !ok {
-				return nil, errors.New("leases service not found")
-			}
-			i, err := p.Instance()
+			i, err := ic.GetByID(plugin.LeasePlugin, "manager")
 			if err != nil {
 				return nil, err
 			}
@@ -56,6 +47,7 @@ func init() {
 
 type service struct {
 	lm leases.Manager
+	api.UnimplementedLeasesServer
 }
 
 func (s *service) Register(server *grpc.Server) error {
@@ -150,9 +142,9 @@ func (s *service) ListResources(ctx context.Context, r *api.ListResourcesRequest
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	apiResources := make([]api.Resource, 0, len(rs))
+	apiResources := make([]*api.Resource, 0, len(rs))
 	for _, i := range rs {
-		apiResources = append(apiResources, api.Resource{
+		apiResources = append(apiResources, &api.Resource{
 			ID:   i.ID,
 			Type: i.Type,
 		})
@@ -166,6 +158,6 @@ func leaseToGRPC(l leases.Lease) *api.Lease {
 	return &api.Lease{
 		ID:        l.ID,
 		Labels:    l.Labels,
-		CreatedAt: l.CreatedAt,
+		CreatedAt: protobuf.ToTimestamp(l.CreatedAt),
 	}
 }

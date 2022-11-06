@@ -17,9 +17,9 @@
 package server
 
 import (
+	"context"
 	"fmt"
 
-	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -39,7 +39,6 @@ func (c *criService) PodSandboxStats(
 	}
 
 	podSandboxStats, err := c.podSandboxStats(ctx, sandbox, metrics)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode pod sandbox metrics %s: %w", r.GetPodSandboxId(), err)
 	}

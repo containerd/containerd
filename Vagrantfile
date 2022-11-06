@@ -15,19 +15,28 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-# Vagrantfile for cgroup2 and SELinux
+# Vagrantfile for Fedora and EL
 Vagrant.configure("2") do |config|
-  config.vm.box = "fedora/35-cloud-base"
+  config.vm.box = ENV["BOX"] || "fedora/36-cloud-base"
+  config.vm.box_version = ENV["BOX_VERSION"]
+
   memory = 4096
   cpus = 2
+  disk_size = 60
   config.vm.provider :virtualbox do |v|
     v.memory = memory
     v.cpus = cpus
+    v.disk :disk, size: "#{disk_size}GB", primary: true
   end
   config.vm.provider :libvirt do |v|
     v.memory = memory
     v.cpus = cpus
+    v.machine_virtual_size = disk_size
   end
+
+  config.vm.synced_folder ".", "/vagrant", type: "rsync"
+
+  config.vm.provision 'shell', path: 'script/resize-vagrant-root.sh'
 
   # Disabled by default. To run:
   #   vagrant up --provision-with=upgrade-packages
@@ -71,26 +80,36 @@ Vagrant.configure("2") do |config|
     SHELL
   end
 
+  # EL does not have /usr/local/{bin,sbin} in the PATH by default
+  config.vm.provision "setup-etc-environment", type: "shell", run: "once" do |sh|
+    sh.upload_path = "/tmp/vagrant-setup-etc-environment"
+    sh.inline = <<~SHELL
+        #!/usr/bin/env bash
+        set -eux -o pipefail
+        cat >> /etc/environment <<EOF
+PATH=/usr/local/go/bin:/usr/local/bin:/usr/local/sbin:$PATH
+EOF
+        source /etc/environment
+        SHELL
+  end
+
   # To re-run this provisioner, installing a different version of go:
   #   GO_VERSION="1.14.6" vagrant up --provision-with=install-golang
   #
   config.vm.provision "install-golang", type: "shell", run: "once" do |sh|
     sh.upload_path = "/tmp/vagrant-install-golang"
     sh.env = {
-        'GO_VERSION': ENV['GO_VERSION'] || "1.17.7",
+        'GO_VERSION': ENV['GO_VERSION'] || "1.19.3",
     }
     sh.inline = <<~SHELL
         #!/usr/bin/env bash
         set -eux -o pipefail
         curl -fsSL "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar Cxz /usr/local
-        cat >> /etc/environment <<EOF
-PATH=/usr/local/go/bin:$PATH
-EOF
-        source /etc/environment
         cat >> /etc/profile.d/sh.local <<EOF
 GOPATH=\\$HOME/go
 PATH=\\$GOPATH/bin:\\$PATH
 export GOPATH PATH
+git config --global --add safe.directory /vagrant
 EOF
     source /etc/profile.d/sh.local
     SHELL
@@ -135,7 +154,8 @@ EOF
         source /etc/environment
         source /etc/profile.d/sh.local
         set -eux -o pipefail
-        ${GOPATH}/src/github.com/containerd/containerd/script/setup/install-cni
+        cd ${GOPATH}/src/github.com/containerd/containerd
+        script/setup/install-cni
         PATH=/opt/cni/bin:$PATH type ${CNI_BINARIES} || true
     SHELL
   end
@@ -210,6 +230,7 @@ EOF
         'RUNC_FLAVOR': ENV['RUNC_FLAVOR'] || "runc",
         'GOTEST': ENV['GOTEST'] || "go test",
         'GOTESTSUM_JUNITFILE': ENV['GOTESTSUM_JUNITFILE'],
+        'GOTESTSUM_JSONFILE': ENV['GOTESTSUM_JSONFILE'],
     }
     sh.inline = <<~SHELL
         #!/usr/bin/env bash
@@ -218,6 +239,7 @@ EOF
         set -eux -o pipefail
         rm -rf /var/lib/containerd-test /run/containerd-test
         cd ${GOPATH}/src/github.com/containerd/containerd
+        go test -v -count=1 -race ./metrics/cgroups
         make integration EXTRA_TESTFLAGS="-timeout 15m -no-criu -test.v" TEST_RUNTIME=io.containerd.runc.v2 RUNC_FLAVOR=$RUNC_FLAVOR
     SHELL
   end
@@ -241,6 +263,7 @@ EOF
         function cleanup()
         {
             journalctl -u containerd > /tmp/containerd.log
+            cat /tmp/containerd.log
             systemctl stop containerd
         }
         selinux=$(getenforce)
@@ -253,7 +276,7 @@ EOF
         fi
         trap cleanup EXIT
         ctr version
-        critest --parallel=$(nproc) --report-dir="${REPORT_DIR}" --ginkgo.skip='HostIpc is true'
+        critest --parallel=$[$(nproc)+2] --ginkgo.skip='HostIpc is true' --report-dir="${REPORT_DIR}"
     SHELL
   end
 

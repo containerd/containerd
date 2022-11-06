@@ -41,8 +41,8 @@ do
 done<<<$(go mod edit -json | jq -r '.Require[] | .Path +  " # " + .Version')
 while IFS='#' read -r key value
 do
-  map_replaces_1[$key]="$value"
-done<<<$(go mod edit -json | jq -r '.Replace[] | .Old.Path + " # " + .New.Path + " : " + .New.Version')
+  [ "$key" = "" ] || map_replaces_1[$key]="$value"
+done<<<$(go mod edit -json | jq -r 'try .Replace[] | .Old.Path + " # " + .New.Path + " : " + .New.Version')
 popd > /dev/null
 
 # Load the requires and replaces section in the other go.mod file
@@ -51,12 +51,12 @@ declare -A map_replaces_2
 pushd "${ROOT}/$1" > /dev/null
 while IFS='#' read -r key value
 do
-  map_requires_2[$key]="$value"
+  [ "$key" = "" ] || map_requires_2[$key]="$value"
 done<<<$(go mod edit -json | jq -r '.Require[] | .Path +  " # " + .Version')
 while IFS='#' read -r key value
 do
   map_replaces_2[$key]="$value"
-done<<<$(go mod edit -json | jq -r '.Replace[] | .Old.Path + " # " + .New.Path + " : " + .New.Version')
+done<<<$(go mod edit -json | jq -r 'try .Replace[] | .Old.Path + " # " + .New.Path + " : " + .New.Version')
 popd > /dev/null
 
 # signal for errors later

@@ -221,28 +221,29 @@ func TestImageStore(t *testing.T) {
 			expected: []Image{},
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		s, err := NewFakeStore([]Image{image})
-		assert.NoError(err)
-		assert.NoError(s.update(test.ref, test.image))
-
-		assert.Len(s.List(), len(test.expected))
-		for _, expect := range test.expected {
-			got, err := s.Get(expect.ID)
+		t.Run(desc, func(t *testing.T) {
+			s, err := NewFakeStore([]Image{image})
 			assert.NoError(err)
-			equal(got, expect)
-			for _, ref := range expect.References {
-				id, err := s.Resolve(ref)
-				assert.NoError(err)
-				assert.Equal(expect.ID, id)
-			}
-		}
+			assert.NoError(s.update(test.ref, test.image))
 
-		if test.image == nil {
-			// Shouldn't be able to index by removed ref.
-			id, err := s.Resolve(test.ref)
-			assert.Equal(errdefs.ErrNotFound, err)
-			assert.Empty(id)
-		}
+			assert.Len(s.List(), len(test.expected))
+			for _, expect := range test.expected {
+				got, err := s.Get(expect.ID)
+				assert.NoError(err)
+				equal(got, expect)
+				for _, ref := range expect.References {
+					id, err := s.Resolve(ref)
+					assert.NoError(err)
+					assert.Equal(expect.ID, id)
+				}
+			}
+
+			if test.image == nil {
+				// Shouldn't be able to index by removed ref.
+				id, err := s.Resolve(test.ref)
+				assert.Equal(errdefs.ErrNotFound, err)
+				assert.Empty(id)
+			}
+		})
 	}
 }

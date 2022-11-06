@@ -78,21 +78,22 @@ func TestSetContainerStarting(t *testing.T) {
 			expectErr: true,
 		},
 	} {
-		t.Logf("TestCase %q", desc)
-		container, err := containerstore.NewContainer(
-			containerstore.Metadata{ID: testID},
-			containerstore.WithFakeStatus(test.status),
-		)
-		assert.NoError(t, err)
-		err = setContainerStarting(container)
-		if test.expectErr {
-			assert.Error(t, err)
-			assert.Equal(t, test.status, container.Status.Get(), "metadata should not be updated")
-		} else {
+		t.Run(desc, func(t *testing.T) {
+			container, err := containerstore.NewContainer(
+				containerstore.Metadata{ID: testID},
+				containerstore.WithFakeStatus(test.status),
+			)
 			assert.NoError(t, err)
-			assert.True(t, container.Status.Get().Starting, "starting should be set")
-			assert.NoError(t, resetContainerStarting(container))
-			assert.False(t, container.Status.Get().Starting, "starting should be reset")
-		}
+			err = setContainerStarting(container)
+			if test.expectErr {
+				assert.Error(t, err)
+				assert.Equal(t, test.status, container.Status.Get(), "metadata should not be updated")
+			} else {
+				assert.NoError(t, err)
+				assert.True(t, container.Status.Get().Starting, "starting should be set")
+				assert.NoError(t, resetContainerStarting(container))
+				assert.False(t, container.Status.Get().Starting, "starting should be reset")
+			}
+		})
 	}
 }
