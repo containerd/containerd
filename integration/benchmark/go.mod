@@ -2,11 +2,9 @@ module github.com/containerd/containerd/integration/benchmark
 
 go 1.18
 
-require (
-	github.com/containerd/containerd v1.5.13
-	github.com/hashicorp/go-multierror v1.1.1
-	github.com/montanaflynn/stats v0.6.6
-)
+require github.com/containerd/containerd v1.6.1
+
+require github.com/opencontainers/image-spec v1.0.3-0.20220303224323-02efb9a75ee1 // indirect
 
 require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20220706123152-fef3fe1bab07 // indirect
@@ -27,12 +25,12 @@ require (
 	github.com/google/go-cmp v0.5.8 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
+	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/klauspost/compress v1.11.13 // indirect
 	github.com/moby/locker v1.0.1 // indirect
 	github.com/moby/sys/mountinfo v0.6.2 // indirect
 	github.com/moby/sys/signal v0.7.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/image-spec v1.0.3-0.20220303224323-02efb9a75ee1 // indirect
 	github.com/opencontainers/runc v1.1.2 // indirect
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417 // indirect
 	github.com/opencontainers/runtime-tools v0.0.0-20190417131837-cd1349b7c47e // indirect
