@@ -22,13 +22,18 @@ import (
 )
 
 func TestCPUVariant(t *testing.T) {
-	if !isArmArch(runtime.GOARCH) || !isLinuxOS(runtime.GOOS) {
+	if !isArmArch(runtime.GOARCH) {
 		t.Skip("only relevant on linux/arm")
 	}
 
 	variants := []string{"v8", "v7", "v6", "v5", "v4", "v3"}
 
-	p := getCPUVariant()
+	p, err := getCPUVariant()
+	if err != nil {
+		t.Fatalf("Error getting CPU variant: %v\n", err)
+		return
+	}
+
 	for _, variant := range variants {
 		if p == variant {
 			t.Logf("got valid variant as expected: %#v = %#v\n", p, variant)
@@ -37,4 +42,12 @@ func TestCPUVariant(t *testing.T) {
 	}
 
 	t.Fatalf("could not get valid variant as expected: %v\n", variants)
+}
+
+func TestGetCPUVariantFromArch(t *testing.T) {
+
+	if !isArmArch(runtime.GOARCH) {
+		t.Skip("only relevant on linux/arm")
+	}
+
 }
