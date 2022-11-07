@@ -31,8 +31,8 @@ func TestMergeConfigs(t *testing.T) {
 	a := &Config{
 		Version:          2,
 		Root:             "old_root",
-		RequiredPlugins:  []string{"old_plugin"},
-		DisabledPlugins:  []string{"old_plugin"},
+		RequiredPlugins:  []string{"io.containerd.old_plugin.v1"},
+		DisabledPlugins:  []string{"io.containerd.old_plugin.v1"},
 		State:            "old_state",
 		OOMScore:         1,
 		Timeouts:         map[string]string{"a": "1"},
@@ -40,8 +40,9 @@ func TestMergeConfigs(t *testing.T) {
 	}
 
 	b := &Config{
+		Version:          2,
 		Root:             "new_root",
-		RequiredPlugins:  []string{"new_plugin1", "new_plugin2"},
+		RequiredPlugins:  []string{"io.containerd.new_plugin1.v1", "io.containerd.new_plugin2.v1"},
 		OOMScore:         2,
 		Timeouts:         map[string]string{"b": "2"},
 		StreamProcessors: map[string]StreamProcessor{"1": {Path: "3"}},
@@ -54,10 +55,24 @@ func TestMergeConfigs(t *testing.T) {
 	assert.Equal(t, "new_root", a.Root)
 	assert.Equal(t, "old_state", a.State)
 	assert.Equal(t, 2, a.OOMScore)
-	assert.Equal(t, []string{"old_plugin", "new_plugin1", "new_plugin2"}, a.RequiredPlugins)
-	assert.Equal(t, []string{"old_plugin"}, a.DisabledPlugins)
+	assert.Equal(t, []string{"io.containerd.old_plugin.v1", "io.containerd.new_plugin1.v1", "io.containerd.new_plugin2.v1"}, a.RequiredPlugins)
+	assert.Equal(t, []string{"io.containerd.old_plugin.v1"}, a.DisabledPlugins)
 	assert.Equal(t, map[string]string{"a": "1", "b": "2"}, a.Timeouts)
 	assert.Equal(t, map[string]StreamProcessor{"1": {Path: "3"}, "2": {Path: "5"}}, a.StreamProcessors)
+
+	// Verify overrides for integers
+	// https://github.com/containerd/containerd/blob/v1.6.0/services/server/config/config.go#L322-L323
+	a = &Config{Version: 2, OOMScore: 1}
+	b = &Config{Version: 2, OOMScore: 0} // OOMScore "not set / default"
+	err = mergeConfig(a, b)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, a.OOMScore)
+
+	a = &Config{Version: 2, OOMScore: 1}
+	b = &Config{Version: 2, OOMScore: 0} // OOMScore "not set / default"
+	err = mergeConfig(a, b)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, a.OOMScore)
 }
 
 func TestResolveImports(t *testing.T) {
