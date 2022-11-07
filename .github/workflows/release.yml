@@ -69,6 +69,8 @@ jobs:
             dockerfile-platform: linux/arm64
           - dockerfile-ubuntu: 18.04
             dockerfile-platform: linux/ppc64le
+          - dockerfile-ubuntu: 18.04
+            dockerfile-platform: linux/s390x
           # riscv64 isn't supported by Ubuntu 18.04
           - dockerfile-ubuntu: 22.04
             dockerfile-platform: linux/riscv64
