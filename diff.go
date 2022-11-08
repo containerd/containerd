@@ -25,7 +25,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/protobuf"
-	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -57,7 +56,7 @@ func (r *diffRemote) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 		}
 	}
 
-	payloads := make(map[string]*ptypes.Any)
+	payloads := make(map[string]*protobuf.Any)
 	for k, v := range config.ProcessorPayloads {
 		payloads[k] = protobuf.FromAny(v)
 	}

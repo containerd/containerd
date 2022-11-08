@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/containerd/containerd/protobuf/types"
+	types "github.com/containerd/containerd/protobuf"
 )
 
 // TaskInfo provides task specific information

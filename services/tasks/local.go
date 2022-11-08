@@ -750,7 +750,7 @@ func (l *local) allRuntimes() (o []runtime.PlatformRuntime) {
 }
 
 // getCheckpointPath only suitable for runc runtime now
-func getCheckpointPath(runtime string, option *ptypes.Any) (string, error) {
+func getCheckpointPath(runtime string, option *protobuf.Any) (string, error) {
 	if option == nil {
 		return "", nil
 	}
@@ -784,7 +784,7 @@ func getCheckpointPath(runtime string, option *ptypes.Any) (string, error) {
 }
 
 // getRestorePath only suitable for runc runtime now
-func getRestorePath(runtime string, option *ptypes.Any) (string, error) {
+func getRestorePath(runtime string, option *protobuf.Any) (string, error) {
 	if option == nil {
 		return "", nil
 	}

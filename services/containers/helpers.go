@@ -20,7 +20,6 @@ import (
 	api "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/typeurl"
 )
 
@@ -36,7 +35,7 @@ func containersToProto(containers []containers.Container) []*api.Container {
 }
 
 func containerToProto(container *containers.Container) *api.Container {
-	extensions := make(map[string]*types.Any)
+	extensions := make(map[string]*protobuf.Any)
 	for k, v := range container.Extensions {
 		extensions[k] = protobuf.FromAny(v)
 	}

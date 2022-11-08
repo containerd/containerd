@@ -22,7 +22,7 @@ import (
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
@@ -50,7 +50,7 @@ func TestCreateDelete(t *testing.T) {
 				_, err := store.Create(ctx, containers.Container{
 					ID:      "c1",
 					Runtime: containers.RuntimeInfo{Name: "rt"},
-					Spec:    &types.Any{},
+					Spec:    &protobuf.Any{},
 				})
 				require.NoError(t, err)
 

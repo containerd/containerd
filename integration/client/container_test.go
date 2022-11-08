@@ -40,7 +40,6 @@ import (
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
-	gogotypes "github.com/containerd/containerd/protobuf/types"
 	_ "github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/go-runc"
@@ -1426,7 +1425,7 @@ func TestContainerExtensions(t *testing.T) {
 	}
 	defer client.Close()
 
-	ext := gogotypes.Any{TypeUrl: "test.ext.url", Value: []byte("hello")}
+	ext := protobuf.Any{TypeUrl: "test.ext.url", Value: []byte("hello")}
 	container, err := client.NewContainer(ctx, id, WithNewSpec(), WithContainerExtension("hello", &ext))
 	if err != nil {
 		t.Fatal(err)

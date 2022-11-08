@@ -26,7 +26,7 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/errdefs"
-	google_protobuf "github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/containerd/protobuf"
 )
 
 type deletedState struct {
@@ -40,7 +40,7 @@ func (s *deletedState) Resume(ctx context.Context) error {
 	return errors.New("cannot resume a deleted process")
 }
 
-func (s *deletedState) Update(context context.Context, r *google_protobuf.Any) error {
+func (s *deletedState) Update(context context.Context, r *protobuf.Any) error {
 	return errors.New("cannot update a deleted process")
 }
 

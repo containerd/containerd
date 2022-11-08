@@ -16,9 +16,7 @@
 
 package process
 
-import (
-	google_protobuf "github.com/containerd/containerd/protobuf/types"
-)
+import "github.com/containerd/containerd/protobuf"
 
 // Mount holds filesystem mount configuration
 type Mount struct {
@@ -40,7 +38,7 @@ type CreateConfig struct {
 	Stderr           string
 	Checkpoint       string
 	ParentCheckpoint string
-	Options          *google_protobuf.Any
+	Options          *protobuf.Any
 }
 
 // ExecConfig holds exec creation configuration
@@ -50,7 +48,7 @@ type ExecConfig struct {
 	Stdin    string
 	Stdout   string
 	Stderr   string
-	Spec     *google_protobuf.Any
+	Spec     *protobuf.Any
 }
 
 // CheckpointConfig holds task checkpoint configuration

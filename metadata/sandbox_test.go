@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/protobuf/types"
+	types "github.com/containerd/containerd/protobuf"
 	api "github.com/containerd/containerd/sandbox"
 	"github.com/containerd/typeurl"
 	"github.com/google/go-cmp/cmp"

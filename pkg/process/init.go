@@ -34,7 +34,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/stdio"
-	google_protobuf "github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -452,14 +452,14 @@ func (p *Init) checkpoint(ctx context.Context, r *CheckpointConfig) error {
 }
 
 // Update the processes resource configuration
-func (p *Init) Update(ctx context.Context, r *google_protobuf.Any) error {
+func (p *Init) Update(ctx context.Context, r *protobuf.Any) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	return p.initState.Update(ctx, r)
 }
 
-func (p *Init) update(ctx context.Context, r *google_protobuf.Any) error {
+func (p *Init) update(ctx context.Context, r *protobuf.Any) error {
 	var resources specs.LinuxResources
 	if err := json.Unmarshal(r.Value, &resources); err != nil {
 		return err

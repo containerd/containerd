@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/services"
 	"github.com/google/uuid"
@@ -196,9 +197,9 @@ func pluginsToPB(plugins []*plugin.Plugin) []*api.Plugin {
 		if err := p.Err(); err != nil {
 			st, ok := status.FromError(errdefs.ToGRPC(err))
 			if ok {
-				var details []*ptypes.Any
+				var details []*protobuf.Any
 				for _, d := range st.Proto().Details {
-					details = append(details, &ptypes.Any{
+					details = append(details, &protobuf.Any{
 						TypeUrl: d.TypeUrl,
 						Value:   d.Value,
 					})

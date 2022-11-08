@@ -35,7 +35,6 @@ import (
 	"github.com/containerd/containerd/protobuf"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/containerd/containerd/protobuf/types"
 	metrics "github.com/docker/go-metrics"
 )
 
@@ -150,7 +149,7 @@ func (t *mockStatT) Namespace() string {
 	return t.namespace
 }
 
-func (t *mockStatT) Stats(context.Context) (*types.Any, error) {
+func (t *mockStatT) Stats(context.Context) (*protobuf.Any, error) {
 	if t.isV1 {
 		return protobuf.MarshalAnyToProto(&v1types.Metrics{})
 	}

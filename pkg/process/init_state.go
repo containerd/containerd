@@ -24,7 +24,7 @@ import (
 	"errors"
 	"fmt"
 
-	google_protobuf "github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/containerd/protobuf"
 	runc "github.com/containerd/go-runc"
 	"github.com/sirupsen/logrus"
 )
@@ -34,7 +34,7 @@ type initState interface {
 	Delete(context.Context) error
 	Pause(context.Context) error
 	Resume(context.Context) error
-	Update(context.Context, *google_protobuf.Any) error
+	Update(context.Context, *protobuf.Any) error
 	Checkpoint(context.Context, *CheckpointConfig) error
 	Exec(context.Context, string, *ExecConfig) (Process, error)
 	Kill(context.Context, uint32, bool) error
@@ -68,7 +68,7 @@ func (s *createdState) Resume(ctx context.Context) error {
 	return errors.New("cannot resume task in created state")
 }
 
-func (s *createdState) Update(ctx context.Context, r *google_protobuf.Any) error {
+func (s *createdState) Update(ctx context.Context, r *protobuf.Any) error {
 	return s.p.update(ctx, r)
 }
 
@@ -137,7 +137,7 @@ func (s *createdCheckpointState) Resume(ctx context.Context) error {
 	return errors.New("cannot resume task in created state")
 }
 
-func (s *createdCheckpointState) Update(ctx context.Context, r *google_protobuf.Any) error {
+func (s *createdCheckpointState) Update(ctx context.Context, r *protobuf.Any) error {
 	return s.p.update(ctx, r)
 }
 
@@ -254,7 +254,7 @@ func (s *runningState) Resume(ctx context.Context) error {
 	return errors.New("cannot resume a running process")
 }
 
-func (s *runningState) Update(ctx context.Context, r *google_protobuf.Any) error {
+func (s *runningState) Update(ctx context.Context, r *protobuf.Any) error {
 	return s.p.update(ctx, r)
 }
 
@@ -318,7 +318,7 @@ func (s *pausedState) Resume(ctx context.Context) error {
 	return s.transition("running")
 }
 
-func (s *pausedState) Update(ctx context.Context, r *google_protobuf.Any) error {
+func (s *pausedState) Update(ctx context.Context, r *protobuf.Any) error {
 	return s.p.update(ctx, r)
 }
 
@@ -380,7 +380,7 @@ func (s *stoppedState) Resume(ctx context.Context) error {
 	return errors.New("cannot resume a stopped container")
 }
 
-func (s *stoppedState) Update(ctx context.Context, r *google_protobuf.Any) error {
+func (s *stoppedState) Update(ctx context.Context, r *protobuf.Any) error {
 	return errors.New("cannot update a stopped container")
 }
 

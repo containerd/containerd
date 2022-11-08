@@ -40,7 +40,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/process"
 	"github.com/containerd/containerd/protobuf"
-	ptypes "github.com/containerd/containerd/protobuf/types"
 	shimlog "github.com/containerd/containerd/runtime/v1"
 	"github.com/containerd/containerd/runtime/v1/shim"
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
@@ -271,7 +270,7 @@ func handleSignals(logger *logrus.Entry, signals chan os.Signal, server *ttrpc.S
 						Signal: uint32(syscall.SIGKILL),
 						All:    true,
 					})
-					sv.Delete(context.Background(), &ptypes.Empty{})
+					sv.Delete(context.Background(), &protobuf.Empty{})
 					close(done)
 				})
 			case unix.SIGPIPE:

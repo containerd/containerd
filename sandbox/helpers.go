@@ -19,13 +19,12 @@ package sandbox
 import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/protobuf"
-	gogo_types "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/typeurl"
 )
 
 // ToProto will map Sandbox struct to it's protobuf definition
 func ToProto(sandbox *Sandbox) *types.Sandbox {
-	extensions := make(map[string]*gogo_types.Any)
+	extensions := make(map[string]*protobuf.Any)
 	for k, v := range sandbox.Extensions {
 		extensions[k] = protobuf.FromAny(v)
 	}

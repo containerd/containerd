@@ -35,7 +35,7 @@ import (
 
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
-	ptypes "github.com/containerd/containerd/protobuf/types"
+	ptypes "github.com/containerd/containerd/protobuf"
 	v1 "github.com/containerd/containerd/runtime/v1"
 	"github.com/containerd/containerd/runtime/v1/shim"
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"

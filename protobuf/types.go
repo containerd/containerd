@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -17,17 +14,14 @@
    limitations under the License.
 */
 
-package common
+package protobuf
 
 import (
-	"context"
-
-	"github.com/containerd/containerd/protobuf"
+	"google.golang.org/genproto/protobuf/field_mask"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// Statable type that returns cgroup metrics
-type Statable interface {
-	ID() string
-	Namespace() string
-	Stats(context.Context) (*protobuf.Any, error)
-}
+type Empty = emptypb.Empty
+type Any = anypb.Any
+type FieldMask = field_mask.FieldMask

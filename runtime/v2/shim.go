@@ -35,7 +35,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/protobuf"
-	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime"
 	client "github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/ttrpc"
@@ -490,7 +489,7 @@ func (s *shimTask) Wait(ctx context.Context) (*runtime.Exit, error) {
 	}, nil
 }
 
-func (s *shimTask) Checkpoint(ctx context.Context, path string, options *ptypes.Any) error {
+func (s *shimTask) Checkpoint(ctx context.Context, path string, options *protobuf.Any) error {
 	request := &task.CheckpointTaskRequest{
 		ID:      s.ID(),
 		Path:    path,
@@ -502,7 +501,7 @@ func (s *shimTask) Checkpoint(ctx context.Context, path string, options *ptypes.
 	return nil
 }
 
-func (s *shimTask) Update(ctx context.Context, resources *ptypes.Any, annotations map[string]string) error {
+func (s *shimTask) Update(ctx context.Context, resources *protobuf.Any, annotations map[string]string) error {
 	if _, err := s.task.Update(ctx, &task.UpdateTaskRequest{
 		ID:          s.ID(),
 		Resources:   resources,
@@ -513,7 +512,7 @@ func (s *shimTask) Update(ctx context.Context, resources *ptypes.Any, annotation
 	return nil
 }
 
-func (s *shimTask) Stats(ctx context.Context) (*ptypes.Any, error) {
+func (s *shimTask) Stats(ctx context.Context) (*protobuf.Any, error) {
 	response, err := s.task.Stats(ctx, &task.StatsRequest{
 		ID: s.ID(),
 	})

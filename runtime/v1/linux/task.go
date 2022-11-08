@@ -32,7 +32,6 @@ import (
 	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/v1/shim/client"
 	"github.com/containerd/containerd/runtime/v1/shim/v1"
@@ -279,7 +278,7 @@ func (t *Task) CloseIO(ctx context.Context) error {
 }
 
 // Checkpoint creates a system level dump of the task and process information that can be later restored
-func (t *Task) Checkpoint(ctx context.Context, path string, options *types.Any) error {
+func (t *Task) Checkpoint(ctx context.Context, path string, options *protobuf.Any) error {
 	r := &shim.CheckpointTaskRequest{
 		Path:    path,
 		Options: options,
@@ -294,7 +293,7 @@ func (t *Task) Checkpoint(ctx context.Context, path string, options *types.Any) 
 }
 
 // Update changes runtime information of a running task
-func (t *Task) Update(ctx context.Context, resources *types.Any, _ map[string]string) error {
+func (t *Task) Update(ctx context.Context, resources *protobuf.Any, _ map[string]string) error {
 	if _, err := t.shim.Update(ctx, &shim.UpdateTaskRequest{
 		Resources: resources,
 	}); err != nil {
@@ -316,7 +315,7 @@ func (t *Task) Process(ctx context.Context, id string) (runtime.ExecProcess, err
 }
 
 // Stats returns runtime specific system level metric information for the task
-func (t *Task) Stats(ctx context.Context) (*types.Any, error) {
+func (t *Task) Stats(ctx context.Context) (*protobuf.Any, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.cg == nil {

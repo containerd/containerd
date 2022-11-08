@@ -31,7 +31,6 @@ import (
 	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/typeurl"
 	"github.com/google/go-cmp/cmp"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -463,7 +462,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 					Name: "testruntime",
 				},
 				Extensions: map[string]typeurl.Any{
-					"hello": &types.Any{
+					"hello": &protobuf.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("hello"),
 					},
@@ -475,7 +474,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 					Name: "testruntime",
 				},
 				Extensions: map[string]typeurl.Any{
-					"hello": &types.Any{
+					"hello": &protobuf.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("world"),
 					},
@@ -487,7 +486,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 					Name: "testruntime",
 				},
 				Extensions: map[string]typeurl.Any{
-					"hello": &types.Any{
+					"hello": &protobuf.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("world"),
 					},
@@ -502,7 +501,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 					Name: "testruntime",
 				},
 				Extensions: map[string]typeurl.Any{
-					"hello": &types.Any{
+					"hello": &protobuf.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("hello"),
 					},
@@ -514,7 +513,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 					Name: "testruntime",
 				},
 				Extensions: map[string]typeurl.Any{
-					"hello": &types.Any{
+					"hello": &protobuf.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("world"),
 					},
@@ -527,7 +526,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 					Name: "testruntime",
 				},
 				Extensions: map[string]typeurl.Any{
-					"hello": &types.Any{
+					"hello": &protobuf.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("hello"),
 					},
@@ -542,7 +541,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 					Name: "testruntime",
 				},
 				Extensions: map[string]typeurl.Any{
-					"hello": &types.Any{
+					"hello": &protobuf.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("hello"),
 					},
@@ -553,7 +552,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 					"foo": "one",
 				},
 				Extensions: map[string]typeurl.Any{
-					"hello": &types.Any{
+					"hello": &protobuf.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("world"),
 					},
@@ -566,7 +565,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 					Name: "testruntime",
 				},
 				Extensions: map[string]typeurl.Any{
-					"hello": &types.Any{
+					"hello": &protobuf.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("world"),
 					},
@@ -582,7 +581,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 				},
 				Extensions: map[string]typeurl.Any{
 					// leaves hello in place.
-					"hello": &types.Any{
+					"hello": &protobuf.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("hello"),
 					},
@@ -590,11 +589,11 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 			},
 			input: containers.Container{
 				Extensions: map[string]typeurl.Any{
-					"hello": &types.Any{
+					"hello": &protobuf.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("universe"), // this will be ignored
 					},
-					"bar": &types.Any{
+					"bar": &protobuf.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("foo"), // this will be added
 					},
@@ -607,11 +606,11 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 					Name: "testruntime",
 				},
 				Extensions: map[string]typeurl.Any{
-					"hello": &types.Any{
+					"hello": &protobuf.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("hello"), // remains as world
 					},
-					"bar": &types.Any{
+					"bar": &protobuf.Any{
 						TypeUrl: "test.update.extensions",
 						Value:   []byte("foo"), // this will be added
 					},

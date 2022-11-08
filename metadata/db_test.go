@@ -38,7 +38,7 @@ import (
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/native"
 	"github.com/opencontainers/go-digest"
@@ -665,7 +665,7 @@ func create(obj object, tx *bolt.Tx, db *DB, cs content.Store, sn snapshots.Snap
 			Runtime: containers.RuntimeInfo{
 				Name: "testruntime",
 			},
-			Spec: &types.Any{},
+			Spec: &protobuf.Any{},
 		}
 		_, err := NewContainerStore(db).Create(ctx, container)
 		if err != nil {

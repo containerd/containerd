@@ -193,7 +193,7 @@ func (s *service) StartShim(ctx context.Context, opts shim.StartOpts) (_ string,
 	}
 	if data, err := io.ReadAll(os.Stdin); err == nil {
 		if len(data) > 0 {
-			var any ptypes.Any
+			var any protobuf.Any
 			if err := protobuf.Unmarshal(data, &any); err != nil {
 				return "", err
 			}

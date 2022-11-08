@@ -29,7 +29,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/types"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
@@ -73,12 +72,12 @@ var publishCommand = cli.Command{
 	},
 }
 
-func getEventPayload(r io.Reader) (*types.Any, error) {
+func getEventPayload(r io.Reader) (*protobuf.Any, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
-	var any types.Any
+	var any protobuf.Any
 	if err := protobuf.Unmarshal(data, &any); err != nil {
 		return nil, err
 	}

@@ -32,7 +32,7 @@ import (
 	"github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/namespaces"
-	ptypes "github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl"
@@ -185,7 +185,7 @@ var execCommand = cli.Command{
 
 		rq := &task.ExecProcessRequest{
 			ID: id,
-			Spec: &ptypes.Any{
+			Spec: &protobuf.Any{
 				TypeUrl: url,
 				Value:   spec,
 			},

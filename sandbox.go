@@ -25,7 +25,6 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/types"
 	api "github.com/containerd/containerd/sandbox"
 	"github.com/containerd/typeurl"
 )
@@ -184,7 +183,7 @@ type NewSandboxOpts func(ctx context.Context, client *Client, sandbox *api.Sandb
 func WithSandboxRuntime(name string, options interface{}) NewSandboxOpts {
 	return func(ctx context.Context, client *Client, s *api.Sandbox) error {
 		if options == nil {
-			options = &types.Empty{}
+			options = &protobuf.Empty{}
 		}
 
 		opts, err := typeurl.MarshalAny(options)

@@ -25,7 +25,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/ttrpcutil"
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/ttrpc"
 	"github.com/stretchr/testify/assert"
 )
@@ -60,7 +59,7 @@ func TestClientTTRPC_Reconnect(t *testing.T) {
 			Timestamp: protobuf.ToTimestamp(time.Now()),
 			Namespace: namespaces.Default,
 			Topic:     "/test",
-			Event:     &types.Any{},
+			Event:     &protobuf.Any{},
 		},
 	})
 	assert.NoError(t, err)

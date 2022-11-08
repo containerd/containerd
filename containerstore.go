@@ -25,7 +25,6 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/protobuf"
-	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/typeurl"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -150,7 +149,7 @@ func (r *remoteContainers) Delete(ctx context.Context, id string) error {
 }
 
 func containerToProto(container *containers.Container) *containersapi.Container {
-	extensions := make(map[string]*ptypes.Any)
+	extensions := make(map[string]*protobuf.Any)
 	for k, v := range container.Extensions {
 		extensions[k] = protobuf.FromAny(v)
 	}

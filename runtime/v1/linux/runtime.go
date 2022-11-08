@@ -42,7 +42,6 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf"
-	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	v1 "github.com/containerd/containerd/runtime/v1"
@@ -56,7 +55,7 @@ import (
 
 var (
 	pluginID = fmt.Sprintf("%s.%s", plugin.RuntimePlugin, "linux")
-	empty    = &ptypes.Empty{}
+	empty    = &protobuf.Empty{}
 )
 
 const (

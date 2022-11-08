@@ -30,7 +30,6 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime"
 	client "github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/ttrpc"
@@ -62,7 +61,7 @@ type binary struct {
 	bundle                 *Bundle
 }
 
-func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ *shim, err error) {
+func (b *binary) Start(ctx context.Context, opts *protobuf.Any, onClose func()) (_ *shim, err error) {
 	args := []string{"-id", b.bundle.ID}
 	switch logrus.GetLevel() {
 	case logrus.DebugLevel, logrus.TraceLevel:

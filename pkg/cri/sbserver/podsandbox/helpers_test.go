@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd/oci"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/protobuf/types"
+	types "github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"

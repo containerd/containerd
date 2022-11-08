@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/typeurl"
 	bolt "go.etcd.io/bbolt"
 )
@@ -189,7 +188,7 @@ func ReadExtensions(bkt *bolt.Bucket) (map[string]typeurl.Any, error) {
 	}
 
 	if err := ebkt.ForEach(func(k, v []byte) error {
-		var t types.Any
+		var t protobuf.Any
 		if err := protobuf.Unmarshal(v, &t); err != nil {
 			return err
 		}
@@ -223,13 +222,13 @@ func WriteAny(bkt *bolt.Bucket, name []byte, any typeurl.Any) error {
 }
 
 // ReadAny reads back protobuf's Any type from the bucket
-func ReadAny(bkt *bolt.Bucket, name []byte) (*types.Any, error) {
+func ReadAny(bkt *bolt.Bucket, name []byte) (*protobuf.Any, error) {
 	bytes := bkt.Get(name)
 	if bytes == nil {
 		return nil, nil
 	}
 
-	out := types.Any{}
+	out := protobuf.Any{}
 	if err := protobuf.Unmarshal(bytes, &out); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal any: %w", err)
 	}

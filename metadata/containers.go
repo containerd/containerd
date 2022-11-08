@@ -31,7 +31,6 @@ import (
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/typeurl"
 	bolt "go.etcd.io/bbolt"
 )
@@ -343,7 +342,7 @@ func readContainer(container *containers.Container, bkt *bolt.Bucket) error {
 			}
 			container.Runtime.Options = any
 		case string(bucketKeySpec):
-			var any types.Any
+			var any protobuf.Any
 			if err := protobuf.Unmarshal(v, &any); err != nil {
 				return err
 			}

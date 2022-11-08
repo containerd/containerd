@@ -22,7 +22,7 @@ import (
 
 	api "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/plugin"
-	ptypes "github.com/containerd/containerd/protobuf/types"
+	ptypes "github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/services"
 	"google.golang.org/grpc"
 )

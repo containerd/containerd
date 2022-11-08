@@ -24,11 +24,10 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/protobuf"
-	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/snapshots"
 )
 
-var empty = &ptypes.Empty{}
+var empty = &protobuf.Empty{}
 
 type service struct {
 	sn snapshots.Snapshotter
@@ -79,7 +78,7 @@ func (s service) Mounts(ctx context.Context, mr *snapshotsapi.MountsRequest) (*s
 	}, nil
 }
 
-func (s service) Commit(ctx context.Context, cr *snapshotsapi.CommitSnapshotRequest) (*ptypes.Empty, error) {
+func (s service) Commit(ctx context.Context, cr *snapshotsapi.CommitSnapshotRequest) (*protobuf.Empty, error) {
 	var opts []snapshots.Opt
 	if cr.Labels != nil {
 		opts = append(opts, snapshots.WithLabels(cr.Labels))
@@ -91,7 +90,7 @@ func (s service) Commit(ctx context.Context, cr *snapshotsapi.CommitSnapshotRequ
 	return empty, nil
 }
 
-func (s service) Remove(ctx context.Context, rr *snapshotsapi.RemoveSnapshotRequest) (*ptypes.Empty, error) {
+func (s service) Remove(ctx context.Context, rr *snapshotsapi.RemoveSnapshotRequest) (*protobuf.Empty, error) {
 	if err := s.sn.Remove(ctx, rr.Key); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -165,7 +164,7 @@ func (s service) Usage(ctx context.Context, ur *snapshotsapi.UsageRequest) (*sna
 	}, nil
 }
 
-func (s service) Cleanup(ctx context.Context, cr *snapshotsapi.CleanupRequest) (*ptypes.Empty, error) {
+func (s service) Cleanup(ctx context.Context, cr *snapshotsapi.CleanupRequest) (*protobuf.Empty, error) {
 	c, ok := s.sn.(snapshots.Cleaner)
 	if !ok {
 		return nil, errdefs.ToGRPCf(errdefs.ErrNotImplemented, "snapshotter does not implement Cleanup method")

@@ -25,7 +25,6 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/protobuf"
-	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -88,7 +87,7 @@ func WithRestoreRuntime(ctx context.Context, id string, client *Client, checkpoi
 				return err
 			}
 		}
-		var options ptypes.Any
+		var options protobuf.Any
 		if m != nil {
 			store := client.ContentStore()
 			data, err := content.ReadBlob(ctx, store, *m)
@@ -120,7 +119,7 @@ func WithRestoreSpec(ctx context.Context, id string, client *Client, checkpoint 
 		if err != nil {
 			return fmt.Errorf("unable to read checkpoint config: %w", err)
 		}
-		var any ptypes.Any
+		var any protobuf.Any
 		if err := protobuf.Unmarshal(data, &any); err != nil {
 			return err
 		}

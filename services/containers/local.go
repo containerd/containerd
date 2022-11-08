@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
-	ptypes "github.com/containerd/containerd/protobuf/types"
+	ptypes "github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/services"
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc"

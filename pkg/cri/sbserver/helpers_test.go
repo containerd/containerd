@@ -30,7 +30,7 @@ import (
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
@@ -610,7 +610,7 @@ func TestGetRuntimeOptions(t *testing.T) {
 	_, err := getRuntimeOptions(containers.Container{})
 	require.NoError(t, err)
 
-	var pbany *types.Any               // This is nil.
+	var pbany *protobuf.Any            // This is nil.
 	var typeurlAny typeurl.Any = pbany // This is typed nil.
 	_, err = getRuntimeOptions(containers.Container{Runtime: containers.RuntimeInfo{Options: typeurlAny}})
 	require.NoError(t, err)

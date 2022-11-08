@@ -29,7 +29,6 @@ import (
 
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/ttrpc"
 	exec "golang.org/x/sys/execabs"
 )
@@ -41,7 +40,7 @@ type CommandConfig struct {
 	Path         string
 	SchedCore    bool
 	Args         []string
-	Opts         *types.Any
+	Opts         *protobuf.Any
 }
 
 // Command returns the shim command with the provided args and configuration

@@ -39,7 +39,6 @@ import (
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf"
-	google_protobuf "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
@@ -76,7 +75,7 @@ type ProcessInfo struct {
 	Pid uint32
 	// Info includes additional process information
 	// Info varies by platform
-	Info *google_protobuf.Any
+	Info *protobuf.Any
 }
 
 // ProcessStatus returns a human readable status for the Process representing its current status
