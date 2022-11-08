@@ -24,8 +24,8 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/cgroups"
-	cgroupsv2 "github.com/containerd/cgroups/v2"
+	"github.com/containerd/cgroups/v2"
+	cgroupsv2 "github.com/containerd/cgroups/v2/cgroup2"
 
 	"github.com/vishvananda/netlink"
 

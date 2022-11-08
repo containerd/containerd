@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/containerd/cgroups"
+	"github.com/containerd/cgroups/v2"
 	"github.com/containerd/containerd/log"
 	cmetrics "github.com/containerd/containerd/metrics"
 	"github.com/containerd/containerd/metrics/cgroups/common"

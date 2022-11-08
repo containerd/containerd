@@ -20,8 +20,8 @@ import (
 	"context"
 	"os"
 
-	"github.com/containerd/cgroups"
-	cgroupsv2 "github.com/containerd/cgroups/v2"
+	"github.com/containerd/cgroups/v2"
+	cgroupsv2 "github.com/containerd/cgroups/v2/cgroup2"
 	"github.com/containerd/containerd/log"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/containerd/containerd/sys"

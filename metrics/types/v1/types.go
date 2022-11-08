@@ -20,7 +20,7 @@
 package v1
 
 import (
-	v1 "github.com/containerd/cgroups/stats/v1"
+	v1 "github.com/containerd/cgroups/v2/stats/v1"
 )
 
 type (

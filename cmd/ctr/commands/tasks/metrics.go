@@ -24,8 +24,8 @@ import (
 	"text/tabwriter"
 
 	wstats "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
-	v1 "github.com/containerd/cgroups/stats/v1"
-	v2 "github.com/containerd/cgroups/v2/stats"
+	v2 "github.com/containerd/cgroups/v2/cgroup2/stats"
+	v1 "github.com/containerd/cgroups/v2/stats/v1"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/typeurl"
 	"github.com/urfave/cli"

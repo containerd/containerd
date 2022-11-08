@@ -19,8 +19,8 @@ package opts
 import (
 	"context"
 
-	"github.com/containerd/cgroups"
-	cgroupsv2 "github.com/containerd/cgroups/v2"
+	"github.com/containerd/cgroups/v2"
+	cgroupsv2 "github.com/containerd/cgroups/v2/cgroup2"
 	"github.com/containerd/containerd/namespaces"
 )
 

@@ -30,7 +30,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/cgroups"
+	"github.com/containerd/cgroups/v2"
 	eventstypes "github.com/containerd/containerd/api/events"
 	taskAPI "github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/api/types/task"

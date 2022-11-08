@@ -196,9 +196,10 @@ github.com/containerd/cgroups v0.0.0-20200710171044-318312a37340/go.mod h1:s5q4S
 github.com/containerd/cgroups v0.0.0-20200824123100-0b889c03f102/go.mod h1:s5q4SojHctfxANBDvMeIaIovkq29IP48TKAxnhYRxvo=
 github.com/containerd/cgroups v0.0.0-20210114181951-8a68de567b68/go.mod h1:ZJeTFisyysqgcCdecO57Dj79RfL0LNeGiFUqLYQRYLE=
 github.com/containerd/cgroups v1.0.1/go.mod h1:0SJrPIenamHDcZhEcJMNBB85rHcUsw4f25ZfBiPYRkU=
+github.com/containerd/cgroups v1.0.3 h1:ADZftAkglvCiD44c77s5YmMqaP2pzVCFZvBmAlBdAP4=
 github.com/containerd/cgroups v1.0.3/go.mod h1:/ofk34relqNjSGyqPrmEULrO4Sc8LJhvJmWbUCUKqj8=
-github.com/containerd/cgroups v1.0.5-0.20220816231112-7083cd60b721 h1:qWq0iv560E8jXZKwWipx3Xot0dYPyfKBeDNfRwYth/U=
-github.com/containerd/cgroups v1.0.5-0.20220816231112-7083cd60b721/go.mod h1:6ppBcbh/NOOUU+dMKrykgaBnK9lCIBxHqJDGwsa1mIw=
+github.com/containerd/cgroups/v2 v2.0.0-20221108021732-3e546aa1dbb0 h1:mVq/CHJ5Nz6VbWW+dJ1wI/p0T3FZBrP+uJzQtAFwHFQ=
+github.com/containerd/cgroups/v2 v2.0.0-20221108021732-3e546aa1dbb0/go.mod h1:nno7catpBPPU5fP1B4f1c1B5B5v8VTs+U2z62ZsTzSE=
 github.com/containerd/console v0.0.0-20180822173158-c12b1e7919c1/go.mod h1:Tj/on1eG8kiEhd0+fhSDzsPAFESxzBBvdyEgyryXffw=
 github.com/containerd/console v0.0.0-20181022165439-0650fd9eeb50/go.mod h1:Tj/on1eG8kiEhd0+fhSDzsPAFESxzBBvdyEgyryXffw=
 github.com/containerd/console v0.0.0-20191206165004-02ecf6a7291e/go.mod h1:8Pf4gM6VEbTNRIT26AyyU7hxdQU3MvAvxVI0sc00XBE=
