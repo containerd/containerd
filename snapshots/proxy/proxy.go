@@ -25,7 +25,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/protobuf"
-	protobuftypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/snapshots"
 )
 
@@ -60,7 +59,7 @@ func (p *proxySnapshotter) Update(ctx context.Context, info snapshots.Info, fiel
 		&snapshotsapi.UpdateSnapshotRequest{
 			Snapshotter: p.snapshotterName,
 			Info:        fromInfo(info),
-			UpdateMask: &protobuftypes.FieldMask{
+			UpdateMask: &protobuf.FieldMask{
 				Paths: fieldpaths,
 			},
 		})

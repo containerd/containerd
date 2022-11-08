@@ -24,7 +24,6 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/protobuf"
-	protobuftypes "github.com/containerd/containerd/protobuf/types"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -127,7 +126,7 @@ func (pcs *proxyContentStore) Status(ctx context.Context, ref string) (content.S
 func (pcs *proxyContentStore) Update(ctx context.Context, info content.Info, fieldpaths ...string) (content.Info, error) {
 	resp, err := pcs.client.Update(ctx, &contentapi.UpdateRequest{
 		Info: infoToGRPC(&info),
-		UpdateMask: &protobuftypes.FieldMask{
+		UpdateMask: &protobuf.FieldMask{
 			Paths: fieldpaths,
 		},
 	})

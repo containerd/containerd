@@ -24,7 +24,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/protobuf"
-	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -74,9 +73,9 @@ func (s *remoteImages) Create(ctx context.Context, image images.Image) (images.I
 }
 
 func (s *remoteImages) Update(ctx context.Context, image images.Image, fieldpaths ...string) (images.Image, error) {
-	var updateMask *ptypes.FieldMask
+	var updateMask *protobuf.FieldMask
 	if len(fieldpaths) > 0 {
-		updateMask = &ptypes.FieldMask{
+		updateMask = &protobuf.FieldMask{
 			Paths: fieldpaths,
 		}
 	}

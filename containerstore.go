@@ -121,9 +121,9 @@ func (r *remoteContainers) Create(ctx context.Context, container containers.Cont
 }
 
 func (r *remoteContainers) Update(ctx context.Context, container containers.Container, fieldpaths ...string) (containers.Container, error) {
-	var updateMask *ptypes.FieldMask
+	var updateMask *protobuf.FieldMask
 	if len(fieldpaths) > 0 {
-		updateMask = &ptypes.FieldMask{
+		updateMask = &protobuf.FieldMask{
 			Paths: fieldpaths,
 		}
 	}

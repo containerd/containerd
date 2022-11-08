@@ -23,7 +23,7 @@ import (
 	api "github.com/containerd/containerd/api/services/namespaces/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/containerd/protobuf"
 )
 
 // NewNamespaceStoreFromClient returns a new namespace store
@@ -71,7 +71,7 @@ func (r *remoteNamespaces) SetLabel(ctx context.Context, namespace, key, value s
 		Labels: map[string]string{key: value},
 	}
 
-	req.UpdateMask = &types.FieldMask{
+	req.UpdateMask = &protobuf.FieldMask{
 		Paths: []string{strings.Join([]string{"labels", key}, ".")},
 	}
 
