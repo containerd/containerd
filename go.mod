@@ -68,14 +68,14 @@ require (
 	google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21
 	google.golang.org/grpc v1.47.0
 	google.golang.org/protobuf v1.28.0
-	k8s.io/api v0.24.1
-	k8s.io/apimachinery v0.24.1
-	k8s.io/apiserver v0.24.1
-	k8s.io/client-go v0.24.1
-	k8s.io/component-base v0.24.1
-	k8s.io/cri-api v0.25.0
-	k8s.io/klog/v2 v2.60.1
-	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
+	k8s.io/api v0.25.3
+	k8s.io/apimachinery v0.25.3
+	k8s.io/apiserver v0.25.3
+	k8s.io/client-go v0.25.3
+	k8s.io/component-base v0.25.3
+	k8s.io/cri-api v0.25.3
+	k8s.io/klog/v2 v2.80.1
+	k8s.io/utils v0.0.0-20221107191617-1a15be271d1d
 )
 
 require (
@@ -88,7 +88,6 @@ require (
 	github.com/containers/ocicrypt v1.1.3 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.1 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
-	github.com/emicklei/go-restful v2.16.0+incompatible // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/godbus/dbus/v5 v5.0.6 // indirect
@@ -136,7 +135,7 @@ require (
 	gopkg.in/square/go-jose.v2 v2.5.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2 // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
+	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
+	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
