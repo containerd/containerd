@@ -29,10 +29,11 @@ import (
 func DefaultConfig() PluginConfig {
 	return PluginConfig{
 		CniConfig: CniConfig{
-			NetworkPluginBinDir:       filepath.Join(os.Getenv("ProgramFiles"), "containerd", "cni", "bin"),
-			NetworkPluginConfDir:      filepath.Join(os.Getenv("ProgramFiles"), "containerd", "cni", "conf"),
-			NetworkPluginMaxConfNum:   1,
-			NetworkPluginConfTemplate: "",
+			NetworkPluginBinDir:        filepath.Join(os.Getenv("ProgramFiles"), "containerd", "cni", "bin"),
+			NetworkPluginConfDir:       filepath.Join(os.Getenv("ProgramFiles"), "containerd", "cni", "conf"),
+			NetworkPluginMaxConfNum:    1,
+			NetworkPluginSetupSerially: false,
+			NetworkPluginConfTemplate:  "",
 		},
 		ContainerdConfig: ContainerdConfig{
 			Snapshotter:        containerd.DefaultSnapshotter,

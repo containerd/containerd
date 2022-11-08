@@ -66,10 +66,11 @@ func DefaultConfig() PluginConfig {
 	tree, _ := toml.Load(defaultRuncV2Opts)
 	return PluginConfig{
 		CniConfig: CniConfig{
-			NetworkPluginBinDir:       "/opt/cni/bin",
-			NetworkPluginConfDir:      "/etc/cni/net.d",
-			NetworkPluginMaxConfNum:   1, // only one CNI plugin config file will be loaded
-			NetworkPluginConfTemplate: "",
+			NetworkPluginBinDir:        "/opt/cni/bin",
+			NetworkPluginConfDir:       "/etc/cni/net.d",
+			NetworkPluginMaxConfNum:    1, // only one CNI plugin config file will be loaded
+			NetworkPluginSetupSerially: false,
+			NetworkPluginConfTemplate:  "",
 		},
 		ContainerdConfig: ContainerdConfig{
 			Snapshotter:        containerd.DefaultSnapshotter,

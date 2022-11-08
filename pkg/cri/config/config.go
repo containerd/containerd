@@ -143,6 +143,9 @@ type CniConfig struct {
 	// be loaded from the cni config directory by go-cni. Set the value to 0 to
 	// load all config files (no arbitrary limit). The legacy default value is 1.
 	NetworkPluginMaxConfNum int `toml:"max_conf_num" json:"maxConfNum"`
+	// NetworkPluginSetupSerially is a boolean flag to specify whether containerd sets up networks serially
+	// if there are multiple CNI plugin config files existing and NetworkPluginMaxConfNum is larger than 1.
+	NetworkPluginSetupSerially bool `toml:"setup_serially" json:"setupSerially"`
 	// NetworkPluginConfTemplate is the file path of golang template used to generate
 	// cni config.
 	// When it is set, containerd will get cidr(s) from kubelet to replace {{.PodCIDR}},
