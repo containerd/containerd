@@ -42,7 +42,6 @@ import (
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/proto"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
@@ -586,7 +585,7 @@ func (l *local) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest, _ 
 	}
 	// write the config to the content store
 	pbany := protobuf.FromAny(container.Spec)
-	data, err := proto.Marshal(pbany)
+	data, err := protobuf.Marshal(pbany)
 	if err != nil {
 		return nil, err
 	}

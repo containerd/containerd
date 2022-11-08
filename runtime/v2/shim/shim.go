@@ -36,7 +36,6 @@ import (
 	"github.com/containerd/containerd/pkg/shutdown"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/containerd/version"
 	"github.com/containerd/ttrpc"
 	"github.com/sirupsen/logrus"
@@ -319,7 +318,7 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 		if err != nil {
 			return err
 		}
-		data, err := proto.Marshal(&shimapi.DeleteResponse{
+		data, err := protobuf.Marshal(&shimapi.DeleteResponse{
 			Pid:        uint32(ss.Pid),
 			ExitStatus: uint32(ss.ExitStatus),
 			ExitedAt:   protobuf.ToTimestamp(ss.ExitedAt),

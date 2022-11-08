@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/protobuf/proto"
+	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -95,7 +95,7 @@ func WithRestoreRuntime(ctx context.Context, id string, client *Client, checkpoi
 			if err != nil {
 				return fmt.Errorf("unable to read checkpoint runtime: %w", err)
 			}
-			if err := proto.Unmarshal(data, &options); err != nil {
+			if err := protobuf.Unmarshal(data, &options); err != nil {
 				return err
 			}
 		}
@@ -121,7 +121,7 @@ func WithRestoreSpec(ctx context.Context, id string, client *Client, checkpoint 
 			return fmt.Errorf("unable to read checkpoint config: %w", err)
 		}
 		var any ptypes.Any
-		if err := proto.Unmarshal(data, &any); err != nil {
+		if err := protobuf.Unmarshal(data, &any); err != nil {
 			return err
 		}
 		c.Spec = &any

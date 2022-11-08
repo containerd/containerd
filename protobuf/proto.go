@@ -14,17 +14,16 @@
    limitations under the License.
 */
 
-// Package proto provides convinient aliases that make google.golang.org/protobuf migration easier.
-package proto
+package protobuf
 
 import (
-	google "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
 
-func Marshal(input google.Message) ([]byte, error) {
-	return google.Marshal(input)
+func Marshal(input proto.Message) ([]byte, error) {
+	return proto.Marshal(input)
 }
 
-func Unmarshal(input []byte, output google.Message) error {
-	return google.Unmarshal(input, output)
+func Unmarshal(input []byte, output proto.Message) error {
+	return proto.Unmarshal(input, output)
 }

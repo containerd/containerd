@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/protobuf/proto"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/ttrpc"
 	exec "golang.org/x/sys/execabs"
@@ -72,7 +72,7 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 	}
 	cmd.SysProcAttr = getSysProcAttr()
 	if config.Opts != nil {
-		d, err := proto.Marshal(config.Opts)
+		d, err := protobuf.Marshal(config.Opts)
 		if err != nil {
 			return nil, err
 		}

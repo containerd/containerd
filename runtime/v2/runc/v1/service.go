@@ -43,7 +43,6 @@ import (
 	"github.com/containerd/containerd/pkg/schedcore"
 	"github.com/containerd/containerd/pkg/stdio"
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/proto"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime/v2/runc"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
@@ -195,7 +194,7 @@ func (s *service) StartShim(ctx context.Context, opts shim.StartOpts) (_ string,
 	if data, err := io.ReadAll(os.Stdin); err == nil {
 		if len(data) > 0 {
 			var any ptypes.Any
-			if err := proto.Unmarshal(data, &any); err != nil {
+			if err := protobuf.Unmarshal(data, &any); err != nil {
 				return "", err
 			}
 			v, err := typeurl.UnmarshalAny(&any)

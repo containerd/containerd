@@ -28,7 +28,6 @@ import (
 
 	winio "github.com/Microsoft/go-winio"
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/typeurl"
 	"github.com/sirupsen/logrus"
 	exec "golang.org/x/sys/execabs"
@@ -44,7 +43,7 @@ func NewBinaryProcessor(ctx context.Context, imt, rmt string, stream StreamProce
 
 	if payload != nil {
 		pb := protobuf.FromAny(payload)
-		data, err := proto.Marshal(pb)
+		data, err := protobuf.Marshal(pb)
 		if err != nil {
 			return nil, err
 		}

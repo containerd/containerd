@@ -29,7 +29,6 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/typeurl"
 	exec "golang.org/x/sys/execabs"
 )
@@ -43,7 +42,7 @@ func NewBinaryProcessor(ctx context.Context, imt, rmt string, stream StreamProce
 	var payloadC io.Closer
 	if payload != nil {
 		pb := protobuf.FromAny(payload)
-		data, err := proto.Marshal(pb)
+		data, err := protobuf.Marshal(pb)
 		if err != nil {
 			return nil, err
 		}

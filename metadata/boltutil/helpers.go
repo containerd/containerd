@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/typeurl"
 	bolt "go.etcd.io/bbolt"
@@ -165,7 +164,7 @@ func WriteExtensions(bkt *bolt.Bucket, extensions map[string]typeurl.Any) error 
 
 	for name, ext := range extensions {
 		ext := protobuf.FromAny(ext)
-		p, err := proto.Marshal(ext)
+		p, err := protobuf.Marshal(ext)
 		if err != nil {
 			return err
 		}
@@ -191,7 +190,7 @@ func ReadExtensions(bkt *bolt.Bucket) (map[string]typeurl.Any, error) {
 
 	if err := ebkt.ForEach(func(k, v []byte) error {
 		var t types.Any
-		if err := proto.Unmarshal(v, &t); err != nil {
+		if err := protobuf.Unmarshal(v, &t); err != nil {
 			return err
 		}
 
@@ -211,7 +210,7 @@ func WriteAny(bkt *bolt.Bucket, name []byte, any typeurl.Any) error {
 		return nil
 	}
 
-	data, err := proto.Marshal(pbany)
+	data, err := protobuf.Marshal(pbany)
 	if err != nil {
 		return fmt.Errorf("failed to marshal: %w", err)
 	}
@@ -231,7 +230,7 @@ func ReadAny(bkt *bolt.Bucket, name []byte) (*types.Any, error) {
 	}
 
 	out := types.Any{}
-	if err := proto.Unmarshal(bytes, &out); err != nil {
+	if err := protobuf.Unmarshal(bytes, &out); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal any: %w", err)
 	}
 

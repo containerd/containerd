@@ -29,7 +29,6 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/opencontainers/go-digest"
@@ -80,7 +79,7 @@ func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Conta
 		})
 	}
 	// save copts
-	data, err := proto.Marshal(any)
+	data, err := protobuf.Marshal(any)
 	if err != nil {
 		return err
 	}
@@ -101,7 +100,7 @@ func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Conta
 func WithCheckpointRuntime(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
 	if c.Runtime.Options != nil && c.Runtime.Options.GetValue() != nil {
 		any := protobuf.FromAny(c.Runtime.Options)
-		data, err := proto.Marshal(any)
+		data, err := protobuf.Marshal(any)
 		if err != nil {
 			return err
 		}

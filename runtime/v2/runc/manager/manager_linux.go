@@ -34,7 +34,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/process"
 	"github.com/containerd/containerd/pkg/schedcore"
-	"github.com/containerd/containerd/protobuf/proto"
+	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime/v2/runc"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
@@ -202,7 +202,7 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ str
 	if data, err := io.ReadAll(os.Stdin); err == nil {
 		if len(data) > 0 {
 			var any ptypes.Any
-			if err := proto.Unmarshal(data, &any); err != nil {
+			if err := protobuf.Unmarshal(data, &any); err != nil {
 				return "", err
 			}
 			v, err := typeurl.UnmarshalAny(&any)
