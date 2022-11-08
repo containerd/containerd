@@ -130,6 +130,16 @@ func WithCPUCFS(quota int64, period uint64) SpecOpts {
 	}
 }
 
+// WithCPURT sets the container's realtime scheduling (RT) runtime and period.
+func WithCPURT(runtime int64, period uint64) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		setCPU(s)
+		s.Linux.Resources.CPU.RealtimeRuntime = &runtime
+		s.Linux.Resources.CPU.RealtimePeriod = &period
+		return nil
+	}
+}
+
 // WithAllCurrentCapabilities propagates the effective capabilities of the caller process to the container process.
 // The capability set may differ from WithAllKnownCapabilities when running in a container.
 var WithAllCurrentCapabilities = func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
