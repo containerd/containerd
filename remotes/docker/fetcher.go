@@ -80,7 +80,7 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 				req.path = req.path + "?" + u.RawQuery
 			}
 
-			rc, err := r.open(ctx, req, desc.MediaType, offset)
+			rc, _, err := r.open(ctx, req, desc.MediaType, offset)
 			if err != nil {
 				if errdefs.IsNotFound(err) {
 					continue // try one of the other urls.
@@ -105,7 +105,7 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 					return nil, err
 				}
 
-				rc, err := r.open(ctx, req, desc.MediaType, offset)
+				rc, _, err := r.open(ctx, req, desc.MediaType, offset)
 				if err != nil {
 					// Store the error for referencing later
 					if firstErr == nil {
@@ -128,7 +128,7 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 				return nil, err
 			}
 
-			rc, err := r.open(ctx, req, desc.MediaType, offset)
+			rc, _, err := r.open(ctx, req, desc.MediaType, offset)
 			if err != nil {
 				// Store the error for referencing later
 				if firstErr == nil {
@@ -230,8 +230,9 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest) (i
 		return nil, desc, firstErr
 	}
 
-	seeker, err := newHTTPReadSeeker(sz, func(offset int64) (io.ReadCloser, error) {
-		return r.open(ctx, getReq, "", offset)
+	seeker, err := newHTTPReadSeeker(sz, func(offset int64) (rc io.ReadCloser, err error) {
+		rc, _, err = r.open(ctx, getReq, "", offset)
+		return
 	})
 	if err != nil {
 		return nil, desc, err
@@ -245,7 +246,7 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest) (i
 	return seeker, desc, nil
 }
 
-func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string, offset int64) (_ io.ReadCloser, retErr error) {
+func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string, offset int64) (_ io.ReadCloser, _ int64, retErr error) {
 	if mediatype == "" {
 		req.header.Set("Accept", "*/*")
 	} else {
@@ -261,7 +262,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 
 	resp, err := req.doWithRetries(ctx, nil)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer func() {
 		if retErr != nil {
@@ -276,19 +277,20 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		// implementation.
 
 		if resp.StatusCode == http.StatusNotFound {
-			return nil, fmt.Errorf("content at %v not found: %w", req.String(), errdefs.ErrNotFound)
+			return nil, 0, fmt.Errorf("content at %v not found: %w", req.String(), errdefs.ErrNotFound)
 		}
 		var registryErr Errors
 		if err := json.NewDecoder(resp.Body).Decode(&registryErr); err != nil || registryErr.Len() < 1 {
-			return nil, fmt.Errorf("unexpected status code %v: %v", req.String(), resp.Status)
+			return nil, 0, fmt.Errorf("unexpected status code %v: %v", req.String(), resp.Status)
 		}
-		return nil, fmt.Errorf("unexpected status code %v: %s - Server message: %s", req.String(), resp.Status, registryErr.Error())
+		return nil, 0, fmt.Errorf("unexpected status code %v: %s - Server message: %s", req.String(), resp.Status, registryErr.Error())
 	}
+	cl := resp.ContentLength
 	if offset > 0 {
 		cr := resp.Header.Get("content-range")
 		if cr != "" {
 			if !strings.HasPrefix(cr, fmt.Sprintf("bytes %d-", offset)) {
-				return nil, fmt.Errorf("unhandled content range in response: %v", cr)
+				return nil, 0, fmt.Errorf("unhandled content range in response: %v", cr)
 
 			}
 		} else {
@@ -300,14 +302,16 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 			// Could use buffer pool here but this case should be rare
 			n, err := io.Copy(io.Discard, io.LimitReader(resp.Body, offset))
 			if err != nil {
-				return nil, fmt.Errorf("failed to discard to offset: %w", err)
+				return nil, 0, fmt.Errorf("failed to discard to offset: %w", err)
 			}
 			if n != offset {
-				return nil, errors.New("unable to discard to offset")
+				return nil, 0, errors.New("unable to discard to offset")
 			}
-
+			// Subtract discarded bytes from returned content length to return body
+			// size consistent with content-range
+			cl = cl - offset
 		}
 	}
 
-	return resp.Body, nil
+	return resp.Body, cl, nil
 }
