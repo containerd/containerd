@@ -308,7 +308,7 @@ func checkBlobPath(t *testing.T, cs content.Store, dgst digest.Digest) string {
 		t.Fatalf("failed to calculate blob path: %v", err)
 	}
 
-	if path != filepath.Join(cs.(*store).root, "blobs", dgst.Algorithm().String(), dgst.Hex()) {
+	if path != filepath.Join(cs.(*store).root, "blobs", dgst.Algorithm().String(), dgst.Encoded()) {
 		t.Fatalf("unexpected path: %q", path)
 	}
 	fi, err := os.Stat(path)
