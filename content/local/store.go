@@ -507,6 +507,7 @@ func (s *store) resumeStatus(ref string, total int64, digester digest.Digester) 
 
 	// TODO(stevvooe): slow slow slow!!, send to goroutine or use resumable hashes
 	fp, err := os.Open(data)
+	defer fp.Close()
 	if err != nil {
 		return status, err
 	}
@@ -514,7 +515,6 @@ func (s *store) resumeStatus(ref string, total int64, digester digest.Digester) 
 	p := bufPool.Get().(*[]byte)
 	status.Offset, err = io.CopyBuffer(digester.Hash(), fp, *p)
 	bufPool.Put(p)
-	fp.Close()
 	return status, err
 }
 
