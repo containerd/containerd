@@ -21,13 +21,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os/exec"
 	"runtime"
 	"sync"
 	"syscall"
 	"time"
 
 	. "github.com/containerd/containerd/v2/client"
-	exec "golang.org/x/sys/execabs"
 )
 
 type daemon struct {

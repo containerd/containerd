@@ -19,6 +19,7 @@ package mount
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -28,7 +29,6 @@ import (
 	"github.com/containerd/continuity/testutil"
 	"github.com/containerd/continuity/testutil/loopback"
 	"github.com/stretchr/testify/assert"
-	exec "golang.org/x/sys/execabs"
 )
 
 func checkLookup(t *testing.T, fsType, mntPoint, dir string) {

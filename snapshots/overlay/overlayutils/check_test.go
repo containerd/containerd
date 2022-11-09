@@ -19,11 +19,11 @@
 package overlayutils
 
 import (
+	"os/exec"
 	"testing"
 
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/continuity/testutil/loopback"
-	exec "golang.org/x/sys/execabs"
 )
 
 func testOverlaySupported(t testing.TB, expected bool, mkfs ...string) {

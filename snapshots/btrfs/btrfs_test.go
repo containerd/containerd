@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -35,7 +36,6 @@ import (
 	"github.com/containerd/containerd/v2/snapshots/testsuite"
 	"github.com/containerd/continuity/testutil/loopback"
 	"github.com/containerd/plugin"
-	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 )
 
@@ -51,7 +51,6 @@ func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshots.Snap
 	}
 
 	return func(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
-
 		loopbackSize := int64(128 << 20) // 128 MB
 		// mkfs.btrfs creates a fs which has a blocksize equal to the system default pagesize. If that pagesize
 		// is > 4KB, mounting the fs will fail unless we increase the size of the file used by mkfs.btrfs
@@ -59,7 +58,6 @@ func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshots.Snap
 			loopbackSize = int64(650 << 20) // 650 MB
 		}
 		loop, err := loopback.New(loopbackSize)
-
 		if err != nil {
 			return nil, nil, err
 		}
@@ -146,7 +144,7 @@ func TestBtrfsMounts(t *testing.T) {
 		}
 	}
 
-	if err := os.MkdirAll(target, 0755); err != nil {
+	if err := os.MkdirAll(target, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := mount.All(mounts, target); err != nil {
@@ -155,13 +153,13 @@ func TestBtrfsMounts(t *testing.T) {
 	defer testutil.Unmount(t, target)
 
 	// write in some data
-	if err := os.WriteFile(filepath.Join(target, "foo"), []byte("content"), 0777); err != nil {
+	if err := os.WriteFile(filepath.Join(target, "foo"), []byte("content"), 0o777); err != nil {
 		t.Fatal(err)
 	}
 
 	// TODO(stevvooe): We don't really make this with the driver, but that
 	// might prove annoying in practice.
-	if err := os.MkdirAll(filepath.Join(root, "snapshots"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "snapshots"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -175,7 +173,7 @@ func TestBtrfsMounts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := os.MkdirAll(target, 0755); err != nil {
+	if err := os.MkdirAll(target, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -192,7 +190,7 @@ func TestBtrfsMounts(t *testing.T) {
 		t.Fatalf("wrong content in foo want: content, got: %s", bs)
 	}
 
-	if err := os.WriteFile(filepath.Join(target, "bar"), []byte("content"), 0777); err != nil {
+	if err := os.WriteFile(filepath.Join(target, "bar"), []byte("content"), 0o777); err != nil {
 		t.Fatal(err)
 	}
 

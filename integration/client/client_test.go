@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -30,7 +31,6 @@ import (
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
-	exec "golang.org/x/sys/execabs"
 
 	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/defaults"

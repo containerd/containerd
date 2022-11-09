@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -32,7 +33,6 @@ import (
 	"github.com/containerd/log"
 	"github.com/docker/go-units"
 	"github.com/stretchr/testify/assert"
-	exec "golang.org/x/sys/execabs"
 )
 
 const (

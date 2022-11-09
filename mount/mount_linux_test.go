@@ -19,12 +19,12 @@ package mount
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"testing"
 
 	"github.com/containerd/continuity/testutil"
-	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 )
 

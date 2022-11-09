@@ -24,13 +24,13 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
-	exec "golang.org/x/sys/execabs"
 
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/namespaces"

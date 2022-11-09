@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -38,7 +39,6 @@ import (
 	"github.com/containerd/continuity/fs/fstest"
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/require"
-	exec "golang.org/x/sys/execabs"
 )
 
 const tarCmd = "tar"
