@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -37,7 +38,6 @@ import (
 	"github.com/containerd/containerd/runtime/restart"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/containerd/typeurl/v2"
-	exec "golang.org/x/sys/execabs"
 )
 
 //nolint:unused // Ignore on non-Linux
