@@ -23,11 +23,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 
 	"github.com/Microsoft/go-winio"
-	exec "golang.org/x/sys/execabs"
 
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/containerd/v2/protobuf/proto"

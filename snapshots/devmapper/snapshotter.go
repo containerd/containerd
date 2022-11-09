@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -33,7 +34,6 @@ import (
 	"github.com/containerd/containerd/v2/snapshots/devmapper/dmsetup"
 	"github.com/containerd/containerd/v2/snapshots/storage"
 	"github.com/containerd/log"
-	exec "golang.org/x/sys/execabs"
 )
 
 type fsType string

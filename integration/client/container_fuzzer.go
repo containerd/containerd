@@ -26,13 +26,13 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/oci"
-	exec "golang.org/x/sys/execabs"
 )
 
 var (
