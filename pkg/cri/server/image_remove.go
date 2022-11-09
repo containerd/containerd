@@ -34,7 +34,7 @@ import (
 // Remove the whole image no matter the it's image id or reference. This is the
 // semantic defined in CRI now.
 func (c *criService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequest) (*runtime.RemoveImageResponse, error) {
-	span := tracing.CurrentSpan(ctx)
+	span := tracing.SpanFromContext(ctx)
 	image, err := c.localResolve(r.GetImage().GetImage())
 	if err != nil {
 		if errdefs.IsNotFound(err) {
@@ -44,7 +44,7 @@ func (c *criService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequ
 		}
 		return nil, fmt.Errorf("can not resolve %q locally: %w", r.GetImage().GetImage(), err)
 	}
-	span.SetAttributes(tracing.SpanAttribute("image.id", image.ID))
+	span.SetAttributes(tracing.Attribute("image.id", image.ID))
 	// Remove all image references.
 	for i, ref := range image.References {
 		var opts []images.DeleteOpt

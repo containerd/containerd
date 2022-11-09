@@ -48,6 +48,7 @@ import (
 
 const (
 	labelSnapshotRef = "containerd.io/snapshot.ref"
+	unpackSpanPrefix = "pkg.unpack.unpacker"
 )
 
 // Result returns information about the unpacks which were completed.
@@ -162,11 +163,11 @@ func (u *Unpacker) Unpack(h images.Handler) images.Handler {
 		layers = map[digest.Digest][]ocispec.Descriptor{}
 	)
 	return images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		ctx, span := tracing.StartSpan(ctx, "pkg.unpack.unpacker.UnpackHandler")
+		ctx, span := tracing.StartSpan(ctx, tracing.Name(unpackSpanPrefix, "UnpackHandler"))
 		defer span.End()
 		span.SetAttributes(
-			tracing.SpanAttribute("descriptor.media.type", desc.MediaType),
-			tracing.SpanAttribute("descriptor.digest", desc.Digest.String()))
+			tracing.Attribute("descriptor.media.type", desc.MediaType),
+			tracing.Attribute("descriptor.digest", desc.Digest.String()))
 		unlock, err := u.lockBlobDescriptor(ctx, desc)
 		if err != nil {
 			return nil, err
@@ -185,7 +186,7 @@ func (u *Unpacker) Unpack(h images.Handler) images.Handler {
 			// the config
 			for i, child := range children {
 				span.SetAttributes(
-					tracing.SpanAttribute("descriptor.child."+strconv.Itoa(i), []string{child.MediaType, child.Digest.String()}),
+					tracing.Attribute("descriptor.child."+strconv.Itoa(i), []string{child.MediaType, child.Digest.String()}),
 				)
 				if images.IsLayerType(child.MediaType) {
 					manifestLayers = append(manifestLayers, child)
@@ -232,7 +233,7 @@ func (u *Unpacker) unpack(
 	layers []ocispec.Descriptor,
 ) error {
 	ctx := u.ctx
-	ctx, layerSpan := tracing.StartSpan(ctx, "pkg.unpack.unpacker.unpack")
+	ctx, layerSpan := tracing.StartSpan(ctx, tracing.Name(unpackSpanPrefix, "unpack"))
 	defer layerSpan.End()
 	p, err := content.ReadBlob(ctx, u.content, config)
 	if err != nil {
@@ -409,14 +410,14 @@ func (u *Unpacker) unpack(
 	}
 
 	for i, desc := range layers {
-		_, layerSpan := tracing.StartSpan(ctx, "pkg.unpack.unpacker.unpackLayer")
+		_, layerSpan := tracing.StartSpan(ctx, tracing.Name(unpackSpanPrefix, "unpackLayer"))
 		layerSpan.SetAttributes(
-			tracing.SpanAttribute("layer.media.type", desc.MediaType),
-			tracing.SpanAttribute("layer.media.size", desc.Size),
-			tracing.SpanAttribute("layer.media.digest", desc.Digest.String()),
+			tracing.Attribute("layer.media.type", desc.MediaType),
+			tracing.Attribute("layer.media.size", desc.Size),
+			tracing.Attribute("layer.media.digest", desc.Digest.String()),
 		)
 		if err := doUnpackFn(i, desc); err != nil {
-			layerSpan.RecordError(err)
+			layerSpan.SetStatus(err)
 			layerSpan.End()
 			return err
 		}
@@ -445,11 +446,11 @@ func (u *Unpacker) unpack(
 func (u *Unpacker) fetch(ctx context.Context, h images.Handler, layers []ocispec.Descriptor, done []chan struct{}) error {
 	eg, ctx2 := errgroup.WithContext(ctx)
 	for i, desc := range layers {
-		ctx2, layerSpan := tracing.StartSpan(ctx2, "pkg.unpack.unpacker.fetchLayer")
+		ctx2, layerSpan := tracing.StartSpan(ctx2, tracing.Name(unpackSpanPrefix, "fetchLayer"))
 		layerSpan.SetAttributes(
-			tracing.SpanAttribute("layer.media.type", desc.MediaType),
-			tracing.SpanAttribute("layer.media.size", desc.Size),
-			tracing.SpanAttribute("layer.media.digest", desc.Digest.String()),
+			tracing.Attribute("layer.media.type", desc.MediaType),
+			tracing.Attribute("layer.media.size", desc.Size),
+			tracing.Attribute("layer.media.digest", desc.Digest.String()),
 		)
 		desc := desc
 		i := i
