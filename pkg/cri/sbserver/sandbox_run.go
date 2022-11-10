@@ -164,17 +164,22 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, fmt.Errorf("unable to save sandbox %q to store: %w", id, err)
 	}
 
+	controller, err := c.getSandboxController(config, r.GetRuntimeHandler())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
+	}
+
 	if _, err := c.client.SandboxStore().Create(ctx, sandboxInfo); err != nil {
 		return nil, fmt.Errorf("failed to save sandbox metadata: %w", err)
 	}
 
 	runtimeStart := time.Now()
 
-	if err := c.sandboxController.Create(ctx, id); err != nil {
+	if err := controller.Create(ctx, id); err != nil {
 		return nil, fmt.Errorf("failed to create sandbox %q: %w", id, err)
 	}
 
-	resp, err := c.sandboxController.Start(ctx, id)
+	resp, err := controller.Start(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start sandbox %q: %w", id, err)
 	}
@@ -214,7 +219,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// TaskOOM from containerd may come before sandbox is added to store,
 	// but we don't care about sandbox TaskOOM right now, so it is fine.
 	go func() {
-		resp, err := c.sandboxController.Wait(context.Background(), id)
+		resp, err := controller.Wait(context.Background(), id)
 		if err != nil && err != context.Canceled && err != context.DeadlineExceeded {
 			e := &eventtypes.TaskExit{
 				ContainerID: id,
@@ -469,6 +474,25 @@ func (c *criService) getSandboxRuntime(config *runtime.PodSandboxConfig, runtime
 		return criconfig.Runtime{}, fmt.Errorf("no runtime for %q is configured", runtimeHandler)
 	}
 	return handler, nil
+}
+
+// getSandboxController returns the sandbox controller configuration for sandbox.
+// If absent in legacy case, it will return the default controller.
+func (c *criService) getSandboxController(config *runtime.PodSandboxConfig, runtimeHandler string) (sb.Controller, error) {
+	ociRuntime, err := c.getSandboxRuntime(config, runtimeHandler)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
+	}
+	// Validate mode
+	if err = ValidateMode(ociRuntime.SandboxMode); err != nil {
+		return nil, err
+	}
+	// Use sandbox controller to delete sandbox
+	controller, exist := c.sandboxControllers[criconfig.SandboxControllerMode(ociRuntime.SandboxMode)]
+	if !exist {
+		return nil, fmt.Errorf("sandbox controller %s not exist", ociRuntime.SandboxMode)
+	}
+	return controller, nil
 }
 
 func logDebugCNIResult(ctx context.Context, sandboxID string, result *cni.Result) {

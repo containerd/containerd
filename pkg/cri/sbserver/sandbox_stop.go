@@ -64,7 +64,12 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 		}
 	}
 
-	if _, err := c.sandboxController.Stop(ctx, id); err != nil {
+	// Use sandbox controller to stop sandbox
+	controller, err := c.getSandboxController(sandbox.Config, sandbox.RuntimeHandler)
+	if err != nil {
+		return fmt.Errorf("failed to get sandbox controller: %w", err)
+	}
+	if _, err := controller.Stop(ctx, id); err != nil {
 		return fmt.Errorf("failed to stop sandbox %q: %w", id, err)
 	}
 

@@ -27,6 +27,16 @@ import (
 	"github.com/containerd/containerd/plugin"
 )
 
+type SandboxControllerMode string
+
+const (
+	// ModePodSandbox means use Controller implementation from sbserver podsandbox package.
+	// We take this one as a default mode.
+	ModePodSandbox SandboxControllerMode = "podsandbox"
+	// ModeShim means use whatever Controller implementation provided by shim.
+	ModeShim SandboxControllerMode = "shim"
+)
+
 // Runtime struct to contain the type(ID), engine, and root variables for a default runtime
 // and a runtime for untrusted workload.
 type Runtime struct {
@@ -76,6 +86,11 @@ type Runtime struct {
 	// while using default snapshotters for operational simplicity.
 	// See https://github.com/containerd/containerd/issues/6657 for details.
 	Snapshotter string `toml:"snapshotter" json:"snapshotter"`
+	// SandboxMode defines which sandbox runtime to use when scheduling pods
+	// This features requires experimental CRI server to be enabled (use ENABLE_CRI_SANDBOXES=1)
+	// shim - means use whatever Controller implementation provided by shim (e.g. use RemoteController).
+	// podsandbox - means use Controller implementation from sbserver podsandbox package.
+	SandboxMode string `toml:"sandbox_mode" json:"sandboxMode"`
 }
 
 // ContainerdConfig contains toml config related to containerd
@@ -412,7 +427,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 		// NoPivot can't be deprecated yet, because there is no alternative config option
 		// for `io.containerd.runtime.v1.linux`.
 	}
-	for _, r := range c.ContainerdConfig.Runtimes {
+	for k, r := range c.ContainerdConfig.Runtimes {
 		if r.Engine != "" {
 			if r.Type != plugin.RuntimeLinuxV1 {
 				return fmt.Errorf("`runtime_engine` only works for runtime %s", plugin.RuntimeLinuxV1)
@@ -427,6 +442,11 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 		}
 		if !r.PrivilegedWithoutHostDevices && r.PrivilegedWithoutHostDevicesAllDevicesAllowed {
 			return errors.New("`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled")
+		}
+		// If empty, use default podSandbox mode
+		if len(r.SandboxMode) == 0 {
+			r.SandboxMode = string(ModePodSandbox)
+			c.ContainerdConfig.Runtimes[k] = r
 		}
 	}
 

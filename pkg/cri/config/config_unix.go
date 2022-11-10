@@ -77,8 +77,9 @@ func DefaultConfig() PluginConfig {
 			NoPivot:            false,
 			Runtimes: map[string]Runtime{
 				"runc": {
-					Type:    "io.containerd.runc.v2",
-					Options: tree.ToMap(),
+					Type:        "io.containerd.runc.v2",
+					Options:     tree.ToMap(),
+					SandboxMode: string(ModePodSandbox),
 				},
 			},
 			DisableSnapshotAnnotations: true,
