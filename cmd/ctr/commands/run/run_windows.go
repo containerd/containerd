@@ -152,14 +152,14 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			opts = append(opts, oci.WithWindowsCPUMaximum(uint16(cmax)))
 		}
 		for _, dev := range context.StringSlice("device") {
-			parts := strings.Split(dev, "://")
-			if len(parts) != 2 {
+			idType, devID, ok := strings.Cut(dev, "://")
+			if !ok {
 				return nil, errors.New("devices must be in the format IDType://ID")
 			}
-			if parts[0] == "" {
+			if idType == "" {
 				return nil, errors.New("devices must have a non-empty IDType")
 			}
-			opts = append(opts, oci.WithWindowsDevice(parts[0], parts[1]))
+			opts = append(opts, oci.WithWindowsDevice(idType, devID))
 		}
 	}
 

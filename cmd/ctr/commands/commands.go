@@ -230,13 +230,10 @@ func ObjectWithLabelArgs(clicontext *cli.Context) (string, map[string]string) {
 func LabelArgs(labelStrings []string) map[string]string {
 	labels := make(map[string]string, len(labelStrings))
 	for _, label := range labelStrings {
-		parts := strings.SplitN(label, "=", 2)
-		key := parts[0]
-		value := "true"
-		if len(parts) > 1 {
-			value = parts[1]
+		key, value, ok := strings.Cut(label, "=")
+		if !ok {
+			value = "true"
 		}
-
 		labels[key] = value
 	}
 
@@ -247,11 +244,11 @@ func LabelArgs(labelStrings []string) map[string]string {
 func AnnotationArgs(annoStrings []string) (map[string]string, error) {
 	annotations := make(map[string]string, len(annoStrings))
 	for _, anno := range annoStrings {
-		parts := strings.SplitN(anno, "=", 2)
-		if len(parts) != 2 {
+		key, value, ok := strings.Cut(anno, "=")
+		if !ok {
 			return nil, fmt.Errorf("invalid key=value format annotation: %v", anno)
 		}
-		annotations[parts[0]] = parts[1]
+		annotations[key] = value
 	}
 	return annotations, nil
 }

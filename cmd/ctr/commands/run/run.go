@@ -62,13 +62,11 @@ func parseMountFlag(m string) (specs.Mount, error) {
 	}
 
 	for _, field := range fields {
-		v := strings.SplitN(field, "=", 2)
-		if len(v) < 2 {
+		key, val, ok := strings.Cut(field, "=")
+		if !ok {
 			return mount, fmt.Errorf("invalid mount specification: expected key=val")
 		}
 
-		key := v[0]
-		val := v[1]
 		switch key {
 		case "type":
 			mount.Type = val

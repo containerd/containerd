@@ -232,11 +232,10 @@ func ParseAuth(auth *runtime.AuthConfig, host string) (string, string, error) {
 		if err != nil {
 			return "", "", err
 		}
-		fields := strings.SplitN(string(decoded), ":", 2)
-		if len(fields) != 2 {
+		user, passwd, ok := strings.Cut(string(decoded), ":")
+		if !ok {
 			return "", "", fmt.Errorf("invalid decoded auth: %q", decoded)
 		}
-		user, passwd := fields[0], fields[1]
 		return user, strings.Trim(passwd, "\x00"), nil
 	}
 	// TODO(random-liu): Support RegistryToken.

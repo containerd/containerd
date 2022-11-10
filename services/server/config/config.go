@@ -104,17 +104,17 @@ func (c *Config) ValidateV2() error {
 		return nil
 	}
 	for _, p := range c.DisabledPlugins {
-		if len(strings.Split(p, ".")) < 4 {
+		if !strings.HasPrefix(p, "io.containerd.") || len(strings.SplitN(p, ".", 4)) < 4 {
 			return fmt.Errorf("invalid disabled plugin URI %q expect io.containerd.x.vx", p)
 		}
 	}
 	for _, p := range c.RequiredPlugins {
-		if len(strings.Split(p, ".")) < 4 {
+		if !strings.HasPrefix(p, "io.containerd.") || len(strings.SplitN(p, ".", 4)) < 4 {
 			return fmt.Errorf("invalid required plugin URI %q expect io.containerd.x.vx", p)
 		}
 	}
 	for p := range c.Plugins {
-		if len(strings.Split(p, ".")) < 4 {
+		if !strings.HasPrefix(p, "io.containerd.") || len(strings.SplitN(p, ".", 4)) < 4 {
 			return fmt.Errorf("invalid plugin key URI %q expect io.containerd.x.vx", p)
 		}
 	}
