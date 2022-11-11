@@ -73,25 +73,26 @@ func samplerFromEnv() (Sampler, error) {
 	case samplerAlwaysOff:
 		return NeverSample(), nil
 	case samplerTraceIDRatio:
-		ratio, err := parseTraceIDRatio(samplerArg, hasSamplerArg)
-		return ratio, err
+		if !hasSamplerArg {
+			return TraceIDRatioBased(1.0), nil
+		}
+		return parseTraceIDRatio(samplerArg)
 	case samplerParentBasedAlwaysOn:
 		return ParentBased(AlwaysSample()), nil
 	case samplerParsedBasedAlwaysOff:
 		return ParentBased(NeverSample()), nil
 	case samplerParentBasedTraceIDRatio:
-		ratio, err := parseTraceIDRatio(samplerArg, hasSamplerArg)
+		if !hasSamplerArg {
+			return ParentBased(TraceIDRatioBased(1.0)), nil
+		}
+		ratio, err := parseTraceIDRatio(samplerArg)
 		return ParentBased(ratio), err
 	default:
 		return nil, errUnsupportedSampler(sampler)
 	}
-
 }
 
-func parseTraceIDRatio(arg string, hasSamplerArg bool) (Sampler, error) {
-	if !hasSamplerArg {
-		return TraceIDRatioBased(1.0), nil
-	}
+func parseTraceIDRatio(arg string) (Sampler, error) {
 	v, err := strconv.ParseFloat(arg, 64)
 	if err != nil {
 		return TraceIDRatioBased(1.0), samplerArgParseError{err}

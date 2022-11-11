@@ -16,7 +16,6 @@ package otlpconfig // import "go.opentelemetry.io/otel/exporters/otlp/otlptrace/
 
 import (
 	"crypto/tls"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path"
@@ -29,7 +28,7 @@ import (
 // DefaultEnvOptionsReader is the default environments reader.
 var DefaultEnvOptionsReader = envconfig.EnvOptionsReader{
 	GetEnv:    os.Getenv,
-	ReadFile:  ioutil.ReadFile,
+	ReadFile:  os.ReadFile,
 	Namespace: "OTEL_EXPORTER_OTLP",
 }
 
@@ -118,8 +117,7 @@ func WithEnvCompression(n string, fn func(Compression)) func(e *envconfig.EnvOpt
 	return func(e *envconfig.EnvOptionsReader) {
 		if v, ok := e.GetEnvValue(n); ok {
 			cp := NoCompression
-			switch v {
-			case "gzip":
+			if v == "gzip" {
 				cp = GzipCompression
 			}
 

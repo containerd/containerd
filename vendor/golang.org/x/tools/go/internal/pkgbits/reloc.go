@@ -5,11 +5,11 @@
 package pkgbits
 
 // A RelocKind indicates a particular section within a unified IR export.
-type RelocKind int32
+type RelocKind int
 
 // An Index represents a bitstream element index within a particular
 // section.
-type Index int32
+type Index int
 
 // A relocEnt (relocation entry) is an entry in an element's local
 // reference table.

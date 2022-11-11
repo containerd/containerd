@@ -87,11 +87,7 @@ func NewReader(r io.Reader) (io.Reader, error) {
 
 // Read reads export data from in, decodes it, and returns type
 // information for the package.
-//
-// The package path (effectively its linker symbol prefix) is
-// specified by path, since unlike the package name, this information
-// may not be recorded in the export data.
-//
+// The package name is specified by path.
 // File position information is added to fset.
 //
 // Read may inspect and add to the imports map to ensure that references

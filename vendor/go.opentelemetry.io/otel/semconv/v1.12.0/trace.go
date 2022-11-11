@@ -14,9 +14,88 @@
 
 // Code generated from semantic convention specification. DO NOT EDIT.
 
-package semconv // import "go.opentelemetry.io/otel/semconv/v1.4.0"
+package semconv // import "go.opentelemetry.io/otel/semconv/v1.12.0"
 
 import "go.opentelemetry.io/otel/attribute"
+
+// Span attributes used by AWS Lambda (in addition to general `faas` attributes).
+const (
+	// The full invoked ARN as provided on the `Context` passed to the function
+	// (`Lambda-Runtime-Invoked-Function-ARN` header on the `/runtime/invocation/next`
+	// applicable).
+	//
+	// Type: string
+	// Required: No
+	// Stability: stable
+	// Examples: 'arn:aws:lambda:us-east-1:123456:function:myfunction:myalias'
+	// Note: This may be different from `faas.id` if an alias is involved.
+	AWSLambdaInvokedARNKey = attribute.Key("aws.lambda.invoked_arn")
+)
+
+// This document defines attributes for CloudEvents. CloudEvents is a specification on how to define event data in a standard way. These attributes can be attached to spans when performing operations with CloudEvents, regardless of the protocol being used.
+const (
+	// The [event_id](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec
+	// .md#id) uniquely identifies the event.
+	//
+	// Type: string
+	// Required: Always
+	// Stability: stable
+	// Examples: '123e4567-e89b-12d3-a456-426614174000', '0001'
+	CloudeventsEventIDKey = attribute.Key("cloudevents.event_id")
+	// The [source](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec.m
+	// d#source-1) identifies the context in which an event happened.
+	//
+	// Type: string
+	// Required: Always
+	// Stability: stable
+	// Examples: 'https://github.com/cloudevents', '/cloudevents/spec/pull/123', 'my-
+	// service'
+	CloudeventsEventSourceKey = attribute.Key("cloudevents.event_source")
+	// The [version of the CloudEvents specification](https://github.com/cloudevents/s
+	// pec/blob/v1.0.2/cloudevents/spec.md#specversion) which the event uses.
+	//
+	// Type: string
+	// Required: Always
+	// Stability: stable
+	// Examples: '1.0'
+	CloudeventsEventSpecVersionKey = attribute.Key("cloudevents.event_spec_version")
+	// The [event_type](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/sp
+	// ec.md#type) contains a value describing the type of event related to the
+	// originating occurrence.
+	//
+	// Type: string
+	// Required: Always
+	// Stability: stable
+	// Examples: 'com.github.pull_request.opened', 'com.example.object.deleted.v2'
+	CloudeventsEventTypeKey = attribute.Key("cloudevents.event_type")
+	// The [subject](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec.
+	// md#subject) of the event in the context of the event producer (identified by
+	// source).
+	//
+	// Type: string
+	// Required: No
+	// Stability: stable
+	// Examples: 'mynewfile.jpg'
+	CloudeventsEventSubjectKey = attribute.Key("cloudevents.event_subject")
+)
+
+// This document defines semantic conventions for the OpenTracing Shim
+const (
+	// Parent-child Reference type
+	//
+	// Type: Enum
+	// Required: No
+	// Stability: stable
+	// Note: The causal relationship between a child Span and a parent Span.
+	OpentracingRefTypeKey = attribute.Key("opentracing.ref_type")
+)
+
+var (
+	// The parent Span depends on the child Span in some capacity
+	OpentracingRefTypeChildOf = OpentracingRefTypeKey.String("child_of")
+	// The parent Span does not depend in any way on the result of the child Span
+	OpentracingRefTypeFollowsFrom = OpentracingRefTypeKey.String("follows_from")
+)
 
 // This document defines the attributes used to perform database client calls.
 const (
@@ -52,17 +131,18 @@ const (
 	// Examples: 'org.postgresql.Driver',
 	// 'com.microsoft.sqlserver.jdbc.SQLServerDriver'
 	DBJDBCDriverClassnameKey = attribute.Key("db.jdbc.driver_classname")
-	// If no [tech-specific attribute](#call-level-attributes-for-specific-
-	// technologies) is defined, this attribute is used to report the name of the
-	// database being accessed. For commands that switch the database, this should be
-	// set to the target database (even if the command fails).
+	// This attribute is used to report the name of the database being accessed. For
+	// commands that switch the database, this should be set to the target database
+	// (even if the command fails).
 	//
 	// Type: string
-	// Required: Required, if applicable and no more-specific attribute is defined.
+	// Required: Required, if applicable.
 	// Stability: stable
 	// Examples: 'customers', 'main'
 	// Note: In some SQL databases, the database name to be used is called "schema
-	// name".
+	// name". In case there are multiple layers that could be considered for database
+	// name (e.g. Oracle instance name and schema name), the database name to be used
+	// is the more specific layer (e.g. Oracle schema name).
 	DBNameKey = attribute.Key("db.name")
 	// The database statement being executed.
 	//
@@ -203,14 +283,6 @@ const (
 
 // Call-level attributes for Cassandra
 const (
-	// The name of the keyspace being accessed. To be used instead of the generic
-	// `db.name` attribute.
-	//
-	// Type: string
-	// Required: Always
-	// Stability: stable
-	// Examples: 'mykeyspace'
-	DBCassandraKeyspaceKey = attribute.Key("db.cassandra.keyspace")
 	// The fetch size used for paging, i.e. how many rows will be returned at once.
 	//
 	// Type: int
@@ -227,7 +299,7 @@ const (
 	// Stability: stable
 	DBCassandraConsistencyLevelKey = attribute.Key("db.cassandra.consistency_level")
 	// The name of the primary table that the operation is acting upon, including the
-	// schema name (if applicable).
+	// keyspace name (if applicable).
 	//
 	// Type: string
 	// Required: Recommended if available.
@@ -294,18 +366,6 @@ var (
 	DBCassandraConsistencyLevelLocalSerial = DBCassandraConsistencyLevelKey.String("local_serial")
 )
 
-// Call-level attributes for Apache HBase
-const (
-	// The [HBase namespace](https://hbase.apache.org/book.html#_namespace) being
-	// accessed. To be used instead of the generic `db.name` attribute.
-	//
-	// Type: string
-	// Required: Always
-	// Stability: stable
-	// Examples: 'default'
-	DBHBaseNamespaceKey = attribute.Key("db.hbase.namespace")
-)
-
 // Call-level attributes for Redis
 const (
 	// The index of the database being accessed as used in the [`SELECT`
@@ -330,10 +390,10 @@ const (
 	DBMongoDBCollectionKey = attribute.Key("db.mongodb.collection")
 )
 
-// Call-level attrbiutes for SQL databases
+// Call-level attributes for SQL databases
 const (
 	// The name of the primary table that the operation is acting upon, including the
-	// schema name (if applicable).
+	// database name (if applicable).
 	//
 	// Type: string
 	// Required: Recommended if available.
@@ -394,7 +454,7 @@ const (
 	// whether it will escape the scope of a span.
 	// However, it is trivial to know that an exception
 	// will escape, if one checks for an active exception just before ending the span,
-	// as done in the [example above](#exception-end-example).
+	// as done in the [example above](#recording-an-exception).
 
 	// It follows that an exception may still escape the scope of the span
 	// even if the `exception.escaped` attribute was not set or set to false,
@@ -405,15 +465,20 @@ const (
 
 // This semantic convention describes an instance of a function that runs without provisioning or managing of servers (also known as serverless functions or Function as a Service (FaaS)) with spans.
 const (
-	// Type of the trigger on which the function is executed.
+	// Type of the trigger which caused this function execution.
 	//
 	// Type: Enum
-	// Required: On FaaS instances, faas.trigger MUST be set on incoming invocations.
-	// Clients invoking FaaS instances MUST set `faas.trigger` on outgoing
-	// invocations, if it is known to the client. This is, for example, not the case,
-	// when the transport layer is abstracted in a FaaS client framework without
-	// access to its configuration.
+	// Required: No
 	// Stability: stable
+	// Note: For the server/consumer span on the incoming side,
+	// `faas.trigger` MUST be set.
+
+	// Clients invoking FaaS instances usually cannot set `faas.trigger`,
+	// since they would typically need to look in the payload to determine
+	// the event type. If clients set it, it should be the same as the
+	// trigger that corresponding incoming would have (i.e., this has
+	// nothing to do with the underlying transport used to make the API
+	// call to invoke the lambda, which is often HTTP).
 	FaaSTriggerKey = attribute.Key("faas.trigger")
 	// The execution ID of the current function execution.
 	//
@@ -530,7 +595,6 @@ const (
 	// Type: Enum
 	// Required: Always
 	// Stability: stable
-	// Examples: 'aws'
 	// Note: SHOULD be equal to the `cloud.provider` resource attribute of the invoked
 	// function.
 	FaaSInvokedProviderKey = attribute.Key("faas.invoked_provider")
@@ -551,12 +615,16 @@ const (
 )
 
 var (
+	// Alibaba Cloud
+	FaaSInvokedProviderAlibabaCloud = FaaSInvokedProviderKey.String("alibaba_cloud")
 	// Amazon Web Services
 	FaaSInvokedProviderAWS = FaaSInvokedProviderKey.String("aws")
 	// Microsoft Azure
 	FaaSInvokedProviderAzure = FaaSInvokedProviderKey.String("azure")
 	// Google Cloud Platform
 	FaaSInvokedProviderGCP = FaaSInvokedProviderKey.String("gcp")
+	// Tencent Cloud
+	FaaSInvokedProviderTencentCloud = FaaSInvokedProviderKey.String("tencent_cloud")
 )
 
 // These attributes may be used for any network related operation.
@@ -566,7 +634,6 @@ const (
 	// Type: Enum
 	// Required: No
 	// Stability: stable
-	// Examples: 'ip_tcp'
 	NetTransportKey = attribute.Key("net.transport")
 	// Remote address of the peer (dotted decimal for IPv4 or
 	// [RFC5952](https://tools.ietf.org/html/rfc5952) for IPv6)
@@ -589,6 +656,8 @@ const (
 	// Required: No
 	// Stability: stable
 	// Examples: 'example.com'
+	// Note: `net.peer.name` SHOULD NOT be set if capturing it would require an extra
+	// DNS lookup.
 	NetPeerNameKey = attribute.Key("net.peer.name")
 	// Like `net.peer.ip` but for the host IP. Useful in case of a multi-IP host.
 	//
@@ -611,6 +680,51 @@ const (
 	// Stability: stable
 	// Examples: 'localhost'
 	NetHostNameKey = attribute.Key("net.host.name")
+	// The internet connection type currently being used by the host.
+	//
+	// Type: Enum
+	// Required: No
+	// Stability: stable
+	// Examples: 'wifi'
+	NetHostConnectionTypeKey = attribute.Key("net.host.connection.type")
+	// This describes more details regarding the connection.type. It may be the type
+	// of cell technology connection, but it could be used for describing details
+	// about a wifi connection.
+	//
+	// Type: Enum
+	// Required: No
+	// Stability: stable
+	// Examples: 'LTE'
+	NetHostConnectionSubtypeKey = attribute.Key("net.host.connection.subtype")
+	// The name of the mobile carrier.
+	//
+	// Type: string
+	// Required: No
+	// Stability: stable
+	// Examples: 'sprint'
+	NetHostCarrierNameKey = attribute.Key("net.host.carrier.name")
+	// The mobile carrier country code.
+	//
+	// Type: string
+	// Required: No
+	// Stability: stable
+	// Examples: '310'
+	NetHostCarrierMccKey = attribute.Key("net.host.carrier.mcc")
+	// The mobile carrier network code.
+	//
+	// Type: string
+	// Required: No
+	// Stability: stable
+	// Examples: '001'
+	NetHostCarrierMncKey = attribute.Key("net.host.carrier.mnc")
+	// The ISO 3166-1 alpha-2 2-character country code associated with the mobile
+	// carrier network.
+	//
+	// Type: string
+	// Required: No
+	// Stability: stable
+	// Examples: 'DE'
+	NetHostCarrierIccKey = attribute.Key("net.host.carrier.icc")
 )
 
 var (
@@ -628,6 +742,64 @@ var (
 	NetTransportInProc = NetTransportKey.String("inproc")
 	// Something else (non IP-based)
 	NetTransportOther = NetTransportKey.String("other")
+)
+
+var (
+	// wifi
+	NetHostConnectionTypeWifi = NetHostConnectionTypeKey.String("wifi")
+	// wired
+	NetHostConnectionTypeWired = NetHostConnectionTypeKey.String("wired")
+	// cell
+	NetHostConnectionTypeCell = NetHostConnectionTypeKey.String("cell")
+	// unavailable
+	NetHostConnectionTypeUnavailable = NetHostConnectionTypeKey.String("unavailable")
+	// unknown
+	NetHostConnectionTypeUnknown = NetHostConnectionTypeKey.String("unknown")
+)
+
+var (
+	// GPRS
+	NetHostConnectionSubtypeGprs = NetHostConnectionSubtypeKey.String("gprs")
+	// EDGE
+	NetHostConnectionSubtypeEdge = NetHostConnectionSubtypeKey.String("edge")
+	// UMTS
+	NetHostConnectionSubtypeUmts = NetHostConnectionSubtypeKey.String("umts")
+	// CDMA
+	NetHostConnectionSubtypeCdma = NetHostConnectionSubtypeKey.String("cdma")
+	// EVDO Rel. 0
+	NetHostConnectionSubtypeEvdo0 = NetHostConnectionSubtypeKey.String("evdo_0")
+	// EVDO Rev. A
+	NetHostConnectionSubtypeEvdoA = NetHostConnectionSubtypeKey.String("evdo_a")
+	// CDMA2000 1XRTT
+	NetHostConnectionSubtypeCdma20001xrtt = NetHostConnectionSubtypeKey.String("cdma2000_1xrtt")
+	// HSDPA
+	NetHostConnectionSubtypeHsdpa = NetHostConnectionSubtypeKey.String("hsdpa")
+	// HSUPA
+	NetHostConnectionSubtypeHsupa = NetHostConnectionSubtypeKey.String("hsupa")
+	// HSPA
+	NetHostConnectionSubtypeHspa = NetHostConnectionSubtypeKey.String("hspa")
+	// IDEN
+	NetHostConnectionSubtypeIden = NetHostConnectionSubtypeKey.String("iden")
+	// EVDO Rev. B
+	NetHostConnectionSubtypeEvdoB = NetHostConnectionSubtypeKey.String("evdo_b")
+	// LTE
+	NetHostConnectionSubtypeLte = NetHostConnectionSubtypeKey.String("lte")
+	// EHRPD
+	NetHostConnectionSubtypeEhrpd = NetHostConnectionSubtypeKey.String("ehrpd")
+	// HSPAP
+	NetHostConnectionSubtypeHspap = NetHostConnectionSubtypeKey.String("hspap")
+	// GSM
+	NetHostConnectionSubtypeGsm = NetHostConnectionSubtypeKey.String("gsm")
+	// TD-SCDMA
+	NetHostConnectionSubtypeTdScdma = NetHostConnectionSubtypeKey.String("td_scdma")
+	// IWLAN
+	NetHostConnectionSubtypeIwlan = NetHostConnectionSubtypeKey.String("iwlan")
+	// 5G NR (New Radio)
+	NetHostConnectionSubtypeNr = NetHostConnectionSubtypeKey.String("nr")
+	// 5G NRNSA (New Radio Non-Standalone)
+	NetHostConnectionSubtypeNrnsa = NetHostConnectionSubtypeKey.String("nrnsa")
+	// LTE CA
+	NetHostConnectionSubtypeLteCa = NetHostConnectionSubtypeKey.String("lte_ca")
 )
 
 // Operations that access some remote service.
@@ -760,13 +932,18 @@ const (
 	// Examples: '/path/12314/?q=ddds#123'
 	HTTPTargetKey = attribute.Key("http.target")
 	// The value of the [HTTP host
-	// header](https://tools.ietf.org/html/rfc7230#section-5.4). When the header is
-	// empty or not present, this attribute should be the same.
+	// header](https://tools.ietf.org/html/rfc7230#section-5.4). An empty Host header
+	// should also be reported, see note.
 	//
 	// Type: string
 	// Required: No
 	// Stability: stable
 	// Examples: 'www.example.org'
+	// Note: When the header is present but empty the attribute SHOULD be set to the
+	// empty string. Note that this is a valid situation that is expected in certain
+	// cases, according the aforementioned [section of RFC
+	// 7230](https://tools.ietf.org/html/rfc7230#section-5.4). When the header is not
+	// set the attribute MUST NOT be set.
 	HTTPHostKey = attribute.Key("http.host")
 	// The URI scheme identifying the used protocol.
 	//
@@ -787,7 +964,6 @@ const (
 	// Type: Enum
 	// Required: No
 	// Stability: stable
-	// Examples: '1.0'
 	// Note: If `net.transport` is not specified, it can be assumed to be `IP.TCP`
 	// except if `http.flavor` is `QUIC`, in which case `IP.UDP` is assumed.
 	HTTPFlavorKey = attribute.Key("http.flavor")
@@ -836,15 +1012,24 @@ const (
 	// Stability: stable
 	// Examples: 5493
 	HTTPResponseContentLengthUncompressedKey = attribute.Key("http.response_content_length_uncompressed")
+	// The ordinal number of request re-sending attempt.
+	//
+	// Type: int
+	// Required: If and only if a request was retried.
+	// Stability: stable
+	// Examples: 3
+	HTTPRetryCountKey = attribute.Key("http.retry_count")
 )
 
 var (
-	// HTTP 1.0
+	// HTTP/1.0
 	HTTPFlavorHTTP10 = HTTPFlavorKey.String("1.0")
-	// HTTP 1.1
+	// HTTP/1.1
 	HTTPFlavorHTTP11 = HTTPFlavorKey.String("1.1")
-	// HTTP 2
+	// HTTP/2
 	HTTPFlavorHTTP20 = HTTPFlavorKey.String("2.0")
+	// HTTP/3
+	HTTPFlavorHTTP30 = HTTPFlavorKey.String("3.0")
 	// SPDY protocol
 	HTTPFlavorSPDY = HTTPFlavorKey.String("SPDY")
 	// QUIC protocol
@@ -881,8 +1066,17 @@ const (
 	// Required: No
 	// Stability: stable
 	// Examples: '83.164.160.102'
-	// Note: This is not necessarily the same as `net.peer.ip`, which would identify
-	// the network-level peer, which may be a proxy.
+	// Note: This is not necessarily the same as `net.peer.ip`, which would
+	// identify the network-level peer, which may be a proxy.
+
+	// This attribute should be set when a source of information different
+	// from the one used for `net.peer.ip`, is available even if that other
+	// source just confirms the same value as `net.peer.ip`.
+	// Rationale: For `net.peer.ip`, one typically does not know if it
+	// comes from a proxy, reverse proxy, or the actual client. Setting
+	// `http.client_ip` when it's the same as `net.peer.ip` means that
+	// one is at least somewhat confident that the address is not that of
+	// the closest proxy.
 	HTTPClientIPKey = attribute.Key("http.client_ip")
 )
 
@@ -1094,7 +1288,7 @@ const (
 	// Type: string
 	// Required: Always
 	// Stability: stable
-	// Examples: 'kafka', 'rabbitmq', 'activemq', 'AmazonSQS'
+	// Examples: 'kafka', 'rabbitmq', 'rocketmq', 'activemq', 'AmazonSQS'
 	MessagingSystemKey = attribute.Key("messaging.system")
 	// The message destination name. This might be equal to the span name but is
 	// required nevertheless.
@@ -1191,6 +1385,17 @@ const (
 	// Required: No
 	// Stability: stable
 	MessagingOperationKey = attribute.Key("messaging.operation")
+	// The identifier for the consumer receiving a message. For Kafka, set it to
+	// `{messaging.kafka.consumer_group} - {messaging.kafka.client_id}`, if both are
+	// present, or only `messaging.kafka.consumer_group`. For brokers, such as
+	// RabbitMQ and Artemis, set it to the `client_id` of the client consuming the
+	// message.
+	//
+	// Type: string
+	// Required: No
+	// Stability: stable
+	// Examples: 'mygroup - client-6'
+	MessagingConsumerIDKey = attribute.Key("messaging.consumer_id")
 )
 
 var (
@@ -1255,31 +1460,124 @@ const (
 	MessagingKafkaTombstoneKey = attribute.Key("messaging.kafka.tombstone")
 )
 
-// This document defines semantic conventions for remote procedure calls.
+// Attributes for Apache RocketMQ
 const (
-	// A string identifying the remoting system.
+	// Namespace of RocketMQ resources, resources in different namespaces are
+	// individual.
 	//
 	// Type: string
 	// Required: Always
 	// Stability: stable
-	// Examples: 'grpc', 'java_rmi', 'wcf'
+	// Examples: 'myNamespace'
+	MessagingRocketmqNamespaceKey = attribute.Key("messaging.rocketmq.namespace")
+	// Name of the RocketMQ producer/consumer group that is handling the message. The
+	// client type is identified by the SpanKind.
+	//
+	// Type: string
+	// Required: Always
+	// Stability: stable
+	// Examples: 'myConsumerGroup'
+	MessagingRocketmqClientGroupKey = attribute.Key("messaging.rocketmq.client_group")
+	// The unique identifier for each client.
+	//
+	// Type: string
+	// Required: Always
+	// Stability: stable
+	// Examples: 'myhost@8742@s8083jm'
+	MessagingRocketmqClientIDKey = attribute.Key("messaging.rocketmq.client_id")
+	// Type of message.
+	//
+	// Type: Enum
+	// Required: No
+	// Stability: stable
+	MessagingRocketmqMessageTypeKey = attribute.Key("messaging.rocketmq.message_type")
+	// The secondary classifier of message besides topic.
+	//
+	// Type: string
+	// Required: No
+	// Stability: stable
+	// Examples: 'tagA'
+	MessagingRocketmqMessageTagKey = attribute.Key("messaging.rocketmq.message_tag")
+	// Key(s) of message, another way to mark message besides message id.
+	//
+	// Type: string[]
+	// Required: No
+	// Stability: stable
+	// Examples: 'keyA', 'keyB'
+	MessagingRocketmqMessageKeysKey = attribute.Key("messaging.rocketmq.message_keys")
+	// Model of message consumption. This only applies to consumer spans.
+	//
+	// Type: Enum
+	// Required: No
+	// Stability: stable
+	MessagingRocketmqConsumptionModelKey = attribute.Key("messaging.rocketmq.consumption_model")
+)
+
+var (
+	// Normal message
+	MessagingRocketmqMessageTypeNormal = MessagingRocketmqMessageTypeKey.String("normal")
+	// FIFO message
+	MessagingRocketmqMessageTypeFifo = MessagingRocketmqMessageTypeKey.String("fifo")
+	// Delay message
+	MessagingRocketmqMessageTypeDelay = MessagingRocketmqMessageTypeKey.String("delay")
+	// Transaction message
+	MessagingRocketmqMessageTypeTransaction = MessagingRocketmqMessageTypeKey.String("transaction")
+)
+
+var (
+	// Clustering consumption model
+	MessagingRocketmqConsumptionModelClustering = MessagingRocketmqConsumptionModelKey.String("clustering")
+	// Broadcasting consumption model
+	MessagingRocketmqConsumptionModelBroadcasting = MessagingRocketmqConsumptionModelKey.String("broadcasting")
+)
+
+// This document defines semantic conventions for remote procedure calls.
+const (
+	// A string identifying the remoting system. See below for a list of well-known
+	// identifiers.
+	//
+	// Type: Enum
+	// Required: Always
+	// Stability: stable
 	RPCSystemKey = attribute.Key("rpc.system")
-	// The full name of the service being called, including its package name, if
-	// applicable.
+	// The full (logical) name of the service being called, including its package
+	// name, if applicable.
 	//
 	// Type: string
 	// Required: No, but recommended
 	// Stability: stable
 	// Examples: 'myservice.EchoService'
+	// Note: This is the logical name of the service from the RPC interface
+	// perspective, which can be different from the name of any implementing class.
+	// The `code.namespace` attribute may be used to store the latter (despite the
+	// attribute name, it may include a class name; e.g., class with method actually
+	// executing the call on the server side, RPC client stub class on the client
+	// side).
 	RPCServiceKey = attribute.Key("rpc.service")
-	// The name of the method being called, must be equal to the $method part in the
-	// span name.
+	// The name of the (logical) method being called, must be equal to the $method
+	// part in the span name.
 	//
 	// Type: string
 	// Required: No, but recommended
 	// Stability: stable
 	// Examples: 'exampleMethod'
+	// Note: This is the logical name of the method from the RPC interface
+	// perspective, which can be different from the name of any implementing
+	// method/function. The `code.function` attribute may be used to store the latter
+	// (e.g., method actually executing the call on the server side, RPC client stub
+	// method on the client side).
 	RPCMethodKey = attribute.Key("rpc.method")
+)
+
+var (
+	// gRPC
+	RPCSystemGRPC = RPCSystemKey.String("grpc")
+	// Java RMI
+	RPCSystemJavaRmi = RPCSystemKey.String("java_rmi")
+	// .NET WCF
+	RPCSystemDotnetWcf = RPCSystemKey.String("dotnet_wcf")
+	// Apache Dubbo
+	RPCSystemApacheDubbo = RPCSystemKey.String("apache_dubbo")
 )
 
 // Tech-specific attributes for gRPC.
@@ -1291,7 +1589,6 @@ const (
 	// Type: Enum
 	// Required: Always
 	// Stability: stable
-	// Examples: 0, 1, 16
 	RPCGRPCStatusCodeKey = attribute.Key("rpc.grpc.status_code")
 )
 
@@ -1342,15 +1639,6 @@ const (
 	// Stability: stable
 	// Examples: '2.0', '1.0'
 	RPCJsonrpcVersionKey = attribute.Key("rpc.jsonrpc.version")
-	// `method` property from request. Unlike `rpc.method`, this may not relate to the
-	// actual method being called. Useful for client-side traces since client does not
-	// know what will be called on the server.
-	//
-	// Type: string
-	// Required: Always
-	// Stability: stable
-	// Examples: 'users.create', 'get_users'
-	RPCJsonrpcMethodKey = attribute.Key("rpc.jsonrpc.method")
 	// `id` property of request or response. Since protocol allows id to be int,
 	// string, `null` or missing (for notifications), value is expected to be cast to
 	// string for simplicity. Use empty string in case of `null` value. Omit entirely
@@ -1375,4 +1663,42 @@ const (
 	// Stability: stable
 	// Examples: 'Parse error', 'User already exists'
 	RPCJsonrpcErrorMessageKey = attribute.Key("rpc.jsonrpc.error_message")
+)
+
+// RPC received/sent message.
+const (
+	// Whether this is a received or sent message.
+	//
+	// Type: Enum
+	// Required: No
+	// Stability: stable
+	MessageTypeKey = attribute.Key("message.type")
+	// MUST be calculated as two different counters starting from `1` one for sent
+	// messages and one for received message.
+	//
+	// Type: int
+	// Required: No
+	// Stability: stable
+	// Note: This way we guarantee that the values will be consistent between
+	// different implementations.
+	MessageIDKey = attribute.Key("message.id")
+	// Compressed size of the message in bytes.
+	//
+	// Type: int
+	// Required: No
+	// Stability: stable
+	MessageCompressedSizeKey = attribute.Key("message.compressed_size")
+	// Uncompressed size of the message in bytes.
+	//
+	// Type: int
+	// Required: No
+	// Stability: stable
+	MessageUncompressedSizeKey = attribute.Key("message.uncompressed_size")
+)
+
+var (
+	// sent
+	MessageTypeSent = MessageTypeKey.String("SENT")
+	// received
+	MessageTypeReceived = MessageTypeKey.String("RECEIVED")
 )
