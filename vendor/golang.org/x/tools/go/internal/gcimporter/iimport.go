@@ -51,8 +51,6 @@ const (
 	iexportVersionPosCol   = 1
 	iexportVersionGo1_18   = 2
 	iexportVersionGenerics = 2
-
-	iexportVersionCurrent = 2
 )
 
 type ident struct {
@@ -98,7 +96,7 @@ func IImportBundle(fset *token.FileSet, imports map[string]*types.Package, data 
 }
 
 func iimportCommon(fset *token.FileSet, imports map[string]*types.Package, data []byte, bundle bool, path string) (pkgs []*types.Package, err error) {
-	const currentVersion = iexportVersionCurrent
+	const currentVersion = 1
 	version := int64(-1)
 	if !debug {
 		defer func() {

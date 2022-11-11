@@ -14,9 +14,54 @@
 
 // Code generated from semantic convention specification. DO NOT EDIT.
 
-package semconv // import "go.opentelemetry.io/otel/semconv/v1.4.0"
+package semconv // import "go.opentelemetry.io/otel/semconv/v1.12.0"
 
 import "go.opentelemetry.io/otel/attribute"
+
+// The web browser in which the application represented by the resource is running. The `browser.*` attributes MUST be used only for resources that represent applications running in a web browser (regardless of whether running on a mobile or desktop device).
+const (
+	// Array of brand name and version separated by a space
+	//
+	// Type: string[]
+	// Required: No
+	// Stability: stable
+	// Examples: ' Not A;Brand 99', 'Chromium 99', 'Chrome 99'
+	// Note: This value is intended to be taken from the [UA client hints
+	// API](https://wicg.github.io/ua-client-hints/#interface)
+	// (navigator.userAgentData.brands).
+	BrowserBrandsKey = attribute.Key("browser.brands")
+	// The platform on which the browser is running
+	//
+	// Type: string
+	// Required: No
+	// Stability: stable
+	// Examples: 'Windows', 'macOS', 'Android'
+	// Note: This value is intended to be taken from the [UA client hints
+	// API](https://wicg.github.io/ua-client-hints/#interface)
+	// (navigator.userAgentData.platform). If unavailable, the legacy
+	// `navigator.platform` API SHOULD NOT be used instead and this attribute SHOULD
+	// be left unset in order for the values to be consistent.
+	// The list of possible values is defined in the [W3C User-Agent Client Hints
+	// specification](https://wicg.github.io/ua-client-hints/#sec-ch-ua-platform).
+	// Note that some (but not all) of these values can overlap with values in the
+	// [os.type and os.name attributes](./os.md). However, for consistency, the values
+	// in the `browser.platform` attribute should capture the exact value that the
+	// user agent provides.
+	BrowserPlatformKey = attribute.Key("browser.platform")
+	// Full user-agent string provided by the browser
+	//
+	// Type: string
+	// Required: No
+	// Stability: stable
+	// Examples: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36
+	// (KHTML, '
+	//  'like Gecko) Chrome/95.0.4638.54 Safari/537.36'
+	// Note: The user-agent value SHOULD be provided only from browsers that do not
+	// have a mechanism to retrieve brands and platform individually from the User-
+	// Agent Client Hints API. To retrieve the value, the legacy `navigator.userAgent`
+	// API can be used.
+	BrowserUserAgentKey = attribute.Key("browser.user_agent")
+)
 
 // A cloud environment (e.g. GCP, Azure, AWS)
 const (
@@ -25,7 +70,6 @@ const (
 	// Type: Enum
 	// Required: No
 	// Stability: stable
-	// Examples: 'gcp'
 	CloudProviderKey = attribute.Key("cloud.provider")
 	// The cloud account ID the resource is assigned to.
 	//
@@ -34,17 +78,19 @@ const (
 	// Stability: stable
 	// Examples: '111111111111', 'opentelemetry'
 	CloudAccountIDKey = attribute.Key("cloud.account.id")
-	// The geographical region the resource is running. Refer to your provider's docs
-	// to see the available regions, for example [AWS
-	// regions](https://aws.amazon.com/about-aws/global-infrastructure/regions_az/),
-	// [Azure regions](https://azure.microsoft.com/en-us/global-
-	// infrastructure/geographies/), or [Google Cloud
-	// regions](https://cloud.google.com/about/locations).
+	// The geographical region the resource is running.
 	//
 	// Type: string
 	// Required: No
 	// Stability: stable
 	// Examples: 'us-central1', 'us-east-1'
+	// Note: Refer to your provider's docs to see the available regions, for example
+	// [Alibaba Cloud regions](https://www.alibabacloud.com/help/doc-
+	// detail/40654.htm), [AWS regions](https://aws.amazon.com/about-aws/global-
+	// infrastructure/regions_az/), [Azure regions](https://azure.microsoft.com/en-
+	// us/global-infrastructure/geographies/), [Google Cloud
+	// regions](https://cloud.google.com/about/locations), or [Tencent Cloud
+	// regions](https://intl.cloud.tencent.com/document/product/213/6091).
 	CloudRegionKey = attribute.Key("cloud.region")
 	// Cloud regions often have multiple, isolated locations known as zones to
 	// increase availability. Availability zone represents the zone where the resource
@@ -54,29 +100,36 @@ const (
 	// Required: No
 	// Stability: stable
 	// Examples: 'us-east-1c'
-	// Note: Availability zones are called "zones" on Google Cloud.
+	// Note: Availability zones are called "zones" on Alibaba Cloud and Google Cloud.
 	CloudAvailabilityZoneKey = attribute.Key("cloud.availability_zone")
 	// The cloud platform in use.
 	//
 	// Type: Enum
 	// Required: No
 	// Stability: stable
-	// Examples: 'aws_ec2', 'azure_vm', 'gcp_compute_engine'
 	// Note: The prefix of the service SHOULD match the one specified in
 	// `cloud.provider`.
 	CloudPlatformKey = attribute.Key("cloud.platform")
 )
 
 var (
+	// Alibaba Cloud
+	CloudProviderAlibabaCloud = CloudProviderKey.String("alibaba_cloud")
 	// Amazon Web Services
 	CloudProviderAWS = CloudProviderKey.String("aws")
 	// Microsoft Azure
 	CloudProviderAzure = CloudProviderKey.String("azure")
 	// Google Cloud Platform
 	CloudProviderGCP = CloudProviderKey.String("gcp")
+	// Tencent Cloud
+	CloudProviderTencentCloud = CloudProviderKey.String("tencent_cloud")
 )
 
 var (
+	// Alibaba Cloud Elastic Compute Service
+	CloudPlatformAlibabaCloudECS = CloudPlatformKey.String("alibaba_cloud_ecs")
+	// Alibaba Cloud Function Compute
+	CloudPlatformAlibabaCloudFc = CloudPlatformKey.String("alibaba_cloud_fc")
 	// AWS Elastic Compute Cloud
 	CloudPlatformAWSEC2 = CloudPlatformKey.String("aws_ec2")
 	// AWS Elastic Container Service
@@ -87,6 +140,8 @@ var (
 	CloudPlatformAWSLambda = CloudPlatformKey.String("aws_lambda")
 	// AWS Elastic Beanstalk
 	CloudPlatformAWSElasticBeanstalk = CloudPlatformKey.String("aws_elastic_beanstalk")
+	// AWS App Runner
+	CloudPlatformAWSAppRunner = CloudPlatformKey.String("aws_app_runner")
 	// Azure Virtual Machines
 	CloudPlatformAzureVM = CloudPlatformKey.String("azure_vm")
 	// Azure Container Instances
@@ -107,6 +162,12 @@ var (
 	CloudPlatformGCPCloudFunctions = CloudPlatformKey.String("gcp_cloud_functions")
 	// Google Cloud App Engine (GAE)
 	CloudPlatformGCPAppEngine = CloudPlatformKey.String("gcp_app_engine")
+	// Tencent Cloud Cloud Virtual Machine (CVM)
+	CloudPlatformTencentCloudCvm = CloudPlatformKey.String("tencent_cloud_cvm")
+	// Tencent Cloud Elastic Kubernetes Service (EKS)
+	CloudPlatformTencentCloudEKS = CloudPlatformKey.String("tencent_cloud_eks")
+	// Tencent Cloud Serverless Cloud Function (SCF)
+	CloudPlatformTencentCloudScf = CloudPlatformKey.String("tencent_cloud_scf")
 )
 
 // Resources used by AWS Elastic Container Service (ECS).
@@ -134,7 +195,6 @@ const (
 	// Type: Enum
 	// Required: No
 	// Stability: stable
-	// Examples: 'ec2', 'fargate'
 	AWSECSLaunchtypeKey = attribute.Key("aws.ecs.launchtype")
 	// The ARN of an [ECS task definition](https://docs.aws.amazon.com/AmazonECS/lates
 	// t/developerguide/task_definitions.html).
@@ -225,7 +285,7 @@ const (
 
 // A container instance.
 const (
-	// Container name.
+	// Container name used by container runtime.
 	//
 	// Type: string
 	// Required: No
@@ -316,43 +376,105 @@ const (
 	// Note: It's recommended this value represents a human readable version of the
 	// device model rather than a machine readable alternative.
 	DeviceModelNameKey = attribute.Key("device.model.name")
+	// The name of the device manufacturer
+	//
+	// Type: string
+	// Required: No
+	// Stability: stable
+	// Examples: 'Apple', 'Samsung'
+	// Note: The Android OS provides this field via
+	// [Build](https://developer.android.com/reference/android/os/Build#MANUFACTURER).
+	// iOS apps SHOULD hardcode the value `Apple`.
+	DeviceManufacturerKey = attribute.Key("device.manufacturer")
 )
 
 // A serverless instance.
 const (
-	// The name of the function being executed.
+	// The name of the single function that this runtime instance executes.
 	//
 	// Type: string
 	// Required: Always
 	// Stability: stable
-	// Examples: 'my-function'
+	// Examples: 'my-function', 'myazurefunctionapp/some-function-name'
+	// Note: This is the name of the function as configured/deployed on the FaaS
+	// platform and is usually different from the name of the callback
+	// function (which may be stored in the
+	// [`code.namespace`/`code.function`](../../trace/semantic_conventions/span-
+	// general.md#source-code-attributes)
+	// span attributes).
+
+	// For some cloud providers, the above definition is ambiguous. The following
+	// definition of function name MUST be used for this attribute
+	// (and consequently the span name) for the listed cloud providers/products:
+
+	// * **Azure:**  The full name `<FUNCAPP>/<FUNC>`, i.e., function app name
+	//   followed by a forward slash followed by the function name (this form
+	//   can also be seen in the resource JSON for the function).
+	//   This means that a span attribute MUST be used, as an Azure function
+	//   app can host multiple functions that would usually share
+	//   a TracerProvider (see also the `faas.id` attribute).
 	FaaSNameKey = attribute.Key("faas.name")
-	// The unique ID of the function being executed.
+	// The unique ID of the single function that this runtime instance executes.
 	//
 	// Type: string
-	// Required: Always
+	// Required: No
 	// Stability: stable
 	// Examples: 'arn:aws:lambda:us-west-2:123456789012:function:my-function'
-	// Note: For example, in AWS Lambda this field corresponds to the
+	// Note: On some cloud providers, it may not be possible to determine the full ID
+	// at startup,
+	// so consider setting `faas.id` as a span attribute instead.
+
+	// The exact value to use for `faas.id` depends on the cloud provider:
+
+	// * **AWS Lambda:** The function
 	// [ARN](https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-
-	// namespaces.html) value, in GCP to the URI of the resource, and in Azure to the
-	// [FunctionDirectory](https://github.com/Azure/azure-functions-
-	// host/wiki/Retrieving-information-about-the-currently-running-function) field.
+	// namespaces.html).
+	//   Take care not to use the "invoked ARN" directly but replace any
+	//   [alias suffix](https://docs.aws.amazon.com/lambda/latest/dg/configuration-
+	// aliases.html)
+	//   with the resolved function version, as the same runtime instance may be
+	// invokable with
+	//   multiple different aliases.
+	// * **GCP:** The [URI of the resource](https://cloud.google.com/iam/docs/full-
+	// resource-names)
+	// * **Azure:** The [Fully Qualified Resource ID](https://docs.microsoft.com/en-
+	// us/rest/api/resources/resources/get-by-id) of the invoked function,
+	//   *not* the function app, having the form
+	//   `/subscriptions/<SUBSCIPTION_GUID>/resourceGroups/<RG>/providers/Microsoft.We
+	// b/sites/<FUNCAPP>/functions/<FUNC>`.
+	//   This means that a span attribute MUST be used, as an Azure function app can
+	// host multiple functions that would usually share
+	//   a TracerProvider.
 	FaaSIDKey = attribute.Key("faas.id")
-	// The version string of the function being executed as defined in [Version
-	// Attributes](../../resource/semantic_conventions/README.md#version-attributes).
+	// The immutable version of the function being executed.
 	//
 	// Type: string
 	// Required: No
 	// Stability: stable
-	// Examples: '2.0.0'
+	// Examples: '26', 'pinkfroid-00002'
+	// Note: Depending on the cloud provider and platform, use:
+
+	// * **AWS Lambda:** The [function
+	// version](https://docs.aws.amazon.com/lambda/latest/dg/configuration-
+	// versions.html)
+	//   (an integer represented as a decimal string).
+	// * **Google Cloud Run:** The
+	// [revision](https://cloud.google.com/run/docs/managing/revisions)
+	//   (i.e., the function name plus the revision suffix).
+	// * **Google Cloud Functions:** The value of the
+	//   [`K_REVISION` environment
+	// variable](https://cloud.google.com/functions/docs/env-
+	// var#runtime_environment_variables_set_automatically).
+	// * **Azure Functions:** Not applicable. Do not set this attribute.
 	FaaSVersionKey = attribute.Key("faas.version")
-	// The execution environment ID as a string.
+	// The execution environment ID as a string, that will be potentially reused for
+	// other invocations to the same function/function version.
 	//
 	// Type: string
 	// Required: No
 	// Stability: stable
-	// Examples: 'my-function:instance-0001'
+	// Examples: '2021/06/28/[$LATEST]2f399eb14537447da05ab2a2e39309de'
+	// Note: * **AWS Lambda:** Use the (full) log stream name.
 	FaaSInstanceKey = attribute.Key("faas.instance")
 	// The amount of memory available to the serverless function in MiB.
 	//
@@ -436,6 +558,8 @@ var (
 	HostArchPPC32 = HostArchKey.String("ppc32")
 	// 64-bit PowerPC
 	HostArchPPC64 = HostArchKey.String("ppc64")
+	// IBM z/Architecture
+	HostArchS390x = HostArchKey.String("s390x")
 	// 32-bit x86
 	HostArchX86 = HostArchKey.String("x86")
 )
@@ -500,13 +624,23 @@ const (
 
 // A container in a [PodTemplate](https://kubernetes.io/docs/concepts/workloads/pods/#pod-templates).
 const (
-	// The name of the Container in a Pod template.
+	// The name of the Container from Pod specification, must be unique within a Pod.
+	// Container runtime usually uses different globally unique name
+	// (`container.name`).
 	//
 	// Type: string
 	// Required: No
 	// Stability: stable
 	// Examples: 'redis'
 	K8SContainerNameKey = attribute.Key("k8s.container.name")
+	// Number of times the container was restarted. This attribute can be used to
+	// identify a particular container (running or stopped) within a container spec.
+	//
+	// Type: int
+	// Required: No
+	// Stability: stable
+	// Examples: 0, 2
+	K8SContainerRestartCountKey = attribute.Key("k8s.container.restart_count")
 )
 
 // A Kubernetes ReplicaSet object.
@@ -517,14 +651,14 @@ const (
 	// Required: No
 	// Stability: stable
 	// Examples: '275ecb36-5aa8-4c2a-9c47-d8bb681b9aff'
-	K8SReplicasetUIDKey = attribute.Key("k8s.replicaset.uid")
+	K8SReplicaSetUIDKey = attribute.Key("k8s.replicaset.uid")
 	// The name of the ReplicaSet.
 	//
 	// Type: string
 	// Required: No
 	// Stability: stable
 	// Examples: 'opentelemetry'
-	K8SReplicasetNameKey = attribute.Key("k8s.replicaset.name")
+	K8SReplicaSetNameKey = attribute.Key("k8s.replicaset.name")
 )
 
 // A Kubernetes Deployment object.
@@ -553,14 +687,14 @@ const (
 	// Required: No
 	// Stability: stable
 	// Examples: '275ecb36-5aa8-4c2a-9c47-d8bb681b9aff'
-	K8SStatefulsetUIDKey = attribute.Key("k8s.statefulset.uid")
+	K8SStatefulSetUIDKey = attribute.Key("k8s.statefulset.uid")
 	// The name of the StatefulSet.
 	//
 	// Type: string
 	// Required: No
 	// Stability: stable
 	// Examples: 'opentelemetry'
-	K8SStatefulsetNameKey = attribute.Key("k8s.statefulset.name")
+	K8SStatefulSetNameKey = attribute.Key("k8s.statefulset.name")
 )
 
 // A Kubernetes DaemonSet object.
@@ -571,14 +705,14 @@ const (
 	// Required: No
 	// Stability: stable
 	// Examples: '275ecb36-5aa8-4c2a-9c47-d8bb681b9aff'
-	K8SDaemonsetUIDKey = attribute.Key("k8s.daemonset.uid")
+	K8SDaemonSetUIDKey = attribute.Key("k8s.daemonset.uid")
 	// The name of the DaemonSet.
 	//
 	// Type: string
 	// Required: No
 	// Stability: stable
 	// Examples: 'opentelemetry'
-	K8SDaemonsetNameKey = attribute.Key("k8s.daemonset.name")
+	K8SDaemonSetNameKey = attribute.Key("k8s.daemonset.name")
 )
 
 // A Kubernetes Job object.
@@ -669,7 +803,7 @@ var (
 	OSTypeHPUX = OSTypeKey.String("hpux")
 	// AIX (Advanced Interactive eXecutive)
 	OSTypeAIX = OSTypeKey.String("aix")
-	// Oracle Solaris
+	// SunOS, Oracle Solaris
 	OSTypeSolaris = OSTypeKey.String("solaris")
 	// IBM z/OS
 	OSTypeZOS = OSTypeKey.String("z_os")
@@ -877,6 +1011,8 @@ var (
 	TelemetrySDKLanguageRuby = TelemetrySDKLanguageKey.String("ruby")
 	// webjs
 	TelemetrySDKLanguageWebjs = TelemetrySDKLanguageKey.String("webjs")
+	// swift
+	TelemetrySDKLanguageSwift = TelemetrySDKLanguageKey.String("swift")
 )
 
 // Resource describing the packaged software running the application code. Web engines are typically executed using process.runtime.

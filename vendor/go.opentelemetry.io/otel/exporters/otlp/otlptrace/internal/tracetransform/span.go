@@ -34,7 +34,7 @@ func Spans(sdl []tracesdk.ReadOnlySpan) []*tracepb.ResourceSpans {
 
 	type key struct {
 		r  attribute.Distinct
-		il instrumentation.Library
+		is instrumentation.Scope
 	}
 	ssm := make(map[key]*tracepb.ScopeSpans)
 
@@ -47,15 +47,15 @@ func Spans(sdl []tracesdk.ReadOnlySpan) []*tracepb.ResourceSpans {
 		rKey := sd.Resource().Equivalent()
 		k := key{
 			r:  rKey,
-			il: sd.InstrumentationLibrary(),
+			is: sd.InstrumentationScope(),
 		}
 		scopeSpan, iOk := ssm[k]
 		if !iOk {
-			// Either the resource or instrumentation library were unknown.
+			// Either the resource or instrumentation scope were unknown.
 			scopeSpan = &tracepb.ScopeSpans{
-				Scope:     InstrumentationScope(sd.InstrumentationLibrary()),
+				Scope:     InstrumentationScope(sd.InstrumentationScope()),
 				Spans:     []*tracepb.Span{},
-				SchemaUrl: sd.InstrumentationLibrary().SchemaURL,
+				SchemaUrl: sd.InstrumentationScope().SchemaURL,
 			}
 		}
 		scopeSpan.Spans = append(scopeSpan.Spans, span(sd))
