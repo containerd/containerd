@@ -97,9 +97,7 @@ const (
 	runtimeRunhcsV1 = "io.containerd.runhcs.v1"
 
 	// name prefix for CRI sbserver specific spans
-	criSbServerSpanPrefix = "pkg.cri.sbserver"
-
-	spanDelimiter = "."
+	criSpanPrefix = "pkg.cri.sbserver"
 )
 
 // makeSandboxName generates sandbox name from sandbox metadata. The name
@@ -505,11 +503,4 @@ func copyResourcesToStatus(spec *runtimespec.Spec, status containerstore.Status)
 		// TODO: Figure out how to get RootfsSizeInBytes
 	}
 	return status
-}
-
-func makeSpanName(funcName string) string {
-	return strings.Join([]string{
-		criSbServerSpanPrefix,
-		funcName,
-	}, spanDelimiter)
 }

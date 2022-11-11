@@ -932,8 +932,8 @@ func (in *instrumentedService) PullImage(ctx context.Context, r *runtime.PullIma
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, makeSpanName("PullImage"))
-	defer tracing.StopSpan(span)
+	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "PullImage"))
+	defer span.End()
 	log.G(ctx).Infof("PullImage %q", r.GetImage().GetImage())
 	defer func() {
 		if err != nil {
@@ -942,7 +942,7 @@ func (in *instrumentedService) PullImage(ctx context.Context, r *runtime.PullIma
 			log.G(ctx).Infof("PullImage %q returns image reference %q",
 				r.GetImage().GetImage(), res.GetImageRef())
 		}
-		tracing.SetSpanStatus(span, err)
+		span.SetStatus(err)
 	}()
 	res, err = in.c.PullImage(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
@@ -952,8 +952,8 @@ func (in *instrumentedAlphaService) PullImage(ctx context.Context, r *runtime_al
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, makeSpanName("PullImage"))
-	defer tracing.StopSpan(span)
+	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "PullImage"))
+	defer span.End()
 	log.G(ctx).Infof("PullImage %q", r.GetImage().GetImage())
 	defer func() {
 		if err != nil {
@@ -962,7 +962,7 @@ func (in *instrumentedAlphaService) PullImage(ctx context.Context, r *runtime_al
 			log.G(ctx).Infof("PullImage %q returns image reference %q",
 				r.GetImage().GetImage(), res.GetImageRef())
 		}
-		tracing.SetSpanStatus(span, err)
+		span.SetStatus(err)
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
 	var v1r runtime.PullImageRequest
@@ -993,8 +993,8 @@ func (in *instrumentedService) ListImages(ctx context.Context, r *runtime.ListIm
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, makeSpanName("ListImages"))
-	defer tracing.StopSpan(span)
+	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "ListImages"))
+	defer span.End()
 	log.G(ctx).Tracef("ListImages with filter %+v", r.GetFilter())
 	defer func() {
 		if err != nil {
@@ -1003,7 +1003,7 @@ func (in *instrumentedService) ListImages(ctx context.Context, r *runtime.ListIm
 			log.G(ctx).Tracef("ListImages with filter %+v returns image list %+v",
 				r.GetFilter(), res.GetImages())
 		}
-		tracing.SetSpanStatus(span, err)
+		span.SetStatus(err)
 	}()
 	res, err = in.c.ListImages(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
@@ -1013,8 +1013,8 @@ func (in *instrumentedAlphaService) ListImages(ctx context.Context, r *runtime_a
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, makeSpanName("ListImages"))
-	defer tracing.StopSpan(span)
+	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "ListImages"))
+	defer span.End()
 	log.G(ctx).Tracef("ListImages with filter %+v", r.GetFilter())
 	defer func() {
 		if err != nil {
@@ -1023,7 +1023,7 @@ func (in *instrumentedAlphaService) ListImages(ctx context.Context, r *runtime_a
 			log.G(ctx).Tracef("ListImages with filter %+v returns image list %+v",
 				r.GetFilter(), res.GetImages())
 		}
-		tracing.SetSpanStatus(span, err)
+		span.SetStatus(err)
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
 	var v1r runtime.ListImagesRequest
@@ -1054,8 +1054,8 @@ func (in *instrumentedService) ImageStatus(ctx context.Context, r *runtime.Image
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, makeSpanName("ImageStatus"))
-	defer tracing.StopSpan(span)
+	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "ImageStatus"))
+	defer span.End()
 	log.G(ctx).Tracef("ImageStatus for %q", r.GetImage().GetImage())
 	defer func() {
 		if err != nil {
@@ -1064,7 +1064,7 @@ func (in *instrumentedService) ImageStatus(ctx context.Context, r *runtime.Image
 			log.G(ctx).Tracef("ImageStatus for %q returns image status %+v",
 				r.GetImage().GetImage(), res.GetImage())
 		}
-		tracing.SetSpanStatus(span, err)
+		span.SetStatus(err)
 	}()
 	res, err = in.c.ImageStatus(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
@@ -1074,8 +1074,8 @@ func (in *instrumentedAlphaService) ImageStatus(ctx context.Context, r *runtime_
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, makeSpanName("ImageStatus"))
-	defer tracing.StopSpan(span)
+	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "ImageStatus"))
+	defer span.End()
 	log.G(ctx).Tracef("ImageStatus for %q", r.GetImage().GetImage())
 	defer func() {
 		if err != nil {
@@ -1084,7 +1084,7 @@ func (in *instrumentedAlphaService) ImageStatus(ctx context.Context, r *runtime_
 			log.G(ctx).Tracef("ImageStatus for %q returns image status %+v",
 				r.GetImage().GetImage(), res.GetImage())
 		}
-		tracing.SetSpanStatus(span, err)
+		span.SetStatus(err)
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
 	var v1r runtime.ImageStatusRequest
@@ -1115,8 +1115,8 @@ func (in *instrumentedService) RemoveImage(ctx context.Context, r *runtime.Remov
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, makeSpanName("RemoveImage"))
-	defer tracing.StopSpan(span)
+	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "RemoveImage"))
+	defer span.End()
 	log.G(ctx).Infof("RemoveImage %q", r.GetImage().GetImage())
 	defer func() {
 		if err != nil {
@@ -1124,7 +1124,7 @@ func (in *instrumentedService) RemoveImage(ctx context.Context, r *runtime.Remov
 		} else {
 			log.G(ctx).Infof("RemoveImage %q returns successfully", r.GetImage().GetImage())
 		}
-		tracing.SetSpanStatus(span, err)
+		span.SetStatus(err)
 	}()
 	res, err := in.c.RemoveImage(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
@@ -1134,8 +1134,8 @@ func (in *instrumentedAlphaService) RemoveImage(ctx context.Context, r *runtime_
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, makeSpanName("RemoveImage"))
-	defer tracing.StopSpan(span)
+	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "RemoveImage"))
+	defer span.End()
 	log.G(ctx).Infof("RemoveImage %q", r.GetImage().GetImage())
 	defer func() {
 		if err != nil {
@@ -1143,7 +1143,7 @@ func (in *instrumentedAlphaService) RemoveImage(ctx context.Context, r *runtime_
 		} else {
 			log.G(ctx).Infof("RemoveImage %q returns successfully", r.GetImage().GetImage())
 		}
-		tracing.SetSpanStatus(span, err)
+		span.SetStatus(err)
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
 	var v1r runtime.RemoveImageRequest
@@ -1174,8 +1174,8 @@ func (in *instrumentedService) ImageFsInfo(ctx context.Context, r *runtime.Image
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, makeSpanName("ImageFsInfo"))
-	defer tracing.StopSpan(span)
+	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "ImageFsInfo"))
+	defer span.End()
 	log.G(ctx).Debugf("ImageFsInfo")
 	defer func() {
 		if err != nil {
@@ -1183,7 +1183,7 @@ func (in *instrumentedService) ImageFsInfo(ctx context.Context, r *runtime.Image
 		} else {
 			log.G(ctx).Debugf("ImageFsInfo returns filesystem info %+v", res.ImageFilesystems)
 		}
-		tracing.SetSpanStatus(span, err)
+		span.SetStatus(err)
 	}()
 	res, err = in.c.ImageFsInfo(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
@@ -1193,8 +1193,8 @@ func (in *instrumentedAlphaService) ImageFsInfo(ctx context.Context, r *runtime_
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, makeSpanName("ImageFsInfo"))
-	defer tracing.StopSpan(span)
+	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "ImageFsInfo"))
+	defer span.End()
 	log.G(ctx).Debugf("ImageFsInfo")
 	defer func() {
 		if err != nil {
@@ -1202,7 +1202,7 @@ func (in *instrumentedAlphaService) ImageFsInfo(ctx context.Context, r *runtime_
 		} else {
 			log.G(ctx).Debugf("ImageFsInfo returns filesystem info %+v", res.ImageFilesystems)
 		}
-		tracing.SetSpanStatus(span, err)
+		span.SetStatus(err)
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
 	var v1r runtime.ImageFsInfoRequest

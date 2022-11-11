@@ -571,18 +571,18 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 	}
 	_, httpSpan := tracing.StartSpan(
 		ctx,
-		"remotes.docker.resolver.HTTPRequest",
+		tracing.Name("remotes.docker.resolver", "HTTPRequest"),
 		oteltrace.WithSpanKind(oteltrace.SpanKindClient),
 		oteltrace.WithAttributes(semconv.HTTPClientAttributesFromHTTPRequest(req)...),
 	)
 	resp, err := client.Do(req)
 	if err != nil {
-		httpSpan.RecordError(err)
-		tracing.StopSpan(httpSpan)
+		httpSpan.SetStatus(err)
+		httpSpan.End()
 		return nil, fmt.Errorf("failed to do request: %w", err)
 	}
 	httpSpan.SetAttributes(semconv.HTTPAttributesFromHTTPStatusCode(resp.StatusCode)...)
-	tracing.StopSpan(httpSpan)
+	httpSpan.End()
 	log.G(ctx).WithFields(responseFields(resp)).Debug("fetch response received")
 	return resp, nil
 }

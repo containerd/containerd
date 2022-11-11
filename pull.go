@@ -33,11 +33,15 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
+const (
+	pullSpanPrefix = "pull"
+)
+
 // Pull downloads the provided content into containerd's content store
 // and returns a platform specific image object
 func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Image, retErr error) {
-	ctx, span := tracing.StartSpan(ctx, "pull.Pull")
-	defer tracing.StopSpan(span)
+	ctx, span := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "Pull"))
+	defer span.End()
 
 	pullCtx := defaultRemoteContext()
 
@@ -63,11 +67,11 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 	}
 
 	span.SetAttributes(
-		tracing.SpanAttribute("image.ref", ref),
-		tracing.SpanAttribute("unpack", pullCtx.Unpack),
-		tracing.SpanAttribute("max.concurrent.downloads", pullCtx.MaxConcurrentDownloads),
-		tracing.SpanAttribute("max.concurrent.upload.layers", pullCtx.MaxConcurrentUploadedLayers),
-		tracing.SpanAttribute("platforms.count", len(pullCtx.Platforms)),
+		tracing.Attribute("image.ref", ref),
+		tracing.Attribute("unpack", pullCtx.Unpack),
+		tracing.Attribute("max.concurrent.downloads", pullCtx.MaxConcurrentDownloads),
+		tracing.Attribute("max.concurrent.upload.layers", pullCtx.MaxConcurrentUploadedLayers),
+		tracing.Attribute("platforms.count", len(pullCtx.Platforms)),
 	)
 
 	ctx, done, err := c.WithLease(ctx)
@@ -83,7 +87,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		if err != nil {
 			return nil, fmt.Errorf("unable to resolve snapshotter: %w", err)
 		}
-		span.SetAttributes(tracing.SpanAttribute("snapshotter.name", snapshotterName))
+		span.SetAttributes(tracing.Attribute("snapshotter.name", snapshotterName))
 		var uconfig UnpackConfig
 		for _, opt := range pullCtx.UnpackOpts {
 			if err := opt(ctx, &uconfig); err != nil {
@@ -141,13 +145,13 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 	// download).
 	var ur unpack.Result
 	if unpacker != nil {
-		_, unpackSpan := tracing.StartSpan(ctx, "pull.UnpackWait")
+		_, unpackSpan := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "UnpackWait"))
 		if ur, err = unpacker.Wait(); err != nil {
-			unpackSpan.RecordError(err)
-			tracing.StopSpan(unpackSpan)
+			unpackSpan.SetStatus(err)
+			unpackSpan.End()
 			return nil, err
 		}
-		tracing.StopSpan(unpackSpan)
+		unpackSpan.End()
 	}
 
 	img, err = c.createNewImage(ctx, img)
@@ -156,7 +160,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 	}
 
 	i := NewImageWithPlatform(c, img, pullCtx.PlatformMatcher)
-	span.SetAttributes(tracing.SpanAttribute("image.ref", i.Name()))
+	span.SetAttributes(tracing.Attribute("image.ref", i.Name()))
 
 	if unpacker != nil && ur.Unpacks == 0 {
 		// Unpack was tried previously but nothing was unpacked
@@ -170,8 +174,8 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 }
 
 func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, limit int) (images.Image, error) {
-	ctx, span := tracing.StartSpan(ctx, "pull.fetch")
-	defer tracing.StopSpan(span)
+	ctx, span := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "fetch"))
+	defer span.End()
 	store := c.ContentStore()
 	name, desc, err := rCtx.Resolver.Resolve(ctx, ref)
 	if err != nil {
@@ -275,8 +279,8 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 }
 
 func (c *Client) createNewImage(ctx context.Context, img images.Image) (images.Image, error) {
-	ctx, span := tracing.StartSpan(ctx, "pull.createNewImage")
-	defer tracing.StopSpan(span)
+	ctx, span := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "pull.createNewImage"))
+	defer span.End()
 	is := c.ImageService()
 	for {
 		if created, err := is.Create(ctx, img); err != nil {

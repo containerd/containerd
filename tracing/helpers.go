@@ -19,9 +19,18 @@ package tracing
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
 )
+
+const (
+	spanDelimiter = "."
+)
+
+func makeSpanName(names ...string) string {
+	return strings.Join(names, spanDelimiter)
+}
 
 func any(k string, v interface{}) attribute.KeyValue {
 	if v == nil {
