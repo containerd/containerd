@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/cgroups"
+	"github.com/containerd/cgroups/v3"
 	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/plugin"

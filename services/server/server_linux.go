@@ -20,8 +20,9 @@ import (
 	"context"
 	"os"
 
-	"github.com/containerd/cgroups"
-	cgroupsv2 "github.com/containerd/cgroups/v2"
+	"github.com/containerd/cgroups/v3"
+	cgroup1 "github.com/containerd/cgroups/v3/cgroup1"
+	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	"github.com/containerd/containerd/log"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/containerd/containerd/sys"
@@ -39,7 +40,7 @@ func apply(ctx context.Context, config *srvconfig.Config) error {
 	}
 	if config.Cgroup.Path != "" {
 		if cgroups.Mode() == cgroups.Unified {
-			cg, err := cgroupsv2.LoadManager("/sys/fs/cgroup", config.Cgroup.Path)
+			cg, err := cgroupsv2.Load(config.Cgroup.Path)
 			if err != nil {
 				return err
 			}
@@ -47,12 +48,12 @@ func apply(ctx context.Context, config *srvconfig.Config) error {
 				return err
 			}
 		} else {
-			cg, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(config.Cgroup.Path))
+			cg, err := cgroup1.Load(cgroup1.StaticPath(config.Cgroup.Path))
 			if err != nil {
-				if err != cgroups.ErrCgroupDeleted {
+				if err != cgroup1.ErrCgroupDeleted {
 					return err
 				}
-				if cg, err = cgroups.New(cgroups.V1, cgroups.StaticPath(config.Cgroup.Path), &specs.LinuxResources{}); err != nil {
+				if cg, err = cgroup1.New(cgroup1.StaticPath(config.Cgroup.Path), &specs.LinuxResources{}); err != nil {
 					return err
 				}
 			}

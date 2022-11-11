@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
-	v1 "github.com/containerd/cgroups/stats/v1"
-	v2 "github.com/containerd/cgroups/v2/stats"
+	v1 "github.com/containerd/cgroups/v3/cgroup1/stats"
+	v2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
