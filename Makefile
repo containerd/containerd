@@ -75,6 +75,7 @@ WHALE = "🇩"
 ONI = "👹"
 
 RELEASE=containerd-$(VERSION:v%=%)-${GOOS}-${GOARCH}
+STATICRELEASE=containerd-static-$(VERSION:v%=%)-${GOOS}-${GOARCH}
 CRIRELEASE=cri-containerd-$(VERSION:v%=%)-${GOOS}-${GOARCH}
 CRICNIRELEASE=cri-containerd-cni-$(VERSION:v%=%)-${GOOS}-${GOARCH}
 
@@ -148,7 +149,7 @@ GOTEST ?= $(GO) test
 OUTPUTDIR = $(join $(ROOTDIR), _output)
 CRIDIR=$(OUTPUTDIR)/cri
 
-.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install uninstall vendor release mandir install-man genman install-cri-deps cri-release cri-cni-release cri-integration install-deps bin/cri-integration.test
+.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install uninstall vendor release static-release mandir install-man genman install-cri-deps cri-release cri-cni-release cri-integration install-deps bin/cri-integration.test
 .DEFAULT: default
 
 # Forcibly set the default goal to all, in case an include above brought in a rule definition.
@@ -299,17 +300,39 @@ install-man: man
 	$(foreach manpage,$(addprefix man/,$(MANPAGES)), $(call installmanpage,$(manpage),$(subst .,,$(suffix $(manpage))),$(notdir $(manpage))))
 
 
+define pack_release
+	@rm -rf releases/$(1) releases/$(1).tar.gz
+	@$(INSTALL) -d releases/$(1)/bin
+	@$(INSTALL) $(BINARIES) releases/$(1)/bin
+	@tar -czf releases/$(1).tar.gz -C releases/$(1) bin
+	@rm -rf releases/$(1)
+endef
+
+
 releases/$(RELEASE).tar.gz: $(BINARIES)
 	@echo "$(WHALE) $@"
-	@rm -rf releases/$(RELEASE) releases/$(RELEASE).tar.gz
-	@$(INSTALL) -d releases/$(RELEASE)/bin
-	@$(INSTALL) $(BINARIES) releases/$(RELEASE)/bin
-	@tar -czf releases/$(RELEASE).tar.gz -C releases/$(RELEASE) bin
-	@rm -rf releases/$(RELEASE)
+	$(call pack_release,$(RELEASE))
 
 release: releases/$(RELEASE).tar.gz
 	@echo "$(WHALE) $@"
 	@cd releases && sha256sum $(RELEASE).tar.gz >$(RELEASE).tar.gz.sha256sum
+
+releases/$(STATICRELEASE).tar.gz:
+ifeq ($(GOOS),linux)
+	@make STATIC=1 $(BINARIES)
+	@echo "$(WHALE) $@"
+	$(call pack_release,$(STATICRELEASE))
+else
+	@echo "Skipping $(STATICRELEASE) for $(GOOS)"
+endif
+
+static-release: releases/$(STATICRELEASE).tar.gz
+ifeq ($(GOOS),linux)
+	@echo "$(WHALE) $@"
+	@cd releases && sha256sum $(STATICRELEASE).tar.gz >$(STATICRELEASE).tar.gz.sha256sum
+else
+	@echo "Skipping releasing $(STATICRELEASE) for $(GOOS)"
+endif
 
 # install of cri deps into release output directory
 ifeq ($(GOOS),windows)

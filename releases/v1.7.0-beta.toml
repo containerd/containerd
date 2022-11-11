@@ -93,3 +93,16 @@ The 2.0 release will remove any feature deprecated in 1.x. Features deprecated i
 * **Add NoSameOwner option when unpacking tars** ([#7386](https://github.com/containerd/containerd/pull/7386))
 
 See the changelog for complete list of changes"""
+
+postface = """\
+### Which file should I download?
+* `containerd-<VERSION>-<OS>-<ARCH>.tar.gz`:         ✅Recommended. Dynamically linked with glibc 2.27 (Ubuntu 18.04).
+* `containerd-static-<VERSION>-<OS>-<ARCH>.tar.gz`:  Statically linked. Expected to be used on non-glibc Linux distributions. Not position-independent.
+* `cri-containerd-<VERSION>-<OS>-<ARCH>.tar.gz`:     (Deprecated)
+* `cri-containerd-cni-<VERSION>-<OS>-<ARCH>.tar.gz`: (Deprecated)
+
+In addition to containerd, typically you will have to install [runc](https://github.com/opencontainers/runc/releases)
+and [CNI plugins](https://github.com/containernetworking/plugins/releases) from their official sites too.
+
+See also the [Getting Started](https://github.com/containerd/containerd/blob/main/docs/getting-started.md) documentation.
+"""
