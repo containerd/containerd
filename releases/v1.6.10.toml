@@ -1,0 +1,22 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.6.9"
+
+pre_release = false
+
+preface = """\
+The tenth patch release for containerd 1.6 contains various fixes, including a CVE fix for Windows platforms.
+
+### Notable Updates
+
+* **Always check userxattr for overlay on kernels >= 5.11** ([#7646](https://github.com/containerd/containerd/pull/7646))
+* **Bump hcsshim to 0.9.5 to fix container shutdown bug on Windows** ([#7610](https://github.com/containerd/containerd/pull/7610)
+* **Bump Go version to 1.18.8 to address CVE-2022-41716** ([#7634](https://github.com/containerd/containerd/pull/7634))
+
+See the changelog for complete list of changes"""
