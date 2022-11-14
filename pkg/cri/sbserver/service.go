@@ -35,11 +35,11 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/containerd/sandbox/proxy"
+	runtime_alpha "github.com/containerd/containerd/third_party/k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"github.com/containerd/go-cni"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-	runtime_alpha "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	"github.com/containerd/containerd/pkg/cri/store/label"
 

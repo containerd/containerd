@@ -22,9 +22,9 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
+	runtime_alpha "github.com/containerd/containerd/third_party/k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"github.com/containerd/containerd/tracing"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-	runtime_alpha "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 )

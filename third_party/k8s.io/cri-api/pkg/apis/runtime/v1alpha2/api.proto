@@ -756,7 +756,7 @@ message SELinuxOption {
 
 // Capability contains the container capabilities to add or drop
 // Dropping a capability will drop it from all sets.
-// If a capability is added to only the add_capabilities list then it gets added to permitted, 
+// If a capability is added to only the add_capabilities list then it gets added to permitted,
 // inheritable, effective and bounding sets, i.e. all sets except the ambient set.
 // If a capability is added to only the add_ambient_capabilities list then it gets added to all sets, i.e permitted
 // inheritable, effective, bounding and ambient sets.
