@@ -32,12 +32,6 @@ import (
 	"github.com/urfave/cli"
 )
 
-func init() {
-	// metricsCommand is only added on Linux as github.com/containerd/cgroups/v3
-	// does not compile on darwin or windows
-	Command.Subcommands = append(Command.Subcommands, metricsCommand)
-}
-
 const (
 	formatFlag  = "format"
 	formatTable = "table"
