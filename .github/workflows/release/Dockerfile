@@ -49,7 +49,7 @@ RUN \
 	--mount=type=cache,target=/root/.cache/go-build \
 	--mount=type=cache,target=/go/pkg \
 	export CC=$(xx-info)-gcc && xx-go --wrap && \
-	make release cri-release cri-cni-release && \
+	make release static-release cri-release cri-cni-release && \
 	for f in $(find bin -executable -type f); do xx-verify $f; done
 
 # check git working tree after build
