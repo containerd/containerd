@@ -85,7 +85,7 @@ type ImageExportStreamer interface {
 }
 
 type ImageUnpacker interface {
-	// TODO: Or unpack options?
+	// TODO: consider using unpack options
 	UnpackPlatforms() []unpack.Platform
 }
 
@@ -103,6 +103,10 @@ func WithProgress(f ProgressFunc) Opt {
 	}
 }
 
+// Progress is used to represent a particular progress event or incremental
+// update for the provided named object. The parents represent the names of
+// the objects which initiated the progress for the provided named object.
+// The name and what object it represents is determined by the implementation.
 type Progress struct {
 	Event    string
 	Name     string
@@ -111,21 +115,3 @@ type Progress struct {
 	Total    int64
 	// Descriptor?
 }
-
-/*
-// Distribution options
-// Stream handler
-// Progress rate
-// Unpack options
-// Remote options
-// Cases:
-//  Registry -> Content/ImageStore (pull)
-//  Registry -> Registry
-//  Content/ImageStore -> Registry (push)
-//  Content/ImageStore -> Content/ImageStore (tag)
-// Common fetch/push interface for registry, content/imagestore, OCI index
-// Always starts with string for source and destination, on client side, does not need to resolve
-//  Higher level implementation just takes strings and options
-//  Lower level implementation takes pusher/fetcher?
-
-*/

@@ -113,7 +113,7 @@ func SendStream(ctx context.Context, r io.Reader, stream streaming.Stream) {
 			b := (*buf)[:max]
 			n, err := r.Read(b)
 			if err != nil {
-				if err != io.EOF {
+				if !errors.Is(err, io.EOF) {
 					log.G(ctx).WithError(err).Errorf("failed to read stream source")
 					// TODO: Send error message on stream before close to allow remote side to return error
 				}

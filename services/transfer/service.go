@@ -119,7 +119,6 @@ func (s *service) Transfer(ctx context.Context, req *transferapi.TransferRequest
 		return nil, errdefs.ToGRPC(err)
 	}
 	dst, err := s.convertAny(ctx, req.Destination)
-	plugins.ResolveType(req.Source)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}

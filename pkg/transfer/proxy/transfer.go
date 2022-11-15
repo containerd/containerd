@@ -18,6 +18,7 @@ package proxy
 
 import (
 	"context"
+	"errors"
 	"io"
 
 	transferapi "github.com/containerd/containerd/api/services/transfer/v1"
@@ -61,7 +62,7 @@ func (p *proxyTransferer) Transfer(ctx context.Context, src interface{}, dst int
 			for {
 				a, err := stream.Recv()
 				if err != nil {
-					if err != io.EOF {
+					if !errors.Is(err, io.EOF) {
 						log.G(ctx).WithError(err).Error("progress stream failed to recv")
 					}
 					return

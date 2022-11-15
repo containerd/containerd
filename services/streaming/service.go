@@ -17,6 +17,7 @@
 package streaming
 
 import (
+	"errors"
 	"io"
 
 	api "github.com/containerd/containerd/api/services/streaming/v1"
@@ -107,7 +108,7 @@ func (ss *serviceStream) Send(a typeurl.Any) error {
 
 func (ss *serviceStream) Recv() (a typeurl.Any, err error) {
 	a, err = ss.s.Recv()
-	if err != io.EOF {
+	if !errors.Is(err, io.EOF) {
 		err = errdefs.FromGRPC(err)
 	}
 	return

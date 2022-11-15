@@ -100,10 +100,9 @@ func (j *ProgressTracker) HandleProgress(ctx context.Context, pf transfer.Progre
 				if ok {
 					if status.Offset > job.progress {
 						pf(transfer.Progress{
-							Event:   j.transferState,
-							Name:    job.name,
-							Parents: job.parents,
-							//Digest:   job.desc.Digest.String(),
+							Event:    j.transferState,
+							Name:     job.name,
+							Parents:  job.parents,
 							Progress: status.Offset,
 							Total:    status.Total,
 						})
@@ -117,10 +116,9 @@ func (j *ProgressTracker) HandleProgress(ctx context.Context, pf transfer.Progre
 						log.G(ctx).WithError(err).Error("failed to get statuses for progress")
 					} else if ok {
 						pf(transfer.Progress{
-							Event:   "complete",
-							Name:    job.name,
-							Parents: job.parents,
-							//Digest:   job.desc.Digest.String(),
+							Event:    "complete",
+							Name:     job.name,
+							Parents:  job.parents,
 							Progress: job.desc.Size,
 							Total:    job.desc.Size,
 						})

@@ -101,7 +101,6 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 			tops.Progress(transfer.Progress{
 				Event: "saved",
 				Name:  img.Name,
-				//Digest: img.Target.Digest.String(),
 			})
 		}
 	}
