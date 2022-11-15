@@ -1307,11 +1307,27 @@ func WithLinuxDevices(devices []specs.LinuxDevice) SpecOpts {
 	}
 }
 
+func WithLinuxDeviceFollowSymlinks(path, permissions string) SpecOpts {
+	return withLinuxDevice(path, permissions, true)
+}
+
 // WithLinuxDevice adds the device specified by path to the spec
 func WithLinuxDevice(path, permissions string) SpecOpts {
+	return withLinuxDevice(path, permissions, false)
+}
+
+func withLinuxDevice(path, permissions string, followSymlinks bool) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setLinux(s)
 		setResources(s)
+
+		if followSymlinks {
+			resolvedPath, err := filepath.EvalSymlinks(path)
+			if err != nil {
+				return err
+			}
+			path = resolvedPath
+		}
 
 		dev, err := DeviceFromPath(path)
 		if err != nil {
