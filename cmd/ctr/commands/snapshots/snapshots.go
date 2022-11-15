@@ -290,7 +290,7 @@ var prepareCommand = cli.Command{
 		},
 		cli.BoolFlag{
 			Name:  "mounts",
-			Usage: "Print out snapshot mounts as JSON",
+			Usage: "print out snapshot mounts as JSON",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -341,7 +341,7 @@ var viewCommand = cli.Command{
 		},
 		cli.BoolFlag{
 			Name:  "mounts",
-			Usage: "Print out snapshot mounts as JSON",
+			Usage: "print out snapshot mounts as JSON",
 		},
 	},
 	Action: func(context *cli.Context) error {

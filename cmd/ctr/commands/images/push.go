@@ -67,10 +67,10 @@ var pushCommand = cli.Command{
 		Value: &cli.StringSlice{},
 	}, cli.IntFlag{
 		Name:  "max-concurrent-uploaded-layers",
-		Usage: "Set the max concurrent uploaded layers for each push",
+		Usage: "set the max concurrent uploaded layers for each push",
 	}, cli.BoolFlag{
 		Name:  "allow-non-distributable-blobs",
-		Usage: "Allow pushing blobs that are marked as non-distributable",
+		Usage: "allow pushing blobs that are marked as non-distributable",
 	}),
 	Action: func(context *cli.Context) error {
 		var (
