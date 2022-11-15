@@ -19,10 +19,13 @@ package containers
 import (
 	"errors"
 
+	"github.com/containerd/console"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/cmd/ctr/commands/tasks"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -81,17 +84,60 @@ var restoreCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-
 		topts := []containerd.NewTaskOpts{}
 		if context.Bool("live") {
 			topts = append(topts, containerd.WithTaskCheckpoint(checkpoint))
 		}
-
-		task, err := ctr.NewTask(ctx, cio.NewCreator(cio.WithStdio), topts...)
+		spec, err := ctr.Spec(ctx)
 		if err != nil {
 			return err
 		}
 
-		return task.Start(ctx)
+		useTTY := spec.Process.Terminal
+
+		var con console.Console
+		if useTTY {
+			con = console.Current()
+			defer con.Reset()
+			if err := con.SetRaw(); err != nil {
+				return err
+			}
+		}
+
+		task, err := tasks.NewTask(ctx, client, ctr, "", con, false, "", []cio.Opt{}, topts...)
+		if err != nil {
+			return err
+		}
+
+		var statusC <-chan containerd.ExitStatus
+		if useTTY {
+			if statusC, err = task.Wait(ctx); err != nil {
+				return err
+			}
+		}
+
+		if err := task.Start(ctx); err != nil {
+			return err
+		}
+		if !useTTY {
+			return nil
+		}
+
+		if err := tasks.HandleConsoleResize(ctx, task, con); err != nil {
+			logrus.WithError(err).Error("console resize")
+		}
+
+		status := <-statusC
+		code, _, err := status.Result()
+		if err != nil {
+			return err
+		}
+		if _, err := task.Delete(ctx); err != nil {
+			return err
+		}
+		if code != 0 {
+			return cli.NewExitError("", int(code))
+		}
+		return nil
 	},
 }
