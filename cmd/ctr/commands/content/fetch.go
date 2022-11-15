@@ -236,9 +236,9 @@ outer:
 
 			tw := tabwriter.NewWriter(fw, 1, 8, 1, ' ', 0)
 
-			resolved := "resolved"
+			resolved := StatusResolved
 			if !ongoing.IsResolved() {
-				resolved = "resolving"
+				resolved = StatusResolving
 			}
 			statuses[ongoing.name] = StatusInfo{
 				Ref:    ongoing.name,
@@ -257,7 +257,7 @@ outer:
 				for _, active := range active {
 					statuses[active.Ref] = StatusInfo{
 						Ref:       active.Ref,
-						Status:    "downloading",
+						Status:    StatusDownloading,
 						Offset:    active.Offset,
 						Total:     active.Total,
 						StartedAt: active.StartedAt,
@@ -276,7 +276,7 @@ outer:
 				}
 
 				status, ok := statuses[key]
-				if !done && (!ok || status.Status == "downloading") {
+				if !done && (!ok || status.Status == StatusDownloading) {
 					info, err := cs.Info(ctx, j.Digest)
 					if err != nil {
 						if !errdefs.IsNotFound(err) {
@@ -285,13 +285,13 @@ outer:
 						} else {
 							statuses[key] = StatusInfo{
 								Ref:    key,
-								Status: "waiting",
+								Status: StatusWaiting,
 							}
 						}
 					} else if info.CreatedAt.After(start) {
 						statuses[key] = StatusInfo{
 							Ref:       key,
-							Status:    "done",
+							Status:    StatusDone,
 							Offset:    info.Size,
 							Total:     info.Size,
 							UpdatedAt: info.CreatedAt,
@@ -299,19 +299,19 @@ outer:
 					} else {
 						statuses[key] = StatusInfo{
 							Ref:    key,
-							Status: "exists",
+							Status: StatusExists,
 						}
 					}
 				} else if done {
 					if ok {
-						if status.Status != "done" && status.Status != "exists" {
-							status.Status = "done"
+						if status.Status != StatusDone && status.Status != StatusExists {
+							status.Status = StatusDone
 							statuses[key] = status
 						}
 					} else {
 						statuses[key] = StatusInfo{
 							Ref:    key,
-							Status: "done",
+							Status: StatusDone,
 						}
 					}
 				}
@@ -385,10 +385,24 @@ func (j *Jobs) IsResolved() bool {
 	return j.resolved
 }
 
+// StatusInfoStatus describes status info for an upload or download.
+type StatusInfoStatus string
+
+const (
+	StatusResolved    StatusInfoStatus = "resolved"
+	StatusResolving   StatusInfoStatus = "resolving"
+	StatusWaiting     StatusInfoStatus = "waiting"
+	StatusCommitting  StatusInfoStatus = "committing"
+	StatusDone        StatusInfoStatus = "done"
+	StatusDownloading StatusInfoStatus = "downloading"
+	StatusUploading   StatusInfoStatus = "uploading"
+	StatusExists      StatusInfoStatus = "exists"
+)
+
 // StatusInfo holds the status info for an upload or download
 type StatusInfo struct {
 	Ref       string
-	Status    string
+	Status    StatusInfoStatus
 	Offset    int64
 	Total     int64
 	StartedAt time.Time
@@ -401,7 +415,7 @@ func Display(w io.Writer, statuses []StatusInfo, start time.Time) {
 	for _, status := range statuses {
 		total += status.Offset
 		switch status.Status {
-		case "downloading", "uploading":
+		case StatusDownloading, StatusUploading:
 			var bar progress.Bar
 			if status.Total > 0.0 {
 				bar = progress.Bar(float64(status.Offset) / float64(status.Total))
@@ -411,7 +425,7 @@ func Display(w io.Writer, statuses []StatusInfo, start time.Time) {
 				status.Status,
 				bar,
 				progress.Bytes(status.Offset), progress.Bytes(status.Total))
-		case "resolving", "waiting":
+		case StatusResolving, StatusWaiting:
 			bar := progress.Bar(0.0)
 			fmt.Fprintf(w, "%s:\t%s\t%40r\t\n",
 				status.Ref,
