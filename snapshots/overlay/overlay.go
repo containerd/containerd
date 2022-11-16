@@ -154,9 +154,17 @@ func (o *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 		return snapshots.Info{}, err
 	}
 
+	rollback := true
+	defer func() {
+		if rollback {
+			if rerr := t.Rollback(); rerr != nil {
+				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
+			}
+		}
+	}()
+
 	info, err = storage.UpdateInfo(ctx, info, fieldpaths...)
 	if err != nil {
-		t.Rollback()
 		return snapshots.Info{}, err
 	}
 
@@ -171,6 +179,7 @@ func (o *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 		info.Labels[upperdirKey] = o.upperPath(id)
 	}
 
+	rollback = false
 	if err := t.Commit(); err != nil {
 		return snapshots.Info{}, err
 	}
