@@ -20,8 +20,8 @@
 package containerd
 
 import (
-	"github.com/AdamKorcz/go-118-fuzz-build/utils"
+	"github.com/AdamKorcz/go-118-fuzz-build/testing"
 )
 
 // To keep this package in go.mod.
-var _ = utils.F{}
+var _ = testing.F{}

@@ -1,16 +1,15 @@
-package utils
+package testing
 
 import (
 	"fmt"
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	"reflect"
-	"testing"
 )
 
 type F struct {
 	Data     []byte
-	T        *testing.T
-	FuzzFunc func(*testing.T, any)
+	T        *T
+	FuzzFunc func(*T, any)
 }
 
 func (f *F) Add(args ...any)                   {}
@@ -172,13 +171,25 @@ func (f *F) Fuzz(ff any) {
 	}
 	fn.Call(args)
 }
-func (f *F) Helper()                          {}
-func (c *F) Log(args ...any)                  {}
-func (c *F) Logf(format string, args ...any)  {}
-func (c *F) Name() string                     { return "name" }
-func (c *F) Setenv(key, value string)         {}
-func (c *F) Skip(args ...any)                 {}
-func (c *F) SkipNow()                         {}
-func (c *F) Skipf(format string, args ...any) {}
-func (f *F) Skipped() bool                    { return false }
-func (c *F) TempDir() string                  { return "/tmp" }
+func (f *F) Helper() {}
+func (c *F) Log(args ...any) {
+	fmt.Println(args)
+}
+func (c *F) Logf(format string, args ...any) {
+	fmt.Println(format, args, "\n")
+}
+func (c *F) Name() string             { return "libFuzzer" }
+func (c *F) Setenv(key, value string) {}
+func (c *F) Skip(args ...any) {
+	panic("GO-FUZZ-BUILD-PANIC")
+}
+func (c *F) SkipNow() {
+	panic("GO-FUZZ-BUILD-PANIC")
+}
+func (c *F) Skipf(format string, args ...any) {
+	panic("GO-FUZZ-BUILD-PANIC")
+}
+func (f *F) Skipped() bool { return false }
+func (c *F) TempDir() string {
+	panic("TempDir() is not supported")
+}
