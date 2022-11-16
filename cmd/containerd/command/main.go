@@ -68,7 +68,7 @@ func App() *cli.App {
 	app.Usage = usage
 	app.Description = `
 containerd is a high performance container runtime whose daemon can be started
-by using this command. If none of the *config*, *publish*, or *help* commands
+by using this command. If none of the *config*, *publish*, *oci-hook*, or *help* commands
 are specified, the default action of the **containerd** command is to start the
 containerd daemon in the foreground.
 
