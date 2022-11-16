@@ -96,6 +96,23 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.IPCNamespace))
 	}
 
+	usernsOpts := nsOptions.GetUsernsOptions()
+	uids, gids, err := parseUsernsIDs(usernsOpts)
+	if err != nil {
+		return nil, fmt.Errorf("user namespace configuration: %w", err)
+	}
+
+	if usernsOpts != nil {
+		switch mode := usernsOpts.GetMode(); mode {
+		case runtime.NamespaceMode_NODE:
+			specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.UserNamespace))
+		case runtime.NamespaceMode_POD:
+			specOpts = append(specOpts, oci.WithUserNamespace(uids, gids))
+		default:
+			return nil, fmt.Errorf("unsupported user namespace mode: %q", mode)
+		}
+	}
+
 	// It's fine to generate the spec before the sandbox /dev/shm
 	// is actually created.
 	sandboxDevShm := c.getSandboxDevShm(id)
