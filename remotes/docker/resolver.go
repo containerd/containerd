@@ -36,11 +36,9 @@ import (
 	remoteerrors "github.com/containerd/containerd/remotes/errors"
 	"github.com/containerd/containerd/tracing"
 	"github.com/containerd/containerd/version"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
-	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
-	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -573,17 +571,15 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 	_, httpSpan := tracing.StartSpan(
 		ctx,
 		tracing.Name("remotes.docker.resolver", "HTTPRequest"),
-		oteltrace.WithSpanKind(oteltrace.SpanKindClient),
-		oteltrace.WithAttributes(semconv.HTTPClientAttributesFromHTTPRequest(req)...),
+		tracing.WithHTTPRequest(req),
 	)
+	defer httpSpan.End()
 	resp, err := client.Do(req)
 	if err != nil {
 		httpSpan.SetStatus(err)
-		httpSpan.End()
 		return nil, fmt.Errorf("failed to do request: %w", err)
 	}
-	httpSpan.SetAttributes(semconv.HTTPAttributesFromHTTPStatusCode(resp.StatusCode)...)
-	httpSpan.End()
+	httpSpan.SetAttributes(tracing.HTTPStatusCodeAttributes(resp.StatusCode)...)
 	log.G(ctx).WithFields(responseFields(resp)).Debug("fetch response received")
 	return resp, nil
 }
